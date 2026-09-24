@@ -379,11 +379,6 @@ docker --image <ref>` remains the explicit image override for debugging.
 
 - `plan` — validate config and preview the sync diff without mutating anything.
 - `apply` — validate and upload repo config to the platform.
-- No command takes `--environment` (`-e`, `--env`). `plan`, `apply` and the
-  resource commands work on the project's resources and never selected an
-  environment; `variables` names its owner with `--project-level`. The flag
-  returns when the platform's environments settle, and `deploy` (ADR 035) is
-  what will put config onto one.
 - `plan` and `apply --dry-run` also emit `data.warnings`: non-blocking
   findings as `{path, rule, message}`, the same text the human plan prints as
   `# warning:` lines and `apply` prints through stderr. They never fail a run.
@@ -404,6 +399,11 @@ docker --image <ref>` remains the explicit image override for debugging.
   `liquid_template`) renders as `(<n> lines, sha256:…)` when it is created or
   unchanged, and as a changed-line diff when it moved — not as one escaped
   line. Read the file itself for full content.
+- No command takes `--environment` (`-e`, `--env`). `plan`, `apply` and the
+  resource commands work on the project's resources and never selected an
+  environment; `variables` names its owner with `--project-level`. The flag
+  returns when the platform's environments settle, and `deploy` (ADR 035) is
+  what will put config onto one.
 - `schemas list` — inspect the revision history of a user-schema, filtered by
   `--object-type` (e.g. `human-user`). Non-interactive/`--json` prints one row
   per revision (newest first); interactive adds a picker that fetches and

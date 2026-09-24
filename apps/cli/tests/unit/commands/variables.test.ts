@@ -350,6 +350,8 @@ describe("variables get", () => {
     expect(res.exitCode).toBe(0);
     expect(res.stdout).toContain("GOOGLE_CLIENT_ID");
     expect(res.stdout).toMatch(/value\s+999-prod/);
+    // The owner row is gone: every run addresses the same one.
+    expect(res.stdout).not.toContain("environment");
   });
 
   it("marks a secret, and shows an empty value, on a terminal", async () => {
@@ -441,6 +443,35 @@ describe("variables set", () => {
     expect(res.exitCode).toBe(0);
     expect(environment).toBeNull();
     expect(body).toEqual({ GOOGLE_CLIENT_SECRET: { value: "GOCSPX-abc", secret: true } });
+    const json = parseJson(res.stdout) as { data: Record<string, unknown> };
+    expect(json.data).toEqual({ name: "GOOGLE_CLIENT_SECRET", secret: true, type: "string" });
+  });
+
+  it("says on a terminal that the value was set on the project", async () => {
+    const cwd = await makeProject();
+    server.use(http.patch("*/variables", () => HttpResponse.json({})));
+
+    const plain = await asTerminal(() =>
+      withStdin("v", () =>
+        runCliForTest(["variables", "set", "TOKEN", "--project-level", ...plainArgs(cwd)]),
+      ),
+    );
+    const secret = await asTerminal(() =>
+      withStdin("v", () =>
+        runCliForTest([
+          "variables",
+          "set",
+          "TOKEN",
+          "--project-level",
+          "--secret",
+          ...plainArgs(cwd),
+        ]),
+      ),
+    );
+
+    expect(plain.stdout).toContain("Set TOKEN on the project");
+    expect(plain.stdout).not.toContain("(secret)");
+    expect(secret.stdout).toContain("Set TOKEN on the project (secret)");
   });
 
   it("fails rather than blocking when a scripted run pipes nothing in", async () => {
@@ -603,6 +634,29 @@ describe("variables set", () => {
     });
     expect(json.data).not.toHaveProperty("value");
     expect(json.data).not.toHaveProperty("environment");
+  });
+
+  it("previews the write on the project under --dry-run", async () => {
+    const cwd = await makeProject();
+
+    const res = await asTerminal(() =>
+      withStdin("5", () =>
+        runCliForTest([
+          "variables",
+          "set",
+          "RETRY_COUNT",
+          "--project-level",
+          "--as",
+          "number",
+          "--dry-run",
+          ...plainArgs(cwd),
+        ]),
+      ),
+    );
+
+    expect(res.exitCode).toBe(0);
+    expect(res.stdout).toContain("on the project");
+    expect(res.stdout).toContain("as number");
   });
 
   it("sets an empty value, which the scalar schema accepts", async () => {
@@ -848,6 +902,26 @@ describe("variables delete", () => {
     expect(res.exitCode).toBe(0);
     expect(path).toBe("SUPPORT_EMAIL");
     expect(environment).toBeNull();
+    const json = parseJson(res.stdout) as { data: Record<string, unknown> };
+    expect(json.data).toEqual({ name: "SUPPORT_EMAIL", deleted: true });
+  });
+
+  it("says on a terminal that the name was deleted from the project", async () => {
+    const cwd = await makeProject();
+    server.use(http.delete("*/variables/:name", () => new HttpResponse(null, { status: 204 })));
+
+    const res = await asTerminal(() =>
+      runCliForTest([
+        "variables",
+        "delete",
+        "SUPPORT_EMAIL",
+        "--project-level",
+        "--force",
+        ...plainArgs(cwd),
+      ]),
+    );
+
+    expect(res.stdout).toContain("Deleted SUPPORT_EMAIL from the project");
   });
 
   it("sends no request under --dry-run", async () => {
@@ -881,6 +955,7 @@ describe("variables delete", () => {
       topic: "variables",
       id: "SUPPORT_EMAIL",
     });
+    expect(String(res.stdout)).toContain("variables");
     // Nothing was deleted, so the preview must not say it was.
     expect(json.data).not.toHaveProperty("deleted");
     expect(json.data).not.toHaveProperty("environment");
@@ -907,9 +982,16 @@ describe("variables delete", () => {
 
     expect(res.exitCode).not.toBe(0);
     expect(called).toBe(false);
-    const json = parseJson(res.stdout) as { code: string; next_commands: string[] };
+    const json = parseJson(res.stdout) as {
+      code: string;
+      hint: string;
+      next_commands: string[];
+    };
     expect(json.code).toBe("E_VALIDATION");
+    // Both flags, or the retry is refused again for the owner it dropped.
     expect(json.next_commands.join(" ")).toContain("--force");
+    expect(json.next_commands.join(" ")).toContain("--project-level");
+    expect(json.hint).toContain("from the project");
   });
 });
 
@@ -1044,16 +1126,44 @@ describe("naming the owner", () => {
     expect(json.message).toContain("--project-level");
   });
 
-  it("suggests the same run with the owner named, as a command an agent can re-run", async () => {
+  it("refuses before the server is resolved, so --server local needs nothing running", async () => {
     const cwd = await makeProject();
 
-    const res = await runCliForTest(["variables", "get", "GOOGLE_CLIENT_ID", ...base(cwd)]);
+    // `--server local` reads `.zitadel/local/runtime.json` and probes the
+    // runtime's health, which this project has never started. The owner is
+    // settled first, so the refusal is about the owner rather than the runtime.
+    const res = await runCliForTest([
+      "variables",
+      "list",
+      "--cwd",
+      cwd,
+      "--json",
+      "--server",
+      "local",
+    ]);
 
-    const json = parseJson(res.stdout) as { next_commands: string[] };
-    const retry = json.next_commands.join(" ");
-    // The retry has to carry the whole run, not just the flag: a bare
-    // `--project-level` would drop the name being read.
-    expect(retry).toContain("variables get GOOGLE_CLIENT_ID");
-    expect(retry).toContain("--project-level");
+    expect(res.exitCode).not.toBe(0);
+    const json = parseJson(res.stdout) as { code: string; message: string };
+    expect(json.code).toBe("E_VALIDATION");
+    expect(json.message).toContain("--project-level");
+  });
+
+  it("asks the platform for no environments, since there is nothing to choose", async () => {
+    const cwd = await makeProject();
+    let listed = false;
+    server.use(
+      http.get("*/environments", () => {
+        listed = true;
+        return HttpResponse.json({ environments: [] });
+      }),
+      http.get("*/variables", () => HttpResponse.json({})),
+    );
+
+    const refused = await runCliForTest(["variables", "list", ...base(cwd)]);
+    const named = await runCliForTest(["variables", "list", "--project-level", ...base(cwd)]);
+
+    expect(refused.exitCode).not.toBe(0);
+    expect(named.exitCode).toBe(0);
+    expect(listed).toBe(false);
   });
 });

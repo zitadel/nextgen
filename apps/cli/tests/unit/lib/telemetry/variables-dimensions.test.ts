@@ -87,6 +87,7 @@ describe("variables telemetry dimensions", () => {
     expect([...recorded.keys()].sort()).toEqual(["delete.ts", "get.ts", "list.ts", "set.ts"]);
     // `delete` records none: with one owner and no per-command shape to report,
     // the lifecycle events already carry everything true of the run.
+    expect(recorded.get("delete.ts")).toEqual([]);
     for (const command of ["get.ts", "list.ts", "set.ts"]) {
       expect(recorded.get(command)?.length, `${command} records no dimensions`).toBeGreaterThan(0);
     }

@@ -27,6 +27,7 @@ export default class Apply extends BaseCommand {
   static override description = "Validate and upload repo config to the platform.";
   static override group = CommandGroups.configuration;
   static override groupOrder = 2;
+
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(Apply);
     await this.toMeta(flags);

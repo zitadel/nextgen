@@ -99,6 +99,8 @@ and agent UIs may display stderr package-manager progress together with stdout.
 - `zitadel apply` — validate and upload repo config to Zitadel
 - `zitadel branding eject` — scaffold an editable login template from a design
 - `zitadel schemas list` — list the project's user schemas
+- `zitadel variables list|get|set|delete` — manage the project's variables and
+  secrets (`--project-level`)
 - `zitadel eject` — remove what setup wrote (alias: `zitadel uninstall`)
 - `zitadel start|stop|logs|reset` — manage the local runtime
 

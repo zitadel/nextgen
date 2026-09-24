@@ -4,7 +4,6 @@ import { consola } from "consola";
 import { createZitadelClient, type ZitadelClient } from "../api-client";
 import { ZitadelError } from "../errors";
 import { readZitadelSecret } from "../project";
-import { publicCliCommand } from "../public-cli";
 import { BaseCommand } from "./base";
 import type { GlobalOptions } from "./types";
 
@@ -36,30 +35,20 @@ export abstract class OwnerCommand extends BaseCommand {
    * owner available there is nothing to ask about, and a prompt offering a
    * single answer is a keystroke, not a choice.
    *
-   * It answers with the run it was given plus the missing flag, the way the
-   * resource commands' `--force` refusal does, so an agent re-runs a structured
-   * `next_commands` entry instead of parsing the hint. Echoing `argv` is safe
-   * here: no variables command takes a value as a flag — `set` reads it from
-   * stdin or a prompt — so a credential cannot be in the suggestion.
+   * It comes before `super.toMeta`, which resolves the server — a run that
+   * named no owner is refused whatever `--server` says, rather than answering
+   * `E_LOCAL_SERVER_NOT_RUNNING` for a `--server local` with nothing running.
    */
   protected override async toMeta(
     flags: Record<string, unknown>,
     options: { resolveServer?: boolean; source?: string } = {},
   ): Promise<GlobalOptions> {
-    const meta = await super.toMeta(flags, options);
     if (flags["project-level"] !== true) {
-      const retry = publicCliCommand(
-        [this.id?.replaceAll(":", " "), ...this.argv, "--project-level"]
-          .filter((part) => part !== undefined && part !== "")
-          .join(" "),
-        meta.cliVersion,
-      );
       throw new ZitadelError("E_VALIDATION", "Name the owner: --project-level", {
         hint: "The project level is the only owner the CLI can address today; --environment returns when the platform's environments settle.",
-        nextCommands: [retry],
       });
     }
-    return meta;
+    return super.toMeta(flags, options);
   }
 
   /**
