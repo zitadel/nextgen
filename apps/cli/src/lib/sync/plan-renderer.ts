@@ -428,13 +428,15 @@ function diffLines(oldLines: readonly string[], newLines: readonly string[]): Li
 
 /** Classic LCS-length DP, walked back into an op list. */
 function lcsDiff(a: readonly string[], b: readonly string[]): LineOp[] {
-  const table: number[][] = Array.from({ length: a.length + 1 }, () =>
-    new Array<number>(b.length + 1).fill(0),
-  );
+  const table: number[][] = [];
+  // Reads past the filled edge are the recurrence's base case: an empty suffix, length 0.
+  const cell = (i: number, j: number): number => table[i]?.[j] ?? 0;
+
   for (let i = a.length - 1; i >= 0; i -= 1) {
+    const row = new Array<number>(b.length + 1).fill(0);
+    table[i] = row;
     for (let j = b.length - 1; j >= 0; j -= 1) {
-      table[i][j] =
-        a[i] === b[j] ? table[i + 1][j + 1] + 1 : Math.max(table[i + 1][j], table[i][j + 1]);
+      row[j] = a[i] === b[j] ? cell(i + 1, j + 1) + 1 : Math.max(cell(i + 1, j), cell(i, j + 1));
     }
   }
 
@@ -442,24 +444,23 @@ function lcsDiff(a: readonly string[], b: readonly string[]): LineOp[] {
   let i = 0;
   let j = 0;
   while (i < a.length && j < b.length) {
-    if (a[i] === b[j]) {
-      ops.push({ kind: "same", line: a[i] });
+    const left = a[i];
+    const right = b[j];
+    if (left === undefined || right === undefined) break;
+    if (left === right) {
+      ops.push({ kind: "same", line: left });
       i += 1;
       j += 1;
-    } else if (table[i + 1][j] >= table[i][j + 1]) {
-      ops.push({ kind: "del", line: a[i] });
+    } else if (cell(i + 1, j) >= cell(i, j + 1)) {
+      ops.push({ kind: "del", line: left });
       i += 1;
     } else {
-      ops.push({ kind: "add", line: b[j] });
+      ops.push({ kind: "add", line: right });
       j += 1;
     }
   }
-  for (; i < a.length; i += 1) {
-    ops.push({ kind: "del", line: a[i] });
-  }
-  for (; j < b.length; j += 1) {
-    ops.push({ kind: "add", line: b[j] });
-  }
+  for (const line of a.slice(i)) ops.push({ kind: "del", line });
+  for (const line of b.slice(j)) ops.push({ kind: "add", line });
   return ops;
 }
 
