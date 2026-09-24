@@ -137,8 +137,10 @@ docker compose up -d
 | Sign-in shell      | http://localhost:8080/ui/login/   |
 | Health             | http://localhost:8080/healthz     |
 
-This console asks for a password. On the CLI path above, `zitadel console`
-signs you in as the local admin instead.
+A fresh Compose server has no project and no user yet, so this console shows
+its setup prompt until you seed one (see
+[docker-compose.md](docs/quick-start/docker-compose.md)). On the CLI path
+above, `zitadel console` signs you in as the local admin instead.
 
 Details: [docs/quick-start/index.md](docs/quick-start/index.md). To build from source: [CONTRIBUTING.md](CONTRIBUTING.md).
 
