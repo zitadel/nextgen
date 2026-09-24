@@ -5,19 +5,16 @@ import { intro, outro } from "@clack/prompts";
 import { Flags } from "@oclif/core";
 import type { CreateProject201 } from "@zitadel/api/generated/model";
 import {
-  BRANDING_DESIGNS,
   DEFAULT_SETUP_PRESET,
   DEFAULT_SETUP_USE_CASE,
   SETUP_PRESETS,
   SETUP_USE_CASES,
-  type BrandingDesign,
   type SetupPreset,
   type SetupUseCase,
 } from "@zitadel/config/defaults";
 import { consola } from "consola";
 
 import { createZitadelClient } from "../../lib/api-client";
-import { brandingDesignLabel } from "../../lib/branding/designs";
 import { renderBoxActions, wrapForBox } from "../../lib/box";
 import {
   claimAction,
@@ -58,9 +55,7 @@ import {
 import { installDependenciesForSetup } from "./install";
 import { PickFrameworkPrompt, SETUP_PROMPTS, type SetupAnswers } from "./prompts";
 import {
-  designWarnings,
   detectProjectFacts,
-  dim as styleDim,
   fileNameOf,
   formatFrameworkLine,
   id as styleId,
@@ -142,11 +137,6 @@ export default class Setup extends BaseCommand {
         "Use case for the scaffolded schema fields: who signs in to the app (default: minimal).",
       options: [...SETUP_USE_CASES],
     }),
-    design: Flags.string({
-      description:
-        "Login design to eject into .zitadel/branding/ and publish as branding revision 1. Skips the wizard's design question. When omitted in non-interactive runs, the login uses the built-in template; run the `branding eject` command later to customize. Split-family designs (split, split-right, hero) collapse their brand pane by container width: narrow containers — including widget-posture embeds at card width — render the compact brand mark instead (logo_url, else hero_url, from .zitadel/branding/branding.json; hero falls back to editable text).",
-      options: [...BRANDING_DESIGNS],
-    }),
   };
 
   async run(): Promise<JsonEnvelope> {
@@ -206,7 +196,6 @@ export default class Setup extends BaseCommand {
       dev_port_explicit: flags["dev-port"] !== undefined,
       preset: flags.preset ?? DEFAULT_SETUP_PRESET,
       use_case: flags["use-case"] ?? DEFAULT_SETUP_USE_CASE,
-      design: flags.design ?? "built-in",
       step: "framework_resolved",
     });
 
@@ -236,7 +225,6 @@ export default class Setup extends BaseCommand {
       devPort: framework.devPort,
       preset: (flags.preset as SetupPreset | undefined) ?? DEFAULT_SETUP_PRESET,
       useCase: (flags["use-case"] as SetupUseCase | undefined) ?? DEFAULT_SETUP_USE_CASE,
-      design: flags.design as BrandingDesign | undefined,
     };
 
     if (!nonInteractive && !dryRun) {
@@ -248,7 +236,6 @@ export default class Setup extends BaseCommand {
         devPortFromFlag: flags["dev-port"] !== undefined,
         presetFromFlag: flags.preset !== undefined,
         useCaseFromFlag: flags["use-case"] !== undefined,
-        designFromFlag: flags.design !== undefined,
       };
       for (const prompt of SETUP_PROMPTS) {
         answers = await prompt.ask(answers, promptCtx);
@@ -256,13 +243,12 @@ export default class Setup extends BaseCommand {
       outro("Configuration captured");
     }
 
-    // The interactive prompts can override the flag/default preset, use
-    // case, and design recorded at framework_resolved — re-record so
+    // The interactive prompts can override the flag/default preset and use
+    // case recorded at framework_resolved — re-record so
     // telemetry carries the values that actually scaffold.
     this.recordTelemetry({
       preset: answers.preset,
       use_case: answers.useCase,
-      design: answers.design ?? "built-in",
     });
 
     const issuer = issuerFromPort(answers.devPort);
@@ -290,14 +276,13 @@ export default class Setup extends BaseCommand {
           issuer,
           {
             // Resolved values, not raw flags: the wizard may have picked the
-            // preset, design, or dev port interactively, and the retry must
+            // preset, use case, or dev port interactively, and the retry must
             // reproduce those choices — the issuer registered with the
             // project derives from the port.
             ...retryOptionsFromFlags(flags),
             framework: framework.id,
             preset: answers.preset,
             useCase: answers.useCase,
-            design: answers.design,
             devPort: answers.devPort,
           },
         );
@@ -343,7 +328,6 @@ export default class Setup extends BaseCommand {
             force,
             preset: answers.preset,
             useCase: answers.useCase,
-            design: answers.design,
             cliVersion: this.meta.cliVersion,
           });
     } catch (error) {
@@ -499,13 +483,6 @@ export default class Setup extends BaseCommand {
     // The structured report is human-only. Under `--json` we let the
     // envelope returned from `this.emit(...)` be the sole stdout
     // payload (oclif requires single-doc JSON).
-    // The split-family brand pane collapses to the compact brand mark once the
-    // login's container is narrow — and the template only emits that mark when
-    // branding.json names an asset. Say so at setup time instead of letting the
-    // branding's absence read as a rendering bug. Keyed to the design alone:
-    // the collapse is a container query, so posture doesn't decide it (see
-    // `designWarnings`).
-    const warnings = designWarnings(answers.design);
     if (!this.jsonEnabled()) {
       const projectFacts = await detectProjectFacts(cwd, framework.id);
       const sections = buildSummary({
@@ -516,7 +493,6 @@ export default class Setup extends BaseCommand {
         server: answers.server,
         issuer,
         scaffoldedFramework,
-        design: answers.design,
       });
       // Frame the report in a consola box so it reads as a distinct
       // status panel separate from the per-step narration above it.
@@ -536,16 +512,10 @@ export default class Setup extends BaseCommand {
         ),
         style: { padding: 1, borderStyle: "rounded", borderColor: "green" },
       });
-      // The envelope's `warnings` never render in non-JSON mode (setup
-      // passes `pretty: ""`), so surface them to humans here.
-      for (const warning of warnings) {
-        consola.warn(warning);
-      }
     }
 
     return this.emit({
       status: "ok",
-      warnings,
       // Human-facing output was already shown via consola (box + per-step
       // narration). Pass an empty `pretty` so the base command's fallback
       // renderer doesn't duplicate the summary on stdout. The JSON envelope
@@ -568,14 +538,11 @@ export default class Setup extends BaseCommand {
         })),
         files_skipped: result.filesSkipped.map((file) => relativeDisplay(cwd, file)),
         install: installOutcome.install,
-        // The chosen login design, or null for the built-in template — so
-        // agents can verify what setup published without diffing the repo.
-        design: answers.design ?? null,
         // Branding guidance before the claim nudge: make it yours, then
         // claim to keep it (the same order the manifesto's journey walks).
         next_actions: [
           ...installOutcome.nextActions,
-          brandingGuidanceAction(answers.design, this.meta.cliVersion),
+          brandingGuidanceAction(this.meta.cliVersion),
           ...claimNudge.actions,
         ],
         next_commands: [...installOutcome.nextCommands, ...claimNudge.commands],
@@ -661,7 +628,6 @@ type SetupRetryOptions = {
   framework?: string;
   preset?: SetupPreset;
   useCase?: SetupUseCase;
-  design?: string;
   renderer?: string;
   devPort?: number;
   nonInteractive?: boolean;
@@ -682,9 +648,6 @@ function setupRetryFlags(opts: SetupRetryOptions): string {
   }
   if (opts.useCase && opts.useCase !== DEFAULT_SETUP_USE_CASE) {
     parts.push(`--use-case ${opts.useCase}`);
-  }
-  if (opts.design) {
-    parts.push(`--design ${opts.design}`);
   }
   if (opts.renderer && opts.renderer !== "react") {
     parts.push(`--renderer ${opts.renderer}`);
@@ -708,7 +671,6 @@ function retryOptionsFromFlags(flags: {
   framework?: string;
   preset?: string;
   "use-case"?: string;
-  design?: string;
   renderer?: string;
   "dev-port"?: number;
   "non-interactive"?: boolean;
@@ -717,7 +679,6 @@ function retryOptionsFromFlags(flags: {
     framework: flags.framework,
     preset: flags.preset as SetupPreset | undefined,
     useCase: flags["use-case"] as SetupUseCase | undefined,
-    design: flags.design,
     renderer: flags.renderer,
     devPort: flags["dev-port"],
     nonInteractive: Boolean(flags["non-interactive"]),
@@ -851,9 +812,6 @@ const SENTENCE_BY_PATH: Record<string, { subject: string }> = {
   ".zitadel/meta/user-schema.json": { subject: "the user-schema dialect spec" },
   ".zitadel/meta/user-property.json": { subject: "the user-property dialect spec" },
   ".zitadel/meta/branding.json": { subject: "the branding dialect spec" },
-  ".zitadel/branding/branding.json": { subject: "the branding descriptor (layout + asset URLs)" },
-  ".zitadel/branding/login.liquid": { subject: "the editable login template" },
-  ".zitadel/branding/README.md": { subject: "the branding folder README" },
   "AGENTS.md": { subject: "the agent guidance (golden journey + config dialect)" },
   "README.md": { subject: "the README's Zitadel section" },
   "app/page.tsx": { subject: "the home page redirect" },
@@ -875,7 +833,6 @@ function buildSummary(opts: {
   server: string;
   issuer: string;
   scaffoldedFramework: boolean;
-  design?: BrandingDesign;
 }): Section[] {
   const {
     projectFacts,
@@ -885,7 +842,6 @@ function buildSummary(opts: {
     server,
     issuer,
     scaffoldedFramework,
-    design,
   } = opts;
   const packageJsonHit = pickWrittenFile(writtenRel, "package.json");
 
@@ -938,14 +894,13 @@ function buildSummary(opts: {
   }
 
   // The login-customization entry points. These are what a user edits to
-  // change what the login collects, how it authenticates, and how it looks —
+  // change what the login collects and how it authenticates —
   // burying them in the verbose per-file narration above the box means users
   // don't find them (each folder ships a README with the workflow).
   const customizeRows: Row[] = [];
   for (const [label, suffix, dir] of [
     ["User schema", ".zitadel/schemas/default-human-user.json", ".zitadel/schemas/"],
     ["Login flow", ".zitadel/flows/default-login.json", ".zitadel/flows/"],
-    ["Login template", ".zitadel/branding/login.liquid", ".zitadel/branding/"],
   ] as const) {
     const hit = pickWrittenFile(writtenRel, suffix);
     if (hit) customizeRows.push({ label, value: stylePath(dir), secondary: "see its README.md" });
@@ -955,13 +910,6 @@ function buildSummary(opts: {
     { label: "Project id", value: styleId(project.id) },
     { label: "Server", value: styleUrl(server) },
     { label: "App will run", value: styleUrl(issuer) },
-    design
-      ? {
-          label: "Login design",
-          value: brandingDesignLabel(design),
-          secondary: `${design} · ${stylePath(".zitadel/branding/")}`,
-        }
-      : { label: "Login design", value: styleDim("built-in template") },
   ];
 
   return [

@@ -65,13 +65,16 @@ function presetTemplates(preset: string): { schema: unknown; flow: unknown } {
 }
 
 /**
- * Login-design starting points `zitadel branding eject --design <name>` (and
- * `zitadel setup --design <name>`) scaffold into `.zitadel/branding/`. A
- * design is a full Liquid template plus the descriptor `layout` it degrades
- * to — the wire `layout` enum stays `centered | split`, richer designs are
- * delivered as templates (ADR 040).
+ * Widget-template starting points `zitadel branding eject --design <name>`
+ * scaffolds into `.zitadel/branding/` (setup never does, #1039). Only
+ * widget structure belongs here: `centered` is the bundled default card and
+ * `minimal` the same form without card chrome. Page layouts (the former
+ * `split`, `split-right`, `hero`) were page chrome and live in the embedding
+ * application instead; revisions already published from them keep rendering
+ * (see docs/design/branding/customization-strategy.md). Add a design here
+ * only when it changes the widget's structure, not the page around it.
  */
-export const BRANDING_DESIGNS = ["centered", "split", "split-right", "hero", "minimal"] as const;
+export const BRANDING_DESIGNS = ["centered", "minimal"] as const;
 
 export type BrandingDesign = (typeof BRANDING_DESIGNS)[number];
 
@@ -80,9 +83,6 @@ export const DEFAULT_BRANDING_DESIGN: BrandingDesign = "centered";
 /** Descriptor `layout` each design degrades to when its template is rejected. */
 const DESIGN_LAYOUTS: Record<BrandingDesign, "centered" | "split"> = {
   centered: "centered",
-  split: "split",
-  "split-right": "split",
-  hero: "split",
   minimal: "centered",
 };
 
@@ -100,7 +100,7 @@ export type DefaultBrandingConfig = {
 /**
  * Renders the scaffold files for a branding design. The `centered` template
  * is a drift-tested copy of the bundled default in `@zitadel/components`;
- * the other designs are authored variants of it.
+ * `minimal` is an authored variant of it.
  */
 export function getDefaultBrandingConfig(
   design: string = DEFAULT_BRANDING_DESIGN,

@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
@@ -285,11 +286,8 @@ describe("setup command pre-flight", () => {
     expect(projectName.trim().length).toBeGreaterThan(0);
   });
 
-  it("warns about the split brand pane's narrow-container fallback, not about this app", async () => {
+  it("writes no login template and publishes no branding revision (#1039)", async () => {
     const cwd = await makeTempDir();
-    // Widget posture (a pre-existing Next app, ADR 044): the card is meant to
-    // move into a layout the CLI doesn't own, so a narrow container is the
-    // likely end state.
     await mkdir(join(cwd, "app"), { recursive: true });
     await writeFile(
       join(cwd, "package.json"),
@@ -301,8 +299,6 @@ describe("setup command pre-flight", () => {
       "setup",
       "--cwd",
       cwd,
-      "--design",
-      "split-right",
       "--server",
       capture.url,
       "--non-interactive",
@@ -311,37 +307,40 @@ describe("setup command pre-flight", () => {
     ]);
 
     expect(res.exitCode).toBe(0);
-    const json = parseJson(res.stdout) as { status: string; warnings: string[] };
+    const json = parseJson(res.stdout) as {
+      status: string;
+      warnings: string[];
+      data: Record<string, unknown> & { files_written: string[]; next_actions: string[] };
+    };
     expect(json.status).toBe("ok");
-    expect(json.warnings).toHaveLength(1);
-    // The wrapper setup scaffolds around the widget is full-width, so the
-    // brand pane does render in the page we just wrote. Telling the user it
-    // shows the compact mark "instead" sends them hunting a rendering bug
-    // that isn't happening — the warning states the container-width contract
-    // and the branding.json fix for the narrow case.
-    expect(json.warnings[0]).not.toMatch(/this app/i);
-    expect(json.warnings[0]).toContain("container is wide");
-    expect(json.warnings[0]).toContain(".zitadel/branding/branding.json");
+    expect(json.warnings).toEqual([]);
+    // Setup only gets authentication working: the login renders the
+    // maintained component, so nothing under .zitadel/branding/ is written
+    // and no branding revision is created on the platform.
+    expect(existsSync(join(cwd, ".zitadel/branding"))).toBe(false);
+    expect(json.data.files_written.some((file) => file.includes(".zitadel/branding/"))).toBe(
+      false,
+    );
+    expect(capture.requests).not.toContain("POST /branding");
+    // The envelope no longer carries a design, and the look guidance must not
+    // claim a revision is live.
+    expect(json.data).not.toHaveProperty("design");
+    const guidance = json.data.next_actions.join("\n");
+    expect(guidance).not.toMatch(/revision 1/i);
+    expect(guidance).toContain("branding eject");
+  });
+});
+
+describe("setup --design removal (#1039)", () => {
+  it("--help no longer offers a login design", async () => {
+    const res = await runCliForTest(["setup", "--help"]);
+
+    expect(res.exitCode).toBe(0);
+    expect(res.stdout).not.toContain("--design");
   });
 
-  it("warns in page posture too — the collapse is a container query, not a posture", async () => {
+  it("rejects --design at parse time, before any project is created", async () => {
     const cwd = await makeTempDir();
-    // A pre-existing React app: not route-based, so `derivePosture` returns
-    // "page" without a scaffold (ADR 044). A full-page split login hits the
-    // same collapse on a phone that an embedded card hits in a sidebar, and
-    // the template emits no compact mark without logo_url/hero_url — so
-    // suppressing the advice here would leave that dead state unexplained.
-    await mkdir(join(cwd, "src"), { recursive: true });
-    await writeFile(
-      join(cwd, "package.json"),
-      JSON.stringify({ name: "demo", dependencies: { react: "^19", vite: "^7" } }),
-    );
-    // The React patcher merges the /__nextgen dev proxy into the Vite config
-    // and fails loudly without one.
-    await writeFile(
-      join(cwd, "vite.config.ts"),
-      'import { defineConfig } from "vite";\n\nexport default defineConfig({});\n',
-    );
     const capture = await startCreateProjectCaptureServer();
 
     const res = await runCliForTest([
@@ -354,15 +353,11 @@ describe("setup command pre-flight", () => {
       capture.url,
       "--non-interactive",
       "--json",
-      "--skip-install",
     ]);
 
-    expect(res.exitCode).toBe(0);
-    const json = parseJson(res.stdout) as { status: string; warnings: string[] };
-    expect(json.status).toBe("ok");
-    expect(json.warnings).toHaveLength(1);
-    expect(json.warnings[0]).toContain("The split design");
-    expect(json.warnings[0]).toContain(".zitadel/branding/branding.json");
+    expect(res.exitCode).not.toBe(0);
+    expect(capture.requests).toEqual([]);
+    expect(existsSync(join(cwd, ".zitadel"))).toBe(false);
   });
 });
 
@@ -440,10 +435,13 @@ async function startNotFoundServer(): Promise<string> {
 async function startCreateProjectCaptureServer(): Promise<{
   url: string;
   body: Record<string, unknown> | null;
+  requests: string[];
 }> {
   let body: Record<string, unknown> | null = null;
+  const requests: string[] = [];
   const server = createServer(async (req, res) => {
     const path = new URL(req.url ?? "/", "http://localhost").pathname;
+    requests.push(`${req.method ?? "GET"} ${path}`);
     if (req.method === "POST" && path === "/projects") {
       const chunks: Buffer[] = [];
       for await (const chunk of req) {
@@ -480,16 +478,6 @@ async function startCreateProjectCaptureServer(): Promise<{
       );
       return;
     }
-    if (req.method === "POST" && path === "/branding") {
-      res.writeHead(201, { "content-type": "application/json" }).end(
-        JSON.stringify({
-          id: "brand_test",
-          revision: 1,
-          created_at: "2026-06-01T00:00:00.000Z",
-        }),
-      );
-      return;
-    }
     res.writeHead(404).end();
   });
   servers.push(server);
@@ -503,6 +491,7 @@ async function startCreateProjectCaptureServer(): Promise<{
     get body() {
       return body;
     },
+    requests,
   };
 }
 

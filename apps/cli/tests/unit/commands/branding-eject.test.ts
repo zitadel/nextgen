@@ -77,20 +77,31 @@ describe("branding eject", () => {
     expect(meta).not.toMatch(/`zitadel /);
   });
 
-  it("--design split writes the split template and layout", async () => {
+  it("--design minimal writes the card-less template on the centered layout", async () => {
     const cwd = await makeProject();
 
-    const res = await eject(cwd, "--design", "split");
+    const res = await eject(cwd, "--design", "minimal");
     expect(res.exitCode, res.stderr).toBe(0);
 
     const descriptor = JSON.parse(
       await readFile(join(cwd, ".zitadel/branding/branding.json"), "utf8"),
     ) as Record<string, unknown>;
-    expect(descriptor.layout).toBe("split");
+    expect(descriptor.layout).toBe("centered");
 
     const template = await readFile(join(cwd, ".zitadel/branding/login.liquid"), "utf8");
-    expect(template).toBe(getDefaultBrandingConfig("split").template);
-    expect(template).toContain('class="zl-split"');
+    expect(template).toBe(getDefaultBrandingConfig("minimal").template);
+    expect(template).not.toContain("<zl-card");
+  });
+
+  it("no longer offers page-layout designs (#1039)", async () => {
+    // split, split-right and hero were page chrome around the default card;
+    // that layout belongs in the embedding app, not the widget template.
+    for (const design of ["split", "split-right", "hero"]) {
+      const cwd = await makeProject();
+      const res = await eject(cwd, "--design", design);
+      expect(res.exitCode, design).not.toBe(0);
+      await expect(readFile(join(cwd, ".zitadel/branding/login.liquid"), "utf8")).rejects.toThrow();
+    }
   });
 
   it("refuses to overwrite existing files without --force", async () => {

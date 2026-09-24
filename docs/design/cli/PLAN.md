@@ -13,7 +13,7 @@ for the agent contract):
 | Area | Shipped commands |
 |---|---|
 | Local runtime | `start`, `stop`, `status`, `logs`, `reset`, `doctor` |
-| Scaffolding | `setup` (8 frameworks: next, nuxt, react, vue, angular, solid, svelte, qwik; wizard asks for the login `--design`), `eject` |
+| Scaffolding | `setup` (8 frameworks: next, nuxt, react, vue, angular, solid, svelte, qwik), `eject` |
 | Config reconciliation | `plan`, `apply` (terraform-shaped: diff → plan → apply) |
 | Resources | `users` (list, get, create, update, delete), `teams` (list, get, create, update, deactivate), `grants` (list, get, create, delete), `idps` (list, get, create), `projects` (list, get, update), `sessions` (list, get, revoke), `events` (list, get); read-only `schemas`, `environments`, `releases`, `flow-definitions` and `branding`; plus `branding eject` — each resource exposes what its API supports ([resource-commands.md](resource-commands.md), [ADR 064](../../adrs/064-cli-resource-commands.md)) |
 | Ownership | `claim` ([ADR 046](../../adrs/046-claim-lifecycle-v2.md)) — init/status/complete against the server's claim endpoints, team attachment reported in `setup`/`status`/`doctor` |
@@ -55,7 +55,7 @@ framework version floors are enforced per
    [`packages/components/src/orchestrator/templates/default.liquid`](../../../packages/components/src/orchestrator/templates/default.liquid);
    the design catalog lives under
    [`packages/config/defaults/branding/`](../../../packages/config/defaults/branding/)
-   (`centered`, `split`, `split-right`, `hero`, `minimal`).
+   (`centered`, `minimal`; the page-layout designs were retired in #1039).
 6. **Templates carry a tenant-attack surface** — validated against the banned
    set before upload; see
    [template-security.md](../flowengine/template-security.md).

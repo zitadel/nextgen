@@ -242,7 +242,7 @@ own the CLI and structure work; #936 owns the first visual loop.
 
 | Surface | Today | Later |
 | --- | --- | --- |
-| `zitadel branding eject --design` | Catalog of five Liquid files that mix page chrome with the form card | Ejects the **widget template** only — bundled default card. No split/hero in this catalog |
+| `zitadel branding eject --design` | ~~Catalog of five Liquid files that mix page chrome with the form card~~ Done in #1039: `centered` (default card) + `minimal` | Ejects the **widget template** only. No split/hero in this catalog |
 | Shared widget structure (disclaimer) | Same eject path, starting files are page layouts | Opt-in `login.liquid` from the default card. Embedded **and** Zitadel-served |
 
 ### Proposed / unset — Zitadel-served page chrome
@@ -511,9 +511,9 @@ these paths is a prerequisite for the others.
    sit between atoms.
 5. Behaviour stays on the flow definition.
 
-Setup is only step 1. Today's `setup --design` that ejects Liquid and
-publishes branding revision 1 is the behavior a **follow-up issue**
-retires; see
+Setup is only step 1. The former `setup --design`, which ejected Liquid
+and published branding revision 1, was retired by
+[#1039](https://github.com/zitadel/nextgen/issues/1039); see
 [What the shipped designs really are](#what-the-shipped-designs-really-are).
 
 ### Zitadel-served
@@ -636,10 +636,10 @@ Matches #678's delivery direction, with #936 as the first visual ticket.
 
 | Stage | What customers can do | Ticket |
 | --- | --- | --- |
-| **Now (shipped)** | `setup --design` still ejects widget Liquid; `/ui/login/` is a `page`-variant shell | Behavior to retire from setup, not the destination |
+| **Now (shipped)** | `/ui/login/` is a `page`-variant shell; `branding eject` offers `centered` + `minimal` only | Setup no longer ejects Liquid; split/hero retired from the catalog ([#1039](https://github.com/zitadel/nextgen/issues/1039)) |
 | **First iteration** | Console **branding settings** (appearance) on working embedded components; preview / publish / restore | [#936](https://github.com/zitadel/nextgen/issues/936) |
 | **Translations setting** | Locale × key copy overlays. Different Console setting from branding | [#1038](https://github.com/zitadel/nextgen/issues/1038) |
-| **Follow-up** | Setup embeds the maintained component only. No Liquid, no branding revision 1. `branding eject` stays opt-in for later structure | [#1039](https://github.com/zitadel/nextgen/issues/1039) |
+| **Follow-up (done)** | Setup embeds the maintained component only. No Liquid, no branding revision 1. `branding eject` stays opt-in and offers widget structure only (`centered`, `minimal`) | [#1039](https://github.com/zitadel/nextgen/issues/1039) |
 | **Later** | Widget structure (`login.liquid`) from the default card; shared with Zitadel-served | New issue under #678 |
 | **Zitadel-served login** | Polished standalone page; branding/content reuse; no advanced page chrome required | #678 follow-up |
 | **Zitadel-served customisation** | Define and deliver served-page customisation | #678 follow-up; `page.liquid` only if that work chooses it |

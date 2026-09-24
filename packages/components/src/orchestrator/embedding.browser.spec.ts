@@ -5,12 +5,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { page } from "vitest/browser";
 
 import "./zitadel-login.js";
-import heroTemplate from "../../../config/defaults/branding/hero/login.liquid";
 import minimalTemplate from "../../../config/defaults/branding/minimal/login.liquid";
-import splitRightTemplate from "../../../config/defaults/branding/split-right/login.liquid";
-// Raw import via the liquidRaw Vite plugin — @zitadel/config/defaults reads
-// files with node:fs at call time, which cannot run inside Chromium.
-import splitTemplate from "../../../config/defaults/branding/split/login.liquid";
+// Raw imports via the liquidRaw Vite plugin — @zitadel/config/defaults reads
+// files with node:fs at call time, which cannot run inside Chromium. The
+// split/hero designs are retired (#1039); their fixtures stand in for
+// revisions published before that, which must keep rendering.
+import heroTemplate from "./__fixtures__/legacy-designs/hero.liquid";
+import splitRightTemplate from "./__fixtures__/legacy-designs/split-right.liquid";
+import splitTemplate from "./__fixtures__/legacy-designs/split.liquid";
 import type { ZitadelLogin } from "./zitadel-login.js";
 
 /**

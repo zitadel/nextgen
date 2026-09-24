@@ -5,9 +5,11 @@
  * one of these through the MSW worker so the orchestrator's CSS-token bridge
  * has a tenant payload to render.
  *
- * The `*-template` presets carry the ejectable design templates from
- * `@zitadel/config` as `liquid_template` — the exact markup `setup --design`
- * and `branding eject` put into a user's repo. They exist so the shipped
+ * The `*-template` presets carry design templates as `liquid_template`:
+ * `minimal-template` is the exact markup `branding eject` puts into a user's
+ * repo; the split/hero presets are the retired page-layout designs (#1039),
+ * kept so revisions already published from them can still be reviewed. They
+ * exist so the shipped
  * designs can be reviewed here instead of only inside a scaffolded app
  * (the alpha.18 feedback round found empty-brand-pane and badge-alignment
  * regressions nobody had ever rendered). Raw vite imports, not
@@ -16,10 +18,10 @@
  */
 import type { Branding } from "@zitadel/components";
 
-import heroTemplate from "../../../packages/config/defaults/branding/hero/login.liquid?raw";
+import heroTemplate from "../../../packages/components/src/orchestrator/__fixtures__/legacy-designs/hero.liquid?raw";
+import splitRightTemplate from "../../../packages/components/src/orchestrator/__fixtures__/legacy-designs/split-right.liquid?raw";
+import splitTemplate from "../../../packages/components/src/orchestrator/__fixtures__/legacy-designs/split.liquid?raw";
 import minimalTemplate from "../../../packages/config/defaults/branding/minimal/login.liquid?raw";
-import splitRightTemplate from "../../../packages/config/defaults/branding/split-right/login.liquid?raw";
-import splitTemplate from "../../../packages/config/defaults/branding/split/login.liquid?raw";
 
 const INTER_FONT_URL =
   "https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700&display=swap";
@@ -164,9 +166,9 @@ export const brandingPresets = {
       },
     },
   } satisfies Branding,
-  // The ejected designs, exactly as scaffolded — no palette overrides, so
-  // what renders here is the out-of-the-box look a fresh `setup --design`
-  // user sees.
+  // Ejected designs exactly as scaffolded — no palette overrides. The
+  // split/hero entries are retired (#1039) and render already-published
+  // revisions only.
   "split-template": {
     layout: "split",
     liquid_template: splitTemplate,

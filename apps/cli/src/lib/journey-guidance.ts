@@ -37,27 +37,18 @@ export function customizeAndPublishActions(cliVersion: string): string[] {
 }
 
 /**
- * How to change the login's look, depending on whether setup already ejected
- * a starter design. With a design, revision 1 is already live and the
- * template is repo-owned — point at the files and the plan/apply loop.
- * Without one, point at `branding eject` so the built-in template's
- * customization path stays discoverable after setup.
+ * How to change the login's look after setup. Setup never ejects a template
+ * or publishes a branding revision (#1039): the app embeds the maintained
+ * `<zitadel-login>`, so its look is the app's own CSS (`--zl-*` tokens) and
+ * layout around it. Taking ownership of the widget's structure stays the
+ * opt-in `branding eject`, surfaced here so it remains discoverable.
  */
-export function brandingGuidanceAction(
-  design: string | undefined,
-  cliVersion: string,
-): string {
-  if (design) {
-    return (
-      `Make the login yours: the ${design} design is live as branding revision 1. ` +
-      "Edit .zitadel/branding/login.liquid (logo and hero image URLs live in " +
-      `branding.json), then ${publicCliCommand("plan", cliVersion)} and ` +
-      `${publicCliCommand("apply", cliVersion)} to publish the next revision.`
-    );
-  }
+export function brandingGuidanceAction(cliVersion: string): string {
   return (
-    "Change how the login looks: " +
-    `${publicCliCommand("branding eject", cliVersion)} scaffolds .zitadel/branding/ ` +
-    "from a starter design (centered, split, split-right, hero, minimal) for you to edit."
+    "Change how the login looks: it is a component in your app, so theme it with `--zl-*` " +
+    "custom properties in your own stylesheet and build any page layout around it in your " +
+    "code. To change the widget's structure, " +
+    `${publicCliCommand("branding eject", cliVersion)} scaffolds an editable template ` +
+    "in .zitadel/branding/."
   );
 }

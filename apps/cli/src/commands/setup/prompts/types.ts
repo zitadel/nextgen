@@ -1,4 +1,4 @@
-import type { BrandingDesign, SetupPreset, SetupUseCase } from "@zitadel/config/defaults";
+import type { SetupPreset, SetupUseCase } from "@zitadel/config/defaults";
 
 import type { FrameworkFacts } from "../../../lib/orca";
 
@@ -19,14 +19,6 @@ export type SetupAnswers = {
   preset: SetupPreset;
   /** Use case (schema field set); see `SETUP_USE_CASES` in @zitadel/config. */
   useCase: SetupUseCase;
-  /**
-   * Starter login design to eject into `.zitadel/branding/` and publish as
-   * branding revision 1; see `BRANDING_DESIGNS` in @zitadel/config.
-   * `undefined` keeps the built-in template and writes no branding files —
-   * template ownership stays an explicit opt-in (`branding eject` offers
-   * the same choice after setup).
-   */
-  design?: BrandingDesign;
 };
 
 /** Read-only facts a prompt may need. */
@@ -65,11 +57,6 @@ export type PromptContext = {
    * authoritative and {@link import("./use-case").UseCasePrompt} skips itself.
    */
   readonly useCaseFromFlag?: boolean;
-  /**
-   * Whether `--design` was passed explicitly. When set, the flag is
-   * authoritative and {@link import("./design").DesignPrompt} skips itself.
-   */
-  readonly designFromFlag?: boolean;
 };
 
 /**

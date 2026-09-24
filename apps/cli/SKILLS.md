@@ -57,10 +57,10 @@ Each invocation prints one JSON object:
   see what setup created versus merged into (your `package.json` is an
   `update`). `data.files_written` remains the flat list — deduplicated file
   paths only, covering both scaffolded and `.zitadel/` resource files.
-- `setup` also emits `data.design`: the starter login design it ejected and
-  published as branding revision 1, or `null` when the built-in template was
-  kept (no `.zitadel/branding/` files exist in that case). Use it to verify
-  the requested `--design` took effect without diffing the repo.
+- `setup` never writes `.zitadel/branding/` or publishes a branding
+  revision: the login renders the maintained `<zitadel-login>` component.
+  Taking ownership of the widget template is the separate, opt-in
+  `branding eject` command.
 - `E_LOCAL_SERVER_NOT_RUNNING`: start the local runtime with
   `npx @zitadel/cli@alpha start`, then retry with `--server local`.
 - `E_NOT_FOUND`: an HTTP 404 from the target server. With the platform's
@@ -217,12 +217,9 @@ The groups below mirror the ones `zitadel --help` prints.
   email only; `consumer` adds given and family name; `business` also adds a
   `companyName` attribute and overlays work-email copy on the generated auth
   pages via the SDK's `businessLocales`; asked before `--preset` and recorded
-  in `zitadel.json`), `--design centered|split|split-right|hero|minimal`
-  (starter login design: ejects the design's template into
-  `.zitadel/branding/` and publishes it as branding revision 1 during setup;
-  the interactive wizard asks this as its final question with the built-in
-  template preselected — omit the flag in non-interactive runs to keep the
-  built-in template and no branding files), `--skip-install`.
+  in `zitadel.json`), `--skip-install`. Setup does not ask about or apply a
+  login design: it writes no `.zitadel/branding/` files and publishes no
+  branding revision (`branding eject` is the opt-in for that).
   On Next and Nuxt, the scaffolded auth/profile pages derive their embedding
   posture from the app: a fresh scaffold (setup created the skeleton) pins
   `variant="page"` full-page chrome, while a pre-existing app embeds
@@ -241,11 +238,8 @@ The groups below mirror the ones `zitadel --help` prints.
   link color `--zl-link`); the `suppress-header` attribute
   (wrapper prop `suppressHeader`) visually hides the widget's own heading
   block when the page already carries one, keeping it in the accessibility
-  tree. Split-family designs collapse their brand pane by container width —
-  at card width they show the compact brand mark (`logo_url`, else
-  `hero_url`, from `.zitadel/branding/branding.json`; `hero` falls back to
-  editable text), and setup warns when a widget-posture app picks `split`
-  or `split-right`.
+  tree. Page layout around the widget (split screens, hero panes) is the
+  app's own code, not a Zitadel template.
 - `claim` — claim the project for a team to make it permanent. Mints a
   short-lived link, opens it in a browser, and blocks until the developer
   finishes signing in there, then records `claimed_at` and `team_id` in
@@ -410,8 +404,8 @@ docker --image <ref>` remains the explicit image override for debugging.
   pretty-prints the selected revision body.
 - `branding eject` — take ownership of the login template: scaffold
   `.zitadel/branding/` (a `branding.json` descriptor plus the `login.liquid`
-  template) from a shipped design, `--design centered|split|split-right|hero|minimal`
-  or an interactive picker on a TTY. `plan`/`apply` then publish every edit as
+  template) from a shipped design, `--design centered|minimal` (the default card, or
+  the same form without card chrome) or an interactive picker on a TTY. `plan`/`apply` then publish every edit as
   a new branding revision.
 - `variables list|get|set|delete` — manage the variables and secrets a
   configuration document references as `${{ NAME }}`. Every command addresses
@@ -504,9 +498,8 @@ then re-run `plan` and `apply`. Schema and flow files are synced from
 (branding) are synced from `.zitadel/branding/`: a single `branding.json`
 descriptor (layout, asset URLs) plus a sibling `login.liquid` LiquidJS
 template referenced as `"liquid_template": { "$file": "./login.liquid" }`. Scaffold them with the
-`branding eject` command (`--design centered|split|split-right|hero|minimal`,
-interactive picker on a TTY) or at project creation with
-`setup --design <name>`, which also publishes revision 1. Branding is
+`branding eject` command (`--design centered|minimal`,
+interactive picker on a TTY); setup never scaffolds them. Branding is
 revisioned and immutable: every edit — including a `.liquid`-only edit —
 plans as a `revise` and `apply` publishes a new revision; the login serves
 the newest one. `plan` validates templates with the authoritative LiquidJS
