@@ -123,7 +123,6 @@ export class ZlSsoProviders extends LitElement {
         data-template=${provider.template ?? nothing}
         data-testid=${`zitadel-sso-provider-${provider.id}`}
         ?disabled=${this.disabled}
-        label=${this.labelFor(provider)}
         @click=${() => this.choose(provider)}
       >
         ${mark
@@ -131,11 +130,19 @@ export class ZlSsoProviders extends LitElement {
               ><zl-icon name=${mark} size="24" decorative></zl-icon
             ></span>`
           : nothing}
+        <span class="zr-sso__label">${this.labelFor(provider)}</span>
       </zl-button>
     `;
   }
 
-  /** The vendor's name in the caller's sentence; `{name}` may repeat. */
+  /**
+   * The vendor's name in the caller's sentence; `{name}` may repeat.
+   *
+   * Rendered into the button's default slot rather than passed as its
+   * `label`: slotted content stays in this atom's shadow tree, which is the
+   * only way its stylesheet can keep a long vendor name from pushing the
+   * button past the card. `<zl-button>` exposes no part for its own text.
+   */
   private labelFor(provider: SsoProvider): string {
     return this.labelFormat.split(NAME_PLACEHOLDER).join(provider.name);
   }
