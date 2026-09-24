@@ -96,7 +96,7 @@ export const de: Locale = {
   // ═══════════════════════════════════════════════════════════════════════════
   // Step: done (Terminal — Anmeldebestätigung)
   // ═══════════════════════════════════════════════════════════════════════════
-  "done.title": "Du bist angemeldet als",
+  "done.title": "Du bist angemeldet",
   "done.description": "",
 
   // --- Step-Name-Aliase für den Standard-Login-Flow ---
@@ -131,7 +131,7 @@ export const de: Locale = {
   "register.action.sign_in.lead": "Bereits ein Konto? ",
   "register.action.sign_in.link": "Anmelden",
 
-  "complete.title": "Du bist angemeldet als",
+  "complete.title": "Du bist angemeldet",
   "signed-in.continue": "Weiter",
   "signed-in.logout": "Abmelden",
 
