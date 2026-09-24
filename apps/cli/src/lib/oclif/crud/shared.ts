@@ -48,10 +48,10 @@ export const parseOrThrow = <B>(
   if (!parsed.success) {
     throw new ZitadelError("E_VALIDATION", message, {
       hint,
-      details: { issues: parsed.error?.issues },
+      details: { issues: parsed.error.issues },
     });
   }
-  return parsed.data as B;
+  return parsed.data;
 };
 
 export const dryRunResult = (

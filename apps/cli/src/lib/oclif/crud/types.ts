@@ -16,10 +16,13 @@ export type Page = Readonly<{ items: readonly unknown[]; next: string | null }>;
 
 /**
  * Structural subset of a Zod schema (a `ZodType<B>` satisfies it); keeps the
- * factory free of a Zod import while carrying the parsed body type `B`.
+ * factory free of a Zod import while carrying the parsed body type `B`. The
+ * discriminated result narrows `data` to `B` on success without a cast.
  */
 export type Schema<B = unknown> = {
-  safeParse: (value: unknown) => { success: boolean; data?: B; error?: { issues: unknown } };
+  safeParse: (
+    value: unknown,
+  ) => { success: true; data: B } | { success: false; error: { issues: unknown } };
 };
 
 /**

@@ -39,13 +39,6 @@ import {
   QueryTeamsResponse,
   QueryUsersResponse,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
-import type {
-  ListEnvironmentsParams,
-  ListEventsParams,
-  ListFlowDefinitionsParams,
-  ListReleasesParams,
-  ListSchemasParams,
-} from "@zitadel/api/generated/model";
 import { consola } from "consola";
 
 import { createZitadelClient, type ZitadelClient } from "../lib/api-client";
@@ -82,9 +75,9 @@ const update = <B>(
   call: (ctx: Platform, id: string, body: B) => Promise<unknown>,
 ): UpdateSpec<Platform, B> => ({ schema, call });
 
-// A structured-query list infers `B` from its `body` schema; a `GET` list has
-// none and stays a plain object whose request is the flat parameter map.
-const query = <B>(spec: ListSpec<Platform, B>): ListSpec<Platform, B> => spec;
+// Binds a list's request type `B`: inferred from its `body` schema for a
+// structured query, or given explicitly for a `GET` list's flat parameters.
+const list = <B>(spec: ListSpec<Platform, B>): ListSpec<Platform, B> => spec;
 
 /** Filter operations of `POST /<resource>/query` endpoints (ADR 031). */
 const FILTER_OPERATIONS = [
@@ -125,7 +118,7 @@ export const RESOURCES = {
       "metadata.created_at",
       "metadata.updated_at",
     ],
-    list: query({
+    list: list({
       items: "users",
       body: QueryUsersBody,
       response: QueryUsersResponse,
@@ -155,7 +148,7 @@ export const RESOURCES = {
     columns: ["id", "name", "status", "created_at"],
     heading: "name",
     detail: ["id", "status", "created_at", "updated_at"],
-    list: query({
+    list: list({
       items: "teams",
       body: QueryTeamsBody,
       response: QueryTeamsResponse,
@@ -184,7 +177,7 @@ export const RESOURCES = {
     columns: ["session_id", "state", "user_id", "created_at", "expires_at"],
     heading: "session_id",
     detail: ["project_id", "state", "user_id", "created_at", "expires_at"],
-    list: query({
+    list: list({
       items: "sessions",
       body: QuerySessionsBody,
       response: QuerySessionsResponse,
@@ -256,7 +249,7 @@ export const RESOURCES = {
       sorts: ["occurred_at"],
       sortParam: "order",
       call: ({ client, projectId }, params) =>
-        client.listEvents({ project_id: projectId, ...params } as ListEventsParams),
+        client.listEvents({ project_id: projectId, ...params }),
     },
     get: { call: ({ client, projectId }, id) => client.getEvent(id, { project_id: projectId }) },
   },
@@ -275,7 +268,7 @@ export const RESOURCES = {
       "created_at",
       "expires_at",
     ],
-    list: query({
+    list: list({
       items: "grants",
       body: QueryGrantsBody,
       response: QueryGrantsResponse,
@@ -312,7 +305,7 @@ export const RESOURCES = {
     columns: ["id", "slug", "definition.protocol", "definition.display_name", "created_at"],
     heading: "slug",
     detail: ["id", "revision_id", "slug", "created_at", "updated_at"],
-    list: query({
+    list: list({
       items: "idps",
       body: QueryIdpsBody,
       response: QueryIdpsResponse,
@@ -342,7 +335,7 @@ export const RESOURCES = {
     columns: ["id", "name", "created_at"],
     heading: "name",
     detail: ["id", "preview_origins", "created_at", "updated_at"],
-    list: query({
+    list: list({
       items: "projects",
       body: QueryProjectsBody,
       response: QueryProjectsResponse,
@@ -389,7 +382,7 @@ export const RESOURCES = {
         },
       ],
       call: ({ client, projectId }, params) =>
-        client.listSchemas({ ...params, project_id: projectId } as ListSchemasParams),
+        client.listSchemas({ ...params, project_id: projectId }),
     },
     get: {
       response: GetSchemaByIdResponse,
@@ -407,7 +400,7 @@ export const RESOURCES = {
           object_type: ref,
           revisions: "latest",
           limit: 1,
-        } as ListSchemasParams);
+        });
         const current = page.schemas[0];
         if (!current) {
           throw new ZitadelError("E_NOT_FOUND", `No schema for object type "${ref}"`, {
@@ -433,7 +426,7 @@ export const RESOURCES = {
       items: "environments",
       response: ListEnvironmentsResponse,
       call: ({ client, projectId }, params) =>
-        client.listEnvironments({ ...params, project_id: projectId } as ListEnvironmentsParams),
+        client.listEnvironments({ ...params, project_id: projectId }),
     },
     get: {
       call: ({ client, projectId }, name) =>
@@ -453,7 +446,7 @@ export const RESOURCES = {
       items: "releases",
       response: ListReleasesResponse,
       call: ({ client, projectId }, params) =>
-        client.listReleases({ ...params, project_id: projectId } as ListReleasesParams),
+        client.listReleases({ ...params, project_id: projectId }),
     },
     get: {
       call: ({ client, projectId }, id) => client.getReleaseById(id, { project_id: projectId }),
@@ -491,7 +484,7 @@ export const RESOURCES = {
         client.listFlowDefinitions({
           ...params,
           project_id: projectId,
-        } as ListFlowDefinitionsParams),
+        }),
     },
     get: {
       response: GetFlowDefinitionResponse,
@@ -506,7 +499,7 @@ export const RESOURCES = {
           project_id: projectId,
           name: ref,
           limit: 1,
-        } as ListFlowDefinitionsParams);
+        });
         const current = page.flow_definitions[0];
         if (!current) {
           throw new ZitadelError("E_NOT_FOUND", `No flow definition named "${ref}"`, {
