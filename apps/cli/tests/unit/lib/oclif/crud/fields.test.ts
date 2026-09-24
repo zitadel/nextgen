@@ -58,6 +58,15 @@ describe("describeBody", () => {
     expect(describeBody(schema).map((field) => field.name)).toEqual(["name"]);
   });
 
+  it("no longer reserves `environment`, which no generated command owns", () => {
+    // The reserved set exists to keep a body field from shadowing a flag the
+    // command itself declares. No resource command declares `--environment`
+    // any more, so a resource whose body carries that field gets its flag.
+    const schema = z.object({ environment: z.string() });
+    expect(byName(schema).environment?.flag).toBe("environment");
+    expect(Object.keys(bodyFieldFlags(describeBody(schema)))).toContain("environment");
+  });
+
   it("returns nothing for a schema it cannot introspect", () => {
     expect(describeBody(z.string())).toEqual([]);
     expect(describeBody({ safeParse: () => ({ success: true }) })).toEqual([]);

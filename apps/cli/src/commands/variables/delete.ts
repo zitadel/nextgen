@@ -1,26 +1,26 @@
 import { Args, Flags } from "@oclif/core";
 import { cancel, confirm, isCancel } from "@clack/prompts";
 
-import { ownerLabel } from "../../lib/environment";
-import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../../lib/oclif";
+import { CommandGroups, OwnerCommand, type JsonEnvelope } from "../../lib/oclif";
 import { dryRunResult } from "../../lib/oclif/crud/shared";
 import { ZitadelError } from "../../lib/errors";
 import { assertVariableName } from "../../lib/variables";
 import { publicCliCommand } from "../../lib/public-cli";
 
 /**
- * The `variables delete` topic command — remove one variable from one owner.
+ * The `variables delete` topic command — remove one variable from the project
+ * level.
  *
- * A variable is removable only by the owner that entered it: deleting a name
- * another owner of the same project holds answers `var.not_found` and leaves
- * that owner's value standing (ADR 062 §4). Destructive, so it takes the same
+ * A variable is removable only by the owner that entered it: deleting a name an
+ * environment of the same project holds answers `var.not_found` and leaves that
+ * owner's value standing (ADR 062 §4). Destructive, so it takes the same
  * `--force`-or-confirm gate the resource commands' `delete` uses.
  */
-export default class VariablesDelete extends EnvironmentCommand {
-  static override description = "Delete one variable from an environment or the project.";
+export default class VariablesDelete extends OwnerCommand {
+  static override description = "Delete one variable from the project.";
   static override group = CommandGroups.configuration;
   static override examples = [
-    "<%= config.bin %> variables delete GOOGLE_CLIENT_ID --environment prod",
+    "<%= config.bin %> variables delete GOOGLE_CLIENT_ID --project-level",
     "<%= config.bin %> variables delete GOOGLE_CLIENT_ID --project-level --force",
   ];
   static override args = {
@@ -43,8 +43,7 @@ export default class VariablesDelete extends EnvironmentCommand {
 
     assertVariableName(name);
 
-    const { client, scope, environment } = await this.connect();
-    const where = ownerLabel(environment);
+    const { client, scope } = await this.connect();
 
     // A dry run makes no request, so it answers before the guard — the order
     // the resource commands' `delete` uses, which keeps
@@ -53,30 +52,26 @@ export default class VariablesDelete extends EnvironmentCommand {
       // The resource commands' dry-run contract, so an agent reads one shape
       // for every preview; `deleted` is reserved for a deletion that happened.
       const preview = dryRunResult("delete", "variables", name);
-      return this.emit({
-        ...preview,
-        data: { ...(preview.data as object), environment: environment ?? null },
-        pretty: `${preview.pretty} from ${where}`,
-      });
+      return this.emit({ ...preview, pretty: `${preview.pretty} from the project` });
     }
 
     if (!force) {
       if (nonInteractive) {
         const retry = publicCliCommand(
-          `variables delete ${name} ${environment ? `--environment ${environment}` : "--project-level"} --force`,
+          `variables delete ${name} --project-level --force`,
           cliVersion,
         );
         throw new ZitadelError(
           "E_VALIDATION",
           "Deleting a variable requires --force in non-interactive mode",
           {
-            hint: `Pass --force to delete ${name} from ${where}.`,
+            hint: `Pass --force to delete ${name} from the project.`,
             nextCommands: [retry],
           },
         );
       }
       const answer = await confirm({
-        message: `Delete ${name} from ${where}?`,
+        message: `Delete ${name} from the project?`,
         initialValue: false,
       });
       if (isCancel(answer) || !answer) {
@@ -86,12 +81,11 @@ export default class VariablesDelete extends EnvironmentCommand {
     }
 
     await client.deleteVariable(name, scope);
-    this.recordTelemetry({ is_environment_scoped: environment !== undefined });
 
     return this.emit({
       status: "ok",
-      data: { environment: environment ?? null, name, deleted: true },
-      pretty: `Deleted ${name} from ${where}`,
+      data: { name, deleted: true },
+      pretty: `Deleted ${name} from the project`,
     });
   }
 }

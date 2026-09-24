@@ -63,7 +63,18 @@ describe("variables telemetry dimensions", () => {
   });
 
   it("records nothing that identifies a person, a machine, or a credential", async () => {
-    const forbidden = ["name", "value", "secret_value", "file", "path", "environment", "project"];
+    const forbidden = [
+      "name",
+      "value",
+      "secret_value",
+      "file",
+      "path",
+      "environment",
+      // The owner dimension the commands recorded while they could address an
+      // environment. Every run has the same owner now, so it says nothing.
+      "is_environment_scoped",
+      "project",
+    ];
     for (const [file, keys] of await recordedDimensions()) {
       for (const key of keys) {
         expect(forbidden, `${file} records ${key}, which is not allow-listed`).not.toContain(key);
@@ -71,11 +82,14 @@ describe("variables telemetry dimensions", () => {
     }
   });
 
-  it("covers every variables command", async () => {
+  it("covers every variables command that has a dimension to record", async () => {
     const recorded = await recordedDimensions();
     expect([...recorded.keys()].sort()).toEqual(["delete.ts", "get.ts", "list.ts", "set.ts"]);
-    for (const [file, keys] of recorded) {
-      expect(keys.length, `${file} records no dimensions`).toBeGreaterThan(0);
+    // `delete` records none: with one owner and no per-command shape to report,
+    // the lifecycle events already carry everything true of the run.
+    expect(recorded.get("delete.ts")).toEqual([]);
+    for (const command of ["get.ts", "list.ts", "set.ts"]) {
+      expect(recorded.get(command)?.length, `${command} records no dimensions`).toBeGreaterThan(0);
     }
   });
 });
