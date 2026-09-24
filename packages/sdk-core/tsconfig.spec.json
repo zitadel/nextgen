@@ -2,9 +2,7 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "./out-tsc/vitest",
-    "types": ["vitest/globals", "vitest/importMeta", "node", "vitest"],
-    "module": "nodenext",
-    "moduleResolution": "nodenext"
+    "types": ["vitest/globals", "vitest/importMeta", "node", "vitest"]
   },
   "include": ["vite.config.mts", "src/**/*.spec.ts", "src/**/*.d.ts"],
   "references": [
