@@ -1,25 +1,16 @@
 import { defineConfig } from "orval";
 
-/**
- * Both generators read the same spec. `api/openapi/` is deliberately split
- * one file per endpoint (see api/openapi/AGENTS.md), so the root document is
- * almost entirely `$ref`s into sibling files. orval 8.37 stopped following
- * external `$ref`s unless they are allow-listed — a fetch guard aimed at
- * remote documents. Every target here is a local file in this repo, checked
- * in beside the root, so allowing all of them adds no network reach.
- */
-const input = {
-  target: "../../api/openapi/openapi-spec.yaml",
-  parserOptions: {
-    externalRefs: {
-      allow: ["*"],
-    },
-  },
-};
-
 export default defineConfig({
   zitadel: {
-    input,
+    input: {
+      target: "../../api/openapi/openapi-spec.yaml",
+      // `api/openapi/` is split one file per endpoint (see api/openapi/AGENTS.md),
+      // so the spec is almost entirely `$ref`s into sibling files. orval 8.37
+      // stopped following external `$ref`s unless allow-listed — a fetch guard
+      // aimed at remote documents. Every target is a local file checked in beside
+      // the root, so allowing all adds no network reach.
+      parserOptions: { externalRefs: { allow: ["*"] } },
+    },
     output: {
       target: "./src/generated/endpoints",
       schemas: "./src/generated/model",
@@ -53,7 +44,11 @@ export default defineConfig({
     },
   },
   zitadelZod: {
-    input,
+    input: {
+      target: "../../api/openapi/openapi-spec.yaml",
+      // See the note on the `zitadel` input above.
+      parserOptions: { externalRefs: { allow: ["*"] } },
+    },
     output: {
       mode: "split",
       client: "zod",
