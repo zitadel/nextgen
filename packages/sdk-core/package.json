@@ -18,7 +18,7 @@
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.lib.json",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck": "tsc --build tsconfig.json",
     "test": "vitest run",
     "lint": "eslint ."
   },
