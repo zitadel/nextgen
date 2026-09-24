@@ -31,8 +31,8 @@ async function renderAt(path: string) {
 }
 
 /**
- * Neither `/` nor `/settings` has a screen of its own, so both land on the first
- * screen behind them rather than rendering a page that explains the absence.
+ * `/` has no screen of its own and lands on the first one behind it; `/settings`
+ * is a view with nothing built in it yet and says so.
  *
  * Worth its own spec because these are the two paths nobody navigates to
  * deliberately: `/` is where sign-in, the logo and the claim flow's "Open the
@@ -49,13 +49,19 @@ describe("landing routes", () => {
     expect(await screen.findByRole("heading", { name: "Teams" })).toBeInTheDocument();
   });
 
-  it("lands on Admins from settings", async () => {
-    server.use(
-      http.post("http://localhost/api/grants/query", () => HttpResponse.json({ grants: [] })),
-    );
+  it("shows the empty settings view from settings", async () => {
+    // Settings has no built screen yet: Admins moved to the project page
+    // (#1238) and Profile is not built, so the account dropdown's target is the
+    // view's own empty state rather than a redirect somewhere unrelated.
     const router = await renderAt("/settings");
 
-    await waitFor(() => expect(router.state.location.pathname).toBe("/settings/admins"));
-    expect(await screen.findByRole("heading", { name: "Admins" })).toBeInTheDocument();
+    await waitFor(() => expect(router.state.location.pathname).toBe("/settings"));
+    expect(await screen.findByRole("heading", { name: "Settings" })).toBeInTheDocument();
+    expect(screen.getByText("No settings yet.")).toBeInTheDocument();
+    // Asserted here, where the Settings nav is actually mounted: no route
+    // claims a Settings heading any more, so neither a WORKSPACE group over
+    // nothing nor an Admins row survives.
+    expect(screen.queryByRole("navigation", { name: "WORKSPACE" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Admins/ })).not.toBeInTheDocument();
   });
 });

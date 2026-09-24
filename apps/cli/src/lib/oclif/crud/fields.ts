@@ -208,6 +208,21 @@ const parsePair = (raw: string, flag: string): readonly [string, unknown] => {
   return [secretChecked(raw.slice(0, plain), flag), raw.slice(plain + 1)];
 };
 
+/**
+ * Whether the schema carries a property no flag can express — a nested object
+ * or an array, which {@link describeBody} leaves out. Such a body can only be
+ * given in full through `--data` / `--file`, so a command that has one offers
+ * no flags-only example: `grants create --relation viewer` names no principal,
+ * and the platform answers `grant.invalid` rather than creating anything.
+ */
+export const needsRawBody = (schema: Schema): boolean => {
+  const shape = (schema as { shape?: Record<string, ZodLike> }).shape;
+  if (!isObject(shape)) {
+    return false;
+  }
+  return Object.values(shape).some((field) => kindOf(unwrap(field)) === undefined);
+};
+
 /** One example invocation using the required fields, for a command's `examples`. */
 export const fieldExample = (fields: readonly BodyField[]): string | undefined => {
   const required = fields.filter((field) => field.required);
