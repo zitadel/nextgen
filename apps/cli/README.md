@@ -35,6 +35,8 @@ npm run dev
 under `.zitadel/local/` (SQLite by default). Remote-server setup can use
 `--server <url>` without starting a local runtime. Use `--runtime docker`,
 `--image`, or `ZITADEL_LOCAL_IMAGE` for advanced Docker backend debugging.
+`start` also creates a local admin, `admin@zitadel.localhost`, and ends by
+printing a one-time sign-in link for the management console.
 `setup --server local` creates a project on that local server, asks which
 framework to scaffold when the directory is fresh (and which login design to
 use), writes the app into the current directory, and scaffolds the framework's
@@ -46,6 +48,11 @@ embedding posture from the app instead of assuming a fresh skeleton: the
 scaffolded pages take the `variant="widget"` posture inside your app's own
 shell, recorded in the scaffold manifest and verified by `doctor`. Fresh
 scaffolds also replace the starter home page with a redirect to `/login`.
+Against a local server started with the default platform bootstrap, setup also
+attaches the new project to the local admin's team, so the project is owned
+from the start and `zitadel claim` reports it as already owned. If you opted
+out with `NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=false`, there is no local admin
+and the project has no owning team; that server cannot claim projects.
 Setup writes `.env.local` and `.zitadel/`, and installs
 dependencies with the detected package manager. Pass `--skip-install` to install
 them yourself. The project's default user schema and login flow are provisioned
@@ -54,7 +61,9 @@ from versioned local defaults; setup writes editable copies into
 `.zitadel/flows/default-login.json`, uploads them through the schema and flow
 APIs, then seeds `.zitadel/state.json` so `zitadel plan` is immediately empty.
 Open the dev server URL printed by your framework, register a user, log out,
-log back in, and end on the signed-in profile page.
+log back in, and end on the signed-in profile page. That user is an end user
+of your app. The management console is a separate sign-in: run
+`zitadel console` for a fresh one-time link as the local admin.
 
 For a reproducible tester report, use the exact alpha train from the GitHub
 Release:
@@ -89,20 +98,23 @@ and agent UIs may display stderr package-manager progress together with stdout.
 
 ## Other commands
 
-- `zitadel claim` — claim the project to make it permanent (opens the claim
+- `zitadel claim`: claim the project to make it permanent (opens the claim
   page, polls for completion; the claim then shows in `setup`, `status`, and
   `doctor`)
-- `zitadel doctor` — verify the local runtime and generated project files
+- `zitadel console`: print a fresh one-time sign-in link for the local
+  console as `admin@zitadel.localhost` and open it in a browser
+  (`--no-open` prints the link only)
+- `zitadel doctor`: verify the local runtime and generated project files
   (including scaffold drift and dependency-version alignment)
-- `zitadel status` — summarise the local runtime and project
-- `zitadel plan` — validate config and preview sync changes without mutation
-- `zitadel apply` — validate and upload repo config to Zitadel
-- `zitadel branding eject` — scaffold an editable login template from a design
-- `zitadel schemas list` — list the project's user schemas
-- `zitadel variables list|get|set|delete` — manage the project's variables and
+- `zitadel status`: summarise the local runtime and project
+- `zitadel plan`: validate config and preview sync changes without mutation
+- `zitadel apply`: validate and upload repo config to Zitadel
+- `zitadel branding eject`: scaffold an editable login template from a design
+- `zitadel schemas list`: list the project's user schemas
+- `zitadel variables list|get|set|delete`: manage the project's variables and
   secrets (`--project-level`)
-- `zitadel eject` — remove what setup wrote (alias: `zitadel uninstall`)
-- `zitadel start|stop|logs|reset` — manage the local runtime
+- `zitadel eject`: remove what setup wrote (alias: `zitadel uninstall`)
+- `zitadel start|stop|logs|reset`: manage the local runtime
 
 The full agent-facing contract (JSON envelope, posture rules, claim flow,
 doctor repair) is [`SKILLS.md`](https://github.com/zitadel/nextgen/blob/main/apps/cli/SKILLS.md),

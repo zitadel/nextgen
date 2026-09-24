@@ -5,6 +5,8 @@ description: How the CLI starts and stores local Zitadel state.
 
 `zitadel start` starts a managed local Zitadel runtime for app development.
 
+By default, the managed runtime includes the platform project and a local admin, `admin@zitadel.localhost`, so a developer exists on their own server without signing up. Projects created by `zitadel setup --server local` are by default attached to that admin's team, and `zitadel console` signs the admin in to the management console. Setting `NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=false`, or pinning another project, starts a bare server with neither.
+
 The default runtime backend is the `@zitadel/server` npm binary that matches the selected alpha package train. It is intended for app developers and agents, so it does not require Docker, Go, Moon, or this repository.
 
 Runtime metadata is stored in:
