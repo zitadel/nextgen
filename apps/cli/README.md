@@ -48,9 +48,11 @@ embedding posture from the app instead of assuming a fresh skeleton: the
 scaffolded pages take the `variant="widget"` posture inside your app's own
 shell, recorded in the scaffold manifest and verified by `doctor`. Fresh
 scaffolds also replace the starter home page with a redirect to `/login`.
-Against a local server, setup also attaches the new project to the local
-admin's team, so the project is owned from the start and `zitadel claim`
-reports it as already owned.
+Against a local server started with the default platform bootstrap, setup also
+attaches the new project to the local admin's team, so the project is owned
+from the start and `zitadel claim` reports it as already owned. If you opted
+out with `NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=false`, the project stays
+unclaimed.
 Setup writes `.env.local` and `.zitadel/`, and installs
 dependencies with the detected package manager. Pass `--skip-install` to install
 them yourself. The project's default user schema and login flow are provisioned

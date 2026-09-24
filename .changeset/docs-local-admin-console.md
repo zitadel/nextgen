@@ -2,9 +2,8 @@
 "@zitadel/cli": patch
 ---
 
-The CLI README and `SKILLS.md` now describe the local admin
-`admin@zitadel.localhost` that `zitadel start` creates, the one-time console
-sign-in link it prints, and the `zitadel console` command that prints a fresh
-one. They also say that a local `zitadel setup` attaches the project to that
-admin's team, so the project is owned from the start and `zitadel claim`
-reports it as already owned.
+The CLI documentation now explains the local admin `admin@zitadel.localhost`
+that `zitadel start` creates by default, the one-time console sign-in link it
+prints, the `zitadel console` command that prints a fresh link, and that a
+local `zitadel setup` attaches the project to that admin's team so
+`zitadel claim` reports it as already owned.

@@ -102,9 +102,11 @@ schema, default login flow) and is what makes `zitadel claim` and
 self-registration work. It still lacks §2's server-discovered seed transport
 for membership and owner assignment, but it is no longer only a manual
 opt-in: `zitadel start` sets the flag and hands the server an initial
-operator, `admin@zitadel.localhost`, through `--user-file`. So on any
-CLI-started server the console signs into `proj_platform`, and
-`zitadel console` prints a one-time link that signs that operator in.
+operator, `admin@zitadel.localhost`, through `--user-file`. So on a
+CLI-started server that keeps the default bootstrap the console signs into
+`proj_platform`, and `zitadel console` prints a one-time link that signs that
+operator in. Setting `NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=false` or pinning
+another project turns both the platform project and the local admin off.
 
 The "run `zitadel setup`" hint on the login screen therefore only shows where
 the platform project is off and no project exists yet; refresh after setup and
