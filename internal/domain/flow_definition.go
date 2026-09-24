@@ -40,6 +40,11 @@ type FlowOnSuccess uint8
 
 const (
 	FlowOnSuccessCreateUser FlowOnSuccess = iota
+	// FlowOnSuccessCreateUserWithSso creates the user from the identity an
+	// external provider returned. It is separate from CreateUser because it
+	// establishes a different thing: the provider vouched for the
+	// identifier, so no password is collected and none is set.
+	FlowOnSuccessCreateUserWithSso
 )
 
 // FlowStepComplete classifies a terminal step. The frontend uses this

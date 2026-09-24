@@ -64,6 +64,7 @@ type flowTestWorld struct {
 	authAttemptService *domainmock.MockFlowAuthAttemptService
 	schemaResolver     *domainmock.MockSchemaResolver
 	createUser         *domainmock.MockFlowOnSuccessHandler
+	createUserWithSSO  *domainmock.MockFlowOnSuccessHandler
 	sm                 *domain.FlowStateMachineRuntime
 }
 
@@ -81,6 +82,7 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 	schemaStore := domainmock.NewMockJSONSchemaStore(mock)
 	authAttemptService := domainmock.NewMockFlowAuthAttemptService(mock)
 	createUser := domainmock.NewMockFlowOnSuccessHandler(mock)
+	createUserWithSSO := domainmock.NewMockFlowOnSuccessHandler(mock)
 
 	resolver := domain.NewSchemaFieldResolver()
 
@@ -91,6 +93,7 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 		schemaStore,
 		resolver,
 		createUser,
+		createUserWithSSO,
 		authAttemptService,
 		now,
 	)
@@ -101,6 +104,7 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 		schemaResolver:     schemaResolver,
 		authAttemptService: authAttemptService,
 		createUser:         createUser,
+		createUserWithSSO:  createUserWithSSO,
 		sm:                 sm,
 	}
 }
@@ -591,6 +595,55 @@ func TestFlowStateMachine_Process_IntegrityOnMissingTargetStep(t *testing.T) {
 		},
 	})
 	require.ErrorIs(t, err, domain.ErrFlowIntegrity())
+}
+
+// create_user_with_sso runs its own handler, not the password one: an
+// external identity has no password to set. Having resolved a user, the flow
+// terminates for real and mints a handoff, as the password path does.
+func TestFlowStateMachine_Process_CreateUserWithSsoRunsItsOwnHandler(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+
+	w.schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+		AnyTimes()
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
+	w.authAttemptService.EXPECT().
+		SubmitIdentifier(gomock.Any(), gomock.Any()).
+		Return("", domain.ErrAuthAttemptProofRejected(nil))
+	// Each on_success runs its own handler: the password one must not be
+	// reached for an external identity, which has no password to set.
+	w.createUser.EXPECT().Handle(gomock.Any(), gomock.Any()).Times(0)
+	w.createUserWithSSO.EXPECT().
+		Handle(gomock.Any(), gomock.Any()).
+		Return(domain.FlowOnSuccessResult{UserID: "user-sso-1", Irreversible: true}, nil)
+	// The handler resolved a user, so the flow terminates for real: a
+	// completion that mints no handoff is one the caller cannot exchange.
+	w.authAttemptService.EXPECT().
+		Handoff(gomock.Any(), gomock.Any()).
+		Return(domain.FlowHandoffOutput{Token: "handoff-1"}, nil)
+
+	withSso := domain.FlowOnSuccessCreateUserWithSso
+	def := signupDefinition()
+	def.Steps[0].OnSuccess = &withSso
+
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeRegister,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	_, err = w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{
+			"email":                   "alice@example.com",
+			"x-auth-methods#password": "correct-horse-battery-staple",
+		},
+	})
+	require.NoError(t, err)
 }
 
 func TestFlowStateMachine_Process_InvalidActionRejected(t *testing.T) {
@@ -4089,4 +4142,166 @@ func TestFlowStateMachine_Process_PurposeToggleDoesNotGrowState(t *testing.T) {
 	assert.Empty(t, state.BackStack)
 	assert.Empty(t, state.History)
 	assert.Equal(t, "attempt-1", state.AuthAttemptID)
+}
+
+// ssoResolveDefinition is a login flow whose entry step routes the three
+// outcomes an identity-provider callback resolves to, so ResumeWithOutcome
+// can be driven for each without a submit.
+func ssoResolveDefinition() *domain.FlowDefinition {
+	show := domain.FlowStepCompleteShow
+	return &domain.FlowDefinition{
+		ProjectID:  testProjectID,
+		ID:         "def-sso-resolve",
+		UserSchema: defaultSchemaURL,
+		Purposes: map[domain.FlowDefinitionPurpose]string{
+			domain.FlowDefinitionPurposeLogin:    "identifier",
+			domain.FlowDefinitionPurposeRegister: "register-sso",
+		},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name:   "identifier",
+				Fields: []domain.Field{"email"},
+				Actions: []domain.FlowStepAction{
+					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					"callback":            {Target: "done"},
+					"identity_unknown":    {Target: "register-sso"},
+					"user_already_exists": {Target: "sso-conflict"},
+				},
+			},
+			{
+				Name:   "register-sso",
+				Fields: []domain.Field{"email"},
+				Actions: []domain.FlowStepAction{
+					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					domain.FlowActionSubmit: {Target: "done"},
+				},
+			},
+			{
+				Name:   "sso-conflict",
+				Fields: []domain.Field{"email"},
+				Actions: []domain.FlowStepAction{
+					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					domain.FlowActionSubmit: {Target: "done"},
+				},
+			},
+			{Name: "done", Complete: &show},
+		},
+	}
+}
+
+// resolvedState builds a login flow parked on the entry step, holding the
+// email the provider returned — the shape finishSsoCallback hands to
+// ResumeWithOutcome.
+func resolvedState(userID string) *domain.FlowState {
+	return &domain.FlowState{
+		ID:            "flow-sso",
+		ProjectID:     testProjectID,
+		UserSchemaURL: defaultSchemaURL,
+		AuthAttemptID: "attempt-1",
+		FlowProgress: domain.FlowProgress{
+			DefinitionID:   "def-sso-resolve",
+			Purpose:        domain.FlowDefinitionPurposeLogin,
+			CurrentPurpose: domain.FlowDefinitionPurposeLogin,
+			CurrentStep:    "identifier",
+			CollectedData: domain.CollectedFlowData{
+				UserID:   userID,
+				UserData: map[string]any{"email": "sso@example.com"},
+			},
+		},
+	}
+}
+
+func TestResumeWithOutcome_Callback_TerminatesAndMintsHandoff(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+	w.schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+		AnyTimes()
+	// The account was created during callback processing, so the flow arrives
+	// with a user already resolved and terminates for real.
+	w.authAttemptService.EXPECT().
+		Handoff(gomock.Any(), gomock.Any()).
+		Return(domain.FlowHandoffOutput{Token: "handoff-1"}, nil)
+
+	state := resolvedState("user-sso-1")
+	result, err := w.sm.ResumeWithOutcome(t.Context(), ssoResolveDefinition(), state, "callback", true)
+
+	require.NoError(t, err)
+	assert.Equal(t, "done", result.State.CurrentStep)
+	require.NotNil(t, result.Step.Complete)
+	assert.Equal(t, "handoff-1", result.HandoffToken, "a resolved callback must mint a handoff")
+	assert.Empty(t, state.BackStack, "an irreversible completion clears the back stack")
+}
+
+func TestResumeWithOutcome_IdentityUnknown_FlipsToRegisterAndCollects(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+	w.schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+		AnyTimes()
+
+	state := resolvedState("")
+	result, err := w.sm.ResumeWithOutcome(t.Context(), ssoResolveDefinition(), state, "identity_unknown", false)
+
+	require.NoError(t, err)
+	assert.Equal(t, "register-sso", result.State.CurrentStep, "an unknown identity lands on the collection step")
+	assert.Nil(t, result.Step.Complete, "collection is not a completion")
+	// The purpose flip is the whole reason this goes through routeOutcome: the
+	// collected email must be dispatched as a registration, not a sign-in.
+	assert.Equal(t, domain.FlowDefinitionPurposeRegister, state.CurrentPurpose)
+}
+
+func TestResumeWithOutcome_UserAlreadyExists_BindsThenRoutesToConflict(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+	w.schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+		AnyTimes()
+	// The conflict step verifies a factor, which refuses to run against an
+	// attempt with no user: the collision must bind the account first, from
+	// the email the provider returned.
+	w.authAttemptService.EXPECT().
+		SubmitIdentifier(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitIdentifierInput) bool {
+			return in.Value == "sso@example.com" && in.AttemptID == "attempt-1"
+		})).
+		Return("user_alice", nil)
+
+	state := resolvedState("")
+	result, err := w.sm.ResumeWithOutcome(t.Context(), ssoResolveDefinition(), state, "user_already_exists", false)
+
+	require.NoError(t, err)
+	assert.Equal(t, "sso-conflict", result.State.CurrentStep)
+	assert.Equal(t, "user_alice", state.CollectedData.UserID, "the colliding account is pinned for the conflict step")
+}
+
+func TestResumeWithOutcome_UnroutedOutcome_IsIntegrityError(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+
+	// The entry step routes callback/identity_unknown/user_already_exists but
+	// not this: a definition that offers a provider without saying where an
+	// outcome goes is a scaffolding bug, surfaced rather than silently eaten.
+	_, err := w.sm.ResumeWithOutcome(t.Context(), ssoResolveDefinition(), resolvedState(""), "user_not_found", false)
+
+	require.ErrorIs(t, err, domain.ErrFlowIntegrity())
+}
+
+func TestResumeWithOutcome_UnknownStep_IsIntegrityError(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+
+	state := resolvedState("")
+	state.CurrentStep = "no-such-step"
+	_, err := w.sm.ResumeWithOutcome(t.Context(), ssoResolveDefinition(), state, "callback", false)
+
+	require.ErrorIs(t, err, domain.ErrFlowIntegrity())
 }

@@ -5,6 +5,7 @@ package integration_test
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/go-faster/jx"
@@ -1092,4 +1093,99 @@ func TestListFlowDefinitionsExpandUserSchema(t *testing.T) {
 		assert.NotEqual(t, first.FlowDefinitions[0].ID, second.FlowDefinitions[0].ID)
 		require.True(t, second.FlowDefinitions[0].UserSchema.Set, helpers.MustMarshal(t, second))
 	})
+}
+
+// TestCreateFlowDefinitionOnSuccessRoundTrip walks every on_success value
+// through the API and back.
+//
+// The engine tests set [domain.FlowOnSuccess] directly, which says nothing
+// about the wire: generated request validation could reject the value, the
+// string-to-enum conversion could refuse it, or the response mapping could
+// drop it, and a flow would be rejected or silently persisted without its
+// mutation while every engine test still passed. Adding a value to the enum
+// without extending this test leaves that gap open, so the cases are derived
+// from the enum rather than listed by hand.
+func TestCreateFlowDefinitionOnSuccessRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+
+	// The seeded default human-user schema, which enables password: the
+	// create_user manifest demands one be collected, and a schema without it
+	// rejects the field before on_success is ever reached.
+	userSchemaURI := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+
+	for _, onSuccess := range domain.FlowOnSuccessValues() {
+		t.Run(onSuccess.String(), func(t *testing.T) {
+			wire := api.FlowDefinitionStepOnSuccess(onSuccess.String())
+			// Definition names are kebab-case by contract; the enum is snake.
+			name := "on-success-" + strings.ReplaceAll(onSuccess.String(), "_", "-")
+
+			// The validator refuses a mutation whose manifest is not collected
+			// upstream, so the fixture collects exactly what this value
+			// declares. Reading the manifest rather than hardcoding fields
+			// keeps the test valid when a mutation's requirements change.
+			// email is always collected: the validator also requires every
+			// required schema field to appear somewhere in the steps, which
+			// holds regardless of what the mutation itself demands.
+			upstream := []string{"email"}
+			for _, kind := range domain.ManifestForOnSuccess(onSuccess) {
+				if kind == domain.FlowFieldChallengePassword {
+					upstream = append(upstream, "x-auth-methods#password")
+				}
+			}
+
+			definition := newFlowDefinitionFixture(name, userSchemaURI)
+			definition.Steps = []api.FlowDefinitionStep{
+				{
+					Name:   "step_1",
+					Fields: upstream,
+					Transitions: api.NewOptFlowDefinitionStepTransitions(
+						map[string]api.FlowDefinitionStepTransitionsItem{"submit": {Target: "step_2"}},
+					),
+					Actions: []api.StepAction{
+						{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
+					},
+				},
+				{
+					Name:      "step_2",
+					OnSuccess: api.NewOptFlowDefinitionStepOnSuccess(wire),
+					Transitions: api.NewOptFlowDefinitionStepTransitions(
+						map[string]api.FlowDefinitionStepTransitionsItem{"submit": {Target: "step_3"}},
+					),
+					Actions: []api.StepAction{
+						{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
+					},
+				},
+				{
+					Name:     "step_3",
+					Complete: api.NewOptFlowDefinitionStepComplete(api.FlowDefinitionStepCompleteRedirect),
+				},
+			}
+
+			created, err := client.CreateFlowDefinition(
+				t.Context(),
+				newCreateFlowDefinitionRequest(api.ProjectID(project.ID), definition),
+			)
+			require.NoError(t, err)
+			response, ok := created.(*api.FlowDefinitionResponse)
+			require.True(t, ok, helpers.MustMarshal(t, created))
+			require.Equal(t, wire, response.FlowDefinition.Steps[1].OnSuccess.Value,
+				"the created revision dropped or changed on_success")
+
+			// Read it back: the value has to survive storage and the response
+			// mapping, not just the request that carried it in.
+			fetched, err := client.GetFlowDefinition(t.Context(), api.GetFlowDefinitionParams{ID: response.ID})
+			require.NoError(t, err)
+			stored, ok := fetched.(*api.FlowDefinitionResponse)
+			require.True(t, ok, helpers.MustMarshal(t, fetched))
+			assert.Equal(t, wire, stored.FlowDefinition.Steps[1].OnSuccess.Value,
+				"the stored revision dropped or changed on_success")
+		})
+	}
 }

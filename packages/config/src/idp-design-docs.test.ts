@@ -267,14 +267,14 @@ describe("scaffolded flow (schemas/default-login.scaffold.json)", () => {
   };
   const flowMeta = loadJson(metaSchemaDir, "flow-definition.json");
 
-  it("fails against the shipped meta-schema only on the documented on_success delta", () => {
-    // The on_success enum gains create_user_with_sso once #1037 adds the value
-    // and its engine handler together; the editor schema mirrors the API until
-    // then. sso_providers is already a slug list, so it no longer differs.
+  it("differs from the shipped meta-schema only on the documented on_success delta", () => {
+    // One delta is left: the on_success enum gains create_user_with_sso. The
+    // editor schema mirrors the API, so this holds both before that lands and
+    // after. sso_providers is already a slug list, so it no longer differs.
     const validate = new Ajv2020({ strict: false, validateFormats: false, allErrors: true }).compile(
       flowMeta,
     );
-    expect(validate(flow)).toBe(false);
+    validate(flow);
     for (const err of validate.errors ?? []) {
       const onSuccess = err.keyword === "enum" && err.instancePath.endsWith("/on_success");
       expect(onSuccess, `${err.instancePath} ${err.keyword}`).toBe(true);
@@ -285,7 +285,12 @@ describe("scaffolded flow (schemas/default-login.scaffold.json)", () => {
     const patched = structuredClone(flowMeta) as {
       $defs: { FlowDefinitionStep: { properties: { on_success: { enum: string[] } } } };
     };
-    patched.$defs.FlowDefinitionStep.properties.on_success.enum.push("create_user_with_sso");
+    const step = patched.$defs.FlowDefinitionStep.properties;
+    // Patched in only while it is still missing, so this passes whether or
+    // not the PR carrying the value has landed.
+    if (!step.on_success.enum.includes("create_user_with_sso")) {
+      step.on_success.enum.push("create_user_with_sso");
+    }
     expect(ajv().compile(patched)(flow)).toBe(true);
   });
 

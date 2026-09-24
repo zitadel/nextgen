@@ -4346,6 +4346,8 @@ func (s FlowDefinitionStepOnSuccess) Validate() error {
 	switch s {
 	case "create_user":
 		return nil
+	case "create_user_with_sso":
+		return nil
 	default:
 		return errors.Errorf("invalid value: %v", s)
 	}
