@@ -851,8 +851,6 @@ DESCRIPTION
   Create a grant.
 
 EXAMPLES
-  $ zitadel grants create --relation viewer --json
-
   $ zitadel grants create --data '{...}' --json
 
   $ zitadel grants create --file ./grant.json

@@ -239,7 +239,13 @@ the schema's own description becomes the flag help. `--help` groups them under
 alphabetically rather than by declaration.
 
 ```sh
-zitadel grants create --relation viewer --expires-at 2030-01-01T00:00:00Z
+zitadel users create --schema human-user --attributes email=ada@example.com
+```
+
+The two forms combine, so a field flag can sit beside a raw body:
+
+```sh
+zitadel grants create --relation viewer --data '{"user":{"user_id":"user_01J…"}}'
 ```
 
 An **open record** — a user's `attributes`, whose keys come from the project's
@@ -265,7 +271,10 @@ by the user schema, since the value would reach the server quoted. A malformed
 JSON value fails locally and the error offers the string form.
 
 Fields the CLI cannot express as a single flag (nested objects, arrays) are
-absent from the flag list and stay reachable through the raw body.
+absent from the flag list and stay reachable through the raw body. A resource
+that has one — `grants create` names its principal with a nested `user` or
+`team` object — also gets no flags-only example in `--help`, because that run
+would send an incomplete body for the platform to reject.
 
 **Credentials are refused on the command line.** Anything in argv is visible to
 anyone running `ps`, is kept in shell history, and is captured by CI logs — and
