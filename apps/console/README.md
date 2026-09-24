@@ -157,6 +157,15 @@ Note `queryUsers` requires `user.read`, which only the **project secret** carrie
 (`internal/api/user.go`). So real list screens need the proxy's
 `CONSOLE_PROJECT_SECRET`, which this script supplies; sign-in alone does not.
 
+The proxy injects that secret only for requests aimed at the seeded project
+(no `project_id`, or the seeded one). A request scoped to another project —
+one you were granted access to, or one added with
+[`scripts/dev-real-add-project.mts`](scripts/dev-real-add-project.mts) — goes
+through on the session cookie alone, because the server lets a Bearer win over
+the cookie and the seeded project's secret would only hide the other project
+as a 404. That is also why the Add-admin picker on a project's page lists the
+seeded project's users for every project: `POST /users/query` names no project.
+
 ### Mock backend
 
 ```sh
@@ -192,6 +201,8 @@ embed base path.
 | --- | --- | --- |
 | `CONSOLE_BACKEND_URL` | Node (dev proxy) | Upstream API origin (defaults in `vite.config.mts`) |
 | `CONSOLE_PROJECT_SECRET` | Node (dev proxy) | Bearer attached by the proxy; never shipped to the browser |
+| `CONSOLE_PROJECT_SECRET_PROJECT_ID` | Node (dev proxy) | The project that secret belongs to; the proxy attaches the secret only to requests scoped to it (or to none). Defaults to `VITE_CONSOLE_PROJECT_ID`, which differs only in claim mode |
+| `CONSOLE_DEV_PROXY_LOG` | Node (dev proxy) | Set to `1` to print which credential each proxied request went out with (project secret, caller's authorization, or cookie only) — for a screen that answers 401/403/404 when it is not obvious who the server saw |
 | `VITE_CONSOLE_API_BASE` | Client | Same-origin API base the SDK calls (default `/api`) |
 | `VITE_CONSOLE_PROJECT_ID` | Client | Dev override for the project id; when unset it is discovered from `/console/runtime.json` (Console ADR 0004) |
 | `VITE_CONSOLE_RUNTIME_FALLBACK` | Client (build/dev time) | Opt-in for runs with no `/console/runtime.json` (`vite preview`, api-mock): failed discovery resolves to `standalone` instead of the connectivity error. Never set it for the embedded build |
