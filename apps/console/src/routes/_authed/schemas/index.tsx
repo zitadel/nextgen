@@ -22,12 +22,17 @@ import {
 } from "@/lib/schema";
 
 import { api } from "../../../api/zitadel";
-import { getConsoleProjectId } from "../../../runtime/runtime";
+import {
+  projectScopeDeps,
+  requireProjectScope,
+  useRequiredProjectScope,
+} from "../../../lib/project-scope";
 
 export const Route = createFileRoute("/_authed/schemas/")({
-  staticData: { nav: { label: "User schemas", order: 1, parent: "/users" } },
-  loader: async () => {
-    const projectId = getConsoleProjectId();
+  staticData: { scope: "project", nav: { label: "User schemas", order: 1, parent: "/users" } },
+  loaderDeps: projectScopeDeps,
+  loader: async ({ deps }) => {
+    const projectId = requireProjectScope(deps.project);
     // `kind` scopes the list to user schemas. The screen is titled `User
     // schemas` and only knows how to render one, so this is the contract the
     // rows already assume rather than a new restriction.
@@ -68,6 +73,7 @@ function toSchemaRow(entry: { id: string; metadata: { created_at: string }; sche
 }
 
 function SchemasScreen() {
+  const projectId = useRequiredProjectScope();
   const loaded = Route.useLoaderData();
 
   // Pages fetched after the first live here rather than in the loader: `Load
@@ -104,7 +110,7 @@ function SchemasScreen() {
       // ordering and mode, so a filter drift between pages would silently
       // page over a different set.
       const page = await api.listSchemas({
-        project_id: getConsoleProjectId(),
+        project_id: projectId,
         kind: "user-schema",
         revisions: "latest",
         limit: PAGE_SIZE,

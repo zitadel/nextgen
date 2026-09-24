@@ -28,6 +28,7 @@ import { schemaDisplayName } from "@/lib/schema";
 import { api } from "../../../api/zitadel";
 
 export const Route = createFileRoute("/_authed/flow-definitions/$definitionId")({
+  staticData: { scope: "project" },
   loader: async ({ params }) => {
     const entry = await api.getFlowDefinition(params.definitionId);
     // Structurally the list's `flow_definition`; orval renames per operation.

@@ -24,18 +24,19 @@ import {
 import { schemaDisplayName } from "@/lib/schema";
 
 import { api } from "../../../api/zitadel";
-import { getConsoleProjectId } from "../../../runtime/runtime";
+import { projectScopeDeps, requireProjectScope } from "../../../lib/project-scope";
 
 export const Route = createFileRoute("/_authed/flow-definitions/")({
   // Order 4: Users sits at 3.
-  staticData: { nav: { label: "Login flows", order: 4, icon: Workflow } },
-  loader: async () => {
+  staticData: { scope: "project", nav: { label: "Login flows", order: 4, icon: Workflow } },
+  loaderDeps: projectScopeDeps,
+  loader: async ({ deps }) => {
     // Without the embed the row has only the schema's id, not its name.
     // `latest` because this is a directory of flows, not a revision history:
     // publishing under an existing name generates a new row, and only the newest
     // one is the flow.
     const page = await api.listFlowDefinitions({
-      project_id: getConsoleProjectId(),
+      project_id: requireProjectScope(deps.project),
       revisions: "latest",
       expand: ["user_schema"],
     });

@@ -18,7 +18,7 @@ import {
 
 import { api } from "../api/zitadel";
 import { describeError } from "../lib/api-error";
-import { getConsoleProjectId } from "../runtime/runtime";
+import { useRequiredProjectScope } from "../lib/project-scope";
 
 // Long utility strings live as named constants so Tailwind's scanner sees the
 // full literal (it never sees a concatenated fragment). Shared with the Add user
@@ -68,6 +68,7 @@ function AddTeamForm({
   onCreated: () => void | Promise<void>;
   onClose: () => void;
 }) {
+  const projectId = useRequiredProjectScope();
   const [name, setName] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
@@ -80,7 +81,7 @@ function AddTeamForm({
     setSubmitting(true);
     setError(undefined);
     try {
-      await api.createTeam({ name: name.trim() }, { project_id: getConsoleProjectId() });
+      await api.createTeam({ name: name.trim() }, { project_id: projectId });
       await onCreated();
       onClose();
     } catch (cause) {

@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { scopedPath } from "@/lib/project-scope.fixture";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
@@ -72,7 +73,7 @@ async function renderAt(path: string) {
     import("@tanstack/react-router"),
     import("../../../router"),
   ]);
-  const router = createAppRouter({ history: createMemoryHistory({ initialEntries: [path] }) });
+  const router = createAppRouter({ history: createMemoryHistory({ initialEntries: [scopedPath(path)] }) });
   render(<RouterProvider router={router} />);
   return router;
 }
@@ -98,7 +99,7 @@ describe("login flows list", () => {
     // The schema name comes from the `expand=user_schema` embed, not the id,
     // and links to the schema it names.
     const schema = screen.getByRole("link", { name: "Minimal" });
-    expect(schema).toHaveAttribute("href", "/schemas/sch_1");
+    expect(schema).toHaveAttribute("href", scopedPath("/schemas/sch_1"));
   });
 
   it("marks a draft flow and leaves an active one unmarked", async () => {
@@ -166,7 +167,7 @@ describe("login flow detail", () => {
     await renderAt("/flow-definitions/flow_1");
 
     expect(await screen.findByRole("heading", { name: "Default login" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Minimal" })).toHaveAttribute("href", "/schemas/sch_1");
+    expect(screen.getByRole("link", { name: "Minimal" })).toHaveAttribute("href", scopedPath("/schemas/sch_1"));
     expect(screen.getByText("flow_1")).toBeInTheDocument();
     expect(screen.getByRole("cell", { name: "submit, passkey" })).toBeInTheDocument();
     // A terminal step collects nothing and offers nothing.

@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { scopedPath } from "@/lib/project-scope.fixture";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
@@ -26,13 +27,13 @@ afterAll(() => {
   vi.unstubAllEnvs();
 });
 
-async function renderUsers() {
+async function renderUsers(path = scopedPath("/users")) {
   const [{ RouterProvider, createMemoryHistory }, { createAppRouter }] = await Promise.all([
     import("@tanstack/react-router"),
     import("../../../router"),
   ]);
   const router = createAppRouter({
-    history: createMemoryHistory({ initialEntries: ["/users"] }),
+    history: createMemoryHistory({ initialEntries: [path] }),
   });
   render(<RouterProvider router={router} />);
   return router;
@@ -52,6 +53,20 @@ function recordQueries(response: (body: Record<string, unknown>) => Response) {
 }
 
 describe("users screen", () => {
+  it("says it cannot list another project's users rather than showing its own", async () => {
+    // `POST /users/query` names no project and answers for the caller's own
+    // (`proj_test`, the session fixture's), so reading it here would put that
+    // project's users under the selected one's name.
+    const bodies = recordQueries(() => HttpResponse.json({ users: [] }));
+    await renderUsers(scopedPath("/users", "proj_other"));
+
+    expect(
+      await screen.findByText("Users of this project can't be listed yet"),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    expect(bodies).toEqual([]);
+  });
+
   it("renders the page heading and a user row", async () => {
     server.use(
       http.post(USERS_QUERY_URL, () =>
@@ -445,11 +460,11 @@ describe("users screen", () => {
     // entry carries the id, so this costs no extra read.
     expect(table.getByRole("link", { name: "Acme Web" })).toHaveAttribute(
       "href",
-      "/teams/team_1",
+      scopedPath("/teams/team_1"),
     );
     expect(table.getByRole("link", { name: "Platform" })).toHaveAttribute(
       "href",
-      "/teams/team_2",
+      scopedPath("/teams/team_2"),
     );
     // `[]` is "on no team", which the table draws as an empty cell rather than
     // leaving the row a column short.
