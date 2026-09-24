@@ -99,8 +99,17 @@ export async function mergeEnvFile(
 /** What happened to a captured secret, for the command's summary. */
 export type SecretOutcome =
   | { readonly stored: true; readonly name: string }
-  /** Deferred by the developer, or refused because the file is not ignored. */
-  | { readonly stored: false; readonly name: string; readonly reason: "deferred" | "not-ignored" };
+  /**
+   * Not written. Either the developer gave no value, the file cannot be
+   * written to safely, or the name already had one — `mergeEnvFile` never
+   * overwrites, so reporting "stored" there would be a lie the developer
+   * only discovers when sign-in keeps failing with the old credential.
+   */
+  | {
+      readonly stored: false;
+      readonly name: string;
+      readonly reason: "deferred" | "not-ignored" | "already-set";
+    };
 
 /**
  * Store a client secret for local development.
@@ -127,6 +136,9 @@ export async function storeClientSecret(options: {
   if (!(await isSafeForSecrets(cwd, ENV_LOCAL))) {
     return { stored: false, name, reason: "not-ignored" };
   }
-  await mergeEnvFile(cwd, ENV_LOCAL, [{ name, value }]);
+  const added = await mergeEnvFile(cwd, ENV_LOCAL, [{ name, value }]);
+  if (added.length === 0) {
+    return { stored: false, name, reason: "already-set" };
+  }
   return { stored: true, name };
 }

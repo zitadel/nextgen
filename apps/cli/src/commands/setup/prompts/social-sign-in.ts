@@ -46,7 +46,10 @@ export class SocialSignInPrompt implements SetupPrompt {
     const entry = idpCatalogEntry(provider);
     this.announce(entry, answers.devPort);
 
-    const clientId = answers.sso?.clientId ?? (await this.askClientId());
+    const clientId =
+      answers.sso?.clientId !== undefined && answers.sso.clientId !== ""
+        ? answers.sso.clientId
+        : await this.askClientId();
     const secret = answers.sso?.secret ?? (await this.askSecret(provider));
     return { ...answers, sso: { provider, clientId, secret } };
   }

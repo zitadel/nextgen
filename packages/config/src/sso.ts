@@ -43,13 +43,19 @@ function providerSteps(flow: Json): string[] {
  * so this cannot be hardcoded: `identifier` is only the password-first flow's
  * entry, and a passkey-first flow starts at its passkey screen.
  */
-function loginEntry(flow: Json): string {
+function loginEntry(flow: Json): string | undefined {
   const purposes = isObject(flow.purposes) ? flow.purposes : {};
   const named = purposes.login;
   if (typeof named === "string" && stepNamed(flow, named) !== undefined) {
     return named;
   }
-  return "identifier";
+  // A flow that does not serve the login purpose has nowhere to send someone
+  // who wants to sign in instead, and the validator rejects a transition that
+  // re-purposes to a purpose the definition does not serve. Falling back to
+  // `identifier` would write exactly that.
+  return stepNamed(flow, "identifier") !== undefined && purposes.login !== undefined
+    ? "identifier"
+    : undefined;
 }
 
 /** Step the engine sends a new external identity to. */
@@ -143,7 +149,7 @@ function registerSsoStep(): Step {
 function ssoConflictStep(
   slug: string,
   methods: { password: boolean; passkey: boolean },
-  loginStep: string,
+  loginStep: string | undefined,
 ): Step {
   const actions: Json[] = [];
   const fields: string[] = [];
@@ -154,7 +160,14 @@ function ssoConflictStep(
   if (methods.passkey) {
     actions.push({ name: "passkey", kind: "passkey", primary: false, text_key: `${SSO_CONFLICT}.action.passkey` });
   }
-  actions.push({ name: "sign_in", kind: "navigate", primary: false, text_key: `${SSO_CONFLICT}.action.sign_in` });
+  if (loginStep !== undefined) {
+    actions.push({
+      name: "sign_in",
+      kind: "navigate",
+      primary: false,
+      text_key: `${SSO_CONFLICT}.action.sign_in`,
+    });
+  }
 
   const transitions: Json = {};
   if (methods.password) {
@@ -165,15 +178,64 @@ function ssoConflictStep(
   }
   transitions.callback = { target: "done" };
   transitions.user_already_exists = { target: SSO_CONFLICT };
-  transitions.sign_in = { target: loginStep, purpose: "login" };
+  if (loginStep !== undefined) {
+    transitions.sign_in = { target: loginStep, purpose: "login" };
+  }
   transitions.identity_unknown = { target: REGISTER_SSO };
 
   return { name: SSO_CONFLICT, fields, actions, sso_providers: [slug], transitions };
 }
 
-/** Whether a step matches what this generator would write for it. */
+/**
+ * Whether a step is still what this generator would write for it.
+ *
+ * Compared key-sorted at every depth: the CLI writes its managed files with a
+ * stable serialiser, so a step that has been through `setup` or any `apply`
+ * has its keys in a different order from the object built here while being
+ * the same step. Comparing the raw JSON would report the generator's own
+ * output as hand-edited.
+ */
 function matches(step: Step, expected: Step): boolean {
-  return JSON.stringify(step) === JSON.stringify(expected);
+  return canonical(step) === canonical(expected);
+}
+
+/** The provider list a step should end up with: what it has, plus this slug. */
+function mergedProviders(step: Step, slug: string): unknown[] {
+  const providers = Array.isArray(step.sso_providers) ? [...(step.sso_providers as unknown[])] : [];
+  return providers.includes(slug) ? providers : [...providers, slug];
+}
+
+/**
+ * Offer a provider on a step, keeping any already there. Returns whether the
+ * step changed, so a rerun is a no-op.
+ */
+function addProvider(step: Step, slug: string): boolean {
+  const providers = Array.isArray(step.sso_providers) ? [...(step.sso_providers as unknown[])] : [];
+  if (providers.includes(slug)) {
+    return false;
+  }
+  providers.push(slug);
+  step.sso_providers = providers;
+  return true;
+}
+
+/** Stable JSON: object keys sorted at every depth, arrays left in order. */
+function canonical(value: unknown): string {
+  return JSON.stringify(sortKeys(value));
+}
+
+function sortKeys(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(sortKeys);
+  }
+  if (isObject(value)) {
+    return Object.fromEntries(
+      Object.keys(value)
+        .sort()
+        .map((key) => [key, sortKeys(value[key])]),
+    );
+  }
+  return value;
 }
 
 /**
@@ -196,10 +258,7 @@ export function applySsoToFlow(
     if (step === undefined) {
       continue;
     }
-    const providers = Array.isArray(step.sso_providers) ? [...(step.sso_providers as unknown[])] : [];
-    if (!providers.includes(slug)) {
-      providers.push(slug);
-      step.sso_providers = providers;
+    if (addProvider(step, slug)) {
       changed = true;
     }
     const transitions = isObject(step.transitions) ? { ...step.transitions } : {};
@@ -237,15 +296,27 @@ export function applySsoToFlow(
   const wanted: Step[] = [registerSsoStep(), ssoConflictStep(slug, enabled, loginEntry(document))];
   let offset = 0;
   for (const step of wanted) {
-    const existing = stepNamed(document, step.name as string);
+    const name = step.name as string;
+    const existing = stepNamed(document, name);
     if (existing === undefined) {
       list.splice(insertAt + offset, 0, step);
       offset += 1;
       changed = true;
       continue;
     }
-    if (!matches(existing, step)) {
-      skipped.push({ region: `steps.${step.name as string}`, reason: "hand-edited" });
+    // The conflict step carries a provider list of its own, so a second
+    // provider is added to it rather than replacing the first — otherwise the
+    // generator would report its own output as hand-edited and leave the
+    // screen offering only the provider that was enabled first. `register-sso`
+    // declares none, so it is compared as written.
+    const expected = step.sso_providers === undefined
+      ? step
+      : { ...step, sso_providers: mergedProviders(existing, slug) };
+    if (step.sso_providers !== undefined && addProvider(existing, slug)) {
+      changed = true;
+    }
+    if (!matches(existing, expected)) {
+      skipped.push({ region: `steps.${name}`, reason: "hand-edited" });
     }
   }
   document.steps = list;

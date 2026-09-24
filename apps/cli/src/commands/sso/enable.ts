@@ -2,7 +2,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import { Flags } from "@oclif/core";
-import { cancel, isCancel, password, select, text } from "@clack/prompts";
+import { cancel, isCancel, password, text } from "@clack/prompts";
 import { consola } from "consola";
 
 import {
@@ -14,9 +14,11 @@ import {
 import { applySsoToFlow, applySsoToSchema, type SsoSkipped } from "@zitadel/config/sso";
 
 import { ZitadelError } from "../../lib/errors";
+import { stableStringify } from "../../lib/json";
 import {
   callbackUriFor,
   CONNECTION_SCHEMA_REF,
+  ENV_LOCAL,
   enabledMethods,
   IDPS_DIR,
   planConnection,
@@ -30,6 +32,7 @@ import {
 } from "../../lib/idp";
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "../../lib/oclif";
 import { readDevelopmentIssuer, readZitadelConfig, readZitadelSecret } from "../../lib/project";
+import { publicCliCommand } from "../../lib/public-cli";
 import { readState } from "../../lib/sync/state";
 import { readStdin } from "../../lib/variables";
 
@@ -106,55 +109,72 @@ export default class SsoEnable extends BaseCommand {
         pretty: `Would ${plan.action} ${plan.action === "reuse" ? plan.file.path : plan.path}`,
       });
     }
+    // An existing connection is reused as it stands — its credentials are
+    // already configured, and a second prompt would invite replacing them —
+    // but the schema and flow edits still run. Those are the point of the
+    // command, they are per-schema, and they are idempotent. Enabling the
+    // provider for a second user type, and finishing a run that was
+    // interrupted after the connection file was written, both arrive here.
+    const reusing = plan.action === "reuse";
+    const variable = clientSecretVariableName(plan.slug);
+    let secret: SecretOutcome | undefined;
 
-    // Reusing an existing connection asks for nothing: its credentials are
-    // already configured, and a second prompt would invite replacing them.
-    if (plan.action === "reuse") {
+    if (reusing) {
       consola.success(`Reusing ${plan.file.path}`);
-      return this.emit({
-        status: "ok",
-        data: this.payload({ provider, schema: schema.name, plan, callbackUri, secret: undefined }),
-        pretty: `Reused the ${entry.display_name} connection in ${plan.file.path}`,
+    } else {
+      consola.info(`${entry.display_name} needs an OAuth application.`);
+      consola.info(`Callback URI   ${callbackUri}`);
+      consola.info(`Create it at   ${entry.console_url}`);
+
+      const clientId =
+        flags["client-id"] ?? (await this.askClientId(entry.display_name, nonInteractive));
+      const secretValue = await this.askClientSecret(variable, nonInteractive);
+
+      const connection = scaffoldConnection({
+        provider,
+        clientId,
+        slug: plan.slug,
+        schemaProperties: schema.properties,
+        schemaRef: CONNECTION_SCHEMA_REF,
       });
+      const target = join(cwd, plan.path);
+      await mkdir(dirname(target), { recursive: true });
+      // `wx` rather than a plain write: planConnection decided this file does
+      // not exist, and anything that appeared since is not ours to overwrite.
+      await writeFile(target, `${stableStringify(connection)}\n`, { flag: "wx" });
+      secret = await storeClientSecret({ cwd, name: variable, value: secretValue });
+      consola.success(`Wrote ${plan.path}`);
     }
 
-    consola.info(`${entry.display_name} needs an OAuth application.`);
-    consola.info(`Callback URI   ${callbackUri}`);
-    consola.info(`Create it at   ${entry.console_url}`);
-
-    const clientId = flags["client-id"] ?? (await this.askClientId(entry.display_name, nonInteractive));
-    const variable = clientSecretVariableName(plan.slug);
-    const secretValue = await this.askClientSecret(variable, nonInteractive);
-
-    const connection = scaffoldConnection({
-      provider,
-      clientId,
-      slug: plan.slug,
-      schemaProperties: schema.properties,
-      schemaRef: CONNECTION_SCHEMA_REF,
-    });
-    const target = join(cwd, plan.path);
-    await mkdir(dirname(target), { recursive: true });
-    // `wx` rather than a plain write: planConnection decided this file does
-    // not exist, and anything that appeared since is not ours to overwrite.
-    await writeFile(target, `${JSON.stringify(connection, null, 2)}\n`, { flag: "wx" });
-    const secret = await storeClientSecret({ cwd, name: variable, value: secretValue });
     const edits = await this.enableInConfiguration(cwd, schema, plan.slug);
 
-    consola.success(`Wrote ${plan.path}`);
     for (const file of edits.written) {
       consola.success(`Updated ${file}`);
     }
     for (const skipped of edits.skipped) {
       consola.warn(`Left ${skipped.region} alone: it has been edited by hand. Update it yourself.`);
     }
-    if (secret.stored) {
-      consola.success(`Stored ${variable} in .env.local`);
-    } else {
-      consola.warn(
-        secret.reason === "deferred"
-          ? `${variable} has no value yet. Set it in .env.local before signing in.`
-          : `${variable} was not written: .env.local is not ignored by git. Set it yourself, or ignore that file first.`,
+    if (edits.written.length === 0 && edits.skipped.length === 0) {
+      consola.info(`${schema.name} and its login flow already offer ${entry.display_name}`);
+    }
+    if (secret) {
+      if (secret.stored) {
+        consola.success(`Stored ${variable} in ${ENV_LOCAL}`);
+      } else if (secret.reason === "already-set") {
+        consola.warn(
+          `${variable} already has a value in ${ENV_LOCAL} and was left alone. Edit it yourself to change it.`,
+        );
+      } else if (secret.reason === "deferred") {
+        consola.warn(`${variable} has no value yet.`);
+      } else {
+        consola.warn(
+          `${variable} was not written: ${ENV_LOCAL} is not ignored by git. Set it yourself, or ignore that file first.`,
+        );
+      }
+      // The engine resolves `${{ NAME }}` from the environment's variables,
+      // not from this file, so say the step that actually makes sign-in work.
+      consola.info(
+        `Publish it with: ${publicCliCommand(`variables set ${variable} --secret`, this.meta.cliVersion)}`,
       );
     }
 
@@ -170,7 +190,11 @@ export default class SsoEnable extends BaseCommand {
         skipped: edits.skipped,
       }),
       pretty: `Enabled ${entry.display_name} for ${schema.name}`,
-      nextCommands: ["plan", "apply"],
+      // `variables set` first: the connection references the secret as
+      // `${{ NAME }}` and the engine resolves that from the environment's
+      // variables, so publishing the configuration without it leaves a button
+      // that fails at token exchange.
+      nextCommands: [`variables set ${variable} --secret`, "plan", "apply"],
     });
   }
 
@@ -184,13 +208,14 @@ export default class SsoEnable extends BaseCommand {
     cwd: string,
     schema: SchemaFile,
     slug: string,
-  ): Promise<{ written: string[]; skipped: SsoSkipped[] }> {
+  ): Promise<{ written: string[]; skipped: SsoSkipped[]; flowsMatched: number }> {
     const written: string[] = [];
     const skipped: SsoSkipped[] = [];
+    let flowsMatched = 0;
 
     const schemaResult = applySsoToSchema(schema.body, slug);
     if (schemaResult.changed) {
-      await writeFile(join(cwd, schema.path), `${JSON.stringify(schemaResult.document, null, 2)}\n`);
+      await writeFile(join(cwd, schema.path), `${stableStringify(schemaResult.document)}\n`);
       written.push(schema.path);
     }
 
@@ -200,14 +225,27 @@ export default class SsoEnable extends BaseCommand {
       if (!flowUsesSchema(flow.body, schema, publishedSchemaId)) {
         continue;
       }
+      flowsMatched += 1;
       const result = applySsoToFlow(flow.body, slug, methods);
       skipped.push(...result.skipped.map((entry) => ({ ...entry, region: `${flow.path} ${entry.region}` })));
       if (result.changed) {
-        await writeFile(join(cwd, flow.path), `${JSON.stringify(result.document, null, 2)}\n`);
+        await writeFile(join(cwd, flow.path), `${stableStringify(result.document)}\n`);
         written.push(flow.path);
       }
     }
-    return { written, skipped };
+    // No flow means no button, however well the schema went — and the failure
+    // is invisible otherwise: `plan` and `apply` both succeed and the sign-in
+    // screen simply never offers the provider.
+    if (flowsMatched === 0) {
+      throw new ZitadelError("E_NOT_FOUND", `No login flow runs against ${schema.name}`, {
+        hint:
+          "The provider is offered by a flow, and none of the files under .zitadel/flows/ " +
+          "names this schema. Check the flow's user_schema, or run `apply` first so the " +
+          "schema's published id is recorded in .zitadel/state.json.",
+        details: { schema: schema.path },
+      });
+    }
+    return { written, skipped, flowsMatched };
   }
 
   /** The machine-readable payload. Never the secret, only whether it is held. */

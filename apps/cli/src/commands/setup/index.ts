@@ -32,7 +32,7 @@ import {
   claimWindowDeadline,
 } from "../../lib/claim-state";
 import { toZitadelError, ZitadelError } from "../../lib/errors";
-import { storeClientSecret, type SecretOutcome } from "../../lib/idp";
+import { IDPS_DIR, storeClientSecret, type SecretOutcome } from "../../lib/idp";
 import { brandingGuidanceAction } from "../../lib/journey-guidance";
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "../../lib/oclif";
 import { serverKind } from "../../lib/oclif/server-kind";
@@ -389,6 +389,12 @@ export default class Setup extends BaseCommand {
       // are not worth keeping.
       await rm(join(cwd, "zitadel.json"), { force: true });
       await rm(join(cwd, ".zitadel/secret"), { force: true });
+      // The connection file goes too: it is written before the schema and
+      // flow, so leaving it behind makes a plain rerun fail on it existing
+      // rather than starting the fresh setup this cleanup promises.
+      if (answers.sso) {
+        await rm(join(cwd, `${IDPS_DIR}/${answers.sso.provider}.json`), { force: true });
+      }
       const cause = toZitadelError(error);
       throw new ZitadelError(cause.code, `Default resource setup failed: ${cause.message}`, {
         hint:
@@ -751,6 +757,12 @@ async function ssoFromFlags(
   }
   const clientId = flags["sso-client-id"]?.trim();
   if (clientId === undefined || clientId === "") {
+    // Interactively the wizard asks for it — `--sso` skips the question it
+    // answers and no other, the way `--preset` does. Only a scripted run has
+    // nobody to ask.
+    if (!nonInteractive) {
+      return { provider: flags.sso, clientId: "" };
+    }
     throw new ZitadelError("E_VALIDATION", `--sso ${flags.sso} needs --sso-client-id`, {
       hint: `Register an OAuth application at ${idpCatalogEntry(flags.sso).console_url} and pass its client id.`,
     });
