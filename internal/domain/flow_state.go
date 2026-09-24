@@ -84,6 +84,33 @@ type FlowState struct {
 	// last successful Submit* call; handed off by the API handler at
 	// the OIDC redirect boundary.
 	AuthAttemptID string
+
+	// PendingHandoff carries a completion that was reached while the
+	// browser was somewhere else, so the next GET can deliver it.
+	//
+	// A flow normally completes on a submit, and the handoff token rides
+	// that response. The identity-provider callback has no response to ride:
+	// it answers a redirect, and a bearer token must not travel in a URL.
+	// Following [FlowPendingChallenge], the completion is sealed into the
+	// cookie instead and re-emitted once, rather than re-minted -- a GET that
+	// minted a fresh token on every call would be a replay surface.
+	PendingHandoff *FlowPendingHandoff
+}
+
+// FlowPendingHandoff is a completion waiting to be delivered. Single use:
+// the handler clears it as it emits it, so the same token cannot be handed
+// to two readers of the same cookie.
+type FlowPendingHandoff struct {
+	// Token is the handoff the caller exchanges for a session.
+	Token string
+
+	// ExpiresAt bounds the exchange window, as it does on the submit path.
+	ExpiresAt time.Time
+
+	// Complete is the terminal step's completion kind, captured when the
+	// flow terminated so the delivering render reports the same thing the
+	// submit path would have.
+	Complete FlowStepComplete
 }
 
 // FlowPendingChallenge records the server-issued challenge the next

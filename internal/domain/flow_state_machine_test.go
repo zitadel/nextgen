@@ -64,6 +64,7 @@ type flowTestWorld struct {
 	authAttemptService *domainmock.MockFlowAuthAttemptService
 	schemaResolver     *domainmock.MockSchemaResolver
 	createUser         *domainmock.MockFlowOnSuccessHandler
+	createUserWithSSO  *domainmock.MockFlowOnSuccessHandler
 	sm                 *domain.FlowStateMachineRuntime
 }
 
@@ -81,6 +82,7 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 	schemaStore := domainmock.NewMockJSONSchemaStore(mock)
 	authAttemptService := domainmock.NewMockFlowAuthAttemptService(mock)
 	createUser := domainmock.NewMockFlowOnSuccessHandler(mock)
+	createUserWithSSO := domainmock.NewMockFlowOnSuccessHandler(mock)
 
 	resolver := domain.NewSchemaFieldResolver()
 
@@ -91,6 +93,7 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 		schemaStore,
 		resolver,
 		createUser,
+		createUserWithSSO,
 		authAttemptService,
 		now,
 	)
@@ -101,6 +104,7 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 		schemaResolver:     schemaResolver,
 		authAttemptService: authAttemptService,
 		createUser:         createUser,
+		createUserWithSSO:  createUserWithSSO,
 		sm:                 sm,
 	}
 }
@@ -591,6 +595,55 @@ func TestFlowStateMachine_Process_IntegrityOnMissingTargetStep(t *testing.T) {
 		},
 	})
 	require.ErrorIs(t, err, domain.ErrFlowIntegrity())
+}
+
+// create_user_with_sso is accepted by the contract so an SSO flow can be
+// authored and stored, but no handler is wired yet. A step that reaches it
+// must fail loudly rather than advance as though a user had been created.
+func TestFlowStateMachine_Process_CreateUserWithSsoRunsItsOwnHandler(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+
+	w.schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+		AnyTimes()
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
+	w.authAttemptService.EXPECT().
+		SubmitIdentifier(gomock.Any(), gomock.Any()).
+		Return("", domain.ErrAuthAttemptProofRejected(nil))
+	// Each on_success runs its own handler: the password one must not be
+	// reached for an external identity, which has no password to set.
+	w.createUser.EXPECT().Handle(gomock.Any(), gomock.Any()).Times(0)
+	w.createUserWithSSO.EXPECT().
+		Handle(gomock.Any(), gomock.Any()).
+		Return(domain.FlowOnSuccessResult{UserID: "user-sso-1", Irreversible: true}, nil)
+	// The handler resolved a user, so the flow terminates for real: a
+	// completion that mints no handoff is one the caller cannot exchange.
+	w.authAttemptService.EXPECT().
+		Handoff(gomock.Any(), gomock.Any()).
+		Return(domain.FlowHandoffOutput{Token: "handoff-1"}, nil)
+
+	withSso := domain.FlowOnSuccessCreateUserWithSso
+	def := signupDefinition()
+	def.Steps[0].OnSuccess = &withSso
+
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeRegister,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	_, err = w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{
+			"email":                   "alice@example.com",
+			"x-auth-methods#password": "correct-horse-battery-staple",
+		},
+	})
+	require.NoError(t, err)
 }
 
 func TestFlowStateMachine_Process_InvalidActionRejected(t *testing.T) {

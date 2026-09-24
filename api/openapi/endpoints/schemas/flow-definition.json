@@ -375,9 +375,10 @@
         "on_success": {
           "type": "string",
           "enum": [
-            "create_user"
+            "create_user",
+            "create_user_with_sso"
           ],
-          "description": "Server-side mutation to execute when this step completes successfully.\nRuns after field validation passes, before the transition fires.\n\n- create_user: creates the user record (registration flows)\n",
+          "description": "Server-side mutation to execute when this step completes successfully.\nRuns after field validation passes, before the transition fires.\n\n- create_user: creates the user record (registration flows)\n- create_user_with_sso: creates the user record from the identity an\n  external provider returned, linking it to that identity. Accepted by\n  the API so an SSO flow can be authored and stored; the engine handler\n  is not wired yet, and a step reaching it fails with a flow integrity\n  error rather than creating anything.\n",
           "examples": [
             "create_user"
           ]

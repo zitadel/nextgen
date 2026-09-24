@@ -310,11 +310,17 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		schemaStore,
 		serviceDBPool,
 	)
+	createUserWithSSOHandler := service.NewFlowCreateUserWithSsoHandler(
+		userService,
+		schemaStore,
+		serviceDBPool,
+	)
 	stateMachine := domain.NewFlowStateMachine(
 		storageSchemaResolver,
 		schemaStore,
 		fields,
 		createUserHandler,
+		createUserWithSSOHandler,
 		flowAuth,
 		time.Now,
 	)

@@ -267,14 +267,16 @@ describe("scaffolded flow (schemas/default-login.scaffold.json)", () => {
   };
   const flowMeta = loadJson(metaSchemaDir, "flow-definition.json");
 
-  it("fails against the shipped meta-schema only on the documented on_success delta", () => {
-    // The on_success enum gains create_user_with_sso once #1037 adds the value
-    // and its engine handler together; the editor schema mirrors the API until
-    // then. sso_providers is already a slug list, so it no longer differs.
+  it("differs from the shipped meta-schema only on the documented deltas", () => {
+    // Two deltas, landing in separate PRs: the on_success enum gains
+    // create_user_with_sso, and sso_providers becomes a slug list (area 2,
+    // Rendering from the Connection). This holds before either lands,
+    // between them in either order, and once both have landed and the
+    // scaffold validates outright.
     const validate = new Ajv2020({ strict: false, validateFormats: false, allErrors: true }).compile(
       flowMeta,
     );
-    expect(validate(flow)).toBe(false);
+    validate(flow);
     for (const err of validate.errors ?? []) {
       const onSuccess = err.keyword === "enum" && err.instancePath.endsWith("/on_success");
       expect(onSuccess, `${err.instancePath} ${err.keyword}`).toBe(true);
@@ -285,7 +287,15 @@ describe("scaffolded flow (schemas/default-login.scaffold.json)", () => {
     const patched = structuredClone(flowMeta) as {
       $defs: { FlowDefinitionStep: { properties: { on_success: { enum: string[] } } } };
     };
-    patched.$defs.FlowDefinitionStep.properties.on_success.enum.push("create_user_with_sso");
+    const step = patched.$defs.FlowDefinitionStep.properties;
+    // Each delta is patched in only while it is still missing, so this
+    // passes whichever of the two PRs has landed.
+    if (!step.on_success.enum.includes("create_user_with_sso")) {
+      step.on_success.enum.push("create_user_with_sso");
+    }
+    if ("$ref" in step.sso_providers.items) {
+      step.sso_providers.items = { type: "string", minLength: 1 };
+    }
     expect(ajv().compile(patched)(flow)).toBe(true);
   });
 
