@@ -32,7 +32,9 @@ Before setup, `doctor` checks local runtime prerequisites. After setup, it also 
 npx @zitadel/cli@alpha start
 ```
 
-By default this starts the matching `@zitadel/server` npm binary for the alpha train and stores runtime metadata under `.zitadel/local/runtime.json`. Runtime data is stored under `.zitadel/local/nextgen-data` (SQLite by default — see [Databases](/docs/concepts/databases)).
+By default this starts the matching `@zitadel/server` npm binary for the alpha train and stores runtime metadata under `.zitadel/local/runtime.json`. Runtime data is stored under `.zitadel/local/nextgen-data` (SQLite by default, see [Databases](/docs/concepts/databases)).
+
+`start` also creates a local admin, `admin@zitadel.localhost`, and ends by printing a one-time sign-in link for the management console. Keep it: it is how you reach the console without a password. You can print a fresh one at any time with `zitadel console`.
 
 ## Scaffold auth
 
@@ -45,6 +47,8 @@ In a fresh directory, setup asks which framework to scaffold. Scripted runs shou
 Setup also asks how users should sign in and scaffolds the matching schema and login flow: `--preset password-first` (the default: email + password, passkey optional during registration) or `--preset passkey-first` (a one-tap passkey up front, with an email + password fallback). The preset only picks the starting point — everything under `.zitadel/` stays editable.
 
 Setup writes the app files, `.env.local`, `zitadel.json`, and `.zitadel/**`, then installs dependencies with the detected package manager unless `--skip-install` is passed.
+
+Against a local server, setup also attaches the project to the local admin's team and prints `Project owned by admin@zitadel.localhost (team ...)`. The project is owned from the start, so there is nothing to claim: `zitadel claim` reports it as already owned.
 
 ## Prove the browser flow
 
@@ -61,6 +65,14 @@ register a user -> log out -> log in with the same user -> profile shows signed 
 ```
 
 Do not treat a rendered login form as completion. The useful proof is a full register, logout, and login loop in a real browser.
+
+The user you just registered is an end user of your app. The management console is a separate sign-in, as the local admin:
+
+```sh
+npx @zitadel/cli@alpha console
+```
+
+See [Local runtime commands](/docs/cli/local-runtime) for what that link does and how long it lasts.
 
 ## Customize the login
 

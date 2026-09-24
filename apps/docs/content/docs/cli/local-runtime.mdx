@@ -9,6 +9,34 @@ Start local Zitadel:
 npx @zitadel/cli@alpha start
 ```
 
+`start` boots the runtime with the platform project and creates a local admin,
+`admin@zitadel.localhost`, so you exist on your own server without signing up.
+Its password is generated, kept in `.zitadel/local/admin.json`, and never
+printed. `start` ends by printing a one-time sign-in link for the management
+console.
+
+## Open the console
+
+The link `start` printed works once. Print a fresh one whenever you need to get
+back in:
+
+```sh
+npx @zitadel/cli@alpha console
+```
+
+The command signs in as `admin@zitadel.localhost` and opens the link in a
+browser. Add `--no-open` to print it without opening anything, which is what
+you want over SSH or on a headless machine.
+
+If `start` never ran in this directory there is no local admin, and the command
+fails with `E_VALIDATION` and tells you to run `start` first.
+
+The credential file, how the password is handled, and how to turn the local
+admin off are described in
+[SKILLS.md](https://github.com/zitadel/nextgen/blob/main/apps/cli/SKILLS.md).
+
+## Inspect and stop
+
 Show status:
 
 ```sh

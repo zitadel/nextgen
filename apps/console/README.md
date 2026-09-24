@@ -97,16 +97,19 @@ seed transport ships the reserved platform project end to end.
 
 A deployment can opt out of the fallback today by setting
 `platform.bootstrap_project` (`NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT`), which
-provisions the reserved platform project itself at startup — keys, default
-schema, default login flow — and is what makes `zitadel claim` and
-self-registration work; it still lacks §2's fuller seed transport (an initial
-user, membership, owner assignment), so it is a manual opt-in, not the
-default.
+provisions the reserved platform project itself at startup (keys, default
+schema, default login flow) and is what makes `zitadel claim` and
+self-registration work. It still lacks §2's server-discovered seed transport
+for membership and owner assignment, but it is no longer only a manual
+opt-in: `zitadel start` sets the flag and hands the server an initial
+operator, `admin@zitadel.localhost`, through `--user-file`. So on any
+CLI-started server the console signs into `proj_platform`, and
+`zitadel console` prints a one-time link that signs that operator in.
 
-While no project exists yet, the login screen shows a "run `zitadel setup`"
-hint; refresh after setup and the console picks the new project up. Only
-`standalone` mode exists today; `platform` (cloud portal) mode is future
-work.
+The "run `zitadel setup`" hint on the login screen therefore only shows where
+the platform project is off and no project exists yet; refresh after setup and
+the console picks the new project up. Only `standalone` mode exists today;
+`platform` (cloud portal) mode is future work.
 
 **A server the console cannot reach is an error, not a mode** (ADR 0004 §3).
 An unreachable endpoint, a non-2xx answer, or a body that is not a runtime

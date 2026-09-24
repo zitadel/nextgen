@@ -24,7 +24,9 @@ npx @zitadel/cli@alpha setup --framework next --server local --non-interactive -
 
 - `doctor` checks prerequisites and generated app state.
 - `start`, `stop`, `logs`, and `reset` manage local runtime state.
+- `console` prints a one-time link that signs you in to the local management console as the local admin `start` created.
 - `setup` creates a Zitadel project and scaffolds app auth.
+- `claim` attaches a project to your team on a hosted server. A local project is already owned by the local admin, so `claim` reports it as already owned.
 - `plan` and `apply` validate and sync repo configuration.
 - `status` summarizes local runtime and project state.
 - `eject` or `uninstall` removes managed files and local Zitadel state.
