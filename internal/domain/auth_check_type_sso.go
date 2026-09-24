@@ -30,10 +30,11 @@ type SSOStatePayload struct {
 
 // LogValue implements [slog.LogValuer]. The nonces and the PKCE verifier are
 // replay material, so only the non-secret routing fields are logged.
-func (p *SSOStatePayload) LogValue() slog.Value {
-	if p == nil {
-		return slog.Value{}
-	}
+//
+// The receiver is a value so that both SSOStatePayload and *SSOStatePayload
+// redact. With a pointer receiver the value form is not a [slog.LogValuer], so
+// the handler reflects over the struct and prints every field in it.
+func (p SSOStatePayload) LogValue() slog.Value {
 	return slog.GroupValue(
 		slog.String("provider_slug", p.ProviderSlug),
 		slog.String("connection_revision_id", p.ConnectionRevisionID),
@@ -52,11 +53,9 @@ type SSOCallbackResult struct {
 }
 
 // LogValue implements [slog.LogValuer]. Claims may hold personal data, so the
-// log carries only the subject and the connection revision.
-func (r *SSOCallbackResult) LogValue() slog.Value {
-	if r == nil {
-		return slog.Value{}
-	}
+// log carries only the subject and the connection revision. Value receiver for
+// the reason given on [SSOStatePayload.LogValue].
+func (r SSOCallbackResult) LogValue() slog.Value {
 	return slog.GroupValue(
 		slog.String("subject", r.Subject),
 		slog.String("connection_revision_id", r.ConnectionRevisionID),
@@ -88,11 +87,9 @@ func (c *SSOCallbackCheck) Type() AuthCheckType { return AuthCheckTypeSSOCallbac
 func (c *SSOCallbackCheck) Payload() any { return c.Pending }
 
 // LogValue implements [slog.LogValuer]. The id is the stored hash, so it is
-// safe to log; the payloads are summarised as presence flags.
-func (c *SSOCallbackCheck) LogValue() slog.Value {
-	if c == nil {
-		return slog.Value{}
-	}
+// safe to log; the payloads are summarised as presence flags. Value receiver
+// for the reason given on [SSOStatePayload.LogValue].
+func (c SSOCallbackCheck) LogValue() slog.Value {
 	return slog.GroupValue(
 		slog.String("id", c.ID),
 		slog.Time("issued_at", c.IssuedAt),

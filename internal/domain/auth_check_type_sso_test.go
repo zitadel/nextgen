@@ -98,7 +98,14 @@ func TestSSOState_LogValueOmitsSecrets(t *testing.T) {
 
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewTextHandler(&buf, nil))
-	logger.Info("sso", "check", check, "payload", check.Pending, "result", check.Result)
+	// Both forms: a value passed to slog only redacts when the receiver is a
+	// value, otherwise the handler reflects over the struct and prints
+	// everything in it.
+	logger.Info("sso",
+		"check_ptr", check, "check_value", *check,
+		"payload_ptr", check.Pending, "payload_value", *check.Pending,
+		"result_ptr", check.Result, "result_value", *check.Result,
+	)
 	logged := buf.String()
 
 	for _, secret := range []string{

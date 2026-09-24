@@ -2,4 +2,4 @@
 "@zitadel/server": patch
 ---
 
-Store single-use SSO state records on the auth attempt: the `sso_callback` check row keyed by the hash of the `state` value, consumed exactly once at the provider callback. Groundwork for social login; no user-facing change yet.
+Prepare the server for social login: it can now issue and consume the single-use state that links a sign-in with an external identity provider back to the right login attempt. Nothing changes for users until social login ships.
