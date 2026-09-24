@@ -43,6 +43,19 @@ const (
 		` THEN RETURN id`
 	authAttemptChallengeSucceededStmt = `UPDATE checks SET last_verified_at = @p1, factor_payload = @p2, challenge_payload = NULL, last_challenged_at = NULL, failure_count = 0` +
 		` WHERE project_id = @p3 AND auth_attempt_id = @p4 AND type = @p5 AND id = @p6`
+	// Spanner DML cannot update a primary-key column and the row id is the
+	// state hash, so a re-issue deletes the attempt's row and inserts the new
+	// one inside withTransaction.
+	deleteSSOStateStmt = `DELETE FROM checks WHERE project_id = @p1 AND auth_attempt_id = @p2 AND type = @p3`
+	insertSSOStateStmt = `INSERT INTO checks (project_id, auth_attempt_id, type, id, last_challenged_at, challenge_payload, failure_count)` +
+		` VALUES (@p1, @p2, @p3, @p4, @p5, @p6, 0)`
+	selectPendingSSOStateStmt = `SELECT auth_attempt_id, challenge_payload FROM checks` +
+		` WHERE project_id = @p1 AND id = @p2 AND type = @p3 AND last_challenged_at IS NOT NULL`
+	consumeSSOStateStmt = `UPDATE checks SET challenge_payload = NULL, last_challenged_at = NULL, factor_payload = NULL` +
+		` WHERE project_id = @p1 AND id = @p2 AND type = @p3 AND last_challenged_at IS NOT NULL`
+	setSSOCallbackResultStmt = `UPDATE checks SET factor_payload = @p4` +
+		` WHERE project_id = @p1 AND id = @p2 AND type = @p3 AND last_challenged_at IS NULL`
+
 	authAttemptChallengeFailedStmt = `UPDATE checks SET last_failed_at = @p1, failure_count = failure_count + 1` +
 		` WHERE project_id = @p2 AND auth_attempt_id = @p3 AND type = @p4 AND id = @p5` +
 		` THEN RETURN failure_count, last_failed_at`
@@ -423,6 +436,92 @@ func (as authAttemptStatements) AuthAttemptChallengeFailed(ctx context.Context, 
 	}
 	challenge.SetFailureCount(uint16(failureCount))
 	challenge.SetLastFailedAt(lastFailedAt)
+	return nil
+}
+
+// IssueSSOState implements [service.AuthAttemptStatements].
+func (as authAttemptStatements) IssueSSOState(ctx context.Context, projectID, authAttemptID string, check *domain.SSOCallbackCheck) error {
+	now := time.Now().UTC()
+	payloadStr, err := authattempt.MarshalPayloadString(check.Pending)
+	if err != nil {
+		return fmt.Errorf("failed to marshal sso state payload: %w", err)
+	}
+	err = withTransaction(ctx, as.db, func(ctx context.Context, tx queryExecutor) error {
+		deletion := buildStatement(deleteSSOStateStmt,
+			projectID, authAttemptID, int64(domain.AuthCheckTypeSSOCallback)).statement()
+		if _, err := tx.Update(ctx, deletion); err != nil {
+			return fmt.Errorf("failed to clear the previous sso state: %w", err)
+		}
+		insert := buildStatement(insertSSOStateStmt,
+			projectID, authAttemptID, int64(domain.AuthCheckTypeSSOCallback), check.ID, now,
+			encodeSpannerJSONPtr(payloadStr)).statement()
+		if _, err := tx.Update(ctx, insert); err != nil {
+			return fmt.Errorf("failed to insert the sso state: %w", err)
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to issue sso state: %w", err)
+	}
+	check.AuthAttemptID = authAttemptID
+	check.IssuedAt = now
+	return nil
+}
+
+// ConsumeSSOState implements [service.AuthAttemptStatements].
+func (as authAttemptStatements) ConsumeSSOState(ctx context.Context, projectID, stateHash string) (*domain.SSOCallbackCheck, error) {
+	check := &domain.SSOCallbackCheck{ID: stateHash}
+	selection := buildStatement(selectPendingSSOStateStmt,
+		projectID, stateHash, int64(domain.AuthCheckTypeSSOCallback)).statement()
+	var payload spanner.NullJSON
+	err := as.db.Query(ctx, selection, func(iter *spanner.RowIterator) error {
+		_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
+			return struct{}{}, row.Columns(&check.AuthAttemptID, &payload)
+		})
+		return err
+	})
+	if err != nil {
+		var noRow *database.NoRowFoundError
+		if errors.As(err, &noRow) {
+			return nil, domain.ErrSSOStateInvalid()
+		}
+		return nil, fmt.Errorf("failed to read sso state: %w", err)
+	}
+	if raw := nullJSONBytes(payload); len(raw) > 0 {
+		if err := json.Unmarshal(raw, &check.Pending); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal sso state payload: %w", err)
+		}
+	}
+	// The guarded update is the single-use gate: a racing consumer that
+	// already cleared the challenge state leaves zero rows for this one.
+	consume := buildStatement(consumeSSOStateStmt,
+		projectID, stateHash, int64(domain.AuthCheckTypeSSOCallback)).statement()
+	n, err := as.db.Update(ctx, consume)
+	if err != nil {
+		return nil, fmt.Errorf("failed to consume sso state: %w", err)
+	}
+	if n == 0 {
+		return nil, domain.ErrSSOStateInvalid()
+	}
+	return check, nil
+}
+
+// SetSSOCallbackResult implements [service.AuthAttemptStatements].
+func (as authAttemptStatements) SetSSOCallbackResult(ctx context.Context, projectID, stateHash string, result *domain.SSOCallbackResult) error {
+	payloadStr, err := authattempt.MarshalPayloadString(result)
+	if err != nil {
+		return fmt.Errorf("failed to marshal sso callback result: %w", err)
+	}
+	stmt := buildStatement(setSSOCallbackResultStmt,
+		projectID, stateHash, int64(domain.AuthCheckTypeSSOCallback),
+		encodeSpannerJSONPtr(payloadStr)).statement()
+	n, err := as.db.Update(ctx, stmt)
+	if err != nil {
+		return fmt.Errorf("failed to set sso callback result: %w", err)
+	}
+	if n == 0 {
+		return domain.ErrSSOStateInvalid()
+	}
 	return nil
 }
 

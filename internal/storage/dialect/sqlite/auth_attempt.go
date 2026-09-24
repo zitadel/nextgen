@@ -45,6 +45,20 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`
 	authAttemptChallengeSucceededStmt = `UPDATE checks SET last_verified_at = ?, factor_payload = ?, challenge_payload = NULL, last_challenged_at = NULL, failure_count = 0` +
 		` WHERE project_id = ? AND auth_attempt_id = ? AND type = ? AND id = ?`
 
+	issueSSOStateStmt = `INSERT INTO checks (project_id, auth_attempt_id, type, id, last_challenged_at, challenge_payload, failure_count, last_failed_at)` +
+		` VALUES (?, ?, ?, ?, ?, ?, 0, NULL) ON CONFLICT (project_id, auth_attempt_id, type)` +
+		` DO UPDATE SET id = EXCLUDED.id, last_challenged_at = EXCLUDED.last_challenged_at, challenge_payload = EXCLUDED.challenge_payload,` +
+		` factor_payload = NULL, last_verified_at = NULL, failure_count = 0, last_failed_at = NULL`
+
+	selectPendingSSOStateStmt = `SELECT auth_attempt_id, challenge_payload FROM checks` +
+		` WHERE project_id = ? AND id = ? AND type = ? AND last_challenged_at IS NOT NULL`
+
+	consumeSSOStateStmt = `UPDATE checks SET challenge_payload = NULL, last_challenged_at = NULL, factor_payload = NULL` +
+		` WHERE project_id = ? AND id = ? AND type = ? AND last_challenged_at IS NOT NULL`
+
+	setSSOCallbackResultStmt = `UPDATE checks SET factor_payload = ?` +
+		` WHERE project_id = ? AND id = ? AND type = ? AND last_challenged_at IS NULL`
+
 	authAttemptChallengeFailedStmt = `UPDATE checks SET last_failed_at = ?, failure_count = failure_count + 1` +
 		` WHERE project_id = ? AND auth_attempt_id = ? AND type = ? AND id = ?` +
 		` RETURNING failure_count, last_failed_at`
@@ -401,6 +415,79 @@ func (as authAttemptStatements) AuthAttemptChallengeFailed(ctx context.Context, 
 	}
 	challenge.SetFailureCount(uint16(failureCount))
 	challenge.SetLastFailedAt(timeFromUnixNano(lastFailedNano))
+	return nil
+}
+
+// IssueSSOState implements [service.AuthAttemptStatements].
+func (as authAttemptStatements) IssueSSOState(ctx context.Context, projectID, authAttemptID string, check *domain.SSOCallbackCheck) error {
+	now := time.Now().UTC()
+	payloadStr, err := authattempt.MarshalPayloadString(check.Pending)
+	if err != nil {
+		return fmt.Errorf("failed to marshal sso state payload: %w", err)
+	}
+	var payloadArg any
+	if payloadStr != nil {
+		payloadArg = *payloadStr
+	}
+	if _, err := as.client.Exec(ctx, issueSSOStateStmt,
+		projectID, authAttemptID, int64(domain.AuthCheckTypeSSOCallback), check.ID, now.UnixNano(), payloadArg,
+	); err != nil {
+		return fmt.Errorf("failed to issue sso state: %w", wrapError(err))
+	}
+	check.AuthAttemptID = authAttemptID
+	check.IssuedAt = now
+	return nil
+}
+
+// ConsumeSSOState implements [service.AuthAttemptStatements].
+func (as authAttemptStatements) ConsumeSSOState(ctx context.Context, projectID, stateHash string) (*domain.SSOCallbackCheck, error) {
+	check := &domain.SSOCallbackCheck{ID: stateHash}
+	var payload sql.NullString
+	err := as.client.QueryRow(ctx, selectPendingSSOStateStmt,
+		projectID, stateHash, int64(domain.AuthCheckTypeSSOCallback),
+	).Scan(&check.AuthAttemptID, &payload)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, domain.ErrSSOStateInvalid()
+		}
+		return nil, fmt.Errorf("failed to read sso state: %w", wrapError(err))
+	}
+	if raw := nullJSONBytes(payload); len(raw) > 0 {
+		if err := json.Unmarshal(raw, &check.Pending); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal sso state payload: %w", err)
+		}
+	}
+	// The guarded update is the single-use gate: a racing consumer that
+	// already cleared the challenge state leaves zero rows for this one.
+	n, err := execAffected(ctx, as.client, consumeSSOStateStmt,
+		projectID, stateHash, int64(domain.AuthCheckTypeSSOCallback))
+	if err != nil {
+		return nil, fmt.Errorf("failed to consume sso state: %w", err)
+	}
+	if n == 0 {
+		return nil, domain.ErrSSOStateInvalid()
+	}
+	return check, nil
+}
+
+// SetSSOCallbackResult implements [service.AuthAttemptStatements].
+func (as authAttemptStatements) SetSSOCallbackResult(ctx context.Context, projectID, stateHash string, result *domain.SSOCallbackResult) error {
+	payloadStr, err := authattempt.MarshalPayloadString(result)
+	if err != nil {
+		return fmt.Errorf("failed to marshal sso callback result: %w", err)
+	}
+	var payloadArg any
+	if payloadStr != nil {
+		payloadArg = *payloadStr
+	}
+	n, err := execAffected(ctx, as.client, setSSOCallbackResultStmt,
+		payloadArg, projectID, stateHash, int64(domain.AuthCheckTypeSSOCallback))
+	if err != nil {
+		return fmt.Errorf("failed to set sso callback result: %w", err)
+	}
+	if n == 0 {
+		return domain.ErrSSOStateInvalid()
+	}
 	return nil
 }
 

@@ -139,6 +139,18 @@ func CheckAs[T AuthFactor](attempt *AuthAttempt, typ AuthCheckType) (T, bool) {
 	return typedCheck, ok
 }
 
+// SSOCallback returns the attempt's SSO state record, if it has one.
+// [CheckAs] cannot reach it: that helper is constrained to [AuthFactor] and
+// the record is deliberately not one.
+func (a *AuthAttempt) SSOCallback() (*SSOCallbackCheck, bool) {
+	for _, check := range a.Checks {
+		if ssoCheck, ok := check.(*SSOCallbackCheck); ok {
+			return ssoCheck, true
+		}
+	}
+	return nil, false
+}
+
 // IsExpired returns true if the attempt's TTL has elapsed. Returns false if the attempt is not yet initialized (zero CreatedAt) or TTL is nil.
 func (a *AuthAttempt) IsExpired() bool {
 	if a.CreatedAt.IsZero() || a.TimeToLive == nil {

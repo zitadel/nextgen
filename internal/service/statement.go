@@ -285,6 +285,20 @@ type AuthAttemptStatements interface {
 	SetAuthAttemptFactor(ctx context.Context, projectID, authAttemptID string, factor domain.AuthFactor) (checkID string, err error)
 	AuthAttemptChallengeSucceeded(ctx context.Context, projectID, authAttemptID string, factor domain.AuthFactor, challengeID string) error
 	AuthAttemptChallengeFailed(ctx context.Context, projectID, authAttemptID string, challenge domain.AuthChallenge) error
+	// IssueSSOState upserts the attempt's single sso_callback row: id = state hash,
+	// last_challenged_at = now, challenge_payload = check.Pending; clears factor_payload,
+	// last_verified_at and failure state, so a re-issue never exposes an earlier result.
+	IssueSSOState(ctx context.Context, projectID, authAttemptID string, check *domain.SSOCallbackCheck) error
+	// ConsumeSSOState atomically consumes the pending row keyed by state hash and returns
+	// AuthAttemptID and Pending. Zero matches (unknown, consumed, re-issued) return
+	// domain.ErrSSOStateInvalid(). Expiry is not checked here: the caller loads the attempt,
+	// applies AuthAttempt.IsExpired() and maps it to the same sentinel.
+	ConsumeSSOState(ctx context.Context, projectID, stateHash string) (*domain.SSOCallbackCheck, error)
+	// SetSSOCallbackResult stores the callback result on the row consumed under
+	// stateHash. Returns ErrSSOStateInvalid when no such consumed row exists,
+	// including when a new state was issued since the consume (the hash no longer
+	// matches). Never sets last_verified_at.
+	SetSSOCallbackResult(ctx context.Context, projectID, stateHash string, result *domain.SSOCallbackResult) error
 }
 
 // UserQueryOptions carries EAV match/hydrate options for GetUser / ListUsers.
