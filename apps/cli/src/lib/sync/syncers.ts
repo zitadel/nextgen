@@ -3,9 +3,7 @@ import type {
   CreateBrandingBody,
   CreateFlowDefinition201,
   CreateFlowDefinitionBodyFlowDefinition,
-  GetBrandingById200,
   CreateSchemaBody,
-  GetFlowDefinition200,
 } from "@zitadel/api/generated/model";
 import { consola } from "consola";
 
@@ -222,7 +220,7 @@ class FlowDefinitionSyncer implements ResourceSyncer {
    * Flat-by-id: no `project_id` query — authz resolves the project from RSI.
    */
   async fetch(id: string): Promise<object> {
-    const envelope = (await this.client.getFlowDefinition(id)) as GetFlowDefinition200;
+    const envelope = await this.client.getFlowDefinition(id);
 
     return envelope.flow_definition as object;
   }
@@ -315,7 +313,7 @@ class BrandingSyncer implements ResourceSyncer {
 
   /** Wire form (template inlined); diffs compare in the normalized form. Flat-by-id: no project_id query. */
   async fetch(id: string): Promise<object> {
-    const envelope = (await this.client.getBrandingById(id)) as GetBrandingById200;
+    const envelope = await this.client.getBrandingById(id);
     return envelope.branding as object;
   }
 
