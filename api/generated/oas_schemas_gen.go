@@ -17181,8 +17181,12 @@ type FlowDefinitionStep struct {
 	// configuration. The engine may also inject gates dynamically based on
 	// policy.
 	Gates OptFlowDefinitionStepGates `json:"gates"`
-	// Available SSO identity providers for this step.
-	SSOProviders []SSOProvider `json:"sso_providers"`
+	// Slugs of the identity provider connections this step offers, in display
+	// order. Each names the `slug` of a connection under `.zitadel/idps/`; the
+	// connection carries the display name and template, so a rename there
+	// reaches every step without editing the flow. The rendered step the client
+	// receives carries the resolved `{id, name, template}` objects instead.
+	SSOProviders []string `json:"sso_providers"`
 	// Server-side mutation to execute when this step completes successfully.
 	// Runs after field validation passes, before the transition fires.
 	// - create_user: creates the user record (registration flows)
@@ -17225,7 +17229,7 @@ func (s *FlowDefinitionStep) GetGates() OptFlowDefinitionStepGates {
 }
 
 // GetSSOProviders returns the value of SSOProviders.
-func (s *FlowDefinitionStep) GetSSOProviders() []SSOProvider {
+func (s *FlowDefinitionStep) GetSSOProviders() []string {
 	return s.SSOProviders
 }
 
@@ -17265,7 +17269,7 @@ func (s *FlowDefinitionStep) SetGates(val OptFlowDefinitionStepGates) {
 }
 
 // SetSSOProviders sets the value of SSOProviders.
-func (s *FlowDefinitionStep) SetSSOProviders(val []SSOProvider) {
+func (s *FlowDefinitionStep) SetSSOProviders(val []string) {
 	s.SSOProviders = val
 }
 
@@ -24749,8 +24753,15 @@ type IdentifierChallengePayload struct{}
 // Identifier-specific factor metadata.
 // Ref: #
 type IdentifierFactorPayload struct {
+	// Always `identifier`; the discriminator of the payload union.
+	Method IdentifierFactorPayloadMethod `json:"method"`
 	// The identified user ID.
 	UserID UserID `json:"user_id"`
+}
+
+// GetMethod returns the value of Method.
+func (s *IdentifierFactorPayload) GetMethod() IdentifierFactorPayloadMethod {
+	return s.Method
 }
 
 // GetUserID returns the value of UserID.
@@ -24758,15 +24769,60 @@ func (s *IdentifierFactorPayload) GetUserID() UserID {
 	return s.UserID
 }
 
+// SetMethod sets the value of Method.
+func (s *IdentifierFactorPayload) SetMethod(val IdentifierFactorPayloadMethod) {
+	s.Method = val
+}
+
 // SetUserID sets the value of UserID.
 func (s *IdentifierFactorPayload) SetUserID(val UserID) {
 	s.UserID = val
 }
 
+// Always `identifier`; the discriminator of the payload union.
+type IdentifierFactorPayloadMethod string
+
+const (
+	IdentifierFactorPayloadMethodIdentifier IdentifierFactorPayloadMethod = "identifier"
+)
+
+// AllValues returns all IdentifierFactorPayloadMethod values.
+func (IdentifierFactorPayloadMethod) AllValues() []IdentifierFactorPayloadMethod {
+	return []IdentifierFactorPayloadMethod{
+		IdentifierFactorPayloadMethodIdentifier,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s IdentifierFactorPayloadMethod) MarshalText() ([]byte, error) {
+	switch s {
+	case IdentifierFactorPayloadMethodIdentifier:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *IdentifierFactorPayloadMethod) UnmarshalText(data []byte) error {
+	switch IdentifierFactorPayloadMethod(data) {
+	case IdentifierFactorPayloadMethodIdentifier:
+		*s = IdentifierFactorPayloadMethodIdentifier
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 // Proof for `identifier` method.
+// The login name is resolved against the designated identifier (`x-identifier`)
+// of every user schema in the project, and must identify exactly one user; none,
+// or users of more than one schema, rejects the proof. The caller does not name
+// the property: which property identifies users is the project's decision, made
+// in its user schemas (ADR 058 §5).
 // Ref: #
 type IdentifierProof struct {
-	// The login name or email being identified.
+	// The value being identified, as the user typed it.
 	LoginName string `json:"login_name"`
 }
 
@@ -40741,6 +40797,8 @@ func (s *PasskeyChallengePayloadPublicKeyUserVerification) UnmarshalText(data []
 // Passkey-specific factor metadata including credential and verification details.
 // Ref: #
 type PasskeyFactorPayload struct {
+	// Always `passkey`; the discriminator of the payload union.
+	Method PasskeyFactorPayloadMethod `json:"method"`
 	// The credential ID that was used.
 	CredentialID string `json:"credential_id"`
 	// Whether user verification was performed (PIN/biometric).
@@ -40751,6 +40809,11 @@ type PasskeyFactorPayload struct {
 	BackupState OptBool `json:"backup_state"`
 	// Authenticator attachment modality.
 	AuthenticatorAttachment OptPasskeyFactorPayloadAuthenticatorAttachment `json:"authenticator_attachment"`
+}
+
+// GetMethod returns the value of Method.
+func (s *PasskeyFactorPayload) GetMethod() PasskeyFactorPayloadMethod {
+	return s.Method
 }
 
 // GetCredentialID returns the value of CredentialID.
@@ -40776,6 +40839,11 @@ func (s *PasskeyFactorPayload) GetBackupState() OptBool {
 // GetAuthenticatorAttachment returns the value of AuthenticatorAttachment.
 func (s *PasskeyFactorPayload) GetAuthenticatorAttachment() OptPasskeyFactorPayloadAuthenticatorAttachment {
 	return s.AuthenticatorAttachment
+}
+
+// SetMethod sets the value of Method.
+func (s *PasskeyFactorPayload) SetMethod(val PasskeyFactorPayloadMethod) {
+	s.Method = val
 }
 
 // SetCredentialID sets the value of CredentialID.
@@ -40845,6 +40913,41 @@ func (s *PasskeyFactorPayloadAuthenticatorAttachment) UnmarshalText(data []byte)
 	}
 }
 
+// Always `passkey`; the discriminator of the payload union.
+type PasskeyFactorPayloadMethod string
+
+const (
+	PasskeyFactorPayloadMethodPasskey PasskeyFactorPayloadMethod = "passkey"
+)
+
+// AllValues returns all PasskeyFactorPayloadMethod values.
+func (PasskeyFactorPayloadMethod) AllValues() []PasskeyFactorPayloadMethod {
+	return []PasskeyFactorPayloadMethod{
+		PasskeyFactorPayloadMethodPasskey,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s PasskeyFactorPayloadMethod) MarshalText() ([]byte, error) {
+	switch s {
+	case PasskeyFactorPayloadMethodPasskey:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *PasskeyFactorPayloadMethod) UnmarshalText(data []byte) error {
+	switch PasskeyFactorPayloadMethod(data) {
+	case PasskeyFactorPayloadMethodPasskey:
+		*s = PasskeyFactorPayloadMethodPasskey
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 // Proof for `passkey` method.
 // Ref: #
 type PasskeyProof struct {
@@ -40894,9 +40997,58 @@ func (s *PasskeyProofPasskeyAssertion) init() PasskeyProofPasskeyAssertion {
 // Ref: #
 type PasswordChallengePayload struct{}
 
-// Password authentication has no additional metadata beyond the base factor fields.
+// Password authentication carries no metadata beyond the discriminator the
+// `payload` union resolves on.
 // Ref: #
-type PasswordFactorPayload struct{}
+type PasswordFactorPayload struct {
+	// Always `password`; the discriminator of the payload union.
+	Method PasswordFactorPayloadMethod `json:"method"`
+}
+
+// GetMethod returns the value of Method.
+func (s *PasswordFactorPayload) GetMethod() PasswordFactorPayloadMethod {
+	return s.Method
+}
+
+// SetMethod sets the value of Method.
+func (s *PasswordFactorPayload) SetMethod(val PasswordFactorPayloadMethod) {
+	s.Method = val
+}
+
+// Always `password`; the discriminator of the payload union.
+type PasswordFactorPayloadMethod string
+
+const (
+	PasswordFactorPayloadMethodPassword PasswordFactorPayloadMethod = "password"
+)
+
+// AllValues returns all PasswordFactorPayloadMethod values.
+func (PasswordFactorPayloadMethod) AllValues() []PasswordFactorPayloadMethod {
+	return []PasswordFactorPayloadMethod{
+		PasswordFactorPayloadMethodPassword,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s PasswordFactorPayloadMethod) MarshalText() ([]byte, error) {
+	switch s {
+	case PasswordFactorPayloadMethodPassword:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *PasswordFactorPayloadMethod) UnmarshalText(data []byte) error {
+	switch PasswordFactorPayloadMethod(data) {
+	case PasswordFactorPayloadMethodPassword:
+		*s = PasswordFactorPayloadMethodPassword
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
 
 // Proof for `password` method.
 // Ref: #

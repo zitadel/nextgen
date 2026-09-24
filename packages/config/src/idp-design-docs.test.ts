@@ -267,39 +267,29 @@ describe("scaffolded flow (schemas/default-login.scaffold.json)", () => {
   };
   const flowMeta = loadJson(metaSchemaDir, "flow-definition.json");
 
-  it("differs from the shipped meta-schema only on the documented deltas", () => {
-    // Two deltas, landing in separate PRs: the on_success enum gains
-    // create_user_with_sso, and sso_providers becomes a slug list (area 2,
-    // Rendering from the Connection). This holds before either lands,
-    // between them in either order, and once both have landed and the
-    // scaffold validates outright.
+  it("differs from the shipped meta-schema only on the documented on_success delta", () => {
+    // One delta is left: the on_success enum gains create_user_with_sso. The
+    // editor schema mirrors the API, so this holds both before that lands and
+    // after. sso_providers is already a slug list, so it no longer differs.
     const validate = new Ajv2020({ strict: false, validateFormats: false, allErrors: true }).compile(
       flowMeta,
     );
     validate(flow);
     for (const err of validate.errors ?? []) {
       const onSuccess = err.keyword === "enum" && err.instancePath.endsWith("/on_success");
-      const slugList = err.keyword === "type" && err.instancePath.includes("/sso_providers/");
-      expect(onSuccess || slugList, `${err.instancePath} ${err.keyword}`).toBe(true);
+      expect(onSuccess, `${err.instancePath} ${err.keyword}`).toBe(true);
     }
   });
 
-  it("validates once both deltas land in the meta-schema", () => {
+  it("validates once the on_success delta lands in the meta-schema", () => {
     const patched = structuredClone(flowMeta) as {
-      $defs: {
-        FlowDefinitionStep: {
-          properties: { on_success: { enum: string[] }; sso_providers: { items: object } };
-        };
-      };
+      $defs: { FlowDefinitionStep: { properties: { on_success: { enum: string[] } } } };
     };
     const step = patched.$defs.FlowDefinitionStep.properties;
-    // Each delta is patched in only while it is still missing, so this
-    // passes whichever of the two PRs has landed.
+    // Patched in only while it is still missing, so this passes whether or
+    // not the PR carrying the value has landed.
     if (!step.on_success.enum.includes("create_user_with_sso")) {
       step.on_success.enum.push("create_user_with_sso");
-    }
-    if ("$ref" in step.sso_providers.items) {
-      step.sso_providers.items = { type: "string", minLength: 1 };
     }
     expect(ajv().compile(patched)(flow)).toBe(true);
   });

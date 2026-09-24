@@ -19,6 +19,7 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/branding"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/idpconnection"
 	"github.com/zitadel/nextgen/internal/storage/release"
 )
 
@@ -75,6 +76,8 @@ func TestCursorBattle_DrainAllListIncarnations(t *testing.T) {
 		t.Run("brandings", func(t *testing.T) { battleBrandings(t, d) })
 		t.Run("environments", func(t *testing.T) { battleEnvironments(t, d) })
 		t.Run("releases", func(t *testing.T) { battleReleases(t, d) })
+		t.Run("idp_connections", func(t *testing.T) { battleIDPConnections(t, d) })
+		t.Run("idp_connection_revisions", func(t *testing.T) { battleIDPConnectionRevisions(t, d) })
 		t.Run("flow_definitions", func(t *testing.T) { battleFlowDefinitions(t, d) })
 		t.Run("json_schemas", func(t *testing.T) { battleJSONSchemas(t, d) })
 		t.Run("json_schemas_latest", func(t *testing.T) { battleJSONSchemasLatest(t, d) })
@@ -678,4 +681,83 @@ func battleReleases(t *testing.T, d dialect) {
 		}, func(r *domain.Release) string { return r.ID })
 		assertDrainMatch(t, want, got)
 	})
+}
+
+// battleIDPConnections works like battleJSONSchemasLatest: the list joins each
+// connection to its revisions and keeps only the newest, and a page boundary is
+// where that and the keyset predicate can fall out of step. Every connection
+// here has a superseded revision, so a stale or missing row shows the break.
+func battleIDPConnections(t *testing.T, d dialect) {
+	t.Helper()
+	projectID := ensureProject(t, d.stmts)
+	suffix := uniqueSuffix(t)
+	created := make([]*domain.IDPConnection, 0, 5)
+	for i := range 5 {
+		slug := "battle-" + suffix + "-" + string(rune('a'+i))
+		entity := createIDPConnection(t, d.stmts, projectID, slug, idpConnectionDocument("https://v1.example.com"))
+		entity.Document = idpConnectionDocument("https://v2.example.com")
+		require.NoError(t, d.stmts.ReviseIDPConnection(t.Context(), entity))
+		created = append(created, entity)
+	}
+	want := idpConnectionIDsInDefaultOrder(created)
+
+	filter := database.Equal(database.Col(domain.IDPConnectionFieldProjectID), projectID)
+	orderAsc := database.OrderBy[domain.IDPConnectionField]{
+		Columns: []database.Column[domain.IDPConnectionField]{
+			database.Col(domain.IDPConnectionFieldCreatedAt),
+			database.Col(domain.IDPConnectionFieldID),
+		},
+		Direction: database.OrderAsc,
+	}
+	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.IDPConnectionField]) (*database.ListResult[*domain.IDPConnection], error) {
+		return d.stmts.ListIDPConnections(unfilteredListCtx(t), &database.ListOptions[domain.IDPConnectionField]{
+			Filter: filter, Pagination: page,
+		})
+	}, func(c *domain.IDPConnection) string { return c.ID }, 2)
+
+	// Slug is the other column the contract lets a caller sort on, and unlike
+	// created_at it is a single key with no tiebreaker.
+	t.Run("slug_order", func(t *testing.T) {
+		bySlug := slices.SortedFunc(slices.Values(created), func(a, b *domain.IDPConnection) int {
+			return strings.Compare(a.Slug, b.Slug)
+		})
+		wantBySlug := make([]string, 0, len(bySlug))
+		for _, entity := range bySlug {
+			wantBySlug = append(wantBySlug, entity.ID)
+		}
+		orderSlugAsc := database.OrderBy[domain.IDPConnectionField]{
+			Columns:   []database.Column[domain.IDPConnectionField]{database.Col(domain.IDPConnectionFieldSlug)},
+			Direction: database.OrderAsc,
+		}
+		drainIncarnation(t, wantBySlug, orderSlugAsc, func(page database.Page[domain.IDPConnectionField]) (*database.ListResult[*domain.IDPConnection], error) {
+			return d.stmts.ListIDPConnections(unfilteredListCtx(t), &database.ListOptions[domain.IDPConnectionField]{
+				Filter: filter, Pagination: page,
+			})
+		}, func(c *domain.IDPConnection) string { return c.ID }, 2)
+	})
+}
+
+// battleIDPConnectionRevisions pages one connection's history: the same join
+// without the newest-revision filter, where the keyset sits on the revision row
+// and the identity columns come from the connection. Each row's id is a
+// revision id.
+func battleIDPConnectionRevisions(t *testing.T, d dialect) {
+	t.Helper()
+	projectID := ensureProject(t, d.stmts)
+	entity := createIDPConnection(t, d.stmts, projectID, "battle-rev-"+uniqueSuffix(t), idpConnectionDocument("https://v1.example.com"))
+	revisions := []domain.IDPConnection{*entity}
+	for i := range 5 {
+		entity.Document = idpConnectionDocument("https://v" + string(rune('a'+i)) + ".example.com")
+		require.NoError(t, d.stmts.ReviseIDPConnection(t.Context(), entity))
+		revisions = append(revisions, *entity)
+	}
+	want := idpRevisionIDsOldestFirst(revisions)
+
+	// The drain walks both directions, so this reuses the newest-first key and
+	// only flips the direction.
+	orderAsc := idpconnection.RevisionsNewestFirst()
+	orderAsc.Direction = database.OrderAsc
+	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.IDPConnectionField]) (*database.ListResult[*domain.IDPConnection], error) {
+		return d.stmts.ListIDPConnectionRevisions(unfilteredListCtx(t), projectID, entity.ID, page)
+	}, func(c *domain.IDPConnection) string { return c.RevisionID }, 2)
 }

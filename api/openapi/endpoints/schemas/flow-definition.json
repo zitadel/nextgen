@@ -358,18 +358,17 @@
         },
         "sso_providers": {
           "type": "array",
-          "description": "Available SSO identity providers for this step.",
+          "description": "Slugs of the identity provider connections this step offers, in display\norder. Each names the `slug` of a connection under `.zitadel/idps/`; the\nconnection carries the display name and template, so a rename there\nreaches every step without editing the flow. The rendered step the client\nreceives carries the resolved `{id, name, template}` objects instead.\n",
+          "uniqueItems": true,
           "items": {
-            "$ref": "#/$defs/SsoProvider"
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_-]*$",
+            "maxLength": 64
           },
           "default": [],
           "examples": [
             [
-              {
-                "id": "google",
-                "name": "Google",
-                "template": "google"
-              }
+              "google"
             ]
           ]
         },
@@ -561,39 +560,6 @@
             {
               "site_key": "0x4AAAAAAA-example-site-key"
             }
-          ]
-        }
-      }
-    },
-    "SsoProvider": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "id",
-        "name",
-        "template"
-      ],
-      "description": "An available SSO identity provider.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Provider instance identifier.",
-          "examples": [
-            "google"
-          ]
-        },
-        "name": {
-          "type": "string",
-          "description": "Display name for the provider.",
-          "examples": [
-            "Google"
-          ]
-        },
-        "template": {
-          "type": "string",
-          "description": "Template hint for rendering (logo, colors).",
-          "examples": [
-            "google"
           ]
         }
       }

@@ -41,9 +41,9 @@ type FlowOnSuccess uint8
 const (
 	FlowOnSuccessCreateUser FlowOnSuccess = iota
 	// FlowOnSuccessCreateUserWithSso creates the user from the identity an
-	// external provider returned. The value is accepted so an SSO flow can
-	// be authored and stored; no handler is wired, so a step that reaches
-	// it fails with a flow integrity error (see runOnSuccess).
+	// external provider returned. It is separate from CreateUser because it
+	// establishes a different thing: the provider vouched for the
+	// identifier, so no password is collected and none is set.
 	FlowOnSuccessCreateUserWithSso
 )
 
@@ -252,8 +252,11 @@ type FlowDefinitionStep struct {
 	// Gates are security challenges that must be satisfied before the
 	// step's submission is accepted, keyed by gate name.
 	Gates map[string]FlowStepGate
-	// SSOProviders lists the identity providers available on this step.
-	SSOProviders []FlowSSOProvider
+	// SSOProviders lists the slugs of the identity provider connections
+	// this step offers, in display order. The connection owns the display
+	// name and template; rendering resolves each slug into a
+	// [FlowSSOProvider] for the client.
+	SSOProviders []string
 	// OnSuccess names the server-side mutation to run after field
 	// validation passes, before the transition fires. Nil means advance
 	// directly with no side effect.
@@ -287,7 +290,10 @@ type FlowStepGate struct {
 	Config map[string]any
 }
 
-// FlowSSOProvider is an identity provider option offered on a step.
+// FlowSSOProvider is an identity provider option as rendered to the
+// client: a connection slug resolved to its display name and template.
+// Flow definitions reference connections by slug only
+// ([FlowDefinitionStep.SSOProviders]).
 type FlowSSOProvider struct {
 	ID       string
 	Name     string
