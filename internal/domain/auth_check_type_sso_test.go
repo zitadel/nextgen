@@ -35,7 +35,8 @@ func TestNewSSOState(t *testing.T) {
 		check := sso.Check
 		require.NotNil(t, check)
 
-		assert.Equal(t, domain.HashSecret(sso.State), check.ID)
+		assert.Equal(t, domain.HashSecret(sso.State), check.StateHash)
+		assert.Empty(t, check.ID, "the storage layer mints the row id")
 		assert.Equal(t, domain.AuthCheckTypeSSOCallback, check.Type())
 		assert.True(t, check.IssuedAt.IsZero(), "the storage layer stamps the issue time")
 		assert.Nil(t, check.Result)
@@ -97,7 +98,7 @@ func TestNewSSOState(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.NotEqual(t, first.State, second.State)
-		assert.NotEqual(t, first.Check.ID, second.Check.ID)
+		assert.NotEqual(t, first.Check.StateHash, second.Check.StateHash)
 		assert.NotEqual(t, first.PKCEVerifier, second.PKCEVerifier)
 		assert.NotEqual(t, first.Check.Pending.EncryptedPKCEVerifier, second.Check.Pending.EncryptedPKCEVerifier)
 		assert.NotEqual(t, first.BindingNonce, second.BindingNonce)
@@ -184,6 +185,8 @@ func TestSSOState_LogValueOmitsSecrets(t *testing.T) {
 	sso, err := domain.NewSSOState("google", "idprev_1", "/after-login", crypter)
 	require.NoError(t, err)
 	check := sso.Check
+	// The storage layer would have stamped these two.
+	check.ID = "ch_logged"
 	check.AuthAttemptID = "att_1"
 	check.Result = &domain.SSOCallbackResult{
 		Subject:              "sub-1",
@@ -206,6 +209,7 @@ func TestSSOState_LogValueOmitsSecrets(t *testing.T) {
 
 	for _, secret := range []string{
 		sso.State,
+		check.StateHash,
 		sso.PKCEVerifier,
 		check.Pending.EncryptedPKCEVerifier,
 		check.Pending.OIDCNonce,
@@ -215,7 +219,8 @@ func TestSSOState_LogValueOmitsSecrets(t *testing.T) {
 	} {
 		assert.NotContains(t, logged, secret)
 	}
-	assert.Contains(t, logged, check.ID)
+	assert.Contains(t, logged, "has_state_hash=true")
+	assert.Contains(t, logged, "ch_logged")
 	assert.Contains(t, logged, "sub-1")
 	assert.Contains(t, logged, "google")
 }
@@ -241,7 +246,7 @@ func TestErrSSOStateInvalid(t *testing.T) {
 // record out of every factor and challenge path: it is only an AuthCheck.
 func TestSSOCallbackCheck_IsNotFactorOrChallenge(t *testing.T) {
 	t.Parallel()
-	var check domain.AuthCheck = &domain.SSOCallbackCheck{ID: "hash"}
+	var check domain.AuthCheck = &domain.SSOCallbackCheck{ID: "ch_1"}
 	_, isFactor := check.(domain.AuthFactor)
 	assert.False(t, isFactor)
 	_, isChallenge := check.(domain.AuthChallenge)

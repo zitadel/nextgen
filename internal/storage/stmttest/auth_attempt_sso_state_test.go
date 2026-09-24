@@ -4,6 +4,7 @@ package stmttest
 
 import (
 	"encoding/base64"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -49,11 +50,17 @@ func TestAuthAttemptStatements_SSOState(t *testing.T) {
 			attempt := createBareAttempt(t, d.stmts, projectID)
 			sso := issueSSOState(t, d.stmts, projectID, attempt.ID)
 
+			// The row keeps a dialect-minted id (ADR 047); the state digest is
+			// only the lookup key.
+			assert.True(t, strings.HasPrefix(sso.Check.ID, "ch_"), "got id %q", sso.Check.ID)
+			assert.Equal(t, domain.HashSecret(sso.State), sso.Check.StateHash)
+
 			got, err := d.stmts.GetAuthAttemptByID(t.Context(), projectID, attempt.ID)
 			require.NoError(t, err)
 			stored, ok := got.SSOCallback()
 			require.True(t, ok)
-			assert.Equal(t, domain.HashSecret(sso.State), stored.ID)
+			assert.Equal(t, sso.Check.ID, stored.ID)
+			assert.Empty(t, stored.StateHash, "an attempt read never carries the lookup key")
 			assert.Equal(t, sso.Check.Pending, stored.Pending)
 			assert.Nil(t, stored.Result)
 			assert.False(t, stored.IssuedAt.IsZero())
@@ -84,7 +91,8 @@ func TestAuthAttemptStatements_SSOState(t *testing.T) {
 
 			consumed, err := d.stmts.ConsumeSSOState(t.Context(), projectID, stateHash)
 			require.NoError(t, err)
-			assert.Equal(t, stateHash, consumed.ID)
+			assert.Equal(t, sso.Check.ID, consumed.ID)
+			assert.Equal(t, stateHash, consumed.StateHash)
 			assert.Equal(t, attempt.ID, consumed.AuthAttemptID)
 			assert.Equal(t, sso.Check.Pending, consumed.Pending)
 
@@ -132,6 +140,24 @@ func TestAuthAttemptStatements_SSOState(t *testing.T) {
 			projectID := ensureProject(t, d.stmts)
 			_, err := d.stmts.ConsumeSSOState(t.Context(), projectID, domain.HashSecret("never-issued"))
 			assert.ErrorIs(t, err, domain.ErrSSOStateInvalid())
+		})
+
+		// A re-issue mints a fresh row id, so a check id captured before it can
+		// never name the new ceremony.
+		t.Run("reissue_rotates_the_check_id", func(t *testing.T) {
+			projectID := ensureProject(t, d.stmts)
+			attempt := createBareAttempt(t, d.stmts, projectID)
+			first := issueSSOState(t, d.stmts, projectID, attempt.ID)
+			second := issueSSOState(t, d.stmts, projectID, attempt.ID)
+
+			assert.NotEqual(t, first.Check.ID, second.Check.ID)
+			assert.True(t, strings.HasPrefix(second.Check.ID, "ch_"), "got id %q", second.Check.ID)
+
+			got, err := d.stmts.GetAuthAttemptByID(t.Context(), projectID, attempt.ID)
+			require.NoError(t, err)
+			stored, ok := got.SSOCallback()
+			require.True(t, ok)
+			assert.Equal(t, second.Check.ID, stored.ID)
 		})
 
 		t.Run("consume_after_reissue_fails", func(t *testing.T) {

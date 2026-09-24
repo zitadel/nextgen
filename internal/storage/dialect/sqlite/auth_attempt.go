@@ -45,21 +45,23 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`
 	authAttemptChallengeSucceededStmt = `UPDATE checks SET last_verified_at = ?, factor_payload = ?, challenge_payload = NULL, last_challenged_at = NULL, failure_count = 0` +
 		` WHERE project_id = ? AND auth_attempt_id = ? AND type = ? AND id = ?`
 
-	issueSSOStateStmt = `INSERT INTO checks (project_id, auth_attempt_id, type, id, last_challenged_at, challenge_payload, failure_count, last_failed_at)` +
-		` VALUES (?, ?, ?, ?, ?, ?, 0, NULL) ON CONFLICT (project_id, auth_attempt_id, type)` +
+	issueSSOStateStmt = `INSERT INTO checks (project_id, auth_attempt_id, type, id, last_challenged_at, challenge_payload, lookup_hash, failure_count, last_failed_at)` +
+		` VALUES (?, ?, ?, ?, ?, ?, ?, 0, NULL) ON CONFLICT (project_id, auth_attempt_id, type)` +
 		` DO UPDATE SET id = EXCLUDED.id, last_challenged_at = EXCLUDED.last_challenged_at, challenge_payload = EXCLUDED.challenge_payload,` +
-		` factor_payload = NULL, last_verified_at = NULL, failure_count = 0, last_failed_at = NULL`
+		` lookup_hash = EXCLUDED.lookup_hash,` +
+		` factor_payload = NULL, last_verified_at = NULL, failure_count = 0, last_failed_at = NULL` +
+		` RETURNING id`
 
-	selectPendingSSOStateStmt = `SELECT c.auth_attempt_id, c.challenge_payload, aa.created_at, aa.time_to_live` +
+	selectPendingSSOStateStmt = `SELECT c.id, c.auth_attempt_id, c.challenge_payload, aa.created_at, aa.time_to_live` +
 		` FROM checks c` +
 		` JOIN auth_attempts aa ON aa.project_id = c.project_id AND aa.id = c.auth_attempt_id` +
-		` WHERE c.project_id = ? AND c.id = ? AND c.type = ? AND c.last_challenged_at IS NOT NULL`
+		` WHERE c.project_id = ? AND c.lookup_hash = ? AND c.type = ? AND c.last_challenged_at IS NOT NULL`
 
 	consumeSSOStateStmt = `UPDATE checks SET challenge_payload = NULL, last_challenged_at = NULL, factor_payload = NULL` +
-		` WHERE project_id = ? AND id = ? AND type = ? AND last_challenged_at IS NOT NULL`
+		` WHERE project_id = ? AND lookup_hash = ? AND type = ? AND last_challenged_at IS NOT NULL`
 
 	setSSOCallbackResultStmt = `UPDATE checks SET factor_payload = ?` +
-		` WHERE project_id = ? AND id = ? AND type = ? AND last_challenged_at IS NULL`
+		` WHERE project_id = ? AND lookup_hash = ? AND type = ? AND last_challenged_at IS NULL`
 
 	authAttemptChallengeFailedStmt = `UPDATE checks SET last_failed_at = ?, failure_count = failure_count + 1` +
 		` WHERE project_id = ? AND auth_attempt_id = ? AND type = ? AND id = ?` +
@@ -431,11 +433,17 @@ func (as authAttemptStatements) IssueSSOState(ctx context.Context, projectID, au
 	if payloadStr != nil {
 		payloadArg = *payloadStr
 	}
-	if _, err := as.client.Exec(ctx, issueSSOStateStmt,
-		projectID, authAttemptID, int64(domain.AuthCheckTypeSSOCallback), check.ID, now.UnixNano(), payloadArg,
-	); err != nil {
+	checkID := check.ID
+	if err := ensureManagedID(&checkID, domain.PrefixChallenge); err != nil {
+		return err
+	}
+	var returnedID string
+	if err := as.client.QueryRow(ctx, issueSSOStateStmt,
+		projectID, authAttemptID, int64(domain.AuthCheckTypeSSOCallback), checkID, now.UnixNano(), payloadArg, check.StateHash,
+	).Scan(&returnedID); err != nil {
 		return fmt.Errorf("failed to issue sso state: %w", wrapError(err))
 	}
+	check.ID = returnedID
 	check.AuthAttemptID = authAttemptID
 	check.IssuedAt = now
 	return nil
@@ -443,13 +451,13 @@ func (as authAttemptStatements) IssueSSOState(ctx context.Context, projectID, au
 
 // ConsumeSSOState implements [service.AuthAttemptStatements].
 func (as authAttemptStatements) ConsumeSSOState(ctx context.Context, projectID, stateHash string) (*domain.SSOCallbackCheck, error) {
-	check := &domain.SSOCallbackCheck{ID: stateHash}
+	check := &domain.SSOCallbackCheck{StateHash: stateHash}
 	var payload sql.NullString
 	var createdNano int64
 	var timeToLiveNano sql.NullInt64
 	err := as.client.QueryRow(ctx, selectPendingSSOStateStmt,
 		projectID, stateHash, int64(domain.AuthCheckTypeSSOCallback),
-	).Scan(&check.AuthAttemptID, &payload, &createdNano, &timeToLiveNano)
+	).Scan(&check.ID, &check.AuthAttemptID, &payload, &createdNano, &timeToLiveNano)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, domain.ErrSSOStateInvalid()

@@ -43,20 +43,20 @@ const (
 		` THEN RETURN id`
 	authAttemptChallengeSucceededStmt = `UPDATE checks SET last_verified_at = @p1, factor_payload = @p2, challenge_payload = NULL, last_challenged_at = NULL, failure_count = 0` +
 		` WHERE project_id = @p3 AND auth_attempt_id = @p4 AND type = @p5 AND id = @p6`
-	// Spanner DML cannot update a primary-key column and the row id is the
-	// state hash, so a re-issue deletes the attempt's row and inserts the new
-	// one inside withTransaction.
+	// Spanner DML cannot update a primary-key column, and a re-issue mints a
+	// fresh check id so a stale one cannot match, so the issue deletes the
+	// attempt's row and inserts the new one inside withTransaction.
 	deleteSSOStateStmt = `DELETE FROM checks WHERE project_id = @p1 AND auth_attempt_id = @p2 AND type = @p3`
-	insertSSOStateStmt = `INSERT INTO checks (project_id, auth_attempt_id, type, id, last_challenged_at, challenge_payload, failure_count)` +
-		` VALUES (@p1, @p2, @p3, @p4, @p5, @p6, 0)`
-	selectPendingSSOStateStmt = `SELECT c.auth_attempt_id, c.challenge_payload, aa.created_at, aa.time_to_live` +
+	insertSSOStateStmt = `INSERT INTO checks (project_id, auth_attempt_id, type, id, last_challenged_at, challenge_payload, lookup_hash, failure_count)` +
+		` VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, 0)`
+	selectPendingSSOStateStmt = `SELECT c.id, c.auth_attempt_id, c.challenge_payload, aa.created_at, aa.time_to_live` +
 		` FROM checks c` +
 		` JOIN auth_attempts aa ON aa.project_id = c.project_id AND aa.id = c.auth_attempt_id` +
-		` WHERE c.project_id = @p1 AND c.id = @p2 AND c.type = @p3 AND c.last_challenged_at IS NOT NULL`
+		` WHERE c.project_id = @p1 AND c.lookup_hash = @p2 AND c.type = @p3 AND c.last_challenged_at IS NOT NULL`
 	consumeSSOStateStmt = `UPDATE checks SET challenge_payload = NULL, last_challenged_at = NULL, factor_payload = NULL` +
-		` WHERE project_id = @p1 AND id = @p2 AND type = @p3 AND last_challenged_at IS NOT NULL`
+		` WHERE project_id = @p1 AND lookup_hash = @p2 AND type = @p3 AND last_challenged_at IS NOT NULL`
 	setSSOCallbackResultStmt = `UPDATE checks SET factor_payload = @p4` +
-		` WHERE project_id = @p1 AND id = @p2 AND type = @p3 AND last_challenged_at IS NULL`
+		` WHERE project_id = @p1 AND lookup_hash = @p2 AND type = @p3 AND last_challenged_at IS NULL`
 
 	authAttemptChallengeFailedStmt = `UPDATE checks SET last_failed_at = @p1, failure_count = failure_count + 1` +
 		` WHERE project_id = @p2 AND auth_attempt_id = @p3 AND type = @p4 AND id = @p5` +
@@ -448,6 +448,10 @@ func (as authAttemptStatements) IssueSSOState(ctx context.Context, projectID, au
 	if err != nil {
 		return fmt.Errorf("failed to marshal sso state payload: %w", err)
 	}
+	checkID := check.ID
+	if err := ensureManagedID(&checkID, domain.PrefixChallenge); err != nil {
+		return err
+	}
 	err = withTransaction(ctx, as.db, func(ctx context.Context, tx queryExecutor) error {
 		deletion := buildStatement(deleteSSOStateStmt,
 			projectID, authAttemptID, int64(domain.AuthCheckTypeSSOCallback)).statement()
@@ -455,8 +459,8 @@ func (as authAttemptStatements) IssueSSOState(ctx context.Context, projectID, au
 			return fmt.Errorf("failed to clear the previous sso state: %w", err)
 		}
 		insert := buildStatement(insertSSOStateStmt,
-			projectID, authAttemptID, int64(domain.AuthCheckTypeSSOCallback), check.ID, now,
-			encodeSpannerJSONPtr(payloadStr)).statement()
+			projectID, authAttemptID, int64(domain.AuthCheckTypeSSOCallback), checkID, now,
+			encodeSpannerJSONPtr(payloadStr), check.StateHash).statement()
 		if _, err := tx.Update(ctx, insert); err != nil {
 			return fmt.Errorf("failed to insert the sso state: %w", err)
 		}
@@ -465,6 +469,7 @@ func (as authAttemptStatements) IssueSSOState(ctx context.Context, projectID, au
 	if err != nil {
 		return fmt.Errorf("failed to issue sso state: %w", err)
 	}
+	check.ID = checkID
 	check.AuthAttemptID = authAttemptID
 	check.IssuedAt = now
 	return nil
@@ -472,7 +477,7 @@ func (as authAttemptStatements) IssueSSOState(ctx context.Context, projectID, au
 
 // ConsumeSSOState implements [service.AuthAttemptStatements].
 func (as authAttemptStatements) ConsumeSSOState(ctx context.Context, projectID, stateHash string) (*domain.SSOCallbackCheck, error) {
-	check := &domain.SSOCallbackCheck{ID: stateHash}
+	check := &domain.SSOCallbackCheck{StateHash: stateHash}
 	selection := buildStatement(selectPendingSSOStateStmt,
 		projectID, stateHash, int64(domain.AuthCheckTypeSSOCallback)).statement()
 	var payload spanner.NullJSON
@@ -480,7 +485,7 @@ func (as authAttemptStatements) ConsumeSSOState(ctx context.Context, projectID, 
 	var timeToLiveNanos spanner.NullInt64
 	err := as.db.Query(ctx, selection, func(iter *spanner.RowIterator) error {
 		_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
-			return struct{}{}, row.Columns(&check.AuthAttemptID, &payload, &createdAt, &timeToLiveNanos)
+			return struct{}{}, row.Columns(&check.ID, &check.AuthAttemptID, &payload, &createdAt, &timeToLiveNanos)
 		})
 		return err
 	})

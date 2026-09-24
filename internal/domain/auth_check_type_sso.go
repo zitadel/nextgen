@@ -112,9 +112,14 @@ func (r SSOCallbackResult) LogValue() slog.Value {
 // it, and not an [AuthChallenge], so the generic challenge and proof endpoints
 // cannot reach it either.
 type SSOCallbackCheck struct {
-	// ID is HashSecret(state): the plaintext state travels to the provider and
-	// back, only its hash is stored.
+	// ID is the dialect-minted check id (ADR 047). NewSSOState leaves it empty
+	// and IssueSSOState assigns it.
 	ID string
+	// StateHash is HashSecret(state), the callback's only lookup key: it is
+	// stored in checks.lookup_hash, set by NewSSOState and filled by
+	// ConsumeSSOState. Attempt reads leave it empty, since nothing that reads an
+	// attempt looks a record up by state.
+	StateHash string
 	// AuthAttemptID is filled by IssueSSOState and by ConsumeSSOState, which is
 	// how the callback learns the attempt from the state alone.
 	AuthAttemptID string
@@ -132,13 +137,14 @@ func (c *SSOCallbackCheck) Type() AuthCheckType { return AuthCheckTypeSSOCallbac
 
 func (c *SSOCallbackCheck) Payload() any { return c.Pending }
 
-// LogValue implements [slog.LogValuer]. The id is the stored hash, so it is
-// safe to log; the payloads are summarised as presence flags. Value receiver
-// for the reason given on [SSOStatePayload.LogValue].
+// LogValue implements [slog.LogValuer]. The minted id is safe to log; the state
+// hash and the payloads are reported as presence flags only. Value receiver for
+// the reason given on [SSOStatePayload.LogValue].
 func (c SSOCallbackCheck) LogValue() slog.Value {
 	return slog.GroupValue(
 		slog.String("id", c.ID),
 		slog.Time("issued_at", c.IssuedAt),
+		slog.Bool("has_state_hash", c.StateHash != ""),
 		slog.Bool("pending", c.Pending != nil),
 		slog.Bool("has_result", c.Result != nil),
 	)
@@ -149,8 +155,8 @@ var _ AuthCheck = (*SSOCallbackCheck)(nil)
 
 // SSOState is what NewSSOState hands the submit step: the three plaintext
 // secrets it needs and the record to persist. None of them is stored as such.
-// State is stored as its hash, the binding nonce as its hash, the verifier as
-// AES-GCM ciphertext (ADR 029).
+// The state becomes the record's lookup hash, the binding nonce a hash in the
+// payload, the verifier AES-GCM ciphertext (ADR 029).
 type SSOState struct {
 	State        string            // plaintext state, goes to the provider
 	PKCEVerifier string            // plaintext verifier for PKCEChallenge; empty when PKCE is off
@@ -171,6 +177,7 @@ func (s SSOState) LogValue() slog.Value {
 // state (16 bytes), the binding nonce (16 bytes), the OIDC nonce (16 bytes) and
 // the PKCE verifier (32 bytes, the 43-character form RFC 7636 §4.1 recommends).
 // State and binding nonce reach the record only as their HashSecret digests.
+// The record's own id is left to the storage layer (ADR 047).
 //
 // pkceEncrypter nil means PKCE is disabled for this connection: no verifier is
 // minted. Otherwise the verifier is encrypted with it before it is placed on
@@ -181,8 +188,8 @@ func (s SSOState) LogValue() slog.Value {
 // writing key's id, which is what lets the callback decrypt after a rotation
 // (see [SSOStatePayload.DecryptPKCEVerifier]).
 //
-// Only the state's hash becomes the record id, so the plaintext is the single
-// thing that can find the record again.
+// Only the state's hash is stored, so the plaintext is the single thing that can
+// find the record again.
 func NewSSOState(providerSlug, connectionRevisionID, returnTarget string, pkceEncrypter crypto.Encrypter) (*SSOState, error) {
 	state, err := randomSecret(16)
 	if err != nil {
@@ -210,7 +217,7 @@ func NewSSOState(providerSlug, connectionRevisionID, returnTarget string, pkceEn
 		PKCEVerifier: verifier,
 		BindingNonce: bindingNonce,
 		Check: &SSOCallbackCheck{
-			ID: HashSecret(state),
+			StateHash: HashSecret(state),
 			Pending: &SSOStatePayload{
 				ProviderSlug:          providerSlug,
 				ConnectionRevisionID:  connectionRevisionID,
