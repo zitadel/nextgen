@@ -1,5 +1,6 @@
 import { Flags } from "@oclif/core";
 import { createZitadelClient, type ZitadelClient } from "@zitadel/api/client";
+import { ApiError } from "@zitadel/api/runtime/fetch";
 import {
   CreateGrantBody,
   CreateTeamBody,
@@ -403,14 +404,21 @@ export const RESOURCES = {
     },
     get: {
       response: GetSchemaByIdResponse,
-      // A schema is addressed two ways. `sch_…`, or the customer's own `$id`
-      // URI, names one immutable revision and fetches directly. Anything else
-      // is an object type, which the endpoint resolves to the current revision
-      // in a single call. The API has no fetch-by-object-type route yet; when
-      // it does, this collapses to one client call like every other `get`.
+      // A schema is addressed two ways: a revision id names one immutable
+      // revision and fetches directly, an object type resolves to the current
+      // revision through the list. A revision id is whatever the customer's
+      // `$id` says — `sch_…`, a URL, `urn:example:human`, anything — so there
+      // is no shape to test for. Ask the server instead: fetch, and read a 404
+      // as "that was an object type". The API has no fetch-by-object-type
+      // route yet; when it does, this collapses to one client call like every
+      // other `get`.
       call: async ({ client, projectId }, ref) => {
-        if (ref.startsWith("sch_") || ref.includes("://")) {
-          return client.getSchemaById(ref);
+        try {
+          return await client.getSchemaById(ref);
+        } catch (error) {
+          if (!(error instanceof ApiError) || error.status !== 404) {
+            throw error;
+          }
         }
         const page = await client.listSchemas({
           project_id: projectId,
@@ -420,7 +428,7 @@ export const RESOURCES = {
         } as ListSchemasParams);
         const current = page.schemas[0];
         if (!current) {
-          throw new ZitadelError("E_NOT_FOUND", `No schema for object type "${ref}"`, {
+          throw new ZitadelError("E_NOT_FOUND", `No schema named "${ref}"`, {
             hint: "Run `schemas list` to see the object types this project has.",
           });
         }
