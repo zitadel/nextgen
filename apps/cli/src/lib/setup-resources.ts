@@ -9,7 +9,6 @@ import type {
   CreateFlowDefinition201,
   CreateSchema201,
   CreateSchemaBody,
-  GetSchemaById200,
 } from "@zitadel/api/generated/model";
 import type { ZitadelClient } from "@zitadel/api/client";
 import {
@@ -113,9 +112,7 @@ export async function materializeSetupResources(opts: {
   try {
     // The response is the `{id, schema, metadata}` envelope; the local config
     // file keeps only the customer-authored document.
-    const canonical = (
-      (await opts.client.getSchemaById(schemaId)) as unknown as GetSchemaById200
-    ).schema;
+    const canonical = (await opts.client.getSchemaById(schemaId)).schema;
     const written = await writeBackResource(
       opts.cwd,
       DEFAULT_SCHEMA_CONFIG_PATH,
