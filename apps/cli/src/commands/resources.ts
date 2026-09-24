@@ -70,9 +70,8 @@ import { readZitadelSecret } from "../lib/project";
  */
 export type Platform = Readonly<{ client: ZitadelClient; projectId: string }>;
 
-// Builders that infer a verb's body type from its generated Zod schema, so a
-// `call` receives the typed body straight from `parseOrThrow` — no cast from
-// `Json`. `<B>` is bound at each call site by the schema passed in.
+// Builders that infer a verb's body type from its Zod schema, so `call` gets
+// the typed body straight from `parseOrThrow` — no cast from `Json`.
 const create = <B>(
   schema: Schema<B>,
   call: (ctx: Platform, body: B) => Promise<unknown>,
@@ -83,9 +82,8 @@ const update = <B>(
   call: (ctx: Platform, id: string, body: B) => Promise<unknown>,
 ): UpdateSpec<Platform, B> => ({ schema, call });
 
-// A structured-query list: `B` is inferred from the spec's `body` schema and
-// flows to `call`'s request. A `GET` list has no body schema, so it stays a
-// plain object whose request is the flat parameter map.
+// A structured-query list infers `B` from its `body` schema; a `GET` list has
+// none and stays a plain object whose request is the flat parameter map.
 const query = <B>(spec: ListSpec<Platform, B>): ListSpec<Platform, B> => spec;
 
 /** Filter operations of `POST /<resource>/query` endpoints (ADR 031). */

@@ -15,9 +15,8 @@ export type Json = Readonly<Record<string, unknown>>;
 export type Page = Readonly<{ items: readonly unknown[]; next: string | null }>;
 
 /**
- * Structural subset of a Zod schema; keeps the factory free of a Zod import.
- * `B` is the schema's parsed output — a `ZodType<B>` satisfies it — so a spec
- * can carry its body type from the generated schema straight to its `call`.
+ * Structural subset of a Zod schema (a `ZodType<B>` satisfies it); keeps the
+ * factory free of a Zod import while carrying the parsed body type `B`.
  */
 export type Schema<B = unknown> = {
   safeParse: (value: unknown) => { success: boolean; data?: B; error?: { issues: unknown } };
@@ -119,12 +118,9 @@ export type GetSpec<Ctx> = Readonly<{
   /** Generated response schema of the record itself; see {@link QueryListSpec.response}. */
   response?: Schema;
 }>;
-// `call` is written in method syntax on purpose: it makes the body parameter
-// bivariant, so a spec built for a concrete body type (`CreateSpec<Ctx,
-// CreateUserBody>`) still assigns to the erased `CreateSpec<Ctx>` the registry
-// and factory hold. The body type is checked where it matters — at the
-// `create`/`update`/`query` builder call site against the schema — not
-// re-checked as bodies flow through the transport-agnostic factory.
+// Method syntax makes `body` bivariant, so a concrete-body spec still assigns to
+// the erased spec the registry and factory hold; the body/schema fit is checked
+// at the builder call site, not as bodies flow through the factory.
 export type CreateSpec<Ctx, B = Json> = Readonly<{
   schema: Schema<B>;
   call(ctx: Ctx, body: B): Promise<unknown>;
