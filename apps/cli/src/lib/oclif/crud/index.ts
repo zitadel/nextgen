@@ -23,7 +23,7 @@ import type {
  * destructive-action guards, and the JSON / table envelopes.
  */
 
-export { bodyFieldFlags, bodyFromFlags, describeBody, fieldExample } from "./fields";
+export { bodyFieldFlags, bodyFromFlags, describeBody, fieldExample, needsRawBody } from "./fields";
 export type { BodyField, FieldKind } from "./fields";
 export { describeRegistry } from "./describe";
 export { collectPages } from "./paging";
