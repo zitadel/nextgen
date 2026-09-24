@@ -506,16 +506,17 @@ func (as authAttemptStatements) ConsumeSSOState(ctx context.Context, projectID, 
 		ttl := time.Duration(timeToLiveNanos.Int64)
 		attempt.TimeToLive = &ttl
 	}
-	expired := attempt.IsExpired()
 	// The guarded update is the single-use gate: a racing consumer that
-	// already cleared the challenge state leaves zero rows for this one.
+	// already cleared the challenge state leaves zero rows for this one. The
+	// clock is read after the burn, so a consume that stalls on the update
+	// cannot hand back a state that has meanwhile expired.
 	consume := buildStatement(consumeSSOStateStmt,
 		projectID, stateHash, int64(domain.AuthCheckTypeSSOCallback)).statement()
 	n, err := as.db.Update(ctx, consume)
 	if err != nil {
 		return nil, fmt.Errorf("failed to consume sso state: %w", err)
 	}
-	if n == 0 || expired {
+	if n == 0 || attempt.IsExpired() {
 		return nil, domain.ErrSSOStateInvalid()
 	}
 	return check, nil

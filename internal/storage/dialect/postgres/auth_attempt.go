@@ -453,14 +453,16 @@ func (as authAttemptStatements) ConsumeSSOState(ctx context.Context, projectID, 
 			return nil, fmt.Errorf("failed to unmarshal sso state payload: %w", err)
 		}
 	}
-	expired := (&domain.AuthAttempt{CreatedAt: createdAt, TimeToLive: timeToLive}).IsExpired()
+	attempt := domain.AuthAttempt{CreatedAt: createdAt, TimeToLive: timeToLive}
 	// The guarded update is the single-use gate: a racing consumer that
-	// already cleared the challenge state leaves zero rows for this one.
+	// already cleared the challenge state leaves zero rows for this one. The
+	// clock is read after the burn, so a consume that stalls on the update
+	// cannot hand back a state that has meanwhile expired.
 	tag, err := as.client.Exec(ctx, consumeSSOStateStmt, projectID, stateHash, domain.AuthCheckTypeSSOCallback)
 	if err != nil {
 		return nil, fmt.Errorf("failed to consume sso state: %w", wrapError(err))
 	}
-	if tag.RowsAffected() == 0 || expired {
+	if tag.RowsAffected() == 0 || attempt.IsExpired() {
 		return nil, domain.ErrSSOStateInvalid()
 	}
 	return check, nil
