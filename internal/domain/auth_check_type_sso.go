@@ -35,8 +35,12 @@ type SSOStatePayload struct {
 
 // DecryptPKCEVerifier returns the plaintext verifier for the token exchange,
 // or "" when the record was issued without PKCE. Call it only after
-// ConsumeSSOState succeeded. Services pass the crypter the issue used:
-// keys.GetProjectCrypter(ctx, projectID, EncryptionKeyPurposeSecret).
+// ConsumeSSOState succeeded.
+//
+// dec must resolve the key from the ciphertext's own kid, the way
+// decrypterOfWritingKey in internal/service/variables.go does, never from the
+// project's currently active secret key. The ceremony lives up to the attempt
+// TTL, so a key rotation in between would otherwise strand it.
 func (p SSOStatePayload) DecryptPKCEVerifier(dec crypto.Decrypter) (string, error) {
 	if p.EncryptedPKCEVerifier == "" {
 		return "", nil
@@ -151,7 +155,9 @@ func (s SSOState) LogValue() slog.Value {
 // the record, because it later travels to the provider's token endpoint and so
 // cannot be stored in the clear (ADR 029, data at rest). Services pass
 // keys.GetProjectCrypter(ctx, projectID, EncryptionKeyPurposeSecret), the same
-// crypter secret variables use.
+// crypter secret variables use. Its ciphertext is a compact JWE carrying the
+// writing key's id, which is what lets the callback decrypt after a rotation
+// (see [SSOStatePayload.DecryptPKCEVerifier]).
 //
 // Only the state's hash becomes the record id, so the plaintext is the single
 // thing that can find the record again.

@@ -3,9 +3,11 @@ package domain_test
 import (
 	"bytes"
 	"encoding/base64"
+	"errors"
 	"log/slog"
 	"reflect"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -100,6 +102,55 @@ func TestNewSSOState(t *testing.T) {
 		require.NoError(t, err)
 		assert.Empty(t, decrypted)
 	})
+}
+
+// keyedCrypter stands in for one project secret key. Its ciphertext names the
+// writing key, the way the real compact JWE carries its kid.
+type keyedCrypter struct{ keyID string }
+
+func (c keyedCrypter) Encrypt(plain string) (string, error) {
+	return c.keyID + ":" + base64.StdEncoding.EncodeToString([]byte(plain)), nil
+}
+
+func (c keyedCrypter) Decrypt(encrypted string) (string, error) {
+	keyID, body, ok := strings.Cut(encrypted, ":")
+	if !ok || keyID != c.keyID {
+		return "", errors.New("ciphertext was written by another key")
+	}
+	plain, err := base64.StdEncoding.DecodeString(body)
+	return string(plain), err
+}
+
+// TestSSOStatePayload_DecryptPKCEVerifierResolvesTheWritingKey pins why the
+// decrypter must come from the ciphertext's key id: the ceremony can outlive a
+// rotation of the project's active secret key.
+func TestSSOStatePayload_DecryptPKCEVerifierResolvesTheWritingKey(t *testing.T) {
+	t.Parallel()
+	issuing := keyedCrypter{keyID: "key-1"}
+	rotated := keyedCrypter{keyID: "key-2"}
+
+	sso, err := domain.NewSSOState("google", "idprev_1", "/after-login", issuing)
+	require.NoError(t, err)
+
+	// The active key rotated while the ceremony was in flight.
+	_, err = sso.Check.Pending.DecryptPKCEVerifier(rotated)
+	require.ErrorIs(t, err, domain.ErrDecryptionFailed(nil))
+
+	// Resolving the key the ciphertext names still works, and a
+	// crypto.DecrypterFn satisfies the parameter, so a service can pass the
+	// decrypterOfWritingKey closure straight in.
+	byWritingKey := crypto.DecrypterFn(func(encrypted string) (string, error) {
+		keyID, _, _ := strings.Cut(encrypted, ":")
+		for _, candidate := range []keyedCrypter{rotated, issuing} {
+			if candidate.keyID == keyID {
+				return candidate.Decrypt(encrypted)
+			}
+		}
+		return "", errors.New("unknown key " + keyID)
+	})
+	verifier, err := sso.Check.Pending.DecryptPKCEVerifier(byWritingKey)
+	require.NoError(t, err)
+	assert.Equal(t, sso.PKCEVerifier, verifier)
 }
 
 // TestPKCEChallenge pins the S256 transformation against the worked example in
