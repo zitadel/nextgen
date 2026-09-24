@@ -5,32 +5,20 @@ import { parseConfigModule } from "../utils/magicast";
 
 const AUTH_ROUTE_PATHS = ["login", "register", "profile"] as const;
 
-/**
- * The slice of magicast's array proxy this edit uses: its length, indexed
- * elements (each a route object whose `path` may be anything the file wrote),
- * and `push` for appending a raw member.
- */
+/** The slice of magicast's array proxy this edit reads: indexed route objects, length, and push. */
 type ProxifiedRouteArray = Readonly<{
   length: number;
   push: (item: unknown) => void;
 }> &
   Readonly<Record<number, { path?: unknown } | undefined>>;
 
-/**
- * Whether `value` is an inline array literal magicast can append to. Members
- * are read with `Reflect.get` because magicast's proxies answer property gets
- * but not `in` checks, which see only the empty proxy target.
- */
+// magicast proxies answer property gets but not `in`, so members are read with Reflect.get.
 function isProxifiedArray(value: unknown): value is ProxifiedRouteArray {
-  if (typeof value !== "object" || value === null) {
-    return false;
-  }
-  const push: unknown = Reflect.get(value, "push");
-  const length: unknown = Reflect.get(value, "length");
+  if (typeof value !== "object" || value === null) return false;
   return (
     Reflect.get(value, "$type") === "array" &&
-    typeof push === "function" &&
-    typeof length === "number"
+    typeof Reflect.get(value, "push") === "function" &&
+    typeof Reflect.get(value, "length") === "number"
   );
 }
 
@@ -45,9 +33,7 @@ export function angularRoutesEdit(): (source: string | undefined) => string {
   return (source) => {
     const label = "src/app/app.routes.ts";
     const mod = parseConfigModule(source, label);
-    // magicast types a module's exports as an object with no declared members,
-    // so the `routes` export is reached as an unknown property and narrowed to
-    // an array proxy before it is read or appended to.
+    // magicast types exports as an object with no declared members; reach `routes` as unknown.
     const moduleExports: unknown = mod.exports;
     const routes: unknown =
       typeof moduleExports === "object" && moduleExports !== null
