@@ -75,8 +75,8 @@ const update = <B>(
   call: (ctx: Platform, id: string, body: B) => Promise<unknown>,
 ): UpdateSpec<Platform, B> => ({ schema, call });
 
-// Binds a list's request type `B`: inferred from its `body` schema for a
-// structured query, or given explicitly for a `GET` list's flat parameters.
+// Infers a structured-query list's request type `B` from its `body` schema. A
+// `GET` list has no body, so it is written as a plain object (request stays `Json`).
 const list = <B>(spec: ListSpec<Platform, B>): ListSpec<Platform, B> => spec;
 
 /** Filter operations of `POST /<resource>/query` endpoints (ADR 031). */
@@ -136,7 +136,8 @@ export const RESOURCES = {
     }),
     get: { call: ({ client }, id) => client.getUserByID(id), response: GetUserByIDResponse },
     create: create(CreateUserBody, ({ client, projectId }, body) =>
-      client.createUser(body, { project_id: projectId })),
+      client.createUser(body, { project_id: projectId }),
+    ),
     update: update(PatchUserByIDBody, ({ client }, id, body) => client.patchUserByID(id, body)),
     delete: { call: ({ client }, id) => client.deleteUserByID(id) },
   },
@@ -163,7 +164,8 @@ export const RESOURCES = {
     }),
     get: { call: ({ client }, id) => client.getTeam(id), response: GetTeamResponse },
     create: create(CreateTeamBody, ({ client, projectId }, body) =>
-      client.createTeam(body, { project_id: projectId })),
+      client.createTeam(body, { project_id: projectId }),
+    ),
     update: update(UpdateTeamBody, ({ client }, id, body) => client.updateTeam(id, body)),
     // A team's DELETE deactivates it and leaves it readable (ADR 024), so the
     // command is named after that rather than claiming the team is gone.
@@ -288,7 +290,8 @@ export const RESOURCES = {
       response: GetGrantResponse,
     },
     create: create(CreateGrantBody, ({ client, projectId }, body) =>
-      client.createGrant(body, { project_id: projectId })),
+      client.createGrant(body, { project_id: projectId }),
+    ),
     delete: {
       call: ({ client, projectId }, id) => client.deleteGrant(id, { project_id: projectId }),
     },
