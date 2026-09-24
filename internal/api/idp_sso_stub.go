@@ -6,6 +6,7 @@ import (
 	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -283,7 +284,7 @@ func (h *Handler) IdpCallbackHandler() http.Handler {
 		if errParam := r.URL.Query().Get("error"); errParam != "" {
 			// The user declined at the provider, or it refused. Put them back
 			// on the step they started from rather than on an error page.
-			h.finishSsoCallback(ctx, w, r, pending, "")
+			h.finishSsoCallback(ctx, w, r, pending, ssoClaims{})
 			return
 		}
 		code := r.URL.Query().Get("code")
@@ -291,37 +292,39 @@ func (h *Handler) IdpCallbackHandler() http.Handler {
 			http.Error(w, "sso callback without a code", http.StatusBadRequest)
 			return
 		}
-		email, err := h.exchangeSsoCode(ctx, pending, code)
+		claims, err := h.exchangeSsoCode(ctx, pending, code)
 		if err != nil {
 			slog.ErrorContext(ctx, "sso stub: code exchange failed", slog.String("error", err.Error()))
 			http.Error(w, "sso code exchange failed", http.StatusBadGateway)
 			return
 		}
-		h.finishSsoCallback(ctx, w, r, pending, email)
+		h.finishSsoCallback(ctx, w, r, pending, claims)
 	})
 }
 
 // finishSsoCallback advances the flow to the step the outcome calls for and
 // sends the browser back to the page that started the sign-in.
-func (h *Handler) finishSsoCallback(ctx context.Context, w http.ResponseWriter, r *http.Request, pending ssoPending, email string) {
+func (h *Handler) finishSsoCallback(ctx context.Context, w http.ResponseWriter, r *http.Request, pending ssoPending, claims ssoClaims) {
 	state, err := h.openState(ctx, pending.sealedState)
 	if err != nil {
 		http.Error(w, "sso callback for an expired flow", http.StatusBadRequest)
 		return
 	}
-	target := h.ssoOutcomeStep(ctx, state, email)
-	state.CurrentStep = target
-	// Every advance refreshes this (see FlowState.IssuedAt); without it a user
-	// who spent a while at the provider resumes holding an almost-expired
-	// state.
-	state.IssuedAt = time.Now().UTC()
-	if email != "" {
-		// The provider supplied the identifier, so the step the flow resumes
-		// on does not have to ask for it again.
+	if claims.Email != "" {
+		// The provider supplied the identifier, so whatever happens next --
+		// creation or collection -- works from the claim rather than asking
+		// for it again. An unverified one is still prefilled: the user sees
+		// it in the field and confirms it, which is what "treated as
+		// user-typed" means.
 		if state.CollectedData.UserData == nil {
 			state.CollectedData.UserData = map[string]any{}
 		}
-		state.CollectedData.UserData["email"] = email
+		state.CollectedData.UserData["email"] = claims.Email
+	}
+	if err := h.resolveSsoIdentity(ctx, state, pending, claims); err != nil {
+		slog.ErrorContext(ctx, "sso stub: resolving the identity failed", slog.String("error", err.Error()))
+		http.Error(w, "sso callback could not resume the flow", http.StatusInternalServerError)
+		return
 	}
 	sealed, err := h.sealState(ctx, state)
 	if err != nil {
@@ -349,28 +352,136 @@ func (h *Handler) finishSsoCallback(ctx context.Context, w http.ResponseWriter, 
 	http.Redirect(w, r, pending.returnURL+"/login?flow="+url.QueryEscape(state.ID), http.StatusFound)
 }
 
-// ssoOutcomeStep picks the step the flow resumes on.
+// resolveSsoIdentity fires the outcome the callback resolved to and lets the
+// flow definition route it, which is what [domain.FlowResumeWithOutcome] is
+// for: the purpose flip that `identity_unknown` carries is part of the
+// outcome's meaning, and a caller that assigns the next step itself loses it.
 //
-// Always `register-sso` on a successful return, because this stub records no
-// identity link: every returning identity is one it has never seen, which is
-// the engine's `identity_unknown` outcome. The other two outcomes are reached
-// from there rather than decided here — `register-sso` commits with
-// `on_success: create_user_with_sso`, and an email that already has an account
-// fails that with `user_already_exists`, which the flow definition routes to
-// `sso-conflict`. Recognising a returning user at all is what the identity
-// link buys, and that is #1033's.
-func (h *Handler) ssoOutcomeStep(ctx context.Context, state *domain.FlowState, email string) string {
-	if email == "" {
-		// The user declined at the provider: leave them where they were.
-		return state.CurrentStep
+// The three outcomes are area 3's
+// ([docs/design/idp/3-social-login-flow.md](../../docs/design/idp/3-social-login-flow.md)):
+//
+//   - `callback` -- the subject is signed in. This stub stores no identity
+//     link (#1033), so it never recognises a *returning* subject; it reaches
+//     this outcome only the other way, by creating the account here and now
+//     under `provisioning.creation: auto`.
+//   - `identity_unknown` -- the account could not be created from the claims
+//     alone, so the flow stops at the collection step, prefilled.
+//   - `user_already_exists` -- the claims collide with an account that is
+//     already there, which the definition routes to the conflict step.
+//
+// A provider the user declined leaves the flow exactly where it was.
+func (h *Handler) resolveSsoIdentity(
+	ctx context.Context,
+	state *domain.FlowState,
+	pending ssoPending,
+	claims ssoClaims,
+) error {
+	if claims.Email == "" {
+		// Declined at the provider: no outcome fired, so nothing advances.
+		// Refreshing the clock is still right -- the user was away a while.
+		state.IssuedAt = time.Now().UTC()
+		return nil
 	}
-	const registerSSOStep = "register-sso"
-	if !h.flowStepExists(ctx, state, registerSSOStep) {
-		// A project whose flow has no provider steps (the CLI writes them with
-		// `sso enable`) has nowhere to go; the current step is the safe answer.
-		return state.CurrentStep
+	def, err := h.flowDefinitionService.Get(ctx, state.ProjectID, state.DefinitionID)
+	if err != nil {
+		return fmt.Errorf("sso callback: load definition: %w", err)
 	}
-	return registerSSOStep
+	outcome, created := h.ssoOutcome(ctx, state, pending, claims)
+	result, err := h.flowStateMachine.ResumeWithOutcome(ctx, def, state, outcome, created)
+	if err != nil {
+		if errors.Is(err, domain.ErrFlowIntegrity()) {
+			// A definition that offers a provider on a step but does not say
+			// where its answers go is a scaffolding bug, not a user error;
+			// leaving the flow where it stands is the only safe answer.
+			slog.WarnContext(ctx, "sso stub: definition does not route the outcome",
+				slog.String("outcome", outcome), slog.String("step", state.CurrentStep))
+			state.IssuedAt = time.Now().UTC()
+			return nil
+		}
+		return fmt.Errorf("sso callback: resume: %w", err)
+	}
+	if result.HandoffToken != "" && result.Step != nil && result.Step.Complete != nil {
+		// The flow finished while the browser was at the provider. The token
+		// cannot ride the redirect, so it waits in the sealed cookie for the
+		// GET the page makes on its way back (see FlowPendingHandoff).
+		state.PendingHandoff = &domain.FlowPendingHandoff{
+			Token:     result.HandoffToken,
+			ExpiresAt: result.HandoffTokenExpiresAt,
+			Complete:  *result.Step.Complete,
+		}
+	}
+	return nil
+}
+
+// ssoOutcome decides which of the three resolution outcomes fired.
+//
+// Under `provisioning.creation: auto` -- the catalog default, and what the
+// CLI writes -- the account is created here, from the claims, and the user is
+// signed in without being stopped for anything the provider already answered.
+// The completeness test is the creation itself: the schema decides what a
+// user needs, so attempting it and degrading on failure asks the schema
+// rather than re-deriving its required list here.
+// The second return says whether an account was created, which the resume
+// treats as irreversible: the user cannot go back past it.
+func (h *Handler) ssoOutcome(
+	ctx context.Context,
+	state *domain.FlowState,
+	pending ssoPending,
+	claims ssoClaims,
+) (string, bool) {
+	if h.ssoCreationMode(pending) != api.IdpConnectionProvisioningCreationAuto || h.ssoUserCreater == nil {
+		return domain.FlowImplicitOutcomeIdentityUnknown, false
+	}
+	if !claims.Verified {
+		// The identifier is the schema's unique property, and an unverified
+		// one may not skip collection: provisioning on it would let anyone
+		// who can type a victim's address into a provider claim their
+		// account before they ever sign up.
+		return domain.FlowImplicitOutcomeIdentityUnknown, false
+	}
+	result, err := h.ssoUserCreater.Handle(ctx, domain.FlowOnSuccessInput{
+		ProjectID:     state.ProjectID,
+		UserSchemaURL: state.UserSchemaURL,
+		State:         state,
+	})
+	switch {
+	case err != nil:
+		// Incomplete claims fail schema validation here, which is the
+		// documented fallback: show the collection step, prefilled with what
+		// did arrive. An infrastructure failure lands in the same place, so
+		// it is logged rather than swallowed -- the user gets a form instead
+		// of a 500, and the operator gets the cause.
+		slog.WarnContext(ctx, "sso stub: creating from claims failed, collecting instead",
+			slog.String("error", err.Error()))
+		return domain.FlowImplicitOutcomeIdentityUnknown, false
+	case result.StepError != nil && *result.StepError == domain.FlowImplicitOutcomeUserAlreadyExists:
+		return domain.FlowImplicitOutcomeUserAlreadyExists, false
+	case result.StepError != nil:
+		return domain.FlowImplicitOutcomeIdentityUnknown, false
+	}
+	if result.UserID != "" {
+		state.CollectedData.UserID = result.UserID
+	}
+	return ssoCallbackOutcome, true
+}
+
+// ssoCallbackOutcome is the shipped outcome for a resolved identity.
+const ssoCallbackOutcome = "callback"
+
+// ssoCreationMode reads the connection's provisioning policy, defaulting to
+// the schema's own default rather than to the most restrictive value: a
+// connection that omits the block means "auto", and treating it as disabled
+// would stop every new user at a step the scaffold may not even contain.
+func (h *Handler) ssoCreationMode(pending ssoPending) api.IdpConnectionProvisioningCreation {
+	provisioning, ok := pending.connection.Provisioning.Get()
+	if !ok {
+		return api.IdpConnectionProvisioningCreationAuto
+	}
+	creation, ok := provisioning.Creation.Get()
+	if !ok {
+		return api.IdpConnectionProvisioningCreationAuto
+	}
+	return creation
 }
 
 // flowStepExists reports whether the running definition declares a step.
@@ -385,11 +496,11 @@ func (h *Handler) flowStepExists(ctx context.Context, state *domain.FlowState, n
 
 // exchangeSsoCode swaps the authorization code for tokens and reads the email
 // claim. Stub: the id_token's signature is not verified.
-func (h *Handler) exchangeSsoCode(ctx context.Context, pending ssoPending, code string) (string, error) {
+func (h *Handler) exchangeSsoCode(ctx context.Context, pending ssoPending, code string) (ssoClaims, error) {
 	oidc, _ := pending.connection.Oidc.Get()
 	tokenURL, err := tokenEndpoint(oidc)
 	if err != nil {
-		return "", err
+		return ssoClaims{}, err
 	}
 	form := url.Values{}
 	form.Set("grant_type", "authorization_code")
@@ -407,74 +518,106 @@ func (h *Handler) exchangeSsoCode(ctx context.Context, pending ssoPending, code 
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, tokenURL, strings.NewReader(form.Encode()))
 	if err != nil {
-		return "", err
+		return ssoClaims{}, err
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	if basic {
 		req.SetBasicAuth(url.QueryEscape(oidc.ClientID), url.QueryEscape(oidc.ClientSecret))
 	}
 	if h.ssoEgress == nil {
-		return "", fmt.Errorf("no egress client configured for the token exchange")
+		return ssoClaims{}, fmt.Errorf("no egress client configured for the token exchange")
 	}
 	resp, err := h.ssoEgress.Do(req)
 	if err != nil {
-		return "", err
+		return ssoClaims{}, err
 	}
 	defer func() { _ = resp.Body.Close() }()
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if err != nil {
-		return "", err
+		return ssoClaims{}, err
 	}
 	if resp.StatusCode != http.StatusOK {
 		// OAuth error bodies (invalid_client, invalid_grant) are the entire
 		// diagnostic here, and this stub's most likely failure — an
 		// unresolved `${{ VAR }}` client secret — reports exactly that way.
-		return "", fmt.Errorf("token endpoint answered %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+		return ssoClaims{}, fmt.Errorf("token endpoint answered %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 	var tokens struct {
 		IDToken string `json:"id_token"`
 	}
 	if err := json.Unmarshal(body, &tokens); err != nil {
-		return "", err
+		return ssoClaims{}, err
 	}
 	if tokens.IDToken == "" {
-		return "", fmt.Errorf("token response carried no id_token")
+		return ssoClaims{}, fmt.Errorf("token response carried no id_token")
 	}
 	return emailClaim(tokens.IDToken)
 }
 
+// ssoClaims is what the stub reads out of an id_token: the identifier and
+// whether the provider says it checked it.
+type ssoClaims struct {
+	Email string
+	// Verified follows the connection's `verified_claims` rule for the
+	// identifier. Unverified is not a failure -- it decides whether the
+	// claim may skip collection, not whether the sign-in may proceed.
+	Verified bool
+}
+
 // emailClaim reads the email out of an id_token's payload WITHOUT verifying
 // its signature. Stub only.
-func emailClaim(idToken string) (string, error) {
+//
+// An unverified address is returned rather than refused. The design's rule is
+// that it degrades the attempt to collection and is treated as user-typed
+// (area 3, Creation Without Collection): the user still gets to sign up, but
+// the provider's word alone does not provision an account on an address
+// anyone could have typed into it, which is the account-takeover this gate
+// exists to stop. Refusing outright would instead strand a legitimate user
+// on the entry step with nothing to do.
+func emailClaim(idToken string) (ssoClaims, error) {
 	parts := strings.Split(idToken, ".")
 	if len(parts) < 2 {
-		return "", fmt.Errorf("id_token is not a JWT")
+		return ssoClaims{}, fmt.Errorf("id_token is not a JWT")
 	}
 	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
 	if err != nil {
-		return "", err
+		return ssoClaims{}, err
 	}
 	var claims struct {
-		Email    string `json:"email"`
-		Verified *bool  `json:"email_verified"`
-		Expiry   int64  `json:"exp"`
+		Email string `json:"email"`
+		// Providers disagree on the shape: some send a boolean, some the
+		// string "true". Decoding into `any` reads either without the whole
+		// token failing on the surprise, which is the difference between
+		// "we do not trust this address" and "we cannot sign this user in".
+		Verified any   `json:"email_verified"`
+		Expiry   int64 `json:"exp"`
 	}
 	if err := json.Unmarshal(payload, &claims); err != nil {
-		return "", err
+		return ssoClaims{}, err
 	}
 	if claims.Email == "" {
-		return "", fmt.Errorf("id_token carried no email claim")
-	}
-	// An address the provider has not verified is an address anyone could
-	// have typed there. Provisioning on it is the classic account takeover,
-	// and is a separate mistake from not checking the signature.
-	if claims.Verified == nil || !*claims.Verified {
-		return "", fmt.Errorf("id_token's email is not verified by the provider")
+		return ssoClaims{}, fmt.Errorf("id_token carried no email claim")
 	}
 	if claims.Expiry > 0 && time.Now().After(time.Unix(claims.Expiry, 0)) {
-		return "", fmt.Errorf("id_token has expired")
+		return ssoClaims{}, fmt.Errorf("id_token has expired")
 	}
-	return claims.Email, nil
+	return ssoClaims{Email: claims.Email, Verified: claimIsTrue(claims.Verified)}, nil
+}
+
+// claimIsTrue evaluates a verification claim: strictly boolean true, or the
+// string "true". Anything else -- another string, a number, a missing claim
+// -- is unverified, rather than an error. A provider that answers something
+// unrecognised has not told us the address is checked, which is all this
+// needs to decide.
+func claimIsTrue(value any) bool {
+	switch typed := value.(type) {
+	case bool:
+		return typed
+	case string:
+		return typed == "true"
+	default:
+		return false
+	}
 }
 
 // authorizeEndpoint prefers the connection's explicit endpoint and otherwise

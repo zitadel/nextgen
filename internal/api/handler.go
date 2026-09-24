@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	api "github.com/zitadel/nextgen/api/generated"
+	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
@@ -50,6 +51,17 @@ type Handler struct {
 	// WithEgressClient); without it the sso stub refuses the exchange rather
 	// than reaching the network unguarded.
 	ssoEgress *http.Client
+
+	// ssoUserCreater commits the account an unknown external identity
+	// arrives without, which `provisioning.creation: auto` does during
+	// callback processing rather than after a collection step. Optional: a
+	// handler without it degrades every unknown subject to collection.
+	ssoUserCreater domain.FlowOnSuccessHandler
+
+	// flowStateMachine lets the identity-provider callback re-enter the flow
+	// through the engine rather than moving the step itself, which is what
+	// makes the purpose flip and the terminal handoff happen at all.
+	flowStateMachine *domain.FlowStateMachineRuntime
 }
 
 func NewHandler(
@@ -113,6 +125,23 @@ func (h *Handler) WithPersonalTeamEnsurer(e service.PersonalTeamEnsurer) *Handle
 // standard-library client. Chainable for the same reason as above.
 func (h *Handler) WithEgressClient(client *http.Client) *Handler {
 	h.ssoEgress = client
+	return h
+}
+
+// WithSsoUserCreater wires the `create_user_with_sso` on_success handler so
+// the callback can honour `provisioning.creation: auto` -- creating the
+// account from complete claims and signing the user in, instead of stopping
+// to ask for what the provider already supplied. Chainable for the same
+// reason as above.
+func (h *Handler) WithSsoUserCreater(handler domain.FlowOnSuccessHandler) *Handler {
+	h.ssoUserCreater = handler
+	return h
+}
+
+// WithFlowStateMachine wires the engine the sso callback resumes through.
+// Chainable for the same reason as above.
+func (h *Handler) WithFlowStateMachine(sm *domain.FlowStateMachineRuntime) *Handler {
+	h.flowStateMachine = sm
 	return h
 }
 

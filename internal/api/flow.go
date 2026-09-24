@@ -254,6 +254,26 @@ func (h *Handler) GetFlowStep(ctx context.Context, params api.GetFlowStepParams)
 	if err != nil {
 		return nil, err
 	}
+	if pending := state.PendingHandoff; pending != nil {
+		// The flow finished while the browser was at the identity provider,
+		// so this GET is the response that completion never got: the token
+		// could not ride a redirect, and it waited in the sealed cookie.
+		//
+		// This read does not clear the cookie -- a GET has no Set-Cookie in
+		// the contract -- so a repeat of this request hands out the same
+		// token again. That is safe because the token itself is single use
+		// (see AuthAttemptService.Handoff): the second exchange is refused.
+		// Re-minting per GET is what would not be safe, and is why the
+		// completion is stored rather than recomputed.
+		if result.Step != nil {
+			kind := pending.Complete
+			result.Step.Complete = &kind
+		}
+		result.HandoffToken = pending.Token
+		result.HandoffTokenExpiresAt = pending.ExpiresAt
+		resp := h.buildFlowResponse(ctx, result, true)
+		return &resp, nil
+	}
 	if result.Step != nil && result.Step.Complete != nil {
 		return mapFlowGetError(domain.ErrFlowCompleted())
 	}
