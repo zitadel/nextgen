@@ -77,7 +77,7 @@
   "type": "module",
   "scripts": {
     "build": "tsdown",
-    "typecheck": "tsc --noEmit -p tsconfig.app.json",
+    "typecheck": "tsc --build tsconfig.app.json",
     "test": "vitest run",
     "readme": "oclif readme",
     "prepack": "tsdown && oclif manifest",
