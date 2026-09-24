@@ -74,9 +74,10 @@ management console. That link works once.
 
 `setup --server local` creates the project and, by default, attaches it to
 that admin's team, so the project is owned from the start and `zitadel claim`
-reports it as already owned. If setup could not attach it (the platform
-bootstrap was turned off, or the step failed), setup prints a warning and
-`zitadel claim` remains the way to attach it.
+reports it as already owned. If that attempt fails, setup prints a warning and
+`zitadel claim` remains the way to attach it. If you turned the platform
+bootstrap off, the server has no local admin and no claiming at all, so the
+project simply has no owning team.
 
 Any time you need the console again, print a fresh link:
 

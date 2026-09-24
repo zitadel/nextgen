@@ -196,8 +196,11 @@ The groups below mirror the ones `zitadel --help` prints.
   `.zitadel/secret` and prints
   `Project owned by admin@zitadel.localhost (team ...)`, so a later `claim`
   returns `status: "skipped"` with `reason: "already-claimed"`. The step is
-  best-effort and skipped when `start` opted out of the platform bootstrap;
-  then the project has no owning team and the normal claim nudge applies. Agents
+  best-effort. When the attempt fails on a platform-hosting runtime, setup
+  warns and the normal claim nudge applies. When `start` opted out of the
+  platform bootstrap there is no local admin and no claim surface, so setup
+  skips the step silently, emits no nudge, and the project has no owning
+  team. Agents
   must pass `--framework` when scaffolding into a fresh directory; interactive
   humans can omit it and choose from the prompt. Supported floors: Next.js 15+
   and React 18+ — `setup` and `doctor` fail with `E_UNSUPPORTED_PROJECT_SHAPE`
