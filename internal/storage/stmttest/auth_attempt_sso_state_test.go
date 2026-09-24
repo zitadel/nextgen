@@ -65,6 +65,12 @@ func TestAuthAttemptStatements_SSOState(t *testing.T) {
 			verifier, err := stored.Pending.DecryptPKCEVerifier(ssoTestCrypter{})
 			require.NoError(t, err)
 			assert.Equal(t, sso.PKCEVerifier, verifier)
+
+			// The binding nonce survives as a hash the callback can verify
+			// against the browser's cookie.
+			assert.Equal(t, domain.HashSecret(sso.BindingNonce), stored.Pending.BindingNonceHash)
+			assert.NotEqual(t, sso.BindingNonce, stored.Pending.BindingNonceHash)
+			assert.True(t, stored.Pending.MatchesBindingNonce(sso.BindingNonce))
 		})
 
 		t.Run("consume_returns_payload_once", func(t *testing.T) {

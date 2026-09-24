@@ -54,7 +54,7 @@ func TestNewSSOState(t *testing.T) {
 			return len(raw)
 		}
 		assert.Equal(t, 16, decodedLen(t, sso.State))
-		assert.Equal(t, 16, decodedLen(t, check.Pending.BindingNonce))
+		assert.Equal(t, 16, decodedLen(t, sso.BindingNonce))
 		assert.Equal(t, 16, decodedLen(t, check.Pending.OIDCNonce))
 		assert.Equal(t, 32, decodedLen(t, sso.PKCEVerifier))
 	})
@@ -76,6 +76,20 @@ func TestNewSSOState(t *testing.T) {
 		assert.Equal(t, domain.PKCEChallenge(sso.PKCEVerifier), domain.PKCEChallenge(decrypted))
 	})
 
+	t.Run("the binding nonce is stored only as its hash", func(t *testing.T) {
+		sso, err := domain.NewSSOState("google", "idprev_1", "/after-login", crypter)
+		require.NoError(t, err)
+
+		stored := sso.Check.Pending.BindingNonceHash
+		require.NotEmpty(t, sso.BindingNonce)
+		assert.Equal(t, domain.HashSecret(sso.BindingNonce), stored)
+		assert.NotEqual(t, sso.BindingNonce, stored, "the record must never hold the plaintext nonce")
+
+		assert.True(t, sso.Check.Pending.MatchesBindingNonce(sso.BindingNonce))
+		assert.False(t, sso.Check.Pending.MatchesBindingNonce("some-other-value"))
+		assert.False(t, sso.Check.Pending.MatchesBindingNonce(""), "an absent cookie must never match")
+	})
+
 	t.Run("two calls share no secret", func(t *testing.T) {
 		first, err := domain.NewSSOState("google", "idprev_1", "/after-login", crypter)
 		require.NoError(t, err)
@@ -86,7 +100,8 @@ func TestNewSSOState(t *testing.T) {
 		assert.NotEqual(t, first.Check.ID, second.Check.ID)
 		assert.NotEqual(t, first.PKCEVerifier, second.PKCEVerifier)
 		assert.NotEqual(t, first.Check.Pending.EncryptedPKCEVerifier, second.Check.Pending.EncryptedPKCEVerifier)
-		assert.NotEqual(t, first.Check.Pending.BindingNonce, second.Check.Pending.BindingNonce)
+		assert.NotEqual(t, first.BindingNonce, second.BindingNonce)
+		assert.NotEqual(t, first.Check.Pending.BindingNonceHash, second.Check.Pending.BindingNonceHash)
 		assert.NotEqual(t, first.Check.Pending.OIDCNonce, second.Check.Pending.OIDCNonce)
 	})
 
@@ -96,7 +111,7 @@ func TestNewSSOState(t *testing.T) {
 		assert.Empty(t, sso.PKCEVerifier)
 		assert.Empty(t, sso.Check.Pending.EncryptedPKCEVerifier)
 		assert.NotEmpty(t, sso.Check.Pending.OIDCNonce)
-		assert.NotEmpty(t, sso.Check.Pending.BindingNonce)
+		assert.NotEmpty(t, sso.BindingNonce)
 
 		decrypted, err := sso.Check.Pending.DecryptPKCEVerifier(crypter)
 		require.NoError(t, err)
@@ -194,7 +209,8 @@ func TestSSOState_LogValueOmitsSecrets(t *testing.T) {
 		sso.PKCEVerifier,
 		check.Pending.EncryptedPKCEVerifier,
 		check.Pending.OIDCNonce,
-		check.Pending.BindingNonce,
+		sso.BindingNonce,
+		check.Pending.BindingNonceHash,
 		"alice@example.com",
 	} {
 		assert.NotContains(t, logged, secret)

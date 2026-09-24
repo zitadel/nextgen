@@ -142,6 +142,11 @@ func CheckAs[T AuthFactor](attempt *AuthAttempt, typ AuthCheckType) (T, bool) {
 // SSOCallback returns the attempt's SSO state record, if it has one.
 // [CheckAs] cannot reach it: that helper is constrained to [AuthFactor] and
 // the record is deliberately not one.
+//
+// The record's Result may hold personal data: the claims the provider asserted.
+// This is the one place claim values live outside the user record, and only for
+// that window: at most the attempt TTL, wiped by a re-issue, and gone when the
+// user is bound or the attempt is deleted.
 func (a *AuthAttempt) SSOCallback() (*SSOCallbackCheck, bool) {
 	for _, check := range a.Checks {
 		if ssoCheck, ok := check.(*SSOCallbackCheck); ok {

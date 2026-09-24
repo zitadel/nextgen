@@ -183,8 +183,8 @@ func TestDecodeAuthChecks(t *testing.T) {
 func TestDecodeAuthChecks_SSOCallback(t *testing.T) {
 	t.Parallel()
 	issuedAt := time.Date(2024, 5, 6, 7, 8, 9, 0, time.UTC)
-	pendingPayload := json.RawMessage(`{"provider_slug":"google","connection_revision_id":"idprev_1","binding_nonce":"bn","encrypted_pkce_verifier":"ct","oidc_nonce":"on","return_target":"/home"}`)
-	resultPayload := json.RawMessage(`{"subject":"sub-1","connection_revision_id":"idprev_1","claims":{"email":"alice@example.com"}}`)
+	pendingPayload := json.RawMessage(`{"provider_slug":"google","connection_revision_id":"idprev_1","binding_nonce_hash":"bnhash","encrypted_pkce_verifier":"ct","oidc_nonce":"on","return_target":"/home"}`)
+	resultPayload := json.RawMessage(`{"subject":"sub-1","connection_revision_id":"idprev_1","claims":{"email":"alice@example.com"},"verified":{"email":true,"phone":false}}`)
 
 	decode := func(t *testing.T, lastChallengedAt time.Time, challenge, factor json.RawMessage) *domain.SSOCallbackCheck {
 		t.Helper()
@@ -208,6 +208,7 @@ func TestDecodeAuthChecks_SSOCallback(t *testing.T) {
 		assert.Equal(t, issuedAt, ssoCheck.IssuedAt)
 		require.NotNil(t, ssoCheck.Pending)
 		assert.Equal(t, "google", ssoCheck.Pending.ProviderSlug)
+		assert.Equal(t, "bnhash", ssoCheck.Pending.BindingNonceHash)
 		assert.Equal(t, "ct", ssoCheck.Pending.EncryptedPKCEVerifier)
 		assert.Equal(t, "/home", ssoCheck.Pending.ReturnTarget)
 		assert.Nil(t, ssoCheck.Result)
@@ -227,5 +228,6 @@ func TestDecodeAuthChecks_SSOCallback(t *testing.T) {
 		assert.Equal(t, "sub-1", ssoCheck.Result.Subject)
 		assert.Equal(t, "idprev_1", ssoCheck.Result.ConnectionRevisionID)
 		assert.Equal(t, "alice@example.com", ssoCheck.Result.Claims["email"])
+		assert.Equal(t, map[string]bool{"email": true, "phone": false}, ssoCheck.Result.Verified)
 	})
 }
