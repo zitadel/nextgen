@@ -59,6 +59,11 @@ func ErrAuthAttemptStaleChallenge() Error {
 
 // AuthAttempt represents the object defined [here](https://github.com/zitadel/nextgen/blob/15bd7f438d709fcd5205a163e24374f6f667b68f/docs/design/api/resource-map.md#auth-flows)
 // It is short-lived and should therefore be stored near the client, do not store PII data in it.
+//
+// One exception: the sso_callback check's result may hold the claims a provider
+// asserted. They stay server side, since checksToAPI never renders that check,
+// and they live at most the attempt TTL, are wiped by a re-issue and go with the
+// attempt. See [AuthAttempt.SSOCallback].
 type AuthAttempt struct {
 	// ProjectID links to [Project].
 	ProjectID string
@@ -143,9 +148,8 @@ func CheckAs[T AuthFactor](attempt *AuthAttempt, typ AuthCheckType) (T, bool) {
 // [CheckAs] cannot reach it: that helper is constrained to [AuthFactor] and
 // the record is deliberately not one.
 //
-// The record's Result may hold personal data: the claims the provider asserted.
-// It lives at most the attempt TTL, a re-issue wipes it, and it cascades away
-// with the attempt, which the session exchange deletes.
+// Its Result is the PII exception documented on [AuthAttempt]; the attempt
+// delete that the session exchange runs is what cascades it away.
 func (a *AuthAttempt) SSOCallback() (*SSOCallbackCheck, bool) {
 	for _, check := range a.Checks {
 		if ssoCheck, ok := check.(*SSOCallbackCheck); ok {

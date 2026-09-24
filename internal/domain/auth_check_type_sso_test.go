@@ -28,7 +28,7 @@ func TestNewSSOState(t *testing.T) {
 	t.Parallel()
 	crypter := &crypto.InverseCrypter{}
 
-	t.Run("mints every secret and hashes the state into the id", func(t *testing.T) {
+	t.Run("mints every secret, leaves the id for storage and hashes the state into StateHash", func(t *testing.T) {
 		sso, err := domain.NewSSOState("google", "idprev_1", "/after-login", crypter)
 		require.NoError(t, err)
 		require.NotNil(t, sso)
