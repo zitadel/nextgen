@@ -491,7 +491,7 @@ func TestListAuthzTeamScopedOnlyPartialView(t *testing.T) {
 
 	asgns, err := stmts.ListAuthzAssignments(t.Context(), project.ID, domain.AuthzPrincipalTypeSKProj, project.ID, false)
 	require.NoError(t, err)
-	require.NotEmpty(t, asgns, "CreateProject seeds sk_proj → project.viewer")
+	require.NotEmpty(t, asgns, "CreateProject seeds sk_proj → project.admin")
 	for _, a := range asgns {
 		require.NoError(t, stmts.RevokeAuthzAssignment(t.Context(), project.ID, a.ID))
 	}

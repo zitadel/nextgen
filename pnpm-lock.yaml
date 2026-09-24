@@ -543,6 +543,12 @@ importers:
       '@zitadel/api':
         specifier: workspace:*
         version: link:../../packages/api
+      '@zitadel/components':
+        specifier: workspace:*
+        version: link:../../packages/components
+      '@zitadel/config':
+        specifier: workspace:*
+        version: link:../../packages/config
       '@zitadel/design-tokens':
         specifier: workspace:*
         version: link:../../packages/design-tokens

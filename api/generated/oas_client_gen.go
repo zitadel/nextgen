@@ -106,12 +106,13 @@ type Invoker interface {
 	// (`project.team`) grants are not created here — claim owns that path. An
 	// unrevoked grant with the same principal and relation occupies the unique
 	// key even after `expires_at`; DELETE it before re-creating.
-	// Create does not accept `expand`; the 201 `user` / `team` are refs only.
-	// Creating by `user.identifier` is accepted with 201 whether or not
-	// a user matched: the server may write nothing, and a duplicate
-	// returns the existing grant. Granting the session caller's own
-	// resolved user is `grant.invalid`. Other locators still 404 / 409
-	// when the principal is missing or the tuple already exists.
+	// Create does not accept `expand`. The `user_id` and team locators
+	// return 201, whose `user` / `team` carry only `user_id` / `team_id`,
+	// and still 404 / 409 when the principal is missing or the tuple
+	// already exists. Creating by `user.identifier` answers 202 with no
+	// body on every outcome. Granting the session caller's own user is
+	// `grant.invalid` on either user locator. Read the grant back for
+	// identifier and display.
 	// Accepts either a project secret (`oauth2`) or a user-bound Console
 	// session cookie (`nextgenSession`). Session callers are authorized as
 	// the human against the target project (home may differ). CSRF/Origin
@@ -1625,12 +1626,13 @@ func (c *Client) sendCreateFlowDefinition(ctx context.Context, request *CreateFl
 // (`project.team`) grants are not created here — claim owns that path. An
 // unrevoked grant with the same principal and relation occupies the unique
 // key even after `expires_at`; DELETE it before re-creating.
-// Create does not accept `expand`; the 201 `user` / `team` are refs only.
-// Creating by `user.identifier` is accepted with 201 whether or not
-// a user matched: the server may write nothing, and a duplicate
-// returns the existing grant. Granting the session caller's own
-// resolved user is `grant.invalid`. Other locators still 404 / 409
-// when the principal is missing or the tuple already exists.
+// Create does not accept `expand`. The `user_id` and team locators
+// return 201, whose `user` / `team` carry only `user_id` / `team_id`,
+// and still 404 / 409 when the principal is missing or the tuple
+// already exists. Creating by `user.identifier` answers 202 with no
+// body on every outcome. Granting the session caller's own user is
+// `grant.invalid` on either user locator. Read the grant back for
+// identifier and display.
 // Accepts either a project secret (`oauth2`) or a user-bound Console
 // session cookie (`nextgenSession`). Session callers are authorized as
 // the human against the target project (home may differ). CSRF/Origin
@@ -5863,11 +5865,23 @@ func (c *Client) sendGetProject(ctx context.Context, params GetProjectParams) (r
 				return res, errors.Wrap(err, "security \"OAuth2\"")
 			}
 		}
+		{
+			stage = "Security:NextgenSession"
+			switch err := c.securityNextgenSession(ctx, GetProjectOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"NextgenSession\"")
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -6504,11 +6518,23 @@ func (c *Client) sendGetTeam(ctx context.Context, params GetTeamParams) (res Get
 				return res, errors.Wrap(err, "security \"OAuth2\"")
 			}
 		}
+		{
+			stage = "Security:NextgenSession"
+			switch err := c.securityNextgenSession(ctx, GetTeamOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"NextgenSession\"")
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -9580,11 +9606,23 @@ func (c *Client) sendPatchProject(ctx context.Context, request *PatchProjectRequ
 				return res, errors.Wrap(err, "security \"OAuth2\"")
 			}
 		}
+		{
+			stage = "Security:NextgenSession"
+			switch err := c.securityNextgenSession(ctx, PatchProjectOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"NextgenSession\"")
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -10431,11 +10469,23 @@ func (c *Client) sendQueryTeams(ctx context.Context, request *QueryTeamsRequest,
 				return res, errors.Wrap(err, "security \"OAuth2\"")
 			}
 		}
+		{
+			stage = "Security:NextgenSession"
+			switch err := c.securityNextgenSession(ctx, QueryTeamsOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"NextgenSession\"")
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {

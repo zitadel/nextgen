@@ -114,9 +114,7 @@ export async function materializeSetupResources(opts: {
     // The response is the `{id, schema, metadata}` envelope; the local config
     // file keeps only the customer-authored document.
     const canonical = (
-      (await opts.client.getSchemaById(
-        encodeURIComponent(schemaId),
-      )) as unknown as GetSchemaById200
+      (await opts.client.getSchemaById(schemaId)) as unknown as GetSchemaById200
     ).schema;
     const written = await writeBackResource(
       opts.cwd,

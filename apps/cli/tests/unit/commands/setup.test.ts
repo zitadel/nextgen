@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -239,7 +239,11 @@ describe("setup command", () => {
   it("detects the platform plane from the local runtime document, failing closed", async () => {
     server.use(
       http.get("http://localhost:9931/console/runtime.json", () =>
-        HttpResponse.json({ mode: "standalone", console_project_id: "proj_platform" }),
+        HttpResponse.json({
+          mode: "standalone",
+          console_project_id: "proj_platform",
+          publishable_key: "pk_platform",
+        }),
       ),
       http.get("http://localhost:9932/console/runtime.json", () =>
         HttpResponse.json({ mode: "standalone", console_project_id: "proj_someone" }),
@@ -366,6 +370,57 @@ describe("setup command", () => {
       throw new Error("expected create-project payload name to be a string");
     }
     expect(projectName.trim().length).toBeGreaterThan(0);
+  });
+
+  // A runtime document naming the platform project does not guarantee a claim
+  // can complete, so attaching the project to the local admin must not fail a
+  // setup that has already written the app files.
+  it("keeps the project unclaimed when attaching it to the local admin fails", async () => {
+    const cwd = await makeNextProject();
+    await mkdir(join(cwd, ".zitadel/local"), { recursive: true });
+    await writeFile(
+      join(cwd, ".zitadel/local/admin.json"),
+      JSON.stringify({
+        email: "admin@zitadel.localhost",
+        password: "local-admin-password",
+        user_id: "user_localadmin",
+        team_id: "team_localadmin",
+      }),
+    );
+    server.use(
+      http.get("http://localhost:9941/console/runtime.json", () =>
+        HttpResponse.json({
+          mode: "standalone",
+          console_project_id: "proj_platform",
+          publishable_key: "pk_platform",
+        }),
+      ),
+      http.post("http://localhost:9941/projects/:projectId/claim/init", () =>
+        HttpResponse.json({ code: "internal", message: "claim unavailable" }, { status: 500 }),
+      ),
+    );
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--json",
+      "--server",
+      "http://localhost:9941",
+      "--non-interactive",
+      "--skip-install",
+      "--framework",
+      "next",
+    ]);
+
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as { status: string; data: { next_commands: string[] } };
+    expect(json.status).toBe("ok");
+    const secret = JSON.parse(await readFile(join(cwd, ".zitadel/secret"), "utf8")) as {
+      team_id?: string;
+    };
+    expect(secret.team_id).toBeUndefined();
+    expect(json.data.next_commands.at(-1)).toMatch(/^npx @zitadel\/cli@\S+ claim$/);
   });
 
   it("errors in a non-interactive empty directory without --framework", async () => {

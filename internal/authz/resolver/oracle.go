@@ -166,8 +166,11 @@ func (g *Graph) closureAllowsScoped(projectID, home string, pType domain.AuthzPr
 
 func (g *Graph) ttuAllows(projectID, home string, pType domain.AuthzPrincipalType, pID, objectType, relation string, now time.Time) bool {
 	for _, edge := range g.Edges {
+		// The edge answers every relation its own relation closes to, the
+		// same way a direct assignment does (mirrors writeFullTTUExists).
 		if edge.Kind != compiler.TermTupleToUserset ||
-			edge.Target.Type != objectType || edge.Target.Name != relation {
+			edge.Target.Type != objectType ||
+			!g.implies(edge.Target.Type, edge.Target.Name, objectType, relation) {
 			continue
 		}
 		for _, ts := range g.Assignments {
