@@ -257,11 +257,11 @@ func TestConsoleManagementSessionWithoutAccess(t *testing.T) {
 	})
 }
 
-// TestConsoleSessionListsTargetProjectUsers pins #1300 §2: a platform
+// TestConsoleSessionListsTargetProject pins #1300 §2: a platform
 // operator signs in to the platform project and manages a customer project
 // through a grant, so home and target differ. `project_id` on queryUsers names
 // the target; without it the home project is listed, as before.
-func TestConsoleSessionListsTargetProjectUsers(t *testing.T) {
+func TestConsoleSessionListsTargetProject(t *testing.T) {
 	t.Parallel()
 
 	console := harness.EnsurePlatformProject(t)
@@ -308,7 +308,7 @@ func TestConsoleSessionListsTargetProjectUsers(t *testing.T) {
 
 		resp, err := secret.QueryUsers(t.Context(), &api.QueryUsersRequest{}, target)
 		require.NoError(t, err)
-		require.IsNotType(t, &api.QueryUsersResponse{}, resp, helpers.MustMarshal(t, resp))
+		requireUsersNotFound(t, resp)
 	})
 
 	t.Run("without a grant the target is not listed", func(t *testing.T) {
@@ -317,7 +317,7 @@ func TestConsoleSessionListsTargetProjectUsers(t *testing.T) {
 		stranger := sessionClientForUser(t, strangerID)
 		resp, err := stranger.QueryUsers(t.Context(), &api.QueryUsersRequest{}, target)
 		require.NoError(t, err)
-		require.IsNotType(t, &api.QueryUsersResponse{}, resp, helpers.MustMarshal(t, resp))
+		requireUsersNotFound(t, resp)
 	})
 }
 
@@ -503,4 +503,14 @@ func TestConsoleManagementBearerIgnoresStaleCookie(t *testing.T) {
 	require.NoError(t, err)
 	defer resp.Body.Close()
 	assert.Equal(t, http.StatusCreated, resp.StatusCode)
+}
+
+// requireUsersNotFound pins a refused users list to its not-found shape: 404
+// user.not_found, the same answer as a project that does not exist.
+func requireUsersNotFound(t *testing.T, resp api.QueryUsersRes) {
+	t.Helper()
+	require.IsType(t, &api.QueryUsersErrorResponseStatusCode{}, resp, helpers.MustMarshal(t, resp))
+	denied := resp.(*api.QueryUsersErrorResponseStatusCode)
+	assert.Equal(t, http.StatusNotFound, denied.StatusCode)
+	assert.True(t, denied.Response.IsUserNotFound(), helpers.MustMarshal(t, resp))
 }

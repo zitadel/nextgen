@@ -49,7 +49,7 @@ func (h *Handler) CreateSchema(ctx context.Context, req api.CreateSchemaReq, par
 }
 
 func (h *Handler) GetSchemaById(ctx context.Context, params api.GetSchemaByIdParams) (api.GetSchemaByIdRes, error) {
-	projectID, err := h.requireResourceAccessIn(ctx, string(params.ProjectID.Value), params.ID, schemaAccess, opRead)
+	projectID, err := h.requireResourceAccessInProject(ctx, string(params.ProjectID.Value), params.ID, schemaAccess, opRead)
 	if err != nil {
 		return nil, err
 	}

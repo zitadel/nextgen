@@ -1,0 +1,8 @@
+name: project_id
+in: query
+required: false
+description: |
+  The project the request addresses. Omit it to address the credential's own
+  project.
+schema:
+  $ref: '../schemas/project-id.yaml'

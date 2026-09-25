@@ -3325,7 +3325,8 @@ type GetSchemaByIdParams struct {
 	ID string
 	// The unique identifier of the team.
 	TeamID OptTeamID `json:",omitempty,omitzero"`
-	// The project the schema belongs to. Optional; see the description.
+	// The project the request addresses. Omit it to address the credential's own
+	// project.
 	ProjectID OptProjectID `json:",omitempty,omitzero"`
 }
 
@@ -8155,7 +8156,7 @@ func decodeQueryTeamsParams(args [0]string, argsEscaped bool, r *http.Request) (
 
 // QueryUsersParams is parameters of queryUsers operation.
 type QueryUsersParams struct {
-	// The project whose users to list. Defaults to the credential's home
+	// The project the request addresses. Omit it to address the credential's own
 	// project.
 	ProjectID OptProjectID `json:",omitempty,omitzero"`
 }
