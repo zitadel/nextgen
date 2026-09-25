@@ -169,6 +169,12 @@ edits become `revise` entries, no update/delete).
 
 ### 5. Authoring entry points: eject + design catalog
 
+> **Superseded in part** by [ADR 057](057-login-customization-categories.md),
+> implemented in [#1039](https://github.com/zitadel/nextgen/issues/1039):
+> `zitadel setup --design` is removed, and the catalog is `centered` and
+> `minimal` only. See the 2026-08-27 amendment below. The text of this
+> section is kept as the original decision.
+
 Vocabulary (canonical rows in
 [`../design/glossary.md` § 6](../design/glossary.md#6-config-terms)):
 **branding** is the resource, a **template** is the Liquid artifact you
@@ -234,6 +240,13 @@ strict scope, later). It amends §5's catalog: `split` / `split-right` /
 `hero` are page chrome. Setup must not publish those files as
 `login.liquid`. Zitadel-served page chrome is unset; `page.liquid` is a
 proposal, not a requirement.
+
+Implemented in [#1039](https://github.com/zitadel/nextgen/issues/1039):
+setup no longer has a `--design` flag or design question and publishes no
+branding revision. `branding eject --design` offers `centered` and `minimal`
+only and refuses `split`, `split-right`, and `hero` with a hint. Revisions
+already published from those designs keep rendering on the chrome in
+`layout-chrome.css`.
 
 ## Amendment (2026-09-15): `$file` references
 

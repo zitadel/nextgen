@@ -4,11 +4,20 @@
  * LiquidJS engine → DOMPurify sanitiser → `patchMandatoryGates` — and keep
  * the atoms a step needs. The authoring-side validation of the same files
  * lives in `packages/config/src/template.test.ts`.
+ *
+ * The retired page-layout designs (`split`, `split-right`, `hero`, #1039)
+ * are no longer ejectable, but revisions already published from them keep
+ * rendering on the `layout-chrome.css` split/hero chrome. Their last shipped
+ * templates live in `__fixtures__/legacy-designs/` so that promise stays
+ * tested until the chrome is removed.
  */
 import type { CreateFlow201Step } from "@zitadel/api/generated/model";
 import { BRANDING_DESIGNS, getDefaultBrandingConfig } from "@zitadel/config/defaults";
 import { describe, expect, it } from "vitest";
 
+import heroTemplate from "./__fixtures__/legacy-designs/hero.liquid";
+import splitRightTemplate from "./__fixtures__/legacy-designs/split-right.liquid";
+import splitTemplate from "./__fixtures__/legacy-designs/split.liquid";
 import { createLiquidEngine } from "./liquid.js";
 import { mandatoryGatesMarkerComment, patchMandatoryGates } from "./mandatory-gates.js";
 import { createSanitiser } from "./sanitiser.js";
@@ -54,16 +63,39 @@ const context = {
   challenge: null,
 };
 
+const LEGACY_TEMPLATES: Record<string, string> = {
+  split: splitTemplate,
+  "split-right": splitRightTemplate,
+  hero: heroTemplate,
+};
+const LEGACY_DESIGNS = Object.keys(LEGACY_TEMPLATES);
+
+function legacyTemplate(design: string): string {
+  const template = LEGACY_TEMPLATES[design];
+  if (template === undefined) throw new Error(`no legacy fixture for ${design}`);
+  return template;
+}
+
+/** A shipped design's template, or a retired one's last published fixture. */
+function templateFor(design: string): string {
+  return LEGACY_DESIGNS.includes(design)
+    ? legacyTemplate(design)
+    : getDefaultBrandingConfig(design).template;
+}
+
 function renderDesign(design: string): string {
   const engine = createLiquidEngine({ locale });
-  const { template } = getDefaultBrandingConfig(design);
-  const rendered = engine.parseAndRenderSync(template, context);
+  const rendered = engine.parseAndRenderSync(templateFor(design), context);
   const sanitised = createSanitiser()(rendered);
   return patchMandatoryGates(sanitised, step, locale);
 }
 
 describe("branding design catalog", () => {
-  for (const design of BRANDING_DESIGNS) {
+  it("ships only widget-structure designs (#1039)", () => {
+    expect([...BRANDING_DESIGNS]).toEqual(["centered", "minimal"]);
+  });
+
+  for (const design of [...BRANDING_DESIGNS, ...LEGACY_DESIGNS]) {
     describe(design, () => {
       const html = renderDesign(design);
 
@@ -93,8 +125,7 @@ describe("branding design catalog", () => {
 
       it("renders no visible control for a kind: back action (gesture-only)", () => {
         const engine = createLiquidEngine({ locale });
-        const { template } = getDefaultBrandingConfig(design);
-        const rendered = engine.parseAndRenderSync(template, {
+        const rendered = engine.parseAndRenderSync(templateFor(design), {
           ...context,
           actions: [...step.actions, { name: "back", kind: "back", text_key: "action.back" }],
         });
@@ -108,7 +139,7 @@ describe("branding design catalog", () => {
     });
   }
 
-  it("split designs keep the brand pane and mirror class", () => {
+  it("legacy split revisions keep the brand pane and mirror class", () => {
     const split = renderDesign("split");
     expect(split).toContain('class="zl-split"');
     expect(split).toContain('class="zl-split__brand"');
@@ -123,7 +154,7 @@ describe("branding design catalog", () => {
     const engine = createLiquidEngine({ locale });
     const noAssets = { ...context, branding: {} };
     for (const design of ["split", "split-right"]) {
-      const { template } = getDefaultBrandingConfig(design);
+      const template = legacyTemplate(design);
       const bare = createSanitiser()(engine.parseAndRenderSync(template, noAssets));
       // An empty brand pane renders the whole design as a lonely off-centre
       // card; the decorative panel must survive the sanitiser.
@@ -149,7 +180,7 @@ describe("branding design catalog", () => {
       branding: { hero_url: "https://cdn.example.com/hero.png" },
     };
     for (const design of ["split", "split-right"]) {
-      const { template } = getDefaultBrandingConfig(design);
+      const template = legacyTemplate(design);
       const html = patchMandatoryGates(
         createSanitiser()(engine.parseAndRenderSync(template, heroOnly)),
         step,
