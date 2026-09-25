@@ -14,6 +14,7 @@ oneOf:
   - $ref: types/authz-granted-event.yaml
   - $ref: types/authz-revoked-event.yaml
   - $ref: types/branding-created-event.yaml
+  - $ref: types/deployment-created-event.yaml
   - $ref: types/environment-created-event.yaml
   - $ref: types/flowdef-created-event.yaml
   - $ref: types/flowdef-deleted-event.yaml
@@ -46,6 +47,7 @@ discriminator:
     authz.granted: types/authz-granted-event.yaml
     authz.revoked: types/authz-revoked-event.yaml
     branding.created: types/branding-created-event.yaml
+    deployment.created: types/deployment-created-event.yaml
     environment.created: types/environment-created-event.yaml
     flowdef.created: types/flowdef-created-event.yaml
     flowdef.deleted: types/flowdef-deleted-event.yaml

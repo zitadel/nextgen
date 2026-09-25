@@ -283,6 +283,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	environmentService := service.NewEnvironmentService(serviceDBPool)
 	variableService := service.NewVariableService(serviceDBPool, keyService)
 	releaseService := service.NewReleaseService(serviceDBPool)
+	deploymentService := service.NewDeploymentService(serviceDBPool)
 	eventService := service.NewEventService(serviceDBPool)
 	projectHashers := service.NewProjectHasherResolver(serviceDBPool, hasherFactory)
 	userService := service.NewUserService(
@@ -375,6 +376,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 			brandingService,
 			environmentService,
 			releaseService,
+			deploymentService,
 			eventService,
 			tokenService,
 			keyService,
