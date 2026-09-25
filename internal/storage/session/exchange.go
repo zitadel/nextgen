@@ -201,6 +201,21 @@ func DecodeAuthChecks(
 			}
 			checks = append(checks, registrationCheck)
 		}
+	case domain.AuthCheckTypeSSOCallback:
+		// Never a factor: the record carries its result in factor_payload but
+		// last_verified_at stays NULL, so nothing promotes or completes on it.
+		ssoCheck := &domain.SSOCallbackCheck{ID: id, IssuedAt: lastChallengedAt}
+		if !lastChallengedAt.IsZero() && len(challenge) > 0 {
+			if err := json.Unmarshal(challenge, &ssoCheck.Pending); err != nil {
+				return nil, fmt.Errorf("failed to unmarshal sso callback auth check challenge payload: %w", err)
+			}
+		}
+		if len(factor) > 0 {
+			if err := json.Unmarshal(factor, &ssoCheck.Result); err != nil {
+				return nil, fmt.Errorf("failed to unmarshal sso callback auth check factor payload: %w", err)
+			}
+		}
+		checks = append(checks, ssoCheck)
 	default:
 		return nil, fmt.Errorf("unsupported auth check type %v", checkType)
 	}

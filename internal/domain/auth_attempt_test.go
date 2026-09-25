@@ -613,3 +613,53 @@ func TestAuthAttempt_SetCheck(t *testing.T) {
 		assert.Equal(t, userFactor2, attempt.Checks[0])
 	})
 }
+
+// TestAuthAttempt_SSOCallbackIsIgnored pins the contract that makes the SSO
+// state record invisible to every factor and challenge path: it implements
+// AuthCheck only, so nothing about completeness, factor lookup, challenge
+// lookup or user re-pinning needs a special case for it.
+func TestAuthAttempt_SSOCallbackIsIgnored(t *testing.T) {
+	ssoCheck := &domain.SSOCallbackCheck{
+		ID:            "b8a1f0",
+		AuthAttemptID: "att-1",
+		Result: &domain.SSOCallbackResult{
+			Subject:              "sub-1",
+			ConnectionRevisionID: "idprev_1",
+		},
+	}
+	passwordFactor := domain.SetAuthFactorPassword(time.Now())
+
+	attempt := &domain.AuthAttempt{
+		RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypePassword},
+		Checks:         []domain.AuthCheck{passwordFactor, ssoCheck},
+	}
+
+	assert.True(t, attempt.IsCompleted(), "the SSO record neither helps nor blocks completeness")
+
+	_, ok := attempt.FactorByType(domain.AuthCheckTypeSSOCallback)
+	assert.False(t, ok)
+	_, ok = attempt.FactorByClass(domain.AuthCheckTypeSSOCallback)
+	assert.False(t, ok)
+	_, ok = attempt.ChallengeByType(domain.AuthCheckTypeSSOCallback)
+	assert.False(t, ok)
+	_, ok = attempt.ChallengeByID(ssoCheck.ID)
+	assert.False(t, ok)
+
+	got, ok := attempt.SSOCallback()
+	require.True(t, ok)
+	assert.Same(t, ssoCheck, got)
+
+	// Without the password factor the required check is unmet: the record on
+	// its own completes nothing, and it does not count as an authenticated
+	// factor that would freeze the user.
+	ssoOnly := &domain.AuthAttempt{
+		RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypePassword},
+		Checks:         []domain.AuthCheck{ssoCheck},
+	}
+	assert.False(t, ssoOnly.IsCompleted())
+	assert.NoError(t, ssoOnly.PrepareUserChallenge())
+
+	none := &domain.AuthAttempt{}
+	_, ok = none.SSOCallback()
+	assert.False(t, ok)
+}

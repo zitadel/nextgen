@@ -362,6 +362,45 @@ func (c *MockAllStatementsCheckAuthzCall) DoAndReturn(f func(context.Context, do
 	return c
 }
 
+// ConsumeSSOState mocks base method.
+func (m *MockAllStatements) ConsumeSSOState(ctx context.Context, projectID, stateHash string) (*domain.SSOCallbackCheck, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ConsumeSSOState", ctx, projectID, stateHash)
+	ret0, _ := ret[0].(*domain.SSOCallbackCheck)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ConsumeSSOState indicates an expected call of ConsumeSSOState.
+func (mr *MockAllStatementsMockRecorder) ConsumeSSOState(ctx, projectID, stateHash any) *MockAllStatementsConsumeSSOStateCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConsumeSSOState", reflect.TypeOf((*MockAllStatements)(nil).ConsumeSSOState), ctx, projectID, stateHash)
+	return &MockAllStatementsConsumeSSOStateCall{Call: call}
+}
+
+// MockAllStatementsConsumeSSOStateCall wrap *gomock.Call
+type MockAllStatementsConsumeSSOStateCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsConsumeSSOStateCall) Return(arg0 *domain.SSOCallbackCheck, arg1 error) *MockAllStatementsConsumeSSOStateCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsConsumeSSOStateCall) Do(f func(context.Context, string, string) (*domain.SSOCallbackCheck, error)) *MockAllStatementsConsumeSSOStateCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsConsumeSSOStateCall) DoAndReturn(f func(context.Context, string, string) (*domain.SSOCallbackCheck, error)) *MockAllStatementsConsumeSSOStateCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // CreateAuthAttempt mocks base method.
 func (m *MockAllStatements) CreateAuthAttempt(ctx context.Context, entity *domain.AuthAttempt) error {
 	m.ctrl.T.Helper()
@@ -3601,6 +3640,44 @@ func (c *MockAllStatementsIsStatementsCall) DoAndReturn(f func()) *MockAllStatem
 	return c
 }
 
+// IssueSSOState mocks base method.
+func (m *MockAllStatements) IssueSSOState(ctx context.Context, projectID, authAttemptID string, check *domain.SSOCallbackCheck) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IssueSSOState", ctx, projectID, authAttemptID, check)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// IssueSSOState indicates an expected call of IssueSSOState.
+func (mr *MockAllStatementsMockRecorder) IssueSSOState(ctx, projectID, authAttemptID, check any) *MockAllStatementsIssueSSOStateCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IssueSSOState", reflect.TypeOf((*MockAllStatements)(nil).IssueSSOState), ctx, projectID, authAttemptID, check)
+	return &MockAllStatementsIssueSSOStateCall{Call: call}
+}
+
+// MockAllStatementsIssueSSOStateCall wrap *gomock.Call
+type MockAllStatementsIssueSSOStateCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsIssueSSOStateCall) Return(arg0 error) *MockAllStatementsIssueSSOStateCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsIssueSSOStateCall) Do(f func(context.Context, string, string, *domain.SSOCallbackCheck) error) *MockAllStatementsIssueSSOStateCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsIssueSSOStateCall) DoAndReturn(f func(context.Context, string, string, *domain.SSOCallbackCheck) error) *MockAllStatementsIssueSSOStateCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // ListAuthorizedProjects mocks base method.
 func (m *MockAllStatements) ListAuthorizedProjects(ctx context.Context, homeProjectID, userID string, page database.Page[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {
 	m.ctrl.T.Helper()
@@ -5033,6 +5110,44 @@ func (c *MockAllStatementsSetProjectPasswordHashPolicyCall) Do(f func(context.Co
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAllStatementsSetProjectPasswordHashPolicyCall) DoAndReturn(f func(context.Context, string, *domain.PasswordHashPolicy) error) *MockAllStatementsSetProjectPasswordHashPolicyCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// SetSSOCallbackResult mocks base method.
+func (m *MockAllStatements) SetSSOCallbackResult(ctx context.Context, projectID, stateHash string, result *domain.SSOCallbackResult) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetSSOCallbackResult", ctx, projectID, stateHash, result)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetSSOCallbackResult indicates an expected call of SetSSOCallbackResult.
+func (mr *MockAllStatementsMockRecorder) SetSSOCallbackResult(ctx, projectID, stateHash, result any) *MockAllStatementsSetSSOCallbackResultCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetSSOCallbackResult", reflect.TypeOf((*MockAllStatements)(nil).SetSSOCallbackResult), ctx, projectID, stateHash, result)
+	return &MockAllStatementsSetSSOCallbackResultCall{Call: call}
+}
+
+// MockAllStatementsSetSSOCallbackResultCall wrap *gomock.Call
+type MockAllStatementsSetSSOCallbackResultCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsSetSSOCallbackResultCall) Return(arg0 error) *MockAllStatementsSetSSOCallbackResultCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsSetSSOCallbackResultCall) Do(f func(context.Context, string, string, *domain.SSOCallbackResult) error) *MockAllStatementsSetSSOCallbackResultCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsSetSSOCallbackResultCall) DoAndReturn(f func(context.Context, string, string, *domain.SSOCallbackResult) error) *MockAllStatementsSetSSOCallbackResultCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -7750,6 +7865,45 @@ func (c *MockAuthAttemptStatementsAuthAttemptChallengeSucceededCall) DoAndReturn
 	return c
 }
 
+// ConsumeSSOState mocks base method.
+func (m *MockAuthAttemptStatements) ConsumeSSOState(ctx context.Context, projectID, stateHash string) (*domain.SSOCallbackCheck, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ConsumeSSOState", ctx, projectID, stateHash)
+	ret0, _ := ret[0].(*domain.SSOCallbackCheck)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ConsumeSSOState indicates an expected call of ConsumeSSOState.
+func (mr *MockAuthAttemptStatementsMockRecorder) ConsumeSSOState(ctx, projectID, stateHash any) *MockAuthAttemptStatementsConsumeSSOStateCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConsumeSSOState", reflect.TypeOf((*MockAuthAttemptStatements)(nil).ConsumeSSOState), ctx, projectID, stateHash)
+	return &MockAuthAttemptStatementsConsumeSSOStateCall{Call: call}
+}
+
+// MockAuthAttemptStatementsConsumeSSOStateCall wrap *gomock.Call
+type MockAuthAttemptStatementsConsumeSSOStateCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAuthAttemptStatementsConsumeSSOStateCall) Return(arg0 *domain.SSOCallbackCheck, arg1 error) *MockAuthAttemptStatementsConsumeSSOStateCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAuthAttemptStatementsConsumeSSOStateCall) Do(f func(context.Context, string, string) (*domain.SSOCallbackCheck, error)) *MockAuthAttemptStatementsConsumeSSOStateCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAuthAttemptStatementsConsumeSSOStateCall) DoAndReturn(f func(context.Context, string, string) (*domain.SSOCallbackCheck, error)) *MockAuthAttemptStatementsConsumeSSOStateCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // CreateAuthAttempt mocks base method.
 func (m *MockAuthAttemptStatements) CreateAuthAttempt(ctx context.Context, entity *domain.AuthAttempt) error {
 	m.ctrl.T.Helper()
@@ -7978,6 +8132,44 @@ func (c *MockAuthAttemptStatementsIsStatementsCall) DoAndReturn(f func()) *MockA
 	return c
 }
 
+// IssueSSOState mocks base method.
+func (m *MockAuthAttemptStatements) IssueSSOState(ctx context.Context, projectID, authAttemptID string, check *domain.SSOCallbackCheck) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IssueSSOState", ctx, projectID, authAttemptID, check)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// IssueSSOState indicates an expected call of IssueSSOState.
+func (mr *MockAuthAttemptStatementsMockRecorder) IssueSSOState(ctx, projectID, authAttemptID, check any) *MockAuthAttemptStatementsIssueSSOStateCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IssueSSOState", reflect.TypeOf((*MockAuthAttemptStatements)(nil).IssueSSOState), ctx, projectID, authAttemptID, check)
+	return &MockAuthAttemptStatementsIssueSSOStateCall{Call: call}
+}
+
+// MockAuthAttemptStatementsIssueSSOStateCall wrap *gomock.Call
+type MockAuthAttemptStatementsIssueSSOStateCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAuthAttemptStatementsIssueSSOStateCall) Return(arg0 error) *MockAuthAttemptStatementsIssueSSOStateCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAuthAttemptStatementsIssueSSOStateCall) Do(f func(context.Context, string, string, *domain.SSOCallbackCheck) error) *MockAuthAttemptStatementsIssueSSOStateCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAuthAttemptStatementsIssueSSOStateCall) DoAndReturn(f func(context.Context, string, string, *domain.SSOCallbackCheck) error) *MockAuthAttemptStatementsIssueSSOStateCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // SetAuthAttemptChallenge mocks base method.
 func (m *MockAuthAttemptStatements) SetAuthAttemptChallenge(ctx context.Context, projectID, authAttemptID string, challenge domain.AuthChallenge) error {
 	m.ctrl.T.Helper()
@@ -8051,6 +8243,44 @@ func (c *MockAuthAttemptStatementsSetAuthAttemptFactorCall) Do(f func(context.Co
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAuthAttemptStatementsSetAuthAttemptFactorCall) DoAndReturn(f func(context.Context, string, string, domain.AuthFactor) (string, error)) *MockAuthAttemptStatementsSetAuthAttemptFactorCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// SetSSOCallbackResult mocks base method.
+func (m *MockAuthAttemptStatements) SetSSOCallbackResult(ctx context.Context, projectID, stateHash string, result *domain.SSOCallbackResult) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetSSOCallbackResult", ctx, projectID, stateHash, result)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetSSOCallbackResult indicates an expected call of SetSSOCallbackResult.
+func (mr *MockAuthAttemptStatementsMockRecorder) SetSSOCallbackResult(ctx, projectID, stateHash, result any) *MockAuthAttemptStatementsSetSSOCallbackResultCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetSSOCallbackResult", reflect.TypeOf((*MockAuthAttemptStatements)(nil).SetSSOCallbackResult), ctx, projectID, stateHash, result)
+	return &MockAuthAttemptStatementsSetSSOCallbackResultCall{Call: call}
+}
+
+// MockAuthAttemptStatementsSetSSOCallbackResultCall wrap *gomock.Call
+type MockAuthAttemptStatementsSetSSOCallbackResultCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAuthAttemptStatementsSetSSOCallbackResultCall) Return(arg0 error) *MockAuthAttemptStatementsSetSSOCallbackResultCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAuthAttemptStatementsSetSSOCallbackResultCall) Do(f func(context.Context, string, string, *domain.SSOCallbackResult) error) *MockAuthAttemptStatementsSetSSOCallbackResultCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAuthAttemptStatementsSetSSOCallbackResultCall) DoAndReturn(f func(context.Context, string, string, *domain.SSOCallbackResult) error) *MockAuthAttemptStatementsSetSSOCallbackResultCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

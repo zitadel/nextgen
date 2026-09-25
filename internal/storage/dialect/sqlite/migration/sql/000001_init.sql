@@ -281,6 +281,10 @@ CREATE TABLE checks (
     failure_count       INTEGER NOT NULL DEFAULT (0),
     challenge_payload   TEXT,
     factor_payload      TEXT,
+    -- Hash of a secret a caller presents to find this row when it holds no
+    -- other identifier (the SSO callback carries only the state). The row id
+    -- stays dialect-minted (ADR 047).
+    lookup_hash         TEXT,
     PRIMARY KEY (project_id, id),
     CONSTRAINT chk_checks_id CHECK (id <> ''),
     CONSTRAINT fk_checks_auth_attempt
@@ -299,6 +303,11 @@ CREATE UNIQUE INDEX idx_checks_auth_attempt_type
 
 -- +goose StatementBegin
 CREATE INDEX idx_checks_session ON checks (project_id, session_id);
+-- +goose StatementEnd
+
+-- +goose StatementBegin
+CREATE UNIQUE INDEX checks_lookup_hash
+    ON checks (project_id, lookup_hash) WHERE lookup_hash IS NOT NULL;
 -- +goose StatementEnd
 
 -- +goose StatementBegin
