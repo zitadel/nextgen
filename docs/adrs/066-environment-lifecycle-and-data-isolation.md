@@ -57,6 +57,14 @@ discarded lifecycle draft in
 those environments isolated was data, and data isolation belongs to the
 project.
 
+This is the definition of an environment from the server's and the project's
+point of view. A frontend application is free to keep its own notion of
+environments: an app's development, staging and production deployments can
+each bind to a different project, and each of those projects again has its
+`live` environment and previews. The app-level environment split is expressed
+through projects, not through environment kinds the server would have to know
+about.
+
 ## Consequences
 
 - The dev/staging/prod trio generated at project creation is replaced by `live`
