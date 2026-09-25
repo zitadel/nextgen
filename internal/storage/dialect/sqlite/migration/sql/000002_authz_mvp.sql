@@ -44,6 +44,13 @@ CREATE INDEX idx_resource_scope_index_kind_project
     ON resource_scope_index (resource_kind, project_id);
 -- +goose StatementEnd
 
+-- By-id lookup across projects (GetResourceScope): a Console session resolves
+-- a path id without knowing its project (#1300).
+-- +goose StatementBegin
+CREATE INDEX idx_resource_scope_index_resource
+    ON resource_scope_index (resource_id);
+-- +goose StatementEnd
+
 -- +goose StatementBegin
 CREATE TABLE authz_catalogs (
     id           TEXT    NOT NULL CHECK (id <> ''),
@@ -401,6 +408,9 @@ DROP INDEX IF EXISTS authz_catalogs_one_active;
 -- +goose StatementEnd
 -- +goose StatementBegin
 DROP TABLE IF EXISTS authz_catalogs;
+-- +goose StatementEnd
+-- +goose StatementBegin
+DROP INDEX IF EXISTS idx_resource_scope_index_resource;
 -- +goose StatementEnd
 -- +goose StatementBegin
 DROP INDEX IF EXISTS idx_resource_scope_index_kind_project;

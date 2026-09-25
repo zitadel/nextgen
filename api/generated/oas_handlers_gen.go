@@ -7530,6 +7530,12 @@ func (s *Server) handleGetReleaseByIdRequest(args [1]string, argsEscaped bool, w
 // Get a schema by its ID. A schema ID identifies one immutable revision, so
 // this returns exactly that revision. To find the current revision of an
 // object type, list with `revisions=latest`.
+// Schema IDs are unique within a project, not across projects (the seeded
+// default schema carries the same `$id` in every project). A Console
+// session that manages more than one project names the project with
+// `project_id`; without it, the ID is resolved in the credential's own
+// project when it is ambiguous. A project secret always resolves in its
+// own project and ignores `project_id`.
 //
 // GET /schemas/{id}
 func (s *Server) handleGetSchemaByIdRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -7696,6 +7702,10 @@ func (s *Server) handleGetSchemaByIdRequest(args [1]string, argsEscaped bool, w 
 					Name: "team_id",
 					In:   "query",
 				}: params.TeamID,
+				{
+					Name: "project_id",
+					In:   "query",
+				}: params.ProjectID,
 			},
 			Raw: r,
 		}

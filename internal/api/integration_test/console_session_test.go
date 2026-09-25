@@ -321,6 +321,135 @@ func TestConsoleSessionListsTargetProject(t *testing.T) {
 	})
 }
 
+// TestConsoleSessionReadsTargetProjectByID pins #1300 §3: a platform operator
+// opens a customer project's resources by id. The id is looked up across
+// projects for a user principal, and the Check runs against the resource's own
+// project — so the grant on the customer project is what allows it, and a
+// caller without one still gets the not-found shape.
+func TestConsoleSessionReadsTargetProjectByID(t *testing.T) {
+	t.Parallel()
+
+	console := harness.EnsurePlatformProject(t)
+	operatorID, _ := harness.CreateUserOwnedByTeam(t, console.ID)
+
+	customer, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	harness.SeedProjectAdmin(t, customer.ID, operatorID)
+	customerUserID, customerTeamID := harness.CreateUserOwnedByTeam(t, customer.ID)
+
+	customerSecret, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, customerSecret, customer)
+
+	session := sessionClientForUser(t, operatorID)
+	customerProjectID := api.ProjectID(customer.ID)
+
+	t.Run("user", func(t *testing.T) {
+		t.Parallel()
+		resp, err := session.GetUserByID(t.Context(), api.GetUserByIDParams{UserID: api.UserID(customerUserID)})
+		require.NoError(t, err)
+		require.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
+	})
+
+	t.Run("team read and update", func(t *testing.T) {
+		t.Parallel()
+		resp, err := session.GetTeam(t.Context(), api.GetTeamParams{TeamID: api.TeamID(customerTeamID)})
+		require.NoError(t, err)
+		require.IsType(t, &api.TeamResponse{}, resp, helpers.MustMarshal(t, resp))
+
+		renamed := helpers.TeamName()
+		updated, err := session.UpdateTeam(t.Context(), &api.UpdateTeamRequest{Name: api.NewOptString(renamed)},
+			api.UpdateTeamParams{TeamID: api.TeamID(customerTeamID)})
+		require.NoError(t, err)
+		got, ok := updated.(*api.TeamResponse)
+		require.True(t, ok, helpers.MustMarshal(t, updated))
+		require.Equal(t, renamed, got.Name)
+	})
+
+	t.Run("user delete", func(t *testing.T) {
+		t.Parallel()
+		doomedID, _ := harness.CreateUserOwnedByTeam(t, customer.ID)
+		resp, err := session.DeleteUserByID(t.Context(), api.DeleteUserByIDParams{UserID: api.UserID(doomedID)})
+		require.NoError(t, err)
+		require.IsType(t, &api.DeleteUserByIDNoContent{}, resp, helpers.MustMarshal(t, resp))
+	})
+
+	t.Run("schema", func(t *testing.T) {
+		t.Parallel()
+		listed, err := session.ListSchemas(t.Context(), api.ListSchemasParams{ProjectID: customerProjectID})
+		require.NoError(t, err)
+		schemas, ok := listed.(*api.ListSchemasResponse)
+		require.True(t, ok, helpers.MustMarshal(t, listed))
+		require.NotEmpty(t, schemas.Schemas)
+
+		// Schema ids are unique per project only (the seeded default carries
+		// the same $id everywhere), so the session names the project.
+		resp, err := session.GetSchemaById(t.Context(), api.GetSchemaByIdParams{
+			ID:        schemas.Schemas[0].ID,
+			ProjectID: api.NewOptProjectID(customerProjectID),
+		})
+		require.NoError(t, err)
+		got, ok := resp.(*api.Schema)
+		require.True(t, ok, helpers.MustMarshal(t, resp))
+		require.Equal(t, schemas.Schemas[0].ID, got.ID)
+	})
+
+	t.Run("flow definition", func(t *testing.T) {
+		t.Parallel()
+		listed, err := session.ListFlowDefinitions(t.Context(), api.ListFlowDefinitionsParams{ProjectID: customerProjectID})
+		require.NoError(t, err)
+		flows, ok := listed.(*api.FlowDefinitionListResponse)
+		require.True(t, ok, helpers.MustMarshal(t, listed))
+		require.NotEmpty(t, flows.FlowDefinitions)
+
+		resp, err := session.GetFlowDefinition(t.Context(), api.GetFlowDefinitionParams{ID: flows.FlowDefinitions[0].ID})
+		require.NoError(t, err)
+		require.IsType(t, &api.FlowDefinitionResponse{}, resp, helpers.MustMarshal(t, resp))
+	})
+
+	t.Run("branding", func(t *testing.T) {
+		t.Parallel()
+		created, err := customerSecret.CreateBranding(t.Context(), &api.Branding{
+			Layout: api.NewOptBrandingLayout(api.BrandingLayoutSplit),
+		}, api.CreateBrandingParams{ProjectID: customerProjectID})
+		require.NoError(t, err)
+		revision, ok := created.(*api.BrandingRevisionResponse)
+		require.True(t, ok, helpers.MustMarshal(t, created))
+
+		resp, err := session.GetBrandingById(t.Context(), api.GetBrandingByIdParams{ID: revision.ID})
+		require.NoError(t, err)
+		require.IsType(t, &api.BrandingRevisionResponse{}, resp, helpers.MustMarshal(t, resp))
+	})
+
+	t.Run("without a grant the resource is not found", func(t *testing.T) {
+		t.Parallel()
+		strangerID, _ := harness.CreateUserOwnedByTeam(t, console.ID)
+		stranger := sessionClientForUser(t, strangerID)
+
+		user, err := stranger.GetUserByID(t.Context(), api.GetUserByIDParams{UserID: api.UserID(customerUserID)})
+		require.NoError(t, err)
+		require.IsType(t, &api.GetUserByIDNotFound{}, user, helpers.MustMarshal(t, user))
+
+		team, err := stranger.GetTeam(t.Context(), api.GetTeamParams{TeamID: api.TeamID(customerTeamID)})
+		require.NoError(t, err)
+		require.IsType(t, &api.GetTeamNotFound{}, team, helpers.MustMarshal(t, team))
+	})
+
+	// The cross-project lookup is for user principals only: a project secret
+	// still resolves ids in its own project, so another project's user is the
+	// same not-found as before.
+	t.Run("a project secret stays bound to its own project", func(t *testing.T) {
+		t.Parallel()
+		secret, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+		require.NoError(t, err)
+		harness.SetProjectSecretOnApiClient(t, secret, console)
+
+		resp, err := secret.GetUserByID(t.Context(), api.GetUserByIDParams{UserID: api.UserID(customerUserID)})
+		require.NoError(t, err)
+		require.IsType(t, &api.GetUserByIDNotFound{}, resp, helpers.MustMarshal(t, resp))
+	})
+}
+
 // TestConsoleManagementBearerIgnoresStaleCookie pins the dual-scheme
 // precedence: a valid project secret authorizes the request even when a stale
 // or malformed session cookie rides along, instead of the cookie's failure
