@@ -6,6 +6,7 @@ post:
   security:
     - oauth2:
         - user.write
+    - nextgenSession: []
   parameters:
     - $ref: ../../components/parameters/project-id.yaml
     # Declared here rather than shared: `team_id` is the team parameter across

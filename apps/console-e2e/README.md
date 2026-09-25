@@ -71,9 +71,10 @@ deployment state cannot produce. The stubbed retry falls through to the real
 server, so recovery is asserted against a genuine document rather than a
 fixture.
 
-Keep feature coverage out of it. Management screens need `user.read`, which
-only the project secret carries — that is `e2e-real`'s job. This lane asserts
-that the surfaces reach the API at all.
+Keep feature coverage out of it — that is `e2e-real`'s job. This lane asserts
+that the surfaces reach the API at all. Management screens work here too: they
+authorize with the signed-in user's session cookie and grants (#1300), so a
+test that needs one grants its user access through the API first.
 
 ## Handling the handshake
 

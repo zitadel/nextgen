@@ -1,0 +1,38 @@
+[
+  {
+    "id": "user_01M3BQ78KZ8VGXSGXKN7K01MAP",
+    "email": "dev@zitadel.local"
+  },
+  {
+    "id": "user_01M3BQ78MWXMSTFXBM1K8V3S6C",
+    "email": "ada.lovelace@example.com"
+  },
+  {
+    "id": "user_01M3BQ78NS640TCJEBQT2ZGQ11",
+    "email": "alan.turing@example.com"
+  },
+  {
+    "id": "user_01M3BQ78PNXFCRX1G5A41KDMSV",
+    "email": "grace.hopper@example.com"
+  },
+  {
+    "id": "user_01M3BQ78QGFNFGDRC711QT7CD0",
+    "email": "katherine.johnson@example.com"
+  },
+  {
+    "id": "user_01M3BQ78RDA9V462T0HGG8SJ1V",
+    "email": "linus.torvalds@example.com"
+  },
+  {
+    "id": "user_01M3BQ78S8RFVGX96AEZ2ESNNT",
+    "email": "margaret.hamilton@example.com"
+  },
+  {
+    "id": "user_01M3BQ78T21DNWNRD7DWVVV6NX",
+    "email": "radia.perlman@example.com"
+  },
+  {
+    "id": "user_01M3BQ78TWQ555D5XZG4KA51HE",
+    "email": "barbara.liskov@example.com"
+  }
+]
