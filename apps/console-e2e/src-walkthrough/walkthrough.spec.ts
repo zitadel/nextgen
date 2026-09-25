@@ -48,7 +48,7 @@ test("scenario A: single project, session cookie only", async ({ page, zitadel, 
   });
 
   await screen(page, "Projects", "projects", { openFirstRow: true });
-  await screen(page, "Settings (project admins)", "settings");
+  await screen(page, "Settings", "settings");
   await screen(page, "Users", "users", { openFirstRow: true });
   await screen(page, "Teams", "teams?status=active", { openFirstRow: true });
   // These two render cards, not a table: open the seeded default by name.
