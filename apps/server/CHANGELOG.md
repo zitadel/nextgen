@@ -1,5 +1,15 @@
 # @zitadel/server
 
+## 1.0.0-alpha.24
+
+### Minor Changes
+
+- [#1176](https://github.com/zitadel/nextgen/pull/1176) [`db15426`](https://github.com/zitadel/nextgen/commit/db154268d9610833e15860b7358a626c8b2315d0) Thanks [@wim07101993](https://github.com/wim07101993)! - Let a project choose the method its passwords are hashed with (ADR 029 §Hashing). `PATCH /projects/{project_id}` takes a `password_hash` of an algorithm and its cost parameters, and `null` hands the project back to the server default. Verification is unchanged and deployment-wide, so stored passwords keep working across a change; only the next password written moves. A method is accepted only if the deployment can verify it and its cost sits inside the configured limits, which now cover scrypt, pbkdf2 and sha2 as well as bcrypt and argon2.
+
+### Patch Changes
+
+- [#1288](https://github.com/zitadel/nextgen/pull/1288) [`4bea70a`](https://github.com/zitadel/nextgen/commit/4bea70a7244b44e62476e6dd2dc6b8e4a7bd1a45) Thanks [@mridang](https://github.com/mridang)! - Encode path parameters in the generated API client, so any id the API accepts can be fetched. Schema ids are the case that hit today: a schema's id is its `$id`, usually a URL such as `https://nextgen.com/api/schemas/default-human-user.json`. Sent raw, the `//` collapsed on a redirect and the request 404'd, so `zitadel schemas get <id>` failed for every URL id and the console's user list silently dropped its schema columns. `zitadel schemas get` also stops guessing what an id looks like: it used to read anything without `sch_` or `://` as an object type, which sent ids like `urn:example:human` down the wrong path. It now asks the server, and falls back to the object-type lookup only on a 404. Setup reconciliation and `apply`/`plan` schema fetches used to encode the id themselves to work around the same bug; that is gone, so the client encodes exactly once rather than sending `%25` for every delimiter.
+
 ## 1.0.0-alpha.23
 
 ### Major Changes
