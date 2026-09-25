@@ -64,6 +64,14 @@ func (s SecurityHandler) HandleOAuth2(ctx context.Context, operationName api.Ope
 // one (dual-scheme OR). Anonymous sessions skip the grant/user-query ops
 // so a leftover building cookie cannot 401 a valid Bearer.
 func (s SecurityHandler) HandleNextgenSession(ctx context.Context, operationName api.OperationName, t api.NextgenSession) (context.Context, error) {
+	// A Bearer that already satisfied a dual-scheme operation is the
+	// credential; the cookie is not consulted at all. Otherwise a stale or
+	// malformed cookie riding along would fail here and 401 a request the
+	// Bearer authorized. Session-only operations never get this far with a
+	// ScopeContext, so they still validate the cookie below.
+	if _, ok := GetScopeContext(ctx); ok {
+		return ctx, nil
+	}
 	token, err := s.tokenService.IntrospectToken(ctx, t.APIKey)
 	if err != nil {
 		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
@@ -73,9 +81,6 @@ func (s SecurityHandler) HandleNextgenSession(ctx context.Context, operationName
 		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
 	}
 	ctx = context.WithValue(ctx, sessionTokenKey{}, token)
-	if _, ok := GetScopeContext(ctx); ok {
-		return ctx, nil
-	}
 	if token.UserID == "" && userBoundSessionOperations[operationName] {
 		return ctx, ogenerrors.ErrSkipServerSecurity
 	}
