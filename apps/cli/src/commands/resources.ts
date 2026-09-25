@@ -130,7 +130,8 @@ export const RESOURCES = {
         { field: "lifecycle_owner_team_id", operations: FILTER_OPERATIONS },
       ],
       sorts: ["created_at", "id", "schema", "status", "lifecycle_owner_team_id"],
-      // The users query binds to the token's project; no project_id param.
+      // No project_id: the users query defaults to the token's own project,
+      // which is the only one a project secret can list.
       call: ({ client }, body) => client.queryUsers(body),
     }),
     get: { call: ({ client }, id) => client.getUserByID(id), response: GetUserByIDResponse },

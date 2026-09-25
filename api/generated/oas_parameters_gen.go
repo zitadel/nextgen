@@ -8081,7 +8081,7 @@ func decodeQueryTeamsParams(args [0]string, argsEscaped bool, r *http.Request) (
 
 // QueryUsersParams is parameters of queryUsers operation.
 type QueryUsersParams struct {
-	// The project whose users to list. Defaults to the credential's home
+	// The project the request addresses. Omit it to address the credential's own
 	// project.
 	ProjectID OptProjectID `json:",omitempty,omitzero"`
 }
