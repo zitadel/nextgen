@@ -88,6 +88,29 @@ func (rs releaseStatements) getOne(ctx context.Context, filter database.Filter[d
 	return entity, nil
 }
 
+// GetReleasesByIDs implements [service.ReleaseStatements].
+func (rs releaseStatements) GetReleasesByIDs(ctx context.Context, projectID string, ids []string) ([]*domain.Release, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	var compiler statementCompiler
+	if err := compileRead(&compiler, releaseQuery, &database.ListOptions[domain.ReleaseField]{
+		Filter: release.ByIDs(projectID, ids),
+	}, release.Schema); err != nil {
+		return nil, err
+	}
+
+	rows, err := rs.client.Query(ctx, compiler.String(), compiler.args...)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	items, err := pgx.CollectRows(rows, scanRelease)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	return items, nil
+}
+
 // ListReleases implements [service.ReleaseStatements].
 func (rs releaseStatements) ListReleases(ctx context.Context, filter *database.ListOptions[domain.ReleaseField]) (*database.ListResult[*domain.Release], error) {
 	var compiler statementCompiler
