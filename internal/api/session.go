@@ -140,6 +140,34 @@ func (h Handler) GetMySession(ctx context.Context) (api.GetMySessionRes, error) 
 	}, nil
 }
 
+// GetMySessionCsrfToken hands the cookie's session its CSRF token (ADR 053 §5).
+// The session is read and checked the way GetMySession does, so a revoked or
+// superseded cookie gets no token.
+func (h Handler) GetMySessionCsrfToken(ctx context.Context) (api.GetMySessionCsrfTokenRes, error) {
+	sessionToken, ok := sessionTokenFromContext(ctx)
+	cookie, hasCookie := sessionCookieFromContext(ctx)
+	if !ok || !hasCookie {
+		return nil, invalidSessionCredential(domain.ErrSessionTokenInvalid())
+	}
+	session, err := h.sessionService.Get(ctx, service.GetSessionInput{
+		ProjectID: sessionToken.ProjectID,
+		SessionID: gu.Value(sessionToken.SessionID),
+	})
+	if err != nil {
+		if errors.Is(err, domain.ErrSessionNotFound()) {
+			return nil, invalidSessionCredential(err)
+		}
+		return nil, err
+	}
+	if err := validateSessionToken(session, sessionToken); err != nil {
+		return nil, invalidSessionCredential(err)
+	}
+	return &api.CsrfTokenResponseHeaders{
+		CacheControl: api.NewOptString(sessionStateCacheControl),
+		Response:     api.CsrfTokenResponse{CsrfToken: CSRFToken(cookie)},
+	}, nil
+}
+
 func (h Handler) QuerySessions(ctx context.Context, req *api.QuerySessionsRequest, params api.QuerySessionsParams) (api.QuerySessionsRes, error) {
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), sessionAccess, opRead); err != nil {
 		return nil, err

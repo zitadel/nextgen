@@ -1,4 +1,5 @@
 import type { GetMySession200 } from "@zitadel/api/generated/model";
+import { setApiCsrfToken } from "@zitadel/api/runtime/auth";
 
 import { api } from "../api/zitadel";
 
@@ -33,6 +34,7 @@ const SESSION_CACHE_MS = 15_000;
 /** Drops the cached session (called on sign-out). */
 export function invalidateSessionCache(): void {
   cachedSession = null;
+  setApiCsrfToken(undefined);
 }
 
 /**
@@ -49,9 +51,17 @@ export async function fetchSession(): Promise<ConsoleSession | null> {
     return cachedSession.session;
   }
   try {
-    const session = await api.getMySession(withCredentials);
+    // Every state-changing management call the cookie authenticates must
+    // carry the session's CSRF token (ADR 053 §5); it has its own resource,
+    // read alongside the session so it costs no extra round trip in sequence.
+    const [session, csrf] = await Promise.all([
+      api.getMySession(withCredentials),
+      api.getMySessionCsrfToken(withCredentials),
+    ]);
     if (session.state !== "active" || !session.user_id) return null;
     cachedSession = { at: Date.now(), session };
+    // The shared fetch adds it to every unsafe request from here on.
+    setApiCsrfToken(csrf.csrf_token);
     return session;
   } catch {
     return null;

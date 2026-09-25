@@ -237,6 +237,29 @@ Server enforcement must not land before the first-party callers can supply the
 token. The CLI's secret-authenticated `claim/init` and `claim/status` legs are
 unchanged; only the cookie-authenticated browser leg it opens is affected.
 
+> **Implementation note (2026-09-25, #1300):** shipped with three deliberate
+> refinements.
+>
+> - **Origin.** The check is Go's `http.CrossOriginProtection`: the
+>   browser-set `Sec-Fetch-Site` header, falling back to `Origin` against
+>   `Host`. Requests carrying neither (non-browser clients) pass the origin
+>   check and still need the token where one is required. An exact match
+>   against the configured public base would have failed in every
+>   development and test setup that does not configure it, and behind the
+>   Console's Vite dev proxy.
+> - **Token.** The CSRF token is derived from the session cookie value
+>   (an HMAC keyed by it; `CSRFToken` in `internal/api/csrf.go`), with no
+>   server-side state or keys. Only a holder of the HttpOnly cookie can learn
+>   it, from its own cookie-authenticated resource, `GET /sessions/me/csrf`.
+> - **Scope.** The origin check covers every unsafe request the cookie
+>   authenticates. The token is required on the management writes,
+>   `claim/complete` and `patchMyUser`. Sign-out (`revokeMySession`) gets the
+>   origin check only, because customer apps call it through the SDK proxies,
+>   which cannot supply the token yet. The `POST …/query` reads need no token.
+>
+> Session liveness (the "active user session" condition above) is tracked
+> separately.
+
 ### 6. Project discovery is an authorization query
 
 The Console and CLI need a query that means "projects on which this principal

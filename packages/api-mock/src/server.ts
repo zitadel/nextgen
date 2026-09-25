@@ -33,11 +33,11 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { type Server } from "node:http";
 
-import type { ExchangeHandoff200, GetMySession200 } from "@zitadel/api/generated/model";
-import { CompleteClaimBody } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
-import express from "express";
-import cookieParser from "cookie-parser";
 import { createMiddleware } from "@mswjs/http-middleware";
+import { CompleteClaimBody } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
+import type { ExchangeHandoff200, GetMySession200 } from "@zitadel/api/generated/model";
+import cookieParser from "cookie-parser";
+import express from "express";
 
 import { applyBranding } from "./branding.js";
 import { HandoffError, JWK, verifyHandoffToken } from "./crypto.js";
@@ -81,6 +81,12 @@ const DEMO_DISPLAY_NAMES = new Map<string, string>([
   ["grace@example.com", "Grace Hopper"],
 ]);
 const sessionStore = new Map<string, StoredSession>();
+/**
+ * Each session's CSRF token (ADR 053 §5), served by GET /sessions/me/csrf and
+ * checked on claim/complete. The Go server derives it from the cookie; any
+ * unguessable per-session value is the same contract to a client.
+ */
+const csrfTokens = new Map<string, string>();
 
 /**
  * Generates an opaque session token (random hex, not a JWT).
@@ -160,12 +166,9 @@ export function createMockApp(options: { issuer: string }): express.Express {
   app.get("/auth/keys", (_req: express.Request, res: express.Response) => {
     res.json({ keys: [JWK] });
   });
-  app.get(
-    "/.well-known/openid-configuration",
-    (_req: express.Request, res: express.Response) => {
-      res.json(buildOpenIdConfiguration(iss));
-    },
-  );
+  app.get("/.well-known/openid-configuration", (_req: express.Request, res: express.Response) => {
+    res.json(buildOpenIdConfiguration(iss));
+  });
 
   const jsonBodyParser: express.RequestHandler = (req, res, next) => {
     express.json()(req, res, (err) => {
@@ -256,7 +259,9 @@ export function createMockApp(options: { issuer: string }): express.Express {
       // session carries a verified factor. The contract now defines `active`
       // as "has at least one verified authentication factor", so an empty
       // factor list would contradict the state we report.
-      const verifiedFactors = [{ method: "password" as const, verified_at: createdAt.toISOString() }];
+      const verifiedFactors = [
+        { method: "password" as const, verified_at: createdAt.toISOString() },
+      ];
       const display = claims.sub ? DEMO_DISPLAY_NAMES.get(claims.sub) : undefined;
       const sessionData: StoredSession = {
         session_id: sessionId,
@@ -275,6 +280,7 @@ export function createMockApp(options: { issuer: string }): express.Express {
         },
       };
       sessionStore.set(opaqueToken, sessionData);
+      csrfTokens.set(opaqueToken, randomBytes(24).toString("base64url"));
 
       const setCookie = [
         `__nextgen_session=${opaqueToken}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${SESSION_TTL_SECONDS}`,
@@ -320,10 +326,25 @@ export function createMockApp(options: { issuer: string }): express.Express {
     // Check expiry
     if (new Date(session.expires_at) < new Date()) {
       sessionStore.delete(token);
+      csrfTokens.delete(token);
       res.status(401).json(errorBody("unauthenticated", "session expired"));
       return;
     }
     res.json(session);
+  });
+
+  // GET /sessions/me/csrf — the session's CSRF token (ADR 053 §5). Mirrors
+  // the Go server's GetMySessionCsrfToken handler.
+  app.get("/sessions/me/csrf", (req: express.Request, res: express.Response) => {
+    const token = (req.cookies as Record<string, string>).__nextgen_session;
+    const session = token ? sessionStore.get(token) : undefined;
+    const csrf = token ? csrfTokens.get(token) : undefined;
+    if (!token || !session || !csrf || new Date(session.expires_at) < new Date()) {
+      res.status(401).json(errorBody("auth.unauthorized", "Missing or invalid session token."));
+      return;
+    }
+    res.setHeader("Cache-Control", "private, no-store");
+    res.json({ csrf_token: csrf });
   });
 
   // DELETE /sessions/me — revoke the current session (logout). Mirrors the
@@ -341,10 +362,12 @@ export function createMockApp(options: { issuer: string }): express.Express {
     }
     if (new Date(session.expires_at) < new Date()) {
       sessionStore.delete(token);
+      csrfTokens.delete(token);
       res.status(409).json(errorBody("session_revoked", "session already revoked or expired"));
       return;
     }
     sessionStore.delete(token);
+    csrfTokens.delete(token);
     res.setHeader("Set-Cookie", [
       `__nextgen_session=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
       `__nextgen_display=; Path=/; SameSite=Lax; Max-Age=0`,
@@ -367,6 +390,20 @@ export function createMockApp(options: { issuer: string }): express.Express {
         res.status(401).json(errorBody("auth.unauthorized", "missing or invalid session token"));
         return;
       }
+      // ADR 053 §5: a cookie-authenticated write carries the session's CSRF
+      // token. Checked after the credential and before eligibility, in the
+      // same order as the Go server's security handler.
+      if (req.get("x-zitadel-csrf") !== csrfTokens.get(token)) {
+        res
+          .status(403)
+          .json(
+            errorBody(
+              "auth.csrf_invalid",
+              "The request failed cross-site request forgery validation.",
+            ),
+          );
+        return;
+      }
       // ADR 046 §2: only a platform-project session that is active and carries a
       // verified factor may claim. A customer-project session, an inactive one,
       // or an anonymous pre-login session must never complete a claim.
@@ -382,13 +419,11 @@ export function createMockApp(options: { issuer: string }): express.Express {
       }
       const parsed = CompleteClaimBody.safeParse(req.body);
       if (!parsed.success) {
-        res
-          .status(400)
-          .json(
-            errorBody("invalid_request", "request does not conform to spec", {
-              issues: parsed.error.issues,
-            }),
-          );
+        res.status(400).json(
+          errorBody("invalid_request", "request does not conform to spec", {
+            issues: parsed.error.issues,
+          }),
+        );
         return;
       }
       const result = completeClaimChallenge(parsed.data.challenge_id, req.params.project_id ?? "");
@@ -401,6 +436,7 @@ export function createMockApp(options: { issuer: string }): express.Express {
     const token = (req.cookies as Record<string, string>).__nextgen_session;
     if (token) {
       sessionStore.delete(token);
+      csrfTokens.delete(token);
     }
     res.setHeader("Set-Cookie", [
       `__nextgen_session=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,

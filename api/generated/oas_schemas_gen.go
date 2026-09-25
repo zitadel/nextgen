@@ -4539,7 +4539,8 @@ func (s *AuthUnauthorizedHeaders) SetResponse(val AuthUnauthorized) {
 	s.Response = val
 }
 
-func (*AuthUnauthorizedHeaders) getMySessionRes() {}
+func (*AuthUnauthorizedHeaders) getMySessionCsrfTokenRes() {}
+func (*AuthUnauthorizedHeaders) getMySessionRes()          {}
 
 // Merged schema.
 // Ref: #
@@ -12448,6 +12449,52 @@ func (s *CreateUserRequestAttributes) init() CreateUserRequestAttributes {
 type CreateUserUnauthorized ErrorDetails
 
 func (*CreateUserUnauthorized) createUserRes() {}
+
+// The session-bound CSRF token (ADR 053 §5).
+// Ref: #
+type CsrfTokenResponse struct {
+	// Send it in the `X-Zitadel-CSRF` header on state-changing requests the
+	// session cookie authenticates.
+	CsrfToken string `json:"csrf_token"`
+}
+
+// GetCsrfToken returns the value of CsrfToken.
+func (s *CsrfTokenResponse) GetCsrfToken() string {
+	return s.CsrfToken
+}
+
+// SetCsrfToken sets the value of CsrfToken.
+func (s *CsrfTokenResponse) SetCsrfToken(val string) {
+	s.CsrfToken = val
+}
+
+// CsrfTokenResponseHeaders wraps CsrfTokenResponse with response headers.
+type CsrfTokenResponseHeaders struct {
+	CacheControl OptString
+	Response     CsrfTokenResponse
+}
+
+// GetCacheControl returns the value of CacheControl.
+func (s *CsrfTokenResponseHeaders) GetCacheControl() OptString {
+	return s.CacheControl
+}
+
+// GetResponse returns the value of Response.
+func (s *CsrfTokenResponseHeaders) GetResponse() CsrfTokenResponse {
+	return s.Response
+}
+
+// SetCacheControl sets the value of CacheControl.
+func (s *CsrfTokenResponseHeaders) SetCacheControl(val OptString) {
+	s.CacheControl = val
+}
+
+// SetResponse sets the value of Response.
+func (s *CsrfTokenResponseHeaders) SetResponse(val CsrfTokenResponse) {
+	s.Response = val
+}
+
+func (*CsrfTokenResponseHeaders) getMySessionCsrfTokenRes() {}
 
 // DeleteGrantErrorResponse represents sum type.
 type DeleteGrantErrorResponse struct {

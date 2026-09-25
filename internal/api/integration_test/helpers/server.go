@@ -17,7 +17,7 @@ func (h *Harness) EnsureTestServer(t *testing.T) *httptest.Server {
 
 	if h.testServer.value == nil {
 		h.testServer.value = httptest.NewServer(
-			api.WithSessionStateNoStore(h.EnsureGeneratedServer(t)),
+			api.WithSessionStateNoStore(api.WithCSRFRequest(h.EnsureGeneratedServer(t))),
 		)
 	}
 	return h.testServer.value

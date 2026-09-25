@@ -171,6 +171,10 @@ func OgenErrorHandler(_ context.Context, w http.ResponseWriter, _ *http.Request,
 	)
 
 	switch {
+	case isCSRFError(err):
+		status = http.StatusForbidden
+		details = domainErrorDetails(domain.ErrAuthCSRFInvalid())
+
 	case isSecurityError(err):
 		status = http.StatusUnauthorized
 		details = securityErrorDetails(err)
@@ -193,6 +197,14 @@ func OgenErrorHandler(_ context.Context, w http.ResponseWriter, _ *http.Request,
 	if err == nil {
 		_, _ = w.Write(data)
 	}
+}
+
+// isCSRFError reports a session-cookie request refused by the CSRF checks. It
+// arrives wrapped in ogen's SecurityError, but it is a refusal of an
+// authenticated caller, not a missing credential: 403, not 401.
+func isCSRFError(err error) bool {
+	var e domain.Error
+	return errors.As(err, &e) && e.Code == domain.ErrAuthCSRFInvalid().Code
 }
 
 func isSecurityError(err error) bool {
