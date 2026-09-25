@@ -645,12 +645,12 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
 
   /**
    * The headers a cookie-authenticated claim/complete sends: the cookie plus
-   * the session's CSRF token from GET /sessions/me (ADR 053 §5). A session
-   * /sessions/me rejects gets an empty token, which the credential check
+   * the session's CSRF token from GET /sessions/me/csrf (ADR 053 §5). A session
+   * it rejects gets an empty token, which the credential check
    * refuses first anyway.
    */
   async function claimHeaders(cookie: string): Promise<Record<string, string>> {
-    const me = await fetch(`${BASE}/sessions/me`, { headers: { cookie } });
+    const me = await fetch(`${BASE}/sessions/me/csrf`, { headers: { cookie } });
     const token = me.ok ? (((await me.json()) as { csrf_token?: string }).csrf_token ?? "") : "";
     return { "content-type": "application/json", cookie, "x-zitadel-csrf": token };
   }

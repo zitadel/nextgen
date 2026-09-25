@@ -21,7 +21,7 @@ get:
       content:
         application/json:
           schema:
-            $ref: my-session-response.yaml
+            $ref: ../session-response.yaml
     '401':
       description: Missing or invalid session token.
       headers:

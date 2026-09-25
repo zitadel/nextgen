@@ -248,9 +248,9 @@ unchanged; only the cookie-authenticated browser leg it opens is affected.
 >   development and test setup that does not configure it, and behind the
 >   Console's Vite dev proxy.
 > - **Token.** The CSRF token is derived from the session cookie value
->   (`CSRFToken` in `internal/api/csrf.go`), with no server-side state or keys.
->   Only a holder of the HttpOnly cookie can learn it, from `GET /sessions/me`
->   (`csrf_token`).
+>   (an HMAC keyed by it; `CSRFToken` in `internal/api/csrf.go`), with no
+>   server-side state or keys. Only a holder of the HttpOnly cookie can learn
+>   it, from its own cookie-authenticated resource, `GET /sessions/me/csrf`.
 > - **Scope.** The origin check covers every unsafe request the cookie
 >   authenticates. The token is required on the management writes,
 >   `claim/complete` and `patchMyUser`. Sign-out (`revokeMySession`) gets the

@@ -53,7 +53,7 @@ const server = setupServer(
     initAuth = request.headers.get("authorization");
     return HttpResponse.json({ challenge_id: "claim_ch_1" }, { status: 201 });
   }),
-  http.get(`${SERVER}/sessions/me`, ({ request }) =>
+  http.get(`${SERVER}/sessions/me/csrf`, ({ request }) =>
     request.headers.get("cookie")?.includes("__nextgen_session=admin_session")
       ? HttpResponse.json({ csrf_token: "csrf_admin" })
       : HttpResponse.json({ code: "auth.unauthorized" }, { status: 401 }),

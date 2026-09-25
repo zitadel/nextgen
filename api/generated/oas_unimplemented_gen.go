@@ -516,6 +516,21 @@ func (UnimplementedHandler) GetMySession(ctx context.Context) (r GetMySessionRes
 	return r, ht.ErrNotImplemented
 }
 
+// GetMySessionCsrfToken implements getMySessionCsrfToken operation.
+//
+// Returns the session-bound token for cross-site request forgery protection
+// (ADR 053 §5). Browser code sends it in the `X-Zitadel-CSRF` header on the
+// state-changing requests the session cookie authenticates that require it
+// — see the `nextgenSession` scheme. It authorizes nothing on its own: the
+// HttpOnly cookie is still the credential, and a cross-site page cannot
+// read this response. It stays the same for the life of the session, so a
+// client fetches it once per session.
+//
+// GET /sessions/me/csrf
+func (UnimplementedHandler) GetMySessionCsrfToken(ctx context.Context) (r GetMySessionCsrfTokenRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // GetMyUser implements getMyUser operation.
 //
 // Get my user information.

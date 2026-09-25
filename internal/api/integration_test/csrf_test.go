@@ -19,8 +19,8 @@ import (
 // TestSessionCSRF pins ADR 053 §5 as scoped for #1300: every unsafe request
 // the session cookie authenticates must be same-origin, and the management
 // writes (plus claim/complete and the user's own profile write) must also
-// carry the session-bound X-Zitadel-CSRF token that GET /sessions/me hands
-// out. A Bearer caller is untouched.
+// carry the session-bound X-Zitadel-CSRF token that GET /sessions/me/csrf
+// hands out. A Bearer caller is untouched.
 func TestSessionCSRF(t *testing.T) {
 	t.Parallel()
 
@@ -55,15 +55,32 @@ func TestSessionCSRF(t *testing.T) {
 	}
 	teamsPath := "/teams?project_id=" + console.ID
 
-	t.Run("sessions/me hands out the session's token", func(t *testing.T) {
+	t.Run("sessions/me/csrf hands out the session's token", func(t *testing.T) {
 		t.Parallel()
-		status, body := raw(t, http.MethodGet, "/sessions/me", "", nil)
+		status, body := raw(t, http.MethodGet, "/sessions/me/csrf", "", nil)
 		require.Equal(t, http.StatusOK, status, body)
-		var me struct {
+		var token struct {
 			CSRFToken string `json:"csrf_token"`
 		}
-		require.NoError(t, json.Unmarshal([]byte(body), &me))
-		assert.Equal(t, internalapi.CSRFToken(cookie.Value), me.CSRFToken)
+		require.NoError(t, json.Unmarshal([]byte(body), &token))
+		assert.Equal(t, internalapi.CSRFToken(cookie.Value), token.CSRFToken)
+
+		// The session representation itself is unchanged: the token has its
+		// own resource.
+		status, body = raw(t, http.MethodGet, "/sessions/me", "", nil)
+		require.Equal(t, http.StatusOK, status, body)
+		assert.NotContains(t, body, "csrf_token")
+	})
+
+	t.Run("sessions/me/csrf needs the session cookie", func(t *testing.T) {
+		t.Parallel()
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, base+"/sessions/me/csrf", nil)
+		require.NoError(t, err)
+		resp, err := harness.EnsureHttpClient(t).Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+		assert.Equal(t, "private, no-store", resp.Header.Get("Cache-Control"))
 	})
 
 	t.Run("a write with the token is accepted", func(t *testing.T) {

@@ -51,12 +51,17 @@ export async function fetchSession(): Promise<ConsoleSession | null> {
     return cachedSession.session;
   }
   try {
-    const session = await api.getMySession(withCredentials);
+    // Every state-changing management call the cookie authenticates must
+    // carry the session's CSRF token (ADR 053 §5); it has its own resource,
+    // read alongside the session so it costs no extra round trip in sequence.
+    const [session, csrf] = await Promise.all([
+      api.getMySession(withCredentials),
+      api.getMySessionCsrfToken(withCredentials),
+    ]);
     if (session.state !== "active" || !session.user_id) return null;
     cachedSession = { at: Date.now(), session };
-    // Every state-changing management call the cookie authenticates must
-    // carry this token (ADR 053 §5); the shared fetch adds it from here on.
-    setApiCsrfToken(session.csrf_token);
+    // The shared fetch adds it to every unsafe request from here on.
+    setApiCsrfToken(csrf.csrf_token);
     return session;
   } catch {
     return null;

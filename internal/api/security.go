@@ -105,12 +105,13 @@ var _ api.SecurityHandler = (*SecurityHandler)(nil)
 // sessionCookieOperations is the session-only 401 rewrite allowlist.
 // Dual-scheme ops stay off it so a bad Bearer is not a missing-session message.
 var sessionCookieOperations = map[api.OperationName]bool{
-	api.GetMySessionOperation:    true,
-	api.RevokeMySessionOperation: true,
-	api.GetMyUserOperation:       true,
-	api.PatchMyUserOperation:     true,
-	api.CompleteClaimOperation:   true,
-	api.ListMyProjectsOperation:  true,
+	api.GetMySessionOperation:          true,
+	api.GetMySessionCsrfTokenOperation: true,
+	api.RevokeMySessionOperation:       true,
+	api.GetMyUserOperation:             true,
+	api.PatchMyUserOperation:           true,
+	api.CompleteClaimOperation:         true,
+	api.ListMyProjectsOperation:        true,
 }
 
 // userBoundSessionOperations require a session with UserID. Anonymous

@@ -4539,7 +4539,8 @@ func (s *AuthUnauthorizedHeaders) SetResponse(val AuthUnauthorized) {
 	s.Response = val
 }
 
-func (*AuthUnauthorizedHeaders) getMySessionRes() {}
+func (*AuthUnauthorizedHeaders) getMySessionCsrfTokenRes() {}
+func (*AuthUnauthorizedHeaders) getMySessionRes()          {}
 
 // Merged schema.
 // Ref: #
@@ -12448,6 +12449,52 @@ func (s *CreateUserRequestAttributes) init() CreateUserRequestAttributes {
 type CreateUserUnauthorized ErrorDetails
 
 func (*CreateUserUnauthorized) createUserRes() {}
+
+// The session-bound CSRF token (ADR 053 §5).
+// Ref: #
+type CsrfTokenResponse struct {
+	// Send it in the `X-Zitadel-CSRF` header on state-changing requests the
+	// session cookie authenticates.
+	CsrfToken string `json:"csrf_token"`
+}
+
+// GetCsrfToken returns the value of CsrfToken.
+func (s *CsrfTokenResponse) GetCsrfToken() string {
+	return s.CsrfToken
+}
+
+// SetCsrfToken sets the value of CsrfToken.
+func (s *CsrfTokenResponse) SetCsrfToken(val string) {
+	s.CsrfToken = val
+}
+
+// CsrfTokenResponseHeaders wraps CsrfTokenResponse with response headers.
+type CsrfTokenResponseHeaders struct {
+	CacheControl OptString
+	Response     CsrfTokenResponse
+}
+
+// GetCacheControl returns the value of CacheControl.
+func (s *CsrfTokenResponseHeaders) GetCacheControl() OptString {
+	return s.CacheControl
+}
+
+// GetResponse returns the value of Response.
+func (s *CsrfTokenResponseHeaders) GetResponse() CsrfTokenResponse {
+	return s.Response
+}
+
+// SetCacheControl sets the value of CacheControl.
+func (s *CsrfTokenResponseHeaders) SetCacheControl(val OptString) {
+	s.CacheControl = val
+}
+
+// SetResponse sets the value of Response.
+func (s *CsrfTokenResponseHeaders) SetResponse(val CsrfTokenResponse) {
+	s.Response = val
+}
+
+func (*CsrfTokenResponseHeaders) getMySessionCsrfTokenRes() {}
 
 // DeleteGrantErrorResponse represents sum type.
 type DeleteGrantErrorResponse struct {
@@ -28370,316 +28417,6 @@ type ListUserTeamsUnauthorized ErrorDetails
 
 func (*ListUserTeamsUnauthorized) listUserTeamsRes() {}
 
-// Merged schema.
-// Ref: #
-type MySessionResponse struct {
-	SessionID SessionID `json:"session_id"`
-	ProjectID ProjectID `json:"project_id"`
-	// Current lifecycle state of the session:
-	// - `building`: no verified authentication factors yet
-	// - `active`: has at least one verified authentication factor; `assurance_levels[]` may shrink as
-	// factors age
-	// - `expired`: TTL elapsed.
-	State MySessionResponseState `json:"state"`
-	// The authenticated user. Null for anonymous sessions and until the `user`
-	// factor has been verified through an `auth_attempt`.
-	UserID OptNilUserID `json:"user_id"`
-	// The authenticated user's resolved reference, derived live from the
-	// user schema's `x-identifier`/`x-display` designations (ADR 058).
-	// Present on identity-hydrating reads (`GET /sessions/me`, session get
-	// and query) whenever the session has an authenticated user; absent
-	// for anonymous sessions. Clients render `display`, falling back to
-	// `identifier`, then `user_id`.
-	User OptUserRef `json:"user"`
-	// Verified authentication factors accumulated by this session.
-	// Each key is a factor type (e.g. `password`, `totp`, `passkey`).
-	// Each value is a factor event object with at least `verified_at` and
-	// method-specific properties (e.g. `user_verified`, `hardware` for passkeys).
-	Factors []CompletedFactor `json:"factors"`
-	// All assurance levels whose schemas the current session factors satisfy.
-	// This list shrinks as factor freshness windows expire and grows when step-up
-	// auth_attempts add or refresh factors.
-	// Whether any level is "enough" is determined by the request context, not the session.
-	AssuranceLevels []string `json:"assurance_levels"`
-	// Arbitrary key/value metadata attached to the session.
-	Metadata OptNilMySessionResponseMetadata `json:"metadata"`
-	// User agent information captured at session creation.
-	UserAgent OptNilMySessionResponseUserAgent `json:"user_agent"`
-	// When this session was created.
-	CreatedAt time.Time `json:"created_at"`
-	// When this session expires. Short TTL (10 min) for anonymous sessions;
-	// reset to the full configured session TTL once the first authentication factor is written.
-	ExpiresAt time.Time `json:"expires_at"`
-	// Session-bound token for cross-site request forgery protection
-	// (ADR 053 §5). Browser code sends it in the `X-Zitadel-CSRF` header
-	// on state-changing management requests that the session cookie
-	// authenticates; without it they answer 403 `auth.csrf_invalid`. It
-	// authorizes nothing on its own — the HttpOnly cookie is still the
-	// credential — and it stays the same for the life of the session.
-	CsrfToken string `json:"csrf_token"`
-}
-
-// GetSessionID returns the value of SessionID.
-func (s *MySessionResponse) GetSessionID() SessionID {
-	return s.SessionID
-}
-
-// GetProjectID returns the value of ProjectID.
-func (s *MySessionResponse) GetProjectID() ProjectID {
-	return s.ProjectID
-}
-
-// GetState returns the value of State.
-func (s *MySessionResponse) GetState() MySessionResponseState {
-	return s.State
-}
-
-// GetUserID returns the value of UserID.
-func (s *MySessionResponse) GetUserID() OptNilUserID {
-	return s.UserID
-}
-
-// GetUser returns the value of User.
-func (s *MySessionResponse) GetUser() OptUserRef {
-	return s.User
-}
-
-// GetFactors returns the value of Factors.
-func (s *MySessionResponse) GetFactors() []CompletedFactor {
-	return s.Factors
-}
-
-// GetAssuranceLevels returns the value of AssuranceLevels.
-func (s *MySessionResponse) GetAssuranceLevels() []string {
-	return s.AssuranceLevels
-}
-
-// GetMetadata returns the value of Metadata.
-func (s *MySessionResponse) GetMetadata() OptNilMySessionResponseMetadata {
-	return s.Metadata
-}
-
-// GetUserAgent returns the value of UserAgent.
-func (s *MySessionResponse) GetUserAgent() OptNilMySessionResponseUserAgent {
-	return s.UserAgent
-}
-
-// GetCreatedAt returns the value of CreatedAt.
-func (s *MySessionResponse) GetCreatedAt() time.Time {
-	return s.CreatedAt
-}
-
-// GetExpiresAt returns the value of ExpiresAt.
-func (s *MySessionResponse) GetExpiresAt() time.Time {
-	return s.ExpiresAt
-}
-
-// GetCsrfToken returns the value of CsrfToken.
-func (s *MySessionResponse) GetCsrfToken() string {
-	return s.CsrfToken
-}
-
-// SetSessionID sets the value of SessionID.
-func (s *MySessionResponse) SetSessionID(val SessionID) {
-	s.SessionID = val
-}
-
-// SetProjectID sets the value of ProjectID.
-func (s *MySessionResponse) SetProjectID(val ProjectID) {
-	s.ProjectID = val
-}
-
-// SetState sets the value of State.
-func (s *MySessionResponse) SetState(val MySessionResponseState) {
-	s.State = val
-}
-
-// SetUserID sets the value of UserID.
-func (s *MySessionResponse) SetUserID(val OptNilUserID) {
-	s.UserID = val
-}
-
-// SetUser sets the value of User.
-func (s *MySessionResponse) SetUser(val OptUserRef) {
-	s.User = val
-}
-
-// SetFactors sets the value of Factors.
-func (s *MySessionResponse) SetFactors(val []CompletedFactor) {
-	s.Factors = val
-}
-
-// SetAssuranceLevels sets the value of AssuranceLevels.
-func (s *MySessionResponse) SetAssuranceLevels(val []string) {
-	s.AssuranceLevels = val
-}
-
-// SetMetadata sets the value of Metadata.
-func (s *MySessionResponse) SetMetadata(val OptNilMySessionResponseMetadata) {
-	s.Metadata = val
-}
-
-// SetUserAgent sets the value of UserAgent.
-func (s *MySessionResponse) SetUserAgent(val OptNilMySessionResponseUserAgent) {
-	s.UserAgent = val
-}
-
-// SetCreatedAt sets the value of CreatedAt.
-func (s *MySessionResponse) SetCreatedAt(val time.Time) {
-	s.CreatedAt = val
-}
-
-// SetExpiresAt sets the value of ExpiresAt.
-func (s *MySessionResponse) SetExpiresAt(val time.Time) {
-	s.ExpiresAt = val
-}
-
-// SetCsrfToken sets the value of CsrfToken.
-func (s *MySessionResponse) SetCsrfToken(val string) {
-	s.CsrfToken = val
-}
-
-// MySessionResponseHeaders wraps MySessionResponse with response headers.
-type MySessionResponseHeaders struct {
-	CacheControl OptString
-	Response     MySessionResponse
-}
-
-// GetCacheControl returns the value of CacheControl.
-func (s *MySessionResponseHeaders) GetCacheControl() OptString {
-	return s.CacheControl
-}
-
-// GetResponse returns the value of Response.
-func (s *MySessionResponseHeaders) GetResponse() MySessionResponse {
-	return s.Response
-}
-
-// SetCacheControl sets the value of CacheControl.
-func (s *MySessionResponseHeaders) SetCacheControl(val OptString) {
-	s.CacheControl = val
-}
-
-// SetResponse sets the value of Response.
-func (s *MySessionResponseHeaders) SetResponse(val MySessionResponse) {
-	s.Response = val
-}
-
-func (*MySessionResponseHeaders) getMySessionRes() {}
-
-type MySessionResponseMetadata map[string]jx.Raw
-
-func (s *MySessionResponseMetadata) init() MySessionResponseMetadata {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
-
-// Current lifecycle state of the session:
-// - `building`: no verified authentication factors yet
-// - `active`: has at least one verified authentication factor; `assurance_levels[]` may shrink as
-// factors age
-// - `expired`: TTL elapsed.
-type MySessionResponseState string
-
-const (
-	MySessionResponseStateBuilding MySessionResponseState = "building"
-	MySessionResponseStateActive   MySessionResponseState = "active"
-	MySessionResponseStateExpired  MySessionResponseState = "expired"
-)
-
-// AllValues returns all MySessionResponseState values.
-func (MySessionResponseState) AllValues() []MySessionResponseState {
-	return []MySessionResponseState{
-		MySessionResponseStateBuilding,
-		MySessionResponseStateActive,
-		MySessionResponseStateExpired,
-	}
-}
-
-// MarshalText implements encoding.TextMarshaler.
-func (s MySessionResponseState) MarshalText() ([]byte, error) {
-	switch s {
-	case MySessionResponseStateBuilding:
-		return []byte(s), nil
-	case MySessionResponseStateActive:
-		return []byte(s), nil
-	case MySessionResponseStateExpired:
-		return []byte(s), nil
-	default:
-		return nil, errors.Errorf("invalid value: %q", s)
-	}
-}
-
-// UnmarshalText implements encoding.TextUnmarshaler.
-func (s *MySessionResponseState) UnmarshalText(data []byte) error {
-	switch MySessionResponseState(data) {
-	case MySessionResponseStateBuilding:
-		*s = MySessionResponseStateBuilding
-		return nil
-	case MySessionResponseStateActive:
-		*s = MySessionResponseStateActive
-		return nil
-	case MySessionResponseStateExpired:
-		*s = MySessionResponseStateExpired
-		return nil
-	default:
-		return errors.Errorf("invalid value: %q", data)
-	}
-}
-
-type MySessionResponseUserAgent struct {
-	// Client-supplied device fingerprint.
-	Fingerprint OptString `json:"fingerprint"`
-	// IP address of the client at session creation.
-	IP              OptString `json:"ip"`
-	AdditionalProps MySessionResponseUserAgentAdditional
-}
-
-// GetFingerprint returns the value of Fingerprint.
-func (s *MySessionResponseUserAgent) GetFingerprint() OptString {
-	return s.Fingerprint
-}
-
-// GetIP returns the value of IP.
-func (s *MySessionResponseUserAgent) GetIP() OptString {
-	return s.IP
-}
-
-// GetAdditionalProps returns the value of AdditionalProps.
-func (s *MySessionResponseUserAgent) GetAdditionalProps() MySessionResponseUserAgentAdditional {
-	return s.AdditionalProps
-}
-
-// SetFingerprint sets the value of Fingerprint.
-func (s *MySessionResponseUserAgent) SetFingerprint(val OptString) {
-	s.Fingerprint = val
-}
-
-// SetIP sets the value of IP.
-func (s *MySessionResponseUserAgent) SetIP(val OptString) {
-	s.IP = val
-}
-
-// SetAdditionalProps sets the value of AdditionalProps.
-func (s *MySessionResponseUserAgent) SetAdditionalProps(val MySessionResponseUserAgentAdditional) {
-	s.AdditionalProps = val
-}
-
-type MySessionResponseUserAgentAdditional map[string]jx.Raw
-
-func (s *MySessionResponseUserAgentAdditional) init() MySessionResponseUserAgentAdditional {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
-
 type NextgenSession struct {
 	APIKey string
 	Roles  []string
@@ -35477,132 +35214,6 @@ func (o OptNilFlowdefUpdatedEventActorType) Get() (v FlowdefUpdatedEventActorTyp
 
 // Or returns value if set, or given parameter if does not.
 func (o OptNilFlowdefUpdatedEventActorType) Or(d FlowdefUpdatedEventActorType) FlowdefUpdatedEventActorType {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptNilMySessionResponseMetadata returns new OptNilMySessionResponseMetadata with value set to v.
-func NewOptNilMySessionResponseMetadata(v MySessionResponseMetadata) OptNilMySessionResponseMetadata {
-	return OptNilMySessionResponseMetadata{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptNilMySessionResponseMetadata is optional nullable MySessionResponseMetadata.
-type OptNilMySessionResponseMetadata struct {
-	Value MySessionResponseMetadata
-	Set   bool
-	Null  bool
-}
-
-// IsSet returns true if OptNilMySessionResponseMetadata was set.
-func (o OptNilMySessionResponseMetadata) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptNilMySessionResponseMetadata) Reset() {
-	var v MySessionResponseMetadata
-	o.Value = v
-	o.Set = false
-	o.Null = false
-}
-
-// SetTo sets value to v.
-func (o *OptNilMySessionResponseMetadata) SetTo(v MySessionResponseMetadata) {
-	o.Set = true
-	o.Null = false
-	o.Value = v
-}
-
-// IsNull returns true if value is Null.
-func (o OptNilMySessionResponseMetadata) IsNull() bool { return o.Null }
-
-// SetToNull sets value to null.
-func (o *OptNilMySessionResponseMetadata) SetToNull() {
-	o.Set = true
-	o.Null = true
-	var v MySessionResponseMetadata
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptNilMySessionResponseMetadata) Get() (v MySessionResponseMetadata, ok bool) {
-	if o.Null {
-		return v, false
-	}
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptNilMySessionResponseMetadata) Or(d MySessionResponseMetadata) MySessionResponseMetadata {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptNilMySessionResponseUserAgent returns new OptNilMySessionResponseUserAgent with value set to v.
-func NewOptNilMySessionResponseUserAgent(v MySessionResponseUserAgent) OptNilMySessionResponseUserAgent {
-	return OptNilMySessionResponseUserAgent{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptNilMySessionResponseUserAgent is optional nullable MySessionResponseUserAgent.
-type OptNilMySessionResponseUserAgent struct {
-	Value MySessionResponseUserAgent
-	Set   bool
-	Null  bool
-}
-
-// IsSet returns true if OptNilMySessionResponseUserAgent was set.
-func (o OptNilMySessionResponseUserAgent) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptNilMySessionResponseUserAgent) Reset() {
-	var v MySessionResponseUserAgent
-	o.Value = v
-	o.Set = false
-	o.Null = false
-}
-
-// SetTo sets value to v.
-func (o *OptNilMySessionResponseUserAgent) SetTo(v MySessionResponseUserAgent) {
-	o.Set = true
-	o.Null = false
-	o.Value = v
-}
-
-// IsNull returns true if value is Null.
-func (o OptNilMySessionResponseUserAgent) IsNull() bool { return o.Null }
-
-// SetToNull sets value to null.
-func (o *OptNilMySessionResponseUserAgent) SetToNull() {
-	o.Set = true
-	o.Null = true
-	var v MySessionResponseUserAgent
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptNilMySessionResponseUserAgent) Get() (v MySessionResponseUserAgent, ok bool) {
-	if o.Null {
-		return v, false
-	}
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptNilMySessionResponseUserAgent) Or(d MySessionResponseUserAgent) MySessionResponseUserAgent {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -51991,6 +51602,34 @@ func (s *SessionResponse) SetExpiresAt(val time.Time) {
 }
 
 func (*SessionResponse) getSessionRes() {}
+
+// SessionResponseHeaders wraps SessionResponse with response headers.
+type SessionResponseHeaders struct {
+	CacheControl OptString
+	Response     SessionResponse
+}
+
+// GetCacheControl returns the value of CacheControl.
+func (s *SessionResponseHeaders) GetCacheControl() OptString {
+	return s.CacheControl
+}
+
+// GetResponse returns the value of Response.
+func (s *SessionResponseHeaders) GetResponse() SessionResponse {
+	return s.Response
+}
+
+// SetCacheControl sets the value of CacheControl.
+func (s *SessionResponseHeaders) SetCacheControl(val OptString) {
+	s.CacheControl = val
+}
+
+// SetResponse sets the value of Response.
+func (s *SessionResponseHeaders) SetResponse(val SessionResponse) {
+	s.Response = val
+}
+
+func (*SessionResponseHeaders) getMySessionRes() {}
 
 type SessionResponseMetadata map[string]jx.Raw
 

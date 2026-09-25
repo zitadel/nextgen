@@ -22,8 +22,8 @@ type SecurityHandler interface {
 	// request is refused with `403` and code `auth.csrf_invalid`. The management
 	// writes (`createUser`, `DeleteUserByID`, `createTeam`, `updateTeam`,
 	// `patchProject`, `createGrant`, `deleteGrant`), `completeClaim` and
-	// `patchMyUser` must also send the session's token from `GET /sessions/me`
-	// (`csrf_token`) in the `X-Zitadel-CSRF` header, or they answer the same
+	// `patchMyUser` must also send the session's token from
+	// `GET /sessions/me/csrf` in the `X-Zitadel-CSRF` header, or they answer the same
 	// `403`. Reads, including the `POST …/query` operations, and sign-out
 	// (`revokeMySession`) need no token. A request a project secret authenticates
 	// is not affected.
@@ -49,32 +49,33 @@ func findAuthorization(h http.Header, prefix string) (string, bool) {
 
 // operationRolesNextgenSession is a private map storing roles per operation.
 var operationRolesNextgenSession = map[string][]string{
-	CompleteClaimOperation:       []string{},
-	CreateGrantOperation:         []string{},
-	CreateTeamOperation:          []string{},
-	CreateUserOperation:          []string{},
-	DeleteGrantOperation:         []string{},
-	DeleteUserByIDOperation:      []string{},
-	GetBrandingByIdOperation:     []string{},
-	GetFlowDefinitionOperation:   []string{},
-	GetGrantOperation:            []string{},
-	GetMySessionOperation:        []string{},
-	GetMyUserOperation:           []string{},
-	GetProjectOperation:          []string{},
-	GetSchemaByIdOperation:       []string{},
-	GetTeamOperation:             []string{},
-	GetUserByIDOperation:         []string{},
-	ListBrandingOperation:        []string{},
-	ListFlowDefinitionsOperation: []string{},
-	ListMyProjectsOperation:      []string{},
-	ListSchemasOperation:         []string{},
-	PatchMyUserOperation:         []string{},
-	PatchProjectOperation:        []string{},
-	QueryGrantsOperation:         []string{},
-	QueryTeamsOperation:          []string{},
-	QueryUsersOperation:          []string{},
-	RevokeMySessionOperation:     []string{},
-	UpdateTeamOperation:          []string{},
+	CompleteClaimOperation:         []string{},
+	CreateGrantOperation:           []string{},
+	CreateTeamOperation:            []string{},
+	CreateUserOperation:            []string{},
+	DeleteGrantOperation:           []string{},
+	DeleteUserByIDOperation:        []string{},
+	GetBrandingByIdOperation:       []string{},
+	GetFlowDefinitionOperation:     []string{},
+	GetGrantOperation:              []string{},
+	GetMySessionOperation:          []string{},
+	GetMySessionCsrfTokenOperation: []string{},
+	GetMyUserOperation:             []string{},
+	GetProjectOperation:            []string{},
+	GetSchemaByIdOperation:         []string{},
+	GetTeamOperation:               []string{},
+	GetUserByIDOperation:           []string{},
+	ListBrandingOperation:          []string{},
+	ListFlowDefinitionsOperation:   []string{},
+	ListMyProjectsOperation:        []string{},
+	ListSchemasOperation:           []string{},
+	PatchMyUserOperation:           []string{},
+	PatchProjectOperation:          []string{},
+	QueryGrantsOperation:           []string{},
+	QueryTeamsOperation:            []string{},
+	QueryUsersOperation:            []string{},
+	RevokeMySessionOperation:       []string{},
+	UpdateTeamOperation:            []string{},
 }
 
 // GetRolesForNextgenSession returns the required roles for the given operation.
@@ -353,8 +354,8 @@ type SecuritySource interface {
 	// request is refused with `403` and code `auth.csrf_invalid`. The management
 	// writes (`createUser`, `DeleteUserByID`, `createTeam`, `updateTeam`,
 	// `patchProject`, `createGrant`, `deleteGrant`), `completeClaim` and
-	// `patchMyUser` must also send the session's token from `GET /sessions/me`
-	// (`csrf_token`) in the `X-Zitadel-CSRF` header, or they answer the same
+	// `patchMyUser` must also send the session's token from
+	// `GET /sessions/me/csrf` in the `X-Zitadel-CSRF` header, or they answer the same
 	// `403`. Reads, including the `POST …/query` operations, and sign-out
 	// (`revokeMySession`) need no token. A request a project secret authenticates
 	// is not affected.

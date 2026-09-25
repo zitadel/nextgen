@@ -426,6 +426,18 @@ type Invoker interface {
 	//
 	// GET /sessions/me
 	GetMySession(ctx context.Context) (GetMySessionRes, error)
+	// GetMySessionCsrfToken invokes getMySessionCsrfToken operation.
+	//
+	// Returns the session-bound token for cross-site request forgery protection
+	// (ADR 053 §5). Browser code sends it in the `X-Zitadel-CSRF` header on the
+	// state-changing requests the session cookie authenticates that require it
+	// — see the `nextgenSession` scheme. It authorizes nothing on its own: the
+	// HttpOnly cookie is still the credential, and a cross-site page cannot
+	// read this response. It stays the same for the life of the session, so a
+	// client fetches it once per session.
+	//
+	// GET /sessions/me/csrf
+	GetMySessionCsrfToken(ctx context.Context) (GetMySessionCsrfTokenRes, error)
 	// GetMyUser invokes getMyUser operation.
 	//
 	// Get my user information.
@@ -5725,6 +5737,119 @@ func (c *Client) sendGetMySession(ctx context.Context) (res GetMySessionRes, err
 
 	stage = "DecodeResponse"
 	result, err := decodeGetMySessionResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// GetMySessionCsrfToken invokes getMySessionCsrfToken operation.
+//
+// Returns the session-bound token for cross-site request forgery protection
+// (ADR 053 §5). Browser code sends it in the `X-Zitadel-CSRF` header on the
+// state-changing requests the session cookie authenticates that require it
+// — see the `nextgenSession` scheme. It authorizes nothing on its own: the
+// HttpOnly cookie is still the credential, and a cross-site page cannot
+// read this response. It stays the same for the life of the session, so a
+// client fetches it once per session.
+//
+// GET /sessions/me/csrf
+func (c *Client) GetMySessionCsrfToken(ctx context.Context) (GetMySessionCsrfTokenRes, error) {
+	res, err := c.sendGetMySessionCsrfToken(ctx)
+	return res, err
+}
+
+func (c *Client) sendGetMySessionCsrfToken(ctx context.Context) (res GetMySessionCsrfTokenRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("getMySessionCsrfToken"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.URLTemplateKey.String("/sessions/me/csrf"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, GetMySessionCsrfTokenOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [1]string
+	pathParts[0] = "/sessions/me/csrf"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "GET", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:NextgenSession"
+			switch err := c.securityNextgenSession(ctx, GetMySessionCsrfTokenOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"NextgenSession\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeGetMySessionCsrfTokenResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}

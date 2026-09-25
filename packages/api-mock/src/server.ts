@@ -81,6 +81,12 @@ const DEMO_DISPLAY_NAMES = new Map<string, string>([
   ["grace@example.com", "Grace Hopper"],
 ]);
 const sessionStore = new Map<string, StoredSession>();
+/**
+ * Each session's CSRF token (ADR 053 §5), served by GET /sessions/me/csrf and
+ * checked on claim/complete. The Go server derives it from the cookie; any
+ * unguessable per-session value is the same contract to a client.
+ */
+const csrfTokens = new Map<string, string>();
 
 /**
  * Generates an opaque session token (random hex, not a JWT).
@@ -266,10 +272,6 @@ export function createMockApp(options: { issuer: string }): express.Express {
         assurance_levels: [],
         created_at: createdAt.toISOString(),
         expires_at: expiresAt.toISOString(),
-        // The session-bound CSRF token (ADR 053 §5) GET /sessions/me hands out.
-        // The Go server derives it from the cookie; any unguessable per-session
-        // value is the same contract to a client.
-        csrf_token: randomBytes(24).toString("base64url"),
         user: {
           user_id: userId,
           // identifier_property travels exactly with identifier (ADR 058 §3).
@@ -278,6 +280,7 @@ export function createMockApp(options: { issuer: string }): express.Express {
         },
       };
       sessionStore.set(opaqueToken, sessionData);
+      csrfTokens.set(opaqueToken, randomBytes(24).toString("base64url"));
 
       const setCookie = [
         `__nextgen_session=${opaqueToken}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${SESSION_TTL_SECONDS}`,
@@ -323,10 +326,25 @@ export function createMockApp(options: { issuer: string }): express.Express {
     // Check expiry
     if (new Date(session.expires_at) < new Date()) {
       sessionStore.delete(token);
+      csrfTokens.delete(token);
       res.status(401).json(errorBody("unauthenticated", "session expired"));
       return;
     }
     res.json(session);
+  });
+
+  // GET /sessions/me/csrf — the session's CSRF token (ADR 053 §5). Mirrors
+  // the Go server's GetMySessionCsrfToken handler.
+  app.get("/sessions/me/csrf", (req: express.Request, res: express.Response) => {
+    const token = (req.cookies as Record<string, string>).__nextgen_session;
+    const session = token ? sessionStore.get(token) : undefined;
+    const csrf = token ? csrfTokens.get(token) : undefined;
+    if (!token || !session || !csrf || new Date(session.expires_at) < new Date()) {
+      res.status(401).json(errorBody("auth.unauthorized", "Missing or invalid session token."));
+      return;
+    }
+    res.setHeader("Cache-Control", "private, no-store");
+    res.json({ csrf_token: csrf });
   });
 
   // DELETE /sessions/me — revoke the current session (logout). Mirrors the
@@ -344,10 +362,12 @@ export function createMockApp(options: { issuer: string }): express.Express {
     }
     if (new Date(session.expires_at) < new Date()) {
       sessionStore.delete(token);
+      csrfTokens.delete(token);
       res.status(409).json(errorBody("session_revoked", "session already revoked or expired"));
       return;
     }
     sessionStore.delete(token);
+    csrfTokens.delete(token);
     res.setHeader("Set-Cookie", [
       `__nextgen_session=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
       `__nextgen_display=; Path=/; SameSite=Lax; Max-Age=0`,
@@ -373,7 +393,7 @@ export function createMockApp(options: { issuer: string }): express.Express {
       // ADR 053 §5: a cookie-authenticated write carries the session's CSRF
       // token. Checked after the credential and before eligibility, in the
       // same order as the Go server's security handler.
-      if (req.get("x-zitadel-csrf") !== session.csrf_token) {
+      if (req.get("x-zitadel-csrf") !== csrfTokens.get(token)) {
         res
           .status(403)
           .json(
@@ -416,6 +436,7 @@ export function createMockApp(options: { issuer: string }): express.Express {
     const token = (req.cookies as Record<string, string>).__nextgen_session;
     if (token) {
       sessionStore.delete(token);
+      csrfTokens.delete(token);
     }
     res.setHeader("Set-Cookie", [
       `__nextgen_session=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,

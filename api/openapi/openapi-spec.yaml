@@ -152,6 +152,8 @@ paths:
     $ref: endpoints/sessions/by_id/methods.yaml
   /sessions/me:
     $ref: endpoints/sessions/me/methods.yaml
+  /sessions/me/csrf:
+    $ref: endpoints/sessions/me/csrf/methods.yaml
   /schemas:
     $ref: endpoints/schemas/methods.yaml
   /schemas/{id}:

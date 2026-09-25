@@ -6,7 +6,6 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
-	"encoding/json"
 	"net/http"
 
 	api "github.com/zitadel/nextgen/api/generated"
@@ -70,7 +69,7 @@ func WithCSRFRequest(next http.Handler) http.Handler {
 
 // CSRFToken derives the CSRF token for a session cookie value: an HMAC-SHA256
 // keyed by the cookie over a fixed label. Only a holder of the HttpOnly
-// cookie can compute or learn it — from GET /sessions/me, which a cross-site
+// cookie can compute or learn it — from GET /sessions/me/csrf, which a cross-site
 // page cannot read — so it binds the header to the session without
 // server-side state or keys.
 func CSRFToken(sessionCookie string) string {
@@ -98,30 +97,4 @@ func checkSessionCSRF(ctx context.Context, operationName api.OperationName, sess
 		return domain.ErrAuthCSRFInvalid()
 	}
 	return nil
-}
-
-// mySessionToAPI extends the shared session representation with the CSRF
-// token for GET /sessions/me. ogen flattens the allOf into its own type with
-// its own enums, so the two convert through their common JSON encoding rather
-// than a second field-by-field mapping that could drift from sessionToAPI.
-func mySessionToAPI(session *api.SessionResponse, csrfToken string) (api.MySessionResponse, error) {
-	var mine api.MySessionResponse
-	raw, err := session.MarshalJSON()
-	if err != nil {
-		return mine, err
-	}
-	var fields map[string]json.RawMessage
-	if err := json.Unmarshal(raw, &fields); err != nil {
-		return mine, err
-	}
-	token, err := json.Marshal(csrfToken)
-	if err != nil {
-		return mine, err
-	}
-	fields["csrf_token"] = token
-	if raw, err = json.Marshal(fields); err != nil {
-		return mine, err
-	}
-	err = mine.UnmarshalJSON(raw)
-	return mine, err
 }

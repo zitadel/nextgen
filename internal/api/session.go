@@ -134,14 +134,37 @@ func (h Handler) GetMySession(ctx context.Context) (api.GetMySessionRes, error) 
 	if err := validateSessionToken(session, sessionToken); err != nil {
 		return nil, invalidSessionCredential(err)
 	}
-	cookie, _ := sessionCookieFromContext(ctx)
-	mine, err := mySessionToAPI(sessionToAPI(session), CSRFToken(cookie))
-	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to encode the session")
-	}
-	return &api.MySessionResponseHeaders{
+	return &api.SessionResponseHeaders{
 		CacheControl: api.NewOptString(sessionStateCacheControl),
-		Response:     mine,
+		Response:     *sessionToAPI(session),
+	}, nil
+}
+
+// GetMySessionCsrfToken hands the cookie's session its CSRF token (ADR 053 §5).
+// The session is read and checked the way GetMySession does, so a revoked or
+// superseded cookie gets no token.
+func (h Handler) GetMySessionCsrfToken(ctx context.Context) (api.GetMySessionCsrfTokenRes, error) {
+	sessionToken, ok := sessionTokenFromContext(ctx)
+	cookie, hasCookie := sessionCookieFromContext(ctx)
+	if !ok || !hasCookie {
+		return nil, invalidSessionCredential(domain.ErrSessionTokenInvalid())
+	}
+	session, err := h.sessionService.Get(ctx, service.GetSessionInput{
+		ProjectID: sessionToken.ProjectID,
+		SessionID: gu.Value(sessionToken.SessionID),
+	})
+	if err != nil {
+		if errors.Is(err, domain.ErrSessionNotFound()) {
+			return nil, invalidSessionCredential(err)
+		}
+		return nil, err
+	}
+	if err := validateSessionToken(session, sessionToken); err != nil {
+		return nil, invalidSessionCredential(err)
+	}
+	return &api.CsrfTokenResponseHeaders{
+		CacheControl: api.NewOptString(sessionStateCacheControl),
+		Response:     api.CsrfTokenResponse{CsrfToken: CSRFToken(cookie)},
 	}, nil
 }
 

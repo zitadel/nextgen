@@ -28,10 +28,12 @@ export async function claimProjectAsAdmin(input: {
   // claim/complete authenticates by the admin's session cookie, not a bearer
   // token, so this client carries none. As a cookie-authenticated write it
   // also needs the session's CSRF token (ADR 053 §5), which the same cookie
-  // reads from GET /sessions/me.
+  // reads from GET /sessions/me/csrf.
   const cookie = await adminSessionCookie(serverUrl, admin);
   const session = createZitadelClient({ baseUrl: serverUrl });
-  const { csrf_token } = await session.getMySession(localAdminRequest(serverUrl, { cookie }));
+  const { csrf_token } = await session.getMySessionCsrfToken(
+    localAdminRequest(serverUrl, { cookie }),
+  );
   const { team_id, claimed_at } = await session.completeClaim(
     projectId,
     { challenge_id },
