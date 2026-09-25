@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"crypto/hmac"
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
@@ -67,13 +68,15 @@ func WithCSRFRequest(next http.Handler) http.Handler {
 	})
 }
 
-// CSRFToken derives the CSRF token for a session cookie value. Only a holder
-// of the HttpOnly cookie can learn it — from GET /sessions/me, which a
-// cross-site page cannot read — so it binds the header to the session
-// without server-side state or keys.
+// CSRFToken derives the CSRF token for a session cookie value: an HMAC-SHA256
+// keyed by the cookie over a fixed label. Only a holder of the HttpOnly
+// cookie can compute or learn it — from GET /sessions/me, which a cross-site
+// page cannot read — so it binds the header to the session without
+// server-side state or keys.
 func CSRFToken(sessionCookie string) string {
-	sum := sha256.Sum256([]byte("zitadel-csrf-v1\x00" + sessionCookie))
-	return base64.RawURLEncoding.EncodeToString(sum[:])
+	mac := hmac.New(sha256.New, []byte(sessionCookie))
+	mac.Write([]byte("zitadel-csrf-v1"))
+	return base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
 }
 
 // checkSessionCSRF enforces ADR 053 §5 on a request the session cookie
