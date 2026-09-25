@@ -65,6 +65,11 @@ each bind to a different project, and each of those projects again has its
 through projects, not through environment kinds the server would have to know
 about.
 
+Projects and environments topology:
+<img width="3424" height="1968" alt="Zitadel NextGen (13)" src="https://github.com/user-attachments/assets/f9e4c68e-e719-448d-907b-9a119b0ca083" />
+
+
+
 ## Consequences
 
 - The dev/staging/prod trio generated at project creation is replaced by `live`
