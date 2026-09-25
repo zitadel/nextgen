@@ -693,16 +693,17 @@ type Invoker interface {
 	// QueryUsers invokes queryUsers operation.
 	//
 	// Returns the users of a project, paginated with a cursor.
-	// The project comes from the credential, not from a parameter: the
-	// operation is bound to the credential's home project by construction
-	// (oauth2 secret or user-bound session). This is why it takes no
-	// `project_id`, unlike the other query endpoints.
+	// `project_id` names the project to list. Without it, the credential's
+	// home project is listed (the project a secret belongs to, or the project
+	// a session signed in to), which keeps secret callers that never sent it
+	// unchanged. A session may name another project it holds a grant on; a
+	// project secret stays bound to its own project.
 	// Accepts either a project secret (`oauth2`) or a user-bound Console
 	// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
 	// is a follow-up (#1140).
 	//
 	// POST /users/query
-	QueryUsers(ctx context.Context, request *QueryUsersRequest) (QueryUsersRes, error)
+	QueryUsers(ctx context.Context, request *QueryUsersRequest, params QueryUsersParams) (QueryUsersRes, error)
 	// RevokeMySession invokes revokeMySession operation.
 	//
 	// Logs out by permanently deleting the session.
@@ -10649,21 +10650,22 @@ func (c *Client) sendQueryTeams(ctx context.Context, request *QueryTeamsRequest,
 // QueryUsers invokes queryUsers operation.
 //
 // Returns the users of a project, paginated with a cursor.
-// The project comes from the credential, not from a parameter: the
-// operation is bound to the credential's home project by construction
-// (oauth2 secret or user-bound session). This is why it takes no
-// `project_id`, unlike the other query endpoints.
+// `project_id` names the project to list. Without it, the credential's
+// home project is listed (the project a secret belongs to, or the project
+// a session signed in to), which keeps secret callers that never sent it
+// unchanged. A session may name another project it holds a grant on; a
+// project secret stays bound to its own project.
 // Accepts either a project secret (`oauth2`) or a user-bound Console
 // session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
 // is a follow-up (#1140).
 //
 // POST /users/query
-func (c *Client) QueryUsers(ctx context.Context, request *QueryUsersRequest) (QueryUsersRes, error) {
-	res, err := c.sendQueryUsers(ctx, request)
+func (c *Client) QueryUsers(ctx context.Context, request *QueryUsersRequest, params QueryUsersParams) (QueryUsersRes, error) {
+	res, err := c.sendQueryUsers(ctx, request, params)
 	return res, err
 }
 
-func (c *Client) sendQueryUsers(ctx context.Context, request *QueryUsersRequest) (res QueryUsersRes, err error) {
+func (c *Client) sendQueryUsers(ctx context.Context, request *QueryUsersRequest, params QueryUsersParams) (res QueryUsersRes, err error) {
 	// Validate request before sending.
 	if err := func() error {
 		if err := request.Validate(); err != nil {
@@ -10712,6 +10714,30 @@ func (c *Client) sendQueryUsers(ctx context.Context, request *QueryUsersRequest)
 	var pathParts [1]string
 	pathParts[0] = "/users/query"
 	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.ProjectID.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
 
 	stage = "EncodeRequest"
 	r, err := ht.NewRequest(ctx, "POST", u)

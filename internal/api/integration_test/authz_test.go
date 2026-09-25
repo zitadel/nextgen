@@ -221,7 +221,7 @@ func TestManagementAuthz(t *testing.T) {
 			// The type is the status assertion; assertAuthzStatus is for the
 			// undeclared case and would read StatusCode off a struct that has
 			// none.
-			listResp, err := preview.QueryUsers(t.Context(), &api.QueryUsersRequest{})
+			listResp, err := preview.QueryUsers(t.Context(), &api.QueryUsersRequest{}, api.QueryUsersParams{})
 			require.NoError(t, err)
 			require.IsType(t, &api.QueryUsersForbidden{}, listResp, helpers.MustMarshal(t, listResp))
 			assertAuthzError(t, listResp, "user.permission_denied")
@@ -549,7 +549,7 @@ func TestListAuthzTeamScopedOnlyPartialView(t *testing.T) {
 	require.True(t, expandedFlows[0].UserSchema.Set, "expand was requested, so the property must be present")
 	assert.True(t, expandedFlows[0].UserSchema.Null, "the caller cannot read the schema, so it embeds as null")
 
-	usersResp, err := client.QueryUsers(t.Context(), &api.QueryUsersRequest{})
+	usersResp, err := client.QueryUsers(t.Context(), &api.QueryUsersRequest{}, api.QueryUsersParams{})
 	require.NoError(t, err)
 	require.IsType(t, &api.QueryUsersResponse{}, usersResp, helpers.MustMarshal(t, usersResp))
 	assert.Empty(t, usersResp.(*api.QueryUsersResponse).Users, "user RSI team_id is NULL so team-scoped lists are empty")

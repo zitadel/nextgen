@@ -70,7 +70,7 @@ func TestUserResponses_CarryDerivedIdentity(t *testing.T) {
 	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	t.Run("query rows carry each schema's own resolution", func(t *testing.T) {
-		res, err := client.QueryUsers(t.Context(), &api.QueryUsersRequest{})
+		res, err := client.QueryUsers(t.Context(), &api.QueryUsersRequest{}, api.QueryUsersParams{})
 		require.NoError(t, err)
 		page, ok := res.(*api.QueryUsersResponse)
 		require.True(t, ok, helpers.MustMarshal(t, res))

@@ -12910,10 +12910,11 @@ func (s *Server) handleQueryTeamsRequest(args [0]string, argsEscaped bool, w htt
 // handleQueryUsersRequest handles queryUsers operation.
 //
 // Returns the users of a project, paginated with a cursor.
-// The project comes from the credential, not from a parameter: the
-// operation is bound to the credential's home project by construction
-// (oauth2 secret or user-bound session). This is why it takes no
-// `project_id`, unlike the other query endpoints.
+// `project_id` names the project to list. Without it, the credential's
+// home project is listed (the project a secret belongs to, or the project
+// a session signed in to), which keeps secret callers that never sent it
+// unchanged. A session may name another project it holds a grant on; a
+// project secret stays bound to its own project.
 // Accepts either a project secret (`oauth2`) or a user-bound Console
 // session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
 // is a follow-up (#1140).
@@ -13052,6 +13053,16 @@ func (s *Server) handleQueryUsersRequest(args [0]string, argsEscaped bool, w htt
 			return
 		}
 	}
+	params, err := decodeQueryUsersParams(args, argsEscaped, r)
+	if err != nil {
+		err = &ogenerrors.DecodeParamsError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeParams", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
 
 	var rawBody []byte
 	request, rawBody, close, err := s.decodeQueryUsersRequest(r)
@@ -13079,13 +13090,18 @@ func (s *Server) handleQueryUsersRequest(args [0]string, argsEscaped bool, w htt
 			OperationID:      "queryUsers",
 			Body:             request,
 			RawBody:          rawBody,
-			Params:           middleware.Parameters{},
-			Raw:              r,
+			Params: middleware.Parameters{
+				{
+					Name: "project_id",
+					In:   "query",
+				}: params.ProjectID,
+			},
+			Raw: r,
 		}
 
 		type (
 			Request  = *QueryUsersRequest
-			Params   = struct{}
+			Params   = QueryUsersParams
 			Response = QueryUsersRes
 		)
 		response, err = middleware.HookMiddleware[
@@ -13095,14 +13111,14 @@ func (s *Server) handleQueryUsersRequest(args [0]string, argsEscaped bool, w htt
 		](
 			m,
 			mreq,
-			nil,
+			unpackQueryUsersParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.QueryUsers(ctx, request)
+				response, err = s.h.QueryUsers(ctx, request, params)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.QueryUsers(ctx, request)
+		response, err = s.h.QueryUsers(ctx, request, params)
 	}
 	if err != nil {
 		defer recordError("Internal", err)

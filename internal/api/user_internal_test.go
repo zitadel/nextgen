@@ -83,7 +83,7 @@ func TestQueryUsers_SessionCaller(t *testing.T) {
 	t.Run("lists credential home", func(t *testing.T) {
 		users := &stubQueryUsersService{}
 		h := queryUsersHandler(t, true, true, users)
-		resp, err := h.QueryUsers(userCtx, &api.QueryUsersRequest{})
+		resp, err := h.QueryUsers(userCtx, &api.QueryUsersRequest{}, api.QueryUsersParams{})
 		if err != nil {
 			t.Fatalf("session list: %v", err)
 		}
@@ -98,7 +98,7 @@ func TestQueryUsers_SessionCaller(t *testing.T) {
 	t.Run("no foothold is not found", func(t *testing.T) {
 		users := &stubQueryUsersService{}
 		h := queryUsersHandler(t, false, false, users)
-		_, err := h.QueryUsers(userCtx, &api.QueryUsersRequest{})
+		_, err := h.QueryUsers(userCtx, &api.QueryUsersRequest{}, api.QueryUsersParams{})
 		assertDomainCode(t, err, domain.ErrUserNotFound().Code)
 		if len(users.listProjectIDs) != 0 {
 			t.Fatalf("ListUsers must not run before Check, got %v", users.listProjectIDs)
@@ -133,7 +133,7 @@ func TestQueryUsers_SessionCaller(t *testing.T) {
 			t.Run(tt.name, func(t *testing.T) {
 				users := &stubQueryUsersService{}
 				h := queryUsersHandler(t, true, true, users)
-				_, err := h.QueryUsers(userCtx, tt.req)
+				_, err := h.QueryUsers(userCtx, tt.req, api.QueryUsersParams{})
 				assertDomainCode(t, err, domain.ErrUserPermissionDenied().Code)
 				var de domain.Error
 				if !errors.As(err, &de) {

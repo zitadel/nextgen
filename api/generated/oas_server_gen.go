@@ -673,16 +673,17 @@ type Handler interface {
 	// QueryUsers implements queryUsers operation.
 	//
 	// Returns the users of a project, paginated with a cursor.
-	// The project comes from the credential, not from a parameter: the
-	// operation is bound to the credential's home project by construction
-	// (oauth2 secret or user-bound session). This is why it takes no
-	// `project_id`, unlike the other query endpoints.
+	// `project_id` names the project to list. Without it, the credential's
+	// home project is listed (the project a secret belongs to, or the project
+	// a session signed in to), which keeps secret callers that never sent it
+	// unchanged. A session may name another project it holds a grant on; a
+	// project secret stays bound to its own project.
 	// Accepts either a project secret (`oauth2`) or a user-bound Console
 	// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
 	// is a follow-up (#1140).
 	//
 	// POST /users/query
-	QueryUsers(ctx context.Context, req *QueryUsersRequest) (QueryUsersRes, error)
+	QueryUsers(ctx context.Context, req *QueryUsersRequest, params QueryUsersParams) (QueryUsersRes, error)
 	// RevokeMySession implements revokeMySession operation.
 	//
 	// Logs out by permanently deleting the session.
