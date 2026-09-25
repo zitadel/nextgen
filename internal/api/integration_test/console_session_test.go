@@ -4,9 +4,12 @@ package integration_test
 
 import (
 	"fmt"
+	"net/http"
 	"slices"
+	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
@@ -126,7 +129,8 @@ func TestConsoleManagementAcceptsSession(t *testing.T) {
 
 // TestConsoleManagementSessionWithoutAccess pins the other half: accepting
 // the cookie is not authorizing it. A signed-in user with no grant on a
-// project neither reads nor writes there.
+// project neither reads nor writes there, and gets the not-found shape rather
+// than a 401 (the cookie was accepted) or a 403 (there is no foothold).
 func TestConsoleManagementSessionWithoutAccess(t *testing.T) {
 	t.Parallel()
 
@@ -141,32 +145,65 @@ func TestConsoleManagementSessionWithoutAccess(t *testing.T) {
 	t.Run("cannot list another project's schemas", func(t *testing.T) {
 		resp, err := session.ListSchemas(t.Context(), api.ListSchemasParams{ProjectID: otherID})
 		require.NoError(t, err)
-		require.IsNotType(t, &api.ListSchemasResponse{}, resp, helpers.MustMarshal(t, resp))
+		require.IsType(t, &api.ListSchemasErrorResponseStatusCode{}, resp, helpers.MustMarshal(t, resp))
+		denied := resp.(*api.ListSchemasErrorResponseStatusCode)
+		assert.Equal(t, http.StatusNotFound, denied.StatusCode)
+		assert.True(t, denied.Response.IsSchNotFound(), helpers.MustMarshal(t, resp))
 	})
 
 	t.Run("cannot list another project's flow definitions", func(t *testing.T) {
 		resp, err := session.ListFlowDefinitions(t.Context(), api.ListFlowDefinitionsParams{ProjectID: otherID})
 		require.NoError(t, err)
-		require.IsNotType(t, &api.FlowDefinitionListResponse{}, resp, helpers.MustMarshal(t, resp))
+		require.IsType(t, &api.ListFlowDefinitionsErrorResponseStatusCode{}, resp, helpers.MustMarshal(t, resp))
+		denied := resp.(*api.ListFlowDefinitionsErrorResponseStatusCode)
+		assert.Equal(t, http.StatusNotFound, denied.StatusCode)
+		assert.True(t, denied.Response.IsFlowdefNotFound(), helpers.MustMarshal(t, resp))
 	})
 
 	t.Run("cannot list another project's branding", func(t *testing.T) {
 		resp, err := session.ListBranding(t.Context(), api.ListBrandingParams{ProjectID: otherID})
 		require.NoError(t, err)
-		require.IsNotType(t, &api.ListBrandingResponse{}, resp, helpers.MustMarshal(t, resp))
+		require.IsType(t, &api.ErrorDetailsStatusCode{}, resp, helpers.MustMarshal(t, resp))
+		denied := resp.(*api.ErrorDetailsStatusCode)
+		assert.Equal(t, http.StatusNotFound, denied.StatusCode)
+		assert.Equal(t, api.ErrorCode("brnd.not_found"), denied.Response.Code)
 	})
 
 	t.Run("cannot create a team in another project", func(t *testing.T) {
 		resp, err := session.CreateTeam(t.Context(), &api.CreateTeamRequest{Name: helpers.TeamName()},
 			api.CreateTeamParams{ProjectID: otherID})
 		require.NoError(t, err)
-		require.IsNotType(t, &api.TeamResponse{}, resp, helpers.MustMarshal(t, resp))
+		require.IsType(t, &api.CreateTeamNotFound{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, api.ErrorCode("team.project_not_found"), resp.(*api.CreateTeamNotFound).Code)
 	})
 
 	t.Run("cannot read another project's user", func(t *testing.T) {
 		foreignUserID, _ := harness.CreateUserOwnedByTeam(t, other.ID)
 		resp, err := session.GetUserByID(t.Context(), api.GetUserByIDParams{UserID: api.UserID(foreignUserID)})
 		require.NoError(t, err)
-		require.IsNotType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
+		require.IsType(t, &api.GetUserByIDNotFound{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, api.ErrorCode("user.not_found"), resp.(*api.GetUserByIDNotFound).Code)
 	})
+}
+
+// TestConsoleManagementBearerIgnoresStaleCookie pins the dual-scheme
+// precedence: a valid project secret authorizes the request even when a stale
+// or malformed session cookie rides along, instead of the cookie's failure
+// turning it into a 401.
+func TestConsoleManagementBearerIgnoresStaleCookie(t *testing.T) {
+	t.Parallel()
+
+	console := harness.EnsurePlatformProject(t)
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost,
+		harness.EnsureTestServer(t).URL+"/teams?project_id="+console.ID,
+		strings.NewReader(`{"name":"`+helpers.TeamName()+`"}`))
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+harness.ProjectSecret(t, console))
+	req.AddCookie(&http.Cookie{Name: "__nextgen_session", Value: "stale-or-garbage"})
+
+	resp, err := harness.EnsureHttpClient(t).Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	assert.Equal(t, http.StatusCreated, resp.StatusCode)
 }
