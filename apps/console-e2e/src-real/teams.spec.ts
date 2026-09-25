@@ -20,8 +20,8 @@ function teamName(prefix: string): string {
   return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-test("creates a team through the drawer and lists it", async ({ page, seed }) => {
-  await signIn(page, await seed.user());
+test("creates a team through the drawer and lists it", async ({ page, zitadel, seed }) => {
+  await signIn(page, zitadel.handle, await seed.user());
   const name = teamName("acme");
 
   await page.goto("/teams");
@@ -41,8 +41,8 @@ test("creates a team through the drawer and lists it", async ({ page, seed }) =>
   await expectNoErrorBoundary(page);
 });
 
-test("opens a team from the list and renames it", async ({ page, seed }) => {
-  await signIn(page, await seed.user());
+test("opens a team from the list and renames it", async ({ page, zitadel, seed }) => {
+  await signIn(page, zitadel.handle, await seed.user());
   const name = teamName("rename");
   const renamed = `${name}-renamed`;
 
@@ -68,8 +68,8 @@ test("opens a team from the list and renames it", async ({ page, seed }) => {
   await expectNoErrorBoundary(page);
 });
 
-test("shows the status the API stamped on a team", async ({ page, seed }) => {
-  await signIn(page, await seed.user());
+test("shows the status the API stamped on a team", async ({ page, zitadel, seed }) => {
+  await signIn(page, zitadel.handle, await seed.user());
   const name = teamName("status");
 
   await page.goto("/teams");

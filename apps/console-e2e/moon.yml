@@ -58,20 +58,14 @@ tasks:
       # start` creates one by default for the local-admin journey; this lane
       # opts out, so it keeps exercising an ordinary project's Admins screen.
       NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT: "false"
-      # Vite serves the console and proxies its API requests. The binary
-      # embeds the /ui/* surfaces, but this suite must exercise the
-      # Vite-served console, so keep both server surfaces off.
-      NEXTGEN_SERVER_LOGIN_ENABLED: "false"
+      # Vite serves the console and proxies its API requests, so the binary's
+      # embedded console stays off: this suite must exercise the Vite-served
+      # one. The hosted-login surface stays on (the default) because
+      # `/console/runtime.json` is mounted only alongside a UI surface
+      # (`buildHTTPMux`), and that document carries the publishable key the
+      # login widget needs for the handoff exchange. With no project secret in
+      # the proxy (#1300), nothing else would authenticate that exchange.
       NEXTGEN_SERVER_CONSOLE_ENABLED: "false"
-      # Consequence of the two flags above: `/console/runtime.json` is mounted
-      # only alongside a UI surface (`buildHTTPMux`), so this lane's instance
-      # serves none. Since Console ADR 0004 §3 that is a connectivity error,
-      # not a mode, and the console would stop at its error screen before any
-      # screen loaded — so opt in explicitly, the same way a backend-less
-      # preview does. The project id comes from VITE_CONSOLE_PROJECT_ID, which
-      # withZitadel already maps from the instance handle. Reaches the Vite dev
-      # server through the app-runner, which inherits this process env.
-      VITE_CONSOLE_RUNTIME_FALLBACK: "1"
     options:
       cache: false
       runInCI: false

@@ -47,9 +47,9 @@ export function PendingState() {
  * - **Session gone** — the cookie expired or was revoked mid-use: drop the
  *   cached session and redirect to the login screen with the current path in
  *   `?next=`, instead of rendering copy the user cannot act on.
- * - **Session alive** — the user is signed in but the console's operator-plane
- *   credential is missing or invalid (in dev: the proxy's
- *   `CONSOLE_PROJECT_SECRET`). Redirecting would bounce straight back and
+ * - **Session alive** — `GET /sessions/me` still answers, but the server
+ *   refused this request's session (an operation that does not accept the
+ *   Console session, for instance). Redirecting would bounce straight back and
  *   loop, so this renders an honest error state instead.
  *
  * 403 stays a rendered state — signed in, but no access.
@@ -93,9 +93,9 @@ export function ErrorState({ error }: ErrorComponentProps) {
             <AlertCircle aria-hidden />
             <AlertTitle>Console API not authorized</AlertTitle>
             <AlertDescription>
-              You are signed in, but the console&apos;s API requests are not authorized. In
-              development, check that the dev proxy&apos;s <code>CONSOLE_PROJECT_SECRET</code> is
-              set and belongs to the current project (ADR 0003 §4).
+              You are signed in, but the server did not accept your session for this request.
+              Signing out and in again may help; if it persists, this screen calls an operation the
+              console session cannot use yet.
             </AlertDescription>
           </Alert>
         </StatePage>

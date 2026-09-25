@@ -12,10 +12,9 @@
  * seeded project to be bound on another one because dev-real pins no platform
  * project (`internal/service/grant.go`, `resolvePrincipalHome`).
  *
- * The user id is looked up through the console dev server's `/api` proxy
- * (`vite.config.mts`), which injects the seeded project's secret server-side —
- * the secret is not printed by `dev-real` and this script has no other way to
- * hold it. So both processes must be up:
+ * The user id is read from `.dev-real/users.json`, which `dev-real` writes after
+ * seeding (ids and emails only — the project secret never leaves `dev-real`).
+ * So `dev-real` must be up:
  *
  *   moon run console:dev-real                              # terminal 1
  *   corepack pnpm --filter @zitadel/console exec tsx \
@@ -38,14 +37,18 @@
  *   --relation <r>          viewer | editor | admin (default: admin)
  *   --project-id <proj_…>   grant on an existing project instead of creating
  *   --secret <secret>       that project's secret (printed when this script
- *                           created it); required unless it is the seeded
- *                           project, which the dev proxy can authorize
+ *                           created it); required with --project-id. For the
+ *                           seeded project, use the console's own Settings →
+ *                           Admins instead: it grants with your session.
  *
  * Environment (all optional, same defaults as dev-real):
  *   CONSOLE_DEV_ORIGIN        console dev server, default http://localhost:5174
  *   CONSOLE_DEV_ZITADEL_PORT  the booted instance's port, default 8094
  */
 
+import { readFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 
 const consoleOrigin = process.env.CONSOLE_DEV_ORIGIN ?? "http://localhost:5174";
@@ -65,6 +68,11 @@ if (!["viewer", "editor", "admin"].includes(relation)) {
 const principal: Principal = args.identifier
   ? { identifier: args.identifier }
   : { user_id: args["user-id"] ?? (await resolveUserId(email)) };
+if (args["project-id"] && !args.secret) {
+  fail(
+    "--project-id needs that project's --secret (for the seeded project, use Settings → Admins in the console)",
+  );
+}
 const projectId = args["project-id"] ?? (await createProject(name));
 if (args["project-id"] && args.secret) createdSecrets.set(projectId, args.secret);
 await grant(projectId, principal, relation);
@@ -90,27 +98,19 @@ console.log(
   ].join("\n"),
 );
 
-/**
- * `POST /users/query` on the seeded project, through the dev proxy so the
- * seeded project's secret is injected for us. One page of 100 is the same
- * ceiling the console's own picker lives with.
- */
+/** The seeded accounts `dev-real` wrote after seeding (`scripts/dev-real.mts`). */
 async function resolveUserId(identifier: string): Promise<string> {
-  const response = await request(`${consoleOrigin}/api/users/query`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ limit: 100 }),
-  });
-  const { users } = (await response.json()) as {
-    users: Array<{ id: string; identifier?: string; attributes?: { email?: string } }>;
-  };
-  const user = users.find(
-    (candidate) =>
-      candidate.identifier === identifier || candidate.attributes?.email === identifier,
-  );
+  const file = join(dirname(fileURLToPath(import.meta.url)), "..", ".dev-real", "users.json");
+  let users: Array<{ id: string; email: string }>;
+  try {
+    users = JSON.parse(await readFile(file, "utf8")) as Array<{ id: string; email: string }>;
+  } catch {
+    fail(`cannot read ${file} — is console:dev-real running? (pass --user-id to skip the lookup)`);
+  }
+  const user = users.find((candidate) => candidate.email === identifier);
   if (!user) {
     fail(
-      `no user ${identifier} among the ${users.length} on the seeded project — is console:dev-real running at ${consoleOrigin}? (pass --user-id to skip the lookup)`,
+      `no seeded user ${identifier} among the ${users.length} dev-real wrote (pass --user-id to skip the lookup)`,
     );
   }
   return user.id;
@@ -138,25 +138,22 @@ async function createProject(projectName: string): Promise<string> {
 type Principal = { user_id: string } | { identifier: string };
 
 async function grant(targetProjectId: string, principal: Principal, rel: string): Promise<void> {
-  const secret = createdSecrets.get(targetProjectId);
   const query = new URLSearchParams({ project_id: targetProjectId });
-  if (secret) {
-    // A project we just created: its secret authorizes writes on it.
-    await request(`${backendUrl}/grants?${query.toString()}`, {
-      method: "POST",
-      headers: { authorization: `Bearer ${secret}`, "content-type": "application/json" },
-      body: JSON.stringify({ user: principal, relation: rel }),
-    });
-    return;
-  }
-  // No secret for this project: go through the dev proxy and let the seeded
-  // project's secret authorize. The proxy injects it only for the seeded
-  // project (`vite.config.mts`), so any other existing project needs --secret.
-  await request(`${consoleOrigin}/api/grants?${query.toString()}`, {
+  await request(`${backendUrl}/grants?${query.toString()}`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: {
+      authorization: `Bearer ${secretFor(targetProjectId)}`,
+      "content-type": "application/json",
+    },
     body: JSON.stringify({ user: principal, relation: rel }),
   });
+}
+
+/** The secret of a project this run created, or the one --secret supplied. */
+function secretFor(targetProjectId: string): string {
+  const secret = createdSecrets.get(targetProjectId);
+  if (!secret) fail(`no secret for ${targetProjectId}`);
+  return secret;
 }
 
 /**
@@ -165,15 +162,11 @@ async function grant(targetProjectId: string, principal: Principal, rel: string)
  * for through `GET /users/me/projects`.
  */
 async function readBack(targetProjectId: string): Promise<unknown[]> {
-  const secret = createdSecrets.get(targetProjectId);
   const query = new URLSearchParams({ project_id: targetProjectId });
-  const url = secret
-    ? `${backendUrl}/grants/query?${query.toString()}`
-    : `${consoleOrigin}/api/grants/query?${query.toString()}`;
-  const response = await request(url, {
+  const response = await request(`${backendUrl}/grants/query?${query.toString()}`, {
     method: "POST",
     headers: {
-      ...(secret ? { authorization: `Bearer ${secret}` } : {}),
+      authorization: `Bearer ${secretFor(targetProjectId)}`,
       "content-type": "application/json",
     },
     body: JSON.stringify({ limit: 100, expand: ["principal"] }),

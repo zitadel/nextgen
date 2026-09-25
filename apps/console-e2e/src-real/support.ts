@@ -9,17 +9,26 @@ import { expect } from "@zitadel/testing/playwright";
  * mean the suites were signing in differently while looking identical.
  */
 
+/** The instance handle fields the helpers here need. */
+type ProjectHandle = { baseUrl: string; projectId: string; projectSecret: string };
+
 /**
- * Completes the console's login screen (Console ADR 0003) with a seeded
- * user: the default-login flow's identifier step ("Email" + "Continue"),
+ * Grants a seeded user admin on the instance's project, then completes the
+ * console's login screen (Console ADR 0003) with it: the default-login flow's
+ * identifier step ("Email" + "Continue"),
  * then the password step ("Password" + "Sign in"). The widget exchanges the
  * handoff for the `__nextgen_session` cookie and performs a full-document
  * navigation away from /login.
  */
 export async function signIn(
   page: Page,
-  user: { email: string; password: string },
+  handle: ProjectHandle,
+  user: { id: string; email: string; password: string },
 ): Promise<void> {
+  // The console authenticates with the session cookie alone (#1300): what a
+  // person sees is what their grants allow, so every signed-in test user is
+  // made an admin of the instance's project first.
+  await grantProjectAdmin(handle, user.id);
   await page.goto("/login");
   await page.getByLabel("Email").fill(user.email);
   await page.getByRole("button", { name: "Continue", exact: true }).click();
@@ -49,10 +58,7 @@ export async function signIn(
  * Written with the boot-captured project secret from the test process, never
  * from the page: the browser must not see it (see the credential-leak spec).
  */
-export async function grantProjectAdmin(
-  handle: { baseUrl: string; projectId: string; projectSecret: string },
-  userId: string,
-): Promise<void> {
+export async function grantProjectAdmin(handle: ProjectHandle, userId: string): Promise<void> {
   const query = new URLSearchParams({ project_id: handle.projectId });
   const response = await fetch(`${handle.baseUrl}/grants?${query.toString()}`, {
     method: "POST",

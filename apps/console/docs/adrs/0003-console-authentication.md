@@ -121,6 +121,12 @@ fails those requests closed. No production `/api` shim or secret injection is
 planned. Once ADR 053 lands, the dev proxy drops the secret; the Console client
 does not change.
 
+> **Amendment (2026-09-25, #1300):** the bridge is gone. The management
+> operations the Console uses accept the session cookie and authorize it through
+> the signed-in person's grants on the target project, and the Vite dev proxy no
+> longer injects a project secret — it forwards requests as-is. Dev and the
+> embedded build take the same credential path.
+
 ### 5. Recorded caveats
 
 - **Dark-only widget.** The widget's surface CSS still uses the legacy

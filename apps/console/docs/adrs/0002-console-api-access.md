@@ -77,6 +77,12 @@ The Vite development proxy may temporarily inject a project-secret bearer
 until the session-derived management path is implemented. That is a
 development compatibility mechanism, not the embedded deployment contract.
 
+> **Amendment (2026-09-25, #1300):** the bridge is gone. The management
+> operations the Console uses accept the session cookie and authorize it through
+> the signed-in person's grants on the target project, and the Vite dev proxy no
+> longer injects a project secret — it forwards requests as-is. Dev and the
+> embedded build take the same credential path.
+
 The diagram below is the shape as revised in 2026-08-12 (see the note under
 it): one rule, two same-origin paths, and no browser-held secret on either.
 
