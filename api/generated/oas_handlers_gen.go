@@ -7534,7 +7534,8 @@ func (s *Server) handleGetReleaseByIdRequest(args [1]string, argsEscaped bool, w
 // default schema carries the same `$id` in every project). A Console
 // session that manages more than one project names the project with
 // `project_id`; without it, the ID is resolved in the credential's own
-// project when it is ambiguous.
+// project when it is ambiguous. A project secret always resolves in its
+// own project and ignores `project_id`.
 //
 // GET /schemas/{id}
 func (s *Server) handleGetSchemaByIdRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {

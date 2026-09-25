@@ -185,13 +185,13 @@ type resourceAccessStmts interface {
 // RSI miss on read/write → resource 404; on delete → errResourceGone for
 // operators (handlers map to 204), else readMiss. Returns project_id for DAL calls.
 func (h *Handler) requireResourceAccess(ctx context.Context, resourceID string, res resourceAccess, op accessOp) (projectID string, err error) {
-	return h.requireResourceAccessIn(ctx, "", resourceID, res, op)
+	return h.requireResourceAccessInProject(ctx, "", resourceID, res, op)
 }
 
-// requireResourceAccessIn is requireResourceAccess for ids that are unique only
+// requireResourceAccessInProject is requireResourceAccess for ids that are unique only
 // within a project (schemas): projectHint, when set, names the project to
 // resolve the id in instead of the credential's own.
-func (h *Handler) requireResourceAccessIn(ctx context.Context, projectHint, resourceID string, res resourceAccess, op accessOp) (projectID string, err error) {
+func (h *Handler) requireResourceAccessInProject(ctx context.Context, projectHint, resourceID string, res resourceAccess, op accessOp) (projectID string, err error) {
 	if h == nil || h.pool == nil {
 		return "", domain.ErrInternal(errors.New("authz statements not configured"))
 	}
@@ -203,11 +203,16 @@ func (h *Handler) requireResourceAccessIn(ctx context.Context, projectHint, reso
 // session) is looked up across projects, because it manages projects other
 // than the one it signed in to (#1300 §3) — the Check that follows runs
 // against the resource's own project, so being found is not being allowed.
-// projectHint, when set, names the project to search instead. An id that is
-// unique only per project (a schema's `$id`) and matches in several projects
-// resolves in the session's own project, or not at all.
+// projectHint, when set, names the project a session searches instead; a
+// project secret ignores it and stays in its own project, so its containment
+// never rests on the Check alone. An id that is unique only per project (a
+// schema's `$id`) and matches in several projects resolves in the session's
+// own project, or not at all.
 func lookupResourceScope(ctx context.Context, stmts resourceAccessStmts, projectHint, resourceID string, res resourceAccess) (*domain.ResourceScope, error) {
 	cred, _ := GetScopeContext(ctx)
+	if cred.PrincipalType != domain.AuthzPrincipalTypeUser {
+		projectHint = ""
+	}
 	if res.kind != "" && projectHint == "" && cred.PrincipalType == domain.AuthzPrincipalTypeUser {
 		scope, err := stmts.GetResourceScope(ctx, resourceID)
 		if !errors.Is(err, new(database.MultipleRowsFoundError)) {
