@@ -1,6 +1,6 @@
 import { ApiError } from "@zitadel/api/runtime/fetch";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { Box, Loader2, MoreVertical, Plus, Search, User } from "lucide-react";
+import { Box, Info, Loader2, MoreVertical, Plus, Search, User } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { AddUserSheet } from "@/components/add-user-sheet";
@@ -12,6 +12,7 @@ import {
   RESOURCE_TABLE_WRAP,
   ResourceHeadCell,
 } from "@/components/resource-list";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -32,6 +33,7 @@ import {
 import { StatusBadge } from "@/components/status-badge";
 
 import { api } from "../../../api/zitadel";
+import { projectScopeDeps } from "../../../lib/project-scope";
 import { displayValue, field } from "../../../lib/record";
 import { type SchemaField, type UserSchema, schemaColumns } from "../../../lib/schema";
 import { userAttributes, userIdentifier, userIdentity } from "../../../lib/user";
@@ -40,10 +42,26 @@ export const Route = createFileRoute("/_authed/users/")({
   // `User`, not `Users`: the sidebar frame's row carries `lucide/User`, the
   // single-person glyph. The plural two-person one reads as a group.
   // Order 3: Teams sits at 2.
-  staticData: { nav: { label: "Users", order: 3, icon: User } },
-  loader: async () => {
+  staticData: { scope: "project", nav: { label: "Users", order: 3, icon: User } },
+  loaderDeps: projectScopeDeps,
+  loader: async ({ context, deps }) => {
+    // `POST /users/query` names no project: the server answers for the
+    // caller's own — the session's project, or behind the dev proxy the
+    // project secret's, which is the same one. For any other selected project
+    // the page would be that project's neighbour's users under this project's
+    // name, so the screen says it cannot list them instead of reading.
+    if (deps.project !== context.session.project_id) {
+      return {
+        listable: false as const,
+        users: [],
+        teamsExpanded: false,
+        nextPageToken: undefined,
+        columns: [],
+      };
+    }
     const page = await fetchUsers();
     return {
+      listable: true as const,
       users: page.users,
       teamsExpanded: page.teamsExpanded,
       nextPageToken: page.next_page_token ?? undefined,
@@ -268,6 +286,26 @@ function UsersScreen() {
       ].some((value) => value.toLowerCase().includes(needle));
     });
   }, [users, query, columns, teamsExpanded]);
+
+  if (!loaded.listable) {
+    return (
+      <div className={`${RESOURCE_PAGE} pt-4`}>
+        <h1 className={`${RESOURCE_HEADER} text-foreground font-serif text-2xl leading-6 tracking-tight`}>
+          Users
+        </h1>
+        <div className={`${RESOURCE_HEADER} mt-6`}>
+          <Alert>
+            <Info aria-hidden />
+            <AlertTitle>Users of this project can't be listed yet</AlertTitle>
+            <AlertDescription>
+              The users list only reads the project you signed in to. Listing another project's
+              users needs server support that has not landed.
+            </AlertDescription>
+          </Alert>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`${RESOURCE_PAGE} pt-4`}>

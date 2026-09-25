@@ -14,6 +14,7 @@ import { type UserSchema, schemaAuthMethods, schemaDisplayName } from "@/lib/sch
 import { api } from "../../../api/zitadel";
 
 export const Route = createFileRoute("/_authed/schemas/$schemaId")({
+  staticData: { scope: "project" },
   loader: ({ params }) =>
     api.getSchemaById(params.schemaId).then((body) => body.schema as UserSchema),
   component: SchemaDetail,

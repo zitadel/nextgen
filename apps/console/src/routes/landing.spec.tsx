@@ -30,6 +30,16 @@ async function renderAt(path: string) {
   return router;
 }
 
+function project(id: string, name: string) {
+  return {
+    id,
+    name,
+    status: "active",
+    created_at: "2026-01-01T00:00:00Z",
+    updated_at: "2026-01-01T00:00:00Z",
+  };
+}
+
 /**
  * `/` has no screen of its own and lands on the first one behind it; `/settings`
  * is a view with nothing built in it yet and says so.
@@ -39,14 +49,56 @@ async function renderAt(path: string) {
  * console" all arrive, and `/settings` is where the account dropdown goes.
  */
 describe("landing routes", () => {
-  it("lands on Teams from the console root", async () => {
+  // `/` lands on Teams, a project-scoped screen, so with no `?project=` the
+  // `_authed` guard picks one (`resolveDefaultProjectScope`).
+  it("lands on Teams in the only project the person can act on", async () => {
+    const teamQueries: string[] = [];
     server.use(
-      http.post("http://localhost/api/teams/query", () => HttpResponse.json({ teams: [] })),
+      http.get("http://localhost/api/users/me/projects", () =>
+        HttpResponse.json({ projects: [project("proj_1", "Acme")] }),
+      ),
+      http.post("http://localhost/api/teams/query", ({ request }) => {
+        teamQueries.push(new URL(request.url).searchParams.get("project_id") ?? "");
+        return HttpResponse.json({ teams: [] });
+      }),
     );
     const router = await renderAt("/");
 
     await waitFor(() => expect(router.state.location.pathname).toBe("/teams"));
+    expect(router.state.location.search).toMatchObject({ project: "proj_1" });
     expect(await screen.findByRole("heading", { name: "Teams" })).toBeInTheDocument();
+    expect(teamQueries).toEqual(["proj_1"]);
+  });
+
+  it("lands on Projects when there are several to choose from", async () => {
+    server.use(
+      http.get("http://localhost/api/users/me/projects", () =>
+        HttpResponse.json({ projects: [project("proj_1", "Acme"), project("proj_2", "Globex")] }),
+      ),
+    );
+    const router = await renderAt("/");
+
+    await waitFor(() => expect(router.state.location.pathname).toBe("/projects"));
+    expect(router.state.location.search).not.toHaveProperty("project");
+  });
+
+  it("takes the pinned dev project without asking", async () => {
+    vi.stubEnv("VITE_CONSOLE_PROJECT_ID", "proj_pinned");
+    // One other project on offer: without the pin it would be the landing.
+    server.use(
+      http.get("http://localhost/api/users/me/projects", () =>
+        HttpResponse.json({ projects: [project("proj_1", "Acme")] }),
+      ),
+      http.post("http://localhost/api/teams/query", () => HttpResponse.json({ teams: [] })),
+    );
+    try {
+      const router = await renderAt("/");
+
+      await waitFor(() => expect(router.state.location.pathname).toBe("/teams"));
+      expect(router.state.location.search).toMatchObject({ project: "proj_pinned" });
+    } finally {
+      vi.stubEnv("VITE_CONSOLE_PROJECT_ID", "");
+    }
   });
 
   it("shows the empty settings view from settings", async () => {

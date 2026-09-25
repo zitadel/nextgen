@@ -82,9 +82,11 @@ describe("projects screen", () => {
     await renderProjects();
 
     const table = within(await screen.findByRole("table"));
+    // A row opens the project — selects it and lands on its first screen —
+    // rather than a detail page, as the switcher's rows do.
     expect(table.getByRole("link", { name: "Granted to me" })).toHaveAttribute(
       "href",
-      "/projects/proj_theirs",
+      "/?project=proj_theirs",
     );
   });
 
@@ -103,7 +105,7 @@ describe("projects screen", () => {
     expect(pinned).toBe(0);
   });
 
-  it("offers View project from the row menu", async () => {
+  it("offers the project's settings from the row menu", async () => {
     server.use(
       http.get(PROJECTS_URL, () =>
         HttpResponse.json({
@@ -116,8 +118,27 @@ describe("projects screen", () => {
     await renderProjects();
 
     await userEvent.click(await screen.findByRole("button", { name: "Actions for River" }));
-    const item = await screen.findByRole("menuitem", { name: "View project" });
-    expect(item).toHaveAttribute("href", "/projects/proj_1");
+    const item = await screen.findByRole("menuitem", { name: "Project settings" });
+    expect(item).toHaveAttribute("href", "/project?project=proj_1");
+  });
+
+  it("asks for a selection while none is made", async () => {
+    // The sidebar is empty until a project is selected, so this page is the
+    // one that explains what to do.
+    server.use(
+      http.get(PROJECTS_URL, () =>
+        HttpResponse.json({
+          projects: [
+            { id: "proj_1", name: "River", created_at: "2026-07-08T09:00:00Z", updated_at: "2026-07-08T09:00:00Z" },
+          ],
+        }),
+      ),
+    );
+    await renderProjects();
+
+    expect(
+      await screen.findByText("Select a project to manage its teams, users and login flows."),
+    ).toBeInTheDocument();
   });
 
   it("says so when there are no projects", async () => {

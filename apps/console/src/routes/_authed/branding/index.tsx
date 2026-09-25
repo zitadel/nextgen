@@ -20,18 +20,19 @@ import type { BrandingRevision } from "@/lib/branding-palette";
 import { flowDisplayName } from "@/lib/flow-definition";
 
 import { api } from "../../../api/zitadel";
-import { getConsoleProjectId } from "../../../runtime/runtime";
+import { projectScopeDeps, requireProjectScope } from "../../../lib/project-scope";
 
 export const Route = createFileRoute("/_authed/branding/")({
   // Nested under Login flows, as in the design: branding is how those flows
   // render, not a resource of its own. Sub-rows carry no icon.
-  staticData: { nav: { label: "Branding", order: 1, parent: "/flow-definitions" } },
-  loader: async () => {
+  staticData: { scope: "project", nav: { label: "Branding", order: 1, parent: "/flow-definitions" } },
+  loaderDeps: projectScopeDeps,
+  loader: async ({ deps }) => {
     // Newest first, so the head of the list is what visitors see today. The
     // list carries ids only, so the configuration itself is a second call. A
     // project that has never published branding has no revision, and the
     // panel then shows the maintained defaults.
-    const projectId = getConsoleProjectId();
+    const projectId = requireProjectScope(deps.project);
     const [revisions, flows] = await Promise.all([
       api.listBranding({ project_id: projectId }),
       // One row per flow rather than per revision (#1246), as the Login

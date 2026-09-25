@@ -1,6 +1,7 @@
 import type { AnyRoute } from "@tanstack/react-router";
 import { useRouter } from "@tanstack/react-router";
 
+import { useProjectScope } from "../../lib/project-scope";
 import { DESIGN_ONLY_NAV, type NavMeta, type NavView } from "../../nav";
 
 export interface NavItem {
@@ -34,9 +35,15 @@ export interface SubNavItem extends NavItem {
  * child whose parent is not in the list falls back to the top level rather than
  * disappearing: an orphan is a routing mistake, and hiding the screen entirely
  * is the worse failure.
+ *
+ * Screens declaring `staticData.scope: "project"` are listed only while a
+ * project is selected (`src/lib/project-scope.ts`): without one they have
+ * nothing to show, and the Projects screen is where the selection is made.
+ * Links need not carry the selection — the `_authed` layout retains it.
  */
 export function useNavItems(view: NavView = "portal"): NavItem[] {
   const router = useRouter();
+  const projectScope = useProjectScope();
 
   const routed = (Object.values(router.routesById) as AnyRoute[])
     .map((route): NavItem | undefined => {
@@ -44,6 +51,7 @@ export function useNavItems(view: NavView = "portal"): NavItem[] {
       // `view` defaults to the portal list so the existing screens, none of
       // which declare one, keep their place.
       if (!nav || (nav.view ?? "portal") !== view) return undefined;
+      if (route.options.staticData?.scope === "project" && !projectScope) return undefined;
       const fullPath = route.fullPath;
       const to = fullPath === "/" ? "/" : fullPath.replace(/\/$/, "");
       return { to, nav, children: [] };

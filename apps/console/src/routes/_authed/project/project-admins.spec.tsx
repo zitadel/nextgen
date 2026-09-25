@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { scopedPath } from "@/lib/project-scope.fixture";
 
 // Safe as a static import where `@/auth/session` is not: the fixture's only
 // dependency on it is a type, which the transform erases.
@@ -50,7 +51,7 @@ async function renderProject(projectId = PROJECT_ID) {
     import("../../../router"),
   ]);
   const router = createAppRouter({
-    history: createMemoryHistory({ initialEntries: [`/projects/${projectId}`] }),
+    history: createMemoryHistory({ initialEntries: [scopedPath("/project", projectId)] }),
   });
   render(<RouterProvider router={router} />);
   return router;

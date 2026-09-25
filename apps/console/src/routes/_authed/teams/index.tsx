@@ -34,7 +34,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { api } from "../../../api/zitadel";
 import { formatDate } from "../../../lib/date";
-import { getConsoleProjectId } from "../../../runtime/runtime";
+import { requireProjectScope, useRequiredProjectScope } from "../../../lib/project-scope";
 
 /**
  * The two states `team-status` defines. The tabs filter on exactly these, so the
@@ -47,7 +47,7 @@ type TeamStatus = (typeof STATUSES)[number];
 type TeamsSearch = { status: TeamStatus; q?: string };
 
 export const Route = createFileRoute("/_authed/teams/")({
-  staticData: { nav: { label: "Teams", order: 2, icon: Box } },
+  staticData: { scope: "project", nav: { label: "Teams", order: 2, icon: Box } },
   // The tab and the search term live in the URL: both are server-side filters,
   // so they belong to the request the loader makes rather than to component
   // state. A filtered list is then linkable, survives a reload, and moves with
@@ -64,7 +64,7 @@ export const Route = createFileRoute("/_authed/teams/")({
   loader: async ({ deps }) => {
     const page = await api.queryTeams(
       { limit: PAGE_SIZE, filter: teamFilter(deps) },
-      { project_id: getConsoleProjectId() },
+      { project_id: requireProjectScope(deps.project) },
     );
     return { teams: page.teams, nextPageToken: page.next_page_token ?? undefined };
   },
@@ -107,6 +107,7 @@ function teamFilter({ status, q }: TeamsSearch): TeamFilter {
 }
 
 function TeamsScreen() {
+  const projectId = useRequiredProjectScope();
   const loaded = Route.useLoaderData();
   const search = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
@@ -144,7 +145,7 @@ function TeamsScreen() {
         // question, and asking a different one with it is not a narrower list
         // but a meaningless one.
         { limit: PAGE_SIZE, page_token: nextPageToken, filter: teamFilter(search) },
-        { project_id: getConsoleProjectId() },
+        { project_id: projectId },
       );
       // A page that lands after the list was invalidated answers a question about
       // the previous set; appending it would re-add rows the server may no longer

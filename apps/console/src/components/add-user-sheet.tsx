@@ -40,7 +40,7 @@ import {
   schemaFieldSummary,
   schemaFields,
 } from "../lib/schema";
-import { getConsoleProjectId } from "../runtime/runtime";
+import { useRequiredProjectScope } from "../lib/project-scope";
 
 /** A schema plus the id needed to reference it in the created user's `schema`. */
 interface SchemaOption {
@@ -110,6 +110,7 @@ function AddUserForm({
   onCreated: () => void | Promise<void>;
   onClose: () => void;
 }) {
+  const projectId = useRequiredProjectScope();
   const [schemas, setSchemas] = useState<SchemaOption[] | undefined>(undefined);
   const [schemaId, setSchemaId] = useState<string | undefined>(undefined);
   const [values, setValues] = useState<Record<string, string>>({});
@@ -123,7 +124,6 @@ function AddUserForm({
     let cancelled = false;
     void (async () => {
       try {
-        const projectId = getConsoleProjectId();
         // One option per schema, not per edit: a superseded revision is not
         // something a new user should be created against, and offering the
         // same schema once per revision reads as duplicates. The picker needs
@@ -173,7 +173,7 @@ function AddUserForm({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [projectId]);
 
   const selected = schemas?.find((option) => option.id === schemaId);
   const fields = selected ? schemaFields(selected.schema) : [];
@@ -217,7 +217,7 @@ function AddUserForm({
       }
       await api.createUser(
         { schema: selected.id, attributes },
-        { project_id: getConsoleProjectId() },
+        { project_id: projectId },
       );
       await onCreated();
       onClose();

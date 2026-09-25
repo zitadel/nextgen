@@ -53,7 +53,7 @@ test("opens a team from the list and renames it", async ({ page, seed }) => {
   await drawer.getByRole("button", { name: "Add team", exact: true }).click();
 
   await page.getByRole("link", { name, exact: true }).click();
-  await expect(page).toHaveURL(/\/teams\/team_[A-Z0-9]+$/);
+  await expect(page).toHaveURL(/\/teams\/team_[A-Z0-9]+\?project=/);
   await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
 
   const field = page.getByLabel("Tenant name");

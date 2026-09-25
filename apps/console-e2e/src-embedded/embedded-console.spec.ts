@@ -16,7 +16,7 @@ import { expect, test } from "@zitadel/testing/playwright";
  * secret and can therefore exercise the management calls this lane cannot.
  */
 
-test("signs in end to end against the embedded API", async ({ page, seed }) => {
+test("signs in end to end against the embedded API", async ({ page, seed, zitadel }) => {
   const user = await seed.user();
 
   await page.goto("/ui/console/");
@@ -48,8 +48,13 @@ test("signs in end to end against the embedded API", async ({ page, seed }) => {
   // 200. Four more calls that only resolve if the base is right.
   await page.waitForURL((url) => !url.pathname.endsWith("/login"));
   // `/` has no screen of its own and lands on Teams, so the redirect having run
-  // is what proves the console booted.
-  await expect(page).toHaveURL(/\/ui\/console\/teams\?status=active$/);
+  // is what proves the console booted. The seeded user holds no grant, so no
+  // project is listed and the selection falls back to the one the console
+  // signed into (`resolveDefaultProjectScope`).
+  await expect(page).toHaveURL(
+    new RegExp(`/ui/console/teams\\?.*project=${zitadel.handle.projectId}`),
+  );
+  expect(new URL(page.url()).searchParams.get("status")).toBe("active");
   // #1227 taught queryTeams to accept the session cookie, so the list no
   // longer fails closed -- but this lane's seeded user has no team and no
   // grant, so it has no foothold in the console project and the gate answers
@@ -66,9 +71,13 @@ test("signs in end to end against the embedded API", async ({ page, seed }) => {
   // /users/me/projects` is authenticated by the session cookie alone (#1237).
   // It used to ask `POST /projects/query`, which only accepts a project secret,
   // and stayed a skeleton for good on this lane. A seeded user holds no grant,
-  // so the honest answer is the empty state — what matters is that it is an
-  // answer.
-  await expect(page.getByRole("button", { name: "Switch project" })).toHaveText("No projects");
+  // so nothing is listed and the pill names the fallback selection — by id,
+  // since reading the project's name needs the same foothold. What matters is
+  // that it is an answer.
+  // `toContainText`: the pill carries its label twice, once per breakpoint.
+  await expect(page.getByRole("button", { name: "Switch project" })).toContainText(
+    zitadel.handle.projectId,
+  );
 });
 
 test("targets the origin root, never an /api prefix", async ({ page }) => {
