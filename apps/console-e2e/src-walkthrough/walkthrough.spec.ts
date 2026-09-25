@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 
@@ -27,8 +28,39 @@ test.afterEach(async ({ page }, testInfo) => {
   if (!video) return;
   const videoDir = videoDirFor(testInfo);
   mkdirSync(videoDir, { recursive: true });
-  await video.saveAs(join(videoDir, `${label}--${slugify(testInfo.title)}.webm`));
+  const webm = join(videoDir, `${label}--${slugify(testInfo.title)}.webm`);
+  await video.saveAs(webm);
+  toMp4(webm);
 });
+
+/**
+ * Playwright records VP8 WebM, which GitHub does not play inline in every
+ * browser (Safari). When ffmpeg is on PATH, write an H.264 MP4 beside it —
+ * the file to drag into a PR description. Without ffmpeg the WebM stays the
+ * only output.
+ */
+function toMp4(webm: string): void {
+  const mp4 = webm.replace(/\.webm$/, ".mp4");
+  const result = spawnSync(
+    "ffmpeg",
+    [
+      "-y",
+      "-loglevel",
+      "error",
+      "-i",
+      webm,
+      "-c:v",
+      "libx264",
+      "-pix_fmt",
+      "yuv420p",
+      "-movflags",
+      "+faststart",
+      mp4,
+    ],
+    { stdio: "inherit" },
+  );
+  if (result.error) console.log("[walkthrough] ffmpeg not found; keeping the WebM only");
+}
 
 test("scenario A: single project, session cookie only", async ({ page, zitadel, seed }) => {
   const operator = await seed.user();
@@ -133,7 +165,10 @@ async function step(page: Page, title: string, body: () => Promise<void>): Promi
 let stepCount = 0;
 
 function slugify(text: string): string {
-  return text.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase();
+  return text
+    .replace(/[^a-z0-9]+/gi, "-")
+    .replace(/^-|-$/g, "")
+    .toLowerCase();
 }
 
 /** Next to the config, i.e. apps/console-e2e/walkthrough-videos/. */

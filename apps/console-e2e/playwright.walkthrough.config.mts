@@ -12,7 +12,8 @@ import { withZitadel } from "@zitadel/testing/playwright";
  * verdict. The specs visit every management screen at a readable pace and
  * never fail on what they find: an error state on screen *is* the result a
  * reviewer wants to see. Videos land in `walkthrough-videos/`, named by
- * `WALKTHROUGH_LABEL` so a PR can show a before and an after.
+ * `WALKTHROUGH_LABEL` so a PR can show a before and an after — as WebM, plus
+ * an H.264 MP4 (the one GitHub plays inline) when ffmpeg is on PATH.
  */
 const appDir = import.meta.dirname;
 const workspaceRoot = join(appDir, "../..");
