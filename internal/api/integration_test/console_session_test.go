@@ -3,6 +3,7 @@
 package integration_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"slices"
@@ -183,6 +184,76 @@ func TestConsoleManagementSessionWithoutAccess(t *testing.T) {
 		require.NoError(t, err)
 		require.IsType(t, &api.GetUserByIDNotFound{}, resp, helpers.MustMarshal(t, resp))
 		assert.Equal(t, api.ErrorCode("user.not_found"), resp.(*api.GetUserByIDNotFound).Code)
+	})
+
+	// The by-id operations resolve the path id before authorizing, so each is
+	// pinned too: a foreign resource must stay the not-found shape.
+	foreignUserID, foreignTeamID := harness.CreateUserOwnedByTeam(t, other.ID)
+	otherSecret, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, otherSecret, other)
+
+	t.Run("cannot delete another project's user", func(t *testing.T) {
+		resp, err := session.DeleteUserByID(t.Context(), api.DeleteUserByIDParams{UserID: api.UserID(foreignUserID)})
+		require.NoError(t, err)
+		require.IsType(t, &api.DeleteUserByIDNotFound{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, api.ErrorCode("user.not_found"), resp.(*api.DeleteUserByIDNotFound).Code)
+	})
+
+	t.Run("cannot update another project's team", func(t *testing.T) {
+		resp, err := session.UpdateTeam(t.Context(), &api.UpdateTeamRequest{Name: api.NewOptString(helpers.TeamName())},
+			api.UpdateTeamParams{TeamID: api.TeamID(foreignTeamID)})
+		require.NoError(t, err)
+		require.IsType(t, &api.UpdateTeamNotFound{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, api.ErrorCode("team.team_not_found"), resp.(*api.UpdateTeamNotFound).Code)
+	})
+
+	t.Run("cannot read another project's schema", func(t *testing.T) {
+		// A managed sch_* id, unique to the other project: the seeded default
+		// carries the same $id in every project, which is a different question.
+		schemaJSON := []byte(harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema)
+		var schemaObj map[string]any
+		require.NoError(t, json.Unmarshal(schemaJSON, &schemaObj))
+		delete(schemaObj, "$id")
+		schemaJSON, err := json.Marshal(schemaObj)
+		require.NoError(t, err)
+		schemaID := harness.CreateUserSchema(t, other, string(schemaJSON))
+
+		resp, err := session.GetSchemaById(t.Context(), api.GetSchemaByIdParams{ID: schemaID})
+		require.NoError(t, err)
+		require.IsType(t, &api.GetSchemaByIdErrorResponseStatusCode{}, resp, helpers.MustMarshal(t, resp))
+		denied := resp.(*api.GetSchemaByIdErrorResponseStatusCode)
+		assert.Equal(t, http.StatusNotFound, denied.StatusCode)
+		assert.True(t, denied.Response.IsSchNotFound(), helpers.MustMarshal(t, resp))
+	})
+
+	t.Run("cannot read another project's flow definition", func(t *testing.T) {
+		listed, err := otherSecret.ListFlowDefinitions(t.Context(), api.ListFlowDefinitionsParams{ProjectID: otherID})
+		require.NoError(t, err)
+		flows, ok := listed.(*api.FlowDefinitionListResponse)
+		require.True(t, ok, helpers.MustMarshal(t, listed))
+		require.NotEmpty(t, flows.FlowDefinitions)
+
+		resp, err := session.GetFlowDefinition(t.Context(), api.GetFlowDefinitionParams{ID: flows.FlowDefinitions[0].ID})
+		require.NoError(t, err)
+		require.IsType(t, &api.GetFlowDefinitionErrorResponseStatusCode{}, resp, helpers.MustMarshal(t, resp))
+		denied := resp.(*api.GetFlowDefinitionErrorResponseStatusCode)
+		assert.Equal(t, http.StatusNotFound, denied.StatusCode)
+		assert.True(t, denied.Response.IsFlowdefNotFound(), helpers.MustMarshal(t, resp))
+	})
+
+	t.Run("cannot read another project's branding", func(t *testing.T) {
+		created, err := otherSecret.CreateBranding(t.Context(), &api.Branding{
+			Layout: api.NewOptBrandingLayout(api.BrandingLayoutSplit),
+		}, api.CreateBrandingParams{ProjectID: otherID})
+		require.NoError(t, err)
+		revision, ok := created.(*api.BrandingRevisionResponse)
+		require.True(t, ok, helpers.MustMarshal(t, created))
+
+		resp, err := session.GetBrandingById(t.Context(), api.GetBrandingByIdParams{ID: revision.ID})
+		require.NoError(t, err)
+		require.IsType(t, &api.ErrorDetails{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, api.ErrorCode("brnd.not_found"), resp.(*api.ErrorDetails).Code)
 	})
 }
 

@@ -43,3 +43,7 @@ local-only. The `@zitadel/testing` interaction is documented in
   Screen behavior belongs in `apps/console` Vitest specs
   (`src/routes/**/*.spec.tsx`); component behavior in the component packages —
   same layering rule as root `AGENTS.md` Testing Layers.
+- **Screen recordings are not tests**: `record-screens` (`src-recording/`)
+  walks every screen to produce videos for PR descriptions. It asserts
+  nothing, is opt-in and never runs in CI, so the placement rule above does
+  not apply to it — and nothing that must be verified belongs there.
