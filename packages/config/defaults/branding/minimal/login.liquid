@@ -65,6 +65,9 @@
           {% assign alert_body = err.text_key | alertBody %}
           <zl-alert data-zl-step-error{% if alert_heading != "" %} heading="{{ alert_heading | t }}"{% endif %}>
             {% if alert_body != "" %}{{ alert_body | t }}{% elsif err.text_key %}{{ err.text_key | t }}{% else %}{{ err.message }}{% endif %}
+            {% comment %} A provider error carries its own words and a link; show both when present. {% endcomment %}
+            {%- if err.detail %}<span class="zl-alert-detail" part="detail">{{ err.detail }}</span>{% endif -%}
+            {%- if err.uri %}<a class="zl-alert-link" part="link" href="{{ err.uri }}" target="_blank" rel="noopener noreferrer">{{ "error.more_info" | t }}</a>{% endif -%}
           </zl-alert>
         {% endif %}
       {% endfor %}
