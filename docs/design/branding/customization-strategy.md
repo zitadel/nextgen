@@ -229,14 +229,14 @@ own the CLI and structure work; #936 owns the first visual loop.
 | Surrounding application | Customer-owned | Still customer-owned. Not edited here |
 | Translations | Built-in dictionaries; optional element `locales` | **Different setting** ([#1038](https://github.com/zitadel/nextgen/issues/1038)). Not this iteration |
 
-### Follow-up — stop setup from applying a template
+### Done — setup no longer applies a template
 
 [#1039](https://github.com/zitadel/nextgen/issues/1039) under #678. Not part of #936 (onboarding is out of scope there).
 
-| Surface | Today | Follow-up |
+| Surface | Before #1039 | Now |
 | --- | --- | --- |
-| `zitadel setup --design` / wizard | Writes `.zitadel/branding/login.liquid` and publishes branding revision 1. Generated auth page is still a bare `<zitadel-login>` | Setup embeds the maintained component only. Writes **no** Liquid, publishes **no** branding revision. Optional look pick, if kept, writes **app files** only |
-| Embedder who wants a left pane | Ejects Liquid and edits marketing copy inside the sanitiser | Edits their application |
+| `zitadel setup --design` / wizard | Wrote `.zitadel/branding/login.liquid` and published branding revision 1. Generated auth page was still a bare `<zitadel-login>` | Setup embeds the maintained component only. Writes **no** Liquid, publishes **no** branding revision. The wizard has no look question; `--design` fails with a hint pointing at app-side theming and `branding eject` |
+| Embedder who wants a left pane | Ejected Liquid and edited marketing copy inside the sanitiser | Edits their application. `branding eject --design split\|split-right\|hero` is refused with the same pointer |
 
 ### Later — widget structure
 
@@ -540,9 +540,11 @@ flows become release-pinned. This strategy does not change that boundary.
 ## What the shipped designs really are
 
 ADR 040 shipped five named Liquid files under
-`packages/config/defaults/branding/*/login.liquid`. `setup --design` and
-`branding eject --design` copy one of them into `.zitadel/branding/` and
-publish it as branding revision 1. The generated auth page is still just
+`packages/config/defaults/branding/*/login.liquid` (the audit below
+predates #1039, which kept only `centered` and `minimal`). `setup --design`
+copied one of them into `.zitadel/branding/` and published it as branding
+revision 1; `branding eject --design` copies one locally for the next
+`apply` to publish. The generated auth page is still just
 `<zitadel-login>` — the "design" never becomes a wrapper. An audit of
 those files:
 

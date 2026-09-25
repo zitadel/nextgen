@@ -152,14 +152,14 @@ Widget-level sizing belongs to the **embedding page**, not the template:
 `<zitadel-login>` defaults to `variant="widget"` (content-sized, no page
 chrome) and dedicated login routes set `variant="page"` for the full-page
 shape. `--zl-page-min-height` remains the fine-grained height override in
-both modes, and the split-family collapse responds to the widget's own width
-(container queries), not the viewport — see the embedding section in the
-`@zitadel/components` README.
+both modes, and the legacy split chrome's collapse responds to the widget's
+own width (container queries), not the viewport — see the embedding section in
+the `@zitadel/components` README.
 
 ## Authoring workflow (eject → edit → plan → apply)
 
 ```
-zitadel branding eject --design split   # writes .zitadel/branding/{branding.json, login.liquid}
+zitadel branding eject --design minimal # writes .zitadel/branding/{branding.json, login.liquid}
 $EDITOR .zitadel/branding/login.liquid  # real Liquid, not JSON-escaped strings
 zitadel plan                            # authoritative validation + diff (revise on edit)
 zitadel apply                           # publishes an immutable branding revision

@@ -93,15 +93,30 @@ describe("branding eject", () => {
     expect(template).not.toContain("<zl-card");
   });
 
-  it("no longer offers page-layout designs (#1039)", async () => {
+  it("refuses page-layout designs with a pointer to the app (#1039)", async () => {
     // split, split-right and hero were page chrome around the default card;
     // that layout belongs in the embedding app, not the widget template.
     for (const design of ["split", "split-right", "hero"]) {
       const cwd = await makeProject();
       const res = await eject(cwd, "--design", design);
-      expect(res.exitCode, design).not.toBe(0);
+      expect(res.exitCode, design).toBe(3);
+      const json = parseJson(res.stdout) as { code: string; message: string; hint: string };
+      expect(json.code, design).toBe("E_VALIDATION");
+      expect(json.message, design).toContain(`The ${design} design was retired`);
+      expect(json.hint, design).toContain("<zitadel-login>");
+      expect(json.hint, design).toContain("centered, minimal");
       await expect(readFile(join(cwd, ".zitadel/branding/login.liquid"), "utf8")).rejects.toThrow();
     }
+  });
+
+  it("rejects an unknown design and lists the catalog", async () => {
+    const cwd = await makeProject();
+    const res = await eject(cwd, "--design", "nope");
+    expect(res.exitCode).toBe(3);
+    const json = parseJson(res.stdout) as { code: string; message: string; hint: string };
+    expect(json.code).toBe("E_VALIDATION");
+    expect(json.message).toContain('"nope"');
+    expect(json.hint).toBe("Pick one of: centered, minimal.");
   });
 
   it("refuses to overwrite existing files without --force", async () => {

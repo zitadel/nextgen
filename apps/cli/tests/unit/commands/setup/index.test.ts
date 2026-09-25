@@ -339,7 +339,7 @@ describe("setup --design removal (#1039)", () => {
     expect(res.stdout).not.toContain("--design");
   });
 
-  it("rejects --design at parse time, before any project is created", async () => {
+  it("rejects --design with a targeted hint, before any project is created", async () => {
     const cwd = await makeTempDir();
     const capture = await startCreateProjectCaptureServer();
 
@@ -355,7 +355,17 @@ describe("setup --design removal (#1039)", () => {
       "--json",
     ]);
 
-    expect(res.exitCode).not.toBe(0);
+    expect(res.exitCode).toBe(3);
+    const json = parseJson(res.stdout) as {
+      code: string;
+      message: string;
+      hint: string;
+      next_commands: string[];
+    };
+    expect(json.code).toBe("E_VALIDATION");
+    expect(json.message).toContain("no longer applies a login template");
+    expect(json.hint).toContain("--zl-*");
+    expect(json.next_commands.join("\n")).toContain("branding eject");
     expect(capture.requests).toEqual([]);
     expect(existsSync(join(cwd, ".zitadel"))).toBe(false);
   });

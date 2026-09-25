@@ -9,12 +9,17 @@
  * `minimal-template` is the exact markup `branding eject` puts into a user's
  * repo; the split/hero presets are the retired page-layout designs (#1039),
  * kept so revisions already published from them can still be reviewed. They
- * exist so the shipped
- * designs can be reviewed here instead of only inside a scaffolded app
- * (the alpha.18 feedback round found empty-brand-pane and badge-alignment
- * regressions nobody had ever rendered). Raw vite imports, not
- * `getDefaultBrandingConfig()` — that helper reads from disk and is
+ * exist so the shipped designs can be reviewed here instead of only inside a
+ * scaffolded app (the alpha.18 feedback round found empty-brand-pane and
+ * badge-alignment regressions nobody had ever rendered). Raw vite imports,
+ * not `getDefaultBrandingConfig()` — that helper reads from disk and is
  * Node-only.
+ *
+ * The legacy templates are read straight out of `@zitadel/components`' test
+ * fixtures (`src/orchestrator/__fixtures__/legacy-designs/`), the single copy
+ * the render specs also use. Moving or renaming those fixtures breaks these
+ * imports; delete the three presets together with the split/hero chrome in
+ * `layout-chrome.css` once published revisions no longer need it.
  */
 import type { Branding } from "@zitadel/components";
 

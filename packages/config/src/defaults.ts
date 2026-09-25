@@ -80,8 +80,13 @@ export type BrandingDesign = (typeof BRANDING_DESIGNS)[number];
 
 export const DEFAULT_BRANDING_DESIGN: BrandingDesign = "centered";
 
-/** Descriptor `layout` each design degrades to when its template is rejected. */
-const DESIGN_LAYOUTS: Record<BrandingDesign, "centered" | "split"> = {
+/**
+ * Descriptor `layout` each design degrades to when its template is rejected.
+ * Both shipped designs are widget structure and degrade to `centered`; the
+ * wire enum still carries `split` for revisions published from the retired
+ * page-layout designs (#1039), which no catalog entry produces any more.
+ */
+const DESIGN_LAYOUTS: Record<BrandingDesign, "centered"> = {
   centered: "centered",
   minimal: "centered",
 };
@@ -89,7 +94,7 @@ const DESIGN_LAYOUTS: Record<BrandingDesign, "centered" | "split"> = {
 export type DefaultBrandingConfig = {
   /** The `.zitadel/branding/branding.json` descriptor body (sans `$schema`). */
   branding: {
-    layout: "centered" | "split";
+    layout: "centered";
     /** A `$file` reference to the sibling template; the CLI inlines it before publishing. */
     liquid_template: { $file: string };
   };

@@ -16,6 +16,7 @@ import { consola } from "consola";
 
 import { createZitadelClient } from "../../lib/api-client";
 import { renderBoxActions, wrapForBox } from "../../lib/box";
+import { setupDesignRemovedError } from "../../lib/branding/designs";
 import {
   claimAction,
   claimBoxAction,
@@ -137,10 +138,18 @@ export default class Setup extends BaseCommand {
         "Use case for the scaffolded schema fields: who signs in to the app (default: minimal).",
       options: [...SETUP_USE_CASES],
     }),
+    // Removed in #1039 — setup no longer applies a login template. Kept
+    // hidden so scripts and agents still passing it get a targeted error
+    // pointing at `branding eject` instead of oclif's unknown-flag error.
+    design: Flags.string({ hidden: true }),
   };
 
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(Setup);
+    // Before toMeta and before anything touches the server or the disk.
+    if (flags.design !== undefined) {
+      throw setupDesignRemovedError(this.config.version);
+    }
     try {
       await this.toMeta(flags);
     } catch (error) {
