@@ -38,6 +38,7 @@ const page = (redirectUri, state) => `<!doctype html>
  input{width:100%;padding:11px 12px;font-size:15px;border:1px solid #cbd5e1;border-radius:9px;box-sizing:border-box}
  button{margin-top:20px;width:100%;padding:12px;font-size:15px;font-weight:600;border:0;
         border-radius:9px;background:#1d4ed8;color:#fff;cursor:pointer}
+ button.cancel{margin-top:10px;background:transparent;color:#64748b;border:1px solid #cbd5e1}
  .foot{margin-top:18px;font-size:12px;color:#94a3b8;text-align:center}
 </style></head>
 <body>
@@ -57,7 +58,10 @@ const page = (redirectUri, state) => `<!doctype html>
           style="width:auto;margin-right:8px">
    Email is verified
   </label>
-  <button type="submit" data-testid="mock-idp-continue">Continue</button>
+  <button type="submit" name="decision" value="allow" data-testid="mock-idp-continue">Continue</button>
+  <!-- Cancelling is the OAuth2 error response: the provider redirects back with
+       error=access_denied instead of a code (RFC 6749 §4.1.2.1). -->
+  <button type="submit" name="decision" value="deny" formnovalidate data-testid="mock-idp-cancel">Cancel</button>
   <p class="foot">Local mock provider &mdash; stands in for Google during testing</p>
  </form>
 </body></html>`;
@@ -86,6 +90,18 @@ const server = createServer(async (req, res) => {
       req.on("end", () => resolve(new URLSearchParams(raw)));
     });
     const target = new URL(body.get("redirect_uri"));
+    if (body.get("decision") === "deny") {
+      // The full authorization error response. error is required; the other
+      // two are optional but a real provider often sends them, so the mock
+      // does too — it lets us see whether they survive the round trip.
+      target.searchParams.set("error", "access_denied");
+      target.searchParams.set("error_description", "The user cancelled the sign-in.");
+      target.searchParams.set("error_uri", "https://localhost:9100/errors/access_denied");
+      target.searchParams.set("state", body.get("state") ?? "");
+      res.writeHead(302, { location: target.toString() });
+      res.end();
+      return;
+    }
     target.searchParams.set("code", issueCode(body.get("email"), body.get("verified") === "1"));
     target.searchParams.set("state", body.get("state") ?? "");
     res.writeHead(302, { location: target.toString() });
