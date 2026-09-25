@@ -7712,7 +7712,8 @@ func (s *Server) handleGetReleaseByIdRequest(args [1]string, argsEscaped bool, w
 // default schema carries the same `$id` in every project). A Console
 // session that manages more than one project names the project with
 // `project_id`; without it, the ID is resolved in the credential's own
-// project when it is ambiguous.
+// project when it is ambiguous. A project secret always resolves in its
+// own project and ignores `project_id`.
 //
 // GET /schemas/{id}
 func (s *Server) handleGetSchemaByIdRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -13097,11 +13098,8 @@ func (s *Server) handleQueryTeamsRequest(args [0]string, argsEscaped bool, w htt
 // handleQueryUsersRequest handles queryUsers operation.
 //
 // Returns the users of a project, paginated with a cursor.
-// `project_id` names the project to list. Without it, the credential's
-// home project is listed (the project a secret belongs to, or the project
-// a session signed in to), which keeps secret callers that never sent it
-// unchanged. A session may name another project it holds a grant on; a
-// project secret stays bound to its own project.
+// `project_id` names the project to list; without it, the credential's own
+// project is listed.
 // Accepts either a project secret (`oauth2`) or a user-bound Console
 // session cookie (`nextgenSession`). Cookie-authenticated requests
 // follow the scheme's CSRF rules (`nextgenSession`).

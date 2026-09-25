@@ -94,6 +94,20 @@ func TestQueryUsers_SessionCaller(t *testing.T) {
 		}
 	})
 
+	t.Run("project_id names the target instead of the home project", func(t *testing.T) {
+		users := &stubQueryUsersService{}
+		h := queryUsersHandler(t, true, true, users)
+		_, err := h.QueryUsers(userCtx, &api.QueryUsersRequest{}, api.QueryUsersParams{
+			ProjectID: api.NewOptProjectID("proj_target"),
+		})
+		if err != nil {
+			t.Fatalf("session list: %v", err)
+		}
+		if len(users.listProjectIDs) != 1 || users.listProjectIDs[0] != "proj_target" {
+			t.Fatalf("ListUsers projects = %v, want [proj_target]", users.listProjectIDs)
+		}
+	})
+
 	t.Run("no foothold is not found", func(t *testing.T) {
 		users := &stubQueryUsersService{}
 		h := queryUsersHandler(t, false, false, users)

@@ -4,11 +4,8 @@ post:
   description: |
     Returns the users of a project, paginated with a cursor.
 
-    `project_id` names the project to list. Without it, the credential's
-    home project is listed (the project a secret belongs to, or the project
-    a session signed in to), which keeps secret callers that never sent it
-    unchanged. A session may name another project it holds a grant on; a
-    project secret stays bound to its own project.
+    `project_id` names the project to list; without it, the credential's own
+    project is listed.
 
     Accepts either a project secret (`oauth2`) or a user-bound Console
     session cookie (`nextgenSession`). Cookie-authenticated requests
@@ -26,14 +23,7 @@ post:
         - user.read
     - nextgenSession: []
   parameters:
-    - name: project_id
-      in: query
-      description: |
-        The project whose users to list. Defaults to the credential's home
-        project.
-      required: false
-      schema:
-        $ref: ../../../components/schemas/project-id.yaml
+    - $ref: ../../../components/parameters/project-id-query.yaml
   requestBody:
     description: Request to query the users of a project.
     required: true
