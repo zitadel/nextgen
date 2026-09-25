@@ -121,6 +121,7 @@ patch:
   security:
     - oauth2:
         - team.write
+    - nextgenSession: []
   requestBody:
     description: Update team request.
     required: true

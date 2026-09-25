@@ -105,3 +105,25 @@ tasks:
     options:
       cache: false
       runInCI: false
+
+  # Recorded walkthroughs of the embedded console (#1300): the e2e-embedded
+  # server shape, but the output is a video per scenario in
+  # walkthrough-videos/, not a pass/fail verdict. Set WALKTHROUGH_LABEL to
+  # name the recordings (e.g. `before` / `after`) so a PR can show both.
+  walkthrough:
+    command: "corepack pnpm exec playwright test --config playwright.walkthrough.config.mts"
+    deps:
+      - "testing:build"
+      - "cli:build"
+      - "server:build"
+    env:
+      # Fixed pin, same reasoning as the other lanes. Neighbors: 8095
+      # console-e2e e2e-embedded.
+      WALKTHROUGH_ZITADEL_PORT: "8096"
+      ZITADEL_SERVER_BINARY: "$workspaceRoot/dist/server/nextgen"
+      # Scenario A is the single-project deployment: the operator signs in to
+      # the project they manage.
+      NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT: "false"
+    options:
+      cache: false
+      runInCI: false

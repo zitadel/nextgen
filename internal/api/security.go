@@ -121,6 +121,18 @@ var userBoundSessionOperations = map[api.OperationName]bool{
 	api.ListMyProjectsOperation: true,
 	api.GetProjectOperation:     true,
 	api.PatchProjectOperation:   true,
+	// Console management screens (#1300 §1). CSRF for the writes is #1140.
+	api.CreateUserOperation:          true,
+	api.GetUserByIDOperation:         true,
+	api.DeleteUserByIDOperation:      true,
+	api.CreateTeamOperation:          true,
+	api.UpdateTeamOperation:          true,
+	api.ListSchemasOperation:         true,
+	api.GetSchemaByIdOperation:       true,
+	api.ListFlowDefinitionsOperation: true,
+	api.GetFlowDefinitionOperation:   true,
+	api.ListBrandingOperation:        true,
+	api.GetBrandingByIdOperation:     true,
 }
 
 // sessionUnauthorizedMessage mirrors the 401 descriptions of the

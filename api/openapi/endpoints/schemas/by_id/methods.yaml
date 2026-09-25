@@ -10,6 +10,7 @@ get:
   security:
     - oauth2:
         - schema.read
+    - nextgenSession: []
   parameters:
     - name: id
       in: path

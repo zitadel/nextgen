@@ -5,7 +5,6 @@ package integration_test
 import (
 	"net/http"
 	"slices"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -16,8 +15,9 @@ import (
 
 // TestTeamReadsAcceptSession pins #1227: after a claim the Console lands on
 // /teams holding only __nextgen_session, so queryTeams and getTeam must accept
-// that cookie as a user principal. Team writes stay secret-only -- this is not
-// a blanket "sessions may call everything".
+// that cookie as a user principal. createTeam and updateTeam joined them with
+// #1300 (TestConsoleManagementAcceptsSession); deleteTeam stays secret-only --
+// this is not a blanket "sessions may call everything".
 //
 // The caller is seeded in the post-claim shape (personal team owning the
 // project) rather than with a direct user grant, because that is what the
@@ -70,53 +70,30 @@ func TestTeamReadsAcceptSession(t *testing.T) {
 		require.IsType(t, &api.TeamResponse{}, getResp, helpers.MustMarshal(t, getResp))
 	})
 
-	// The allowlist is per-operation: the write ops declare oauth2 only, so
-	// the generated client cannot even offer the cookie and fails before
-	// sending. That pins the spec half -- adding nextgenSession to a write's
-	// security block breaks it.
-	t.Run("team writes do not offer the session scheme", func(t *testing.T) {
-		_, err := session.CreateTeam(t.Context(), &api.CreateTeamRequest{Name: helpers.TeamName()},
-			api.CreateTeamParams{ProjectID: api.ProjectID(console.ID)})
-		require.Error(t, err, "createTeam must not accept the session cookie")
-
-		_, err = session.UpdateTeam(t.Context(), &api.UpdateTeamRequest{},
-			api.UpdateTeamParams{TeamID: api.TeamID(claimerTeamID)})
-		require.Error(t, err, "updateTeam must not accept the session cookie")
-
-		_, err = session.DeleteTeam(t.Context(), api.DeleteTeamParams{TeamID: api.TeamID(claimerTeamID)})
+	// The allowlist is per-operation: deleteTeam declares oauth2 only, so the
+	// generated client cannot even offer the cookie and fails before sending.
+	// That pins the spec half -- adding nextgenSession to its security block
+	// breaks it.
+	t.Run("team delete does not offer the session scheme", func(t *testing.T) {
+		_, err := session.DeleteTeam(t.Context(), api.DeleteTeamParams{TeamID: api.TeamID(claimerTeamID)})
 		require.Error(t, err, "deleteTeam must not accept the session cookie")
 	})
 
 	// ...and the server half, which the generated client cannot reach: a raw
 	// request carrying only the cookie must be refused at the security layer,
 	// before any handler runs.
-	t.Run("team writes refuse a raw session cookie", func(t *testing.T) {
+	t.Run("team delete refuses a raw session cookie", func(t *testing.T) {
 		cookie := platformSessionCookie(t, claimerID).Value
 		base := harness.EnsureTestServer(t).URL
 
-		for _, tc := range []struct {
-			name, method, path, body string
-		}{
-			{"create", http.MethodPost, "/teams?project_id=" + console.ID, `{"name":"x"}`},
-			{"update", http.MethodPatch, "/teams/" + claimerTeamID, `{"name":"x"}`},
-			{"delete", http.MethodDelete, "/teams/" + claimerTeamID, ""},
-		} {
-			t.Run(tc.name, func(t *testing.T) {
-				req, err := http.NewRequestWithContext(t.Context(), tc.method, base+tc.path,
-					strings.NewReader(tc.body))
-				require.NoError(t, err)
-				if tc.body != "" {
-					req.Header.Set("Content-Type", "application/json")
-				}
-				req.AddCookie(&http.Cookie{Name: "__nextgen_session", Value: cookie})
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodDelete, base+"/teams/"+claimerTeamID, nil)
+		require.NoError(t, err)
+		req.AddCookie(&http.Cookie{Name: "__nextgen_session", Value: cookie})
 
-				resp, err := harness.EnsureHttpClient(t).Do(req)
-				require.NoError(t, err)
-				defer resp.Body.Close()
-				assert.Equal(t, http.StatusUnauthorized, resp.StatusCode,
-					"a cookie-only %s must be refused", tc.method)
-			})
-		}
+		resp, err := harness.EnsureHttpClient(t).Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusUnauthorized, resp.StatusCode, "a cookie-only DELETE must be refused")
 	})
 }
 

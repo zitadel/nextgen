@@ -14,6 +14,7 @@
     "scripts/**/*.mts",
     "src/**/*.ts",
     "src-real/**/*.ts",
-    "src-embedded/**/*.ts"
+    "src-embedded/**/*.ts",
+    "src-walkthrough/**/*.ts"
   ]
 }
