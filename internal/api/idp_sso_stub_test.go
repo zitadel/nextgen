@@ -173,3 +173,53 @@ func TestIdpStubStoreHandsOutCopies(t *testing.T) {
 		t.Fatalf("store handed out a shared record: %q", again.definition.DisplayName)
 	}
 }
+
+// TestEncodeSSOError pins the wire shape the login orchestrator decodes: the
+// `sso_error:` tag plus base64 JSON carrying the three OAuth2 error fields.
+// The frontend parses exactly this, so a change here that is not mirrored
+// there silently drops the provider's error off the login screen.
+func TestEncodeSSOError(t *testing.T) {
+	encoded := encodeSSOError(&domain.FlowSSOError{
+		Code:        "access_denied",
+		Description: "The user cancelled the sign-in.",
+		URI:         "https://provider.example/errors/access_denied",
+	})
+
+	const tag = "sso_error:"
+	if len(encoded) <= len(tag) || encoded[:len(tag)] != tag {
+		t.Fatalf("want the %q tag, got %q", tag, encoded)
+	}
+	raw, err := base64.StdEncoding.DecodeString(encoded[len(tag):])
+	if err != nil {
+		t.Fatalf("payload is not base64: %v", err)
+	}
+	var got map[string]string
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatalf("payload is not JSON: %v", err)
+	}
+	for key, want := range map[string]string{
+		"code":        "access_denied",
+		"description": "The user cancelled the sign-in.",
+		"uri":         "https://provider.example/errors/access_denied",
+	} {
+		if got[key] != want {
+			t.Errorf("field %q: want %q, got %q", key, want, got[key])
+		}
+	}
+}
+
+// The optional fields are optional in RFC 6749; a bare code still round-trips.
+func TestEncodeSSOErrorOmitsEmptyOptionalFields(t *testing.T) {
+	encoded := encodeSSOError(&domain.FlowSSOError{Code: "server_error"})
+	raw, err := base64.StdEncoding.DecodeString(encoded[len("sso_error:"):])
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got map[string]string
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatal(err)
+	}
+	if got["code"] != "server_error" || got["description"] != "" || got["uri"] != "" {
+		t.Fatalf("unexpected payload: %+v", got)
+	}
+}

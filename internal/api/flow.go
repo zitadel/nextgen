@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -274,12 +275,39 @@ func (h *Handler) GetFlowStep(ctx context.Context, params api.GetFlowStepParams)
 		resp := h.buildFlowResponse(ctx, result, true)
 		return &resp, nil
 	}
+	if pendingErr := state.PendingError; pendingErr != nil && result.Step != nil {
+		// The provider returned an error while the browser was away. Surface
+		// it on the step the user lands back on, encoded so the login screen
+		// can show the code, description and a link. Not cleared here for the
+		// same reason as the handoff: a GET has no Set-Cookie, and it is
+		// harmless to re-render the same error on a repeat request.
+		encoded := encodeSSOError(pendingErr)
+		result.Step.Error = &encoded
+	}
 	if result.Step != nil && result.Step.Complete != nil {
 		return mapFlowGetError(domain.ErrFlowCompleted())
 	}
 
 	resp := h.buildFlowResponse(ctx, result, false)
 	return &resp, nil
+}
+
+// encodeSSOError packs a provider error into the step's single error string.
+//
+// step.error is one string, and this carries three fields plus a URL, so it
+// is JSON base64'd behind an `sso_error:` tag rather than squeezed into the
+// `error.<key>` catalog convention. The login orchestrator recognises the tag
+// and renders the parts; anything else still reads it as an opaque message.
+func encodeSSOError(e *domain.FlowSSOError) string {
+	payload, err := json.Marshal(map[string]string{
+		"code":        e.Code,
+		"description": e.Description,
+		"uri":         e.URI,
+	})
+	if err != nil {
+		return "error.sso_failed"
+	}
+	return "sso_error:" + base64.StdEncoding.EncodeToString(payload)
 }
 
 func (h *Handler) openState(ctx context.Context, raw string) (*domain.FlowState, error) {

@@ -283,8 +283,14 @@ func (h *Handler) IdpCallbackHandler() http.Handler {
 		})
 		if errParam := r.URL.Query().Get("error"); errParam != "" {
 			// The user declined at the provider, or it refused. Put them back
-			// on the step they started from rather than on an error page.
-			h.finishSsoCallback(ctx, w, r, pending, ssoClaims{})
+			// on the step they started from -- but carry the OAuth2 error
+			// response (RFC 6749 §4.1.2.1) so the login screen can say what
+			// happened, rather than silently swallowing it.
+			h.finishSsoError(ctx, w, r, pending, domain.FlowSSOError{
+				Code:        errParam,
+				Description: r.URL.Query().Get("error_description"),
+				URI:         r.URL.Query().Get("error_uri"),
+			})
 			return
 		}
 		code := r.URL.Query().Get("code")
@@ -326,6 +332,28 @@ func (h *Handler) finishSsoCallback(ctx context.Context, w http.ResponseWriter, 
 		http.Error(w, "sso callback could not resume the flow", http.StatusInternalServerError)
 		return
 	}
+	h.resumeBrowser(ctx, w, r, pending, state)
+}
+
+// finishSsoError parks the provider's error on the flow state and sends the
+// browser back to the page it started from. The error is delivered once, on
+// the GET that page makes, the way a pending handoff is.
+func (h *Handler) finishSsoError(ctx context.Context, w http.ResponseWriter, r *http.Request, pending ssoPending, ssoErr domain.FlowSSOError) {
+	state, err := h.openState(ctx, pending.sealedState)
+	if err != nil {
+		http.Error(w, "sso callback for an expired flow", http.StatusBadRequest)
+		return
+	}
+	// Nothing resolved, so the flow stays on the step it was on; only the
+	// error rides along. Refresh the clock -- the user was away a while.
+	state.PendingError = &ssoErr
+	state.IssuedAt = time.Now().UTC()
+	h.resumeBrowser(ctx, w, r, pending, state)
+}
+
+// resumeBrowser seals the flow state into the cookie and redirects the browser
+// back to the login page, which resumes the flow by its handle.
+func (h *Handler) resumeBrowser(ctx context.Context, w http.ResponseWriter, r *http.Request, pending ssoPending, state *domain.FlowState) {
 	sealed, err := h.sealState(ctx, state)
 	if err != nil {
 		http.Error(w, "sso callback could not resume the flow", http.StatusInternalServerError)

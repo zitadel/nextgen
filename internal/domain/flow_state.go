@@ -95,6 +95,21 @@ type FlowState struct {
 	// cookie instead and re-emitted once, rather than re-minted -- a GET that
 	// minted a fresh token on every call would be a replay surface.
 	PendingHandoff *FlowPendingHandoff
+
+	// PendingError carries a provider error (an OAuth2 authorization error
+	// response, RFC 6749 §4.1.2.1) reached while the browser was at the
+	// provider, so the next GET can surface it on the step the user lands
+	// back on. Single use, like PendingHandoff.
+	PendingError *FlowSSOError
+}
+
+// FlowSSOError is the provider's authorization error, carried back to the
+// step the flow resumes on. Code is required; the other two are optional in
+// the spec and may be empty.
+type FlowSSOError struct {
+	Code        string
+	Description string
+	URI         string
 }
 
 // FlowPendingHandoff is a completion waiting to be delivered. Single use:
