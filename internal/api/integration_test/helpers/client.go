@@ -60,6 +60,7 @@ func NewApiClient(
 ) (*ApiClient, error) {
 	securitySource := &FakeSecuritySource{}
 	client, err := api.NewClient(serverURL, securitySource,
+		//egress:allow integration-test client talking to the server under test
 		api.WithClient(&http.Client{Transport: csrfTransport{source: securitySource}}))
 	if err != nil {
 		return nil, err
@@ -106,6 +107,7 @@ func (c csrfTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 			req.Header.Set(internalapi.CSRFHeader, internalapi.CSRFToken(cookie.Value))
 		}
 	}
+	//egress:allow integration-test client talking to the server under test
 	return http.DefaultTransport.RoundTrip(req)
 }
 
