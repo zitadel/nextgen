@@ -371,31 +371,41 @@ type UpdateProjectRequest struct {
 	PasswordHashPolicy **domain.PasswordHashPolicy
 }
 
-func (s *projectService) Update(ctx context.Context, req UpdateProjectRequest) (*domain.Project, error) {
+func (req *UpdateProjectRequest) Validate(hashers *crypto.HasherFactory) error {
 	if req.ID == "" {
-		return nil, domain.ErrProjectMissingID()
+		return domain.ErrProjectMissingID()
 	}
+
 	if req.Name == nil && req.PasswordHashPolicy == nil {
 		// Unchanged from when the name was the only field there was to patch: a
 		// body that names nothing to write is a bad request rather than a no-op,
 		// and it is the name it is missing.
-		return nil, domain.ErrProjectNameInvalid()
+		return domain.ErrProjectNameInvalid()
 	}
-	var name string
 	if req.Name != nil {
-		name = strings.TrimSpace(*req.Name)
+		name := strings.TrimSpace(*req.Name)
 		if name == "" {
-			return nil, domain.ErrProjectNameInvalid()
+			return domain.ErrProjectNameInvalid()
 		}
+		req.Name = new(name)
 	}
+
 	if req.PasswordHashPolicy != nil && *req.PasswordHashPolicy != nil {
-		if err := s.hashers.Check((*req.PasswordHashPolicy).HasherConfig()); err != nil {
-			return nil, domain.ErrProjectPasswordHashInvalid().WithParent(err).
+		if err := hashers.Check((*req.PasswordHashPolicy).HasherConfig()); err != nil {
+			return domain.ErrProjectPasswordHashInvalid().WithParent(err).
 				WithDetails(map[string]any{
 					"algorithm": string((*req.PasswordHashPolicy).Algorithm),
 					"reason":    err.Error(),
 				})
 		}
+	}
+
+	return nil
+}
+
+func (s *projectService) Update(ctx context.Context, req UpdateProjectRequest) (*domain.Project, error) {
+	if err := req.Validate(s.hashers); err != nil {
+		return nil, err
 	}
 
 	project := &domain.Project{ID: req.ID}
@@ -410,7 +420,7 @@ func (s *projectService) Update(ctx context.Context, req UpdateProjectRequest) (
 		// row is read instead, for the same reason: the caller is answered with
 		// the project as it now stands.
 		if req.Name != nil {
-			project.Name = name
+			project.Name = *req.Name
 			if err := tx.Statements().UpdateProject(ctx, project); err != nil {
 				return err
 			}
@@ -421,34 +431,44 @@ func (s *projectService) Update(ctx context.Context, req UpdateProjectRequest) (
 			}
 			*project = *updated
 		}
-		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
-			Type:       domain.EventTypeProjectUpdated,
-			Category:   domain.EventCategoryEntity,
-			ProjectID:  project.ID,
-			EntityType: "project",
-			EntityID:   project.ID,
-			Payload:    updateProjectPayload(req, name),
-		})
+		return emitProjectUpdated(ctx, tx.Statements(), project.ID, updateProjectPayload(req))
 	})
+
 	if err != nil {
-		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
-			return nil, domain.ErrProjectNotFound()
-		}
-		if de, ok := errors.AsType[domain.Error](err); ok {
-			return nil, de
-		}
-		return nil, domain.ErrInternal(err).WithMessage("failed to update project")
+		return nil, s.mapUpdateError(err)
 	}
+
 	return project, nil
 }
 
-// updateProjectPayload is the delta project.updated carries: the fields the
-// request named, and only those. A field the caller left alone must not appear,
-// or a reader cannot tell a rename from a change to something else.
-func updateProjectPayload(req UpdateProjectRequest, name string) domain.ProjectUpdatedPayload {
+func (s *projectService) mapUpdateError(err error) error {
+	if err == nil {
+		return nil
+	}
+	if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+		return domain.ErrProjectNotFound()
+	}
+	if de, ok := errors.AsType[domain.Error](err); ok {
+		return de
+	}
+	return domain.ErrInternal(err).WithMessage("failed to update project")
+}
+
+func emitProjectUpdated(ctx context.Context, stmts EventStatements, projectID string, payload domain.ProjectUpdatedPayload) error {
+	return audit.Emit(ctx, stmts, audit.EmitSpec{
+		Type:       domain.EventTypeProjectUpdated,
+		Category:   domain.EventCategoryEntity,
+		ProjectID:  projectID,
+		EntityType: "project",
+		EntityID:   projectID,
+		Payload:    payload,
+	})
+}
+
+func updateProjectPayload(req UpdateProjectRequest) domain.ProjectUpdatedPayload {
 	payload := domain.ProjectUpdatedPayload{}
 	if req.Name != nil {
-		payload.Name = name
+		payload.Name = *req.Name
 	}
 	if req.PasswordHashPolicy != nil {
 		// The empty string is the project handing hashing back to the
