@@ -18,6 +18,7 @@ const ICON_NAMES: IconName[] = [
   "user",
   "eye",
   "eye-off",
+  "brand-google",
 ];
 
 interface IconArgs {

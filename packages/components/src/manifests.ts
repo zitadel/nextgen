@@ -17,6 +17,7 @@ import {
   zlPasskeyManifest,
   zlPillManifest,
   zlSelectManifest,
+  zlSsoProvidersManifest,
 } from "./atoms/index.js";
 import type { AtomManifest } from "./manifest.js";
 
@@ -31,6 +32,7 @@ export const manifestRegistry: readonly AtomManifest[] = [
   zlPasskeyManifest,
   zlPillManifest,
   zlSelectManifest,
+  zlSsoProvidersManifest,
 ] as const;
 
 export function findManifest(tag: string): AtomManifest | undefined {

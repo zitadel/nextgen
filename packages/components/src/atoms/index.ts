@@ -6,6 +6,8 @@ export { ZlField, zlFieldManifest, type ZlFieldType } from "./zl-field.js";
 export {
   ZlIcon,
   zlIconManifest,
+  SHIPPED_BRAND_ICON_NAMES,
+  type BrandIconName,
   type IconName,
   type IconSize,
   type IconTone,
@@ -13,6 +15,12 @@ export {
 export { ZlPageShell, zlPageShellManifest } from "./zl-page-shell.js";
 export { ZlPasskey, zlPasskeyManifest, type ZlPasskeyResultDetail, type ZlPasskeyErrorDetail } from "./zl-passkey.js";
 export { ZlPill, zlPillManifest } from "./zl-pill.js";
+export {
+  ZlSsoProviders,
+  zlSsoProvidersManifest,
+  type SsoProvider,
+  type ZlSsoSelectDetail,
+} from "./zl-sso-providers.js";
 export {
   ZlSelect,
   zlSelectManifest,

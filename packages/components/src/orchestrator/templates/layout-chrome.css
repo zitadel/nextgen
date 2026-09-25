@@ -595,3 +595,29 @@ zl-page-shell:has(.zl-split--right) [slot="footer"].zl-attribution ::slotted(*) 
 :host([variant="page"]) .zl-minimal {
   padding: 52px 16px;
 }
+
+/* A provider error's own words (error_description) sit on their own line below
+   the localized body, in the muted alert-message colour rather than shouting. */
+.zl-alert-detail {
+  display: block;
+  margin-top: 4px;
+  color: inherit;
+  opacity: 0.85;
+}
+/* error_uri, styled as the design's other secondary links rather than a raw
+   browser-blue anchor. Its own row so it reads as an action, not part of the
+   sentence above it. */
+.zl-alert-link {
+  display: inline-block;
+  margin-top: 8px;
+  color: var(--zl-link);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.zl-alert-link:hover {
+  color: var(--zl-foreground);
+}
+.zl-alert-link:focus-visible {
+  outline: var(--zl-focus-width) solid var(--zl-ring);
+  outline-offset: var(--zl-focus-offset);
+}

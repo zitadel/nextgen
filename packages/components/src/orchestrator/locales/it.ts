@@ -94,7 +94,7 @@ export const it: Locale = {
   // ═══════════════════════════════════════════════════════════════════════════
   // Step: done (terminale — conferma accesso)
   // ═══════════════════════════════════════════════════════════════════════════
-  "done.title": "Sei connesso come",
+  "done.title": "Sei connesso",
   "done.description": "",
 
   // --- Alias dei nomi step per il flusso login predefinito ---
@@ -129,7 +129,7 @@ export const it: Locale = {
   "register.action.sign_in.lead": "Hai già un account? ",
   "register.action.sign_in.link": "Accedi",
 
-  "complete.title": "Sei connesso come",
+  "complete.title": "Sei connesso",
   "signed-in.continue": "Continua",
   "signed-in.logout": "Esci",
 
@@ -158,6 +158,18 @@ export const it: Locale = {
   "action.back": "Indietro",
 
   // --- SSO ---
+  "sso.continue_with": "Continua con {name}",
+  "sso.divider": "oppure",
+  "register-sso.title": "Completa la creazione del tuo account",
+  "register-sso.description": "Ci servono ancora pochi dati",
+  "register-sso.field.email": "Email",
+  "register-sso.action.submit": "Crea account",
+  "sso-conflict.title": "Hai già un account",
+  "sso-conflict.description": "Accedi come fai di solito e li collegheremo",
+  "sso-conflict.field.password": "Password",
+  "sso-conflict.action.submit": "Accedi",
+  "sso-conflict.action.passkey": "Usa una passkey",
+  "sso-conflict.action.sign_in": "Torna all'accesso",
   "sso.redirect.title": "Reindirizzamento al provider…",
 
   // --- Cerimonia passkey ---
@@ -193,4 +205,9 @@ export const it: Locale = {
   // --- Alert a livello di modulo ---
   "error.sign_in_server.title": "Non è stato possibile completare l'accesso.",
   "error.sign_in_server.body": "Riprova tra qualche minuto",
+  "error.sso_cancelled.title": "Accesso annullato",
+  "error.sso_cancelled.body": "Hai annullato l'accesso con il provider, oppure la richiesta è stata rifiutata. Riprova o usa un altro metodo.",
+  "error.sso_failed.title": "Accesso non riuscito",
+  "error.sso_failed.body": "Il provider non ha potuto completare l'accesso. Riprova.",
+  "error.more_info": "Maggiori informazioni",
 };
