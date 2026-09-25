@@ -14,7 +14,6 @@
     "scripts/**/*.mts",
     "src/**/*.ts",
     "src-real/**/*.ts",
-    "src-embedded/**/*.ts",
-    "src-recording/**/*.ts"
+    "src-embedded/**/*.ts"
   ]
 }
