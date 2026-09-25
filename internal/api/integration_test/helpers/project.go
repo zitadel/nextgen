@@ -51,24 +51,40 @@ type cleanupProjectService struct {
 	stmts service.AllStatements
 }
 
-// Create persists the project and schedules its removal. The cleanup runs last
-// among the test's cleanups (t.Cleanup is last in, first out), so whatever the
-// test registered earlier still sees the project. A failed delete is logged
-// rather than failed: losing a test's rows must not turn an unrelated test red.
+// Create persists the project and schedules its removal. The delete is
+// registered here, before anything the test itself registers, so under
+// t.Cleanup's last in, first out order it runs last: every cleanup the test
+// adds afterwards still sees the project.
 func (s cleanupProjectService) Create(ctx context.Context, name string, previewOrigins []string, seedDefaults bool) (*domain.Project, error) {
 	project, err := s.ProjectService.Create(ctx, name, previewOrigins, seedDefaults)
 	if err != nil {
 		return project, err
 	}
 
-	s.t.Cleanup(func() {
+	cleanupProject(s.t, s.stmts, project.ID)
+	return project, nil
+}
+
+// CleanupProject deletes projectID when t ends. Use it for a project the test
+// created through the API rather than through [Harness.EnsureProjectService]:
+// the handler holds the unwrapped service, so that project is the test's to
+// remove.
+func (h *Harness) CleanupProject(t *testing.T, projectID string) {
+	t.Helper()
+	cleanupProject(t, h.EnsureServiceDB(t).Statements(), projectID)
+}
+
+// cleanupProject fails the owning test when the delete fails. Swallowing it
+// would leave rows in the database every later test reads past, which is the
+// cost this whole convention exists to avoid.
+func cleanupProject(t *testing.T, stmts service.AllStatements, projectID string) {
+	t.Cleanup(func() {
 		// context.Background(), because t.Context() is already cancelled here.
 		// A project the test deleted itself reports false, not an error.
-		if _, err := s.stmts.DeleteProjectByID(context.Background(), project.ID); err != nil {
-			s.t.Logf("cleanup: unable to delete project %s: %v", project.ID, err)
+		if _, err := stmts.DeleteProjectByID(context.Background(), projectID); err != nil {
+			t.Errorf("cleanup: unable to delete project %s: %v", projectID, err)
 		}
 	})
-	return project, nil
 }
 
 // EnsurePlatformProject lazily creates the deployment's platform project

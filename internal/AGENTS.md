@@ -22,8 +22,10 @@ authz tables (`resource_scope_index`, `authz_assignments`,
 `authz_membership_edges`) cascade from `projects`.
 
 Anything a test writes outside its own project it has to clean up itself, with
-its own `t.Cleanup` and `context.Background()`. The platform project and the
-catalog tables are the cases that come up.
+its own `t.Cleanup` and `context.Background()`. Rows written into the platform
+project and the catalog tables are the usual cases. A project created over HTTP
+is another: the handler is cached for the whole run, so it holds the unwrapped
+service, and the test calls `Harness.CleanupProject` for what it created.
 
 ## Format before push
 
