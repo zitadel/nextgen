@@ -9,7 +9,7 @@ you need proven.
 | `e2e`          | `vite preview`     | none                   | the SPA mounts under `/ui/console/` |
 | `e2e-real`     | Vite dev server    | real, via dev proxy    | resource screens against real data |
 | `e2e-embedded` | the Go binary      | real, same origin      | the production request path        |
-| `walkthrough`  | the Go binary      | real, same origin      | nothing — records videos to review |
+| `record-screens` | the Go binary    | real, platform mode    | nothing — records videos to review |
 
 ## Embedded shell smoke
 
@@ -80,15 +80,17 @@ that the surfaces reach the API at all. Management screens work here too: they
 authorize with the signed-in user's session cookie and grants (#1300), so a
 test that needs one grants its user access through the API first.
 
-## Walkthrough recordings
+## Screen recordings
 
-`moon run console-e2e:walkthrough` boots the built binary like `e2e-embedded`
-and drives every management screen at a readable pace with only the session
-cookie, recording a video per scenario and a still per step into
-`walkthrough-videos/` (gitignored). It asserts nothing: an error state on
-screen is the result. Set `WALKTHROUGH_LABEL` (e.g. `before` / `after`) to name
-the recordings of two builds so a PR can show both; point
-`ZITADEL_SERVER_BINARY` at another build to record it. Not part of CI.
+`moon run console-e2e:record-screens` boots the built binary the way a customer
+runs it — platform project bootstrapped — signs an operator up through the
+console's own login, grants them admin on the instance's project by email, and
+walks the management screens on the session cookie alone. It records a video
+per scenario and a numbered still per step into `recordings/` (gitignored) and
+asserts nothing: an error state on screen is the result. Set
+`RECORD_SCREENS_LABEL` (e.g. `before` / `after`) to name the recordings of two
+builds so a PR can show both; point `ZITADEL_SERVER_BINARY` at another build to
+record it. Not part of CI.
 
 ## Handling the handshake
 
