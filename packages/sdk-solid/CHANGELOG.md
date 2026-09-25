@@ -1,5 +1,14 @@
 # @zitadel/sdk-solid
 
+## 1.0.0-alpha.24
+
+### Patch Changes
+
+- Updated dependencies [[`4bea70a`](https://github.com/zitadel/nextgen/commit/4bea70a7244b44e62476e6dd2dc6b8e4a7bd1a45)]:
+  - @zitadel/api@1.0.0-alpha.24
+  - @zitadel/components@1.0.0-alpha.24
+  - @zitadel/sdk-core@1.0.0-alpha.24
+
 ## 1.0.0-alpha.23
 
 ### Patch Changes

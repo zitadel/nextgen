@@ -1,5 +1,32 @@
 # @zitadel/cli
 
+## 1.0.0-alpha.24
+
+### Minor Changes
+
+- [#1286](https://github.com/zitadel/nextgen/pull/1286) [`b633a22`](https://github.com/zitadel/nextgen/commit/b633a22c5d2ee8957255dff6b836caab36c676ce) Thanks [@mridang](https://github.com/mridang)! - **Breaking:** remove `--environment` (`-e`) from `plan`, `apply` and the resource commands (`users`, `teams`, `sessions`, `events`, `grants`, `idps`, `projects`, `schemas`, `environments`, `releases`, `flow-definitions`, `branding`). It accepted only `development`, `preview` or `production` — none of them a name the platform uses — and never reached the platform: its one effect was to read a server URL from `environments.<name>.server` in `zitadel.json`, a key nothing writes. Passing it now fails as an unknown flag; drop it from scripts. `--server`, `ZITADEL_API_BASE` and the top-level `server` in `zitadel.json` still choose the server, and `environments list` / `environments get` still read the platform's environments.
+
+  The CLI therefore has no per-environment flag at all until the platform's environments settle, which is also why the new `variables` commands address the project level only. Their own `--environment` / `--env` never shipped.
+
+### Patch Changes
+
+- [#1296](https://github.com/zitadel/nextgen/pull/1296) [`1a05521`](https://github.com/zitadel/nextgen/commit/1a0552186fe99b0af17a5dc4ffed02ddf2b4c222) Thanks [@IAM-marco](https://github.com/IAM-marco)! - The CLI documentation now explains the local admin `admin@zitadel.localhost`
+  that `zitadel start` creates by default, the one-time console sign-in link it
+  prints, the `zitadel console` command that prints a fresh link, and that on the
+  default local runtime `zitadel setup` attaches the project to that admin's
+  team, so `zitadel claim` reports it as already owned.
+
+- [#1288](https://github.com/zitadel/nextgen/pull/1288) [`4bea70a`](https://github.com/zitadel/nextgen/commit/4bea70a7244b44e62476e6dd2dc6b8e4a7bd1a45) Thanks [@mridang](https://github.com/mridang)! - Encode path parameters in the generated API client, so any id the API accepts can be fetched. Schema ids are the case that hit today: a schema's id is its `$id`, usually a URL such as `https://nextgen.com/api/schemas/default-human-user.json`. Sent raw, the `//` collapsed on a redirect and the request 404'd, so `zitadel schemas get <id>` failed for every URL id and the console's user list silently dropped its schema columns. `zitadel schemas get` also stops guessing what an id looks like: it used to read anything without `sch_` or `://` as an object type, which sent ids like `urn:example:human` down the wrong path. It now asks the server, and falls back to the object-type lookup only on a 404. Setup reconciliation and `apply`/`plan` schema fetches used to encode the id themselves to work around the same bug; that is gone, so the client encodes exactly once rather than sending `%25` for every delimiter.
+
+- [#1292](https://github.com/zitadel/nextgen/pull/1292) [`0a82bb1`](https://github.com/zitadel/nextgen/commit/0a82bb1e66f5d66b7d256389fb503939563b8eaa) Thanks [@mridang](https://github.com/mridang)! - Correct the `grants` command reference. The README still documented `--principal-type` and `--principal-id` on `grants create`, and `principal_type` / `principal_id` as filter fields on `grants list`, which the user and team locators replaced: `grants create` takes `--relation` as its only required field flag and names the principal through `--data` / `--file`, and `grants list` filters on `user_id` and `team_id`.
+
+  `grants create --help` also no longer suggests `grants create --relation viewer`. A grant needs exactly one of `user` or `team`, which are nested objects no flag can carry, so that run was never a complete body. Any write command whose body needs a nested object or an array now offers only its `--data` and `--file` examples.
+
+- Updated dependencies [[`4bea70a`](https://github.com/zitadel/nextgen/commit/4bea70a7244b44e62476e6dd2dc6b8e4a7bd1a45), [`db15426`](https://github.com/zitadel/nextgen/commit/db154268d9610833e15860b7358a626c8b2315d0)]:
+  - @zitadel/api@1.0.0-alpha.24
+  - @zitadel/server@1.0.0-alpha.24
+  - @zitadel/config@1.0.0-alpha.24
+
 ## 1.0.0-alpha.23
 
 ### Minor Changes
