@@ -22,6 +22,7 @@ export function makeTestSession(overrides: Partial<ConsoleSession> = {}): Consol
     factors: [],
     created_at: "2026-01-01T00:00:00Z",
     expires_at: "2100-01-01T00:00:00Z",
+    csrf_token: "csrf_test",
     ...overrides,
   };
 }

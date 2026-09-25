@@ -134,9 +134,14 @@ func (h Handler) GetMySession(ctx context.Context) (api.GetMySessionRes, error) 
 	if err := validateSessionToken(session, sessionToken); err != nil {
 		return nil, invalidSessionCredential(err)
 	}
-	return &api.SessionResponseHeaders{
+	cookie, _ := sessionCookieFromContext(ctx)
+	mine, err := mySessionToAPI(sessionToAPI(session), CSRFToken(cookie))
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to encode the session")
+	}
+	return &api.MySessionResponseHeaders{
 		CacheControl: api.NewOptString(sessionStateCacheControl),
-		Response:     *sessionToAPI(session),
+		Response:     mine,
 	}, nil
 }
 

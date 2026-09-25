@@ -1,4 +1,9 @@
-import { getApiAuthToken } from "./auth";
+import { getApiAuthToken, getApiCsrfToken } from "./auth";
+
+/** The header the session-bound CSRF token travels in (ADR 053 §5). */
+export const CSRF_HEADER = "X-Zitadel-CSRF";
+
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
 /**
  * Framework-neutral failure type the orval-generated client throws on
@@ -32,6 +37,8 @@ export class ApiError extends Error {
  * focused on the shape of one HTTP call:
  *
  * - bearer auth — read from `runtime/auth.ts` and attached automatically;
+ * - the CSRF header — the session-bound token from `runtime/auth.ts`, on
+ *   unsafe methods only, when a first-party surface has set one;
  * - non-2xx → throw — orval's stock client parses the body regardless
  *   of status, so callers would have to inspect every response. Throw
  *   `ApiError` on `!res.ok` so failures interrupt control flow;
@@ -44,6 +51,11 @@ export async function customFetch<T>(url: string, options: RequestInit): Promise
   const headers = new Headers(options.headers);
   if (token && !headers.has("authorization")) {
     headers.set("authorization", `Bearer ${token}`);
+  }
+  const csrfToken = getApiCsrfToken();
+  const method = (options.method ?? "GET").toUpperCase();
+  if (csrfToken && !SAFE_METHODS.has(method) && !headers.has(CSRF_HEADER)) {
+    headers.set(CSRF_HEADER, csrfToken);
   }
 
   const res = await fetch(url, { ...options, headers });

@@ -202,9 +202,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       headers: { cookie: sessionCookie },
     });
     expect(revoke.status).toBe(204);
-    expect(
-      revoke.headers.getSetCookie().some((c) => /^__nextgen_session=;/.test(c)),
-    ).toBe(true);
+    expect(revoke.headers.getSetCookie().some((c) => /^__nextgen_session=;/.test(c))).toBe(true);
 
     // Session is gone after revocation.
     const after = await fetch(`${BASE}/sessions/me`, { headers: { cookie: sessionCookie } });
@@ -538,7 +536,9 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     });
 
     const list = async (params: string) => {
-      const res = await fetch(`${BASE}/flow_definitions?project_id=proj_conformance_latest${params}`);
+      const res = await fetch(
+        `${BASE}/flow_definitions?project_id=proj_conformance_latest${params}`,
+      );
       expect(res.status).toBe(200);
       const body = (await res.json()) as { flow_definitions: { id: string }[] };
       return body.flow_definitions.map((entry) => entry.id);
@@ -643,6 +643,18 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
 
   const platformSessionCookie = () => sessionCookie(PLATFORM_PROJECT_ID);
 
+  /**
+   * The headers a cookie-authenticated claim/complete sends: the cookie plus
+   * the session's CSRF token from GET /sessions/me (ADR 053 §5). A session
+   * /sessions/me rejects gets an empty token, which the credential check
+   * refuses first anyway.
+   */
+  async function claimHeaders(cookie: string): Promise<Record<string, string>> {
+    const me = await fetch(`${BASE}/sessions/me`, { headers: { cookie } });
+    const token = me.ok ? (((await me.json()) as { csrf_token?: string }).csrf_token ?? "") : "";
+    return { "content-type": "application/json", cookie, "x-zitadel-csrf": token };
+  }
+
   test("POST /projects/:id/claim/init returns 201 with a claim challenge", async () => {
     const project = await createProject("claim-init");
     const res = await initClaim(project.id, project.projectSecret);
@@ -702,7 +714,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     const cookie = await platformSessionCookie();
     const complete = await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
       method: "POST",
-      headers: { "content-type": "application/json", cookie },
+      headers: await claimHeaders(cookie),
       body: JSON.stringify({ challenge_id }),
     });
     expect(complete.status).toBe(200);
@@ -731,7 +743,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     const cookie = await platformSessionCookie();
     await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
       method: "POST",
-      headers: { "content-type": "application/json", cookie },
+      headers: await claimHeaders(cookie),
       body: JSON.stringify({ challenge_id }),
     });
 
@@ -757,7 +769,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     const cookie = await platformSessionCookie();
     const complete = await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
       method: "POST",
-      headers: { "content-type": "application/json", cookie },
+      headers: await claimHeaders(cookie),
       body: JSON.stringify({ challenge_id }),
     });
     expect(complete.status).toBe(410);
@@ -788,7 +800,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     const cookie = await platformSessionCookie();
     const complete = await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
       method: "POST",
-      headers: { "content-type": "application/json", cookie },
+      headers: await claimHeaders(cookie),
       body: JSON.stringify({ challenge_id }),
     });
     expect(complete.status).toBe(410);
@@ -805,7 +817,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     );
     const bothComplete = await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
       method: "POST",
-      headers: { "content-type": "application/json", cookie },
+      headers: await claimHeaders(cookie),
       body: JSON.stringify({ challenge_id }),
     });
     expect(bothComplete.status).toBe(410);
@@ -829,12 +841,28 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     expect(body.code).toBe("auth.unauthorized");
   });
 
+  test("POST /projects/:id/claim/complete without the CSRF token returns 403", async () => {
+    const project = await createProject("claim-complete-no-csrf");
+    const init = await initClaim(project.id, project.projectSecret);
+    const { challenge_id } = (await init.json()) as { challenge_id: string };
+
+    const cookie = await platformSessionCookie();
+    const res = await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ challenge_id }),
+    });
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.code).toBe("auth.csrf_invalid");
+  });
+
   test("POST /projects/:id/claim/complete with an unknown challenge returns 404", async () => {
     const project = await createProject("claim-complete-unknown");
     const cookie = await platformSessionCookie();
     const res = await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
       method: "POST",
-      headers: { "content-type": "application/json", cookie },
+      headers: await claimHeaders(cookie),
       body: JSON.stringify({ challenge_id: "ch_doesnotexist" }),
     });
     expect(res.status).toBe(404);
@@ -845,7 +873,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     const cookie = await platformSessionCookie();
     const res = await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
       method: "POST",
-      headers: { "content-type": "application/json", cookie },
+      headers: await claimHeaders(cookie),
       body: JSON.stringify({}),
     });
     expect(res.status).toBe(400);
@@ -883,7 +911,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     const cookie = await sessionCookie(project.id);
     const res = await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
       method: "POST",
-      headers: { "content-type": "application/json", cookie },
+      headers: await claimHeaders(cookie),
       body: JSON.stringify({ challenge_id }),
     });
     expect(res.status).toBe(401);
@@ -900,7 +928,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     const cookie = await platformSessionCookie();
     const res = await fetch(`${BASE}/projects/${other.id}/claim/complete`, {
       method: "POST",
-      headers: { "content-type": "application/json", cookie },
+      headers: await claimHeaders(cookie),
       body: JSON.stringify({ challenge_id }),
     });
     expect(res.status).toBe(404);
@@ -913,19 +941,12 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     const cookie = await platformSessionCookie();
     const url = `${BASE}/projects/${project.id}/claim/complete`;
     const body = JSON.stringify({ challenge_id });
+    const headers = await claimHeaders(cookie);
 
-    const first = await fetch(url, {
-      method: "POST",
-      headers: { "content-type": "application/json", cookie },
-      body,
-    });
+    const first = await fetch(url, { method: "POST", headers, body });
     expect(first.status).toBe(200);
 
-    const second = await fetch(url, {
-      method: "POST",
-      headers: { "content-type": "application/json", cookie },
-      body,
-    });
+    const second = await fetch(url, { method: "POST", headers, body });
     expect(second.status).toBe(409);
     const secondBody = (await second.json()) as { code: string; details: Record<string, unknown> };
     expect(secondBody.code).toBe("proj.already_claimed");
@@ -942,7 +963,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     const cookie = await platformSessionCookie();
     const complete = await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
       method: "POST",
-      headers: { "content-type": "application/json", cookie },
+      headers: await claimHeaders(cookie),
       body: JSON.stringify({ challenge_id }),
     });
     expect(complete.status).toBe(200);
@@ -969,7 +990,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     const cookie = await platformSessionCookie();
     const complete = await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
       method: "POST",
-      headers: { "content-type": "application/json", cookie },
+      headers: await claimHeaders(cookie),
       body: JSON.stringify({ challenge_id: winner }),
     });
     expect(complete.status).toBe(200);

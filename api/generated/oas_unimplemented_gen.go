@@ -118,8 +118,8 @@ func (UnimplementedHandler) CreateFlowDefinition(ctx context.Context, req *Creat
 // identifier and display.
 // Accepts either a project secret (`oauth2`) or a user-bound Console
 // session cookie (`nextgenSession`). Session callers are authorized as
-// the human against the target project (home may differ). CSRF/Origin
-// for cookie mutations is a follow-up (#1140).
+// the human against the target project (home may differ). Cookie-authenticated
+// requests follow the scheme's CSRF rules (`nextgenSession`).
 //
 // POST /grants
 func (UnimplementedHandler) CreateGrant(ctx context.Context, req *CreateGrantRequest, params CreateGrantParams) (r CreateGrantRes, _ error) {
@@ -263,8 +263,8 @@ func (UnimplementedHandler) CreateUser(ctx context.Context, req *CreateUserReque
 // return 404. The row is not un-revoked. Expired grants can still be
 // revoked so the unique binding can be reused.
 // Accepts either a project secret (`oauth2`) or a user-bound Console
-// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
-// is a follow-up (#1140).
+// session cookie (`nextgenSession`). Cookie-authenticated requests
+// follow the scheme's CSRF rules (`nextgenSession`).
 //
 // DELETE /grants/{id}
 func (UnimplementedHandler) DeleteGrant(ctx context.Context, params DeleteGrantParams) (r DeleteGrantRes, _ error) {
@@ -455,8 +455,8 @@ func (UnimplementedHandler) GetFlowStep(ctx context.Context, params GetFlowStepP
 // secrets. A user-bound Console session that already passed the project
 // Check may expand without those scopes.
 // Accepts either a project secret (`oauth2`) or a user-bound Console
-// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
-// is a follow-up (#1140).
+// session cookie (`nextgenSession`). Cookie-authenticated requests
+// follow the scheme's CSRF rules (`nextgenSession`).
 //
 // GET /grants/{id}
 func (UnimplementedHandler) GetGrant(ctx context.Context, params GetGrantParams) (r GetGrantRes, _ error) {
@@ -828,8 +828,8 @@ func (UnimplementedHandler) PatchUserByID(ctx context.Context, req *PatchUserReq
 // body-conditional). A user-bound Console session that already passed
 // the project Check may expand without those scopes.
 // Accepts either a project secret (`oauth2`) or a user-bound Console
-// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
-// is a follow-up (#1140).
+// session cookie (`nextgenSession`). Cookie-authenticated requests
+// follow the scheme's CSRF rules (`nextgenSession`).
 //
 // POST /grants/query
 func (UnimplementedHandler) QueryGrants(ctx context.Context, req *QueryGrantsRequest, params QueryGrantsParams) (r QueryGrantsRes, _ error) {
@@ -884,8 +884,8 @@ func (UnimplementedHandler) QueryTeams(ctx context.Context, req *QueryTeamsReque
 // unchanged. A session may name another project it holds a grant on; a
 // project secret stays bound to its own project.
 // Accepts either a project secret (`oauth2`) or a user-bound Console
-// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
-// is a follow-up (#1140).
+// session cookie (`nextgenSession`). Cookie-authenticated requests
+// follow the scheme's CSRF rules (`nextgenSession`).
 //
 // POST /users/query
 func (UnimplementedHandler) QueryUsers(ctx context.Context, req *QueryUsersRequest, params QueryUsersParams) (r QueryUsersRes, _ error) {

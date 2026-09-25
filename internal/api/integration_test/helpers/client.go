@@ -2,11 +2,13 @@ package helpers
 
 import (
 	"context"
+	"net/http"
 	"testing"
 
 	"github.com/ogen-go/ogen/ogenerrors"
 	"github.com/stretchr/testify/require"
 	api "github.com/zitadel/nextgen/api/generated"
+	internalapi "github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
@@ -15,6 +17,9 @@ type FakeSecuritySource struct {
 	Scopes []string
 
 	SessionToken string
+	// OmitCSRF stops the client sending X-Zitadel-CSRF with the session
+	// cookie, for tests of the server refusing a write without it.
+	OmitCSRF bool
 }
 
 func (f FakeSecuritySource) OAuth2(ctx context.Context, operationName api.OperationName) (api.OAuth2, error) {
@@ -54,7 +59,8 @@ func NewApiClient(
 	serverURL string,
 ) (*ApiClient, error) {
 	securitySource := &FakeSecuritySource{}
-	client, err := api.NewClient(serverURL, securitySource)
+	client, err := api.NewClient(serverURL, securitySource,
+		api.WithClient(&http.Client{Transport: csrfTransport{source: securitySource}}))
 	if err != nil {
 		return nil, err
 	}
@@ -75,6 +81,32 @@ func (c *ApiClient) SetScopes(scopes []string) {
 }
 func (c *ApiClient) SetSessionToken(token string) {
 	c.securitySource.SessionToken = token
+}
+
+// SetOmitCSRF makes session-cookie writes go out without X-Zitadel-CSRF.
+func (c *ApiClient) SetOmitCSRF(omit bool) {
+	c.securitySource.OmitCSRF = omit
+}
+
+// csrfTransport sends the session's X-Zitadel-CSRF token on unsafe requests,
+// as the Console does (ADR 053 §5), so session tests exercise the same
+// contract as the browser. Only when the request actually carries the session
+// cookie: a Bearer caller needs no token.
+type csrfTransport struct {
+	source *FakeSecuritySource
+}
+
+func (c csrfTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	switch req.Method {
+	case http.MethodGet, http.MethodHead, http.MethodOptions:
+	default:
+		if cookie, err := req.Cookie("__nextgen_session"); err == nil && !c.source.OmitCSRF &&
+			req.Header.Get(internalapi.CSRFHeader) == "" {
+			req = req.Clone(req.Context())
+			req.Header.Set(internalapi.CSRFHeader, internalapi.CSRFToken(cookie.Value))
+		}
+	}
+	return http.DefaultTransport.RoundTrip(req)
 }
 
 // ProjectSecret mints the project's bearer, for tests that send a raw request

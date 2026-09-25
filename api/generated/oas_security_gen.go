@@ -16,7 +16,17 @@ type SecurityHandler interface {
 	// HandleNextgenSession handles nextgenSession security.
 	// The __nextgen_session cookie issued at session creation or superseding handoff exchange.
 	// A missing or invalid cookie yields `401` with code `auth.unauthorized` and the message
-	// `Missing or invalid session token.`.
+	// `Missing or invalid session token.`
+	// Cross-site request forgery (ADR 053 §5): a state-changing request that this
+	// cookie authenticates must come from the same origin — a cross-site browser
+	// request is refused with `403` and code `auth.csrf_invalid`. The management
+	// writes (`createUser`, `DeleteUserByID`, `createTeam`, `updateTeam`,
+	// `patchProject`, `createGrant`, `deleteGrant`), `completeClaim` and
+	// `patchMyUser` must also send the session's token from `GET /sessions/me`
+	// (`csrf_token`) in the `X-Zitadel-CSRF` header, or they answer the same
+	// `403`. Reads, including the `POST …/query` operations, and sign-out
+	// (`revokeMySession`) need no token. A request a project secret authenticates
+	// is not affected.
 	HandleNextgenSession(ctx context.Context, operationName OperationName, t NextgenSession) (context.Context, error)
 	// HandleOAuth2 handles oauth2 security.
 	HandleOAuth2(ctx context.Context, operationName OperationName, t OAuth2) (context.Context, error)
@@ -337,7 +347,17 @@ type SecuritySource interface {
 	// NextgenSession provides nextgenSession security value.
 	// The __nextgen_session cookie issued at session creation or superseding handoff exchange.
 	// A missing or invalid cookie yields `401` with code `auth.unauthorized` and the message
-	// `Missing or invalid session token.`.
+	// `Missing or invalid session token.`
+	// Cross-site request forgery (ADR 053 §5): a state-changing request that this
+	// cookie authenticates must come from the same origin — a cross-site browser
+	// request is refused with `403` and code `auth.csrf_invalid`. The management
+	// writes (`createUser`, `DeleteUserByID`, `createTeam`, `updateTeam`,
+	// `patchProject`, `createGrant`, `deleteGrant`), `completeClaim` and
+	// `patchMyUser` must also send the session's token from `GET /sessions/me`
+	// (`csrf_token`) in the `X-Zitadel-CSRF` header, or they answer the same
+	// `403`. Reads, including the `POST …/query` operations, and sign-out
+	// (`revokeMySession`) need no token. A request a project secret authenticates
+	// is not affected.
 	NextgenSession(ctx context.Context, operationName OperationName) (NextgenSession, error)
 	// OAuth2 provides oauth2 security value.
 	OAuth2(ctx context.Context, operationName OperationName) (OAuth2, error)

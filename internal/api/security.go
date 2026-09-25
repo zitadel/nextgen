@@ -79,6 +79,13 @@ func (s SecurityHandler) HandleNextgenSession(ctx context.Context, operationName
 	if token.UserID == "" && userBoundSessionOperations[operationName] {
 		return ctx, ogenerrors.ErrSkipServerSecurity
 	}
+	// The cookie is the credential from here on, so a state-changing request
+	// must pass the CSRF checks (ADR 053 §5). A Bearer that satisfied the
+	// operation returned above and never reaches this.
+	if err := checkSessionCSRF(ctx, operationName, t.APIKey); err != nil {
+		return nil, err
+	}
+	ctx = context.WithValue(ctx, sessionCookieKey{}, t.APIKey)
 	ctx = withActorFromToken(ctx, token)
 	if token.UserID != "" {
 		// Session.Token() never mints Scope (always empty). Users skip the
@@ -149,6 +156,15 @@ var secretHashOperations = map[api.OperationName]bool{
 }
 
 type sessionTokenKey struct{}
+
+// sessionCookieKey carries the raw __nextgen_session value of a request the
+// cookie authenticated, so GET /sessions/me can derive its CSRF token.
+type sessionCookieKey struct{}
+
+func sessionCookieFromContext(ctx context.Context) (string, bool) {
+	v, ok := ctx.Value(sessionCookieKey{}).(string)
+	return v, ok && v != ""
+}
 
 // sessionTokenFromContext returns the session token parsed from the
 // __nextgen_session cookie by HandleNextgenSession.

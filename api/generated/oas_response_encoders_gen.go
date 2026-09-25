@@ -2818,7 +2818,7 @@ func encodeGetLiveResponse(response GetLiveRes, w http.ResponseWriter, span trac
 
 func encodeGetMySessionResponse(response GetMySessionRes, w http.ResponseWriter, span trace.Span) error {
 	switch response := response.(type) {
-	case *SessionResponseHeaders:
+	case *MySessionResponseHeaders:
 		if err := func() error {
 			if err := response.Validate(); err != nil {
 				return err

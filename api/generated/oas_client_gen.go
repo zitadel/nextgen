@@ -115,8 +115,8 @@ type Invoker interface {
 	// identifier and display.
 	// Accepts either a project secret (`oauth2`) or a user-bound Console
 	// session cookie (`nextgenSession`). Session callers are authorized as
-	// the human against the target project (home may differ). CSRF/Origin
-	// for cookie mutations is a follow-up (#1140).
+	// the human against the target project (home may differ). Cookie-authenticated
+	// requests follow the scheme's CSRF rules (`nextgenSession`).
 	//
 	// POST /grants
 	CreateGrant(ctx context.Context, request *CreateGrantRequest, params CreateGrantParams) (CreateGrantRes, error)
@@ -233,8 +233,8 @@ type Invoker interface {
 	// return 404. The row is not un-revoked. Expired grants can still be
 	// revoked so the unique binding can be reused.
 	// Accepts either a project secret (`oauth2`) or a user-bound Console
-	// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
-	// is a follow-up (#1140).
+	// session cookie (`nextgenSession`). Cookie-authenticated requests
+	// follow the scheme's CSRF rules (`nextgenSession`).
 	//
 	// DELETE /grants/{id}
 	DeleteGrant(ctx context.Context, params DeleteGrantParams) (DeleteGrantRes, error)
@@ -383,8 +383,8 @@ type Invoker interface {
 	// secrets. A user-bound Console session that already passed the project
 	// Check may expand without those scopes.
 	// Accepts either a project secret (`oauth2`) or a user-bound Console
-	// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
-	// is a follow-up (#1140).
+	// session cookie (`nextgenSession`). Cookie-authenticated requests
+	// follow the scheme's CSRF rules (`nextgenSession`).
 	//
 	// GET /grants/{id}
 	GetGrant(ctx context.Context, params GetGrantParams) (GetGrantRes, error)
@@ -663,8 +663,8 @@ type Invoker interface {
 	// body-conditional). A user-bound Console session that already passed
 	// the project Check may expand without those scopes.
 	// Accepts either a project secret (`oauth2`) or a user-bound Console
-	// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
-	// is a follow-up (#1140).
+	// session cookie (`nextgenSession`). Cookie-authenticated requests
+	// follow the scheme's CSRF rules (`nextgenSession`).
 	//
 	// POST /grants/query
 	QueryGrants(ctx context.Context, request *QueryGrantsRequest, params QueryGrantsParams) (QueryGrantsRes, error)
@@ -704,8 +704,8 @@ type Invoker interface {
 	// unchanged. A session may name another project it holds a grant on; a
 	// project secret stays bound to its own project.
 	// Accepts either a project secret (`oauth2`) or a user-bound Console
-	// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
-	// is a follow-up (#1140).
+	// session cookie (`nextgenSession`). Cookie-authenticated requests
+	// follow the scheme's CSRF rules (`nextgenSession`).
 	//
 	// POST /users/query
 	QueryUsers(ctx context.Context, request *QueryUsersRequest, params QueryUsersParams) (QueryUsersRes, error)
@@ -1641,8 +1641,8 @@ func (c *Client) sendCreateFlowDefinition(ctx context.Context, request *CreateFl
 // identifier and display.
 // Accepts either a project secret (`oauth2`) or a user-bound Console
 // session cookie (`nextgenSession`). Session callers are authorized as
-// the human against the target project (home may differ). CSRF/Origin
-// for cookie mutations is a follow-up (#1140).
+// the human against the target project (home may differ). Cookie-authenticated
+// requests follow the scheme's CSRF rules (`nextgenSession`).
 //
 // POST /grants
 func (c *Client) CreateGrant(ctx context.Context, request *CreateGrantRequest, params CreateGrantParams) (CreateGrantRes, error) {
@@ -2963,8 +2963,8 @@ func (c *Client) sendCreateUser(ctx context.Context, request *CreateUserRequest,
 // return 404. The row is not un-revoked. Expired grants can still be
 // revoked so the unique binding can be reused.
 // Accepts either a project secret (`oauth2`) or a user-bound Console
-// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
-// is a follow-up (#1140).
+// session cookie (`nextgenSession`). Cookie-authenticated requests
+// follow the scheme's CSRF rules (`nextgenSession`).
 //
 // DELETE /grants/{id}
 func (c *Client) DeleteGrant(ctx context.Context, params DeleteGrantParams) (DeleteGrantRes, error) {
@@ -4994,8 +4994,8 @@ func (c *Client) sendGetFlowStep(ctx context.Context, params GetFlowStepParams) 
 // secrets. A user-bound Console session that already passed the project
 // Check may expand without those scopes.
 // Accepts either a project secret (`oauth2`) or a user-bound Console
-// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
-// is a follow-up (#1140).
+// session cookie (`nextgenSession`). Cookie-authenticated requests
+// follow the scheme's CSRF rules (`nextgenSession`).
 //
 // GET /grants/{id}
 func (c *Client) GetGrant(ctx context.Context, params GetGrantParams) (GetGrantRes, error) {
@@ -9972,8 +9972,8 @@ func (c *Client) sendPatchUserByID(ctx context.Context, request *PatchUserReques
 // body-conditional). A user-bound Console session that already passed
 // the project Check may expand without those scopes.
 // Accepts either a project secret (`oauth2`) or a user-bound Console
-// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
-// is a follow-up (#1140).
+// session cookie (`nextgenSession`). Cookie-authenticated requests
+// follow the scheme's CSRF rules (`nextgenSession`).
 //
 // POST /grants/query
 func (c *Client) QueryGrants(ctx context.Context, request *QueryGrantsRequest, params QueryGrantsParams) (QueryGrantsRes, error) {
@@ -10686,8 +10686,8 @@ func (c *Client) sendQueryTeams(ctx context.Context, request *QueryTeamsRequest,
 // unchanged. A session may name another project it holds a grant on; a
 // project secret stays bound to its own project.
 // Accepts either a project secret (`oauth2`) or a user-bound Console
-// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
-// is a follow-up (#1140).
+// session cookie (`nextgenSession`). Cookie-authenticated requests
+// follow the scheme's CSRF rules (`nextgenSession`).
 //
 // POST /users/query
 func (c *Client) QueryUsers(ctx context.Context, request *QueryUsersRequest, params QueryUsersParams) (QueryUsersRes, error) {

@@ -1,6 +1,7 @@
 import { ApiError } from "@zitadel/api/runtime/fetch";
 
 import { api } from "../api/zitadel";
+import { fetchSession } from "../auth/session";
 import { describeError } from "./api-error";
 
 /**
@@ -49,8 +50,9 @@ export type ClaimOutcome =
  * authenticated by the `__nextgen_session` cookie.
  *
  * Deliberately the **single** place the completion request is made (#615):
- * when ADR 053 adds the `X-Zitadel-CSRF` requirement it lands in this call
- * alone, and if ADR 054 grows the contract a team-selection parameter, the
+ * it carries ADR 053's `X-Zitadel-CSRF` token, loaded through `fetchSession()`
+ * first because the claim page sits outside the `_authed` guard that normally
+ * loads it; and if ADR 054 grows the contract a team-selection parameter, the
  * body grows here. Callers render the outcome; they do not build the request.
  */
 export async function completeProjectClaim(
@@ -58,6 +60,7 @@ export async function completeProjectClaim(
   challengeId: string,
 ): Promise<ClaimOutcome> {
   try {
+    await fetchSession();
     const result = await api.completeClaim(
       projectId,
       { challenge_id: challengeId },

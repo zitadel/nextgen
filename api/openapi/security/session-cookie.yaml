@@ -6,3 +6,14 @@ description: |
 
   A missing or invalid cookie yields `401` with code `auth.unauthorized` and the message
   `Missing or invalid session token.`
+
+  Cross-site request forgery (ADR 053 §5): a state-changing request that this
+  cookie authenticates must come from the same origin — a cross-site browser
+  request is refused with `403` and code `auth.csrf_invalid`. The management
+  writes (`createUser`, `DeleteUserByID`, `createTeam`, `updateTeam`,
+  `patchProject`, `createGrant`, `deleteGrant`), `completeClaim` and
+  `patchMyUser` must also send the session's token from `GET /sessions/me`
+  (`csrf_token`) in the `X-Zitadel-CSRF` header, or they answer the same
+  `403`. Reads, including the `POST …/query` operations, and sign-out
+  (`revokeMySession`) need no token. A request a project secret authenticates
+  is not affected.

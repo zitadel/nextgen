@@ -1207,8 +1207,8 @@ func (s *Server) handleCreateFlowDefinitionRequest(args [0]string, argsEscaped b
 // identifier and display.
 // Accepts either a project secret (`oauth2`) or a user-bound Console
 // session cookie (`nextgenSession`). Session callers are authorized as
-// the human against the target project (home may differ). CSRF/Origin
-// for cookie mutations is a follow-up (#1140).
+// the human against the target project (home may differ). Cookie-authenticated
+// requests follow the scheme's CSRF rules (`nextgenSession`).
 //
 // POST /grants
 func (s *Server) handleCreateGrantRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -3066,8 +3066,8 @@ func (s *Server) handleCreateUserRequest(args [0]string, argsEscaped bool, w htt
 // return 404. The row is not un-revoked. Expired grants can still be
 // revoked so the unique binding can be reused.
 // Accepts either a project secret (`oauth2`) or a user-bound Console
-// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
-// is a follow-up (#1140).
+// session cookie (`nextgenSession`). Cookie-authenticated requests
+// follow the scheme's CSRF rules (`nextgenSession`).
 //
 // DELETE /grants/{id}
 func (s *Server) handleDeleteGrantRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -5804,8 +5804,8 @@ func (s *Server) handleGetFlowStepRequest(args [1]string, argsEscaped bool, w ht
 // secrets. A user-bound Console session that already passed the project
 // Check may expand without those scopes.
 // Accepts either a project secret (`oauth2`) or a user-bound Console
-// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
-// is a follow-up (#1140).
+// session cookie (`nextgenSession`). Cookie-authenticated requests
+// follow the scheme's CSRF rules (`nextgenSession`).
 //
 // GET /grants/{id}
 func (s *Server) handleGetGrantRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -11883,8 +11883,8 @@ func (s *Server) handlePatchUserByIDRequest(args [1]string, argsEscaped bool, w 
 // body-conditional). A user-bound Console session that already passed
 // the project Check may expand without those scopes.
 // Accepts either a project secret (`oauth2`) or a user-bound Console
-// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
-// is a follow-up (#1140).
+// session cookie (`nextgenSession`). Cookie-authenticated requests
+// follow the scheme's CSRF rules (`nextgenSession`).
 //
 // POST /grants/query
 func (s *Server) handleQueryGrantsRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -12925,8 +12925,8 @@ func (s *Server) handleQueryTeamsRequest(args [0]string, argsEscaped bool, w htt
 // unchanged. A session may name another project it holds a grant on; a
 // project secret stays bound to its own project.
 // Accepts either a project secret (`oauth2`) or a user-bound Console
-// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
-// is a follow-up (#1140).
+// session cookie (`nextgenSession`). Cookie-authenticated requests
+// follow the scheme's CSRF rules (`nextgenSession`).
 //
 // POST /users/query
 func (s *Server) handleQueryUsersRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {

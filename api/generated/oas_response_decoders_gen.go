@@ -5898,7 +5898,7 @@ func decodeGetMySessionResponse(resp *http.Response) (res GetMySessionRes, _ err
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response SessionResponse
+			var response MySessionResponse
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -5924,7 +5924,7 @@ func decodeGetMySessionResponse(resp *http.Response) (res GetMySessionRes, _ err
 			}(); err != nil {
 				return res, errors.Wrap(err, "validate")
 			}
-			var wrapper SessionResponseHeaders
+			var wrapper MySessionResponseHeaders
 			wrapper.Response = response
 			h := uri.NewHeaderDecoder(resp.Header)
 			// Parse "Cache-Control" header.

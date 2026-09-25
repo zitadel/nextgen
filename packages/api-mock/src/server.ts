@@ -33,11 +33,11 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { type Server } from "node:http";
 
-import type { ExchangeHandoff200, GetMySession200 } from "@zitadel/api/generated/model";
-import { CompleteClaimBody } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
-import express from "express";
-import cookieParser from "cookie-parser";
 import { createMiddleware } from "@mswjs/http-middleware";
+import { CompleteClaimBody } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
+import type { ExchangeHandoff200, GetMySession200 } from "@zitadel/api/generated/model";
+import cookieParser from "cookie-parser";
+import express from "express";
 
 import { applyBranding } from "./branding.js";
 import { HandoffError, JWK, verifyHandoffToken } from "./crypto.js";
@@ -160,12 +160,9 @@ export function createMockApp(options: { issuer: string }): express.Express {
   app.get("/auth/keys", (_req: express.Request, res: express.Response) => {
     res.json({ keys: [JWK] });
   });
-  app.get(
-    "/.well-known/openid-configuration",
-    (_req: express.Request, res: express.Response) => {
-      res.json(buildOpenIdConfiguration(iss));
-    },
-  );
+  app.get("/.well-known/openid-configuration", (_req: express.Request, res: express.Response) => {
+    res.json(buildOpenIdConfiguration(iss));
+  });
 
   const jsonBodyParser: express.RequestHandler = (req, res, next) => {
     express.json()(req, res, (err) => {
@@ -256,7 +253,9 @@ export function createMockApp(options: { issuer: string }): express.Express {
       // session carries a verified factor. The contract now defines `active`
       // as "has at least one verified authentication factor", so an empty
       // factor list would contradict the state we report.
-      const verifiedFactors = [{ method: "password" as const, verified_at: createdAt.toISOString() }];
+      const verifiedFactors = [
+        { method: "password" as const, verified_at: createdAt.toISOString() },
+      ];
       const display = claims.sub ? DEMO_DISPLAY_NAMES.get(claims.sub) : undefined;
       const sessionData: StoredSession = {
         session_id: sessionId,
@@ -267,6 +266,10 @@ export function createMockApp(options: { issuer: string }): express.Express {
         assurance_levels: [],
         created_at: createdAt.toISOString(),
         expires_at: expiresAt.toISOString(),
+        // The session-bound CSRF token (ADR 053 §5) GET /sessions/me hands out.
+        // The Go server derives it from the cookie; any unguessable per-session
+        // value is the same contract to a client.
+        csrf_token: randomBytes(24).toString("base64url"),
         user: {
           user_id: userId,
           // identifier_property travels exactly with identifier (ADR 058 §3).
@@ -367,6 +370,20 @@ export function createMockApp(options: { issuer: string }): express.Express {
         res.status(401).json(errorBody("auth.unauthorized", "missing or invalid session token"));
         return;
       }
+      // ADR 053 §5: a cookie-authenticated write carries the session's CSRF
+      // token. Checked after the credential and before eligibility, in the
+      // same order as the Go server's security handler.
+      if (req.get("x-zitadel-csrf") !== session.csrf_token) {
+        res
+          .status(403)
+          .json(
+            errorBody(
+              "auth.csrf_invalid",
+              "The request failed cross-site request forgery validation.",
+            ),
+          );
+        return;
+      }
       // ADR 046 §2: only a platform-project session that is active and carries a
       // verified factor may claim. A customer-project session, an inactive one,
       // or an anonymous pre-login session must never complete a claim.
@@ -382,13 +399,11 @@ export function createMockApp(options: { issuer: string }): express.Express {
       }
       const parsed = CompleteClaimBody.safeParse(req.body);
       if (!parsed.success) {
-        res
-          .status(400)
-          .json(
-            errorBody("invalid_request", "request does not conform to spec", {
-              issues: parsed.error.issues,
-            }),
-          );
+        res.status(400).json(
+          errorBody("invalid_request", "request does not conform to spec", {
+            issues: parsed.error.issues,
+          }),
+        );
         return;
       }
       const result = completeClaimChallenge(parsed.data.challenge_id, req.params.project_id ?? "");

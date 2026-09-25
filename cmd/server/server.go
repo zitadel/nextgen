@@ -727,6 +727,7 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiH
 			api.WithRequestHostMiddleware,
 			middleware.WithUserAgentMiddleware,
 			api.WithSessionStateNoStore,
+			api.WithCSRFRequest,
 			func(next http.Handler) http.Handler { return audit.WithRequestEventMiddleware(requestEvents, next) },
 		),
 	)

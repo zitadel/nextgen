@@ -1,0 +1,19 @@
+description: |
+  The caller's own session, as `GET /sessions/me` returns it: the session
+  representation plus the session-bound CSRF token.
+allOf:
+  - $ref: ../session-response.yaml
+  - type: object
+    required:
+      - csrf_token
+    properties:
+      csrf_token:
+        type: string
+        description: |
+          Session-bound token for cross-site request forgery protection
+          (ADR 053 §5). Browser code sends it in the `X-Zitadel-CSRF` header
+          on state-changing management requests that the session cookie
+          authenticates; without it they answer 403 `auth.csrf_invalid`. It
+          authorizes nothing on its own — the HttpOnly cookie is still the
+          credential — and it stays the same for the life of the session.
+        example: 3q9Y5mJ7m1wq0yBqS4kz0mJ3o1bG8v7t2Y4r6Pp9Ls0
