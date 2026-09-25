@@ -152,13 +152,14 @@ does not change.
   client only.
 - `AppShell` moves from `__root` to `_authed`; screens keep their URLs
   (pathless layout) and their loaders/boundaries (ADR 0001) untouched.
-- The secret's remaining use is server-side (dev proxy env); the browser
-  bundle still never contains it (ADR 005 holds).
+- The Console uses no project secret at all since 2026-09-25 (#1300) — not in
+  the browser bundle (ADR 005 holds) and not in the dev proxy either; dev
+  tooling uses it only server-side, to seed and grant.
 - **~~Dependency to track~~ resolved 2026-08-12 by withdrawal (ADR 0002):**
   no Go `/api` mount exists or is planned — the deployed console calls the
-  API at the origin root. The deployed management surface now waits on
+  API at the origin root. The deployed management surface waited on
   session-derived target permissions (root ADRs 032/033/053) rather than on a
-  secret-injecting mount.
+  secret-injecting mount; those landed with #1300.
 - Tests: the `_authed` guard is covered by `src/routes/auth-guard.spec.tsx`;
   existing screen specs mock `@/auth/session` and run as signed-in.
 

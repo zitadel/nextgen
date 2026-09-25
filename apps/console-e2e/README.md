@@ -46,11 +46,12 @@ The dev proxy is also this lane's blind spot: it rewrites `/api/*` onto the API
 root, so the console's API base is correct here by construction. That is what
 `e2e-embedded` is for.
 
-This lane boots the binary with both `/ui/*` surfaces off, and the mux mounts
-`/console/runtime.json` only alongside one of them — so its instance serves no
-runtime document, and the lane sets `VITE_CONSOLE_RUNTIME_FALLBACK` for the same
-reason a backend-less preview does (see [`moon.yml`](moon.yml)). The project id
-reaches the console through `VITE_CONSOLE_PROJECT_ID` as before.
+This lane boots the binary with its embedded console off (Vite serves the
+console here) but its hosted-login surface on: the mux mounts
+`/console/runtime.json` only alongside a UI surface, and that document carries
+the publishable key the login widget needs for the sign-in exchange (see
+[`moon.yml`](moon.yml)). The proxy forwards it like any other request. The
+project id reaches the console through `VITE_CONSOLE_PROJECT_ID` as before.
 
 ## Embedded-surface coverage
 
