@@ -231,9 +231,13 @@ tasks:
     # the aborts that prove the abort-retry path still works. Pinning it hid the
     # missing retry rather than fixing it (#788); do not put it back.
     #
-    # -p 1 stays: the suites share one emulator database, and packages like
-    # stmttest assert on global list results, so they still need to run one
-    # package at a time. That is test isolation, not contention avoidance.
+    # -p 1 stays, but not for isolation: testdb.SpannerDSN starts a fresh
+    # emulator testcontainer per package, so each package already has its own
+    # database in its own process. What the flag buys is not running three
+    # emulators at once. Dropping it would overlap stmttest and the spanner
+    # dialect package with integration_test and save roughly 40 seconds, which
+    # is a poor trade against three concurrent emulator containers on a
+    # developer laptop.
     command: "go"
     args:
       - "test"
@@ -241,13 +245,16 @@ tasks:
       - "-count=1"
       - "-tags"
       - "spanner_integration"
-      # Emulator-only budget: the emulator's query planner is pathologically slow
-      # on the principal-scoped authz list predicate (TestListAuthzTeamScoped*),
-      # spiking to ~9m30s and tripping a 10m timeout, while real Cloud Spanner
-      # runs the same predicate in ~40ms. Postgres runs the same test in 0.08s.
-      # Keep the other lanes tight so genuine hangs still surface; see #1011.
+      # Same budget as test-postgres. The emulator's planner is still slow on the
+      # authz list predicate, which real Cloud Spanner answers in ~40ms, but the
+      # lane no longer lets rows pile up in front of it: tests delete their own
+      # project when they finish, and the one test that reads lists against the
+      # whole database runs serially, so it meets an almost empty one. The
+      # integration_test package takes about 111s in CI, so this leaves roughly
+      # five times headroom and a genuine hang surfaces again instead of sitting
+      # inside a 20 minute window. See #1011.
       - "-timeout"
-      - "20m"
+      - "10m"
       - "-p"
       - "1"
       - "./..."
