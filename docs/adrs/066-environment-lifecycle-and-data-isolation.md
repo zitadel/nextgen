@@ -50,6 +50,25 @@ as `preview-<name>`, carrying an expiry that is renewed on deploy and enforced
 by garbage collection. They exist to try a release before it reaches `live`,
 and differ from `live` only in the release they serve.
 
+#### Creation
+
+`live` is created with the project and never by hand. Preview environments
+are created on demand: `zitadel preview` deploys a release to a preview by
+name (`POST /environments` on the wire), creating the environment if the name
+does not exist yet and renewing its expiry if it does. Deploying to the same
+name again is an update of the same environment, which is what keeps a
+preview's URL stable across redeploys.
+
+#### Deletion
+
+`live` cannot be deleted; it goes away only with its project. A preview is
+deleted when its expiry passes and the garbage collector picks it up, or
+earlier by hand (`zitadel env delete`, `DELETE /environments/{name}`).
+Deletion removes the environment record together with its deployment history;
+the releases it served belong to the project and are untouched. A collected
+name may be reused, and the reuse is a new environment with a new identity,
+not a revival of the old one.
+
 There are no other environment kinds. The earlier draft taxonomy of arbitrary
 long-lived environments per project, with dev, staging and prod as peers (the
 discarded lifecycle draft in
