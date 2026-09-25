@@ -10,6 +10,7 @@ content:
         - $ref: '../../../components/schemas/errors/proj-missing_id.yaml'
         - $ref: '../../../components/schemas/errors/proj-name_invalid.yaml'
         - $ref: '../../../components/schemas/errors/proj-not_found.yaml'
+        - $ref: '../../../components/schemas/errors/proj-password_hash_invalid.yaml'
         - $ref: '../../../components/schemas/errors/proj-permission_denied.yaml'
         - $ref: '../../../components/schemas/errors/req-invalid.yaml'
       discriminator:
@@ -21,6 +22,7 @@ content:
           proj.missing_id: '../../../components/schemas/errors/proj-missing_id.yaml'
           proj.name_invalid: '../../../components/schemas/errors/proj-name_invalid.yaml'
           proj.not_found: '../../../components/schemas/errors/proj-not_found.yaml'
+          proj.password_hash_invalid: '../../../components/schemas/errors/proj-password_hash_invalid.yaml'
           proj.permission_denied: '../../../components/schemas/errors/proj-permission_denied.yaml'
           req.invalid: '../../../components/schemas/errors/req-invalid.yaml'
     examples:
@@ -54,6 +56,11 @@ content:
         value:
           code: proj.not_found
           message: 'project not found'
+      proj.password_hash_invalid:
+        summary: proj.password_hash_invalid
+        value:
+          code: proj.password_hash_invalid
+          message: 'the password hashing method is invalid'
       proj.permission_denied:
         summary: proj.permission_denied
         value:
