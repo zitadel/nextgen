@@ -140,9 +140,10 @@ Consequences for changes here:
   session cookie is rebuilt from its token (`SESSION_COOKIE_NAME` +
   constants), so a future serialized session is `{ sessionToken, expiresAt }`,
   not a stored cookie object.
-- Dev loops feed from boot output: `console:dev-real` threads
-  `handle.projectSecret` into the Vite proxy env itself (and prints it under
-  `--seed-only`). Don't reintroduce developer-remembered credential env vars.
+- Dev loops feed from boot output: `console:dev-real` uses
+  `handle.projectSecret` server-side only, to seed and to grant the dev user
+  access; the console itself signs in with that user's session cookie (#1300).
+  Don't reintroduce developer-remembered credential env vars.
 
 ## Moon layering
 

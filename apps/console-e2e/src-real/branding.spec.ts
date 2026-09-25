@@ -13,8 +13,8 @@ import { expectNoErrorBoundary, signIn } from "./support";
  * failure mode the mock exists to avoid.
  */
 
-test("previews the project's own login beside the settings", async ({ page, seed }) => {
-  await signIn(page, await seed.user());
+test("previews the project's own login beside the settings", async ({ page, zitadel, seed }) => {
+  await signIn(page, zitadel.handle, await seed.user());
 
   await page.goto("/branding");
 
@@ -30,8 +30,12 @@ test("previews the project's own login beside the settings", async ({ page, seed
   await expectNoErrorBoundary(page);
 });
 
-test("is reached from the sidebar, nested under the flows it brands", async ({ page, seed }) => {
-  await signIn(page, await seed.user());
+test("is reached from the sidebar, nested under the flows it brands", async ({
+  page,
+  zitadel,
+  seed,
+}) => {
+  await signIn(page, zitadel.handle, await seed.user());
 
   await page.goto("/projects");
 
@@ -57,8 +61,12 @@ test("is reached from the sidebar, nested under the flows it brands", async ({ p
   await expectNoErrorBoundary(page);
 });
 
-test("shows the branding in use without a control to change it", async ({ page, seed }) => {
-  await signIn(page, await seed.user());
+test("shows the branding in use without a control to change it", async ({
+  page,
+  zitadel,
+  seed,
+}) => {
+  await signIn(page, zitadel.handle, await seed.user());
 
   await page.goto("/branding");
   await expect(page.locator("zitadel-login").getByRole("textbox", { name: "Email" })).toBeVisible();

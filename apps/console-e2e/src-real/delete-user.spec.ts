@@ -17,8 +17,12 @@ import { expectNoErrorBoundary, signIn } from "./support";
 test.describe.configure({ mode: "parallel" });
 
 /** Signs in as `actor` and lands on the users list. */
-async function openList(page: Page, actor: { email: string; password: string }): Promise<void> {
-  await signIn(page, actor);
+async function openList(
+  page: Page,
+  handle: Parameters<typeof signIn>[1],
+  actor: Parameters<typeof signIn>[2],
+): Promise<void> {
+  await signIn(page, handle, actor);
   await page.goto("/users");
   await expect(page.getByRole("heading", { name: "Users", exact: true })).toBeVisible();
 }
@@ -32,13 +36,12 @@ async function openDeleteDialog(page: Page, name: string) {
   return dialog;
 }
 
-
-test("deletes a user for real and drops it from the list", async ({ page, seed }) => {
+test("deletes a user for real and drops it from the list", async ({ page, zitadel, seed }) => {
   // Two users: one to sign in as, one to delete. Deleting the signed-in user
   // would end the session mid-test and prove something else entirely.
   const actor = await seed.user();
   const victim = await seed.user();
-  await openList(page, actor);
+  await openList(page, zitadel.handle, actor);
 
   const dialog = await openDeleteDialog(page, victim.email);
   await dialog.getByRole("textbox", { name: "Type DELETE to confirm" }).fill("DELETE");
@@ -56,10 +59,14 @@ test("deletes a user for real and drops it from the list", async ({ page, seed }
   await expectNoErrorBoundary(page);
 });
 
-test("keeps the confirm action locked until DELETE is typed exactly", async ({ page, seed }) => {
+test("keeps the confirm action locked until DELETE is typed exactly", async ({
+  page,
+  zitadel,
+  seed,
+}) => {
   const actor = await seed.user();
   const victim = await seed.user();
-  await openList(page, actor);
+  await openList(page, zitadel.handle, actor);
 
   const dialog = await openDeleteDialog(page, victim.email);
   const confirm = dialog.getByRole("button", { name: "Delete user", exact: true });
@@ -74,10 +81,10 @@ test("keeps the confirm action locked until DELETE is typed exactly", async ({ p
   await expect(confirm).toBeEnabled();
 });
 
-test("cancelling leaves the user in place", async ({ page, seed }) => {
+test("cancelling leaves the user in place", async ({ page, zitadel, seed }) => {
   const actor = await seed.user();
   const victim = await seed.user();
-  await openList(page, actor);
+  await openList(page, zitadel.handle, actor);
 
   const dialog = await openDeleteDialog(page, victim.email);
   await dialog.getByRole("textbox", { name: "Type DELETE to confirm" }).fill("DELETE");
@@ -92,12 +99,12 @@ test("cancelling leaves the user in place", async ({ page, seed }) => {
   await expect(reopened.getByRole("button", { name: "Delete user", exact: true })).toBeDisabled();
 });
 
-test("the row menu offers only actions the API can serve", async ({ page, seed }) => {
+test("the row menu offers only actions the API can serve", async ({ page, zitadel, seed }) => {
   // Edit user (#693), Deactivate (#553) and Reset password were rendering as
   // live controls with nothing behind them; they are out until they work.
   const actor = await seed.user();
   const victim = await seed.user();
-  await openList(page, actor);
+  await openList(page, zitadel.handle, actor);
 
   await page.getByRole("button", { name: `Actions for ${victim.email}` }).click();
   const menu = page.getByRole("menu", { name: `Actions for ${victim.email}` });

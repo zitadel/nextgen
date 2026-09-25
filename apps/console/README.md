@@ -73,9 +73,9 @@ against `GET /sessions/me` and redirects unauthenticated visitors to
 `/login?next=…`. Sign-out lives in the sidebar user menu
 (`DELETE /sessions/me`).
 
-The cookie authenticates the console UI and the session endpoints; the
-management API still authorizes via the server-held project secret (injected
-by the proxy) until session-derived permissions land server-side — see
+The cookie authenticates the console UI, the session endpoints, and the
+management API: a signed-in person sees and changes what their grants on the
+project allow (#1300). No project secret is involved — see
 [ADR 0003](docs/adrs/0003-console-authentication.md) for the model and its
 caveats (including the widget's dark-only styling for now).
 
@@ -127,10 +127,9 @@ production build.
 
 The runtime document also carries the default project's **publishable key**
 (root ADR 036): a browser-safe, origin-scoped bearer the login widget sends
-on flow calls and the handoff exchange. Sign-in therefore needs no
-`CONSOLE_PROJECT_SECRET` — the secret remains only for the management
-(operator-plane) data calls until session-derived permissions land
-(ADR 0003 §4).
+on flow calls and the handoff exchange. Sign-in therefore needs no server-side
+credential either. The server serves the document only while one of its UI
+surfaces (console or hosted login) is enabled.
 
 ## Local development
 
@@ -157,18 +156,11 @@ Vite, for pointing a separately-running console at a fresh instance. Overrides:
 `CONSOLE_DEV_EMAIL`, `CONSOLE_DEV_PASSWORD`, `CONSOLE_DEV_ZITADEL_PORT`,
 `CONSOLE_DEV_ORIGIN`. See [`scripts/dev-real.mts`](scripts/dev-real.mts).
 
-Note `queryUsers` requires `user.read`, which only the **project secret** carries
-— the browser-plane publishable key is deliberately refused
-(`internal/api/user.go`). So real list screens need the proxy's
-`CONSOLE_PROJECT_SECRET`, which this script supplies; sign-in alone does not.
-
-The proxy injects that secret only for requests aimed at the seeded project
-(no `project_id`, or the seeded one). A request scoped to another project —
-one you were granted access to, or one added with
-[`scripts/dev-real-add-project.mts`](scripts/dev-real-add-project.mts) — goes
-through on the session cookie alone, because the server lets a Bearer win over
-the cookie and the seeded project's secret would only hide the other project
-as a 404.
+The proxy adds no credential: every screen reads with the dev user's session
+cookie, which is why the script grants that user admin on the seeded project.
+A project you were granted access to, or one added with
+[`scripts/dev-real-add-project.mts`](scripts/dev-real-add-project.mts), works
+the same way — through the grant, not a secret.
 
 ### Mock backend
 
@@ -204,9 +196,7 @@ embed base path.
 | Variable | Where | Purpose |
 | --- | --- | --- |
 | `CONSOLE_BACKEND_URL` | Node (dev proxy) | Upstream API origin (defaults in `vite.config.mts`) |
-| `CONSOLE_PROJECT_SECRET` | Node (dev proxy) | Bearer attached by the proxy; never shipped to the browser |
-| `CONSOLE_PROJECT_SECRET_PROJECT_ID` | Node (dev proxy) | The project that secret belongs to; the proxy attaches the secret only to requests scoped to it (or to none). Defaults to `VITE_CONSOLE_PROJECT_ID`, which differs only in claim mode |
-| `CONSOLE_DEV_PROXY_LOG` | Node (dev proxy) | Set to `1` to print which credential each proxied request went out with (project secret, caller's authorization, or cookie only) — for a screen that answers 401/403/404 when it is not obvious who the server saw |
+| `CONSOLE_DEV_PROXY_LOG` | Node (dev proxy) | Set to `1` to print each proxied request — for a screen that answers 401/403/404 when it is not obvious what the server was asked |
 | `VITE_CONSOLE_API_BASE` | Client | Same-origin API base the SDK calls (default `/api`) |
 | `VITE_CONSOLE_PROJECT_ID` | Client | Dev override for the project id; when unset it is discovered from `/console/runtime.json` (Console ADR 0004) |
 | `VITE_CONSOLE_RUNTIME_FALLBACK` | Client (build/dev time) | Opt-in for runs with no `/console/runtime.json` (`vite preview`, api-mock): failed discovery resolves to `standalone` instead of the connectivity error. Never set it for the embedded build |

@@ -301,6 +301,12 @@ required assignments exist, management calls fail closed. The Console must
 not compensate by exposing a secret or treating every authenticated platform
 user as an administrator.
 
+> **Amendment (2026-09-25, #1300):** the bridge is gone. The management
+> operations the Console uses accept the session cookie and authorize it through
+> the signed-in person's grants on the target project, and the Vite dev proxy no
+> longer injects a project secret — it forwards requests as-is. Dev and the
+> embedded build take the same credential path.
+
 ### 5. Portal surfaces render from effective permissions
 
 Two questions govern a portal surface:

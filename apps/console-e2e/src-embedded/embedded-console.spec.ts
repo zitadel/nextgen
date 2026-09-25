@@ -1,5 +1,7 @@
 import { expect, test } from "@zitadel/testing/playwright";
 
+import { grantProjectAdmin } from "../src-real/support";
+
 /**
  * The console as the Go binary serves it (Console ADR 0002 §4).
  *
@@ -12,8 +14,7 @@ import { expect, test } from "@zitadel/testing/playwright";
  * mux that serves `/ui/login`, `/ui/console`, `/console/runtime.json`, `/`.
  *
  * Keep the assertions here about *reaching the API*. Console features belong
- * in `src-real/`, which runs the same screens with the dev proxy's project
- * secret and can therefore exercise the management calls this lane cannot.
+ * in `src-real/`, which runs the same screens through the Vite dev proxy.
  */
 
 test("signs in end to end against the embedded API", async ({ page, seed }) => {
@@ -69,6 +70,40 @@ test("signs in end to end against the embedded API", async ({ page, seed }) => {
   // so the honest answer is the empty state — what matters is that it is an
   // answer.
   await expect(page.getByRole("button", { name: "Switch project" })).toHaveText("No projects");
+});
+
+test("manages the project with the session cookie alone", async ({ page, seed, zitadel }) => {
+  // #1300: nothing on this lane holds the project secret — the binary serves
+  // the console and the API at one origin and no proxy adds a credential — so
+  // a granted operator's session cookie is what authorizes a management read
+  // and a management write. The grant is written from the test process.
+  const operator = await seed.user();
+  await grantProjectAdmin(zitadel.handle, operator.id);
+  const colleague = await seed.user();
+
+  await page.goto("/ui/console/");
+  await page.getByLabel("Email").fill(operator.email);
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  await page.getByLabel("Password").fill(operator.password);
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.waitForURL((url) => !url.pathname.endsWith("/login"));
+  await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();
+
+  await page.goto("/ui/console/users");
+  await expect(page.getByRole("link", { name: colleague.email, exact: true })).toBeVisible();
+
+  const name = `Embedded ${Date.now().toString(36)}`;
+  await page.goto("/ui/console/teams?status=active");
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+  const drawer = page.getByRole("dialog", { name: "Add team" });
+  await drawer.getByLabel("Team name").fill(name);
+  const created = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname === "/teams" && response.request().method() === "POST",
+  );
+  await drawer.getByRole("button", { name: "Add team", exact: true }).click();
+  expect((await created).status()).toBe(201);
+  await expect(page.getByRole("link", { name, exact: true })).toBeVisible();
 });
 
 test("targets the origin root, never an /api prefix", async ({ page }) => {
