@@ -9,6 +9,7 @@ you need proven.
 | `e2e`          | `vite preview`     | none                   | the SPA mounts under `/ui/console/` |
 | `e2e-real`     | Vite dev server    | real, via secret proxy | resource screens against real data |
 | `e2e-embedded` | the Go binary      | real, same origin      | the production request path        |
+| `walkthrough`  | the Go binary      | real, same origin      | nothing — records videos to review |
 
 ## Embedded shell smoke
 
@@ -71,9 +72,20 @@ deployment state cannot produce. The stubbed retry falls through to the real
 server, so recovery is asserted against a genuine document rather than a
 fixture.
 
-Keep feature coverage out of it. Management screens need `user.read`, which
-only the project secret carries — that is `e2e-real`'s job. This lane asserts
-that the surfaces reach the API at all.
+Keep feature coverage out of it — that is `e2e-real`'s job. This lane asserts
+that the surfaces reach the API at all. Management screens work here too: they
+authorize with the signed-in user's session cookie and grants (#1300), so a
+test that needs one grants its user access through the API first.
+
+## Walkthrough recordings
+
+`moon run console-e2e:walkthrough` boots the built binary like `e2e-embedded`
+and drives every management screen at a readable pace with only the session
+cookie, recording a video per scenario and a still per step into
+`walkthrough-videos/` (gitignored). It asserts nothing: an error state on
+screen is the result. Set `WALKTHROUGH_LABEL` (e.g. `before` / `after`) to name
+the recordings of two builds so a PR can show both; point
+`ZITADEL_SERVER_BINARY` at another build to record it. Not part of CI.
 
 ## Handling the handshake
 
