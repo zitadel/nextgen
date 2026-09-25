@@ -105,24 +105,3 @@ tasks:
     options:
       cache: false
       runInCI: false
-
-  # Screen recordings of the embedded console for PR descriptions (#1300):
-  # the built binary with the platform project bootstrapped (the server
-  # default), driven through every management screen on the session cookie
-  # alone. The output is a video per scenario and a still per step in
-  # recordings/, not a pass/fail verdict. RECORD_SCREENS_LABEL names the
-  # recordings (e.g. `before` / `after`) so a PR can show two builds.
-  record-screens:
-    command: "corepack pnpm exec playwright test --config playwright.record-screens.config.mts"
-    deps:
-      - "testing:build"
-      - "cli:build"
-      - "server:build"
-    env:
-      # Fixed pin, same reasoning as the other lanes. Neighbors: 8095
-      # console-e2e e2e-embedded.
-      RECORD_SCREENS_ZITADEL_PORT: "8096"
-      ZITADEL_SERVER_BINARY: "$workspaceRoot/dist/server/nextgen"
-    options:
-      cache: false
-      runInCI: false
