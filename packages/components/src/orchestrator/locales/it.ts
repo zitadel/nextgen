@@ -205,4 +205,9 @@ export const it: Locale = {
   // --- Alert a livello di modulo ---
   "error.sign_in_server.title": "Non è stato possibile completare l'accesso.",
   "error.sign_in_server.body": "Riprova tra qualche minuto",
+  "error.sso_cancelled.title": "Accesso annullato",
+  "error.sso_cancelled.body": "Hai annullato l'accesso con il provider, oppure la richiesta è stata rifiutata. Riprova o usa un altro metodo.",
+  "error.sso_failed.title": "Accesso non riuscito",
+  "error.sso_failed.body": "Il provider non ha potuto completare l'accesso. Riprova.",
+  "error.more_info": "Maggiori informazioni",
 };

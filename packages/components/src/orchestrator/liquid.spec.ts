@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createLiquidEngine, localiseFlowErrorKeys } from "./liquid.js";
+import { createLiquidEngine, localiseFlowErrorKeys, parseSsoError } from "./liquid.js";
 import { en as fullLocale } from "./locales/en.js";
 import { mandatoryGatesMarkerComment } from "./mandatory-gates.js";
 import { TEMPLATE_NAMES } from "./template-names.js";
@@ -666,6 +666,87 @@ function decodeEntities(value: string): string {
     .replaceAll("&lt;", "<")
     .replaceAll("&gt;", ">");
 }
+
+
+describe("parseSsoError", () => {
+  const tag = (obj: Record<string, string>) => "sso_error:" + btoa(JSON.stringify(obj));
+
+  it("returns null for a payload without the tag, so the catalog path handles it", () => {
+    expect(parseSsoError("error.invalid_credentials")).toBeNull();
+    expect(parseSsoError("user_not_found")).toBeNull();
+  });
+
+  it("unpacks code, description and uri into one form-level error", () => {
+    const errors = parseSsoError(
+      tag({
+        code: "access_denied",
+        description: "The user cancelled the sign-in.",
+        uri: "https://provider.example/errors/access_denied",
+      }),
+    );
+    expect(errors).toEqual([
+      {
+        text_key: "error.sso_cancelled",
+        code: "access_denied",
+        detail: "The user cancelled the sign-in.",
+        uri: "https://provider.example/errors/access_denied",
+      },
+    ]);
+    // No field, so the template renders it in the form-level banner.
+    expect(errors?.[0]?.field).toBeUndefined();
+  });
+
+  it("omits the optional fields the provider left out", () => {
+    // description and error_uri are optional in RFC 6749; a bare code is valid.
+    const errors = parseSsoError(tag({ code: "access_denied" }));
+    expect(errors?.[0]?.detail).toBeUndefined();
+    expect(errors?.[0]?.uri).toBeUndefined();
+  });
+
+  it("degrades a corrupt payload to a generic failure rather than leaking it", () => {
+    expect(parseSsoError("sso_error:not-valid-base64!!")).toEqual([{ text_key: "error.sso_failed" }]);
+  });
+});
+
+describe("provider error renders in the alert", () => {
+  const render = (errors: unknown) => {
+    const engine = createLiquidEngine({ locale: fullLocale });
+    return engine.renderFileSync(TEMPLATE_NAMES.default, {
+      step: { name: "identifier", type: "identifier", texts: { title_key: "identifier.title" } },
+      fields: [],
+      actions: [],
+      branding: {},
+      loading: false,
+      errors,
+      gates: {},
+      sso_providers: [],
+      messages: [],
+      identity: null,
+    });
+  };
+
+  it("shows the provider description and a styled link, escaping both", () => {
+    const out = render([
+      {
+        text_key: "error.sso_cancelled",
+        code: "access_denied",
+        detail: "Cancelled at O'Reilly.",
+        uri: "https://provider.example/e?x=1&y=2",
+      },
+    ]);
+    expect(out).toContain('class="zl-alert-detail"');
+    expect(out).toContain("Cancelled at O&#39;Reilly.");
+    expect(out).toContain('class="zl-alert-link"');
+    // The href is attribute-escaped, not raw browser-blue markup.
+    expect(out).toContain("https://provider.example/e?x=1&amp;y=2");
+  });
+
+  it("renders neither row when the error carries no detail or uri", () => {
+    const out = render([{ text_key: "error.invalid_credentials" }]);
+    expect(out).not.toContain("zl-alert-detail");
+    expect(out).not.toContain("zl-alert-link");
+  });
+});
 
 describe("localiseFlowErrorKeys", () => {
   const ctx = { locale: fullLocale, stepName: "register" };
