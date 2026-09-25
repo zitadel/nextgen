@@ -58,19 +58,19 @@ func (h *Handler) DeleteUserByID(ctx context.Context, params api.DeleteUserByIDP
 	return &api.DeleteUserByIDNoContent{}, nil
 }
 
-// QueryUsers is the users list (ADR 031). It carries no project parameter: the
-// credential's home project (oauth2 secret or user-bound session) is the
-// only authority for which project's users are served. The scope check is
-// what keeps a browser-plane preview secret out. Results are newest-first
-// unless the request sorts otherwise.
-func (h *Handler) QueryUsers(ctx context.Context, req *api.QueryUsersRequest) (api.QueryUsersRes, error) {
+// QueryUsers is the users list (ADR 031, #1300 §2), defaulting to the
+// credential's own project. The scope check is what keeps a browser-plane
+// preview secret out. Results are newest-first unless the request sorts
+// otherwise.
+func (h *Handler) QueryUsers(ctx context.Context, req *api.QueryUsersRequest, params api.QueryUsersParams) (api.QueryUsersRes, error) {
 	scopeCtx, _ := GetScopeContext(ctx)
-	ctx, err := h.requireProjectListAccess(ctx, scopeCtx.ProjectID, userAccess, domain.ResourceKindUser)
+	projectID := string(params.ProjectID.Or(api.ProjectID(scopeCtx.ProjectID)))
+	ctx, err := h.requireProjectListAccess(ctx, projectID, userAccess, domain.ResourceKindUser)
 	if err != nil {
 		return nil, err
 	}
 
-	input := mapQueryUsersToService(scopeCtx.ProjectID, req)
+	input := mapQueryUsersToService(projectID, req)
 	// Expanding answers 403 rather than a silently missing property: a caller
 	// could not tell that from "this user has no teams". Filtering on team_id
 	// reads the same memberships by a different route — it answers "who is in

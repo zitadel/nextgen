@@ -98,8 +98,7 @@ POST /users/query               # structured filters + cursor pagination (ADR 03
 ```
 
 There is no `GET /users`, matching projects and teams. `POST /users/query`
-takes no `project_id` either, unlike the other query endpoints: the users list
-is bound to the token's own project by construction.
+takes an optional `project_id`, defaulting to the credential's project (#1300).
 
 `DELETE /users/{id}` deactivates/tombstones the user, revokes sessions, tokens,
 and credentials, and deactivates memberships. Teams and resources the user
