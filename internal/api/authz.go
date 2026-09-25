@@ -185,16 +185,43 @@ type resourceAccessStmts interface {
 // RSI miss on read/write → resource 404; on delete → errResourceGone for
 // operators (handlers map to 204), else readMiss. Returns project_id for DAL calls.
 func (h *Handler) requireResourceAccess(ctx context.Context, resourceID string, res resourceAccess, op accessOp) (projectID string, err error) {
+	return h.requireResourceAccessIn(ctx, "", resourceID, res, op)
+}
+
+// requireResourceAccessIn is requireResourceAccess for ids that are unique only
+// within a project (schemas): projectHint, when set, names the project to
+// resolve the id in instead of the credential's own.
+func (h *Handler) requireResourceAccessIn(ctx context.Context, projectHint, resourceID string, res resourceAccess, op accessOp) (projectID string, err error) {
 	if h == nil || h.pool == nil {
 		return "", domain.ErrInternal(errors.New("authz statements not configured"))
 	}
-	return requireResourceAccess(ctx, h.pool.Statements(), resourceID, res, op)
+	return requireResourceAccess(ctx, h.pool.Statements(), projectHint, resourceID, res, op)
 }
 
-func lookupResourceScope(ctx context.Context, stmts resourceAccessStmts, resourceID string, res resourceAccess) (*domain.ResourceScope, error) {
+// lookupResourceScope finds the project a path id lives in. A project-bound
+// credential (secret) searches its own project; a user principal (a Console
+// session) is looked up across projects, because it manages projects other
+// than the one it signed in to (#1300 §3) — the Check that follows runs
+// against the resource's own project, so being found is not being allowed.
+// projectHint, when set, names the project to search instead. An id that is
+// unique only per project (a schema's `$id`) and matches in several projects
+// resolves in the session's own project, or not at all.
+func lookupResourceScope(ctx context.Context, stmts resourceAccessStmts, projectHint, resourceID string, res resourceAccess) (*domain.ResourceScope, error) {
+	cred, _ := GetScopeContext(ctx)
+	if res.kind != "" && projectHint == "" && cred.PrincipalType == domain.AuthzPrincipalTypeUser {
+		scope, err := stmts.GetResourceScope(ctx, resourceID)
+		if !errors.Is(err, new(database.MultipleRowsFoundError)) {
+			return scope, err
+		}
+		projectHint = cred.ProjectID
+	}
 	if res.kind != "" {
-		if cred, ok := GetScopeContext(ctx); ok && cred.ProjectID != "" {
-			scope, err := stmts.GetResourceScopeInProject(ctx, res.kind, cred.ProjectID, resourceID)
+		home := projectHint
+		if home == "" {
+			home = cred.ProjectID
+		}
+		if home != "" {
+			scope, err := stmts.GetResourceScopeInProject(ctx, res.kind, home, resourceID)
 			if err == nil {
 				return scope, nil
 			}
@@ -202,7 +229,7 @@ func lookupResourceScope(ctx context.Context, stmts resourceAccessStmts, resourc
 				return nil, err
 			}
 			// Same-project row under a different kind (e.g. schema id on a user route).
-			if same, gerr := stmts.GetResourceScopeByIDInProject(ctx, cred.ProjectID, resourceID); gerr == nil {
+			if same, gerr := stmts.GetResourceScopeByIDInProject(ctx, home, resourceID); gerr == nil {
 				return same, nil
 			} else if !errors.Is(gerr, new(database.NoRowFoundError)) {
 				return nil, gerr
@@ -213,8 +240,8 @@ func lookupResourceScope(ctx context.Context, stmts resourceAccessStmts, resourc
 	return stmts.GetResourceScope(ctx, resourceID)
 }
 
-func requireResourceAccess(ctx context.Context, stmts resourceAccessStmts, resourceID string, res resourceAccess, op accessOp) (string, error) {
-	scope, err := lookupResourceScope(ctx, stmts, resourceID, res)
+func requireResourceAccess(ctx context.Context, stmts resourceAccessStmts, projectHint, resourceID string, res resourceAccess, op accessOp) (string, error) {
+	scope, err := lookupResourceScope(ctx, stmts, projectHint, resourceID, res)
 	if err != nil {
 		if errors.Is(err, new(database.NoRowFoundError)) {
 			if op == opDelete {

@@ -755,7 +755,7 @@ func TestRequireResourceAccess(t *testing.T) {
 		PrincipalType: domain.AuthzPrincipalTypeSKProj, PrincipalID: "proj_a",
 	})
 
-	projectID, err := requireResourceAccess(operator, stmts, "usr_a", userAccess, opRead)
+	projectID, err := requireResourceAccess(operator, stmts, "", "usr_a", userAccess, opRead)
 	if err != nil {
 		t.Fatalf("own-project resource: %v", err)
 	}
@@ -763,37 +763,37 @@ func TestRequireResourceAccess(t *testing.T) {
 		t.Fatalf("projectID = %q, want proj_a", projectID)
 	}
 
-	_, err = requireResourceAccess(operator, stmts, "usr_missing", userAccess, opRead)
+	_, err = requireResourceAccess(operator, stmts, "", "usr_missing", userAccess, opRead)
 	assertDomainCode(t, err, domain.ErrUserNotFound().Code)
 
-	_, err = requireResourceAccess(operator, stmts, "usr_missing", userAccess, opWrite)
+	_, err = requireResourceAccess(operator, stmts, "", "usr_missing", userAccess, opWrite)
 	assertDomainCode(t, err, domain.ErrUserNotFound().Code)
 
-	_, err = requireResourceAccess(operator, stmts, "usr_missing", userAccess, opDelete)
+	_, err = requireResourceAccess(operator, stmts, "", "usr_missing", userAccess, opDelete)
 	if !errors.Is(err, errResourceGone) {
 		t.Fatalf("operator delete RSI miss: %v, want errResourceGone", err)
 	}
 
-	_, err = requireResourceAccess(preview, stmts, "usr_missing", userAccess, opDelete)
+	_, err = requireResourceAccess(preview, stmts, "", "usr_missing", userAccess, opDelete)
 	assertDomainCode(t, err, domain.ErrUserNotFound().Code)
 
-	_, err = requireResourceAccess(context.Background(), stmts, "usr_missing", userAccess, opDelete)
+	_, err = requireResourceAccess(context.Background(), stmts, "", "usr_missing", userAccess, opDelete)
 	assertDomainCode(t, err, domain.ErrUserNotFound().Code)
 
-	_, err = requireResourceAccess(operator, stmts, "usr_b", userAccess, opRead)
+	_, err = requireResourceAccess(operator, stmts, "", "usr_b", userAccess, opRead)
 	assertDomainCode(t, err, domain.ErrUserNotFound().Code)
 
 	// Foreign delete of a real id must not 204 — anti-oracle readMiss.
-	_, err = requireResourceAccess(operator, stmts, "usr_b", userAccess, opDelete)
+	_, err = requireResourceAccess(operator, stmts, "", "usr_b", userAccess, opDelete)
 	assertDomainCode(t, err, domain.ErrUserNotFound().Code)
 
-	_, err = requireResourceAccess(operator, stmts, "usr_b", userAccess, opWrite)
+	_, err = requireResourceAccess(operator, stmts, "", "usr_b", userAccess, opWrite)
 	assertDomainCode(t, err, domain.ErrUserNotFound().Code)
 
-	_, err = requireResourceAccess(preview, stmts, "usr_a", userAccess, opRead)
+	_, err = requireResourceAccess(preview, stmts, "", "usr_a", userAccess, opRead)
 	assertDomainCode(t, err, domain.ErrUserPermissionDenied().Code)
 
-	_, err = requireResourceAccess(preview, stmts, "usr_a", userAccess, opDelete)
+	_, err = requireResourceAccess(preview, stmts, "", "usr_a", userAccess, opDelete)
 	assertDomainCode(t, err, domain.ErrUserPermissionDenied().Code)
 }
 
@@ -807,10 +807,10 @@ func TestRequireResourceAccessWrongKind(t *testing.T) {
 		PrincipalType: domain.AuthzPrincipalTypeSKProj, PrincipalID: "proj_a",
 	})
 
-	_, err := requireResourceAccess(operator, stmts, "id_shared", userAccess, opRead)
+	_, err := requireResourceAccess(operator, stmts, "", "id_shared", userAccess, opRead)
 	assertDomainCode(t, err, domain.ErrUserNotFound().Code)
 
-	_, err = requireResourceAccess(operator, stmts, "id_shared", userAccess, opDelete)
+	_, err = requireResourceAccess(operator, stmts, "", "id_shared", userAccess, opDelete)
 	assertDomainCode(t, err, domain.ErrUserNotFound().Code)
 }
 
@@ -826,7 +826,7 @@ func TestRequireResourceAccessDeleteSharedURLElsewhere(t *testing.T) {
 		PrincipalType: domain.AuthzPrincipalTypeSKProj, PrincipalID: "proj_a",
 	})
 
-	_, err := requireResourceAccess(operator, stmts, "https://example.com/x.json", schemaAccess, opDelete)
+	_, err := requireResourceAccess(operator, stmts, "", "https://example.com/x.json", schemaAccess, opDelete)
 	assertDomainCode(t, err, domain.ErrJSONSchemaNotFound().Code)
 }
 
@@ -842,4 +842,110 @@ func assertDomainCode(t *testing.T, err error, wantCode string) {
 	if de.Code != wantCode {
 		t.Fatalf("error code = %q, want %q (%v)", de.Code, wantCode, err)
 	}
+}
+
+// rowsResourceScopeStmts serves resource_scope_index lookups from a row list,
+// so one id can live in several projects (a schema's `$id`).
+type rowsResourceScopeStmts struct {
+	stubAuthzStmts
+	rows []domain.ResourceScope
+}
+
+func (s rowsResourceScopeStmts) GetResourceScope(_ context.Context, resourceID string) (*domain.ResourceScope, error) {
+	var found []domain.ResourceScope
+	for _, row := range s.rows {
+		if row.ResourceID == resourceID {
+			found = append(found, row)
+		}
+	}
+	switch len(found) {
+	case 0:
+		return nil, new(database.NoRowFoundError)
+	case 1:
+		return &found[0], nil
+	default:
+		return nil, new(database.MultipleRowsFoundError)
+	}
+}
+
+func (s rowsResourceScopeStmts) GetResourceScopeInProject(_ context.Context, kind domain.ResourceKind, projectID, resourceID string) (*domain.ResourceScope, error) {
+	for _, row := range s.rows {
+		if row.ResourceID == resourceID && row.ProjectID == projectID && row.ResourceKind == kind {
+			return &row, nil
+		}
+	}
+	return nil, new(database.NoRowFoundError)
+}
+
+func (s rowsResourceScopeStmts) GetResourceScopeByIDInProject(_ context.Context, projectID, resourceID string) (*domain.ResourceScope, error) {
+	for _, row := range s.rows {
+		if row.ResourceID == resourceID && row.ProjectID == projectID {
+			return &row, nil
+		}
+	}
+	return nil, new(database.NoRowFoundError)
+}
+
+// TestLookupResourceScopeAcrossProjects pins #1300 §3: a user principal (a
+// Console session) resolves ids in any project, a secret only in its own, and
+// an id that exists in several projects needs a hint or falls back to the
+// session's own project.
+func TestLookupResourceScopeAcrossProjects(t *testing.T) {
+	t.Parallel()
+
+	const sharedSchema = "https://example.test/schemas/default-human-user.json"
+	stmts := rowsResourceScopeStmts{rows: []domain.ResourceScope{
+		{ResourceID: "user_b", ResourceKind: domain.ResourceKindUser, ProjectID: "proj_b"},
+		{ResourceID: sharedSchema, ResourceKind: domain.ResourceKindSchema, ProjectID: "proj_home"},
+		{ResourceID: sharedSchema, ResourceKind: domain.ResourceKindSchema, ProjectID: "proj_b"},
+		{ResourceID: sharedSchema, ResourceKind: domain.ResourceKindSchema, ProjectID: "proj_c"},
+	}}
+	session := WithScopeContext(t.Context(), ScopeContext{
+		ProjectID: "proj_home", PrincipalType: domain.AuthzPrincipalTypeUser, PrincipalID: "user_operator",
+	})
+	secret := WithScopeContext(t.Context(), ScopeContext{
+		ProjectID: "proj_home", PrincipalType: domain.AuthzPrincipalTypeSKProj, PrincipalID: "proj_home",
+		Scope: []string{"project.write"},
+	})
+
+	tests := []struct {
+		name        string
+		ctx         context.Context
+		hint, id    string
+		access      resourceAccess
+		wantProject string
+	}{
+		{"session finds a unique id in another project", session, "", "user_b", userAccess, "proj_b"},
+		{"secret stays in its own project", secret, "", "user_b", userAccess, ""},
+		{"session resolves an ambiguous id in its own project", session, "", sharedSchema, schemaAccess, "proj_home"},
+		{"session names the project of an ambiguous id", session, "proj_b", sharedSchema, schemaAccess, "proj_b"},
+		{"secret resolves an ambiguous id in its own project", secret, "", sharedSchema, schemaAccess, "proj_home"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			scope, err := lookupResourceScope(tt.ctx, stmts, tt.hint, tt.id, tt.access)
+			if tt.wantProject == "" {
+				if !errors.Is(err, new(database.NoRowFoundError)) {
+					t.Fatalf("want NoRowFoundError, got scope %+v, err %v", scope, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("lookup: %v", err)
+			}
+			if scope.ProjectID != tt.wantProject {
+				t.Fatalf("resolved in %q, want %q", scope.ProjectID, tt.wantProject)
+			}
+		})
+	}
+
+	t.Run("an ambiguous id outside the session's own project is not found", func(t *testing.T) {
+		t.Parallel()
+		elsewhere := rowsResourceScopeStmts{rows: stmts.rows[2:]}
+		scope, err := lookupResourceScope(session, elsewhere, "", sharedSchema, schemaAccess)
+		if !errors.Is(err, new(database.NoRowFoundError)) {
+			t.Fatalf("want NoRowFoundError, got scope %+v, err %v", scope, err)
+		}
+	})
 }
