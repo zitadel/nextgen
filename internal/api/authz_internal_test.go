@@ -245,7 +245,10 @@ func TestRequireExpandScope(t *testing.T) {
 			t.Fatalf("code %q, want %q", de.Code, domain.ErrTeamPermissionDenied().Code)
 		}
 	})
-	t.Run("session user does not skip users-query expand ceilings", func(t *testing.T) {
+	// #1300 §4 (relaxed): a session mints no scopes, so the expand ceilings
+	// let a user principal through — it has passed the project Check already.
+	// hasGranularOrOperator itself still reads scopes only.
+	t.Run("session user passes users-query expand ceilings", func(t *testing.T) {
 		ctx := WithScopeContext(context.Background(), ScopeContext{
 			ProjectID:     "proj_platform",
 			PrincipalType: domain.AuthzPrincipalTypeUser,
@@ -254,11 +257,11 @@ func TestRequireExpandScope(t *testing.T) {
 		if hasGranularOrOperator(ctx, "user.read") || hasGranularOrOperator(ctx, "team.read") {
 			t.Fatal("empty-scope user must not satisfy hasGranularOrOperator")
 		}
-		if err := requireMembershipRead(ctx); err == nil {
-			t.Fatal("session users must still need team_membership.read")
+		if err := requireMembershipRead(ctx); err != nil {
+			t.Fatalf("session users pass the team_membership.read ceiling: %v", err)
 		}
-		if err := requireTeamRead(ctx); err == nil {
-			t.Fatal("session users must still need team.read")
+		if err := requireTeamRead(ctx); err != nil {
+			t.Fatalf("session users pass the team.read ceiling: %v", err)
 		}
 	})
 }

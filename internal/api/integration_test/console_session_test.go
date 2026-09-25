@@ -450,6 +450,39 @@ func TestConsoleSessionReadsTargetProjectByID(t *testing.T) {
 	})
 }
 
+// TestConsoleSessionExpandsUserTeams pins #1300 §4 (relaxed): a session mints
+// no scopes, so the team_membership.read / team.read ceilings on
+// queryUsers' expansions let a user principal through once it has passed the
+// Check on the target project. The Console's Team column depends on it.
+func TestConsoleSessionExpandsUserTeams(t *testing.T) {
+	t.Parallel()
+
+	console := harness.EnsurePlatformProject(t)
+	operatorID, _ := harness.CreateUserOwnedByTeam(t, console.ID)
+
+	customer, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	harness.SeedProjectAdmin(t, customer.ID, operatorID)
+	memberID := harness.CreateUserWithTeam(t, customer.ID)
+
+	session := sessionClientForUser(t, operatorID)
+	resp, err := session.QueryUsers(t.Context(), &api.QueryUsersRequest{
+		Expand: []api.UserExpand{api.UserExpandTeams, api.UserExpandLifecycleOwnerTeam},
+	}, api.QueryUsersParams{ProjectID: api.NewOptProjectID(api.ProjectID(customer.ID))})
+	require.NoError(t, err)
+	listed, ok := resp.(*api.QueryUsersResponse)
+	require.True(t, ok, helpers.MustMarshal(t, resp))
+
+	var member *api.User
+	for i := range listed.Users {
+		if userID(t, listed.Users[i]) == memberID {
+			member = &listed.Users[i]
+		}
+	}
+	require.NotNil(t, member, helpers.MustMarshal(t, listed))
+	require.NotEmpty(t, member.Teams, "the expansion must embed the member's team")
+}
+
 // TestConsoleManagementBearerIgnoresStaleCookie pins the dual-scheme
 // precedence: a valid project secret authorizes the request even when a stale
 // or malformed session cookie rides along, instead of the cookie's failure

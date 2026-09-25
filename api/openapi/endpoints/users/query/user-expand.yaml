@@ -25,6 +25,10 @@ description: |
 
   The two are independent: asking for one says nothing about the other, and
   neither implies the other's permission.
+
+  The scope requirements apply to project secrets. A Console session carries
+  no scopes; once it is authorized to list the project's users, it may use
+  both expansions.
 enum:
   - teams
   - lifecycle_owner_team
