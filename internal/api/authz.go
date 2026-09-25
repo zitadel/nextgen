@@ -406,8 +406,17 @@ func hasGranularOrOperator(ctx context.Context, scope string) bool {
 // requireExpandScope gates an ADR 059 expand that reads a related resource.
 // The operator project.write fallback is interim until #420 mints granular
 // scopes. WithMessage keeps the sentinel code so errors.Is still matches.
+//
+// A user principal (a Console session) mints no scopes, so it would always be
+// refused here however much its grants allow. It passes instead (#1300 §4,
+// relaxed): the caller has already passed the Check on the target project, so
+// the expansion only reads within a project it can read. Deriving
+// team_membership.read / team.read from the resolver is a follow-up (#1300).
 func requireExpandScope(ctx context.Context, scope string, denied func() domain.Error, msg string) error {
 	if hasGranularOrOperator(ctx, scope) {
+		return nil
+	}
+	if sc, ok := GetScopeContext(ctx); ok && sc.PrincipalType == domain.AuthzPrincipalTypeUser {
 		return nil
 	}
 	return denied().WithMessage(msg)

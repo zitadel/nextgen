@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"errors"
-	"strings"
 	"testing"
 
 	"go.uber.org/mock/gomock"
@@ -105,45 +104,28 @@ func TestQueryUsers_SessionCaller(t *testing.T) {
 		}
 	})
 
-	t.Run("expand and membership filter still need read scopes", func(t *testing.T) {
+	// #1300 §4 (relaxed): the session has passed the project Check, so its
+	// expansions and the membership filter run instead of answering 403.
+	t.Run("expand and membership filter pass for a session", func(t *testing.T) {
 		tests := []struct {
 			name string
 			req  *api.QueryUsersRequest
-			want string
 		}{
-			{
-				name: "expand teams",
-				req:  &api.QueryUsersRequest{Expand: []api.UserExpand{api.UserExpandTeams}},
-				want: "team_membership.read",
-			},
-			{
-				name: "team_id filter",
-				req: &api.QueryUsersRequest{Filter: []api.QueryUsersRequestFilterItem{{
-					Field: api.UserFilterFieldTeamID,
-				}}},
-				want: "team_membership.read",
-			},
-			{
-				name: "expand owner team",
-				req:  &api.QueryUsersRequest{Expand: []api.UserExpand{api.UserExpandLifecycleOwnerTeam}},
-				want: "team.read",
-			},
+			{"expand teams", &api.QueryUsersRequest{Expand: []api.UserExpand{api.UserExpandTeams}}},
+			{"team_id filter", &api.QueryUsersRequest{Filter: []api.QueryUsersRequestFilterItem{{
+				Field: api.UserFilterFieldTeamID,
+			}}}},
+			{"expand owner team", &api.QueryUsersRequest{Expand: []api.UserExpand{api.UserExpandLifecycleOwnerTeam}}},
 		}
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
 				users := &stubQueryUsersService{}
 				h := queryUsersHandler(t, true, true, users)
-				_, err := h.QueryUsers(userCtx, tt.req, api.QueryUsersParams{})
-				assertDomainCode(t, err, domain.ErrUserPermissionDenied().Code)
-				var de domain.Error
-				if !errors.As(err, &de) {
-					t.Fatalf("error is not a domain.Error: %v", err)
+				if _, err := h.QueryUsers(userCtx, tt.req, api.QueryUsersParams{}); err != nil {
+					t.Fatalf("QueryUsers: %v", err)
 				}
-				if !strings.Contains(de.Message, tt.want) {
-					t.Fatalf("message %q does not name %q", de.Message, tt.want)
-				}
-				if len(users.listProjectIDs) != 0 {
-					t.Fatalf("ListUsers must not run after expand/filter deny, got %v", users.listProjectIDs)
+				if len(users.listProjectIDs) != 1 {
+					t.Fatalf("ListUsers must run once, got %v", users.listProjectIDs)
 				}
 			})
 		}

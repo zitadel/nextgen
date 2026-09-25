@@ -56985,6 +56985,9 @@ func (s *UserDeletedEventDelegationType) UnmarshalText(data []byte) error {
 // Requires `team.read` in addition to `user.read`.
 // The two are independent: asking for one says nothing about the other, and
 // neither implies the other's permission.
+// The scope requirements apply to project secrets. A Console session carries
+// no scopes; once it is authorized to list the project's users, it may use
+// both expansions.
 // Ref: #
 type UserExpand string
 
@@ -57050,6 +57053,8 @@ func (s *UserExpand) UnmarshalText(data []byte) error {
 // it is absent from the sort-field enum.
 // Filtering on `team_id` requires `team_membership.read` in addition to
 // `user.read`: it reads the same memberships that `expand: ["teams"]` embeds.
+// A Console session, which carries no scopes, may filter on it once it is
+// authorized to list the project's users.
 // Ref: #
 type UserFilterField string
 
