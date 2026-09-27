@@ -24,14 +24,15 @@ and release workflows. Agent-facing workspace rules live in
 
 ### I am adding Zitadel to my app
 
-| I want to...                      | Run                                                            |
-| --------------------------------- | -------------------------------------------------------------- |
-| Check local runtime prerequisites | `npx @zitadel/cli@alpha doctor`                                |
-| Start local Zitadel               | `npx @zitadel/cli@alpha start`                                 |
-| Add auth to my app                | `npx @zitadel/cli@alpha setup --server local`                  |
-| Check generated app files         | `npx @zitadel/cli@alpha doctor`                                |
-| Stop local Zitadel, keeping data  | `npx @zitadel/cli@alpha stop`                                  |
-| Delete local Zitadel data         | `npx @zitadel/cli@alpha reset --force`                         |
+| I want to...                                         | Run                                           |
+| ---------------------------------------------------- | --------------------------------------------- |
+| Check local runtime prerequisites                    | `npx @zitadel/cli@alpha doctor`               |
+| Start local Zitadel                                  | `npx @zitadel/cli@alpha start`                |
+| Add auth to my app                                   | `npx @zitadel/cli@alpha setup --server local` |
+| Open the local console, signed in as the local admin | `npx @zitadel/cli@alpha console`              |
+| Check generated app files                            | `npx @zitadel/cli@alpha doctor`               |
+| Stop local Zitadel, keeping data                     | `npx @zitadel/cli@alpha stop`                 |
+| Delete local Zitadel data                            | `npx @zitadel/cli@alpha reset --force`        |
 
 The published `zitadel` runtime commands run the released local runtime through
 the `@zitadel/server` npm binary by default and do not require Docker, Go, Moon,
@@ -55,29 +56,58 @@ cd myapp
 npx @zitadel/cli@alpha doctor
 ```
 
-Pick a server before running `setup` — it can't be changed on this app
-afterward. Use `--server local` for local dev, or point at a hosted Zitadel
-Cloud instance if you intend to claim the project later and attach it to your
-team:
+Pick a server before running `setup`. It cannot be changed on this app
+afterwards. Use `--server local` for local development, or point at a hosted
+Zitadel Cloud instance if you want the project to belong to your team there.
+
+### Local
 
 ```sh
-npx @zitadel/cli@alpha start                # local dev only
-npx @zitadel/cli@alpha setup --server local  # or --server https://api.zitadel.cloud
+npx @zitadel/cli@alpha start
+npx @zitadel/cli@alpha setup --server local
 npm run dev
 ```
 
-Open http://localhost:3000/login and register your first user. `setup` walks
-through the scaffold choices (such as which framework and use case) and
-writes the app into the current directory; pass `--skip-install` if you want
-to install dependencies yourself. With `--server local`, the managed Zitadel
-runtime stores its metadata and data under `.zitadel/local/`; `stop`
-preserves that data and `reset --force` deletes it — none of that applies
-against a hosted server, which has no local runtime to manage.
+`start` boots the local Zitadel runtime and creates a local admin,
+`admin@zitadel.localhost`. It ends by printing a sign-in link for the
+management console. That link works once.
 
-### Claim your project (Zitadel Cloud only)
+`setup --server local` creates the project and, by default, attaches it to
+that admin's team, so the project is owned from the start and `zitadel claim`
+reports it as already owned. If that attempt fails, setup prints a warning and
+`zitadel claim` remains the way to attach it. If you turned the platform
+bootstrap off, the server has no local admin and no claiming at all, so the
+project simply has no owning team.
 
-If you set up against Zitadel Cloud above, attach the project to your team
-once the app is up:
+Any time you need the console again, print a fresh link:
+
+```sh
+npx @zitadel/cli@alpha console
+```
+
+The console shows your project and lets you add colleagues as project admins
+by their email address. Pass `--no-open` to print the link instead of opening
+a browser. For the admin credential file, how its password is handled, and
+how to turn the local admin off, see [apps/cli/SKILLS.md](apps/cli/SKILLS.md).
+
+Open http://localhost:3000/login and register your first user. That user is
+an end user of your app, a different identity from the console admin above.
+`setup` walks through the scaffold choices (such as which framework and use
+case) and writes the app into the current directory; pass `--skip-install` if
+you want to install dependencies yourself. The managed Zitadel runtime stores
+its metadata and data under `.zitadel/local/`; `stop` preserves that data and
+`reset --force` deletes it.
+
+### Zitadel Cloud
+
+```sh
+npx @zitadel/cli@alpha setup --server https://api.zitadel.cloud
+npm run dev
+```
+
+A hosted server has no local runtime to manage, so `start`, `stop`, `reset`
+and `console` do not apply there. Once the app is up, attach the project to
+your team:
 
 ```sh
 npx @zitadel/cli@alpha claim
@@ -87,22 +117,8 @@ This opens a browser so you can sign in with your own Zitadel account (not
 one of the app's end users) and attach the project to your team. The link
 prints before any browser opens, so it works over SSH or headless too
 (`--no-open`); nothing about the running project changes. Claiming only
-works within 14 days of running `setup` — after that, `setup` a fresh
+works within 14 days of running `setup`. After that, `setup` a fresh
 project instead.
-
-> **Trying this before deploying to Zitadel Cloud:** claiming needs a server
-> with a platform project bootstrapped, which Zitadel Cloud has by default.
-> To exercise the same flow locally today, run the Docker deploy with the
-> platform project enabled and use `http://localhost:8080` as the `--server`
-> above — see [docker-compose.md](docs/quick-start/docker-compose.md)
-> and [configuration.md § Platform](docs/quick-start/configuration.md#platform).
-> This box goes away once claiming against Zitadel Cloud is verified
-> end to end.
-
-<!-- Claiming is a strong signal for adoption, so once the cloud path above is
-verified end to end, this is proposed to become the primary customer quick
-start — author a project locally, connect it to an app, claim it on Zitadel
-Cloud — rather than a separate section. -->
 
 ## Manual Docker quick start
 
@@ -120,6 +136,11 @@ docker compose up -d
 | Management console | http://localhost:8080/ui/console/ |
 | Sign-in shell      | http://localhost:8080/ui/login/   |
 | Health             | http://localhost:8080/healthz     |
+
+A fresh Compose server has no project and no user yet, so this console shows
+its setup prompt until you seed one (see
+[docker-compose.md](docs/quick-start/docker-compose.md)). On the CLI path
+above, `zitadel console` signs you in as the local admin instead.
 
 Details: [docs/quick-start/index.md](docs/quick-start/index.md). To build from source: [CONTRIBUTING.md](CONTRIBUTING.md).
 

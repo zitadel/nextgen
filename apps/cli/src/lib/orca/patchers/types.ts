@@ -1,5 +1,5 @@
 import type { FrameworkFacts } from "../detectors/types";
-import type { CreateProjectResponse } from "../../api/client";
+import type { CreateProject201 } from "@zitadel/api/generated/model";
 import type { ScaffoldFileClass, ScaffoldPosture } from "../../sync/types";
 
 /**
@@ -24,7 +24,12 @@ export type PatchView = Readonly<{
  */
 export type PatchContext = PatchView &
   Readonly<{
-    project: CreateProjectResponse;
+    /**
+     * The created project, minus its name: `doctor` rebuilds this context from
+     * `.zitadel/secret`, which records the project's ids and secrets but not
+     * its name, and no patcher needs the name to fill a file.
+     */
+    project: Omit<CreateProject201, "name">;
     issuer: string;
     server: string;
     cliVersion: string;

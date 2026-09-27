@@ -12,6 +12,7 @@ import {
   bodyFromFlags,
   describeBody,
   fieldExample,
+  needsRawBody,
 } from "../../../../../src/lib/oclif/crud";
 
 const byName = (schema: Parameters<typeof describeBody>[0]) =>
@@ -55,6 +56,15 @@ describe("describeBody", () => {
   it("skips fields that would collide with an existing flag", () => {
     const schema = z.object({ data: z.string(), name: z.string() });
     expect(describeBody(schema).map((field) => field.name)).toEqual(["name"]);
+  });
+
+  it("no longer reserves `environment`, which no generated command owns", () => {
+    // The reserved set exists to keep a body field from shadowing a flag the
+    // command itself declares. No resource command declares `--environment`
+    // any more, so a resource whose body carries that field gets its flag.
+    const schema = z.object({ environment: z.string() });
+    expect(byName(schema).environment?.flag).toBe("environment");
+    expect(Object.keys(bodyFieldFlags(describeBody(schema)))).toContain("environment");
   });
 
   it("returns nothing for a schema it cannot introspect", () => {
@@ -189,6 +199,24 @@ describe("bodyFromFlags", () => {
 
   it("returns undefined when no field flag was given", () => {
     expect(bodyFromFlags(grantFields, { json: true })).toBeUndefined();
+  });
+});
+
+describe("needsRawBody", () => {
+  it("reports a body whose principal is a nested object", () => {
+    // `user` and `team` carry the grant's principal and neither becomes a flag,
+    // so no run made of flags alone is a complete grant.
+    expect(needsRawBody(CreateGrantBody)).toBe(true);
+  });
+
+  it("reports nothing for a body every field of which is a flag", () => {
+    expect(needsRawBody(CreateTeamBody)).toBe(false);
+    expect(needsRawBody(CreateUserBody)).toBe(false);
+    expect(needsRawBody(PatchProjectBody)).toBe(false);
+  });
+
+  it("reports nothing for a schema it cannot introspect", () => {
+    expect(needsRawBody(z.string())).toBe(false);
   });
 });
 

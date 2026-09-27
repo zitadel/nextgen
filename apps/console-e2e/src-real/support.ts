@@ -44,7 +44,7 @@ export async function signIn(
  * A seeded user can sign in to the console but holds no grant, and the console
  * lists only the projects a person can act on (`GET /users/me/projects`,
  * #1237) — so without this the project pill and the Projects screen are
- * honestly empty. The grant is the same one Settings → Admins creates.
+ * honestly empty. The grant is the same one a project's admins section creates.
  *
  * Written with the boot-captured project secret from the test process, never
  * from the page: the browser must not see it (see the credential-leak spec).

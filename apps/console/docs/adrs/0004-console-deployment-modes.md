@@ -25,6 +25,20 @@
 > (Console / Customer Portal epic) and
 > [#527](https://github.com/zitadel/nextgen/issues/527) (platform-project
 > bootstrap).
+>
+> **Amendment (2026-09-24):** the body below still describes
+> `platform.bootstrap_project` as a row-only insert and a manual opt-in. Both
+> have moved. The flag now provisions the reserved platform project properly:
+> encryption and signing keys, the default user schema, and the default login
+> flow. And the CLI turns it on by itself: `zitadel start` sets the flag and
+> hands the server an initial operator, `admin@zitadel.localhost`, through
+> `--user-file`, so a CLI-started server with the default bootstrap signs the
+> Console into `proj_platform` without an operator touching configuration;
+> `NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=false` or a non-platform project pin
+> keeps the transitional fallback. What is still
+> missing from §2 is the server-discovered seed contract for membership and
+> owner assignment, not the initial user. This note records the drift; the
+> body is unchanged.
 
 ## Context
 

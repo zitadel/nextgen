@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
 )
 
 func (h *Harness) EnsureSigningKey(t *testing.T) *rsa.PrivateKey {
@@ -40,18 +41,28 @@ func (h *Harness) EnsureHashValidator(t *testing.T) crypto.HashValidator {
 
 func (h *Harness) ensureHasher(t *testing.T) *crypto.PasswapHasher {
 	t.Helper()
-	h.hasher.mutex.Lock()
-	defer h.hasher.mutex.Unlock()
-
-	if h.hasher.value == nil {
-		h.hasher.value = createNewHasher(t)
-	}
-	return h.hasher.value
+	return h.EnsureHasherFactory(t).Default()
 }
 
-func createNewHasher(t *testing.T) *crypto.PasswapHasher {
+func (h *Harness) EnsureProjectHashers(t *testing.T) service.ProjectHasherResolver {
+	t.Helper()
+	return service.NewProjectHasherResolver(h.EnsureServiceDB(t), h.EnsureHasherFactory(t))
+}
+
+func (h *Harness) EnsureHasherFactory(t *testing.T) *crypto.HasherFactory {
+	t.Helper()
+	h.hasherFactory.mutex.Lock()
+	defer h.hasherFactory.mutex.Unlock()
+
+	if h.hasherFactory.value == nil {
+		h.hasherFactory.value = createNewHasherFactory(t)
+	}
+	return h.hasherFactory.value
+}
+
+func createNewHasherFactory(t *testing.T) *crypto.HasherFactory {
 	cfg := crypto.HashConfig{
-		Verifiers: []crypto.HashName{crypto.HashNameBcrypt},
+		Verifiers: []crypto.HashName{crypto.HashNameBcrypt, crypto.HashNameArgon2},
 		Hasher: crypto.HasherConfig{
 			Algorithm: crypto.HashNameBcrypt,
 			Params: map[string]any{
@@ -63,11 +74,16 @@ func createNewHasher(t *testing.T) *crypto.PasswapHasher {
 				MinCost: 10,
 				MaxCost: 16,
 			},
+			Argon2: crypto.Argon2LimitsConfig{
+				MinTime: 1, MaxTime: 8,
+				MinMemory: 8 * 1024, MaxMemory: 128 * 1024,
+				MinThreads: 1, MaxThreads: 8,
+			},
 		},
 	}
-	hasher, err := cfg.NewHasher()
+	factory, err := cfg.NewHasherFactory()
 	require.NoError(t, err)
-	return hasher
+	return factory
 }
 
 func (h *Harness) EnsureMasterKey(t *testing.T) *domain.MasterKeys {
