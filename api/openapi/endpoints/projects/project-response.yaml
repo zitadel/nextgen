@@ -26,3 +26,10 @@ properties:
     type: string
     format: date-time
     description: The time when the project was last updated.
+  password_hash:
+    description: |
+      The method this project's passwords are hashed with. Null when the project
+      uses the server default.
+    oneOf:
+      - $ref: password-hash-policy.yaml
+      - type: 'null'
