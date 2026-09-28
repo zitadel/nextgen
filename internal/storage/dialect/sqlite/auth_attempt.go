@@ -451,7 +451,7 @@ func (as authAttemptStatements) IssueSSOState(ctx context.Context, projectID, au
 }
 
 // ConsumeSSOState implements [service.AuthAttemptStatements].
-func (as authAttemptStatements) ConsumeSSOState(ctx context.Context, projectID, stateHash string) (*domain.SSOCallbackCheck, error) {
+func (as authAttemptStatements) ConsumeSSOState(ctx context.Context, projectID, stateHash, bindingNonce string) (*domain.SSOCallbackCheck, error) {
 	check := &domain.SSOCallbackCheck{StateHash: stateHash}
 	var payload sql.NullString
 	var createdNano int64
@@ -469,6 +469,11 @@ func (as authAttemptStatements) ConsumeSSOState(ctx context.Context, projectID, 
 		if err := json.Unmarshal(raw, &check.Pending); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal sso state payload: %w", err)
 		}
+	}
+	// The cookie is checked before anything is burned: a caller who knows the
+	// state but not the cookie must not be able to end the user's ceremony.
+	if check.Pending == nil || !check.Pending.MatchesBindingNonce(bindingNonce) {
+		return nil, domain.ErrSSOStateInvalid()
 	}
 	attempt := domain.AuthAttempt{CreatedAt: timeFromUnixNano(createdNano)}
 	if timeToLiveNano.Valid {

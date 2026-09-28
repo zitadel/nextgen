@@ -298,10 +298,13 @@ type AuthAttemptStatements interface {
 	// is written back onto check.
 	IssueSSOState(ctx context.Context, projectID, authAttemptID string, check *domain.SSOCallbackCheck) error
 	// ConsumeSSOState atomically consumes the pending row whose lookup_hash is stateHash
-	// and returns its check id, AuthAttemptID and Pending. Zero matches (unknown,
-	// consumed, re-issued) return domain.ErrSSOStateInvalid(). An expired attempt is
-	// burned and rejected with the same sentinel; no expiry check is left to the caller.
-	ConsumeSSOState(ctx context.Context, projectID, stateHash string) (*domain.SSOCallbackCheck, error)
+	// and returns its check id, AuthAttemptID and Pending. The presented cookie value must
+	// match the record's binding nonce; on a mismatch or an empty value the record is left
+	// pending and ErrSSOStateInvalid is returned, so a caller who knows the state but not
+	// the cookie cannot burn it. Unknown, consumed and expired states return the same
+	// sentinel. An expired attempt is burned and rejected; no expiry check is left to the
+	// caller.
+	ConsumeSSOState(ctx context.Context, projectID, stateHash, bindingNonce string) (*domain.SSOCallbackCheck, error)
 	// SetSSOCallbackResult stores the callback result on the consumed row whose
 	// lookup_hash is stateHash. Returns ErrSSOStateInvalid when no such consumed row
 	// exists, including when a new state was issued since the consume (the hash no

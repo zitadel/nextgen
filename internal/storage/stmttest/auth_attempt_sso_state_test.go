@@ -93,7 +93,7 @@ func TestAuthAttemptStatements_SSOState(t *testing.T) {
 			sso := issueSSOState(t, d.stmts, projectID, attempt.ID)
 			stateHash := domain.HashSecret(sso.State)
 
-			consumed, err := d.stmts.ConsumeSSOState(t.Context(), projectID, stateHash)
+			consumed, err := d.stmts.ConsumeSSOState(t.Context(), projectID, stateHash, sso.BindingNonce)
 			require.NoError(t, err)
 			assert.Equal(t, sso.Check.ID, consumed.ID)
 			assert.Equal(t, stateHash, consumed.StateHash)
@@ -106,7 +106,7 @@ func TestAuthAttemptStatements_SSOState(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, sso.PKCEVerifier, verifier)
 
-			_, err = d.stmts.ConsumeSSOState(t.Context(), projectID, stateHash)
+			_, err = d.stmts.ConsumeSSOState(t.Context(), projectID, stateHash, sso.BindingNonce)
 			assert.ErrorIs(t, err, domain.ErrSSOStateInvalid())
 
 			got, err := d.stmts.GetAuthAttemptByID(t.Context(), projectID, attempt.ID)
@@ -115,6 +115,38 @@ func TestAuthAttemptStatements_SSOState(t *testing.T) {
 			require.True(t, ok)
 			assert.Nil(t, stored.Pending)
 			assert.True(t, stored.IssuedAt.IsZero())
+		})
+
+		// Knowing the state is not enough to end a ceremony: without the
+		// browser's cookie the record must survive for the user's own tab.
+		t.Run("wrong_binding_nonce_leaves_state_pending", func(t *testing.T) {
+			projectID := ensureProject(t, d.stmts)
+			attempt := createBareAttempt(t, d.stmts, projectID)
+			sso := issueSSOState(t, d.stmts, projectID, attempt.ID)
+			stateHash := domain.HashSecret(sso.State)
+
+			stillPending := func(t *testing.T) {
+				t.Helper()
+				got, err := d.stmts.GetAuthAttemptByID(t.Context(), projectID, attempt.ID)
+				require.NoError(t, err)
+				stored, ok := got.SSOCallback()
+				require.True(t, ok)
+				require.NotNil(t, stored.Pending, "a rejected consume must not burn the state")
+				assert.False(t, stored.IssuedAt.IsZero())
+			}
+
+			_, err := d.stmts.ConsumeSSOState(t.Context(), projectID, stateHash, "not-the-nonce")
+			assert.ErrorIs(t, err, domain.ErrSSOStateInvalid())
+			stillPending(t)
+
+			_, err = d.stmts.ConsumeSSOState(t.Context(), projectID, stateHash, "")
+			assert.ErrorIs(t, err, domain.ErrSSOStateInvalid())
+			stillPending(t)
+
+			// The user's own tab, with the cookie, still finishes the ceremony.
+			consumed, err := d.stmts.ConsumeSSOState(t.Context(), projectID, stateHash, sso.BindingNonce)
+			require.NoError(t, err)
+			assert.Equal(t, attempt.ID, consumed.AuthAttemptID)
 		})
 
 		// An expired ceremony must not be told apart from an unknown state, and
@@ -127,10 +159,10 @@ func TestAuthAttemptStatements_SSOState(t *testing.T) {
 			sso := issueSSOState(t, d.stmts, projectID, attempt.ID)
 			stateHash := domain.HashSecret(sso.State)
 
-			_, err := d.stmts.ConsumeSSOState(t.Context(), projectID, stateHash)
+			_, err := d.stmts.ConsumeSSOState(t.Context(), projectID, stateHash, sso.BindingNonce)
 			assert.ErrorIs(t, err, domain.ErrSSOStateInvalid())
 
-			_, err = d.stmts.ConsumeSSOState(t.Context(), projectID, stateHash)
+			_, err = d.stmts.ConsumeSSOState(t.Context(), projectID, stateHash, sso.BindingNonce)
 			assert.ErrorIs(t, err, domain.ErrSSOStateInvalid())
 
 			got, err := d.stmts.GetAuthAttemptByID(t.Context(), projectID, attempt.ID)
@@ -142,7 +174,7 @@ func TestAuthAttemptStatements_SSOState(t *testing.T) {
 
 		t.Run("unknown_hash_same_sentinel", func(t *testing.T) {
 			projectID := ensureProject(t, d.stmts)
-			_, err := d.stmts.ConsumeSSOState(t.Context(), projectID, domain.HashSecret("never-issued"))
+			_, err := d.stmts.ConsumeSSOState(t.Context(), projectID, domain.HashSecret("never-issued"), "any-nonce")
 			assert.ErrorIs(t, err, domain.ErrSSOStateInvalid())
 		})
 
@@ -170,10 +202,10 @@ func TestAuthAttemptStatements_SSOState(t *testing.T) {
 			first := issueSSOState(t, d.stmts, projectID, attempt.ID)
 			second := issueSSOState(t, d.stmts, projectID, attempt.ID)
 
-			_, err := d.stmts.ConsumeSSOState(t.Context(), projectID, domain.HashSecret(first.State))
+			_, err := d.stmts.ConsumeSSOState(t.Context(), projectID, domain.HashSecret(first.State), first.BindingNonce)
 			assert.ErrorIs(t, err, domain.ErrSSOStateInvalid())
 
-			consumed, err := d.stmts.ConsumeSSOState(t.Context(), projectID, domain.HashSecret(second.State))
+			consumed, err := d.stmts.ConsumeSSOState(t.Context(), projectID, domain.HashSecret(second.State), second.BindingNonce)
 			require.NoError(t, err)
 			assert.Equal(t, attempt.ID, consumed.AuthAttemptID)
 		})
@@ -188,7 +220,7 @@ func TestAuthAttemptStatements_SSOState(t *testing.T) {
 			sso := issueSSOState(t, d.stmts, projectID, attempt.ID)
 			stateHash := domain.HashSecret(sso.State)
 
-			_, err := d.stmts.ConsumeSSOState(t.Context(), projectID, stateHash)
+			_, err := d.stmts.ConsumeSSOState(t.Context(), projectID, stateHash, sso.BindingNonce)
 			require.NoError(t, err)
 			result := &domain.SSOCallbackResult{
 				Subject:              "sub-1",
@@ -218,7 +250,7 @@ func TestAuthAttemptStatements_SSOState(t *testing.T) {
 			attempt := createBareAttempt(t, d.stmts, projectID)
 			sso := issueSSOState(t, d.stmts, projectID, attempt.ID)
 			stateHash := domain.HashSecret(sso.State)
-			_, err := d.stmts.ConsumeSSOState(t.Context(), projectID, stateHash)
+			_, err := d.stmts.ConsumeSSOState(t.Context(), projectID, stateHash, sso.BindingNonce)
 			require.NoError(t, err)
 			require.NoError(t, d.stmts.SetSSOCallbackResult(t.Context(), projectID, stateHash,
 				&domain.SSOCallbackResult{Subject: "sub-1"}))
@@ -246,7 +278,7 @@ func TestAuthAttemptStatements_SSOState(t *testing.T) {
 			attempt := createBareAttempt(t, d.stmts, projectID)
 			sso := issueSSOState(t, d.stmts, projectID, attempt.ID)
 			stateHash := domain.HashSecret(sso.State)
-			_, err := d.stmts.ConsumeSSOState(t.Context(), projectID, stateHash)
+			_, err := d.stmts.ConsumeSSOState(t.Context(), projectID, stateHash, sso.BindingNonce)
 			require.NoError(t, err)
 
 			require.NoError(t, d.stmts.SetSSOCallbackResult(t.Context(), projectID, stateHash,
@@ -280,11 +312,11 @@ func TestAuthAttemptStatements_SSOState(t *testing.T) {
 			attempt := createBareAttempt(t, d.stmts, projectID)
 
 			first := issueSSOState(t, d.stmts, projectID, attempt.ID)
-			_, err := d.stmts.ConsumeSSOState(t.Context(), projectID, domain.HashSecret(first.State))
+			_, err := d.stmts.ConsumeSSOState(t.Context(), projectID, domain.HashSecret(first.State), first.BindingNonce)
 			require.NoError(t, err)
 
 			second := issueSSOState(t, d.stmts, projectID, attempt.ID)
-			_, err = d.stmts.ConsumeSSOState(t.Context(), projectID, domain.HashSecret(second.State))
+			_, err = d.stmts.ConsumeSSOState(t.Context(), projectID, domain.HashSecret(second.State), second.BindingNonce)
 			require.NoError(t, err)
 
 			err = d.stmts.SetSSOCallbackResult(t.Context(), projectID, domain.HashSecret(first.State),
@@ -317,7 +349,7 @@ func TestAuthAttemptStatements_SSOState(t *testing.T) {
 			for i := range results {
 				wg.Go(func() {
 					<-start // release together so the two consumes genuinely overlap
-					results[i], errs[i] = d.stmts.ConsumeSSOState(t.Context(), projectID, stateHash)
+					results[i], errs[i] = d.stmts.ConsumeSSOState(t.Context(), projectID, stateHash, sso.BindingNonce)
 				})
 			}
 			close(start)
@@ -341,7 +373,7 @@ func TestAuthAttemptStatements_SSOState(t *testing.T) {
 			token, attempt := handoffCompletedAttempt(t, d.stmts, projectID, nil)
 			sso := issueSSOState(t, d.stmts, projectID, attempt.ID)
 			stateHash := domain.HashSecret(sso.State)
-			_, err := d.stmts.ConsumeSSOState(t.Context(), projectID, stateHash)
+			_, err := d.stmts.ConsumeSSOState(t.Context(), projectID, stateHash, sso.BindingNonce)
 			require.NoError(t, err)
 			require.NoError(t, d.stmts.SetSSOCallbackResult(t.Context(), projectID, stateHash,
 				&domain.SSOCallbackResult{Subject: "sub-1"}))
@@ -358,7 +390,7 @@ func TestAuthAttemptStatements_SSOState(t *testing.T) {
 			_, err = d.stmts.ExchangeSession(t.Context(), projectID, pendingToken, nil, time.Hour)
 			require.NoError(t, err)
 
-			_, err = d.stmts.ConsumeSSOState(t.Context(), projectID, domain.HashSecret(pending.State))
+			_, err = d.stmts.ConsumeSSOState(t.Context(), projectID, domain.HashSecret(pending.State), pending.BindingNonce)
 			assert.ErrorIs(t, err, domain.ErrSSOStateInvalid())
 			_, err = d.stmts.GetAuthAttemptByID(t.Context(), projectID, pendingAttempt.ID)
 			assert.ErrorIs(t, err, domain.ErrAuthAttemptNotFound())

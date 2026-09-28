@@ -17,9 +17,9 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
-func TestAuthCheckTypeSSOCallback_WireName(t *testing.T) {
+func TestAuthCheckTypeSSOCallback_NameAndClass(t *testing.T) {
 	t.Parallel()
-	assert.Equal(t, "sso_callback", domain.AuthCheckTypeSSOCallback.String())
+	assert.Equal(t, "SSOCallback", domain.AuthCheckTypeSSOCallback.String())
 	// The callback check is its own factor class: nothing competes with it.
 	assert.Equal(t, domain.AuthCheckTypeSSOCallback, domain.AuthCheckTypeSSOCallback.Class())
 }

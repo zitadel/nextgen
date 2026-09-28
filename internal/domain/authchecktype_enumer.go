@@ -7,11 +7,11 @@ import (
 	"strings"
 )
 
-const _AuthCheckTypeName = "UnspecifiedUserPasswordPasskeyPasskeyRegistrationsso_callback"
+const _AuthCheckTypeName = "UnspecifiedUserPasswordPasskeyPasskeyRegistrationSSOCallback"
 
-var _AuthCheckTypeIndex = [...]uint8{0, 11, 15, 23, 30, 49, 61}
+var _AuthCheckTypeIndex = [...]uint8{0, 11, 15, 23, 30, 49, 60}
 
-const _AuthCheckTypeLowerName = "unspecifieduserpasswordpasskeypasskeyregistrationsso_callback"
+const _AuthCheckTypeLowerName = "unspecifieduserpasswordpasskeypasskeyregistrationssocallback"
 
 func (i AuthCheckType) String() string {
 	if i >= AuthCheckType(len(_AuthCheckTypeIndex)-1) {
@@ -45,8 +45,8 @@ var _AuthCheckTypeNameToValueMap = map[string]AuthCheckType{
 	_AuthCheckTypeLowerName[23:30]: AuthCheckTypePasskey,
 	_AuthCheckTypeName[30:49]:      AuthCheckTypePasskeyRegistration,
 	_AuthCheckTypeLowerName[30:49]: AuthCheckTypePasskeyRegistration,
-	_AuthCheckTypeName[49:61]:      AuthCheckTypeSSOCallback,
-	_AuthCheckTypeLowerName[49:61]: AuthCheckTypeSSOCallback,
+	_AuthCheckTypeName[49:60]:      AuthCheckTypeSSOCallback,
+	_AuthCheckTypeLowerName[49:60]: AuthCheckTypeSSOCallback,
 }
 
 var _AuthCheckTypeNames = []string{
@@ -55,7 +55,7 @@ var _AuthCheckTypeNames = []string{
 	_AuthCheckTypeName[15:23],
 	_AuthCheckTypeName[23:30],
 	_AuthCheckTypeName[30:49],
-	_AuthCheckTypeName[49:61],
+	_AuthCheckTypeName[49:60],
 }
 
 // AuthCheckTypeString retrieves an enum value from the enum constants string name.

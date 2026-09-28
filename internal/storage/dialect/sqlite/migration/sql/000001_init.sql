@@ -306,7 +306,7 @@ CREATE INDEX idx_checks_session ON checks (project_id, session_id);
 -- +goose StatementEnd
 
 -- +goose StatementBegin
-CREATE UNIQUE INDEX checks_lookup_hash
+CREATE UNIQUE INDEX idx_checks_lookup_hash
     ON checks (project_id, lookup_hash) WHERE lookup_hash IS NOT NULL;
 -- +goose StatementEnd
 
