@@ -101,6 +101,13 @@ type FlowState struct {
 	// provider, so the next GET can surface it on the step the user lands
 	// back on. Single use, like PendingHandoff.
 	PendingError *FlowSSOError
+
+	// VerifiedIdentity records that a trusted provider callback resolved an
+	// external identity in this flow. Server-set (only the SSO callback
+	// writes it) and durable on FlowState -- unlike CollectedData it must
+	// survive a pivot. create_user_with_sso refuses to run without it, so a
+	// submit-only flow cannot mint a user with no proof of identity.
+	VerifiedIdentity *FlowVerifiedIdentity
 }
 
 // FlowSSOError is the provider's authorization error, carried back to the
@@ -194,6 +201,17 @@ type FlowProgress struct {
 	// progress entry, keyed by schema property name. A child flow's
 	// CollectedData is discarded when its progress is popped.
 	CollectedData CollectedFlowData
+}
+
+type FlowVerifiedIdentity struct {
+	Provider string // "google", "github", "saml", ...
+	Subject  string
+}
+
+// Valid reports whether a provider verification was recorded.
+// Safe to call on a nil receiver.
+func (vi *FlowVerifiedIdentity) Valid() bool {
+	return vi != nil && vi.Provider != "" && vi.Subject != ""
 }
 
 // FlowBackEntry holds an entry to be pushed into BackStack.

@@ -47,6 +47,14 @@ func (h *FlowCreateUserWithSsoHandler) Handle(
 	ctx context.Context,
 	in domain.FlowOnSuccessInput,
 ) (domain.FlowOnSuccessResult, error) {
+	// Guard: this mutation mints a user with no password, so it must only run
+	// when a provider callback actually verified an identity in this flow.
+	// Without it, a submit-only flow could route here and create an account
+	// with no proof of identity at all.
+	if !in.State.VerifiedIdentity.Valid() {
+		return domain.FlowOnSuccessResult{}, fmt.Errorf("%w: create_user_with_sso without a verified identity", domain.ErrFlowIntegrity())
+	}
+
 	userID, err := h.db.Statements().NewManagedID(string(domain.PrefixUser))
 	if err != nil {
 		return domain.FlowOnSuccessResult{}, fmt.Errorf("create_user_with_sso: mint user id: %w", err)
@@ -63,9 +71,10 @@ func (h *FlowCreateUserWithSsoHandler) Handle(
 	)
 	// The provider proved who this is, so the user factor is recorded in the
 	// same transaction -- otherwise the session exchanged at the end of the
-	// flow would be bound to a user with no factors at all. There is no
-	// second factor to record: an external sign-in is the one proof this
-	// account has, and the factor that says so is #1033's to add.
+	// flow would be bound to a user with no factors at all. Only the user
+	// factor is recorded: there is no dedicated "external sign-in" check type
+	// yet, so the fact that the proof came from a provider is not captured as
+	// a factor. (#1033 stores the identity link, not an auth factor.)
 	recordFactorsAction := &recordAttemptFactorsAction{
 		projectID: in.ProjectID,
 		attemptID: in.State.AuthAttemptID,

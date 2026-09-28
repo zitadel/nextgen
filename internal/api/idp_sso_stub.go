@@ -326,6 +326,11 @@ func (h *Handler) finishSsoCallback(ctx context.Context, w http.ResponseWriter, 
 			state.CollectedData.UserData = map[string]any{}
 		}
 		state.CollectedData.UserData["email"] = claims.Email
+
+		state.VerifiedIdentity = &domain.FlowVerifiedIdentity{
+			Provider: pending.connection.Slug,
+			Subject:  claims.Subject,
+		}
 	}
 	if err := h.resolveSsoIdentity(ctx, state, pending, claims); err != nil {
 		slog.ErrorContext(ctx, "sso stub: resolving the identity failed", slog.String("error", err.Error()))
@@ -586,6 +591,10 @@ func (h *Handler) exchangeSsoCode(ctx context.Context, pending ssoPending, code 
 // whether the provider says it checked it.
 type ssoClaims struct {
 	Email string
+	// Subject is the provider's stable, unique id for the account (the
+	// id_token `sub`). Unlike email it never changes, so identity linking
+	// keys on it.
+	Subject string
 	// Verified follows the connection's `verified_claims` rule for the
 	// identifier. Unverified is not a failure -- it decides whether the
 	// claim may skip collection, not whether the sign-in may proceed.
@@ -612,7 +621,8 @@ func emailClaim(idToken string) (ssoClaims, error) {
 		return ssoClaims{}, err
 	}
 	var claims struct {
-		Email string `json:"email"`
+		Email   string `json:"email"`
+		Subject string `json:"sub"`
 		// Providers disagree on the shape: some send a boolean, some the
 		// string "true". Decoding into `any` reads either without the whole
 		// token failing on the surprise, which is the difference between
@@ -629,7 +639,7 @@ func emailClaim(idToken string) (ssoClaims, error) {
 	if claims.Expiry > 0 && time.Now().After(time.Unix(claims.Expiry, 0)) {
 		return ssoClaims{}, fmt.Errorf("id_token has expired")
 	}
-	return ssoClaims{Email: claims.Email, Verified: claimIsTrue(claims.Verified)}, nil
+	return ssoClaims{Email: claims.Email, Subject: claims.Subject, Verified: claimIsTrue(claims.Verified)}, nil
 }
 
 // claimIsTrue evaluates a verification claim: strictly boolean true, or the
