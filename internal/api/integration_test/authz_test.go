@@ -406,9 +406,19 @@ func TestManagementAuthz(t *testing.T) {
 // omit the outsider (RSI.team_id stamped after create). ListSchemas is empty
 // because schema RSI rows are project-scoped. QueryUsers is 200 [] because
 // user RSI rows have NULL team_id — by-id user reads deny for the same shape.
+//
+// It deliberately has no t.Parallel(). The Spanner emulator's planner charges
+// for the authz list predicate in proportion to the rows in the tables, and Go
+// runs every serial test to completion before any parallel body starts. So
+// running serially means the tests before it have finished and deleted their
+// own projects, and this one meets an almost empty database. Real Cloud Spanner
+// answers the same predicate in ~40ms, so the cost is the emulator's planner,
+// not a query bug.
+//
+// Measured: 687.9s when it ran in parallel against everything the package had
+// accumulated, 17.94s serial before project cleanup existed, and 5.32s serial
+// with cleanup. Do not give it t.Parallel() back.
 func TestListAuthzTeamScopedOnlyPartialView(t *testing.T) {
-	t.Parallel()
-
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 

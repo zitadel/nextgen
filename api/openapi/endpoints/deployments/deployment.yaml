@@ -1,0 +1,55 @@
+title: Deployment
+description: |
+  An immutable record of a release being made live on an environment.
+
+  Deploying, promoting and rolling back all create a deployment. The record
+  is what ran where and when — the ids and the timestamp — plus metadata
+  saying why and who. It is append-only: written once when the environment
+  starts running the release and never changed afterwards, so the deployment
+  log is the audit trail of what ran where.
+
+  Environments are referenced by id, not name. Names are resolved when the
+  deployment is created, so renaming an environment later does not reattach
+  its history.
+type: object
+required:
+  - id
+  - project_id
+  - environment_id
+  - release_id
+  - deployed_at
+  - metadata
+properties:
+  id:
+    readOnly: true
+    description: The opaque, immutable resource id, assigned at creation.
+    $ref: ../../components/schemas/deployment-id.yaml
+  project_id:
+    readOnly: true
+    description: The project this deployment belongs to.
+    $ref: ../../components/schemas/project-id.yaml
+  environment_id:
+    readOnly: true
+    type: string
+    description: The environment this deployment made the release live on.
+    example: env_01KX3RG8A7F0N9WD3P2E4YM5C1
+  release_id:
+    readOnly: true
+    description: The release this deployment made live.
+    $ref: ../../components/schemas/release-id.yaml
+  deployed_at:
+    readOnly: true
+    type: string
+    format: date-time
+    description: When the deployment was created.
+    example: '2026-07-14T09:11:00Z'
+  metadata:
+    readOnly: true
+    $ref: deployment-metadata.yaml
+  release:
+    readOnly: true
+    description: |
+      The release named by `release_id`, present only when the request asked
+      for it with `expand: ["release"]` — the same representation
+      `GET /releases/{release_id}` serves. Absent means it was not requested.
+    $ref: ../releases/release.yaml

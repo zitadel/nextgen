@@ -189,7 +189,18 @@ The groups below mirror the ones `zitadel --help` prints.
   default user schema and login flow into
   `.zitadel/schemas/default-human-user.json` and
   `.zitadel/flows/default-login.json`, uploads them through the schema and flow
-  APIs, then seeds `.zitadel/state.json` so `plan` is immediately empty. Agents
+  APIs, then seeds `.zitadel/state.json` so `plan` is immediately empty.
+  Against a local server that hosts the platform project and has a local admin
+  (the default `start` configuration), setup also attaches the project to the
+  local admin's team: it writes `team_id` and `claimed_at` into
+  `.zitadel/secret` and prints
+  `Project owned by admin@zitadel.localhost (team ...)`, so a later `claim`
+  returns `status: "skipped"` with `reason: "already-claimed"`. The step is
+  best-effort. When the attempt fails on a platform-hosting runtime, setup
+  warns and the normal claim nudge applies. When `start` opted out of the
+  platform bootstrap there is no local admin and no claim surface, so setup
+  skips the step silently, emits no nudge, and the project has no owning
+  team. Agents
   must pass `--framework` when scaffolding into a fresh directory; interactive
   humans can omit it and choose from the prompt. Supported floors: Next.js 15+
   and React 18+ — `setup` and `doctor` fail with `E_UNSUPPORTED_PROJECT_SHAPE`

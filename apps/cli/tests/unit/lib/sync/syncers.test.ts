@@ -158,6 +158,31 @@ describe("SchemaSyncer", () => {
     expect(new URL(receivedUrl).searchParams.get("project_id")).toBeNull();
     expect(body).toEqual({ kind: "user-schema", version: 1 });
   });
+
+  // A schema's id is its `$id`, usually a URL. The generated client owns the
+  // encoding now (#1272); this syncer used to pre-encode, which sent `%25` for
+  // every delimiter once the client started encoding too.
+  it("fetch sends a URL id encoded exactly once", async () => {
+    const id = "https://nextgen.com/api/schemas/default-human-user.json";
+    let path = "";
+    server.use(
+      http.get(`${BASE}/schemas/:id`, ({ request }) => {
+        path = new URL(request.url).pathname;
+        return HttpResponse.json({
+          id,
+          schema: { kind: "user-schema", version: 1 },
+          metadata: { created_at: "2026-01-01T00:00:00Z" },
+        });
+      }),
+    );
+    const [schema] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
+
+    const body = await schema.fetch?.(id);
+
+    expect(path).toBe(`/schemas/${encodeURIComponent(id)}`);
+    expect(path).not.toContain("%25");
+    expect(body).toEqual({ kind: "user-schema", version: 1 });
+  });
 });
 
 const VALID_FLOW = {
