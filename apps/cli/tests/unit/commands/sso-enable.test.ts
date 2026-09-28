@@ -206,6 +206,22 @@ describe("sso enable", () => {
     expect(result.stdout).not.toContain("GOCSPX");
     expect(result.stderr).not.toContain("GOCSPX");
   });
+
+  it("names the next move when no provider was given", async () => {
+    // oclif's own "Missing required flag provider" would be the one refusal in
+    // this command carrying no hint, and every other error here says what to
+    // do next.
+    const cwd = await makeProject();
+
+    const result = await withStdin(undefined, () =>
+      runCliForTest(["sso", "enable", "--cwd", cwd, "--json"]),
+    );
+
+    expect(result.exitCode).not.toBe(0);
+    const json = parseJson(result.stdout) as { code: string; hint?: string };
+    expect(json.code).toBe("E_VALIDATION");
+    expect(json.hint).toContain("--provider google");
+  });
 });
 
 describe("sso enable secret handling", () => {

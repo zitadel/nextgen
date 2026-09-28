@@ -67,8 +67,10 @@ export default class SsoEnable extends BaseCommand {
     "<%= config.bin %> sso enable --provider google --client-id 1234-abc.apps.googleusercontent.com --non-interactive < secret.txt",
   ];
   static override flags = {
+    // Not `required`: oclif's own "Missing required flag provider" is the one
+    // refusal in this command that would carry no hint, and every other error
+    // here names the next move. The check below does that instead.
     provider: Flags.string({
-      required: true,
       options: [...IDP_PROVIDERS],
       description: "Identity provider to enable.",
     }),
@@ -89,7 +91,15 @@ export default class SsoEnable extends BaseCommand {
     await this.toMeta(flags);
     const { cwd, nonInteractive, dryRun } = this.meta;
 
-    const provider = flags.provider as string;
+    const provider = flags.provider;
+    if (provider === undefined) {
+      // Named rather than prompted for: the catalog holds one provider today,
+      // and a question offering a single answer is a keystroke, not a choice
+      // (the same reasoning `OwnerCommand` gives for requiring an owner).
+      throw new ZitadelError("E_VALIDATION", "Name the provider to enable", {
+        hint: `Pass --provider, e.g. --provider ${IDP_PROVIDERS[0]}.`,
+      });
+    }
     const entry = idpCatalogEntry(provider);
 
     // The Project is read before anything is asked for: being turned away
