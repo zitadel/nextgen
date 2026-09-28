@@ -38,6 +38,17 @@ func mustInitClaim(t *testing.T, client *helpers.ApiClient, projectID string) *a
 func exchangeForSessionCookie(t *testing.T, projectID, projectSecret, handoffToken string) *http.Cookie {
 	t.Helper()
 
+	cookie, status, raw := tryExchangeForSessionCookie(t, projectID, projectSecret, handoffToken)
+	require.Equal(t, http.StatusOK, status, raw)
+	require.NotNil(t, cookie, "exchange must set the __nextgen_session cookie")
+	return cookie
+}
+
+// tryExchangeForSessionCookie is exchangeForSessionCookie without the
+// assertions: the cookie (nil if none was set), the status and the body.
+func tryExchangeForSessionCookie(t *testing.T, projectID, projectSecret, handoffToken string) (*http.Cookie, int, string) {
+	t.Helper()
+
 	body, err := json.Marshal(map[string]string{"handoff_token": handoffToken})
 	require.NoError(t, err)
 	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost,
@@ -51,15 +62,13 @@ func exchangeForSessionCookie(t *testing.T, projectID, projectSecret, handoffTok
 	defer func() { _ = resp.Body.Close() }()
 	raw, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
-	require.Equal(t, http.StatusOK, resp.StatusCode, string(raw))
 
 	for _, cookie := range resp.Cookies() {
 		if cookie.Name == "__nextgen_session" {
-			return cookie
+			return cookie, resp.StatusCode, string(raw)
 		}
 	}
-	t.Fatal("exchange must set the __nextgen_session cookie")
-	return nil
+	return nil, resp.StatusCode, string(raw)
 }
 
 // platformSessionCookie signs the user into the platform project by seeding a
@@ -68,21 +77,55 @@ func exchangeForSessionCookie(t *testing.T, projectID, projectSecret, handoffTok
 // test; TestClaimHappyPath drives the real flow engine instead.
 func platformSessionCookie(t *testing.T, userID string) *http.Cookie {
 	t.Helper()
+	return sessionCookieIn(t, harness.EnsurePlatformProject(t), userID)
+}
 
-	platform := harness.EnsurePlatformProject(t)
-	attempt := &domain.AuthAttempt{
-		ProjectID:      platform.ID,
-		RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypeUser},
-		Checks:         []domain.AuthCheck{&domain.AuthFactorUser{UserID: userID}},
-	}
+// signInAttempts bounds sessionCookieIn's fresh handoffs. See there.
+const signInAttempts = 3
+
+// sessionCookieIn signs the user into project the same way.
+//
+// A handoff token is valid for a minute after the handoff
+// (domain.HandoffTokenExpiration). The Spanner emulator runs one read-write
+// transaction at a time, so under the parallel integration lane the exchange
+// can queue past that minute and answer sess.invalid_handoff_token although
+// nothing is wrong. That minute is not what these callers test, so on that
+// answer the helper starts over with a fresh attempt and handoff. A handoff that
+// is actually broken fails every time and still fails the test; the handoff and
+// its expiry keep their own coverage in TestClaimHappyPath and the session
+// exchange tests, which exchange exactly once.
+func sessionCookieIn(t *testing.T, project *domain.Project, userID string) *http.Cookie {
+	t.Helper()
+
 	stmts := harness.EnsureServiceDB(t)
-	require.NoError(t, stmts.Statements().CreateAuthAttempt(t.Context(), attempt))
-	plainToken := "handoff_claim_" + helpers.RandString(8)
-	sum := sha256.Sum256([]byte(plainToken))
-	attempt.HandoffToken = &domain.HandoffToken{TokenHash: sum[:]}
-	require.NoError(t, stmts.Statements().HandoffAuthAttempt(t.Context(), attempt))
+	secret := harness.ProjectSecret(t, project)
+	var status int
+	var raw string
+	for i := range signInAttempts {
+		attempt := &domain.AuthAttempt{
+			ProjectID:      project.ID,
+			RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypeUser},
+			Checks:         []domain.AuthCheck{&domain.AuthFactorUser{UserID: userID}},
+		}
+		require.NoError(t, stmts.Statements().CreateAuthAttempt(t.Context(), attempt))
+		plainToken := "handoff_claim_" + helpers.RandString(8)
+		sum := sha256.Sum256([]byte(plainToken))
+		attempt.HandoffToken = &domain.HandoffToken{TokenHash: sum[:]}
+		require.NoError(t, stmts.Statements().HandoffAuthAttempt(t.Context(), attempt))
 
-	return exchangeForSessionCookie(t, platform.ID, harness.ProjectSecret(t, platform), plainToken)
+		var cookie *http.Cookie
+		cookie, status, raw = tryExchangeForSessionCookie(t, project.ID, secret, plainToken)
+		if status == http.StatusOK && cookie != nil {
+			return cookie
+		}
+		if !strings.Contains(raw, domain.ErrSessionInvalidHandoffToken().Code) || i == signInAttempts-1 {
+			break
+		}
+		t.Logf("handoff expired before the exchange (slow database?), signing in again: %s", raw)
+	}
+	require.Equal(t, http.StatusOK, status, raw)
+	t.Fatal("exchange must set the __nextgen_session cookie")
+	return nil
 }
 
 // TestClaimHappyPath is the ticket's end-to-end leg: init → pending status →
