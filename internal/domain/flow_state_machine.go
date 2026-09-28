@@ -795,10 +795,12 @@ func (r *FlowStateMachineRuntime) dispatchChallenges(pc *processCtx, resolved Fl
 			if state.CurrentPurpose != FlowDefinitionPurposeLogin {
 				continue
 			}
-			// Skip if any visited step runs an on_success — today the only
-			// one (create_user) establishes the password kind, and the
-			// validator enforces password-collected-upstream for it.
-			if anyVisitedStepOnSuccess(def, state, step) {
+			// Skip only if a visited step's on_success actually establishes a
+			// password (its manifest includes the password challenge, e.g.
+			// create_user). create_user_with_sso establishes no password, so a
+			// conflict step reached after an SSO step must still verify the
+			// password here -- otherwise the check is silently skipped.
+			if anyVisitedStepEstablishesPassword(def, state, step) {
 				continue
 			}
 			err := r.authAttempts.SubmitPassword(ctx, FlowSubmitPasswordInput{
@@ -818,14 +820,29 @@ func (r *FlowStateMachineRuntime) dispatchChallenges(pc *processCtx, resolved Fl
 	return flowDispatchResult{}, nil
 }
 
-// anyVisitedStepOnSuccess reports whether any step in (history ∪ current)
-// runs an on_success mutation.
-func anyVisitedStepOnSuccess(def *FlowDefinition, state *FlowState, current *FlowDefinitionStep) bool {
-	if current.OnSuccess != nil {
+// anyVisitedStepEstablishesPassword reports whether any step in
+// (history ∪ current) runs an on_success mutation that sets a password.
+func anyVisitedStepEstablishesPassword(def *FlowDefinition, state *FlowState, current *FlowDefinitionStep) bool {
+	if stepEstablishesPassword(current) {
 		return true
 	}
 	for _, name := range state.History {
-		if s, ok := def.FindStep(name); ok && s.OnSuccess != nil {
+		if s, ok := def.FindStep(name); ok && stepEstablishesPassword(s) {
+			return true
+		}
+	}
+	return false
+}
+
+// stepEstablishesPassword reports whether the step's on_success mutation sets a
+// password credential -- i.e. its manifest requires the password challenge
+// upstream. create_user does; create_user_with_sso does not.
+func stepEstablishesPassword(step *FlowDefinitionStep) bool {
+	if step.OnSuccess == nil {
+		return false
+	}
+	for _, challenge := range ManifestForOnSuccess(*step.OnSuccess) {
+		if challenge == FlowFieldChallengePassword {
 			return true
 		}
 	}
