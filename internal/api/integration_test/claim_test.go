@@ -68,10 +68,15 @@ func exchangeForSessionCookie(t *testing.T, projectID, projectSecret, handoffTok
 // test; TestClaimHappyPath drives the real flow engine instead.
 func platformSessionCookie(t *testing.T, userID string) *http.Cookie {
 	t.Helper()
+	return sessionCookieIn(t, harness.EnsurePlatformProject(t), userID)
+}
 
-	platform := harness.EnsurePlatformProject(t)
+// sessionCookieIn signs the user into project the same way.
+func sessionCookieIn(t *testing.T, project *domain.Project, userID string) *http.Cookie {
+	t.Helper()
+
 	attempt := &domain.AuthAttempt{
-		ProjectID:      platform.ID,
+		ProjectID:      project.ID,
 		RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypeUser},
 		Checks:         []domain.AuthCheck{&domain.AuthFactorUser{UserID: userID}},
 	}
@@ -82,7 +87,7 @@ func platformSessionCookie(t *testing.T, userID string) *http.Cookie {
 	attempt.HandoffToken = &domain.HandoffToken{TokenHash: sum[:]}
 	require.NoError(t, stmts.Statements().HandoffAuthAttempt(t.Context(), attempt))
 
-	return exchangeForSessionCookie(t, platform.ID, harness.ProjectSecret(t, platform), plainToken)
+	return exchangeForSessionCookie(t, project.ID, harness.ProjectSecret(t, project), plainToken)
 }
 
 // TestClaimHappyPath is the ticket's end-to-end leg: init → pending status →
