@@ -68,8 +68,9 @@ func parseIDPConnectionDocument(document []byte) (idpConnectionDocument, error) 
 // IDPConnectionImmutableFieldsChanged returns the dotted paths of the identity
 // fields that next changes against stored (see ErrIDPConnectionFieldImmutable).
 // Values are compared as written, so an absent subject_claim and "sub" differ.
-// A protocol change reports only protocol: the endpoint fields of two
-// protocols are not comparable.
+// subject_claim does not depend on the protocol, so it is always compared. On
+// a protocol change the endpoint fields are skipped: those of two protocols
+// are not comparable. The order is protocol, subject_claim, then endpoints.
 func IDPConnectionImmutableFieldsChanged(stored, next []byte) ([]string, error) {
 	before, err := parseIDPConnectionDocument(stored)
 	if err != nil {
@@ -79,15 +80,21 @@ func IDPConnectionImmutableFieldsChanged(stored, next []byte) ([]string, error) 
 	if err != nil {
 		return nil, err
 	}
-	if !sameString(before.Protocol, after.Protocol) {
-		return []string{"protocol"}, nil
-	}
 	var changed []string
+	protocolChanged := !sameString(before.Protocol, after.Protocol)
+	if protocolChanged {
+		changed = append(changed, "protocol")
+	}
+	if !sameString(before.SubjectClaim, after.SubjectClaim) {
+		changed = append(changed, "subject_claim")
+	}
+	if protocolChanged {
+		return changed, nil
+	}
 	for _, field := range []struct {
 		path          string
 		before, after *string
 	}{
-		{"subject_claim", before.SubjectClaim, after.SubjectClaim},
 		{"oidc.issuer", before.OIDC.Issuer, after.OIDC.Issuer},
 		{"oauth2.token_endpoint", before.OAuth2.TokenEndpoint, after.OAuth2.TokenEndpoint},
 		{"oauth2.userinfo_endpoint", before.OAuth2.UserinfoEndpoint, after.OAuth2.UserinfoEndpoint},

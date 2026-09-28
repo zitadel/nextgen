@@ -57,9 +57,15 @@ func TestIDPConnectionImmutableFieldsChanged(t *testing.T) {
 			want: []string{"oauth2.token_endpoint", "oauth2.userinfo_endpoint"},
 		},
 		{
-			name:   "a protocol change reports only the protocol",
+			name:   "a protocol change still compares subject_claim",
 			stored: oidcConnection,
 			next:   `{"slug":"google","protocol":"oauth2","display_name":"Google","subject_claim":"id","oauth2":{"token_endpoint":"https://x.example.com"}}`,
+			want:   []string{"protocol", "subject_claim"},
+		},
+		{
+			name:   "a protocol change skips the endpoints",
+			stored: oauth2Connection,
+			next:   `{"slug":"github","protocol":"oidc","display_name":"GitHub","subject_claim":"id","oidc":{"issuer":"https://x.example.com"}}`,
 			want:   []string{"protocol"},
 		},
 	}
