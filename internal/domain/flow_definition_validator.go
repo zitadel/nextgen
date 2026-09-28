@@ -607,6 +607,14 @@ func validateSsoCreationReachability(def FlowDefinition, resolvedByStep map[stri
 			return ErrFlowDefinitionInvalid(fmt.Sprintf(
 				"step %q runs create_user_with_sso but declares no %q transition; a colliding identity would have nowhere to route", step.Name, FlowImplicitOutcomeUserAlreadyExists), nil)
 		}
+		// It has to be a plain current-flow transition. A re-purpose runs
+		// dropResolvedUser, which discards the very account the collision just
+		// pinned, and a cross-flow transition is refused at runtime -- either
+		// way the conflict step is reached with nobody to verify against.
+		if conflict.Action != nil || conflict.Purpose != nil {
+			return ErrFlowDefinitionInvalid(fmt.Sprintf(
+				"step %q routes %q through a re-purpose or another flow; it must be a plain transition within this flow so the colliding account stays pinned for verification", step.Name, FlowImplicitOutcomeUserAlreadyExists), nil)
+		}
 		// The collision pins the *existing* account, so the target must actually
 		// prove ownership. Being non-terminal is not enough: required-checks are
 		// not enforced yet, so a step that collects nothing would still reach a

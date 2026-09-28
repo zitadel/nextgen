@@ -1645,10 +1645,15 @@ func (r *FlowStateMachineRuntime) bindCollidingUser(pc *processCtx, resolved Flo
 	// Try every unique attribute, not just the identifier, so a collision on
 	// any unique field still pins the owner (mirrors the passkey conflict
 	// path). The identifier is itself unique, so this is strictly broader.
-	candidates := uniqueFieldValues(pc.state.CollectedData.UserData, resolved)
-	if visited, verr := r.resolveVisitedFields(pc); verr == nil {
-		candidates = uniqueFieldValues(pc.state.CollectedData.UserData, resolved, visited)
+	// A valid step may collect its unique identifier only upstream, so the
+	// visited fields are part of the candidate set -- not a best-effort extra.
+	// Swallowing a resolver error here would leave candidates empty and route
+	// to the conflict step with nobody pinned to verify against.
+	visited, err := r.resolveVisitedFields(pc)
+	if err != nil {
+		return fmt.Errorf("flow state machine: resolve visited fields for collision binding: %w", err)
 	}
+	candidates := uniqueFieldValues(pc.state.CollectedData.UserData, resolved, visited)
 	for _, candidate := range candidates {
 		userID, err := r.authAttempts.SubmitIdentifier(pc.ctx, FlowSubmitIdentifierInput{
 			ProjectID:     pc.state.ProjectID,

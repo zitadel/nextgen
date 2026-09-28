@@ -505,6 +505,45 @@ describe("sso/create-only-via-callback", () => {
     expect(ssoIssues(def)).toEqual([]);
   });
 
+  it("rejects a collision transition that re-purposes", () => {
+    const def = flow();
+    def.purposes = { login: "identifier" };
+    def.steps = [
+      {
+        name: "identifier",
+        fields: ["email"],
+        sso_providers: ["google"],
+        actions: [{ name: "submit", kind: "submit" }],
+        transitions: {
+          submit: { target: "done" },
+          callback: { target: "done" },
+          identity_unknown: { target: "register-sso" },
+        },
+      },
+      {
+        name: "register-sso",
+        fields: ["email"],
+        on_success: "create_user_with_sso",
+        actions: [{ name: "submit", kind: "submit" }],
+        transitions: {
+          submit: { target: "done" },
+          // A re-purpose drops the pinned account.
+          user_already_exists: { target: "conflict", purpose: "login" },
+        },
+      },
+      {
+        name: "conflict",
+        fields: ["x-auth-methods#password"],
+        actions: [{ name: "submit", kind: "submit" }],
+        transitions: { submit: { target: "done" } },
+      },
+      { name: "done", complete: "show" },
+    ];
+    expect(messages(ssoIssues(def))).toContain(
+      'step "register-sso" routes "user_already_exists" through a re-purpose or another flow; it must be a plain transition within this flow so the colliding account stays pinned for verification',
+    );
+  });
+
   it("rejects a collision target that verifies no credential", () => {
     const def = flow();
     def.purposes = { login: "identifier" };

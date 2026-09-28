@@ -644,6 +644,17 @@ function validateSsoCreationOnlyViaCallback(def: FlowDef): FlowValidationIssue[]
           step.name,
         ),
       );
+    } else if (conflict.action !== null || conflict.purpose !== null) {
+      // It has to be a plain current-flow transition. A re-purpose discards the
+      // very account the collision just pinned, and a cross-flow transition is
+      // refused at runtime -- either way nobody is left to verify against.
+      issues.push(
+        error(
+          "sso/create-only-via-callback",
+          `step ${q(step.name)} routes "user_already_exists" through a re-purpose or another flow; it must be a plain transition within this flow so the colliding account stays pinned for verification`,
+          step.name,
+        ),
+      );
     } else {
       // The collision pins the existing account, so the target must actually
       // prove ownership. Non-terminal is not enough: a step that collects no

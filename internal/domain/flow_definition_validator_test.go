@@ -2076,6 +2076,49 @@ func TestValidateSsoCreationReachability(t *testing.T) {
 		require.Error(t, err, "routing a collision to a terminal step must be rejected (account takeover)")
 	})
 
+	t.Run("rejects a collision transition that re-purposes", func(t *testing.T) {
+		login := domain.FlowDefinitionPurposeLogin
+		def := base(
+			[]domain.FlowDefinitionStep{
+				{
+					Name:         "identifier",
+					Fields:       []domain.Field{"email"},
+					SSOProviders: []string{"google"},
+					Actions: []domain.FlowStepAction{
+						{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+					},
+					Transitions: map[string]domain.FlowStepTransition{
+						"submit":           {Target: "done"},
+						"callback":         {Target: "done"},
+						"identity_unknown": {Target: "register-sso"},
+					},
+				},
+				{
+					Name:      "register-sso",
+					Fields:    []domain.Field{"email"},
+					OnSuccess: &ssoCreate,
+					Actions:   []domain.FlowStepAction{{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true}},
+					Transitions: map[string]domain.FlowStepTransition{
+						"submit": {Target: "done"},
+						// A re-purpose drops the pinned account, so the conflict
+						// step would have nobody to verify.
+						"user_already_exists": {Target: "conflict", Purpose: &login},
+					},
+				},
+				{
+					Name:        "conflict",
+					Fields:      []domain.Field{"x-auth-methods#password"},
+					Actions:     []domain.FlowStepAction{{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true}},
+					Transitions: map[string]domain.FlowStepTransition{"submit": {Target: "done"}},
+				},
+				{Name: "done", Complete: &show},
+			},
+			map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "identifier"},
+		)
+		_, err := domain.ValidateFlowDefinition(&schema, def)
+		require.Error(t, err, "a collision routed through a re-purpose must be rejected")
+	})
+
 	t.Run("rejects a collision target that verifies no credential", func(t *testing.T) {
 		def := base(
 			[]domain.FlowDefinitionStep{
