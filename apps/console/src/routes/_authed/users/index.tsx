@@ -1,6 +1,6 @@
 import { ApiError } from "@zitadel/api/runtime/fetch";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { Box, Info, Loader2, MoreVertical, Plus, Search, User } from "lucide-react";
+import { Box, Loader2, MoreVertical, Plus, Search, User } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { AddUserSheet } from "@/components/add-user-sheet";
@@ -12,7 +12,6 @@ import {
   RESOURCE_TABLE_WRAP,
   ResourceHeadCell,
 } from "@/components/resource-list";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -33,7 +32,11 @@ import {
 import { StatusBadge } from "@/components/status-badge";
 
 import { api } from "../../../api/zitadel";
-import { projectScopeDeps } from "../../../lib/project-scope";
+import {
+  projectScopeDeps,
+  requireProjectScope,
+  useRequiredProjectScope,
+} from "../../../lib/project-scope";
 import { displayValue, field } from "../../../lib/record";
 import { type SchemaField, type UserSchema, schemaColumns } from "../../../lib/schema";
 import { userAttributes, userIdentifier, userIdentity } from "../../../lib/user";
@@ -44,24 +47,9 @@ export const Route = createFileRoute("/_authed/users/")({
   // Order 3: Teams sits at 2.
   staticData: { scope: "project", nav: { label: "Users", order: 3, icon: User } },
   loaderDeps: projectScopeDeps,
-  loader: async ({ context, deps }) => {
-    // `POST /users/query` names no project: the server answers for the
-    // caller's own — the session's project, or behind the dev proxy the
-    // project secret's, which is the same one. For any other selected project
-    // the page would be that project's neighbour's users under this project's
-    // name, so the screen says it cannot list them instead of reading.
-    if (deps.project !== context.session.project_id) {
-      return {
-        listable: false as const,
-        users: [],
-        teamsExpanded: false,
-        nextPageToken: undefined,
-        columns: [],
-      };
-    }
-    const page = await fetchUsers();
+  loader: async ({ deps }) => {
+    const page = await fetchUsers(requireProjectScope(deps.project));
     return {
-      listable: true as const,
       users: page.users,
       teamsExpanded: page.teamsExpanded,
       nextPageToken: page.next_page_token ?? undefined,
@@ -74,20 +62,31 @@ export const Route = createFileRoute("/_authed/users/")({
 type UsersPage = Awaited<ReturnType<typeof api.queryUsers>>;
 
 /**
- * One page of users, with each user's team memberships embedded.
+ * One page of the selected project's users, with each user's team memberships
+ * embedded. `project_id` names the target (#1303): without it the server
+ * answers for the caller's own project, which on a platform deployment is not
+ * the one selected.
  *
  * `expand: ["teams"]` needs `team_membership.read` on top of `user.read`, and a
  * credential carrying one without the other is refused the whole request rather
- * than just the relation (ADR 059). The refusal therefore falls back to the
- * unexpanded read: the screen loses its Team column, not its users.
+ * than just the relation (ADR 059). A Console session passes once it may list
+ * the project (#1306); the refusal still falls back to the unexpanded read for
+ * a credential that may not, so the screen loses its Team column, not its users.
  */
-async function fetchUsers(pageToken?: string): Promise<UsersPage & { teamsExpanded: boolean }> {
+async function fetchUsers(
+  projectId: string,
+  pageToken?: string,
+): Promise<UsersPage & { teamsExpanded: boolean }> {
   const body = { limit: PAGE_SIZE, page_token: pageToken };
+  const params = { project_id: projectId };
   try {
-    return { ...(await api.queryUsers({ ...body, expand: ["teams"] })), teamsExpanded: true };
+    return {
+      ...(await api.queryUsers({ ...body, expand: ["teams"] }, params)),
+      teamsExpanded: true,
+    };
   } catch (cause) {
     if (!(cause instanceof ApiError) || cause.status !== 403) throw cause;
-    return { ...(await api.queryUsers(body)), teamsExpanded: false };
+    return { ...(await api.queryUsers(body, params)), teamsExpanded: false };
   }
 }
 
@@ -181,6 +180,7 @@ function searchShortcutLabel(): string {
 }
 
 function UsersScreen() {
+  const projectId = useRequiredProjectScope();
   const loaded = Route.useLoaderData();
   const router = useRouter();
   const [query, setQuery] = useState("");
@@ -219,7 +219,7 @@ function UsersScreen() {
     const generation = loaded;
     setLoadingMore(true);
     try {
-      const page = await fetchUsers(nextPageToken);
+      const page = await fetchUsers(projectId, nextPageToken);
       // A later page can carry a schema the first page never referenced, which
       // would otherwise render its users with every cell blank.
       const nextColumns = await columnsForUsers([...users, ...page.users]);
@@ -286,26 +286,6 @@ function UsersScreen() {
       ].some((value) => value.toLowerCase().includes(needle));
     });
   }, [users, query, columns, teamsExpanded]);
-
-  if (!loaded.listable) {
-    return (
-      <div className={`${RESOURCE_PAGE} pt-4`}>
-        <h1 className={`${RESOURCE_HEADER} text-foreground font-serif text-2xl leading-6 tracking-tight`}>
-          Users
-        </h1>
-        <div className={`${RESOURCE_HEADER} mt-6`}>
-          <Alert>
-            <Info aria-hidden />
-            <AlertTitle>Users of this project can't be listed yet</AlertTitle>
-            <AlertDescription>
-              The users list only reads the project you signed in to. Listing another project's
-              users needs server support that has not landed.
-            </AlertDescription>
-          </Alert>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className={`${RESOURCE_PAGE} pt-4`}>

@@ -53,18 +53,39 @@ function recordQueries(response: (body: Record<string, unknown>) => Response) {
 }
 
 describe("users screen", () => {
-  it("says it cannot list another project's users rather than showing its own", async () => {
-    // `POST /users/query` names no project and answers for the caller's own
-    // (`proj_test`, the session fixture's), so reading it here would put that
-    // project's users under the selected one's name.
-    const bodies = recordQueries(() => HttpResponse.json({ users: [] }));
+  it("lists the selected project's users, on every page", async () => {
+    // `project_id` names the target (#1303). Without it the server answers for
+    // the caller's own project (`proj_test`, the session fixture's), which is
+    // not the one selected here.
+    const projects: (string | null)[] = [];
+    server.use(
+      http.post(USERS_QUERY_URL, async ({ request }) => {
+        projects.push(new URL(request.url).searchParams.get("project_id"));
+        const body = (await request.json()) as { page_token?: string };
+        return HttpResponse.json(
+          body.page_token
+            ? { users: [] }
+            : {
+                users: [
+                  {
+                    id: "user_1",
+                    identifier: "maya@acme.com",
+                    identifier_property: "email",
+                    attributes: { email: "maya@acme.com" },
+                  },
+                ],
+                next_page_token: "tok_2",
+              },
+        );
+      }),
+    );
     await renderUsers(scopedPath("/users", "proj_other"));
 
-    expect(
-      await screen.findByText("Users of this project can't be listed yet"),
-    ).toBeInTheDocument();
-    expect(screen.queryByRole("table")).not.toBeInTheDocument();
-    expect(bodies).toEqual([]);
+    // The address renders twice in the row (User and identifier columns).
+    const table = within(await screen.findByRole("table"));
+    expect(table.getAllByText("maya@acme.com").length).toBeGreaterThan(0);
+    await userEvent.click(screen.getByRole("button", { name: "Load more" }));
+    await waitFor(() => expect(projects).toEqual(["proj_other", "proj_other"]));
   });
 
   it("renders the page heading and a user row", async () => {
