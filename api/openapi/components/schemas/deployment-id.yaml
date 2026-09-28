@@ -1,0 +1,4 @@
+type: string
+description: The opaque, immutable identifier of a deployment.
+pattern: '^dep_[a-zA-Z0-9_-]+$'
+example: dep_01KX4SB9C8E1F0N9WD3P2E4YM5
