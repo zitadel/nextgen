@@ -209,6 +209,26 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(after.status).toBe(401);
   });
 
+  test("GET /sessions/me/csrf without a session answers a 401 that is not stored", async () => {
+    const res = await fetch(`${BASE}/sessions/me/csrf`);
+    expect(res.status).toBe(401);
+    expect(res.headers.get("cache-control")).toBe("private, no-store");
+  });
+
+  test("a cross-origin preflight allows the X-Zitadel-CSRF header", async () => {
+    const res = await fetch(`${BASE}/users?project_id=proj_test`, {
+      method: "OPTIONS",
+      headers: {
+        origin: "http://localhost:4200",
+        "access-control-request-method": "POST",
+        "access-control-request-headers": "content-type, x-zitadel-csrf",
+      },
+    });
+    expect(res.status).toBe(204);
+    const allowed = (res.headers.get("access-control-allow-headers") ?? "").toLowerCase();
+    expect(allowed).toContain("x-zitadel-csrf");
+  });
+
   test("DELETE /sessions/me without a session cookie returns 401", async () => {
     const res = await fetch(`${BASE}/sessions/me`, { method: "DELETE" });
     expect(res.status).toBe(401);
