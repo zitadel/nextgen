@@ -1145,25 +1145,20 @@ func attachPendingChallenge(step *FlowStep, pc *FlowPendingChallenge) {
 // runOnSuccess dispatches the step's on_success mutation. Add a case
 // when a new [FlowOnSuccess] handler lands.
 func (r *FlowStateMachineRuntime) runOnSuccess(pc *processCtx, resolved FlowResolvedFields) (FlowOnSuccessResult, error) {
+	// The input is identical whichever mutation runs; only the handler differs.
+	in := FlowOnSuccessInput{
+		ProjectID:     pc.state.ProjectID,
+		UserSchemaURL: pc.state.UserSchemaURL,
+		Fields:        pc.in.Fields,
+		Resolved:      resolved,
+		State:         pc.state,
+		ResolvedFlow:  pc.def,
+	}
 	switch *pc.currentStep.OnSuccess {
 	case FlowOnSuccessCreateUser:
-		return r.userCreater.Handle(pc.ctx, FlowOnSuccessInput{
-			ProjectID:     pc.state.ProjectID,
-			UserSchemaURL: pc.state.UserSchemaURL,
-			Fields:        pc.in.Fields,
-			Resolved:      resolved,
-			State:         pc.state,
-			ResolvedFlow:  pc.def,
-		})
+		return r.userCreater.Handle(pc.ctx, in)
 	case FlowOnSuccessCreateUserWithSso:
-		return r.ssoUserCreater.Handle(pc.ctx, FlowOnSuccessInput{
-			ProjectID:     pc.state.ProjectID,
-			UserSchemaURL: pc.state.UserSchemaURL,
-			Fields:        pc.in.Fields,
-			Resolved:      resolved,
-			State:         pc.state,
-			ResolvedFlow:  pc.def,
-		})
+		return r.ssoUserCreater.Handle(pc.ctx, in)
 	default:
 		return FlowOnSuccessResult{}, fmt.Errorf("%w: on_success %s not wired", ErrFlowIntegrity(), *pc.currentStep.OnSuccess)
 	}

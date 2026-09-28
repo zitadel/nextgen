@@ -627,6 +627,9 @@ func TestFlowStateMachine_Process_CreateUserWithSsoRunsItsOwnHandler(t *testing.
 	withSso := domain.FlowOnSuccessCreateUserWithSso
 	def := signupDefinition()
 	def.Steps[0].OnSuccess = &withSso
+	// An SSO signup mints a user with no password, so the step that runs
+	// create_user_with_sso collects only the identifier -- never a password.
+	def.Steps[0].Fields = []domain.Field{"email"}
 
 	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
 		Definition:    def,
@@ -639,8 +642,7 @@ func TestFlowStateMachine_Process_CreateUserWithSsoRunsItsOwnHandler(t *testing.
 	_, err = w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
 		Action: domain.FlowActionSubmit,
 		Fields: map[string]any{
-			"email":                   "alice@example.com",
-			"x-auth-methods#password": "correct-horse-battery-staple",
+			"email": "alice@example.com",
 		},
 	})
 	require.NoError(t, err)
