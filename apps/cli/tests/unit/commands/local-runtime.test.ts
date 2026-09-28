@@ -58,6 +58,20 @@ afterEach(async () => {
   }
 });
 
+/**
+ * The three ways a local server is told not to bootstrap the platform project:
+ * the shell, the project's own env file, and a pin to another project. Each
+ * must leave the start without a local admin.
+ */
+const PLATFORM_OPT_OUTS: { how: string; env: Record<string, string>; envLocal?: string }[] = [
+  { how: "the shell opts out", env: { NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT: "false" } },
+  { how: ".env.local opts out", env: {}, envLocal: "NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=false\n" },
+  {
+    how: "the server is pinned to its own project",
+    env: { NEXTGEN_PLATFORM_PROJECT_ID: "proj_custom" },
+  },
+];
+
 describe("local runtime commands", () => {
   it("doctor --json passes with the binary runtime before app setup", async () => {
     const cwd = await tempProject("zitadel-doctor-binary-");
@@ -441,6 +455,7 @@ describe("local runtime commands", () => {
       data: {
         runtime: { backend: string; pid: number; log_path: string; server_package: string };
         urls: { api: string };
+        console: { signed_in_as: string; sign_in_url?: string; error?: string; hint?: string };
         next_commands: string[];
       };
     };
@@ -453,6 +468,15 @@ describe("local runtime commands", () => {
     });
     expect(envelope.data.runtime.pid).toBeGreaterThan(0);
     binaryPids.push(envelope.data.runtime.pid);
+    // The fake server hosts no platform project, so no sign-in link can be
+    // minted: the envelope says why and stops advertising `zitadel console`,
+    // which would fail the same way.
+    expect(envelope.data.console).toMatchObject({
+      signed_in_as: expect.any(String),
+      error: expect.stringContaining("platform project"),
+      hint: expect.stringContaining("zitadel stop"),
+    });
+    expect(envelope.data.console.sign_in_url).toBeUndefined();
     expect(envelope.data.next_commands).toEqual([expectedPublicCliCommand("setup --server local")]);
 
     const runtime = await readRuntimeMetadata(cwd);
@@ -502,6 +526,49 @@ describe("local runtime commands", () => {
     expect(envelope.next_commands).toContain(expectedPublicCliCommand("stop --all"));
   });
 
+  // The platform project and the local admin travel together: a harness that
+  // wants a bare single-project instance opts out of both (apps/console-e2e's
+  // real and embedded lanes do). The project's env files reach the server over
+  // the shell and the user file forces the bootstrap on, so an opt-out in
+  // `.env.local` must be read by the CLI too. And the server refuses to
+  // bootstrap the platform project while pinned to another one, so a pin means
+  // no local admin rather than a start that fails.
+  it.each(PLATFORM_OPT_OUTS)(
+    "start creates no local admin when $how",
+    async ({ env, envLocal }) => {
+      const cwd = await tempProject("zitadel-start-no-platform-");
+      if (envLocal) await writeFile(join(cwd, ".env.local"), envLocal);
+      const fake = await fakeServerBinary();
+      const port = await freePort();
+
+      const result = await runCliForTest(
+        ["start", "--cwd", cwd, "--json", "--port", String(port)],
+        {
+          ZITADEL_SERVER_BINARY: fake.binPath,
+          ...env,
+        },
+      );
+
+      expect(result.exitCode).toBe(0);
+      const envelope = parseJson(result.stdout) as {
+        status: string;
+        data: { runtime: { pid: number }; console?: unknown; next_commands: string[] };
+      };
+      expect(envelope.status).toBe("ok");
+      binaryPids.push(envelope.data.runtime.pid);
+      // No admin, so nothing to sign in as and nothing to suggest.
+      expect(envelope.data.console).toBeUndefined();
+      expect(envelope.data.next_commands).toEqual([
+        expectedPublicCliCommand("setup --server local"),
+      ]);
+      await expect(readFile(join(cwd, ".zitadel/local/admin.json"), "utf8")).rejects.toThrow();
+      await expect(readFile(join(cwd, ".zitadel/local/admin-user.json"), "utf8")).rejects.toThrow();
+      // And the server is started without the bootstrap user document.
+      const commandLine = (await readRuntimeMetadata(cwd)) as { command?: string } | undefined;
+      expect(commandLine?.command ?? "").not.toContain("--user-file");
+    },
+  );
+
   it("start fails if its spawned binary exits even when another health server appears", async () => {
     const cwd = await tempProject("zitadel-start-dead-pid-");
     const fake = await fakeExitingServerWithForeignHealth();
@@ -541,6 +608,8 @@ describe("local runtime commands", () => {
     expect(envelope.data.urls.api).toBe(serverUrl);
     expect(envelope.data.next_actions.join("\n")).toContain("From your app directory");
     expect(envelope.data.next_actions.join("\n")).toContain("Setup installs dependencies");
+    // As in the binary case: no platform project on the fake server, so no
+    // link and no `console` suggestion.
     expect(envelope.data.next_commands).toEqual([expectedPublicCliCommand("setup --server local")]);
     expect(envelope.data.next_commands).not.toContain("npm install");
     expect(envelope.data.next_commands).not.toContain("npm run dev");
@@ -555,7 +624,7 @@ describe("local runtime commands", () => {
     expect(runCall?.join(" ")).toContain(`${localRuntimePaths(cwd).dataDir}:${CONTAINER_DATA_DIR}`);
     expect(runCall?.join(" ")).toContain(`NEXTGEN_SERVER_DATA_DIR=${CONTAINER_DATA_DIR}`);
     expect(runCall?.join(" ")).not.toContain("NEXTGEN_SERVER_ENCRYPTION_KEY");
-    expect(runCall?.at(-1)).toBe(await expectedDefaultImage());
+    expect(runImage(runCall)).toBe(await expectedDefaultImage());
   });
 
   it("start uses a prebuilt local image without pulling it", async () => {
@@ -575,7 +644,7 @@ describe("local runtime commands", () => {
     const dockerCalls = await readDockerCalls(fake.logPath);
     expect(dockerCalls).toContainEqual(["image", "inspect", "zitadel-nextgen:test"]);
     expect(dockerCalls.some((args) => args[0] === "pull")).toBe(false);
-    expect(dockerCalls.find((args) => args[0] === "run")?.at(-1)).toBe("zitadel-nextgen:test");
+    expect(runImage(dockerCalls.find((args) => args[0] === "run"))).toBe("zitadel-nextgen:test");
   });
 
   it("start uses ZITADEL_LOCAL_IMAGE before the derived alpha image", async () => {
@@ -594,7 +663,7 @@ describe("local runtime commands", () => {
 
     expect(result.exitCode).toBe(0);
     const dockerCalls = await readDockerCalls(fake.logPath);
-    expect(dockerCalls.find((args) => args[0] === "run")?.at(-1)).toBe("zitadel-nextgen:env");
+    expect(runImage(dockerCalls.find((args) => args[0] === "run"))).toBe("zitadel-nextgen:env");
   });
 
   it("start --image overrides ZITADEL_LOCAL_IMAGE", async () => {
@@ -622,7 +691,9 @@ describe("local runtime commands", () => {
 
     expect(result.exitCode).toBe(0);
     const dockerCalls = await readDockerCalls(fake.logPath);
-    expect(dockerCalls.find((args) => args[0] === "run")?.at(-1)).toBe("zitadel-nextgen:override");
+    expect(runImage(dockerCalls.find((args) => args[0] === "run"))).toBe(
+      "zitadel-nextgen:override",
+    );
   });
 
   it("start replaces an existing container from another image", async () => {
@@ -642,7 +713,7 @@ describe("local runtime commands", () => {
     const dockerCalls = await readDockerCalls(fake.logPath);
     expect(dockerCalls.some((args) => args[0] === "stop")).toBe(true);
     expect(dockerCalls.some((args) => args[0] === "rm")).toBe(true);
-    expect(dockerCalls.find((args) => args[0] === "run")?.at(-1)).toBe(
+    expect(runImage(dockerCalls.find((args) => args[0] === "run"))).toBe(
       await expectedDefaultImage(),
     );
   });
@@ -1024,6 +1095,17 @@ process.exit(1);
   );
   await chmod(psPath, 0o755);
   return { binDir };
+}
+
+/**
+ * The image of a recorded `docker run`. It is the last argument unless the run
+ * passes server arguments after it (`--migrate --user-file …` for the local
+ * admin), in which case it is the argument just before them.
+ */
+function runImage(args: string[] | undefined): string | undefined {
+  if (!args) return undefined;
+  const serverArgs = args.indexOf("--migrate");
+  return serverArgs > 0 ? args[serverArgs - 1] : args.at(-1);
 }
 
 async function readDockerCalls(logPath: string): Promise<string[][]> {

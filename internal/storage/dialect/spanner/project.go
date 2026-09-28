@@ -9,18 +9,21 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/dialect/pagination"
+	storageproject "github.com/zitadel/nextgen/internal/storage/project"
 )
 
 const (
 	projectsTable         = "projects"
-	createProjectStmt     = `INSERT INTO projects (id, name, preview_origins) VALUES (@p1, @p2, @p3) THEN RETURN id, created_at, updated_at`
-	updateProjectStmt     = `UPDATE projects SET name = @p2, updated_at = CURRENT_TIMESTAMP() WHERE id = @p1 THEN RETURN id, name, preview_origins, created_at, updated_at`
+	createProjectStmt     = `INSERT INTO projects (id, name, preview_origins, password_hash_policy) VALUES (@p1, @p2, @p3, @p4) THEN RETURN id, created_at, updated_at`
+	updateProjectStmt     = `UPDATE projects SET name = @p2, updated_at = CURRENT_TIMESTAMP() WHERE id = @p1 THEN RETURN id, name, preview_origins, password_hash_policy, created_at, updated_at`
 	deleteByIDProjectStmt = `DELETE FROM projects WHERE id = @p1`
-	projectQuery          = "SELECT id, name, preview_origins, created_at, updated_at FROM projects"
+	projectQuery          = "SELECT id, name, preview_origins, password_hash_policy, created_at, updated_at FROM projects"
+
+	setProjectPasswordHashPolicyStmt = `UPDATE projects SET password_hash_policy = @p2, updated_at = CURRENT_TIMESTAMP() WHERE id = @p1 THEN RETURN id`
 )
 
 var projectColumns = []string{
-	"id", "name", "preview_origins", "created_at", "updated_at",
+	"id", "name", "preview_origins", "password_hash_policy", "created_at", "updated_at",
 }
 
 type projectStatements struct{ statement }
@@ -42,8 +45,12 @@ func (ps projectStatements) CreateProject(ctx context.Context, project *domain.P
 	if err != nil {
 		return wrapError(err)
 	}
+	policy, err := encodePasswordHashPolicy(project.PasswordHashPolicy)
+	if err != nil {
+		return wrapError(err)
+	}
 	return withTransaction(ctx, ps.db, func(ctx context.Context, tx queryExecutor) error {
-		stmt := buildStatement(createProjectStmt, project.ID, project.Name, previewOrigins).statement()
+		stmt := buildStatement(createProjectStmt, project.ID, project.Name, previewOrigins, policy).statement()
 		if err := tx.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
 			_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
 				return struct{}{}, row.Columns(&project.ID, &project.CreatedAt, &project.UpdatedAt)
@@ -91,6 +98,24 @@ func (ps projectStatements) UpdateProject(ctx context.Context, project *domain.P
 	})
 }
 
+// SetProjectPasswordHashPolicy implements [service.ProjectStatements].
+// A nil policy writes NULL, which hands the project back to the deployment
+// default.
+func (ps projectStatements) SetProjectPasswordHashPolicy(ctx context.Context, projectID string, policy *domain.PasswordHashPolicy) error {
+	encoded, err := encodePasswordHashPolicy(policy)
+	if err != nil {
+		return wrapError(err)
+	}
+	stmt := buildStatement(setProjectPasswordHashPolicyStmt, projectID, encoded).statement()
+	return ps.db.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
+		_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
+			var id string
+			return struct{}{}, row.Columns(&id)
+		})
+		return err
+	})
+}
+
 // ListProjects implements [service.ProjectStatements].
 func (ps projectStatements) ListProjects(ctx context.Context, filter *database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {
 	var compiler statementCompiler
@@ -123,16 +148,43 @@ func (ps projectStatements) ListProjects(ctx context.Context, filter *database.L
 
 func (ps projectStatements) scanProject(row *spanner.Row) (*domain.Project, error) {
 	project := new(domain.Project)
-	var previewOriginsJSON string
-	if err := row.Columns(&project.ID, &project.Name, &previewOriginsJSON, &project.CreatedAt, &project.UpdatedAt); err != nil {
+	var (
+		previewOriginsJSON string
+		policyJSON         spanner.NullJSON
+	)
+	if err := row.Columns(&project.ID, &project.Name, &previewOriginsJSON, &policyJSON, &project.CreatedAt, &project.UpdatedAt); err != nil {
 		return nil, err
 	}
 	origins, err := decodePreviewOrigins(previewOriginsJSON)
 	if err != nil {
 		return nil, err
 	}
+	policy, err := decodePasswordHashPolicy(policyJSON)
+	if err != nil {
+		return nil, err
+	}
 	project.PreviewOrigins = origins
+	project.PasswordHashPolicy = policy
 	return project, nil
+}
+
+// encodePasswordHashPolicy binds the policy as spanner.NullJSON; a plain string
+// cannot be bound to a Spanner JSON column, and a project with no policy of its
+// own stores NULL.
+func encodePasswordHashPolicy(policy *domain.PasswordHashPolicy) (spanner.NullJSON, error) {
+	raw, err := storageproject.MarshalPasswordHashPolicy(policy)
+	if err != nil {
+		return spanner.NullJSON{}, err
+	}
+	return encodeNullJSON(raw)
+}
+
+func decodePasswordHashPolicy(value spanner.NullJSON) (*domain.PasswordHashPolicy, error) {
+	raw, err := decodeNullJSON(value)
+	if err != nil {
+		return nil, err
+	}
+	return storageproject.UnmarshalPasswordHashPolicy(raw)
 }
 
 func encodePreviewOrigins(origins []string) (string, error) {

@@ -119,25 +119,26 @@ template** (advanced structure inside the widget, shared later by embedded
 and Zitadel-served login). Zitadel-served **page chrome** is unset;
 `page.liquid` is only a later proposal — see
 [`customization-strategy.md`](customization-strategy.md#what-the-shipped-designs-really-are)
-and [ADR 057](../../adrs/057-login-customization-categories.md). The five
-named files below are what `zitadel branding eject --design` / `setup --design`
-still write today; that catalog is the setup path to retire, not the
-destination:
+and [ADR 057](../../adrs/057-login-customization-categories.md).
+`zitadel branding eject --design` offers two widget-structure starting
+points; setup never writes either
+([#1039](https://github.com/zitadel/nextgen/issues/1039)):
 
 | Design        | Descriptor `layout` | Sketch                                                                  |
 | ------------- | ------------------- | ----------------------------------------------------------------------- |
 | `centered`    | `centered`          | The bundled default, ejected verbatim.                                  |
-| `split`       | `split`             | Brand panel left (logo, `hero_url`), form right.                        |
-| `split-right` | `split`             | Mirrored: form left, brand panel right.                                 |
-| `hero`        | `split`             | Landing-style brand pane left (nav, headline, feature bullets — editable copy on token-styled `zl-hero__*` classes), form right. |
 | `minimal`     | `centered`          | Chrome stripped to heading, fields, and actions.                        |
 
-Those five files still pass the authoring validator and a component-level
-render test. They remain a supported *render* path for already-ejected
-revisions. They are not the setup destination: embedder page looks live
-in the application; Zitadel-served page chrome is unset.
+The retired page-layout designs (`split`, `split-right`, `hero`) are no
+longer ejectable: they were page chrome around the same card, and embedder
+page looks live in the application (Zitadel-served page chrome is unset).
+Revisions already published from them keep rendering; their last shipped
+templates are kept as fixtures in
+`packages/components/src/orchestrator/__fixtures__/legacy-designs/` and
+covered by the component render tests. The split chrome below documents
+that legacy render path.
 
-### Split chrome: mobile fallback and knobs
+### Split chrome (legacy revisions): mobile fallback and knobs
 
 On viewports ≤48rem the chrome collapses `.zl-split` to one column and hides `.zl-split__brand`; the shipped split-family designs render a `.zl-split__compact` node inside the form pane (logo, or a text brand line in `hero`) that only shows there, so the tenant's identity survives the collapse. Three custom properties tune the chrome — set them on the template's root element via its `style` attribute (inline `style=""` passes the sanitiser; the values cascade into the orchestrator's shadow chrome):
 
@@ -151,14 +152,14 @@ Widget-level sizing belongs to the **embedding page**, not the template:
 `<zitadel-login>` defaults to `variant="widget"` (content-sized, no page
 chrome) and dedicated login routes set `variant="page"` for the full-page
 shape. `--zl-page-min-height` remains the fine-grained height override in
-both modes, and the split-family collapse responds to the widget's own width
-(container queries), not the viewport — see the embedding section in the
-`@zitadel/components` README.
+both modes, and the legacy split chrome's collapse responds to the widget's
+own width (container queries), not the viewport — see the embedding section in
+the `@zitadel/components` README.
 
 ## Authoring workflow (eject → edit → plan → apply)
 
 ```
-zitadel branding eject --design split   # writes .zitadel/branding/{branding.json, login.liquid}
+zitadel branding eject --design minimal # writes .zitadel/branding/{branding.json, login.liquid}
 $EDITOR .zitadel/branding/login.liquid  # real Liquid, not JSON-escaped strings
 zitadel plan                            # authoritative validation + diff (revise on edit)
 zitadel apply                           # publishes an immutable branding revision

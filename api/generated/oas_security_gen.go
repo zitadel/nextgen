@@ -39,17 +39,32 @@ func findAuthorization(h http.Header, prefix string) (string, bool) {
 
 // operationRolesNextgenSession is a private map storing roles per operation.
 var operationRolesNextgenSession = map[string][]string{
-	CompleteClaimOperation:   []string{},
-	CreateGrantOperation:     []string{},
-	DeleteGrantOperation:     []string{},
-	GetGrantOperation:        []string{},
-	GetMySessionOperation:    []string{},
-	GetMyUserOperation:       []string{},
-	ListMyProjectsOperation:  []string{},
-	PatchMyUserOperation:     []string{},
-	QueryGrantsOperation:     []string{},
-	QueryUsersOperation:      []string{},
-	RevokeMySessionOperation: []string{},
+	CompleteClaimOperation:       []string{},
+	CreateGrantOperation:         []string{},
+	CreateTeamOperation:          []string{},
+	CreateUserOperation:          []string{},
+	DeleteGrantOperation:         []string{},
+	DeleteUserByIDOperation:      []string{},
+	GetBrandingByIdOperation:     []string{},
+	GetFlowDefinitionOperation:   []string{},
+	GetGrantOperation:            []string{},
+	GetMySessionOperation:        []string{},
+	GetMyUserOperation:           []string{},
+	GetProjectOperation:          []string{},
+	GetSchemaByIdOperation:       []string{},
+	GetTeamOperation:             []string{},
+	GetUserByIDOperation:         []string{},
+	ListBrandingOperation:        []string{},
+	ListFlowDefinitionsOperation: []string{},
+	ListMyProjectsOperation:      []string{},
+	ListSchemasOperation:         []string{},
+	PatchMyUserOperation:         []string{},
+	PatchProjectOperation:        []string{},
+	QueryGrantsOperation:         []string{},
+	QueryTeamsOperation:          []string{},
+	QueryUsersOperation:          []string{},
+	RevokeMySessionOperation:     []string{},
+	UpdateTeamOperation:          []string{},
 }
 
 // GetRolesForNextgenSession returns the required roles for the given operation.
@@ -83,6 +98,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	CreateBrandingOperation: []string{
 		"branding.write",
+	},
+	CreateDeploymentOperation: []string{
+		"deployment.write",
 	},
 	CreateFlowDefinitionOperation: []string{
 		"flow_definition.write",
@@ -141,6 +159,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	GetClaimStatusOperation: []string{
 		"project.write",
 	},
+	GetDeploymentByIdOperation: []string{
+		"deployment.read",
+	},
 	GetEnvironmentByNameOperation: []string{
 		"environment.read",
 	},
@@ -194,6 +215,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	ListBrandingOperation: []string{
 		"branding.read",
+	},
+	ListDeploymentsOperation: []string{
+		"deployment.read",
 	},
 	ListEnvironmentsOperation: []string{
 		"environment.read",

@@ -28,6 +28,8 @@ export type BinaryRunSpec = {
   serverUrl: string;
   /** Project variables for the child's environment, never its argv. */
   env?: ResolvedEnv;
+  /** Bootstrap user document for the local admin, passed as `--user-file`. */
+  userFile?: string;
 };
 
 export type StopBinaryRuntimeResult = Readonly<{
@@ -68,7 +70,10 @@ export async function startBinaryRuntime(spec: BinaryRunSpec): Promise<BinaryRun
   await mkdir(dirname(spec.logPath), { recursive: true, mode: 0o700 });
   const log = await open(spec.logPath, "a", 0o600);
   try {
-    const args = withMigrateFlag(command.args);
+    const args = withMigrateFlag([
+      ...command.args,
+      ...(spec.userFile ? ["--user-file", spec.userFile] : []),
+    ]);
     const child = spawn(command.command, args, {
       detached: true,
       env: {
@@ -80,6 +85,11 @@ export async function startBinaryRuntime(spec: BinaryRunSpec): Promise<BinaryRun
         // Browser-facing URLs (claim, dashboard) must point at this local
         // server, not the cloud default the server config falls back to.
         NEXTGEN_SERVER_PUBLIC_BASE: spec.serverUrl,
+        // The platform project and the local admin travel together: the admin
+        // is a user of it. The caller decides by passing a user file, and an
+        // opted-out start passes none — leaving whatever the environment says
+        // (by default nothing, which the server reads as disabled).
+        ...(spec.userFile ? { NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT: "true" } : {}),
       },
       stdio: ["ignore", log.fd, log.fd],
     });

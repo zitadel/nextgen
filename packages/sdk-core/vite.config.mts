@@ -2,7 +2,7 @@ import { resolve } from "node:path";
 
 import { defineConfig } from "vite";
 
-export default defineConfig(() => ({
+export default defineConfig({
   root: import.meta.dirname,
   cacheDir: "../../node_modules/.vite/packages/sdk-core",
   build: {
@@ -30,4 +30,4 @@ export default defineConfig(() => ({
       include: ["src/**/*.ts"],
     },
   },
-}));
+});

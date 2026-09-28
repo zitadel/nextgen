@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 
+import { escapeControlCharacters } from "../api-client";
 import { stableStringify } from "../json";
 import type {
   ResourceSyncer,
@@ -186,13 +187,30 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
 
 const KNOWN_AFTER_APPLY = "(known after apply)";
 
+/**
+ * Quote-escape a string value, then escape whatever could still drive the
+ * terminal. The plan prints what the server stores, and `plan` and `apply`
+ * read it verbatim so the diff and the write-back see the real bytes; this is
+ * where it is made safe to print.
+ */
 function escapeString(s: string): string {
-  return s
-    .replace(/\\/g, "\\\\")
-    .replace(/"/g, '\\"')
-    .replace(/\n/g, "\\n")
-    .replace(/\r/g, "\\r")
-    .replace(/\t/g, "\\t");
+  return escapeControlCharacters(
+    s
+      .replace(/\\/g, "\\\\")
+      .replace(/"/g, '\\"')
+      .replace(/\n/g, "\\n")
+      .replace(/\r/g, "\\r")
+      .replace(/\t/g, "\\t"),
+  );
+}
+
+/**
+ * A field name as printed: a server-side key is as untrusted as a value.
+ * Backslashes are doubled first, as `sanitizeResponse` does for keys, so a key
+ * holding a raw ESC and one holding the literal text `\x1b` get two labels.
+ */
+function fieldLabel(key: string): string {
+  return escapeControlCharacters(key.replaceAll("\\", "\\\\"), { keepLayout: false });
 }
 
 function fmtPrimitive(v: string | number | boolean | null): string {
@@ -285,11 +303,11 @@ function renderFields(
   const col = (s: string) => paint(s, ansi, ctx.tty);
 
   const keys = Object.keys(obj).sort();
-  const maxLen = keys.reduce((m, k) => Math.max(m, k.length), 0);
+  const maxLen = keys.reduce((m, k) => Math.max(m, fieldLabel(k).length), 0);
 
   for (const key of keys) {
     const val = obj[key];
-    const pk = key.padEnd(maxLen);
+    const pk = fieldLabel(key).padEnd(maxLen);
 
     if (isPrimitive(val)) {
       const formatted = fmtScalar(val);
@@ -410,13 +428,15 @@ function diffLines(oldLines: readonly string[], newLines: readonly string[]): Li
 
 /** Classic LCS-length DP, walked back into an op list. */
 function lcsDiff(a: readonly string[], b: readonly string[]): LineOp[] {
-  const table: number[][] = Array.from({ length: a.length + 1 }, () =>
-    new Array<number>(b.length + 1).fill(0),
-  );
+  const table: number[][] = [];
+  // Reads past the filled edge are the recurrence's base case: an empty suffix, length 0.
+  const cell = (i: number, j: number): number => table[i]?.[j] ?? 0;
+
   for (let i = a.length - 1; i >= 0; i -= 1) {
+    const row = new Array<number>(b.length + 1).fill(0);
+    table[i] = row;
     for (let j = b.length - 1; j >= 0; j -= 1) {
-      table[i][j] =
-        a[i] === b[j] ? table[i + 1][j + 1] + 1 : Math.max(table[i + 1][j], table[i][j + 1]);
+      row[j] = a[i] === b[j] ? cell(i + 1, j + 1) + 1 : Math.max(cell(i + 1, j), cell(i, j + 1));
     }
   }
 
@@ -424,24 +444,23 @@ function lcsDiff(a: readonly string[], b: readonly string[]): LineOp[] {
   let i = 0;
   let j = 0;
   while (i < a.length && j < b.length) {
-    if (a[i] === b[j]) {
-      ops.push({ kind: "same", line: a[i] });
+    const left = a[i];
+    const right = b[j];
+    if (left === undefined || right === undefined) break;
+    if (left === right) {
+      ops.push({ kind: "same", line: left });
       i += 1;
       j += 1;
-    } else if (table[i + 1][j] >= table[i][j + 1]) {
-      ops.push({ kind: "del", line: a[i] });
+    } else if (cell(i + 1, j) >= cell(i, j + 1)) {
+      ops.push({ kind: "del", line: left });
       i += 1;
     } else {
-      ops.push({ kind: "add", line: b[j] });
+      ops.push({ kind: "add", line: right });
       j += 1;
     }
   }
-  for (; i < a.length; i += 1) {
-    ops.push({ kind: "del", line: a[i] });
-  }
-  for (; j < b.length; j += 1) {
-    ops.push({ kind: "add", line: b[j] });
-  }
+  for (const line of a.slice(i)) ops.push({ kind: "del", line });
+  for (const line of b.slice(j)) ops.push({ kind: "add", line });
   return ops;
 }
 
@@ -476,7 +495,8 @@ function renderBlockStringDiff(
   );
   for (const op of changed.slice(0, MAX_BLOCK_DIFF_LINES)) {
     const del = op.kind === "del";
-    lines.push(paint(`${bodyPad}${del ? "-" : "+"} ${op.line}`, del ? A.red : A.green, tty));
+    const line = escapeControlCharacters(op.line);
+    lines.push(paint(`${bodyPad}${del ? "-" : "+"} ${line}`, del ? A.red : A.green, tty));
   }
   const omitted = changed.length - MAX_BLOCK_DIFF_LINES;
   if (omitted > 0) {
@@ -503,12 +523,12 @@ function renderDiff(
   lines: string[],
 ): boolean {
   const allKeys = [...new Set([...Object.keys(oldObj), ...Object.keys(newObj)])].sort();
-  const maxLen = allKeys.reduce((m, k) => Math.max(m, k.length), 0);
+  const maxLen = allKeys.reduce((m, k) => Math.max(m, fieldLabel(k).length), 0);
   const pad = " ".repeat(prefixCol);
   let hasChanges = false;
 
   for (const key of allKeys) {
-    const pk = key.padEnd(maxLen);
+    const pk = fieldLabel(key).padEnd(maxLen);
     const hasOld = Object.prototype.hasOwnProperty.call(oldObj, key);
     const hasNew = Object.prototype.hasOwnProperty.call(newObj, key);
     const oldVal = oldObj[key];

@@ -78,6 +78,8 @@ const (
 
 	EventTypeReleaseCreated EventType = "release.created"
 
+	EventTypeDeploymentCreated EventType = "deployment.created"
+
 	EventTypeAuthzGranted EventType = "authz.granted"
 	EventTypeAuthzRevoked EventType = "authz.revoked"
 
