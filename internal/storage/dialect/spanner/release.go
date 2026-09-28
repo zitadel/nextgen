@@ -112,6 +112,29 @@ func (rs releaseStatements) GetReleaseByContentHash(ctx context.Context, project
 	return entity, nil
 }
 
+// GetReleasesByIDs implements [service.ReleaseStatements].
+func (rs releaseStatements) GetReleasesByIDs(ctx context.Context, projectID string, ids []string) ([]*domain.Release, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	var compiler statementCompiler
+	if err := compileRead(&compiler, releaseQuery, &database.ListOptions[domain.ReleaseField]{
+		Filter: release.ByIDs(projectID, ids),
+	}, release.Schema); err != nil {
+		return nil, err
+	}
+
+	var items []*domain.Release
+	if err := rs.db.Query(ctx, compiler.statement(), func(iter *spanner.RowIterator) error {
+		var err error
+		items, err = collectRows(iter, rs.scanRelease)
+		return err
+	}); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 // ListReleases implements [service.ReleaseStatements].
 func (rs releaseStatements) ListReleases(ctx context.Context, filter *database.ListOptions[domain.ReleaseField]) (*database.ListResult[*domain.Release], error) {
 	var compiler statementCompiler
