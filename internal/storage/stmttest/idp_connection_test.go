@@ -349,7 +349,7 @@ func TestIDPConnectionStatements_ConcurrentReviseAgreesOnNewest(t *testing.T) {
 // revision, so a second revise of one connection reads what the first one
 // wrote. Postgres waits on the row lock and SQLite on the write lock BEGIN
 // takes, so B cannot commit while A holds the lock. Spanner aborts one of the
-// two and replays it; the emulator aborts the open one, so there A replays
+// two and replays it; the emulator aborts the open one, so there A often replays
 // after B. On every dialect the writer that commits second has read the
 // revision the first one committed.
 func TestIDPConnectionStatements_LockSerializesRevisions(t *testing.T) {
@@ -405,10 +405,10 @@ func TestIDPConnectionStatements_LockSerializesRevisions(t *testing.T) {
 				return revise(ctx, tx, "https://b.example.com", &readB, &wroteB)
 			})
 		}()
-		bFirst := false
+		// The timer checks a lock property only: on Postgres and SQLite, B
+		// cannot commit while A holds the lock. It does not decide the order.
 		select {
 		case err := <-errB:
-			bFirst = true
 			if d.name != "spanner" {
 				t.Errorf("transaction B committed while A held the lock: %v", err)
 			}
@@ -420,14 +420,19 @@ func TestIDPConnectionStatements_LockSerializesRevisions(t *testing.T) {
 		require.NoError(t, <-errA)
 		require.NoError(t, <-errB)
 
-		second := wroteB
-		if bFirst {
-			assert.Equal(t, entity.RevisionID, readB, "B read the first revision")
-			assert.Equal(t, wroteB, readA, "A's read after the lock must see B's committed revision")
+		// The order comes from the reads: the writer that committed second
+		// read the other's revision, and the first one read the original.
+		var second string
+		switch {
+		case readB == wroteA:
+			assert.Equal(t, entity.RevisionID, readA, "A committed first, so it read the first revision")
+			second = wroteB
+		case readA == wroteB:
+			assert.Equal(t, entity.RevisionID, readB, "B committed first, so it read the first revision")
 			second = wroteA
-		} else {
-			assert.Equal(t, entity.RevisionID, readA, "A read the first revision")
-			assert.Equal(t, wroteA, readB, "B's read after the lock must see A's committed revision")
+		default:
+			t.Fatalf("neither writer read the other's revision: A read %s and wrote %s, B read %s and wrote %s",
+				readA, wroteA, readB, wroteB)
 		}
 		newest, err := d.stmts.GetIDPConnection(t.Context(), idpConnectionByID(projectID, entity.ID))
 		require.NoError(t, err)
