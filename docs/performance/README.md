@@ -5,7 +5,7 @@ the performance targets live. The benchmark tooling
 ([#1094](https://github.com/zitadel/nextgen/issues/1094)) produces the numbers;
 this page decides what they have to be.
 
-Why it is set up this way: [ADR 065](../adrs/065-performance-acceptance-criteria.md).
+Why it is set up this way: [ADR 066](../adrs/066-performance-acceptance-criteria.md).
 Test results: [`runs/`](runs/). Template for a test run:
 [`acceptance-template.md`](acceptance-template.md).
 
@@ -31,7 +31,7 @@ We work in four phases. Each phase asks one question and has one pass/fail check
 The phases belong to this page only. They are **not** GitHub milestones and are
 not linked to the product roadmap. Linking them is a product decision, and we
 left it open on purpose (see
-[ADR 065, Consequences](../adrs/065-performance-acceptance-criteria.md#consequences)).
+[ADR 066, Consequences](../adrs/066-performance-acceptance-criteria.md#consequences)).
 
 | Phase  | Question                                 | Passes when                                                                                                                 |
 | ------ | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
@@ -52,7 +52,7 @@ are identical except for the database
 
 | Setup          | What it tells us                                                                                                                                     | What it does **not** tell us                                                                                                                                                                  |
 | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **SQLite**     | How much work one request costs. Very stable, so it is great for spotting slowdowns early.                                                           | How many requests per second nextgen can handle. SQLite handles one request at a time by design ([why](../adrs/065-performance-acceptance-criteria.md#sqlite-handles-one-request-at-a-time)). |
+| **SQLite**     | How much work one request costs. Very stable, so it is great for spotting slowdowns early.                                                           | How many requests per second nextgen can handle. SQLite handles one request at a time by design ([why](../adrs/066-performance-acceptance-criteria.md#sqlite-handles-one-request-at-a-time)). |
 | **PostgreSQL** | What most customers will see.                                                                                                                        |                                                                                                                                                                                               |
 | **Spanner**    | How nextgen behaves when spread over many machines. Some known problems live here already ([#1011](https://github.com/zitadel/nextgen/issues/1011)). |                                                                                                                                                                                               |
 
