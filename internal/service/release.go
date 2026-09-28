@@ -249,8 +249,8 @@ func (s *releaseService) resolveHandle(ctx context.Context, projectID string, po
 		if err != nil {
 			return "", mapRevisionLookupError(err, pointer)
 		}
-		// One instance per operation and audience (ADR 066): the operation
-		// plus the team ids is what two revisions of the same instance share.
+		// One instance per operation (ADR 066): the operation is what two
+		// revisions of the same instance share.
 		return domain.ReleasePolicyHandle(revision), nil
 
 	default:
