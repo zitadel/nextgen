@@ -32,9 +32,25 @@ func TestTeamReadsAcceptSession(t *testing.T) {
 
 	session := sessionClientForUser(t, claimerID)
 
+	// The platform project is shared by parallel tests that each add teams,
+	// so an unfiltered list can page the claimer's team past the default
+	// limit. Filter by its (random) name to keep the assertion about access,
+	// not about page position.
+	claimerTeam, err := harness.EnsureTeamService(t).Get(t.Context(), console.ID, claimerTeamID)
+	require.NoError(t, err)
+	claimerTeamOnly := &api.QueryTeamsRequest{Filter: []api.QueryTeamsRequestFilterItem{{
+		Field:     api.TeamFilterFieldName,
+		Operation: api.FilterOperationEquals,
+		Value:     api.NewOptFilterValue(api.NewStringFilterValue(claimerTeam.Name)),
+	}}}
+
 	t.Run("queryTeams returns the claimer's team", func(t *testing.T) {
-		teams := allTeams(t, session, console.ID)
-		assert.True(t, slices.ContainsFunc(teams, func(team api.TeamResponse) bool {
+		resp, err := session.QueryTeams(t.Context(), claimerTeamOnly,
+			api.QueryTeamsParams{ProjectID: api.ProjectID(console.ID)})
+		require.NoError(t, err)
+		listed, ok := resp.(*api.QueryTeamsResponse)
+		require.True(t, ok, helpers.MustMarshal(t, resp))
+		assert.True(t, slices.ContainsFunc(listed.Teams, func(team api.TeamResponse) bool {
 			return team.ID == claimerTeamID
 		}), "the team that owns the project must be in the session-authenticated list")
 	})
@@ -52,8 +68,12 @@ func TestTeamReadsAcceptSession(t *testing.T) {
 		require.NoError(t, err)
 		harness.SetProjectSecretOnApiClient(t, secret, console)
 
-		teams := allTeams(t, secret, console.ID)
-		assert.True(t, slices.ContainsFunc(teams, func(team api.TeamResponse) bool {
+		resp, err := secret.QueryTeams(t.Context(), claimerTeamOnly,
+			api.QueryTeamsParams{ProjectID: api.ProjectID(console.ID)})
+		require.NoError(t, err)
+		listed, ok := resp.(*api.QueryTeamsResponse)
+		require.True(t, ok, helpers.MustMarshal(t, resp))
+		assert.True(t, slices.ContainsFunc(listed.Teams, func(team api.TeamResponse) bool {
 			return team.ID == claimerTeamID
 		}))
 
@@ -148,27 +168,4 @@ func TestTeamReadsSessionWithoutAccess(t *testing.T) {
 		require.NoError(t, err)
 		require.IsType(t, &api.QueryTeamsNotFound{}, resp, helpers.MustMarshal(t, resp))
 	})
-}
-
-// allTeams pages through a project's teams. The platform project is shared by
-// every test in the package, so the one a test looks for need not be on the
-// first page (newest first) by the time it asks.
-func allTeams(t *testing.T, client *helpers.ApiClient, projectID string) []api.TeamResponse {
-	t.Helper()
-	var (
-		teams []api.TeamResponse
-		req   = &api.QueryTeamsRequest{Limit: api.NewOptLimit(100)}
-	)
-	for {
-		resp, err := client.QueryTeams(t.Context(), req, api.QueryTeamsParams{ProjectID: api.ProjectID(projectID)})
-		require.NoError(t, err)
-		page, ok := resp.(*api.QueryTeamsResponse)
-		require.True(t, ok, helpers.MustMarshal(t, resp))
-		teams = append(teams, page.Teams...)
-		next, ok := page.NextPageToken.Get()
-		if !ok || next == "" {
-			return teams
-		}
-		req.PageToken = api.NewOptNilPageToken(next)
-	}
 }
