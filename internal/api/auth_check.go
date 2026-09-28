@@ -13,6 +13,13 @@ func checksToAPI(checks []domain.AuthCheck) ([]api.CompletedFactor, []api.Challe
 	for _, check := range checks {
 		switch c := check.(type) {
 		case domain.AuthFactor:
+			// Internal-only factors (no wire method, e.g. the SSO factor) are
+			// bookkeeping on the attempt and never surface on the wire: emitting
+			// one would produce a CompletedFactor with an empty method, which
+			// fails FactorMethod validation.
+			if checkTypeToAPI(c.Type()) == "" {
+				continue
+			}
 			factors = append(factors, factorToAPI(c))
 		case domain.AuthChallenge:
 			challenges = append(challenges, *challengeToAPI(c))

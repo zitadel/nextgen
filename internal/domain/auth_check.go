@@ -13,6 +13,11 @@ const (
 	AuthCheckTypePassword
 	AuthCheckTypePasskey
 	AuthCheckTypePasskeyRegistration
+	// AuthCheckTypeSso records that an external identity provider vouched for
+	// the user in this attempt. It is internal bookkeeping: it has no wire
+	// method and never surfaces as a challenge, only as a factor written when
+	// a provider callback verified an identity.
+	AuthCheckTypeSso
 )
 
 // Class returns the factor class a check type competes in. Passkey

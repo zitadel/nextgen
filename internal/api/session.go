@@ -280,9 +280,15 @@ func sessionWithTokenToAPI(ctx context.Context, session *domain.Session, encrypt
 }
 
 func sessionToAPI(session *domain.Session) *api.SessionResponse {
-	factors := make([]api.CompletedFactor, len(session.Factors))
-	for i, factor := range session.Factors {
-		factors[i] = factorToAPI(factor)
+	// Internal-only factors (no wire method, e.g. the SSO factor) are session
+	// bookkeeping and never surface on the wire: emitting one would produce a
+	// CompletedFactor with an empty method, which fails FactorMethod validation.
+	factors := make([]api.CompletedFactor, 0, len(session.Factors))
+	for _, factor := range session.Factors {
+		if checkTypeToAPI(factor.Type()) == "" {
+			continue
+		}
+		factors = append(factors, factorToAPI(factor))
 	}
 	resp := &api.SessionResponse{
 		SessionID:       api.SessionID(session.ID),

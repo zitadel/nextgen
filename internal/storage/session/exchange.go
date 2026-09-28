@@ -201,6 +201,19 @@ func DecodeAuthChecks(
 			}
 			checks = append(checks, registrationCheck)
 		}
+	case domain.AuthCheckTypeSso:
+		// Factor-only: the provider redirect is the challenge, so only the
+		// returned proof is recorded. Restore Provider and Subject from the
+		// factor payload.
+		if !verifiedAt.IsZero() {
+			ssoFactor := domain.SetAuthFactorSso(verifiedAt)
+			if len(factor) > 0 {
+				if err := json.Unmarshal(factor, ssoFactor); err != nil {
+					return nil, fmt.Errorf("failed to unmarshal sso auth check factor payload: %w", err)
+				}
+			}
+			checks = append(checks, ssoFactor)
+		}
 	default:
 		return nil, fmt.Errorf("unsupported auth check type %v", checkType)
 	}

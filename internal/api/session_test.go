@@ -124,6 +124,21 @@ func TestSessionStateToAPI(t *testing.T) {
 	}
 }
 
+func TestChecksToAPI_FiltersInternalFactors(t *testing.T) {
+	t.Parallel()
+
+	// The SSO factor is internal bookkeeping with no wire method; it must not
+	// surface as a CompletedFactor (an empty method fails FactorMethod
+	// validation), while wire-mapped factors still pass through.
+	factors, _ := checksToAPI([]domain.AuthCheck{
+		&domain.AuthFactorUser{UserID: "u-1"},
+		&domain.AuthFactorSso{Provider: "google", Subject: "sub-123"},
+	})
+
+	require.Len(t, factors, 1)
+	require.Equal(t, api.FactorMethodIdentifier, factors[0].Method)
+}
+
 func TestExchangeInputFromRequest(t *testing.T) {
 	t.Parallel()
 

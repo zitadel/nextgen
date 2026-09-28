@@ -176,3 +176,26 @@ func TestDecodeAuthChecks(t *testing.T) {
 	_, err = session.DecodeAuthChecks(domain.AuthCheckType(255), "x", time.Time{}, time.Time{}, time.Time{}, 0, nil, nil)
 	require.Error(t, err)
 }
+
+func TestDecodeAuthChecks_Sso(t *testing.T) {
+	t.Parallel()
+	verified := time.Date(2024, 2, 3, 4, 5, 6, 0, time.UTC)
+	payload := json.RawMessage(`{"Provider":"google","Subject":"sub-123"}`)
+	checks, err := session.DecodeAuthChecks(
+		domain.AuthCheckTypeSso,
+		"chk-sso",
+		time.Time{},
+		time.Time{},
+		verified,
+		0,
+		nil,
+		payload,
+	)
+	require.NoError(t, err)
+	require.Len(t, checks, 1)
+	require.IsType(t, &domain.AuthFactorSso{}, checks[0])
+	ssoFactor := checks[0].(*domain.AuthFactorSso)
+	assert.Equal(t, "google", ssoFactor.Provider)
+	assert.Equal(t, "sub-123", ssoFactor.Subject)
+	assert.Equal(t, verified, ssoFactor.GetLastVerifiedAt())
+}
