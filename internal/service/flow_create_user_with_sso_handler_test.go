@@ -88,11 +88,10 @@ func newSsoHandlerFixture(t *testing.T) *ssoHandlerFixture {
 	}
 }
 
-// A verified callback creates the user with no password and records two factors
-// on the attempt in the same transaction: the user factor binds the session,
-// and the SSO factor captures which provider vouched and for whom. Mirrors the
-// symmetric factor recording in TestFlowCreateUserWithPassword_PreMintsSharedUserID.
-func TestFlowCreateUserWithSso_RecordsUserAndSsoFactors(t *testing.T) {
+// A verified callback creates the user with no password and records the user
+// factor on the attempt in the same transaction, so the session exchanged at
+// the end of the flow is bound to a user that has one.
+func TestFlowCreateUserWithSso_RecordsTheUserFactor(t *testing.T) {
 	f := newSsoHandlerFixture(t)
 
 	f.stmts.EXPECT().NewManagedID(string(domain.PrefixUser)).Return("user_sso0001", nil)
@@ -118,7 +117,7 @@ func TestFlowCreateUserWithSso_RecordsUserAndSsoFactors(t *testing.T) {
 			recordedFactors = append(recordedFactors, factor)
 			return "ch-" + factor.Type().String(), nil
 		}).
-		Times(2)
+		Times(1)
 	f.stmts.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	f.v2Pool.EXPECT().Transaction(gomock.Any(), gomock.Any()).DoAndReturn(
 		func(ctx context.Context, fn func(context.Context, service.Statementer[service.AllStatements]) error) error {
@@ -149,14 +148,12 @@ func TestFlowCreateUserWithSso_RecordsUserAndSsoFactors(t *testing.T) {
 	require.NotNil(t, created)
 	assert.Equal(t, "user_sso0001", created.ID)
 
-	require.Len(t, recordedFactors, 2)
+	// Only the user factor: what the provider asserted lives on the
+	// sso_callback record (#1073), not on a factor of its own.
+	require.Len(t, recordedFactors, 1)
 	userFactor, ok := recordedFactors[0].(*domain.AuthFactorUser)
-	require.True(t, ok, "first recorded factor must be the user factor")
+	require.True(t, ok, "the recorded factor must be the user factor")
 	assert.Equal(t, "user_sso0001", userFactor.UserID)
-	ssoFactor, ok := recordedFactors[1].(*domain.AuthFactorSso)
-	require.True(t, ok, "second recorded factor must be the sso factor")
-	assert.Equal(t, "google", ssoFactor.Provider)
-	assert.Equal(t, "sub-123", ssoFactor.Subject)
 }
 
 // When the provider's email already has an account, the create loses the unique
@@ -233,7 +230,7 @@ func TestFlowCreateUserWithSso_IgnoresSubmittedEmailInFavourOfVerified(t *testin
 	f.stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), "proj_1", "att-1").
 		Return(&domain.AuthAttempt{ProjectID: "proj_1", ID: "att-1"}, nil)
 	f.stmts.EXPECT().SetAuthAttemptFactor(gomock.Any(), "proj_1", "att-1", gomock.Any()).
-		Return("ch-1", nil).Times(2)
+		Return("ch-1", nil).AnyTimes()
 	f.stmts.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	f.v2Pool.EXPECT().Transaction(gomock.Any(), gomock.Any()).DoAndReturn(
 		func(ctx context.Context, fn func(context.Context, service.Statementer[service.AllStatements]) error) error {

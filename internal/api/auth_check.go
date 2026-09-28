@@ -13,13 +13,6 @@ func checksToAPI(checks []domain.AuthCheck) ([]api.CompletedFactor, []api.Challe
 	for _, check := range checks {
 		switch c := check.(type) {
 		case domain.AuthFactor:
-			// Internal-only factors (no wire method, e.g. the SSO factor) are
-			// bookkeeping on the attempt and never surface on the wire: emitting
-			// one would produce a CompletedFactor with an empty method, which
-			// fails FactorMethod validation.
-			if checkTypeToAPI(c.Type()) == "" {
-				continue
-			}
 			factors = append(factors, factorToAPI(c))
 		case domain.AuthChallenge:
 			challenges = append(challenges, *challengeToAPI(c))
@@ -85,9 +78,9 @@ func factorPayloadToAPI(factor domain.AuthFactor) api.OptCompletedFactorPayload 
 func requiredFactorsToAPI(checks []domain.AuthCheckType) []api.FactorMethod {
 	factors := make([]api.FactorMethod, 0, len(checks))
 	for _, check := range checks {
-		// Internal-only check types (no wire method, e.g. SSO) are skipped:
-		// emitting an empty method would fail FactorMethod validation and sink
-		// the whole response. Symmetric with checksToAPI/sessionToAPI.
+		// Check types with no wire method (the sso_callback record, #1073) are
+		// skipped: emitting an empty method would fail FactorMethod validation
+		// and sink the whole response.
 		method := checkTypeToAPI(check)
 		if method == "" {
 			continue

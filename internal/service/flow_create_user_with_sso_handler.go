@@ -80,25 +80,18 @@ func (h *FlowCreateUserWithSsoHandler) Handle(
 		},
 		h.schemaStore,
 	)
-	// The provider proved who this is, so the factors are recorded in the same
-	// transaction -- otherwise the session exchanged at the end of the flow
-	// would be bound to a user with no factors at all. Two factors are written:
-	// the user factor binds the session to the new user, and the SSO factor
-	// captures which provider vouched and for whom, so the attempt keeps a
-	// durable record of the external proof independent of the sealed flow
-	// cookie. The SSO factor is internal bookkeeping -- it has no wire method
-	// and is filtered from API responses -- not the identity link itself, which
-	// #1033 stores as (connection, subject) -> user.
+	// The provider proved who this is, so the user factor is recorded in the
+	// same transaction -- otherwise the session exchanged at the end of the
+	// flow would be bound to a user with no factors at all.
+	//
+	// What the provider asserted is not recorded here: the sso_callback check
+	// (#1073) already holds it on the attempt as a single-use record, which is
+	// where the resolved external identity belongs. The identity link itself,
+	// (connection, subject) -> user, is #1033.
 	recordFactorsAction := &recordAttemptFactorsAction{
 		projectID: in.ProjectID,
 		attemptID: in.State.AuthAttemptID,
-		factors: []domain.AuthFactor{
-			&domain.AuthFactorUser{UserID: userID},
-			&domain.AuthFactorSso{
-				Provider: in.State.VerifiedIdentity.Provider,
-				Subject:  in.State.VerifiedIdentity.Subject,
-			},
-		},
+		factors:   []domain.AuthFactor{&domain.AuthFactorUser{UserID: userID}},
 	}
 
 	if err := h.userService.ApplyActions(ctx, createUserAction, recordFactorsAction); err != nil {

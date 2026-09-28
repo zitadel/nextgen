@@ -177,25 +177,58 @@ func TestDecodeAuthChecks(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestDecodeAuthChecks_Sso(t *testing.T) {
+// TestDecodeAuthChecks_SSOCallback covers the three shapes an sso_callback row
+// can have. The arm is mandatory: the switch's default errors, so without it
+// every attempt read fails once one of these rows exists.
+func TestDecodeAuthChecks_SSOCallback(t *testing.T) {
 	t.Parallel()
-	verified := time.Date(2024, 2, 3, 4, 5, 6, 0, time.UTC)
-	payload := json.RawMessage(`{"Provider":"google","Subject":"sub-123"}`)
-	checks, err := session.DecodeAuthChecks(
-		domain.AuthCheckTypeSso,
-		"chk-sso",
-		time.Time{},
-		time.Time{},
-		verified,
-		0,
-		nil,
-		payload,
-	)
-	require.NoError(t, err)
-	require.Len(t, checks, 1)
-	require.IsType(t, &domain.AuthFactorSso{}, checks[0])
-	ssoFactor := checks[0].(*domain.AuthFactorSso)
-	assert.Equal(t, "google", ssoFactor.Provider)
-	assert.Equal(t, "sub-123", ssoFactor.Subject)
-	assert.Equal(t, verified, ssoFactor.GetLastVerifiedAt())
+	issuedAt := time.Date(2024, 5, 6, 7, 8, 9, 0, time.UTC)
+	pendingPayload := json.RawMessage(`{"provider_slug":"google","connection_revision_id":"idprev_1","binding_nonce_hash":"bnhash","encrypted_pkce_verifier":"ct","oidc_nonce_hash":"onhash","return_target":"/home"}`)
+	resultPayload := json.RawMessage(`{"subject":"sub-1","connection_revision_id":"idprev_1","claims":{"email":"alice@example.com"},"verified":{"email":true,"phone":false}}`)
+
+	decode := func(t *testing.T, lastChallengedAt time.Time, challenge, factor json.RawMessage) *domain.SSOCallbackCheck {
+		t.Helper()
+		checks, err := session.DecodeAuthChecks(
+			domain.AuthCheckTypeSSOCallback, "statehash",
+			lastChallengedAt, time.Time{}, time.Time{}, 0,
+			challenge, factor,
+		)
+		require.NoError(t, err)
+		require.Len(t, checks, 1)
+		_, isFactor := checks[0].(domain.AuthFactor)
+		assert.False(t, isFactor, "an SSO state record must never decode as a verified factor")
+		ssoCheck, ok := checks[0].(*domain.SSOCallbackCheck)
+		require.True(t, ok)
+		assert.Equal(t, "statehash", ssoCheck.ID)
+		return ssoCheck
+	}
+
+	t.Run("pending", func(t *testing.T) {
+		ssoCheck := decode(t, issuedAt, pendingPayload, nil)
+		assert.Equal(t, issuedAt, ssoCheck.IssuedAt)
+		require.NotNil(t, ssoCheck.Pending)
+		assert.Equal(t, "google", ssoCheck.Pending.ProviderSlug)
+		assert.Equal(t, "bnhash", ssoCheck.Pending.BindingNonceHash)
+		assert.Equal(t, "onhash", ssoCheck.Pending.OIDCNonceHash)
+		assert.Equal(t, "ct", ssoCheck.Pending.EncryptedPKCEVerifier)
+		assert.Equal(t, "/home", ssoCheck.Pending.ReturnTarget)
+		assert.Nil(t, ssoCheck.Result)
+	})
+
+	t.Run("consumed without result", func(t *testing.T) {
+		ssoCheck := decode(t, time.Time{}, nil, nil)
+		assert.True(t, ssoCheck.IssuedAt.IsZero())
+		assert.Nil(t, ssoCheck.Pending)
+		assert.Nil(t, ssoCheck.Result)
+	})
+
+	t.Run("consumed with result", func(t *testing.T) {
+		ssoCheck := decode(t, time.Time{}, nil, resultPayload)
+		assert.Nil(t, ssoCheck.Pending)
+		require.NotNil(t, ssoCheck.Result)
+		assert.Equal(t, "sub-1", ssoCheck.Result.Subject)
+		assert.Equal(t, "idprev_1", ssoCheck.Result.ConnectionRevisionID)
+		assert.Equal(t, "alice@example.com", ssoCheck.Result.Claims["email"])
+		assert.Equal(t, map[string]bool{"email": true, "phone": false}, ssoCheck.Result.Verified)
+	})
 }
