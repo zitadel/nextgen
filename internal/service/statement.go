@@ -305,7 +305,8 @@ type AuthAttemptStatements interface {
 	// SetSSOCallbackResult stores the callback result on the consumed row whose
 	// lookup_hash is stateHash. Returns ErrSSOStateInvalid when no such consumed row
 	// exists, including when a new state was issued since the consume (the hash no
-	// longer matches). Never sets last_verified_at.
+	// longer matches). The write is once only: a second write on the same consumed
+	// row returns ErrSSOStateInvalid. Never sets last_verified_at.
 	SetSSOCallbackResult(ctx context.Context, projectID, stateHash string, result *domain.SSOCallbackResult) error
 }
 

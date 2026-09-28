@@ -61,7 +61,8 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`
 		` WHERE project_id = ? AND lookup_hash = ? AND type = ? AND last_challenged_at IS NOT NULL`
 
 	setSSOCallbackResultStmt = `UPDATE checks SET factor_payload = ?` +
-		` WHERE project_id = ? AND lookup_hash = ? AND type = ? AND last_challenged_at IS NULL`
+		` WHERE project_id = ? AND lookup_hash = ? AND type = ? AND last_challenged_at IS NULL` +
+		` AND factor_payload IS NULL`
 
 	authAttemptChallengeFailedStmt = `UPDATE checks SET last_failed_at = ?, failure_count = failure_count + 1` +
 		` WHERE project_id = ? AND auth_attempt_id = ? AND type = ? AND id = ?` +

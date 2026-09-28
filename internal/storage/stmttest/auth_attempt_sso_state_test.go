@@ -73,11 +73,15 @@ func TestAuthAttemptStatements_SSOState(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, sso.PKCEVerifier, verifier)
 
-			// The binding nonce survives as a hash the callback can verify
-			// against the browser's cookie.
+			// Both nonces survive as hashes the callback can verify: the
+			// binding nonce against the browser's cookie, the OIDC nonce
+			// against the id_token claim.
 			assert.Equal(t, domain.HashSecret(sso.BindingNonce), stored.Pending.BindingNonceHash)
 			assert.NotEqual(t, sso.BindingNonce, stored.Pending.BindingNonceHash)
 			assert.True(t, stored.Pending.MatchesBindingNonce(sso.BindingNonce))
+			assert.Equal(t, domain.HashSecret(sso.OIDCNonce), stored.Pending.OIDCNonceHash)
+			assert.NotEqual(t, sso.OIDCNonce, stored.Pending.OIDCNonceHash)
+			assert.True(t, stored.Pending.MatchesOIDCNonce(sso.OIDCNonce))
 		})
 
 		t.Run("consume_returns_payload_once", func(t *testing.T) {
@@ -233,6 +237,31 @@ func TestAuthAttemptStatements_SSOState(t *testing.T) {
 			err = d.stmts.SetSSOCallbackResult(t.Context(), projectID, stateHash,
 				&domain.SSOCallbackResult{Subject: "sub-2"})
 			assert.ErrorIs(t, err, domain.ErrSSOStateInvalid())
+		})
+
+		// One consumed row takes one result: a retried or duplicated exchange
+		// cannot overwrite the identity already recorded.
+		t.Run("result_is_write_once", func(t *testing.T) {
+			projectID := ensureProject(t, d.stmts)
+			attempt := createBareAttempt(t, d.stmts, projectID)
+			sso := issueSSOState(t, d.stmts, projectID, attempt.ID)
+			stateHash := domain.HashSecret(sso.State)
+			_, err := d.stmts.ConsumeSSOState(t.Context(), projectID, stateHash)
+			require.NoError(t, err)
+
+			require.NoError(t, d.stmts.SetSSOCallbackResult(t.Context(), projectID, stateHash,
+				&domain.SSOCallbackResult{Subject: "first-sub"}))
+
+			err = d.stmts.SetSSOCallbackResult(t.Context(), projectID, stateHash,
+				&domain.SSOCallbackResult{Subject: "second-sub"})
+			assert.ErrorIs(t, err, domain.ErrSSOStateInvalid())
+
+			got, err := d.stmts.GetAuthAttemptByID(t.Context(), projectID, attempt.ID)
+			require.NoError(t, err)
+			stored, ok := got.SSOCallback()
+			require.True(t, ok)
+			require.NotNil(t, stored.Result)
+			assert.Equal(t, "first-sub", stored.Result.Subject)
 		})
 
 		t.Run("set_result_without_issue_fails", func(t *testing.T) {

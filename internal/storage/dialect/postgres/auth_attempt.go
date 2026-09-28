@@ -82,7 +82,8 @@ const consumeSSOStateStmt = `UPDATE zitadel_nextgen.checks` +
 	` WHERE project_id = $1 AND lookup_hash = $2 AND type = $3 AND last_challenged_at IS NOT NULL`
 
 const setSSOCallbackResultStmt = `UPDATE zitadel_nextgen.checks SET factor_payload = $4::JSONB` +
-	` WHERE project_id = $1 AND lookup_hash = $2 AND type = $3 AND last_challenged_at IS NULL`
+	` WHERE project_id = $1 AND lookup_hash = $2 AND type = $3 AND last_challenged_at IS NULL` +
+	` AND factor_payload IS NULL`
 
 const authAttemptChallengeFailedStmt = `UPDATE zitadel_nextgen.checks` +
 	` SET last_failed_at = NOW(), failure_count = failure_count + 1` +

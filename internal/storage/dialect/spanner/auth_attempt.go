@@ -56,7 +56,8 @@ const (
 	consumeSSOStateStmt = `UPDATE checks SET challenge_payload = NULL, last_challenged_at = NULL, factor_payload = NULL` +
 		` WHERE project_id = @p1 AND lookup_hash = @p2 AND type = @p3 AND last_challenged_at IS NOT NULL`
 	setSSOCallbackResultStmt = `UPDATE checks SET factor_payload = @p4` +
-		` WHERE project_id = @p1 AND lookup_hash = @p2 AND type = @p3 AND last_challenged_at IS NULL`
+		` WHERE project_id = @p1 AND lookup_hash = @p2 AND type = @p3 AND last_challenged_at IS NULL` +
+		` AND factor_payload IS NULL`
 
 	authAttemptChallengeFailedStmt = `UPDATE checks SET last_failed_at = @p1, failure_count = failure_count + 1` +
 		` WHERE project_id = @p2 AND auth_attempt_id = @p3 AND type = @p4 AND id = @p5` +
