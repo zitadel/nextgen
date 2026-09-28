@@ -17191,10 +17191,12 @@ type FlowDefinitionStep struct {
 	// Runs after field validation passes, before the transition fires.
 	// - create_user: creates the user record (registration flows)
 	// - create_user_with_sso: creates the user record from the identity an
-	// external provider returned, linking it to that identity. Accepted by
-	// the API so an SSO flow can be authored and stored; the engine handler
-	// is not wired yet, and a step reaching it fails with a flow integrity
-	// error rather than creating anything.
+	// external provider returned. The handler is wired, but it refuses with
+	// a flow-integrity error unless a provider callback verified an identity
+	// in this flow, so a step reachable by a plain submit cannot mint a
+	// credential-free account. The provider identity link is not persisted
+	// yet (#1033), so a returning identity re-enters registration rather than
+	// signing in.
 	OnSuccess OptFlowDefinitionStepOnSuccess `json:"on_success"`
 	// Marks this as a terminal step. Tells the frontend what to do:
 	// - redirect: navigate to redirect_uri (OIDC/SAML callback done)
@@ -17351,10 +17353,12 @@ func (s *FlowDefinitionStepGates) init() FlowDefinitionStepGates {
 // Runs after field validation passes, before the transition fires.
 // - create_user: creates the user record (registration flows)
 // - create_user_with_sso: creates the user record from the identity an
-// external provider returned, linking it to that identity. Accepted by
-// the API so an SSO flow can be authored and stored; the engine handler
-// is not wired yet, and a step reaching it fails with a flow integrity
-// error rather than creating anything.
+// external provider returned. The handler is wired, but it refuses with
+// a flow-integrity error unless a provider callback verified an identity
+// in this flow, so a step reachable by a plain submit cannot mint a
+// credential-free account. The provider identity link is not persisted
+// yet (#1033), so a returning identity re-enters registration rather than
+// signing in.
 type FlowDefinitionStepOnSuccess string
 
 const (
