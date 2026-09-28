@@ -153,7 +153,7 @@ export function createMockApp(options: { issuer: string }): express.Express {
     }
     if (req.method === "OPTIONS") {
       res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
-      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Idempotency-Key");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Idempotency-Key, X-Zitadel-CSRF");
       res.status(204).end();
       return;
     }
@@ -336,6 +336,8 @@ export function createMockApp(options: { issuer: string }): express.Express {
   // GET /sessions/me/csrf — the session's CSRF token (ADR 053 §5). Mirrors
   // the Go server's GetMySessionCsrfToken handler.
   app.get("/sessions/me/csrf", (req: express.Request, res: express.Response) => {
+    // Both the token and the 401 are session state: neither may be stored.
+    res.setHeader("Cache-Control", "private, no-store");
     const token = (req.cookies as Record<string, string>).__nextgen_session;
     const session = token ? sessionStore.get(token) : undefined;
     const csrf = token ? csrfTokens.get(token) : undefined;
@@ -343,7 +345,6 @@ export function createMockApp(options: { issuer: string }): express.Express {
       res.status(401).json(errorBody("auth.unauthorized", "Missing or invalid session token."));
       return;
     }
-    res.setHeader("Cache-Control", "private, no-store");
     res.json({ csrf_token: csrf });
   });
 
