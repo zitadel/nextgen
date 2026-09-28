@@ -50,21 +50,28 @@ handling lives, not in the rules:
 
 ## Limits
 
-Checked once, at server start, for every rule in every template
-(`policy.DefaultLimits`):
+A rule is an expression a customer may one day author, so the engine bounds
+what one rule can be and what it can cost. Four checks, the first three at
+server start for every rule in every template, the last on every evaluation:
 
-| Limit | Value | What it bounds |
-|---|---|---|
-| expression length | 256 bytes | the source of one rule |
-| estimated cost | 10 000 | the worst-case static cost of one rule, with context lists assumed to hold at most 64 entries |
-| runtime cost | 10 000 | the tracked cost of one rule evaluation |
+- **Type check.** The expression is compiled against the template's `config`
+  and `context` schemas and must produce a `bool`. A reference to a field the
+  context does not declare fails here.
+- **Expression length.** The source text of one rule is capped. A rule that
+  needs more is two rules.
+- **Estimated cost.** cel-go estimates the worst-case work of an expression
+  without running it, by walking the parsed tree; since a list's length is
+  unknown statically, context lists are assumed to hold a fixed maximum. The
+  estimate must stay under a cap.
+- **Runtime cost.** cel-go counts evaluation steps while a rule runs and
+  aborts past a budget. The rule also runs under the request's context
+  deadline.
 
-The expression must also type-check to `bool` against `config` plus
-`context`. At evaluation time the program runs under the runtime cost limit
-and the request's context deadline. Kubernetes enforces the same pair (a
-static per-expression limit and a per-request runtime budget); OpenFGA caps
-condition cost at 100 by default. A rule that needs more than this is two
-rules.
+A template that fails a startup check stops the server before it serves
+traffic, so a bad rule never reaches a running system. The values live in
+`policy.DefaultLimits` and are sized for a handful of scalar comparisons per
+rule. Kubernetes enforces the same pair (a static per-expression limit and a
+per-request runtime budget); OpenFGA caps condition cost the same way.
 
 The environment is the CEL standard library plus the `strings` and `lists`
 extensions, nothing else, pinned per catalog version.
