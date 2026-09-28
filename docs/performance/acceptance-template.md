@@ -1,143 +1,149 @@
 # Acceptance run — template
 
-Copy to `runs/<YYYY-MM-DD>-<lane>-p<phase>.md` and fill it in. Targets for the
-phase are copied in from [`README.md`](README.md) **before** the run; measured
-columns start empty and stay empty until there is a file to trace them to.
+Use this template to record one test run. Copy it to
+`runs/<YYYY-MM-DD>-<lane>-p<phase>.md` and fill it in. Copy the phase's targets
+from [`README.md`](README.md) **before** the run. Leave the measured columns
+empty until you have a result file to point to.
 
-Do not delete rows that do not apply — mark them `n/a` with a reason. A missing
-row reads as an oversight; an explicit `n/a` reads as a decision.
+Don't delete rows that don't apply. Mark them `n/a` and give a reason. A missing
+row looks like something was forgotten; `n/a` shows it was a decision.
+
+Unfamiliar words are explained in the [glossary](README.md#glossary).
 
 ---
 
-# P&lt;phase&gt; · &lt;lane&gt; · &lt;rung&gt; · &lt;date&gt;
+# P&lt;phase&gt; · &lt;lane&gt; · &lt;size&gt; · &lt;date&gt;
 
-**Verdict: PASS / FAIL / INCOMPLETE** — one line, stating which gate and why.
+**Verdict: PASS / FAIL / INCOMPLETE** — one line, naming the gate and the
+reason. This follows from the _Verdict_ columns below: PASS only if every row
+passes, INCOMPLETE if any row has no measurement. It is not a judgement call.
 
-## Preflight
+## Before the run
 
-Every box before the first measured request. Capturing configuration after a run
-is how a sweep turns out to have measured something other than what it is
-compared against.
+Tick every box before the first measured request. If you record the
+configuration after the run, you may find out that you measured something
+different from what you compare it to.
 
-- [ ] Run mode stated explicitly (local / separated). Unset is a refusal, not a default
-- [ ] **The load generator is not the machine under test.** Co-located runs are smokes, are labeled as such, and are never compared against a separated run
+- [ ] Run mode stated (local / separated). If it is not set, don't run; don't assume a default
+- [ ] **The load generator is not the machine being tested.** Runs on the same machine are smoke tests, are labeled as such, and are never compared with a separated run
 - [ ] Git SHA of the server build recorded
-- [ ] Dialect and engine version recorded
-- [ ] Replica count recorded; SQLite lane is `min = max = 1`
-- [ ] Password hasher parameters recorded (bounds the `credential` class)
+- [ ] Database and database version recorded
+- [ ] Number of app replicas recorded; for SQLite it is `min = max = 1`
+- [ ] Password hasher settings recorded (they limit the `credential` type)
 - [ ] Log level and format recorded
-- [ ] Feature flags / anything selecting a code path recorded
-- [ ] Storage type recorded (local volume vs network-attached — the latter makes `fsync` the measurement)
-- [ ] Boot marker captured, to be re-checked at the end
-- [ ] Audit retention sweep window recorded or disabled
-- [ ] Price inputs recorded (currency per hour, per component)
-- [ ] Load generator resource baseline recorded (RSS, CPU)
-- [ ] Executor is **open-model** (arrival rate), not a fixed virtual-user pool
+- [ ] Feature flags, and anything else that changes which code runs, recorded
+- [ ] Storage type recorded (local disk or network disk; on a network disk you mostly measure `fsync`)
+- [ ] Boot marker captured, to check again at the end
+- [ ] Audit retention cleanup window recorded, or cleanup turned off
+- [ ] Prices recorded (currency per hour, per component)
+- [ ] Load generator's own resource use recorded before the run (RSS, CPU)
+- [ ] Load is **open-model** (arrival rate), not a fixed number of virtual users
 
 ## Environment
 
-| | |
-| --- | --- |
-| Phase | |
-| Lane | SQLite / PostgreSQL / Spanner |
-| Rung | e.g. `4 vCPU / 16 GiB`, or processing units |
-| Server git SHA | |
-| Engine version | |
-| App replicas | |
-| Storage | |
-| Hasher | `argon2id time=? memory=? KiB threads=?` |
-| Log level / format | |
-| Run mode | local / separated |
-| Generator host class | |
-| Boot marker (start) | |
-| Boot marker (end) | |
-| Duration | |
-| Raw sample artifact | path, and whether it still exists |
+|                             |                                             |
+| --------------------------- | ------------------------------------------- |
+| Phase                       |                                             |
+| Lane                        | SQLite / PostgreSQL / Spanner               |
+| Server size                 | e.g. `4 vCPU / 16 GiB`, or processing units |
+| Server git SHA              |                                             |
+| Database version            |                                             |
+| App replicas                |                                             |
+| Storage                     |                                             |
+| Hasher                      | `argon2id time=? memory=? KiB threads=?`    |
+| Log level / format          |                                             |
+| Run mode                    | local / separated                           |
+| Load generator machine type |                                             |
+| Boot marker (start)         |                                             |
+| Boot marker (end)           |                                             |
+| Duration                    |                                             |
+| Raw test output             | path, and whether it still exists           |
 
-## Latency and throughput
+## Response time and capacity
 
-One row per operation class. Every measured value states the arrival rate it was
+One row per request type. Every measured value states the arrival rate it was
 measured at.
 
-| Class | Rate | Target p95 | p50 | p95 | p99 | Source | Verdict |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| `probe` | | | | | | | |
-| `read-point` | | | | | | | |
-| `read-query` | | | | | | | |
-| `write` | | | | | | | |
-| `flow-step` | | | | | | | |
-| `credential` | | | | | | | |
-| `handoff` | | | | | | | |
+| Type         | Rate | Target p95 | p50 | p95 | p99 | Source | Verdict |
+| ------------ | ---- | ---------- | --- | --- | --- | ------ | ------- |
+| `probe`      |      |            |     |     |     |        |         |
+| `read-point` |      |            |     |     |     |        |         |
+| `read-query` |      |            |     |     |     |        |         |
+| `write`      |      |            |     |     |     |        |         |
+| `flow-step`  |      |            |     |     |     |        |         |
+| `credential` |      |            |     |     |     |        |         |
+| `handoff`    |      |            |     |     |     |        |         |
 
-**Throughput at SLO** — highest sustained arrival rate holding the class p95
-budget:
+**Throughput within budget**: the highest steady arrival rate at which the p95
+of the type stays within its target:
 
-| Class | `T` (req/s) | Budget held | Source |
-| --- | --- | --- | --- |
-| | | | |
+| Type | `T` (req/s) | Target held | Source |
+| ---- | ----------- | ----------- | ------ |
+|      |             |             |        |
 
 ## Scaling — P2 gate
 
-PostgreSQL and Spanner only. **The SQLite lane is not laddered**; delete this
-section on a SQLite record and record the service-time floor below instead.
+PostgreSQL and Spanner only. **SQLite is not part of the size test.** On an
+SQLite record, mark every row of this table `n/a` and fill in the service-time
+floor below instead.
 
-| Rung | `T` at SLO | `E` vs previous | Target `E` | p99/p50 | Dropped iterations | Verdict |
-| --- | --- | --- | --- | --- | --- | --- |
-| base | | — | — | | | |
-| ×2 | | | ≥ 0.8 | | | |
-| ×4 | | | ≥ 0.8 | | | |
-| ×8 | | | ≥ 0.8 | | | |
+| Size | `T` within budget | `E` vs previous size | Target `E` | p99/p50 | Dropped iterations | Verdict |
+| ---- | ----------------- | -------------------- | ---------- | ------- | ------------------ | ------- |
+| base |                   | —                    | —          |         |                    |         |
+| ×2   |                   |                      | ≥ 0.8      |         |                    |         |
+| ×4   |                   |                      | ≥ 0.8      |         |                    |         |
+| ×8   |                   |                      | ≥ 0.8      |         |                    |         |
 
-### SQLite lane only — service-time floor
+### SQLite only — service-time floor
 
-| Class | Service time (1 concurrent) | Floor | Tolerance | Verdict |
-| --- | --- | --- | --- | --- |
-| | | | | |
+| Type | Service time (1 request at a time) | Floor | Margin | Verdict |
+| ---- | ---------------------------------- | ----- | ------ | ------- |
+|      |                                    |       |        |         |
 
 ## Errors
 
-Counted from the raw sample output, not from the log. The log tells you a class
-of failure exists; only the raw output tells you how much of it there was.
+Count errors from the raw test output, not from the log. The log tells you that
+a kind of error happened; only the raw output tells you how often.
 
-| Population | Count | Rate | Budget | Source | Verdict |
-| --- | --- | --- | --- | --- | --- |
-| 5xx | | | | | |
-| 4xx | | | | | |
-| Check failures | | | | | |
-| Dropped iterations | | | `0` | | |
+| Kind               | Count | Rate | Budget | Source | Verdict |
+| ------------------ | ----- | ---- | ------ | ------ | ------- |
+| 5xx                |       |      |        |        |         |
+| 4xx                |       |      |        |        |         |
+| Check failures     |       |      |        |        |         |
+| Dropped iterations |       |      | `0`    |        |         |
 
-A structural-looking failure rate — a round split, or exactly one check's worth
-per iteration — is the harness, not the server. Say which before publishing
-either.
+If the error rate looks suspiciously regular, like a round number or exactly one
+failed check per iteration, the problem is usually in the test, not the server.
+Find out which one it is before publishing anything.
 
 ## Cost
 
-| | Inputs | Value |
-| --- | --- | --- |
-| Database | per hour × duration | |
-| Application | per hour × duration | |
-| Cost per 1000 requests | total ÷ (requests ÷ 1000) | |
+|                        | Inputs                    | Value |
+| ---------------------- | ------------------------- | ----- |
+| Database               | price per hour × duration |       |
+| Application            | price per hour × duration |       |
+| Cost per 1000 requests | total ÷ (requests ÷ 1000) |       |
 
-## Run validity
+## Is the run valid?
 
-Tick what happened. Any unticked box under *Invalidating* means the run is
-reported, not compared.
+Tick what happened. If any box under _Makes the run invalid_ is ticked, report
+the run, but don't compare it with other runs.
 
-**Non-invalidating**
+**Does not make the run invalid**
 
-- [ ] Setup aborted before the measurement window — surrounding runs remain valid
-- [ ] Known harness defect, described, affecting a named class only
+- [ ] Setup failed before the measurement started; the runs before and after are still valid
+- [ ] Known problem in the test tooling, described, affecting only one named request type
 
-**Invalidating**
+**Makes the run invalid**
 
-- [ ] Boot marker changed between start and end (the dataset is not the one the run started against)
-- [ ] Generator resource exhaustion during the measurement window
-- [ ] Retention sweep landed inside the window
-- [ ] Co-located generator and server
-- [ ] Configuration captured after the run rather than before
+- [ ] Boot marker changed between start and end (the data is not what the run started with)
+- [ ] Load generator ran out of resources during the measurement
+- [ ] Audit retention cleanup ran during the measurement
+- [ ] Load generator and server ran on the same machine
+- [ ] Configuration recorded after the run instead of before
 
 ## Notes and corrections
 
-Anything corrected by hand, with the reason. What went wrong, described
-accurately — including the parts that make the harness look bad, which are the
-ones worth writing down.
+Anything corrected by hand, and why. Describe what went wrong accurately, also
+the parts that make the test tooling look bad. Those are the ones most worth
+writing down.

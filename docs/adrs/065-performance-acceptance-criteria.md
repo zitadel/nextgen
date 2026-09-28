@@ -1,144 +1,175 @@
-# ADR 065: Performance Acceptance Criteria Are Phased, Lane-Scoped, and Derived
+# ADR 065: Performance Acceptance Criteria Are Set in Phases, per Database, from Measurements
 
 > **Status:** Proposed
 > **Date:** 2026-09-04
-> **Context:** Benchmark epic ([#1094](https://github.com/zitadel/nextgen/issues/1094)) builds a harness but defines no pass mark
-> **Relates to:** [ADR 028](028-storage-v2-statements-and-dialects.md) (three dialects; SQLite is not a production peer),
+> **Context:** Benchmark epic ([#1094](https://github.com/zitadel/nextgen/issues/1094)) builds the test tooling but does not say what result is good enough
+> **Relates to:** [ADR 028](028-storage-v2-statements-and-dialects.md) (three databases; SQLite is not meant for production),
 > [ADR 048](048-wide-events-internal-audit-primitive.md) (one audit row per API request)
+
+The first sections are written for everyone. The
+[technical background](#technical-background) comes last. Unfamiliar words are
+explained in the [glossary](../performance/README.md#glossary).
 
 ## Decision
 
-Performance targets live in [`docs/performance/`](../performance/), not in the
-benchmark epic and not duplicated across API issues. They are:
+Performance targets live in one place: [`docs/performance/`](../performance/).
+They are not in the benchmark epic, and they are not copied into API issues.
 
-- **Phased.** Four phases, P0–P3, each with one question and one gate.
-- **Lane-scoped.** A target names its storage dialect and its hardware rung, or
-  it is not a target.
-- **Derived.** A gate value may only be computed by stated arithmetic from a
-  measured cell in the previous phase. Never from an assumed one.
-- **Provenance-marked.** Every cell says whether it is unmeasured, assumed,
-  measured, or a gate. An empty cell is a valid state and is preferred to a
-  plausible one.
+- **In phases.** There are four phases, P0 to P3. Each one asks one question and
+  has one pass/fail check.
+- **Per database and server size.** A target always says which database and
+  which server size it applies to. A number without those is not a target.
+- **Based on measurements.** A target is always calculated from something we
+  measured in the phase before. Never from a guess.
+- **Every number shows where it came from.** Each value is marked as not measured
+  yet, a guess, measured, or a target. Leaving a cell empty is fine, and better
+  than filling it with a number that only looks right.
 
-An API issue references the matrix by link. It does not copy a number.
+An API issue links to the targets page. It does not copy a number.
 
 ## Problem
 
-The benchmark epic explains how nextgen will be measured across nineteen
-sub-issues. None of them says what a number has to be. The gap is visible in the
-tracker: [#1113](https://github.com/zitadel/nextgen/issues/1113) is filed to
-alert on performance regressions against a baseline that no issue creates.
+The benchmark epic describes, across nineteen sub-issues, how nextgen will be
+measured. None of them says what result is good enough. You can see this gap in
+the issue tracker: [#1113](https://github.com/zitadel/nextgen/issues/1113) plans
+alerts for when performance gets worse than a baseline, but no issue creates
+that baseline.
 
-Two positions have to hold at once, and they appear to conflict:
+We need two things that seem to conflict:
 
-- A launch decision needs one page stating what "good enough" means for latency,
-  throughput, error rate and cost.
-- The numbers are acceptance criteria of the APIs that own them, not deliverables
-  of a measurement harness — and they cannot honestly be written today, because
-  the storage architecture has not been verified on either production dialect and
-  there is no baseline to reason from.
+- For a launch decision, we need one page that says what "good enough" means for
+  response time, capacity, errors and cost.
+- But those numbers belong to the APIs, not to the test tooling. And we cannot
+  write them honestly today: the new storage design has not been tested on
+  PostgreSQL or Spanner yet, so there is nothing to base them on.
 
-Setting targets by guessing produces a page that is wrong, is treated as
-authoritative, and is quietly ignored the first time it disagrees with reality.
-Setting none produces a launch decision made on vibes a week before the date,
-which is the failure mode this ADR exists to prevent.
-
-## Context
-
-Three facts constrain any target on this system.
-
-**Nothing is a plain read.** `internal/audit` writes one `request.api` row per
-API request (ADR 048, Path A). `/healthz` is excluded; nothing else is. Targets
-premised on reads scaling like reads will be wrong on every dialect.
-
-**The `credential` class is bounded by memory.** The password hasher defaults to
-argon2id at 64 MiB per verification. That is correct and deliberate. It also
-means concurrency on any credential path is a function of server RAM, so that
-class needs its own budget and its parameters must be published beside any
-figure.
-
-**The SQLite lane cannot produce a throughput number.**
-[`internal/storage/dialect/sqlite/dialect.go`](../../internal/storage/dialect/sqlite/dialect.go)
-sets `SetMaxOpenConns(1)`, so every statement queues on one connection before
-SQLite's own locking applies; `_txlock=immediate` with no `ReadOnly` transaction
-option puts a second serialization behind it. Throughput on that lane is
-`1 / service_time` by construction. This is the right design for a zero-config
-local default (ADR 028) and is not a defect — but a target set on it, or a
-resource ladder run against it, measures the connection pool.
-
-## How
-
-**Four phases.** P0 baseline — no performance target at all; the gate is that
-every cell is measured, labeled, and reproducible within 10% across two runs.
-P1 lenient absolute budgets on the base rung. P2 scaling, gated on efficiency
-and explicitly not on absolute latency. P3 launch budgets, error budget, cost,
-soak and burst.
-
-P0's gate is what makes the rest honest: it requires a complete labeled
-baseline and no invention, and every P1 value is written from it by arithmetic.
-
-**Scaling efficiency is the P2 gate.** `E = (T_2x / T_1x) / 2` per rung
-doubling, where `T` is throughput at a fixed latency SLO — the highest sustained
-arrival rate holding the class p95 budget, not peak requests per second. Gate at
-`E ≥ 0.8`. This turns "it scales" into a pass/fail cell and is what catches
-requests serializing on a shared lock.
-
-**Offered load is open-model.** Arrival-rate driven, not a fixed pool of virtual
-users. In a closed loop throughput and latency are not independent — workers
-back off exactly when the server struggles — so `T` is unmeasurable and the
-system's response looks identical whether or not anything is wrong. This
-constrains the harness design ([#1095](https://github.com/zitadel/nextgen/issues/1095),
-[#1096](https://github.com/zitadel/nextgen/issues/1096)).
-
-**Cross-dialect rungs are calibrated, not asserted.** Processing units do not
-convert to vCPU, and a doubling tests different things on each engine —
-contention on one box for PostgreSQL, key-range splitting for Spanner. The
-Spanner base rung is established in P1 by matching measured base-rung throughput,
-recorded as a measured cell, and laddered from there.
-
-**A run is a committed file.** Each acceptance run copies
-[`acceptance-template.md`](../performance/acceptance-template.md) into
-`docs/performance/runs/`, with the phase's targets pre-filled and measurements
-empty. Verdicts are computed from the table, not written by hand. Errors are
-counted from raw sample output rather than from logs, and the template carries an
-explicit list of run-invalidating conditions.
-
-**Unmet gates block a phase, not a merge.** A failed gate produces a fix in the
-*next* phase's scope. Per-merge regression detection is a separate, ratcheted
-mechanism on the SQLite lane, whose full serialization makes it the lowest-variance
-detector of the three.
+If we guess the targets now, we get a targets page that is wrong. People will
+trust it anyway, and then quietly ignore it the first time real results
+disagree with it. If we set no targets at all, the launch decision ends up
+being made on gut feeling a week before the date. This ADR exists to prevent
+that.
 
 ## Consequences
 
-- The matrix is mostly `—` today, deliberately, and that is a reportable state
-  rather than an unfinished one.
-- API issues gain a link, not a number. Changing a budget is a single-file change.
-- The SQLite lane is documented as a serial-cost and regression lane. Its
-  throughput figure is never published beside PostgreSQL or Spanner.
-- The P2 scaling gate applies to PostgreSQL and Spanner only.
-- The open-model requirement lands on the harness before it is built, which is
-  the cheapest moment for it to land.
-- **Phases are not mapped to product roadmap stages here.** The mapping is a
-  product decision, the roadmap and the milestone set do not currently agree,
-  and inventing that alignment in an ADR would be the same error this document
-  is written to avoid. P0–P3 are local to the performance topic until someone
-  who owns the roadmap says otherwise.
+- Most of the targets page is empty today. That is on purpose, and it is a
+  valid status to report, not a sign of unfinished work.
+- API issues get a link instead of a number. Changing a target means changing
+  one file.
+- The SQLite setup is only used to measure the cost of a single request and to
+  catch slowdowns. Its capacity number is never shown next to PostgreSQL or
+  Spanner.
+- The P2 scaling check only applies to PostgreSQL and Spanner.
+- The test tooling must create load in a specific way (open model, see below).
+  We say so now, before the tooling is built, when the change is cheapest.
+- **The phases are not linked to the product roadmap here.** That is a product
+  decision. The roadmap and the GitHub milestones don't match each other right
+  now, and making up a link between them in an ADR would be the same mistake this
+  document tries to avoid. P0 to P3 belong only to the performance topic until
+  the roadmap owner decides otherwise.
 
 ## Alternatives considered
 
-**Put the numbers in the benchmark epic.** Rejected: it makes the harness the
-owner of criteria it does not control, and the epic completes long before the
-APIs it measures are optimized.
+**Put the numbers in the benchmark epic.** Rejected: that makes the test tooling
+the owner of targets it does not control. The epic will also be done long
+before the APIs it measures are optimized.
 
-**Put the numbers in each API issue.** Rejected: nineteen-plus copies of a
-budget drift, and there is no single page a launch decision can be made from.
-The link-not-copy rule keeps both properties.
+**Put the numbers in each API issue.** Rejected: twenty or more copies of the
+same target get out of sync, and there is no single page to base a launch
+decision on. Linking instead of copying gives us both.
 
-**Set targets now, from the reference deployment of current-generation Zitadel.**
-Rejected: nextgen is relational with pushed events rather than event-sourced with
-projections. Inheriting `8 vCPU / 32 GiB` as a floor assumes the property under
-test. It appears in the ladder as a rung, not as a starting point.
+**Set targets now, based on the current Zitadel deployment.** Rejected: nextgen
+stores data in a different way than current Zitadel. Taking over
+`8 vCPU / 32 GiB` as the minimum would assume the very thing we want to test. It
+is one of the tested server sizes, not the starting point.
 
-**Gate absolute latency in P2.** Rejected: endpoints are expected to be
-unoptimized at that stage, so the phase would fail for a reason it is not asking
-about, and the scaling signal would be lost in the noise of that argument.
+**Check response times in P2.** Rejected: endpoints are not expected to be
+optimized at that stage. The phase would fail for a reason it is not testing,
+and the scaling result would get lost in that discussion.
+
+## Technical background
+
+_This section explains the facts behind the decision and how it works in
+practice. It is written for engineers._
+
+### Three facts that limit any target
+
+#### Every request writes to the database
+
+`internal/audit` writes one `request.api` row per API request (ADR 048, Path A).
+Only `/healthz` is skipped. Targets that assume reads are cheap will be wrong
+on every database.
+
+#### The `credential` requests are limited by memory
+
+The password hasher defaults to argon2id with 64 MiB per password check. That is
+correct and on purpose. But it means how many credential requests can run at
+once depends on the server's RAM. So this request type needs its own target, and
+the hasher settings must be published next to any number for it.
+
+#### SQLite handles one request at a time
+
+[`internal/storage/dialect/sqlite/dialect.go`](../../internal/storage/dialect/sqlite/dialect.go)
+sets `SetMaxOpenConns(1)`: the server talks to SQLite over exactly one
+`database/sql` connection, so every statement, reads included, waits in the Go
+connection pool before SQLite's own locking is even checked. `journal_mode(WAL)`
+is set and would allow reads in parallel, but the single connection cancels
+that out. There is a second queue behind it: transactions start without the
+`ReadOnly` option and the DSN sets `_txlock=immediate`, so every transaction,
+reads included, takes SQLite's write lock at `BEGIN`.
+
+This is intended. SQLite is the zero-config local default and not meant for
+production (ADR 028). What it means for testing:
+
+- Capacity on this setup is always `1 / service_time`. It says nothing about
+  the server, and must never be published next to a PostgreSQL or Spanner
+  number. Every published SQLite number says so.
+- **Doubling the server size changes nothing** when there is only one
+  connection, so the P2 scaling check does not run on SQLite.
+- Its check is a **service-time floor**. Because everything runs one at a time,
+  there is almost no noise: if a request does more work, the result shows it
+  directly. That makes it the best setup for catching slowdowns on every merge,
+  not the weakest.
+
+### How it works
+
+**Four phases.** P0: baseline, with no performance target at all. It passes when
+every cell is measured, labeled, and two runs differ by less than 10%. P1: easy
+targets on the base size. P2: scaling, checked on scaling efficiency and on
+purpose not on response times. P3: launch targets, error budget, cost, soak and
+burst tests.
+
+P0 is what makes the rest honest: it needs a complete, labeled baseline and no
+guessing, and every P1 value is calculated from it.
+
+**Scaling efficiency is the P2 gate.** `E = (T_2x / T_1x) / 2` per doubling of
+server size, where `T` is throughput within the latency budget: the highest
+steady arrival rate at which the p95 of a request type stays within its target,
+not the peak requests per second. The gate is `E ≥ 0.8`. This turns "it scales"
+into a pass/fail check, and it catches requests that queue up on a shared lock.
+
+**Load is open-model.** Requests arrive at a set rate, not from a fixed number of
+virtual users. With a closed model, throughput and latency depend on each other:
+workers slow down exactly when the server struggles. That makes `T` impossible
+to measure, and a healthy system looks the same as an overloaded one. This is a
+requirement on the tooling design
+([#1095](https://github.com/zitadel/nextgen/issues/1095),
+[#1096](https://github.com/zitadel/nextgen/issues/1096)).
+
+**Server sizes are matched by measurement, not by spec sheet.** Spanner
+processing units cannot be converted to vCPU, and doubling tests different
+things on each database: whether one bigger machine does more for PostgreSQL,
+and whether the data spreads over more key ranges for Spanner. The Spanner base
+size is found in P1 by matching the measured throughput of the PostgreSQL base
+size, stored as a measured value, and doubled from there.
+
+**Each test run is a committed file.** Each acceptance run copies
+[`acceptance-template.md`](../performance/acceptance-template.md) into
+`docs/performance/runs/`, with the phase's targets filled in beforehand and the
+measurements empty. The verdict follows from the tables and is not a judgement
+call. Errors are counted from the raw test output, not from logs, and the
+template has a fixed list of problems that make a run invalid.
+
+**A failed gate blocks a phase, not a merge.** A failed gate leads to a fix in
+the _next_ phase. Catching slowdowns on every merge is a separate check on the
+SQLite setup, where running one request at a time makes it the most stable of
+the three.

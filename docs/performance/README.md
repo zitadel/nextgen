@@ -1,244 +1,291 @@
 # Performance Acceptance Criteria
 
-What "good enough" means for nextgen, per storage dialect, per hardware class,
-per phase. This page owns the numbers. The benchmark harness
-([#1094](https://github.com/zitadel/nextgen/issues/1094)) produces them; it does
-not decide them.
+This page says what "fast enough" means for nextgen. It is the one place where
+the performance targets live. The benchmark tooling
+([#1094](https://github.com/zitadel/nextgen/issues/1094)) produces the numbers;
+this page decides what they have to be.
 
-Policy behind this page: [ADR 065](../adrs/065-performance-acceptance-criteria.md).
-Run records: [`runs/`](runs/). Template: [`acceptance-template.md`](acceptance-template.md).
+Why it is set up this way: [ADR 065](../adrs/065-performance-acceptance-criteria.md).
+Test results: [`runs/`](runs/). Template for a test run:
+[`acceptance-template.md`](acceptance-template.md).
 
-## How to read a cell
+The first half of this page is written for everyone. The
+[technical detail](#technical-detail) starts further down, and you can stop
+reading there if you only need the overview. Words that may be unfamiliar are
+explained in the [glossary](#glossary) at the end.
 
-Nothing here is asserted. Every cell carries its provenance, and the marker is
-part of the value:
+## Where we are today
 
-| Marker | Meaning |
-| --- | --- |
-| `—` | Not measured, no target. Honest, and the expected state of most of this page today. |
-| `~1000` *(assumed)* | A guess, labeled as one, with the reasoning in a footnote. Never a gate. |
-| `825` *(measured, `runs/<file>`)* | Traceable to a committed run record. |
-| `≥ 660` *(gate P2)* | A target, derived by stated arithmetic from a measured cell one phase back. |
+**Most of the tables on this page are empty, and that is on purpose.** We have
+not measured nextgen yet, so we don't know what numbers are realistic. Instead of
+guessing, we first measure, and then set the targets based on what we measured.
 
-**An empty cell is honest. A cell copied forward from a previous run is not.**
-A number that cannot be traced to a committed run record does not belong on this
-page, and a gate may only be derived from a measured cell — never from an
-assumed one.
+The first step (phase P0) has no performance target at all. It only asks: can we
+measure nextgen in a way that gives the same result twice?
 
 ## Phases
 
-Phases are local to this topic. They are **not** GitHub milestones and are not
-mapped to the product roadmap; that mapping is a product decision and is
-deliberately left open (see ADR 065, *Consequences*).
+We work in four phases. Each phase asks one question and has one pass/fail check
+(a _gate_). A phase must pass before the next one starts.
 
-| Phase | Question it answers | Gate |
-| --- | --- | --- |
-| **P0** | Can we measure this at all, reproducibly? | **Every cell measured and labeled.** Two runs of the same configuration agree within 10%. No performance target of any kind. |
-| **P1** | Is anything catastrophically broken? | Lenient absolute budgets on the base rung. The harness holds a fixed arrival rate for 30 minutes without drift. |
-| **P2** | Does it scale with resources? | **Scaling efficiency ≥ 0.8 per doubling.** Absolute latency deliberately not gated. |
-| **P3** | Is it fit to launch and to publish? | Absolute per-class budgets, published error budget, cost per 1000 requests, soak and burst. |
+The phases belong to this page only. They are **not** GitHub milestones and are
+not linked to the product roadmap. Linking them is a product decision, and we
+left it open on purpose (see
+[ADR 065, Consequences](../adrs/065-performance-acceptance-criteria.md#consequences)).
 
-P0's gate is the one that matters today. It costs no invention: it is satisfied
-by a complete, labeled, reproducible baseline, and every P1 target is written
-the day P0's measurements land.
+| Phase  | Question                                 | Passes when                                                                                                                 |
+| ------ | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| **P0** | Can we measure this at all, reliably?    | **Everything is measured and labeled.** Two runs of the same test differ by less than 10%. No speed target.                 |
+| **P1** | Is anything badly broken?                | Easy targets on the smallest server size. The system handles a steady load for 30 minutes without slowing down.             |
+| **P2** | Does it get faster when we add hardware? | **Doubling the hardware gives at least 1.6× the capacity** (80% of a perfect doubling). Response times are not checked yet. |
+| **P3** | Is it ready to launch and to publish?    | Firm response-time targets, a published error budget, cost per 1000 requests, long-running and spike tests.                 |
 
-## Lanes
+P0 is the phase that matters today. It needs no guessing: it passes once we have
+a complete, labeled measurement that we can repeat. All P1 targets are then
+calculated from those measurements.
 
-Three deployment lanes, differing in one variable
-([#1097](https://github.com/zitadel/nextgen/issues/1097)). Same image, same
-manifest, same collector; only the dialect and its storage differ.
+## Test setups: one per database
 
-| Lane | Answers | Does **not** answer |
-| --- | --- | --- |
-| **SQLite** (container, local volume, 1 replica) | Per-request **serial** cost, at very low variance. The 1-VU latency floor. | Anything about throughput or scaling — see below. |
-| **PostgreSQL** | What most deployments will see. | |
-| **Spanner** | Horizontal behavior, and where the interesting failures already live ([#1011](https://github.com/zitadel/nextgen/issues/1011)). | |
+nextgen supports three databases. We test each one in its own setup. The setups
+are identical except for the database
+([#1097](https://github.com/zitadel/nextgen/issues/1097)).
 
-### The SQLite lane measures serial cost, never throughput
+| Setup          | What it tells us                                                                                                                                     | What it does **not** tell us                                                                                                                                                                  |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **SQLite**     | How much work one request costs. Very stable, so it is great for spotting slowdowns early.                                                           | How many requests per second nextgen can handle. SQLite handles one request at a time by design ([why](../adrs/065-performance-acceptance-criteria.md#sqlite-handles-one-request-at-a-time)). |
+| **PostgreSQL** | What most customers will see.                                                                                                                        |                                                                                                                                                                                               |
+| **Spanner**    | How nextgen behaves when spread over many machines. Some known problems live here already ([#1011](https://github.com/zitadel/nextgen/issues/1011)). |                                                                                                                                                                                               |
 
-[`internal/storage/dialect/sqlite/dialect.go`](../../internal/storage/dialect/sqlite/dialect.go)
-sets `SetMaxOpenConns(1)`: the server talks to SQLite over exactly one
-`database/sql` connection, so every statement — reads included — queues in the Go
-pool before SQLite's own locking is consulted. `journal_mode(WAL)` is set and
-would allow concurrent reads; the pool of one discards that. A second
-serialization sits behind it: transactions begin with no `ReadOnly` option and
-the DSN sets `_txlock=immediate`, so every transaction takes SQLite's exclusive
-write lock at `BEGIN`, reads included.
+Because of this, an SQLite number is never shown next to a PostgreSQL or Spanner
+number, and SQLite is not part of the "does it scale" test in P2.
 
-This is deliberate and correct — [ADR 028](../adrs/028-storage-v2-statements-and-dialects.md)
-states that SQLite is the zero-config local default and not a production peer.
-The consequence for this page is what matters:
+## Server sizes
 
-- Throughput on this lane is `1 / service_time` **by construction**. It is not a
-  property of the server and must never be published beside a Postgres or
-  Spanner figure.
-- **No resource ladder may be run on it.** Adding vCPU to a pool of one changes
-  nothing, so the P2 scaling gate is PostgreSQL and Spanner only.
-- Its gate is a **service-time floor**, and full serialization makes it nearly
-  noiseless — a regression in per-request work shows up proportionally with no
-  concurrency noise to hide in. That makes it the best per-merge regression
-  detector of the three, not the weakest.
+To check whether nextgen gets faster with more hardware, we run the same test on
+a small server, then double it, and double it again.
 
-Every published SQLite figure carries that sentence or it invites a comparison
-it cannot support.
+| Size | PostgreSQL       | Spanner             | What doubling tests                                                                 |
+| ---- | ---------------- | ------------------- | ----------------------------------------------------------------------------------- |
+| base | 2 vCPU / 8 GiB   | _(measured in P1)_  | —                                                                                   |
+| ×2   | 4 vCPU / 16 GiB  | ×2 processing units | PostgreSQL: can one bigger machine do more? Spanner: does the data spread out well? |
+| ×4   | 8 vCPU / 32 GiB  | ×4 processing units |                                                                                     |
+| ×8   | 16 vCPU / 64 GiB | ×8 processing units |                                                                                     |
 
-## Capacity ladders
+`8 vCPU / 32 GiB` is the PostgreSQL size used today for current Zitadel. Here it
+is the ×4 size, not the starting point. nextgen stores data in a different way
+than current Zitadel, so we should not assume it needs the same hardware. That
+is something to measure, not to copy.
 
-The two production dialects do not share a unit, and a doubling does not test
-the same thing on each.
+**The Spanner base size is measured, not guessed.** Spanner capacity is sold in
+"processing units", which cannot be converted to CPUs. So in P1 we look for the
+Spanner size that handles the same load as the 2 vCPU PostgreSQL server, and
+start from there. Until then, Spanner and PostgreSQL results cannot be compared
+with each other.
 
-| Rung | PostgreSQL | Spanner | What a doubling tests |
-| --- | --- | --- | --- |
-| base | 2 vCPU / 8 GiB | *(calibrated, see below)* | — |
-| ×2 | 4 vCPU / 16 GiB | ×2 processing units | PG: contention on one box. Spanner: whether the key layout splits. |
-| ×4 | 8 vCPU / 32 GiB | ×4 processing units | |
-| ×8 | 16 vCPU / 64 GiB | ×8 processing units | |
+## What we measure
 
-`8 vCPU / 32 GiB` is the reference PostgreSQL shape used for current-generation
-Zitadel. It appears here as the ×4 rung, not as the starting point: nextgen is
-relational with pushed events rather than event-sourced with projections, and
-assuming it needs the same floor is exactly the sort of inherited number this
-page exists to stop.
+- **Response time**, for each type of request separately. Always stated together
+  with the load it was measured at.
+- **Capacity**: the highest steady load at which response times stay within
+  their target.
+- **Scaling**: how much capacity grows when the hardware doubles.
+- **Errors**: server errors, client errors and failed checks, counted separately
+  because different teams fix them.
+- **Missed requests**: requests the test tool could not send on time. Any number
+  above zero fails the test.
+- **Cost per 1000 requests**, based on the cloud list price, with the
+  calculation shown.
 
-**The Spanner base rung is calibrated, not asserted.** Processing units do not
-convert to vCPU, and pairing them by price or by spec sheet is a guess. In P1,
-find the processing-unit count whose base-rung throughput matches the 2 vCPU
-PostgreSQL rung, record it here as a measured cell, and ladder from there. Until
-that is done, cross-dialect rows are not comparable and must not be charted on
-one axis.
+The exact definitions are in the [technical detail](#metric-definitions).
 
-## Operation classes
+## How to read a number on this page
 
-Latency is gated per class, never globally. A single global budget either passes
-trivially or fails on a correct default.
+Every number says where it came from. The label is part of the number:
 
-| Class | Operations | Note |
-| --- | --- | --- |
-| `probe` | `GET /healthz` | No auth, no audit row. The control: bounds the HTTP stack itself. |
-| `read-point` | `getSession` `GetUserByID` `getMyUser` `getMySession` `getAuthAttempt` | |
-| `read-query` | `querySessions` `queryUsers` `listUserTeams` `listUserPasskeys` | Cursor-paginated ([ADR 027](../adrs/027-cursor-based-pagination.md)). |
-| `write` | `createSession` `createUser` `revokeSession` `revokeMySession` `DeleteUserByID` `createAuthAttempt` | |
-| `flow-step` | `createFlow` `getFlowStep` `submitFlowStep` (non-credential steps) | |
-| `credential` | `setUserPassword` `submitFlowStep` (password) `beginUserPasskeyRegistration` `finishUserPasskeyRegistration` `verifyChallengeProof` | **Memory-bound, see below.** |
-| `handoff` | `exchangeHandoff` `createHandoff` `issueChallenge` | |
+| Looks like                        | Meaning                                                                           |
+| --------------------------------- | --------------------------------------------------------------------------------- |
+| `—`                               | Not measured yet, no target yet. This is what most of the page looks like today.  |
+| `~1000` _(assumed)_               | A guess, clearly marked as one, with the reasoning in a footnote. Never a target. |
+| `825` _(measured, `runs/<file>`)_ | Comes from a test result stored in [`runs/`](runs/).                              |
+| `≥ 660` _(gate P2)_               | A target, calculated from a measured number in the phase before.                  |
 
-### The `credential` class is bounded by memory, not CPU
+**An empty cell is fine. A number copied from an older test is not.** If we can't
+point to the test result a number came from, it doesn't go on this page. And a
+target may only be calculated from a measured number, never from a guess.
 
-`password_hasher` defaults to argon2id at `time: 3`, `memory: 65536` KiB,
-`threads: 4`. That is the correct default and is not a defect. It is a hard
-constraint on this page: concurrency on any credential path costs 64 MiB per
-in-flight verification, so the class ceiling is a function of server memory, and
-a load generator ramping arrival rate on a login flow is measuring RAM.
+## When the tests run
 
-**Every published `credential` figure states the hasher parameters beside it**,
-or it is meaningless. The class target is derived from memory, not guessed.
+| Setup      | How often          | Why                                                                                                                                                                 |
+| ---------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| SQLite     | on every merge     | Cheapest to run, and the most stable, so it catches slowdowns early. Once a speed is measured, later merges may not be slower than that, apart from a small margin. |
+| PostgreSQL | weekly             |                                                                                                                                                                     |
+| Spanner    | weekly             |                                                                                                                                                                     |
+| All sizes  | at each phase gate |                                                                                                                                                                     |
 
-### Every other class writes to the database
+How the tests are scheduled is handled in
+[#1113](https://github.com/zitadel/nextgen/issues/1113). The target values
+themselves stay on this page.
 
-`internal/audit` emits one `request.api` wide event per API request
-([ADR 048](../adrs/048-wide-events-internal-audit-primitive.md), Path A).
-`/healthz` is excluded; nothing else is. **No endpoint in this API is read-only
-at the storage layer**, and any target set on the assumption that reads scale
-like reads will be wrong on every lane.
+## Using these targets in an API issue
 
-## Metrics, defined
+An API issue links to this page. It does not copy a number:
 
-| Metric | Definition |
-| --- | --- |
-| **Latency** | p50 / p95 / p99 per operation class, measured at a **fixed arrival rate**, stated with the rate. A p95 without its offered load is not a measurement. |
-| **Throughput at SLO** `T` | The highest sustained arrival rate at which the class p95 stays inside its budget. Not peak requests per second — peak is always obtainable by accepting worse latency. |
-| **Scaling efficiency** `E` | `E = (T_2x / T_1x) / 2` across one rung doubling. `E = 1.0` is perfectly linear. **P2 gate: `E ≥ 0.8`.** |
-| **Error rate** | Counted from the raw sample output, never from the log, and split into 5xx / 4xx / check failures. The three have different owners. |
-| **Dropped iterations** | Requests the generator could not issue at the configured rate. **Non-zero is a failure**, and it is silent unless a row exists for it. |
-| **Cost per 1000 requests** | Derived at the SLO rate from the lane's list price. Shows its inputs or it is not a number. |
+> Meets the **P2** target for its request type in
+> [`docs/performance/README.md`](README.md).
 
-### The ladder must be open-model
+A copied number gets out of date. With a link, we change the target in one
+place and every issue follows.
 
-Offered load is set by a **constant or ramping arrival rate**, independent of
-response time. It must not be set by a fixed pool of virtual users waiting on
-their own responses.
+---
 
-In a closed loop, throughput and latency are not independent variables: each
-worker backs off exactly when the server begins to struggle, so a queue never
-forms and `T` cannot be measured. A closed-loop ladder produces flat throughput
-with linearly growing latency whether or not anything is wrong, which is
-indistinguishable from a healthy system being politely under-driven.
+## Technical detail
 
-This is a constraint on the harness
+_Everything below is for engineers building or running the tests. Product
+readers can stop here; the [glossary](#glossary) is at the very end._
+
+### Request types
+
+Response times are checked per request type, never as one number for
+everything. A single overall target either passes too easily or fails because
+of a correct default setting.
+
+| Type         | Operations                                                                                                                          | Note                                                                          |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `probe`      | `GET /healthz`                                                                                                                      | No login, no audit row. The baseline: shows the cost of the HTTP layer alone. |
+| `read-point` | `getSession` `GetUserByID` `getMyUser` `getMySession` `getAuthAttempt`                                                              |                                                                               |
+| `read-query` | `querySessions` `queryUsers` `listUserTeams` `listUserPasskeys`                                                                     | Paged with cursors ([ADR 027](../adrs/027-cursor-based-pagination.md)).       |
+| `write`      | `createSession` `createUser` `revokeSession` `revokeMySession` `DeleteUserByID` `createAuthAttempt`                                 |                                                                               |
+| `flow-step`  | `createFlow` `getFlowStep` `submitFlowStep` (steps without a credential)                                                            |                                                                               |
+| `credential` | `setUserPassword` `submitFlowStep` (password) `beginUserPasskeyRegistration` `finishUserPasskeyRegistration` `verifyChallengeProof` | **Limited by memory, see below.**                                             |
+| `handoff`    | `exchangeHandoff` `createHandoff` `issueChallenge`                                                                                  |                                                                               |
+
+#### The `credential` type is limited by memory, not CPU
+
+The password hasher defaults to argon2id with `time: 3`, `memory: 65536` KiB,
+`threads: 4`. That is the right default and not a bug. But it means every
+password check in progress uses 64 MiB of memory. How many can run at once
+depends on the server's memory, so a load test on a login flow is really
+measuring RAM.
+
+**Every published `credential` number states the hasher settings next to it**,
+otherwise it means nothing. The target for this type is calculated from memory,
+not guessed.
+
+#### Every other type writes to the database
+
+`internal/audit` writes one `request.api` event per API request
+([ADR 048](../adrs/048-wide-events-internal-audit-primitive.md), Path A). Only
+`/healthz` is skipped. So **no endpoint is read-only in the database**, and a
+target that assumes reads are cheap will be wrong on every setup.
+
+### Metric definitions
+
+| Metric                           | Definition                                                                                                                                                                                    |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Latency**                      | p50 / p95 / p99 per request type, measured at a **fixed arrival rate**, and stated with that rate. A p95 without its load is not a measurement.                                               |
+| **Throughput within budget** `T` | The highest steady arrival rate at which the p95 of a request type stays within its target. Not the peak requests per second: a higher peak is always possible by accepting slower responses. |
+| **Scaling efficiency** `E`       | `E = (T_2x / T_1x) / 2` for one doubling of server size. `E = 1.0` means capacity doubled exactly. **P2 gate: `E ≥ 0.8`.**                                                                    |
+| **Error rate**                   | Counted from the raw test output, never from the log, and split into 5xx / 4xx / check failures. Each has a different owner.                                                                  |
+| **Dropped iterations**           | Requests the load generator could not send at the configured rate. **Any non-zero value fails the run.**                                                                                      |
+| **Cost per 1000 requests**       | Calculated at rate `T` from the setup's list price. Shows its inputs, or it is not a number.                                                                                                  |
+
+### Load must be open-model
+
+Load is set as a **fixed or rising arrival rate** that does not depend on how
+fast the server answers. It must not come from a fixed number of virtual users
+who each wait for their answer before sending the next request.
+
+With a fixed number of waiting users (a closed model), load and response time
+depend on each other: when the server slows down, the users send less. A queue
+never builds up, so `T` cannot be measured. The result looks the same whether
+the server is healthy or struggling.
+
+This is a requirement on the benchmark tooling
 ([#1095](https://github.com/zitadel/nextgen/issues/1095),
 [#1096](https://github.com/zitadel/nextgen/issues/1096)), not only on this page.
 
-## The gates
+### Gate values per phase
 
-Targets are `—` until P0 lands. The gate *definitions* are fixed now; the
-*values* are derived from measurement, in the phase before.
+Values stay `—` until P0 is done. What each gate checks is fixed now; the
+numbers are calculated from the measurements of the phase before.
 
-### P0 — baseline
+#### P0: baseline
 
-No performance target. The gate is reproducibility:
+No performance target. The gate is repeatability:
 
-- Every cell on this page measured and labeled, on all three lanes.
-- Two runs of the same configuration agree within 10% on `T` and class p95.
-- One committed run record per lane in [`runs/`](runs/), no empty cells.
-- Spanner base rung calibrated against the PostgreSQL base rung.
+- Every cell on this page measured and labeled, on all three setups.
+- Two runs of the same configuration differ by less than 10% on `T` and on p95
+  per request type.
+- One stored test result per setup in [`runs/`](runs/), with no empty cells.
+- Spanner base size measured against the PostgreSQL base size.
 
-### P1 — nothing catastrophically broken
+#### P1: nothing badly broken
 
-Base rung only. PostgreSQL 2 vCPU / 8 GiB, Spanner at its calibrated base.
+Base size only: PostgreSQL 2 vCPU / 8 GiB, Spanner at its measured base size.
 
-| Criterion | Value |
-| --- | --- |
-| Class p95 | `< 1 s` for every class except `credential`, which gets its own memory-derived budget |
-| Sustained rate | `≥ 100/s`, held 30 min without latency drift |
-| 5xx | `0` |
-| Check failures | `< 1%`, counted from raw samples |
-| Dropped iterations | `0` |
+| Check              | Value                                                                                 |
+| ------------------ | ------------------------------------------------------------------------------------- |
+| p95 per type       | `< 1 s` for every type except `credential`, which gets its own target based on memory |
+| Steady rate        | `≥ 100/s`, held for 30 min without response times creeping up                         |
+| 5xx                | `0`                                                                                   |
+| Check failures     | `< 1%`, counted from raw test output                                                  |
+| Dropped iterations | `0`                                                                                   |
 
-Deliberately lenient. P1 is a liveness gate at realistic-but-modest load, not an
-optimization target.
+Intentionally easy. P1 checks that the system works under modest, realistic
+load. It is not an optimization target.
 
-### P2 — it scales
+#### P2: it scales
 
-The doubling matrix, PostgreSQL and Spanner. **Absolute latency is not gated**:
-individual endpoints are expected to be unoptimized at this point, and gating
-them here would fail the phase for the wrong reason.
+All doublings, PostgreSQL and Spanner. **Response times are not checked**:
+endpoints are not expected to be optimized yet, and checking them here would
+fail the phase for the wrong reason.
 
-| Criterion | Value |
-| --- | --- |
-| Scaling efficiency | `E ≥ 0.8` at every rung doubling |
-| Queue behavior | `p99 / p50 < 10` at the SLO rate |
-| Dropped iterations | `0` at every rung |
-| SQLite lane | Service-time floor held within tolerance. **Not laddered.** |
+| Check              | Value                                                                                             |
+| ------------------ | ------------------------------------------------------------------------------------------------- |
+| Scaling efficiency | `E ≥ 0.8` for every doubling                                                                      |
+| Queueing           | `p99 / p50 < 10` at rate `T`                                                                      |
+| Dropped iterations | `0` at every size                                                                                 |
+| SQLite setup       | Service time no slower than its recorded value, within the margin. **Not part of the size test.** |
 
-This is the phase that catches work piling up on a shared lock, and it is the
-phase whose result is the honest answer to "can you handle web scale".
+This phase finds requests that pile up waiting on a shared lock. Its result is
+the honest answer to "can nextgen handle large scale?".
 
-### P3 — fit to launch
+#### P3: ready to launch
 
-Absolute per-class latency budgets, derived from P2's measurements; the
-throughput figure that goes on a public page; a published error budget; cost per
-1000 requests per lane and rung; plus soak (multi-hour, memory and lag stable)
-and burst (step change in arrival rate, recovery time bounded).
+Firm response-time targets per request type, calculated from P2's measurements;
+the capacity number that goes on a public page; a published error budget; cost
+per 1000 requests per setup and size; plus a soak test (several hours, memory
+use and backlogs stay stable) and a burst test (sudden jump in load, recovery time
+within a limit).
 
-## Cadence
+## Glossary
 
-| Lane | When | Why |
-| --- | --- | --- |
-| SQLite | per merge | Cheapest standing deployment of the three, and the lowest-variance regression detector. Ratcheted: a measured service time becomes a floor with a tolerance band. |
-| PostgreSQL | weekly | |
-| Spanner | weekly | |
-| Full matrix | phase gate | |
-
-Cadence mechanics belong to
-[#1113](https://github.com/zitadel/nextgen/issues/1113); the ratchet values
-belong here.
-
-## Referencing this page from an API issue
-
-An endpoint's acceptance criteria links, and does not copy:
-
-> Meets the **P2** budget for its operation class in
-> [`docs/performance/README.md`](README.md).
-
-A copied number is a number that will drift. The one page moves; the issues
-follow it.
+| Term                            | Meaning                                                                                                                                                                                         |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **4xx / 5xx**                   | HTTP error codes. 4xx means the request was wrong (client error); 5xx means the server failed (server error).                                                                                   |
+| **argon2id**                    | The method used to hash (safely store and check) passwords. It uses a lot of memory on purpose, to make password cracking expensive.                                                            |
+| **Arrival rate**                | How many new requests the test sends per second, regardless of how fast the server answers.                                                                                                     |
+| **Benchmark tooling / harness** | The software that generates load and records the results. Being built in [#1094](https://github.com/zitadel/nextgen/issues/1094).                                                               |
+| **Boot marker**                 | A value recorded when the test starts and checked again at the end, to prove the server and its data were not reset during the run.                                                             |
+| **Burst test**                  | A test where the load suddenly jumps, to see how quickly the system recovers.                                                                                                                   |
+| **Check failure**               | The server answered, but the answer was not what the test expected.                                                                                                                             |
+| **Dropped iteration**           | A request the load generator should have sent but could not, usually because the generator itself was overloaded.                                                                               |
+| **Error budget**                | The share of requests that may fail in a period before we consider the service unhealthy.                                                                                                       |
+| **Gate**                        | A pass/fail check at the end of a phase. The next phase starts only when it passes.                                                                                                             |
+| **fsync**                       | Forcing data to be written to disk. On a network disk this is slow, and can end up being the main thing a test measures.                                                                        |
+| **GiB**                         | Gibibyte, a unit of memory (about 1.07 GB).                                                                                                                                                     |
+| **Lane**                        | The name the benchmark issues use for a test setup. There is one per database: SQLite, PostgreSQL and Spanner.                                                                                  |
+| **Latency / response time**     | How long one request takes, from sending it to getting the answer.                                                                                                                              |
+| **Load generator**              | The machine that sends the test requests. It must not be the machine being tested.                                                                                                              |
+| **Open model / closed model**   | Two ways to create test load. Open: requests arrive at a set rate, like real users. Closed: a fixed group of simulated users, each waiting for an answer before sending again. We require open. |
+| **p50 / p95 / p99**             | Percentiles. p95 = 500 ms means 95 out of 100 requests took 500 ms or less. p50 is the typical request; p99 shows the slowest ones.                                                             |
+| **Processing unit**             | The unit Spanner capacity is sold in. It cannot be converted to CPUs.                                                                                                                           |
+| **Regression**                  | Something that got slower (or worse) compared to an earlier version.                                                                                                                            |
+| **Replica**                     | One running copy of the application. More replicas share the load.                                                                                                                              |
+| **RSS**                         | How much memory a program is using right now.                                                                                                                                                   |
+| **Service time**                | How long the server works on one request when nothing else is running.                                                                                                                          |
+| **Smoke test**                  | A short, quick test that only checks that things work at all. Its numbers are not compared with real runs.                                                                                      |
+| **Soak test**                   | A test that runs for several hours at steady load, to find slow problems like memory that is never freed.                                                                                       |
+| **Throughput / capacity**       | How many requests per second the system handles.                                                                                                                                                |
+| **vCPU**                        | A virtual CPU core in a cloud server.                                                                                                                                                           |
+| **Virtual user (VU)**           | A simulated user in a load test.                                                                                                                                                                |
