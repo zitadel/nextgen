@@ -463,7 +463,9 @@ func TestConsoleSessionExpandsUserTeams(t *testing.T) {
 	customer, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 	harness.SeedProjectAdmin(t, customer.ID, operatorID)
-	memberID := harness.CreateUserWithTeam(t, customer.ID)
+	// Owned by the team as well as a member of it, so both expansions have
+	// something to resolve.
+	memberID, memberTeamID := harness.CreateUserOwnedByTeam(t, customer.ID)
 
 	session := sessionClientForUser(t, operatorID)
 	resp, err := session.QueryUsers(t.Context(), &api.QueryUsersRequest{
@@ -473,14 +475,15 @@ func TestConsoleSessionExpandsUserTeams(t *testing.T) {
 	listed, ok := resp.(*api.QueryUsersResponse)
 	require.True(t, ok, helpers.MustMarshal(t, resp))
 
-	var member *api.User
-	for i := range listed.Users {
-		if userID(t, listed.Users[i]) == memberID {
-			member = &listed.Users[i]
-		}
-	}
-	require.NotNil(t, member, helpers.MustMarshal(t, listed))
-	require.NotEmpty(t, member.Teams, "the expansion must embed the member's team")
+	idx := slices.IndexFunc(listed.Users, func(u api.User) bool { return userID(t, u) == memberID })
+	require.GreaterOrEqual(t, idx, 0, helpers.MustMarshal(t, listed))
+	member := listed.Users[idx]
+
+	require.True(t, slices.ContainsFunc(member.Teams, func(team api.UserTeam) bool { return team.ID == memberTeamID }),
+		"expand teams must embed the member's team: %s", helpers.MustMarshal(t, member))
+	owner, ok := member.Metadata.LifecycleOwnerTeam.Get()
+	require.True(t, ok, "expand lifecycle_owner_team must embed the owner: %s", helpers.MustMarshal(t, member))
+	assert.Equal(t, memberTeamID, owner.ID)
 }
 
 // TestConsoleManagementBearerIgnoresStaleCookie pins the dual-scheme
