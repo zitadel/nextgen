@@ -13,26 +13,32 @@ import {
 } from "@zitadel/config/idp-catalog";
 import { applySsoToFlow, applySsoToSchema, type SsoSkipped } from "@zitadel/config/sso";
 
+import { createZitadelClient } from "../../lib/api-client";
 import { ZitadelError } from "../../lib/errors";
 import { stableStringify } from "../../lib/json";
 import {
   callbackUriFor,
   CONNECTION_SCHEMA_REF,
-  ENV_LOCAL,
   enabledMethods,
   IDPS_DIR,
   planConnection,
-  readFlowFiles,
   readConnectionFiles,
+  readFlowFiles,
   readSchemaFiles,
+  reportSecretOutcome,
   selectSchema,
   storeClientSecret,
   type SchemaFile,
   type SecretOutcome,
+  type SecretPublisher,
 } from "../../lib/idp";
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "../../lib/oclif";
-import { readDevelopmentIssuer, readZitadelConfig, readZitadelSecret } from "../../lib/project";
-import { publicCliCommand } from "../../lib/public-cli";
+import {
+  readDevelopmentIssuer,
+  readZitadelConfig,
+  readZitadelSecret,
+  type ZitadelSecret,
+} from "../../lib/project";
 import { readState } from "../../lib/sync/state";
 import { readStdin } from "../../lib/variables";
 
@@ -142,7 +148,12 @@ export default class SsoEnable extends BaseCommand {
       // `wx` rather than a plain write: planConnection decided this file does
       // not exist, and anything that appeared since is not ours to overwrite.
       await writeFile(target, `${stableStringify(connection)}\n`, { flag: "wx" });
-      secret = await storeClientSecret({ cwd, name: variable, value: secretValue });
+      secret = await storeClientSecret({
+        cwd,
+        name: variable,
+        value: secretValue,
+        publish: this.publisher(secretFile),
+      });
       consola.success(`Wrote ${plan.path}`);
     }
 
@@ -158,24 +169,7 @@ export default class SsoEnable extends BaseCommand {
       consola.info(`${schema.name} and its login flow already offer ${entry.display_name}`);
     }
     if (secret) {
-      if (secret.stored) {
-        consola.success(`Stored ${variable} in ${ENV_LOCAL}`);
-      } else if (secret.reason === "already-set") {
-        consola.warn(
-          `${variable} already has a value in ${ENV_LOCAL} and was left alone. Edit it yourself to change it.`,
-        );
-      } else if (secret.reason === "deferred") {
-        consola.warn(`${variable} has no value yet.`);
-      } else {
-        consola.warn(
-          `${variable} was not written: ${ENV_LOCAL} is not ignored by git. Set it yourself, or ignore that file first.`,
-        );
-      }
-      // The engine resolves `${{ NAME }}` from the environment's variables,
-      // not from this file, so say the step that actually makes sign-in work.
-      consola.info(
-        `Publish it with: ${publicCliCommand(`variables set ${variable} --secret`, this.meta.cliVersion)}`,
-      );
+      reportSecretOutcome(secret, this.meta.cliVersion);
     }
 
     return this.emit({
@@ -190,17 +184,44 @@ export default class SsoEnable extends BaseCommand {
           changed: edits.written,
           skipped: edits.skipped,
         }),
-        // `variables set` first: the connection references the secret as
-        // `${{ NAME }}` and the engine resolves that from the environment's
-        // variables, so publishing the configuration without it leaves a button
-        // that fails at token exchange. An ok result carries its follow-ups in
-        // data.next_commands (errors use the top-level nextCommands instead).
-        next_commands: [`variables set ${variable} --secret`, "plan", "apply"],
+        // `variables set` only when the secret did not reach the project:
+        // the connection references it as `${{ NAME }}` and the engine
+        // resolves that from the project's variables, so a button whose
+        // credential never arrived fails at token exchange. An ok result
+        // carries its follow-ups in data.next_commands (errors use the
+        // top-level nextCommands instead).
+        next_commands: [
+          ...(secret !== undefined && secret.published !== "stored"
+            ? [`variables set ${variable} --secret`]
+            : []),
+          "plan",
+          "apply",
+        ],
       },
       pretty: `Enabled ${entry.display_name} for ${schema.name}`,
     });
   }
 
+  /**
+   * How the captured secret reaches the project, or `undefined` when there is
+   * no project behind this run: `--source mock` answers from fixtures and has
+   * no variables to write. The connection is built here rather than taken from
+   * `OwnerCommand.connect` because this command addresses the local Project it
+   * was pointed at, not an owner the developer named.
+   */
+  private publisher(secret: ZitadelSecret): SecretPublisher | undefined {
+    const { source } = this.meta;
+    if (source === "mock") {
+      return undefined;
+    }
+    const client = createZitadelClient({ baseUrl: source, token: secret.project_secret });
+    return async (name, value) => {
+      await client.updateVariables(
+        { [name]: { value, secret: true } },
+        { project_id: secret.project_id },
+      );
+    };
+  }
 
   /**
    * Enable the provider in the schema and every login flow that runs against
@@ -275,7 +296,11 @@ export default class SsoEnable extends BaseCommand {
       secret:
         input.secret === undefined
           ? null
-          : { variable: input.secret.name, stored: input.secret.stored },
+          : {
+              variable: input.secret.name,
+              published: input.secret.published,
+              mirrored: input.secret.mirrored,
+            },
     };
   }
 

@@ -32,7 +32,13 @@ import {
   claimWindowDeadline,
 } from "../../lib/claim-state";
 import { toZitadelError, ZitadelError } from "../../lib/errors";
-import { IDPS_DIR, storeClientSecret, type SecretOutcome } from "../../lib/idp";
+import {
+  IDPS_DIR,
+  reportSecretOutcome,
+  storeClientSecret,
+  type SecretOutcome,
+  type SecretPublisher,
+} from "../../lib/idp";
 import { brandingGuidanceAction } from "../../lib/journey-guidance";
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "../../lib/oclif";
 import { serverKind } from "../../lib/oclif/server-kind";
@@ -420,23 +426,21 @@ export default class Setup extends BaseCommand {
     });
 
     // After the connection exists, not before: the name belongs in
-    // `.env.example` only once something references it. The value is written
-    // only where git cannot pick it up, and a refusal is reported rather than
-    // failing setup — everything else is already provisioned, and the
-    // developer can set the variable themselves.
+    // `.env.example` only once something references it. The value goes to the
+    // project's variables, which is where the engine resolves the connection's
+    // `${{ NAME }}` from — against Zitadel Cloud as much as against a local
+    // server. A refusal is reported rather than failing setup: everything else
+    // is already provisioned, and `variables set` publishes it later.
     let ssoSecret: SecretOutcome | undefined;
     if (answers.sso && !dryRun) {
       const variable = clientSecretVariableName(answers.sso.provider);
-      ssoSecret = await storeClientSecret({ cwd, name: variable, value: answers.sso.secret });
-      if (ssoSecret.stored) {
-        consola.success(`Stored ${variable} in .env.local`);
-      } else {
-        consola.warn(
-          ssoSecret.reason === "deferred"
-            ? `${variable} has no value yet. Set it in .env.local before signing in.`
-            : `${variable} was not written: .env.local is not ignored by git. Set it yourself, or ignore that file first.`,
-        );
-      }
+      ssoSecret = await storeClientSecret({
+        cwd,
+        name: variable,
+        value: answers.sso.secret,
+        publish: ssoSecretPublisher(answers.server, project),
+      });
+      reportSecretOutcome(ssoSecret, this.meta.cliVersion);
     }
 
     if (!dryRun) {
@@ -633,14 +637,19 @@ export default class Setup extends BaseCommand {
         // agents can verify what setup published without diffing the repo.
         design: answers.design ?? null,
         // The provider enabled during scaffolding, or null. `secret` reports
-        // only whether a value was stored, never the value itself.
+        // where the value went, never the value itself — `published` is the
+        // one that decides whether the provider button works.
         sso: answers.sso
           ? {
               provider: answers.sso.provider,
               client_id: answers.sso.clientId,
               connection: `.zitadel/idps/${answers.sso.provider}.json`,
               secret: ssoSecret
-                ? { variable: ssoSecret.name, stored: ssoSecret.stored }
+                ? {
+                    variable: ssoSecret.name,
+                    published: ssoSecret.published,
+                    mirrored: ssoSecret.mirrored,
+                  }
                 : null,
             }
           : null,
@@ -857,6 +866,27 @@ function retryOptionsFromFlags(flags: {
       flags.sso !== undefined && flags["sso-client-id"] !== undefined
         ? { provider: flags.sso, clientId: flags["sso-client-id"] }
         : undefined,
+  };
+}
+
+/**
+ * How the captured client secret reaches the project just created.
+ *
+ * `undefined` when there is no project behind the run — `--server mock`
+ * answers from fixtures and has no variables to write. The freshly minted
+ * project credentials are used directly: setup has them in hand and nothing
+ * has been claimed yet, so there is no owner for the developer to name.
+ */
+function ssoSecretPublisher(
+  server: string,
+  project: CreateProject201,
+): SecretPublisher | undefined {
+  if (server === "mock") {
+    return undefined;
+  }
+  const client = createZitadelClient({ baseUrl: server, token: project.project_secret });
+  return async (name, value) => {
+    await client.updateVariables({ [name]: { value, secret: true } }, { project_id: project.id });
   };
 }
 

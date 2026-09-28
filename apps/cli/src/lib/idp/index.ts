@@ -33,6 +33,8 @@ export {
   isSafeForSecrets,
   mergeEnvFile,
   type SecretOutcome,
+  type SecretPublisher,
+  reportSecretOutcome,
   storeClientSecret,
 } from "./credentials";
 

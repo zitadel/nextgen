@@ -6,7 +6,13 @@ import { promisify } from "node:util";
 
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { ENV_LOCAL, isSafeForSecrets, mergeEnvFile, storeClientSecret } from "../../../../src/lib/idp";
+import {
+  ENV_LOCAL,
+  isSafeForSecrets,
+  mergeEnvFile,
+  storeClientSecret,
+  type SecretPublisher,
+} from "../../../../src/lib/idp";
 
 const exec = promisify(execFile);
 
@@ -77,35 +83,86 @@ describe("mergeEnvFile", () => {
 describe("storeClientSecret", () => {
   const name = "GOOGLE_CLIENT_SECRET";
 
-  it("writes the value only when the file is ignored", async () => {
+  /** A publisher that records what it was handed, standing in for the API. */
+  function recorder(): { calls: Array<[string, string]>; publish: SecretPublisher } {
+    const calls: Array<[string, string]> = [];
+    return {
+      calls,
+      publish: async (variable, value) => {
+        calls.push([variable, value]);
+      },
+    };
+  }
+
+  it("publishes the value to the project and keeps a copy locally", async () => {
     await initRepo(".env*\n!.env.example\n");
-    expect(await storeClientSecret({ cwd, name, value: "s3cret" })).toEqual({ stored: true, name });
+    const { calls, publish } = recorder();
+    expect(await storeClientSecret({ cwd, name, value: "s3cret", publish })).toEqual({
+      name,
+      published: "stored",
+      mirrored: "stored",
+    });
+    expect(calls).toEqual([[name, "s3cret"]]);
     expect(await readFile(join(cwd, ENV_LOCAL), "utf8")).toContain("GOOGLE_CLIENT_SECRET=s3cret");
     expect(await readFile(join(cwd, ".env.example"), "utf8")).toBe("GOOGLE_CLIENT_SECRET=\n");
   });
 
-  it("writes no value when the file is not ignored, and says why", async () => {
+  it("still publishes when the local copy cannot be written", async () => {
     await initRepo("node_modules\n");
-    expect(await storeClientSecret({ cwd, name, value: "s3cret" })).toEqual({
-      stored: false,
+    const { calls, publish } = recorder();
+    expect(await storeClientSecret({ cwd, name, value: "s3cret", publish })).toEqual({
       name,
-      reason: "not-ignored",
+      published: "stored",
+      mirrored: "not-ignored",
     });
+    // The project is what makes sign-in work, so a file git would commit
+    // costs the copy, never the publish.
+    expect(calls).toEqual([[name, "s3cret"]]);
     await expect(readFile(join(cwd, ENV_LOCAL), "utf8")).rejects.toThrow();
     // The name is still discoverable, just without its value.
     expect(await readFile(join(cwd, ".env.example"), "utf8")).toBe("GOOGLE_CLIENT_SECRET=\n");
   });
 
+  it("reports a refused publish instead of raising it", async () => {
+    await initRepo(".env*\n!.env.example\n");
+    const publish: SecretPublisher = async () => {
+      throw new Error("403");
+    };
+    expect(await storeClientSecret({ cwd, name, value: "s3cret", publish })).toEqual({
+      name,
+      published: "failed",
+      // The copy is still kept: the developer needs the value to publish it
+      // themselves, and a secret variable can never be read back.
+      mirrored: "stored",
+    });
+  });
+
   it("stores nothing when no value is supplied", async () => {
     await initRepo(".env*\n!.env.example\n");
-    expect(await storeClientSecret({ cwd, name })).toEqual({ stored: false, name, reason: "deferred" });
+    const { calls, publish } = recorder();
+    expect(await storeClientSecret({ cwd, name, publish })).toEqual({
+      name,
+      published: "deferred",
+      mirrored: "deferred",
+    });
+    expect(calls).toEqual([]);
     await expect(readFile(join(cwd, ENV_LOCAL), "utf8")).rejects.toThrow();
+  });
+
+  it("defers the publish when there is no project behind the run", async () => {
+    await initRepo(".env*\n!.env.example\n");
+    expect(await storeClientSecret({ cwd, name, value: "s3cret" })).toEqual({
+      name,
+      published: "deferred",
+      mirrored: "stored",
+    });
   });
 
   it("never replaces a secret the developer already set", async () => {
     await initRepo(".env*\n!.env.example\n");
     await writeFile(join(cwd, ENV_LOCAL), "GOOGLE_CLIENT_SECRET=original\n", "utf8");
-    await storeClientSecret({ cwd, name, value: "replacement" });
+    const outcome = await storeClientSecret({ cwd, name, value: "replacement" });
+    expect(outcome.mirrored).toBe("already-set");
     expect(await readFile(join(cwd, ENV_LOCAL), "utf8")).toBe("GOOGLE_CLIENT_SECRET=original\n");
   });
 });

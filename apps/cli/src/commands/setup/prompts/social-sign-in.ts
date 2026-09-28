@@ -111,11 +111,15 @@ export class SocialSignInPrompt implements SetupPrompt {
 
   /**
    * Empty is a deliberate answer: the connection is scaffolded either way and
-   * the developer may prefer to set the value themselves later.
+   * the developer may prefer to publish the value themselves later.
+   *
+   * The message names the project rather than a file because that is where the
+   * value has to land — the connection references it as `${{ NAME }}` and the
+   * engine resolves that from the project's variables.
    */
   private async askSecret(provider: string): Promise<string | undefined> {
     const answer = await password({
-      message: `Client secret (stored in .env.local as ${clientSecretVariableName(provider)}, Enter to skip)`,
+      message: `Client secret (published to the project as ${clientSecretVariableName(provider)}, Enter to skip)`,
     });
     bail(answer);
     const value = String(answer ?? "").trim();

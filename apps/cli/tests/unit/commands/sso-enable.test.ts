@@ -212,8 +212,45 @@ describe("sso enable secret handling", () => {
     expect(result.exitCode).toBe(0);
     const env = await readFile(join(cwd, ".env.local"), "utf8");
     expect(env).toContain("GOOGLE_CLIENT_SECRET=piped-secret");
-    // The value is never echoed back, only whether it was stored.
+    // The value is never echoed back, only where it went.
     expect(result.stdout).not.toContain("piped-secret");
+  });
+
+  it("reports a publish the project never received, and how to retry it", async () => {
+    // No server is listening on the Project's own address here, which is the
+    // shape of every failure that matters: the connection references the
+    // secret as `${{ NAME }}`, so a button whose credential never arrived
+    // fails at token exchange rather than at enable time. The command must
+    // say so and hand back the command that fixes it, not exit 0 quietly.
+    const cwd = await makeProject();
+
+    const result = await withStdin("piped-secret", () =>
+      runCliForTest([
+        "sso",
+        "enable",
+        "--cwd",
+        cwd,
+        "--provider",
+        "google",
+        "--json",
+        "--client-id",
+        "1234-abc.apps.googleusercontent.com",
+        "--non-interactive",
+      ]),
+    );
+
+    expect(result.exitCode).toBe(0);
+    const json = parseJson(result.stdout) as {
+      data: { secret: { published: string; mirrored: string }; next_commands: string[] };
+    };
+    expect(json.data.secret).toEqual({
+      variable: "GOOGLE_CLIENT_SECRET",
+      published: "failed",
+      // The copy stays: a secret variable can be replaced but never read
+      // back, so it is the only record of what to publish.
+      mirrored: "stored",
+    });
+    expect(json.data.next_commands).toContain("variables set GOOGLE_CLIENT_SECRET --secret");
   });
 
   it("does not block when a scripted run pipes nothing in", async () => {
@@ -227,8 +264,12 @@ describe("sso enable secret handling", () => {
     );
 
     expect(result.exitCode).toBe(0);
-    const json = parseJson(result.stdout) as { data: { secret: { stored: boolean } } };
-    expect(json.data.secret.stored).toBe(false);
+    const json = parseJson(result.stdout) as {
+      data: { secret: { published: string; mirrored: string } };
+    };
+    // Nothing was piped in, so there is nothing to publish and nothing to
+    // copy — and that is not a failure: the connection is written either way.
+    expect(json.data.secret).toMatchObject({ published: "deferred", mirrored: "deferred" });
   });
 });
 
