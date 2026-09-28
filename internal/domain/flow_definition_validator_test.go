@@ -1968,11 +1968,15 @@ func TestValidateSsoCreationReachability(t *testing.T) {
 				{
 					Name:   "identifier",
 					Fields: []domain.Field{"email"},
+					// identity_unknown only fires from callback resolution, so
+					// the step has to actually offer a provider to reach it.
+					SSOProviders: []string{"google"},
 					Actions: []domain.FlowStepAction{
 						{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
 					},
 					Transitions: map[string]domain.FlowStepTransition{
 						"submit":           {Target: "done"},
+						"callback":         {Target: "done"},
 						"identity_unknown": {Target: "register-sso"},
 					},
 				},
@@ -2007,11 +2011,15 @@ func TestValidateSsoCreationReachability(t *testing.T) {
 				{
 					Name:   "identifier",
 					Fields: []domain.Field{"email"},
+					// identity_unknown only fires from callback resolution, so
+					// the step has to actually offer a provider to reach it.
+					SSOProviders: []string{"google"},
 					Actions: []domain.FlowStepAction{
 						{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
 					},
 					Transitions: map[string]domain.FlowStepTransition{
 						"submit":           {Target: "done"},
+						"callback":         {Target: "done"},
 						"identity_unknown": {Target: "register-sso"},
 					},
 				},
@@ -2036,11 +2044,15 @@ func TestValidateSsoCreationReachability(t *testing.T) {
 				{
 					Name:   "identifier",
 					Fields: []domain.Field{"email"},
+					// identity_unknown only fires from callback resolution, so
+					// the step has to actually offer a provider to reach it.
+					SSOProviders: []string{"google"},
 					Actions: []domain.FlowStepAction{
 						{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
 					},
 					Transitions: map[string]domain.FlowStepTransition{
 						"submit":           {Target: "done"},
+						"callback":         {Target: "done"},
 						"identity_unknown": {Target: "register-sso"},
 					},
 				},
@@ -2070,11 +2082,15 @@ func TestValidateSsoCreationReachability(t *testing.T) {
 				{
 					Name:   "identifier",
 					Fields: []domain.Field{"email"},
+					// identity_unknown only fires from callback resolution, so
+					// the step has to actually offer a provider to reach it.
+					SSOProviders: []string{"google"},
 					Actions: []domain.FlowStepAction{
 						{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
 					},
 					Transitions: map[string]domain.FlowStepTransition{
 						"submit":           {Target: "done"},
+						"callback":         {Target: "done"},
 						"identity_unknown": {Target: "register-sso"},
 					},
 				},
