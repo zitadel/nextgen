@@ -58,31 +58,39 @@ func (h *Handler) DeleteUserByID(ctx context.Context, params api.DeleteUserByIDP
 	return &api.DeleteUserByIDNoContent{}, nil
 }
 
-// QueryUsers is the users list (ADR 031). It carries no project parameter: the
-// credential's home project (oauth2 secret or user-bound session) is the
-// only authority for which project's users are served. The scope check is
-// what keeps a browser-plane preview secret out. Results are newest-first
-// unless the request sorts otherwise.
-func (h *Handler) QueryUsers(ctx context.Context, req *api.QueryUsersRequest) (api.QueryUsersRes, error) {
+// QueryUsers is the users list (ADR 031, #1300 §2), defaulting to the
+// credential's own project. The scope check is what keeps a browser-plane
+// preview secret out. Results are newest-first unless the request sorts
+// otherwise.
+func (h *Handler) QueryUsers(ctx context.Context, req *api.QueryUsersRequest, params api.QueryUsersParams) (api.QueryUsersRes, error) {
 	scopeCtx, _ := GetScopeContext(ctx)
-	ctx, err := h.requireProjectListAccess(ctx, scopeCtx.ProjectID, userAccess, domain.ResourceKindUser)
+	projectID := string(params.ProjectID.Or(api.ProjectID(scopeCtx.ProjectID)))
+	ctx, err := h.requireProjectListAccess(ctx, projectID, userAccess, domain.ResourceKindUser)
 	if err != nil {
 		return nil, err
 	}
 
-	input := mapQueryUsersToService(scopeCtx.ProjectID, req)
+	input := mapQueryUsersToService(projectID, req)
+	// A Console session mints no scopes, so the expansion ceilings below would
+	// refuse it however much its grants allow. It skips them instead (#1300
+	// §4, relaxed): it has just passed the list check on this project, so an
+	// expansion only reads within a project it can list. Decided here, for
+	// this list, rather than in the shared ceiling, so another endpoint does
+	// not inherit it by accepting the cookie. Deriving the two permissions
+	// from the resolver is a follow-up (#1300).
+	session := scopeCtx.PrincipalType == domain.AuthzPrincipalTypeUser
 	// Expanding answers 403 rather than a silently missing property: a caller
 	// could not tell that from "this user has no teams". Filtering on team_id
 	// reads the same memberships by a different route — it answers "who is in
 	// this team", one page at a time — so it takes the same gate.
-	if input.IncludeTeams || filtersOnTeamID(req.Filter) {
+	if (input.IncludeTeams || filtersOnTeamID(req.Filter)) && !session {
 		if err := requireMembershipRead(ctx); err != nil {
 			return nil, err
 		}
 	}
 	// The owner team is a different resource under a different permission, so
 	// it is gated on its own rather than folded into the membership check.
-	if input.IncludeLifecycleOwnerTeam {
+	if input.IncludeLifecycleOwnerTeam && !session {
 		if err := requireTeamRead(ctx); err != nil {
 			return nil, err
 		}

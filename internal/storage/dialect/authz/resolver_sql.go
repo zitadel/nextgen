@@ -247,12 +247,22 @@ func writeListedObjectInConstraintTeam(w ArgWriter, env Env, params domain.Authz
 // empty, setID / memberID are bound arguments. Check, List, TTU, and
 // principal-match all use this helper so ADR 053's home-project switch is one edit.
 //
-// The correlated EXISTS is load-bearing, not a style choice. Rewriting it as
-// `set IN (SELECT e.set_id …)` sends the Spanner emulator's planner pathological
-// on the management-list predicate: TestListAuthzTeamScopedOnlyPartialView ran
-// 9m26s and timed out the lane, the same class of planner blowup recorded in the
-// #1007 / #1008 / #1009 history. This shape is the one CI has proven; do not
-// change it without a green Spanner lane.
+// The correlated EXISTS is the shape that performs, not a style choice.
+// Rewriting it as `set IN (SELECT e.set_id …)` sends the Spanner emulator's
+// planner pathological on the management-list predicate:
+// TestListAuthzTeamScopedOnlyPartialView ran 9m26s and timed out the lane, the
+// same class of planner blowup recorded in the #1007 / #1008 / #1009 history.
+// This shape is the one CI has proven; do not change it without a green Spanner
+// lane.
+//
+// Be aware that this test no longer catches it as sharply. It accounted for 94%
+// of the internal/api/integration_test package, so it was made serial, and
+// tests now delete their own projects when they finish. It therefore meets an
+// almost empty database instead of everything the package accumulated. The
+// blowup needs rows to show, so what is left is the Spanner lane's overall
+// duration. The other tests still run list predicates while the parallel phase
+// fills the tables, so a rewrite of this shape should still show up as the lane
+// getting dramatically slower rather than as one named test failing.
 //
 // Authorized-project discovery has no outer row to correlate to, so it writes
 // the IN form itself over writeMembershipEdgeMatch. The edge conditions live in

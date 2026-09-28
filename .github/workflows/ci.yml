@@ -245,6 +245,14 @@ jobs:
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.suites_console == 'true' }}
         run: env -u CI -u GITHUB_ACTIONS moon run console-e2e:e2e-embedded
 
+      # The same binary with the platform project bootstrapped (#1300): a
+      # platform operator signs up through the console and manages a granted
+      # customer project on the session cookie alone. Its own step, same
+      # rationale as above.
+      - name: Run console platform-project suite
+        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.suites_console == 'true' }}
+        run: env -u CI -u GITHUB_ACTIONS moon run console-e2e:e2e-platform
+
       - name: Validate version PR
         if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}
         run: env -u CI -u GITHUB_ACTIONS moon run release:version

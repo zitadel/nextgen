@@ -16,7 +16,7 @@ import {
 import { BRANDING_FILE_SCHEMA_REF, META_SCHEMA_DIR, metaSchemaFiles } from "@zitadel/config/meta-schemas";
 
 import { BRANDING_DIR } from "../../lib/branding";
-import { BRANDING_DESIGN_INFO } from "../../lib/branding/designs";
+import { BRANDING_DESIGN_INFO, resolveBrandingDesign } from "../../lib/branding/designs";
 import { ZitadelError } from "../../lib/errors";
 import { stableStringify } from "../../lib/json";
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "../../lib/oclif";
@@ -45,9 +45,11 @@ export default class BrandingEject extends BaseCommand {
   static override groupOrder = 4;
   static override flags = {
     force: Flags.boolean({ char: "f", description: "Overwrite an existing branding file." }),
+    // No oclif `options`: the retired designs (#1039) must reach
+    // resolveBrandingDesign to get their targeted error instead of oclif's
+    // generic "expected one of".
     design: Flags.string({
-      description: `Design to start from (default: ${DEFAULT_BRANDING_DESIGN}).`,
-      options: [...BRANDING_DESIGNS],
+      description: `Design to start from: ${BRANDING_DESIGNS.join(" or ")} (default: ${DEFAULT_BRANDING_DESIGN}).`,
     }),
   };
 
@@ -55,6 +57,10 @@ export default class BrandingEject extends BaseCommand {
     const { flags } = await this.parse(BrandingEject);
     await this.toMeta(flags);
     const { cwd, force, nonInteractive } = this.meta;
+    const flagDesign =
+      flags.design === undefined
+        ? undefined
+        : resolveBrandingDesign(flags.design, this.meta.cliVersion);
 
     if (!(await hasZitadelConfig(cwd))) {
       throw new ZitadelError("E_VALIDATION", "This directory is not a Zitadel project", {
@@ -63,7 +69,7 @@ export default class BrandingEject extends BaseCommand {
       });
     }
 
-    const design = flags.design ?? (await this.promptDesign(nonInteractive));
+    const design = flagDesign ?? (await this.promptDesign(nonInteractive));
     this.recordTelemetry({ design, force });
     const { branding, template } = getDefaultBrandingConfig(design);
 

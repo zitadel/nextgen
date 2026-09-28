@@ -17,21 +17,25 @@ secret-handling caveat live in [`README.md`](README.md).
   the built Go binary serves the console, hosted login, and API from one
   origin, with no Vite proxy. This is the only lane that proves the API base
   and Go mux agree on the request path customers receive.
+- `moon run console-e2e:e2e-platform` — **platform-project coverage**: the
+  same binary with the platform project bootstrapped (the server default). An
+  operator signs up through the console, is granted the harness project by
+  email, and uses the screens on the session cookie alone.
 
-All three tasks carry `runInCI: false` — that only keeps them out of moon's
-automatic selection. The `full-pr` job explicitly runs `e2e-real` and
-`e2e-embedded` in separate, sequential workflow steps; the shell smoke stays
-local-only. The `@zitadel/testing` interaction is documented in
+All four tasks carry `runInCI: false` — that only keeps them out of moon's
+automatic selection. The `full-pr` job explicitly runs `e2e-real`,
+`e2e-embedded` and `e2e-platform` in separate, sequential workflow steps; the
+shell smoke stays local-only. The `@zitadel/testing` interaction is documented in
 [`packages/testing/AGENTS.md`](../../packages/testing/AGENTS.md).
 
 ## Hard rules
 
-- **Port pinning**: `REAL_ZITADEL_PORT: 8093` and
-  `EMBEDDED_ZITADEL_PORT: 8095` are fixed pins deliberately outside the
+- **Port pinning**: `REAL_ZITADEL_PORT: 8093`, `EMBEDDED_ZITADEL_PORT: 8095`
+  and `PLATFORM_ZITADEL_PORT: 8097` are fixed pins deliberately outside the
   deferred-bind blocks — the full doctrine (why config-time ports cannot live
   in the dynamically scanned reservation domains, and the neighbor map) is in
   [`moon.yml`](moon.yml) and `apps/cli-journey-e2e/scripts/ports.mjs`. Do not
-  move either lane onto a scanned block, and sweep orphans with
+  move any of these lanes onto a scanned block, and sweep orphans with
   `moon run workspace:cli -- stop --all`.
 - **Secrets**: the `.zitadel-testing/` handshake contains the project secret —
   gitignored, never uploaded as a CI artifact. Failure artifacts are limited

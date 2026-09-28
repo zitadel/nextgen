@@ -6,6 +6,7 @@ post:
   security:
     - oauth2:
         - team.write
+    - nextgenSession: []
   parameters:
     - $ref: ../../components/parameters/project-id.yaml
   requestBody:
