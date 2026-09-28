@@ -61,6 +61,11 @@ func toAPIEnvironment(env *domain.Environment) api.Environment {
 		ProjectID: api.ProjectID(env.ProjectID),
 		Name:      api.EnvironmentName(env.Name),
 		CreatedAt: env.CreatedAt,
+		// Explicitly null, not the zero value, which would encode as an
+		// empty object. Hydration arrives with the deployments service
+		// (#532); until a deployment can be created, no environment runs
+		// anything.
+		CurrentDeployment: api.NilCurrentDeployment{Null: true},
 	}
 }
 
