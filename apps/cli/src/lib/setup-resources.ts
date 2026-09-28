@@ -94,7 +94,6 @@ export async function materializeSetupResources(opts: {
   const connection = opts.sso
     ? scaffoldConnection({
         provider: opts.sso.provider,
-        clientId: opts.sso.clientId,
         schemaProperties: Object.keys((schemaTemplate.properties as object | undefined) ?? {}),
         schemaRef: CONNECTION_SCHEMA_REF,
       })

@@ -6,6 +6,7 @@ import { cancel, isCancel, password, text } from "@clack/prompts";
 import { consola } from "consola";
 
 import {
+  clientIdVariableName,
   clientSecretVariableName,
   idpCatalogEntry,
   IDP_PROVIDERS,
@@ -22,9 +23,12 @@ import {
   enabledMethods,
   IDPS_DIR,
   planConnection,
+  publishClientId,
+  type PublishState,
   readConnectionFiles,
   readFlowFiles,
   readSchemaFiles,
+  reportClientIdOutcome,
   reportSecretOutcome,
   selectSchema,
   storeClientSecret,
@@ -111,7 +115,14 @@ export default class SsoEnable extends BaseCommand {
       return this.emit({
         status: "skipped",
         reason: "dry-run",
-        data: this.payload({ provider, schema: schema.name, plan, callbackUri, secret: undefined }),
+        data: this.payload({
+          provider,
+          schema: schema.name,
+          plan,
+          callbackUri,
+          secret: undefined,
+          clientId: undefined,
+        }),
         pretty: `Would ${plan.action} ${plan.action === "reuse" ? plan.file.path : plan.path}`,
       });
     }
@@ -123,7 +134,9 @@ export default class SsoEnable extends BaseCommand {
     // interrupted after the connection file was written, both arrive here.
     const reusing = plan.action === "reuse";
     const variable = clientSecretVariableName(plan.slug);
+    const idVariable = clientIdVariableName(plan.slug);
     let secret: SecretOutcome | undefined;
+    let clientIdState: PublishState | undefined;
 
     if (reusing) {
       consola.success(`Reusing ${plan.file.path}`);
@@ -136,9 +149,9 @@ export default class SsoEnable extends BaseCommand {
         flags["client-id"] ?? (await this.askClientId(entry.display_name, nonInteractive));
       const secretValue = await this.askClientSecret(variable, nonInteractive);
 
+      const publish = this.publisher(secretFile);
       const connection = scaffoldConnection({
         provider,
-        clientId,
         slug: plan.slug,
         schemaProperties: schema.properties,
         schemaRef: CONNECTION_SCHEMA_REF,
@@ -148,12 +161,10 @@ export default class SsoEnable extends BaseCommand {
       // `wx` rather than a plain write: planConnection decided this file does
       // not exist, and anything that appeared since is not ours to overwrite.
       await writeFile(target, `${stableStringify(connection)}\n`, { flag: "wx" });
-      secret = await storeClientSecret({
-        cwd,
-        name: variable,
-        value: secretValue,
-        publish: this.publisher(secretFile),
-      });
+      // The id first: it is the half the developer can read back afterwards,
+      // and a connection missing either credential fails the same way.
+      clientIdState = await publishClientId({ name: idVariable, value: clientId, publish });
+      secret = await storeClientSecret({ cwd, name: variable, value: secretValue, publish });
       consola.success(`Wrote ${plan.path}`);
     }
 
@@ -168,6 +179,9 @@ export default class SsoEnable extends BaseCommand {
     if (edits.written.length === 0 && edits.skipped.length === 0) {
       consola.info(`${schema.name} and its login flow already offer ${entry.display_name}`);
     }
+    if (clientIdState) {
+      reportClientIdOutcome(idVariable, clientIdState, this.meta.cliVersion);
+    }
     if (secret) {
       reportSecretOutcome(secret, this.meta.cliVersion);
     }
@@ -181,6 +195,7 @@ export default class SsoEnable extends BaseCommand {
           plan,
           callbackUri,
           secret,
+          clientId: clientIdState,
           changed: edits.written,
           skipped: edits.skipped,
         }),
@@ -191,6 +206,9 @@ export default class SsoEnable extends BaseCommand {
         // carries its follow-ups in data.next_commands (errors use the
         // top-level nextCommands instead).
         next_commands: [
+          ...(clientIdState !== undefined && clientIdState !== "stored"
+            ? [`variables set ${idVariable}`]
+            : []),
           ...(secret !== undefined && secret.published !== "stored"
             ? [`variables set ${variable} --secret`]
             : []),
@@ -203,7 +221,7 @@ export default class SsoEnable extends BaseCommand {
   }
 
   /**
-   * How the captured secret reaches the project, or `undefined` when there is
+   * How the connection's credentials reach the project, or `undefined` when there is
    * no project behind this run: `--source mock` answers from fixtures and has
    * no variables to write. The connection is built here rather than taken from
    * `OwnerCommand.connect` because this command addresses the local Project it
@@ -215,9 +233,9 @@ export default class SsoEnable extends BaseCommand {
       return undefined;
     }
     const client = createZitadelClient({ baseUrl: source, token: secret.project_secret });
-    return async (name, value) => {
+    return async (name, value, { secret: isSecret }) => {
       await client.updateVariables(
-        { [name]: { value, secret: true } },
+        { [name]: { value, secret: isSecret } },
         { project_id: secret.project_id },
       );
     };
@@ -279,6 +297,7 @@ export default class SsoEnable extends BaseCommand {
     plan: { action: string; slug: string; path?: string; file?: { path: string } };
     callbackUri: string;
     secret: SecretOutcome | undefined;
+    clientId: PublishState | undefined;
     changed?: string[];
     skipped?: SsoSkipped[];
   }): Record<string, unknown> {
@@ -293,6 +312,10 @@ export default class SsoEnable extends BaseCommand {
       callback_uri: input.callbackUri,
       changed: input.changed ?? [],
       untouched: (input.skipped ?? []).map((s) => s.region),
+      client_id:
+        input.clientId === undefined
+          ? null
+          : { variable: clientIdVariableName(input.plan.slug), published: input.clientId },
       secret:
         input.secret === undefined
           ? null

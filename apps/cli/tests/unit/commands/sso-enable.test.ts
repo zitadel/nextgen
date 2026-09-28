@@ -124,7 +124,10 @@ describe("sso enable", () => {
     expect(payload.data.callback_uri).toBe("http://localhost:3000/__nextgen/idp/callback");
 
     const written = JSON.parse(await readFile(join(cwd, ".zitadel/idps/google.json"), "utf8"));
-    expect(written.oidc.client_id).toBe("1234-abc.apps.googleusercontent.com");
+    // Neither credential is a literal: each environment registers its own
+    // OAuth application, so both are references to project variables and one
+    // connection file serves every environment.
+    expect(written.oidc.client_id).toBe("${{ GOOGLE_CLIENT_ID }}");
     // Only a reference, whatever the developer typed.
     expect(written.oidc.client_secret).toBe("${{ GOOGLE_CLIENT_SECRET }}");
     // The default schema defines only email, so the name claims are dropped.

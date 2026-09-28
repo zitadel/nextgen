@@ -80,26 +80,43 @@ export function idpCatalogEntry(provider: string): IdpCatalogEntry {
 }
 
 /**
- * The environment-variable name a connection's `client_secret` references:
- * the slug uppercased with every non-alphanumeric replaced by `_`, suffixed
- * `_CLIENT_SECRET`. A slug may start with a digit, which no shell accepts as
- * the first character of a name, so such a name is prefixed with `_`.
- *
- * The connection file stores only the reference (`${{ NAME }}`), never the
- * value; the value lives in `.env.local`.
+ * A variable name for one of a connection's credentials: the slug uppercased
+ * with every non-alphanumeric replaced by `_`, then the suffix. A slug may
+ * start with a digit, which no shell accepts as the first character of a name,
+ * so such a name is prefixed with `_`.
  */
-export function clientSecretVariableName(slug: string): string {
-  const name = `${slug.toUpperCase().replace(/[^A-Z0-9]/g, "_")}_CLIENT_SECRET`;
+function credentialVariableName(slug: string, suffix: string): string {
+  const name = `${slug.toUpperCase().replace(/[^A-Z0-9]/g, "_")}_${suffix}`;
   return /^[0-9]/.test(name) ? `_${name}` : name;
 }
 
+/** The variable a connection's `client_secret` references. */
+export function clientSecretVariableName(slug: string): string {
+  return credentialVariableName(slug, "CLIENT_SECRET");
+}
+
+/** The variable a connection's `client_id` references. */
+export function clientIdVariableName(slug: string): string {
+  return credentialVariableName(slug, "CLIENT_ID");
+}
+
 /**
- * The `${{ NAME }}` reference written to a connection's `client_secret`, as
+ * The `${{ NAME }}` reference written to a credential field, as
  * `idp-connection.json` requires: a whole-value placeholder, with no text
  * around it that would be rendered into the resolved credential.
  */
+function variableReference(name: string): string {
+  return `\${{ ${name} }}`;
+}
+
+/** The reference written to a connection's `client_secret`. */
 export function clientSecretReference(slug: string): string {
-  return `\${{ ${clientSecretVariableName(slug)} }}`;
+  return variableReference(clientSecretVariableName(slug));
+}
+
+/** The reference written to a connection's `client_id`. */
+export function clientIdReference(slug: string): string {
+  return variableReference(clientIdVariableName(slug));
 }
 
 /**
@@ -121,16 +138,26 @@ export function claimMappingFor(
 }
 
 /**
- * Compose a connection document from a catalog entry and the prompted client
- * id. Pure: it returns the object `zitadel setup` writes to
- * `.zitadel/idps/<slug>.json`, and performs no IO.
+ * Compose a connection document from a catalog entry. Pure: it returns the
+ * object `zitadel setup` writes to `.zitadel/idps/<slug>.json`, and performs
+ * no IO.
  *
- * The secret is never a parameter — only the `${{ NAME }}` reference is
- * written, so a value cannot reach the committed file through this path.
+ * Neither credential is written into the document. Both are `${{ NAME }}`
+ * references to project variables, for different reasons:
+ *
+ * - The **secret** must not be committed at all. The file goes into git and
+ *   config revisions are immutable, so a literal could never be scrubbed.
+ * - The **client id** is public and could be a literal, but each environment
+ *   registers its own OAuth application, so a literal would force one
+ *   connection file per environment and defeat the indirection. The API's
+ *   own schema says as much (`idp-connection.yaml`).
+ *
+ * Neither value is a parameter, so neither can reach the committed file
+ * through this path. Both are published as project variables instead — the
+ * client id as an ordinary one, readable afterwards; the secret as a secret.
  */
 export function scaffoldConnection(options: {
   readonly provider: string;
-  readonly clientId: string;
   readonly schemaProperties: Iterable<string>;
   /** Slug to write under; defaults to the catalog key. */
   readonly slug?: string;
@@ -144,7 +171,7 @@ export function scaffoldConnection(options: {
     unknown
   >;
   const credentials = {
-    client_id: options.clientId,
+    client_id: clientIdReference(slug),
     client_secret: clientSecretReference(slug),
   };
   const claimMapping = claimMappingFor(entry, options.schemaProperties);

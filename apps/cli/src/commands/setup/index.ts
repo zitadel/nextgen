@@ -13,6 +13,7 @@ import {
   type SetupUseCase,
 } from "@zitadel/config/defaults";
 import {
+  clientIdVariableName,
   clientSecretVariableName,
   idpCatalogEntry,
   IDP_PROVIDERS,
@@ -32,6 +33,9 @@ import {
 import { toZitadelError, ZitadelError } from "../../lib/errors";
 import {
   IDPS_DIR,
+  publishClientId,
+  type PublishState,
+  reportClientIdOutcome,
   reportSecretOutcome,
   storeClientSecret,
   type SecretOutcome,
@@ -425,14 +429,18 @@ export default class Setup extends BaseCommand {
     // server. A refusal is reported rather than failing setup: everything else
     // is already provisioned, and `variables set` publishes it later.
     let ssoSecret: SecretOutcome | undefined;
+    let ssoClientId: PublishState | undefined;
     if (answers.sso && !dryRun) {
+      const idVariable = clientIdVariableName(answers.sso.provider);
       const variable = clientSecretVariableName(answers.sso.provider);
-      ssoSecret = await storeClientSecret({
-        cwd,
-        name: variable,
-        value: answers.sso.secret,
-        publish: ssoSecretPublisher(answers.server, project),
+      const publish = ssoCredentialPublisher(answers.server, project);
+      ssoClientId = await publishClientId({
+        name: idVariable,
+        value: answers.sso.clientId,
+        publish,
       });
+      ssoSecret = await storeClientSecret({ cwd, name: variable, value: answers.sso.secret, publish });
+      reportClientIdOutcome(idVariable, ssoClientId, this.meta.cliVersion);
       reportSecretOutcome(ssoSecret, this.meta.cliVersion);
     }
 
@@ -620,6 +628,9 @@ export default class Setup extends BaseCommand {
               provider: answers.sso.provider,
               client_id: answers.sso.clientId,
               connection: `.zitadel/idps/${answers.sso.provider}.json`,
+              client_id_variable: ssoClientId
+                ? { variable: clientIdVariableName(answers.sso.provider), published: ssoClientId }
+                : null,
               secret: ssoSecret
                 ? {
                     variable: ssoSecret.name,
@@ -840,14 +851,14 @@ function retryOptionsFromFlags(flags: {
 }
 
 /**
- * How the captured client secret reaches the project just created.
+ * How the connection's credentials reach the project just created.
  *
  * `undefined` when there is no project behind the run — `--server mock`
  * answers from fixtures and has no variables to write. The freshly minted
  * project credentials are used directly: setup has them in hand and nothing
  * has been claimed yet, so there is no owner for the developer to name.
  */
-function ssoSecretPublisher(
+function ssoCredentialPublisher(
   server: string,
   project: CreateProject201,
 ): SecretPublisher | undefined {
@@ -855,8 +866,8 @@ function ssoSecretPublisher(
     return undefined;
   }
   const client = createZitadelClient({ baseUrl: server, token: project.project_secret });
-  return async (name, value) => {
-    await client.updateVariables({ [name]: { value, secret: true } }, { project_id: project.id });
+  return async (name, value, { secret }) => {
+    await client.updateVariables({ [name]: { value, secret } }, { project_id: project.id });
   };
 }
 

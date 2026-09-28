@@ -101,14 +101,21 @@ export async function mergeEnvFile(
 }
 
 /**
- * Publishes one secret variable to the project.
+ * Publishes one variable to the project.
  *
  * Injected rather than built here: this module knows about files and git, and
  * giving it an API client as well would make the one place that decides where
  * a credential may be written depend on the whole platform surface. Both
  * callers already hold a connection to the project they just addressed.
  */
-export type SecretPublisher = (name: string, value: string) => Promise<void>;
+export type SecretPublisher = (
+  name: string,
+  value: string,
+  options: { readonly secret: boolean },
+) => Promise<void>;
+
+/** Whether a value reached the project's variables. */
+export type PublishState = "stored" | "deferred" | "failed";
 
 /** Where a captured client secret ended up, for the command's summary. */
 export type SecretOutcome = {
@@ -125,7 +132,7 @@ export type SecretOutcome = {
    * `failed` when the platform refused the call. Neither is fatal — the
    * connection is written either way and `variables set` publishes it later.
    */
-  readonly published: "stored" | "deferred" | "failed";
+  readonly published: PublishState;
 
   /**
    * `.env.local`, where the value is mirrored so the developer keeps a copy of
@@ -178,17 +185,36 @@ async function publishSecret(
   publish: SecretPublisher | undefined,
   name: string,
   value: string,
-): Promise<SecretOutcome["published"]> {
+  secret = true,
+): Promise<PublishState> {
   if (publish === undefined) {
     return "deferred";
   }
   try {
-    await publish(name, value);
+    await publish(name, value, { secret });
     return "stored";
   } catch (error) {
     consola.debug(`Publishing ${name} to the project failed`, error);
     return "failed";
   }
+}
+
+/**
+ * Publish the connection's client id.
+ *
+ * An ordinary variable, not a secret: the id travels in the browser's
+ * authorize URL, so it is public by construction and hiding it would only
+ * cost the developer the ability to read back what was configured. It is a
+ * variable rather than a literal in the connection document because each
+ * environment registers its own OAuth application, and a literal would force
+ * one connection file per environment.
+ */
+export async function publishClientId(options: {
+  readonly name: string;
+  readonly value: string;
+  readonly publish?: SecretPublisher;
+}): Promise<PublishState> {
+  return publishSecret(options.publish, options.name, options.value, false);
 }
 
 /**
@@ -250,6 +276,32 @@ export function reportSecretOutcome(outcome: SecretOutcome, cliVersion: string):
       consola.warn(`No copy kept in ${ENV_LOCAL}: git does not ignore that file`);
       break;
     case "deferred":
+      break;
+  }
+}
+
+/**
+ * Tell the developer what became of the client id.
+ *
+ * Shorter than the secret's report because there is less to say: the id is
+ * public, so there is no local copy and no warning about where it may be
+ * written — only whether the project received it.
+ */
+export function reportClientIdOutcome(
+  name: string,
+  state: PublishState,
+  cliVersion: string,
+): void {
+  const republish = publicCliCommand(`variables set ${name}`, cliVersion);
+  switch (state) {
+    case "stored":
+      consola.success(`Published ${name} to the project`);
+      break;
+    case "deferred":
+      consola.warn(`${name} was not published to the project. Publish it with: ${republish}`);
+      break;
+    case "failed":
+      consola.warn(`${name} could not be published. Sign-in fails until it is: ${republish}`);
       break;
   }
 }

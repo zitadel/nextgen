@@ -340,7 +340,9 @@ describe("materializeSetupResources with a social provider", () => {
       await readFile(join(cwd, IDPS_DIR, "google.json"), "utf8"),
     ) as { slug: string; oidc: { client_id: string; client_secret: string } };
     expect(connection.slug).toBe("google");
-    expect(connection.oidc.client_id).toBe(google.clientId);
+    // A reference, not the prompted value: the id is published as an ordinary
+    // project variable so one connection file serves every environment.
+    expect(connection.oidc.client_id).toBe("${{ GOOGLE_CLIENT_ID }}");
     // The value never reaches the file, only the reference the platform
     // resolves from its variables.
     expect(connection.oidc.client_secret).toBe("${{ GOOGLE_CLIENT_SECRET }}");

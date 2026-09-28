@@ -32,9 +32,12 @@ export {
   type EnvEntry,
   isSafeForSecrets,
   mergeEnvFile,
+  publishClientId,
+  type PublishState,
+  reportClientIdOutcome,
+  reportSecretOutcome,
   type SecretOutcome,
   type SecretPublisher,
-  reportSecretOutcome,
   storeClientSecret,
 } from "./credentials";
 
