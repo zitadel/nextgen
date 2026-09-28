@@ -68,12 +68,12 @@ function listResponse() {
   return { flow_definitions: [{ ...DETAIL_RESPONSE, user_schema: SCHEMA_EMBED }] };
 }
 
-async function renderAt(path: string) {
+async function renderAt(path: string, project?: string) {
   const [{ RouterProvider, createMemoryHistory }, { createAppRouter }] = await Promise.all([
     import("@tanstack/react-router"),
     import("../../../router"),
   ]);
-  const router = createAppRouter({ history: createMemoryHistory({ initialEntries: [scopedPath(path)] }) });
+  const router = createAppRouter({ history: createMemoryHistory({ initialEntries: [scopedPath(path, project)] }) });
   render(<RouterProvider router={router} />);
   return router;
 }
@@ -172,6 +172,23 @@ describe("login flow detail", () => {
     expect(screen.getByRole("cell", { name: "submit, passkey" })).toBeInTheDocument();
     // A terminal step collects nothing and offers nothing.
     expect(screen.getAllByRole("cell", { name: "—" })).toHaveLength(2);
+  });
+
+  it("names the schema as the selected project knows it", async () => {
+    // Schema ids are unique per project only, so the badge's lookup names the
+    // project rather than letting the id resolve in the caller's own.
+    const projects: (string | null)[] = [];
+    server.use(
+      http.get(FLOW_URL, () => HttpResponse.json(DETAIL_RESPONSE)),
+      http.get(SCHEMA_URL, ({ request }) => {
+        projects.push(new URL(request.url).searchParams.get("project_id"));
+        return HttpResponse.json({ schema: SCHEMA });
+      }),
+    );
+    await renderAt("/flow-definitions/flow_1", "proj_other");
+
+    expect(await screen.findByRole("link", { name: "Minimal" })).toBeInTheDocument();
+    expect(projects).toEqual(["proj_other"]);
   });
 
   it("drops the schema badge when the schema cannot be read", async () => {

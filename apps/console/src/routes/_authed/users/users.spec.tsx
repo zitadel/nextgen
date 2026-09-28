@@ -88,6 +88,36 @@ describe("users screen", () => {
     await waitFor(() => expect(projects).toEqual(["proj_other", "proj_other"]));
   });
 
+  it("resolves the users' schemas in the selected project, on every page", async () => {
+    // Schema ids are unique per project only, and the server resolves an
+    // ambiguous one in the caller's own project unless `project_id` names it.
+    const schemaProjects: Record<string, string | null> = {};
+    server.use(
+      http.post(USERS_QUERY_URL, async ({ request }) => {
+        const body = (await request.json()) as { page_token?: string };
+        return HttpResponse.json(
+          body.page_token
+            ? { users: [{ id: "user_2", schema: "sch_later", attributes: {} }] }
+            : {
+                users: [{ id: "user_1", schema: "sch_first", attributes: {} }],
+                next_page_token: "tok_2",
+              },
+        );
+      }),
+      http.get(`${SCHEMAS_URL}/:id`, ({ params, request }) => {
+        schemaProjects[params.id as string] = new URL(request.url).searchParams.get("project_id");
+        return HttpResponse.json({ schema: { type: "object", properties: {} } });
+      }),
+    );
+    await renderUsers(scopedPath("/users", "proj_other"));
+
+    await waitFor(() => expect(schemaProjects).toEqual({ sch_first: "proj_other" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Load more" }));
+    await waitFor(() =>
+      expect(schemaProjects).toEqual({ sch_first: "proj_other", sch_later: "proj_other" }),
+    );
+  });
+
   it("renders the page heading and a user row", async () => {
     server.use(
       http.post(USERS_QUERY_URL, () =>

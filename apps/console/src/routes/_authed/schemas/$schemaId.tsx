@@ -12,11 +12,18 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { type UserSchema, schemaAuthMethods, schemaDisplayName } from "@/lib/schema";
 
 import { api } from "../../../api/zitadel";
+import { projectScopeDeps, requireProjectScope } from "../../../lib/project-scope";
 
 export const Route = createFileRoute("/_authed/schemas/$schemaId")({
   staticData: { scope: "project" },
-  loader: ({ params }) =>
-    api.getSchemaById(params.schemaId).then((body) => body.schema as UserSchema),
+  loaderDeps: projectScopeDeps,
+  // Schema ids are unique per project only (the seeded default carries the same
+  // `$id` everywhere), and an ambiguous id resolves in the caller's own project
+  // unless `project_id` names the selected one.
+  loader: ({ params, deps }) =>
+    api
+      .getSchemaById(params.schemaId, { project_id: requireProjectScope(deps.project) })
+      .then((body) => body.schema as UserSchema),
   component: SchemaDetail,
 });
 

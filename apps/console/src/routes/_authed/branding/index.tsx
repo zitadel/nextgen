@@ -87,6 +87,7 @@ function BrandingScreen() {
   const { revision, flows } = Route.useLoaderData();
   // What the operator last picked; `activeJourney` below is what renders.
   const [journey, setJourney] = useState<PreviewJourney>("register");
+  // What the operator last picked; `activeFlowName` below is what renders.
   const [flowName, setFlowName] = useState(flows[0]?.name ?? "");
   const [theme, setTheme] = useState<PreviewTheme>("revision");
   const [narrow, setNarrow] = useState(false);
@@ -95,7 +96,12 @@ function BrandingScreen() {
   // it does not carry answers `flowdef.purpose_mismatch` instead of rendering.
   // A flow the list did not describe is treated as serving everything, so a
   // missing `purposes` narrows nothing.
-  const selected = flows.find((flow) => flow.name === flowName);
+  //
+  // Switching projects keeps this screen mounted and reloads `flows`, so a pick
+  // from the previous project can name a flow this one does not have. It falls
+  // back to the first flow, derived like `activeJourney` below.
+  const selected = flows.find((flow) => flow.name === flowName) ?? flows[0];
+  const activeFlowName = selected?.name ?? "";
   const journeys = selected?.purposes.length
     ? JOURNEYS.filter((entry) => selected.purposes.includes(entry.id))
     : JOURNEYS;
@@ -120,7 +126,7 @@ function BrandingScreen() {
       <div className="mt-3 flex flex-col gap-2 lg:flex-row lg:items-center lg:gap-[10px] lg:px-2">
         {flows.length > 0 && (
           <div className="flex items-center justify-between gap-[10px]">
-            <Select value={flowName} onValueChange={setFlowName}>
+            <Select value={activeFlowName} onValueChange={setFlowName}>
               <SelectTrigger aria-label="Previewed flow" className={GHOST_TRIGGER}>
                 <Workflow />
                 <SelectValue />
@@ -192,7 +198,7 @@ function BrandingScreen() {
           {/* The widget is content-sized, so the preview constrains the width
               rather than the element: that is what an embedding page does. */}
           <div className={narrow ? "w-[24rem]" : "w-full max-w-[32rem]"}>
-            <LoginPreview journey={activeJourney} flowName={flowName} theme={theme} />
+            <LoginPreview journey={activeJourney} flowName={activeFlowName} theme={theme} />
           </div>
         </Card>
 

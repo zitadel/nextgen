@@ -48,12 +48,13 @@ export const Route = createFileRoute("/_authed/users/")({
   staticData: { scope: "project", nav: { label: "Users", order: 3, icon: User } },
   loaderDeps: projectScopeDeps,
   loader: async ({ deps }) => {
-    const page = await fetchUsers(requireProjectScope(deps.project));
+    const projectId = requireProjectScope(deps.project);
+    const page = await fetchUsers(projectId);
     return {
       users: page.users,
       teamsExpanded: page.teamsExpanded,
       nextPageToken: page.next_page_token ?? undefined,
-      columns: await columnsForUsers(page.users),
+      columns: await columnsForUsers(projectId, page.users),
     };
   },
   component: UsersScreen,
@@ -107,13 +108,20 @@ function isPresent<T>(value: T | undefined | null): value is T {
  * Only the loaded users' schemas are fetched, not every schema in the project:
  * one nobody uses would add a column that is blank in every row. Each user
  * carries `schema`, so the set is known without a second list call.
+ *
+ * Schema ids are unique per project only — the seeded default carries the same
+ * `$id` everywhere — and the server resolves an ambiguous id in the caller's
+ * own project, so `project_id` names the one these users live in.
  */
-async function columnsForUsers(users: Record<string, unknown>[]): Promise<SchemaField[]> {
+async function columnsForUsers(
+  projectId: string,
+  users: Record<string, unknown>[],
+): Promise<SchemaField[]> {
   const schemaIds = [...new Set(users.map((user) => field(user, "schema")).filter(isPresent))];
   const schemas = await Promise.all(
     schemaIds.map(async (id) => {
       try {
-        return (await api.getSchemaById(id)).schema as UserSchema;
+        return (await api.getSchemaById(id, { project_id: projectId })).schema as UserSchema;
       } catch {
         // One unreadable schema costs its columns, not the screen. The rows
         // still render from the fallback below.
@@ -222,7 +230,7 @@ function UsersScreen() {
       const page = await fetchUsers(projectId, nextPageToken);
       // A later page can carry a schema the first page never referenced, which
       // would otherwise render its users with every cell blank.
-      const nextColumns = await columnsForUsers([...users, ...page.users]);
+      const nextColumns = await columnsForUsers(projectId, [...users, ...page.users]);
       // A delete or a create while this was in flight has already reset the list
       // to a fresh first page. This page answers a question about the previous
       // one — appending it would re-add rows the server no longer returns — so

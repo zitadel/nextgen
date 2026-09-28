@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { api } from "../../../api/zitadel";
 import { formatDate } from "../../../lib/date";
+import { projectScopeDeps, requireProjectScope } from "../../../lib/project-scope";
 import { displayValue, field } from "../../../lib/record";
 import { type UserSchema, schemaDisplayName, schemaFields } from "../../../lib/schema";
 import { userAttributes, userIdentity, userIdentitySecondary } from "../../../lib/user";
@@ -38,7 +39,8 @@ import { userAttributes, userIdentity, userIdentitySecondary } from "../../../li
  */
 export const Route = createFileRoute("/_authed/users/$userId")({
   staticData: { scope: "project" },
-  loader: async ({ params }) => {
+  loaderDeps: projectScopeDeps,
+  loader: async ({ params, deps }) => {
     const user = await api.getUserByID(params.userId);
 
     // Both are chrome for the record rather than the record itself, so neither
@@ -47,7 +49,8 @@ export const Route = createFileRoute("/_authed/users/$userId")({
     const [schema, passkeys] = await Promise.all([
       schemaId
         ? api
-            .getSchemaById(schemaId)
+            // Schema ids are unique per project only, so name the selected one.
+            .getSchemaById(schemaId, { project_id: requireProjectScope(deps.project) })
             .then((value) => value.schema as UserSchema)
             .catch(() => undefined)
         : Promise.resolve(undefined),

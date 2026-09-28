@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
@@ -17,7 +17,11 @@ vi.mock("@/auth/session", async (importOriginal) => {
 // connect and needs a browser to paint. Neither is what this spec is about:
 // the widget's own behaviour is covered in `@zitadel/components`.
 vi.mock("@/components/branding/login-preview", () => ({
-  LoginPreview: ({ journey }: { journey: string }) => <div data-testid="preview">{journey}</div>,
+  LoginPreview: ({ journey, flowName }: { journey: string; flowName: string }) => (
+    <div data-testid="preview" data-flow={flowName}>
+      {journey}
+    </div>
+  ),
 }));
 
 vi.stubEnv("VITE_CONSOLE_API_BASE", "http://localhost/api");
@@ -191,6 +195,30 @@ describe("branding screen", () => {
     // `default-login` is a slug on the wire; the selector is where it becomes
     // a label, as the flow list does.
     expect(await screen.findByLabelText("Previewed flow")).toHaveTextContent("Default login");
+  });
+
+  it("previews the new project's flow after switching projects", async () => {
+    // Switching projects keeps the screen mounted, so a flow picked from the
+    // previous project must not carry over to one that does not have it.
+    const acme = { ...FLOW, flow_definition: { ...FLOW.flow_definition, name: "acme-login" } };
+    serveRevision();
+    server.use(
+      http.get(FLOWS_URL, ({ request }) =>
+        HttpResponse.json({
+          flow_definitions:
+            new URL(request.url).searchParams.get("project_id") === "proj_other" ? [FLOW] : [acme],
+        }),
+      ),
+    );
+    const router = await renderAt("/branding");
+    expect(await screen.findByLabelText("Previewed flow")).toHaveTextContent("Acme login");
+
+    await act(() => router.history.push(scopedPath("/branding", "proj_other")));
+
+    await waitFor(() =>
+      expect(screen.getByLabelText("Previewed flow")).toHaveTextContent("Default login"),
+    );
+    expect(screen.getByTestId("preview")).toHaveAttribute("data-flow", "default-login");
   });
 
   it("offers only the journeys it can actually render", async () => {

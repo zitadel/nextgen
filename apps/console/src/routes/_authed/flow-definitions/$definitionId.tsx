@@ -26,10 +26,12 @@ import {
 import { schemaDisplayName } from "@/lib/schema";
 
 import { api } from "../../../api/zitadel";
+import { projectScopeDeps, requireProjectScope } from "../../../lib/project-scope";
 
 export const Route = createFileRoute("/_authed/flow-definitions/$definitionId")({
   staticData: { scope: "project" },
-  loader: async ({ params }) => {
+  loaderDeps: projectScopeDeps,
+  loader: async ({ params, deps }) => {
     const entry = await api.getFlowDefinition(params.definitionId);
     // Structurally the list's `flow_definition`; orval renames per operation.
     const definition: FlowDefinition = entry.flow_definition;
@@ -37,17 +39,27 @@ export const Route = createFileRoute("/_authed/flow-definitions/$definitionId")(
       definition,
       createdAt: entry.created_at,
       // No `expand` on this endpoint, so the badge costs a second call.
-      schemaName: await resolveSchemaName(definition.user_schema),
+      schemaName: await resolveSchemaName(
+        definition.user_schema,
+        requireProjectScope(deps.project),
+      ),
       schemaId: definition.user_schema,
     };
   },
   component: FlowDefinitionDetail,
 });
 
-async function resolveSchemaName(id: string | undefined): Promise<string | undefined> {
+/**
+ * Schema ids are unique per project only, so the lookup names the project the
+ * flow belongs to — otherwise an ambiguous id resolves in the caller's own.
+ */
+async function resolveSchemaName(
+  id: string | undefined,
+  projectId: string,
+): Promise<string | undefined> {
   if (!id) return undefined;
   try {
-    const body = await api.getSchemaById(id);
+    const body = await api.getSchemaById(id, { project_id: projectId });
     return schemaDisplayName(body.schema, id);
   } catch {
     return undefined;
