@@ -188,7 +188,9 @@ type IDPConnectionStatements interface {
 	GetIDPConnection(ctx context.Context, filter database.Filter[domain.IDPConnectionField]) (*domain.IDPConnection, error)
 	// GetIDPConnectionRevision returns the connection at the given revision,
 	// even when a newer one exists. Revision ids are unique per project. An
-	// unknown revision returns *database.NoRowFoundError.
+	// unknown revision returns *database.NoRowFoundError. It serves both the
+	// auth attempt reading its pinned revision and the public
+	// `GET /idps/revisions/{revision_id}` read (#1252).
 	GetIDPConnectionRevision(ctx context.Context, projectID, revisionID string) (*domain.IDPConnection, error)
 	ListIDPConnections(ctx context.Context, filter *database.ListOptions[domain.IDPConnectionField]) (*database.ListResult[*domain.IDPConnection], error)
 	// ListIDPConnectionRevisions pages one connection's revisions newest first.
