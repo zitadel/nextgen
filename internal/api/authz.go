@@ -34,8 +34,9 @@ const (
 // → readMiss unless the principal has a foothold, at the cost of repeated-delete 204s.
 var errResourceGone = errors.New("authz: resource gone")
 
-// projectRelation is the catalog relation checked for an accessOp.
-// Until #420, the seeded viewer grant satisfies viewer/editor/admin Checks.
+// projectRelation is the catalog relation checked for an accessOp. Roles are
+// monotonic in the seeded catalog: an admin assignment closes to editor and
+// viewer, an editor one to viewer, so a stronger grant passes a weaker check.
 func projectRelation(op accessOp) string {
 	switch op {
 	case opRead:

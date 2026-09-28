@@ -5,7 +5,7 @@
 -- references store compiled policy. Bundle tables exist but are unused by the
 -- v1 compiler mapper.
 --
--- Seed cat_sys_1 matches this OpenFGA-style model (placeholders pending #420):
+-- Seed cat_sys_1 matches this OpenFGA-style model:
 --   type user
 --   type team
 --     relations
@@ -13,9 +13,13 @@
 --   type project
 --     relations
 --       define team: [team]
---       define viewer: [user, team#member] or member from team
---       define editor: viewer
---       define admin: [user] or editor
+--       define admin: [user, team#member] or member from team
+--       define editor: [user, team#member] or admin
+--       define viewer: [user, team#member] or editor
+--
+-- Roles are additive and monotonic (ADR 054 §5): admin closes to editor and
+-- viewer, editor to viewer. The owning team (`project.team`) reaches admin
+-- through the tuple-to-userset edge and inherits the rest by closure.
 
 CREATE TABLE zitadel_nextgen.resource_scope_index (
     resource_id   TEXT COLLATE "C" NOT NULL CHECK (resource_id <> ''),
@@ -265,7 +269,10 @@ INSERT INTO zitadel_nextgen.authz_relation_references (
     ('cat_sys_1', 'project', 'team', 'team', '', FALSE, '', 0),
     ('cat_sys_1', 'project', 'viewer', 'team', 'member', FALSE, '', 0),
     ('cat_sys_1', 'project', 'viewer', 'user', '', FALSE, '', 1),
-    ('cat_sys_1', 'project', 'admin', 'user', '', FALSE, '', 0);
+    ('cat_sys_1', 'project', 'editor', 'team', 'member', FALSE, '', 0),
+    ('cat_sys_1', 'project', 'editor', 'user', '', FALSE, '', 1),
+    ('cat_sys_1', 'project', 'admin', 'team', 'member', FALSE, '', 0),
+    ('cat_sys_1', 'project', 'admin', 'user', '', FALSE, '', 1);
 
 INSERT INTO zitadel_nextgen.authz_expression_edges (
     catalog_id, object_type, relation, kind,
@@ -275,23 +282,24 @@ INSERT INTO zitadel_nextgen.authz_expression_edges (
     ('cat_sys_1', 'team', 'member', 'direct', NULL, NULL, NULL, NULL, 0),
     ('cat_sys_1', 'project', 'team', 'direct', NULL, NULL, NULL, NULL, 0),
     ('cat_sys_1', 'project', 'viewer', 'direct', NULL, NULL, NULL, NULL, 0),
-    ('cat_sys_1', 'project', 'viewer', 'tuple_to_userset', 'team', 'member', 'project', 'team', 1),
-    ('cat_sys_1', 'project', 'editor', 'computed_userset', 'project', 'viewer', NULL, NULL, 0),
+    ('cat_sys_1', 'project', 'viewer', 'computed_userset', 'project', 'editor', NULL, NULL, 1),
+    ('cat_sys_1', 'project', 'editor', 'direct', NULL, NULL, NULL, NULL, 0),
+    ('cat_sys_1', 'project', 'editor', 'computed_userset', 'project', 'admin', NULL, NULL, 1),
     ('cat_sys_1', 'project', 'admin', 'direct', NULL, NULL, NULL, NULL, 0),
-    ('cat_sys_1', 'project', 'admin', 'computed_userset', 'project', 'editor', NULL, NULL, 1);
+    ('cat_sys_1', 'project', 'admin', 'tuple_to_userset', 'team', 'member', 'project', 'team', 1);
 
--- Reflexive + computed-userset closure (viewer -> editor -> admin).
+-- Reflexive + computed-userset closure (admin -> editor -> viewer).
 INSERT INTO zitadel_nextgen.authz_relation_closure (
     catalog_id, from_object_type, from_relation, to_object_type, to_relation, depth
 ) VALUES
     ('cat_sys_1', 'team', 'member', 'team', 'member', 0),
     ('cat_sys_1', 'project', 'team', 'project', 'team', 0),
     ('cat_sys_1', 'project', 'viewer', 'project', 'viewer', 0),
-    ('cat_sys_1', 'project', 'viewer', 'project', 'editor', 1),
-    ('cat_sys_1', 'project', 'viewer', 'project', 'admin', 2),
     ('cat_sys_1', 'project', 'editor', 'project', 'editor', 0),
-    ('cat_sys_1', 'project', 'editor', 'project', 'admin', 1),
-    ('cat_sys_1', 'project', 'admin', 'project', 'admin', 0);
+    ('cat_sys_1', 'project', 'editor', 'project', 'viewer', 1),
+    ('cat_sys_1', 'project', 'admin', 'project', 'admin', 0),
+    ('cat_sys_1', 'project', 'admin', 'project', 'editor', 1),
+    ('cat_sys_1', 'project', 'admin', 'project', 'viewer', 2);
 
 -- Backfill resource_scope_index and authz_membership_edges.
 INSERT INTO zitadel_nextgen.resource_scope_index (resource_id, resource_kind, project_id, team_id)

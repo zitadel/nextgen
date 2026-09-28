@@ -241,6 +241,8 @@ func TestHandleNextgenSession(t *testing.T) {
 			api.QueryGrantsOperation,
 			api.QueryUsersOperation,
 			api.ListMyProjectsOperation,
+			api.GetProjectOperation,
+			api.PatchProjectOperation,
 		} {
 			t.Run(string(op), func(t *testing.T) {
 				t.Parallel()

@@ -9,6 +9,7 @@ import { resolveCwd } from "../paths";
 import { normalizePublicCliCommand, normalizePublicCliCommands } from "../public-cli";
 import { resolveServer } from "../server";
 import { type Properties, Telemetry, type TelemetryDeps } from "../telemetry";
+import { buildUserAgent, installUserAgent, processUserAgentFacts } from "../user-agent";
 import {
   CLI_COMMAND_COMPLETED,
   CLI_COMMAND_FAILED,
@@ -105,6 +106,21 @@ export abstract class BaseCommand extends Command {
   private readonly telemetryStartedAt = Date.now();
 
   /**
+   * oclif runs this before `run`. The user agent goes in here, ahead of flag
+   * parsing and server resolution, so every request the command makes carries
+   * it — including the local-server health probes {@link toMeta} can trigger.
+   * Flags are not parsed yet, so `--no-telemetry` is looked for in this
+   * command's argv — a plain match that errs towards opting out. (oclif's own
+   * `config.userAgent` only feeds its `http-call` client, which the CLI does
+   * not use.)
+   */
+  protected override async init(): Promise<void> {
+    await super.init();
+    const telemetryFlag = this.argv.includes("--no-telemetry") ? false : undefined;
+    installUserAgent(buildUserAgent(processUserAgentFacts(this.config.version, telemetryFlag)));
+  }
+
+  /**
    * Merge command-specific dimensions into {@link telemetryProps} immutably: a
    * new frozen bag replaces the previous one, so no shared object is ever
    * mutated. `step` advances by re-recording it at each milestone.
@@ -124,11 +140,10 @@ export abstract class BaseCommand extends Command {
   ): Promise<GlobalOptions> {
     const cwd = resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined);
     const serverFlag = typeof flags.server === "string" ? flags.server : undefined;
-    const environment = typeof flags.environment === "string" ? flags.environment : "development";
     const source =
       options.resolveServer === false
         ? { value: options.source ?? "", origin: "default" as const }
-        : await resolveServer({ cwd, env: process.env, serverFlag, environment });
+        : await resolveServer({ cwd, env: process.env, serverFlag });
     const json = this.jsonEnabled();
     const isTTY = Boolean(process.stdout.isTTY && process.stdin.isTTY);
     const verbose = Boolean(flags.verbose);

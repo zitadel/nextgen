@@ -1,10 +1,10 @@
 import { setTimeout as sleep } from "node:timers/promises";
 
 import { Flags } from "@oclif/core";
-import { createZitadelClient } from "@zitadel/api/client";
 import { ApiError } from "@zitadel/api/runtime/fetch";
 import consola from "consola";
 
+import { createZitadelClient } from "../lib/api-client";
 import { wrapForBox } from "../lib/box";
 import { openInBrowser } from "../lib/browser";
 import { CLAIM_WINDOW_DAYS, isAttached } from "../lib/claim-state";

@@ -5,6 +5,8 @@ package integration_test
 import (
 	"cmp"
 	"context"
+	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -17,6 +19,8 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/passwap/argon2"
+	"github.com/zitadel/passwap/bcrypt"
 )
 
 // actionNames returns the names of the given step actions in order, useful
@@ -279,6 +283,80 @@ func TestGetProject(t *testing.T) {
 	}
 }
 
+// TestProjectSessionCaller covers the session scheme on the by-id project
+// endpoints: a signed-in person holding a grant on a project (the projects
+// `GET /users/me/projects` lists for them) can open it, and somebody without a
+// foothold gets the same proj.not_found a wrong id gets, so the response does
+// not confirm the project exists.
+func TestProjectSessionCaller(t *testing.T) {
+	t.Parallel()
+
+	platform := harness.EnsurePlatformProject(t)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+
+	granteeID := harness.CreateUserWithTeam(t, platform.ID)
+	// One grant covers the read and the rename below.
+	harness.SeedProjectAdmin(t, project.ID, granteeID)
+
+	grantee, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	grantee.SetSessionToken(platformSessionCookie(t, granteeID).Value)
+
+	params := api.GetProjectParams{ProjectID: api.ProjectID(project.ID)}
+
+	// Sequential: the rename below changes what the read before it sees.
+	t.Run("granted person opens the project", func(t *testing.T) {
+		resp, err := grantee.GetProject(t.Context(), params)
+		require.NoError(t, err)
+		assertProjectResponse(t, &api.ProjectResponse{Name: project.Name, PreviewOrigins: []string{}}, resp)
+	})
+
+	t.Run("granted person renames the project", func(t *testing.T) {
+		resp, err := grantee.PatchProject(t.Context(), &api.PatchProjectRequest{Name: api.NewOptNilString(project.Name + " renamed")}, api.PatchProjectParams{ProjectID: api.ProjectID(project.ID)})
+		require.NoError(t, err)
+		require.IsType(t, &api.ProjectResponse{}, resp, helpers.MustMarshal(t, resp))
+	})
+
+	t.Run("viewer opens but cannot rename", func(t *testing.T) {
+		// Roles are monotonic, never the reverse: a viewer passes the read
+		// check and is refused the editor check. The foothold makes the refusal
+		// a 403, not the anti-oracle 404 a stranger gets.
+		viewerID := harness.CreateUserWithTeam(t, platform.ID)
+		harness.SeedProjectViewer(t, project.ID, viewerID)
+		viewer, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+		require.NoError(t, err)
+		viewer.SetSessionToken(platformSessionCookie(t, viewerID).Value)
+
+		resp, err := viewer.GetProject(t.Context(), params)
+		require.NoError(t, err)
+		require.IsType(t, &api.ProjectResponse{}, resp, helpers.MustMarshal(t, resp))
+
+		patchResp, err := viewer.PatchProject(t.Context(), &api.PatchProjectRequest{Name: api.NewOptNilString("viewer rename")}, api.PatchProjectParams{ProjectID: api.ProjectID(project.ID)})
+		require.NoError(t, err)
+		require.IsType(t, &api.PatchProjectErrorResponseStatusCode{}, patchResp, helpers.MustMarshal(t, patchResp))
+		denied := patchResp.(*api.PatchProjectErrorResponseStatusCode)
+		assert.Equal(t, http.StatusForbidden, denied.StatusCode)
+		assert.Equal(t, api.PatchProjectErrorResponseType(domain.ErrProjectPermissionDenied().Code), denied.Response.Type)
+	})
+
+	t.Run("no foothold is not found", func(t *testing.T) {
+		strangerID := harness.CreateUserWithTeam(t, platform.ID)
+		stranger, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+		require.NoError(t, err)
+		stranger.SetSessionToken(platformSessionCookie(t, strangerID).Value)
+
+		notFound := domain.ErrProjectNotFound()
+		resp, err := stranger.GetProject(t.Context(), params)
+		require.NoError(t, err)
+		assertProjectResponse(t, &api.GetProjectNotFound{Code: api.ErrorCode(notFound.Code), Message: notFound.Message}, resp)
+
+		patchResp, err := stranger.PatchProject(t.Context(), &api.PatchProjectRequest{Name: api.NewOptNilString("taken")}, api.PatchProjectParams{ProjectID: api.ProjectID(project.ID)})
+		require.NoError(t, err)
+		require.IsType(t, &api.PatchProjectNotFound{}, patchResp, helpers.MustMarshal(t, patchResp))
+	})
+}
+
 func TestPatchProject(t *testing.T) {
 	t.Parallel()
 
@@ -361,6 +439,183 @@ func TestPatchProject(t *testing.T) {
 			assertProjectResponse(t, tc.want, resp)
 		})
 	}
+}
+
+// ADR 029 §Hashing: a project admin chooses the hashing method, so what a PATCH
+// sets has to be what a later GET reads back, and null has to mean "back to the
+// server default" rather than "leave it".
+func TestPatchProjectPasswordHash(t *testing.T) {
+	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+
+	argon2id := api.PasswordHashPolicy{
+		Algorithm: api.PasswordHashPolicyAlgorithmArgon2id,
+		Params: api.PasswordHashPolicyParams{
+			Time:    api.NewOptInt(1),
+			Memory:  api.NewOptInt(32 * 1024),
+			Threads: api.NewOptInt(1),
+		},
+	}
+
+	t.Run("a new project reads back no method of its own", func(t *testing.T) {
+		got, err := client.GetProject(t.Context(), api.GetProjectParams{ProjectID: api.ProjectID(project.ID)})
+		require.NoError(t, err)
+		response, ok := got.(*api.ProjectResponse)
+		require.True(t, ok, helpers.MustMarshal(t, got))
+		assert.True(t, response.PasswordHash.IsNull(), "no method chosen reads back as null")
+	})
+
+	t.Run("sets a method and reads it back", func(t *testing.T) {
+		got, err := client.PatchProject(t.Context(), &api.PatchProjectRequest{
+			PasswordHash: api.NewOptNilPasswordHashPolicy(argon2id),
+		}, api.PatchProjectParams{ProjectID: api.ProjectID(project.ID)})
+		require.NoError(t, err)
+		patched, ok := got.(*api.ProjectResponse)
+		require.True(t, ok, helpers.MustMarshal(t, got))
+
+		policy, ok := patched.PasswordHash.Get()
+		require.True(t, ok, helpers.MustMarshal(t, got))
+		assert.Equal(t, api.PasswordHashPolicyAlgorithmArgon2id, policy.Algorithm)
+		assert.Equal(t, api.NewOptInt(32*1024), policy.Params.Memory)
+
+		read, err := client.GetProject(t.Context(), api.GetProjectParams{ProjectID: api.ProjectID(project.ID)})
+		require.NoError(t, err)
+		reread, ok := read.(*api.ProjectResponse)
+		require.True(t, ok, helpers.MustMarshal(t, read))
+		assert.Equal(t, patched.PasswordHash, reread.PasswordHash, "a GET reads back what the PATCH set")
+	})
+
+	t.Run("a rename leaves the method alone", func(t *testing.T) {
+		got, err := client.PatchProject(t.Context(), &api.PatchProjectRequest{
+			Name: api.NewOptNilString(helpers.ProjectName()),
+		}, api.PatchProjectParams{ProjectID: api.ProjectID(project.ID)})
+		require.NoError(t, err)
+		renamed, ok := got.(*api.ProjectResponse)
+		require.True(t, ok, helpers.MustMarshal(t, got))
+		assert.False(t, renamed.PasswordHash.IsNull(), "a body that says nothing about hashing changes nothing")
+	})
+
+	t.Run("null gives the project back to the server default", func(t *testing.T) {
+		got, err := client.PatchProject(t.Context(), &api.PatchProjectRequest{
+			PasswordHash: api.OptNilPasswordHashPolicy{Set: true, Null: true},
+		}, api.PatchProjectParams{ProjectID: api.ProjectID(project.ID)})
+		require.NoError(t, err)
+		cleared, ok := got.(*api.ProjectResponse)
+		require.True(t, ok, helpers.MustMarshal(t, got))
+		assert.True(t, cleared.PasswordHash.IsNull())
+	})
+
+	// The deployment's limits are the bar a project chooses inside. This
+	// harness bounds bcrypt to 10..16, so cost 4 is refused, and it registers
+	// no scrypt verifier, so scrypt is refused whatever it costs.
+	t.Run("refuses a method the deployment would not take back", func(t *testing.T) {
+		invalid := domain.ErrProjectPasswordHashInvalid()
+		for name, policy := range map[string]api.PasswordHashPolicy{
+			"cost below the limit": {
+				Algorithm: api.PasswordHashPolicyAlgorithmBcrypt,
+				Params:    api.PasswordHashPolicyParams{Cost: api.NewOptInt(4)},
+			},
+			"algorithm with no verifier": {
+				Algorithm: api.PasswordHashPolicyAlgorithmScrypt,
+				Params:    api.PasswordHashPolicyParams{Cost: api.NewOptInt(15)},
+			},
+			"parameters of another algorithm": {
+				Algorithm: api.PasswordHashPolicyAlgorithmArgon2id,
+				Params:    api.PasswordHashPolicyParams{Cost: api.NewOptInt(12)},
+			},
+		} {
+			t.Run(name, func(t *testing.T) {
+				got, err := client.PatchProject(t.Context(), &api.PatchProjectRequest{
+					PasswordHash: api.NewOptNilPasswordHashPolicy(policy),
+				}, api.PatchProjectParams{ProjectID: api.ProjectID(project.ID)})
+				require.NoError(t, err)
+				bad, ok := got.(*api.PatchProjectBadRequest)
+				require.True(t, ok, helpers.MustMarshal(t, got))
+				assert.Equal(t, api.ErrorCode(invalid.Code), bad.Code)
+			})
+		}
+	})
+}
+
+// The acceptance criterion of #504: a project configured to hash with argon2id
+// writes argon2id, while the deployment default keeps writing bcrypt, and both
+// keep verifying.
+func TestProjectPasswordHashPolicyGovernsHashing(t *testing.T) {
+	t.Parallel()
+
+	const password = "Passw0rd!-504"
+
+	hashOf := func(t *testing.T, projectID, userID string) string {
+		t.Helper()
+		stored, err := harness.EnsureServiceDB(t).Statements().GetUserPassword(t.Context(), database.And(
+			database.Equal(database.Col(domain.UserPasswordFieldProjectID), projectID),
+			database.Equal(database.Col(domain.UserPasswordFieldUserID), userID),
+		))
+		require.NoError(t, err)
+		return stored.EncodedHash
+	}
+
+	setPassword := func(t *testing.T, projectID string) (userID, encodedHash string) {
+		t.Helper()
+		userID = harness.CreateUserWithTeam(t, projectID)
+		require.NoError(t, harness.EnsureUserService(t).SetPassword(t.Context(), service.SetPasswordInput{
+			ProjectID: projectID,
+			UserID:    userID,
+			Password:  password,
+		}))
+		return userID, hashOf(t, projectID, userID)
+	}
+
+	deploymentDefault, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	ownMethod, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+
+	policy, err := domain.NewPasswordHashPolicy("argon2id", map[string]any{
+		"time": 1, "memory": 32 * 1024, "threads": 1,
+	})
+	require.NoError(t, err)
+	_, err = harness.EnsureProjectService(t).Update(t.Context(), service.UpdateProjectRequest{
+		ID:                 ownMethod.ID,
+		PasswordHashPolicy: &policy,
+	})
+	require.NoError(t, err)
+
+	_, defaultHash := setPassword(t, deploymentDefault.ID)
+	ownUserID, ownHash := setPassword(t, ownMethod.ID)
+
+	assert.True(t, strings.HasPrefix(defaultHash, bcrypt.Prefix),
+		"a project with no method of its own writes the deployment's: %q", defaultHash)
+	assert.True(t, strings.HasPrefix(ownHash, argon2.Prefix),
+		"a project that chose argon2id writes argon2id: %q", ownHash)
+
+	// Verification is deployment-wide and unchanged, which is what keeps a
+	// password written under one method readable after the project picks
+	// another.
+	verifier := harness.EnsureHashVerifier(t)
+	assert.NoError(t, verifier.VerifyHash(defaultHash, password))
+	assert.NoError(t, verifier.VerifyHash(ownHash, password))
+
+	// Handing the project back to the default moves the next password written,
+	// not the one already stored.
+	var cleared *domain.PasswordHashPolicy
+	_, err = harness.EnsureProjectService(t).Update(t.Context(), service.UpdateProjectRequest{
+		ID:                 ownMethod.ID,
+		PasswordHashPolicy: &cleared,
+	})
+	require.NoError(t, err)
+
+	assert.True(t, strings.HasPrefix(hashOf(t, ownMethod.ID, ownUserID), argon2.Prefix),
+		"the stored hash is not rewritten by a policy change")
+	_, afterClearing := setPassword(t, ownMethod.ID)
+	assert.True(t, strings.HasPrefix(afterClearing, bcrypt.Prefix),
+		"the next password written goes back to the deployment default")
 }
 
 func TestQueryProjects(t *testing.T) {
