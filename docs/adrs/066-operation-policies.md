@@ -1,7 +1,7 @@
 # ADR 066: Operation Policies
 
 > **Status:** Draft
-> **Date:** 2026-08-28 (revised 2026-09-21)
+> **Date:** 2026-08-28 (revised 2026-09-28)
 > **Context:** [#383](https://github.com/zitadel/nextgen/issues/383) asks for the
 > settings-and-policies architecture; [#899](https://github.com/zitadel/nextgen/issues/899)
 > defines the product model; [#898](https://github.com/zitadel/nextgen/issues/898)
@@ -10,7 +10,7 @@
 > [ADR 035](035-configuration-environments.md),
 > [ADR 042](042-scaffolded-file-ownership-and-drift-detection.md),
 > [ADR 048](048-wide-events-internal-audit-primitive.md),
-> [ADR 065](065-audience-scoped-configuration.md)
+> audience-scoped configuration (draft, [#1264](https://github.com/zitadel/nextgen/pull/1264))
 
 ## Context
 
@@ -59,8 +59,7 @@ Azure Policy's definition/assignment):
   the rules receive, and the **rules** themselves: a list of named boolean
   expressions in [CEL](https://cel.dev) over `config` and context.
 - The **instance** is developer-authored and lives in the release. It carries the
-  configuration values and the audience the policy applies to
-  ([ADR 065](065-audience-scoped-configuration.md)).
+  configuration values for the whole project.
 
 A policy is always evaluated **before** its operation runs. Every rule must hold
 for the operation to proceed.
@@ -69,7 +68,7 @@ for the operation to proceed.
 
 - **Operation**: a domain action that can carry a policy, such as `user.password.save` (static list defined by Zitadel)
 - **Template**: the Zitadel-defined half of a policy for one operation: config schema, context schema, rules
-- **Instance** (or just *policy*): the developer-authored half: config values and audience; a revisioned resource in the release
+- **Instance** (or just *policy*): the developer-authored half: config values; a revisioned resource in the release, one per operation per project
 - **Rule**: one named CEL expression in a template that must evaluate to `true`
 - **Decision**: what evaluating an instance against a request context returns — `allow` or `deny` with the violated rules
 
@@ -78,12 +77,12 @@ for the operation to proceed.
 #### Instance
 
 Each instance guards one operation and carries its own configuration under `config`.
-The envelope (`kind`, `operation`, `audience`) is the same for every operation;
+The envelope (`kind`, `operation`) is the same for every operation;
 `config` is what the operation's template defines, and `operation` is the
 discriminator that says which template that is.
 
 ```json
-// .zitadel/policies/user.password.save.json — the project default
+// .zitadel/policies/user.password.save.json
 {
   "kind": "policy",
   "operation": "user.password.save",
@@ -94,21 +93,12 @@ discriminator that says which template that is.
 }
 ```
 
-```json
-// .zitadel/policies/user.password.save.acme.json — a stricter override for one team
-{
-  "kind": "policy",
-  "operation": "user.password.save",
-  "audience": { "team_ids": ["team_01k…"] },
-  "config": {
-    "min_length": 20,
-    "history_depth": 4
-  }
-}
-```
-
-- `audience` follows [ADR 065](065-audience-scoped-configuration.md): absent means
-  project default, the most specific matching instance applies wholesale.
+- An instance applies to its whole project: one instance per operation per
+  project, and every request to that operation in the project is evaluated
+  against it. Narrowing an instance to part of a project (a team, an app) is
+  the audience mechanism of the audience-scoped configuration draft
+  ([#1264](https://github.com/zitadel/nextgen/pull/1264)), which follows this
+  ADR and adds an `audience` envelope field; see [Applicability](#applicability).
 - `config` is validated against the template's config schema at write time.
   A key the template does not declare is rejected.
 - The wire schema of the instance is a **discriminated union on `operation`**:
@@ -220,8 +210,8 @@ For `user.password.save` the evaluating function is
 the single function every password set goes through (admin API and
 registration flow alike). The context builder is
 `service.PasswordPolicy.buildContext`. Instances are resolved by
-`service.PolicyService.Resolve`: newest stored revision per operation, most
-specific audience wins, template defaults when the project authored nothing.
+`service.PolicyService.Resolve`: newest stored revision of the project's
+instance for the operation, template defaults when the project authored nothing.
 
 ### Policy evaluation trigger (relation to domain events)
 
@@ -239,7 +229,7 @@ Evaluation takes the resolved instance and the request context. The engine is
 short-circuit, so a user sees every requirement they missed, not just the first.
 
 ```json
-// config — from the instance resolved for this request (ADR 065), defaults filled from the template
+// config — from the project's instance for this operation, defaults filled from the template
 { "min_length": 15, "history_depth": 4 }
 ```
 
@@ -374,21 +364,31 @@ policy does not need). Templates are not release content:
 they ship with the server, and a release records the catalog version it was
 validated against. Release validation checks every instance against its template
 (unknown operation, unknown setting, out-of-bounds value) and rejects two
-instances for the same operation whose audiences overlap at the same tier
-(ADR 065 rule 6).
+instances for the same operation.
 
 ### Applicability
 
-An instance's audience is the [ADR 065](065-audience-scoped-configuration.md)
-mechanism, unchanged: `team_ids` today, closed parameter set, most specific match
-wins wholesale, a request matching no instance gets the template defaults. A
-policy never applies outside its audience. #898 scopes the MVP to one
-project-wide password policy, so the MVP ships one unscoped instance per
-project; audience-scoped instances are ADR 065 capability the model keeps
-open, not #898 scope. There is no expression-based selector
-on the instance: a free-form predicate would make same-tier overlap undecidable
-at release validation and would break the pre-auth, release-cacheable
-`constraints` projection. Context-dependent conditions belong inside a rule.
+This ADR ships policies in **project scope only**: an instance applies to every
+request to its operation in the project, and a project without an instance
+gets the template defaults. That is what #898 asks for (one project-wide
+password policy) and the whole of what is implemented.
+
+Scoping an instance to part of a project is a follow-up, decided in the
+audience-scoped configuration draft
+([#1264](https://github.com/zitadel/nextgen/pull/1264)). That draft gives
+release content a required `audience` (an explicit project default or a set
+of scope parameters such as `team_ids`), release-time validation, and
+most-specific-wins resolution; policies adopt it as-is when it lands, the
+`audience` field joining the envelope next to `kind` and `operation`. Nothing
+here is designed against it: the engine evaluates one resolved instance, the
+resolver is the only piece that grows a request hint, and the [not-weaker
+than-the-project-default check](#policy-hierarchy) waits for the explicit
+default that draft introduces.
+
+There is no expression-based selector on the instance: a free-form predicate
+would make overlap undecidable at release validation and would break the
+pre-auth, release-cacheable `constraints` projection. Context-dependent
+conditions belong inside a rule.
 
 ### Hooks and actions
 
@@ -495,9 +495,9 @@ Four properties of that endpoint are load-bearing rather than incidental:
   operation is not in the catalogue: a client bug, not an unconfigured project.
 - **It is cacheable on the release.** Constraints change only when a release is
   deployed, so the response carries its `release` id and that id is the `ETag`.
-- **It is scoped like any other public read**, resolving the project and the
-  audience the same way the rest of the unauthenticated surface does, and reading
-  from that environment's active release.
+- **It is scoped like any other public read**, resolving the project the same
+  way the rest of the unauthenticated surface does, and reading from that
+  environment's active release.
 
 **The invariant, and the line it does not cross.** Anything `evaluate` can deny
 for must be discoverable in `constraints`. A rule found only by failing is a
@@ -541,9 +541,11 @@ CEL has no `opa test`. Two things replace it:
   (`gator verify`, `kyverno test`, `sentinel test`, `fga model test`).
 - **A server-side dry run.** `POST /policies/{operation}/evaluate` takes an
   explicit context and an optional instance, returns the decision, and has no
-  side effects. The CLI test command calls it. The same endpoint answers "which
-  instance wins for this audience and why", which a first-match resolution model
-  needs (Okta ships a policy simulator for exactly this reason).
+  side effects. The CLI test command calls it. Once scoped instances land
+  ([#1264](https://github.com/zitadel/nextgen/pull/1264)) the same endpoint
+  answers "which instance wins for this request and why", which a
+  most-specific-wins resolution model needs (Okta ships a policy simulator for
+  exactly this reason).
 
 The CLI never evaluates CEL itself: it is TypeScript, there is no official CEL
 implementation for JavaScript, and a second evaluator would drift.
@@ -576,7 +578,7 @@ The other jobs keep their existing homes: who may view and change it →
 permission catalogs ([ADR 032](032-permission-catalogs.md),
 [033](033-internal-permission-management.md),
 [034](034-external-permission-management.md)); what it affects → applicability
-([ADR 065](065-audience-scoped-configuration.md)); what happens when the owning
+([#1264](https://github.com/zitadel/nextgen/pull/1264), project-wide until then); what happens when the owning
 resource is deleted → explicit lifecycle policy in
 [ADR 024](024-user-team-lifecycle-ownership.md)'s style, never a cascade; where
 it is authored → the release (ADR 035).
@@ -627,13 +629,21 @@ property of the data model, not of review.
 
 **Not MVP.** #383 asks only that the architecture not foreclose it, and
 [Ownership](#ownership) pins the resolution root to the Project.
-[ADR 065](065-audience-scoped-configuration.md) already gives one default and
-one winning override per audience, wholesale. What it does not give is
-*restrictive* inheritance: a team override may today be weaker than the project
-default. When that is wanted, the template gains a per-setting strictness
-direction (`min_length`: higher is stricter; `max_attempts`: lower is stricter)
-and release validation rejects an override that weakens the default. The
-setting-level metadata is the only new piece; the resolution model is unchanged.
+
+Scoped instances come with the audience-scoped configuration draft
+([#1264](https://github.com/zitadel/nextgen/pull/1264)): one explicit project
+default and one winning override per request, applied wholesale. What that
+draft does not give by itself is *restrictive* inheritance: a team override
+could be weaker than the project default. Policies close that when they adopt
+it: the template gains a per-setting strictness direction (`min_length`:
+higher is stricter; a blocklist: a superset is stricter; a fixed setting has
+none), and saving a scoped instance compares its effective config against the
+project's explicit default for the same operation, rejecting any setting that
+is weaker and naming both values. Saving a new default runs the same check the
+other way, against every scoped instance of the operation, so a default can
+only tighten when its overrides already comply. Without a default the
+comparison runs against the template defaults. The setting-level metadata is
+the only new piece; the resolution model is unchanged.
 
 The unresolved product question is tenant-authored configuration: a Team in a
 customer project is a runtime resource, so a Team-level override cannot be in
