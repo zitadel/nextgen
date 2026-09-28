@@ -648,6 +648,79 @@ func TestFlowStateMachine_Process_CreateUserWithSsoRunsItsOwnHandler(t *testing.
 	require.NoError(t, err)
 }
 
+// Security regression (Copilot review on #1280): the password-dispatch
+// shortcut skipped verification whenever a visited step ran any on_success.
+// create_user_with_sso establishes no password, so a login step that collects
+// one while running (or after) an SSO mutation must still verify it -- else a
+// password-shaped submission reaches handoff unverified. Pin that SubmitPassword
+// is still called for a create_user_with_sso step.
+func TestFlowStateMachine_Process_SsoStepStillVerifiesPassword(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+
+	w.schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+		AnyTimes()
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
+	w.authAttemptService.EXPECT().
+		SubmitIdentifier(gomock.Any(), gomock.Any()).
+		Return("user_alice", nil)
+	// The fix: the password must be verified even though this step runs an
+	// on_success. A rejected password stops the flow before on_success.
+	w.authAttemptService.EXPECT().
+		SubmitPassword(gomock.Any(), gomock.Any()).
+		Return(domain.ErrAuthAttemptProofRejected(nil)).
+		Times(1)
+	// on_success must not run: verification failed, so no user is minted and
+	// nothing is handed off.
+	w.createUserWithSSO.EXPECT().Handle(gomock.Any(), gomock.Any()).Times(0)
+	w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).Times(0)
+
+	withSso := domain.FlowOnSuccessCreateUserWithSso
+	show := domain.FlowStepCompleteShow
+	def := &domain.FlowDefinition{
+		ProjectID:  testProjectID,
+		ID:         "def-sso-verify",
+		UserSchema: defaultSchemaURL,
+		Purposes:   map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "verify"},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name:      "verify",
+				Fields:    []domain.Field{"email", "x-auth-methods#password"},
+				OnSuccess: &withSso,
+				Actions: []domain.FlowStepAction{
+					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					domain.FlowActionSubmit: {Target: "done"},
+				},
+			},
+			{Name: "done", Complete: &show},
+		},
+	}
+
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	result, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{
+			"email":                   "alice@example.com",
+			"x-auth-methods#password": "wrong-password",
+		},
+	})
+	require.NoError(t, err)
+	// The step re-renders with a credential error rather than advancing.
+	require.NotNil(t, result.Step.Error)
+	assert.Equal(t, domain.FlowStepErrorInvalidCredentials, *result.Step.Error)
+}
+
 func TestFlowStateMachine_Process_InvalidActionRejected(t *testing.T) {
 	t.Parallel()
 	w := newFlowTestWorld(t)
