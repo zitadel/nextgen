@@ -67,6 +67,11 @@ func (r *SchemaFieldResolver) Validate(fields FlowResolvedFields, values map[str
 		if violatesConst(value, field.Validation) {
 			errs = append(errs, FlowFieldValidationError{Field: name, Rule: FlowFieldValidationRuleFormat})
 		}
+		// A password is normalized before it is hashed or checked by the
+		// policy gate, so its length rules must count the same string.
+		if field.Type == FlowFieldTypePassword {
+			str = NormalizePassword(str)
+		}
 		errs = append(errs, applyValidationRules(name, str, field.Validation)...)
 	}
 	if len(errs) > 0 {

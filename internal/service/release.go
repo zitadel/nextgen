@@ -254,7 +254,7 @@ func (s *releaseService) resolveHandle(ctx context.Context, projectID string, po
 		return domain.ReleasePolicyHandle(revision), nil
 
 	default:
-		// Unreachable over HTTP: the wire enum admits only the three kinds
+		// Unreachable over HTTP: the wire enum admits only the four kinds
 		// above. It stays mapped for the in-process callers that skip the
 		// decoder.
 		return "", domain.ErrReleaseInvalid(fmt.Sprintf("unknown pointer kind %d", pointer.Kind), nil)

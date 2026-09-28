@@ -51255,6 +51255,7 @@ const (
 	ReleasePointerKindSchema         ReleasePointerKind = "schema"
 	ReleasePointerKindFlowDefinition ReleasePointerKind = "flow_definition"
 	ReleasePointerKindBranding       ReleasePointerKind = "branding"
+	ReleasePointerKindPolicy         ReleasePointerKind = "policy"
 )
 
 // AllValues returns all ReleasePointerKind values.
@@ -51263,6 +51264,7 @@ func (ReleasePointerKind) AllValues() []ReleasePointerKind {
 		ReleasePointerKindSchema,
 		ReleasePointerKindFlowDefinition,
 		ReleasePointerKindBranding,
+		ReleasePointerKindPolicy,
 	}
 }
 
@@ -51274,6 +51276,8 @@ func (s ReleasePointerKind) MarshalText() ([]byte, error) {
 	case ReleasePointerKindFlowDefinition:
 		return []byte(s), nil
 	case ReleasePointerKindBranding:
+		return []byte(s), nil
+	case ReleasePointerKindPolicy:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -51291,6 +51295,9 @@ func (s *ReleasePointerKind) UnmarshalText(data []byte) error {
 		return nil
 	case ReleasePointerKindBranding:
 		*s = ReleasePointerKindBranding
+		return nil
+	case ReleasePointerKindPolicy:
+		*s = ReleasePointerKindPolicy
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
