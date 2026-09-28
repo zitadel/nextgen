@@ -23,3 +23,19 @@ func TestFlowFieldValidationCountsCodePointsNotBytes(t *testing.T) {
 		t.Fatalf("9 code points rejected: %v", err)
 	}
 }
+
+func TestFlowFieldValidationNormalizesPasswordBeforeCounting(t *testing.T) {
+	t.Parallel()
+	resolver := domain.NewSchemaFieldResolver()
+	fields := domain.FlowResolvedFields{Fields: []domain.FlowField{{
+		Name:       "pw",
+		Type:       domain.FlowFieldTypePassword,
+		Validation: &domain.FlowFieldValidation{MinLength: 8, MaxLength: 8},
+	}}}
+	// Eight decomposed "é" (e + combining acute) are 16 code points raw and
+	// 8 once NFC-normalized, which is what the policy gate counts.
+	decomposed := "éééééééé"
+	if err := resolver.Validate(fields, map[string]any{"pw": decomposed}); err != nil {
+		t.Fatalf("8 normalized code points rejected: %v", err)
+	}
+}
