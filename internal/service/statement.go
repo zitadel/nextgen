@@ -32,6 +32,7 @@ type AllStatements interface {
 	EnvironmentStatements
 	ReleaseStatements
 	IDPConnectionStatements
+	DeploymentStatements
 	TeamStatements
 	TeamMembershipStatements
 	TokenStatements
@@ -156,6 +157,10 @@ type ReleaseStatements interface {
 	// assembling a release resolves an identical pinned set to the release that
 	// already holds it rather than writing a second one.
 	GetReleaseByContentHash(ctx context.Context, projectID, contentHash string) (*domain.Release, error)
+	// GetReleasesByIDs reads the named releases in one round trip, for
+	// hydrating an expanded deployment list (ADR 059). Unknown ids are simply
+	// absent from the result, not an error.
+	GetReleasesByIDs(ctx context.Context, projectID string, ids []string) ([]*domain.Release, error)
 	ListReleases(ctx context.Context, filter *database.ListOptions[domain.ReleaseField]) (*database.ListResult[*domain.Release], error)
 }
 
@@ -191,6 +196,33 @@ type IDPConnectionStatements interface {
 	// the cursor. An unknown connection returns an empty page, so a handler
 	// needs GetIDPConnection to tell that from a connection with no revisions.
 	ListIDPConnectionRevisions(ctx context.Context, projectID, connectionID string, page database.Page[domain.IDPConnectionField]) (*database.ListResult[*domain.IDPConnection], error)
+}
+
+// TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
+// type DeploymentPool interface {
+// 	Statementer[DeploymentStatements]
+// 	Transactioner[DeploymentStatements]
+// }
+
+type DeploymentStatements interface {
+	Statements
+	// CreateDeployment inserts the deployment and points the environment's
+	// current_deployment_id at it, atomically. A non-nil
+	// expectedCurrentDeploymentID makes the swap conditional: when the
+	// environment's current deployment is not exactly that one, nothing is
+	// written and domain.ErrDeploymentConflict reports what actually runs.
+	// An environment that does not exist is a NoRowFoundError.
+	//
+	// Idempotent on the running release: when the environment's current
+	// deployment already points at entity's release, nothing is written,
+	// entity is overwritten with that existing record, and created is false.
+	CreateDeployment(ctx context.Context, entity *domain.Deployment, expectedCurrentDeploymentID *string) (created bool, err error)
+	GetDeploymentByID(ctx context.Context, projectID, id string) (*domain.Deployment, error)
+	// GetDeploymentsByIDs reads the named deployments in one round trip, for
+	// hydrating current_deployment on environment reads. Unknown ids are
+	// simply absent from the result, not an error.
+	GetDeploymentsByIDs(ctx context.Context, projectID string, ids []string) ([]*domain.Deployment, error)
+	ListDeployments(ctx context.Context, filter *database.ListOptions[domain.DeploymentField]) (*database.ListResult[*domain.Deployment], error)
 }
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
