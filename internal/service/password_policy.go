@@ -32,8 +32,8 @@ func NewPasswordPolicy(engine *policy.Engine, resolver policy.Resolver, verifier
 
 // Constraints returns the pre-auth projection for the project's effective
 // instance: what a login form renders before the user types.
-func (p *PasswordPolicy) Constraints(ctx context.Context, projectID string, hint policy.Hint) (policy.Constraints, error) {
-	inst, err := policy.Effective(ctx, p.engine, p.resolver, projectID, PasswordSaveOperation, hint)
+func (p *PasswordPolicy) Constraints(ctx context.Context, projectID string) (policy.Constraints, error) {
+	inst, err := policy.Effective(ctx, p.engine, p.resolver, projectID, PasswordSaveOperation)
 	if err != nil {
 		return policy.Constraints{}, err
 	}
@@ -41,10 +41,9 @@ func (p *PasswordPolicy) Constraints(ctx context.Context, projectID string, hint
 }
 
 // FieldValidation projects the constraints onto the flow field validation
-// the step payload already carries. Only the project default is reachable
-// here: the field resolver runs before the request's team is known.
+// the step payload already carries.
 func (p *PasswordPolicy) FieldValidation(ctx context.Context, projectID string) (*domain.FlowFieldValidation, error) {
-	c, err := p.Constraints(ctx, projectID, policy.Hint{})
+	c, err := p.Constraints(ctx, projectID)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +62,7 @@ func (p *PasswordPolicy) FieldValidation(ctx context.Context, projectID string) 
 // operation may proceed.
 func (p *PasswordPolicy) Check(ctx context.Context, stmts AllStatements, projectID, userID, candidate string) error {
 	candidate = domain.NormalizePassword(candidate)
-	inst, err := policy.Effective(ctx, p.engine, p.resolver, projectID, PasswordSaveOperation, policy.Hint{})
+	inst, err := policy.Effective(ctx, p.engine, p.resolver, projectID, PasswordSaveOperation)
 	if err != nil {
 		return domain.ErrInternal(err).WithMessage("failed to resolve password policy")
 	}

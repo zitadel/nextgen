@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/policy"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	policystore "github.com/zitadel/nextgen/internal/storage/policy"
@@ -36,7 +35,6 @@ func samplePolicy(projectID, id string) *domain.Policy {
 		ProjectID: projectID,
 		ID:        id,
 		Operation: "user.password.save",
-		Audience:  policy.Audience{TeamIDs: []string{"team_acme"}},
 		Config:    map[string]any{"min_length": float64(20), "history_depth": float64(2)},
 	}
 }
@@ -55,7 +53,6 @@ func TestPolicyStatements_CreateAndGet(t *testing.T) {
 		assert.Equal(t, entity.ProjectID, got.ProjectID)
 		assert.Equal(t, entity.ID, got.ID)
 		assert.Equal(t, entity.Operation, got.Operation)
-		assert.Equal(t, entity.Audience, got.Audience)
 		assert.Equal(t, entity.Config, got.Config)
 	})
 }

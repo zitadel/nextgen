@@ -2,8 +2,8 @@ x-meta-schema: true
 title: Policy
 description: |
   A policy instance: the developer-authored half of an operation policy. It
-  carries the configuration values for one catalogued operation and the
-  audience the values apply to. Used as the request body of `POST /policies`,
+  carries the configuration values for one catalogued operation and applies
+  to the whole project. Used as the request body of `POST /policies`,
   which publishes it as a new immutable revision, and locally as a
   `.zitadel/policies/<operation>.json` file that `zitadel apply` publishes.
 

@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"strings"
 	"time"
 
 	"github.com/zitadel/nextgen/internal/policy"
@@ -24,14 +23,13 @@ func ErrPolicyPermissionDenied() Error {
 }
 
 // Policy is one immutable revision of a policy instance (ADR 066): the
-// developer-authored config and audience for one catalogued operation. Revisions are never updated or deleted; every edit publishes a
-// new revision and evaluation resolves the newest one per operation and
-// audience.
+// developer-authored config for one catalogued operation, applying to the
+// whole project. Revisions are never updated or deleted; every edit publishes
+// a new revision and evaluation resolves the newest one per operation.
 type Policy struct {
 	ProjectID string
 	ID        string
 	Operation string
-	Audience  policy.Audience
 	Config    map[string]any
 	CreatedAt time.Time
 }
@@ -41,7 +39,6 @@ func (p *Policy) Instance() *policy.Instance {
 	return &policy.Instance{
 		Kind:      policy.KindPolicy,
 		Operation: p.Operation,
-		Audience:  p.Audience,
 		Config:    p.Config,
 	}
 }
@@ -78,19 +75,14 @@ func NewPolicy(projectID string, inst *policy.Instance) (*Policy, error) {
 	return &Policy{
 		ProjectID: projectID,
 		Operation: inst.Operation,
-		Audience:  inst.Audience,
 		Config:    cfg,
 		CreatedAt: time.Now().UTC(),
 	}, nil
 }
 
 // ReleasePolicyHandle is the handle a release pointer carries for a policy
-// revision: the operation, plus the audience when the instance is scoped, so
-// the project default and a team override of the same operation do not
-// collide while two revisions of the same instance do.
+// revision: the operation, so two revisions of the same instance collide
+// while instances for different operations do not.
 func ReleasePolicyHandle(p *Policy) string {
-	if p.Audience.IsEmpty() {
-		return p.Operation
-	}
-	return p.Operation + "@" + strings.Join(p.Audience.TeamIDs, ",")
+	return p.Operation
 }
