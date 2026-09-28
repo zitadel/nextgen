@@ -257,6 +257,70 @@ func TestConsoleManagementSessionWithoutAccess(t *testing.T) {
 	})
 }
 
+// TestConsoleSessionListsTargetProject pins #1300 §2: a platform
+// operator signs in to the platform project and manages a customer project
+// through a grant, so home and target differ. `project_id` on queryUsers names
+// the target; without it the home project is listed, as before.
+func TestConsoleSessionListsTargetProject(t *testing.T) {
+	t.Parallel()
+
+	console := harness.EnsurePlatformProject(t)
+	operatorID, _ := harness.CreateUserOwnedByTeam(t, console.ID)
+
+	customer, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	harness.SeedProjectAdmin(t, customer.ID, operatorID)
+	customerUserID, _ := harness.CreateUserOwnedByTeam(t, customer.ID)
+
+	session := sessionClientForUser(t, operatorID)
+	target := api.QueryUsersParams{ProjectID: api.NewOptProjectID(api.ProjectID(customer.ID))}
+
+	t.Run("lists the customer project's users", func(t *testing.T) {
+		t.Parallel()
+		resp, err := session.QueryUsers(t.Context(), &api.QueryUsersRequest{}, target)
+		require.NoError(t, err)
+		listed, ok := resp.(*api.QueryUsersResponse)
+		require.True(t, ok, helpers.MustMarshal(t, resp))
+		ids := make([]string, 0, len(listed.Users))
+		for _, item := range listed.Users {
+			ids = append(ids, userID(t, item))
+		}
+		require.Contains(t, ids, customerUserID)
+		require.NotContains(t, ids, operatorID, "the operator is homed in the platform project")
+	})
+
+	// The other list screens already took project_id; with #1300 §1 they
+	// accept the cookie too, so the whole screen set follows the selection.
+	t.Run("lists the customer project's schemas", func(t *testing.T) {
+		t.Parallel()
+		resp, err := session.ListSchemas(t.Context(), api.ListSchemasParams{ProjectID: api.ProjectID(customer.ID)})
+		require.NoError(t, err)
+		listed, ok := resp.(*api.ListSchemasResponse)
+		require.True(t, ok, helpers.MustMarshal(t, resp))
+		require.NotEmpty(t, listed.Schemas)
+	})
+
+	t.Run("a project secret stays bound to its own project", func(t *testing.T) {
+		t.Parallel()
+		secret, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+		require.NoError(t, err)
+		harness.SetProjectSecretOnApiClient(t, secret, console)
+
+		resp, err := secret.QueryUsers(t.Context(), &api.QueryUsersRequest{}, target)
+		require.NoError(t, err)
+		requireUsersNotFound(t, resp)
+	})
+
+	t.Run("without a grant the target is not listed", func(t *testing.T) {
+		t.Parallel()
+		strangerID, _ := harness.CreateUserOwnedByTeam(t, console.ID)
+		stranger := sessionClientForUser(t, strangerID)
+		resp, err := stranger.QueryUsers(t.Context(), &api.QueryUsersRequest{}, target)
+		require.NoError(t, err)
+		requireUsersNotFound(t, resp)
+	})
+}
+
 // TestConsoleManagementBearerIgnoresStaleCookie pins the dual-scheme
 // precedence: a valid project secret authorizes the request even when a stale
 // or malformed session cookie rides along, instead of the cookie's failure
@@ -277,4 +341,14 @@ func TestConsoleManagementBearerIgnoresStaleCookie(t *testing.T) {
 	require.NoError(t, err)
 	defer resp.Body.Close()
 	assert.Equal(t, http.StatusCreated, resp.StatusCode)
+}
+
+// requireUsersNotFound pins a refused users list to its not-found shape: 404
+// user.not_found, the same answer as a project that does not exist.
+func requireUsersNotFound(t *testing.T, resp api.QueryUsersRes) {
+	t.Helper()
+	require.IsType(t, &api.QueryUsersErrorResponseStatusCode{}, resp, helpers.MustMarshal(t, resp))
+	denied := resp.(*api.QueryUsersErrorResponseStatusCode)
+	assert.Equal(t, http.StatusNotFound, denied.StatusCode)
+	assert.True(t, denied.Response.IsUserNotFound(), helpers.MustMarshal(t, resp))
 }
