@@ -20,7 +20,15 @@ secret-handling caveat live in [`README.md`](README.md).
 - `moon run console-e2e:e2e-platform` — **platform-project coverage**: the
   same binary with the platform project bootstrapped (the server default). An
   operator signs up through the console, is granted the harness project by
-  email, and uses the screens on the session cookie alone.
+  email, and uses the screens on the session cookie alone. The console selects
+  that project on its own (the operator's only grant, as `?project=`), so the
+  screens run in a project other than the one the console signs into.
+
+Console screens act on the selected project (`?project=`, see
+[`apps/console/AGENTS.md`](../console/AGENTS.md)). The `e2e-real` lane pins it
+through `VITE_CONSOLE_PROJECT_ID`; a spec that navigates by URL either lets the
+guard fill it in or names it, and asserts it survives navigation where that is
+the point.
 
 All four tasks carry `runInCI: false` — that only keeps them out of moon's
 automatic selection. The `full-pr` job explicitly runs `e2e-real`,
