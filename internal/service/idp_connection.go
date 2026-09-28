@@ -70,6 +70,11 @@ func (s *idpConnectionService) CreateOrRevise(ctx context.Context, projectID str
 		if createErr == nil {
 			return &CreateIDPConnectionOutput{Connection: created, Created: true}, nil
 		}
+		// project_id is the only foreign key on a new connection, so a
+		// violation means the project was deleted underneath the call.
+		if _, ok := errors.AsType[*database.ForeignKeyError](createErr); ok {
+			return nil, domain.ErrIDPConnectionNotFound().WithParent(createErr)
+		}
 		if _, raced := errors.AsType[*database.UniqueError](createErr); !raced {
 			return nil, domain.ErrInternal(createErr).WithMessage("failed to create identity provider connection")
 		}

@@ -242,6 +242,18 @@ func TestIDPConnectionService_CreateOrRevise(t *testing.T) {
 		assert.ErrorIs(t, err, domain.ErrIDPConnectionRevisionConflict())
 	})
 
+	t.Run("a project deleted before the create is not found", func(t *testing.T) {
+		t.Parallel()
+		f := newIDPConnectionFixture(t)
+		f.pool.EXPECT().GetIDPConnection(gomock.Any(), gomock.Any()).Return(nil, database.NewNoRowFoundError(nil))
+		f.tx.EXPECT().CreateIDPConnection(gomock.Any(), gomock.Any()).
+			Return(database.NewForeignKeyError("idp_connections", "fk_idp_connections_project", nil))
+
+		_, err := f.svc.CreateOrRevise(t.Context(), idpProjectID, googleConnection("https://accounts.google.com", "Google"))
+		assert.ErrorIs(t, err, domain.ErrIDPConnectionNotFound())
+		assert.Empty(t, *f.events)
+	})
+
 	t.Run("a connection gone before the lock is not found", func(t *testing.T) {
 		t.Parallel()
 		f := newIDPConnectionFixture(t)
