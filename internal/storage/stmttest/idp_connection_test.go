@@ -435,6 +435,78 @@ func TestIDPConnectionStatements_LockSerializesRevisions(t *testing.T) {
 	})
 }
 
+// A revise whose transaction began before a concurrent one but took the lock
+// after it must still stamp its revision after the one it follows. Otherwise
+// the newest-by-created_at rule would serve the older write as newest, and
+// the late revise's answer would be superseded at once. Postgres' now() is
+// transaction-start time, so it once failed exactly this way.
+func TestIDPConnectionStatements_LateReviseInEarlyTransactionStampsLast(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		if d.name == "sqlite" {
+			// A single writer: BEGIN IMMEDIATE blocks B until A commits, so B
+			// cannot lock and commit while A's transaction is open.
+			t.Skip("sqlite serializes writers; interleaving not constructible")
+		}
+		projectID := ensureProject(t, d.stmts)
+		entity := createIDPConnection(t, d.stmts, projectID, "late-"+uniqueSuffix(t), idpConnectionDocument("https://v1.example.com"))
+
+		revise := func(ctx context.Context, tx service.Statementer[service.AllStatements], issuer string, out *domain.IDPConnection) error {
+			if err := tx.Statements().LockIDPConnection(ctx, projectID, entity.ID); err != nil {
+				return err
+			}
+			current, err := tx.Statements().GetIDPConnection(ctx, idpConnectionByID(projectID, entity.ID))
+			if err != nil {
+				return err
+			}
+			next := *current
+			next.Document = idpConnectionDocument(issuer)
+			if err := tx.Statements().ReviseIDPConnection(ctx, &next); err != nil {
+				return err
+			}
+			*out = next
+			return nil
+		}
+
+		var begun sync.Once
+		begunCh := make(chan struct{})
+		proceedCh := make(chan struct{})
+		var late domain.IDPConnection
+		lateErr := make(chan error, 1)
+		go func() {
+			// No require in here: it would leave begunCh open and hang the test.
+			lateErr <- d.pool.Transaction(context.Background(), func(ctx context.Context, tx service.Statementer[service.AllStatements]) error {
+				// A statement fixes the transaction's start before B runs.
+				if _, err := tx.Statements().GetIDPConnection(ctx, idpConnectionByID(projectID, entity.ID)); err != nil {
+					return err
+				}
+				// Once per attempt: spanner replays aborted attempts.
+				begun.Do(func() { close(begunCh) })
+				<-proceedCh
+				return revise(ctx, tx, "https://late.example.com", &late)
+			})
+		}()
+		select {
+		case <-begunCh:
+		case err := <-lateErr:
+			t.Fatalf("the late transaction ended before it began waiting: %v", err)
+		}
+
+		var early domain.IDPConnection
+		earlyErr := d.pool.Transaction(t.Context(), func(ctx context.Context, tx service.Statementer[service.AllStatements]) error {
+			return revise(ctx, tx, "https://early.example.com", &early)
+		})
+		close(proceedCh)
+		require.NoError(t, earlyErr)
+		require.NoError(t, <-lateErr)
+
+		assert.True(t, late.UpdatedAt.After(early.UpdatedAt),
+			"the late revise stamped %s, not after the revision it followed (%s)", late.UpdatedAt, early.UpdatedAt)
+		newest, err := d.stmts.GetIDPConnection(t.Context(), idpConnectionByID(projectID, entity.ID))
+		require.NoError(t, err)
+		assert.Equal(t, late.RevisionID, newest.RevisionID, "the late revise must be the newest revision")
+	})
+}
+
 func TestIDPConnectionStatements_LockUnknownConnection(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID := ensureProject(t, d.stmts)

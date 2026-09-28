@@ -20,6 +20,9 @@ const (
 	// The revision's created_at is served as UpdatedAt, so the insert returns
 	// it. This is also the whole of a revise, where the foreign key on
 	// (project_id, connection_id) reports an unknown connection.
+	// The default CURRENT_TIMESTAMP() is taken when this statement runs, after
+	// the revise transaction read the connection row, so revision order follows
+	// lock order.
 	createIDPConnectionRevisionStmt = `INSERT INTO idp_connection_revisions ` +
 		`(project_id, id, connection_id, document) VALUES (@p1, @p2, @p3, @p4) THEN RETURN created_at`
 

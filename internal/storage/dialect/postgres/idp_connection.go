@@ -16,11 +16,21 @@ const (
 	createIDPConnectionStmt = `INSERT INTO zitadel_nextgen.idp_connections ` +
 		`(project_id, id, slug) VALUES ($1, $2, $3) RETURNING created_at`
 
-	// The revision's created_at is served as UpdatedAt, so the insert returns
-	// it. This is also the whole of a revise, where the foreign key on
-	// (project_id, connection_id) reports an unknown connection.
+	// The revision's created_at is served as UpdatedAt, so the inserts return
+	// it. The first revision takes the column default now(), the connection
+	// row's transaction timestamp.
 	createIDPConnectionRevisionStmt = `INSERT INTO zitadel_nextgen.idp_connection_revisions ` +
 		`(project_id, id, connection_id, document) VALUES ($1, $2, $3, $4) RETURNING created_at`
+
+	// The whole of a revise, where the foreign key on (project_id,
+	// connection_id) reports an unknown connection. clock_timestamp() rather
+	// than now(): now() is fixed at transaction start, and a revise that began
+	// before a concurrent one but took the connection lock after it would
+	// stamp a time older than the revision it follows, so the newest-by-
+	// created_at rule (ADR 063 section 7) would skip it. Deployments stamp
+	// deployed_at the same way for the same reason.
+	reviseIDPConnectionStmt = `INSERT INTO zitadel_nextgen.idp_connection_revisions ` +
+		`(project_id, id, connection_id, document, created_at) VALUES ($1, $2, $3, $4, clock_timestamp()) RETURNING created_at`
 
 	// FOR UPDATE holds the connection row until the transaction ends: a second
 	// revise of the same connection waits here, then reads the first one's
@@ -94,7 +104,7 @@ func (s idpConnectionStatements) ReviseIDPConnection(ctx context.Context, entity
 	}
 	// One insert, so no transaction. The connection row is not read here, so
 	// CreatedAt stays as the caller had it.
-	if err := s.client.QueryRow(ctx, createIDPConnectionRevisionStmt,
+	if err := s.client.QueryRow(ctx, reviseIDPConnectionStmt,
 		entity.ProjectID,
 		revisionID,
 		entity.ID,

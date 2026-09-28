@@ -94,6 +94,8 @@ func (s idpConnectionStatements) ReviseIDPConnection(ctx context.Context, entity
 	}
 	// One insert, so no transaction. The connection row is not read here, so
 	// CreatedAt stays as the caller had it.
+	// Stamped at the insert, inside a transaction BEGIN IMMEDIATE already
+	// serialized, so revision order follows transaction order.
 	now := nowUnixNano()
 	if _, err := s.client.Exec(ctx, createIDPConnectionRevisionStmt,
 		entity.ProjectID,
