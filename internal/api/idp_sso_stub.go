@@ -487,9 +487,11 @@ func (h *Handler) ssoOutcome(
 		slog.WarnContext(ctx, "sso stub: creating from claims failed, collecting instead",
 			slog.String("error", err.Error()))
 		return domain.FlowImplicitOutcomeIdentityUnknown, false
-	case result.StepError != nil && *result.StepError == domain.FlowImplicitOutcomeUserAlreadyExists:
+	case result.Outcome == domain.FlowImplicitOutcomeUserAlreadyExists:
 		return domain.FlowImplicitOutcomeUserAlreadyExists, false
-	case result.StepError != nil:
+	case result.Outcome != "":
+		// Any other outcome the handler routes to is not one the callback
+		// knows how to resume; fall back to collection.
 		return domain.FlowImplicitOutcomeIdentityUnknown, false
 	}
 	if result.UserID != "" {
