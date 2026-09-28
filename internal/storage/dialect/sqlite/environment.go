@@ -13,7 +13,7 @@ import (
 
 const (
 	createEnvironmentStmt = `INSERT INTO environments (project_id, id, name, created_at) VALUES (?, ?, ?, ?) RETURNING created_at`
-	environmentQuery      = `SELECT project_id, id, name, created_at FROM environments`
+	environmentQuery      = `SELECT project_id, id, name, created_at, current_deployment_id FROM environments`
 )
 
 type environmentStatements struct{ statement }
@@ -89,13 +89,18 @@ func (es environmentStatements) ListEnvironments(ctx context.Context, filter *da
 
 func scanEnvironment(rows *sql.Rows) (*domain.Environment, error) {
 	var (
-		entity      domain.Environment
-		createdNano int64
+		entity            domain.Environment
+		createdNano       int64
+		currentDeployment sql.NullString
 	)
-	if err := rows.Scan(&entity.ProjectID, &entity.ID, &entity.Name, &createdNano); err != nil {
+	if err := rows.Scan(&entity.ProjectID, &entity.ID, &entity.Name, &createdNano, &currentDeployment); err != nil {
 		return nil, err
 	}
 	entity.CreatedAt = timeFromUnixNano(createdNano)
+	if currentDeployment.Valid {
+		v := currentDeployment.String
+		entity.CurrentDeploymentID = &v
+	}
 	return &entity, nil
 }
 
