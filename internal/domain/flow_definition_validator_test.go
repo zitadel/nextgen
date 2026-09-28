@@ -1893,3 +1893,98 @@ func TestValidator_TransitionPurposeWrongTargetRejected(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, errorDetails(t, err), `must target that purpose's entry step "register"`)
 }
+
+// The create_user_with_sso mutation mints a user with no credential, so the
+// validator must reject any flow that could reach it without a provider
+// callback (raised in review by @vitorbari). A valid flow reaches it only via
+// the identity_unknown outcome.
+func TestValidateSsoCreationReachability(t *testing.T) {
+	var schema jsonschema.Schema
+	require.NoError(t, json.Unmarshal(tenantUserSchema, &schema))
+
+	ssoCreate := domain.FlowOnSuccessCreateUserWithSso
+	show := domain.FlowStepCompleteShow
+
+	base := func(steps []domain.FlowDefinitionStep, purposes map[domain.FlowDefinitionPurpose]string) domain.FlowDefinition {
+		return domain.FlowDefinition{
+			ProjectID:     "project1",
+			Name:          "login",
+			SchemaVersion: "1.0.0",
+			UserSchema:    "https://tenant.com/schemas/my-user.json",
+			Purposes:      purposes,
+			Audience:      domain.FlowDefinitionAudience{AppIDs: []string{"app1"}, TeamIDs: []string{"team1"}},
+			Steps:         steps,
+		}
+	}
+
+	t.Run("rejects create_user_with_sso as a purpose entry", func(t *testing.T) {
+		def := base(
+			[]domain.FlowDefinitionStep{
+				{
+					Name:        "signup",
+					Fields:      []domain.Field{"email"},
+					OnSuccess:   &ssoCreate,
+					Actions:     []domain.FlowStepAction{{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true}},
+					Transitions: map[string]domain.FlowStepTransition{"submit": {Target: "done"}},
+				},
+				{Name: "done", Complete: &show},
+			},
+			map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeRegister: "signup"},
+		)
+		_, err := domain.ValidateFlowDefinition(&schema, def)
+		require.Error(t, err, "a plain-submit entry step running create_user_with_sso must be rejected")
+	})
+
+	t.Run("rejects create_user_with_sso reached via a plain submit", func(t *testing.T) {
+		def := base(
+			[]domain.FlowDefinitionStep{
+				{
+					Name:        "identifier",
+					Fields:      []domain.Field{"email"},
+					Actions:     []domain.FlowStepAction{{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true}},
+					Transitions: map[string]domain.FlowStepTransition{"submit": {Target: "make"}},
+				},
+				{
+					Name:        "make",
+					Fields:      []domain.Field{"email"},
+					OnSuccess:   &ssoCreate,
+					Actions:     []domain.FlowStepAction{{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true}},
+					Transitions: map[string]domain.FlowStepTransition{"submit": {Target: "done"}},
+				},
+				{Name: "done", Complete: &show},
+			},
+			map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeRegister: "identifier"},
+		)
+		_, err := domain.ValidateFlowDefinition(&schema, def)
+		require.Error(t, err, "a create_user_with_sso step reached via submit must be rejected")
+	})
+
+	t.Run("accepts create_user_with_sso reached only via identity_unknown", func(t *testing.T) {
+		def := base(
+			[]domain.FlowDefinitionStep{
+				{
+					Name:   "identifier",
+					Fields: []domain.Field{"email"},
+					Actions: []domain.FlowStepAction{
+						{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+					},
+					Transitions: map[string]domain.FlowStepTransition{
+						"submit":           {Target: "done"},
+						"identity_unknown": {Target: "register-sso"},
+					},
+				},
+				{
+					Name:        "register-sso",
+					Fields:      []domain.Field{"email"},
+					OnSuccess:   &ssoCreate,
+					Actions:     []domain.FlowStepAction{{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true}},
+					Transitions: map[string]domain.FlowStepTransition{"submit": {Target: "done"}},
+				},
+				{Name: "done", Complete: &show},
+			},
+			map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "identifier"},
+		)
+		_, err := domain.ValidateFlowDefinition(&schema, def)
+		require.NoError(t, err, "reaching create_user_with_sso only via identity_unknown must be allowed")
+	})
+}

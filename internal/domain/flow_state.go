@@ -84,6 +84,27 @@ type FlowState struct {
 	// last successful Submit* call; handed off by the API handler at
 	// the OIDC redirect boundary.
 	AuthAttemptID string
+
+	// VerifiedIdentity records that a trusted provider callback resolved an
+	// external identity in this flow. Server-set (only the SSO callback
+	// writes it) and durable on FlowState -- unlike CollectedData it must
+	// survive a pivot. create_user_with_sso refuses to run without it, so a
+	// flow that routes a plain submit into that mutation cannot mint a user
+	// with no proof of identity.
+	VerifiedIdentity *FlowVerifiedIdentity
+}
+
+// FlowVerifiedIdentity is what a provider callback asserted about the user:
+// which provider, and the provider's stable subject id.
+type FlowVerifiedIdentity struct {
+	Provider string // "google", "github", "saml", ...
+	Subject  string
+}
+
+// Valid reports whether a provider verification was recorded. Safe to call on
+// a nil receiver, so callers can write `state.VerifiedIdentity.Valid()`.
+func (vi *FlowVerifiedIdentity) Valid() bool {
+	return vi != nil && vi.Provider != "" && vi.Subject != ""
 }
 
 // FlowPendingChallenge records the server-issued challenge the next
