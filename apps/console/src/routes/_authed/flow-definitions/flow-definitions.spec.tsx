@@ -85,17 +85,21 @@ describe("login flows list", () => {
     expect(await screen.findByText("This project has no login flows.")).toBeInTheDocument();
   });
 
-  it("renders a row with its humanised name, purposes, steps and schema", async () => {
+  it("renders a table row with its humanised name, purposes and schema", async () => {
     server.use(http.get(FLOWS_URL, () => HttpResponse.json(listResponse())));
     await renderAt("/flow-definitions");
 
     // `default-login` is a slug on the wire; the row is the only place it
     // becomes a label.
     expect(await screen.findByRole("link", { name: "Default login" })).toBeInTheDocument();
+    // The Figma `Flows directory` table: four columns and an action column.
+    expect(
+      screen.getAllByRole("columnheader").map((header) => header.textContent?.trim()),
+    ).toEqual(["Name", "Purpose", "User schema", "Last change", ""]);
     // Fixed order, not the object's: the response lists `register` first.
     expect(screen.getByText("Login + Register")).toBeInTheDocument();
-    expect(screen.getByText("identifier")).toBeInTheDocument();
-    expect(screen.getByText("passkey-upsell")).toBeInTheDocument();
+    // Steps are the detail screen's; the directory table does not list them.
+    expect(screen.queryByText("passkey-upsell")).not.toBeInTheDocument();
     // The schema name comes from the `expand=user_schema` embed, not the id,
     // and links to the schema it names.
     const schema = screen.getByRole("link", { name: "Minimal" });

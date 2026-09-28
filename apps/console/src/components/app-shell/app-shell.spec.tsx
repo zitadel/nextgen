@@ -54,7 +54,8 @@ const NEVER_SHOWN = [
 // `GET /users/me/projects` is the authorized-projects query (#1228): what the
 // signed-in person can act on, read with the session cookie.
 const MY_PROJECTS = "*/api/users/me/projects";
-// `/` lands on Teams, so most tests read it once a project is selected.
+// Most tests open Teams without a selection: a project-scoped screen with the
+// person's only project auto-selects it (`_authed`), so the scoped nav renders.
 const TEAMS_QUERY = "*/api/teams/query";
 const server = setupServer(
   http.get(MY_PROJECTS, () =>
@@ -67,7 +68,7 @@ beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
 afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
 
-function renderShell(path = "/") {
+function renderShell(path = "/teams") {
   const router = createAppRouter({ history: createMemoryHistory({ initialEntries: [path] }) });
   render(<RouterProvider router={router} />);
   return router;
@@ -136,7 +137,7 @@ describe("app shell navigation", () => {
         }),
       ),
     );
-    const router = renderShell();
+    const router = renderShell("/");
     await vi.waitFor(() => expect(router.state.location.pathname).toBe("/projects"));
     const pill = await screen.findByRole("button", { name: "Switch project" });
     await vi.waitFor(() => expect(pill).toHaveTextContent("Select a project"));
@@ -161,7 +162,7 @@ describe("app shell navigation", () => {
 /**
  * The sidebar has two views and the route picks between them, so a settings URL
  * restores the Settings view rather than dropping the operator back into Portal
- * chrome. The account dropdown is the way in; `Back to app` is the way out.
+ * chrome. The account dropdown is the way in; `Back` is the way out.
  */
 describe("settings view", () => {
   it("shows the portal nav and the account dropdown's entry point by default", async () => {
@@ -172,7 +173,7 @@ describe("settings view", () => {
     await userEvent.click(screen.getByRole("button", { name: /^Account:/ }));
     // Log out, not Sign out, and Settings alongside it — both per the design.
     expect(await screen.findByRole("menuitem", { name: "Log out" })).toBeInTheDocument();
-    // The selection rides along, so `Back to app` returns to the same project.
+    // The selection rides along, so `Back` returns to the same project.
     expect(screen.getByRole("menuitem", { name: "Settings" })).toHaveAttribute(
       "href",
       scopedPath("/settings", "proj_1"),
@@ -182,7 +183,7 @@ describe("settings view", () => {
   it("swaps the portal nav for the settings view on a settings URL", async () => {
     renderShell("/settings");
     // The way back out is present...
-    expect(await screen.findByRole("link", { name: "Back to app" })).toHaveAttribute("href", "/");
+    expect(await screen.findByRole("link", { name: "Back" })).toHaveAttribute("href", "/");
     // ...and the portal list is gone rather than sitting underneath it.
     expect(screen.queryByRole("navigation", { name: "Primary" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /^Users/ })).not.toBeInTheDocument();
@@ -193,13 +194,29 @@ describe("settings view", () => {
     // are portal chrome; the sidebar keeps a trigger of its own, so the
     // collapse is not lost with them.
     renderShell("/settings");
-    await screen.findByRole("link", { name: "Back to app" });
+    await screen.findByRole("link", { name: "Back" });
 
     expect(screen.queryByRole("button", { name: "Switch project" })).not.toBeInTheDocument();
     expect(screen.queryByRole("radio", { name: "Dark" })).not.toBeInTheDocument();
     // The sidebar keeps its own triggers (header row and rail), so the
     // collapse survives the bar going away.
     expect(screen.getAllByRole("button", { name: "Toggle Sidebar" }).length).toBeGreaterThan(0);
+  });
+
+  it("lands on Profile and lists the settings rows without the account footer", async () => {
+    // `/settings` is not a screen of its own; the Settings frames draw
+    // ACCOUNT › Profile over WORKSPACE › Members and no account footer.
+    const router = renderShell("/settings");
+    await vi.waitFor(() => expect(router.state.location.pathname).toBe("/settings/profile"));
+    expect(await screen.findByRole("link", { name: "Profile" })).toHaveAttribute(
+      "href",
+      "/settings/profile",
+    );
+    expect(screen.getByRole("link", { name: "Members" })).toHaveAttribute(
+      "href",
+      "/settings/members",
+    );
+    expect(screen.queryByRole("button", { name: /^Account:/ })).not.toBeInTheDocument();
   });
 });
 

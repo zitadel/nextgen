@@ -217,7 +217,7 @@ function TeamsScreen() {
                     <ResourceHeadCell className={COLUMN}>Name</ResourceHeadCell>
                     <ResourceHeadCell className={COLUMN}>Status</ResourceHeadCell>
                     <ResourceHeadCell className={COLUMN}>Created</ResourceHeadCell>
-                    <TableHead className={`${COLUMN} h-14 px-6`} />
+                    <TableHead className={`${COLUMN} h-14 px-4`} />
                   </TableRow>
                 </TableHeader>
                 <TableBody>

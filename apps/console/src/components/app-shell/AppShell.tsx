@@ -33,6 +33,7 @@ import {
 
 import type { NavGroup } from "../../nav";
 import { type ThemePreference, useTheme } from "../../theme";
+import { FigmaIcons } from "../figma-icons";
 import { ContextSwitcher } from "./ContextSwitcher";
 import { ZitadelLogo } from "./icons";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -66,7 +67,11 @@ export function AppShell({
 
   return (
     <SidebarProvider defaultOpen={readSidebarOpen()}>
-      <AppSidebar user={user} onSignOut={onSignOut} />
+      {/* The sidebar and context bar carry the Figma Lucide stroke; the routed
+          screen (`children`) sits outside it. */}
+      <FigmaIcons>
+        <AppSidebar user={user} onSignOut={onSignOut} />
+      </FigmaIcons>
       {/* `min-w-0` because the inset is a flex item, and a flex item's default
           `min-width: auto` makes it grow to fit its widest content instead of
           letting that content scroll. Without it a table wider than the viewport
@@ -77,7 +82,11 @@ export function AppShell({
             and the switcher it carries is a *project* control that says nothing
             about an account screen. The sidebar's own header keeps a trigger, so
             collapsing still works without it. */}
-        {!inSettings && <ContextBar />}
+        {!inSettings && (
+          <FigmaIcons>
+            <ContextBar />
+          </FigmaIcons>
+        )}
         {children}
       </SidebarInset>
     </SidebarProvider>
@@ -133,8 +142,22 @@ function AppSidebar({ user, onSignOut }: { user?: ShellUser; onSignOut?: () => v
     <Sidebar collapsible="icon">
       {inSettings ? <SettingsHeader /> : <PortalHeader />}
 
-      <SidebarContent>{inSettings ? <SettingsNav /> : <PortalNav />}</SidebarContent>
+      {/* In the Settings rail the group labels collapse away and the design
+          stacks every row 4px apart in one 8px-padded column, so the groups drop
+          their own block padding there. */}
+      <SidebarContent
+        className={
+          inSettings
+            ? "group-data-[collapsible=icon]:gap-1 group-data-[collapsible=icon]:py-2"
+            : undefined
+        }
+      >
+        {inSettings ? <SettingsNav /> : <PortalNav />}
+      </SidebarContent>
 
+      {/* The Settings frames draw no account footer — "Back" is the way out of
+          the view. */}
+      {!inSettings && (
       <SidebarFooter>
         <SidebarMenu>
           {/* Search and Documentation are parked: both rendered as ordinary
@@ -148,6 +171,7 @@ function AppSidebar({ user, onSignOut }: { user?: ShellUser; onSignOut?: () => v
           <UserMenuItem user={user} onSignOut={onSignOut} />
         </SidebarMenu>
       </SidebarFooter>
+      )}
 
       <SidebarRail />
     </Sidebar>
@@ -180,22 +204,26 @@ function PortalHeader() {
  * switches the sidebar's view rather than walking a page hierarchy — so it is
  * read as the mechanism D13 endorses rather than an exception to it. Worth
  * confirming as a decision either way.
+ *
+ * Styled per the Figma `Settings Page / Profile` frames: the one "Back" row over
+ * a bottom rule (the frames label it "Back to dashboard"; the console has no
+ * dashboard).
  */
 function SettingsHeader() {
   return (
-    <SidebarHeader className="group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:p-0">
+    <SidebarHeader className="border-b border-border group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:border-b-0 group-data-[collapsible=icon]:p-0">
       <div className={RAIL_HEADER}>
         <SidebarTrigger className={RAIL_BUTTON} />
       </div>
       {/* One row, restyled per state — rendering a separate rail copy would put
-          two "Back to app" links in the accessibility tree at once, with only
+          two "Back" links in the accessibility tree at once, with only
           CSS deciding which one is real. */}
       <SidebarMenu className="group-data-[collapsible=icon]:h-11 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:justify-center">
         <SidebarMenuItem>
-          <SidebarMenuButton asChild tooltip="Back to app" className={BACK_BUTTON}>
+          <SidebarMenuButton asChild tooltip="Back" className={BACK_BUTTON}>
             <Link to="/">
               <ArrowLeft aria-hidden />
-              <span>Back to app</span>
+              <span className="font-light">Back</span>
             </Link>
           </SidebarMenuButton>
         </SidebarMenuItem>
@@ -210,10 +238,8 @@ function SettingsHeader() {
  * Rows attach the same way Portal's do, through `staticData.nav` on the route,
  * and declare `view: "settings"` so they leave the primary list alone.
  *
- * A heading renders only when a route claims it. `ACCOUNT / Profile` needs a
- * call that updates a user (#693) and is not built, and Admins moved to the
- * project page (#1238), so today no route claims either heading and the nav
- * is empty rather than a heading over nothing.
+ * A heading renders only when a route claims it: `ACCOUNT / Profile` and
+ * `WORKSPACE / Members` today — both design-ahead screens (see their routes).
  */
 function SettingsNav() {
   const items = useNavItems("settings");
@@ -225,8 +251,16 @@ function SettingsNav() {
         const rows = items.filter((item) => item.nav.group === group);
         if (rows.length === 0) return null;
         return (
-          <SidebarGroup key={group} role="navigation" aria-label={group} className="py-0">
-            <SidebarGroupLabel>{group}</SidebarGroupLabel>
+          <SidebarGroup
+            key={group}
+            role="navigation"
+            aria-label={group}
+            className="group-data-[collapsible=icon]:py-0"
+          >
+            {/* Figma `SidebarGroupLabel`: display face 12/16, caps, 0.72px tracking. */}
+            <SidebarGroupLabel className="font-serif leading-4 font-normal tracking-[0.72px] uppercase">
+              {group}
+            </SidebarGroupLabel>
             <SidebarMenu className="gap-0 group-data-[collapsible=icon]:gap-1">
               {rows.map((item) => {
                 const Icon = item.nav.icon;
@@ -400,11 +434,12 @@ function ContextBar() {
   const { state } = useSidebar();
 
   return (
-    // 64px tall with its content centred, per the navbar every screen frame
-    // draws. `pt-7` bottom-aligned a 40px row into 68px, which pushed every
-    // page 4px down the screen.
-    <div className="sticky top-0 z-10 flex items-start justify-between gap-4 bg-background px-2 py-3 md:items-center md:px-4">
-      <div className="flex min-w-0 flex-1 flex-col gap-2 md:flex-row md:items-center">
+    // Figma `Pro Blocks / Navbar / Portal` (1985:63298): 64px tall with its
+    // content centred, 24px side padding, `shadow-xs`; the 28px sidebar toggle
+    // sits 24px from the switcher. `pt-7` bottom-aligned a 40px row into 68px,
+    // which pushed every page 4px down the screen.
+    <div className="sticky top-0 z-10 flex items-start justify-between gap-4 bg-background px-2 py-3 shadow-xs md:h-16 md:items-center md:px-6 md:py-0">
+      <div className="flex min-w-0 flex-1 flex-col gap-2 md:flex-row md:items-center md:gap-6">
         {/* Desktop only — mobile keeps the persistent Sidebar 07. icon rail. */}
         {state === "expanded" && <SidebarTrigger className="hidden text-foreground md:inline-flex" />}
         <ContextSwitcher />

@@ -247,11 +247,16 @@ function Switcher({
         <button
           type="button"
           aria-label={ariaLabel}
+          // Figma `Sidebar / PopoverContextSwitcher`: 196×40, 8px padding and
+          // gap, `rounded-md`; a 24px `rounded-xs` icon wrapper around a 16px
+          // icon; the label in the sans face at 14/20.
           className={cn(
-            "flex h-12 w-full items-center gap-2 rounded-xs bg-card px-2 text-sm transition-colors hover:bg-accent md:h-10 md:w-[196px]",
+            "flex h-12 w-full items-center gap-2 rounded-md bg-card p-2 text-sm leading-5 transition-colors hover:bg-accent md:h-10 md:w-[196px]",
           )}
         >
-          <Icon size={16} className="shrink-0 text-foreground" aria-hidden />
+          <span className="flex size-6 shrink-0 items-center justify-center rounded-xs">
+            <Icon size={16} className="text-foreground" aria-hidden />
+          </span>
           {loading ? (
             <Skeleton className="h-4 min-w-0 flex-1" />
           ) : label === undefined ? (
@@ -259,7 +264,7 @@ function Switcher({
               {emptyLabel}
             </span>
           ) : (
-            <span className="min-w-0 flex-1 truncate text-left font-serif text-foreground">
+            <span className="min-w-0 flex-1 truncate text-left font-sans text-popover-foreground">
               <span className="md:hidden">{shortLabel ?? label}</span>
               <span className="hidden md:inline">{label}</span>
             </span>

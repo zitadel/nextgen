@@ -88,7 +88,7 @@ export function ProjectAdmins({
                   field, so every row would read `Active` and the column would
                   say nothing about any of them. */}
               <ResourceHeadCell>Level</ResourceHeadCell>
-              <TableHead className="h-14 w-[60px] px-6" />
+              <TableHead className="h-14 w-[60px] px-4" />
             </TableRow>
           </TableHeader>
           <TableBody>

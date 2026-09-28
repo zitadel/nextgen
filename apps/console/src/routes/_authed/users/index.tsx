@@ -349,7 +349,7 @@ function UsersScreen() {
               {/* After `Status`, where the design's column order puts it. */}
               {teamsExpanded && <ResourceHeadCell>Team</ResourceHeadCell>}
               <ResourceHeadCell>ID</ResourceHeadCell>
-              <TableHead className="h-14 w-[60px] px-6" />
+              <TableHead className="h-14 w-[60px] px-4" />
             </TableRow>
           </TableHeader>
           <TableBody>

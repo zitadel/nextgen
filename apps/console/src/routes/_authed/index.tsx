@@ -3,7 +3,8 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 /**
  * Home.
  *
- * **There is no Home screen, so `/` lands on Teams.** The designed overview is a
+ * **There is no Home screen, so `/` lands on Projects, or on Teams once a
+ * project is selected.** The designed overview is a
  * set of figures nothing can compute: the stat cards need an aggregate or count
  * endpoint (`POST /users/query` and `POST /projects/query` return pages),
  * "Total Projects" and its trend need a multi-project list and a time series,
@@ -18,8 +19,17 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
  * mock parked below and replacing its dummy constants with loader data.
  */
 export const Route = createFileRoute("/_authed/")({
-  beforeLoad: () => {
-    // Teams pins its tab in the URL, so the redirect has to name one.
+  beforeLoad: ({ search }) => {
+    // With no project selected, the project directory is the landing screen:
+    // the console is entered through its projects (design decision), rather
+    // than auto-selecting one. The switcher's "All projects" leads there too.
+    // A dev build's pinned project (`VITE_CONSOLE_PROJECT_ID`) counts as
+    // selected, so it still lands on Teams without asking.
+    if (!search.project && !import.meta.env.VITE_CONSOLE_PROJECT_ID) {
+      throw redirect({ to: "/projects" });
+    }
+    // Teams pins its tab in the URL, so the redirect has to name one. The
+    // selected project rides along (`_authed` retains `?project=`).
     throw redirect({ to: "/teams", search: { status: "active" } });
   },
 });

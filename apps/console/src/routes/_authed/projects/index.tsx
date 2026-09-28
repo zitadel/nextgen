@@ -136,7 +136,7 @@ function ProjectsScreen() {
             <TableRow className="border-border border-b hover:bg-transparent">
               <ResourceHeadCell className={COLUMN}>Name</ResourceHeadCell>
               <ResourceHeadCell className={COLUMN}>Created</ResourceHeadCell>
-              <TableHead className={`${COLUMN} h-14 px-6`} />
+              <TableHead className={`${COLUMN} h-14 px-4`} />
             </TableRow>
           </TableHeader>
           <TableBody>

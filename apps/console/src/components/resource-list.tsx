@@ -11,14 +11,16 @@ import { cn } from "@/lib/utils";
  * three versions of it — different page gutters, different cell padding, a
  * header label wrapped in a ghost-button-shaped span on one screen and not the
  * others. The numbers below are the ones measured off the Teams and Projects
- * hand-off frames and confirmed with a full-frame pixel diff:
+ * hand-off frames and confirmed with a full-frame pixel diff, then recalibrated
+ * against the current Figma Projects frame (card radius and cell inset):
  *
  * | Region        | Value                                              |
  * | ------------- | -------------------------------------------------- |
  * | Page gutter   | 16px — the table's own inset                        |
  * | Header gutter | 24px — the page gutter plus 8px                     |
- * | Table head    | 56px tall, 24px leading / 16px trailing inset       |
- * | Table cell    | 56px tall, 24px inset, 8px block padding            |
+ * | Table card    | 8px radius (`rounded-md`)                           |
+ * | Table head    | 56px tall, 16px inset                               |
+ * | Table cell    | 56px tall, 16px inset, 8px block padding            |
  * | Head label    | display face, 12/16, 0.72px tracking, `foreground`  |
  * | Row icon      | 16px, stroke 1.5, `muted-foreground`, 10px to label |
  *
@@ -35,10 +37,10 @@ export const RESOURCE_HEADER = "px-2";
 
 /** The card the table sits on. */
 export const RESOURCE_TABLE_WRAP =
-  "border-sidebar-border bg-card overflow-x-auto rounded-2xl border";
+  "border-sidebar-border bg-card overflow-x-auto rounded-md border";
 
-/** One body cell: 56px tall, inset 24px. */
-export const RESOURCE_CELL = "h-14 px-6 py-2";
+/** One body cell: 56px tall, inset 16px. */
+export const RESOURCE_CELL = "h-14 px-4 py-2";
 
 /** A row's leading glyph — the design draws Lucide at stroke 1.5, not the default 2. */
 export const RESOURCE_ROW_ICON = "text-muted-foreground size-4 shrink-0";
@@ -81,7 +83,7 @@ export function ResourceHeadCell({
   return (
     <TableHead
       className={cn(
-        "text-foreground h-14 py-0 pr-4 pl-6 align-middle font-serif text-xs leading-4 tracking-[0.72px] uppercase",
+        "text-foreground h-14 px-4 py-0 align-middle font-serif text-xs leading-4 tracking-[0.72px] uppercase",
         className,
       )}
     >
