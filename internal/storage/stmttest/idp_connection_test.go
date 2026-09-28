@@ -229,6 +229,12 @@ func TestIDPConnectionStatements_ListRevisionsNewestFirst(t *testing.T) {
 			byRevisionID[entity.RevisionID] = document
 		}
 
+		// A revised sibling in the same project proves the connection id
+		// filter: without it, its revisions would show up in the page below.
+		sibling := createIDPConnection(t, d.stmts, projectID, "sibling-"+uniqueSuffix(t), idpConnectionDocument("https://sibling.example.com"))
+		sibling.Document = idpConnectionDocument("https://sibling-v2.example.com")
+		require.NoError(t, d.stmts.ReviseIDPConnection(t.Context(), sibling))
+
 		want := idpRevisionIDsOldestFirst(written)
 		slices.Reverse(want)
 
