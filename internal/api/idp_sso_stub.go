@@ -327,9 +327,13 @@ func (h *Handler) finishSsoCallback(ctx context.Context, w http.ResponseWriter, 
 		}
 		state.CollectedData.UserData["email"] = claims.Email
 
+		// The address is part of the proof, not just the prefill: the account
+		// is created from it, and CollectedData above can be overwritten by a
+		// later submit. Without it here the guard refuses every sso login.
 		state.VerifiedIdentity = &domain.FlowVerifiedIdentity{
 			Provider: pending.connection.Slug,
 			Subject:  claims.Subject,
+			Email:    claims.Email,
 		}
 	}
 	if err := h.resolveSsoIdentity(ctx, state, pending, claims); err != nil {

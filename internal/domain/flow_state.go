@@ -206,12 +206,17 @@ type FlowProgress struct {
 type FlowVerifiedIdentity struct {
 	Provider string // "google", "github", "saml", ...
 	Subject  string
+	// Email is the identifier the provider vouched for. The account is created
+	// from it, so it belongs to the proof: CollectedData can be overwritten by
+	// a later submit, and creating from that would let a real callback for one
+	// address mint an account for another.
+	Email string
 }
 
 // Valid reports whether a provider verification was recorded.
 // Safe to call on a nil receiver.
 func (vi *FlowVerifiedIdentity) Valid() bool {
-	return vi != nil && vi.Provider != "" && vi.Subject != ""
+	return vi != nil && vi.Provider != "" && vi.Subject != "" && vi.Email != ""
 }
 
 // FlowBackEntry holds an entry to be pushed into BackStack.
