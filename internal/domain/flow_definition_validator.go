@@ -67,7 +67,7 @@ func ValidateFlowDefinition(userSchema *jsonschema.Schema, flowDefinition FlowDe
 	if err := validateOnSuccessManifests(flowDefinition, resolvedByStep); err != nil {
 		return nil, err
 	}
-	if err := validateSsoCreationReachability(flowDefinition); err != nil {
+	if err := validateSsoCreationReachability(flowDefinition, resolvedByStep); err != nil {
 		return nil, err
 	}
 
@@ -558,7 +558,7 @@ var flipOutcomeImpacts = map[string]string{
 // entry) into it is rejected at author time rather than only failing at run
 // time. A create_user_with_sso step must therefore (a) not be a purpose entry,
 // and (b) be targeted only by the `identity_unknown` outcome.
-func validateSsoCreationReachability(def FlowDefinition) error {
+func validateSsoCreationReachability(def FlowDefinition, resolvedByStep map[string]FlowResolvedFields) error {
 	// outcome keys pointing at each step, within this flow.
 	incoming := make(map[string][]string, len(def.Steps))
 	for _, s := range def.Steps {
@@ -596,12 +596,18 @@ func validateSsoCreationReachability(def FlowDefinition) error {
 			return ErrFlowDefinitionInvalid(fmt.Sprintf(
 				"step %q runs create_user_with_sso but declares no %q transition; a colliding identity would have nowhere to route", step.Name, FlowImplicitOutcomeUserAlreadyExists), nil)
 		}
-		// The collision pins the *existing* account, so the target must verify
-		// ownership. Routing it to a terminal step would hand off a session
-		// bound to that account with no proof -- an account takeover.
-		if target, found := def.FindStep(conflict.Target); !found || target.Complete != nil {
+		// The collision pins the *existing* account, so the target must actually
+		// prove ownership. Being non-terminal is not enough: required-checks are
+		// not enforced yet, so a step that collects nothing would still reach a
+		// completion and hand off a session bound to that account.
+		target, found := def.FindStep(conflict.Target)
+		if !found || target.Complete != nil {
 			return ErrFlowDefinitionInvalid(fmt.Sprintf(
 				"step %q routes %q to %q, which is terminal or missing; a colliding identity must reach a verification step, not a completion", step.Name, FlowImplicitOutcomeUserAlreadyExists, conflict.Target), nil)
+		}
+		if !stepVerifiesCredential(target, resolvedByStep) {
+			return ErrFlowDefinitionInvalid(fmt.Sprintf(
+				"step %q routes %q to %q, which verifies no credential; the colliding account must prove ownership with a password or passkey", step.Name, FlowImplicitOutcomeUserAlreadyExists, conflict.Target), nil)
 		}
 	}
 	return nil
@@ -662,6 +668,26 @@ func reachableSteps(start string, reverse map[string][]string) map[string]struct
 
 // someStepEstablishesKind reports whether any candidate step collects
 // a field whose resolver-derived challenge matches kind.
+// stepVerifiesCredential reports whether the step proves who the user is: it
+// either collects a password (field-shaped) or offers a passkey assertion
+// (action-shaped). A conflict step that does neither cannot establish that the
+// caller owns the account the collision pinned.
+func stepVerifiesCredential(step *FlowDefinitionStep, resolvedByStep map[string]FlowResolvedFields) bool {
+	if resolved, ok := resolvedByStep[step.Name]; ok {
+		for _, f := range resolved.Fields {
+			if f.Challenge == FlowFieldChallengePassword {
+				return true
+			}
+		}
+	}
+	for _, action := range step.Actions {
+		if action.Kind == FlowActionKindPasskey {
+			return true
+		}
+	}
+	return false
+}
+
 func someStepEstablishesKind(candidates map[string]struct{}, resolvedByStep map[string]FlowResolvedFields, kind FlowFieldChallenge) bool {
 	for name := range candidates {
 		resolved, ok := resolvedByStep[name]

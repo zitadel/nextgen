@@ -95,16 +95,23 @@ type FlowState struct {
 }
 
 // FlowVerifiedIdentity is what a provider callback asserted about the user:
-// which provider, and the provider's stable subject id.
+// which provider, the provider's stable subject id, and the identifier it
+// vouched for.
+//
+// Email is the claim the account is created from. Carrying it here is what
+// makes the guard mean something: without it the handler would build the user
+// out of CollectedData, which a later submit can overwrite -- so a real
+// callback for one address could mint an account for another.
 type FlowVerifiedIdentity struct {
 	Provider string // "google", "github", "saml", ...
 	Subject  string
+	Email    string
 }
 
 // Valid reports whether a provider verification was recorded. Safe to call on
 // a nil receiver, so callers can write `state.VerifiedIdentity.Valid()`.
 func (vi *FlowVerifiedIdentity) Valid() bool {
-	return vi != nil && vi.Provider != "" && vi.Subject != ""
+	return vi != nil && vi.Provider != "" && vi.Subject != "" && vi.Email != ""
 }
 
 // FlowPendingChallenge records the server-issued challenge the next

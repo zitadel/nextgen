@@ -1984,8 +1984,9 @@ func TestValidateSsoCreationReachability(t *testing.T) {
 					},
 				},
 				{
-					Name:        "conflict",
-					Fields:      []domain.Field{"email"},
+					Name: "conflict",
+					// Proves ownership of the account the collision pinned.
+					Fields:      []domain.Field{"x-auth-methods#password"},
 					Actions:     []domain.FlowStepAction{{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true}},
 					Transitions: map[string]domain.FlowStepTransition{"submit": {Target: "done"}},
 				},
@@ -2058,5 +2059,45 @@ func TestValidateSsoCreationReachability(t *testing.T) {
 		)
 		_, err := domain.ValidateFlowDefinition(&schema, def)
 		require.Error(t, err, "routing a collision to a terminal step must be rejected (account takeover)")
+	})
+
+	t.Run("rejects a collision target that verifies no credential", func(t *testing.T) {
+		def := base(
+			[]domain.FlowDefinitionStep{
+				{
+					Name:   "identifier",
+					Fields: []domain.Field{"email"},
+					Actions: []domain.FlowStepAction{
+						{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+					},
+					Transitions: map[string]domain.FlowStepTransition{
+						"submit":           {Target: "done"},
+						"identity_unknown": {Target: "register-sso"},
+					},
+				},
+				{
+					Name:      "register-sso",
+					Fields:    []domain.Field{"email"},
+					OnSuccess: &ssoCreate,
+					Actions:   []domain.FlowStepAction{{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true}},
+					Transitions: map[string]domain.FlowStepTransition{
+						"submit":              {Target: "done"},
+						"user_already_exists": {Target: "conflict"},
+					},
+				},
+				{
+					// Non-terminal, but asks for nothing that proves ownership:
+					// the pinned account would be handed off unverified.
+					Name:        "conflict",
+					Fields:      []domain.Field{"email"},
+					Actions:     []domain.FlowStepAction{{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true}},
+					Transitions: map[string]domain.FlowStepTransition{"submit": {Target: "done"}},
+				},
+				{Name: "done", Complete: &show},
+			},
+			map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "identifier"},
+		)
+		_, err := domain.ValidateFlowDefinition(&schema, def)
+		require.Error(t, err, "a collision target that verifies no credential must be rejected")
 	})
 }

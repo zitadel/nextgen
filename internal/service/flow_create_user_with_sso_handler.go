@@ -55,6 +55,15 @@ func (h *FlowCreateUserWithSsoHandler) Handle(
 		return domain.FlowOnSuccessResult{}, fmt.Errorf("%w: create_user_with_sso without a verified identity", domain.ErrFlowIntegrity())
 	}
 
+	// The account is created from the identifier the provider vouched for, never
+	// from CollectedData alone: a later submit merges over the callback's
+	// prefilled value, so trusting the form would let a real callback for one
+	// address mint an account for another.
+	attributes, err := attributesFromVerifiedIdentity(in)
+	if err != nil {
+		return domain.FlowOnSuccessResult{}, err
+	}
+
 	userID, err := h.db.Statements().NewManagedID(string(domain.PrefixUser))
 	if err != nil {
 		return domain.FlowOnSuccessResult{}, fmt.Errorf("create_user_with_sso: mint user id: %w", err)
@@ -64,7 +73,7 @@ func (h *FlowCreateUserWithSsoHandler) Handle(
 		CreateUserInput{
 			ProjectID:  in.ProjectID,
 			SchemaURL:  in.UserSchemaURL,
-			Attributes: in.State.CollectedData.UserData,
+			Attributes: attributes,
 			ID:         userID,
 		},
 		h.schemaStore,
@@ -102,4 +111,33 @@ func (h *FlowCreateUserWithSsoHandler) Handle(
 	}
 
 	return domain.FlowOnSuccessResult{UserID: userID, Irreversible: true}, nil
+}
+
+// attributesFromVerifiedIdentity copies the collected attributes and forces the
+// identifier to the address the provider vouched for, so a submitted value
+// cannot displace it. Refuses when the flow resolves no identifier field: there
+// would be nowhere to anchor the verified address, and creating from the form
+// alone is exactly the hole this closes.
+func attributesFromVerifiedIdentity(in domain.FlowOnSuccessInput) (map[string]any, error) {
+	name, ok := identifierFieldName(in.Resolved)
+	if !ok {
+		return nil, fmt.Errorf("%w: create_user_with_sso resolves no identifier field to bind the verified address to", domain.ErrFlowIntegrity())
+	}
+	attributes := make(map[string]any, len(in.State.CollectedData.UserData)+1)
+	for key, value := range in.State.CollectedData.UserData {
+		attributes[key] = value
+	}
+	attributes[name] = in.State.VerifiedIdentity.Email
+	return attributes, nil
+}
+
+// identifierFieldName reports the schema attribute carrying the identifier
+// challenge -- the field the provider's address belongs in.
+func identifierFieldName(resolved domain.FlowResolvedFields) (string, bool) {
+	for _, field := range resolved.Fields {
+		if field.Challenge == domain.FlowFieldChallengeIdentifier {
+			return field.Name, true
+		}
+	}
+	return "", false
 }

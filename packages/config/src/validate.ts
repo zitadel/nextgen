@@ -570,6 +570,16 @@ function validateCycles(def: FlowDef): FlowValidationIssue[] {
 // flow_definition_validator.go: create_user_with_sso mints a user with no
 // credential, so it must never be a purpose entry and only the identity_unknown
 // outcome may target it. Catches at plan time what the runtime handler refuses.
+/**
+ * Mirrors `stepVerifiesCredential` in flow_definition_validator.go: the step
+ * proves who the user is, by collecting a password (the reserved field) or
+ * offering a passkey assertion.
+ */
+function stepVerifiesCredential(step: FlowStep): boolean {
+  if (step.fields.includes("x-auth-methods#password")) return true;
+  return step.actions.some((a) => a.kind === "passkey");
+}
+
 function validateSsoCreationOnlyViaCallback(def: FlowDef): FlowValidationIssue[] {
   const issues: FlowValidationIssue[] = [];
   const entrySteps = new Set(def.purposes.values());
@@ -617,15 +627,23 @@ function validateSsoCreationOnlyViaCallback(def: FlowDef): FlowValidationIssue[]
         ),
       );
     } else {
-      // The collision pins the existing account, so the target must verify
-      // ownership. A terminal target would hand off a session bound to that
-      // account with no proof -- an account takeover.
+      // The collision pins the existing account, so the target must actually
+      // prove ownership. Non-terminal is not enough: a step that collects no
+      // credential still reaches a completion and hands off that account.
       const target = def.steps.find((s) => s.name === conflict.target);
       if (!target || target.terminal) {
         issues.push(
           error(
             "sso/create-only-via-callback",
             `step ${q(step.name)} routes "user_already_exists" to ${q(conflict.target)}, which is terminal or missing; a colliding identity must reach a verification step, not a completion`,
+            step.name,
+          ),
+        );
+      } else if (!stepVerifiesCredential(target)) {
+        issues.push(
+          error(
+            "sso/create-only-via-callback",
+            `step ${q(step.name)} routes "user_already_exists" to ${q(conflict.target)}, which verifies no credential; the colliding account must prove ownership with a password or passkey`,
             step.name,
           ),
         );

@@ -34,7 +34,11 @@ func TestFlowCreateUserWithSso_RefusesWithoutVerifiedIdentity(t *testing.T) {
 		},
 		"empty subject": {
 			ProjectID:        "proj-1",
-			VerifiedIdentity: &domain.FlowVerifiedIdentity{Provider: "google"},
+			VerifiedIdentity: &domain.FlowVerifiedIdentity{Provider: "google", Email: "a@b.test"},
+		},
+		"empty email": {
+			ProjectID:        "proj-1",
+			VerifiedIdentity: &domain.FlowVerifiedIdentity{Provider: "google", Subject: "sub-1"},
 		},
 	}
 
@@ -124,10 +128,15 @@ func TestFlowCreateUserWithSso_RecordsUserAndSsoFactors(t *testing.T) {
 	out, err := f.handler.Handle(t.Context(), domain.FlowOnSuccessInput{
 		ProjectID:     "proj_1",
 		UserSchemaURL: "https://example.test/schema.json",
+		// The flow resolves email as the identifier, so the verified address
+		// lands there rather than whatever the form carried.
+		Resolved: domain.FlowResolvedFields{Fields: []domain.FlowField{
+			{Name: "email", Challenge: domain.FlowFieldChallengeIdentifier},
+		}},
 		State: &domain.FlowState{
 			ProjectID:        "proj_1",
 			AuthAttemptID:    "att-1",
-			VerifiedIdentity: &domain.FlowVerifiedIdentity{Provider: "google", Subject: "sub-123"},
+			VerifiedIdentity: &domain.FlowVerifiedIdentity{Provider: "google", Subject: "sub-123", Email: "alice@example.com"},
 			FlowProgress: domain.FlowProgress{
 				CollectedData: domain.CollectedFlowData{
 					UserData: map[string]any{"email": "alice@example.com"},
@@ -178,10 +187,15 @@ func TestFlowCreateUserWithSso_RoutesUserAlreadyExistsOnCollision(t *testing.T) 
 	out, err := f.handler.Handle(t.Context(), domain.FlowOnSuccessInput{
 		ProjectID:     "proj_1",
 		UserSchemaURL: "https://example.test/schema.json",
+		// The flow resolves email as the identifier, so the verified address
+		// lands there rather than whatever the form carried.
+		Resolved: domain.FlowResolvedFields{Fields: []domain.FlowField{
+			{Name: "email", Challenge: domain.FlowFieldChallengeIdentifier},
+		}},
 		State: &domain.FlowState{
 			ProjectID:        "proj_1",
 			AuthAttemptID:    "att-1",
-			VerifiedIdentity: &domain.FlowVerifiedIdentity{Provider: "google", Subject: "sub-123"},
+			VerifiedIdentity: &domain.FlowVerifiedIdentity{Provider: "google", Subject: "sub-123", Email: "alice@example.com"},
 			FlowProgress: domain.FlowProgress{
 				CollectedData: domain.CollectedFlowData{
 					UserData: map[string]any{"email": "alice@example.com"},
@@ -193,4 +207,65 @@ func TestFlowCreateUserWithSso_RoutesUserAlreadyExistsOnCollision(t *testing.T) 
 	require.Nil(t, out.StepError, "a collision must route an outcome, not re-render a step error")
 	assert.Equal(t, domain.FlowImplicitOutcomeUserAlreadyExists, out.Outcome)
 	assert.Empty(t, out.UserID, "no user is created on a collision")
+}
+
+// The provider's address is the one the account is created from. A submit that
+// merges a different email over the callback's prefilled value must not win --
+// otherwise a genuine callback for one address mints an account for another.
+func TestFlowCreateUserWithSso_IgnoresSubmittedEmailInFavourOfVerified(t *testing.T) {
+	f := newSsoHandlerFixture(t)
+
+	f.stmts.EXPECT().NewManagedID(string(domain.PrefixUser)).Return("user_sso0003", nil)
+	f.schemaStore.EXPECT().
+		GetJSONSchemaByID(gomock.Any(), "proj_1", "https://example.test/schema.json").
+		Return(&domain.JSONSchema{
+			ProjectID: "proj_1",
+			URL:       "https://example.test/schema.json",
+			Schema:    []byte(passwordHandlerTestSchema),
+		}, nil)
+
+	var created *domain.CreateUser
+	f.stmts.EXPECT().CreateUser(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ context.Context, u *domain.CreateUser) error {
+			created = u
+			return nil
+		})
+	f.stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), "proj_1", "att-1").
+		Return(&domain.AuthAttempt{ProjectID: "proj_1", ID: "att-1"}, nil)
+	f.stmts.EXPECT().SetAuthAttemptFactor(gomock.Any(), "proj_1", "att-1", gomock.Any()).
+		Return("ch-1", nil).Times(2)
+	f.stmts.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	f.v2Pool.EXPECT().Transaction(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(ctx context.Context, fn func(context.Context, service.Statementer[service.AllStatements]) error) error {
+			return fn(ctx, v2TestTx{stmts: f.stmts})
+		})
+
+	_, err := f.handler.Handle(t.Context(), domain.FlowOnSuccessInput{
+		ProjectID:     "proj_1",
+		UserSchemaURL: "https://example.test/schema.json",
+		Resolved: domain.FlowResolvedFields{Fields: []domain.FlowField{
+			{Name: "email", Challenge: domain.FlowFieldChallengeIdentifier},
+		}},
+		State: &domain.FlowState{
+			ProjectID:     "proj_1",
+			AuthAttemptID: "att-1",
+			// The provider vouched for alice.
+			VerifiedIdentity: &domain.FlowVerifiedIdentity{
+				Provider: "google", Subject: "sub-123", Email: "alice@example.com",
+			},
+			FlowProgress: domain.FlowProgress{
+				CollectedData: domain.CollectedFlowData{
+					// ...but the submit carried someone else's address.
+					UserData: map[string]any{"email": "attacker@evil.test"},
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	require.NotNil(t, created)
+	email, ok := created.Attributes.Get("email")
+	require.True(t, ok, "the created user must carry an email attribute")
+	assert.Equal(t, "alice@example.com", email.Value,
+		"the account must be created from the provider-verified address, not the submitted one")
 }

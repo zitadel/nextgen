@@ -1156,10 +1156,11 @@ func TestCreateFlowDefinitionOnSuccessRoundTrip(t *testing.T) {
 					"submit":           {Target: "step_3"},
 					"identity_unknown": {Target: "step_2"},
 				}
-				// A create_user_with_sso step must route the collision outcome to
-				// a non-terminal verification step, or the definition is rejected
-				// (validateSsoCreationReachability). step_1 is non-terminal.
-				stepTwoTransitions["user_already_exists"] = api.FlowDefinitionStepTransitionsItem{Target: "step_1"}
+				// A create_user_with_sso step must route the collision outcome to a
+				// step that verifies the pinned account owns it, or the definition
+				// is rejected (validateSsoCreationReachability). step_conflict below
+				// collects a password for exactly that.
+				stepTwoTransitions["user_already_exists"] = api.FlowDefinitionStepTransitionsItem{Target: "step_conflict"}
 			}
 
 			definition := newFlowDefinitionFixture(name, userSchemaURI)
@@ -1184,6 +1185,19 @@ func TestCreateFlowDefinitionOnSuccessRoundTrip(t *testing.T) {
 					Name:     "step_3",
 					Complete: api.NewOptFlowDefinitionStepComplete(api.FlowDefinitionStepCompleteRedirect),
 				},
+			}
+			if onSuccess == domain.FlowOnSuccessCreateUserWithSso {
+				// Where a colliding identity proves it owns the existing account.
+				definition.Steps = append(definition.Steps, api.FlowDefinitionStep{
+					Name:   "step_conflict",
+					Fields: []string{"x-auth-methods#password"},
+					Transitions: api.NewOptFlowDefinitionStepTransitions(
+						map[string]api.FlowDefinitionStepTransitionsItem{"submit": {Target: "step_3"}},
+					),
+					Actions: []api.StepAction{
+						{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
+					},
+				})
 			}
 
 			created, err := client.CreateFlowDefinition(
