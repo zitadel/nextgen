@@ -604,8 +604,16 @@ func (r *FlowStateMachineRuntime) processSubmit(pc *processCtx, resolved FlowRes
 		recordResolvedUser(pc.state, result.UserID)
 	}
 	if result.Outcome != "" {
-		// The mutation resolved to a flow outcome (e.g. user_already_exists);
-		// route its declared transition instead of the submitted action.
+		// The mutation resolved to a flow outcome; route its declared
+		// transition instead of the submitted action. Bind the colliding
+		// account first for user_already_exists (as ResumeWithOutcome does),
+		// so the conflict step can verify against the existing user rather
+		// than landing with no user pinned on the attempt.
+		if result.Outcome == FlowImplicitOutcomeUserAlreadyExists {
+			if err := r.bindCollidingUser(pc, resolved); err != nil {
+				return FlowStepResult{}, err
+			}
+		}
 		return r.routeOutcome(pc, resolved, result.Outcome, result.Irreversible)
 	}
 	return r.routeOutcome(pc, resolved, pc.in.Action, result.Irreversible)
