@@ -14,6 +14,10 @@
  *                              is what authorizes `queryUsers` (`user.read`);
  *                              the browser-plane publishable key deliberately
  *                              cannot list users (`internal/api/user.go`)
+ *   CONSOLE_PROJECT_SECRET_PROJECT_ID
+ *                           -> the project that secret belongs to, so the proxy
+ *                              injects it only for calls scoped to that project;
+ *                              differs from the pin below in claim mode
  *   VITE_CONSOLE_PROJECT_ID -> pins the client to the bootstrapped project, so
  *                              it agrees with the secret above
  *
@@ -46,8 +50,7 @@ const workspaceRoot = resolve(appDir, "../..");
 const consoleOrigin = process.env.CONSOLE_DEV_ORIGIN ?? "http://localhost:5174";
 const port = Number(process.env.CONSOLE_DEV_ZITADEL_PORT ?? 8094);
 const configuredServerBinary = process.env.ZITADEL_SERVER_BINARY;
-const serverBinary =
-  configuredServerBinary || join(workspaceRoot, "dist", "server", "nextgen");
+const serverBinary = configuredServerBinary || join(workspaceRoot, "dist", "server", "nextgen");
 const seedOnly = process.argv.includes("--seed-only");
 /**
  * Claim mode boots the deployment's *platform* project and points the console
@@ -62,11 +65,12 @@ const claimMode = process.argv.includes("--claim");
 /** The well-known platform project id (`domain.PlatformProjectID`). */
 const PLATFORM_PROJECT_ID = "proj_platform";
 
-if (claimMode) {
-  // Read by the server through the CLI's `start`, which inherits this process's
-  // environment (`packages/testing/src/cli.ts` merges `process.env`).
-  process.env["NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT"] = "true";
-}
+// Read by the server through the CLI's `start`, which inherits this process's
+// environment (`packages/testing/src/cli.ts` merges `process.env`). Set either
+// way: `zitadel start` bootstraps the platform project by default, and that
+// pins the console's default project to `proj_platform` — which would leave
+// DEV_USER, seeded in the project this script bootstraps, unable to sign in.
+process.env["NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT"] = claimMode ? "true" : "false";
 
 /**
  * The account you sign in as. Fixed rather than random so the credentials stay
@@ -191,7 +195,7 @@ async function grantDevUserAdmin(userId: string): Promise<boolean> {
     const response = await fetch(`${baseUrl}/grants?${query.toString()}`, {
       method: "POST",
       headers: { authorization: `Bearer ${projectSecret}`, "content-type": "application/json" },
-      body: JSON.stringify({ principal_type: "user", principal_id: userId, relation: "admin" }),
+      body: JSON.stringify({ user: { user_id: userId }, relation: "admin" }),
       signal: AbortSignal.timeout(5_000),
     });
     return response.ok;
@@ -282,7 +286,8 @@ if (seedOnly) {
       "",
       `    CONSOLE_BACKEND_URL=${baseUrl} \\`,
       `    CONSOLE_PROJECT_SECRET=${projectSecret} \\`,
-      `    VITE_CONSOLE_PROJECT_ID=${projectId} \\`,
+      `    CONSOLE_PROJECT_SECRET_PROJECT_ID=${projectId} \\`,
+      `    VITE_CONSOLE_PROJECT_ID=${consoleProjectId} \\`,
       "    corepack pnpm --filter @zitadel/console dev",
       "",
     ].join("\n"),
@@ -306,6 +311,7 @@ if (seedOnly) {
       ...process.env,
       CONSOLE_BACKEND_URL: baseUrl,
       CONSOLE_PROJECT_SECRET: projectSecret,
+      CONSOLE_PROJECT_SECRET_PROJECT_ID: projectId,
       VITE_CONSOLE_PROJECT_ID: consoleProjectId,
     },
   });

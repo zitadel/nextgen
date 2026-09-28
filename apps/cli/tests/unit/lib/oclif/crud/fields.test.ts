@@ -12,6 +12,7 @@ import {
   bodyFromFlags,
   describeBody,
   fieldExample,
+  needsRawBody,
 } from "../../../../../src/lib/oclif/crud";
 
 const byName = (schema: Parameters<typeof describeBody>[0]) =>
@@ -20,10 +21,11 @@ const byName = (schema: Parameters<typeof describeBody>[0]) =>
 describe("describeBody", () => {
   it("marks required and optional fields from the schema", () => {
     const fields = byName(CreateGrantBody);
-    expect(fields.principal_type?.required).toBe(true);
-    expect(fields.principal_id?.required).toBe(true);
     expect(fields.relation?.required).toBe(true);
     expect(fields.expires_at?.required).toBe(false);
+    // `user` and `team` are nested objects: no flag, reached through --data.
+    expect(fields.user).toBeUndefined();
+    expect(fields.team).toBeUndefined();
   });
 
   it("treats a fully optional body as optional", () => {
@@ -32,15 +34,16 @@ describe("describeBody", () => {
   });
 
   it("carries enum options and kebab-cases the flag name", () => {
-    const field = byName(CreateGrantBody).principal_type;
-    expect(field?.flag).toBe("principal-type");
-    expect(field?.kind).toBe("enum");
-    expect(field?.options).toEqual(["user", "team"]);
+    const fields = byName(CreateGrantBody);
+    expect(fields.relation?.kind).toBe("enum");
+    expect(fields.relation?.options).toEqual(["viewer", "editor", "admin"]);
+    // A `_` in the wire name becomes a `-` in the flag.
+    expect(fields.expires_at?.flag).toBe("expires-at");
   });
 
   it("summarises a long multi-line description to one sentence", () => {
-    const summary = byName(CreateGrantBody).principal_id?.summary ?? "";
-    expect(summary).toBe("Principal id (`user_<opaque>` or `team_<opaque>`).");
+    const summary = byName(CreateGrantBody).expires_at?.summary ?? "";
+    expect(summary).toBe("Optional expiry.");
     expect(summary).not.toContain("\n");
   });
 
@@ -55,6 +58,15 @@ describe("describeBody", () => {
     expect(describeBody(schema).map((field) => field.name)).toEqual(["name"]);
   });
 
+  it("no longer reserves `environment`, which no generated command owns", () => {
+    // The reserved set exists to keep a body field from shadowing a flag the
+    // command itself declares. No resource command declares `--environment`
+    // any more, so a resource whose body carries that field gets its flag.
+    const schema = z.object({ environment: z.string() });
+    expect(byName(schema).environment?.flag).toBe("environment");
+    expect(Object.keys(bodyFieldFlags(describeBody(schema)))).toContain("environment");
+  });
+
   it("returns nothing for a schema it cannot introspect", () => {
     expect(describeBody(z.string())).toEqual([]);
     expect(describeBody({ safeParse: () => ({ success: true }) })).toEqual([]);
@@ -67,9 +79,9 @@ describe("bodyFieldFlags", () => {
       string,
       { helpGroup?: string; description?: string; options?: string[]; multiple?: boolean }
     >;
-    expect(flags["principal-type"]?.helpGroup).toBe("REQUIRED FIELD");
-    expect(flags["principal-type"]?.options).toEqual(["user", "team"]);
-    expect(flags["principal-type"]?.description).toMatch(/^\(required\) /);
+    expect(flags["relation"]?.helpGroup).toBe("REQUIRED FIELD");
+    expect(flags["relation"]?.options).toEqual(["viewer", "editor", "admin"]);
+    expect(flags["relation"]?.description).toMatch(/^\(required\) /);
     expect(flags["expires-at"]?.helpGroup).toBe("OPTIONAL FIELD");
     expect(flags["expires-at"]?.description).not.toMatch(/^\(required\)/);
   });
@@ -91,11 +103,10 @@ describe("bodyFromFlags", () => {
   it("collects scalar and enum flags under their wire names", () => {
     expect(
       bodyFromFlags(grantFields, {
-        "principal-type": "user",
-        "principal-id": "user_1",
         relation: "viewer",
+        "expires-at": "2030-01-01T00:00:00Z",
       }),
-    ).toEqual({ principal_type: "user", principal_id: "user_1", relation: "viewer" });
+    ).toEqual({ relation: "viewer", expires_at: "2030-01-01T00:00:00Z" });
   });
 
   it("builds an object from repeated key=value entries", () => {
@@ -191,11 +202,27 @@ describe("bodyFromFlags", () => {
   });
 });
 
+describe("needsRawBody", () => {
+  it("reports a body whose principal is a nested object", () => {
+    // `user` and `team` carry the grant's principal and neither becomes a flag,
+    // so no run made of flags alone is a complete grant.
+    expect(needsRawBody(CreateGrantBody)).toBe(true);
+  });
+
+  it("reports nothing for a body every field of which is a flag", () => {
+    expect(needsRawBody(CreateTeamBody)).toBe(false);
+    expect(needsRawBody(CreateUserBody)).toBe(false);
+    expect(needsRawBody(PatchProjectBody)).toBe(false);
+  });
+
+  it("reports nothing for a schema it cannot introspect", () => {
+    expect(needsRawBody(z.string())).toBe(false);
+  });
+});
+
 describe("fieldExample", () => {
   it("uses the required fields and their first allowed value", () => {
-    expect(fieldExample(describeBody(CreateGrantBody))).toBe(
-      "--principal-type user --principal-id <principal_id> --relation viewer",
-    );
+    expect(fieldExample(describeBody(CreateGrantBody))).toBe("--relation viewer");
   });
 
   it("is absent when nothing is required", () => {

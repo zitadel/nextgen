@@ -126,6 +126,11 @@ People API's `$country_code` profile property for the same derived country. Buil
 in `src/lib/oclif/command-telemetry.ts` (using the generic env/geo helpers in
 `src/lib/telemetry/`).
 
+`ci_provider` and `host_agent` also leave the machine outside Mixpanel, as the
+`ci/` and `host/` tokens of the HTTP `User-Agent` (`src/lib/user-agent.ts`). They
+share the telemetry opt-out: `--no-telemetry`, `DO_NOT_TRACK` and
+`ZITADEL_TELEMETRY=0` drop them.
+
 ### Event shape
 
 Each event is one Mixpanel `track` call. We set the properties below;
@@ -171,6 +176,7 @@ since `started` fires before the command body runs):
 - **plan / apply** — `creates`, `updates`, `deletes`, `revisions`, `total` (diff *counts* only).
 - **doctor** — `runtime`, `checks_total`, `checks_failed`, `checks_warn`, `failed_checks` (failing check **names**, never messages).
 - **start** — `runtime` (`binary` / `docker`).
+- **variables** — `is_secret`, `variable_count`. Deliberately *not* recorded: the variable's name or value — a name is free text, and a value is the credential itself. There is no owner dimension: the project level is the only owner the commands can address.
 - **claim** — `claim_outcome` (`completed` / `already_claimed` / `expired` / `window_expired` / `timeout` / `dry_run`), `poll_count`, `browser_opened`. Deliberately *not* recorded: `challenge_id`, `team_id`, `claim_url`, `dashboard_url` — every one of them is an id or a URL.
 
 ### Naming conventions

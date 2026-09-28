@@ -221,7 +221,7 @@ func TestManagementAuthz(t *testing.T) {
 			// The type is the status assertion; assertAuthzStatus is for the
 			// undeclared case and would read StatusCode off a struct that has
 			// none.
-			listResp, err := preview.QueryUsers(t.Context(), &api.QueryUsersRequest{})
+			listResp, err := preview.QueryUsers(t.Context(), &api.QueryUsersRequest{}, api.QueryUsersParams{})
 			require.NoError(t, err)
 			require.IsType(t, &api.QueryUsersForbidden{}, listResp, helpers.MustMarshal(t, listResp))
 			assertAuthzError(t, listResp, "user.permission_denied")
@@ -406,9 +406,19 @@ func TestManagementAuthz(t *testing.T) {
 // omit the outsider (RSI.team_id stamped after create). ListSchemas is empty
 // because schema RSI rows are project-scoped. QueryUsers is 200 [] because
 // user RSI rows have NULL team_id — by-id user reads deny for the same shape.
+//
+// It deliberately has no t.Parallel(). The Spanner emulator's planner charges
+// for the authz list predicate in proportion to the rows in the tables, and Go
+// runs every serial test to completion before any parallel body starts. So
+// running serially means the tests before it have finished and deleted their
+// own projects, and this one meets an almost empty database. Real Cloud Spanner
+// answers the same predicate in ~40ms, so the cost is the emulator's planner,
+// not a query bug.
+//
+// Measured: 687.9s when it ran in parallel against everything the package had
+// accumulated, 17.94s serial before project cleanup existed, and 5.32s serial
+// with cleanup. Do not give it t.Parallel() back.
 func TestListAuthzTeamScopedOnlyPartialView(t *testing.T) {
-	t.Parallel()
-
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 
@@ -491,7 +501,7 @@ func TestListAuthzTeamScopedOnlyPartialView(t *testing.T) {
 
 	asgns, err := stmts.ListAuthzAssignments(t.Context(), project.ID, domain.AuthzPrincipalTypeSKProj, project.ID, false)
 	require.NoError(t, err)
-	require.NotEmpty(t, asgns, "CreateProject seeds sk_proj → project.viewer")
+	require.NotEmpty(t, asgns, "CreateProject seeds sk_proj → project.admin")
 	for _, a := range asgns {
 		require.NoError(t, stmts.RevokeAuthzAssignment(t.Context(), project.ID, a.ID))
 	}
@@ -549,7 +559,7 @@ func TestListAuthzTeamScopedOnlyPartialView(t *testing.T) {
 	require.True(t, expandedFlows[0].UserSchema.Set, "expand was requested, so the property must be present")
 	assert.True(t, expandedFlows[0].UserSchema.Null, "the caller cannot read the schema, so it embeds as null")
 
-	usersResp, err := client.QueryUsers(t.Context(), &api.QueryUsersRequest{})
+	usersResp, err := client.QueryUsers(t.Context(), &api.QueryUsersRequest{}, api.QueryUsersParams{})
 	require.NoError(t, err)
 	require.IsType(t, &api.QueryUsersResponse{}, usersResp, helpers.MustMarshal(t, usersResp))
 	assert.Empty(t, usersResp.(*api.QueryUsersResponse).Users, "user RSI team_id is NULL so team-scoped lists are empty")

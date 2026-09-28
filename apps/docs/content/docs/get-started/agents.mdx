@@ -44,6 +44,10 @@ Create or use an empty local app directory. Run:
 
 Use the available browser automation to open the generated app. Register a unique user, verify the signed-in profile state, log out, log back in with the same user, and finish on the signed-in page.
 
+To reach the management console, read data.console.sign_in_url from step 2, or run
+npx @zitadel/cli@alpha console --non-interactive --json and read data.sign_in_url.
+Each link signs in the local admin once, so get a new one per visit.
+
 Summarize commands run, JSON statuses, files changed, browser steps completed, and any setup or UI friction.
 ```
 

@@ -142,6 +142,10 @@ func teamErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		return errorResponseWithStatusCode(http.StatusForbidden, err)
 	case domain.ErrTeamAlreadyExists().Code:
 		return errorResponseWithStatusCode(http.StatusConflict, err)
+	// Conflict, not forbidden: the caller has the permission, the team's
+	// current state is what refuses.
+	case domain.ErrTeamOwnsProject().Code:
+		return errorResponseWithStatusCode(http.StatusConflict, err)
 	default:
 		return internalErrorResponse(err)
 	}

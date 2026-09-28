@@ -49,6 +49,30 @@ type Handler interface {
 	//
 	// POST /branding
 	CreateBranding(ctx context.Context, req *Branding, params CreateBrandingParams) (CreateBrandingRes, error)
+	// CreateDeployment implements createDeployment operation.
+	//
+	// Makes a release live on an environment by recording a deployment. The two
+	// happen atomically: when the call returns, the environment runs the named
+	// release and the record exists; on any failure the environment keeps
+	// running what it ran and no record is written.
+	// Deploying, promoting and rolling back are all this call — `reason` says
+	// which. None of them assembles a release: the release must already exist,
+	// and rolling back means deploying a release the environment ran earlier,
+	// chosen from its deployment history.
+	// Idempotent on the running release: deploying the release the environment
+	// already runs changes nothing and answers `200` with the deployment that
+	// made it live, so a re-run of `zitadel deploy` on unchanged content is a
+	// no-op end to end — matching `POST /releases`, which resolves the same
+	// content to the same release first. Anything else writes a new record,
+	// including the same release returning after something else ran in between:
+	// the log is append-only, and each row is one act of making a release live.
+	// `expected_current_deployment_id` guards against racing another deploy:
+	// when present, the swap only happens if the environment's current
+	// deployment still is the one named, and a mismatch answers `409` with the
+	// actual `current_deployment_id` and `current_release_id` in the details.
+	//
+	// POST /deployments
+	CreateDeployment(ctx context.Context, req *CreateDeploymentRequest, params CreateDeploymentParams) (CreateDeploymentRes, error)
 	// CreateFlow implements createFlow operation.
 	//
 	// Resolves a flow definition based on purpose + audience context and returns
@@ -81,10 +105,18 @@ type Handler interface {
 	//
 	// Bind a user or team to `project.viewer`, `project.editor`, or
 	// `project.admin` on the project identified by the `project-id` header.
-	// IDs are `asgn_<opaque>`. Owning-team (`project.team`) grants are not
-	// created here — claim owns that path. An unrevoked grant with the same
-	// principal and relation occupies the unique key even after `expires_at`;
-	// DELETE it before re-creating.
+	// Name the principal with `user` (`user_id` or `identifier`) or `team`
+	// (`team_id` or `name`). IDs are `asgn_<opaque>`. Owning-team
+	// (`project.team`) grants are not created here — claim owns that path. An
+	// unrevoked grant with the same principal and relation occupies the unique
+	// key even after `expires_at`; DELETE it before re-creating.
+	// Create does not accept `expand`. The `user_id` and team locators
+	// return 201, whose `user` / `team` carry only `user_id` / `team_id`,
+	// and still 404 / 409 when the principal is missing or the tuple
+	// already exists. Creating by `user.identifier` answers 202 with no
+	// body on every outcome. Granting the session caller's own user is
+	// `grant.invalid` on either user locator. Read the grant back for
+	// identifier and display.
 	// Accepts either a project secret (`oauth2`) or a user-bound Console
 	// session cookie (`nextgenSession`). Session callers are authorized as
 	// the human against the target project (home may differ). CSRF/Origin
@@ -218,6 +250,10 @@ type Handler interface {
 	// users whose lifecycle it owns are deactivated with it.
 	// The request is idempotent. Deleting a team that is already deactivated
 	// or doesn't exist succeeds without changing anything.
+	// A team that still owns a project is refused with `409
+	// team.owns_project`: deactivating it would leave the project owned by a
+	// dead team and so unmanageable. No endpoint releases that ownership yet,
+	// so such a team cannot currently be deactivated through the API.
 	//
 	// DELETE /teams/{team_id}
 	DeleteTeam(ctx context.Context, params DeleteTeamParams) (DeleteTeamRes, error)
@@ -306,6 +342,16 @@ type Handler interface {
 	//
 	// GET /projects/{project_id}/claim/window
 	GetClaimWindow(ctx context.Context, params GetClaimWindowParams) (GetClaimWindowRes, error)
+	// GetDeploymentById implements getDeploymentById operation.
+	//
+	// Reads one deployment record.
+	// The lookup is scoped to the project in `project_id`: a deployment id
+	// belonging to another project answers not found exactly as an unknown id
+	// does, so the endpoint cannot be used to probe for deployments in projects
+	// the caller cannot read.
+	//
+	// GET /deployments/{deployment_id}
+	GetDeploymentById(ctx context.Context, params GetDeploymentByIdParams) (GetDeploymentByIdRes, error)
 	// GetEnvironmentByName implements getEnvironmentByName operation.
 	//
 	// Reads one environment of the project by its name.
@@ -346,6 +392,10 @@ type Handler interface {
 	// `resource_scope_index`; project scope is required on the query (same as
 	// events). Misses, revoked rows, project-secret setup (`sk_proj`),
 	// owning-team (`relation=team`) rows, and cross-project ids return 404.
+	// `expand=principal` adds envelope fields on `user` or `team` and requires
+	// `user.read` and `team.read` in addition to `project.read` for project
+	// secrets. A user-bound Console session that already passed the project
+	// Check may expand without those scopes.
 	// Accepts either a project secret (`oauth2`) or a user-bound Console
 	// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
 	// is a follow-up (#1140).
@@ -426,6 +476,12 @@ type Handler interface {
 	// Get a schema by its ID. A schema ID identifies one immutable revision, so
 	// this returns exactly that revision. To find the current revision of an
 	// object type, list with `revisions=latest`.
+	// Schema IDs are unique within a project, not across projects (the seeded
+	// default schema carries the same `$id` in every project). A Console
+	// session that manages more than one project names the project with
+	// `project_id`; without it, the ID is resolved in the credential's own
+	// project when it is ambiguous. A project secret always resolves in its
+	// own project and ignores `project_id`.
 	//
 	// GET /schemas/{id}
 	GetSchemaById(ctx context.Context, params GetSchemaByIdParams) (GetSchemaByIdRes, error)
@@ -505,6 +561,20 @@ type Handler interface {
 	//
 	// GET /branding
 	ListBranding(ctx context.Context, params ListBrandingParams) (ListBrandingRes, error)
+	// ListDeployments implements listDeployments operation.
+	//
+	// Lists deployments newest first: what ran where, and when.
+	// With `environment_name`, the list is that environment's history and its
+	// first row is the environment's current deployment. Without it, the list
+	// interleaves every environment of the project — a project-wide audit view
+	// in which the first row is only the most recent deployment anywhere.
+	// `expand: ["release"]` embeds the release each deployment made live, so a
+	// history renders with each entry's content without resolving `release_id`
+	// one by one. Expanding requires `release.read` and does not affect the
+	// ordering or the page tokens.
+	//
+	// GET /deployments
+	ListDeployments(ctx context.Context, params ListDeploymentsParams) (ListDeploymentsRes, error)
 	// ListEnvironments implements listEnvironments operation.
 	//
 	// Lists the project's environments ordered by name.
@@ -615,11 +685,12 @@ type Handler interface {
 	// DELETE before re-granting. Project-secret setup (`sk_proj`) and
 	// owning-team (`relation=team`) rows are not returned. Grants are not in
 	// `resource_scope_index`; project scope is required on the query (same as
-	// get). Requires `project.read`. `expand: ["principal"]` additionally
-	// requires `user.read` and `team.read` for project secrets (documented on
-	// the expand enum; those scopes cannot be ANDed onto this security block
-	// because they are body-conditional). A user-bound Console session that
-	// already passed the project Check may expand without those scopes.
+	// get). Requires `project.read`. `expand: ["principal"]` adds envelope
+	// fields on `user` / `team` and additionally requires `user.read` and
+	// `team.read` for project secrets (documented on the expand enum; those
+	// scopes cannot be ANDed onto this security block because they are
+	// body-conditional). A user-bound Console session that already passed
+	// the project Check may expand without those scopes.
 	// Accepts either a project secret (`oauth2`) or a user-bound Console
 	// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
 	// is a follow-up (#1140).
@@ -656,16 +727,14 @@ type Handler interface {
 	// QueryUsers implements queryUsers operation.
 	//
 	// Returns the users of a project, paginated with a cursor.
-	// The project comes from the credential, not from a parameter: the
-	// operation is bound to the credential's home project by construction
-	// (oauth2 secret or user-bound session). This is why it takes no
-	// `project_id`, unlike the other query endpoints.
+	// `project_id` names the project to list; without it, the credential's own
+	// project is listed.
 	// Accepts either a project secret (`oauth2`) or a user-bound Console
 	// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
 	// is a follow-up (#1140).
 	//
 	// POST /users/query
-	QueryUsers(ctx context.Context, req *QueryUsersRequest) (QueryUsersRes, error)
+	QueryUsers(ctx context.Context, req *QueryUsersRequest, params QueryUsersParams) (QueryUsersRes, error)
 	// RevokeMySession implements revokeMySession operation.
 	//
 	// Logs out by permanently deleting the session.

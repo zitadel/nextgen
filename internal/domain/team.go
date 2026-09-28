@@ -44,6 +44,12 @@ func ErrTeamPermissionDenied() Error {
 	return newError(PrefixTeam.ErrorCodePrefix("permission_denied"), "the team management API requires the project secret", nil, nil)
 }
 
+// ErrTeamOwnsProject refuses to deactivate a team that still owns a project.
+// No API operation releases that ownership yet (recovery is zitadel/nextgen#1261).
+func ErrTeamOwnsProject() Error {
+	return newError(PrefixTeam.ErrorCodePrefix("owns_project"), "the team still owns a project and cannot be deactivated while it does", nil, nil)
+}
+
 // Team represents the object defined [here](https://github.com/zitadel/nextgen/blob/main/docs/design/api/resource-map.md#teams)
 // It is hardly ever modified but read a lot therefore it should be stored in global tables.
 type Team struct {

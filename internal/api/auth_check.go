@@ -36,18 +36,20 @@ func factorPayloadToAPI(factor domain.AuthFactor) api.OptCompletedFactorPayload 
 		return api.NewOptCompletedFactorPayload(api.CompletedFactorPayload{
 			Type: api.IdentifierFactorPayloadCompletedFactorPayload,
 			IdentifierFactorPayload: api.IdentifierFactorPayload{
+				Method: api.IdentifierFactorPayloadMethodIdentifier,
 				UserID: api.UserID(f.UserID),
 			},
 		})
 	case *domain.AuthFactorPassword:
 		return api.NewOptCompletedFactorPayload(api.CompletedFactorPayload{
 			Type:                  api.PasswordFactorPayloadCompletedFactorPayload,
-			PasswordFactorPayload: api.PasswordFactorPayload{},
+			PasswordFactorPayload: api.PasswordFactorPayload{Method: api.PasswordFactorPayloadMethodPassword},
 		})
 	case *domain.AuthFactorPasskey:
 		return api.NewOptCompletedFactorPayload(api.CompletedFactorPayload{
 			Type: api.PasskeyFactorPayloadCompletedFactorPayload,
 			PasskeyFactorPayload: api.PasskeyFactorPayload{
+				Method:                  api.PasskeyFactorPayloadMethodPasskey,
 				CredentialID:            base64.RawURLEncoding.EncodeToString(f.CredentialID),
 				UserVerified:            f.UserVerified,
 				BackupEligible:          api.NewOptBool(f.BackupEligible),
@@ -61,6 +63,7 @@ func factorPayloadToAPI(factor domain.AuthFactor) api.OptCompletedFactorPayload 
 		return api.NewOptCompletedFactorPayload(api.CompletedFactorPayload{
 			Type: api.PasskeyFactorPayloadCompletedFactorPayload,
 			PasskeyFactorPayload: api.PasskeyFactorPayload{
+				Method:                  api.PasskeyFactorPayloadMethodPasskey,
 				CredentialID:            f.CredentialID,
 				UserVerified:            f.UserVerified,
 				BackupEligible:          api.NewOptBool(f.BackupEligible),
