@@ -1980,8 +1980,14 @@ func TestValidateSsoCreationReachability(t *testing.T) {
 					Actions:   []domain.FlowStepAction{{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true}},
 					Transitions: map[string]domain.FlowStepTransition{
 						"submit":              {Target: "done"},
-						"user_already_exists": {Target: "done"},
+						"user_already_exists": {Target: "conflict"},
 					},
+				},
+				{
+					Name:        "conflict",
+					Fields:      []domain.Field{"email"},
+					Actions:     []domain.FlowStepAction{{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true}},
+					Transitions: map[string]domain.FlowStepTransition{"submit": {Target: "done"}},
 				},
 				{Name: "done", Complete: &show},
 			},
@@ -2018,5 +2024,39 @@ func TestValidateSsoCreationReachability(t *testing.T) {
 		)
 		_, err := domain.ValidateFlowDefinition(&schema, def)
 		require.Error(t, err, "a create_user_with_sso step with nowhere to route a collision must be rejected")
+	})
+
+	t.Run("rejects create_user_with_sso whose user_already_exists routes to a terminal step", func(t *testing.T) {
+		def := base(
+			[]domain.FlowDefinitionStep{
+				{
+					Name:   "identifier",
+					Fields: []domain.Field{"email"},
+					Actions: []domain.FlowStepAction{
+						{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+					},
+					Transitions: map[string]domain.FlowStepTransition{
+						"submit":           {Target: "done"},
+						"identity_unknown": {Target: "register-sso"},
+					},
+				},
+				{
+					Name:      "register-sso",
+					Fields:    []domain.Field{"email"},
+					OnSuccess: &ssoCreate,
+					Actions:   []domain.FlowStepAction{{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true}},
+					// Routes the collision straight to a completion: the existing
+					// account would be handed off without proving ownership.
+					Transitions: map[string]domain.FlowStepTransition{
+						"submit":              {Target: "done"},
+						"user_already_exists": {Target: "done"},
+					},
+				},
+				{Name: "done", Complete: &show},
+			},
+			map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "identifier"},
+		)
+		_, err := domain.ValidateFlowDefinition(&schema, def)
+		require.Error(t, err, "routing a collision to a terminal step must be rejected (account takeover)")
 	})
 }

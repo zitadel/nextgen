@@ -553,6 +553,9 @@ func (r *FlowStateMachineRuntime) dropResolvedUser(pc *processCtx, reason string
 	hadResolvedUser := pc.state.CollectedData.UserID != ""
 	clearUserBoundState(pc.state)
 	pc.state.CollectedData.AuthMethods.Password = ""
+	// back / re-purpose must start fresh: the external identity's proof is
+	// identity-bound material and must not leak across it either.
+	pc.state.VerifiedIdentity = nil
 	if !hadResolvedUser {
 		return nil
 	}
@@ -602,6 +605,10 @@ func (r *FlowStateMachineRuntime) processSubmit(pc *processCtx, resolved FlowRes
 		// The handler already recorded the user's factors on the attempt
 		// inside its own transaction; only the flow state needs the id.
 		recordResolvedUser(pc.state, result.UserID)
+		// Single-use: a provider's proof authorizes exactly one creation.
+		// Consuming it here stops a captured/replayed cookie (or concurrent
+		// submits) from minting a second user off the same VerifiedIdentity.
+		pc.state.VerifiedIdentity = nil
 	}
 	if result.Outcome != "" {
 		// The mutation resolved to a flow outcome; route its declared
@@ -1618,22 +1625,30 @@ func (r *FlowStateMachineRuntime) bindCollidingUser(pc *processCtx, resolved Flo
 	// create_user_with_sso without a fresh provider callback.
 	pc.state.VerifiedIdentity = nil
 
-	name, value, ok := fieldValueByChallenge(resolved, pc.state.CollectedData.UserData, FlowFieldChallengeIdentifier)
-	if !ok {
-		return nil
+	// Try every unique attribute, not just the identifier, so a collision on
+	// any unique field still pins the owner (mirrors the passkey conflict
+	// path). The identifier is itself unique, so this is strictly broader.
+	candidates := uniqueFieldValues(pc.state.CollectedData.UserData, resolved)
+	if visited, verr := r.resolveVisitedFields(pc); verr == nil {
+		candidates = uniqueFieldValues(pc.state.CollectedData.UserData, resolved, visited)
 	}
-	userID, err := r.authAttempts.SubmitIdentifier(pc.ctx, FlowSubmitIdentifierInput{
-		ProjectID:     pc.state.ProjectID,
-		AttemptID:     pc.state.AuthAttemptID,
-		AttributeName: name,
-		Value:         value,
-	})
-	if errors.Is(err, ErrAuthAttemptProofRejected(nil)) {
-		return nil
+	for _, candidate := range candidates {
+		userID, err := r.authAttempts.SubmitIdentifier(pc.ctx, FlowSubmitIdentifierInput{
+			ProjectID:     pc.state.ProjectID,
+			AttemptID:     pc.state.AuthAttemptID,
+			AttributeName: candidate[0],
+			Value:         candidate[1],
+		})
+		if err == nil {
+			recordResolvedUser(pc.state, userID)
+			return nil
+		}
+		if !errors.Is(err, ErrAuthAttemptProofRejected(nil)) {
+			return fmt.Errorf("flow state machine: bind colliding user: %w", err)
+		}
+		// Rejected: this value is not the taken one; try the next candidate.
 	}
-	if err != nil {
-		return fmt.Errorf("flow state machine: bind colliding user: %w", err)
-	}
-	recordResolvedUser(pc.state, userID)
+	// A miss is not an error: the account may have been deleted between the
+	// resolution and this call, and the conflict step will simply fail to verify.
 	return nil
 }

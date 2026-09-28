@@ -475,12 +475,48 @@ describe("sso/create-only-via-callback", () => {
         actions: [{ name: "submit", kind: "submit" }],
         transitions: {
           submit: { target: "done" },
+          user_already_exists: { target: "conflict" },
+        },
+      },
+      {
+        name: "conflict",
+        fields: ["email"],
+        actions: [{ name: "submit", kind: "submit" }],
+        transitions: { submit: { target: "done" } },
+      },
+      { name: "done", complete: "show" },
+    ];
+    expect(ssoIssues(def)).toEqual([]);
+  });
+
+  it("rejects create_user_with_sso whose user_already_exists routes to a terminal step", () => {
+    const def = flow();
+    def.purposes = { login: "identifier" };
+    def.steps = [
+      {
+        name: "identifier",
+        fields: ["email"],
+        actions: [{ name: "submit", kind: "submit" }],
+        transitions: {
+          submit: { target: "done" },
+          identity_unknown: { target: "register-sso" },
+        },
+      },
+      {
+        name: "register-sso",
+        fields: ["email"],
+        on_success: "create_user_with_sso",
+        actions: [{ name: "submit", kind: "submit" }],
+        transitions: {
+          submit: { target: "done" },
           user_already_exists: { target: "done" },
         },
       },
       { name: "done", complete: "show" },
     ];
-    expect(ssoIssues(def)).toEqual([]);
+    expect(messages(ssoIssues(def))).toContain(
+      'step "register-sso" routes "user_already_exists" to "done", which is terminal or missing; a colliding identity must reach a verification step, not a completion',
+    );
   });
 
   it("rejects a create_user_with_sso step with no user_already_exists transition", () => {

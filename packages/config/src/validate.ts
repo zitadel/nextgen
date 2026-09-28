@@ -84,7 +84,7 @@ export const FLOW_PURPOSES = [
  * identifier outcomes only. `identity_unknown` comes only from SSO
  * resolution and is left out here; requiring it on every combined entry
  * step would reject the shipped default flow. A rule on steps carrying
- * sso_providers is future work (#1044).
+ * sso_providers is future work (#1014).
  */
 export const PURPOSE_FLIP_TARGETS: Readonly<Record<string, Readonly<Record<string, string>>>> = {
   login: { user_not_found: "register" },
@@ -607,7 +607,8 @@ function validateSsoCreationOnlyViaCallback(def: FlowDef): FlowValidationIssue[]
     }
     // The mutation resolves to user_already_exists on a colliding identity, so
     // the step must route that outcome or the collision dead-ends.
-    if (!step.transitions.has("user_already_exists")) {
+    const conflict = step.transitions.get("user_already_exists");
+    if (!conflict) {
       issues.push(
         error(
           "sso/create-only-via-callback",
@@ -615,6 +616,20 @@ function validateSsoCreationOnlyViaCallback(def: FlowDef): FlowValidationIssue[]
           step.name,
         ),
       );
+    } else {
+      // The collision pins the existing account, so the target must verify
+      // ownership. A terminal target would hand off a session bound to that
+      // account with no proof -- an account takeover.
+      const target = def.steps.find((s) => s.name === conflict.target);
+      if (!target || target.terminal) {
+        issues.push(
+          error(
+            "sso/create-only-via-callback",
+            `step ${q(step.name)} routes "user_already_exists" to ${q(conflict.target)}, which is terminal or missing; a colliding identity must reach a verification step, not a completion`,
+            step.name,
+          ),
+        );
+      }
     }
   }
   return issues;

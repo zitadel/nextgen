@@ -591,9 +591,17 @@ func validateSsoCreationReachability(def FlowDefinition) error {
 		// The mutation resolves to user_already_exists when the provider's
 		// identity collides with an existing account, so the step must route
 		// that outcome (to a conflict step) or the collision dead-ends.
-		if _, ok := step.Transitions[FlowImplicitOutcomeUserAlreadyExists]; !ok {
+		conflict, ok := step.Transitions[FlowImplicitOutcomeUserAlreadyExists]
+		if !ok {
 			return ErrFlowDefinitionInvalid(fmt.Sprintf(
 				"step %q runs create_user_with_sso but declares no %q transition; a colliding identity would have nowhere to route", step.Name, FlowImplicitOutcomeUserAlreadyExists), nil)
+		}
+		// The collision pins the *existing* account, so the target must verify
+		// ownership. Routing it to a terminal step would hand off a session
+		// bound to that account with no proof -- an account takeover.
+		if target, found := def.FindStep(conflict.Target); !found || target.Complete != nil {
+			return ErrFlowDefinitionInvalid(fmt.Sprintf(
+				"step %q routes %q to %q, which is terminal or missing; a colliding identity must reach a verification step, not a completion", step.Name, FlowImplicitOutcomeUserAlreadyExists, conflict.Target), nil)
 		}
 	}
 	return nil

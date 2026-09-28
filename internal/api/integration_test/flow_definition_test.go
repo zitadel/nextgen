@@ -1156,9 +1156,10 @@ func TestCreateFlowDefinitionOnSuccessRoundTrip(t *testing.T) {
 					"submit":           {Target: "step_3"},
 					"identity_unknown": {Target: "step_2"},
 				}
-				// A create_user_with_sso step must route the collision outcome,
-				// or the definition is rejected (validateSsoCreationReachability).
-				stepTwoTransitions["user_already_exists"] = api.FlowDefinitionStepTransitionsItem{Target: "step_3"}
+				// A create_user_with_sso step must route the collision outcome to
+				// a non-terminal verification step, or the definition is rejected
+				// (validateSsoCreationReachability). step_1 is non-terminal.
+				stepTwoTransitions["user_already_exists"] = api.FlowDefinitionStepTransitionsItem{Target: "step_1"}
 			}
 
 			definition := newFlowDefinitionFixture(name, userSchemaURI)
