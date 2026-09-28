@@ -34,14 +34,17 @@ import { formatDate } from "../../../lib/date";
 export const Route = createFileRoute("/_authed/projects/")({
   staticData: { nav: { label: "Projects", order: 1, icon: Boxes } },
   loader: async () => {
-    const page = await api.queryProjects({ limit: PAGE_SIZE });
+    // The projects the signed-in person can act on (root ADR 053 §6), read with
+    // the session cookie — not `POST /projects/query`, which the server pins to
+    // the calling credential's one home project (#1237).
+    const page = await api.listMyProjects({ limit: PAGE_SIZE });
     return { projects: page.projects, nextPageToken: page.next_page_token ?? undefined };
   },
   component: ProjectsScreen,
 });
 
 /**
- * One page of projects. `POST /projects/query` is cursor-paginated, so this is a
+ * One page of projects. `GET /users/me/projects` is cursor-paginated, so this is a
  * page size rather than a cap on what the operator can reach — `Load more` walks
  * the rest (design decisions log D5: a button, not pagination controls).
  */
@@ -50,7 +53,7 @@ const PAGE_SIZE = 25;
 /** Three equal columns; the trailing one carries the row menu. */
 const COLUMN = "w-1/3";
 
-type Project = Awaited<ReturnType<typeof api.queryProjects>>["projects"][number];
+type Project = Awaited<ReturnType<typeof api.listMyProjects>>["projects"][number];
 
 function ProjectsScreen() {
   const loaded = Route.useLoaderData();
@@ -83,7 +86,7 @@ function ProjectsScreen() {
     const generation = loaded;
     setLoadingMore(true);
     try {
-      const page = await api.queryProjects({ limit: PAGE_SIZE, page_token: nextPageToken });
+      const page = await api.listMyProjects({ limit: PAGE_SIZE, page_token: nextPageToken });
       // A page that lands after the list was invalidated answers a question about
       // the previous set; appending it would re-add rows the server may no longer
       // return. It is dropped, leaving the button ready to fetch the current

@@ -11,7 +11,7 @@
 | Area | Convention |
 |---|---|
 | **IDs** | Prefixed, opaque, dialect-minted (`prefix_<opaque>`). Prefix is part of the ID (e.g. `user_01H…`, `proj_01H…`). No scope hints encoded — the resource-scope index resolves them. Project IDs are `proj_*` ([ADR 047](../../adrs/047-dialect-id-generation.md)); the older dictionary-slug form is retired. |
-| **Verbs** | `POST`, `GET`, `PUT`, `PATCH`, `DELETE`. `PUT` is reserved for full-document replacement (`PUT /flow_definitions/{id}`, `PUT /users/{id}/password`); partial updates use `PATCH`. |
+| **Verbs** | `POST`, `GET`, `PUT`, `PATCH`, `DELETE`. `PUT` is reserved for full-document replacement (`PUT /users/{id}/password`); partial updates use `PATCH`. |
 | **Wire casing** | `snake_case` for fields, enum values, and parameters — enforced by the redocly rules and the `workspace:check-openapi-rules` gate. Wrong casing fails silently at runtime (unknown properties are dropped), which is why the gate exists. |
 | **Timestamps** | RFC3339 UTC strings. Never epoch millis. |
 | **Response shape** | Single resources are plain objects. Cursor-paginated lists are `{ <resource>: […], next_page_token }` (e.g. `{ sessions: […], next_page_token }`) — there is no `object`/`data` envelope. One shipped exception predates the pattern and is a normalization candidate: `GET /branding` returns a bare array. |

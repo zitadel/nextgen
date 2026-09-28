@@ -9,6 +9,8 @@ content:
         - $ref: '../../components/schemas/errors/flowdef-not_found.yaml'
         - $ref: '../../components/schemas/errors/flowdef-permission_denied.yaml'
         - $ref: '../../components/schemas/errors/internal.yaml'
+        - $ref: '../../components/schemas/errors/sch-not_found.yaml'
+        - $ref: '../../components/schemas/errors/sch-permission_denied.yaml'
         - $ref: '../../components/schemas/errors/flowdef-missing_project_id.yaml'
         - $ref: '../../components/schemas/errors/req-invalid.yaml'
       discriminator:
@@ -19,6 +21,8 @@ content:
           flowdef.not_found: '../../components/schemas/errors/flowdef-not_found.yaml'
           flowdef.permission_denied: '../../components/schemas/errors/flowdef-permission_denied.yaml'
           internal: '../../components/schemas/errors/internal.yaml'
+          sch.not_found: '../../components/schemas/errors/sch-not_found.yaml'
+          sch.permission_denied: '../../components/schemas/errors/sch-permission_denied.yaml'
           flowdef.missing_project_id: '../../components/schemas/errors/flowdef-missing_project_id.yaml'
           req.invalid: '../../components/schemas/errors/req-invalid.yaml'
     examples:
@@ -47,6 +51,16 @@ content:
         value:
           code: internal
           message: 'An unexpected error occurred.'
+      sch.not_found:
+        summary: sch.not_found
+        value:
+          code: sch.not_found
+          message: 'schema not found'
+      sch.permission_denied:
+        summary: sch.permission_denied
+        value:
+          code: sch.permission_denied
+          message: 'the schema management API requires the project secret'
       flowdef.missing_project_id:
         summary: flowdef.missing_project_id
         value:

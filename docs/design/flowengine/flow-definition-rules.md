@@ -9,15 +9,15 @@ shape and the rules the engine enforces on top of the JSON schema.
 
 Validation runs in two layers:
 
-1. **Schema** — `api/openapi/endpoints/schemas/flow-definition.yaml` enforces required fields, types, enums, and string patterns.
+1. **Schema** — `api/openapi/components/flows/flow-definition.yaml` states required fields, types, enums, and string patterns, plus the step and transition shapes JSON Schema can express: a terminal step carries nothing else, a non-terminal step does something, `sso_providers` needs `transitions.callback`, and a transition never sets both `purpose` and `action`. The generated editor meta-schema enforces all of it; the API's generated request validation ignores the shape rules, which the engine rules below enforce again.
 2. **Engine** — the rules below, applied at write time and (where deferred) at runtime.
 
 ## Definition shape
 
 | Field | Required | Notes |
 |---|:-:|---|
-| `name` | ✓ | Unique within `(project_id, schema_version)`. Used as the slug for direct resolution. |
-| `schema_version` | ✓ | Monotonic per `(project_id, name)`. The repository picks the highest active version. |
+| `name` | ✓ | The handle that groups revisions; not unique. Every `POST` publishes a new revision under the name. Resolution by name prefers the highest active `schema_version`, then the newest revision of it. |
+| `schema_version` | ✓ | Monotonic per `(project_id, name)`. First key of resolution by name (see `name`); the server hard-codes it today, so the newest revision decides. |
 | `status` | ✓ | `draft`, `active`, `deprecated`, `archived`. Only `active` is resolvable. |
 | `user_schema` | ✓ | URL of the user schema this flow's `fields` resolve against. Captured into `FlowState.UserSchemaURL` at `Start` so mid-flow schema changes don't reshape in-flight data. |
 | `purposes` | ✓ | Map from purpose (`login`, `register`, `recovery`, `profiling`, `reauth`, `link_account`) to the name of that purpose's entry-point step. |
@@ -65,7 +65,6 @@ Transition values:
 
 ### Definition
 
-- `name` unique within `(project_id, schema_version)`. **DDL.**
 - Every key in `purposes` is a supported `FlowDefinitionPurpose`.
 - Every value in `purposes` matches a step `name`.
 - `user_schema` URL resolves to a user-type schema. May be deferred until promotion to runtime use.
@@ -101,6 +100,5 @@ Transition values:
 ## Open questions
 
 - **When to resolve `user_schema`.** On write, only at runtime use, or somewhere in between? Tied to the still-undecided definition lifecycle.
-- **Uniqueness key.** `(project_id, name)` or `(project_id, name, schema_version)`? The latter lets revisions coexist; recommended.
 - **Cross-project pivots.** Out of scope — pivots and switches resolve within the same `project_id` when implemented.
-- **Built-in default flow.** Should the project-wide default ship embedded (`go:embed`) and be exempt from the uniqueness check on `name`?
+- **Built-in default flow.** Should the project-wide default ship embedded (`go:embed`)?

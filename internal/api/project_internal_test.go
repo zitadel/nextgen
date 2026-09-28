@@ -25,17 +25,23 @@ type stubProjectService struct {
 func (s stubProjectService) Create(context.Context, string, []string, bool) (*domain.Project, error) {
 	return s.created, nil
 }
+func (s stubProjectService) CreateWithID(context.Context, string, string, []string, bool) (*domain.Project, error) {
+	return s.created, nil
+}
 func (stubProjectService) Get(context.Context, string) (*domain.Project, error) {
 	return nil, domain.ErrProjectNotFound()
 }
 func (stubProjectService) DefaultProject(context.Context, string) (*domain.Project, error) {
 	return nil, nil
 }
-func (stubProjectService) Update(context.Context, string, string) (*domain.Project, error) {
+func (stubProjectService) Update(context.Context, service.UpdateProjectRequest) (*domain.Project, error) {
 	return nil, domain.ErrProjectNotFound()
 }
 func (stubProjectService) List(context.Context, service.ListProjectsRequest) (*service.ListProjectsResponse, error) {
 	return nil, domain.ErrProjectMissingID()
+}
+func (stubProjectService) ListAuthorized(context.Context, service.ListAuthorizedProjectsRequest) (*service.ListProjectsResponse, error) {
+	return nil, domain.ErrSessionTokenInvalid()
 }
 func (stubProjectService) Delete(context.Context, string) error { return nil }
 
@@ -56,6 +62,7 @@ func TestProjectErrorResponse(t *testing.T) {
 		{"missing_id", domain.ErrProjectMissingID(), http.StatusBadRequest},
 		{"already_claimed", domain.ErrProjectAlreadyClaimed(), http.StatusConflict},
 		{"claim_expired", domain.ErrProjectClaimExpired(), http.StatusGone},
+		{"claim_window_expired", domain.ErrProjectClaimWindowExpired(), http.StatusGone},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

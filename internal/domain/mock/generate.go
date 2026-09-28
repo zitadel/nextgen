@@ -12,4 +12,4 @@ package domainmock
 // generated before this one is reached. That is what lets generation bootstrap
 // from a tree with no generated files in it.
 
-//go:generate go tool mockgen -typed -package domainmock -destination ./domain.mock.go github.com/zitadel/nextgen/internal/domain SchemaResolver,FlowFieldResolver,FlowPasskeyRegistrationService,FlowOnSuccessHandler,FlowPasskeyUserCreater,JSONSchemaStore,FlowAuthAttemptService
+//go:generate go tool mockgen -typed -package domainmock -destination ./domain.mock.go github.com/zitadel/nextgen/internal/domain SchemaResolver,FlowFieldResolver,FlowOnSuccessHandler,JSONSchemaStore,FlowAuthAttemptService

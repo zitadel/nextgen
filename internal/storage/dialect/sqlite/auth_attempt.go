@@ -16,13 +16,13 @@ import (
 
 const (
 	authAttemptGetSelect = `SELECT aa.project_id, aa.id, aa.handoff_token, aa.handed_off_at, aa.session_id,` +
-		` aa.required_checks, aa.created_at, c.type, aa.time_to_live,` +
+		` aa.required_checks, aa.created_at, c.type, aa.time_to_live, aa.internal,` +
 		` c.id, c.last_challenged_at, c.last_verified_at, c.last_failed_at, c.failure_count, c.challenge_payload, c.factor_payload` +
 		` FROM auth_attempts aa` +
 		` LEFT JOIN checks c ON aa.project_id = c.project_id AND aa.id = c.auth_attempt_id`
 
-	createAuthAttemptStmt = `INSERT INTO auth_attempts (project_id, id, required_checks, time_to_live, session_id, created_at)
-VALUES (?, ?, ?, ?, ?, ?)`
+	createAuthAttemptStmt = `INSERT INTO auth_attempts (project_id, id, required_checks, time_to_live, session_id, created_at, internal)
+VALUES (?, ?, ?, ?, ?, ?, ?)`
 
 	createAuthCheckStmt = `INSERT INTO checks (project_id, auth_attempt_id, id, type, last_challenged_at, last_verified_at, challenge_payload, factor_payload, failure_count)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`
@@ -34,6 +34,12 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`
 	setAuthAttemptChallengeStmt = `INSERT INTO checks (project_id, auth_attempt_id, id, type, last_challenged_at, challenge_payload, failure_count, last_failed_at)` +
 		` VALUES (?, ?, ?, ?, ?, ?, 0, NULL) ON CONFLICT (project_id, auth_attempt_id, type)` +
 		` DO UPDATE SET id = excluded.id, last_challenged_at = EXCLUDED.last_challenged_at, challenge_payload = EXCLUDED.challenge_payload, failure_count = 0, last_failed_at = NULL` +
+		` RETURNING id`
+
+	setAuthAttemptFactorStmt = `INSERT INTO checks (project_id, auth_attempt_id, id, type, last_verified_at, factor_payload, failure_count)` +
+		` VALUES (?, ?, ?, ?, ?, ?, 0) ON CONFLICT (project_id, auth_attempt_id, type)` +
+		` DO UPDATE SET last_verified_at = EXCLUDED.last_verified_at, factor_payload = EXCLUDED.factor_payload,` +
+		` challenge_payload = NULL, last_challenged_at = NULL, failure_count = 0, last_failed_at = NULL` +
 		` RETURNING id`
 
 	authAttemptChallengeSucceededStmt = `UPDATE checks SET last_verified_at = ?, factor_payload = ?, challenge_payload = NULL, last_challenged_at = NULL, failure_count = 0` +
@@ -87,7 +93,7 @@ func (as authAttemptStatements) CreateAuthAttempt(ctx context.Context, attempt *
 
 	return withTransaction(ctx, as.client, func(ctx context.Context, tx queryExecutor) error {
 		if _, err := tx.Exec(ctx, createAuthAttemptStmt,
-			attempt.ProjectID, attempt.ID, string(req), ttlNanos, sessionID, now.UnixNano(),
+			attempt.ProjectID, attempt.ID, string(req), ttlNanos, sessionID, now.UnixNano(), attempt.Internal,
 		); err != nil {
 			return fmt.Errorf("failed to create auth attempt: %w", wrapError(err))
 		}
@@ -192,10 +198,11 @@ func scanAuthAttemptRows(rows *sql.Rows, attempt *domain.AuthAttempt) error {
 			challengePayload   sql.NullString
 			factorPayload      sql.NullString
 			createdNano        int64
+			internalInt        int64
 		)
 		if err := rows.Scan(
 			&attempt.ProjectID, &attemptID, &handoffToken, &handedOffAtNano, &sessionIDVal,
-			&requiredChecksJSON, &createdNano, &checkType, &timeToLiveNano,
+			&requiredChecksJSON, &createdNano, &checkType, &timeToLiveNano, &internalInt,
 			&checkID, &lastChallengedNano, &verifiedAtNano, &lastFailedAtNano, &failureCount,
 			&challengePayload, &factorPayload,
 		); err != nil {
@@ -203,6 +210,7 @@ func scanAuthAttemptRows(rows *sql.Rows, attempt *domain.AuthAttempt) error {
 		}
 		attempt.ID = attemptID
 		attempt.CreatedAt = timeFromUnixNano(createdNano)
+		attempt.Internal = internalInt != 0
 
 		if attempt.RequiredChecks == nil && requiredChecksJSON.Valid {
 			var reqInts []int64
@@ -325,6 +333,31 @@ func (as authAttemptStatements) SetAuthAttemptChallenge(ctx context.Context, pro
 	challenge.SetFailureCount(0)
 	challenge.SetLastFailedAt(time.Time{})
 	return nil
+}
+
+// SetAuthAttemptFactor implements [service.AuthAttemptStatements].
+func (as authAttemptStatements) SetAuthAttemptFactor(ctx context.Context, projectID, authAttemptID string, factor domain.AuthFactor) (string, error) {
+	now := time.Now().UTC()
+	payloadStr, err := authattempt.MarshalPayloadString(factor.Payload())
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal factor payload: %w", err)
+	}
+	checkID := ""
+	if err := ensureManagedID(&checkID, domain.PrefixChallenge); err != nil {
+		return "", err
+	}
+	var payloadArg any
+	if payloadStr != nil {
+		payloadArg = *payloadStr
+	}
+	var returnedID string
+	if err := as.client.QueryRow(ctx, setAuthAttemptFactorStmt,
+		projectID, authAttemptID, checkID, int64(factor.Type()), now.UnixNano(), payloadArg,
+	).Scan(&returnedID); err != nil {
+		return "", fmt.Errorf("failed to set factor: %w", wrapError(err))
+	}
+	factor.SetLastVerifiedAt(now)
+	return returnedID, nil
 }
 
 // AuthAttemptChallengeSucceeded implements [service.AuthAttemptStatements].

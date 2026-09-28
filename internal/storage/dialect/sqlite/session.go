@@ -271,11 +271,16 @@ func (ss sessionStatements) ApplyExchange(ctx context.Context, projectID, sessio
 		}
 	}
 	for _, c := range last {
-		if _, err := ss.client.Exec(ctx,
-			`DELETE FROM checks WHERE project_id = ? AND session_id = ? AND type = ? AND id != ?`,
-			projectID, sessionID, int64(c.Type), c.ID,
-		); err != nil {
-			return wrapError(err)
+		// Prune every losing row in the winner's class, not just its exact
+		// type: an enrollment row and a login row compete for the same
+		// passkey slot on the session.
+		for _, typ := range v2session.ClassMembers(c.Type) {
+			if _, err := ss.client.Exec(ctx,
+				`DELETE FROM checks WHERE project_id = ? AND session_id = ? AND type = ? AND id != ?`,
+				projectID, sessionID, int64(typ), c.ID,
+			); err != nil {
+				return wrapError(err)
+			}
 		}
 	}
 	return nil
@@ -498,5 +503,22 @@ var sessionSchema = database.NewSchema(map[domain.SessionField]database.FieldBin
 	domain.SessionFieldHasVerifiedFactors: {
 		SQLName:  "EXISTS (SELECT 1 FROM checks vc WHERE vc.project_id = s.project_id AND vc.session_id = s.id AND vc.last_verified_at IS NOT NULL)",
 		Computed: true,
+	},
+	// Not a column: a correlated EXISTS over the session user's lifecycle
+	// owner (ADR 024, ADR 060), split so the filter binds the team id inline.
+	// Both correlation columns are the users primary key and the team side is
+	// equality-bound against idx_users_lifecycle_owner_team_id, which leaves
+	// the planner two shapes to pick from by selectivity: probe users per
+	// candidate session for a team owning much of the project, or drive from
+	// the owned users into sessions for a narrow one. A session with user_id
+	// NULL never matches: the correlation compares to NULL and EXISTS is
+	// false, and a self-owned user's NULL lifecycle_owner_team_id never equals
+	// a bound team id.
+	domain.SessionFieldLifecycleOwnerTeamID: {
+		SQLName: `EXISTS (SELECT 1 FROM users u
+	WHERE u.project_id = s.project_id AND u.id = s.user_id
+	  AND u.lifecycle_owner_team_id = `,
+		SQLSuffix: ")",
+		Computed:  true,
 	},
 })

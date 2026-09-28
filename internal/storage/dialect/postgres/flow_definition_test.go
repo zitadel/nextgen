@@ -91,7 +91,7 @@ func TestFlowDefinitionStatements_ListAndDelete(t *testing.T) {
 			database.Equal(database.Col(domain.FlowDefinitionFieldProjectID), projectID),
 			database.Equal(database.Col(domain.FlowDefinitionFieldName), def.Name),
 		),
-	})
+	}, service.FlowDefinitionQueryOptions{})
 	require.NoError(t, err)
 	require.Len(t, listed.Items, 1)
 	assert.Equal(t, def.ID, listed.Items[0].ID)
@@ -99,27 +99,6 @@ func TestFlowDefinitionStatements_ListAndDelete(t *testing.T) {
 	require.NoError(t, testPool.DeleteFlowDefinitionByID(t.Context(), projectID, def.ID))
 	_, err = testPool.GetFlowDefinitionByID(t.Context(), projectID, def.ID)
 	assert.ErrorIs(t, err, new(database.NoRowFoundError))
-}
-
-func TestFlowDefinitionStatements_Update(t *testing.T) {
-	projectID := uniqueProjectID(t)
-	t.Cleanup(func() { _, _ = testPool.DeleteProjectByID(context.Background(), projectID) })
-	require.NoError(t, testPool.CreateProject(t.Context(), newTestProject(projectID)))
-
-	def := sampleFlowDefinition(projectID, uniqueFlowDefinitionID(t))
-	t.Cleanup(func() { _ = testPool.DeleteFlowDefinitionByID(context.Background(), projectID, def.ID) })
-	require.NoError(t, testPool.CreateFlowDefinition(t.Context(), def))
-
-	def.Name = "Updated Login"
-	def.Status = domain.FlowDefinitionStatusActive
-	def.SchemaVersion = "2.0.0"
-	require.NoError(t, testPool.UpdateFlowDefinition(t.Context(), def))
-
-	got, err := testPool.GetFlowDefinitionByID(t.Context(), projectID, def.ID)
-	require.NoError(t, err)
-	assert.Equal(t, "Updated Login", got.Name)
-	assert.Equal(t, domain.FlowDefinitionStatusActive, got.Status)
-	assert.Equal(t, "2.0.0", got.SchemaVersion)
 }
 
 func TestFlowDefinitionStatements_ListByPurpose(t *testing.T) {
@@ -145,7 +124,7 @@ func TestFlowDefinitionStatements_ListByPurpose(t *testing.T) {
 			database.Equal(database.Col(domain.FlowDefinitionFieldProjectID), projectID),
 			database.ArrayContains(database.Col(domain.FlowDefinitionFieldPurposes), domain.FlowDefinitionPurposeLogin.String()),
 		),
-	})
+	}, service.FlowDefinitionQueryOptions{})
 	require.NoError(t, err)
 	require.Len(t, listed.Items, 1)
 	assert.Equal(t, login.ID, listed.Items[0].ID)
@@ -172,7 +151,7 @@ func TestFlowDefinitionStatements_ListByStatus(t *testing.T) {
 			database.Equal(database.Col(domain.FlowDefinitionFieldProjectID), projectID),
 			database.Equal(database.Col(domain.FlowDefinitionFieldStatus), domain.FlowDefinitionStatusActive.String()),
 		),
-	})
+	}, service.FlowDefinitionQueryOptions{})
 	require.NoError(t, err)
 	require.Len(t, listed.Items, 1)
 	assert.Equal(t, active.ID, listed.Items[0].ID)

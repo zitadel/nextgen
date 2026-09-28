@@ -61,3 +61,19 @@ func InsertJSONSchemaAt(ctx context.Context, pool database.Pool, projectID, url 
 	).statement())
 	return wrapError(err)
 }
+
+// InsertFlowDefinitionAt inserts a flow_definitions row at an exact created_at.
+// CreateFlowDefinition never accepts a caller-supplied created_at, so a test
+// that needs two revisions to collide has to write the row itself.
+func InsertFlowDefinitionAt(ctx context.Context, pool database.Pool, projectID, id, name string, createdAt time.Time) error {
+	c, ok := pool.(*Client)
+	if !ok {
+		return fmt.Errorf("spanner.InsertFlowDefinitionAt: expected *Client, got %T", pool)
+	}
+	db := newClientDB(c.client)
+	_, err := db.Update(ctx, buildStatement(
+		`INSERT INTO flow_definitions (project_id, id, name, schema_version, status, purposes, definition, created_at, updated_at) VALUES (@p1, @p2, @p3, '1.0.0', 'draft', ARRAY<STRING>[], JSON '{}', @p4, @p4)`,
+		projectID, id, name, createdAt,
+	).statement())
+	return wrapError(err)
+}

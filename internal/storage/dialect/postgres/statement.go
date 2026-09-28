@@ -19,10 +19,12 @@ type statements struct {
 	flowDefinitionStatements
 	cryptoKeyStatements
 	jsonSchemaStatements
+	environmentStatements
+	releaseStatements
+	idpConnectionStatements
 	teamStatements
 	teamMembershipStatements
 	tokenStatements
-	passkeyRegistrationStatements
 	sessionStatements
 	authAttemptStatements
 	userStatements
@@ -31,6 +33,7 @@ type statements struct {
 	userPasskeyStatements
 	userRecoveryCodesStatements
 	brandingStatements
+	variableStatements
 	claimStatements
 	resourceScopeStatements
 	authzAssignmentStatements
@@ -53,10 +56,12 @@ func newStatements(client queryExecutor) statements {
 		flowDefinitionStatements:      newFlowDefinitionStatements(client),
 		cryptoKeyStatements:           newCryptoKeyStatements(client),
 		jsonSchemaStatements:          newJSONSchemaStatements(client),
+		environmentStatements:         newEnvironmentStatements(client),
+		releaseStatements:             newReleaseStatements(client),
+		idpConnectionStatements:       newIDPConnectionStatements(client),
 		teamStatements:                newTeamStatements(client),
 		teamMembershipStatements:      newTeamMembershipStatements(client),
 		tokenStatements:               newTokenStatements(client),
-		passkeyRegistrationStatements: newPasskeyRegistrationStatements(client),
 		sessionStatements:             newSessionStatements(client),
 		authAttemptStatements:         newAuthAttemptStatements(client),
 		userStatements:                newUserStatements(client),
@@ -65,6 +70,7 @@ func newStatements(client queryExecutor) statements {
 		userPasskeyStatements:         newUserPasskeyStatements(client),
 		userRecoveryCodesStatements:   newUserRecoveryCodesStatements(client),
 		brandingStatements:            newBrandingStatements(client),
+		variableStatements:            newVariableStatements(client),
 		claimStatements:               newClaimStatements(client),
 		resourceScopeStatements:       newResourceScopeStatements(client),
 		authzAssignmentStatements:     newAuthzAssignmentStatements(client),

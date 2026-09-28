@@ -10,6 +10,9 @@ CREATE TABLE auth_attempts (
     required_checks ARRAY<INT64>,
     created_at      TIMESTAMP   NOT NULL DEFAULT (CURRENT_TIMESTAMP()),
     time_to_live    INT64,
+    -- internal marks server-orchestrated ceremonies (e.g. management passkey
+    -- enrollment) that must never be handed off or read as attempts (ADR 056).
+    internal        BOOL        NOT NULL DEFAULT (false),
     FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE,
 ) PRIMARY KEY (project_id, id)
 -- +goose StatementEnd

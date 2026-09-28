@@ -23,7 +23,7 @@ import { describeError } from "../lib/api-error";
 
 /**
  * The word the operator has to type before the action unlocks. Compared
- * case-sensitively: the design (`656:49130`) renders it uppercase, and a
+ * case-sensitively: the design renders it uppercase, and a
  * confirmation step that accepts "delete" is not the barrier it appears to be.
  */
 const CONFIRM_WORD = "DELETE";
@@ -52,7 +52,7 @@ const CONFIRM_LABEL = "font-serif text-sm leading-5 font-normal text-foreground"
 const FOOTER = "flex-row items-center justify-end gap-2 px-6 pb-6";
 
 /**
- * The delete-user confirmation dialog (Figma `656:49130`).
+ * The delete-user confirmation dialog.
  *
  * **The copy is literally true.** `DELETE /users/{user_id}` is a hard delete:
  * the service removes the user's memberships and the user row in one

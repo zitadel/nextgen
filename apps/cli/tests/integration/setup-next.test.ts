@@ -29,6 +29,34 @@ function cli(args: string[], env: NodeJS.ProcessEnv = {}) {
   return runCliForTest([...args, "--server", MOCK_SERVER_URL], env);
 }
 
+function jsonCode(stdout: string): string | undefined {
+  try {
+    return (parseJson(stdout) as { code?: string }).code;
+  } catch {
+    return undefined;
+  }
+}
+
+// `freePort()` bind-then-close races other vitest workers. Doctor maps a
+// failed port check to E_PORT_IN_USE (exit 5); retry once with a new port.
+async function doctorCli(cwd: string, extraArgs: string[] = []) {
+  const fake = await fakeDocker();
+  const env = {
+    PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
+    DOCKER_LOG: fake.logPath,
+  };
+  let result = await runDoctorOnce(cwd, extraArgs, env);
+  if (result.exitCode !== 0 && jsonCode(result.stdout) === "E_PORT_IN_USE") {
+    result = await runDoctorOnce(cwd, extraArgs, env);
+  }
+  return result;
+}
+
+async function runDoctorOnce(cwd: string, extraArgs: string[], env: NodeJS.ProcessEnv) {
+  const port = await freePort();
+  return cli(["doctor", "--cwd", cwd, "--json", ...extraArgs, "--port", String(port)], env);
+}
+
 describe("Next setup integration", () => {
   it("sets up, verifies, plans, applies, and preserves idempotency", async () => {
     const cwd = await createNextProject();
@@ -195,7 +223,7 @@ describe("Next setup integration", () => {
     // Pre-existing app ⇒ widget posture, recorded for doctor --fix (ADR 044).
     expect(scaffold.posture).toBe("widget");
     expect(state.resources[".zitadel/flows/default-login.json"]).toMatchObject({
-      id: expect.stringMatching(/^flow_/),
+      id: expect.stringMatching(/^flowdef_/),
       hash: expect.stringMatching(/^[a-f0-9]{64}$/),
       name: "default-login",
       status: "active",
@@ -261,13 +289,8 @@ describe("Next setup integration", () => {
     };
     expect(packageJson.dependencies?.["@zitadel/sdk-next"]).toBe(await expectedCliVersion());
 
-    const fake = await fakeDocker();
-    const port = await freePort();
-    const doctor = await cli(["doctor", "--cwd", cwd, "--json", "--port", String(port)], {
-      PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
-      DOCKER_LOG: fake.logPath,
-    });
-    expect(doctor.exitCode).toBe(0);
+    const doctor = await doctorCli(cwd);
+    expect(doctor.exitCode, doctor.stdout).toBe(0);
     expect((parseJson(doctor.stdout) as { status: string }).status).toBe("ok");
 
     const noArg = await cli(["status", "--cwd", cwd, "--json"]);
@@ -393,13 +416,8 @@ describe("Next setup integration", () => {
     pkg.dependencies.next = "^14.2.0";
     await writeFile(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`);
 
-    const fake = await fakeDocker();
-    const port = await freePort();
-    const doctor = await cli(["doctor", "--cwd", cwd, "--json", "--port", String(port)], {
-      PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
-      DOCKER_LOG: fake.logPath,
-    });
-    expect(doctor.exitCode).toBe(3);
+    const doctor = await doctorCli(cwd);
+    expect(doctor.exitCode, doctor.stdout).toBe(3);
     const envelope = parseJson(doctor.stdout) as {
       code: string;
       hint?: string;
@@ -463,7 +481,7 @@ describe("Next setup integration", () => {
       resources: Record<string, { id?: string }>;
     };
     expect(state.resources[".zitadel/schemas/default-human-user.json"]?.id).toMatch(/^sch_/);
-    expect(state.resources[".zitadel/flows/default-login.json"]?.id).toMatch(/^flow_/);
+    expect(state.resources[".zitadel/flows/default-login.json"]?.id).toMatch(/^flowdef_/);
   });
 
   it("fails apply clearly for missing env refs", async () => {
@@ -588,13 +606,8 @@ describe("Next setup integration", () => {
     // the neutral default — doctor restores the renderer context from
     // zitadel.json rather than assuming setup defaults.
     await rm(join(cwd, "app/login/page.tsx"));
-    const fake = await fakeDocker();
-    const port = await freePort();
-    const fix = await cli(["doctor", "--cwd", cwd, "--json", "--fix", "--port", String(port)], {
-      PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
-      DOCKER_LOG: fake.logPath,
-    });
-    expect(fix.exitCode).toBe(0);
+    const fix = await doctorCli(cwd, ["--fix"]);
+    expect(fix.exitCode, fix.stdout).toBe(0);
     const restored = await readFile(join(cwd, "app/login/page.tsx"), "utf8");
     expect(restored).toContain("element.locales = businessLocales");
   });
@@ -645,7 +658,7 @@ describe("Next setup integration", () => {
     expect(setupJson.data.next_actions.join("\n")).toContain(".zitadel/branding/login.liquid");
 
     // The wire body inlines the template under `liquid_template`; the local
-    // descriptor keeps the file reference — the dialect's two carriers.
+    // descriptor keeps the `$file` reference in the same key.
     expect(brandingBodies).toHaveLength(1);
     expect(brandingBodies[0]).toMatchObject({ layout: "split" });
     expect(typeof brandingBodies[0]?.liquid_template).toBe("string");
@@ -653,7 +666,7 @@ describe("Next setup integration", () => {
     const descriptor = JSON.parse(
       await readFile(join(cwd, ".zitadel/branding/branding.json"), "utf8"),
     ) as Record<string, unknown>;
-    expect(descriptor.liquid_template_file).toBe("./login.liquid");
+    expect(descriptor.liquid_template).toEqual({ $file: "./login.liquid" });
 
     // Sync state pins the published revision, so the first plan is empty —
     // the ejected design converges exactly like schemas and flows.

@@ -22,11 +22,10 @@
  *
  * Reference: https://www.figma.com/developers/api#variables
  */
+import { readFileSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-
-import lockfile from "../figma-tokens.lock" with { type: "json" };
 
 interface FigmaTokensLock {
   fileKey: string;
@@ -70,7 +69,11 @@ interface FigmaVariableCollection {
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
 const OUT = resolve(ROOT, "../src/generated/figma.tokens.json");
-const lock = lockfile as unknown as FigmaTokensLock;
+// Read rather than import: the lock is JSON but not `.json`, and an import
+// attribute cannot describe an extension Node has no loader for.
+const lock = JSON.parse(
+  readFileSync(resolve(ROOT, "../figma-tokens.lock"), "utf8"),
+) as FigmaTokensLock;
 
 async function main(): Promise<void> {
   const token = process.env["FIGMA_TOKEN"];

@@ -1,5 +1,6 @@
 package openapi
 
+//go:generate corepack pnpm exec tsx ../scripts/generate-meta-schemas.ts
 //go:generate go run ./cmd/gen_error_schemas
 //go:generate go run ./cmd/gen_event_schemas
 //go:generate go run ./cmd/gen_openapi_errors

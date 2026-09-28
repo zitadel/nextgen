@@ -38,6 +38,7 @@ var tenantUserSchemaNoAuthMethod = []byte(`{
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://tenant.com/schemas/no-auth-methods.json",
   "type": "object",
+  "x-identifier": "email",
   "required": ["email"],
   "properties": {
     "email": { "type": "string", "format": "email", "x-unique": "team" }
@@ -48,6 +49,7 @@ var tenantUserSchemaEmptyAuthMethod = []byte(`{
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://tenant.com/schemas/empty-auth-methods.json",
   "type": "object",
+  "x-identifier": "email",
   "required": ["email"],
   "x-auth-methods": {},
   "properties": {
@@ -59,6 +61,7 @@ var tenantUserSchemaDisabledAuthMethod = []byte(`{
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://tenant.com/schemas/disabled-auth-user.json",
   "type": "object",
+  "x-identifier": "email",
   "required": ["email"],
   "x-auth-methods": {
     "password": { "enabled": false }
@@ -72,6 +75,7 @@ var userSchemaIDAndPassword = []byte(`{
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://tenant.com/schemas/idpw-user.json",
   "type": "object",
+  "x-identifier": "email",
   "required": ["email"],
   "x-auth-methods": {
     "password": { "enabled": true }
@@ -85,6 +89,7 @@ var userSchemaPasskeyEnabled = []byte(`{
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://tenant.com/schemas/passkey-user.json",
   "type": "object",
+  "x-identifier": "email",
   "required": ["email"],
   "x-auth-methods": {
     "password": { "enabled": true },
@@ -99,6 +104,7 @@ var userSchemaPasskeyDisabled = []byte(`{
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://tenant.com/schemas/passkey-disabled-user.json",
   "type": "object",
+  "x-identifier": "email",
   "required": ["email"],
   "x-auth-methods": {
     "password": { "enabled": true },
@@ -375,13 +381,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 							Fields: []domain.Field{
 								"email",
 							},
-							SSOProviders: []domain.FlowSSOProvider{
-								{
-									ID:       "google",
-									Name:     "Google",
-									Template: "google",
-								},
-							},
+							SSOProviders: []string{"google"},
 							Transitions: map[string]domain.FlowStepTransition{
 								"callback": {Target: "done"},
 							},
@@ -410,14 +410,8 @@ func TestValidateFlowDefinition(t *testing.T) {
 					},
 					Steps: []domain.FlowDefinitionStep{
 						{
-							Name: "identify",
-							SSOProviders: []domain.FlowSSOProvider{
-								{
-									ID:       "google",
-									Name:     "Google",
-									Template: "google",
-								},
-							},
+							Name:         "identify",
+							SSOProviders: []string{"google"},
 							Transitions: map[string]domain.FlowStepTransition{
 								"cancel": {Target: "done"},
 							},
@@ -1062,7 +1056,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 					},
 				},
 			},
-			wantErr: domain.ErrFlowDefinitionInvalid(`step "start": transition key "magic_link" is not an action name or reserved outcome (user_not_found, user_already_exists, callback)`, nil),
+			wantErr: domain.ErrFlowDefinitionInvalid(`step "start": transition key "magic_link" is not an action name or reserved outcome (user_not_found, user_already_exists, identity_unknown, callback)`, nil),
 		},
 		{
 			name: "invalid flow - duplicate step names",

@@ -219,6 +219,9 @@ func TestClaimErrorResponse(t *testing.T) {
 		{"challenge_not_found", domain.ErrClaimChallengeNotFound(), http.StatusNotFound},
 		{"challenge_invalid", domain.ErrClaimChallengeInvalid(), http.StatusBadRequest},
 		{"no_personal_team", domain.ErrClaimNoPersonalTeam(), http.StatusForbidden},
+		// Same status as its sibling on purpose: the caller is refused either
+		// way, and only the code tells them whether waiting will help.
+		{"personal_team_not_active", domain.ErrPersonalTeamNotActive("removed"), http.StatusForbidden},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

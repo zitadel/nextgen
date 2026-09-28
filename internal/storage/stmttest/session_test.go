@@ -422,3 +422,99 @@ func TestSessionStatements_List_StateColumnFilters(t *testing.T) {
 		assert.ElementsMatch(t, []string{activeID}, ids(userBound), "live and user_id IS NOT NULL")
 	})
 }
+
+// TestSessionStatements_List_LifecycleOwnerTeamFilter exercises the team
+// filter, which is not a column: a session joins a team through its bound
+// user's lifecycle owner (ADR 024, ADR 060). Roster membership is deliberately
+// not the join — the cases below pin that difference, because it is what the
+// team may act on: every session it sees is one it may revoke.
+func TestSessionStatements_List_LifecycleOwnerTeamFilter(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
+
+		newTeam := func(label string) string {
+			teamID := "team-" + label + "-" + uniqueSuffix(t)
+			require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, teamID)))
+			return teamID
+		}
+		// ownerTeamID nil creates a self-owned user: nobody manages their
+		// lifecycle, so no team may revoke their sessions.
+		newUser := func(label string, ownerTeamID *string) string {
+			userID := "usr-" + label + "-" + uniqueSuffix(t)
+			user := newTestUser(t, projectID, schemaURL, userID, userID+"@example.com", "Team Filter "+label)
+			user.LifecycleOwnerTeamID = ownerTeamID
+			require.NoError(t, d.stmts.CreateUser(t.Context(), user))
+			t.Cleanup(func() { _ = d.stmts.DeleteUserByID(context.Background(), projectID, userID) })
+			return userID
+		}
+		join := func(teamID, userID string, status domain.MembershipStatus) {
+			require.NoError(t, d.stmts.CreateTeamMembership(t.Context(), &domain.TeamMembership{
+				ProjectID: projectID, TeamID: teamID, UserID: userID, Status: status,
+			}))
+		}
+
+		teamA, teamB := newTeam("a"), newTeam("b")
+
+		// Owned by A, but also a collaborator on B's roster: B sees the user
+		// on its roster and can remove them from it, yet may not end their
+		// session, so B must not see it here.
+		ownedByA := newUser("owned-a", &teamA)
+		join(teamB, ownedByA, domain.MembershipStatusActive)
+		ownedByASessionID := createTwoCheckSession(t, d.stmts, projectID, ownedByA).ID
+
+		ownedByB := newUser("owned-b", &teamB)
+		ownedByBSessionID := createTwoCheckSession(t, d.stmts, projectID, ownedByB).ID
+
+		// Self-owned: on A's roster, owned by nobody. The NULL owner equals no
+		// team id, so the session surfaces under none.
+		selfOwned := newUser("self", nil)
+		join(teamA, selfOwned, domain.MembershipStatusActive)
+		selfOwnedSessionID := createTwoCheckSession(t, d.stmts, projectID, selfOwned).ID
+
+		// An anonymous session has no user, so it can reach no owner.
+		anonymous, err := domain.NewSession(projectID, nil)
+		require.NoError(t, err)
+		require.NoError(t, d.stmts.CreateSession(t.Context(), anonymous))
+		t.Cleanup(func() { _ = d.stmts.DeleteSessionByID(context.Background(), projectID, anonymous.ID) })
+
+		ctx := t.Context()
+		listTeam := func(t *testing.T, teamID string) []string {
+			t.Helper()
+			result, err := d.stmts.ListSessions(ctx, &database.ListOptions[domain.SessionField]{
+				Filter: database.And(
+					database.Equal(database.Col(domain.SessionFieldProjectID), projectID),
+					database.CorrelatedEqual(database.Col(domain.SessionFieldLifecycleOwnerTeamID), teamID),
+				),
+				Pagination: database.Page[domain.SessionField]{
+					OrderBy: database.OrderBy[domain.SessionField]{
+						Columns: []database.Column[domain.SessionField]{database.Col(domain.SessionFieldID)},
+					},
+				},
+			})
+			require.NoError(t, err)
+			out := make([]string, 0, len(result.Items))
+			for _, session := range result.Items {
+				out = append(out, session.ID)
+			}
+			return out
+		}
+
+		assert.Equal(t, []string{ownedByASessionID}, listTeam(t, teamA), "the owning team sees its user's session")
+		assert.Equal(t, []string{ownedByBSessionID}, listTeam(t, teamB), "a team only sees the sessions of the users it owns")
+		assert.NotContains(t, listTeam(t, teamB), ownedByASessionID, "a roster collaborator owned elsewhere stays out of the view")
+		assert.NotContains(t, listTeam(t, teamA), selfOwnedSessionID, "a self-owned user on the roster belongs to no team")
+		assert.Empty(t, listTeam(t, "team-does-not-exist"), "an unknown team matches nothing")
+
+		for _, teamID := range []string{teamA, teamB} {
+			assert.NotContains(t, listTeam(t, teamID), anonymous.ID, "a session with no user belongs to no team")
+		}
+
+		// Deactivation drops the user's memberships but not their owner, and
+		// it does not end the session. The owning team is the only principal
+		// that can answer "does a session outlive this deactivation?", so the
+		// row has to stay visible to it — under a roster join it would have
+		// disappeared at exactly that moment.
+		require.NoError(t, d.stmts.DeactivateUser(ctx, projectID, ownedByA))
+		assert.Equal(t, []string{ownedByASessionID}, listTeam(t, teamA), "a deactivated user's live session stays visible to the owning team")
+	})
+}

@@ -137,7 +137,7 @@ func (t *Token) JWE(encrypter op.Encrypter) (string, error) {
 	return token, nil
 }
 
-func ParseAndValidateToken(ctx context.Context, token string, decrypter crypto2.DecrypterFunc) (*Token, error) {
+func ParseAndValidateToken(ctx context.Context, token string, decrypter crypto2.DecrypterFactory) (*Token, error) {
 	header, err := DecodeJWEHeader(token)
 	if err != nil {
 		return nil, err

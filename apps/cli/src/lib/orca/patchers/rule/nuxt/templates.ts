@@ -178,8 +178,9 @@ export default defineNuxtPlugin(() => {
         isAuthenticated: true,
         session: {
           userId: auth.session.userId,
-          email: auth.session.email,
-          name: auth.session.name,
+          identifier: auth.session.identifier,
+          identifierProperty: auth.session.identifierProperty,
+          display: auth.session.display,
         },
       }
     : { isAuthenticated: false, session: null };

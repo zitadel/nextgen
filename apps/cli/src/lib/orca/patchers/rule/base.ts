@@ -35,6 +35,17 @@ import { reclaimableOps, withoutExistingTargets } from "./reclaim";
  * and the shared eject classification; subclasses contribute only their
  * framework-specific routes/middleware.
  */
+/**
+ * Written above the scaffolded entries in `.env.example` and `.env.local`.
+ * `zitadel start` hands every `NEXTGEN_*` variable in these files to the
+ * local server, so the files are also where a developer configures it.
+ */
+const LOCAL_SERVER_ENV_COMMENT = [
+  "Variables the scaffolded app reads. Any NEXTGEN_* variable added here",
+  "configures the local server that `zitadel start` runs, for example",
+  "NEXTGEN_INSTRUMENTATION_LOG_LEVEL=debug.",
+];
+
 export abstract class AbstractRulePatcher implements Patcher {
   abstract canPatch(framework: string): boolean;
 
@@ -236,6 +247,7 @@ export abstract class AbstractRulePatcher implements Patcher {
       {
         kind: "merge-env",
         path: ".env.example",
+        comment: LOCAL_SERVER_ENV_COMMENT,
         entries: {
           ZITADEL_PROJECT_ID: "",
           ZITADEL_PROJECT_SECRET: "",
@@ -247,6 +259,7 @@ export abstract class AbstractRulePatcher implements Patcher {
       {
         kind: "merge-env",
         path: ".env.local",
+        comment: LOCAL_SERVER_ENV_COMMENT,
         entries: {
           ZITADEL_PROJECT_ID: ctx.project.id,
           ZITADEL_PROJECT_SECRET: ctx.project.project_secret,

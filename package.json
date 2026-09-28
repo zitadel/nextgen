@@ -22,10 +22,12 @@
     "oxfmt": "catalog:",
     "oxlint": "catalog:",
     "sharp": "catalog:",
+    "tsx": "catalog:",
     "typescript": "catalog:",
     "verdaccio": "6.7.4",
     "vite": "catalog:",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "yaml": "catalog:"
   },
   "packageManager": "pnpm@10.33.2+sha256.7a7bcf13d7f6ceb3946c03978373d99be9fde1cafc3000bdfed4c4f791167610",
   "pnpm": {

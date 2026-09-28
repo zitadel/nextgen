@@ -327,6 +327,43 @@ describe("<zitadel-login> against the typed Flow API", () => {
     expect(completeEvents[0]?.detail.handoff_token).toBeTruthy();
   });
 
+  it("does not paint the terminal step when it is about to navigate away", async () => {
+    const assign = vi.fn();
+    const { location } = window;
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...location, assign },
+    });
+
+    try {
+      const element = document.createElement("zitadel-login") as ZitadelLogin;
+      element.purpose = "login";
+      element.project = testProject;
+      element.postSignInUrl = "/admin";
+      host.appendChild(element);
+      await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
+
+      await advanceMockLoginFlow(element);
+      await waitFor(() => (assign.mock.calls.length > 0 ? assign : null));
+
+      // The host's own signed-in screen is next; a "you are signed in" card
+      // here would be the second confirmation of one sign-in.
+      expect(element.shadowRoot?.querySelector("zl-card")).toBeNull();
+      expect(element.shadowRoot?.querySelector('slot[name="loader"]')).not.toBeNull();
+    } finally {
+      Object.defineProperty(window, "location", { configurable: true, value: location });
+    }
+  });
+
+  it("still shows the terminal step when the host handles the handoff itself", async () => {
+    // No post-sign-in-url: nothing navigates, so the terminal screen is the
+    // flow's last word and must render.
+    const element = await mount(host);
+    await advanceMockLoginFlow(element);
+    await waitFor(() => element.shadowRoot?.querySelector("zl-card"));
+    expect(element.shadowRoot?.querySelector("zl-card")).not.toBeNull();
+  });
+
   it("exchanges the handoff token and navigates when post-sign-in-url is set", async () => {
     const assign = vi.fn();
     const { location } = window;
@@ -1602,6 +1639,55 @@ describe("<zitadel-login> against the typed Flow API", () => {
         expect(back).not.toHaveBeenCalled();
       } finally {
         back.mockRestore();
+      }
+    });
+
+    it("retires the sentinel in place when the terminal step navigates away", async () => {
+      // The claim-page double spend: retiring with `history.back()` fires
+      // `popstate` in the host, whose router reloads the route, finds the
+      // session the handoff exchange has just created, and completes the
+      // claim in a document that `location.assign` is already replacing.
+      const assign = vi.fn();
+      const { location } = window;
+      Object.defineProperty(window, "location", {
+        configurable: true,
+        value: { ...location, assign },
+      });
+      let hostPopstates = 0;
+      const onPopstate = () => {
+        hostPopstates += 1;
+      };
+      const back = vi.spyOn(history, "back");
+      const replaceState = vi.spyOn(history, "replaceState");
+      try {
+        const element = attachLogin(host);
+        element.postSignInUrl = "/admin";
+        await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
+        await navigateToRegisterPassword(element);
+        await settleHistory();
+        expect((history.state as { zl?: boolean } | null)?.zl).toBe(true);
+        window.addEventListener("popstate", onPopstate);
+        const backCallsBefore = back.mock.calls.length;
+
+        // register-password → done, which navigates via post-sign-in-url.
+        type(element, PASSWORD_FIELD, "hunter2secure");
+        submit(element);
+        await waitFor(() => (assign.mock.calls.length > 0 ? assign : null));
+        await settleHistory();
+
+        expect(assign).toHaveBeenCalledWith("/admin");
+        // No traversal, so nothing for the host to react to…
+        expect(back.mock.calls.length).toBe(backCallsBefore);
+        expect(hostPopstates).toBe(0);
+        // …but the sentinel is still retired: the entry no longer claims to
+        // be the widget's, so a later back press is plain host navigation.
+        expect(replaceState).toHaveBeenCalledWith(expect.objectContaining({ zl: false }), "");
+        expect((history.state as { zl?: boolean } | null)?.zl).toBe(false);
+      } finally {
+        window.removeEventListener("popstate", onPopstate);
+        replaceState.mockRestore();
+        back.mockRestore();
+        Object.defineProperty(window, "location", { configurable: true, value: location });
       }
     });
 

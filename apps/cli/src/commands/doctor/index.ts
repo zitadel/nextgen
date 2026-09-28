@@ -1,7 +1,7 @@
 import { Flags } from "@oclif/core";
 import consola from "consola";
 
-import { claimAction, claimCommand } from "../../lib/claim-state";
+import { claimAction, claimCommand, claimWindowClosedAction } from "../../lib/claim-state";
 import { ZitadelError } from "../../lib/errors";
 import { assertServerPackageAvailable } from "../../lib/local-server/binary";
 import { dockerAvailable, imageAvailable } from "../../lib/local-server/docker";
@@ -23,7 +23,7 @@ import {
   type RuntimeBackend,
   type RuntimeMetadata,
 } from "../../lib/local-server/runtime";
-import { BaseCommand, type JsonEnvelope } from "../../lib/oclif";
+import { BaseCommand, CommandGroups, type JsonEnvelope } from "../../lib/oclif";
 import { createOrca } from "../../lib/orca";
 import { hasZitadelConfig } from "../../lib/project";
 import { listenersForPort } from "../../lib/prober/ports";
@@ -55,6 +55,8 @@ const LOCAL_RUNTIME_CHECK_NAMES = new Set([
  */
 export default class Doctor extends BaseCommand {
   static override description = "Verify local runtime and project state.";
+  static override group = CommandGroups.project;
+  static override groupOrder = 3;
   static override flags = {
     fix: Flags.boolean({ description: "Repair missing files and stale managed wiring." }),
     image: Flags.string({ description: "Container image to check." }),
@@ -260,8 +262,17 @@ function advisoryForWarnings(
     nextCommands.push(...advice.nextCommands);
   }
 
-  if (warnings.some((check) => check.name === "claim")) {
-    nextActions.push(claimAction(cliVersion));
+  const claimWarning = warnings.find((check) => check.name === "claim");
+  if (claimWarning) {
+    // The check classified the window (details.claimable). Once it looks
+    // closed the advisory switches to reconciliation wording, but the claim
+    // command stays suggested either way: the local record can be stale
+    // (claimed from another machine reads detached), and the server checks
+    // the grant before the window, so running claim is safe and answers
+    // authoritatively.
+    nextActions.push(
+      claimWindowClosed(claimWarning) ? claimWindowClosedAction(cliVersion) : claimAction(cliVersion),
+    );
     nextCommands.push(claimCommand(cliVersion));
   }
 
@@ -498,6 +509,22 @@ function remedyCommandOf(check: CheckOutcome | undefined): string | undefined {
   }
   const remedy = (details as { remedy_command?: unknown }).remedy_command;
   return typeof remedy === "string" && remedy.length > 0 ? remedy : undefined;
+}
+
+/**
+ * Reads the claim check's window classification out of its details. Absent
+ * or malformed details mean "not closed". The classification only selects
+ * the advisory wording (deadline nudge vs reconciliation); the claim
+ * command stays suggested either way, because the local record may be stale
+ * and running claim lets the server answer authoritatively.
+ */
+function claimWindowClosed(check: CheckOutcome): boolean {
+  const details = check.details;
+  return (
+    typeof details === "object" &&
+    details !== null &&
+    (details as { claimable?: unknown }).claimable === false
+  );
 }
 
 function hasManagedRuntimeProcesses(check: CheckOutcome | undefined): boolean {

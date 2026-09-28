@@ -240,6 +240,28 @@ describe("scaffold - merge-env", () => {
     expect(text).toContain("BAZ=3");
   });
 
+  it("writes the comment above the entries once, and not again on a later merge", async () => {
+    const op = {
+      kind: "merge-env" as const,
+      path: ".env.local",
+      comment: ["Any NEXTGEN_* variable here configures the local server.", "Second line."],
+      entries: { FOO: "1" },
+    };
+    await scaffold(plan(op), { cwd: dir, dryRun: false, force: false });
+    expect(await readFile(join(dir, ".env.local"), "utf8")).toBe(
+      "# Any NEXTGEN_* variable here configures the local server.\n# Second line.\nFOO=1\n",
+    );
+
+    await scaffold(plan({ ...op, entries: { BAR: "2" } }), {
+      cwd: dir,
+      dryRun: false,
+      force: false,
+    });
+    const text = await readFile(join(dir, ".env.local"), "utf8");
+    expect(text.match(/# Any NEXTGEN_/g)).toHaveLength(1);
+    expect(text).toContain("BAR=2");
+  });
+
   it("skips when every key is already present", async () => {
     await writeFile(join(dir, ".env.local"), "FOO=1\n");
     const result = await scaffold(

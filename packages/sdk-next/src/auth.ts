@@ -76,8 +76,9 @@ const validateOpaqueSession = cache(
 
       return {
         userId: session.user_id,
-        email: session.email ?? null,
-        name: session.name ?? null,
+        identifier: session.user?.identifier ?? null,
+        identifierProperty: session.user?.identifier_property ?? null,
+        display: session.user?.display ?? null,
       };
     } catch {
       console.warn(
@@ -176,8 +177,9 @@ export async function auth(options: AuthOptions = {}): Promise<AuthResult> {
         isAuthenticated: true,
         session: {
           userId: payload.sub,
-          email: payload.email ?? null,
-          name: payload.name ?? null,
+          identifier: payload.email ?? null,
+          identifierProperty: null,
+          display: payload.name ?? null,
           token,
         },
       };

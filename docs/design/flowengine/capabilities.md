@@ -38,7 +38,7 @@ to be a fast answer to "can I build flow X right now?"
 
 - Schema-driven `fields`: type, validation, `required`, uniqueness scope, challenge mapping from the `x-unique` annotation on user properties, or — for credential fields — the reserved `x-auth-methods#<method>` field name resolved against the schema's `x-auth-methods`.
 - `actions` — user-selectable, surfaced on the capability payload. `passkey` and `passkey_register` are recognized action names that drive the passkey ceremony.
-- `on_success: create_user` — hashes the password (argon2id), writes the user and credential rows, then calls `auth-attempt.RegisterCreatedUser` so the new user counts as verified for the terminal handoff.
+- `on_success: create_user` — hashes the password (argon2id) and applies user creation, password persistence, and the attempt's verified user + password factors in one transaction, so the new user counts as verified for the terminal handoff and the exchanged session carries real factors.
 - `complete: redirect` and `complete: show` — terminal step classifiers.
 - Implicit identifier resolution from any identifier-shaped field; routes via `user_not_found` (login flows) or `user_already_exists` (register flows) when wired, errors otherwise. The engine flips `CurrentPurpose` on the matching outcome to switch sub-flows.
 - Implicit password verification when a password-shaped field is present and `on_success` is not `create_user`.
@@ -49,8 +49,8 @@ to be a fast answer to "can I build flow X right now?"
 ### Passkey ceremony (two-phase)
 
 - `passkey` (login) and `passkey_register` (signup) actions trigger an **issue → client signs → verify** ceremony that short-circuits the field-shaped dispatch.
-- **Phase 1 (issue)** — the step emits a `challenge` on the response (`method`, `challenge_id`, `options`). For login, identifier dispatch runs first so `PreparePasskeyChallenge` can populate `allowCredentials` with the resolved user's credential IDs. For registration, `GenerateUserID()` mints a provisional `_user_id` (marked via the reserved `_passkey_provisional` collected key) so the WebAuthn `user.id` can be stable across phases.
-- **Phase 2 (verify)** — the submit carries `challenge_response.proof`. On registration verify, `HandleProvisional` creates the user row inside the same DB transaction that persists the credential, then `RegisterCreatedUser` marks the user as verified on the auth attempt.
+- **Phase 1 (issue)** — the step emits a `challenge` on the response (`method`, `challenge_id`, `options`). For login, identifier dispatch runs first so `PreparePasskeyChallenge` can populate `allowCredentials` with the resolved user's credential IDs. For registration, the attempt service mints a provisional user handle (carried as `_user_id`; the persisted challenge is authoritative for provisional-or-not) so the WebAuthn `user.id` stays stable across phases.
+- **Phase 2 (verify)** — the submit carries `challenge_response.proof`. Registration verify is atomic in the attempt service (ADR 056): for a provisional ceremony the user row, the credential, the verified user factor, and the check success land in one transaction; a lost uniqueness race routes `user_already_exists` after pinning the conflicting owner.
 - RPID derivation: `WithRequestHostMiddleware` injects effective proto+host into the request context so handlers can derive the WebAuthn RPID when the browser omits `Origin` on same-origin fetches.
 
 ### Step response shape
@@ -91,7 +91,7 @@ Not implemented at any layer:
 
 ### On-success handlers
 
-- `create_user` exists today, with a `HandleProvisional` sibling used by the passkey-register verify leg to finalize the provisional user inside the credential-save transaction.
+- `create_user` exists today; the passkey-register verify leg creates its provisional user inside the attempt service's verify transaction instead of an on_success mutation.
 - `reset_credential`, `enroll_factor`, `create_user_with_sso`, `link_sso` are referenced in design docs but unimplemented.
 - The dispatch carve-out for credential establishment is `OnSuccess == create_user`; the writer-manifest generalization is open (ADR 017).
 
@@ -119,6 +119,6 @@ Without writing any new code, the engine supports:
 - **Pure password signup** when the identifier and the password live on the same `create_user` step. Multi-step signup needs the dispatch generalization in [ADR 017](../../adrs/017-flow-engine-auth-attempt-dispatch.md).
 - **Combined login + register** when the entry step declares `user_not_found` and routes to the registration branch.
 - **Passkey login** — discoverable credentials or allow-list per resolved user; the issue leg runs identifier dispatch first so `allowCredentials` is populated.
-- **Passkey signup** — single step with the `passkey_register` action; the provisional user is finalized by `HandleProvisional` on the verify leg.
+- **Passkey signup** — single step with the `passkey_register` action; the provisional user is created inside the verify transaction together with the credential.
 - **Terminal `show` flows** for self-service registration without an OIDC auth request.
 - **Terminal `redirect` flows** when `redirect_uri` is set at `Start` (the OIDC handshake itself is not yet wired).

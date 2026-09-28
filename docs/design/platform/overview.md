@@ -170,6 +170,8 @@ For customers who specifically *want* a redirect-to-Zitadel auth pattern — eit
 
 Pro-gated because DNS validation, cert rotation, and abuse takedown response all have ongoing operational cost. This is the only level where Zitadel hosts UI under a branded domain on the customer's behalf.
 
+Customization ownership — categories, first-iteration vs later, and the three presentation models — is in [`../branding/customization-strategy.md`](../branding/customization-strategy.md) ([ADR 057](../../adrs/057-login-customization-categories.md)). Embedded and Zitadel-served share the widget and project branding where applicable; they are choices, not a ladder.
+
 ### Level 4 — White-label multi-tenant mapping  *(deferred)*
 
 For B2B customers whose *own* customers each get their own auth hostname (`customer-a.auth.com`, `customer-b.auth.com`, `customer-c.auth.com`, …), with each hostname mapping to a different logical tenant in the customer's data model. Builds on Level 3 (custom domains per hostname) and adds a primitive for hostname-to-tenant resolution at request time.

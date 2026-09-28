@@ -26,8 +26,9 @@ describe("useAuth composable", () => {
           isAuthenticated: true,
           session: {
             userId: "nuxt-user",
-            email: "nuxt@example.com",
-            name: "NuxtUser",
+            identifier: "nuxt@example.com",
+            identifierProperty: "email",
+            display: "NuxtUser",
             token: "tok123",
           },
         } as AuthResult,
@@ -39,7 +40,7 @@ describe("useAuth composable", () => {
     expect(result.isAuthenticated).toBe(true);
     if (result.isAuthenticated) {
       expect(result.session.userId).toBe("nuxt-user");
-      expect(result.session.email).toBe("nuxt@example.com");
+      expect(result.session.identifier).toBe("nuxt@example.com");
     }
   });
 });

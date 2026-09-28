@@ -9,7 +9,6 @@
 }
 
 /* Shared surface for `<zl-checkbox>` / `<Checkbox>`. Lit-only rules: lit/checkbox-host.css */
-/* Figma masters: 8UjCXw8yemgljmbkWGrSfE / Checkbox 4387:460 · Checkbox / With Label 6634:1868 */
 /*
  * Figma models the two checked states as a `style` variant (Outline = unchecked,
  * Filled = checked) and the three interaction states (Hovered / Focused / Pressed)

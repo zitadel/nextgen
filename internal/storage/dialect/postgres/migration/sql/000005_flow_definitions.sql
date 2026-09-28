@@ -38,7 +38,15 @@ CREATE INDEX idx_flow_definitions_project_status
 CREATE INDEX idx_flow_definitions_project_purposes
     ON zitadel_nextgen.flow_definitions USING GIN (purposes);
 
+-- Revisions of one flow share its name and are ordered by created_at, so at
+-- most one may carry a given timestamp: a collision has no determinate winner
+-- and must fail loudly instead. The index is also the seek the latest-revision
+-- anti-join in ListFlowDefinitions uses.
+CREATE UNIQUE INDEX idx_flow_definitions_name_revision
+    ON zitadel_nextgen.flow_definitions (project_id, name, created_at);
+
 -- +goose Down
+DROP INDEX IF EXISTS zitadel_nextgen.idx_flow_definitions_name_revision;
 DROP INDEX IF EXISTS zitadel_nextgen.idx_flow_definitions_project_purposes;
 DROP INDEX IF EXISTS zitadel_nextgen.idx_flow_definitions_project_status;
 DROP TABLE IF EXISTS zitadel_nextgen.flow_definitions;

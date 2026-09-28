@@ -43,8 +43,10 @@ export interface ZitadelFlowErrorDetail {
 
 /** Payload of the `zitadel-signout` event. */
 export interface ZitadelSignoutDetail {
-  readonly name: string;
-  readonly email: string;
+  /** The signed-out user's display rendering ("" when none was resolved). */
+  readonly display: string;
+  /** The signed-out user's login identifier ("" when none was resolved). */
+  readonly identifier: string;
 }
 
 /* ───────────────────────────  SPA widget contract  ───────────────────────

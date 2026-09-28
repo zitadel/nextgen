@@ -5,7 +5,7 @@
 -- references store compiled policy. Bundle tables exist but are unused by the
 -- v1 compiler mapper.
 --
--- Seed cat_sys_1 matches this OpenFGA-style model (placeholders pending #420):
+-- Seed cat_sys_1 matches this OpenFGA-style model:
 --   type user
 --   type team
 --     relations
@@ -13,9 +13,13 @@
 --   type project
 --     relations
 --       define team: [team]
---       define viewer: [user, team#member] or member from team
---       define editor: viewer
---       define admin: [user] or editor
+--       define admin: [user, team#member] or member from team
+--       define editor: [user, team#member] or admin
+--       define viewer: [user, team#member] or editor
+--
+-- Roles are additive and monotonic (ADR 054 §5): admin closes to editor and
+-- viewer, editor to viewer. The owning team (`project.team`) reaches admin
+-- through the tuple-to-userset edge and inherits the rest by closure.
 
 -- +goose StatementBegin
 CREATE TABLE resource_scope_index (
@@ -201,6 +205,14 @@ CREATE INDEX idx_authz_assignments_principal_project
     WHERE revoked_at IS NULL;
 -- +goose StatementEnd
 
+-- ADR 053 §6: authorized-projects discovery starts from the principal and has
+-- no project to anchor on, so the project column comes last here.
+-- +goose StatementBegin
+CREATE INDEX idx_authz_assignments_principal
+    ON authz_assignments (principal_type, principal_id, project_id)
+    WHERE revoked_at IS NULL;
+-- +goose StatementEnd
+
 -- +goose StatementBegin
 CREATE INDEX idx_authz_assignments_delegation
     ON authz_assignments (project_id, delegation_id)
@@ -269,7 +281,10 @@ INSERT INTO authz_relation_references (
     ('cat_sys_1', 'project', 'team', 'team', '', 0, '', 0),
     ('cat_sys_1', 'project', 'viewer', 'team', 'member', 0, '', 0),
     ('cat_sys_1', 'project', 'viewer', 'user', '', 0, '', 1),
-    ('cat_sys_1', 'project', 'admin', 'user', '', 0, '', 0);
+    ('cat_sys_1', 'project', 'editor', 'team', 'member', 0, '', 0),
+    ('cat_sys_1', 'project', 'editor', 'user', '', 0, '', 1),
+    ('cat_sys_1', 'project', 'admin', 'team', 'member', 0, '', 0),
+    ('cat_sys_1', 'project', 'admin', 'user', '', 0, '', 1);
 -- +goose StatementEnd
 
 -- +goose StatementBegin
@@ -281,10 +296,11 @@ INSERT INTO authz_expression_edges (
     ('cat_sys_1', 'team', 'member', 'direct', NULL, NULL, NULL, NULL, 0),
     ('cat_sys_1', 'project', 'team', 'direct', NULL, NULL, NULL, NULL, 0),
     ('cat_sys_1', 'project', 'viewer', 'direct', NULL, NULL, NULL, NULL, 0),
-    ('cat_sys_1', 'project', 'viewer', 'tuple_to_userset', 'team', 'member', 'project', 'team', 1),
-    ('cat_sys_1', 'project', 'editor', 'computed_userset', 'project', 'viewer', NULL, NULL, 0),
+    ('cat_sys_1', 'project', 'viewer', 'computed_userset', 'project', 'editor', NULL, NULL, 1),
+    ('cat_sys_1', 'project', 'editor', 'direct', NULL, NULL, NULL, NULL, 0),
+    ('cat_sys_1', 'project', 'editor', 'computed_userset', 'project', 'admin', NULL, NULL, 1),
     ('cat_sys_1', 'project', 'admin', 'direct', NULL, NULL, NULL, NULL, 0),
-    ('cat_sys_1', 'project', 'admin', 'computed_userset', 'project', 'editor', NULL, NULL, 1);
+    ('cat_sys_1', 'project', 'admin', 'tuple_to_userset', 'team', 'member', 'project', 'team', 1);
 -- +goose StatementEnd
 
 -- +goose StatementBegin
@@ -294,11 +310,11 @@ INSERT INTO authz_relation_closure (
     ('cat_sys_1', 'team', 'member', 'team', 'member', 0),
     ('cat_sys_1', 'project', 'team', 'project', 'team', 0),
     ('cat_sys_1', 'project', 'viewer', 'project', 'viewer', 0),
-    ('cat_sys_1', 'project', 'viewer', 'project', 'editor', 1),
-    ('cat_sys_1', 'project', 'viewer', 'project', 'admin', 2),
     ('cat_sys_1', 'project', 'editor', 'project', 'editor', 0),
-    ('cat_sys_1', 'project', 'editor', 'project', 'admin', 1),
-    ('cat_sys_1', 'project', 'admin', 'project', 'admin', 0);
+    ('cat_sys_1', 'project', 'editor', 'project', 'viewer', 1),
+    ('cat_sys_1', 'project', 'admin', 'project', 'admin', 0),
+    ('cat_sys_1', 'project', 'admin', 'project', 'editor', 1),
+    ('cat_sys_1', 'project', 'admin', 'project', 'viewer', 2);
 -- +goose StatementEnd
 
 -- Backfill resource_scope_index and authz_membership_edges.
@@ -349,6 +365,9 @@ DROP INDEX IF EXISTS authz_assignments_unique_active;
 -- +goose StatementEnd
 -- +goose StatementBegin
 DROP INDEX IF EXISTS idx_authz_assignments_delegation;
+-- +goose StatementEnd
+-- +goose StatementBegin
+DROP INDEX IF EXISTS idx_authz_assignments_principal;
 -- +goose StatementEnd
 -- +goose StatementBegin
 DROP INDEX IF EXISTS idx_authz_assignments_principal_project;

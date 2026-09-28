@@ -25,9 +25,31 @@ properties:
     description: |
       The team that owns this user's identity lifecycle, or `null` when the
       user is self-owned. This is a single team and a different concept from
-      the user's team roster: it decides who may deprovision the user, not
-      which teams the user collaborates in. The roster is its own paginated
+      the user's team memberships: it decides who may deprovision the user, not
+      which teams the user collaborates in. Memberships are their own paginated
       resource — `GET /users/{user_id}/teams`.
     oneOf:
       - type: string
+      - type: 'null'
+  lifecycle_owner_team:
+    readOnly: true
+    description: |
+      The team named by `lifecycle_owner_team_id`, present only when the
+      request asked for it with `expand: ["lifecycle_owner_team"]` (ADR 059).
+      Absent means it was not requested; `null` means the user is self-owned
+      and there is no owner to resolve.
+
+      Requesting it does not guarantee it is present on every user. Today
+      `team.read` is checked once for the whole request, so it is; once that
+      check is per team, a page may contain a user whose owner the caller may
+      not read, and such a row answers with neither the team nor `null` —
+      `null` already means self-owned. What it answers with instead is decided
+      with the granular scopes (#420); do not read the two cases above as the
+      complete set.
+
+      This is the same representation `GET /teams/{team_id}` serves. It is a
+      single team, not a collection, so it carries no cap and no truncation
+      flag.
+    oneOf:
+      - $ref: ../teams/team-response.yaml
       - type: 'null'

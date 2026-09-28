@@ -9,7 +9,9 @@ import (
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
+	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/dialect/authz"
+	"github.com/zitadel/nextgen/internal/storage/dialect/pagination"
 )
 
 const (
@@ -41,6 +43,14 @@ WHERE project_id = @p1 AND principal_type = @p2 AND principal_id = @p3
   AND (@p4 = TRUE OR revoked_at IS NULL)
 ORDER BY created_at, id`
 
+	listManagedGrantsQuery = `
+SELECT id, project_id, catalog_id,
+       principal_type, principal_id, object_type, relation,
+       scope_kind, scope_team_id, scope_resource_id,
+       grantor_type, grantor_id, delegation_id,
+       expires_at, revoked_at, created_at, updated_at
+FROM authz_assignments`
+
 	revokeAuthzAssignmentStmt = `
 UPDATE authz_assignments
 SET revoked_at = CURRENT_TIMESTAMP(), updated_at = CURRENT_TIMESTAMP(),
@@ -59,6 +69,14 @@ WHERE project_id = @p1 AND object_type = 'project' AND relation = 'team'
   AND revoked_at IS NULL
 ORDER BY created_at, id
 LIMIT 1`
+
+	hasActiveOwningTeamGrantStmt = `
+SELECT EXISTS (
+    SELECT 1 FROM authz_assignments
+    WHERE principal_type = 'team' AND principal_id = @p1
+      AND object_type = 'project' AND relation = 'team'
+      AND revoked_at IS NULL
+)`
 
 	listClaimedProjectIDsStmt = `
 SELECT DISTINCT project_id FROM authz_assignments
@@ -130,7 +148,37 @@ func (s authzAssignmentStatements) ListAuthzAssignments(ctx context.Context, pro
 	return assignments, err
 }
 
-// RevokeAuthzAssignment implements [service.AuthzAssignmentStatements].
+// ListManagedGrants implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) ListManagedGrants(ctx context.Context, projectID string, filter *database.ListOptions[domain.AuthzAssignmentField]) (*database.ListResult[*domain.AuthzAssignment], error) {
+	filter, err := authz.ScopeManagedGrantList(projectID, filter)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	var compiler statementCompiler
+	if err := compileList(ctx, &compiler, listManagedGrantsQuery, filter, authz.AuthzAssignmentSchema, "", "", authz.ManagedGrantListConjunct); err != nil {
+		return nil, err
+	}
+	var assignments []*domain.AuthzAssignment
+	err = s.db.Query(ctx, compiler.statement(), func(iter *spanner.RowIterator) error {
+		var qErr error
+		assignments, qErr = collectRows(iter, scanAuthzAssignment)
+		return qErr
+	})
+	if err != nil {
+		return nil, err
+	}
+	nextCursor := pagination.MarshalNext(
+		filter.Pagination.OrderBy,
+		assignments,
+		authz.AuthzAssignmentSchema,
+		filter.Pagination.Limit,
+	)
+	return &database.ListResult[*domain.AuthzAssignment]{
+		Items:      assignments,
+		NextCursor: nextCursor,
+	}, nil
+}
+
 func (s authzAssignmentStatements) RevokeAuthzAssignment(ctx context.Context, projectID, id string) error {
 	stmt := buildStatement(revokeAuthzAssignmentStmt, projectID, id).statement()
 	return s.db.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
@@ -173,6 +221,24 @@ func (s authzAssignmentStatements) GetActiveOwningTeamGrant(ctx context.Context,
 	return assignment, nil
 }
 
+// HasActiveOwningTeamGrant implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) HasActiveOwningTeamGrant(ctx context.Context, teamID string) (bool, error) {
+	var owns bool
+	err := s.db.Query(ctx, buildStatement(hasActiveOwningTeamGrantStmt, teamID).statement(),
+		func(iter *spanner.RowIterator) error {
+			var qErr error
+			owns, qErr = collectOneRow(iter, func(row *spanner.Row) (bool, error) {
+				var found bool
+				return found, row.Columns(&found)
+			})
+			return qErr
+		})
+	if err != nil {
+		return false, wrapError(err)
+	}
+	return owns, nil
+}
+
 // ListClaimedProjectIDs implements [service.AuthzAssignmentStatements].
 func (s authzAssignmentStatements) ListClaimedProjectIDs(ctx context.Context, afterID string, limit uint32) ([]string, error) {
 	if limit == 0 {
@@ -194,6 +260,39 @@ func (s authzAssignmentStatements) ListClaimedProjectIDs(ctx context.Context, af
 		return nil, err
 	}
 	return ids, nil
+}
+
+// ListAuthorizedProjects implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) ListAuthorizedProjects(ctx context.Context, homeProjectID, userID string, page database.Page[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {
+	var compiler statementCompiler
+	compiler.WriteString(projectQuery)
+	compiler.WriteString(" WHERE id IN (")
+	authz.WriteAuthorizedProjectIDs(&compiler, spannerAuthzEnv(), homeProjectID, userID)
+	compiler.WriteString(")")
+	keyset, err := cursorFilter(page, projectSchema)
+	if err != nil {
+		return nil, err
+	}
+	if keyset != nil {
+		compiler.WriteString(" AND ")
+		compileFilter(&compiler, keyset, projectSchema)
+	}
+	compileOrderBy(&compiler, page.OrderBy, projectSchema)
+	compileLimit(&compiler, page.Limit)
+
+	scan := newProjectStatements(s.db).scanProject
+	var projects []*domain.Project
+	if err := s.db.Query(ctx, compiler.statement(), func(iter *spanner.RowIterator) error {
+		var qErr error
+		projects, qErr = collectRows(iter, scan)
+		return qErr
+	}); err != nil {
+		return nil, err
+	}
+	return &database.ListResult[*domain.Project]{
+		Items:      projects,
+		NextCursor: pagination.MarshalNext(page.OrderBy, projects, projectSchema, page.Limit),
+	}, nil
 }
 
 // activeUniqueKey is Spanner's stand-in for Postgres's partial unique index on

@@ -1,0 +1,6 @@
+name: variable_name
+in: path
+required: true
+description: The name of the variable.
+schema:
+  $ref: '../schemas/variable-name.yaml'

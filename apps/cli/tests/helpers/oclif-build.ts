@@ -6,19 +6,8 @@ import { run } from "@oclif/core";
 
 export const cliPackageRoot = fileURLToPath(new URL("../../", import.meta.url));
 
-const commandIds = [
-  "apply",
-  "claim",
-  "doctor",
-  "eject",
-  "logs",
-  "plan",
-  "reset",
-  "setup",
-  "start",
-  "status",
-  "stop",
-] as const;
+/** Built entries (see `tsdown.config.ts`) that must exist before oclif runs. */
+const builtEntries = ["index", "lib/oclif/help"] as const;
 
 export async function waitForBuiltCli(): Promise<void> {
   const startedAt = Date.now();
@@ -56,9 +45,11 @@ async function waitForCommandFilesReady(): Promise<void> {
 }
 
 async function assertCommandFilesReady(): Promise<void> {
+  // The explicit command strategy loads one module, the COMMANDS table, plus
+  // the root help class.
   await Promise.all(
-    commandIds.map((id) =>
-      access(fileURLToPath(new URL(`../../dist/commands/${id}.mjs`, import.meta.url))),
+    builtEntries.map((entry) =>
+      access(fileURLToPath(new URL(`../../dist/${entry}.mjs`, import.meta.url))),
     ),
   );
 }

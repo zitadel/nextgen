@@ -349,6 +349,7 @@ func VerifyPasskeyRegistration(challenge *PasskeyRegistrationChallenge, attestat
 		AttestationType: &attestationType,
 		Transports:      transports,
 		SignCount:       int64(credential.Authenticator.SignCount),
+		UserVerified:    credential.Flags.UserVerified,
 		BackupEligible:  credential.Flags.BackupEligible,
 		BackupState:     credential.Flags.BackupState,
 		Name:            name,
@@ -404,6 +405,11 @@ func registrationSessionData(c *PasskeyRegistrationChallenge) webauthn.SessionDa
 // ASCII-safe representation.
 func EncodePasskeyCredentialID(id []byte) string {
 	return base64.RawURLEncoding.EncodeToString(id)
+}
+
+// DecodePasskeyCredentialID reverses [EncodePasskeyCredentialID].
+func DecodePasskeyCredentialID(s string) []byte {
+	return decodeCredentialID(s)
 }
 
 // decodeCredentialID reverses the base64url encoding used when storing a

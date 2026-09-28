@@ -5,10 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
+	"time"
 
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/ianlancetaylor/jsonschema"
@@ -18,6 +21,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/domain"
 	domainmock "github.com/zitadel/nextgen/internal/domain/mock"
+	"github.com/zitadel/nextgen/internal/httputil"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
@@ -559,4 +563,181 @@ func TestNewJSONSchema_Kind(t *testing.T) {
 			assert.Equal(t, tc.want, schema.Kind)
 		})
 	}
+}
+
+// TestJSONSchemaResolver_EgressGuards covers #1114's acceptance criteria:
+// distinct errors for a denied address, an oversized document, a slow origin,
+// and a $ref chain that exceeds the whole-resolution envelope.
+func TestJSONSchemaResolver_EgressGuards(t *testing.T) {
+	ctx := context.Background()
+	const projectID = "proj-1"
+
+	newStore := func(ctrl *gomock.Controller) *domainmock.MockJSONSchemaStore {
+		store := domainmock.NewMockJSONSchemaStore(ctrl)
+		store.EXPECT().GetJSONSchemaByID(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(nil, database.NewNoRowFoundError(nil)).AnyTimes()
+		store.EXPECT().CreateJSONSchema(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+		return store
+	}
+	newEgressClient := func(t *testing.T, cfg httputil.ClientConfig) *http.Client {
+		t.Helper()
+		client, err := cfg.NewClient()
+		require.NoError(t, err)
+		return client
+	}
+	serveJSON := func(body string) http.HandlerFunc {
+		return func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(body))
+		}
+	}
+	const simpleSchema = `{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object"}`
+
+	t.Run("denied address yields fetch_denied with the URL in details", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		srv := httptest.NewServer(serveJSON(simpleSchema))
+		defer srv.Close()
+
+		client := newEgressClient(t, httputil.ClientConfig{DenyList: []string{"127.0.0.0/8", "::1/128"}})
+		resolver := newTestResolver(t, client)
+
+		_, err := resolver.Resolve(ctx, newStore(ctrl), projectID, srv.URL, nil)
+		require.ErrorIs(t, err, domain.ErrJSONSchemaFetchDenied())
+		de, ok := errors.AsType[domain.Error](err)
+		require.True(t, ok)
+		assert.Equal(t, domain.SchemaFetchDetails{URL: srv.URL}, de.Details)
+	})
+
+	t.Run("oversized document yields fetch_too_large", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		srv := httptest.NewServer(serveJSON(`{"padding":"` + strings.Repeat("x", 256) + `"}`))
+		defer srv.Close()
+
+		client := newEgressClient(t, httputil.ClientConfig{MaxBodySize: 64})
+		resolver := newTestResolver(t, client)
+
+		_, err := resolver.Resolve(ctx, newStore(ctrl), projectID, srv.URL, nil)
+		require.ErrorIs(t, err, domain.ErrJSONSchemaFetchTooLarge())
+	})
+
+	t.Run("slow origin yields fetch_timeout", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			time.Sleep(300 * time.Millisecond)
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(simpleSchema))
+		}))
+		defer srv.Close()
+
+		client := newEgressClient(t, httputil.ClientConfig{Timeout: 50 * time.Millisecond})
+		resolver := newTestResolver(t, client)
+
+		_, err := resolver.Resolve(ctx, newStore(ctrl), projectID, srv.URL, nil)
+		require.ErrorIs(t, err, domain.ErrJSONSchemaFetchTimeout())
+	})
+
+	t.Run("oversized body behind a redirect names the final hop", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		mux := http.NewServeMux()
+		srv := httptest.NewServer(mux)
+		defer srv.Close()
+		mux.HandleFunc("/start.json", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, srv.URL+"/big.json", http.StatusFound)
+		})
+		mux.HandleFunc("/big.json", func(w http.ResponseWriter, r *http.Request) {
+			// Chunked (no Content-Length), so the overrun surfaces mid-read,
+			// after redirects, where no *url.Error wraps it by default.
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			w.(http.Flusher).Flush()
+			_, _ = w.Write([]byte(`{"padding":"` + strings.Repeat("x", 256) + `"}`))
+		})
+
+		client := newEgressClient(t, httputil.ClientConfig{MaxBodySize: 64, MaxRedirects: 5})
+		resolver := newTestResolver(t, client)
+
+		_, err := resolver.Resolve(ctx, newStore(ctrl), projectID, srv.URL+"/start.json", nil)
+		require.ErrorIs(t, err, domain.ErrJSONSchemaFetchTooLarge())
+		de, ok := errors.AsType[domain.Error](err)
+		require.True(t, ok)
+		assert.Equal(t, domain.SchemaFetchDetails{URL: srv.URL + "/big.json"}, de.Details,
+			"details must name the hop the oversized body came from, not the requested URL")
+	})
+
+	t.Run("redirect loop yields fetch_too_many_redirects", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		mux := http.NewServeMux()
+		srv := httptest.NewServer(mux)
+		defer srv.Close()
+		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, srv.URL, http.StatusFound)
+		})
+
+		client := newEgressClient(t, httputil.ClientConfig{MaxRedirects: 2})
+		resolver := newTestResolver(t, client)
+
+		_, err := resolver.Resolve(ctx, newStore(ctrl), projectID, srv.URL, nil)
+		require.ErrorIs(t, err, domain.ErrJSONSchemaFetchTooManyRedirects())
+	})
+
+	t.Run("an envelope that expires during compilation is not cached as success", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		// The root document is supplied inline, so compilation performs no
+		// I/O that would observe the context; only the post-compile check
+		// can catch the already-expired 1ns envelope.
+		client := newEgressClient(t, httputil.ClientConfig{})
+		resolver := domain.NewJSONSchemaResolver(mustJSONSchemaCache(t, 128), 0, time.Nanosecond, client, nil)
+
+		// The resolver reports the expiry raw; the schema service is what
+		// classifies it into fetch_timeout, keeping fetch codes off
+		// operations whose resolver cannot egress.
+		_, err := resolver.Resolve(ctx, newStore(ctrl), projectID, "https://example.test/inline.json", []byte(simpleSchema))
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+
+		_, err = resolver.Resolve(ctx, newStore(ctrl), projectID, "https://example.test/inline.json", []byte(simpleSchema))
+		require.ErrorIs(t, err, context.DeadlineExceeded, "the expired result must not have been cached")
+	})
+
+	t.Run("a nested lookup's deadline error survives the ref loader", func(t *testing.T) {
+		// The jsonschema library flattens loader errors; a store lookup that
+		// observed the expired envelope must still surface as a deadline
+		// error (which the service classifies), not as a flattened string
+		// that becomes internal.
+		ctrl := gomock.NewController(t)
+		store := domainmock.NewMockJSONSchemaStore(ctrl)
+		store.EXPECT().GetJSONSchemaByID(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(nil, fmt.Errorf("query aborted: %w", context.DeadlineExceeded)).AnyTimes()
+
+		client := newEgressClient(t, httputil.ClientConfig{})
+		resolver := newTestResolver(t, client)
+		root := `{"$schema":"https://json-schema.org/draft/2020-12/schema","$ref":"https://example.test/leaf.json"}`
+
+		_, err := resolver.Resolve(ctx, store, projectID, "https://example.test/root.json", []byte(root))
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+	})
+
+	t.Run("resolve timeout bounds the whole ref chain, not each hop", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		mux := http.NewServeMux()
+		srv := httptest.NewServer(mux)
+		defer srv.Close()
+		// Each hop stays comfortably inside the generous per-request timeout;
+		// only their sum exceeds the 150ms envelope.
+		mux.HandleFunc("/root.json", func(w http.ResponseWriter, r *http.Request) {
+			time.Sleep(100 * time.Millisecond)
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"$schema":"https://json-schema.org/draft/2020-12/schema","$ref":"` + srv.URL + `/leaf.json"}`))
+		})
+		mux.HandleFunc("/leaf.json", func(w http.ResponseWriter, r *http.Request) {
+			time.Sleep(100 * time.Millisecond)
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(simpleSchema))
+		})
+
+		client := newEgressClient(t, httputil.ClientConfig{Timeout: time.Second})
+		resolver := domain.NewJSONSchemaResolver(mustJSONSchemaCache(t, 128), 0, 150*time.Millisecond, client, nil)
+
+		_, err := resolver.Resolve(ctx, newStore(ctrl), projectID, srv.URL+"/root.json", nil)
+		require.ErrorIs(t, err, domain.ErrJSONSchemaFetchTimeout())
+	})
 }

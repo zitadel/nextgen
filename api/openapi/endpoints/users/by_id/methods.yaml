@@ -4,7 +4,25 @@ get:
   tags:
     - Users
   parameters:
-    - $ref: ../../../components/parameters/team-id.yaml
+    # Declared here rather than shared: `team_id` is the team parameter across
+    # the API, but what it does is the resource's own business. On a user it is
+    # membership, and saying so is the whole point of spelling it out locally.
+    - name: team_id
+      in: query
+      description: |
+        Serves the user only when they hold an active membership in this team,
+        and answers `404` otherwise.
+
+        This is team membership, not lifecycle ownership: it asks which team
+        the user collaborates in, not which team may deprovision them. The
+        owning team is reported separately as
+        `metadata.lifecycle_owner_team_id`, and a user can belong to many teams
+        while owning their own lifecycle. See ADR 024.
+
+        Only active memberships match. A user who has been invited but has not
+        accepted is not served.
+      schema:
+        $ref: ../../../components/schemas/team-id.yaml
     - name: user_id
       in: path
       required: true
@@ -34,6 +52,74 @@ get:
             $ref: ../../../components/error-details.yaml
     default:
       $ref: GetUserByID-error-response.yaml
+
+patch:
+  operationId: PatchUserByID
+  summary: Update user by ID
+  description: |
+    Partially updates a user's schema-defined attributes, and optionally
+    moves the user to another registered schema. The merged result is
+    validated against the schema before commit. Concurrent writes are
+    last-write-wins.
+  tags:
+    - Users
+  parameters:
+    - name: user_id
+      in: path
+      required: true
+      schema:
+        $ref: ../../../components/schemas/user-id.yaml
+  security:
+    - oauth2:
+        - user.write
+  requestBody:
+    description: The changes to merge into the user.
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: patch-user-request.yaml
+  responses:
+    '200':
+      description: Updated user state.
+      content:
+        application/json:
+          schema:
+            $ref: ../user.yaml
+    '400':
+      description: Invalid request body, empty patch, unknown schema, or merged attributes failing schema validation.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '401':
+      description: Client was not authorized or the session is anonymous.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '403':
+      description: The credential may not manage users in this project.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '404':
+      description: User not found.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '409':
+      description: |
+        A patched value is unique and already taken by another user, or
+        concurrent writes kept the user changing under the patch; retry.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    default:
+      $ref: PatchUserByID-error-response.yaml
 
 delete:
     operationId: DeleteUserByID

@@ -5,21 +5,20 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
 // FlowCreateUserWithPasswordHandler implements the `create_user` on_success:
 // persist a new user from validated identifier + password fields.
 type FlowCreateUserWithPasswordHandler struct {
-	hasher      crypto.Hasher
+	hashers     ProjectHasherResolver
 	userService UserService
 	schemaStore domain.JSONSchemaStore
 	db          StatementPool
 }
 
 func NewFlowCreateUserHandler(
-	hasher crypto.Hasher,
+	hashers ProjectHasherResolver,
 	userService UserService,
 	schemaStore domain.JSONSchemaStore,
 	db StatementPool,
@@ -27,7 +26,7 @@ func NewFlowCreateUserHandler(
 	return &FlowCreateUserWithPasswordHandler{
 		userService: userService,
 		schemaStore: schemaStore,
-		hasher:      hasher,
+		hashers:     hashers,
 		db:          db,
 	}
 }
@@ -60,10 +59,21 @@ func (h *FlowCreateUserWithPasswordHandler) Handle(ctx context.Context, in domai
 			UserID:    userID,
 			Password:  password,
 		},
-		h.hasher,
+		h.hashers,
 	)
+	// The user just chose this password, so knowledge is proven: record real
+	// user + password factors on the attempt in the same transaction, so the
+	// exchanged session reflects how the user authenticated.
+	recordFactorsAction := &recordAttemptFactorsAction{
+		projectID: in.ProjectID,
+		attemptID: in.State.AuthAttemptID,
+		factors: []domain.AuthFactor{
+			&domain.AuthFactorUser{UserID: userID},
+			&domain.AuthFactorPassword{},
+		},
+	}
 
-	err = h.userService.ApplyActions(ctx, createUserAction, setPasswordAction)
+	err = h.userService.ApplyActions(ctx, createUserAction, setPasswordAction, recordFactorsAction)
 	if err != nil {
 		if derr, ok := errors.AsType[domain.Error](err); ok && derr.Code == domain.ErrUserAlreadyExists().Code {
 			return domain.FlowOnSuccessResult{StepError: new("user_already_exists")}, nil
@@ -76,3 +86,29 @@ func (h *FlowCreateUserWithPasswordHandler) Handle(ctx context.Context, in domai
 		Irreversible: true,
 	}, nil
 }
+
+// recordAttemptFactorsAction upserts verified factors on the auth attempt as
+// part of a user-mutation transaction, emitting the same auth.check.succeeded
+// events a challenge/proof cycle would.
+type recordAttemptFactorsAction struct {
+	projectID string
+	attemptID string
+	factors   []domain.AuthFactor
+}
+
+func (a *recordAttemptFactorsAction) Prepare(context.Context) error { return nil }
+
+func (a *recordAttemptFactorsAction) Apply(ctx context.Context, stmts AllStatements) error {
+	attempt, err := stmts.GetAuthAttemptByID(ctx, a.projectID, a.attemptID)
+	if err != nil {
+		return fmt.Errorf("record attempt factors: %w", err)
+	}
+	for _, factor := range a.factors {
+		if _, err := recordDirectAuthFactor(ctx, stmts, attempt, factor); err != nil {
+			return fmt.Errorf("record attempt factors: %w", err)
+		}
+	}
+	return nil
+}
+
+var _ UserAction = (*recordAttemptFactorsAction)(nil)

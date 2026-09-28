@@ -14,10 +14,8 @@ import type { IconName } from "./zl-icon.js";
  * Atom: `<zl-alert>` — inline status message replacing the legacy
  * `<zl-error>`.
  *
- * Spec lineage (file `8UjCXw8yemgljmbkWGrSfE`):
- *   - design-system master: node `6593:2640` (Alert/Error). Screen instance
- *     `6596:132779` matches the same chrome. Severity is conveyed by icon
- *     shape and colour, not by tinting the background.
+ * Severity is conveyed by icon shape and colour, not by tinting the
+ * background.
  *
  * Per-state Figma values:
  *

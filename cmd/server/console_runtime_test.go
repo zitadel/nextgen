@@ -163,15 +163,23 @@ func (f *fakeProjectService) Create(context.Context, string, []string, bool) (*d
 	panic("unused")
 }
 
+func (f *fakeProjectService) CreateWithID(context.Context, string, string, []string, bool) (*domain.Project, error) {
+	panic("unused")
+}
+
 func (f *fakeProjectService) Get(context.Context, string) (*domain.Project, error) {
 	panic("unused")
 }
 
-func (f *fakeProjectService) Update(context.Context, string, string) (*domain.Project, error) {
+func (f *fakeProjectService) Update(context.Context, service.UpdateProjectRequest) (*domain.Project, error) {
 	panic("unused")
 }
 
 func (f *fakeProjectService) List(context.Context, service.ListProjectsRequest) (*service.ListProjectsResponse, error) {
+	panic("unused")
+}
+
+func (f *fakeProjectService) ListAuthorized(context.Context, service.ListAuthorizedProjectsRequest) (*service.ListProjectsResponse, error) {
 	panic("unused")
 }
 

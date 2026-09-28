@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils"
 
 /**
- * `Typography / InlineCode` (`1389:9783`) — shadcn's inline-code treatment.
+ * `Typography / InlineCode` — shadcn's inline-code treatment.
  *
  * A `muted` fill with mono 12/16 on `foreground`, at the design's own 4.8/3.2px
  * inset. Used for the schema attribute chips and for the `zitadel apply` hint

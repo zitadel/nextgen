@@ -18,6 +18,12 @@ type FieldBinding[T any] struct {
 	// Computed marks SQLName as a SQL expression rather than a column
 	// reference, so it has no DDL nullability of its own.
 	Computed bool
+	// SQLSuffix closes a Computed expression that binds its value inline:
+	// [CorrelatedEqual] writes SQLName, the bound value, then SQLSuffix. It
+	// lets a correlated sub-query take a parameter, which the fixed
+	// value-after-column shape of the other filters cannot express. Only
+	// meaningful together with Computed.
+	SQLSuffix string
 }
 
 // NullableValue flattens a nil pointer to untyped nil so it binds as SQL NULL.
@@ -56,6 +62,11 @@ func (s Schema[F, T]) SQLName(col Column[F]) string {
 // ParamCast returns the optional Postgres parameter cast for col.
 func (s Schema[F, T]) ParamCast(col Column[F]) string {
 	return s.binding(col.Field()).ParamCast
+}
+
+// SQLSuffix returns the SQL that closes col's inline-bound computed expression.
+func (s Schema[F, T]) SQLSuffix(col Column[F]) string {
+	return s.binding(col.Field()).SQLSuffix
 }
 
 // Nullable reports whether col can hold SQL NULL.

@@ -23,7 +23,7 @@ type Harness struct {
 
 	httpClient      dependency[*http.Client]
 	testServer      dependency[*httptest.Server]
-	hasher          dependency[*crypto.PasswapHasher]
+	hasherFactory   dependency[*crypto.HasherFactory]
 	masterKeys      dependency[*domain.MasterKeys]
 	secretGenerator dependency[secrets.Generator]
 	joseSigner      dependency[jose.Signer]
@@ -44,6 +44,8 @@ type Harness struct {
 	flowStateMachine      dependency[*domain.FlowStateMachineRuntime]
 	teamService           dependency[*service.TeamService]
 	brandingService       dependency[*service.BrandingService]
+	environmentService    dependency[*service.EnvironmentService]
+	releaseService        dependency[service.ReleaseService]
 	eventService          dependency[*service.EventService]
 	keyService            dependency[service.KeyService]
 	tokenService          dependency[service.TokenService]

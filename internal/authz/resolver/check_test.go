@@ -45,6 +45,32 @@ func TestCheck_Orchestration(t *testing.T) {
 		assert.Equal(t, resolver.DecisionAllow, d)
 	})
 
+	t.Run("distinct home is forwarded to storage", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		stmts := mocks.NewMockAuthzResolverStatements(ctrl)
+		stmts.EXPECT().ActiveSystemCatalogID(gomock.Any()).Return(domain.SystemCatalogID, nil)
+		stmts.EXPECT().CheckAuthz(gomock.Any(), domain.AuthzCheckParams{
+			CatalogID:              domain.SystemCatalogID,
+			ProjectID:              "proj_customer",
+			PrincipalHomeProjectID: "proj_platform",
+			PrincipalType:          domain.AuthzPrincipalTypeUser,
+			PrincipalID:            "user_alice",
+			ObjectType:             "project",
+			Relation:               "viewer",
+		}).Return(false, true, nil)
+
+		d, err := resolver.New().Check(context.Background(), stmts, resolver.Request{
+			PrincipalType: domain.AuthzPrincipalTypeUser,
+			PrincipalID:   "user_alice",
+			ProjectID:     "proj_customer",
+			HomeProjectID: "proj_platform",
+			ObjectType:    "project",
+			Relation:      "viewer",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, resolver.DecisionForbidden, d)
+	})
+
 	t.Run("forbidden with foothold", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		stmts := mocks.NewMockAuthzResolverStatements(ctrl)

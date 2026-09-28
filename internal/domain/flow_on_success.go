@@ -14,10 +14,6 @@ type FlowOnSuccessHandler interface {
 	Handle(ctx context.Context, in FlowOnSuccessInput) (FlowOnSuccessResult, error)
 }
 
-type FlowPasskeyUserCreater interface {
-	CreateProvisionalUser(ctx context.Context, userID string, state *FlowState) error
-}
-
 // ManifestForOnSuccess returns the credential kinds a mutation establishes.
 // Dispatch (verify-vs-skip) and the validator (upstream-collects check)
 // both read this table.
@@ -45,7 +41,11 @@ type FlowOnSuccessInput struct {
 type FlowOnSuccessResult struct {
 	StepError *string
 	// UserID is set when a handler creates a new user. The state machine
-	// records it and registers the user on the auth attempt.
+	// only records it in flow state — a handler returning a UserID MUST
+	// have persisted the user's verified factors on the auth attempt
+	// inside its own transaction (see FlowCreateUserWithPasswordHandler's
+	// recordAttemptFactorsAction), or the exchanged session will be bound
+	// to a user with no factors.
 	UserID string
 	// Irreversible flags mutations the user cannot reverse (e.g. created a user).
 	Irreversible bool

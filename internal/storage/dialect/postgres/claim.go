@@ -29,6 +29,17 @@ const (
 		` ORDER BY created_at, team_id LIMIT 1) m` +
 		` JOIN zitadel_nextgen.teams t ON t.project_id = m.project_id AND t.id = m.team_id` +
 		` WHERE m.status = 'active' AND t.status = 'active'`
+
+	// earliestTeamMembershipStmt is the other half of personalTeamForUserStmt:
+	// the same earliest-membership pick, without the active filters and without
+	// the team join. personalTeamForUserStmt answers "may this user claim", so
+	// it collapses "holds no membership" and "personal team is deactivated" into
+	// one NoRowFoundError. Provisioning has to tell those apart -- the first
+	// needs a team created, the second must be left alone -- so it asks this
+	// question instead. Zero rows here means the user truly holds no membership.
+	earliestTeamMembershipStmt = `SELECT project_id, team_id, user_id, status, created_at, updated_at` +
+		` FROM zitadel_nextgen.team_memberships WHERE project_id = $1 AND user_id = $2` +
+		` ORDER BY created_at, team_id LIMIT 1`
 )
 
 type claimStatements struct{ statement }
@@ -88,6 +99,19 @@ func (s claimStatements) GetPersonalTeamForUser(ctx context.Context, projectID, 
 		return nil, wrapError(err)
 	}
 	return team, nil
+}
+
+// GetEarliestTeamMembership implements [service.ClaimStatements].
+func (s claimStatements) GetEarliestTeamMembership(ctx context.Context, projectID, userID string) (*domain.TeamMembership, error) {
+	rows, err := s.client.Query(ctx, earliestTeamMembershipStmt, projectID, userID)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	membership, err := pgx.CollectExactlyOneRow(rows, newTeamMembershipStatements(s.client).scanTeamMembership)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	return membership, nil
 }
 
 func scanClaimChallenge(row pgx.CollectableRow) (*domain.ClaimChallenge, error) {

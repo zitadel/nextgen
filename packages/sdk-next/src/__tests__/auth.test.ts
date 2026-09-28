@@ -164,14 +164,15 @@ describe("auth()", () => {
       isAuthenticated: true,
       session: {
         userId: "user-abc",
-        email: "alice@example.com",
-        name: "Alice",
+        identifier: "alice@example.com",
+        identifierProperty: null,
+        display: "Alice",
         token,
       },
     });
   });
 
-  it("nulls email and name when the signed JWT omits them", async () => {
+  it("nulls identifier and display when the signed JWT omits the claims", async () => {
     const kid = nextKid();
     routeFetch(kid, () => jsonResponse({}, 500));
     mockHeadersMap.set(
@@ -184,8 +185,8 @@ describe("auth()", () => {
 
     expect(result.isAuthenticated).toBe(true);
     if (result.isAuthenticated) {
-      expect(result.session.email).toBeNull();
-      expect(result.session.name).toBeNull();
+      expect(result.session.identifier).toBeNull();
+      expect(result.session.display).toBeNull();
     }
   });
 
@@ -241,8 +242,12 @@ describe("auth()", () => {
         project_id: "proj-1",
         state: "active",
         user_id: "user-1",
-        email: "bob@example.com",
-        name: "Bob",
+        user: {
+          user_id: "user-1",
+          identifier: "bob@example.com",
+          identifier_property: "email",
+          display: "Bob",
+        },
       }),
     );
     const token = makeJweShapedToken();
@@ -254,7 +259,13 @@ describe("auth()", () => {
     // Identity comes from the backend response — no more userId "unknown".
     expect(result).toEqual({
       isAuthenticated: true,
-      session: { userId: "user-1", email: "bob@example.com", name: "Bob", token },
+      session: {
+        userId: "user-1",
+        identifier: "bob@example.com",
+        identifierProperty: "email",
+        display: "Bob",
+        token,
+      },
     });
   });
 

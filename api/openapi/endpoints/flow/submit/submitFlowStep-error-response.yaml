@@ -24,7 +24,6 @@ content:
         - $ref: '../../../components/schemas/errors/internal.yaml'
         - $ref: '../../../components/schemas/errors/tkn-invalid.yaml'
         - $ref: '../../../components/schemas/errors/not_implemented.yaml'
-        - $ref: '../../../components/schemas/errors/pkreg-not_found.yaml'
         - $ref: '../../../components/schemas/errors/req-invalid.yaml'
         - $ref: '../../../components/schemas/errors/enc_key-unknown_alg.yaml'
         - $ref: '../../../components/schemas/errors/unavailable.yaml'
@@ -54,7 +53,6 @@ content:
           internal: '../../../components/schemas/errors/internal.yaml'
           tkn.invalid: '../../../components/schemas/errors/tkn-invalid.yaml'
           not_implemented: '../../../components/schemas/errors/not_implemented.yaml'
-          pkreg.not_found: '../../../components/schemas/errors/pkreg-not_found.yaml'
           req.invalid: '../../../components/schemas/errors/req-invalid.yaml'
           enc_key.unknown_alg: '../../../components/schemas/errors/enc_key-unknown_alg.yaml'
           unavailable: '../../../components/schemas/errors/unavailable.yaml'
@@ -162,11 +160,6 @@ content:
         value:
           code: not_implemented
           message: 'This feature is not implemented yet.'
-      pkreg.not_found:
-        summary: pkreg.not_found
-        value:
-          code: pkreg.not_found
-          message: 'passkey registration session not found or expired'
       req.invalid:
         summary: req.invalid
         value:

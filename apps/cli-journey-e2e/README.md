@@ -72,7 +72,8 @@ Useful environment overrides:
 - `JOURNEY_ZITADEL_PORT` for single-framework runs only
 - `JOURNEY_TARBALLS_DIR` to use prebuilt release npm tarballs
 - `JOURNEY_ENABLE_PASSKEY=0` as a local-only escape hatch while debugging
-  passkey setup. CI must run passkey coverage.
+  passkey setup. CI must run passkey coverage — the `passkey-first` preset
+  lane, which is the only shipped preset whose flow offers a passkey.
 
 ## CI gate
 
@@ -102,8 +103,10 @@ runs execute framework suites in parallel.
   package, and Zitadel packages resolve from the temporary registry.
 - Password-only account: register with email/password, skip passkey setup, log
   out, and log in again with password.
-- Passkey-only account: register with email/passkey, log out, and log in again
-  with passkey.
+- Passkey account (`--preset passkey-first` only): register through the entry
+  step's email fallback with a passkey, log out, and log in again with one tap.
+  The default `password-first` flow offers no passkey action, so this journey
+  does not apply to it.
 - Pre-existing-app lane (`--preexisting-app`, Next and Nuxt): setup against the
   seeded host app emits `variant="widget"` + `theme="auto"` pages, records
   `posture` in the scaffold manifest, keeps the host's own homepage and shell,

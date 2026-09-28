@@ -35,7 +35,6 @@ describe("normalizeFlowBody", () => {
       normalizeFlowBody({
         id: "flow_1",
         project_id: "proj_1",
-        schema_uri: "https://example.test/flow.json",
         created_at: "2026-01-01T00:00:00Z",
         updated_at: "2026-01-01T00:00:00Z",
         name: "login",

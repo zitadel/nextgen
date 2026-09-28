@@ -182,7 +182,7 @@ type FlowDefinitionAudience struct {
 // authMethodPrefix marks a step.fields entry as referring to an entry
 // under the user schema's `x-auth-methods` keyword (e.g.
 // "x-auth-methods#password") rather than to a user property.
-const authMethodPrefix = "x-auth-methods#"
+const authMethodPrefix = SchemaAnnotationAuthMethods + "#"
 
 // Field carries the raw field name from a flow-definition step.
 type Field string
@@ -247,8 +247,11 @@ type FlowDefinitionStep struct {
 	// Gates are security challenges that must be satisfied before the
 	// step's submission is accepted, keyed by gate name.
 	Gates map[string]FlowStepGate
-	// SSOProviders lists the identity providers available on this step.
-	SSOProviders []FlowSSOProvider
+	// SSOProviders lists the slugs of the identity provider connections
+	// this step offers, in display order. The connection owns the display
+	// name and template; rendering resolves each slug into a
+	// [FlowSSOProvider] for the client.
+	SSOProviders []string
 	// OnSuccess names the server-side mutation to run after field
 	// validation passes, before the transition fires. Nil means advance
 	// directly with no side effect.
@@ -282,7 +285,10 @@ type FlowStepGate struct {
 	Config map[string]any
 }
 
-// FlowSSOProvider is an identity provider option offered on a step.
+// FlowSSOProvider is an identity provider option as rendered to the
+// client: a connection slug resolved to its display name and template.
+// Flow definitions reference connections by slug only
+// ([FlowDefinitionStep.SSOProviders]).
 type FlowSSOProvider struct {
 	ID       string
 	Name     string

@@ -31,8 +31,12 @@ describe("getSession()", () => {
         project_id: "proj-1",
         state: "active",
         user_id: "user-1",
-        email: "bob@example.com",
-        name: "Bob",
+        user: {
+          user_id: "user-1",
+          identifier: "bob@example.com",
+          identifier_property: "email",
+          display: "Bob",
+        },
       }),
     );
 
@@ -44,7 +48,12 @@ describe("getSession()", () => {
     );
     expect(result).toEqual({
       isAuthenticated: true,
-      session: { userId: "user-1", email: "bob@example.com", name: "Bob" },
+      session: {
+        userId: "user-1",
+        identifier: "bob@example.com",
+        identifierProperty: "email",
+        display: "Bob",
+      },
     });
   });
 
@@ -57,7 +66,7 @@ describe("getSession()", () => {
 
     expect(result).toEqual({
       isAuthenticated: true,
-      session: { userId: "user-2", email: null, name: null },
+      session: { userId: "user-2", identifier: null, identifierProperty: null, display: null },
     });
   });
 

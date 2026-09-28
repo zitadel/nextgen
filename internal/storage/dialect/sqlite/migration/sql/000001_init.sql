@@ -150,6 +150,15 @@ CREATE INDEX idx_flow_definitions_project_status ON flow_definitions (project_id
 -- +goose StatementEnd
 
 -- +goose StatementBegin
+-- Revisions of one flow share its name and are ordered by created_at, so at
+-- most one may carry a given timestamp: a collision has no determinate winner
+-- and must fail loudly instead. The index is also the seek the latest-revision
+-- anti-join in ListFlowDefinitions uses.
+CREATE UNIQUE INDEX idx_flow_definitions_name_revision
+    ON flow_definitions (project_id, name, created_at);
+-- +goose StatementEnd
+
+-- +goose StatementBegin
 CREATE TABLE auth_attempts (
     project_id      TEXT    NOT NULL,
     id              TEXT    NOT NULL,
@@ -159,6 +168,9 @@ CREATE TABLE auth_attempts (
     required_checks TEXT,
     created_at      INTEGER NOT NULL,
     time_to_live    INTEGER,
+    -- internal marks server-orchestrated ceremonies (e.g. management passkey
+    -- enrollment) that must never be handed off or read as attempts (ADR 056).
+    internal        INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (project_id, id),
     CONSTRAINT chk_auth_attempts_id CHECK (id <> ''),
     CONSTRAINT fk_auth_attempts_project
@@ -397,24 +409,6 @@ CREATE INDEX idx_branding_project_created_at ON branding (project_id, created_at
 -- +goose StatementEnd
 
 -- +goose StatementBegin
-CREATE TABLE passkey_registrations (
-    id          TEXT    NOT NULL,
-    project_id  TEXT    NOT NULL,
-    user_id     TEXT    NOT NULL,
-    challenge   TEXT    NOT NULL,
-    expires_at  INTEGER NOT NULL,
-    created_at  INTEGER NOT NULL,
-    PRIMARY KEY (id),
-    CONSTRAINT fk_passkey_registrations_project
-        FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE
-);
--- +goose StatementEnd
-
--- +goose StatementBegin
-CREATE INDEX idx_passkey_registrations_expires_at ON passkey_registrations (expires_at);
--- +goose StatementEnd
-
--- +goose StatementBegin
 CREATE TABLE claim_challenges (
     -- id is the SHA-256 hash of a handoff-token-style challenge token minted in
     -- Go (ADR 041 §3); the plaintext travels outside the system, only the hash
@@ -584,12 +578,6 @@ DROP INDEX IF EXISTS idx_claim_challenges_expires_at;
 DROP TABLE IF EXISTS claim_challenges;
 -- +goose StatementEnd
 -- +goose StatementBegin
-DROP INDEX IF EXISTS idx_passkey_registrations_expires_at;
--- +goose StatementEnd
--- +goose StatementBegin
-DROP TABLE IF EXISTS passkey_registrations;
--- +goose StatementEnd
--- +goose StatementBegin
 DROP INDEX IF EXISTS idx_branding_project_created_at;
 -- +goose StatementEnd
 -- +goose StatementBegin
@@ -645,6 +633,9 @@ DROP INDEX IF EXISTS idx_auth_attempts_handoff_token;
 -- +goose StatementEnd
 -- +goose StatementBegin
 DROP TABLE IF EXISTS auth_attempts;
+-- +goose StatementEnd
+-- +goose StatementBegin
+DROP INDEX IF EXISTS idx_flow_definitions_name_revision;
 -- +goose StatementEnd
 -- +goose StatementBegin
 DROP INDEX IF EXISTS idx_flow_definitions_project_status;

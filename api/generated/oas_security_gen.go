@@ -40,8 +40,19 @@ func findAuthorization(h http.Header, prefix string) (string, bool) {
 // operationRolesNextgenSession is a private map storing roles per operation.
 var operationRolesNextgenSession = map[string][]string{
 	CompleteClaimOperation:   []string{},
+	CreateGrantOperation:     []string{},
+	DeleteGrantOperation:     []string{},
+	GetGrantOperation:        []string{},
 	GetMySessionOperation:    []string{},
 	GetMyUserOperation:       []string{},
+	GetProjectOperation:      []string{},
+	GetTeamOperation:         []string{},
+	ListMyProjectsOperation:  []string{},
+	PatchMyUserOperation:     []string{},
+	PatchProjectOperation:    []string{},
+	QueryGrantsOperation:     []string{},
+	QueryTeamsOperation:      []string{},
+	QueryUsersOperation:      []string{},
 	RevokeMySessionOperation: []string{},
 }
 
@@ -68,6 +79,9 @@ func GetRolesForNextgenSession(operation string) []string {
 
 // oauth2ScopesOAuth2 is a private map storing OAuth2 scopes per operation.
 var oauth2ScopesOAuth2 = map[string][]string{
+	BeginUserPasskeyRegistrationOperation: []string{
+		"user.write",
+	},
 	CreateAuthAttemptOperation: []string{
 		"auth_attempt.write",
 	},
@@ -77,8 +91,17 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	CreateFlowDefinitionOperation: []string{
 		"flow_definition.write",
 	},
+	CreateGrantOperation: []string{
+		"project.write",
+	},
 	CreateHandoffOperation: []string{
 		"auth_attempt.write",
+	},
+	CreateIdpOperation: []string{
+		"idp.write",
+	},
+	CreateReleaseOperation: []string{
+		"release.write",
 	},
 	CreateSchemaOperation: []string{
 		"schema.write",
@@ -92,8 +115,8 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	CreateUserOperation: []string{
 		"user.write",
 	},
-	DeleteFlowDefinitionOperation: []string{
-		"flow_definition.delete",
+	DeleteGrantOperation: []string{
+		"project.write",
 	},
 	DeleteTeamOperation: []string{
 		"team.delete",
@@ -101,8 +124,14 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	DeleteUserByIDOperation: []string{
 		"user.delete",
 	},
+	DeleteVariableOperation: []string{
+		"variable.write",
+	},
 	ExchangeHandoffOperation: []string{
 		"session.write",
+	},
+	FinishUserPasskeyRegistrationOperation: []string{
+		"user.write",
 	},
 	GetAuthAttemptOperation: []string{
 		"auth_attempt.read",
@@ -113,14 +142,29 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	GetClaimStatusOperation: []string{
 		"project.write",
 	},
+	GetEnvironmentByNameOperation: []string{
+		"environment.read",
+	},
 	GetEventOperation: []string{
 		"events.read",
 	},
 	GetFlowDefinitionOperation: []string{
 		"flow_definition.read",
 	},
+	GetGrantOperation: []string{
+		"project.read",
+	},
+	GetIdpByIdOperation: []string{
+		"idp.read",
+	},
+	GetIdpRevisionByIdOperation: []string{
+		"idp.read",
+	},
 	GetProjectOperation: []string{
 		"project.write",
+	},
+	GetReleaseByIdOperation: []string{
+		"release.read",
 	},
 	GetSchemaByIdOperation: []string{
 		"schema.read",
@@ -134,6 +178,12 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	GetUserByIDOperation: []string{
 		"user.read",
 	},
+	GetVariableOperation: []string{
+		"variable.read",
+	},
+	GetVariablesOperation: []string{
+		"variable.read",
+	},
 	InitClaimOperation: []string{
 		"project.write",
 	},
@@ -143,11 +193,20 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	ListBrandingOperation: []string{
 		"branding.read",
 	},
+	ListEnvironmentsOperation: []string{
+		"environment.read",
+	},
 	ListEventsOperation: []string{
 		"events.read",
 	},
 	ListFlowDefinitionsOperation: []string{
 		"flow_definition.read",
+	},
+	ListIdpRevisionsOperation: []string{
+		"idp.read",
+	},
+	ListReleasesOperation: []string{
+		"release.read",
 	},
 	ListSchemasOperation: []string{
 		"schema.read",
@@ -157,13 +216,19 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	ListUserTeamsOperation: []string{
 		"user.read",
-		"team.read",
-	},
-	ListUsersOperation: []string{
-		"user.read",
+		"team_membership.read",
 	},
 	PatchProjectOperation: []string{
 		"project.write",
+	},
+	PatchUserByIDOperation: []string{
+		"user.write",
+	},
+	QueryGrantsOperation: []string{
+		"project.read",
+	},
+	QueryIdpsOperation: []string{
+		"idp.read",
 	},
 	QueryProjectsOperation: []string{
 		"project.write",
@@ -174,17 +239,20 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	QueryTeamsOperation: []string{
 		"team.read",
 	},
+	QueryUsersOperation: []string{
+		"user.read",
+	},
 	RevokeSessionOperation: []string{
 		"session.delete",
 	},
 	SetUserPasswordOperation: []string{
 		"user.write",
 	},
-	UpdateFlowDefinitionOperation: []string{
-		"flow_definition.write",
-	},
 	UpdateTeamOperation: []string{
 		"team.write",
+	},
+	UpdateVariablesOperation: []string{
+		"variable.write",
 	},
 	VerifyChallengeProofOperation: []string{
 		"auth_attempt.write",

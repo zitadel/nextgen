@@ -104,7 +104,7 @@ function wrap(
 export function identifierStep(input: StepFixtureInput): CreateFlow201 {
   return wrap(input, {
     name: "identifier",
-    texts: { title_key: "identifier.title" },
+    texts: { title_key: "identifier.title", description_key: "identifier.description" },
     fields: [
       {
         name: "email",
@@ -115,7 +115,6 @@ export function identifierStep(input: StepFixtureInput): CreateFlow201 {
     ],
     actions: [
       { name: "submit", kind: "submit", text_key: "identifier.action.continue", primary: true },
-      { name: "passkey", kind: "passkey", text_key: "identifier.action.passkey" },
       { name: "register", kind: "navigate", text_key: "identifier.action.register.link" },
       { name: "recover", kind: "navigate", text_key: "action.forgot_password" },
     ],
@@ -127,7 +126,7 @@ export function identifierStep(input: StepFixtureInput): CreateFlow201 {
 export function registerStep(input: StepFixtureInput): CreateFlow201 {
   return wrap(input, {
     name: "register",
-    texts: { title_key: "register.title" },
+    texts: { title_key: "register.title", description_key: "register.description" },
     fields: [
       {
         name: "email",
@@ -169,7 +168,6 @@ export function registerStep(input: StepFixtureInput): CreateFlow201 {
     ],
     actions: [
       { name: "submit", kind: "submit", text_key: "register.action.password", primary: true },
-      { name: "passkey_register", kind: "passkey_register", text_key: "register.action.passkey" },
       { name: "sign_in", kind: "navigate", text_key: "register.action.sign_in.link" },
     ],
     gates: {},
@@ -229,7 +227,7 @@ export function registerPasswordStep(input: StepFixtureInput): CreateFlow201 {
 export function passwordStep(input: StepFixtureInput): CreateFlow201 {
   return wrap(input, {
     name: "password",
-    texts: { title_key: "password.title" },
+    texts: { title_key: "password.title", description_key: "password.description" },
     fields: [
       {
         name: PASSWORD_FIELD,
@@ -240,7 +238,6 @@ export function passwordStep(input: StepFixtureInput): CreateFlow201 {
     ],
     actions: [
       { name: "submit", kind: "submit", text_key: "password.action.signin", primary: true },
-      { name: "passkey", kind: "passkey", text_key: "password.action.passkey" },
       { name: "back", kind: "back", text_key: "action.back" },
     ],
     gates: {},

@@ -12,13 +12,16 @@ oneOf:
   - $ref: types/auth-token-issued-event.yaml
   - $ref: types/auth-token-revoked-event.yaml
   - $ref: types/authz-granted-event.yaml
+  - $ref: types/authz-revoked-event.yaml
   - $ref: types/branding-created-event.yaml
+  - $ref: types/environment-created-event.yaml
   - $ref: types/flowdef-created-event.yaml
   - $ref: types/flowdef-deleted-event.yaml
   - $ref: types/flowdef-updated-event.yaml
   - $ref: types/project-created-event.yaml
   - $ref: types/project-deleted-event.yaml
   - $ref: types/project-updated-event.yaml
+  - $ref: types/release-created-event.yaml
   - $ref: types/request-api-event.yaml
   - $ref: types/schema-created-event.yaml
   - $ref: types/session-deleted-event.yaml
@@ -41,13 +44,16 @@ discriminator:
     auth.token.issued: types/auth-token-issued-event.yaml
     auth.token.revoked: types/auth-token-revoked-event.yaml
     authz.granted: types/authz-granted-event.yaml
+    authz.revoked: types/authz-revoked-event.yaml
     branding.created: types/branding-created-event.yaml
+    environment.created: types/environment-created-event.yaml
     flowdef.created: types/flowdef-created-event.yaml
     flowdef.deleted: types/flowdef-deleted-event.yaml
     flowdef.updated: types/flowdef-updated-event.yaml
     project.created: types/project-created-event.yaml
     project.deleted: types/project-deleted-event.yaml
     project.updated: types/project-updated-event.yaml
+    release.created: types/release-created-event.yaml
     request.api: types/request-api-event.yaml
     schema.created: types/schema-created-event.yaml
     session.deleted: types/session-deleted-event.yaml

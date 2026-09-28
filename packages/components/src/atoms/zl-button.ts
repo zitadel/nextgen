@@ -13,11 +13,7 @@ import "./zl-icon.js";
 /**
  * Atom: `<zl-button>` — the entire Figma button matrix in a single atom.
  *
- * Spec lineage (file `8UjCXw8yemgljmbkWGrSfE`, "Zitadel - Design System - External"):
- *   - master variant set: node `6598:292`
- *   - icon-leading instance reference: node `6598:143281` (passkey upsell)
- *
- * Variant axes (matches Figma directly):
+ * Variant axes, matching the design system's own:
  *   - hierarchy: primary | secondary | text
  *   - size:      medium (48 × auto) | small (40 × auto)
  *   - state:     enabled / hovered / focused / pressed / disabled

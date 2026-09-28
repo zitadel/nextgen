@@ -53,22 +53,148 @@ func ValidateBranding(b *Branding) error {
 	if err := validateBrandingTemplate(b.LiquidTemplate); err != nil {
 		return err
 	}
-	// font_url stays read-only in v1: the component must load the tenant font
-	// stylesheet at document level (shadow-scoped @font-face rules never
-	// register faces), so accepting an arbitrary URL here would hand
-	// branding.write document-level CSS control over every page embedding the
-	// login — bypassing the template sandbox. Safe delivery (FontFace API
-	// against font binaries, or an allowlist) is a follow-up in ADR 040.
-	if b.FontURL != "" {
-		return ErrBrandingInvalid("font_url is not writable yet: tenant font delivery needs a safe design (ADR 040); load fonts from the embedding page instead", nil)
+	if err := validateBrandingFontURL(b.Typography); err != nil {
+		return err
 	}
 	for _, u := range []struct{ name, value string }{
 		{"logo_url", b.LogoURL},
 		{"hero_url", b.HeroURL},
+		{"theme.light.logo_url", brandingSideLogoURL(b.Theme.Light)},
+		{"theme.dark.logo_url", brandingSideLogoURL(b.Theme.Dark)},
 	} {
 		if err := validateBrandingAssetURL(u.name, u.value); err != nil {
 			return err
 		}
+	}
+	if err := validateBrandingTheme(b.Theme); err != nil {
+		return err
+	}
+	if err := validateBrandingTypography(b.Typography); err != nil {
+		return err
+	}
+	return validateBrandingShape(b.Shape)
+}
+
+func brandingSideLogoURL(side *BrandingThemeSide) string {
+	if side == nil {
+		return ""
+	}
+	return side.LogoURL
+}
+
+func validateBrandingTheme(theme BrandingTheme) error {
+	if theme.Mode != "" && !theme.Mode.IsValid() {
+		return ErrBrandingInvalid(fmt.Sprintf("unknown theme.mode %q", theme.Mode), nil)
+	}
+	for _, side := range []struct {
+		name string
+		side *BrandingThemeSide
+	}{
+		{"theme.light", theme.Light},
+		{"theme.dark", theme.Dark},
+	} {
+		if side.side == nil || side.side.Palette == nil {
+			continue
+		}
+		if err := validateBrandingPalette(side.name, side.side.Palette); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// validateBrandingPalette holds every colour to the allowlist in
+// branding_css.go. The widget writes these straight into a CSS declaration, so
+// a value that can close that declaration can emit rules of its own.
+func validateBrandingPalette(side string, palette *BrandingPalette) error {
+	for _, colour := range []struct{ name, value string }{
+		{"primary", palette.Primary},
+		{"on_primary", palette.OnPrimary},
+		{"background", palette.Background},
+		{"surface", palette.Surface},
+		{"muted", palette.Muted},
+		{"border", palette.Border},
+		{"text", palette.Text},
+		{"text_muted", palette.TextMuted},
+		{"link", palette.Link},
+		{"success", palette.Success},
+		{"warning", palette.Warning},
+		{"error", palette.Error},
+	} {
+		if colour.value == "" {
+			continue
+		}
+		if err := ValidateBrandingColor(side+".palette."+colour.name, colour.value); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateBrandingTypography(typography BrandingTypography) error {
+	if typography.FontFamily != "" {
+		if err := ValidateBrandingFontFamily(typography.FontFamily); err != nil {
+			return err
+		}
+	}
+	if typography.Scale != 0 && (typography.Scale < MinBrandingScale || typography.Scale > MaxBrandingScale) {
+		return ErrBrandingInvalid(
+			fmt.Sprintf("typography.scale must be between %g and %g", MinBrandingScale, MaxBrandingScale), nil)
+	}
+	return nil
+}
+
+func validateBrandingShape(shape BrandingShape) error {
+	switch {
+	case shape.Radius.Pixels != nil:
+		if *shape.Radius.Pixels < 0 || *shape.Radius.Pixels > MaxBrandingRadiusPixels {
+			return ErrBrandingInvalid(
+				fmt.Sprintf("shape.radius must be between 0 and %d pixels; send %q for a pill",
+					MaxBrandingRadiusPixels, BrandingRadiusFull), nil)
+		}
+	case shape.Radius.Preset != "":
+		if !shape.Radius.Preset.IsValid() {
+			return ErrBrandingInvalid(fmt.Sprintf("unknown shape.radius %q", shape.Radius.Preset), nil)
+		}
+	}
+	if shape.Density != "" && !shape.Density.IsValid() {
+		return ErrBrandingInvalid(fmt.Sprintf("unknown shape.density %q", shape.Density), nil)
+	}
+	if shape.LogoScale != 0 && (shape.LogoScale < MinBrandingLogoScale || shape.LogoScale > MaxBrandingLogoScale) {
+		return ErrBrandingInvalid(
+			fmt.Sprintf("shape.logo_scale must be between %g and %g", MinBrandingLogoScale, MaxBrandingLogoScale), nil)
+	}
+	return nil
+}
+
+// validateBrandingFontURL gates the tenant font stylesheet. Unlike logo and
+// hero assets there is no loopback carve-out: a stylesheet is executable
+// styling rather than an image, so it stays https everywhere.
+//
+// A URL without a family names nothing to paint with, and the pair is what a
+// surface needs to render the face at all — so the two are validated together
+// rather than each on its own.
+func validateBrandingFontURL(typography BrandingTypography) error {
+	if typography.FontURL == "" {
+		return nil
+	}
+	if typography.FontFamily == "" {
+		return ErrBrandingInvalid("typography.font_url needs a typography.font_family to load; a stylesheet alone names no face to render in", nil)
+	}
+	if len(typography.FontURL) > MaxBrandingURLBytes {
+		return ErrBrandingInvalid(
+			fmt.Sprintf("typography.font_url exceeds %d bytes", MaxBrandingURLBytes), nil)
+	}
+	u, err := url.Parse(typography.FontURL)
+	if err != nil {
+		return ErrBrandingInvalid("typography.font_url is not a valid URL", err)
+	}
+	if u.User != nil {
+		return ErrBrandingInvalid(
+			"typography.font_url must not carry credentials; the URL is fetched by every visitor's browser", nil)
+	}
+	if !strings.EqualFold(u.Scheme, "https") || u.Host == "" {
+		return ErrBrandingInvalid("typography.font_url must be an absolute https URL", nil)
 	}
 	return nil
 }
@@ -110,9 +236,17 @@ func validateBrandingAssetURL(name, value string) error {
 	if value == "" {
 		return nil
 	}
+	if len(value) > MaxBrandingURLBytes {
+		return ErrBrandingInvalid(
+			fmt.Sprintf("%s exceeds %d bytes", name, MaxBrandingURLBytes), nil)
+	}
 	u, err := url.Parse(value)
 	if err != nil {
 		return ErrBrandingInvalid(fmt.Sprintf("%s is not a valid URL", name), err)
+	}
+	if u.User != nil {
+		return ErrBrandingInvalid(
+			fmt.Sprintf("%s must not carry credentials; the URL is fetched by every visitor's browser", name), nil)
 	}
 	if strings.EqualFold(u.Scheme, "http") && isCanonicalLoopbackAssetURL(u) {
 		return nil

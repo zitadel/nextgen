@@ -1,7 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Settings } from "lucide-react";
 
-import { ComingSoon } from "../../../components/coming-soon";
+import { RESOURCE_PAGE, RESOURCE_TABLE_WRAP } from "@/components/resource-list";
 
 /**
  * Account settings — where the sidebar's account dropdown lands, and the route
@@ -11,29 +10,30 @@ import { ComingSoon } from "../../../components/coming-soon";
  * from the account dropdown, not from the primary sidebar list, so the route is
  * addressable without being advertised as a nav row (Console ADR 0001).
  *
- * The screen is a stub, because nothing the designed Settings view holds is
- * buildable yet:
- *
- *   - `PERSONAL / Profile` needs a call that updates a user. There is no
- *     `PATCH /users/{user_id}`, and neither the SDK nor the console exposes an
- *     update call of any kind (#693).
- *   - `WORKSPACE / Teams` and `Members` need a team reference on the user read
- *     responses. `POST /teams/query` lists teams, but nothing on a user says
- *     which ones they belong to (#735).
- *
- * Those rows arrive with the screens behind them. Until then the Settings view
- * is the header and the back row, and this page says why.
+ * There is no settings screen to land on yet. Admins moved to the project's
+ * own page (#1238: a grant is project-level data, not an account setting), and
+ * `ACCOUNT / Profile` needs a call that updates a user (#693) and is not built.
+ * Until Profile lands this renders the view's empty state rather than
+ * redirecting somewhere unrelated; redirect to Profile once it exists.
  */
 export const Route = createFileRoute("/_authed/settings/")({
-  component: SettingsPage,
+  component: SettingsEmpty,
 });
 
-function SettingsPage() {
+/** Same fixed column the settings screens use; named as a token in #1064. */
+const SETTINGS_COLUMN = "mx-auto w-full max-w-[704px]";
+
+function SettingsEmpty() {
   return (
-    <ComingSoon
-      title="Settings"
-      description="Account settings need a call that updates a user, and a team reference on the user read responses. Neither exists yet."
-      icon={Settings}
-    />
+    <div className={`${RESOURCE_PAGE} pt-11`}>
+      <div className={SETTINGS_COLUMN}>
+        <h1 className="text-foreground font-serif text-2xl leading-6 tracking-tight">Settings</h1>
+        <div
+          className={`${RESOURCE_TABLE_WRAP} text-muted-foreground mt-6 py-24 text-center text-xs`}
+        >
+          No settings yet.
+        </div>
+      </div>
+    </div>
   );
 }

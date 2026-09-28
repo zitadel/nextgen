@@ -101,7 +101,7 @@ func TestTeamService_Get(t *testing.T) {
 			name:   "ok",
 			teamID: "team_1",
 			setupStmt: func(s *servicemocks.MockAllStatements) {
-				s.EXPECT().GetTeamByID(gomock.Any(), "proj_1", "team_1").
+				s.EXPECT().GetTeam(gomock.Any(), gomock.Any()).
 					Return(&domain.Team{
 						ProjectID: "proj_1",
 						ID:        "team_1",
@@ -121,7 +121,7 @@ func TestTeamService_Get(t *testing.T) {
 			name:   "not found",
 			teamID: "missing",
 			setupStmt: func(s *servicemocks.MockAllStatements) {
-				s.EXPECT().GetTeamByID(gomock.Any(), "proj_1", "missing").
+				s.EXPECT().GetTeam(gomock.Any(), gomock.Any()).
 					Return(nil, database.NewNoRowFoundError(nil))
 			},
 			wantErr: domain.ErrTeamNotFound(),
@@ -130,13 +130,8 @@ func TestTeamService_Get(t *testing.T) {
 			name:   "pending_purge team reads as not found",
 			teamID: "team_purge",
 			setupStmt: func(s *servicemocks.MockAllStatements) {
-				s.EXPECT().GetTeamByID(gomock.Any(), "proj_1", "team_purge").
-					Return(&domain.Team{
-						ProjectID: "proj_1",
-						ID:        "team_purge",
-						Name:      "doomed",
-						Status:    domain.TeamStatusPendingPurge,
-					}, nil)
+				s.EXPECT().GetTeam(gomock.Any(), gomock.Any()).
+					Return(nil, database.NewNoRowFoundError(nil))
 			},
 			wantErr: domain.ErrTeamNotFound(),
 		},
@@ -269,6 +264,7 @@ func TestTeamService_Delete(t *testing.T) {
 			teamID: "team_1",
 			setupStmt: func(s *servicemocks.MockAllStatements) {
 				s.EXPECT().DeactivateTeam(gomock.Any(), "proj_1", "team_1").Return(true, nil)
+				s.EXPECT().HasActiveOwningTeamGrant(gomock.Any(), "team_1").Return(false, nil)
 			},
 		},
 		{
@@ -291,6 +287,27 @@ func TestTeamService_Delete(t *testing.T) {
 			teamID: "team_1",
 			setupStmt: func(s *servicemocks.MockAllStatements) {
 				s.EXPECT().DeactivateTeam(gomock.Any(), "proj_1", "team_1").Return(false, assert.AnError)
+			},
+			wantErr: domain.ErrInternal(assert.AnError),
+		},
+		{
+			// ADR 054 §8 (amendment 2026-09-21): deactivating the owner would
+			// orphan the project, so it is refused until recovery exists.
+			name:   "team that owns a project is refused",
+			teamID: "team_1",
+			setupStmt: func(s *servicemocks.MockAllStatements) {
+				s.EXPECT().DeactivateTeam(gomock.Any(), "proj_1", "team_1").Return(true, nil)
+				s.EXPECT().HasActiveOwningTeamGrant(gomock.Any(), "team_1").Return(true, nil)
+				// No event: the transaction rolls back, so nothing is recorded.
+			},
+			wantErr: domain.ErrTeamOwnsProject(),
+		},
+		{
+			name:   "ownership lookup fails",
+			teamID: "team_1",
+			setupStmt: func(s *servicemocks.MockAllStatements) {
+				s.EXPECT().DeactivateTeam(gomock.Any(), "proj_1", "team_1").Return(true, nil)
+				s.EXPECT().HasActiveOwningTeamGrant(gomock.Any(), "team_1").Return(false, assert.AnError)
 			},
 			wantErr: domain.ErrInternal(assert.AnError),
 		},

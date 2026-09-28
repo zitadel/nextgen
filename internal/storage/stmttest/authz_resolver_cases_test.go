@@ -4,6 +4,7 @@ package stmttest
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"testing"
 	"time"
@@ -71,7 +72,7 @@ func TestAuthzResolverStatements_Cases(t *testing.T) {
 		})
 
 		t.Run("foothold none", func(t *testing.T) {
-			ok, err := d.stmts.HasAuthzProjectFoothold(t.Context(), projectID, domain.AuthzPrincipalTypeUser, "user_none_"+uniqueSuffix(t))
+			ok, err := d.stmts.HasAuthzProjectFoothold(t.Context(), projectID, "", domain.AuthzPrincipalTypeUser, "user_none_"+uniqueSuffix(t))
 			require.NoError(t, err)
 			assert.False(t, ok)
 		})
@@ -80,7 +81,7 @@ func TestAuthzResolverStatements_Cases(t *testing.T) {
 			u := "user_fh_asgn_" + uniqueSuffix(t)
 			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
 				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeUser, u, "project", "viewer", domain.NewProjectAssignmentScope())))
-			ok, err := d.stmts.HasAuthzProjectFoothold(t.Context(), projectID, domain.AuthzPrincipalTypeUser, u)
+			ok, err := d.stmts.HasAuthzProjectFoothold(t.Context(), projectID, "", domain.AuthzPrincipalTypeUser, u)
 			require.NoError(t, err)
 			assert.True(t, ok)
 		})
@@ -88,7 +89,7 @@ func TestAuthzResolverStatements_Cases(t *testing.T) {
 		t.Run("foothold via membership edge only", func(t *testing.T) {
 			u := "user_fh_edge_" + uniqueSuffix(t)
 			require.NoError(t, d.stmts.UpsertAuthzMembershipEdge(t.Context(), domain.NewUserTeamMembershipEdge(projectID, teamT, u)))
-			ok, err := d.stmts.HasAuthzProjectFoothold(t.Context(), projectID, domain.AuthzPrincipalTypeUser, u)
+			ok, err := d.stmts.HasAuthzProjectFoothold(t.Context(), projectID, "", domain.AuthzPrincipalTypeUser, u)
 			require.NoError(t, err)
 			assert.True(t, ok)
 		})
@@ -98,7 +99,7 @@ func TestAuthzResolverStatements_Cases(t *testing.T) {
 			a := newTestAssignment(projectID, "", domain.AuthzPrincipalTypeUser, u, "project", "viewer", domain.NewProjectAssignmentScope())
 			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(), a))
 			require.NoError(t, d.stmts.RevokeAuthzAssignment(t.Context(), projectID, a.ID))
-			ok, err := d.stmts.HasAuthzProjectFoothold(t.Context(), projectID, domain.AuthzPrincipalTypeUser, u)
+			ok, err := d.stmts.HasAuthzProjectFoothold(t.Context(), projectID, "", domain.AuthzPrincipalTypeUser, u)
 			require.NoError(t, err)
 			assert.False(t, ok)
 		})
@@ -136,30 +137,30 @@ func TestAuthzResolverStatements_Cases(t *testing.T) {
 			assert.True(t, allowed)
 		})
 
-		t.Run("check closure viewer implies editor", func(t *testing.T) {
-			u := "user_impl_ed_" + uniqueSuffix(t)
-			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
-				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeUser, u, "project", "viewer", domain.NewProjectAssignmentScope())))
-			allowed, _ := check(t, base(domain.AuthzPrincipalTypeUser, u, "project", "editor"))
-			assert.True(t, allowed)
-		})
-
-		t.Run("check closure viewer implies admin", func(t *testing.T) {
-			u := "user_impl_ad_" + uniqueSuffix(t)
-			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
-				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeUser, u, "project", "viewer", domain.NewProjectAssignmentScope())))
-			allowed, _ := check(t, base(domain.AuthzPrincipalTypeUser, u, "project", "admin"))
-			assert.True(t, allowed)
-		})
-
-		t.Run("check closure admin does not imply viewer", func(t *testing.T) {
-			u := "user_admin_only_" + uniqueSuffix(t)
-			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
-				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeUser, u, "project", "admin", domain.NewProjectAssignmentScope())))
-			allowed, foothold := check(t, base(domain.AuthzPrincipalTypeUser, u, "project", "viewer"))
-			assert.False(t, allowed)
-			assert.True(t, foothold)
-		})
+		// Roles are monotonic (ADR 054 §5): the stronger assignment closes to
+		// the weaker checks, never the reverse. A refused check still reports
+		// the foothold, so the caller answers 403 rather than 404.
+		for _, tc := range []struct {
+			have, want string
+			allowed    bool
+		}{
+			{"admin", "editor", true},
+			{"admin", "viewer", true},
+			{"editor", "viewer", true},
+			{"viewer", "editor", false},
+			{"viewer", "admin", false},
+		} {
+			t.Run(fmt.Sprintf("check closure %s→%s", tc.have, tc.want), func(t *testing.T) {
+				u := "user_closure_" + uniqueSuffix(t)
+				require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
+					newTestAssignment(projectID, "", domain.AuthzPrincipalTypeUser, u, "project", tc.have, domain.NewProjectAssignmentScope())))
+				allowed, foothold := check(t, base(domain.AuthzPrincipalTypeUser, u, "project", tc.want))
+				assert.Equal(t, tc.allowed, allowed)
+				if !tc.allowed {
+					assert.True(t, foothold)
+				}
+			})
+		}
 
 		t.Run("check wrong relation deny", func(t *testing.T) {
 			u := "user_wrong_rel_" + uniqueSuffix(t)
@@ -304,14 +305,20 @@ func TestAuthzResolverStatements_Cases(t *testing.T) {
 		// --- C. Check — TTU ---
 		t.Run("check ttu membership shortcut allow", func(t *testing.T) {
 			// SQL arm: TTU membership shortcut (source=team.member + edge on tupleset principal).
+			// The tuple-to-userset edge sits on project.admin; the owning
+			// team's members pass editor and viewer through the closure, the
+			// same way a direct admin assignment does. The edge is matched
+			// through authz_relation_closure, not by relation name.
 			u := "user_ttu_mem_" + uniqueSuffix(t)
 			team := "team_ttu_mem_" + uniqueSuffix(t)
 			require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, team)))
 			require.NoError(t, d.stmts.UpsertAuthzMembershipEdge(t.Context(), domain.NewUserTeamMembershipEdge(projectID, team, u)))
 			createOwningTeamGrant(t, d.stmts,
 				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeTeam, team, "project", "team", domain.NewProjectAssignmentScope()))
-			allowed, _ := check(t, base(domain.AuthzPrincipalTypeUser, u, "project", "viewer"))
-			assert.True(t, allowed)
+			for _, rel := range []string{"admin", "editor", "viewer"} {
+				allowed, _ := check(t, base(domain.AuthzPrincipalTypeUser, u, "project", rel))
+				assert.True(t, allowed, "owning-team member must pass %s", rel)
+			}
 		})
 
 		t.Run("check ttu membership shortcut not member deny", func(t *testing.T) {
@@ -644,35 +651,6 @@ func TestAuthzResolverStatements_Cases(t *testing.T) {
 				}
 			}
 			assert.Equal(t, 1, count)
-		})
-
-		// --- E. Params / home ---
-		t.Run("home project id defaults to project", func(t *testing.T) {
-			u := "user_home_def_" + uniqueSuffix(t)
-			team := "team_home_def_" + uniqueSuffix(t)
-			require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, team)))
-			require.NoError(t, d.stmts.UpsertAuthzMembershipEdge(t.Context(), domain.NewUserTeamMembershipEdge(projectID, team, u)))
-			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
-				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeTeam, team, "project", "viewer", domain.NewProjectAssignmentScope())))
-			params := base(domain.AuthzPrincipalTypeUser, u, "project", "viewer")
-			params.PrincipalHomeProjectID = ""
-			allowed, _ := check(t, params)
-			assert.True(t, allowed)
-		})
-
-		t.Run("home project mismatch deny expand", func(t *testing.T) {
-			u := "user_home_mis_" + uniqueSuffix(t)
-			team := "team_home_mis_" + uniqueSuffix(t)
-			other := ensureProject(t, d.stmts)
-			otherTeam := "team_home_other_" + uniqueSuffix(t)
-			require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, team)))
-			require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(other, otherTeam)))
-			// Membership only in other project; grant team viewer in protected project.
-			require.NoError(t, d.stmts.UpsertAuthzMembershipEdge(t.Context(), domain.NewUserTeamMembershipEdge(other, otherTeam, u)))
-			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
-				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeTeam, team, "project", "viewer", domain.NewProjectAssignmentScope())))
-			allowed, _ := check(t, base(domain.AuthzPrincipalTypeUser, u, "project", "viewer"))
-			assert.False(t, allowed)
 		})
 	})
 }

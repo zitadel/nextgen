@@ -35,7 +35,7 @@ const ROOT_LABEL = "Schema";
  * needs it.
  *
  * The panel carries no timestamp: the design's `Last changed` line was removed
- * from both this component (`1389:8803`) and the drill-in frame, and the date a
+ * from both this component and the drill-in frame, and the date a
  * schema was created now lives on the list row instead.
  */
 export function SchemaFieldsPanel({ schema }: { schema: UserSchema }) {

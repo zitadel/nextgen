@@ -36,19 +36,35 @@ func factorPayloadToAPI(factor domain.AuthFactor) api.OptCompletedFactorPayload 
 		return api.NewOptCompletedFactorPayload(api.CompletedFactorPayload{
 			Type: api.IdentifierFactorPayloadCompletedFactorPayload,
 			IdentifierFactorPayload: api.IdentifierFactorPayload{
+				Method: api.IdentifierFactorPayloadMethodIdentifier,
 				UserID: api.UserID(f.UserID),
 			},
 		})
 	case *domain.AuthFactorPassword:
 		return api.NewOptCompletedFactorPayload(api.CompletedFactorPayload{
 			Type:                  api.PasswordFactorPayloadCompletedFactorPayload,
-			PasswordFactorPayload: api.PasswordFactorPayload{},
+			PasswordFactorPayload: api.PasswordFactorPayload{Method: api.PasswordFactorPayloadMethodPassword},
 		})
 	case *domain.AuthFactorPasskey:
 		return api.NewOptCompletedFactorPayload(api.CompletedFactorPayload{
 			Type: api.PasskeyFactorPayloadCompletedFactorPayload,
 			PasskeyFactorPayload: api.PasskeyFactorPayload{
+				Method:                  api.PasskeyFactorPayloadMethodPasskey,
 				CredentialID:            base64.RawURLEncoding.EncodeToString(f.CredentialID),
+				UserVerified:            f.UserVerified,
+				BackupEligible:          api.NewOptBool(f.BackupEligible),
+				BackupState:             api.NewOptBool(f.BackupState),
+				AuthenticatorAttachment: api.OptPasskeyFactorPayloadAuthenticatorAttachment{},
+			},
+		})
+	case *domain.AuthFactorPasskeyRegistration:
+		// A completed enrollment renders as a passkey factor: creating the
+		// credential proved possession just like an assertion would.
+		return api.NewOptCompletedFactorPayload(api.CompletedFactorPayload{
+			Type: api.PasskeyFactorPayloadCompletedFactorPayload,
+			PasskeyFactorPayload: api.PasskeyFactorPayload{
+				Method:                  api.PasskeyFactorPayloadMethodPasskey,
+				CredentialID:            f.CredentialID,
 				UserVerified:            f.UserVerified,
 				BackupEligible:          api.NewOptBool(f.BackupEligible),
 				BackupState:             api.NewOptBool(f.BackupState),
@@ -67,8 +83,10 @@ func requiredFactorsToAPI(checks []domain.AuthCheckType) []api.FactorMethod {
 	return factors
 }
 
+// checkTypeToAPI maps a check type's class to its wire method: enrollment is
+// passkey-class on the wire, the distinct check type is internal bookkeeping.
 func checkTypeToAPI(check domain.AuthCheckType) api.FactorMethod {
-	switch check {
+	switch check.Class() {
 	case domain.AuthCheckTypeUser:
 		return api.FactorMethodIdentifier
 	case domain.AuthCheckTypePassword:

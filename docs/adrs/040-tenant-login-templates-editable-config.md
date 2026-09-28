@@ -1,6 +1,6 @@
 # ADR 040: Tenant Login Templates as Editable Config
 
-> **Status:** Proposed
+> **Status:** Proposed (amended 2026-08-27 by [ADR 057](057-login-customization-categories.md); amended 2026-09-15: `$file` references)
 > **Date:** 2026-07-20
 > **Context:** How tenant-authored LiquidJS login templates ("branding") are stored, validated, delivered to the login component, and edited through the CLI. Completes the write path for the read-only `Branding` projection already defined in [`flow-api` components](../../api/openapi/components/flows/branding.yaml) and consumed by `@zitadel/components`.
 
@@ -224,3 +224,23 @@ authoritative validator and a component-level render test.
   Already rejected in [branding/schema.md](../design/branding/schema.md);
   the override ladder (tokens → inline vars → `::part()` → eject) covers
   CSS needs without a second sandboxing surface.
+
+## Amendment (2026-08-27)
+
+[ADR 057](057-login-customization-categories.md) keeps this ADR's storage,
+validation, and eject→apply path for the **widget template** (advanced
+structure inside the widget, shared by embedded and Zitadel-served login,
+strict scope, later). It amends §5's catalog: `split` / `split-right` /
+`hero` are page chrome. Setup must not publish those files as
+`login.liquid`. Zitadel-served page chrome is unset; `page.liquid` is a
+proposal, not a requirement.
+
+## Amendment (2026-09-15): `$file` references
+
+§4's `liquid_template_file` key is replaced by a general reference form. A
+descriptor now writes `"liquid_template": { "$file": "./login.liquid" }`. The
+OpenAPI YAML marks the field `x-local: file`, the generated editor
+meta-schema accepts either the string or the reference, and the CLI replaces
+any `$file` reference with the file's content before upload and writes the
+published value back to the file. The on-disk layout and the round-trip are
+unchanged; only the key is.

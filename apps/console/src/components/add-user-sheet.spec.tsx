@@ -15,6 +15,7 @@ vi.mock("@/auth/session", async (importOriginal) => {
 vi.stubEnv("VITE_CONSOLE_API_BASE", "http://localhost/api");
 
 const USERS_URL = "http://localhost/api/users";
+const USERS_QUERY_URL = `${USERS_URL}/query`;
 const SCHEMAS_URL = "http://localhost/api/schemas";
 const PROJECTS_QUERY_URL = "http://localhost/api/projects/query";
 const server = setupServer();
@@ -53,7 +54,7 @@ function stubSchemas(
   projects: { id: string; name: string }[] = [],
 ) {
   server.use(
-    http.get(USERS_URL, () => HttpResponse.json({ users: [] })),
+    http.post(USERS_QUERY_URL, () => HttpResponse.json({ users: [] })),
     http.post(PROJECTS_QUERY_URL, () => HttpResponse.json({ projects })),
     // The list carries the documents (#921), so the sheet needs no per-schema
     // stubs — a reintroduced `GET /schemas/{id}` has no handler here.
@@ -174,6 +175,39 @@ describe("add user sheet", () => {
         givenName: "Maya",
       },
     });
+  });
+
+  it("drains every schema page so the picker offers the full set", async () => {
+    // `GET /schemas` is cursor-paginated (#924); the sheet must walk
+    // `next_page_token` or a schema past the first page silently vanishes
+    // from the picker.
+    const askedTokens: Array<string | null> = [];
+    server.use(
+      http.post(USERS_QUERY_URL, () => HttpResponse.json({ users: [] })),
+      http.get(SCHEMAS_URL, ({ request }) => {
+        const token = new URL(request.url).searchParams.get("page_token");
+        askedTokens.push(token);
+        const page = token
+          ? { id: "sch_minimal", body: MINIMAL }
+          : { id: "sch_business", body: BUSINESS };
+        return HttpResponse.json({
+          schemas: [
+            { id: page.id, schema: page.body, metadata: { created_at: "2026-07-01T00:00:00Z" } },
+          ],
+          ...(token ? {} : { next_page_token: "tok_2" }),
+        });
+      }),
+    );
+    await openSheet();
+
+    const picker = await screen.findByRole("combobox", { name: "User Schema" });
+    // Two schemas across the pages, so nothing is preselected.
+    expect(picker).toHaveTextContent("Select schema");
+
+    await userEvent.click(picker);
+    expect(await screen.findByRole("option", { name: /Business/ })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /Minimal/ })).toBeInTheDocument();
+    expect(askedTokens).toEqual([null, "tok_2"]);
   });
 
   it("re-renders the field set and clears values when the schema changes", async () => {
@@ -304,7 +338,7 @@ describe("add user sheet", () => {
   // });
 
   it("marks fields the schema does not require, and leaves required ones unmarked", async () => {
-    // `Optional` (`27843:10611`) sits beside the label, driven by the schema's
+    // `Optional` sits beside the label, driven by the schema's
     // `required` array rather than by which fields the design happens to mark.
     stubSchemas({ sch_business: BUSINESS });
     await openSheet();

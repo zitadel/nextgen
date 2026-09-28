@@ -72,7 +72,7 @@ function rewriteCliCodeSpans(content: string, cliVersion: string): string {
  * a rewritten copy. The input is never mutated: the meta-schema bodies are
  * imported JSON modules shared across calls.
  *
- * Those files are byte-copies of the meta-schemas the server embeds
+ * Those files are generated copies of the meta-schemas the server embeds
  * (`api/openapi/endpoints/schemas/*.json`), where the bare `zitadel` spelling
  * is the correct one — the server documents the product command, not one
  * project's install. Their `description` strings surface as editor tooltips

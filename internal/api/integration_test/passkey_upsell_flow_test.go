@@ -51,7 +51,7 @@ func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 		FlowDefinition: passkeyUpsellFlowDefinition(schemaURL),
 	})
 	require.NoError(t, err)
-	require.IsType(t, &api.FlowDefinitionDetailResponse{}, defResp, "create flow definition: %s", helpers.MustMarshal(t, defResp))
+	require.IsType(t, &api.FlowDefinitionResponse{}, defResp, "create flow definition: %s", helpers.MustMarshal(t, defResp))
 
 	createResp, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{
 		ProjectID: api.ProjectID(project.ID),
@@ -191,7 +191,7 @@ func TestPostCreateUserPasskeyUpsell_SkipsToDone(t *testing.T) {
 		FlowDefinition: passkeyUpsellFlowDefinition(schemaURL),
 	})
 	require.NoError(t, err)
-	require.IsType(t, &api.FlowDefinitionDetailResponse{}, defResp)
+	require.IsType(t, &api.FlowDefinitionResponse{}, defResp)
 
 	createResp, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{
 		ProjectID: api.ProjectID(project.ID),

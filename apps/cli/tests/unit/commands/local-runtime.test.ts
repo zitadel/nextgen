@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import {
   CONTAINER_DATA_DIR,
+  LOCAL_RUNTIME_FILE,
   defaultLocalServerImageForCliVersion,
   localContainerName,
   localRuntimePaths,
@@ -56,6 +57,20 @@ afterEach(async () => {
     }
   }
 });
+
+/**
+ * The three ways a local server is told not to bootstrap the platform project:
+ * the shell, the project's own env file, and a pin to another project. Each
+ * must leave the start without a local admin.
+ */
+const PLATFORM_OPT_OUTS: { how: string; env: Record<string, string>; envLocal?: string }[] = [
+  { how: "the shell opts out", env: { NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT: "false" } },
+  { how: ".env.local opts out", env: {}, envLocal: "NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=false\n" },
+  {
+    how: "the server is pinned to its own project",
+    env: { NEXTGEN_PLATFORM_PROJECT_ID: "proj_custom" },
+  },
+];
 
 describe("local runtime commands", () => {
   it("doctor --json passes with the binary runtime before app setup", async () => {
@@ -277,7 +292,12 @@ describe("local runtime commands", () => {
     expect(result.exitCode).toBe(0);
     const envelope = parseJson(result.stdout) as {
       data: {
-        checks: Array<{ details?: { scope?: string }; message: string; name: string; status: string }>;
+        checks: Array<{
+          details?: { scope?: string };
+          message: string;
+          name: string;
+          status: string;
+        }>;
         next_commands?: string[];
       };
       warnings: string[];
@@ -326,6 +346,99 @@ describe("local runtime commands", () => {
     expect(dockerCalls).toEqual([["version", "--format", "{{.Server.Version}}"]]);
   });
 
+  it("start hands NEXTGEN_* variables from .env.local and .env to the runtime, names only on disk", async () => {
+    const cwd = await tempProject("zitadel-start-env-");
+    const fake = await fakeServerBinary();
+    const port = await freePort();
+    const serverUrl = `http://localhost:${String(port)}`;
+    await writeFile(
+      join(cwd, ".env.local"),
+      "NEXTGEN_GOOGLE_SECRET=canary-local\nUNDECLARED_SECRET=canary-undeclared\n",
+      "utf8",
+    );
+    await writeFile(
+      join(cwd, ".env"),
+      "NEXTGEN_GOOGLE_SECRET=canary-base\nNEXTGEN_GITHUB_SECRET=canary-github\n",
+      "utf8",
+    );
+
+    const result = await runCliForTest(["start", "--cwd", cwd, "--json", "--port", String(port)], {
+      ZITADEL_SERVER_BINARY: fake.binPath,
+    });
+
+    expect(result.exitCode).toBe(0);
+    const envelope = parseJson(result.stdout) as {
+      status: string;
+      data: { runtime: { pid: number; env: { injected: string[] } } };
+    };
+    expect(envelope.status).toBe("ok");
+    binaryPids.push(envelope.data.runtime.pid);
+
+    // The child received the NEXTGEN_* variables, .env.local first, and
+    // nothing else from the files.
+    await expect(childEnv(serverUrl, "NEXTGEN_GOOGLE_SECRET")).resolves.toBe("canary-local");
+    await expect(childEnv(serverUrl, "NEXTGEN_GITHUB_SECRET")).resolves.toBe("canary-github");
+    await expect(childEnv(serverUrl, "UNDECLARED_SECRET")).resolves.toBeUndefined();
+
+    // Names only, in the envelope and on disk.
+    expect(envelope.data.runtime.env).toEqual({
+      injected: ["NEXTGEN_GITHUB_SECRET", "NEXTGEN_GOOGLE_SECRET"],
+    });
+    expect(result.stdout).not.toContain("canary");
+    expect(result.stderr).not.toContain("canary");
+    const runtimeFile = await readFile(join(cwd, LOCAL_RUNTIME_FILE), "utf8");
+    expect(runtimeFile).not.toContain("canary");
+    expect((await readRuntimeMetadata(cwd))?.env).toEqual(envelope.data.runtime.env);
+
+    const status = await runCliForTest(["status", "--cwd", cwd, "--json"]);
+    expect(status.exitCode).toBe(0);
+    expect(status.stdout).not.toContain("canary");
+    expect(parseJson(status.stdout)).toMatchObject({
+      data: { server: { runtime: { env: envelope.data.runtime.env } } },
+    });
+
+    // A second start reuses the healthy runtime and keeps the recorded names.
+    const again = await runCliForTest(["start", "--cwd", cwd, "--json", "--port", String(port)], {
+      ZITADEL_SERVER_BINARY: fake.binPath,
+    });
+    expect(again.exitCode).toBe(0);
+    expect(parseJson(again.stdout)).toMatchObject({
+      data: {
+        title: "Local Zitadel server is already running.",
+        runtime: { env: envelope.data.runtime.env },
+      },
+    });
+
+    const stop = await runCliForTest(["stop", "--cwd", cwd, "--json"]);
+    expect(stop.exitCode).toBe(0);
+  });
+
+  it("start reuses a healthy container and keeps the variable names recorded for it", async () => {
+    const cwd = await tempProject("zitadel-start-docker-reuse-env-");
+    const image = await expectedDefaultImage();
+    const fake = await fakeDocker({ existingContainerImage: image });
+    const serverUrl = await startHealthServer();
+    const port = Number(new URL(serverUrl).port);
+    const recorded = { injected: ["NEXTGEN_GOOGLE_SECRET"] };
+    await writeRuntimeMetadata(cwd, { ...runtimeFor(cwd, serverUrl), image, env: recorded });
+
+    const result = await runCliForTest(
+      ["start", "--cwd", cwd, "--json", "--runtime", "docker", "--port", String(port)],
+      {
+        PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
+        DOCKER_LOG: fake.logPath,
+      },
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(parseJson(result.stdout)).toMatchObject({
+      data: { title: "Local Zitadel server is already running.", runtime: { env: recorded } },
+    });
+    expect((await readRuntimeMetadata(cwd))?.env).toEqual(recorded);
+    const dockerCalls = await readDockerCalls(fake.logPath);
+    expect(dockerCalls.some((args) => args[0] === "run")).toBe(false);
+  });
+
   it("start --json defaults to the npm binary runtime and writes metadata", async () => {
     const cwd = await tempProject("zitadel-start-binary-");
     const fake = await fakeServerBinary();
@@ -342,6 +455,7 @@ describe("local runtime commands", () => {
       data: {
         runtime: { backend: string; pid: number; log_path: string; server_package: string };
         urls: { api: string };
+        console: { signed_in_as: string; sign_in_url?: string; error?: string; hint?: string };
         next_commands: string[];
       };
     };
@@ -354,6 +468,15 @@ describe("local runtime commands", () => {
     });
     expect(envelope.data.runtime.pid).toBeGreaterThan(0);
     binaryPids.push(envelope.data.runtime.pid);
+    // The fake server hosts no platform project, so no sign-in link can be
+    // minted: the envelope says why and stops advertising `zitadel console`,
+    // which would fail the same way.
+    expect(envelope.data.console).toMatchObject({
+      signed_in_as: expect.any(String),
+      error: expect.stringContaining("platform project"),
+      hint: expect.stringContaining("zitadel stop"),
+    });
+    expect(envelope.data.console.sign_in_url).toBeUndefined();
     expect(envelope.data.next_commands).toEqual([expectedPublicCliCommand("setup --server local")]);
 
     const runtime = await readRuntimeMetadata(cwd);
@@ -403,6 +526,49 @@ describe("local runtime commands", () => {
     expect(envelope.next_commands).toContain(expectedPublicCliCommand("stop --all"));
   });
 
+  // The platform project and the local admin travel together: a harness that
+  // wants a bare single-project instance opts out of both (apps/console-e2e's
+  // real and embedded lanes do). The project's env files reach the server over
+  // the shell and the user file forces the bootstrap on, so an opt-out in
+  // `.env.local` must be read by the CLI too. And the server refuses to
+  // bootstrap the platform project while pinned to another one, so a pin means
+  // no local admin rather than a start that fails.
+  it.each(PLATFORM_OPT_OUTS)(
+    "start creates no local admin when $how",
+    async ({ env, envLocal }) => {
+      const cwd = await tempProject("zitadel-start-no-platform-");
+      if (envLocal) await writeFile(join(cwd, ".env.local"), envLocal);
+      const fake = await fakeServerBinary();
+      const port = await freePort();
+
+      const result = await runCliForTest(
+        ["start", "--cwd", cwd, "--json", "--port", String(port)],
+        {
+          ZITADEL_SERVER_BINARY: fake.binPath,
+          ...env,
+        },
+      );
+
+      expect(result.exitCode).toBe(0);
+      const envelope = parseJson(result.stdout) as {
+        status: string;
+        data: { runtime: { pid: number }; console?: unknown; next_commands: string[] };
+      };
+      expect(envelope.status).toBe("ok");
+      binaryPids.push(envelope.data.runtime.pid);
+      // No admin, so nothing to sign in as and nothing to suggest.
+      expect(envelope.data.console).toBeUndefined();
+      expect(envelope.data.next_commands).toEqual([
+        expectedPublicCliCommand("setup --server local"),
+      ]);
+      await expect(readFile(join(cwd, ".zitadel/local/admin.json"), "utf8")).rejects.toThrow();
+      await expect(readFile(join(cwd, ".zitadel/local/admin-user.json"), "utf8")).rejects.toThrow();
+      // And the server is started without the bootstrap user document.
+      const commandLine = (await readRuntimeMetadata(cwd)) as { command?: string } | undefined;
+      expect(commandLine?.command ?? "").not.toContain("--user-file");
+    },
+  );
+
   it("start fails if its spawned binary exits even when another health server appears", async () => {
     const cwd = await tempProject("zitadel-start-dead-pid-");
     const fake = await fakeExitingServerWithForeignHealth();
@@ -442,6 +608,8 @@ describe("local runtime commands", () => {
     expect(envelope.data.urls.api).toBe(serverUrl);
     expect(envelope.data.next_actions.join("\n")).toContain("From your app directory");
     expect(envelope.data.next_actions.join("\n")).toContain("Setup installs dependencies");
+    // As in the binary case: no platform project on the fake server, so no
+    // link and no `console` suggestion.
     expect(envelope.data.next_commands).toEqual([expectedPublicCliCommand("setup --server local")]);
     expect(envelope.data.next_commands).not.toContain("npm install");
     expect(envelope.data.next_commands).not.toContain("npm run dev");
@@ -456,7 +624,7 @@ describe("local runtime commands", () => {
     expect(runCall?.join(" ")).toContain(`${localRuntimePaths(cwd).dataDir}:${CONTAINER_DATA_DIR}`);
     expect(runCall?.join(" ")).toContain(`NEXTGEN_SERVER_DATA_DIR=${CONTAINER_DATA_DIR}`);
     expect(runCall?.join(" ")).not.toContain("NEXTGEN_SERVER_ENCRYPTION_KEY");
-    expect(runCall?.at(-1)).toBe(await expectedDefaultImage());
+    expect(runImage(runCall)).toBe(await expectedDefaultImage());
   });
 
   it("start uses a prebuilt local image without pulling it", async () => {
@@ -476,7 +644,7 @@ describe("local runtime commands", () => {
     const dockerCalls = await readDockerCalls(fake.logPath);
     expect(dockerCalls).toContainEqual(["image", "inspect", "zitadel-nextgen:test"]);
     expect(dockerCalls.some((args) => args[0] === "pull")).toBe(false);
-    expect(dockerCalls.find((args) => args[0] === "run")?.at(-1)).toBe("zitadel-nextgen:test");
+    expect(runImage(dockerCalls.find((args) => args[0] === "run"))).toBe("zitadel-nextgen:test");
   });
 
   it("start uses ZITADEL_LOCAL_IMAGE before the derived alpha image", async () => {
@@ -495,7 +663,7 @@ describe("local runtime commands", () => {
 
     expect(result.exitCode).toBe(0);
     const dockerCalls = await readDockerCalls(fake.logPath);
-    expect(dockerCalls.find((args) => args[0] === "run")?.at(-1)).toBe("zitadel-nextgen:env");
+    expect(runImage(dockerCalls.find((args) => args[0] === "run"))).toBe("zitadel-nextgen:env");
   });
 
   it("start --image overrides ZITADEL_LOCAL_IMAGE", async () => {
@@ -523,7 +691,9 @@ describe("local runtime commands", () => {
 
     expect(result.exitCode).toBe(0);
     const dockerCalls = await readDockerCalls(fake.logPath);
-    expect(dockerCalls.find((args) => args[0] === "run")?.at(-1)).toBe("zitadel-nextgen:override");
+    expect(runImage(dockerCalls.find((args) => args[0] === "run"))).toBe(
+      "zitadel-nextgen:override",
+    );
   });
 
   it("start replaces an existing container from another image", async () => {
@@ -543,7 +713,7 @@ describe("local runtime commands", () => {
     const dockerCalls = await readDockerCalls(fake.logPath);
     expect(dockerCalls.some((args) => args[0] === "stop")).toBe(true);
     expect(dockerCalls.some((args) => args[0] === "rm")).toBe(true);
-    expect(dockerCalls.find((args) => args[0] === "run")?.at(-1)).toBe(
+    expect(runImage(dockerCalls.find((args) => args[0] === "run"))).toBe(
       await expectedDefaultImage(),
     );
   });
@@ -831,6 +1001,16 @@ const server = http.createServer((req, res) => {
     res.writeHead(200).end("ok");
     return;
   }
+  const env = req.url.match(/^\\/env\\/([A-Za-z_][A-Za-z0-9_]*)$/);
+  if (env) {
+    const value = process.env[env[1]];
+    if (value === undefined) {
+      res.writeHead(404).end();
+      return;
+    }
+    res.writeHead(200).end(value);
+    return;
+  }
   res.writeHead(404).end();
 });
 server.listen(port, "localhost", () => {
@@ -917,6 +1097,17 @@ process.exit(1);
   return { binDir };
 }
 
+/**
+ * The image of a recorded `docker run`. It is the last argument unless the run
+ * passes server arguments after it (`--migrate --user-file …` for the local
+ * admin), in which case it is the argument just before them.
+ */
+function runImage(args: string[] | undefined): string | undefined {
+  if (!args) return undefined;
+  const serverArgs = args.indexOf("--migrate");
+  return serverArgs > 0 ? args[serverArgs - 1] : args.at(-1);
+}
+
 async function readDockerCalls(logPath: string): Promise<string[][]> {
   return (await readFile(logPath, "utf8"))
     .trim()
@@ -977,4 +1168,9 @@ async function expectedDefaultImage(): Promise<string> {
     await readFile(new URL("../../../package.json", import.meta.url), "utf8"),
   ) as { version: string };
   return defaultLocalServerImageForCliVersion(pkg.version);
+}
+
+async function childEnv(serverUrl: string, name: string): Promise<string | undefined> {
+  const response = await fetch(`${serverUrl}/env/${name}`);
+  return response.status === 200 ? response.text() : undefined;
 }

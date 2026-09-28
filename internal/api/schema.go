@@ -132,7 +132,12 @@ func schemaErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 	case domain.ErrJSONSchemaAlreadyExists().Code,
 		domain.ErrJSONSchemaRevisionConflict().Code:
 		return errorResponseWithStatusCode(http.StatusConflict, err)
-	case domain.ErrJSONSchemaInvalid().Code:
+	case domain.ErrJSONSchemaInvalid().Code,
+		domain.ErrJSONSchemaFetchDenied().Code,
+		domain.ErrJSONSchemaFetchTooLarge().Code,
+		domain.ErrJSONSchemaFetchTooManyRedirects().Code,
+		domain.ErrJSONSchemaFetchDowngrade().Code,
+		domain.ErrJSONSchemaFetchTimeout().Code:
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
 	case domain.ErrJSONSchemaPermissionDenied().Code:
 		return errorResponseWithStatusCode(http.StatusForbidden, err)

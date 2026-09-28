@@ -18,16 +18,27 @@ const (
 
 	createFlowDefinitionStmt = `INSERT INTO flow_definitions ` +
 		`(project_id, id, name, schema_version, status, purposes, definition, created_at, updated_at) ` +
-		`VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP())`
+		`VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()) THEN RETURN created_at, updated_at`
 
 	deleteFlowDefinitionStmt = `DELETE FROM flow_definitions WHERE project_id = @p1 AND id = @p2`
 
-	updateFlowDefinitionStmt = `UPDATE flow_definitions SET ` +
-		`name = @p1, schema_version = @p2, status = @p3, purposes = @p4, ` +
-		`definition = @p5, updated_at = CURRENT_TIMESTAMP() WHERE project_id = @p6 AND id = @p7`
-
 	flowDefinitionQuery = `SELECT project_id, id, name, schema_version, status, definition, created_at, updated_at ` +
 		`FROM flow_definitions`
+
+	// latestRevisionPerName keeps only the newest revision of each flow name.
+	//
+	// The uniqueness of (project_id, name, created_at) makes created_at a
+	// total order within a name, so no tiebreak belongs in here.
+	//
+	// The sub-query deliberately carries no authz predicate, so "newest" is
+	// the newest revision that exists rather than the newest the caller may
+	// read: a caller granted only a superseded revision sees it under
+	// revisions=all and sees nothing for that flow under revisions=latest.
+	// Which revision is current is a property of the flow, not of the reader.
+	latestRevisionPerName = `NOT EXISTS (SELECT 1 FROM flow_definitions AS newer` +
+		` WHERE newer.project_id = flow_definitions.project_id` +
+		` AND newer.name = flow_definitions.name` +
+		` AND newer.created_at > flow_definitions.created_at)`
 )
 
 var flowDefinitionColumns = []string{
@@ -67,8 +78,8 @@ func (f flowDefinitionStatements) CreateFlowDefinition(ctx context.Context, enti
 			purposes,
 			definition,
 		).statement()
-		if _, err := tx.Update(ctx, stmt); err != nil {
-			return wrapError(err)
+		if err := tx.Write(ctx, stmt, scanFlowDefinitionTimestamps(entity)); err != nil {
+			return err
 		}
 		rsi := newResourceScopeStatements(tx)
 		return rsi.UpsertResourceScope(ctx, domain.NewResourceScope(domain.ResourceKindFlowDefinition, entity.ProjectID, entity.ID))
@@ -83,34 +94,26 @@ func (f flowDefinitionStatements) GetFlowDefinitionByID(ctx context.Context, pro
 	return f.scanFlowDefinition(row)
 }
 
-func (f flowDefinitionStatements) UpdateFlowDefinition(ctx context.Context, entity *domain.FlowDefinition) error {
-	content, err := flowdefinition.Marshal(entity)
-	if err != nil {
+func scanFlowDefinitionTimestamps(entity *domain.FlowDefinition) func(*spanner.RowIterator) error {
+	return func(iter *spanner.RowIterator) error {
+		_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
+			return struct{}{}, row.Columns(&entity.CreatedAt, &entity.UpdatedAt)
+		})
 		return err
 	}
-	definition, err := encodeNullJSON(content)
-	if err != nil {
-		return wrapError(err)
-	}
-	purposes := flowdefinition.PurposeStrings(entity)
-	stmt := buildStatement(updateFlowDefinitionStmt,
-		entity.Name,
-		entity.SchemaVersion,
-		entity.Status.String(),
-		purposes,
-		definition,
-		entity.ProjectID,
-		entity.ID,
-	).statement()
-	_, err = f.db.Update(ctx, stmt)
-	return wrapError(err)
 }
 
-func (f flowDefinitionStatements) ListFlowDefinitions(ctx context.Context, filter *database.ListOptions[domain.FlowDefinitionField]) (*database.ListResult[*domain.FlowDefinition], error) {
+// ListFlowDefinitions implements [service.FlowDefinitionStatements].
+func (f flowDefinitionStatements) ListFlowDefinitions(ctx context.Context, filter *database.ListOptions[domain.FlowDefinitionField], queryOpts service.FlowDefinitionQueryOptions) (*database.ListResult[*domain.FlowDefinition], error) {
 	opts := flowdefinition.EnsureListOptions(filter)
 
+	var conjuncts []string
+	if queryOpts.LatestRevisionPerName {
+		conjuncts = append(conjuncts, latestRevisionPerName)
+	}
+
 	var compiler statementCompiler
-	err := compileList(ctx, &compiler, flowDefinitionQuery, opts, flowdefinition.Schema, "flow_definitions", "id")
+	err := compileList(ctx, &compiler, flowDefinitionQuery, opts, flowdefinition.Schema, "flow_definitions", "id", conjuncts...)
 	if err != nil {
 		return nil, err
 	}

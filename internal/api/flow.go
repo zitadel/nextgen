@@ -464,12 +464,12 @@ func toFlowFieldValidation(v *domain.FlowFieldValidation) *api.FieldValidation {
 	return &out
 }
 
-func toFlowStepActions(actions []domain.FlowAction) []api.StepAction {
-	out := make([]api.StepAction, len(actions))
+func toFlowStepActions(actions []domain.FlowAction) []api.FlowStepAction {
+	out := make([]api.FlowStepAction, len(actions))
 	for i, a := range actions {
-		out[i] = api.StepAction{
+		out[i] = api.FlowStepAction{
 			Name:    a.Name,
-			Kind:    api.StepActionKind(a.Kind.String()),
+			Kind:    api.FlowStepActionKind(a.Kind.String()),
 			TextKey: api.NewOptString(a.TextKey),
 			Primary: api.NewOptBool(a.Primary),
 		}
@@ -631,10 +631,9 @@ var (
 	codeFlowDefinitionNotFound        = domain.ErrFlowDefinitionNotFound().Code
 	codeFlowDefinitionPurposeMismatch = domain.ErrFlowDefinitionPurposeMismatch().Code
 	codeFlowDefinitionInvalid         = domain.ErrFlowDefinitionInvalid(nil, nil).Code
+	codeFlowDefinitionRevisionTaken   = domain.ErrFlowDefinitionRevisionConflict().Code
 	codeMissingFlowDefinitionID       = domain.ErrMissingFlowDefinitionID().Code
 	codeMissingProjectID              = domain.ErrMissingProjectID().Code
-	codeFlowDefinitionAlreadyExists   = domain.ErrFlowDefinitionAlreadyExists().Code
-	codeFlowDefinitionUpdateConflict  = domain.ErrFlowDefinitionUpdateConflict(nil).Code
 	codeFlowDefinitionDenied          = domain.ErrFlowDefinitionPermissionDenied().Code
 )
 
@@ -648,8 +647,8 @@ func flowDefinitionErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
 	case codeFlowDefinitionInvalid:
 		return errorResponseWithDetails(err, http.StatusBadRequest)
-	case codeFlowDefinitionAlreadyExists, codeFlowDefinitionUpdateConflict:
-		return errorResponseWithDetails(err, http.StatusConflict)
+	case codeFlowDefinitionRevisionTaken:
+		return errorResponseWithStatusCode(http.StatusConflict, err)
 	case codeFlowDefinitionDenied:
 		return errorResponseWithStatusCode(http.StatusForbidden, err)
 	default:

@@ -1,0 +1,86 @@
+get:
+  operationId: getIdpRevisionById
+  summary: Get one revision of an identity provider connection
+  description: |
+    Reads one revision of a connection by its `revision_id`, the value an auth
+    attempt or a release pins.
+
+    The lookup is scoped to the project in `project_id`.
+  tags:
+    - Identity Providers
+  security:
+    - oauth2:
+        - idp.read
+  parameters:
+    - $ref: ../../../../components/parameters/project-id.yaml
+    - name: revision_id
+      in: path
+      required: true
+      description: The revision id, allocated when the revision was written.
+      schema:
+        type: string
+        example: idprev_01KWH3B72K7M7F0N9WD3P2E4YN
+  responses:
+    '200':
+      description: The revision was retrieved successfully.
+      content:
+        application/json:
+          schema:
+            $ref: ../../idp-response.yaml
+          examples:
+            first:
+              summary: The first revision of a connection that has since been revised
+              value:
+                id: idp_01KWH3B72K7M7F0N9WD3P2E4YM
+                revision_id: idprev_01KWH3B72K7M7F0N9WD3P2E4YN
+                slug: google
+                created_at: '2026-07-14T09:11:00Z'
+                updated_at: '2026-07-14T09:11:00Z'
+                definition:
+                  slug: google
+                  protocol: oidc
+                  template: google
+                  display_name: Google
+                  subject_claim: sub
+                  claim_mapping:
+                    email: email
+                    givenName: given_name
+                    familyName: family_name
+                  verified_claims:
+                    email: email_verified
+                  provisioning:
+                    creation: auto
+                  oidc:
+                    issuer: https://accounts.google.com
+                    id_token_mapping: false
+                    client_id: '${{ GOOGLE_CLIENT_ID }}'
+                    client_secret: '${{ GOOGLE_CLIENT_SECRET }}'
+                    token_endpoint_auth_method: client_secret_basic
+                    scopes:
+                      - openid
+                      - profile
+                      - email
+                    pkce_enabled: true
+                    static_authorize_parameters:
+                      prompt: select_account
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
+    '403':
+      description: Insufficient permissions.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
+    '404':
+      description: |
+        No revision with this id exists in the given project.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
+    default:
+      $ref: getIdpRevisionById-error-response.yaml

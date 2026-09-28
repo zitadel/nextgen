@@ -11,9 +11,13 @@
  *
  *   CONSOLE_BACKEND_URL     -> the booted instance
  *   CONSOLE_PROJECT_SECRET  -> the operator credential the proxy injects, which
- *                              is what authorizes `listUsers` (`user.read`);
+ *                              is what authorizes `queryUsers` (`user.read`);
  *                              the browser-plane publishable key deliberately
  *                              cannot list users (`internal/api/user.go`)
+ *   CONSOLE_PROJECT_SECRET_PROJECT_ID
+ *                           -> the project that secret belongs to, so the proxy
+ *                              injects it only for calls scoped to that project;
+ *                              differs from the pin below in claim mode
  *   VITE_CONSOLE_PROJECT_ID -> pins the client to the bootstrapped project, so
  *                              it agrees with the secret above
  *
@@ -46,9 +50,27 @@ const workspaceRoot = resolve(appDir, "../..");
 const consoleOrigin = process.env.CONSOLE_DEV_ORIGIN ?? "http://localhost:5174";
 const port = Number(process.env.CONSOLE_DEV_ZITADEL_PORT ?? 8094);
 const configuredServerBinary = process.env.ZITADEL_SERVER_BINARY;
-const serverBinary =
-  configuredServerBinary || join(workspaceRoot, "dist", "server", "nextgen");
+const serverBinary = configuredServerBinary || join(workspaceRoot, "dist", "server", "nextgen");
 const seedOnly = process.argv.includes("--seed-only");
+/**
+ * Claim mode boots the deployment's *platform* project and points the console
+ * at it, which is what `claim/complete` authenticates against — without it the
+ * claim page can render but never finish, because the console's session belongs
+ * to the seeded project instead. Opt-in, not the default: pinning the console
+ * to `proj_platform` is exactly the standalone-semantics change the demo and
+ * embedded suites must not see (see `cli-journey-e2e/scripts/run-local.mjs`).
+ */
+const claimMode = process.argv.includes("--claim");
+
+/** The well-known platform project id (`domain.PlatformProjectID`). */
+const PLATFORM_PROJECT_ID = "proj_platform";
+
+// Read by the server through the CLI's `start`, which inherits this process's
+// environment (`packages/testing/src/cli.ts` merges `process.env`). Set either
+// way: `zitadel start` bootstraps the platform project by default, and that
+// pins the console's default project to `proj_platform` — which would leave
+// DEV_USER, seeded in the project this script bootstraps, unable to sign in.
+process.env["NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT"] = claimMode ? "true" : "false";
 
 /**
  * The account you sign in as. Fixed rather than random so the credentials stay
@@ -157,6 +179,73 @@ try {
 }
 
 const { baseUrl, projectId, projectSecret } = zitadel.handle;
+
+/**
+ * Makes the dev account an admin of the seeded project.
+ *
+ * The project pill and the Projects screen list what the signed-in person can
+ * act on (`GET /users/me/projects`), and a seeded user holds no grant — so
+ * without this the default loop shows "No projects" next to a project full of
+ * users. Skipped in claim mode, where claiming is what is meant to produce the
+ * access. Best-effort: a failure costs the row, not the instance.
+ */
+async function grantDevUserAdmin(userId: string): Promise<boolean> {
+  try {
+    const query = new URLSearchParams({ project_id: projectId });
+    const response = await fetch(`${baseUrl}/grants?${query.toString()}`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${projectSecret}`, "content-type": "application/json" },
+      body: JSON.stringify({ user: { user_id: userId }, relation: "admin" }),
+      signal: AbortSignal.timeout(5_000),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+const devUser = seeded[0];
+if (!claimMode && devUser && !(await grantDevUserAdmin(devUser.id))) {
+  console.warn(
+    "[console-dev-real] could not grant the dev user admin on the project; the project pill and Projects screen will read empty.",
+  );
+}
+
+// Claim mode signs in against the platform project, because that is the only
+// session `claim/complete` accepts. The seeded users stay in the project being
+// claimed — they are its app's users, not the human doing the claiming, who
+// registers through the claim page itself.
+const consoleProjectId = claimMode ? PLATFORM_PROJECT_ID : projectId;
+
+/**
+ * A claim link for the seeded project, so claim mode lands on something
+ * openable instead of leaving the reader to mint one. Best-effort: a failure
+ * costs the link, not the instance.
+ */
+async function mintClaimUrl(): Promise<string | null> {
+  try {
+    const response = await fetch(`${baseUrl}/projects/${projectId}/claim/init`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${projectSecret}`, "content-type": "application/json" },
+      body: "{}",
+      // A hung endpoint must not hold the dev server hostage for a
+      // convenience link.
+      signal: AbortSignal.timeout(5_000),
+    });
+    if (!response.ok) return null;
+    const { challenge_id } = (await response.json()) as { challenge_id?: string };
+    if (!challenge_id) return null;
+    // The server builds claim_url from its configured console base, which is
+    // not this dev server; rebuild it against the origin actually being served.
+    const query = new URLSearchParams({ challenge_id, project_id: projectId });
+    return `${consoleOrigin}/claim?${query.toString()}`;
+  } catch {
+    return null;
+  }
+}
+
+const claimUrl = claimMode ? await mintClaimUrl() : null;
+
 console.log(
   [
     "",
@@ -168,6 +257,18 @@ console.log(
     `  │  sign in at ${consoleOrigin}/login`,
     `  │    email     ${DEV_USER.email}`,
     `  │    password  ${DEV_USER.password}`,
+    ...(claimMode
+      ? [
+          "  │",
+          `  │  claim mode: console is pinned to ${PLATFORM_PROJECT_ID}, so the`,
+          "  │  seeded credentials above do not exist there — register on the",
+          "  │  claim page instead. List screens will look empty; that is the",
+          "  │  platform project, not the seeded one.",
+          ...(claimUrl
+            ? ["  │", `  │  claim       ${claimUrl}`]
+            : ["  │", "  │  claim       could not mint a link; see claim/init"]),
+        ]
+      : []),
     "  └───────────────────────────────────────────────────────────",
     "",
   ].join("\n"),
@@ -185,7 +286,8 @@ if (seedOnly) {
       "",
       `    CONSOLE_BACKEND_URL=${baseUrl} \\`,
       `    CONSOLE_PROJECT_SECRET=${projectSecret} \\`,
-      `    VITE_CONSOLE_PROJECT_ID=${projectId} \\`,
+      `    CONSOLE_PROJECT_SECRET_PROJECT_ID=${projectId} \\`,
+      `    VITE_CONSOLE_PROJECT_ID=${consoleProjectId} \\`,
       "    corepack pnpm --filter @zitadel/console dev",
       "",
     ].join("\n"),
@@ -194,14 +296,23 @@ if (seedOnly) {
     /* keep the event loop alive */
   }, 60_000);
 } else {
-  const vite = spawn("corepack", ["pnpm", "--filter", "@zitadel/console", "dev"], {
+  // `--port` from the origin: everything else here honours CONSOLE_DEV_ORIGIN,
+  // and without this vite stays pinned to its config's 5174 and a second
+  // worktree collides with the first. Passed to the `dev` script rather than
+  // around it, so future flags on that script still apply here. No `--`
+  // separator: pnpm swallows the args with one and vite never sees them.
+  const consolePort = new URL(consoleOrigin).port;
+  const viteArgs = ["pnpm", "--filter", "@zitadel/console", "dev"];
+  if (consolePort) viteArgs.push("--port", consolePort);
+  const vite = spawn("corepack", viteArgs, {
     cwd: workspaceRoot,
     stdio: "inherit",
     env: {
       ...process.env,
       CONSOLE_BACKEND_URL: baseUrl,
       CONSOLE_PROJECT_SECRET: projectSecret,
-      VITE_CONSOLE_PROJECT_ID: projectId,
+      CONSOLE_PROJECT_SECRET_PROJECT_ID: projectId,
+      VITE_CONSOLE_PROJECT_ID: consoleProjectId,
     },
   });
   vite.on("exit", (code) => void shutdown(code ?? 0));

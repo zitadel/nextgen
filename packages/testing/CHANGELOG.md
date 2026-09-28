@@ -1,5 +1,55 @@
 # @zitadel/testing
 
+## 1.0.0-alpha.23
+
+### Patch Changes
+
+- Updated dependencies [[`48351c4`](https://github.com/zitadel/nextgen/commit/48351c4fa3cc16429a3cfcee1bcd2ea290399ed6), [`3a10eb6`](https://github.com/zitadel/nextgen/commit/3a10eb61dd7e597ccd5b62d8a39453fb7645673e), [`f8c5a24`](https://github.com/zitadel/nextgen/commit/f8c5a24aa87015e722f2f6ecfb276b839d46f4de), [`40025fe`](https://github.com/zitadel/nextgen/commit/40025feb3d9a7154db7d1348043248dbd42f5d6c), [`1162dc9`](https://github.com/zitadel/nextgen/commit/1162dc91c274fcd96bf3dada5b474356242cc1b9), [`93cac33`](https://github.com/zitadel/nextgen/commit/93cac336402cae09a3e6dfb8622556d13794ab71), [`93cac33`](https://github.com/zitadel/nextgen/commit/93cac336402cae09a3e6dfb8622556d13794ab71), [`a41c594`](https://github.com/zitadel/nextgen/commit/a41c5949c38baf6e501d9809ddd00f6be0838093), [`116e037`](https://github.com/zitadel/nextgen/commit/116e037eda29800c43ac18a00b20525c48878173), [`24cecf1`](https://github.com/zitadel/nextgen/commit/24cecf15ac26ff35a566622185a494dbec50440a), [`1feea7d`](https://github.com/zitadel/nextgen/commit/1feea7d9fceb633a2011ddf706fc904e3a595b71), [`a5a9046`](https://github.com/zitadel/nextgen/commit/a5a9046058e0cb92fc3d95e87de3458b5f77af96), [`1162dc9`](https://github.com/zitadel/nextgen/commit/1162dc91c274fcd96bf3dada5b474356242cc1b9), [`583a8ed`](https://github.com/zitadel/nextgen/commit/583a8ed0c6142539539eb6e082de8dbfe11a3246), [`f118796`](https://github.com/zitadel/nextgen/commit/f118796f01af9e90be00f3313f1f9fc5ab407b4b), [`6c3f4a3`](https://github.com/zitadel/nextgen/commit/6c3f4a35e6466e9335ebb00b9943902faef8f2f8), [`84d1c4b`](https://github.com/zitadel/nextgen/commit/84d1c4b7dc636dc4439c0ee7a21eee8ecad44f36), [`205cef5`](https://github.com/zitadel/nextgen/commit/205cef525ee26250b652ee40f0b35622dc05caea), [`85fb5ab`](https://github.com/zitadel/nextgen/commit/85fb5abc1edd8699b86898e57d31c4938a6228a5), [`b0e0f02`](https://github.com/zitadel/nextgen/commit/b0e0f02ee5c3ad022695a04c8da36ef891289c0b), [`8fc4472`](https://github.com/zitadel/nextgen/commit/8fc44720d0b93f6d5450bff85cb8ed984712156a), [`c63a477`](https://github.com/zitadel/nextgen/commit/c63a4774039438c43385a2fb410ea914518d3f14), [`b70e520`](https://github.com/zitadel/nextgen/commit/b70e52035b433e7c3293c54be43352bb59e78dc2), [`ce3c67c`](https://github.com/zitadel/nextgen/commit/ce3c67c10b7ef7f20a30335fedb07325b6146cad), [`1162dc9`](https://github.com/zitadel/nextgen/commit/1162dc91c274fcd96bf3dada5b474356242cc1b9)]:
+  - @zitadel/cli@1.0.0-alpha.23
+  - @zitadel/api@1.0.0-alpha.23
+  - @zitadel/config@1.0.0-alpha.23
+
+## 1.0.0-alpha.22
+
+### Patch Changes
+
+- Updated dependencies [[`893364c`](https://github.com/zitadel/nextgen/commit/893364c538f8468114510bfbdaac5cc2966d6395), [`c7c737a`](https://github.com/zitadel/nextgen/commit/c7c737a32dd62368161db2ab90d93af800c07198), [`82186ce`](https://github.com/zitadel/nextgen/commit/82186ce7da8dd96cd0f178a3a7c9994d7ee00cea), [`af21963`](https://github.com/zitadel/nextgen/commit/af21963a99d6f827699249fa524fbc64f2e6baab)]:
+  - @zitadel/cli@1.0.0-alpha.22
+  - @zitadel/config@1.0.0-alpha.22
+  - @zitadel/api@1.0.0-alpha.22
+
+## 1.0.0-alpha.21
+
+### Patch Changes
+
+- Updated dependencies [[`a24ec4d`](https://github.com/zitadel/nextgen/commit/a24ec4daac1c265a1263697ffbd3744873069d9a), [`a59b288`](https://github.com/zitadel/nextgen/commit/a59b288e4e52a3274c1ab4b5e4c241f1083aac6b), [`7a06425`](https://github.com/zitadel/nextgen/commit/7a06425a1b30a448bf05da8d870bd4570d304060)]:
+  - @zitadel/cli@1.0.0-alpha.21
+  - @zitadel/api@1.0.0-alpha.21
+  - @zitadel/config@1.0.0-alpha.21
+
+## 1.0.0-alpha.20
+
+### Minor Changes
+
+- [#905](https://github.com/zitadel/nextgen/pull/905) [`401655b`](https://github.com/zitadel/nextgen/commit/401655b74305ef7ef7178549395378ddfb7c77fc) Thanks [@fforootd](https://github.com/fforootd)! - Boot-captured credentials are now a documented contract on the instance
+  handle. `handle.projectSecret` and `handle.previewSecret` are captured the
+  one time the server mints them at provisioning, and a new `handle.platform`
+  slot reserves the upcoming platform-plane credentials (platform project id
+  and publishable key) — fixtures written against it today won't churn when
+  platform provisioning ships; until then the slot stays unset, and further
+  platform credentials will join it as optional fields once their design
+  lands. `AppEnvTemplate` now accepts only the handle's string fields, so
+  mapping a structured field into an env var fails at compile time instead of
+  at app boot, and handshake files reject malformed `platform` blocks on read
+  with the offending field named.
+
+### Patch Changes
+
+- Updated dependencies [[`de7534a`](https://github.com/zitadel/nextgen/commit/de7534aa6a140e9ea32173a59694c71e61214e7b), [`0a9a5af`](https://github.com/zitadel/nextgen/commit/0a9a5afd0336382ca8ebef9c646f09acde2d7ada), [`4a8d546`](https://github.com/zitadel/nextgen/commit/4a8d546d8abd6902f2e19c50e8b980f91451bbfd), [`1ef3c32`](https://github.com/zitadel/nextgen/commit/1ef3c32fd6fa7091f2300fa9e210f43040dbd143), [`19fc783`](https://github.com/zitadel/nextgen/commit/19fc7835e23d04da9c458bda2fda39c4aa9dbc00), [`de7534a`](https://github.com/zitadel/nextgen/commit/de7534aa6a140e9ea32173a59694c71e61214e7b)]:
+  - @zitadel/cli@1.0.0-alpha.20
+  - @zitadel/config@1.0.0-alpha.20
+  - @zitadel/api@1.0.0-alpha.20
+
 ## 0.1.0-alpha.19
 
 ### Minor Changes

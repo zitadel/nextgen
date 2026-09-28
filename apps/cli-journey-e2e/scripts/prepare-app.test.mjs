@@ -2,8 +2,9 @@
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
 
 import { prepareApp } from "./prepare-app.mjs";
 
@@ -280,10 +281,33 @@ test("seeds the checked-in pre-existing app before any CLI step (ADR 044)", asyn
     assert.equal(metadata.preexistingApp, true);
     assert.equal(appStateAtSetup.packageJson.name, "preexisting-next-app");
     assert.ok(appStateAtSetup.packageJson.dependencies.next, "fixture declares next");
+    assert.equal(
+      appStateAtSetup.packageJson.dependencies.react,
+      appStateAtSetup.packageJson.dependencies["react-dom"],
+    );
+    assert.match(
+      appStateAtSetup.packageJson.dependencies.react,
+      /^\d+\.\d+\.\d+$/,
+      "exact pins: caret ^19.0.0 lets npm pair react 19.2 with react-dom 19.3 (ERESOLVE)",
+    );
     assert.ok(appStateAtSetup.homepage.includes("Welcome to Orbit Notes"));
   } finally {
     await rm(workDir, { recursive: true, force: true });
   }
+});
+
+test("preexisting next fixture pins matching exact react and react-dom", async () => {
+  const fixturePath = join(
+    dirname(fileURLToPath(import.meta.url)),
+    "../fixtures/preexisting/next/package.json",
+  );
+  const fixture = JSON.parse(await readFile(fixturePath, "utf8"));
+  assert.equal(fixture.dependencies.react, fixture.dependencies["react-dom"]);
+  assert.match(
+    fixture.dependencies.react,
+    /^\d+\.\d+\.\d+$/,
+    "caret ranges let npm install react 19.2 with react-dom 19.3 (peer ERESOLVE)",
+  );
 });
 
 test("fails loudly when a framework has no pre-existing fixture", async () => {

@@ -67,6 +67,16 @@ tasks:
       persistent: true
       runInCI: false
 
+  # The claim page is the console acting as the *platform's* claim surface, not
+  # as a project's admin console, so it needs the platform project that
+  # `dev-real` deliberately does not boot. Opt-in for that one screen; every
+  # other screen is better served by `dev-real`.
+  dev-claim:
+    command: "corepack pnpm run dev:claim"
+    options:
+      persistent: true
+      runInCI: false
+
   preview:
     command: "corepack pnpm run preview"
     deps:

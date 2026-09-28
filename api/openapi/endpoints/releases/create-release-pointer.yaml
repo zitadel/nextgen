@@ -1,0 +1,23 @@
+type: object
+description: |
+  One revision to pin. The handle is not supplied: it is the resource's own
+  identifying field, so the server reads it from the revision being pinned and
+  records it on the release.
+required:
+  - kind
+  - revision_id
+properties:
+  kind:
+    $ref: ../../components/schemas/release-pointer-kind.yaml
+  revision_id:
+    type: string
+    minLength: 1
+    maxLength: 512
+    description: |
+      The revision of that resource to pin. Must already exist in the project —
+      this endpoint pins revisions, it does not create them.
+
+      Deliberately not constrained to a prefixed id: for `kind: schema` this is
+      the schema's `$id`, which is a URL whenever the document supplied one and
+      only a generated `sch_*` value otherwise.
+    example: https://example.com/schemas/default-human-user.json

@@ -9,6 +9,7 @@ content:
         - $ref: '../../../components/schemas/errors/internal.yaml'
         - $ref: '../../../components/schemas/errors/req-invalid.yaml'
         - $ref: '../../../components/schemas/errors/team-team_not_found.yaml'
+        - $ref: '../../../components/schemas/errors/team-owns_project.yaml'
         - $ref: '../../../components/schemas/errors/team-permission_denied.yaml'
       discriminator:
         propertyName: code
@@ -18,6 +19,7 @@ content:
           internal: '../../../components/schemas/errors/internal.yaml'
           req.invalid: '../../../components/schemas/errors/req-invalid.yaml'
           team.team_not_found: '../../../components/schemas/errors/team-team_not_found.yaml'
+          team.owns_project: '../../../components/schemas/errors/team-owns_project.yaml'
           team.permission_denied: '../../../components/schemas/errors/team-permission_denied.yaml'
     examples:
       auth.unauthorized:
@@ -45,6 +47,11 @@ content:
         value:
           code: team.team_not_found
           message: 'team not found'
+      team.owns_project:
+        summary: team.owns_project
+        value:
+          code: team.owns_project
+          message: 'the team still owns a project and cannot be deactivated while it does'
       team.permission_denied:
         summary: team.permission_denied
         value:

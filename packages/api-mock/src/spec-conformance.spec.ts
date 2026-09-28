@@ -17,14 +17,13 @@
  *   - GET  /projects/:id                → GetProjectResponse
  *   - GET  /flow_definitions            → ListFlowDefinitionsResponse
  *   - GET  /flow_definitions/:id        → GetFlowDefinitionResponse
- *   - PUT  /flow_definitions/:id        → UpdateFlowDefinitionResponse
  *
  * Endpoints covered structurally (orval emits no `*Response` zod for these
  * because they have no static response schema — POSTs that return only an
  * `id`, or out-of-spec routes):
  *   - POST /projects                    → { id, project_secret, … }
  *   - POST /schemas                     → { id }
- *   - POST /flow_definitions            → flow detail envelope
+ *   - POST /flow_definitions            → flow-definition-response envelope
  *
  * `GET /schemas/:id` is NOT zod-validated here: the mock stores whatever
  * the user POSTed verbatim, so the response shape depends on the request
@@ -38,14 +37,18 @@ import {
   ExchangeHandoffResponse,
   GetClaimStatusResponse,
   GetFlowDefinitionResponse,
+  GetMySessionResponse,
   GetProjectResponse,
   ListFlowDefinitionsResponse,
-  UpdateFlowDefinitionResponse,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
 import { signHandoffToken } from "./crypto.js";
-import { expireClaimChallenge, snapshotPlatformStore } from "./platform-handlers.js";
+import {
+  expireClaimChallenge,
+  expireClaimWindow,
+  snapshotPlatformStore,
+} from "./platform-handlers.js";
 import { PLATFORM_PROJECT_ID, startMockServer } from "./server.js";
 
 const PORT = 4456;
@@ -110,6 +113,59 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(() => ExchangeHandoffResponse.parse(body)).not.toThrow();
+  });
+
+  test("GET /sessions/me resolves a display for the known demo identities", async () => {
+    const handoff = await signHandoffToken({ sub: "ada@example.com", iss: BASE });
+    const exchange = await fetch(`${BASE}/sessions/exchange?project_id=proj_me_display`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ handoff_token: handoff }),
+    });
+    expect(exchange.status).toBe(200);
+    const cookie = exchange.headers
+      .getSetCookie()
+      .find((c) => c.startsWith("__nextgen_session="))
+      ?.split(";")[0];
+
+    const res = await fetch(`${BASE}/sessions/me`, { headers: { cookie: cookie ?? "" } });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(() => GetMySessionResponse.parse(body)).not.toThrow();
+    expect(body.user).toMatchObject({
+      identifier: "ada@example.com",
+      identifier_property: "email",
+      display: "Ada Lovelace",
+    });
+  });
+
+  test("GET /sessions/me returns body parseable by GetMySessionResponse with a user ref", async () => {
+    const handoff = await signHandoffToken({ sub: "me@example.com", iss: BASE });
+    const exchange = await fetch(`${BASE}/sessions/exchange?project_id=proj_me`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ handoff_token: handoff }),
+    });
+    expect(exchange.status).toBe(200);
+    const cookie = exchange.headers
+      .getSetCookie()
+      .find((c) => c.startsWith("__nextgen_session="))
+      ?.split(";")[0];
+    expect(cookie).toBeDefined();
+
+    const res = await fetch(`${BASE}/sessions/me`, { headers: { cookie: cookie ?? "" } });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(() => GetMySessionResponse.parse(body)).not.toThrow();
+    // The identity contract (ADR 058): the ref carries the sign-in email as
+    // the designated identifier; the mock, like the shipped default schema,
+    // designates no display properties.
+    expect(body.user).toMatchObject({
+      user_id: body.user_id,
+      identifier: "me@example.com",
+      identifier_property: "email",
+    });
+    expect(body.user).not.toHaveProperty("display");
   });
 
   test("POST /sessions/exchange without project_id returns 400", async () => {
@@ -222,7 +278,11 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       body: JSON.stringify({
         kind: "user-schema",
         metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
+        // Mirrors the server's designation rule (ADR 058 §1): password
+        // requires a designated project-unique identifier.
+        "x-identifier": "email",
         "x-auth-methods": { password: { enabled: true } },
+        properties: { email: { type: "string", format: "email", "x-unique": "project" } },
       }),
     });
     expect(res.status).toBe(201);
@@ -238,7 +298,11 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       body: JSON.stringify({
         kind: "user-schema",
         metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
+        // Mirrors the server's designation rule (ADR 058 §1): password
+        // requires a designated project-unique identifier.
+        "x-identifier": "email",
         "x-auth-methods": { password: { enabled: true } },
+        properties: { email: { type: "string", format: "email", "x-unique": "project" } },
       }),
     });
     const { id } = (await create.json()) as { id: string };
@@ -312,6 +376,70 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(typeof row?.metadata.created_at).toBe("string");
   });
 
+  test("GET /schemas pages with limit and next_page_token", async () => {
+    // The consumer suites replace this handler with local MSW handlers, so
+    // the mock's own slicing, token emission and continuation are only
+    // proven here.
+    for (let i = 0; i < 5; i += 1) {
+      const create = await fetch(`${BASE}/schemas?project_id=proj_schema_paging`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          kind: "user-schema",
+          metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
+          objectType: `paging-${i}`,
+          "x-auth-methods": { password: { enabled: true } },
+        }),
+      });
+      expect(create.status).toBe(201);
+    }
+
+    // The whole set fits in the default limit of 20: no token.
+    const full = await fetch(`${BASE}/schemas?project_id=proj_schema_paging`);
+    expect(full.status).toBe(200);
+    const fullBody = (await full.json()) as {
+      schemas: Array<{ id: string }>;
+      next_page_token?: string | null;
+    };
+    expect(fullBody.schemas).toHaveLength(5);
+    expect(fullBody.next_page_token ?? undefined).toBeUndefined();
+    const wantIds = fullBody.schemas.map((row) => row.id);
+
+    // A limit-2 walk covers the same rows in the same order, exactly once;
+    // every page before the end carries a token, the last does not.
+    const gotIds: string[] = [];
+    let token: string | undefined;
+    for (const wantSize of [2, 2, 1]) {
+      const url = new URL(`${BASE}/schemas`);
+      url.searchParams.set("project_id", "proj_schema_paging");
+      url.searchParams.set("limit", "2");
+      if (token !== undefined) url.searchParams.set("page_token", token);
+      const page = await fetch(url);
+      expect(page.status).toBe(200);
+      const body = (await page.json()) as {
+        schemas: Array<{ id: string }>;
+        next_page_token?: string | null;
+      };
+      expect(body.schemas).toHaveLength(wantSize);
+      gotIds.push(...body.schemas.map((row) => row.id));
+      token = body.next_page_token ?? undefined;
+    }
+    expect(token).toBeUndefined();
+    expect(gotIds).toEqual(wantIds);
+
+    // A token the mock never minted is rejected, like the real server.
+    const bad = await fetch(
+      `${BASE}/schemas?project_id=proj_schema_paging&page_token=not-a-cursor`,
+    );
+    expect(bad.status).toBe(400);
+    expect(((await bad.json()) as { code: string }).code).toBe("req.invalid");
+
+    // An out-of-range limit is rejected by the generated query schema, not
+    // silently clamped.
+    const oversized = await fetch(`${BASE}/schemas?project_id=proj_schema_paging&limit=101`);
+    expect(oversized.status).toBe(400);
+  });
+
   test("POST /schemas with invalid kind returns spec-compliant 400 envelope", async () => {
     const res = await fetch(`${BASE}/schemas?project_id=proj_conformance`, {
       method: "POST",
@@ -334,7 +462,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     });
     expect(res.status).toBe(201);
     const body = await res.json();
-    // POST 201 and GET 200 share the `flow-definition-detail-response`
+    // POST 201 and GET 200 share the `flow-definition-response`
     // envelope per the spec, so the GET response zod schema validates both.
     expect(() => GetFlowDefinitionResponse.parse(body)).not.toThrow();
   });
@@ -356,9 +484,78 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(body.details).toContain('must wire "user_not_found" transition');
   });
 
+  test("POST /flow_definitions with a repeated name publishes a new revision", async () => {
+    const publish = async () => {
+      const res = await fetch(`${BASE}/flow_definitions`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          project_id: "proj_conformance_revisions",
+          flow_definition: validFlowDefinitionBody(),
+        }),
+      });
+      expect(res.status).toBe(201);
+      return ((await res.json()) as { id: string }).id;
+    };
+    const first = await publish();
+    const second = await publish();
+    expect(second).not.toBe(first);
+    // The server mints flow definition ids under the `flowdef` prefix (ADR 047).
+    expect([first, second].every((id) => id.startsWith("flowdef_"))).toBe(true);
+
+    // The name filter lists that flow's revisions, newest first.
+    const res = await fetch(
+      `${BASE}/flow_definitions?project_id=proj_conformance_revisions&name=login-flow`,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { flow_definitions: { id: string }[] };
+    expect(body.flow_definitions.map((entry) => entry.id)).toEqual([second, first]);
+
+    const none = await fetch(
+      `${BASE}/flow_definitions?project_id=proj_conformance_revisions&name=no-such-flow`,
+    );
+    expect(((await none.json()) as { flow_definitions: unknown[] }).flow_definitions).toEqual([]);
+  });
+
+  test("GET /flow_definitions?revisions=latest keeps one revision per name and honours purpose", async () => {
+    const publish = async (overrides: Record<string, unknown>) => {
+      const res = await fetch(`${BASE}/flow_definitions`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          project_id: "proj_conformance_latest",
+          flow_definition: { ...validFlowDefinitionBody(), ...overrides },
+        }),
+      });
+      expect(res.status).toBe(201);
+      return ((await res.json()) as { id: string }).id;
+    };
+    const loginV1 = await publish({ name: "latest-login" });
+    const loginV2 = await publish({ name: "latest-login" });
+    const registerV1 = await publish({
+      name: "latest-register",
+      purposes: { register: "identifier" },
+    });
+
+    const list = async (params: string) => {
+      const res = await fetch(`${BASE}/flow_definitions?project_id=proj_conformance_latest${params}`);
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { flow_definitions: { id: string }[] };
+      return body.flow_definitions.map((entry) => entry.id);
+    };
+
+    // `all` stays the default and keeps every revision, newest first.
+    expect(await list("")).toEqual([registerV1, loginV2, loginV1]);
+    // `latest` keeps the newest revision of each name.
+    expect(await list("&revisions=latest")).toEqual([registerV1, loginV2]);
+    // The purpose filter applies to the surviving revisions.
+    expect(await list("&revisions=latest&purpose=register")).toEqual([registerV1]);
+    expect(await list("&revisions=latest&purpose=login")).toEqual([loginV2]);
+  });
+
   test("GET /flow_definitions matches ListFlowDefinitionsResponse", async () => {
     // Ensure at least one entry exists so the list is non-trivial.
-    await fetch(`${BASE}/flow_definitions`, {
+    const create = await fetch(`${BASE}/flow_definitions`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -366,11 +563,20 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
         flow_definition: validFlowDefinitionBody(),
       }),
     });
+    const { id } = (await create.json()) as { id: string };
     // Spec: `ListFlowDefinitionsQueryParams` requires `project_id`.
     const res = await fetch(`${BASE}/flow_definitions?project_id=proj_conformance_list`);
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(() => ListFlowDefinitionsResponse.parse(body)).not.toThrow();
+
+    // Both read endpoints describe a flow definition the same way (#939), so
+    // the row and the by-id document must be the same object.
+    const row = (body as { flow_definitions: { id: string }[] }).flow_definitions.find(
+      (entry) => entry.id === id,
+    );
+    const detail = await (await fetch(`${BASE}/flow_definitions/${id}`)).json();
+    expect(row).toEqual(detail);
   });
 
   test("GET /flow_definitions/:id matches GetFlowDefinitionResponse", async () => {
@@ -387,30 +593,6 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(() => GetFlowDefinitionResponse.parse(body)).not.toThrow();
-  });
-
-  test("PUT /flow_definitions/:id matches UpdateFlowDefinitionResponse", async () => {
-    const create = await fetch(`${BASE}/flow_definitions`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        project_id: "proj_conformance_update",
-        flow_definition: validFlowDefinitionBody(),
-      }),
-    });
-    const { id } = (await create.json()) as { id: string };
-    // Spec: `updateFlowDefinition` is flat-by-id `PUT /flow_definitions/{id}`
-    // (no project_id query). The body wraps the definition under
-    // `flow_definition` (flow-definition-update-request.yaml), unlike the
-    // create envelope.
-    const res = await fetch(`${BASE}/flow_definitions/${id}`, {
-      method: "PUT",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ flow_definition: validFlowDefinitionBody() }),
-    });
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(() => UpdateFlowDefinitionResponse.parse(body)).not.toThrow();
   });
 });
 
@@ -583,6 +765,55 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     expect(completeBody.code).toBe("proj.claim_expired");
   });
 
+  test("a closed claim window makes init and complete return 410 claim_window_expired", async () => {
+    const project = await createProject("claim-window-expired");
+    // Mint the challenge while the window is open, then close it: complete
+    // must refuse even a live challenge once the project is too old.
+    const init = await initClaim(project.id, project.projectSecret);
+    const { challenge_id } = (await init.json()) as { challenge_id: string };
+    expireClaimWindow(project.id);
+
+    const reinit = await initClaim(project.id, project.projectSecret);
+    expect(reinit.status).toBe(410);
+    const reinitBody = (await reinit.json()) as Record<string, unknown>;
+    expect(reinitBody.code).toBe("proj.claim_window_expired");
+
+    // The poll must learn the same final refusal, not the retryable
+    // challenge expiry, so a CLI mid-poll stops suggesting a fresh claim.
+    const status = await claimStatus(project.id, challenge_id, project.projectSecret);
+    expect(status.status).toBe(410);
+    const statusBody = (await status.json()) as Record<string, unknown>;
+    expect(statusBody.code).toBe("proj.claim_window_expired");
+
+    const cookie = await platformSessionCookie();
+    const complete = await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ challenge_id }),
+    });
+    expect(complete.status).toBe(410);
+    const completeBody = (await complete.json()) as Record<string, unknown>;
+    expect(completeBody.code).toBe("proj.claim_window_expired");
+
+    // Both expired at once: the final window refusal must win over the
+    // retryable challenge expiry, on status and complete alike.
+    expireClaimChallenge(challenge_id);
+    const bothStatus = await claimStatus(project.id, challenge_id, project.projectSecret);
+    expect(bothStatus.status).toBe(410);
+    expect(((await bothStatus.json()) as Record<string, unknown>).code).toBe(
+      "proj.claim_window_expired",
+    );
+    const bothComplete = await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ challenge_id }),
+    });
+    expect(bothComplete.status).toBe(410);
+    expect(((await bothComplete.json()) as Record<string, unknown>).code).toBe(
+      "proj.claim_window_expired",
+    );
+  });
+
   test("POST /projects/:id/claim/complete without a session cookie returns 401", async () => {
     const project = await createProject("claim-complete-no-cookie");
     const init = await initClaim(project.id, project.projectSecret);
@@ -702,7 +933,9 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     expect(() => new URL(secondBody.details.dashboard_url as string)).not.toThrow();
   });
 
-  test("a completed challenge still returns 410 from status once expired", async () => {
+  // Mirrors the server: the grant is the claim source of truth, so a claim
+  // that landed stays reported as completed even after its challenge's TTL.
+  test("a completed claim stays completed on status past challenge expiry", async () => {
     const project = await createProject("claim-completed-expired");
     const init = await initClaim(project.id, project.projectSecret);
     const { challenge_id } = (await init.json()) as { challenge_id: string };
@@ -716,8 +949,36 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
 
     expireClaimChallenge(challenge_id);
     const status = await claimStatus(project.id, challenge_id, project.projectSecret);
-    expect(status.status).toBe(410);
+    expect(status.status).toBe(200);
     const statusBody = (await status.json()) as Record<string, unknown>;
-    expect(statusBody.code).toBe("proj.claim_expired");
+    expect(statusBody.status).toBe("completed");
+    expect(typeof statusBody.team_id).toBe("string");
+  });
+
+  // The grant, not the polled challenge, is the truth: a poll on a pending
+  // challenge whose project was claimed through ANOTHER challenge reports
+  // completed with the owning team, even once the claim window has closed —
+  // never a false "can no longer be claimed" verdict.
+  test("a pending challenge on a project claimed elsewhere reports completed", async () => {
+    const project = await createProject("claim-cross-challenge-status");
+    const first = await initClaim(project.id, project.projectSecret);
+    const { challenge_id: polled } = (await first.json()) as { challenge_id: string };
+    const second = await initClaim(project.id, project.projectSecret);
+    const { challenge_id: winner } = (await second.json()) as { challenge_id: string };
+
+    const cookie = await platformSessionCookie();
+    const complete = await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ challenge_id: winner }),
+    });
+    expect(complete.status).toBe(200);
+    expireClaimWindow(project.id);
+
+    const status = await claimStatus(project.id, polled, project.projectSecret);
+    expect(status.status).toBe(200);
+    const statusBody = (await status.json()) as Record<string, unknown>;
+    expect(statusBody.status).toBe("completed");
+    expect(typeof statusBody.team_id).toBe("string");
   });
 });

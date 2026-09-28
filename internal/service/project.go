@@ -13,6 +13,7 @@ import (
 	"github.com/zitadel/nextgen/api/openapi/endpoints/flow_definitions"
 	"github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
 	"github.com/zitadel/nextgen/internal/audit"
+	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
@@ -27,6 +28,12 @@ type ProjectService interface {
 	// Returns the stored project including timestamps.
 	Create(ctx context.Context, name string, previewOrigins []string, seedDefaults bool) (*domain.Project, error)
 
+	// CreateWithID is Create under a caller-supplied id, for the one project
+	// whose id the server owns rather than mints: the platform project
+	// (domain.PlatformProjectID). Reports the same already-exists error as
+	// Create when the id is taken.
+	CreateWithID(ctx context.Context, id, name string, previewOrigins []string, seedDefaults bool) (*domain.Project, error)
+
 	// Get retrieves a project by ID.
 	// Returns [database.NoRowFoundError] when no project with the given ID exists.
 	Get(ctx context.Context, id string) (*domain.Project, error)
@@ -40,16 +47,28 @@ type ProjectService interface {
 	// (`zitadel setup` → POST /projects) does.
 	DefaultProject(ctx context.Context, cfgProjectID string) (*domain.Project, error)
 
-	// Update updates the name of a project.
-	// Returns domain.ErrProjectMissingID or domain.ErrProjectNameInvalid for validation failures.
+	// Update applies the fields req names and leaves the rest of the project
+	// alone, which is what makes it the body of a PATCH.
+	// Returns domain.ErrProjectMissingID, domain.ErrProjectNameInvalid or
+	// domain.ErrProjectPasswordHashInvalid for validation failures.
 	// Returns domain.ErrProjectNotFound when no project with the given ID exists; other failures return domain.ErrInternal.
-	Update(ctx context.Context, id, name string) (*domain.Project, error)
+	Update(ctx context.Context, req UpdateProjectRequest) (*domain.Project, error)
 
 	// List returns projects matching the request, ordered and paginated with an
 	// opaque cursor token. The returned NextPageToken is empty when the last page
 	// has been reached.
 	// Returns domain.ErrProjectMissingID when the request carries no project.
 	List(ctx context.Context, req ListProjectsRequest) (*ListProjectsResponse, error)
+
+	// ListAuthorized returns the projects the session user holds an active
+	// grant on, directly or through a team (ADR 053 §6), ordered by project id
+	// and paginated with an opaque cursor. Unlike List it spans projects: the
+	// grants are the scope, not the caller's own project.
+	//
+	// The session user must be active in its home project; deactivated users are
+	// refused even if their session outlives the deactivation (#553).
+	// Returns domain.ErrSessionTokenInvalid when either id is missing.
+	ListAuthorized(ctx context.Context, req ListAuthorizedProjectsRequest) (*ListProjectsResponse, error)
 
 	// Delete hard-deletes a project, cascading to its child resources through the
 	// storage delete. Deleting a project that does not exist is a no-op.
@@ -62,12 +81,14 @@ func NewProjectService(
 	serverURL string,
 	schemaValidator *domain.SchemaValidator,
 	keyService KeyService,
+	hashers *crypto.HasherFactory,
 ) ProjectService {
 	return &projectService{
 		v2Pool:          v2Pool,
 		serverURL:       serverURL,
 		schemaValidator: schemaValidator,
 		keyService:      keyService,
+		hashers:         hashers,
 	}
 }
 
@@ -76,16 +97,36 @@ type projectService struct {
 	serverURL       string
 	schemaValidator *domain.SchemaValidator
 	keyService      KeyService
+	// hashers is the deployment's hashing configuration, which is what decides
+	// whether a project may write with the method it asked for.
+	hashers *crypto.HasherFactory
 }
 
 var _ ProjectService = (*projectService)(nil)
 
-func (s *projectService) Create(ctx context.Context, name string, previewOrigins []string, seedDefaults bool) (_ *domain.Project, err error) {
+func (s *projectService) Create(ctx context.Context, name string, previewOrigins []string, seedDefaults bool) (*domain.Project, error) {
 	project, err := domain.NewProject(name, previewOrigins)
 	if err != nil {
 		return nil, err
 	}
+	return s.create(ctx, project, seedDefaults)
+}
 
+// CreateWithID creates a project under a caller-supplied id rather than a
+// minted one, seeding exactly what Create seeds. Only the platform project
+// needs this: its id is well-known (domain.PlatformProjectID) so that every
+// deployment can address the same project, which is the whole point of a
+// bootstrap. Everything else must keep taking a minted id.
+func (s *projectService) CreateWithID(ctx context.Context, id, name string, previewOrigins []string, seedDefaults bool) (*domain.Project, error) {
+	project, err := domain.NewProject(name, previewOrigins)
+	if err != nil {
+		return nil, err
+	}
+	project.ID = id
+	return s.create(ctx, project, seedDefaults)
+}
+
+func (s *projectService) create(ctx context.Context, project *domain.Project, seedDefaults bool) (_ *domain.Project, err error) {
 	masterKey, err := s.keyService.GetMasterKeyCrypter(ctx)
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to get master key")
@@ -107,20 +148,18 @@ func (s *projectService) Create(ctx context.Context, name string, previewOrigins
 		}
 		keyset.Activate(nil)
 
-		if err := tx.Statements().CreateEncryptionKey(ctx, keyset.KeyEncryptionKey); err != nil {
-			return domain.ErrInternal(err).WithMessage("failed to create project key encryption key in the database")
+		for _, encryptionKey := range []*domain.EncryptionKey{
+			keyset.KeyEncryptionKey,
+			keyset.TokenEncryptionKey,
+			keyset.SecretEncryptionKey,
+			keyset.CookieEncryptionKey,
+		} {
+			if err := s.keyService.SaveEncryptionKey(ctx, tx.Statements(), encryptionKey); err != nil {
+				return err
+			}
 		}
-		if err := tx.Statements().CreateEncryptionKey(ctx, keyset.TokenEncryptionKey); err != nil {
-			return domain.ErrInternal(err).WithMessage("failed to create project token encryption key in the database")
-		}
-		if err := tx.Statements().CreateEncryptionKey(ctx, keyset.SecretEncryptionKey); err != nil {
-			return domain.ErrInternal(err).WithMessage("failed to create project secret encryption key in the database")
-		}
-		if err := tx.Statements().CreateEncryptionKey(ctx, keyset.CookieEncryptionKey); err != nil {
-			return domain.ErrInternal(err).WithMessage("failed to create project cookie encryption key in the database")
-		}
-		if err := tx.Statements().CreateSigningKey(ctx, keyset.TokenSigningKey); err != nil {
-			return domain.ErrInternal(err).WithMessage("failed to create project token signing key in the database")
+		if err := s.keyService.SaveSigningKey(ctx, tx.Statements(), keyset.TokenSigningKey); err != nil {
+			return err
 		}
 
 		asgn := domain.NewSKProjProjectSetupAssignment(project.ID)
@@ -128,6 +167,10 @@ func (s *projectService) Create(ctx context.Context, name string, previewOrigins
 			return domain.ErrInternal(err).WithMessage("failed to seed project secret authz assignment")
 		}
 		if err := emitAuthzGranted(ctx, tx.Statements(), asgn); err != nil {
+			return err
+		}
+
+		if err := seedDefaultEnvironments(ctx, tx.Statements(), project.ID); err != nil {
 			return err
 		}
 
@@ -283,9 +326,16 @@ func (s *projectService) DefaultProject(ctx context.Context, cfgProjectID string
 	// (created_at ascending) so every replica answers the same, and cheap
 	// enough to resolve per runtime.json request — no cached state to
 	// invalidate when `zitadel setup` creates the first project.
+	//
+	// The platform project is skipped: it is infrastructure (the claiming
+	// humans and their personal teams, ADR 046 §2), never the deployment's
+	// own product project — and CLI-managed local servers seed it at startup,
+	// which would otherwise make it the "first-created" project of every
+	// local deployment. There is exactly one platform row, so two candidates
+	// suffice to find the earliest real project.
 	result, err := s.v2Pool.Statements().ListProjects(ctx, &database.ListOptions[domain.ProjectField]{
 		Pagination: database.Page[domain.ProjectField]{
-			Limit: 1,
+			Limit: 2,
 			OrderBy: database.OrderBy[domain.ProjectField]{
 				Columns:   []database.Column[domain.ProjectField]{database.Col(domain.ProjectFieldCreatedAt)},
 				Direction: database.OrderAsc,
@@ -295,47 +345,141 @@ func (s *projectService) DefaultProject(ctx context.Context, cfgProjectID string
 	if err != nil {
 		return nil, mapStorageError(err)
 	}
-	if result == nil || len(result.Items) == 0 {
-		return nil, nil
+	if result != nil {
+		for _, project := range result.Items {
+			if project.ID != domain.PlatformProjectID {
+				return project, nil
+			}
+		}
 	}
-	return result.Items[0], nil
+	return nil, nil
 }
 
-func (s *projectService) Update(ctx context.Context, id, name string) (*domain.Project, error) {
-	if id == "" {
-		return nil, domain.ErrProjectMissingID()
+// UpdateProjectRequest is a PATCH: a nil field is one the caller did not
+// mention and the update leaves as it stands.
+type UpdateProjectRequest struct {
+	ID string
+	// Name renames the project. The empty string is not a rename but a bad one,
+	// and is rejected.
+	Name *string
+	// PasswordHashPolicy sets the hashing method the project's passwords are
+	// written with. It carries three states rather than two: absent leaves the
+	// project's method alone, present sets it, and present-but-nil returns the
+	// project to the deployment default -- which is why it is a pointer to a
+	// pointer. Wire null is how an admin says "stop choosing", and that is a
+	// different instruction from saying nothing.
+	PasswordHashPolicy **domain.PasswordHashPolicy
+}
+
+func (req *UpdateProjectRequest) Validate(hashers *crypto.HasherFactory) error {
+	if req.ID == "" {
+		return domain.ErrProjectMissingID()
 	}
-	name = strings.TrimSpace(name)
-	if name == "" {
-		return nil, domain.ErrProjectNameInvalid()
+
+	if req.Name == nil && req.PasswordHashPolicy == nil {
+		// Unchanged from when the name was the only field there was to patch: a
+		// body that names nothing to write is a bad request rather than a no-op,
+		// and it is the name it is missing.
+		return domain.ErrProjectNameInvalid()
 	}
-	project := &domain.Project{
-		ID:   id,
-		Name: name,
+	if req.Name != nil {
+		name := strings.TrimSpace(*req.Name)
+		if name == "" {
+			return domain.ErrProjectNameInvalid()
+		}
+		req.Name = new(name)
 	}
+
+	if req.PasswordHashPolicy != nil && *req.PasswordHashPolicy != nil {
+		if err := hashers.Check((*req.PasswordHashPolicy).HasherConfig()); err != nil {
+			return domain.ErrProjectPasswordHashInvalid().WithParent(err).
+				WithDetails(map[string]any{
+					"algorithm": string((*req.PasswordHashPolicy).Algorithm),
+					"reason":    err.Error(),
+				})
+		}
+	}
+
+	return nil
+}
+
+func (s *projectService) Update(ctx context.Context, req UpdateProjectRequest) (*domain.Project, error) {
+	if err := req.Validate(s.hashers); err != nil {
+		return nil, err
+	}
+
+	project := &domain.Project{ID: req.ID}
 	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		if err := tx.Statements().UpdateProject(ctx, project); err != nil {
-			return err
+		if req.PasswordHashPolicy != nil {
+			if err := tx.Statements().SetProjectPasswordHashPolicy(ctx, req.ID, *req.PasswordHashPolicy); err != nil {
+				return err
+			}
 		}
-		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
-			Type:       domain.EventTypeProjectUpdated,
-			Category:   domain.EventCategoryEntity,
-			ProjectID:  project.ID,
-			EntityType: "project",
-			EntityID:   project.ID,
-			Payload:    domain.ProjectPayload{Name: project.Name},
-		})
+		// The name write reads the whole row back, so it runs second and lands
+		// the policy just written on the returned project. Without a rename the
+		// row is read instead, for the same reason: the caller is answered with
+		// the project as it now stands.
+		if req.Name != nil {
+			project.Name = *req.Name
+			if err := tx.Statements().UpdateProject(ctx, project); err != nil {
+				return err
+			}
+		} else {
+			updated, err := tx.Statements().GetProjectByID(ctx, req.ID)
+			if err != nil {
+				return err
+			}
+			*project = *updated
+		}
+		return emitProjectUpdated(ctx, tx.Statements(), project.ID, updateProjectPayload(req))
 	})
+
 	if err != nil {
-		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
-			return nil, domain.ErrProjectNotFound()
-		}
-		if de, ok := errors.AsType[domain.Error](err); ok {
-			return nil, de
-		}
-		return nil, domain.ErrInternal(err).WithMessage("failed to update project")
+		return nil, s.mapUpdateError(err)
 	}
+
 	return project, nil
+}
+
+func (s *projectService) mapUpdateError(err error) error {
+	if err == nil {
+		return nil
+	}
+	if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+		return domain.ErrProjectNotFound()
+	}
+	if de, ok := errors.AsType[domain.Error](err); ok {
+		return de
+	}
+	return domain.ErrInternal(err).WithMessage("failed to update project")
+}
+
+func emitProjectUpdated(ctx context.Context, stmts EventStatements, projectID string, payload domain.ProjectUpdatedPayload) error {
+	return audit.Emit(ctx, stmts, audit.EmitSpec{
+		Type:       domain.EventTypeProjectUpdated,
+		Category:   domain.EventCategoryEntity,
+		ProjectID:  projectID,
+		EntityType: "project",
+		EntityID:   projectID,
+		Payload:    payload,
+	})
+}
+
+func updateProjectPayload(req UpdateProjectRequest) domain.ProjectUpdatedPayload {
+	payload := domain.ProjectUpdatedPayload{}
+	if req.Name != nil {
+		payload.Name = *req.Name
+	}
+	if req.PasswordHashPolicy != nil {
+		// The empty string is the project handing hashing back to the
+		// deployment default, which is what "no algorithm of its own" means.
+		algorithm := ""
+		if *req.PasswordHashPolicy != nil {
+			algorithm = string((*req.PasswordHashPolicy).Algorithm)
+		}
+		payload.PasswordHashAlgorithm = &algorithm
+	}
+	return payload
 }
 
 // ListProjectsRequest is the input for listing projects.
@@ -400,6 +544,71 @@ func (s *projectService) List(ctx context.Context, req ListProjectsRequest) (*Li
 		Projects:      result.Items,
 		NextPageToken: string(result.NextCursor),
 	}, nil
+}
+
+// ListAuthorizedProjectsRequest is the input for listing the projects a
+// signed-in user can act on. Both ids come from the session token.
+type ListAuthorizedProjectsRequest struct {
+	// HomeProjectID is the session's project; team membership edges are read
+	// there (ADR 053 §3). Required.
+	HomeProjectID string
+	// UserID is the human the session is bound to. Required.
+	UserID    string
+	Limit     int
+	PageToken string
+}
+
+func (s *projectService) ListAuthorized(ctx context.Context, req ListAuthorizedProjectsRequest) (*ListProjectsResponse, error) {
+	// Fail closed: an empty id would bind an empty string into the grant
+	// predicate instead of narrowing it, so there is no safe default here.
+	if req.UserID == "" || req.HomeProjectID == "" {
+		return nil, domain.ErrSessionTokenInvalid()
+	}
+
+	// Deactivating a user does not revoke the sessions already minted for it
+	// (#553), so holding a valid cookie is not proof the human is still allowed
+	// in. Re-read the user active, the way the grant service vets a principal.
+	if err := s.requireActiveSessionUser(ctx, req.HomeProjectID, req.UserID); err != nil {
+		return nil, err
+	}
+
+	result, err := s.v2Pool.Statements().ListAuthorizedProjects(ctx, req.HomeProjectID, req.UserID, database.Page[domain.ProjectField]{
+		Limit: uint32(normalizeLimit(req.Limit)),
+		OrderBy: database.OrderBy[domain.ProjectField]{
+			Columns:   []database.Column[domain.ProjectField]{database.Col(domain.ProjectFieldID)},
+			Direction: database.OrderAsc,
+		},
+		Cursor: []byte(req.PageToken),
+	})
+	if err != nil {
+		return nil, mapListError(err, "failed to list authorized projects")
+	}
+
+	return &ListProjectsResponse{
+		Projects:      result.Items,
+		NextPageToken: string(result.NextCursor),
+	}, nil
+}
+
+// requireActiveSessionUser refuses a session whose user is gone or no longer
+// active in its home project. A missing or non-active user is refused with
+// domain.ErrSessionTokenInvalid, the same error an anonymous session yields, so
+// a caller cannot tell "deactivated" from "never existed" from "not signed in".
+// A storage failure stays an internal error: an outage is not an answer about
+// the user, and reporting it as one would hide the outage.
+func (s *projectService) requireActiveSessionUser(ctx context.Context, homeProjectID, userID string) error {
+	_, err := s.v2Pool.Statements().GetUser(ctx, database.And(
+		database.Equal(database.Col(domain.UserFieldProjectID), homeProjectID),
+		database.Equal(database.Col(domain.UserFieldID), userID),
+		database.Equal(database.Col(domain.UserFieldStatus), domain.UserStatusActive.String()),
+	), UserQueryOptions{})
+	if err != nil {
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+			return domain.ErrSessionTokenInvalid()
+		}
+		return domain.ErrInternal(err).WithMessage("failed to read the session user")
+	}
+	return nil
 }
 
 // projectFilter maps an API filter predicate to a storage filter. Operations the

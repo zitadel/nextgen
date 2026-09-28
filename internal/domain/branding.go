@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"encoding/json"
 	"time"
 )
 
@@ -30,6 +31,78 @@ const (
 	BrandingLayoutSplit    = "split"
 )
 
+// BrandingThemeMode selects which of the published sides may run. A side runs
+// only if the revision publishes it: light and dark carry their own colours and
+// their own mark, and neither derives from the other.
+//
+// A string rather than an integer enum, here and below: the value's canonical
+// form is the string, both on the wire and in the definition column it is
+// stored in, so an integer would only add a mapping with nothing behind it.
+type BrandingThemeMode string
+
+const (
+	BrandingThemeLight BrandingThemeMode = "light"
+	BrandingThemeDark  BrandingThemeMode = "dark"
+	BrandingThemeAuto  BrandingThemeMode = "auto"
+)
+
+func (m BrandingThemeMode) IsValid() bool {
+	switch m {
+	case BrandingThemeLight, BrandingThemeDark, BrandingThemeAuto:
+		return true
+	}
+	return false
+}
+
+// BrandingRadiusPreset is a named corner rounding. `full` is a pill; the rest
+// are pixel steps the token bridge applies proportionally across the ramp.
+type BrandingRadiusPreset string
+
+const (
+	BrandingRadiusNone BrandingRadiusPreset = "none"
+	BrandingRadiusSm   BrandingRadiusPreset = "sm"
+	BrandingRadiusMd   BrandingRadiusPreset = "md"
+	BrandingRadiusLg   BrandingRadiusPreset = "lg"
+	BrandingRadiusFull BrandingRadiusPreset = "full"
+)
+
+func (p BrandingRadiusPreset) IsValid() bool {
+	switch p {
+	case BrandingRadiusNone, BrandingRadiusSm, BrandingRadiusMd, BrandingRadiusLg, BrandingRadiusFull:
+		return true
+	}
+	return false
+}
+
+// BrandingDensity tunes spacing and control height.
+type BrandingDensity string
+
+const (
+	BrandingDensityCompact     BrandingDensity = "compact"
+	BrandingDensityRegular     BrandingDensity = "regular"
+	BrandingDensityComfortable BrandingDensity = "comfortable"
+)
+
+func (d BrandingDensity) IsValid() bool {
+	switch d {
+	case BrandingDensityCompact, BrandingDensityRegular, BrandingDensityComfortable:
+		return true
+	}
+	return false
+}
+
+// Bounds for the numeric appearance knobs. ogen enforces the same ranges from
+// the OpenAPI contract; this gate re-checks them because a revision can also
+// be built in-process.
+const MaxBrandingRadiusPixels int = 32
+
+const (
+	MinBrandingScale     float64 = 0.75
+	MaxBrandingScale     float64 = 1.25
+	MinBrandingLogoScale float64 = 0.5
+	MaxBrandingLogoScale float64 = 2
+)
+
 // Branding is one immutable branding revision for a project. Revisions are
 // never updated or deleted; every edit publishes a new revision and flow
 // responses resolve the newest one per project (ADR 040).
@@ -39,9 +112,97 @@ type Branding struct {
 	Layout         string
 	LiquidTemplate string
 	LogoURL        string
-	FontURL        string
 	HeroURL        string
+	Theme          BrandingTheme
+	Typography     BrandingTypography
+	Shape          BrandingShape
 	CreatedAt      time.Time
+}
+
+// BrandingTheme names the sides a revision publishes. An absent side is never
+// resolved, whatever Mode or the viewer's operating system asks for.
+type BrandingTheme struct {
+	Mode  BrandingThemeMode  `json:"mode,omitempty"`
+	Light *BrandingThemeSide `json:"light,omitempty"`
+	Dark  *BrandingThemeSide `json:"dark,omitempty"`
+}
+
+// BrandingThemeSide is one complete surface. A key left unset here takes the
+// maintained default for this side, never the other side's value.
+type BrandingThemeSide struct {
+	LogoURL string           `json:"logo_url,omitempty"`
+	Palette *BrandingPalette `json:"palette,omitempty"`
+}
+
+// BrandingPalette is the semantic colour vocabulary a project writes against.
+// Keys name roles rather than tokens, which is what lets the internal --zl-*
+// names move without breaking a stored revision.
+type BrandingPalette struct {
+	Primary    string `json:"primary,omitempty"`
+	OnPrimary  string `json:"on_primary,omitempty"`
+	Background string `json:"background,omitempty"`
+	Surface    string `json:"surface,omitempty"`
+	Muted      string `json:"muted,omitempty"`
+	Border     string `json:"border,omitempty"`
+	Text       string `json:"text,omitempty"`
+	TextMuted  string `json:"text_muted,omitempty"`
+	Link       string `json:"link,omitempty"`
+	Success    string `json:"success,omitempty"`
+	Warning    string `json:"warning,omitempty"`
+	Error      string `json:"error,omitempty"`
+}
+
+// BrandingTypography is the one face the surface renders in, body and headings
+// alike. FontFamily names it and FontURL loads it, which is why the two sit
+// together: either alone renders nothing the other would have.
+type BrandingTypography struct {
+	FontFamily string  `json:"font_family,omitempty"`
+	FontURL    string  `json:"font_url,omitempty"`
+	Scale      float64 `json:"scale,omitzero"`
+}
+
+// BrandingShape is shared across theme sides — a brand does not round its
+// corners differently in the dark.
+type BrandingShape struct {
+	Radius    BrandingRadius  `json:"radius,omitzero"`
+	Density   BrandingDensity `json:"density,omitempty"`
+	LogoScale float64         `json:"logo_scale,omitzero"`
+}
+
+// BrandingRadius is a corner rounding expressed either as a preset name or as
+// a pixel value. Brands routinely specify a number the five presets cannot
+// express, so both spellings persist; the zero value leaves the maintained
+// default in place.
+type BrandingRadius struct {
+	Preset BrandingRadiusPreset
+	Pixels *int
+}
+
+func (r BrandingRadius) IsZero() bool {
+	return r.Preset == "" && r.Pixels == nil
+}
+
+// MarshalJSON writes the radius the way the wire carries it: a bare string for
+// a preset, a bare number for pixels.
+func (r BrandingRadius) MarshalJSON() ([]byte, error) {
+	if r.Pixels != nil {
+		return json.Marshal(*r.Pixels)
+	}
+	return json.Marshal(r.Preset)
+}
+
+func (r *BrandingRadius) UnmarshalJSON(data []byte) error {
+	var preset BrandingRadiusPreset
+	if err := json.Unmarshal(data, &preset); err == nil {
+		*r = BrandingRadius{Preset: preset}
+		return nil
+	}
+	var pixels int
+	if err := json.Unmarshal(data, &pixels); err != nil {
+		return err
+	}
+	*r = BrandingRadius{Pixels: &pixels}
+	return nil
 }
 
 // BrandingField enumerates the fields of Branding which can be used for
@@ -56,8 +217,17 @@ const (
 )
 
 // NewBranding builds a new revision, defaulting the layout, and validates it
-// with the lexical gate in branding_validator.go.
-func NewBranding(projectID string, layout, liquidTemplate, logoURL, fontURL, heroURL string) (*Branding, error) {
+// with the gate in branding_validator.go.
+func NewBranding(
+	projectID string,
+	layout string,
+	liquidTemplate string,
+	logoURL string,
+	heroURL string,
+	theme BrandingTheme,
+	typography BrandingTypography,
+	shape BrandingShape,
+) (*Branding, error) {
 	if projectID == "" {
 		return nil, ErrBrandingMissingProjectID()
 	}
@@ -69,8 +239,10 @@ func NewBranding(projectID string, layout, liquidTemplate, logoURL, fontURL, her
 		Layout:         layout,
 		LiquidTemplate: liquidTemplate,
 		LogoURL:        logoURL,
-		FontURL:        fontURL,
 		HeroURL:        heroURL,
+		Theme:          theme,
+		Typography:     typography,
+		Shape:          shape,
 		CreatedAt:      time.Now().UTC(),
 	}
 	if err := ValidateBranding(b); err != nil {

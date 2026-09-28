@@ -5,6 +5,7 @@ package integration_test
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"strings"
 	"testing"
 
@@ -34,6 +35,24 @@ func TestCreateSchema(t *testing.T) {
 			{
 				name:   "user-schema in body",
 				schema: harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema,
+			},
+			{
+				name: "password schema with a designated identifier",
+				schema: fmt.Sprintf(`{
+                  "title": "password with identifier",
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "$id": "https://example.com/schemas/pw-with-identifier.json",
+                  "metaSchema": "%s/user-schema.json",
+                  "kind": "user-schema",
+                  "type": "object",
+                  "x-identifier": "email",
+                  "x-auth-methods": {
+                    "password": { "enabled": true }
+                  },
+                  "properties": {
+                    "email": { "type": "string", "format": "email", "x-unique": "project" }
+                  }
+                }`, helpers.BuiltinSchemaBaseURL),
 			},
 			// TODO: add this test case once we have a public github-repo from which to get a schema
 			//{
@@ -78,7 +97,7 @@ func TestCreateSchema(t *testing.T) {
 				"kind":       "does not exist",
 				"title":      "an invalid user schema",
 				"x-auth-methods": map[string]any{
-					"password": map[string]any{
+					"passkey": map[string]any{
 						"enabled": true,
 					},
 				},
@@ -99,7 +118,8 @@ func TestCreateSchema(t *testing.T) {
 
 			resp, err := client.CreateSchema(t.Context(), req, params)
 			assert.NoError(t, err)
-			assert.IsType(t, &api.CreateSchemaBadRequest{}, resp, helpers.MustMarshal(t, resp))
+			require.IsType(t, &api.CreateSchemaErrorResponseStatusCode{}, resp, helpers.MustMarshal(t, resp))
+			assert.Equal(t, http.StatusBadRequest, resp.(*api.CreateSchemaErrorResponseStatusCode).StatusCode)
 		})
 
 		t.Run("duplicates are not allowed", func(t *testing.T) {
@@ -114,7 +134,7 @@ func TestCreateSchema(t *testing.T) {
                   "kind": "user-schema",
                   "type": "object",
                   "x-auth-methods": {
-                    "password": { "enabled": true }
+                    "passkey": { "enabled": true }
                   },
                   "properties": {
                     "givenName": { "type": "string" }
@@ -145,8 +165,43 @@ func TestCreateSchema(t *testing.T) {
 			resp, err := client.CreateSchema(t.Context(), req, params)
 			assert.NoError(t, err)
 
-			assert.IsType(t, &api.CreateSchemaConflict{}, resp, helpers.MustMarshal(t, resp))
+			require.IsType(t, &api.CreateSchemaErrorResponseStatusCode{}, resp, helpers.MustMarshal(t, resp))
+			assert.Equal(t, http.StatusConflict, resp.(*api.CreateSchemaErrorResponseStatusCode).StatusCode)
 		})
+
+		t.Run("password without a designated identifier is rejected with the rule named", func(t *testing.T) {
+			t.Parallel()
+
+			schema := fmt.Sprintf(`{
+                  "title": "password without identifier",
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "$id": "https://example.com/schemas/pw-no-identifier.json",
+                  "metaSchema": "%s/user-schema.json",
+                  "kind": "user-schema",
+                  "type": "object",
+                  "x-auth-methods": {
+                    "password": { "enabled": true }
+                  },
+                  "properties": {
+                    "email": { "type": "string", "x-unique": "project" }
+                  }
+                }`, helpers.BuiltinSchemaBaseURL)
+
+			apiSchema := api.UserSchema{}
+			require.NoError(t, apiSchema.UnmarshalJSON([]byte(schema)))
+
+			resp, err := client.CreateSchema(t.Context(), api.CreateSchemaReq{
+				Type:       api.UserSchemaCreateSchemaReq,
+				UserSchema: apiSchema,
+			}, api.CreateSchemaParams{ProjectID: api.ProjectID(project.ID)})
+			assert.NoError(t, err)
+			require.IsType(t, &api.CreateSchemaErrorResponseStatusCode{}, resp, helpers.MustMarshal(t, resp))
+			assert.Equal(t, http.StatusBadRequest, resp.(*api.CreateSchemaErrorResponseStatusCode).StatusCode)
+			// The rule text must reach the client, not vanish into an
+			// unserialized Parent.
+			assert.Contains(t, helpers.MustMarshal(t, resp), "x-identifier")
+		})
+
 	})
 }
 
@@ -205,7 +260,8 @@ func TestGetSchema(t *testing.T) {
 			})
 			assert.NoError(t, err)
 
-			assert.IsType(t, &api.GetSchemaByIdNotFound{}, resp, helpers.MustMarshal(t, resp))
+			require.IsType(t, &api.GetSchemaByIdErrorResponseStatusCode{}, resp, helpers.MustMarshal(t, resp))
+			assert.Equal(t, http.StatusNotFound, resp.(*api.GetSchemaByIdErrorResponseStatusCode).StatusCode)
 		})
 	})
 }
@@ -238,7 +294,7 @@ func TestSchemaRevisions(t *testing.T) {
                   "kind": "user-schema",
                   "type": "object",
                   "x-auth-methods": {
-                    "password": { "enabled": true }
+                    "passkey": { "enabled": true }
                   },
                   "properties": {
                     "givenName": { "type": "string" }
@@ -254,7 +310,7 @@ func TestSchemaRevisions(t *testing.T) {
                   "kind": "user-schema",
                   "type": "object",
                   "x-auth-methods": {
-                    "password": { "enabled": true }
+                    "passkey": { "enabled": true }
                   },
                   "properties": {
                     "firstName": { "type": "string" }
@@ -270,7 +326,7 @@ func TestSchemaRevisions(t *testing.T) {
                   "kind": "user-schema",
                   "type": "object",
                   "x-auth-methods": {
-                    "password": { "enabled": true }
+                    "passkey": { "enabled": true }
                   },
                   "properties": {
                     "givenName": { "type": "string" }
@@ -358,7 +414,7 @@ func TestSchemaKindFilter(t *testing.T) {
           "kind": "user-schema",
           "type": "object",
           "x-auth-methods": {
-            "password": { "enabled": true }
+            "passkey": { "enabled": true }
           },
           "properties": {
             "givenName": { "type": "string" }

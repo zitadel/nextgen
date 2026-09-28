@@ -38,7 +38,7 @@ by re-applying an earlier template.
   {
     "$schema": "../meta/branding.json",
     "layout": "split",
-    "liquid_template_file": "./login.liquid",
+    "liquid_template": { "$file": "./login.liquid" },
     "logo_url": "https://example.com/logo.svg",
     "hero_url": "https://example.com/hero.jpg"
   }

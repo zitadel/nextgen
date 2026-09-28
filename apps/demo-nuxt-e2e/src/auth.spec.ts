@@ -34,8 +34,10 @@ test("signs in via the embedded component and lands on /admin", async ({ page })
 
   await page.waitForURL("**/admin", { timeout: 15_000 });
   await expect(page.getByRole("heading", { name: "Admin" })).toBeVisible();
-  // SessionDetails component fetches /sessions/me and renders identity + details.
-  await expect(page.getByText(/Signed in as user_/)).toBeVisible({ timeout: 10_000 });
+  // SessionDetails fetches /sessions/me and renders the user ref: the mock
+  // schema designates no display for this identity, so the line shows the
+  // signed-in identifier.
+  await expect(page.getByText(`Signed in as ${email}`)).toBeVisible({ timeout: 10_000 });
   await expect(page.getByText("Session details")).toBeVisible();
 
   const sessionCookie = (await page.context().cookies()).find(

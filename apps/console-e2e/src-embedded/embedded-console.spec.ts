@@ -35,6 +35,11 @@ test("signs in end to end against the embedded API", async ({ page, seed }) => {
 
   await expect(page.getByLabel("Password")).toBeVisible();
   await page.getByLabel("Password").fill(user.password);
+  // Registered before the terminal click, because the call fires as soon as
+  // the console boots on the other side of the navigation.
+  const teamsQuery = page.waitForResponse(
+    (response) => new URL(response.url()).pathname === "/teams/query",
+  );
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
 
   // Terminal step → `POST /sessions/exchange` with the runtime-discovered
@@ -42,8 +47,28 @@ test("signs in end to end against the embedded API", async ({ page, seed }) => {
   // back into the console, where the guard's `GET /sessions/me` now answers
   // 200. Four more calls that only resolve if the base is right.
   await page.waitForURL((url) => !url.pathname.endsWith("/login"));
-  await expect(page).toHaveURL(/\/ui\/console\/$/);
-  await expect(page.getByRole("heading", { name: "Home" })).toBeVisible();
+  // `/` has no screen of its own and lands on Teams, so the redirect having run
+  // is what proves the console booted.
+  await expect(page).toHaveURL(/\/ui\/console\/teams\?status=active$/);
+  // #1227 taught queryTeams to accept the session cookie, so the list no
+  // longer fails closed -- but this lane's seeded user has no team and no
+  // grant, so it has no foothold in the console project and the gate answers
+  // 404. Asserted rather than described: that status is the question #1227
+  // asked of this lane, and the sidebar below renders on a 401 just as
+  // happily. Rows need a grant, which is what `src-real/` has a secret for.
+  expect((await teamsQuery).status()).toBe(404);
+
+  // The shell, not the screen: it is what shows the signed-in console was
+  // reached.
+  await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();
+
+  // The project pill is the one management read that does resolve here: `GET
+  // /users/me/projects` is authenticated by the session cookie alone (#1237).
+  // It used to ask `POST /projects/query`, which only accepts a project secret,
+  // and stayed a skeleton for good on this lane. A seeded user holds no grant,
+  // so the honest answer is the empty state — what matters is that it is an
+  // answer.
+  await expect(page.getByRole("button", { name: "Switch project" })).toHaveText("No projects");
 });
 
 test("targets the origin root, never an /api prefix", async ({ page }) => {

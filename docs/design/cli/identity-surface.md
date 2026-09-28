@@ -4,6 +4,13 @@
 > `zitadel idp` / `zitadel app` commands or `.zitadel/{idps,apps}/` directories
 > described here are built; they land only once the server exposes the
 > resources. Shipped CLI resources today: schemas, flows, branding.
+> 
+> **Superseded in part:** the IdP resource half is superseded by
+> [`../idp/`](../idp/README.md); the connection shape below predates area 1
+> ([`../idp/1-resource-model.md`](../idp/1-resource-model.md): `kind`, `enabled`,
+> `audience`, `default_schema` are dropped there, secrets, claim mapping, and
+> the provisioning flags reshaped). Still current here: the App resource and the
+> external-MFA placeholder.
 > **Date:** 2026-04-23 (revised after `frontend-adr-001` folded the external-factor research doc; status note updated 2026-08-11)
 > **See also:** [CLI Plan](PLAN.md) · [Flow Engine](../flowengine/flow-engine.md) · [Flow Engine — Step Response Shape](../flowengine/flow-engine-nodes.md) · [User Schema](../flowengine/user-schema.md)
 

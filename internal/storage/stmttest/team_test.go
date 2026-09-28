@@ -146,6 +146,46 @@ func TestTeamStatements_GetByID(t *testing.T) {
 	})
 }
 
+func TestTeamStatements_Get(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		t.Run("returns active team with status filter", func(t *testing.T) {
+			projectID := ensureProject(t, d.stmts)
+			teamID := uniqueTeamID(t)
+			team := newTestTeam(projectID, teamID)
+			require.NoError(t, d.stmts.CreateTeam(t.Context(), team))
+
+			stored, err := d.stmts.GetTeam(t.Context(), database.And(
+				database.Equal(database.Col(domain.TeamFieldProjectID), projectID),
+				database.Equal(database.Col(domain.TeamFieldID), teamID),
+				database.Equal(database.Col(domain.TeamFieldStatus), domain.TeamStatusActive.String()),
+			))
+			require.NoError(t, err)
+			assert.Equal(t, teamID, stored.ID)
+			assert.Equal(t, domain.TeamStatusActive, stored.Status)
+		})
+
+		t.Run("after deactivate, active filter is NoRowFoundError while GetTeamByID still finds it", func(t *testing.T) {
+			projectID := ensureProject(t, d.stmts)
+			teamID := uniqueTeamID(t)
+			require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, teamID)))
+
+			_, err := d.stmts.DeactivateTeam(t.Context(), projectID, teamID)
+			require.NoError(t, err)
+
+			_, err = d.stmts.GetTeam(t.Context(), database.And(
+				database.Equal(database.Col(domain.TeamFieldProjectID), projectID),
+				database.Equal(database.Col(domain.TeamFieldID), teamID),
+				database.Equal(database.Col(domain.TeamFieldStatus), domain.TeamStatusActive.String()),
+			))
+			assert.ErrorIs(t, err, new(database.NoRowFoundError))
+
+			stored, err := d.stmts.GetTeamByID(t.Context(), projectID, teamID)
+			require.NoError(t, err)
+			assert.Equal(t, domain.TeamStatusDeactivated, stored.Status)
+		})
+	})
+}
+
 func TestTeamStatements_UpdateTeam(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		t.Run("updates team", func(t *testing.T) {

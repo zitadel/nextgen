@@ -145,7 +145,7 @@ Cross-type behavior (deepest-first location and stack inheritance) works through
 
 #### Format
 
-- **Resource errors:** `{prefix}.{condition}` where `prefix` matches `ResourcePrefix` (`user`, `att`, `flowdef`, `sch`, `team`, `pkreg`, …).
+- **Resource errors:** `{prefix}.{condition}` where `prefix` matches `ResourcePrefix` (`user`, `att`, `flowdef`, `sch`, `team`, …).
 - **Cross-cutting errors:**
   - `req.invalid` — structural request validation before domain logic
   - `auth.unauthorized` — missing/invalid credentials at the domain/security boundary

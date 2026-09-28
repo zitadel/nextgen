@@ -11,7 +11,7 @@ import { brandingPresets, type BrandingPresetId } from "./branding-presets.js";
 // Idempotent: the orchestrator story may have already started the worker.
 initialize({ onUnhandledRequest: "bypass" });
 
-const STORY_EMAIL = "qwertz@acme.com";
+const STORY_IDENTIFIER = "qwertz@acme.com";
 
 const sessionHandlers = [
   http.get("*/sessions/me", () =>
@@ -24,7 +24,11 @@ const sessionHandlers = [
       assurance_levels: [],
       created_at: new Date().toISOString(),
       expires_at: new Date(Date.now() + 3_600_000).toISOString(),
-      email: STORY_EMAIL,
+      user: {
+        user_id: "user_story",
+        identifier: STORY_IDENTIFIER,
+        identifier_property: "email",
+      },
     }),
   ),
   http.delete("*/sessions/me", () => new HttpResponse(null, { status: 204 })),
@@ -34,7 +38,8 @@ const sessionHandlers = [
  * `<zitadel-session>` is the post-sign-in "signed in" card (Figma `7355:8959`)
  * — the companion to `<zitadel-login>` for the "go straight to /login" flow.
  *
- * It fetches the signed-in email from `GET /sessions/me`; here that endpoint is
+ * It fetches the signed-in identity (the user ref's display → identifier
+ * chain) from `GET /sessions/me`; here that endpoint is
  * mocked via `msw-storybook-addon`. The Sign out action calls the real
  * `revokeMySession` endpoint, so the story is excluded from the Storybook test
  * run (`no-test`).
@@ -69,7 +74,7 @@ const meta: Meta<SessionArgs> = {
 export default meta;
 type Story = StoryObj<SessionArgs>;
 
-/** Default signed-in card: heading, email, and the Sign out action. */
+/** Default signed-in card: heading, resolved identifier, and the Sign out action. */
 export const SignedIn: Story = {};
 
 /** Same card with split-layout tenant branding tokens. */

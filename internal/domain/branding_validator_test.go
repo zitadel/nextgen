@@ -118,10 +118,106 @@ func TestValidateBranding(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			// Read-only in v1: even a well-formed https value is rejected —
-			// the field would load an arbitrary stylesheet at document level.
-			name:    "font url rejected even when https",
-			mutate:  func(b *Branding) { b.FontURL = "https://fonts.example.com/css2" },
+			name: "font url with a family",
+			mutate: func(b *Branding) {
+				b.Typography = BrandingTypography{
+					FontFamily: "Inter, sans-serif",
+					FontURL:    "https://fonts.example.com/css2",
+				}
+			},
+		},
+		{
+			// A stylesheet alone names no face to render in.
+			name:    "font url without a family rejected",
+			mutate:  func(b *Branding) { b.Typography.FontURL = "https://fonts.example.com/css2" },
+			wantErr: true,
+		},
+		{
+			// No loopback carve-out for the font: a stylesheet is styling, not
+			// an image, so it stays https even in the dev posture.
+			name: "http loopback font url rejected",
+			mutate: func(b *Branding) {
+				b.Typography = BrandingTypography{
+					FontFamily: "Inter, sans-serif",
+					FontURL:    "http://localhost:3000/font.css",
+				}
+			},
+			wantErr: true,
+		},
+		{
+			name: "theme sides carry their own logo",
+			mutate: func(b *Branding) {
+				b.Theme = BrandingTheme{
+					Mode:  BrandingThemeAuto,
+					Light: &BrandingThemeSide{LogoURL: "https://cdn.example.com/on-light.svg"},
+					Dark:  &BrandingThemeSide{LogoURL: "https://cdn.example.com/on-dark.svg"},
+				}
+			},
+		},
+		{
+			name: "http theme side logo rejected",
+			mutate: func(b *Branding) {
+				b.Theme = BrandingTheme{Dark: &BrandingThemeSide{LogoURL: "http://cdn.example.com/on-dark.svg"}}
+			},
+			wantErr: true,
+		},
+		{
+			name:    "unknown theme mode",
+			mutate:  func(b *Branding) { b.Theme = BrandingTheme{Mode: "sepia"} },
+			wantErr: true,
+		},
+		{
+			name: "blank palette colour rejected",
+			mutate: func(b *Branding) {
+				b.Theme = BrandingTheme{Light: &BrandingThemeSide{Palette: &BrandingPalette{Primary: "   "}}}
+			},
+			wantErr: true,
+		},
+		{
+			name: "radius preset",
+			mutate: func(b *Branding) {
+				b.Shape = BrandingShape{Radius: BrandingRadius{Preset: BrandingRadiusLg}}
+			},
+		},
+		{
+			name: "radius pixels",
+			mutate: func(b *Branding) {
+				b.Shape = BrandingShape{Radius: BrandingRadius{Pixels: new(10)}}
+			},
+		},
+		{
+			name: "zero radius pixels is a value, not an omission",
+			mutate: func(b *Branding) {
+				b.Shape = BrandingShape{Radius: BrandingRadius{Pixels: new(0)}}
+			},
+		},
+		{
+			name: "radius pixels above the cap",
+			mutate: func(b *Branding) {
+				b.Shape = BrandingShape{Radius: BrandingRadius{Pixels: new(33)}}
+			},
+			wantErr: true,
+		},
+		{
+			name: "unknown radius preset",
+			mutate: func(b *Branding) {
+				b.Shape = BrandingShape{Radius: BrandingRadius{Preset: "rounded"}}
+			},
+			wantErr: true,
+		},
+		{
+			name:    "unknown density",
+			mutate:  func(b *Branding) { b.Shape = BrandingShape{Density: "roomy"} },
+			wantErr: true,
+		},
+		{
+			name:    "logo scale out of range",
+			mutate:  func(b *Branding) { b.Shape = BrandingShape{LogoScale: 3} },
+			wantErr: true,
+		},
+		{
+			name:    "typography scale out of range",
+			mutate:  func(b *Branding) { b.Typography = BrandingTypography{Scale: 2} },
 			wantErr: true,
 		},
 	}
@@ -174,7 +270,7 @@ func TestValidateBrandingAssetURLLoopbackParity(t *testing.T) {
 }
 
 func TestNewBrandingDefaultsLayout(t *testing.T) {
-	b, err := NewBranding("proj_test", "", "", "", "", "")
+	b, err := NewBranding("proj_test", "", "", "", "", BrandingTheme{}, BrandingTypography{}, BrandingShape{})
 	if err != nil {
 		t.Fatalf("NewBranding() error = %v", err)
 	}
@@ -187,7 +283,7 @@ func TestNewBrandingDefaultsLayout(t *testing.T) {
 }
 
 func TestNewBrandingRequiresProjectID(t *testing.T) {
-	if _, err := NewBranding("", "", "", "", "", ""); err == nil {
+	if _, err := NewBranding("", "", "", "", "", BrandingTheme{}, BrandingTypography{}, BrandingShape{}); err == nil {
 		t.Fatal("NewBranding() with empty project id should fail")
 	}
 }

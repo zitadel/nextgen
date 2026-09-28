@@ -43,7 +43,7 @@ For changes to the Go server, APIs, or database layer.
 | Install dependencies                                  | `corepack pnpm install --frozen-lockfile`  |
 | Verify my toolchain                                   | `moon run workspace:doctor`                |
 | Start the server (builds console + login-ui, then Go) | `moon run workspace:server`                |
-| Start the server (skip UI builds)                     | `go run . server`                          |
+| Start the server (skip UI builds)                     | `go run . server --migrate`                |
 | Debug and attach VSCode                               | `moon run workspace:server-debug`          |
 | Regenerate Go/OpenAPI artifacts                       | `moon run server:generate`                 |
 | Verify committed generated output                     | `moon run server:check-generate`           |
@@ -60,19 +60,21 @@ The Go binary embeds production builds of two frontend apps:
 - `apps/login-ui` → `internal/staticui/login/dist/`
 
 `moon run workspace:server` builds both apps before starting Go. If you have not
-changed any frontend code, skip the UI builds with `go run . server`.
+changed any frontend code, skip the UI builds with `go run . server --migrate`.
 
 To build the UIs manually (when bypassing the wrapper):
 
 ```sh
 moon run console:build login-ui:build
-go run . server
+go run . server --migrate
 ```
 
 With no database configured, the server uses SQLite at
 `<server.data_dir>/zitadel.db`. Override with `-c docs/operations/nextgen.example.yaml`,
 `NEXTGEN_DATABASE_SQLITE`, or `NEXTGEN_DATABASE_POSTGRES` when you want a
-path or DSN you manage.
+path or DSN you manage. Schema migrations run when you pass `--migrate`;
+`moon run workspace:server` adds that flag. To apply schema and exit without
+serving, run `go run . migrate`.
 
 Open http://localhost:8080/ui/console/ and http://localhost:8080/ui/login/
 
@@ -82,7 +84,7 @@ Use `server-debug` to build the binary with debug symbols and disabled inlining,
 then attach VSCode's Go debugger by PID:
 
 ```sh
-moon run workspace:server-debug -- server --user-file examples/bootstrap-users/demo-admin.json
+moon run workspace:server-debug -- server --migrate --user-file examples/bootstrap-users/demo-admin.json
 ```
 
 The task prints the `go build` invocation and the PID of the running process. The
@@ -91,7 +93,7 @@ three `-X` values are stamped from the current HEAD, and `<pkg>` below stands fo
 
 ```
 [server-debug] build: go build -gcflags 'all=-N -l' -ldflags '-X <pkg>.version=debug+<short-sha> -X <pkg>.commit=<sha> -X <pkg>.date=<commit-date>' -o dist/server/nextgen-debug .
-[server-debug] run:   ./dist/server/nextgen-debug server --user-file examples/bootstrap-users/demo-admin.json
+[server-debug] run:   ./dist/server/nextgen-debug server --migrate --user-file examples/bootstrap-users/demo-admin.json
 
 [server-debug] PID 98765 — VSCode: Run ▸ Start Debugging ▸ "Attach to Process"
 ```
@@ -143,7 +145,7 @@ the two SPAs bundled directly into the server binary.
 | Open the component workbench (Storybook)     | `moon run storybook:dev` → http://localhost:6006 |
 | Start the console dev server                 | `moon run console:dev` → http://localhost:5174 |
 | Start the login-UI dev server                | `moon run login-ui:dev` → http://localhost:5175 |
-| Build both apps and test with the Go server  | `moon run console:build login-ui:build` then `go run . server` |
+| Build both apps and test with the Go server  | `moon run console:build login-ui:build` then `go run . server --migrate` |
 | Run lint, type checks, and tests             | `moon ci :lint :typecheck :build :test`    |
 
 Run `corepack pnpm install --frozen-lockfile` first.
@@ -165,7 +167,7 @@ schema and default login/register flow definition.
 **1. Start the API-only backend:**
 
 ```sh
-NEXTGEN_SERVER_CONSOLE_ENABLED=false NEXTGEN_SERVER_LOGIN_ENABLED=false go run . server
+NEXTGEN_SERVER_CONSOLE_ENABLED=false NEXTGEN_SERVER_LOGIN_ENABLED=false go run . server --migrate
 ```
 
 This skips the embedded UI dist checks, so it works before you have built

@@ -15,7 +15,8 @@
   "include": [
     "vitest.config.ts",
     "src/**/*.spec.ts",
-    "src/**/*.test.ts"
+    "src/**/*.test.ts",
+    "src/**/*.json"
   ],
   "references": [
     {

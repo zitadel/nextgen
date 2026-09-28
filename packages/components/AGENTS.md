@@ -43,11 +43,13 @@ There are exactly three places types live in this package:
 - **Wire shapes** — never declared here; imported from
   `@zitadel/api/generated/model` (`CreateFlow201`,
   `CreateFlow201Step`, `CreateFlowBody`, `SubmitFlowStepBody`, …).
-- **Branding** — `src/orchestrator/branding.ts` carries the client-side
-  branding extensions (`Branding`, `BrandingPalette`, `BrandingShape`,
-  `BrandingTheme`, `BrandingTypography`, `BrandingAssets`, `FlowLayout`).
-  These are real client extensions of the OpenAPI Branding component
-  (palette / typography / shape / theme tokenisation aren't on the wire).
+- **Branding** — `src/orchestrator/branding.ts` names the branding shape the
+  orchestrator paints (`Branding`, `BrandingPalette`, `BrandingShape`,
+  `BrandingTheme`, `BrandingThemeSide`, `BrandingTypography`, `FlowLayout`).
+  The appearance blocks are wire fields, so these are aliases of the generated
+  model, not declarations. `attribution` is the one real client extension: it
+  belongs to the embedding, not to the stored revision. Do not add an
+  appearance key here — add it to `api/openapi/` and re-export it.
 - **Template context** — `src/orchestrator/template-context.ts` carries
   the projection tenant Liquid templates can reference (`FlowMessage`,
   `FlowIdentity`, `FlowError[]`, `LiquidContext`). Lifted from the wire
