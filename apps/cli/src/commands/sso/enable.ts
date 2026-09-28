@@ -180,21 +180,24 @@ export default class SsoEnable extends BaseCommand {
 
     return this.emit({
       status: "ok",
-      data: this.payload({
-        provider,
-        schema: schema.name,
-        plan,
-        callbackUri,
-        secret,
-        changed: edits.written,
-        skipped: edits.skipped,
-      }),
+      data: {
+        ...this.payload({
+          provider,
+          schema: schema.name,
+          plan,
+          callbackUri,
+          secret,
+          changed: edits.written,
+          skipped: edits.skipped,
+        }),
+        // `variables set` first: the connection references the secret as
+        // `${{ NAME }}` and the engine resolves that from the environment's
+        // variables, so publishing the configuration without it leaves a button
+        // that fails at token exchange. An ok result carries its follow-ups in
+        // data.next_commands (errors use the top-level nextCommands instead).
+        next_commands: [`variables set ${variable} --secret`, "plan", "apply"],
+      },
       pretty: `Enabled ${entry.display_name} for ${schema.name}`,
-      // `variables set` first: the connection references the secret as
-      // `${{ NAME }}` and the engine resolves that from the environment's
-      // variables, so publishing the configuration without it leaves a button
-      // that fails at token exchange.
-      nextCommands: [`variables set ${variable} --secret`, "plan", "apply"],
     });
   }
 
@@ -285,7 +288,7 @@ export default class SsoEnable extends BaseCommand {
     const answer = await text({
       message: "Client ID",
       // Vendors format these differently, so only emptiness can be checked.
-      validate: (value) => (value.trim() === "" ? "Enter the client id." : undefined),
+      validate: (value) => ((value ?? "").trim() === "" ? "Enter the client id." : undefined),
     });
     if (isCancel(answer)) {
       cancel("Enable cancelled.");

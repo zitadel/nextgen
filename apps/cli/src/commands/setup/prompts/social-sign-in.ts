@@ -103,7 +103,7 @@ export class SocialSignInPrompt implements SetupPrompt {
     const answer = await text({
       message: "Client ID",
       // Vendors format these differently, so only emptiness can be checked.
-      validate: (value) => (value.trim() === "" ? "Enter the client id." : undefined),
+      validate: (value) => ((value ?? "").trim() === "" ? "Enter the client id." : undefined),
     });
     bail(answer);
     return String(answer).trim();
