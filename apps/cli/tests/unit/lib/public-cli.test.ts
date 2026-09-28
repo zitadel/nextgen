@@ -81,7 +81,7 @@ describe("normalizePublicCliJson", () => {
   it("rewrites command spans in nested strings without mutating the input", () => {
     const body = {
       description: "`zitadel apply` publishes this as a revision.",
-      properties: { layout: { examples: ["run `zitadel branding eject --design split`"] } },
+      properties: { layout: { examples: ["run `zitadel branding eject --design minimal`"] } },
     };
     const before = JSON.stringify(body);
 
@@ -91,7 +91,7 @@ describe("normalizePublicCliJson", () => {
       "`npx @zitadel/cli@0.1.0-alpha.1 apply` publishes this as a revision.",
     );
     expect(out.properties.layout.examples[0]).toBe(
-      "run `npx @zitadel/cli@0.1.0-alpha.1 branding eject --design split`",
+      "run `npx @zitadel/cli@0.1.0-alpha.1 branding eject --design minimal`",
     );
     expect(JSON.stringify(body)).toBe(before);
   });
