@@ -508,6 +508,46 @@ func TestConsoleManagementBearerIgnoresStaleCookie(t *testing.T) {
 	assert.Equal(t, http.StatusCreated, resp.StatusCode)
 }
 
+// TestConsoleSessionRevokedStopsAuthorizing pins session liveness (ADR 053
+// §5): a signed-out session's cookie still decrypts, but it must stop
+// authorizing management calls at once rather than when the cookie expires.
+// No extra session lookup provides this: revoking a session deletes its token
+// records in the same transaction, and IntrospectToken rejects a cookie whose
+// record is gone. The 401 is what sends the Console back to its login screen.
+func TestConsoleSessionRevokedStopsAuthorizing(t *testing.T) {
+	t.Parallel()
+
+	console := harness.EnsurePlatformProject(t)
+	operatorID, _ := harness.CreateUserOwnedByTeam(t, console.ID)
+	harness.SeedProjectAdmin(t, console.ID, operatorID)
+
+	cookie := platformSessionCookie(t, operatorID)
+	session, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	session.SetSessionToken(cookie.Value)
+
+	queryUsers := func() int {
+		t.Helper()
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodPost,
+			harness.EnsureTestServer(t).URL+"/users/query?project_id="+console.ID, strings.NewReader(`{}`))
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", "application/json")
+		req.AddCookie(cookie)
+		resp, err := harness.EnsureHttpClient(t).Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		return resp.StatusCode
+	}
+
+	require.Equal(t, http.StatusOK, queryUsers(), "the live session authorizes")
+
+	revoked, err := session.RevokeMySession(t.Context())
+	require.NoError(t, err)
+	require.IsType(t, &api.RevokeMySessionNoContent{}, revoked, helpers.MustMarshal(t, revoked))
+
+	assert.Equal(t, http.StatusUnauthorized, queryUsers(), "the revoked session's cookie must not authorize")
+}
+
 // requireUsersNotFound pins a refused users list to its not-found shape: 404
 // user.not_found, the same answer as a project that does not exist.
 func requireUsersNotFound(t *testing.T, resp api.QueryUsersRes) {
