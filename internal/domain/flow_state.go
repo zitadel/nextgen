@@ -102,6 +102,14 @@ type FlowState struct {
 // makes the guard mean something: without it the handler would build the user
 // out of CollectedData, which a later submit can overwrite -- so a real
 // callback for one address could mint an account for another.
+//
+// This overlaps on one fact with the sso_callback record (#1073), which also
+// stores what the provider asserted. The overlap is deliberate: that record is
+// the OAuth ceremony's state (binding nonce, OIDC nonce, PKCE verifier, return
+// target) and answers "did this redirect really come from us"; this answers a
+// different question at a different layer -- "may this step mint a user" -- and
+// is read by the engine when the step completes, not by the callback. Keep them
+// in step: whatever the callback records there, it records here.
 type FlowVerifiedIdentity struct {
 	Provider string // "google", "github", "saml", ...
 	Subject  string
