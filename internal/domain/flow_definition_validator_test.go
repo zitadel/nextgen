@@ -2104,3 +2104,43 @@ func TestValidateSsoCreationReachability(t *testing.T) {
 		require.Error(t, err, "a collision target that verifies no credential must be rejected")
 	})
 }
+
+// An action named for a reserved outcome would make transition keys ambiguous:
+// the graph could not distinguish an engine-produced edge (a provider callback,
+// an identifier lookup) from a client invoking that action, which is what the
+// callback-only reachability rules read.
+func TestValidateSteps_RejectsReservedOutcomeAsActionName(t *testing.T) {
+	var schema jsonschema.Schema
+	require.NoError(t, json.Unmarshal(userSchemaIDAndPassword, &schema))
+	show := domain.FlowStepCompleteShow
+
+	for _, name := range []string{"identity_unknown", "callback", "user_already_exists", "user_not_found"} {
+		t.Run(name, func(t *testing.T) {
+			def := domain.FlowDefinition{
+				ProjectID:     "project1",
+				Name:          "login",
+				SchemaVersion: "1.0.0",
+				UserSchema:    "https://tenant.com/schemas/idpw-user.json",
+				Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "identifier"},
+				Audience:      domain.FlowDefinitionAudience{AppIDs: []string{"app1"}, TeamIDs: []string{"team1"}},
+				Steps: []domain.FlowDefinitionStep{
+					{
+						Name:   "identifier",
+						Fields: []domain.Field{"email"},
+						Actions: []domain.FlowStepAction{
+							{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+							{Name: name, Kind: domain.FlowActionKindNavigate},
+						},
+						Transitions: map[string]domain.FlowStepTransition{
+							"submit": {Target: "done"},
+							name:     {Target: "done"},
+						},
+					},
+					{Name: "done", Complete: &show},
+				},
+			}
+			_, err := domain.ValidateFlowDefinition(&schema, def)
+			require.Error(t, err, "an action named after a reserved outcome must be rejected")
+		})
+	}
+}

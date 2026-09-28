@@ -340,6 +340,19 @@ function validateStep(step: FlowStep): FlowValidationIssue[] {
         ),
       );
     }
+    // An action sharing a reserved outcome's name makes a transition key
+    // ambiguous: the graph could not say whether the edge came from the engine
+    // or from a client invoking the action, which would defeat the
+    // callback-only reachability rules that read those keys.
+    if ((RESERVED_OUTCOMES as readonly string[]).includes(action.name)) {
+      issues.push(
+        error(
+          "steps",
+          `step ${q(name)}: action name ${q(action.name)} is reserved for an engine outcome and cannot be declared as an action`,
+          name,
+        ),
+      );
+    }
     actionNames.add(action.name);
   }
 

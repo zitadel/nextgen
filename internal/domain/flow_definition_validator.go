@@ -267,6 +267,17 @@ func validateSteps(steps []FlowDefinitionStep) error {
 				return ErrFlowDefinitionInvalid(fmt.Sprintf(
 					"step %q: action name %q is reserved for engine-injected back navigation", step.Name, a.Name), nil)
 			}
+			// An action sharing a reserved outcome's name makes a transition key
+			// ambiguous: the graph could not say whether the edge came from the
+			// engine (a provider callback, an identifier lookup) or from a
+			// client invoking the action. The engine refuses to accept one as a
+			// submitted action, so declaring it would only ever be dead -- and
+			// it would defeat the callback-only reachability rules that read
+			// these keys.
+			if _, reserved := reservedOutcomes[a.Name]; reserved {
+				return ErrFlowDefinitionInvalid(fmt.Sprintf(
+					"step %q: action name %q is reserved for an engine outcome and cannot be declared as an action", step.Name, a.Name), nil)
+			}
 			actionNames[a.Name] = struct{}{}
 		}
 

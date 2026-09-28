@@ -275,6 +275,21 @@ describe("steps", () => {
 
 // ── phase 4: graph / cycles / flip table ─────────────────────────────────────
 
+describe("reserved outcome names", () => {
+  it.each(["identity_unknown", "callback", "user_already_exists", "user_not_found"])(
+    "rejects %s as an action name",
+    (reserved) => {
+      const def = flow();
+      const identifier = step(def, "identifier");
+      identifier.actions.push({ name: reserved, kind: "navigate" });
+      identifier.transitions[reserved] = { target: "done" };
+      expect(messages(validateFlowDefinition(def))).toContain(
+        `step "identifier": action name "${reserved}" is reserved for an engine outcome and cannot be declared as an action`,
+      );
+    },
+  );
+});
+
 describe("graph / cycles / flip-table", () => {
   it("rejects a local transition to an unknown step", () => {
     const def = flow();

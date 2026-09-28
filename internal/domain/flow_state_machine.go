@@ -477,6 +477,17 @@ func (r *FlowStateMachineRuntime) routeOutcome(pc *processCtx, resolved FlowReso
 		return FlowStepResult{}, fmt.Errorf("%w: cross-flow transitions", ErrFlowUnsupported())
 	}
 
+	// Routing user_already_exists is the conflict boundary, whichever path
+	// produced it -- the identifier pre-check in dispatchChallenges, an
+	// on_success collision, or the callback via ResumeWithOutcome. The flow is
+	// no longer creating a user from the external identity, so the proof is
+	// discarded here rather than in any one of those paths: otherwise the
+	// conflict step is handed a sealed state that still authorizes
+	// create_user_with_sso.
+	if outcome == FlowImplicitOutcomeUserAlreadyExists {
+		pc.state.VerifiedIdentity = nil
+	}
+
 	nextStep, ok := pc.def.FindStep(transition.Target)
 	if !ok {
 		return FlowStepResult{}, fmt.Errorf("%w: transition target %q missing from definition", ErrFlowIntegrity(), transition.Target)
@@ -1627,13 +1638,10 @@ func (r *FlowStateMachineRuntime) ResumeWithOutcome(
 // A miss is not an error: the account may have been deleted between the
 // resolution and this call, and the conflict step will simply fail to verify.
 func (r *FlowStateMachineRuntime) bindCollidingUser(pc *processCtx, resolved FlowResolvedFields) error {
-	// Entering the conflict boundary discards the external identity's proof: the
-	// flow is no longer creating a user from it, so it must not linger in the
-	// sealed state. Otherwise a conflict step that routes identity_unknown back
-	// to register-sso would let the stale VerifiedIdentity authorize
-	// create_user_with_sso without a fresh provider callback.
-	pc.state.VerifiedIdentity = nil
-
+	// The external identity's proof is discarded by routeOutcome when it routes
+	// user_already_exists, which every conflict path goes through -- so it is
+	// not cleared here as well.
+	//
 	// Try every unique attribute, not just the identifier, so a collision on
 	// any unique field still pins the owner (mirrors the passkey conflict
 	// path). The identifier is itself unique, so this is strictly broader.
