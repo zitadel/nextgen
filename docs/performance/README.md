@@ -217,7 +217,6 @@ No performance target. The gate is repeatability:
 - Two runs of the same configuration differ by less than 10% on `T` and on p95
   per request type.
 - One stored test result per setup in [`runs/`](runs/), with no empty cells.
-- Spanner base size measured against the PostgreSQL base size.
 
 #### P1: nothing badly broken
 
