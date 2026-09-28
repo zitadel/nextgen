@@ -5956,8 +5956,8 @@ type Branding struct {
 	Schema OptString `json:"$schema"`
 	// Degrade preset (`centered` or `split`) the bundled default template
 	// branches on, and the fallback when a custom template fails validation.
-	// Not the complete design catalog: all named designs (`centered`, `split`,
-	// `split-right`, `hero`, `minimal`) ship as templates and map onto one of
+	// Not a design catalog: the ejectable designs (`centered`, `minimal`)
+	// ship as templates and map onto one of
 	// these two values; switch designs with
 	// `zitadel branding eject --design <name>` instead of editing this field.
 	// Ejected templates may ignore it. Selects a template rather than restyling
@@ -6555,8 +6555,8 @@ func (s *BrandingCreatedPayload) SetHeroURL(val OptString) {
 
 // Degrade preset (`centered` or `split`) the bundled default template
 // branches on, and the fallback when a custom template fails validation.
-// Not the complete design catalog: all named designs (`centered`, `split`,
-// `split-right`, `hero`, `minimal`) ship as templates and map onto one of
+// Not a design catalog: the ejectable designs (`centered`, `minimal`)
+// ship as templates and map onto one of
 // these two values; switch designs with
 // `zitadel branding eject --design <name>` instead of editing this field.
 // Ejected templates may ignore it. Selects a template rather than restyling
@@ -40124,6 +40124,52 @@ func (o OptProjectDeletedEventDelegationType) Or(d ProjectDeletedEventDelegation
 	return d
 }
 
+// NewOptProjectID returns new OptProjectID with value set to v.
+func NewOptProjectID(v ProjectID) OptProjectID {
+	return OptProjectID{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptProjectID is optional ProjectID.
+type OptProjectID struct {
+	Value ProjectID
+	Set   bool
+}
+
+// IsSet returns true if OptProjectID was set.
+func (o OptProjectID) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptProjectID) Reset() {
+	var v ProjectID
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptProjectID) SetTo(v ProjectID) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptProjectID) Get() (v ProjectID, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptProjectID) Or(d ProjectID) ProjectID {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptProjectUpdatedEventDelegationType returns new OptProjectUpdatedEventDelegationType with value set to v.
 func NewOptProjectUpdatedEventDelegationType(v ProjectUpdatedEventDelegationType) OptProjectUpdatedEventDelegationType {
 	return OptProjectUpdatedEventDelegationType{
@@ -59671,6 +59717,9 @@ func (s *UserDeletedEventDelegationType) UnmarshalText(data []byte) error {
 // Requires `team.read` in addition to `user.read`.
 // The two are independent: asking for one says nothing about the other, and
 // neither implies the other's permission.
+// The scope requirements apply to project secrets. A Console session carries
+// no scopes; once it is authorized to list the project's users, it may use
+// both expansions.
 // Ref: #
 type UserExpand string
 
@@ -59736,6 +59785,8 @@ func (s *UserExpand) UnmarshalText(data []byte) error {
 // it is absent from the sort-field enum.
 // Filtering on `team_id` requires `team_membership.read` in addition to
 // `user.read`: it reads the same memberships that `expand: ["teams"]` embeds.
+// A Console session, which carries no scopes, may filter on it once it is
+// authorized to list the project's users.
 // Ref: #
 type UserFilterField string
 

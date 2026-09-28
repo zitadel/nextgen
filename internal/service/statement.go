@@ -188,7 +188,9 @@ type IDPConnectionStatements interface {
 	GetIDPConnection(ctx context.Context, filter database.Filter[domain.IDPConnectionField]) (*domain.IDPConnection, error)
 	// GetIDPConnectionRevision returns the connection at the given revision,
 	// even when a newer one exists. Revision ids are unique per project. An
-	// unknown revision returns *database.NoRowFoundError.
+	// unknown revision returns *database.NoRowFoundError. It serves both the
+	// auth attempt reading its pinned revision and the public
+	// `GET /idps/revisions/{revision_id}` read (#1252).
 	GetIDPConnectionRevision(ctx context.Context, projectID, revisionID string) (*domain.IDPConnection, error)
 	ListIDPConnections(ctx context.Context, filter *database.ListOptions[domain.IDPConnectionField]) (*database.ListResult[*domain.IDPConnection], error)
 	// ListIDPConnectionRevisions pages one connection's revisions newest first.
@@ -322,6 +324,27 @@ type AuthAttemptStatements interface {
 	SetAuthAttemptFactor(ctx context.Context, projectID, authAttemptID string, factor domain.AuthFactor) (checkID string, err error)
 	AuthAttemptChallengeSucceeded(ctx context.Context, projectID, authAttemptID string, factor domain.AuthFactor, challengeID string) error
 	AuthAttemptChallengeFailed(ctx context.Context, projectID, authAttemptID string, challenge domain.AuthChallenge) error
+	// IssueSSOState upserts the attempt's single sso_callback row. It mints the check
+	// id when check.ID is empty and re-mints it on a re-issue, so a stale id cannot
+	// match, and writes lookup_hash = check.StateHash, last_challenged_at = now and
+	// challenge_payload = check.Pending. It clears factor_payload, last_verified_at and
+	// the failure state, so a re-issue never exposes an earlier result. The minted id
+	// is written back onto check.
+	IssueSSOState(ctx context.Context, projectID, authAttemptID string, check *domain.SSOCallbackCheck) error
+	// ConsumeSSOState atomically consumes the pending row whose lookup_hash is stateHash
+	// and returns its check id, AuthAttemptID and Pending. The presented cookie value must
+	// match the record's binding nonce; on a mismatch or an empty value the record is left
+	// pending and ErrSSOStateInvalid is returned, so a caller who knows the state but not
+	// the cookie cannot burn it. Unknown, consumed and expired states return the same
+	// sentinel. An expired attempt is burned and rejected; no expiry check is left to the
+	// caller.
+	ConsumeSSOState(ctx context.Context, projectID, stateHash, bindingNonce string) (*domain.SSOCallbackCheck, error)
+	// SetSSOCallbackResult stores the callback result on the consumed row whose
+	// lookup_hash is stateHash. Returns ErrSSOStateInvalid when no such consumed row
+	// exists, including when a new state was issued since the consume (the hash no
+	// longer matches). The write is once only: a second write on the same consumed
+	// row returns ErrSSOStateInvalid. Never sets last_verified_at.
+	SetSSOCallbackResult(ctx context.Context, projectID, stateHash string, result *domain.SSOCallbackResult) error
 }
 
 // UserQueryOptions carries EAV match/hydrate options for GetUser / ListUsers.
