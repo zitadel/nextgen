@@ -63,9 +63,12 @@ func (h *FlowCreateUserWithSsoHandler) Handle(
 	)
 	// The provider proved who this is, so the user factor is recorded in the
 	// same transaction -- otherwise the session exchanged at the end of the
-	// flow would be bound to a user with no factors at all. There is no
-	// second factor to record: an external sign-in is the one proof this
-	// account has, and the factor that says so is #1033's to add.
+	// flow would be bound to a user with no factors at all. Only the user
+	// factor is recorded: there is no dedicated "external sign-in" check
+	// type yet, so the fact that the proof came from a provider is not
+	// captured as a factor. (#1033 stores the identity link
+	// (connection, subject) -> user, not an auth factor; an idp check type
+	// for audit/policy would be separate work.)
 	recordFactorsAction := &recordAttemptFactorsAction{
 		projectID: in.ProjectID,
 		attemptID: in.State.AuthAttemptID,
