@@ -71,26 +71,29 @@ func (h *Handler) QueryUsers(ctx context.Context, req *api.QueryUsersRequest, pa
 	}
 
 	input := mapQueryUsersToService(projectID, req)
-	// A Console session mints no scopes, so the expansion ceilings below would
-	// refuse it however much its grants allow. It skips them instead (#1300
-	// §4, relaxed): it has just passed the list check on this project, so an
-	// expansion only reads within a project it can list. Decided here, for
-	// this list, rather than in the shared ceiling, so another endpoint does
-	// not inherit it by accepting the cookie. Deriving the two permissions
-	// from the resolver is a follow-up (#1300).
-	session := scopeCtx.PrincipalType == domain.AuthzPrincipalTypeUser
 	// Expanding answers 403 rather than a silently missing property: a caller
 	// could not tell that from "this user has no teams". Filtering on team_id
 	// reads the same memberships by a different route — it answers "who is in
 	// this team", one page at a time — so it takes the same gate.
-	if (input.IncludeTeams || filtersOnTeamID(req.Filter)) && !session {
+	readsMemberships := input.IncludeTeams || filtersOnTeamID(req.Filter)
+	// A Console session mints no scopes, so the resolver answers for it
+	// instead (#1300 §4, see userReadsProject). Decided here, for this list,
+	// rather than in the shared ceiling, so another endpoint does not inherit
+	// it by accepting the cookie.
+	sessionReads := false
+	if readsMemberships || input.IncludeLifecycleOwnerTeam {
+		if sessionReads, err = h.userReadsProject(ctx, projectID); err != nil {
+			return nil, err
+		}
+	}
+	if readsMemberships && !sessionReads {
 		if err := requireMembershipRead(ctx); err != nil {
 			return nil, err
 		}
 	}
 	// The owner team is a different resource under a different permission, so
 	// it is gated on its own rather than folded into the membership check.
-	if input.IncludeLifecycleOwnerTeam && !session {
+	if input.IncludeLifecycleOwnerTeam && !sessionReads {
 		if err := requireTeamRead(ctx); err != nil {
 			return nil, err
 		}

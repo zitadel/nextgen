@@ -15,6 +15,7 @@ import (
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/api/integration_test/test_data"
+	"github.com/zitadel/nextgen/internal/domain"
 )
 
 // TestConsoleManagementAcceptsSession pins #1300 §1: the embedded Console
@@ -450,10 +451,10 @@ func TestConsoleSessionReadsTargetProjectByID(t *testing.T) {
 	})
 }
 
-// TestConsoleSessionExpandsUserTeams pins #1300 §4 (relaxed): a session mints
-// no scopes, so the team_membership.read / team.read ceilings on
-// queryUsers' expansions let a user principal through once it has passed the
-// Check on the target project. The Console's Team column depends on it.
+// TestConsoleSessionExpandsUserTeams pins #1300 §4: a session mints no
+// scopes, so queryUsers' team_membership.read / team.read expansions ask the
+// resolver for read authority on the target project instead. The Console's
+// Team column depends on it.
 func TestConsoleSessionExpandsUserTeams(t *testing.T) {
 	t.Parallel()
 
@@ -484,6 +485,49 @@ func TestConsoleSessionExpandsUserTeams(t *testing.T) {
 	owner, ok := member.Metadata.LifecycleOwnerTeam.Get()
 	require.True(t, ok, "expand lifecycle_owner_team must embed the owner: %s", helpers.MustMarshal(t, member))
 	assert.Equal(t, memberTeamID, owner.ID)
+}
+
+// TestConsoleSessionPartialAccessDoesNotExpand pins #1300 §4 hardened: the
+// expand permissions come from the resolver (viewer on the target project),
+// not from passing the list check. A viewer grant scoped to one team is a
+// foothold, so the list answers with the users that team's scope reaches, but
+// it is not project-wide read authority, so expanding memberships or the
+// owner team is refused.
+func TestConsoleSessionPartialAccessDoesNotExpand(t *testing.T) {
+	t.Parallel()
+
+	console := harness.EnsurePlatformProject(t)
+	operatorID, _ := harness.CreateUserOwnedByTeam(t, console.ID)
+
+	customer, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	_, teamID := harness.CreateUserOwnedByTeam(t, customer.ID)
+	asgn := &domain.AuthzAssignment{
+		ProjectID:     customer.ID,
+		CatalogID:     domain.SystemCatalogID,
+		PrincipalType: domain.AuthzPrincipalTypeUser,
+		PrincipalID:   operatorID,
+		ObjectType:    "project",
+		Relation:      "viewer",
+	}
+	asgn.ApplyScope(domain.NewTeamAssignmentScope(teamID))
+	require.NoError(t, harness.EnsureServiceDB(t).Statements().CreateAuthzAssignment(t.Context(), asgn))
+
+	session := sessionClientForUser(t, operatorID)
+	params := api.QueryUsersParams{ProjectID: api.NewOptProjectID(api.ProjectID(customer.ID))}
+
+	listed, err := session.QueryUsers(t.Context(), &api.QueryUsersRequest{}, params)
+	require.NoError(t, err)
+	require.IsType(t, &api.QueryUsersResponse{}, listed, "the foothold still lists: %s", helpers.MustMarshal(t, listed))
+
+	for _, expand := range []api.UserExpand{api.UserExpandTeams, api.UserExpandLifecycleOwnerTeam} {
+		t.Run(string(expand), func(t *testing.T) {
+			resp, err := session.QueryUsers(t.Context(), &api.QueryUsersRequest{Expand: []api.UserExpand{expand}}, params)
+			require.NoError(t, err)
+			require.IsType(t, &api.QueryUsersForbidden{}, resp, helpers.MustMarshal(t, resp))
+			assert.Equal(t, api.ErrorCode("user.permission_denied"), resp.(*api.QueryUsersForbidden).Code)
+		})
+	}
 }
 
 // TestConsoleManagementBearerIgnoresStaleCookie pins the dual-scheme
