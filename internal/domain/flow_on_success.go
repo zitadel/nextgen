@@ -21,13 +21,9 @@ func ManifestForOnSuccess(o FlowOnSuccess) []FlowFieldChallenge {
 	switch o {
 	case FlowOnSuccessCreateUser:
 		return []FlowFieldChallenge{FlowFieldChallengeIdentifier, FlowFieldChallengePassword}
-	case FlowOnSuccessCreateUserWithSso:
-		// Nothing, deliberately. The identity provider supplies the
-		// identifier and is itself the proof, so demanding either be
-		// collected upstream would reject the very flow this mutation
-		// exists for: a step reached straight from the callback.
-		return nil
 	}
+	// create_user_with_sso deliberately has no manifest: the provider supplies
+	// the identifier and is the proof, so nothing must be collected upstream.
 	return nil
 }
 

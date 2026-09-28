@@ -55,6 +55,7 @@ export const FLOW_VALIDATION_RULES = {
   "schema/fields-resolve": { goRef: "resolveAllStepFields" },
   "schema/passkey-actions": { goRef: "validatePasskeyActionsEnabled" },
   "schema/on-success-manifest": { goRef: "validateOnSuccessManifests" },
+  "sso/create-only-via-callback": { goRef: "validateSsoCreationReachability" },
   "warn/password-without-identifier": { goRef: null },
 } as const;
 
@@ -166,6 +167,7 @@ export function validateFlowDefinition(flow: object, schema?: object): FlowValid
       issues.push(...validateCycles(def));
     }
     issues.push(...validateFlipTableCoverage(def));
+    issues.push(...validateSsoCreationOnlyViaCallback(def));
   }
 
   // Schema-dependent phases: only meaningful over structurally sound
@@ -559,6 +561,49 @@ function validateCycles(def: FlowDef): FlowValidationIssue[] {
           step.name,
         ),
       );
+    }
+  }
+  return issues;
+}
+
+// validateSsoCreationOnlyViaCallback mirrors validateSsoCreationReachability in
+// flow_definition_validator.go: create_user_with_sso mints a user with no
+// credential, so it must never be a purpose entry and only the identity_unknown
+// outcome may target it. Catches at plan time what the runtime handler refuses.
+function validateSsoCreationOnlyViaCallback(def: FlowDef): FlowValidationIssue[] {
+  const issues: FlowValidationIssue[] = [];
+  const entrySteps = new Set(def.purposes.values());
+  const incoming = new Map<string, string[]>();
+  for (const s of def.steps) {
+    for (const [key, t] of s.transitions) {
+      if (t.action === null) {
+        const keys = incoming.get(t.target) ?? [];
+        keys.push(key);
+        incoming.set(t.target, keys);
+      }
+    }
+  }
+  for (const step of def.steps) {
+    if (step.onSuccess !== "create_user_with_sso") continue;
+    if (entrySteps.has(step.name)) {
+      issues.push(
+        error(
+          "sso/create-only-via-callback",
+          `step ${q(step.name)} runs create_user_with_sso but is a purpose entry step; it must only be reached from an identity-provider callback`,
+          step.name,
+        ),
+      );
+    }
+    for (const key of incoming.get(step.name) ?? []) {
+      if (key !== "identity_unknown") {
+        issues.push(
+          error(
+            "sso/create-only-via-callback",
+            `step ${q(step.name)} runs create_user_with_sso but is reachable via ${q(key)}; it must only be reached from the "identity_unknown" outcome`,
+            step.name,
+          ),
+        );
+      }
     }
   }
   return issues;

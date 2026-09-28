@@ -402,6 +402,85 @@ describe("graph / cycles / flip-table", () => {
   });
 });
 
+describe("sso/create-only-via-callback", () => {
+  const rule = "sso/create-only-via-callback";
+
+  function ssoIssues(def: TestFlow): FlowValidationIssue[] {
+    return validateFlowDefinition(def).filter((i) => i.rule === rule);
+  }
+
+  // Mirrors TestValidateSsoCreationReachability in flow_definition_validator.go:
+  // create_user_with_sso mints a user with no credential, so the step running it
+  // must never be a purpose entry and must only be reached from identity_unknown.
+
+  it("rejects create_user_with_sso as a purpose entry step", () => {
+    const def = flow();
+    def.purposes = { register: "signup" };
+    def.steps = [
+      {
+        name: "signup",
+        fields: ["email"],
+        on_success: "create_user_with_sso",
+        actions: [{ name: "submit", kind: "submit" }],
+        transitions: { submit: { target: "done" } },
+      },
+      { name: "done", complete: "show" },
+    ];
+    expect(messages(ssoIssues(def))).toContain(
+      'step "signup" runs create_user_with_sso but is a purpose entry step; it must only be reached from an identity-provider callback',
+    );
+  });
+
+  it("rejects create_user_with_sso reached via a plain submit", () => {
+    const def = flow();
+    def.purposes = { register: "identifier" };
+    def.steps = [
+      {
+        name: "identifier",
+        fields: ["email"],
+        actions: [{ name: "submit", kind: "submit" }],
+        transitions: { submit: { target: "make" } },
+      },
+      {
+        name: "make",
+        fields: ["email"],
+        on_success: "create_user_with_sso",
+        actions: [{ name: "submit", kind: "submit" }],
+        transitions: { submit: { target: "done" } },
+      },
+      { name: "done", complete: "show" },
+    ];
+    expect(messages(ssoIssues(def))).toContain(
+      'step "make" runs create_user_with_sso but is reachable via "submit"; it must only be reached from the "identity_unknown" outcome',
+    );
+  });
+
+  it("accepts create_user_with_sso reached only via identity_unknown", () => {
+    const def = flow();
+    def.purposes = { login: "identifier" };
+    def.steps = [
+      {
+        name: "identifier",
+        fields: ["email"],
+        actions: [{ name: "submit", kind: "submit" }],
+        transitions: {
+          submit: { target: "done" },
+          identity_unknown: { target: "register-sso" },
+        },
+      },
+      {
+        name: "register-sso",
+        fields: ["email"],
+        on_success: "create_user_with_sso",
+        actions: [{ name: "submit", kind: "submit" }],
+        transitions: { submit: { target: "done" } },
+      },
+      { name: "done", complete: "show" },
+    ];
+    expect(ssoIssues(def)).toEqual([]);
+  });
+});
+
 // ── phase 5: schema-dependent rules ──────────────────────────────────────────
 
 describe("schema-dependent rules", () => {
