@@ -203,9 +203,8 @@ Three layers, in precedence order:
 ## Agent UX
 
 The CLI should expose the renderer choice as a flag *and* in capabilities once
-a second renderer is available (direction — today the shipped knobs are
-`setup --design` for the login design and the ADR 044 posture derivation;
-there is no `--renderer` flag):
+a second renderer is available (direction — today the shipped knob is the
+ADR 044 posture derivation; there is no `--renderer` flag):
 
 ```
 zitadel setup --renderer web-component

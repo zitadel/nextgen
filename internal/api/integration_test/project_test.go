@@ -129,6 +129,7 @@ func TestCreateProject(t *testing.T) {
 
 			require.IsType(t, &api.CreateProjectResponse{}, resp, helpers.MustMarshal(t, resp))
 			got := resp.(*api.CreateProjectResponse)
+			harness.CleanupProject(t, got.ID)
 			assert.NotEmpty(t, got.ID)
 			assert.Equal(t, tc.req.Name, got.Name)
 			assert.NotEmpty(t, got.ProjectSecret)
@@ -214,6 +215,7 @@ func TestCreateProjectSkipsDefaultLoginFlow(t *testing.T) {
 	require.NoError(t, err)
 	require.IsType(t, &api.CreateProjectResponse{}, resp, helpers.MustMarshal(t, resp))
 	projectID := resp.(*api.CreateProjectResponse).ID
+	harness.CleanupProject(t, projectID)
 
 	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
 	_, err = harness.EnsureSchemaStore(t).GetJSONSchemaByID(
