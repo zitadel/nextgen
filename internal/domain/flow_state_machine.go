@@ -603,6 +603,11 @@ func (r *FlowStateMachineRuntime) processSubmit(pc *processCtx, resolved FlowRes
 		// inside its own transaction; only the flow state needs the id.
 		recordResolvedUser(pc.state, result.UserID)
 	}
+	if result.Outcome != "" {
+		// The mutation resolved to a flow outcome (e.g. user_already_exists);
+		// route its declared transition instead of the submitted action.
+		return r.routeOutcome(pc, resolved, result.Outcome, result.Irreversible)
+	}
 	return r.routeOutcome(pc, resolved, pc.in.Action, result.Irreversible)
 }
 

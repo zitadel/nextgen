@@ -91,8 +91,12 @@ func (h *FlowCreateUserWithSsoHandler) Handle(
 	}
 
 	if err := h.userService.ApplyActions(ctx, createUserAction, recordFactorsAction); err != nil {
+		// The identifier pre-check passed but the insert lost the unique
+		// race: the provider's email already has an account. Route the
+		// user_already_exists outcome (to the conflict step) rather than
+		// re-rendering -- the user cannot change the address the provider gave.
 		if derr, ok := errors.AsType[domain.Error](err); ok && derr.Code == domain.ErrUserAlreadyExists().Code {
-			return domain.FlowOnSuccessResult{StepError: new("user_already_exists")}, nil
+			return domain.FlowOnSuccessResult{Outcome: domain.FlowImplicitOutcomeUserAlreadyExists}, nil
 		}
 		return domain.FlowOnSuccessResult{}, err
 	}

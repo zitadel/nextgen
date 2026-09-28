@@ -149,3 +149,48 @@ func TestFlowCreateUserWithSso_RecordsUserAndSsoFactors(t *testing.T) {
 	assert.Equal(t, "google", ssoFactor.Provider)
 	assert.Equal(t, "sub-123", ssoFactor.Subject)
 }
+
+// When the provider's email already has an account, the create loses the unique
+// race and the handler must route the user_already_exists outcome (to the
+// conflict step) rather than re-rendering the step with an error -- the user
+// cannot change the address the provider gave.
+func TestFlowCreateUserWithSso_RoutesUserAlreadyExistsOnCollision(t *testing.T) {
+	f := newSsoHandlerFixture(t)
+
+	f.stmts.EXPECT().NewManagedID(string(domain.PrefixUser)).Return("user_sso0002", nil)
+	f.schemaStore.EXPECT().
+		GetJSONSchemaByID(gomock.Any(), "proj_1", "https://example.test/schema.json").
+		Return(&domain.JSONSchema{
+			ProjectID: "proj_1",
+			URL:       "https://example.test/schema.json",
+			Schema:    []byte(passwordHandlerTestSchema),
+		}, nil)
+	// The DB reports the unique-constraint violation; applyCreateUser
+	// translates it to ErrUserAlreadyExists, which the handler routes.
+	f.stmts.EXPECT().CreateUser(gomock.Any(), gomock.Any()).
+		Return(database.NewUniqueError("users", "users_email_key", nil))
+	f.stmts.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	f.v2Pool.EXPECT().Transaction(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(ctx context.Context, fn func(context.Context, service.Statementer[service.AllStatements]) error) error {
+			return fn(ctx, v2TestTx{stmts: f.stmts})
+		})
+
+	out, err := f.handler.Handle(t.Context(), domain.FlowOnSuccessInput{
+		ProjectID:     "proj_1",
+		UserSchemaURL: "https://example.test/schema.json",
+		State: &domain.FlowState{
+			ProjectID:        "proj_1",
+			AuthAttemptID:    "att-1",
+			VerifiedIdentity: &domain.FlowVerifiedIdentity{Provider: "google", Subject: "sub-123"},
+			FlowProgress: domain.FlowProgress{
+				CollectedData: domain.CollectedFlowData{
+					UserData: map[string]any{"email": "alice@example.com"},
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.Nil(t, out.StepError, "a collision must route an outcome, not re-render a step error")
+	assert.Equal(t, domain.FlowImplicitOutcomeUserAlreadyExists, out.Outcome)
+	assert.Empty(t, out.UserID, "no user is created on a collision")
+}
