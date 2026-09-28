@@ -31,6 +31,8 @@ type AllStatements interface {
 	JSONSchemaStatements
 	EnvironmentStatements
 	ReleaseStatements
+	IDPConnectionStatements
+	DeploymentStatements
 	TeamStatements
 	TeamMembershipStatements
 	TokenStatements
@@ -64,6 +66,11 @@ type ProjectStatements interface {
 	CreateProject(ctx context.Context, entity *domain.Project) error
 	GetProjectByID(ctx context.Context, id string) (*domain.Project, error)
 	UpdateProject(ctx context.Context, entity *domain.Project) error
+	// SetProjectPasswordHashPolicy writes the hashing method the project's
+	// passwords are written with. A nil policy clears the choice, which returns
+	// the project to the deployment default. Returns a [database.NoRowFoundError]
+	// when no project carries the id.
+	SetProjectPasswordHashPolicy(ctx context.Context, projectID string, policy *domain.PasswordHashPolicy) error
 	ListProjects(ctx context.Context, filter *database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error)
 	// DeleteProjectByID removes the project. changed is false when no row matched.
 	DeleteProjectByID(ctx context.Context, id string) (changed bool, err error)
@@ -150,7 +157,72 @@ type ReleaseStatements interface {
 	// assembling a release resolves an identical pinned set to the release that
 	// already holds it rather than writing a second one.
 	GetReleaseByContentHash(ctx context.Context, projectID, contentHash string) (*domain.Release, error)
+	// GetReleasesByIDs reads the named releases in one round trip, for
+	// hydrating an expanded deployment list (ADR 059). Unknown ids are simply
+	// absent from the result, not an error.
+	GetReleasesByIDs(ctx context.Context, projectID string, ids []string) ([]*domain.Release, error)
 	ListReleases(ctx context.Context, filter *database.ListOptions[domain.ReleaseField]) (*database.ListResult[*domain.Release], error)
+}
+
+// IDPConnectionStatements persists identity provider connections and their
+// revisions. An edit appends a revision instead of rewriting one, so a caller
+// can pin a revision and keep reading it.
+//
+// No column records which revision is newest (ADR 063 §7): it is the one with
+// the greatest created_at.
+type IDPConnectionStatements interface {
+	Statements
+	// CreateIDPConnection writes the connection, its first revision and the
+	// resource-scope row in one transaction, and sets the ids and timestamps on
+	// entity. A slug already used in the project returns *database.UniqueError.
+	CreateIDPConnection(ctx context.Context, entity *domain.IDPConnection) error
+	// ReviseIDPConnection appends a revision holding entity.Document and sets
+	// RevisionID and UpdatedAt on entity; CreatedAt stays as the caller had it.
+	//
+	// An unknown connection returns *database.NoRowFoundError. Two revisions of
+	// one connection created in the same instant have no newest, so the second
+	// returns *database.UniqueError.
+	ReviseIDPConnection(ctx context.Context, entity *domain.IDPConnection) error
+	// GetIDPConnection returns the connection matching filter at its newest
+	// revision. No match returns *database.NoRowFoundError.
+	GetIDPConnection(ctx context.Context, filter database.Filter[domain.IDPConnectionField]) (*domain.IDPConnection, error)
+	// GetIDPConnectionRevision returns the connection at the given revision,
+	// even when a newer one exists. Revision ids are unique per project. An
+	// unknown revision returns *database.NoRowFoundError.
+	GetIDPConnectionRevision(ctx context.Context, projectID, revisionID string) (*domain.IDPConnection, error)
+	ListIDPConnections(ctx context.Context, filter *database.ListOptions[domain.IDPConnectionField]) (*database.ListResult[*domain.IDPConnection], error)
+	// ListIDPConnectionRevisions pages one connection's revisions newest first.
+	// The endpoint offers no filter or sort, so page carries only the limit and
+	// the cursor. An unknown connection returns an empty page, so a handler
+	// needs GetIDPConnection to tell that from a connection with no revisions.
+	ListIDPConnectionRevisions(ctx context.Context, projectID, connectionID string, page database.Page[domain.IDPConnectionField]) (*database.ListResult[*domain.IDPConnection], error)
+}
+
+// TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
+// type DeploymentPool interface {
+// 	Statementer[DeploymentStatements]
+// 	Transactioner[DeploymentStatements]
+// }
+
+type DeploymentStatements interface {
+	Statements
+	// CreateDeployment inserts the deployment and points the environment's
+	// current_deployment_id at it, atomically. A non-nil
+	// expectedCurrentDeploymentID makes the swap conditional: when the
+	// environment's current deployment is not exactly that one, nothing is
+	// written and domain.ErrDeploymentConflict reports what actually runs.
+	// An environment that does not exist is a NoRowFoundError.
+	//
+	// Idempotent on the running release: when the environment's current
+	// deployment already points at entity's release, nothing is written,
+	// entity is overwritten with that existing record, and created is false.
+	CreateDeployment(ctx context.Context, entity *domain.Deployment, expectedCurrentDeploymentID *string) (created bool, err error)
+	GetDeploymentByID(ctx context.Context, projectID, id string) (*domain.Deployment, error)
+	// GetDeploymentsByIDs reads the named deployments in one round trip, for
+	// hydrating current_deployment on environment reads. Unknown ids are
+	// simply absent from the result, not an error.
+	GetDeploymentsByIDs(ctx context.Context, projectID string, ids []string) ([]*domain.Deployment, error)
+	ListDeployments(ctx context.Context, filter *database.ListOptions[domain.DeploymentField]) (*database.ListResult[*domain.Deployment], error)
 }
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods

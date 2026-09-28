@@ -234,6 +234,8 @@ func TestOgenErrorHandlerDualSchemeInvalidCookieStaysCredentialNeutral(t *testin
 		api.DeleteGrantOperation,
 		api.QueryGrantsOperation,
 		api.QueryUsersOperation,
+		api.QueryTeamsOperation,
+		api.GetTeamOperation,
 	} {
 		require.False(t, sessionCookieOperations[op], "%s must stay off the session-only 401 rewrite", op)
 	}
@@ -249,6 +251,8 @@ func TestOgenErrorHandlerDualSchemeInvalidCookieStaysCredentialNeutral(t *testin
 		{"grant delete", http.MethodDelete, "/grants/asgn_1?project_id=proj_1", ""},
 		{"grant query", http.MethodPost, "/grants/query?project_id=proj_1", `{}`},
 		{"users query", http.MethodPost, "/users/query", `{}`},
+		{"teams query", http.MethodPost, "/teams/query?project_id=proj_1", `{}`},
+		{"team get", http.MethodGet, "/teams/team_1", ""},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -288,6 +292,8 @@ func TestOgenErrorHandlerAnonymousSessionOnDualSchemeStays401(t *testing.T) {
 		{"grant delete", http.MethodDelete, "/grants/asgn_1?project_id=proj_1", ""},
 		{"grant query", http.MethodPost, "/grants/query?project_id=proj_1", `{}`},
 		{"users query", http.MethodPost, "/users/query", `{}`},
+		{"teams query", http.MethodPost, "/teams/query?project_id=proj_1", `{}`},
+		{"team get", http.MethodGet, "/teams/team_1", ""},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

@@ -45,9 +45,13 @@ var operationRolesNextgenSession = map[string][]string{
 	GetGrantOperation:        []string{},
 	GetMySessionOperation:    []string{},
 	GetMyUserOperation:       []string{},
+	GetProjectOperation:      []string{},
+	GetTeamOperation:         []string{},
 	ListMyProjectsOperation:  []string{},
 	PatchMyUserOperation:     []string{},
+	PatchProjectOperation:    []string{},
 	QueryGrantsOperation:     []string{},
+	QueryTeamsOperation:      []string{},
 	QueryUsersOperation:      []string{},
 	RevokeMySessionOperation: []string{},
 }
@@ -83,6 +87,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	CreateBrandingOperation: []string{
 		"branding.write",
+	},
+	CreateDeploymentOperation: []string{
+		"deployment.write",
 	},
 	CreateFlowDefinitionOperation: []string{
 		"flow_definition.write",
@@ -138,6 +145,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	GetClaimStatusOperation: []string{
 		"project.write",
 	},
+	GetDeploymentByIdOperation: []string{
+		"deployment.read",
+	},
 	GetEnvironmentByNameOperation: []string{
 		"environment.read",
 	},
@@ -188,6 +198,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	ListBrandingOperation: []string{
 		"branding.read",
+	},
+	ListDeploymentsOperation: []string{
+		"deployment.read",
 	},
 	ListEnvironmentsOperation: []string{
 		"environment.read",

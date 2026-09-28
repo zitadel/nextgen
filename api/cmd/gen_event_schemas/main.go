@@ -60,6 +60,8 @@ var payloadByEventType = map[string]string{
 
 	"release.created": "release-created-payload.yaml",
 
+	"deployment.created": "deployment-created-payload.yaml",
+
 	"authz.granted": "authz-granted-payload.yaml",
 	"authz.revoked": "authz-granted-payload.yaml",
 

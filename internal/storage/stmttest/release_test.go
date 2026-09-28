@@ -222,3 +222,25 @@ func TestReleaseStatements_ProjectDeleteCascades(t *testing.T) {
 		assert.Empty(t, result.Items)
 	})
 }
+
+func TestReleaseStatements_GetByIDs(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureReleaseProject(t, d.stmts)
+		relA := createRelease(t, d.stmts, projectID, "000a", domain.ReleaseMetadata{})
+		relB := createRelease(t, d.stmts, projectID, "000b", domain.ReleaseMetadata{})
+
+		// Unknown ids are simply absent, not an error: the caller hydrates
+		// whatever ids it holds.
+		got, err := d.stmts.GetReleasesByIDs(t.Context(), projectID, []string{relA.ID, relB.ID, "rel_does_not_exist"})
+		require.NoError(t, err)
+		gotIDs := make([]string, 0, len(got))
+		for _, entity := range got {
+			gotIDs = append(gotIDs, entity.ID)
+		}
+		assert.ElementsMatch(t, []string{relA.ID, relB.ID}, gotIDs)
+
+		empty, err := d.stmts.GetReleasesByIDs(t.Context(), projectID, nil)
+		require.NoError(t, err)
+		assert.Empty(t, empty)
+	})
+}

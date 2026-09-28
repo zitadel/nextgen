@@ -18,11 +18,15 @@ import { Input } from "@/components/ui/input";
 
 import { api } from "../api/zitadel";
 import { describeError } from "../lib/api-error";
-import { getConsoleProjectId } from "../runtime/runtime";
 
 /**
- * Give somebody admin access to this project by their email address (#1236,
+ * Give somebody admin access to a project by their email address (#1236,
  * journey in #769).
+ *
+ * **The project is the caller's.** The admins section of a project's page
+ * renders this, so the grant is created against that route's `projectId` —
+ * never the console's own platform project, whose grants are not the ones
+ * anyone means (#1238).
  *
  * **The field holds the designated identifier.** A schema designates which
  * property identifies a user (ADR 058); in the default schema that is the email
@@ -45,7 +49,16 @@ import { getConsoleProjectId } from "../runtime/runtime";
  * screen behind the dialog, so a grant that was really created shows up as a
  * row; one that was not, does not.
  */
-export function AddAdminDialog({ children, onAdded }: { children: ReactNode; onAdded: () => void }) {
+export function AddAdminDialog({
+  children,
+  projectId,
+  onAdded,
+}: {
+  children: ReactNode;
+  /** The project the grant is created on. */
+  projectId: string;
+  onAdded: () => void;
+}) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -65,6 +78,7 @@ export function AddAdminDialog({ children, onAdded }: { children: ReactNode; onA
             address or its error behind. */}
         {open && (
           <AddAdminForm
+            projectId={projectId}
             onDone={() => {
               setOpen(false);
               onAdded();
@@ -82,10 +96,17 @@ export const NEUTRAL_MESSAGE =
   "If the user exists in our system, they have been granted access to your project.";
 
 /** What the operator's own address gets instead, since the API refuses it. */
-export const SELF_MESSAGE =
-  "You already have access to this project. Enter a colleague's address.";
+export const SELF_MESSAGE = "You already have access to this project. Enter a colleague's address.";
 
-function AddAdminForm({ onDone, onCancel }: { onDone: () => void; onCancel: () => void }) {
+function AddAdminForm({
+  projectId,
+  onDone,
+  onCancel,
+}: {
+  projectId: string;
+  onDone: () => void;
+  onCancel: () => void;
+}) {
   const { session } = useRouteContext({ from: "/_authed" });
   const self = session.user?.identifier;
   const inputId = useId();
@@ -107,10 +128,7 @@ function AddAdminForm({ onDone, onCancel }: { onDone: () => void; onCancel: () =
     setSubmitting(true);
     setError(undefined);
     try {
-      await api.createGrant(
-        { user: { identifier }, relation: "admin" },
-        { project_id: getConsoleProjectId() },
-      );
+      await api.createGrant({ user: { identifier }, relation: "admin" }, { project_id: projectId });
       toast(NEUTRAL_MESSAGE);
       onDone();
     } catch (cause) {

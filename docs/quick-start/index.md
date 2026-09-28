@@ -27,6 +27,12 @@ npx @zitadel/cli@alpha setup --server local
 npm run dev
 ```
 
+`start` also creates a local admin, `admin@zitadel.localhost`, and ends by
+printing a one-time sign-in link for the management console. `setup --server
+local` by default attaches the new project to that admin's team and prints
+`Project owned by admin@zitadel.localhost (team ...)`, so the project is
+already owned and `zitadel claim` has nothing to do.
+
 Open the dev server URL printed by Next.js, then complete the browser proof:
 
 ```text
@@ -74,6 +80,9 @@ are hostname-based, so those spellings are not interchangeable.
 | Management console | http://localhost:8080/ui/console/ |
 | Sign-in shell (`<zitadel-login>`) | http://localhost:8080/ui/login/ |
 | Health check | http://localhost:8080/healthz |
+
+Sign in with `npx @zitadel/cli@alpha console`; the bare console URL asks for a
+password that is never printed.
 
 ## Manual Docker Compose
 

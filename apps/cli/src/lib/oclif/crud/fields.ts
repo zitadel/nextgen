@@ -36,7 +36,7 @@ export type BodyField = Readonly<{
 }>;
 
 /** Flags the write commands own; a body field of the same name stays raw-body only. */
-const RESERVED = new Set(["data", "file", "json", "cwd", "server", "force", "environment", "help"]);
+const RESERVED = new Set(["data", "file", "json", "cwd", "server", "force", "help"]);
 
 const kebab = (name: string): string => name.replaceAll("_", "-");
 
@@ -76,13 +76,25 @@ const kindOf = (type: ZodLike | undefined): FieldKind | undefined => {
 };
 
 /**
+ * The field map of a generated object schema, or `undefined` for anything that
+ * is not a plain object. Zod's own schema type does not surface `shape` on its
+ * public face, so the read is expressed against the {@link ZodLike} view the
+ * rest of this factory walks — declared once because both the field reader and
+ * {@link needsRawBody} need it.
+ */
+const objectShape = (schema: Schema): Record<string, ZodLike> | undefined => {
+  const shape: Record<string, ZodLike> | undefined = (schema as ZodLike).shape;
+  return isObject(shape) ? shape : undefined;
+};
+
+/**
  * Read the body fields of a generated request schema. Returns an empty list
  * for anything that is not a plain object schema, so the caller degrades to
  * `--data` / `--file`.
  */
 export const describeBody = (schema: Schema): readonly BodyField[] => {
-  const shape = (schema as { shape?: Record<string, ZodLike> }).shape;
-  if (!isObject(shape)) {
+  const shape = objectShape(schema);
+  if (!shape) {
     return [];
   }
   return Object.entries(shape).flatMap(([name, field]): BodyField[] => {
@@ -206,6 +218,21 @@ const parsePair = (raw: string, flag: string): readonly [string, unknown] => {
     throw new ZitadelError("E_VALIDATION", `Invalid --${flag} "${raw}"`, { hint });
   }
   return [secretChecked(raw.slice(0, plain), flag), raw.slice(plain + 1)];
+};
+
+/**
+ * Whether the schema carries a property no flag can express — a nested object
+ * or an array, which {@link describeBody} leaves out. Such a body can only be
+ * given in full through `--data` / `--file`, so a command that has one offers
+ * no flags-only example: `grants create --relation viewer` names no principal,
+ * and the platform answers `grant.invalid` rather than creating anything.
+ */
+export const needsRawBody = (schema: Schema): boolean => {
+  const shape = objectShape(schema);
+  if (!shape) {
+    return false;
+  }
+  return Object.values(shape).some((field) => kindOf(unwrap(field)) === undefined);
 };
 
 /** One example invocation using the required fields, for a command's `examples`. */
