@@ -47,14 +47,9 @@ func (h *FlowCreateUserWithSsoHandler) Handle(
 	ctx context.Context,
 	in domain.FlowOnSuccessInput,
 ) (domain.FlowOnSuccessResult, error) {
-	// Guard: this mutation mints a user with no password, so it must only run
-	// when a provider callback actually verified an identity in this flow.
-	// Without it, a submit-only flow could route here and create an account
-	// with no proof of identity at all.
-	if !in.State.VerifiedIdentity.Valid() {
-		return domain.FlowOnSuccessResult{}, fmt.Errorf("%w: create_user_with_sso without a verified identity", domain.ErrFlowIntegrity())
-	}
-
+	// The guard that refuses this mutation without a verified identity lives on
+	// #1280 (feat/flow-create-user-with-sso), which merges first. This PR only
+	// records the identity the callback verified; the two meet in main.
 	userID, err := h.db.Statements().NewManagedID(string(domain.PrefixUser))
 	if err != nil {
 		return domain.FlowOnSuccessResult{}, fmt.Errorf("create_user_with_sso: mint user id: %w", err)
