@@ -19,8 +19,8 @@ type CreatePolicyInput struct {
 
 // PolicyService publishes and resolves immutable policy revisions (ADR 066).
 // Revisions are create-only; evaluation resolves the newest revision per
-// operation and audience, which makes the service the [policy.Resolver] the
-// gates read from.
+// operation, which makes the service the [policy.Resolver] the gates read
+// from.
 type PolicyService struct {
 	v2Pool *DB
 	engine *policy.Engine
@@ -57,10 +57,7 @@ func (s *PolicyService) Create(ctx context.Context, input CreatePolicyInput) (*d
 			ProjectID:  entity.ProjectID,
 			EntityType: "policy",
 			EntityID:   entity.ID,
-			Payload: domain.PolicyPayload{
-				Operation: entity.Operation,
-				TeamIDs:   entity.Audience.TeamIDs,
-			},
+			Payload:    domain.PolicyPayload{Operation: entity.Operation},
 		})
 	}); err != nil {
 		if _, ok := errors.AsType[*database.IntegrityViolationError](err); ok {
@@ -99,21 +96,19 @@ func (s *PolicyService) List(ctx context.Context, projectID string) ([]*domain.P
 	return result.Items, nil
 }
 
-// Resolve implements [policy.Resolver]: among the operation's stored
-// revisions the most specific matching audience wins (ADR 065), newest first
-// within a tier; nil when the project has authored nothing, so the caller
-// falls back to the template defaults.
-func (s *PolicyService) Resolve(ctx context.Context, projectID, operation string, hint policy.Hint) (*policy.Instance, error) {
+// Resolve implements [policy.Resolver]: the newest stored revision for the
+// operation; nil when the project has authored nothing, so the caller falls
+// back to the template defaults.
+func (s *PolicyService) Resolve(ctx context.Context, projectID, operation string) (*policy.Instance, error) {
 	result, err := s.v2Pool.Statements().ListPolicies(
 		WithAuthzListUnrestricted(ctx),
-		policystore.ListOperationOptions(projectID, operation, maxPolicyListRevisions),
+		policystore.ListOperationOptions(projectID, operation, 1),
 	)
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to resolve policy revision")
 	}
-	resolver := policy.NewStaticResolver()
-	for _, revision := range result.Items {
-		resolver.Add(projectID, revision.Instance())
+	if len(result.Items) == 0 {
+		return nil, nil
 	}
-	return resolver.Resolve(ctx, projectID, operation, hint)
+	return result.Items[0].Instance(), nil
 }

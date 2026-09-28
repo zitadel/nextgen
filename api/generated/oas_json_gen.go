@@ -56445,39 +56445,6 @@ func (s *OptPatchUserRequestAttributes) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes PolicyAudience as json.
-func (o OptPolicyAudience) Encode(e *jx.Encoder) {
-	if !o.Set {
-		return
-	}
-	o.Value.Encode(e)
-}
-
-// Decode decodes PolicyAudience from json.
-func (o *OptPolicyAudience) Decode(d *jx.Decoder) error {
-	if o == nil {
-		return errors.New("invalid: unable to decode OptPolicyAudience to nil")
-	}
-	o.Set = true
-	if err := o.Value.Decode(d); err != nil {
-		return err
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s OptPolicyAudience) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *OptPolicyAudience) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
 // Encode encodes PolicyCreatedEventDelegationType as json.
 func (o OptPolicyCreatedEventDelegationType) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -61939,12 +61906,6 @@ func (s Policy) encodeFields(e *jx.Encoder) {
 				s.Kind.Encode(e)
 			}
 			{
-				if s.Audience.Set {
-					e.FieldStart("audience")
-					s.Audience.Encode(e)
-				}
-			}
-			{
 				e.FieldStart("config")
 				s.Config.Encode(e)
 			}
@@ -62011,82 +61972,6 @@ func (s Policy) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *Policy) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode implements json.Marshaler.
-func (s *PolicyAudience) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-// encodeFields encodes fields.
-func (s *PolicyAudience) encodeFields(e *jx.Encoder) {
-	{
-		if s.TeamIds != nil {
-			e.FieldStart("team_ids")
-			e.ArrStart()
-			for _, elem := range s.TeamIds {
-				e.Str(elem)
-			}
-			e.ArrEnd()
-		}
-	}
-}
-
-var jsonFieldsNameOfPolicyAudience = [1]string{
-	0: "team_ids",
-}
-
-// Decode decodes PolicyAudience from json.
-func (s *PolicyAudience) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode PolicyAudience to nil")
-	}
-
-	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		switch string(k) {
-		case "team_ids":
-			if err := func() error {
-				s.TeamIds = make([]string, 0)
-				if err := d.Arr(func(d *jx.Decoder) error {
-					var elem string
-					v, err := d.Str()
-					elem = string(v)
-					if err != nil {
-						return err
-					}
-					s.TeamIds = append(s.TeamIds, elem)
-					return nil
-				}); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"team_ids\"")
-			}
-		default:
-			return errors.Errorf("unexpected field %q", k)
-		}
-		return nil
-	}); err != nil {
-		return errors.Wrap(err, "decode PolicyAudience")
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *PolicyAudience) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *PolicyAudience) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -62691,21 +62576,10 @@ func (s *PolicyCreatedPayload) encodeFields(e *jx.Encoder) {
 			s.Operation.Encode(e)
 		}
 	}
-	{
-		if s.TeamIds != nil {
-			e.FieldStart("team_ids")
-			e.ArrStart()
-			for _, elem := range s.TeamIds {
-				e.Str(elem)
-			}
-			e.ArrEnd()
-		}
-	}
 }
 
-var jsonFieldsNameOfPolicyCreatedPayload = [2]string{
+var jsonFieldsNameOfPolicyCreatedPayload = [1]string{
 	0: "operation",
-	1: "team_ids",
 }
 
 // Decode decodes PolicyCreatedPayload from json.
@@ -62725,25 +62599,6 @@ func (s *PolicyCreatedPayload) Decode(d *jx.Decoder) error {
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"operation\"")
-			}
-		case "team_ids":
-			if err := func() error {
-				s.TeamIds = make([]string, 0)
-				if err := d.Arr(func(d *jx.Decoder) error {
-					var elem string
-					v, err := d.Str()
-					elem = string(v)
-					if err != nil {
-						return err
-					}
-					s.TeamIds = append(s.TeamIds, elem)
-					return nil
-				}); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"team_ids\"")
 			}
 		default:
 			return d.Skip()
@@ -62921,23 +62776,16 @@ func (s *PolicyUserPasswordSave) encodeFields(e *jx.Encoder) {
 		s.Operation.Encode(e)
 	}
 	{
-		if s.Audience.Set {
-			e.FieldStart("audience")
-			s.Audience.Encode(e)
-		}
-	}
-	{
 		e.FieldStart("config")
 		s.Config.Encode(e)
 	}
 }
 
-var jsonFieldsNameOfPolicyUserPasswordSave = [5]string{
+var jsonFieldsNameOfPolicyUserPasswordSave = [4]string{
 	0: "$schema",
 	1: "kind",
 	2: "operation",
-	3: "audience",
-	4: "config",
+	3: "config",
 }
 
 // Decode decodes PolicyUserPasswordSave from json.
@@ -62979,18 +62827,8 @@ func (s *PolicyUserPasswordSave) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"operation\"")
 			}
-		case "audience":
-			if err := func() error {
-				s.Audience.Reset()
-				if err := s.Audience.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"audience\"")
-			}
 		case "config":
-			requiredBitSet[0] |= 1 << 4
+			requiredBitSet[0] |= 1 << 3
 			if err := func() error {
 				if err := s.Config.Decode(d); err != nil {
 					return err
@@ -63009,7 +62847,7 @@ func (s *PolicyUserPasswordSave) Decode(d *jx.Decoder) error {
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [1]uint8{
-		0b00010110,
+		0b00001110,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.

@@ -36987,52 +36987,6 @@ func (o OptPatchUserRequestAttributes) Or(d PatchUserRequestAttributes) PatchUse
 	return d
 }
 
-// NewOptPolicyAudience returns new OptPolicyAudience with value set to v.
-func NewOptPolicyAudience(v PolicyAudience) OptPolicyAudience {
-	return OptPolicyAudience{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptPolicyAudience is optional PolicyAudience.
-type OptPolicyAudience struct {
-	Value PolicyAudience
-	Set   bool
-}
-
-// IsSet returns true if OptPolicyAudience was set.
-func (o OptPolicyAudience) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptPolicyAudience) Reset() {
-	var v PolicyAudience
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptPolicyAudience) SetTo(v PolicyAudience) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptPolicyAudience) Get() (v PolicyAudience, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptPolicyAudience) Or(d PolicyAudience) PolicyAudience {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptPolicyCreatedEventDelegationType returns new OptPolicyCreatedEventDelegationType with value set to v.
 func NewOptPolicyCreatedEventDelegationType(v PolicyCreatedEventDelegationType) OptPolicyCreatedEventDelegationType {
 	return OptPolicyCreatedEventDelegationType{
@@ -42108,8 +42062,8 @@ func (s *PatchUserRequestAttributes) init() PatchUserRequestAttributes {
 }
 
 // A policy instance: the developer-authored half of an operation policy. It
-// carries the configuration values for one catalogued operation and the
-// audience the values apply to. Used as the request body of `POST /policies`,
+// carries the configuration values for one catalogued operation and applies
+// to the whole project. Used as the request body of `POST /policies`,
 // which publishes it as a new immutable revision, and locally as a
 // `.zitadel/policies/<operation>.json` file that `zitadel apply` publishes.
 // `operation` selects the shape: each catalogued operation has its own
@@ -42152,23 +42106,6 @@ func NewPolicyUserPasswordSavePolicy(v PolicyUserPasswordSave) Policy {
 	var s Policy
 	s.SetPolicyUserPasswordSave(v)
 	return s
-}
-
-// Which requests the policy applies to. Omitted means the project default.
-// Only `team_ids` is applicable today.
-// Ref: #
-type PolicyAudience struct {
-	TeamIds []string `json:"team_ids"`
-}
-
-// GetTeamIds returns the value of TeamIds.
-func (s *PolicyAudience) GetTeamIds() []string {
-	return s.TeamIds
-}
-
-// SetTeamIds sets the value of TeamIds.
-func (s *PolicyAudience) SetTeamIds(val []string) {
-	s.TeamIds = val
 }
 
 // Merged schema.
@@ -42620,7 +42557,6 @@ func (s *PolicyCreatedEventDelegationType) UnmarshalText(data []byte) error {
 // Ref: #
 type PolicyCreatedPayload struct {
 	Operation OptString `json:"operation"`
-	TeamIds   []string  `json:"team_ids"`
 }
 
 // GetOperation returns the value of Operation.
@@ -42628,19 +42564,9 @@ func (s *PolicyCreatedPayload) GetOperation() OptString {
 	return s.Operation
 }
 
-// GetTeamIds returns the value of TeamIds.
-func (s *PolicyCreatedPayload) GetTeamIds() []string {
-	return s.TeamIds
-}
-
 // SetOperation sets the value of Operation.
 func (s *PolicyCreatedPayload) SetOperation(val OptString) {
 	s.Operation = val
-}
-
-// SetTeamIds sets the value of TeamIds.
-func (s *PolicyCreatedPayload) SetTeamIds(val []string) {
-	s.TeamIds = val
 }
 
 // A stored policy revision. `policy` echoes the canonical stored document so
@@ -42700,7 +42626,6 @@ type PolicyUserPasswordSave struct {
 	Kind PolicyUserPasswordSaveKind `json:"kind"`
 	// Always `user.password.save`.
 	Operation PolicyUserPasswordSaveOperation `json:"operation"`
-	Audience  OptPolicyAudience               `json:"audience"`
 	// Setting values. An omitted setting takes its default.
 	Config PolicyUserPasswordSaveConfig `json:"config"`
 }
@@ -42718,11 +42643,6 @@ func (s *PolicyUserPasswordSave) GetKind() PolicyUserPasswordSaveKind {
 // GetOperation returns the value of Operation.
 func (s *PolicyUserPasswordSave) GetOperation() PolicyUserPasswordSaveOperation {
 	return s.Operation
-}
-
-// GetAudience returns the value of Audience.
-func (s *PolicyUserPasswordSave) GetAudience() OptPolicyAudience {
-	return s.Audience
 }
 
 // GetConfig returns the value of Config.
@@ -42743,11 +42663,6 @@ func (s *PolicyUserPasswordSave) SetKind(val PolicyUserPasswordSaveKind) {
 // SetOperation sets the value of Operation.
 func (s *PolicyUserPasswordSave) SetOperation(val PolicyUserPasswordSaveOperation) {
 	s.Operation = val
-}
-
-// SetAudience sets the value of Audience.
-func (s *PolicyUserPasswordSave) SetAudience(val OptPolicyAudience) {
-	s.Audience = val
 }
 
 // SetConfig sets the value of Config.

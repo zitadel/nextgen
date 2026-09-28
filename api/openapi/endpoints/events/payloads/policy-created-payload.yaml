@@ -5,7 +5,3 @@ description: |
 properties:
   operation:
     type: string
-  team_ids:
-    type: array
-    items:
-      type: string

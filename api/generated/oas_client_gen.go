@@ -159,7 +159,8 @@ type Invoker interface {
 	//
 	// Publishes a new immutable policy revision for the project. Revisions
 	// cannot be updated or deleted; every edit publishes a new revision, and
-	// evaluation resolves the newest revision per operation and audience.
+	// evaluation resolves the newest revision per operation. A policy applies
+	// to the whole project.
 	// The document is validated against the operation's template: unknown
 	// settings, out-of-bounds values and fixed settings are rejected.
 	//
@@ -2117,7 +2118,8 @@ func (c *Client) sendCreateIdp(ctx context.Context, request *CreateIdpRequest, p
 //
 // Publishes a new immutable policy revision for the project. Revisions
 // cannot be updated or deleted; every edit publishes a new revision, and
-// evaluation resolves the newest revision per operation and audience.
+// evaluation resolves the newest revision per operation. A policy applies
+// to the whole project.
 // The document is validated against the operation's template: unknown
 // settings, out-of-bounds values and fixed settings are rejected.
 //

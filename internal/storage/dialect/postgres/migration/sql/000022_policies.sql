@@ -1,7 +1,7 @@
 -- +goose Up
 -- One row per policy revision (ADR 066): the developer-authored instance for
 -- one catalogued operation. Revisions are immutable; the newest per
--- operation and audience is the one evaluation resolves.
+-- operation is the one evaluation resolves.
 CREATE TABLE zitadel_nextgen.policies (
     project_id   TEXT NOT NULL
         REFERENCES zitadel_nextgen.projects (id) ON DELETE CASCADE

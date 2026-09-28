@@ -25,8 +25,10 @@ It is stateless and never reads storage: each operation has a Go context
 builder that derives the values the rules see, and a gate that calls the
 engine before the operation's write. The instance that applies is resolved
 by [`service.PolicyService.Resolve`](../../../internal/service/policy.go)
-(newest stored revision per operation, most specific audience wins, template
-defaults when the project authored nothing).
+(newest stored revision per operation, template defaults when the project
+authored nothing). An instance applies to its whole project; scoping to a
+team or app follows with the audience-scoped configuration draft
+([#1264](https://github.com/zitadel/nextgen/pull/1264)).
 
 | Operation | Template | Configurable (bounds, default) | Fixed | Rules | Context built in | Evaluated in | Called from |
 |---|---|---|---|---|---|---|---|
