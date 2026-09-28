@@ -1,80 +1,56 @@
 package policy
 
-import (
-	"context"
-	"slices"
-)
+import "context"
 
-// Hint carries the request's audience coordinates for instance resolution.
-type Hint struct {
-	TeamID string
-}
-
-// Resolver picks the instance that governs one operation for one request.
+// Resolver returns the instance that governs one operation in one project.
 // Returning nil means no instance is authored and the template defaults
 // apply.
 type Resolver interface {
-	Resolve(ctx context.Context, projectID, operation string, hint Hint) (*Instance, error)
+	Resolve(ctx context.Context, projectID, operation string) (*Instance, error)
 }
 
 // ResolverFunc adapts a function to [Resolver].
-type ResolverFunc func(ctx context.Context, projectID, operation string, hint Hint) (*Instance, error)
+type ResolverFunc func(ctx context.Context, projectID, operation string) (*Instance, error)
 
-func (f ResolverFunc) Resolve(ctx context.Context, projectID, operation string, hint Hint) (*Instance, error) {
-	return f(ctx, projectID, operation, hint)
+func (f ResolverFunc) Resolve(ctx context.Context, projectID, operation string) (*Instance, error) {
+	return f(ctx, projectID, operation)
 }
 
-// StaticResolver resolves from an in-memory set of instances per project,
-// applying ADR 065's rules: the most specific matching instance wins
-// wholesale, an unscoped instance is the project default, and a scoped
-// instance never applies outside its audience. Prototype stand-in for the
-// release-backed resolver.
+// StaticResolver resolves from an in-memory set of instances, one per
+// operation per project; the last one added for an operation wins, the way
+// the newest stored revision does. Prototype stand-in for the release-backed
+// resolver.
 type StaticResolver struct {
-	instances map[string][]*Instance
+	instances map[string]map[string]*Instance
 }
 
-// NewStaticResolver builds a resolver over the given project's instances.
+// NewStaticResolver builds an empty resolver.
 func NewStaticResolver() *StaticResolver {
-	return &StaticResolver{instances: make(map[string][]*Instance)}
+	return &StaticResolver{instances: make(map[string]map[string]*Instance)}
 }
 
-// Add registers instances for a project.
+// Add registers instances for a project, replacing any earlier instance for
+// the same operation.
 func (r *StaticResolver) Add(projectID string, instances ...*Instance) {
-	r.instances[projectID] = append(r.instances[projectID], instances...)
+	byOperation, ok := r.instances[projectID]
+	if !ok {
+		byOperation = make(map[string]*Instance)
+		r.instances[projectID] = byOperation
+	}
+	for _, inst := range instances {
+		byOperation[inst.Operation] = inst
+	}
 }
 
-func (r *StaticResolver) Resolve(_ context.Context, projectID, operation string, hint Hint) (*Instance, error) {
-	var best *Instance
-	bestScore := 0
-	for _, inst := range r.instances[projectID] {
-		if inst.Operation != operation {
-			continue
-		}
-		score := audienceScore(inst.Audience, hint)
-		if score > bestScore {
-			best, bestScore = inst, score
-		}
-	}
-	return best, nil
+func (r *StaticResolver) Resolve(_ context.Context, projectID, operation string) (*Instance, error) {
+	return r.instances[projectID][operation], nil
 }
 
-// audienceScore ranks an instance for a request: 2 for a team match, 1 for
-// the project default, 0 when the instance is scoped elsewhere.
-func audienceScore(a Audience, hint Hint) int {
-	if a.IsEmpty() {
-		return 1
-	}
-	if hint.TeamID != "" && slices.Contains(a.TeamIDs, hint.TeamID) {
-		return 2
-	}
-	return 0
-}
-
-// Effective resolves the governing instance and falls back to the template
+// Effective resolves the project's instance and falls back to the template
 // defaults when none is authored.
-func Effective(ctx context.Context, e *Engine, r Resolver, projectID, operation string, hint Hint) (*Instance, error) {
+func Effective(ctx context.Context, e *Engine, r Resolver, projectID, operation string) (*Instance, error) {
 	if r != nil {
-		inst, err := r.Resolve(ctx, projectID, operation, hint)
+		inst, err := r.Resolve(ctx, projectID, operation)
 		if err != nil {
 			return nil, err
 		}
