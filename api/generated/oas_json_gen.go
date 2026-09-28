@@ -78603,6 +78603,8 @@ func (s *ReleasePointerKind) Decode(d *jx.Decoder) error {
 		*s = ReleasePointerKindFlowDefinition
 	case ReleasePointerKindBranding:
 		*s = ReleasePointerKindBranding
+	case ReleasePointerKindPolicy:
+		*s = ReleasePointerKindPolicy
 	default:
 		*s = ReleasePointerKind(v)
 	}

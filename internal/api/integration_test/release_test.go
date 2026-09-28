@@ -28,6 +28,7 @@ type releaseFixture struct {
 	schemaURL  string
 	flowdefID  string
 	brandingID string
+	policyID   string
 }
 
 func newReleaseFixture(t *testing.T) releaseFixture {
@@ -54,7 +55,21 @@ func newReleaseFixture(t *testing.T) releaseFixture {
 		schemaURL:  apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL),
 		flowdefID:  definitions[0].ID,
 		brandingID: publishBranding(t, client, project.ID, `<zl-page-shell>{% mandatory_gates %}</zl-page-shell>`),
+		policyID:   publishPolicy(t, client, project.ID),
 	}
+}
+
+func publishPolicy(t *testing.T, client *helpers.ApiClient, projectID string) string {
+	t.Helper()
+	document := api.NewPolicyUserPasswordSavePolicy(api.PolicyUserPasswordSave{
+		Kind:      api.PolicyUserPasswordSaveKindPolicy,
+		Operation: api.PolicyUserPasswordSaveOperationUserPasswordSave,
+		Config:    api.PolicyUserPasswordSaveConfig{MinLength: api.NewOptInt(15)},
+	})
+	resp, err := client.CreatePolicy(t.Context(), document, api.CreatePolicyParams{ProjectID: api.ProjectID(projectID)})
+	require.NoError(t, err)
+	require.IsType(t, &api.PolicyRevisionResponse{}, resp, helpers.MustMarshal(t, resp))
+	return resp.(*api.PolicyRevisionResponse).ID
 }
 
 func publishBranding(t *testing.T, client *helpers.ApiClient, projectID, template string) string {
@@ -73,6 +88,7 @@ func (f releaseFixture) pointers() []api.CreateReleasePointer {
 		{Kind: api.ReleasePointerKindSchema, RevisionID: f.schemaURL},
 		{Kind: api.ReleasePointerKindFlowDefinition, RevisionID: f.flowdefID},
 		{Kind: api.ReleasePointerKindBranding, RevisionID: f.brandingID},
+		{Kind: api.ReleasePointerKindPolicy, RevisionID: f.policyID},
 	}
 }
 
@@ -110,6 +126,7 @@ func TestCreateRelease(t *testing.T) {
 		assert.Equal(t, []api.ReleasePointer{
 			{Kind: api.ReleasePointerKindBranding, Handle: "default", RevisionID: fixture.brandingID},
 			{Kind: api.ReleasePointerKindFlowDefinition, Handle: created.Pointers[1].Handle, RevisionID: fixture.flowdefID},
+			{Kind: api.ReleasePointerKindPolicy, Handle: "user.password.save", RevisionID: fixture.policyID},
 			{Kind: api.ReleasePointerKindSchema, Handle: "human-user", RevisionID: fixture.schemaURL},
 		}, created.Pointers)
 		assert.NotEmpty(t, created.Pointers[1].Handle, "a flow definition's handle is its name")
