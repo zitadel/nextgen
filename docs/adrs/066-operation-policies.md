@@ -183,7 +183,7 @@ cannot add an operation to it. Templates ship with the server; today's list:
 
 | Operation | Rules | Context (derived in Go) |
 |---|---|---|
-| `user.password.save` | `min_length`, `history`, `blocklist` (lands with #898's blocklist) | candidate length, blocklist hit, per-history-entry match |
+| `user.password.save` | `min_length`, `max_length`, `history`, `blocklist` (lands with #898's blocklist) | candidate length, blocklist hit, per-history-entry match |
 | `user.password.verify` (illustrative, not MVP) | `lockout` | recent failed attempts |
 
 #### Where the catalog lives and how an operation is added
@@ -212,7 +212,11 @@ the single function every password set goes through (admin API and
 registration flow alike). The context builder is
 `service.PasswordPolicy.buildContext`. Instances are resolved by
 `service.PolicyService.Resolve`: newest stored revision of the project's
-instance for the operation, template defaults when the project authored nothing.
+instance for the operation, template defaults when the project authored
+nothing. That is a stand-in: ADR 035 says an environment sees only what its
+active release pins, so resolution moves to the release's pinned policy
+revision once release-pinned reads exist (scope table in
+[`docs/design/policies/`](../design/policies/README.md)).
 
 ### Policy evaluation trigger (relation to domain events)
 
@@ -220,7 +224,7 @@ A policy is evaluated **before** its operation, synchronously. Existing [wide ev
 
 | Operation — policy evaluated before | Wide event — emitted after |
 |---|---|
-| `user.password.save` | `user.password.saved` |
+| `user.password.save` | `auth.factor.password.set` |
 | `user.create` | `user.created` |
 
 ### Policy evaluation
