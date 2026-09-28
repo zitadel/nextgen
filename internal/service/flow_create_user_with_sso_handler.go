@@ -62,7 +62,7 @@ func (h *FlowCreateUserWithSsoHandler) Handle(
 	// address mint an account for another. Writing it back into CollectedData
 	// (rather than only into the create attributes) also means a uniqueness
 	// collision rebinds on the verified address, not the submitted one.
-	if err := bindVerifiedIdentifier(in); err != nil {
+	if err := h.bindVerifiedIdentifier(ctx, in); err != nil {
 		return domain.FlowOnSuccessResult{}, err
 	}
 
@@ -120,14 +120,20 @@ func (h *FlowCreateUserWithSsoHandler) Handle(
 // written through the attribute key's path, because collected data nests a
 // dotted attribute (`account.email` lives at UserData["account"]["email"]).
 //
-// Refuses when the flow resolves no identifier field: there would be nowhere to
-// anchor the verified address, and creating from the form alone is exactly the
-// hole this closes. The on_success manifest requires one, so a definition that
-// reaches here without it was already rejected at validation.
-func bindVerifiedIdentifier(in domain.FlowOnSuccessInput) error {
-	name, ok := identifierFieldName(in.Resolved)
-	if !ok {
-		return fmt.Errorf("%w: create_user_with_sso resolves no identifier field to bind the verified address to", domain.ErrFlowIntegrity())
+// The destination comes from the user schema's `x-identifier` designation
+// rather than the step's resolved fields: this handler runs both from the
+// engine (a submit on the collection step) and directly from a provider
+// callback, and only the first has resolved fields to read. Refuses when the
+// schema designates none -- there would be nowhere to anchor the verified
+// address, and creating from the form alone is the hole this closes.
+func (h *FlowCreateUserWithSsoHandler) bindVerifiedIdentifier(ctx context.Context, in domain.FlowOnSuccessInput) error {
+	schema, err := h.schemaStore.GetJSONSchemaByID(ctx, in.ProjectID, in.UserSchemaURL)
+	if err != nil {
+		return fmt.Errorf("create_user_with_sso: read user schema: %w", err)
+	}
+	name := domain.DesignatedIdentifier(schema.Schema)
+	if name == "" {
+		return fmt.Errorf("%w: create_user_with_sso needs a designated identifier to bind the verified address to", domain.ErrFlowIntegrity())
 	}
 	if in.State.CollectedData.UserData == nil {
 		in.State.CollectedData.UserData = map[string]any{}
@@ -136,15 +142,4 @@ func bindVerifiedIdentifier(in domain.FlowOnSuccessInput) error {
 		return fmt.Errorf("create_user_with_sso: bind verified identifier %q: %w", name, err)
 	}
 	return nil
-}
-
-// identifierFieldName reports the schema attribute carrying the identifier
-// challenge -- the field the provider's address belongs in.
-func identifierFieldName(resolved domain.FlowResolvedFields) (string, bool) {
-	for _, field := range resolved.Fields {
-		if field.Challenge == domain.FlowFieldChallengeIdentifier {
-			return field.Name, true
-		}
-	}
-	return "", false
 }

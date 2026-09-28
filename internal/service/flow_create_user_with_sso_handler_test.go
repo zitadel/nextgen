@@ -102,7 +102,7 @@ func TestFlowCreateUserWithSso_RecordsUserAndSsoFactors(t *testing.T) {
 			ProjectID: "proj_1",
 			URL:       "https://example.test/schema.json",
 			Schema:    []byte(passwordHandlerTestSchema),
-		}, nil)
+		}, nil).AnyTimes()
 
 	var created *domain.CreateUser
 	f.stmts.EXPECT().CreateUser(gomock.Any(), gomock.Any()).DoAndReturn(
@@ -173,7 +173,7 @@ func TestFlowCreateUserWithSso_RoutesUserAlreadyExistsOnCollision(t *testing.T) 
 			ProjectID: "proj_1",
 			URL:       "https://example.test/schema.json",
 			Schema:    []byte(passwordHandlerTestSchema),
-		}, nil)
+		}, nil).AnyTimes()
 	// The DB reports the unique-constraint violation; applyCreateUser
 	// translates it to ErrUserAlreadyExists, which the handler routes.
 	f.stmts.EXPECT().CreateUser(gomock.Any(), gomock.Any()).
@@ -222,7 +222,7 @@ func TestFlowCreateUserWithSso_IgnoresSubmittedEmailInFavourOfVerified(t *testin
 			ProjectID: "proj_1",
 			URL:       "https://example.test/schema.json",
 			Schema:    []byte(passwordHandlerTestSchema),
-		}, nil)
+		}, nil).AnyTimes()
 
 	var created *domain.CreateUser
 	f.stmts.EXPECT().CreateUser(gomock.Any(), gomock.Any()).DoAndReturn(
