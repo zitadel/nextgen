@@ -47,6 +47,11 @@ const NOT_RESOURCES: Readonly<Record<string, string>> = {
   readyz: "readiness probe, not a resource",
   flow: "the runtime login flow protocol, driven by the login UI and the SDKs",
   auth_attempts: "the runtime authentication protocol, driven by the login UI and the SDKs",
+  // Deployments are acts, not files: creating one is `zitadel deploy`'s
+  // orchestration (build the release, then make it live — ADR 035), and the
+  // history is that command's to read. Registry CRUD would offer a `create`
+  // that skips the release construction the command exists to do.
+  deployments: "created and read through `zitadel deploy` orchestration, not registry CRUD (#529)",
 };
 
 /**
@@ -71,6 +76,9 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   createBranding:
     "configuration is written from .zitadel/ by the declarative path (deploy, ADR 035)",
   createRelease: "a release is constructed by `zitadel deploy` (ADR 035)",
+  createDeployment: "a release goes live through `zitadel deploy` orchestration (ADR 035, #529)",
+  getDeploymentById: "deployment history reads arrive with the `zitadel deploy` surface (#529)",
+  listDeployments: "deployment history reads arrive with the `zitadel deploy` surface (#529)",
   createFlowDefinition:
     "configuration is written from .zitadel/ by the declarative path (deploy, ADR 035)",
 

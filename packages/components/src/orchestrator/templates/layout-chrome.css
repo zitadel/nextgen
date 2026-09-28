@@ -237,8 +237,10 @@ img[data-zl-asset-broken] {
   outline-offset: var(--zl-focus-offset);
 }
 /* Split-design chrome (ADR 040 design catalog: `split` / `split-right`).
-   Consumed by the ejectable templates in @zitadel/config under
-   defaults/branding/ — a brand pane beside the form pane, collapsing to
+   Those designs are retired from the eject catalog (#1039) — page layout
+   belongs in the embedding app — but revisions already published from them
+   keep rendering on this chrome (fixtures: orchestrator/__fixtures__/
+   legacy-designs/). A brand pane beside the form pane, collapsing to
    form-only on narrow viewports. */
 .zl-split {
   display: grid;
@@ -458,9 +460,10 @@ zl-page-shell:has(.zl-split--right) [slot="footer"].zl-attribution ::slotted(*) 
   }
 }
 /* Hero-design landing primitives (`hero`): a token-styled mock landing
-   page inside .zl-split__brand. Consumed by the ejectable hero template in
-   @zitadel/config under defaults/branding/hero/ — tenants edit the copy,
-   the classes keep it on design tokens so palettes and theme mode apply. */
+   page inside .zl-split__brand. Consumed by the retired hero design (#1039;
+   fixture in orchestrator/__fixtures__/legacy-designs/hero.liquid), which
+   already-published revisions still use. The classes keep it on design
+   tokens so palettes and theme mode apply. */
 .zl-hero {
   display: flex;
   flex-direction: column;

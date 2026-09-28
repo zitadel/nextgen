@@ -73,7 +73,6 @@ describe("Next setup integration", () => {
         install: { status: string; package_manager: string; command: string };
         files_written: string[];
         files: Array<{ path: string; kind: string; action: string }>;
-        design: string | null;
         next_actions: string[];
         next_commands: string[];
       };
@@ -95,11 +94,14 @@ describe("Next setup integration", () => {
     expect(setupJson.data.next_actions.join("\n")).toContain(".zitadel/schemas/");
     expect(setupJson.data.next_actions.join("\n")).toContain(".zitadel/flows/");
     expect(setupJson.data.next_actions.join("\n")).toContain("See your changes before they go live");
-    // No --design: the built-in template stays untouched, and the envelope
-    // still points at the branding customization path.
-    expect(setupJson.data.design).toBeNull();
+    // Setup never applies a login template (#1039): no branding files, no
+    // design in the envelope, and the look guidance points at the opt-in.
+    expect(setupJson.data).not.toHaveProperty("design");
     expect(setupJson.data.next_actions.join("\n")).toContain("branding eject");
-    expect(setupJson.data.files_written).not.toContain(".zitadel/branding/branding.json");
+    expect(setupJson.data.next_actions.join("\n")).not.toMatch(/revision 1/i);
+    expect(
+      setupJson.data.files_written.some((path) => path.startsWith(".zitadel/branding/")),
+    ).toBe(false);
     expect(setupJson.data.files_written).toContain(".zitadel/schemas/default-human-user.json");
     expect(setupJson.data.files_written).toContain(".zitadel/flows/default-login.json");
     // files_written carries deduplicated file paths only: no directories,
@@ -612,7 +614,7 @@ describe("Next setup integration", () => {
     expect(restored).toContain("element.locales = businessLocales");
   });
 
-  it("ejects and publishes the selected design when --design is passed", async () => {
+  it("publishes an ejected design through apply after setup", async () => {
     // The shared platform mock has no branding routes yet, so this test
     // carries its own: capture the publish, echo the canonical envelope.
     const brandingBodies: Array<Record<string, unknown>> = [];
@@ -639,28 +641,32 @@ describe("Next setup integration", () => {
       "setup",
       "--cwd",
       cwd,
-      "--design",
-      "split",
       "--non-interactive",
       "--json",
       "--skip-install",
     ]);
     expect(setup.exitCode).toBe(0);
-    const setupJson = parseJson(setup.stdout) as {
-      data: { design: string | null; files_written: string[]; next_actions: string[] };
-    };
+    // Setup itself publishes nothing; the revision comes from eject + apply.
+    expect(brandingBodies).toHaveLength(0);
 
-    // The envelope reports the choice so agents can verify what setup
-    // published without diffing the repo.
-    expect(setupJson.data.design).toBe("split");
-    expect(setupJson.data.files_written).toContain(".zitadel/branding/branding.json");
-    expect(setupJson.data.files_written).toContain(".zitadel/branding/login.liquid");
-    expect(setupJson.data.next_actions.join("\n")).toContain(".zitadel/branding/login.liquid");
+    const eject = await cli([
+      "branding",
+      "eject",
+      "--cwd",
+      cwd,
+      "--design",
+      "minimal",
+      "--non-interactive",
+      "--json",
+    ]);
+    expect(eject.exitCode, eject.stdout).toBe(0);
+    const apply = await cli(["apply", "--cwd", cwd, "--json"]);
+    expect(apply.exitCode, apply.stdout).toBe(0);
 
     // The wire body inlines the template under `liquid_template`; the local
     // descriptor keeps the `$file` reference in the same key.
     expect(brandingBodies).toHaveLength(1);
-    expect(brandingBodies[0]).toMatchObject({ layout: "split" });
+    expect(brandingBodies[0]).toMatchObject({ layout: "centered" });
     expect(typeof brandingBodies[0]?.liquid_template).toBe("string");
     expect(brandingBodies[0]).not.toHaveProperty("liquid_template_file");
     const descriptor = JSON.parse(
@@ -668,7 +674,7 @@ describe("Next setup integration", () => {
     ) as Record<string, unknown>;
     expect(descriptor.liquid_template).toEqual({ $file: "./login.liquid" });
 
-    // Sync state pins the published revision, so the first plan is empty —
+    // Sync state pins the published revision, so the next plan is empty —
     // the ejected design converges exactly like schemas and flows.
     const state = JSON.parse(await readFile(join(cwd, ".zitadel/state.json"), "utf8")) as {
       resources: Record<string, { id?: string }>;

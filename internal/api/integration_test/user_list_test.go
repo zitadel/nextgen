@@ -39,7 +39,7 @@ func TestQueryUsers(t *testing.T) {
 
 	queryUsers := func(t *testing.T, req *api.QueryUsersRequest) *api.QueryUsersResponse {
 		t.Helper()
-		res, err := client.QueryUsers(t.Context(), req)
+		res, err := client.QueryUsers(t.Context(), req, api.QueryUsersParams{})
 		require.NoError(t, err)
 		require.IsType(t, &api.QueryUsersResponse{}, res, helpers.MustMarshal(t, res))
 		return res.(*api.QueryUsersResponse)
@@ -126,7 +126,7 @@ func TestQueryUsers(t *testing.T) {
 	require.NoError(t, err)
 	harness.SetProjectSecretOnApiClient(t, otherClient, other)
 
-	otherRes, err := otherClient.QueryUsers(t.Context(), &api.QueryUsersRequest{})
+	otherRes, err := otherClient.QueryUsers(t.Context(), &api.QueryUsersRequest{}, api.QueryUsersParams{})
 	require.NoError(t, err)
 	require.IsType(t, &api.QueryUsersResponse{}, otherRes, helpers.MustMarshal(t, otherRes))
 	assert.Empty(t, otherRes.(*api.QueryUsersResponse).Users)
@@ -174,7 +174,7 @@ func TestQueryUsersSessionCaller(t *testing.T) {
 	require.NoError(t, err)
 	client.SetSessionToken(sessionToken)
 
-	resp, err := client.QueryUsers(t.Context(), &api.QueryUsersRequest{})
+	resp, err := client.QueryUsers(t.Context(), &api.QueryUsersRequest{}, api.QueryUsersParams{})
 	require.NoError(t, err)
 	listed, ok := resp.(*api.QueryUsersResponse)
 	require.True(t, ok, helpers.MustMarshal(t, resp))
@@ -194,7 +194,7 @@ func TestQueryUsersSessionCaller(t *testing.T) {
 		stranger, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 		require.NoError(t, err)
 		stranger.SetSessionToken(strangerToken)
-		resp, err := stranger.QueryUsers(t.Context(), &api.QueryUsersRequest{})
+		resp, err := stranger.QueryUsers(t.Context(), &api.QueryUsersRequest{}, api.QueryUsersParams{})
 		require.NoError(t, err)
 		page, ok := resp.(*api.QueryUsersResponse)
 		require.True(t, ok, helpers.MustMarshal(t, resp))

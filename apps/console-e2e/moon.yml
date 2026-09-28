@@ -105,3 +105,25 @@ tasks:
     options:
       cache: false
       runInCI: false
+
+  # The embedded console against a deployment with the platform project
+  # bootstrapped (the server default): an operator signs up through the
+  # console, is granted a customer project, and walks the screens on the
+  # session cookie alone. The embedded lane cannot cover this, because it
+  # switches the platform project off to sign its seeded users into the
+  # harness's own project.
+  e2e-platform:
+    command: "corepack pnpm exec playwright test --config playwright.platform.config.mts"
+    deps:
+      - "testing:build"
+      - "cli:build"
+      - "server:build"
+    env:
+      # Fixed pin, same reasoning as the other lanes. Neighbors: 8095
+      # console-e2e e2e-embedded.
+      PLATFORM_ZITADEL_PORT: "8097"
+      ZITADEL_SERVER_BINARY: "$workspaceRoot/dist/server/nextgen"
+    options:
+      cache: false
+      runInCI: false
+
