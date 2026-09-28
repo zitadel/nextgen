@@ -476,6 +476,12 @@ type Handler interface {
 	// Get a schema by its ID. A schema ID identifies one immutable revision, so
 	// this returns exactly that revision. To find the current revision of an
 	// object type, list with `revisions=latest`.
+	// Schema IDs are unique within a project, not across projects (the seeded
+	// default schema carries the same `$id` in every project). A Console
+	// session that manages more than one project names the project with
+	// `project_id`; without it, the ID is resolved in the credential's own
+	// project when it is ambiguous. A project secret always resolves in its
+	// own project and ignores `project_id`.
 	//
 	// GET /schemas/{id}
 	GetSchemaById(ctx context.Context, params GetSchemaByIdParams) (GetSchemaByIdRes, error)
@@ -721,16 +727,14 @@ type Handler interface {
 	// QueryUsers implements queryUsers operation.
 	//
 	// Returns the users of a project, paginated with a cursor.
-	// The project comes from the credential, not from a parameter: the
-	// operation is bound to the credential's home project by construction
-	// (oauth2 secret or user-bound session). This is why it takes no
-	// `project_id`, unlike the other query endpoints.
+	// `project_id` names the project to list; without it, the credential's own
+	// project is listed.
 	// Accepts either a project secret (`oauth2`) or a user-bound Console
 	// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
 	// is a follow-up (#1140).
 	//
 	// POST /users/query
-	QueryUsers(ctx context.Context, req *QueryUsersRequest) (QueryUsersRes, error)
+	QueryUsers(ctx context.Context, req *QueryUsersRequest, params QueryUsersParams) (QueryUsersRes, error)
 	// RevokeMySession implements revokeMySession operation.
 	//
 	// Logs out by permanently deleting the session.
