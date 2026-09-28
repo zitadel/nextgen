@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
 )
 
 // These cover the guards the sso stub adds around an otherwise deliberately
@@ -222,4 +224,61 @@ func TestEncodeSSOErrorOmitsEmptyOptionalFields(t *testing.T) {
 	if got["code"] != "server_error" || got["description"] != "" || got["uri"] != "" {
 		t.Fatalf("unexpected payload: %+v", got)
 	}
+}
+
+// stubVariableResolver stands in for the variable service, rewriting the
+// document the way the real one does so the test exercises the unwrapping
+// rather than the resolver.
+type stubVariableResolver struct {
+	service.VariableService
+	replace func(doc map[string]any) error
+}
+
+func (s stubVariableResolver) ReplaceVariablesInPlace(_ context.Context, _ domain.VariableOwner, doc map[string]any) error {
+	return s.replace(doc)
+}
+
+func TestResolveClientSecret(t *testing.T) {
+	// A connection never holds a literal secret: it references a project
+	// variable, and the value has to be resolved before the token endpoint
+	// sees it. Getting this wrong posts "${{ GOOGLE_CLIENT_SECRET }}" to the
+	// provider, which fails as invalid_client on every sign-in.
+	t.Run("resolves the reference through the variable service", func(t *testing.T) {
+		h := &Handler{variableService: stubVariableResolver{replace: func(doc map[string]any) error {
+			doc["client_secret"] = "s3cret"
+			return nil
+		}}}
+		got, err := h.resolveClientSecret(t.Context(), "proj_1", "${{ GOOGLE_CLIENT_SECRET }}")
+		if err != nil {
+			t.Fatalf("resolveClientSecret: %v", err)
+		}
+		if got != "s3cret" {
+			t.Fatalf("got %q, want the resolved value", got)
+		}
+	})
+
+	t.Run("reports an unresolvable reference rather than posting it", func(t *testing.T) {
+		h := &Handler{variableService: stubVariableResolver{replace: func(map[string]any) error {
+			return fmt.Errorf("no such variable")
+		}}}
+		if _, err := h.resolveClientSecret(t.Context(), "proj_1", "${{ MISSING }}"); err == nil {
+			t.Fatal("want an error when the variable does not resolve")
+		}
+	})
+
+	t.Run("passes a literal through, for a provider that wants no secret", func(t *testing.T) {
+		h := &Handler{variableService: stubVariableResolver{replace: func(map[string]any) error { return nil }}}
+		got, err := h.resolveClientSecret(t.Context(), "proj_1", "")
+		if err != nil || got != "" {
+			t.Fatalf("got %q, %v; want the stored value unchanged", got, err)
+		}
+	})
+
+	t.Run("passes the stored value through without a variable service", func(t *testing.T) {
+		h := &Handler{}
+		got, err := h.resolveClientSecret(t.Context(), "proj_1", "literal")
+		if err != nil || got != "literal" {
+			t.Fatalf("got %q, %v; want the stored value unchanged", got, err)
+		}
+	})
 }

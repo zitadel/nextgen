@@ -31,12 +31,8 @@ import (
 // read from its payload, so `iss` and `aud` are not checked either. Pending
 // authorizations live in this process's memory, so they do not survive a
 // restart and are not shared between replicas. No identity link is recorded,
-// so every returning identity looks new. The connection's `client_secret` is
-// posted as stored, which means the `${{ NAME }}` reference reaches the
-// provider verbatim: resolving it against the environment's variables is the
-// engine's, and until then only a provider that ignores the secret (a local
-// mock) completes the exchange. None of that is acceptable in the real
-// engine; all of it is enough to prove the round trip the CLI configures.
+// so every returning identity looks new. None of that is acceptable in the
+// real engine; all of it is enough to prove the round trip the CLI configures.
 
 // ssoBindingCookie carries a nonce that ties a callback to the browser that
 // started the authorization. It is SameSite=Lax deliberately: the callback is
@@ -533,11 +529,50 @@ func (h *Handler) flowStepExists(ctx context.Context, state *domain.FlowState, n
 	return ok
 }
 
+// resolveClientSecret turns the connection's stored `client_secret` into the
+// value to authenticate with.
+//
+// Connection documents hold a `${{ NAME }}` reference rather than a credential
+// -- the CLI refuses to write a literal, and a revision is immutable, so a
+// literal could never be scrubbed. The value lives in the project's variables,
+// encrypted under the project's own key (ADR 029), and is resolved here at the
+// moment of use rather than when the connection is read: a decrypted secret
+// should exist for one request, not for as long as a cached document does.
+//
+// A value with no placeholder in it is returned as it stands, so a connection
+// written by hand against a provider that wants no secret still works.
+func (h *Handler) resolveClientSecret(ctx context.Context, projectID, stored string) (string, error) {
+	if h.variableService == nil {
+		return stored, nil
+	}
+	// The resolver works on a document, so the one field is wrapped in one.
+	// Its key is arbitrary: nothing reads it back but the line below.
+	doc := map[string]any{"client_secret": stored}
+	if err := h.variableService.ReplaceVariablesInPlace(
+		ctx,
+		domain.VariableOwner{ProjectID: projectID},
+		doc,
+	); err != nil {
+		// Naming the variable is the whole diagnostic: the usual cause is a
+		// connection that was applied without its secret ever being published.
+		return "", fmt.Errorf("resolving the connection's client_secret: %w", err)
+	}
+	resolved, ok := doc["client_secret"].(string)
+	if !ok {
+		return "", fmt.Errorf("the connection's client_secret did not resolve to a string")
+	}
+	return resolved, nil
+}
+
 // exchangeSsoCode swaps the authorization code for tokens and reads the email
 // claim. Stub: the id_token's signature is not verified.
 func (h *Handler) exchangeSsoCode(ctx context.Context, pending ssoPending, code string) (ssoClaims, error) {
 	oidc, _ := pending.connection.Oidc.Get()
 	tokenURL, err := tokenEndpoint(oidc)
+	if err != nil {
+		return ssoClaims{}, err
+	}
+	clientSecret, err := h.resolveClientSecret(ctx, pending.projectID, oidc.ClientSecret)
 	if err != nil {
 		return ssoClaims{}, err
 	}
@@ -552,7 +587,7 @@ func (h *Handler) exchangeSsoCode(ctx context.Context, pending ssoPending, code 
 	basic := oidc.TokenEndpointAuthMethod.Or(api.IdpConnectionOidcTokenEndpointAuthMethodClientSecretBasic) ==
 		api.IdpConnectionOidcTokenEndpointAuthMethodClientSecretBasic
 	if !basic {
-		form.Set("client_secret", oidc.ClientSecret)
+		form.Set("client_secret", clientSecret)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, tokenURL, strings.NewReader(form.Encode()))
@@ -561,7 +596,7 @@ func (h *Handler) exchangeSsoCode(ctx context.Context, pending ssoPending, code 
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	if basic {
-		req.SetBasicAuth(url.QueryEscape(oidc.ClientID), url.QueryEscape(oidc.ClientSecret))
+		req.SetBasicAuth(url.QueryEscape(oidc.ClientID), url.QueryEscape(clientSecret))
 	}
 	if h.ssoEgress == nil {
 		return ssoClaims{}, fmt.Errorf("no egress client configured for the token exchange")
@@ -577,8 +612,8 @@ func (h *Handler) exchangeSsoCode(ctx context.Context, pending ssoPending, code 
 	}
 	if resp.StatusCode != http.StatusOK {
 		// OAuth error bodies (invalid_client, invalid_grant) are the entire
-		// diagnostic here, and this stub's most likely failure — an
-		// unresolved `${{ VAR }}` client secret — reports exactly that way.
+		// diagnostic here, so they are passed through verbatim — an
+		// unpublished client secret reports as invalid_client.
 		return ssoClaims{}, fmt.Errorf("token endpoint answered %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 	var tokens struct {
