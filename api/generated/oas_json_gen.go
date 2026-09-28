@@ -50003,10 +50003,8 @@ func (s *IdpPayload) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
-		if s.RevisionID.Set {
-			e.FieldStart("revision_id")
-			s.RevisionID.Encode(e)
-		}
+		e.FieldStart("revision_id")
+		e.Str(s.RevisionID)
 	}
 }
 
@@ -50023,6 +50021,7 @@ func (s *IdpPayload) Decode(d *jx.Decoder) error {
 	if s == nil {
 		return errors.New("invalid: unable to decode IdpPayload to nil")
 	}
+	var requiredBitSet [1]uint8
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
@@ -50067,9 +50066,11 @@ func (s *IdpPayload) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"display_name\"")
 			}
 		case "revision_id":
+			requiredBitSet[0] |= 1 << 4
 			if err := func() error {
-				s.RevisionID.Reset()
-				if err := s.RevisionID.Decode(d); err != nil {
+				v, err := d.Str()
+				s.RevisionID = string(v)
+				if err != nil {
 					return err
 				}
 				return nil
@@ -50082,6 +50083,38 @@ func (s *IdpPayload) Decode(d *jx.Decoder) error {
 		return nil
 	}); err != nil {
 		return errors.Wrap(err, "decode IdpPayload")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00010000,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfIdpPayload) {
+					name = jsonFieldsNameOfIdpPayload[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
 	}
 
 	return nil

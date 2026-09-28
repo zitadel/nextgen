@@ -28325,7 +28325,7 @@ type IdpPayload struct {
 	Template    OptString `json:"template"`
 	DisplayName OptString `json:"display_name"`
 	// The revision the write appended.
-	RevisionID OptString `json:"revision_id"`
+	RevisionID string `json:"revision_id"`
 }
 
 // GetSlug returns the value of Slug.
@@ -28349,7 +28349,7 @@ func (s *IdpPayload) GetDisplayName() OptString {
 }
 
 // GetRevisionID returns the value of RevisionID.
-func (s *IdpPayload) GetRevisionID() OptString {
+func (s *IdpPayload) GetRevisionID() string {
 	return s.RevisionID
 }
 
@@ -28374,7 +28374,7 @@ func (s *IdpPayload) SetDisplayName(val OptString) {
 }
 
 // SetRevisionID sets the value of RevisionID.
-func (s *IdpPayload) SetRevisionID(val OptString) {
+func (s *IdpPayload) SetRevisionID(val string) {
 	s.RevisionID = val
 }
 
