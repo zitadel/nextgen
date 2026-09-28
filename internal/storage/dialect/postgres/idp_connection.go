@@ -22,6 +22,12 @@ const (
 	createIDPConnectionRevisionStmt = `INSERT INTO zitadel_nextgen.idp_connection_revisions ` +
 		`(project_id, id, connection_id, document) VALUES ($1, $2, $3, $4) RETURNING created_at`
 
+	// FOR UPDATE holds the connection row until the transaction ends: a second
+	// revise of the same connection waits here, then reads the first one's
+	// revision as newest. A plain SELECT would not wait at READ COMMITTED.
+	lockIDPConnectionStmt = `SELECT id FROM zitadel_nextgen.idp_connections` +
+		` WHERE project_id = $1 AND id = $2 FOR UPDATE`
+
 	// One row per revision, carrying its connection's identity. The last column
 	// is the revision's created_at, which reads serve as UpdatedAt.
 	idpConnectionQuery = `SELECT c.project_id, c.id, c.slug, r.id, r.document, c.created_at, r.created_at
@@ -100,6 +106,12 @@ func (s idpConnectionStatements) ReviseIDPConnection(ctx context.Context, entity
 	entity.UpdatedAt = entity.UpdatedAt.UTC()
 	entity.RevisionID = revisionID
 	return nil
+}
+
+// LockIDPConnection implements [service.IDPConnectionStatements].
+func (s idpConnectionStatements) LockIDPConnection(ctx context.Context, projectID, id string) error {
+	var locked string
+	return wrapError(s.client.QueryRow(ctx, lockIDPConnectionStmt, projectID, id).Scan(&locked))
 }
 
 // GetIDPConnection implements [service.IDPConnectionStatements].

@@ -72,6 +72,15 @@ func newIDPConnectionFixture(t *testing.T) idpConnectionFixture {
 	}
 }
 
+// expectLockedRead expects revise to lock the connection row before it reads
+// the newest revision inside the transaction, and serves current from that read.
+func (f idpConnectionFixture) expectLockedRead(current *domain.IDPConnection) {
+	gomock.InOrder(
+		f.tx.EXPECT().LockIDPConnection(gomock.Any(), current.ProjectID, current.ID).Return(nil),
+		f.tx.EXPECT().GetIDPConnection(gomock.Any(), gomock.Any()).Return(current, nil),
+	)
+}
+
 func storedGoogleConnection() *domain.IDPConnection {
 	return &domain.IDPConnection{
 		ProjectID:  idpProjectID,
@@ -120,7 +129,7 @@ func TestIDPConnectionService_CreateOrRevise(t *testing.T) {
 		f := newIDPConnectionFixture(t)
 		stored := storedGoogleConnection()
 		f.pool.EXPECT().GetIDPConnection(gomock.Any(), gomock.Any()).Return(stored, nil)
-		f.tx.EXPECT().GetIDPConnection(gomock.Any(), gomock.Any()).Return(stored, nil)
+		f.expectLockedRead(stored)
 		f.tx.EXPECT().ReviseIDPConnection(gomock.Any(), gomock.Any()).DoAndReturn(
 			func(_ context.Context, c *domain.IDPConnection) error {
 				assert.Equal(t, stored.ID, c.ID)
@@ -164,7 +173,7 @@ func TestIDPConnectionService_CreateOrRevise(t *testing.T) {
 			stored := storedGoogleConnection()
 			stored.Document = withTemplate(stored.Document)
 			f.pool.EXPECT().GetIDPConnection(gomock.Any(), gomock.Any()).Return(stored, nil)
-			f.tx.EXPECT().GetIDPConnection(gomock.Any(), gomock.Any()).Return(stored, nil)
+			f.expectLockedRead(stored)
 			f.tx.EXPECT().ReviseIDPConnection(gomock.Any(), gomock.Any()).DoAndReturn(
 				func(_ context.Context, c *domain.IDPConnection) error {
 					c.RevisionID = "idprev_2"
@@ -189,7 +198,7 @@ func TestIDPConnectionService_CreateOrRevise(t *testing.T) {
 		current := storedGoogleConnection()
 		current.Document = googleConnection("https://accounts.google.com", "B")
 		f.pool.EXPECT().GetIDPConnection(gomock.Any(), gomock.Any()).Return(stale, nil)
-		f.tx.EXPECT().GetIDPConnection(gomock.Any(), gomock.Any()).Return(current, nil)
+		f.expectLockedRead(current)
 		f.tx.EXPECT().ReviseIDPConnection(gomock.Any(), gomock.Any()).DoAndReturn(
 			func(_ context.Context, c *domain.IDPConnection) error {
 				c.RevisionID = "idprev_3"
@@ -213,7 +222,7 @@ func TestIDPConnectionService_CreateOrRevise(t *testing.T) {
 		f.tx.EXPECT().CreateIDPConnection(gomock.Any(), gomock.Any()).
 			Return(database.NewUniqueError("idp_connections", "idp_connections_slug", nil))
 		f.tx.EXPECT().ReviseIDPConnection(gomock.Any(), gomock.Any()).Return(nil)
-		f.tx.EXPECT().GetIDPConnection(gomock.Any(), gomock.Any()).Return(storedGoogleConnection(), nil)
+		f.expectLockedRead(storedGoogleConnection())
 
 		got, err := f.svc.CreateOrRevise(t.Context(), idpProjectID, googleConnection("https://accounts.google.com", "Google"))
 		require.NoError(t, err)
@@ -225,7 +234,7 @@ func TestIDPConnectionService_CreateOrRevise(t *testing.T) {
 		t.Parallel()
 		f := newIDPConnectionFixture(t)
 		f.pool.EXPECT().GetIDPConnection(gomock.Any(), gomock.Any()).Return(storedGoogleConnection(), nil)
-		f.tx.EXPECT().GetIDPConnection(gomock.Any(), gomock.Any()).Return(storedGoogleConnection(), nil)
+		f.expectLockedRead(storedGoogleConnection())
 		f.tx.EXPECT().ReviseIDPConnection(gomock.Any(), gomock.Any()).
 			Return(database.NewUniqueError("idp_connection_revisions", "idp_connection_revisions_created_at", nil))
 
@@ -233,11 +242,22 @@ func TestIDPConnectionService_CreateOrRevise(t *testing.T) {
 		assert.ErrorIs(t, err, domain.ErrIDPConnectionRevisionConflict())
 	})
 
+	t.Run("a connection gone before the lock is not found", func(t *testing.T) {
+		t.Parallel()
+		f := newIDPConnectionFixture(t)
+		f.pool.EXPECT().GetIDPConnection(gomock.Any(), gomock.Any()).Return(storedGoogleConnection(), nil)
+		f.tx.EXPECT().LockIDPConnection(gomock.Any(), idpProjectID, "idp_1").Return(database.NewNoRowFoundError(nil))
+
+		_, err := f.svc.CreateOrRevise(t.Context(), idpProjectID, googleConnection("https://accounts.google.com", "Google"))
+		assert.ErrorIs(t, err, domain.ErrIDPConnectionNotFound())
+		assert.Empty(t, *f.events)
+	})
+
 	t.Run("changing identity fields is rejected with every field named", func(t *testing.T) {
 		t.Parallel()
 		f := newIDPConnectionFixture(t)
 		f.pool.EXPECT().GetIDPConnection(gomock.Any(), gomock.Any()).Return(storedGoogleConnection(), nil)
-		f.tx.EXPECT().GetIDPConnection(gomock.Any(), gomock.Any()).Return(storedGoogleConnection(), nil)
+		f.expectLockedRead(storedGoogleConnection())
 
 		next := []byte(`{"slug":"google","protocol":"oidc","display_name":"Google","subject_claim":"oid",` +
 			`"oidc":{"issuer":"https://login.example.com","client_id":"id","client_secret":"${{ S }}","scopes":["openid"]}}`)

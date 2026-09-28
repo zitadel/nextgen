@@ -137,6 +137,16 @@ func scanIDPConnectionTimestamp(dst *time.Time) func(*spanner.RowIterator) error
 	}
 }
 
+// LockIDPConnection implements [service.IDPConnectionStatements].
+//
+// A plain keyed read is enough: inside a read-write transaction it takes a
+// lock on the connection row, and a conflicting commit aborts one of the
+// transactions, which ReadWriteTransaction then retries from the start.
+func (s idpConnectionStatements) LockIDPConnection(ctx context.Context, projectID, id string) error {
+	_, err := s.db.ReadRow(ctx, "idp_connections", spanner.Key{projectID, id}, []string{"id"})
+	return err
+}
+
 // GetIDPConnection implements [service.IDPConnectionStatements].
 //
 // The read is a join, so it goes through the compiler rather than ReadRow.

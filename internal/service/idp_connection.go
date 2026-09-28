@@ -132,9 +132,20 @@ func (s *idpConnectionService) create(ctx context.Context, entity *domain.IDPCon
 // revision is read inside the transaction, so the immutability check and the
 // event delta compare against the revision this one follows, not a copy read
 // before a concurrent revise landed.
+//
+// The connection row is locked before that read. Without the lock two
+// concurrent revisions could both read the same newest revision (a plain
+// read does not wait at READ COMMITTED), and the later one would compute its
+// delta against a revision that is no longer the one it follows.
 func (s *idpConnectionService) revise(ctx context.Context, projectID, id string, document []byte) (*domain.IDPConnection, error) {
 	var entity *domain.IDPConnection
 	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		if err := tx.Statements().LockIDPConnection(ctx, projectID, id); err != nil {
+			if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+				return domain.ErrIDPConnectionNotFound().WithParent(err)
+			}
+			return err
+		}
 		current, err := tx.Statements().GetIDPConnection(ctx, idpConnectionBy(projectID, domain.IDPConnectionFieldID, id))
 		if err != nil {
 			return err
