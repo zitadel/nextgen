@@ -16,7 +16,7 @@
         "centered",
         "split"
       ],
-      "description": "Degrade preset (`centered` or `split`) the bundled default template\nbranches on, and the fallback when a custom template fails validation.\nNot the complete design catalog: all named designs (`centered`, `split`,\n`split-right`, `hero`, `minimal`) ship as templates and map onto one of\nthese two values; switch designs with\n`zitadel branding eject --design <name>` instead of editing this field.\nEjected templates may ignore it. Selects a template rather than restyling\nthe widget, so it is not an appearance control.\n",
+      "description": "Degrade preset (`centered` or `split`) the bundled default template\nbranches on, and the fallback when a custom template fails validation.\nNot a design catalog: the ejectable designs (`centered`, `minimal`)\nship as templates and map onto one of\nthese two values; switch designs with\n`zitadel branding eject --design <name>` instead of editing this field.\nEjected templates may ignore it. Selects a template rather than restyling\nthe widget, so it is not an appearance control.\n",
       "default": "centered"
     },
     "liquid_template": {

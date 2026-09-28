@@ -168,8 +168,7 @@ one you were granted access to, or one added with
 [`scripts/dev-real-add-project.mts`](scripts/dev-real-add-project.mts) — goes
 through on the session cookie alone, because the server lets a Bearer win over
 the cookie and the seeded project's secret would only hide the other project
-as a 404. That is also why the Add-admin picker on a project's page lists the
-seeded project's users for every project: `POST /users/query` names no project.
+as a 404.
 
 ### Mock backend
 
