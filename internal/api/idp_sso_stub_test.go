@@ -238,47 +238,60 @@ func (s stubVariableResolver) ReplaceVariablesInPlace(_ context.Context, _ domai
 	return s.replace(doc)
 }
 
-func TestResolveClientSecret(t *testing.T) {
-	// A connection never holds a literal secret: it references a project
-	// variable, and the value has to be resolved before the token endpoint
-	// sees it. Getting this wrong posts "${{ GOOGLE_CLIENT_SECRET }}" to the
-	// provider, which fails as invalid_client on every sign-in.
-	t.Run("resolves the reference through the variable service", func(t *testing.T) {
+func TestResolveClientCredentials(t *testing.T) {
+	// A connection never holds a literal secret, and its client id is a
+	// reference too whenever environments register their own OAuth apps.
+	// Both have to be resolved before the provider sees them: getting it
+	// wrong sends "${{ GOOGLE_CLIENT_ID }}" to the authorize endpoint and
+	// posts "${{ GOOGLE_CLIENT_SECRET }}" to the token endpoint, which fails
+	// as invalid_client on every sign-in.
+	oidc := func(id, secret string) api.IdpConnectionOidc {
+		return api.IdpConnectionOidc{ClientID: id, ClientSecret: secret}
+	}
+
+	t.Run("resolves both references through the variable service", func(t *testing.T) {
 		h := &Handler{variableService: stubVariableResolver{replace: func(doc map[string]any) error {
+			doc["client_id"] = "1234.apps.googleusercontent.com"
 			doc["client_secret"] = "s3cret"
 			return nil
 		}}}
-		got, err := h.resolveClientSecret(t.Context(), "proj_1", "${{ GOOGLE_CLIENT_SECRET }}")
+		got, err := h.resolveClientCredentials(
+			t.Context(),
+			"proj_1",
+			oidc("${{ GOOGLE_CLIENT_ID }}", "${{ GOOGLE_CLIENT_SECRET }}"),
+		)
 		if err != nil {
-			t.Fatalf("resolveClientSecret: %v", err)
+			t.Fatalf("resolveClientCredentials: %v", err)
 		}
-		if got != "s3cret" {
-			t.Fatalf("got %q, want the resolved value", got)
+		if got.ID != "1234.apps.googleusercontent.com" || got.Secret != "s3cret" {
+			t.Fatalf("got %+v, want both resolved", got)
 		}
 	})
 
-	t.Run("reports an unresolvable reference rather than posting it", func(t *testing.T) {
+	t.Run("reports an unresolvable reference rather than sending it", func(t *testing.T) {
 		h := &Handler{variableService: stubVariableResolver{replace: func(map[string]any) error {
 			return fmt.Errorf("no such variable")
 		}}}
-		if _, err := h.resolveClientSecret(t.Context(), "proj_1", "${{ MISSING }}"); err == nil {
-			t.Fatal("want an error when the variable does not resolve")
+		if _, err := h.resolveClientCredentials(t.Context(), "proj_1", oidc("${{ A }}", "${{ B }}")); err == nil {
+			t.Fatal("want an error when a variable does not resolve")
 		}
 	})
 
-	t.Run("passes a literal through, for a provider that wants no secret", func(t *testing.T) {
+	t.Run("passes literals through, for a hand-written connection", func(t *testing.T) {
+		// `idp-connection.yaml` allows a literal client id where one OAuth
+		// application serves every environment.
 		h := &Handler{variableService: stubVariableResolver{replace: func(map[string]any) error { return nil }}}
-		got, err := h.resolveClientSecret(t.Context(), "proj_1", "")
-		if err != nil || got != "" {
-			t.Fatalf("got %q, %v; want the stored value unchanged", got, err)
+		got, err := h.resolveClientCredentials(t.Context(), "proj_1", oidc("literal-id", ""))
+		if err != nil || got.ID != "literal-id" || got.Secret != "" {
+			t.Fatalf("got %+v, %v; want the stored values unchanged", got, err)
 		}
 	})
 
-	t.Run("passes the stored value through without a variable service", func(t *testing.T) {
+	t.Run("passes the stored values through without a variable service", func(t *testing.T) {
 		h := &Handler{}
-		got, err := h.resolveClientSecret(t.Context(), "proj_1", "literal")
-		if err != nil || got != "literal" {
-			t.Fatalf("got %q, %v; want the stored value unchanged", got, err)
+		got, err := h.resolveClientCredentials(t.Context(), "proj_1", oidc("id", "secret"))
+		if err != nil || got.ID != "id" || got.Secret != "secret" {
+			t.Fatalf("got %+v, %v; want the stored values unchanged", got, err)
 		}
 	})
 }

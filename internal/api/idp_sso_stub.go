@@ -171,8 +171,16 @@ func (h *Handler) ssoAuthorizeStep(ctx context.Context, state *domain.FlowState,
 	if err != nil {
 		return nil, "", domain.ErrRequestInvalid().WithMessage(err.Error())
 	}
+	// The id goes into a URL the browser follows, so the reference has to be
+	// resolved here too -- an unresolved one would reach the provider as the
+	// literal text `${{ NAME }}` and be rejected as an unknown client. Only
+	// the id is used: the secret never travels through the browser.
+	credentials, err := h.resolveClientCredentials(ctx, state.ProjectID, oidc)
+	if err != nil {
+		return nil, "", domain.ErrInternal(err)
+	}
 	query := authorize.Query()
-	query.Set("client_id", oidc.ClientID)
+	query.Set("client_id", credentials.ID)
 	query.Set("redirect_uri", callback)
 	query.Set("response_type", "code")
 	query.Set("scope", strings.Join(scopesOrDefault(oidc), " "))
@@ -529,39 +537,57 @@ func (h *Handler) flowStepExists(ctx context.Context, state *domain.FlowState, n
 	return ok
 }
 
-// resolveClientSecret turns the connection's stored `client_secret` into the
-// value to authenticate with.
+// clientCredentials is the pair the token endpoint authenticates with, after
+// any `${{ NAME }}` references have been resolved.
+type clientCredentials struct {
+	ID     string
+	Secret string
+}
+
+// resolveClientCredentials turns a connection's stored client id and secret
+// into the values to authenticate with.
 //
-// Connection documents hold a `${{ NAME }}` reference rather than a credential
-// -- the CLI refuses to write a literal, and a revision is immutable, so a
-// literal could never be scrubbed. The value lives in the project's variables,
-// encrypted under the project's own key (ADR 029), and is resolved here at the
-// moment of use rather than when the connection is read: a decrypted secret
-// should exist for one request, not for as long as a cached document does.
+// Both fields may hold a `${{ NAME }}` reference rather than a value, and
+// `idp-connection.yaml` says so for each:
 //
-// A value with no placeholder in it is returned as it stands, so a connection
-// written by hand against a provider that wants no secret still works.
-func (h *Handler) resolveClientSecret(ctx context.Context, projectID, stored string) (string, error) {
+//   - The **secret** must be a reference. The CLI refuses to write a literal,
+//     the document is committed, and a revision is immutable -- so a literal
+//     could never be scrubbed.
+//   - The **client id** may be either. It is public, so a literal is safe, but
+//     each environment registers its own OAuth application and a literal would
+//     force a separate connection document per environment.
+//
+// Resolution happens here, at the moment of use, rather than when the
+// connection is read: a decrypted secret should exist for one request, not for
+// as long as a cached document does. Values with no placeholder in them pass
+// through untouched, so a hand-written connection still works.
+func (h *Handler) resolveClientCredentials(
+	ctx context.Context,
+	projectID string,
+	oidc api.IdpConnectionOidc,
+) (clientCredentials, error) {
+	stored := clientCredentials{ID: oidc.ClientID, Secret: oidc.ClientSecret}
 	if h.variableService == nil {
 		return stored, nil
 	}
-	// The resolver works on a document, so the one field is wrapped in one.
-	// Its key is arbitrary: nothing reads it back but the line below.
-	doc := map[string]any{"client_secret": stored}
+	// The resolver works on a document, so the two fields are wrapped in one.
+	// The keys are arbitrary: nothing reads them back but the lines below.
+	doc := map[string]any{"client_id": stored.ID, "client_secret": stored.Secret}
 	if err := h.variableService.ReplaceVariablesInPlace(
 		ctx,
 		domain.VariableOwner{ProjectID: projectID},
 		doc,
 	); err != nil {
-		// Naming the variable is the whole diagnostic: the usual cause is a
-		// connection that was applied without its secret ever being published.
-		return "", fmt.Errorf("resolving the connection's client_secret: %w", err)
+		// Naming the field is the whole diagnostic: the usual cause is a
+		// connection applied without its credentials ever being published.
+		return clientCredentials{}, fmt.Errorf("resolving the connection's client credentials: %w", err)
 	}
-	resolved, ok := doc["client_secret"].(string)
-	if !ok {
-		return "", fmt.Errorf("the connection's client_secret did not resolve to a string")
+	id, idOK := doc["client_id"].(string)
+	secret, secretOK := doc["client_secret"].(string)
+	if !idOK || !secretOK {
+		return clientCredentials{}, fmt.Errorf("the connection's client credentials did not resolve to strings")
 	}
-	return resolved, nil
+	return clientCredentials{ID: id, Secret: secret}, nil
 }
 
 // exchangeSsoCode swaps the authorization code for tokens and reads the email
@@ -572,7 +598,7 @@ func (h *Handler) exchangeSsoCode(ctx context.Context, pending ssoPending, code 
 	if err != nil {
 		return ssoClaims{}, err
 	}
-	clientSecret, err := h.resolveClientSecret(ctx, pending.projectID, oidc.ClientSecret)
+	credentials, err := h.resolveClientCredentials(ctx, pending.projectID, oidc)
 	if err != nil {
 		return ssoClaims{}, err
 	}
@@ -580,14 +606,14 @@ func (h *Handler) exchangeSsoCode(ctx context.Context, pending ssoPending, code 
 	form.Set("grant_type", "authorization_code")
 	form.Set("code", code)
 	form.Set("redirect_uri", pending.returnURL+IdpCallbackPath)
-	form.Set("client_id", oidc.ClientID)
+	form.Set("client_id", credentials.ID)
 	// The schema's default is client_secret_basic, so a connection that omits
 	// the field expects the header form. Posting the secret in the body
 	// regardless is rejected by any provider that enforces basic auth.
 	basic := oidc.TokenEndpointAuthMethod.Or(api.IdpConnectionOidcTokenEndpointAuthMethodClientSecretBasic) ==
 		api.IdpConnectionOidcTokenEndpointAuthMethodClientSecretBasic
 	if !basic {
-		form.Set("client_secret", clientSecret)
+		form.Set("client_secret", credentials.Secret)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, tokenURL, strings.NewReader(form.Encode()))
@@ -596,7 +622,7 @@ func (h *Handler) exchangeSsoCode(ctx context.Context, pending ssoPending, code 
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	if basic {
-		req.SetBasicAuth(url.QueryEscape(oidc.ClientID), url.QueryEscape(clientSecret))
+		req.SetBasicAuth(url.QueryEscape(credentials.ID), url.QueryEscape(credentials.Secret))
 	}
 	if h.ssoEgress == nil {
 		return ssoClaims{}, fmt.Errorf("no egress client configured for the token exchange")
