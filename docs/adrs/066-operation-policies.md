@@ -356,15 +356,21 @@ Where operation policies sit against the rest of the platform.
 Instances are revisioned resources deployed as part of a release
 ([ADR 035](035-configuration-environments.md), ids per
 [ADR 063](063-resource-revisions-fixed-id-and-revision-id.md)). ADR 035 already
-reserved the names: the `policy` resource kind with a `name` handle, the `pol_`
-id prefix, and the `policies` key in the release bundle. Instances occupy
-them. The resource slice copies branding (create-only, versioned,
-project-owned), not the user schema (URL identity and `$ref` handling a
-policy does not need). Templates are not release content:
-they ship with the server, and a release records the catalog version it was
-validated against. Release validation checks every instance against its template
-(unknown operation, unknown setting, out-of-bounds value) and rejects two
-instances for the same operation.
+reserved the `policy` resource kind, the `pol_` id prefix and the `policies`
+key in the release bundle; instances occupy them. The handle is the
+**`operation`**: it is what two revisions of the same instance share, so a
+release cannot pin two revisions for one operation, and an instance carries
+no `name`. When scoped instances land
+([#1264](https://github.com/zitadel/nextgen/pull/1264)) the handle grows the
+audience key next to the operation, still derived from the document, so a
+project default and a team override of the same operation are two resources
+without a naming field to keep in step with the audience. The resource slice
+copies branding (create-only, versioned, project-owned), not the user schema
+(URL identity and `$ref` handling a policy does not need). Templates are not
+release content: they ship with the server, and a release records the catalog
+version it was validated against. Release validation checks every instance
+against its template (unknown operation, unknown setting, out-of-bounds value)
+and rejects two instances for the same operation.
 
 ### Applicability
 
