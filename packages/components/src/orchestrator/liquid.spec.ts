@@ -662,9 +662,11 @@ function decodeEntities(value: string): string {
   return value
     .replaceAll("&#34;", '"')
     .replaceAll("&#39;", "'")
-    .replaceAll("&amp;", "&")
     .replaceAll("&lt;", "<")
-    .replaceAll("&gt;", ">");
+    .replaceAll("&gt;", ">")
+    // Unescape &amp; last: decoding it first could turn "&amp;lt;" into "<"
+    // by re-interpreting the revealed "&" as the start of another entity.
+    .replaceAll("&amp;", "&");
 }
 
 
