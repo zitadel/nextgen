@@ -1,12 +1,14 @@
 # Branding
 
-This directory owns how your login UI looks: `branding.json` (layout preset
-and asset URLs) plus `login.liquid`, the LiquidJS template the
-`<zitadel-login>` component renders for every step.
+This directory owns the structure of your login widget: `branding.json`
+(layout preset and asset URLs) plus `login.liquid`, the LiquidJS template the
+`<zitadel-login>` component renders for every step. The page around the
+widget (a split screen, a hero pane, marketing copy) belongs in your
+application, not in this template.
 
 ## Workflow
 
-1. Edit `login.liquid` (and `branding.json` for logo/hero URLs).
+1. Edit `login.liquid` (and `branding.json` for the logo URL).
 2. `zitadel plan` — validates the template (LiquidJS parse, banned patterns,
    the required `{% mandatory_gates %}` tag) and shows the pending revision.
 3. `zitadel apply` — publishes an immutable branding revision. The login UI
@@ -28,19 +30,16 @@ by re-applying an earlier template.
 ## Make it yours
 
 - Brand asset URLs go in `branding.json` and must use `https://`. Each template
-  decides which fields it renders: `centered` and `hero` use `logo_url`; `split`
-  and `split-right` use both `logo_url` and `hero_url`; `minimal` uses neither
-  until you add them to `login.liquid`. The `hero` design's brand pane is
-  editable markup rather than a `hero_url` background. Custom fonts are not
-  configurable here yet; load them from the embedding page.
+  decides which fields it renders: `centered` uses `logo_url`; `minimal` uses
+  none until you add it to `login.liquid`. Custom fonts are not configurable
+  here yet; load them from the embedding page.
 
   ```json
   {
     "$schema": "../meta/branding.json",
-    "layout": "split",
+    "layout": "centered",
     "liquid_template": { "$file": "./login.liquid" },
-    "logo_url": "https://example.com/logo.svg",
-    "hero_url": "https://example.com/hero.jpg"
+    "logo_url": "https://example.com/logo.svg"
   }
   ```
 
@@ -56,23 +55,11 @@ by re-applying an earlier template.
   targets are left to the browser-side fallback instead of being requested by
   the machine running `plan`.
 
-  `layout` is the degrade preset (`centered` or `split`), **not** the complete
-  design catalog. All named designs (`centered`, `split`, `split-right`, `hero`,
-  `minimal`) are delivered as templates and map onto those two values. Switch
-  designs with `zitadel branding eject --design <name>`, don't edit `layout`.
+  `layout` is the degrade preset the login falls back to when a template is
+  rejected, **not** a design picker. Both shipped designs (`centered`,
+  `minimal`) map onto `centered`. Switch designs with
+  `zitadel branding eject --design <name>`, don't edit `layout`.
 
-- In the split-family designs (`split`, `split-right`, `hero`) the
-  `.zl-split__brand` pane is yours: structural HTML plus inline `style=""`
-  attributes are allowed; `button`, `input`, and `form` tags are stripped —
-  use `<a>` for landing CTAs. The `hero` design ships a full landing-page
-  starting point on token-styled `zl-hero__*` classes.
-- On narrow viewports the brand pane collapses and the `.zl-split__compact`
-  node inside the form pane takes over (logo or brand line) — keep one so
-  your identity survives on phones.
-- The split chrome is tunable from your template root's `style` attribute
-  (`--zl-split-columns`, `--zl-split-align`, `--zl-split-brand-mobile`), and
-  `zl-split--right` on the wrapper mirrors the panes. Knob reference:
-  [`docs/design/branding/templates.md`](https://github.com/zitadel/nextgen/blob/main/docs/design/branding/templates.md).
 - The "Secured with Zitadel" attribution is licence-gated and on by default.
 - Back-navigation: the engine injects a `kind: "back"` action on steps
   that can return to their predecessor, and the browser's back gesture
@@ -92,5 +79,4 @@ by re-applying an earlier template.
   loops so the injected action doesn't render as a stray secondary button.
 
 Start over anytime with `zitadel branding eject --design <name>` (designs:
-`centered`, `split`, `split-right`, `hero`, `minimal`; add `--force` to
-overwrite).
+`centered`, `minimal`; add `--force` to overwrite).

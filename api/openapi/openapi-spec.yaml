@@ -202,6 +202,10 @@ paths:
     $ref: endpoints/variables/methods.yaml
   /variables/{variable_name}:
     $ref: endpoints/variables/by_name/methods.yaml
+  /deployments:
+    $ref: endpoints/deployments/methods.yaml
+  /deployments/{deployment_id}:
+    $ref: endpoints/deployments/by_id/methods.yaml
 
 components:
   securitySchemes:
