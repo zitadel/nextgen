@@ -2,9 +2,12 @@
 -- +goose StatementBegin
 -- An identity link pins one provider subject on one connection to one user; see
 -- the postgres migration for why the user FK cascades (ADR 024, "External
--- systems are modeled as provisioning authorities"), why the connection FK is
--- RESTRICT and why there is no project FK. created_at is unix nanos stamped in
--- Go, as everywhere else in this dialect.
+-- systems are modeled as provisioning authorities") and why there is no project
+-- FK. The connection FK is NO ACTION: connection deletion is #1013's decision.
+-- Not RESTRICT: NO ACTION is checked at the end of the whole statement, so a
+-- project delete that removes the link through the user cascade passes, while
+-- a direct delete of a linked connection still fails. created_at is unix nanos
+-- stamped in Go, as everywhere else in this dialect.
 CREATE TABLE idp_identity_links (
     project_id      TEXT    NOT NULL,
     id              TEXT    NOT NULL,
@@ -17,7 +20,7 @@ CREATE TABLE idp_identity_links (
     CONSTRAINT chk_idp_identity_links_subject CHECK (subject <> ''),
     CONSTRAINT fk_idp_identity_links_connection
         FOREIGN KEY (project_id, connection_id)
-        REFERENCES idp_connections (project_id, id) ON DELETE RESTRICT,
+        REFERENCES idp_connections (project_id, id) ON DELETE NO ACTION,
     CONSTRAINT fk_idp_identity_links_user
         FOREIGN KEY (project_id, user_id)
         REFERENCES users (project_id, id) ON DELETE CASCADE

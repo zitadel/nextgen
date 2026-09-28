@@ -154,6 +154,34 @@ func TestIDPIdentityLinkStatements_UserDeleteCascades(t *testing.T) {
 	})
 }
 
+// The project cascades into both the connection and the user, and the link
+// hangs off both. The delete must not trip on the connection FK before the
+// user cascade has removed the link.
+func TestIDPIdentityLinkStatements_ProjectDeleteCascades(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		f := newIDPIdentityLinkFixture(t, d.stmts)
+		require.NoError(t, d.stmts.CreateIDPIdentityLink(t.Context(), f.link("subject-1")))
+
+		_, err := d.stmts.DeleteProjectByID(t.Context(), f.projectID)
+		require.NoError(t, err)
+
+		_, err = d.stmts.GetIDPIdentityLink(t.Context(), idpIdentityLinkByPair(f.projectID, f.connectionID, "subject-1"))
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+
+		_, err = d.stmts.GetIDPConnection(t.Context(), idpConnectionByID(f.projectID, f.connectionID))
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+
+		_, err = d.stmts.GetUser(t.Context(),
+			database.And(
+				database.Equal(database.Col(domain.UserFieldProjectID), f.projectID),
+				database.Equal(database.Col(domain.UserFieldID), f.userID),
+			),
+			service.UserQueryOptions{},
+		)
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+	})
+}
+
 // The engine creates a user from claims and links it in one transaction, so a
 // failure after both inserts must leave neither: a user without its link could
 // never sign in through the provider again.

@@ -4,7 +4,10 @@
 -- Links go with the user: they are provisioning metadata attached to the
 -- local user (ADR 024, "External systems are modeled as provisioning
 -- authorities"), not a lifecycle-managed resource, so the user FK cascades.
--- The connection FK is RESTRICT: connection deletion is #1013's decision.
+-- The connection FK is NO ACTION: connection deletion is #1013's decision.
+-- Not RESTRICT: NO ACTION is checked at the end of the whole statement, so a
+-- project delete that removes the link through the user cascade passes, while
+-- a direct delete of a linked connection still fails.
 -- No project FK: the project reaches a link through its connection and its
 -- user, and both cascade from the project.
 CREATE TABLE zitadel_nextgen.idp_identity_links (
@@ -20,7 +23,7 @@ CREATE TABLE zitadel_nextgen.idp_identity_links (
     , CONSTRAINT fk_idp_identity_links_connection
         FOREIGN KEY (project_id, connection_id)
         REFERENCES zitadel_nextgen.idp_connections (project_id, id)
-        ON DELETE RESTRICT
+        ON DELETE NO ACTION
     , CONSTRAINT fk_idp_identity_links_user
         FOREIGN KEY (project_id, user_id)
         REFERENCES zitadel_nextgen.users (project_id, id)
