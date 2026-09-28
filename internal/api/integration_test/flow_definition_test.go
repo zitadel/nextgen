@@ -1140,14 +1140,27 @@ func TestCreateFlowDefinitionOnSuccessRoundTrip(t *testing.T) {
 				}
 			}
 
+			// create_user_with_sso may only be reached from an identity-provider
+			// callback (validateSsoCreationReachability), so the step running it
+			// is entered through the identity_unknown outcome rather than a plain
+			// submit. Every other value is reached by submit. step_2 stays the
+			// on_success step in both shapes so the assertions below hold.
+			stepOneTransitions := map[string]api.FlowDefinitionStepTransitionsItem{
+				"submit": {Target: "step_2"},
+			}
+			if onSuccess == domain.FlowOnSuccessCreateUserWithSso {
+				stepOneTransitions = map[string]api.FlowDefinitionStepTransitionsItem{
+					"submit":           {Target: "step_3"},
+					"identity_unknown": {Target: "step_2"},
+				}
+			}
+
 			definition := newFlowDefinitionFixture(name, userSchemaURI)
 			definition.Steps = []api.FlowDefinitionStep{
 				{
-					Name:   "step_1",
-					Fields: upstream,
-					Transitions: api.NewOptFlowDefinitionStepTransitions(
-						map[string]api.FlowDefinitionStepTransitionsItem{"submit": {Target: "step_2"}},
-					),
+					Name:        "step_1",
+					Fields:      upstream,
+					Transitions: api.NewOptFlowDefinitionStepTransitions(stepOneTransitions),
 					Actions: []api.StepAction{
 						{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
 					},
