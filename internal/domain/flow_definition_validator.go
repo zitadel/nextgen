@@ -668,10 +668,14 @@ func reachableSteps(start string, reverse map[string][]string) map[string]struct
 
 // someStepEstablishesKind reports whether any candidate step collects
 // a field whose resolver-derived challenge matches kind.
-// stepVerifiesCredential reports whether the step proves who the user is: it
-// either collects a password (field-shaped) or offers a passkey assertion
-// (action-shaped). A conflict step that does neither cannot establish that the
-// caller owns the account the collision pinned.
+// stepVerifiesCredential reports whether *every* way out of the step proves who
+// the user is. Presence of a credential is not enough: a step offering a passkey
+// beside a plain submit lets the caller take the submit and reach a completion
+// with the colliding account already pinned.
+//
+// A collected password makes submit itself the proof (the dispatch verifies it).
+// A passkey is action-shaped, so it only holds when no plain submit sits beside
+// it as an unverified way onward.
 func stepVerifiesCredential(step *FlowDefinitionStep, resolvedByStep map[string]FlowResolvedFields) bool {
 	if resolved, ok := resolvedByStep[step.Name]; ok {
 		for _, f := range resolved.Fields {
@@ -680,12 +684,17 @@ func stepVerifiesCredential(step *FlowDefinitionStep, resolvedByStep map[string]
 			}
 		}
 	}
+	hasPasskey := false
 	for _, action := range step.Actions {
-		if action.Kind == FlowActionKindPasskey {
-			return true
+		switch action.Kind {
+		case FlowActionKindPasskey:
+			hasPasskey = true
+		case FlowActionKindSubmit:
+			// Submits nothing that proves anything: an unverified way onward.
+			return false
 		}
 	}
-	return false
+	return hasPasskey
 }
 
 func someStepEstablishesKind(candidates map[string]struct{}, resolvedByStep map[string]FlowResolvedFields, kind FlowFieldChallenge) bool {

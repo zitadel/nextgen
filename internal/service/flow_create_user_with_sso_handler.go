@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/maputil"
 )
 
 // FlowCreateUserWithSsoHandler implements the `create_user_with_sso`
@@ -56,11 +57,12 @@ func (h *FlowCreateUserWithSsoHandler) Handle(
 	}
 
 	// The account is created from the identifier the provider vouched for, never
-	// from CollectedData alone: a later submit merges over the callback's
+	// from CollectedData as submitted: a later submit merges over the callback's
 	// prefilled value, so trusting the form would let a real callback for one
-	// address mint an account for another.
-	attributes, err := attributesFromVerifiedIdentity(in)
-	if err != nil {
+	// address mint an account for another. Writing it back into CollectedData
+	// (rather than only into the create attributes) also means a uniqueness
+	// collision rebinds on the verified address, not the submitted one.
+	if err := bindVerifiedIdentifier(in); err != nil {
 		return domain.FlowOnSuccessResult{}, err
 	}
 
@@ -73,7 +75,7 @@ func (h *FlowCreateUserWithSsoHandler) Handle(
 		CreateUserInput{
 			ProjectID:  in.ProjectID,
 			SchemaURL:  in.UserSchemaURL,
-			Attributes: attributes,
+			Attributes: in.State.CollectedData.UserData,
 			ID:         userID,
 		},
 		h.schemaStore,
@@ -113,22 +115,27 @@ func (h *FlowCreateUserWithSsoHandler) Handle(
 	return domain.FlowOnSuccessResult{UserID: userID, Irreversible: true}, nil
 }
 
-// attributesFromVerifiedIdentity copies the collected attributes and forces the
-// identifier to the address the provider vouched for, so a submitted value
-// cannot displace it. Refuses when the flow resolves no identifier field: there
-// would be nowhere to anchor the verified address, and creating from the form
-// alone is exactly the hole this closes.
-func attributesFromVerifiedIdentity(in domain.FlowOnSuccessInput) (map[string]any, error) {
+// bindVerifiedIdentifier forces the collected identifier to the address the
+// provider vouched for, so a submitted value cannot displace it. The value is
+// written through the attribute key's path, because collected data nests a
+// dotted attribute (`account.email` lives at UserData["account"]["email"]).
+//
+// Refuses when the flow resolves no identifier field: there would be nowhere to
+// anchor the verified address, and creating from the form alone is exactly the
+// hole this closes. The on_success manifest requires one, so a definition that
+// reaches here without it was already rejected at validation.
+func bindVerifiedIdentifier(in domain.FlowOnSuccessInput) error {
 	name, ok := identifierFieldName(in.Resolved)
 	if !ok {
-		return nil, fmt.Errorf("%w: create_user_with_sso resolves no identifier field to bind the verified address to", domain.ErrFlowIntegrity())
+		return fmt.Errorf("%w: create_user_with_sso resolves no identifier field to bind the verified address to", domain.ErrFlowIntegrity())
 	}
-	attributes := make(map[string]any, len(in.State.CollectedData.UserData)+1)
-	for key, value := range in.State.CollectedData.UserData {
-		attributes[key] = value
+	if in.State.CollectedData.UserData == nil {
+		in.State.CollectedData.UserData = map[string]any{}
 	}
-	attributes[name] = in.State.VerifiedIdentity.Email
-	return attributes, nil
+	if err := maputil.SetNested(in.State.CollectedData.UserData, domain.AttributeKey(name).Nodes(), in.State.VerifiedIdentity.Email); err != nil {
+		return fmt.Errorf("create_user_with_sso: bind verified identifier %q: %w", name, err)
+	}
+	return nil
 }
 
 // identifierFieldName reports the schema attribute carrying the identifier

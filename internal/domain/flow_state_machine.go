@@ -875,12 +875,11 @@ func uniqueFieldValues(values map[string]any, resolvedSets ...FlowResolvedFields
 			if field.Unique == AttributeUniquenessUnspecified || seen[field.Name] {
 				continue
 			}
-			raw, present := values[field.Name]
-			if !present {
-				continue
-			}
-			s, _ := raw.(string)
-			if s == "" {
+			// Collected data nests a dotted attribute (`account.email` lives at
+			// values["account"]["email"]), so read through the key's path
+			// rather than the flat name or nested uniques never resolve.
+			s, present := maputil.GetNested[string](values, AttributeKey(field.Name).Nodes())
+			if !present || s == "" {
 				continue
 			}
 			seen[field.Name] = true

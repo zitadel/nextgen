@@ -1899,8 +1899,11 @@ func TestValidator_TransitionPurposeWrongTargetRejected(t *testing.T) {
 // callback (raised in review by @vitorbari). A valid flow reaches it only via
 // the identity_unknown outcome.
 func TestValidateSsoCreationReachability(t *testing.T) {
+	// create_user_with_sso's manifest requires a designated identifier (it is
+	// where the verified address is written) and the conflict step verifies a
+	// password, so the fixture needs a schema carrying both.
 	var schema jsonschema.Schema
-	require.NoError(t, json.Unmarshal(tenantUserSchema, &schema))
+	require.NoError(t, json.Unmarshal(userSchemaIDAndPassword, &schema))
 
 	ssoCreate := domain.FlowOnSuccessCreateUserWithSso
 	show := domain.FlowStepCompleteShow

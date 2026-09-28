@@ -111,6 +111,9 @@ const AUTH_METHOD_PREFIX = "x-auth-methods#";
 /** Mirrors `ManifestForOnSuccess` in flow_on_success.go. */
 const ON_SUCCESS_MANIFESTS: Readonly<Record<string, readonly FieldChallenge[]>> = {
   create_user: ["identifier", "password"],
+  // The provider is the proof, so no password -- but an identifier field must
+  // resolve: it is where the verified address is written.
+  create_user_with_sso: ["identifier"],
 };
 
 type FieldChallenge = "identifier" | "password";
@@ -571,12 +574,14 @@ function validateCycles(def: FlowDef): FlowValidationIssue[] {
 // credential, so it must never be a purpose entry and only the identity_unknown
 // outcome may target it. Catches at plan time what the runtime handler refuses.
 /**
- * Mirrors `stepVerifiesCredential` in flow_definition_validator.go: the step
- * proves who the user is, by collecting a password (the reserved field) or
- * offering a passkey assertion.
+ * Mirrors `stepVerifiesCredential` in flow_definition_validator.go: *every* way
+ * out of the step must prove who the user is. A collected password makes submit
+ * itself the proof; a passkey only holds when no plain submit sits beside it as
+ * an unverified way onward.
  */
 function stepVerifiesCredential(step: FlowStep): boolean {
   if (step.fields.includes("x-auth-methods#password")) return true;
+  if (step.actions.some((a) => a.kind === "submit")) return false;
   return step.actions.some((a) => a.kind === "passkey");
 }
 

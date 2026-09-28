@@ -21,9 +21,13 @@ func ManifestForOnSuccess(o FlowOnSuccess) []FlowFieldChallenge {
 	switch o {
 	case FlowOnSuccessCreateUser:
 		return []FlowFieldChallenge{FlowFieldChallengeIdentifier, FlowFieldChallengePassword}
+	case FlowOnSuccessCreateUserWithSso:
+		// The provider is the proof, so no password is collected -- but an
+		// identifier field must still be resolved: it is where the verified
+		// address is written. Without this the handler would refuse at runtime
+		// on a definition validation had accepted.
+		return []FlowFieldChallenge{FlowFieldChallengeIdentifier}
 	}
-	// create_user_with_sso deliberately has no manifest: the provider supplies
-	// the identifier and is the proof, so nothing must be collected upstream.
 	return nil
 }
 

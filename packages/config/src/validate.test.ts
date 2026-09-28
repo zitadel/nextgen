@@ -1105,7 +1105,11 @@ describe("drift audit (Go validator)", () => {
     // Mirrors ON_SUCCESS_MANIFESTS in validate.ts (keys and kinds): an
     // on_success gaining a manifest in Go without a port here skips its
     // collected-upstream check at plan time.
-    expect(cases).toEqual(["create_user"]);
+    expect(cases).toEqual(["create_user", "create_user_with_sso"]);
+    // create_user collects identifier + password. create_user_with_sso collects
+    // only the identifier: the provider is the proof, but the verified address
+    // still needs a field to be written to.
     expect(body).toContain("FlowFieldChallengeIdentifier, FlowFieldChallengePassword");
+    expect(body).toContain("[]FlowFieldChallenge{FlowFieldChallengeIdentifier}");
   });
 });
