@@ -7,23 +7,11 @@ import (
 	"slices"
 )
 
-// Audience is the ADR 065 applicability object: the set of requests an
-// instance applies to. Empty means project default.
-type Audience struct {
-	TeamIDs []string `json:"team_ids,omitempty"`
-}
-
-// IsEmpty reports whether the audience is the project default.
-func (a Audience) IsEmpty() bool {
-	return len(a.TeamIDs) == 0
-}
-
 // Instance is the developer-authored half of a policy: config values for one
-// operation and the audience they apply to.
+// operation, applying to the whole project.
 type Instance struct {
 	Kind      string         `json:"kind"`
 	Operation string         `json:"operation"`
-	Audience  Audience       `json:"audience,omitzero"`
 	Config    map[string]any `json:"config"`
 }
 
