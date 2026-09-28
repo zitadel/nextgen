@@ -588,6 +588,13 @@ func validateSsoCreationReachability(def FlowDefinition) error {
 					"step %q runs create_user_with_sso but is reachable via %q; it must only be reached from the %q outcome", step.Name, key, FlowImplicitOutcomeIdentityUnknown), nil)
 			}
 		}
+		// The mutation resolves to user_already_exists when the provider's
+		// identity collides with an existing account, so the step must route
+		// that outcome (to a conflict step) or the collision dead-ends.
+		if _, ok := step.Transitions[FlowImplicitOutcomeUserAlreadyExists]; !ok {
+			return ErrFlowDefinitionInvalid(fmt.Sprintf(
+				"step %q runs create_user_with_sso but declares no %q transition; a colliding identity would have nowhere to route", step.Name, FlowImplicitOutcomeUserAlreadyExists), nil)
+		}
 	}
 	return nil
 }

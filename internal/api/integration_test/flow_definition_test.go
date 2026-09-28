@@ -1148,11 +1148,17 @@ func TestCreateFlowDefinitionOnSuccessRoundTrip(t *testing.T) {
 			stepOneTransitions := map[string]api.FlowDefinitionStepTransitionsItem{
 				"submit": {Target: "step_2"},
 			}
+			stepTwoTransitions := map[string]api.FlowDefinitionStepTransitionsItem{
+				"submit": {Target: "step_3"},
+			}
 			if onSuccess == domain.FlowOnSuccessCreateUserWithSso {
 				stepOneTransitions = map[string]api.FlowDefinitionStepTransitionsItem{
 					"submit":           {Target: "step_3"},
 					"identity_unknown": {Target: "step_2"},
 				}
+				// A create_user_with_sso step must route the collision outcome,
+				// or the definition is rejected (validateSsoCreationReachability).
+				stepTwoTransitions["user_already_exists"] = api.FlowDefinitionStepTransitionsItem{Target: "step_3"}
 			}
 
 			definition := newFlowDefinitionFixture(name, userSchemaURI)
@@ -1166,11 +1172,9 @@ func TestCreateFlowDefinitionOnSuccessRoundTrip(t *testing.T) {
 					},
 				},
 				{
-					Name:      "step_2",
-					OnSuccess: api.NewOptFlowDefinitionStepOnSuccess(wire),
-					Transitions: api.NewOptFlowDefinitionStepTransitions(
-						map[string]api.FlowDefinitionStepTransitionsItem{"submit": {Target: "step_3"}},
-					),
+					Name:        "step_2",
+					OnSuccess:   api.NewOptFlowDefinitionStepOnSuccess(wire),
+					Transitions: api.NewOptFlowDefinitionStepTransitions(stepTwoTransitions),
 					Actions: []api.StepAction{
 						{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
 					},

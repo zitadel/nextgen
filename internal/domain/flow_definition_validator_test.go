@@ -1974,6 +1974,38 @@ func TestValidateSsoCreationReachability(t *testing.T) {
 					},
 				},
 				{
+					Name:      "register-sso",
+					Fields:    []domain.Field{"email"},
+					OnSuccess: &ssoCreate,
+					Actions:   []domain.FlowStepAction{{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true}},
+					Transitions: map[string]domain.FlowStepTransition{
+						"submit":              {Target: "done"},
+						"user_already_exists": {Target: "done"},
+					},
+				},
+				{Name: "done", Complete: &show},
+			},
+			map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "identifier"},
+		)
+		_, err := domain.ValidateFlowDefinition(&schema, def)
+		require.NoError(t, err, "reaching create_user_with_sso only via identity_unknown must be allowed")
+	})
+
+	t.Run("rejects create_user_with_sso without a user_already_exists transition", func(t *testing.T) {
+		def := base(
+			[]domain.FlowDefinitionStep{
+				{
+					Name:   "identifier",
+					Fields: []domain.Field{"email"},
+					Actions: []domain.FlowStepAction{
+						{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+					},
+					Transitions: map[string]domain.FlowStepTransition{
+						"submit":           {Target: "done"},
+						"identity_unknown": {Target: "register-sso"},
+					},
+				},
+				{
 					Name:        "register-sso",
 					Fields:      []domain.Field{"email"},
 					OnSuccess:   &ssoCreate,
@@ -1985,6 +2017,6 @@ func TestValidateSsoCreationReachability(t *testing.T) {
 			map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "identifier"},
 		)
 		_, err := domain.ValidateFlowDefinition(&schema, def)
-		require.NoError(t, err, "reaching create_user_with_sso only via identity_unknown must be allowed")
+		require.Error(t, err, "a create_user_with_sso step with nowhere to route a collision must be rejected")
 	})
 }

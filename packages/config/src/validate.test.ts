@@ -473,11 +473,41 @@ describe("sso/create-only-via-callback", () => {
         fields: ["email"],
         on_success: "create_user_with_sso",
         actions: [{ name: "submit", kind: "submit" }],
-        transitions: { submit: { target: "done" } },
+        transitions: {
+          submit: { target: "done" },
+          user_already_exists: { target: "done" },
+        },
       },
       { name: "done", complete: "show" },
     ];
     expect(ssoIssues(def)).toEqual([]);
+  });
+
+  it("rejects a create_user_with_sso step with no user_already_exists transition", () => {
+    const def = flow();
+    def.purposes = { login: "identifier" };
+    def.steps = [
+      {
+        name: "identifier",
+        fields: ["email"],
+        actions: [{ name: "submit", kind: "submit" }],
+        transitions: {
+          submit: { target: "done" },
+          identity_unknown: { target: "register-sso" },
+        },
+      },
+      {
+        name: "register-sso",
+        fields: ["email"],
+        on_success: "create_user_with_sso",
+        actions: [{ name: "submit", kind: "submit" }],
+        transitions: { submit: { target: "done" } },
+      },
+      { name: "done", complete: "show" },
+    ];
+    expect(messages(ssoIssues(def))).toContain(
+      'step "register-sso" runs create_user_with_sso but declares no "user_already_exists" transition; a colliding identity would have nowhere to route',
+    );
   });
 });
 

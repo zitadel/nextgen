@@ -605,6 +605,17 @@ function validateSsoCreationOnlyViaCallback(def: FlowDef): FlowValidationIssue[]
         );
       }
     }
+    // The mutation resolves to user_already_exists on a colliding identity, so
+    // the step must route that outcome or the collision dead-ends.
+    if (!step.transitions.has("user_already_exists")) {
+      issues.push(
+        error(
+          "sso/create-only-via-callback",
+          `step ${q(step.name)} runs create_user_with_sso but declares no "user_already_exists" transition; a colliding identity would have nowhere to route`,
+          step.name,
+        ),
+      );
+    }
   }
   return issues;
 }
