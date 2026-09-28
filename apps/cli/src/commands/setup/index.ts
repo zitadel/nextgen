@@ -757,15 +757,28 @@ async function ssoFromFlags(
     // answers and no other, the way `--preset` does. Only a scripted run has
     // nobody to ask.
     if (!nonInteractive) {
-      return { provider: flags.sso, clientId: "" };
+      return { provider: flags.sso, clientId: "", secret: "" };
     }
     throw new ZitadelError("E_VALIDATION", `--sso ${flags.sso} needs --sso-client-id`, {
       hint: `Register an OAuth application at ${idpCatalogEntry(flags.sso).console_url} and pass its client id.`,
     });
   }
-  const piped =
-    nonInteractive && !process.stdin.isTTY ? (await readStdin(process.stdin)).trim() : "";
-  return { provider: flags.sso, clientId, secret: piped === "" ? undefined : piped };
+  if (!nonInteractive) {
+    // The wizard asks for the secret, the way it asks for a client id that
+    // `--sso-client-id` did not answer.
+    return { provider: flags.sso, clientId, secret: "" };
+  }
+  const piped = process.stdin.isTTY ? "" : (await readStdin(process.stdin)).trim();
+  if (piped === "") {
+    // Required, not optional: scaffolding the connection without it writes a
+    // sign-in button that fails at the provider with `invalid_client`, long
+    // after setup reports success. It is never a flag — that would put it in
+    // shell history, a process listing and CI logs.
+    throw new ZitadelError("E_VALIDATION", `--sso ${flags.sso} needs the client secret on stdin`, {
+      hint: `Pipe it in, e.g. \`printf '%s' "$GOOGLE_CLIENT_SECRET" | zitadel setup --sso ${flags.sso} --sso-client-id ${clientId} ...\`.`,
+    });
+  }
+  return { provider: flags.sso, clientId, secret: piped };
 }
 
 /**

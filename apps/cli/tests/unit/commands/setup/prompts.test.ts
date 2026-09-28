@@ -350,14 +350,24 @@ describe("SocialSignInPrompt", () => {
     );
   });
 
-  it("treats an empty secret as deferred rather than as a value", async () => {
+  it("will not take an empty secret, because a provider without one cannot work", async () => {
+    // The prompt re-asks rather than accepting nothing: the connection
+    // references the secret as `${{ NAME }}` and the engine resolves it from
+    // the project's variables, so scaffolding without a value writes a
+    // sign-in button that fails at the provider with invalid_client. "Not
+    // now" is answered by declining the provider, not by skipping this.
     vi.mocked(select).mockResolvedValueOnce("google" as never);
     vi.mocked(text).mockResolvedValueOnce("client-id" as never);
-    vi.mocked(password).mockResolvedValueOnce("" as never);
+    vi.mocked(password).mockResolvedValueOnce("the-secret" as never);
 
-    const answers = await new SocialSignInPrompt().ask(baseAnswers(), ctx);
+    await new SocialSignInPrompt().ask(baseAnswers(), ctx);
 
-    expect(answers.sso).toEqual({ provider: "google", clientId: "client-id", secret: undefined });
+    const { validate } = vi.mocked(password).mock.calls.at(-1)![0] as {
+      validate?: (value: string) => string | undefined;
+    };
+    expect(validate?.("")).toBeTruthy();
+    expect(validate?.("   ")).toBeTruthy();
+    expect(validate?.("a-secret")).toBeUndefined();
   });
 
   it("does not ask which provider when --sso named one", async () => {

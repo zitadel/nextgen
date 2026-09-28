@@ -50,7 +50,10 @@ export class SocialSignInPrompt implements SetupPrompt {
       answers.sso?.clientId !== undefined && answers.sso.clientId !== ""
         ? answers.sso.clientId
         : await this.askClientId();
-    const secret = answers.sso?.secret ?? (await this.askSecret(provider));
+    const secret =
+      answers.sso?.secret !== undefined && answers.sso.secret !== ""
+        ? answers.sso.secret
+        : await this.askSecret(provider);
     return { ...answers, sso: { provider, clientId, secret } };
   }
 
@@ -110,19 +113,23 @@ export class SocialSignInPrompt implements SetupPrompt {
   }
 
   /**
-   * Empty is a deliberate answer: the connection is scaffolded either way and
-   * the developer may prefer to publish the value themselves later.
+   * Required, not skippable. By this point the developer has chosen a provider
+   * and registered an OAuth application for it; a connection without the
+   * secret is a button that fails at the provider with `invalid_client`, long
+   * after setup reported success. "Not now" is answered by declining the
+   * provider, which costs nothing — `sso enable` adds it later.
    *
    * The message names the project rather than a file because that is where the
-   * value has to land — the connection references it as `${{ NAME }}` and the
+   * value has to land: the connection references it as `${{ NAME }}` and the
    * engine resolves that from the project's variables.
    */
-  private async askSecret(provider: string): Promise<string | undefined> {
+  private async askSecret(provider: string): Promise<string> {
     const answer = await password({
-      message: `Client secret (published to the project as ${clientSecretVariableName(provider)}, Enter to skip)`,
+      message: `Client secret (published to the project as ${clientSecretVariableName(provider)})`,
+      // Vendors format these differently, so only emptiness can be checked.
+      validate: (value) => ((value ?? "").trim() === "" ? "Enter the client secret." : undefined),
     });
     bail(answer);
-    const value = String(answer ?? "").trim();
-    return value === "" ? undefined : value;
+    return String(answer).trim();
   }
 }

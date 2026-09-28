@@ -356,24 +356,36 @@ export default class SsoEnable extends BaseCommand {
    * either way: the connection file is written regardless, and the developer
    * may prefer to paste the value into `.env.local` themselves.
    */
-  private async askClientSecret(
-    variable: string,
-    nonInteractive: boolean,
-  ): Promise<string | undefined> {
+  /**
+   * Required, like the client id. The connection document references the
+   * secret as `${{ NAME }}` and the engine resolves that from the project's
+   * variables, so enabling a provider without one writes a sign-in button
+   * that fails at the token endpoint with `invalid_client` — a failure that
+   * surfaces in a browser, not here. Refusing now is the cheaper answer.
+   */
+  private async askClientSecret(variable: string, nonInteractive: boolean): Promise<string> {
     if (nonInteractive) {
+      const refuse = (): never => {
+        throw new ZitadelError("E_VALIDATION", `No client secret supplied for ${variable}.`, {
+          hint: "Pipe it in on stdin, or run without --non-interactive to be asked for it. It is never a flag: that would put it in shell history, a process listing and CI logs.",
+        });
+      };
       if (process.stdin.isTTY) {
-        return undefined;
+        refuse();
       }
       const piped = (await readStdin(process.stdin)).trim();
-      return piped === "" ? undefined : piped;
+      return piped === "" ? refuse() : piped;
     }
-    const answer = await password({ message: `Client secret (stored in .env.local as ${variable}, Enter to skip)` });
+    const answer = await password({
+      message: `Client secret (published to the project as ${variable})`,
+      // Vendors format these differently, so only emptiness can be checked.
+      validate: (value) => ((value ?? "").trim() === "" ? "Enter the client secret." : undefined),
+    });
     if (isCancel(answer)) {
       cancel("Enable cancelled.");
       throw new ZitadelError("E_VALIDATION", "Enable cancelled by user");
     }
-    const value = String(answer ?? "").trim();
-    return value === "" ? undefined : value;
+    return String(answer).trim();
   }
 }
 

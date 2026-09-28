@@ -16,15 +16,19 @@ import type { FrameworkFacts } from "../../../lib/orca";
  * A social provider chosen during setup, with the credentials of the OAuth
  * application the developer registered for it.
  *
- * `secret` is held only long enough to reach `.env.local` and is never written
- * to a `.zitadel/` file — the connection document stores the `${{ NAME }}`
- * reference instead. It is optional because skipping it is a deliberate
- * answer: everything else is scaffolded, and the value can be pasted in later.
+ * Both credentials are required. Choosing a provider and then withholding one
+ * scaffolds a sign-in button that cannot work: the connection document stores
+ * `${{ NAME }}` references, and the engine resolves them from the project's
+ * variables, so a missing value fails at the provider with `invalid_client`
+ * long after setup reported success. Declining the provider is the answer for
+ * "not now" — `sso enable` adds it once the OAuth application exists.
+ *
+ * Neither value is ever written to a `.zitadel/` file.
  */
 export type SsoAnswer = {
   readonly provider: string;
   readonly clientId: string;
-  readonly secret?: string;
+  readonly secret: string;
 };
 
 export type SetupAnswers = {

@@ -94,9 +94,24 @@ async function withStdin<T>(piped: string | undefined, run: () => Promise<T>): P
   }
 }
 
+/**
+ * Run the command with a secret on stdin, the way a scripted caller must:
+ * both credentials are required, so a run without one is refused before it
+ * writes anything. Tests about that refusal drive the CLI directly.
+ */
 function enable(cwd: string, ...extra: string[]) {
-  return withStdin(undefined, () =>
-    runCliForTest(["sso", "enable", "--cwd", cwd, "--provider", "google", "--json", ...extra]),
+  return withStdin("piped-secret", () =>
+    runCliForTest([
+      "sso",
+      "enable",
+      "--cwd",
+      cwd,
+      "--provider",
+      "google",
+      "--json",
+      "--non-interactive",
+      ...extra,
+    ]),
   );
 }
 
@@ -256,23 +271,33 @@ describe("sso enable secret handling", () => {
     expect(json.data.next_commands).toContain("variables set GOOGLE_CLIENT_SECRET --secret");
   });
 
-  it("does not block when a scripted run pipes nothing in", async () => {
+  it("refuses a scripted run that pipes nothing in, before writing anything", async () => {
+    // Enabling a provider without its secret scaffolds a sign-in button that
+    // fails at the token endpoint with invalid_client — in a browser, long
+    // after this command reported success. Refusing here is the cheaper
+    // failure, and it must leave no half-written connection behind.
     const cwd = await makeProject();
 
-    const result = await enable(
-      cwd,
-      "--client-id",
-      "1234-abc.apps.googleusercontent.com",
-      "--non-interactive",
+    const result = await withStdin("", () =>
+      runCliForTest([
+        "sso",
+        "enable",
+        "--cwd",
+        cwd,
+        "--provider",
+        "google",
+        "--json",
+        "--client-id",
+        "1234-abc.apps.googleusercontent.com",
+        "--non-interactive",
+      ]),
     );
 
-    expect(result.exitCode).toBe(0);
-    const json = parseJson(result.stdout) as {
-      data: { secret: { published: string; mirrored: string } };
-    };
-    // Nothing was piped in, so there is nothing to publish and nothing to
-    // copy — and that is not a failure: the connection is written either way.
-    expect(json.data.secret).toMatchObject({ published: "deferred", mirrored: "deferred" });
+    expect(result.exitCode).not.toBe(0);
+    const json = parseJson(result.stdout) as { code: string; hint?: string };
+    expect(json.code).toBe("E_VALIDATION");
+    expect(json.hint).toContain("stdin");
+    await expect(readFile(join(cwd, ".zitadel/idps/google.json"), "utf8")).rejects.toThrow();
   });
 });
 
