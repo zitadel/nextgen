@@ -16761,6 +16761,22 @@ func (s CreateIdpErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case EvtInvalidCreateIdpErrorResponse:
+		e.FieldStart("code")
+		e.Str("evt.invalid")
+		{
+			s := s.EvtInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case IdpFieldImmutableCreateIdpErrorResponse:
 		e.FieldStart("code")
 		e.Str("idp.field_immutable")
@@ -16886,6 +16902,9 @@ func (s *CreateIdpErrorResponse) Decode(d *jx.Decoder) error {
 				case "auth.unauthorized":
 					s.Type = AuthUnauthorizedCreateIdpErrorResponse
 					found = true
+				case "evt.invalid":
+					s.Type = EvtInvalidCreateIdpErrorResponse
+					found = true
 				case "idp.field_immutable":
 					s.Type = IdpFieldImmutableCreateIdpErrorResponse
 					found = true
@@ -16920,6 +16939,10 @@ func (s *CreateIdpErrorResponse) Decode(d *jx.Decoder) error {
 	switch s.Type {
 	case AuthUnauthorizedCreateIdpErrorResponse:
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
+			return err
+		}
+	case EvtInvalidCreateIdpErrorResponse:
+		if err := s.EvtInvalid.Decode(d); err != nil {
 			return err
 		}
 	case IdpFieldImmutableCreateIdpErrorResponse:

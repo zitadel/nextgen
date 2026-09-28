@@ -120,6 +120,7 @@ func TestIDPConnectionService_CreateOrRevise(t *testing.T) {
 		f := newIDPConnectionFixture(t)
 		stored := storedGoogleConnection()
 		f.pool.EXPECT().GetIDPConnection(gomock.Any(), gomock.Any()).Return(stored, nil)
+		f.tx.EXPECT().GetIDPConnection(gomock.Any(), gomock.Any()).Return(stored, nil)
 		f.tx.EXPECT().ReviseIDPConnection(gomock.Any(), gomock.Any()).DoAndReturn(
 			func(_ context.Context, c *domain.IDPConnection) error {
 				assert.Equal(t, stored.ID, c.ID)
@@ -163,6 +164,7 @@ func TestIDPConnectionService_CreateOrRevise(t *testing.T) {
 			stored := storedGoogleConnection()
 			stored.Document = withTemplate(stored.Document)
 			f.pool.EXPECT().GetIDPConnection(gomock.Any(), gomock.Any()).Return(stored, nil)
+			f.tx.EXPECT().GetIDPConnection(gomock.Any(), gomock.Any()).Return(stored, nil)
 			f.tx.EXPECT().ReviseIDPConnection(gomock.Any(), gomock.Any()).DoAndReturn(
 				func(_ context.Context, c *domain.IDPConnection) error {
 					c.RevisionID = "idprev_2"
@@ -177,6 +179,30 @@ func TestIDPConnectionService_CreateOrRevise(t *testing.T) {
 		})
 	}
 
+	// A concurrent revise landed between the slug lookup and the transaction.
+	// The delta must compare against the revision read inside the transaction.
+	t.Run("the delta is computed against the in-transaction revision", func(t *testing.T) {
+		t.Parallel()
+		f := newIDPConnectionFixture(t)
+		stale := storedGoogleConnection()
+		stale.Document = googleConnection("https://accounts.google.com", "A")
+		current := storedGoogleConnection()
+		current.Document = googleConnection("https://accounts.google.com", "B")
+		f.pool.EXPECT().GetIDPConnection(gomock.Any(), gomock.Any()).Return(stale, nil)
+		f.tx.EXPECT().GetIDPConnection(gomock.Any(), gomock.Any()).Return(current, nil)
+		f.tx.EXPECT().ReviseIDPConnection(gomock.Any(), gomock.Any()).DoAndReturn(
+			func(_ context.Context, c *domain.IDPConnection) error {
+				c.RevisionID = "idprev_3"
+				return nil
+			},
+		)
+
+		_, err := f.svc.CreateOrRevise(t.Context(), idpProjectID, googleConnection("https://accounts.google.com", "B"))
+		require.NoError(t, err)
+		require.Len(t, *f.events, 1)
+		assert.JSONEq(t, `{"revision_id":"idprev_3"}`, string((*f.events)[0].Payload))
+	})
+
 	t.Run("losing the create race revises the connection that won", func(t *testing.T) {
 		t.Parallel()
 		f := newIDPConnectionFixture(t)
@@ -187,6 +213,7 @@ func TestIDPConnectionService_CreateOrRevise(t *testing.T) {
 		f.tx.EXPECT().CreateIDPConnection(gomock.Any(), gomock.Any()).
 			Return(database.NewUniqueError("idp_connections", "idp_connections_slug", nil))
 		f.tx.EXPECT().ReviseIDPConnection(gomock.Any(), gomock.Any()).Return(nil)
+		f.tx.EXPECT().GetIDPConnection(gomock.Any(), gomock.Any()).Return(storedGoogleConnection(), nil)
 
 		got, err := f.svc.CreateOrRevise(t.Context(), idpProjectID, googleConnection("https://accounts.google.com", "Google"))
 		require.NoError(t, err)
@@ -198,6 +225,7 @@ func TestIDPConnectionService_CreateOrRevise(t *testing.T) {
 		t.Parallel()
 		f := newIDPConnectionFixture(t)
 		f.pool.EXPECT().GetIDPConnection(gomock.Any(), gomock.Any()).Return(storedGoogleConnection(), nil)
+		f.tx.EXPECT().GetIDPConnection(gomock.Any(), gomock.Any()).Return(storedGoogleConnection(), nil)
 		f.tx.EXPECT().ReviseIDPConnection(gomock.Any(), gomock.Any()).
 			Return(database.NewUniqueError("idp_connection_revisions", "idp_connection_revisions_created_at", nil))
 
@@ -209,6 +237,7 @@ func TestIDPConnectionService_CreateOrRevise(t *testing.T) {
 		t.Parallel()
 		f := newIDPConnectionFixture(t)
 		f.pool.EXPECT().GetIDPConnection(gomock.Any(), gomock.Any()).Return(storedGoogleConnection(), nil)
+		f.tx.EXPECT().GetIDPConnection(gomock.Any(), gomock.Any()).Return(storedGoogleConnection(), nil)
 
 		next := []byte(`{"slug":"google","protocol":"oidc","display_name":"Google","subject_claim":"oid",` +
 			`"oidc":{"issuer":"https://login.example.com","client_id":"id","client_secret":"${{ S }}","scopes":["openid"]}}`)

@@ -5,6 +5,7 @@ content:
     schema:
       oneOf:
         - $ref: '../../components/schemas/errors/auth-unauthorized.yaml'
+        - $ref: '../../components/schemas/errors/evt-invalid.yaml'
         - $ref: '../../components/schemas/errors/idp-field_immutable.yaml'
         - $ref: '../../components/schemas/errors/idp-not_found.yaml'
         - $ref: '../../components/schemas/errors/idp-permission_denied.yaml'
@@ -15,6 +16,7 @@ content:
         propertyName: code
         mapping:
           auth.unauthorized: '../../components/schemas/errors/auth-unauthorized.yaml'
+          evt.invalid: '../../components/schemas/errors/evt-invalid.yaml'
           idp.field_immutable: '../../components/schemas/errors/idp-field_immutable.yaml'
           idp.not_found: '../../components/schemas/errors/idp-not_found.yaml'
           idp.permission_denied: '../../components/schemas/errors/idp-permission_denied.yaml'
@@ -27,6 +29,11 @@ content:
         value:
           code: auth.unauthorized
           message: 'The request lacks valid authentication credentials.'
+      evt.invalid:
+        summary: evt.invalid
+        value:
+          code: evt.invalid
+          message: 'event: invalid'
       idp.field_immutable:
         summary: idp.field_immutable
         value:

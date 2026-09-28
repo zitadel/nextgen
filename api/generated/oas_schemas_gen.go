@@ -10503,6 +10503,7 @@ func (*CreateIdpCreated) createIdpRes() {}
 type CreateIdpErrorResponse struct {
 	Type                CreateIdpErrorResponseType // switch on this field
 	AuthUnauthorized    AuthUnauthorized
+	EvtInvalid          EvtInvalid
 	IdpFieldImmutable   IdpFieldImmutable
 	IdpNotFound         IdpNotFound
 	IdpPermissionDenied IdpPermissionDenied
@@ -10517,6 +10518,7 @@ type CreateIdpErrorResponseType string
 // Possible values for CreateIdpErrorResponseType.
 const (
 	AuthUnauthorizedCreateIdpErrorResponse    CreateIdpErrorResponseType = "auth.unauthorized"
+	EvtInvalidCreateIdpErrorResponse          CreateIdpErrorResponseType = "evt.invalid"
 	IdpFieldImmutableCreateIdpErrorResponse   CreateIdpErrorResponseType = "idp.field_immutable"
 	IdpNotFoundCreateIdpErrorResponse         CreateIdpErrorResponseType = "idp.not_found"
 	IdpPermissionDeniedCreateIdpErrorResponse CreateIdpErrorResponseType = "idp.permission_denied"
@@ -10528,6 +10530,11 @@ const (
 // IsAuthUnauthorized reports whether CreateIdpErrorResponse is AuthUnauthorized.
 func (s CreateIdpErrorResponse) IsAuthUnauthorized() bool {
 	return s.Type == AuthUnauthorizedCreateIdpErrorResponse
+}
+
+// IsEvtInvalid reports whether CreateIdpErrorResponse is EvtInvalid.
+func (s CreateIdpErrorResponse) IsEvtInvalid() bool {
+	return s.Type == EvtInvalidCreateIdpErrorResponse
 }
 
 // IsIdpFieldImmutable reports whether CreateIdpErrorResponse is IdpFieldImmutable.
@@ -10576,6 +10583,27 @@ func (s CreateIdpErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bo
 func NewAuthUnauthorizedCreateIdpErrorResponse(v AuthUnauthorized) CreateIdpErrorResponse {
 	var s CreateIdpErrorResponse
 	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetEvtInvalid sets CreateIdpErrorResponse to EvtInvalid.
+func (s *CreateIdpErrorResponse) SetEvtInvalid(v EvtInvalid) {
+	s.Type = EvtInvalidCreateIdpErrorResponse
+	s.EvtInvalid = v
+}
+
+// GetEvtInvalid returns EvtInvalid and true boolean if CreateIdpErrorResponse is EvtInvalid.
+func (s CreateIdpErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
+	if !s.IsEvtInvalid() {
+		return v, false
+	}
+	return s.EvtInvalid, true
+}
+
+// NewEvtInvalidCreateIdpErrorResponse returns new CreateIdpErrorResponse from EvtInvalid.
+func NewEvtInvalidCreateIdpErrorResponse(v EvtInvalid) CreateIdpErrorResponse {
+	var s CreateIdpErrorResponse
+	s.SetEvtInvalid(v)
 	return s
 }
 

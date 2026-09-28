@@ -81,7 +81,7 @@ func (s *idpConnectionService) CreateOrRevise(ctx context.Context, projectID str
 		return nil, err
 	}
 
-	revised, err := s.revise(ctx, existing, document)
+	revised, err := s.revise(ctx, projectID, existing.ID, document)
 	if err != nil {
 		return nil, err
 	}
@@ -128,27 +128,35 @@ func (s *idpConnectionService) create(ctx context.Context, entity *domain.IDPCon
 	return entity, nil
 }
 
-func (s *idpConnectionService) revise(ctx context.Context, existing *domain.IDPConnection, document []byte) (*domain.IDPConnection, error) {
-	changed, err := domain.IDPConnectionImmutableFieldsChanged(existing.Document, document)
-	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to compare identity provider connection documents")
-	}
-	if len(changed) > 0 {
-		return nil, domain.ErrIDPConnectionFieldImmutable(map[string][]string{"fields": changed})
-	}
-
-	entity := &domain.IDPConnection{
-		ProjectID: existing.ProjectID,
-		ID:        existing.ID,
-		Slug:      existing.Slug,
-		Document:  document,
-		CreatedAt: existing.CreatedAt,
-	}
-	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+// revise appends document as a new revision of connection id. The newest
+// revision is read inside the transaction, so the immutability check and the
+// event delta compare against the revision this one follows, not a copy read
+// before a concurrent revise landed.
+func (s *idpConnectionService) revise(ctx context.Context, projectID, id string, document []byte) (*domain.IDPConnection, error) {
+	var entity *domain.IDPConnection
+	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		current, err := tx.Statements().GetIDPConnection(ctx, idpConnectionBy(projectID, domain.IDPConnectionFieldID, id))
+		if err != nil {
+			return err
+		}
+		changed, err := domain.IDPConnectionImmutableFieldsChanged(current.Document, document)
+		if err != nil {
+			return err
+		}
+		if len(changed) > 0 {
+			return domain.ErrIDPConnectionFieldImmutable(map[string][]string{"fields": changed})
+		}
+		entity = &domain.IDPConnection{
+			ProjectID: current.ProjectID,
+			ID:        current.ID,
+			Slug:      current.Slug,
+			Document:  document,
+			CreatedAt: current.CreatedAt,
+		}
 		if err := tx.Statements().ReviseIDPConnection(ctx, entity); err != nil {
 			return err
 		}
-		payload, err := domain.IDPConnectionPayloadDelta(existing, entity)
+		payload, err := domain.IDPConnectionPayloadDelta(current, entity)
 		if err != nil {
 			return err
 		}
@@ -159,6 +167,9 @@ func (s *idpConnectionService) revise(ctx context.Context, existing *domain.IDPC
 		// so the storage unique index rejects the second one.
 		if _, ok := errors.AsType[*database.UniqueError](err); ok {
 			return nil, domain.ErrIDPConnectionRevisionConflict().WithParent(err)
+		}
+		if de, ok := errors.AsType[domain.Error](err); ok {
+			return nil, de
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to revise identity provider connection")
 	}
@@ -181,11 +192,15 @@ func (s *idpConnectionService) Get(ctx context.Context, projectID, id string) (*
 }
 
 func (s *idpConnectionService) get(ctx context.Context, projectID string, field domain.IDPConnectionField, value string) (*domain.IDPConnection, error) {
-	entity, err := s.v2Pool.Statements().GetIDPConnection(ctx, database.And(
+	entity, err := s.v2Pool.Statements().GetIDPConnection(ctx, idpConnectionBy(projectID, field, value))
+	return entity, mapIDPConnectionReadError(err)
+}
+
+func idpConnectionBy(projectID string, field domain.IDPConnectionField, value string) database.Filter[domain.IDPConnectionField] {
+	return database.And(
 		database.Equal(database.Col(domain.IDPConnectionFieldProjectID), projectID),
 		database.Equal(database.Col(field), value),
-	))
-	return entity, mapIDPConnectionReadError(err)
+	)
 }
 
 func (s *idpConnectionService) GetRevision(ctx context.Context, projectID, revisionID string) (*domain.IDPConnection, error) {
