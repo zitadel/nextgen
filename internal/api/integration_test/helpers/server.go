@@ -51,7 +51,11 @@ func (h *Harness) EnsureHandler(t *testing.T) *api.Handler {
 			h.EnsureFlowService(t),
 			h.EnsureAuthAttemptService(t),
 			h.EnsureSessionService(t),
-			h.EnsureProjectService(t),
+			// Unwrapped: the handler is cached for the whole run, so a wrapper
+			// here would register every later test's cleanup on whichever test
+			// happened to build the handler first. A test that creates a project
+			// over HTTP calls Harness.CleanupProject itself.
+			h.ensureProjectService(t),
 			h.EnsureUserService(t),
 			h.EnsureSchemaService(t),
 			h.EnsureFlowDefinitionService(t),

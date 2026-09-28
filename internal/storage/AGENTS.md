@@ -1,7 +1,9 @@
 # Storage Agent Instructions
 
 These instructions apply to `internal/storage/` and may be refined by nearer
-scoped `AGENTS.md` files.
+scoped `AGENTS.md` files. Defer to [`internal/AGENTS.md`](../AGENTS.md) (format
+before push, and the one-database rule that `stmttest` runs under) and root
+[`AGENTS.md`](../../AGENTS.md) for broader rules.
 
 ## Storage Scope
 
