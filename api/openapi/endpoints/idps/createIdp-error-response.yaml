@@ -5,12 +5,20 @@ content:
     schema:
       oneOf:
         - $ref: '../../components/schemas/errors/auth-unauthorized.yaml'
+        - $ref: '../../components/schemas/errors/idp-field_immutable.yaml'
+        - $ref: '../../components/schemas/errors/idp-not_found.yaml'
+        - $ref: '../../components/schemas/errors/idp-permission_denied.yaml'
+        - $ref: '../../components/schemas/errors/idp-revision_conflict.yaml'
         - $ref: '../../components/schemas/errors/internal.yaml'
         - $ref: '../../components/schemas/errors/req-invalid.yaml'
       discriminator:
         propertyName: code
         mapping:
           auth.unauthorized: '../../components/schemas/errors/auth-unauthorized.yaml'
+          idp.field_immutable: '../../components/schemas/errors/idp-field_immutable.yaml'
+          idp.not_found: '../../components/schemas/errors/idp-not_found.yaml'
+          idp.permission_denied: '../../components/schemas/errors/idp-permission_denied.yaml'
+          idp.revision_conflict: '../../components/schemas/errors/idp-revision_conflict.yaml'
           internal: '../../components/schemas/errors/internal.yaml'
           req.invalid: '../../components/schemas/errors/req-invalid.yaml'
     examples:
@@ -19,6 +27,26 @@ content:
         value:
           code: auth.unauthorized
           message: 'The request lacks valid authentication credentials.'
+      idp.field_immutable:
+        summary: idp.field_immutable
+        value:
+          code: idp.field_immutable
+          message: 'identity provider connection: the field is fixed for the life of the connection'
+      idp.not_found:
+        summary: idp.not_found
+        value:
+          code: idp.not_found
+          message: 'identity provider connection: not found'
+      idp.permission_denied:
+        summary: idp.permission_denied
+        value:
+          code: idp.permission_denied
+          message: 'identity provider connection: the caller''s project role does not allow this operation'
+      idp.revision_conflict:
+        summary: idp.revision_conflict
+        value:
+          code: idp.revision_conflict
+          message: 'identity provider connection: another revision of the same connection was created at the same instant'
       internal:
         summary: internal
         value:

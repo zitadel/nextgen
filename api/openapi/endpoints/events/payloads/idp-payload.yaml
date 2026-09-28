@@ -1,0 +1,22 @@
+title: IdpPayload
+type: object
+description: |
+  Shared allowlisted fields for `idp.created` (snapshot) and `idp.updated`
+  (delta: only changed fields present, plus the new `revision_id`). The
+  connection id is the event's `entity_id`. The connection document, and with
+  it the `client_secret` reference, is never included.
+properties:
+  slug:
+    type: string
+  protocol:
+    type: string
+  template:
+    type: string
+    description: |
+      The rendering template hint. On `idp.updated`, the empty string means
+      the revision removed it.
+  display_name:
+    type: string
+  revision_id:
+    type: string
+    description: The revision the write appended.
