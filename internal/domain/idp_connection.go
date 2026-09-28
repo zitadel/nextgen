@@ -1,9 +1,15 @@
 package domain
 
+import "time"
+
 // PrefixIDPConnection namespaces connection ids ("idp_01KWH3B..."), the id an
-// identity link references. Revisions carry their own prefix, registered with
-// the storage layer that allocates them, and are what attempts and releases pin.
+// identity link references.
 const PrefixIDPConnection ResourcePrefix = "idp"
+
+// PrefixIDPConnectionRevision namespaces revision ids ("idprev_01KWH3B..."),
+// what attempts and releases pin. A revision is a row of its own, so it carries
+// its own prefix rather than reusing the connection's.
+const PrefixIDPConnectionRevision ResourcePrefix = "idprev"
 
 func ErrIDPConnectionNotFound() Error {
 	return newError(PrefixIDPConnection.ErrorCodePrefix("not_found"), "identity provider connection: not found", nil, nil)
@@ -19,3 +25,37 @@ func ErrIDPConnectionNotFound() Error {
 func ErrIDPConnectionFieldImmutable(details any) Error {
 	return newError(PrefixIDPConnection.ErrorCodePrefix("field_immutable"), "identity provider connection: the field is fixed for the life of the connection", details, nil)
 }
+
+// IDPConnection is one identity provider connection at one revision. The
+// connection row holds identity — id, slug, timestamps — and every edit appends
+// a revision holding the configuration document, so an in-flight auth attempt
+// can pin the revision it started on.
+//
+// RevisionID is the connection's newest revision on a get-by-id, get-by-slug or
+// list, and the pinned one on a get-revision; Document is that revision's
+// document either way. The document is raw JSON, opaque to storage: the API
+// contract owns its shape.
+type IDPConnection struct {
+	ProjectID  string
+	ID         string
+	Slug       string
+	RevisionID string
+	Document   []byte
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+}
+
+// IDPConnectionField enumerates the fields of IDPConnection which can be used
+// for filtering and ordering in list operations.
+type IDPConnectionField uint8
+
+const (
+	IDPConnectionFieldUnspecified IDPConnectionField = iota
+	IDPConnectionFieldProjectID
+	IDPConnectionFieldID
+	IDPConnectionFieldSlug
+	IDPConnectionFieldRevisionID
+	IDPConnectionFieldCreatedAt
+	IDPConnectionFieldUpdatedAt
+	IDPConnectionFieldDocument
+)

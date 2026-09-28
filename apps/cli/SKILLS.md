@@ -23,7 +23,8 @@ parse the result rather than scraping human output.
 - The CLI sends anonymous usage telemetry by default. For automated/agent runs
   that should stay silent, disable it with `--no-telemetry` (per invocation) or
   `ZITADEL_TELEMETRY=0` / `DO_NOT_TRACK=1` (per environment); this also skips the
-  small end-of-command network flush.
+  small end-of-command network flush and drops the `ci/` and `host/` tokens from
+  the CLI's HTTP `User-Agent`.
 - See `README.md` (its commands section is generated from the CLI's own
   metadata) or run `zitadel <command> --help` for the full per-command flag list.
 
@@ -56,10 +57,10 @@ Each invocation prints one JSON object:
   see what setup created versus merged into (your `package.json` is an
   `update`). `data.files_written` remains the flat list — deduplicated file
   paths only, covering both scaffolded and `.zitadel/` resource files.
-- `setup` also emits `data.design`: the starter login design it ejected and
-  published as branding revision 1, or `null` when the built-in template was
-  kept (no `.zitadel/branding/` files exist in that case). Use it to verify
-  the requested `--design` took effect without diffing the repo.
+- `setup` never writes `.zitadel/branding/` or publishes a branding
+  revision: the login renders the maintained `<zitadel-login>` component.
+  Taking ownership of the widget template is the separate, opt-in
+  `branding eject` command.
 - `E_LOCAL_SERVER_NOT_RUNNING`: start the local runtime with
   `npx @zitadel/cli@alpha start`, then retry with `--server local`.
 - `E_NOT_FOUND`: an HTTP 404 from the target server. With the platform's
@@ -75,6 +76,18 @@ In human mode the output follows the terminal: a TTY gets the project and
 server lines and an aligned table, while a piped or redirected run (or
 `--plain`) gets one tab-separated record per line and nothing else. `--json`
 is unaffected and remains the contract for agents.
+
+Text the server returns is escaped before it is printed, in `--json` as in
+human mode, so a value someone stored cannot drive the reader's terminal.
+Control, format and bidi characters in `data` values and keys and in an
+error's `message` appear as visible `\xNN`, `\uNNNN` or `\u{NNNNN}` text;
+newlines and tabs are kept, and a key's backslashes are doubled so two keys
+never merge. A value that contained such a character is therefore not the
+stored value byte for byte: do not send it back in an update as if it were.
+When you need the exact stored value, call the platform API directly with the
+project secret; the CLI only ever shows the escaped form.
+`plan`, `apply` and `setup` are the exception for `.zitadel/` files: they
+write the server's bodies back verbatim and escape only what they print.
 
 A property whose name reads as a credential (`password`, `client_secret`,
 `api_key`, …) is refused anywhere on the command line — as an `--attributes`
@@ -138,7 +151,7 @@ over reading `--help` per command. It contacts no server.
   out field by field on a terminal and prints the whole object when piped;
   `--json` is unchanged either way.
 - `create` / `update <id>` take the body either as one flag per schema field
-  (`--name`, `--principal-type`, …; run `<resource> create --help` for the
+  (`--name`, `--relation`, …; run `<resource> create --help` for the
   list, where required fields are marked `(required)`) or as a whole JSON
   object via `--data '<json>'` / `--file <path>` (`--file -` reads stdin). A
   field flag overrides the same key in `--data`. A user's schema-defined
@@ -176,7 +189,18 @@ The groups below mirror the ones `zitadel --help` prints.
   default user schema and login flow into
   `.zitadel/schemas/default-human-user.json` and
   `.zitadel/flows/default-login.json`, uploads them through the schema and flow
-  APIs, then seeds `.zitadel/state.json` so `plan` is immediately empty. Agents
+  APIs, then seeds `.zitadel/state.json` so `plan` is immediately empty.
+  Against a local server that hosts the platform project and has a local admin
+  (the default `start` configuration), setup also attaches the project to the
+  local admin's team: it writes `team_id` and `claimed_at` into
+  `.zitadel/secret` and prints
+  `Project owned by admin@zitadel.localhost (team ...)`, so a later `claim`
+  returns `status: "skipped"` with `reason: "already-claimed"`. The step is
+  best-effort. When the attempt fails on a platform-hosting runtime, setup
+  warns and the normal claim nudge applies. When `start` opted out of the
+  platform bootstrap there is no local admin and no claim surface, so setup
+  skips the step silently, emits no nudge, and the project has no owning
+  team. Agents
   must pass `--framework` when scaffolding into a fresh directory; interactive
   humans can omit it and choose from the prompt. Supported floors: Next.js 15+
   and React 18+ — `setup` and `doctor` fail with `E_UNSUPPORTED_PROJECT_SHAPE`
@@ -204,12 +228,9 @@ The groups below mirror the ones `zitadel --help` prints.
   email only; `consumer` adds given and family name; `business` also adds a
   `companyName` attribute and overlays work-email copy on the generated auth
   pages via the SDK's `businessLocales`; asked before `--preset` and recorded
-  in `zitadel.json`), `--design centered|split|split-right|hero|minimal`
-  (starter login design: ejects the design's template into
-  `.zitadel/branding/` and publishes it as branding revision 1 during setup;
-  the interactive wizard asks this as its final question with the built-in
-  template preselected — omit the flag in non-interactive runs to keep the
-  built-in template and no branding files), `--skip-install`.
+  in `zitadel.json`), `--skip-install`. Setup does not ask about or apply a
+  login design: it writes no `.zitadel/branding/` files and publishes no
+  branding revision (`branding eject` is the opt-in for that).
   On Next and Nuxt, the scaffolded auth/profile pages derive their embedding
   posture from the app: a fresh scaffold (setup created the skeleton) pins
   `variant="page"` full-page chrome, while a pre-existing app embeds
@@ -228,11 +249,8 @@ The groups below mirror the ones `zitadel --help` prints.
   link color `--zl-link`); the `suppress-header` attribute
   (wrapper prop `suppressHeader`) visually hides the widget's own heading
   block when the page already carries one, keeping it in the accessibility
-  tree. Split-family designs collapse their brand pane by container width —
-  at card width they show the compact brand mark (`logo_url`, else
-  `hero_url`, from `.zitadel/branding/branding.json`; `hero` falls back to
-  editable text), and setup warns when a widget-posture app picks `split`
-  or `split-right`.
+  tree. Page layout around the widget (split screens, hero panes) is the
+  app's own code, not a Zitadel template.
 - `claim` — claim the project for a team to make it permanent. Mints a
   short-lived link, opens it in a browser, and blocks until the developer
   finishes signing in there, then records `claimed_at` and `team_id` in
@@ -328,6 +346,25 @@ The groups below mirror the ones `zitadel --help` prints.
   `start` with `E_VALIDATION` before any runtime is stopped. `setup` writes a
   comment saying so at the top of the scaffolded `.env.example` and
   `.env.local`.
+  The server boots with the platform project
+  and a local admin, so the developer exists on their own server without
+  signing up: the admin signs in as `admin@zitadel.localhost`, and a
+  generated password is kept in `.zitadel/local/admin.json` (gitignored with
+  the rest of `.zitadel/local/`) and never printed. `start` prints a one-time
+  console sign-in link and reports it as `data.console.sign_in_url` with
+  `data.console.signed_in_as`; if no link can be minted (for example a data
+  directory from before the local admin existed), `data.console.error` and
+  `data.console.hint` say why, `start` still succeeds, and `zitadel console`
+  drops out of `next_commands`. Setting `NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=false`,
+  in the shell or in `.env.local` / `.env`, opts out of both the platform project
+  and the local admin, for harnesses that
+  want a bare single-project server; `data.console` is then absent.
+- `console` — print (and, interactively, open) a fresh one-time sign-in link
+  for the local console as the local admin: `data.sign_in_url`,
+  `data.signed_in_as`, `data.browser_opened`. Each link works once; run the
+  command again for a new one. The console honours the link only when it is
+  served from loopback, since the token signs in whoever opens it. Fails with `E_VALIDATION` when `start` never
+  created a local admin in this directory. Flags: `--no-open`.
 - `stop` — stop the managed runtime while preserving
   `.zitadel/local/nextgen-data`. Use `stop --all` to sweep all discovered
   host-wide CLI-managed local runtime processes, including healthy runtimes
@@ -367,15 +404,41 @@ docker --image <ref>` remains the explicit image override for debugging.
   `liquid_template`) renders as `(<n> lines, sha256:…)` when it is created or
   unchanged, and as a changed-line diff when it moved — not as one escaped
   line. Read the file itself for full content.
+- No command takes `--environment` (`-e`, `--env`). `plan`, `apply` and the
+  resource commands work on the project's resources and never selected an
+  environment; `variables` names its owner with `--project-level`. The flag
+  returns when the platform's environments settle, and `deploy` (ADR 035) is
+  what will put config onto one.
 - `schemas list` — inspect the revision history of a user-schema, filtered by
   `--object-type` (e.g. `human-user`). Non-interactive/`--json` prints one row
   per revision (newest first); interactive adds a picker that fetches and
   pretty-prints the selected revision body.
 - `branding eject` — take ownership of the login template: scaffold
   `.zitadel/branding/` (a `branding.json` descriptor plus the `login.liquid`
-  template) from a shipped design, `--design centered|split|split-right|hero|minimal`
-  or an interactive picker on a TTY. `plan`/`apply` then publish every edit as
+  template) from a shipped design, `--design centered|minimal` (the default card, or
+  the same form without card chrome) or an interactive picker on a TTY. `plan`/`apply` then publish every edit as
   a new branding revision.
+- `variables list|get|set|delete` — manage the variables and secrets a
+  configuration document references as `${{ NAME }}`. Every command addresses
+  one owner, and `--project-level` is the only one the CLI can name today, so it
+  is **required**: a run without it fails with `E_VALIDATION`, on a terminal as
+  in a script. The platform also keeps variables per environment, but the CLI
+  cannot address those until the platform's environments settle; `--environment`
+  returns then, and every command written today keeps its meaning because the
+  owner was named rather than assumed. Owners do not inherit from one another —
+  a value entered at the project level is **not** seen by an environment
+  (ADR 062 §4). `set` takes its value from a prompt or from stdin and never from
+  a flag, so a credential never reaches `argv`; `--secret` stores it encrypted,
+  after which it can be replaced but never read back (`list` reports it as held,
+  and `--json` omits the value key entirely). `set --as number|boolean` stores a
+  JSON number or boolean instead of a string, so a whole-field `${{ NAME }}`
+  reference resolves to that type; it is refused with `--secret`, and an integer
+  too large to store exactly is refused rather than rounded. Output follows the
+  resource commands: on a pipe, `list` prints tab-separated `name`/`value` rows
+  (a secret's value is `(secret)`) and `get` prints the whole record as JSON,
+  which carries no `value` key for a secret. There is no `pull` and no bulk
+  import. `set` and `delete` honour `--dry-run` and make no change; `delete`
+  needs `--force` when non-interactive.
 
 ## Golden path
 
@@ -446,9 +509,8 @@ then re-run `plan` and `apply`. Schema and flow files are synced from
 (branding) are synced from `.zitadel/branding/`: a single `branding.json`
 descriptor (layout, asset URLs) plus a sibling `login.liquid` LiquidJS
 template referenced as `"liquid_template": { "$file": "./login.liquid" }`. Scaffold them with the
-`branding eject` command (`--design centered|split|split-right|hero|minimal`,
-interactive picker on a TTY) or at project creation with
-`setup --design <name>`, which also publishes revision 1. Branding is
+`branding eject` command (`--design centered|minimal`,
+interactive picker on a TTY); setup never scaffolds them. Branding is
 revisioned and immutable: every edit — including a `.liquid`-only edit —
 plans as a `revise` and `apply` publishes a new revision; the login serves
 the newest one. `plan` validates templates with the authoritative LiquidJS

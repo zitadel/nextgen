@@ -28,7 +28,8 @@ func TestAuthzAssignment_SKTeamProjectScopeRejected(t *testing.T) {
 
 // TestAuthzSKTeam_OutsideTeamDeny is the compensating deny suite for #831.
 // MVP catalog relations are project.{viewer,editor,admin}; a project-scoped
-// project.viewer grant is the "somehow holds a project-wide grant" case.
+// project.admin grant (which closes to editor and viewer) is the "somehow holds
+// a project-wide grant" case.
 // ConstraintTeamID still limits Check/List to the token team via membership.
 func TestAuthzSKTeam_OutsideTeamDeny(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
@@ -47,7 +48,7 @@ func TestAuthzSKTeam_OutsideTeamDeny(t *testing.T) {
 
 		sk := "sk_team_" + uniqueSuffix(t)
 		require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
-			newTestAssignment(projectID, "", domain.AuthzPrincipalTypeSKTeam, sk, "project", "viewer", domain.NewProjectAssignmentScope())))
+			newTestAssignment(projectID, "", domain.AuthzPrincipalTypeSKTeam, sk, "project", "admin", domain.NewProjectAssignmentScope())))
 
 		base := domain.AuthzCheckParams{
 			CatalogID:        domain.SystemCatalogID,
@@ -130,7 +131,7 @@ func TestAuthzSKTeam_NonUserResourceCheckListParity(t *testing.T) {
 
 		sk := "sk_team_" + uniqueSuffix(t)
 		require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
-			newTestAssignment(projectID, "", domain.AuthzPrincipalTypeSKTeam, sk, "project", "viewer", domain.NewProjectAssignmentScope())))
+			newTestAssignment(projectID, "", domain.AuthzPrincipalTypeSKTeam, sk, "project", "admin", domain.NewProjectAssignmentScope())))
 
 		base := domain.AuthzCheckParams{
 			CatalogID:        domain.SystemCatalogID,

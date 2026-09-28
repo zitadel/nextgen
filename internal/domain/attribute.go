@@ -222,15 +222,8 @@ func (attrs *CreateAttributes) fromMap(m map[string]any, schema map[string]any, 
 				return err
 			}
 		default:
-			var unique AttributeUniqueness
 			strUnique, _ := maputil.GetNested[string](schema, []string{"properties", key, SchemaAnnotationUnique})
-			switch strUnique {
-			case SchemaUniqueScopeProject:
-				unique = AttributeUniquenessProject
-			case SchemaUniqueScopeTeam:
-				unique = AttributeUniquenessTeam
-			}
-			attr, err := NewCreateAttribute(fullKey, value, unique)
+			attr, err := NewCreateAttribute(fullKey, value, UniqueScopeOf(strUnique))
 			if err != nil {
 				return err
 			}

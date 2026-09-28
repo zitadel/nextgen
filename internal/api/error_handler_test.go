@@ -234,6 +234,19 @@ func TestOgenErrorHandlerDualSchemeInvalidCookieStaysCredentialNeutral(t *testin
 		api.DeleteGrantOperation,
 		api.QueryGrantsOperation,
 		api.QueryUsersOperation,
+		api.QueryTeamsOperation,
+		api.GetTeamOperation,
+		api.CreateUserOperation,
+		api.GetUserByIDOperation,
+		api.DeleteUserByIDOperation,
+		api.CreateTeamOperation,
+		api.UpdateTeamOperation,
+		api.ListSchemasOperation,
+		api.GetSchemaByIdOperation,
+		api.ListFlowDefinitionsOperation,
+		api.GetFlowDefinitionOperation,
+		api.ListBrandingOperation,
+		api.GetBrandingByIdOperation,
 	} {
 		require.False(t, sessionCookieOperations[op], "%s must stay off the session-only 401 rewrite", op)
 	}
@@ -249,6 +262,19 @@ func TestOgenErrorHandlerDualSchemeInvalidCookieStaysCredentialNeutral(t *testin
 		{"grant delete", http.MethodDelete, "/grants/asgn_1?project_id=proj_1", ""},
 		{"grant query", http.MethodPost, "/grants/query?project_id=proj_1", `{}`},
 		{"users query", http.MethodPost, "/users/query", `{}`},
+		{"teams query", http.MethodPost, "/teams/query?project_id=proj_1", `{}`},
+		{"team get", http.MethodGet, "/teams/team_1", ""},
+		{"user create", http.MethodPost, "/users?project_id=proj_1", `{}`},
+		{"user get", http.MethodGet, "/users/user_1", ""},
+		{"user delete", http.MethodDelete, "/users/user_1", ""},
+		{"team create", http.MethodPost, "/teams?project_id=proj_1", `{"name":"x"}`},
+		{"team update", http.MethodPatch, "/teams/team_1", `{"name":"x"}`},
+		{"schemas list", http.MethodGet, "/schemas?project_id=proj_1", ""},
+		{"schema get", http.MethodGet, "/schemas/schema_1?project_id=proj_1", ""},
+		{"flow definitions list", http.MethodGet, "/flow_definitions?project_id=proj_1", ""},
+		{"flow definition get", http.MethodGet, "/flow_definitions/fdef_1?project_id=proj_1", ""},
+		{"branding list", http.MethodGet, "/branding?project_id=proj_1", ""},
+		{"branding get", http.MethodGet, "/branding/brand_1?project_id=proj_1", ""},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -259,7 +285,7 @@ func TestOgenErrorHandlerDualSchemeInvalidCookieStaysCredentialNeutral(t *testin
 			srv := newErrorHandlerTestServer(t, tokenService)
 
 			req := httptest.NewRequest(tc.method, tc.path, strings.NewReader(tc.body))
-			if tc.method == http.MethodPost {
+			if tc.body != "" {
 				req.Header.Set("Content-Type", "application/json")
 			}
 			req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: "garbage"})
@@ -288,6 +314,19 @@ func TestOgenErrorHandlerAnonymousSessionOnDualSchemeStays401(t *testing.T) {
 		{"grant delete", http.MethodDelete, "/grants/asgn_1?project_id=proj_1", ""},
 		{"grant query", http.MethodPost, "/grants/query?project_id=proj_1", `{}`},
 		{"users query", http.MethodPost, "/users/query", `{}`},
+		{"teams query", http.MethodPost, "/teams/query?project_id=proj_1", `{}`},
+		{"team get", http.MethodGet, "/teams/team_1", ""},
+		{"user create", http.MethodPost, "/users?project_id=proj_1", `{}`},
+		{"user get", http.MethodGet, "/users/user_1", ""},
+		{"user delete", http.MethodDelete, "/users/user_1", ""},
+		{"team create", http.MethodPost, "/teams?project_id=proj_1", `{"name":"x"}`},
+		{"team update", http.MethodPatch, "/teams/team_1", `{"name":"x"}`},
+		{"schemas list", http.MethodGet, "/schemas?project_id=proj_1", ""},
+		{"schema get", http.MethodGet, "/schemas/schema_1?project_id=proj_1", ""},
+		{"flow definitions list", http.MethodGet, "/flow_definitions?project_id=proj_1", ""},
+		{"flow definition get", http.MethodGet, "/flow_definitions/fdef_1?project_id=proj_1", ""},
+		{"branding list", http.MethodGet, "/branding?project_id=proj_1", ""},
+		{"branding get", http.MethodGet, "/branding/brand_1?project_id=proj_1", ""},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -304,7 +343,7 @@ func TestOgenErrorHandlerAnonymousSessionOnDualSchemeStays401(t *testing.T) {
 			srv := newErrorHandlerTestServer(t, tokenService)
 
 			req := httptest.NewRequest(tc.method, tc.path, strings.NewReader(tc.body))
-			if tc.method == http.MethodPost {
+			if tc.body != "" {
 				req.Header.Set("Content-Type", "application/json")
 			}
 			req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: "building"})

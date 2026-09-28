@@ -3,6 +3,7 @@ import type { Command } from "@oclif/core";
 import Apply from "./commands/apply";
 import BrandingEject from "./commands/branding/eject";
 import Claim from "./commands/claim";
+import Console from "./commands/console";
 import Doctor from "./commands/doctor/index";
 import Eject from "./commands/eject";
 import Logs from "./commands/logs";
@@ -14,6 +15,10 @@ import Setup from "./commands/setup/index";
 import Start from "./commands/start";
 import Status from "./commands/status";
 import Stop from "./commands/stop";
+import VariablesDelete from "./commands/variables/delete";
+import VariablesGet from "./commands/variables/get";
+import VariablesList from "./commands/variables/list";
+import VariablesSet from "./commands/variables/set";
 
 /**
  * The explicit oclif command table (`oclif.commands.strategy: "explicit"` in
@@ -27,6 +32,7 @@ import Stop from "./commands/stop";
 export const COMMANDS: Record<string, typeof Command> = {
   apply: Apply,
   claim: Claim,
+  console: Console,
   doctor: Doctor,
   eject: Eject,
   logs: Logs,
@@ -38,5 +44,9 @@ export const COMMANDS: Record<string, typeof Command> = {
   status: Status,
   stop: Stop,
   "branding:eject": BrandingEject,
+  "variables:list": VariablesList,
+  "variables:get": VariablesGet,
+  "variables:set": VariablesSet,
+  "variables:delete": VariablesDelete,
   ...RESOURCE_COMMANDS,
 };

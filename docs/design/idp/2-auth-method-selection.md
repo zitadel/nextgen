@@ -16,7 +16,7 @@ It requires three distinct artifacts to align perfectly:
 | :--- | :--- | :--- |
 | **User schema** | `x-auth-methods: {password, passkey, magic_link, sso, otp}` | The `sso` slot exists. Currently, every entry is strictly `{enabled}` only, with `additionalProperties: false`. |
 | **IdP connection** | The external provider configuration itself. | Outlined in area 1 (no server contract exists yet). |
-| **Flow step** | `sso_providers: ["google"]`, a list of connection slugs. The engine fills the rendered step's `name` and `template` from the connection ([Rendering from the connection](#rendering-from-the-connection)). | The meta-schema accepts `[{id, name, template}]` today and changes to slugs with the engine work; the engine rejects any SSO submission (`ErrFlowUnsupported`, `internal/domain/flow_state_machine.go`) and renders no providers. *Constraint:* Any step carrying these **must** define a `transitions.callback` (enforced by the validator). |
+| **Flow step** | `sso_providers: ["google"]`, a list of connection slugs. The engine fills the rendered step's `name` and `template` from the connection ([Rendering from the connection](#rendering-from-the-connection)). | The meta-schema, the flow definition API and stored revisions take the slug list; the engine rejects any SSO submission (`ErrFlowUnsupported`, `internal/domain/flow_state_machine.go`) and renders no providers until it can resolve a slug to its connection. *Constraint:* Any step carrying these **must** define a `transitions.callback` (enforced by the validator). |
 
 Each authentication method surfaces differently within a flow, meaning there is
 no uniform rendering mechanism across the board:
@@ -38,10 +38,11 @@ The connection is the only source for a provider's name and branding. The flow
 definition holds no copy that could go stale when the connection file is
 edited, and the validator only checks that the slug exists.
 
-The definition contract (`SSOProvider` in
-`api/openapi/endpoints/schemas/flow-definition.json` and the meta-schema)
-changes from `[{id, name, template}]` to a slug list with the engine work. No
-production flow carries the old shape.
+The definition contract (`sso_providers` in
+`api/openapi/components/flows/flow-definition-step.yaml`, and the meta-schema
+generated from it) is a slug list. Revisions stored with the earlier
+`[{id, name, template}]` shape still load, each object read as its `id`.
+Resolving slugs at render is the remaining engine work.
 
 ## Principle: Capability vs. Usage
 
