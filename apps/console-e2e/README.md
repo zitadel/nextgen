@@ -9,6 +9,7 @@ you need proven.
 | `e2e`          | `vite preview`     | none                   | the SPA mounts under `/ui/console/` |
 | `e2e-real`     | Vite dev server    | real, via dev proxy    | resource screens against real data |
 | `e2e-embedded` | the Go binary      | real, same origin      | the production request path        |
+| `e2e-platform` | the Go binary      | real, platform project | a platform operator on the cookie   |
 
 ## Embedded shell smoke
 

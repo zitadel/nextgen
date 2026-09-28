@@ -106,6 +106,52 @@ test("manages the project with the session cookie alone", async ({ page, seed, z
   await expect(page.getByRole("link", { name, exact: true })).toBeVisible();
 });
 
+test("shows each user's team on the Users screen with the session cookie", async ({
+  page,
+  zitadel,
+  seed,
+}) => {
+  // #1300 §4: `expand: ["teams"]` needs team_membership.read, which a session
+  // never carries; QueryUsers lets a session through once it may list the
+  // project. Proven through the console, not only the API: without it the
+  // Users screen falls back to the unexpanded read and drops its Team column,
+  // while every Go test stays green.
+  const { baseUrl, projectId, projectSecret, schemaId } = zitadel.handle;
+  const post = async (path: string, body: unknown) => {
+    const response = await fetch(`${baseUrl}${path}`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${projectSecret}`, "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const text = await response.text();
+    expect(response.ok, text).toBe(true);
+    return JSON.parse(text) as { id: string };
+  };
+
+  const operator = await seed.user();
+  await grantProjectAdmin(zitadel.handle, operator.id);
+  const team = await post(`/teams?project_id=${projectId}`, {
+    name: `Support ${Date.now().toString(36)}`,
+  });
+  const member = `member-${Date.now().toString(36)}@example.com`;
+  await post(`/users?project_id=${projectId}&team_id=${team.id}`, {
+    schema: schemaId,
+    attributes: { email: member },
+  });
+
+  await page.goto("/ui/console/");
+  await page.getByLabel("Email").fill(operator.email);
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  await page.getByLabel("Password").fill(operator.password);
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.waitForURL((url) => !url.pathname.endsWith("/login"));
+
+  await page.goto("/ui/console/users");
+  await expect(page.getByRole("columnheader", { name: "Team" })).toBeVisible();
+  const row = page.getByRole("row").filter({ hasText: member });
+  await expect(row.getByText(/^Support /)).toBeVisible();
+});
+
 test("targets the origin root, never an /api prefix", async ({ page }) => {
   const apiPrefixed: string[] = [];
   page.on("request", (request) => {
