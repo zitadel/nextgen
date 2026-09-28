@@ -1611,6 +1611,13 @@ func (r *FlowStateMachineRuntime) ResumeWithOutcome(
 // A miss is not an error: the account may have been deleted between the
 // resolution and this call, and the conflict step will simply fail to verify.
 func (r *FlowStateMachineRuntime) bindCollidingUser(pc *processCtx, resolved FlowResolvedFields) error {
+	// Entering the conflict boundary discards the external identity's proof: the
+	// flow is no longer creating a user from it, so it must not linger in the
+	// sealed state. Otherwise a conflict step that routes identity_unknown back
+	// to register-sso would let the stale VerifiedIdentity authorize
+	// create_user_with_sso without a fresh provider callback.
+	pc.state.VerifiedIdentity = nil
+
 	name, value, ok := fieldValueByChallenge(resolved, pc.state.CollectedData.UserData, FlowFieldChallengeIdentifier)
 	if !ok {
 		return nil
