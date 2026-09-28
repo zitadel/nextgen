@@ -232,13 +232,7 @@ func deriveIdentifierChallenge(field Field, identifier string) FlowFieldChalleng
 }
 
 func deriveUnique(prop schemaReader) AttributeUniqueness {
-	switch prop.String(SchemaAnnotationUnique) {
-	case SchemaUniqueScopeProject:
-		return AttributeUniquenessProject
-	case SchemaUniqueScopeTeam:
-		return AttributeUniquenessTeam
-	}
-	return AttributeUniquenessUnspecified
+	return UniqueScopeOf(prop.String(SchemaAnnotationUnique))
 }
 
 func buildValidation(prop schemaReader) *FlowFieldValidation {

@@ -170,7 +170,7 @@ func TestSetPasswordActionAppliesPolicy(t *testing.T) {
 		ProjectID: "proj_1",
 		UserID:    "user_1",
 		Password:  "short",
-	}, hasher).WithPasswordPolicy(newPasswordPolicy(t))
+	}, service.FixedProjectHasherResolver{Hasher: hasher}).WithPasswordPolicy(newPasswordPolicy(t))
 	require.NoError(t, action.Prepare(t.Context()))
 	err := action.Apply(t.Context(), stmts)
 	derr, ok := errors.AsType[domain.Error](err)

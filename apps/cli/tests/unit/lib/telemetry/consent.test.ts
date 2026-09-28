@@ -36,6 +36,15 @@ describe("resolveConsent", () => {
     expect(resolveConsent({ env: { NODE_ENV: "test" } }).reason).toBe("test-runner");
   });
 
+  it("reports the user's own opt-out ahead of the test runner", () => {
+    expect(resolveConsent({ env: { VITEST: "true", DO_NOT_TRACK: "1" } }).reason).toBe(
+      "do-not-track",
+    );
+    expect(resolveConsent({ env: { NODE_ENV: "test", ZITADEL_TELEMETRY: "0" } }).reason).toBe(
+      "env-opt-out",
+    );
+  });
+
   it("is enabled on the production channel (production token is configured)", () => {
     expect(resolveConsent({ env: { ZITADEL_TELEMETRY_ENV: "production" } })).toMatchObject({
       enabled: true,

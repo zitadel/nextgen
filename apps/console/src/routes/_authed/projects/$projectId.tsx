@@ -3,6 +3,7 @@ import { AlertCircle, Box, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { EYEBROW, MetaRule, MetaValue } from "@/components/detail-meta";
+import { ProjectAdmins } from "@/components/project-admins";
 import { Alert, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -25,14 +26,28 @@ const PLATE = "flex size-9 items-center justify-center rounded-md bg-muted text-
  * `updated_at`, and `issuer` appears nowhere in the spec, the console or the
  * domain layer. The cell is left out rather than shown empty, and returns as one
  * more `MetaValue` when the field lands.
+ *
+ * Below the details, the project's admins (#1238): grants are project-level
+ * data, so they live on the project's page rather than under account settings,
+ * and the id every grant request carries is this route's. Loaded together with
+ * the project: both reads are the same viewer check on the same project, so
+ * they succeed or fail as one.
  */
 export const Route = createFileRoute("/_authed/projects/$projectId")({
-  loader: ({ params }) => api.getProject(params.projectId),
+  loader: async ({ params }) => {
+    const [project, grants] = await Promise.all([
+      api.getProject(params.projectId),
+      // One page: a project's admins are a handful. Add paging with the first
+      // project that needs it.
+      api.queryGrants({ limit: 100, expand: ["principal"] }, { project_id: params.projectId }),
+    ]);
+    return { project, grants: grants.grants };
+  },
   component: ProjectDetail,
 });
 
 function ProjectDetail() {
-  const project = Route.useLoaderData();
+  const { project, grants } = Route.useLoaderData();
   const router = useRouter();
 
   const [name, setName] = useState(project.name);
@@ -130,6 +145,12 @@ function ProjectDetail() {
           </div>
         </CardContent>
       </Card>
+
+      <ProjectAdmins
+        projectId={project.id}
+        grants={grants}
+        onChanged={() => void router.invalidate()}
+      />
     </div>
   );
 }

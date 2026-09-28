@@ -83,7 +83,8 @@ func TestGrantCreateGetRevoke(t *testing.T) {
 		assert.Equal(t, api.GrantObjectTypeProject, created.ObjectType)
 		require.True(t, created.User.IsSet())
 		assert.Equal(t, api.UserID(userID), created.User.Value.UserID)
-		assert.True(t, created.User.Value.Identifier.IsSet())
+		assert.False(t, created.User.Value.Identifier.IsSet())
+		assert.False(t, created.User.Value.Display.IsSet())
 		assert.False(t, created.Team.IsSet())
 		assert.False(t, created.User.Value.Schema.IsSet())
 
@@ -95,6 +96,8 @@ func TestGrantCreateGetRevoke(t *testing.T) {
 		got, ok := getResp.(*api.Grant)
 		require.True(t, ok, helpers.MustMarshal(t, getResp))
 		assert.Equal(t, created.ID, got.ID)
+		require.True(t, got.User.IsSet())
+		assert.True(t, got.User.Value.Identifier.IsSet())
 
 		delResp, err := client.DeleteGrant(t.Context(), api.DeleteGrantParams{
 			ID:        created.ID,
@@ -127,7 +130,7 @@ func TestGrantCreateGetRevoke(t *testing.T) {
 		assert.Equal(t, api.GrantRelationEditor, created.Relation)
 		require.True(t, created.Team.IsSet())
 		assert.Equal(t, team.ID, created.Team.Value.TeamID)
-		assert.Equal(t, team.Name, created.Team.Value.Name.Or(""))
+		assert.False(t, created.Team.Value.Name.IsSet())
 		assert.False(t, created.User.IsSet())
 
 		delResp, err := client.DeleteGrant(t.Context(), api.DeleteGrantParams{
@@ -283,10 +286,14 @@ func TestGrantCreateLocators(t *testing.T) {
 
 		createResp, err := client.CreateGrant(t.Context(), userIdentifierGrant(strings.ToUpper(user.Identifier.Value), api.CreateGrantRequestRelationViewer), params)
 		require.NoError(t, err)
-		created, ok := createResp.(*api.Grant)
-		require.True(t, ok, helpers.MustMarshal(t, createResp))
-		require.True(t, created.User.IsSet())
-		assert.Equal(t, api.UserID(userID), created.User.Value.UserID)
+		require.IsType(t, &api.CreateGrantAccepted{}, createResp, helpers.MustMarshal(t, createResp))
+
+		// The 202 says nothing, so the row is proven through the list.
+		listed := grantsForUser(t, client, project.ID, userID)
+		require.Len(t, listed, 1)
+		require.True(t, listed[0].User.IsSet())
+		assert.Equal(t, api.UserID(userID), listed[0].User.Value.UserID)
+		assert.True(t, listed[0].User.Value.Identifier.IsSet())
 	})
 
 	t.Run("create by team name", func(t *testing.T) {
@@ -303,7 +310,7 @@ func TestGrantCreateLocators(t *testing.T) {
 		require.True(t, ok, helpers.MustMarshal(t, createResp))
 		require.True(t, created.Team.IsSet())
 		assert.Equal(t, team.ID, created.Team.Value.TeamID)
-		assert.Equal(t, team.Name, created.Team.Value.Name.Or(""))
+		assert.False(t, created.Team.Value.Name.IsSet())
 	})
 
 	t.Run("unknown identifier is accepted without a row", func(t *testing.T) {
@@ -324,31 +331,16 @@ func TestGrantCreateLocators(t *testing.T) {
 
 		resp, err := isolatedClient.CreateGrant(t.Context(), userIdentifierGrant("nobody@example.com", api.CreateGrantRequestRelationViewer), isolatedParams)
 		require.NoError(t, err)
-		created, ok := resp.(*api.Grant)
-		require.True(t, ok, helpers.MustMarshal(t, resp))
-		assert.True(t, strings.HasPrefix(created.ID, "asgn_"), created.ID)
-		require.True(t, created.User.IsSet())
-		assert.True(t, strings.HasPrefix(string(created.User.Value.UserID), "user_"))
-		assert.False(t, created.User.Value.Identifier.IsSet())
-
-		getResp, err := isolatedClient.GetGrant(t.Context(), api.GetGrantParams{
-			ID:        created.ID,
-			ProjectID: api.ProjectID(isolated.ID),
-		})
-		require.NoError(t, err)
-		assertGrantNotFound(t, getResp)
+		require.IsType(t, &api.CreateGrantAccepted{}, resp, helpers.MustMarshal(t, resp))
 
 		after, err := isolatedClient.QueryGrants(t.Context(), &api.QueryGrantsRequest{}, api.QueryGrantsParams{ProjectID: api.ProjectID(isolated.ID)})
 		require.NoError(t, err)
 		listedAfter, ok := after.(*api.QueryGrantsResponse)
 		require.True(t, ok, helpers.MustMarshal(t, after))
 		assert.Len(t, listedAfter.Grants, len(listedBefore.Grants))
-		for _, g := range listedAfter.Grants {
-			assert.NotEqual(t, created.ID, g.ID)
-		}
 	})
 
-	t.Run("repeat identifier returns the existing grant", func(t *testing.T) {
+	t.Run("repeat identifier is accepted and writes nothing new", func(t *testing.T) {
 		t.Parallel()
 		userID := harness.CreateUserWithTeam(t, platform.ID)
 		userResp, err := platformClient.GetUserByID(t.Context(), api.GetUserByIDParams{UserID: api.UserID(userID)})
@@ -360,34 +352,21 @@ func TestGrantCreateLocators(t *testing.T) {
 		req := userIdentifierGrant(user.Identifier.Value, api.CreateGrantRequestRelationEditor)
 		first, err := client.CreateGrant(t.Context(), req, params)
 		require.NoError(t, err)
-		created, ok := first.(*api.Grant)
-		require.True(t, ok, helpers.MustMarshal(t, first))
+		require.IsType(t, &api.CreateGrantAccepted{}, first, helpers.MustMarshal(t, first))
 
 		second, err := client.CreateGrant(t.Context(), req, params)
 		require.NoError(t, err)
-		again, ok := second.(*api.Grant)
-		require.True(t, ok, helpers.MustMarshal(t, second))
-		assert.Equal(t, created.ID, again.ID)
-		assert.Equal(t, api.UserID(userID), again.User.Value.UserID)
+		require.IsType(t, &api.CreateGrantAccepted{}, second, helpers.MustMarshal(t, second))
 
-		listed, err := client.QueryGrants(t.Context(), &api.QueryGrantsRequest{
-			Filter: []api.QueryGrantsRequestFilterItem{{
-				Field:     api.GrantFilterFieldUserID,
-				Operation: api.FilterOperationEquals,
-				Value:     api.NewOptFilterValue(api.NewStringFilterValue(userID)),
-			}},
-		}, api.QueryGrantsParams{ProjectID: api.ProjectID(project.ID)})
-		require.NoError(t, err)
-		page, ok := listed.(*api.QueryGrantsResponse)
-		require.True(t, ok, helpers.MustMarshal(t, listed))
-		require.Len(t, page.Grants, 1)
-		assert.Equal(t, created.ID, page.Grants[0].ID)
+		assert.Len(t, grantsForUser(t, client, project.ID, userID), 1)
 	})
 
 	t.Run("own identifier is grant.invalid", func(t *testing.T) {
 		t.Parallel()
 		userID := harness.CreateUserWithTeam(t, platform.ID)
-		harness.SeedProjectViewer(t, project.ID, userID)
+		// Admin: the write check runs before validation, so a viewer would
+		// be refused before the self-grant rule is ever reached.
+		harness.SeedProjectAdmin(t, project.ID, userID)
 		userResp, err := platformClient.GetUserByID(t.Context(), api.GetUserByIDParams{UserID: api.UserID(userID)})
 		require.NoError(t, err)
 		user, ok := userResp.(*api.User)
@@ -399,6 +378,42 @@ func TestGrantCreateLocators(t *testing.T) {
 		sessionClient.SetSessionToken(platformSessionCookie(t, userID).Value)
 
 		resp, err := sessionClient.CreateGrant(t.Context(), userIdentifierGrant(user.Identifier.Value, api.CreateGrantRequestRelationAdmin), params)
+		require.NoError(t, err)
+		bad, ok := resp.(*api.CreateGrantBadRequest)
+		require.True(t, ok, helpers.MustMarshal(t, resp))
+		assert.Equal(t, api.ErrorCode("grant.invalid"), bad.Code)
+		assert.Equal(t, "you cannot grant access to yourself", bad.Message)
+	})
+
+	// A hit and a miss, each repeated, are the whole existence oracle: the
+	// 202 has no body to compare and no id to replay through user_id.
+	t.Run("identifier hit and miss are indistinguishable", func(t *testing.T) {
+		t.Parallel()
+		userID := harness.CreateUserWithTeam(t, platform.ID)
+		userResp, err := platformClient.GetUserByID(t.Context(), api.GetUserByIDParams{UserID: api.UserID(userID)})
+		require.NoError(t, err)
+		user, ok := userResp.(*api.User)
+		require.True(t, ok, helpers.MustMarshal(t, userResp))
+		require.True(t, user.Identifier.IsSet())
+
+		unknown := helpers.RandString(10) + "@example.com"
+		for _, identifier := range []string{user.Identifier.Value, unknown, user.Identifier.Value, unknown} {
+			resp, err := client.CreateGrant(t.Context(), userIdentifierGrant(identifier, api.CreateGrantRequestRelationViewer), params)
+			require.NoError(t, err)
+			require.IsType(t, &api.CreateGrantAccepted{}, resp, helpers.MustMarshal(t, resp))
+		}
+	})
+
+	t.Run("own user_id is grant.invalid", func(t *testing.T) {
+		t.Parallel()
+		userID := harness.CreateUserWithTeam(t, platform.ID)
+		harness.SeedProjectAdmin(t, project.ID, userID)
+
+		sessionClient, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+		require.NoError(t, err)
+		sessionClient.SetSessionToken(platformSessionCookie(t, userID).Value)
+
+		resp, err := sessionClient.CreateGrant(t.Context(), userIDGrant(userID, api.CreateGrantRequestRelationAdmin), params)
 		require.NoError(t, err)
 		bad, ok := resp.(*api.CreateGrantBadRequest)
 		require.True(t, ok, helpers.MustMarshal(t, resp))
@@ -450,6 +465,23 @@ func TestGrantCreateLocators(t *testing.T) {
 		assertCreateGrantReqInvalid(t, client.Token(), project.ID,
 			`{"relation":"admin","team":{"team_id":"team_1","extra":"nope"}}`)
 	})
+}
+
+// grantsForUser lists a project's grants for one user. The identifier create
+// answers 202 with no body, so the written row is only observable here.
+func grantsForUser(t *testing.T, client *helpers.ApiClient, projectID, userID string) []api.Grant {
+	t.Helper()
+	listed, err := client.QueryGrants(t.Context(), &api.QueryGrantsRequest{
+		Filter: []api.QueryGrantsRequestFilterItem{{
+			Field:     api.GrantFilterFieldUserID,
+			Operation: api.FilterOperationEquals,
+			Value:     api.NewOptFilterValue(api.NewStringFilterValue(userID)),
+		}},
+	}, api.QueryGrantsParams{ProjectID: api.ProjectID(projectID)})
+	require.NoError(t, err)
+	page, ok := listed.(*api.QueryGrantsResponse)
+	require.True(t, ok, helpers.MustMarshal(t, listed))
+	return page.Grants
 }
 
 func TestGrantQuery(t *testing.T) {
@@ -856,7 +888,7 @@ func TestGrantSessionCaller(t *testing.T) {
 	require.NoError(t, err)
 
 	operatorID := harness.CreateUserWithTeam(t, platform.ID)
-	harness.SeedProjectViewer(t, project.ID, operatorID)
+	harness.SeedProjectAdmin(t, project.ID, operatorID)
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
@@ -907,6 +939,31 @@ func TestGrantSessionCaller(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.IsType(t, &api.DeleteGrantNoContent{}, delResp, helpers.MustMarshal(t, delResp))
+
+	t.Run("editor cannot mint grants", func(t *testing.T) {
+		t.Parallel()
+		// Creating a grant is an admin check: a grant can carry any role up to
+		// admin, so an editor minting one could escalate (for instance, admin
+		// to a team it belongs to, which the self-grant rule does not cover).
+		editorID := harness.CreateUserWithTeam(t, platform.ID)
+		harness.SeedProjectEditor(t, project.ID, editorID)
+		editor, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+		require.NoError(t, err)
+		editor.SetSessionToken(platformSessionCookie(t, editorID).Value)
+
+		// The check runs before the body is read, so the requested relation
+		// cannot change the answer; one request proves the gate.
+		resp, err := editor.CreateGrant(t.Context(), userIDGrant(harness.CreateUserWithTeam(t, platform.ID), api.CreateGrantRequestRelationViewer), params)
+		require.NoError(t, err)
+		forbidden, ok := resp.(*api.CreateGrantForbidden)
+		require.True(t, ok, helpers.MustMarshal(t, resp))
+		assert.Equal(t, api.ErrorCode(domain.ErrGrantPermissionDenied().Code), forbidden.Code)
+
+		// Reading grants stays open to an editor.
+		queryResp, err := editor.QueryGrants(t.Context(), &api.QueryGrantsRequest{}, api.QueryGrantsParams{ProjectID: api.ProjectID(project.ID)})
+		require.NoError(t, err)
+		require.IsType(t, &api.QueryGrantsResponse{}, queryResp, helpers.MustMarshal(t, queryResp))
+	})
 
 	t.Run("no foothold is not found", func(t *testing.T) {
 		t.Parallel()

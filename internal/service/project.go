@@ -13,6 +13,7 @@ import (
 	"github.com/zitadel/nextgen/api/openapi/endpoints/flow_definitions"
 	"github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
 	"github.com/zitadel/nextgen/internal/audit"
+	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
@@ -46,10 +47,12 @@ type ProjectService interface {
 	// (`zitadel setup` → POST /projects) does.
 	DefaultProject(ctx context.Context, cfgProjectID string) (*domain.Project, error)
 
-	// Update updates the name of a project.
-	// Returns domain.ErrProjectMissingID or domain.ErrProjectNameInvalid for validation failures.
+	// Update applies the fields req names and leaves the rest of the project
+	// alone, which is what makes it the body of a PATCH.
+	// Returns domain.ErrProjectMissingID, domain.ErrProjectNameInvalid or
+	// domain.ErrProjectPasswordHashInvalid for validation failures.
 	// Returns domain.ErrProjectNotFound when no project with the given ID exists; other failures return domain.ErrInternal.
-	Update(ctx context.Context, id, name string) (*domain.Project, error)
+	Update(ctx context.Context, req UpdateProjectRequest) (*domain.Project, error)
 
 	// List returns projects matching the request, ordered and paginated with an
 	// opaque cursor token. The returned NextPageToken is empty when the last page
@@ -78,12 +81,14 @@ func NewProjectService(
 	serverURL string,
 	schemaValidator *domain.SchemaValidator,
 	keyService KeyService,
+	hashers *crypto.HasherFactory,
 ) ProjectService {
 	return &projectService{
 		v2Pool:          v2Pool,
 		serverURL:       serverURL,
 		schemaValidator: schemaValidator,
 		keyService:      keyService,
+		hashers:         hashers,
 	}
 }
 
@@ -92,6 +97,9 @@ type projectService struct {
 	serverURL       string
 	schemaValidator *domain.SchemaValidator
 	keyService      KeyService
+	// hashers is the deployment's hashing configuration, which is what decides
+	// whether a project may write with the method it asked for.
+	hashers *crypto.HasherFactory
 }
 
 var _ ProjectService = (*projectService)(nil)
@@ -347,41 +355,131 @@ func (s *projectService) DefaultProject(ctx context.Context, cfgProjectID string
 	return nil, nil
 }
 
-func (s *projectService) Update(ctx context.Context, id, name string) (*domain.Project, error) {
-	if id == "" {
-		return nil, domain.ErrProjectMissingID()
+// UpdateProjectRequest is a PATCH: a nil field is one the caller did not
+// mention and the update leaves as it stands.
+type UpdateProjectRequest struct {
+	ID string
+	// Name renames the project. The empty string is not a rename but a bad one,
+	// and is rejected.
+	Name *string
+	// PasswordHashPolicy sets the hashing method the project's passwords are
+	// written with. It carries three states rather than two: absent leaves the
+	// project's method alone, present sets it, and present-but-nil returns the
+	// project to the deployment default -- which is why it is a pointer to a
+	// pointer. Wire null is how an admin says "stop choosing", and that is a
+	// different instruction from saying nothing.
+	PasswordHashPolicy **domain.PasswordHashPolicy
+}
+
+func (req *UpdateProjectRequest) Validate(hashers *crypto.HasherFactory) error {
+	if req.ID == "" {
+		return domain.ErrProjectMissingID()
 	}
-	name = strings.TrimSpace(name)
-	if name == "" {
-		return nil, domain.ErrProjectNameInvalid()
+
+	if req.Name == nil && req.PasswordHashPolicy == nil {
+		// Unchanged from when the name was the only field there was to patch: a
+		// body that names nothing to write is a bad request rather than a no-op,
+		// and it is the name it is missing.
+		return domain.ErrProjectNameInvalid()
 	}
-	project := &domain.Project{
-		ID:   id,
-		Name: name,
+	if req.Name != nil {
+		name := strings.TrimSpace(*req.Name)
+		if name == "" {
+			return domain.ErrProjectNameInvalid()
+		}
+		req.Name = new(name)
 	}
+
+	if req.PasswordHashPolicy != nil && *req.PasswordHashPolicy != nil {
+		if err := hashers.Check((*req.PasswordHashPolicy).HasherConfig()); err != nil {
+			return domain.ErrProjectPasswordHashInvalid().WithParent(err).
+				WithDetails(map[string]any{
+					"algorithm": string((*req.PasswordHashPolicy).Algorithm),
+					"reason":    err.Error(),
+				})
+		}
+	}
+
+	return nil
+}
+
+func (s *projectService) Update(ctx context.Context, req UpdateProjectRequest) (*domain.Project, error) {
+	if err := req.Validate(s.hashers); err != nil {
+		return nil, err
+	}
+
+	project := &domain.Project{ID: req.ID}
 	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		if err := tx.Statements().UpdateProject(ctx, project); err != nil {
-			return err
+		if req.PasswordHashPolicy != nil {
+			if err := tx.Statements().SetProjectPasswordHashPolicy(ctx, req.ID, *req.PasswordHashPolicy); err != nil {
+				return err
+			}
 		}
-		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
-			Type:       domain.EventTypeProjectUpdated,
-			Category:   domain.EventCategoryEntity,
-			ProjectID:  project.ID,
-			EntityType: "project",
-			EntityID:   project.ID,
-			Payload:    domain.ProjectPayload{Name: project.Name},
-		})
+		// The name write reads the whole row back, so it runs second and lands
+		// the policy just written on the returned project. Without a rename the
+		// row is read instead, for the same reason: the caller is answered with
+		// the project as it now stands.
+		if req.Name != nil {
+			project.Name = *req.Name
+			if err := tx.Statements().UpdateProject(ctx, project); err != nil {
+				return err
+			}
+		} else {
+			updated, err := tx.Statements().GetProjectByID(ctx, req.ID)
+			if err != nil {
+				return err
+			}
+			*project = *updated
+		}
+		return emitProjectUpdated(ctx, tx.Statements(), project.ID, updateProjectPayload(req))
 	})
+
 	if err != nil {
-		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
-			return nil, domain.ErrProjectNotFound()
-		}
-		if de, ok := errors.AsType[domain.Error](err); ok {
-			return nil, de
-		}
-		return nil, domain.ErrInternal(err).WithMessage("failed to update project")
+		return nil, s.mapUpdateError(err)
 	}
+
 	return project, nil
+}
+
+func (s *projectService) mapUpdateError(err error) error {
+	if err == nil {
+		return nil
+	}
+	if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+		return domain.ErrProjectNotFound()
+	}
+	if de, ok := errors.AsType[domain.Error](err); ok {
+		return de
+	}
+	return domain.ErrInternal(err).WithMessage("failed to update project")
+}
+
+func emitProjectUpdated(ctx context.Context, stmts EventStatements, projectID string, payload domain.ProjectUpdatedPayload) error {
+	return audit.Emit(ctx, stmts, audit.EmitSpec{
+		Type:       domain.EventTypeProjectUpdated,
+		Category:   domain.EventCategoryEntity,
+		ProjectID:  projectID,
+		EntityType: "project",
+		EntityID:   projectID,
+		Payload:    payload,
+	})
+}
+
+func updateProjectPayload(req UpdateProjectRequest) domain.ProjectUpdatedPayload {
+	payload := domain.ProjectUpdatedPayload{}
+	if req.Name != nil {
+		payload.Name = *req.Name
+	}
+	if req.PasswordHashPolicy != nil {
+		// The empty string is the project handing hashing back to the
+		// deployment default, which is what "no algorithm of its own" means.
+		algorithm := ""
+		if *req.PasswordHashPolicy != nil {
+			algorithm = string((*req.PasswordHashPolicy).Algorithm)
+		}
+		payload.PasswordHashAlgorithm = &algorithm
+	}
+	return payload
 }
 
 // ListProjectsRequest is the input for listing projects.

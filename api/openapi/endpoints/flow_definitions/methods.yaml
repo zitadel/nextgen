@@ -73,6 +73,7 @@ get:
   security:
     - oauth2:
         - flow_definition.read
+    - nextgenSession: []
   parameters:
     - $ref: ../../components/parameters/limit.yaml
     - $ref: ../../components/parameters/page-token.yaml

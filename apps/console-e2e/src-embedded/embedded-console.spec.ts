@@ -1,5 +1,7 @@
 import { expect, test } from "@zitadel/testing/playwright";
 
+import { grantProjectAdmin } from "../src-real/support";
+
 /**
  * The console as the Go binary serves it (Console ADR 0002 §4).
  *
@@ -35,6 +37,11 @@ test("signs in end to end against the embedded API", async ({ page, seed }) => {
 
   await expect(page.getByLabel("Password")).toBeVisible();
   await page.getByLabel("Password").fill(user.password);
+  // Registered before the terminal click, because the call fires as soon as
+  // the console boots on the other side of the navigation.
+  const teamsQuery = page.waitForResponse(
+    (response) => new URL(response.url()).pathname === "/teams/query",
+  );
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
 
   // Terminal step → `POST /sessions/exchange` with the runtime-discovered
@@ -45,10 +52,16 @@ test("signs in end to end against the embedded API", async ({ page, seed }) => {
   // `/` has no screen of its own and lands on Teams, so the redirect having run
   // is what proves the console booted.
   await expect(page).toHaveURL(/\/ui\/console\/teams\?status=active$/);
-  // The shell, not the screen: this lane carries no project secret, so the
-  // Teams list itself fails closed until session-derived authorization lands
-  // (Console ADR 0003). The sidebar renders either way, and it is what shows the
-  // signed-in console was reached.
+  // #1227 taught queryTeams to accept the session cookie, so the list no
+  // longer fails closed -- but this lane's seeded user has no team and no
+  // grant, so it has no foothold in the console project and the gate answers
+  // 404. Asserted rather than described: that status is the question #1227
+  // asked of this lane, and the sidebar below renders on a 401 just as
+  // happily. Rows need a grant, which is what `src-real/` has a secret for.
+  expect((await teamsQuery).status()).toBe(404);
+
+  // The shell, not the screen: it is what shows the signed-in console was
+  // reached.
   await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();
 
   // The project pill is the one management read that does resolve here: `GET
@@ -58,6 +71,52 @@ test("signs in end to end against the embedded API", async ({ page, seed }) => {
   // so the honest answer is the empty state — what matters is that it is an
   // answer.
   await expect(page.getByRole("button", { name: "Switch project" })).toHaveText("No projects");
+});
+
+test("shows each user's team on the Users screen with the session cookie", async ({
+  page,
+  zitadel,
+  seed,
+}) => {
+  // #1300 §4: `expand: ["teams"]` needs team_membership.read, which a session
+  // never carries; QueryUsers lets a session through once it may list the
+  // project. Proven through the console, not only the API: without it the
+  // Users screen falls back to the unexpanded read and drops its Team column,
+  // while every Go test stays green.
+  const { baseUrl, projectId, projectSecret, schemaId } = zitadel.handle;
+  const post = async (path: string, body: unknown) => {
+    const response = await fetch(`${baseUrl}${path}`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${projectSecret}`, "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const text = await response.text();
+    expect(response.ok, text).toBe(true);
+    return JSON.parse(text) as { id: string };
+  };
+
+  const operator = await seed.user();
+  await grantProjectAdmin(zitadel.handle, operator.id);
+  const team = await post(`/teams?project_id=${projectId}`, {
+    name: `Support ${Date.now().toString(36)}`,
+  });
+  const member = `member-${Date.now().toString(36)}@example.com`;
+  await post(`/users?project_id=${projectId}&team_id=${team.id}`, {
+    schema: schemaId,
+    attributes: { email: member },
+  });
+
+  await page.goto("/ui/console/");
+  await page.getByLabel("Email").fill(operator.email);
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  await page.getByLabel("Password").fill(operator.password);
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.waitForURL((url) => !url.pathname.endsWith("/login"));
+
+  await page.goto("/ui/console/users");
+  await expect(page.getByRole("columnheader", { name: "Team" })).toBeVisible();
+  const row = page.getByRole("row").filter({ hasText: member });
+  await expect(row.getByText(/^Support /)).toBeVisible();
 });
 
 test("targets the origin root, never an /api prefix", async ({ page }) => {
