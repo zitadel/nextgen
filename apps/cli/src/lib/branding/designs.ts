@@ -30,8 +30,7 @@ export const RETIRED_BRANDING_DESIGNS = ["split", "split-right", "hero"] as cons
 /** Where page layout lives now, shared by every retired-design error. */
 const PAGE_LAYOUT_HINT =
   "Build page layout (split screens, hero panes, marketing copy) in your app around " +
-  "<zitadel-login>, and theme the widget with --zl-* custom properties in your stylesheet. " +
-  "See docs/adrs/057-login-customization-categories.md.";
+  "<zitadel-login>, and theme the widget with --zl-* custom properties in your stylesheet.";
 
 /**
  * Resolves a `branding eject --design` value to a shipped design. A retired
