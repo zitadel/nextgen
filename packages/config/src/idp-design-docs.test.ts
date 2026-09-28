@@ -267,31 +267,17 @@ describe("scaffolded flow (schemas/default-login.scaffold.json)", () => {
   };
   const flowMeta = loadJson(metaSchemaDir, "flow-definition.json");
 
-  it("differs from the shipped meta-schema only on the documented on_success delta", () => {
-    // One delta is left: the on_success enum gains create_user_with_sso. The
-    // editor schema mirrors the API, so this holds both before that lands and
-    // after. sso_providers is already a slug list, so it no longer differs.
+  it("validates against the shipped meta-schema", () => {
+    // Both deltas have landed: on_success gained create_user_with_sso and
+    // sso_providers is a slug list. The scaffold must now validate outright,
+    // with no patching -- so a value dropped from the generated enum (the
+    // editor-schema regression this guards against) is caught here.
     const validate = new Ajv2020({ strict: false, validateFormats: false, allErrors: true }).compile(
       flowMeta,
     );
-    validate(flow);
-    for (const err of validate.errors ?? []) {
-      const onSuccess = err.keyword === "enum" && err.instancePath.endsWith("/on_success");
-      expect(onSuccess, `${err.instancePath} ${err.keyword}`).toBe(true);
-    }
-  });
-
-  it("validates once the on_success delta lands in the meta-schema", () => {
-    const patched = structuredClone(flowMeta) as {
-      $defs: { FlowDefinitionStep: { properties: { on_success: { enum: string[] } } } };
-    };
-    const step = patched.$defs.FlowDefinitionStep.properties;
-    // Patched in only while it is still missing, so this passes whether or
-    // not the PR carrying the value has landed.
-    if (!step.on_success.enum.includes("create_user_with_sso")) {
-      step.on_success.enum.push("create_user_with_sso");
-    }
-    expect(ajv().compile(patched)(flow)).toBe(true);
+    const ok = validate(flow);
+    expect(validate.errors ?? [], JSON.stringify(validate.errors)).toEqual([]);
+    expect(ok).toBe(true);
   });
 
   it("every step carrying sso_providers routes all three outcomes", () => {

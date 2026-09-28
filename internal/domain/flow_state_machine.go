@@ -820,8 +820,10 @@ func (r *FlowStateMachineRuntime) dispatchChallenges(pc *processCtx, resolved Fl
 	return flowDispatchResult{}, nil
 }
 
-// anyVisitedStepOnSuccess reports whether any step in (history ∪ current)
-// runs an on_success mutation.
+// anyVisitedStepEstablishesPassword reports whether any step in
+// (history ∪ current) runs an on_success mutation that sets a password. The
+// password-dispatch skip keys on this, so it must stay specific to
+// password-establishing mutations (create_user), not any on_success.
 func anyVisitedStepEstablishesPassword(def *FlowDefinition, state *FlowState, current *FlowDefinitionStep) bool {
 	if stepEstablishesPassword(current) {
 		return true
