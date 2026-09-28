@@ -38,8 +38,8 @@ under `.zitadel/local/` (SQLite by default). Remote-server setup can use
 `start` also creates a local admin, `admin@zitadel.localhost`, and ends by
 printing a one-time sign-in link for the management console.
 `setup --server local` creates a project on that local server, asks which
-framework to scaffold when the directory is fresh (and which login design to
-use), writes the app into the current directory, and scaffolds the framework's
+framework to scaffold when the directory is fresh, writes the app into the
+current directory, and scaffolds the framework's
 idiomatic auth routes plus the proxy layer — for Next.js that means
 `app/login`, `app/register`, `app/profile`, and `proxy.ts` for Next 16+ or
 `middleware.ts` for older versions; other frameworks get their equivalents
@@ -85,7 +85,7 @@ plus a `login.liquid` LiquidJS template), then re-run `zitadel plan` and
 `zitadel apply`. Server-provisioned defaults remain a fallback for non-CLI
 project creation, but CLI-created projects are authored from local files first.
 Login templates are supported: scaffold them with the `branding eject` command
-(`--design centered|split|split-right|hero|minimal`) or `setup --design <name>`;
+(`--design centered|minimal`); setup never does;
 every edit publishes a new immutable branding revision and the login serves
 the newest one. Flows work the same way: every edit publishes a new immutable
 flow revision. A page that pins `flow-name` gets that flow's newest revision. A
@@ -253,7 +253,7 @@ Take ownership of the login template: scaffold .zitadel/branding/ from a shipped
 USAGE
   $ zitadel branding eject [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [--verbose] [--debug] [--telemetry] [-f] [--design
-    centered|split|split-right|hero|minimal]
+    centered|minimal]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -263,7 +263,7 @@ FLAGS
   -s, --server=<value>   Override the resolved server URL.
       --debug            Debug logging.
       --design=<option>  Design to start from (default: centered).
-                         <options: centered|split|split-right|hero|minimal>
+                         <options: centered|minimal>
       --dry-run          Preview without mutating files or the platform.
       --[no-]telemetry   Send anonymous usage analytics. Disable with
                          --no-telemetry.
@@ -1740,7 +1740,6 @@ USAGE
     next|nuxt|react|vue|solid|svelte|qwik|angular] [--renderer react]
     [--dev-port <value>] [--skip-install] [--preset
     password-first|passkey-first] [--use-case minimal|consumer|business]
-    [--design centered|split|split-right|hero|minimal]
 
 FLAGS
   -c, --cwd=<value>
@@ -1757,17 +1756,6 @@ FLAGS
 
   --debug
       Debug logging.
-
-  --design=<option>
-      Login design to eject into .zitadel/branding/ and publish as branding
-      revision 1. Skips the wizard's design question. When omitted in
-      non-interactive runs, the login uses the built-in template; run the
-      `branding eject` command later to customize. Split-family designs (split,
-      split-right, hero) collapse their brand pane by container width: narrow
-      containers — including widget-posture embeds at card width — render the
-      compact brand mark instead (logo_url, else hero_url, from
-      .zitadel/branding/branding.json; hero falls back to editable text).
-      <options: centered|split|split-right|hero|minimal>
 
   --dev-port=<value>
       Dev-server port; also the issuer origin registered with Zitadel. Defaults to
