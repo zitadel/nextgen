@@ -3,7 +3,6 @@ import { basename, join } from "node:path";
 
 import { intro, outro } from "@clack/prompts";
 import { Flags } from "@oclif/core";
-import { createZitadelClient } from "@zitadel/api/client";
 import type { CreateProject201 } from "@zitadel/api/generated/model";
 import {
   BRANDING_DESIGNS,
@@ -11,13 +10,30 @@ import {
   DEFAULT_SETUP_USE_CASE,
   SETUP_PRESETS,
   SETUP_USE_CASES,
+  type BrandingDesign,
   type SetupPreset,
   type SetupUseCase,
 } from "@zitadel/config/defaults";
 import { consola } from "consola";
 
+import { createZitadelClient } from "../../lib/api-client";
+import { brandingDesignLabel } from "../../lib/branding/designs";
+import { renderBoxActions, wrapForBox } from "../../lib/box";
+import {
+  claimAction,
+  claimBoxAction,
+  claimCommand,
+  claimState,
+  claimWindowDeadline,
+} from "../../lib/claim-state";
 import { toZitadelError, ZitadelError } from "../../lib/errors";
-import { BaseCommand, type JsonEnvelope } from "../../lib/oclif";
+import { brandingGuidanceAction } from "../../lib/journey-guidance";
+import { BaseCommand, CommandGroups, type JsonEnvelope } from "../../lib/oclif";
+import { serverKind } from "../../lib/oclif/server-kind";
+import { readLocalAdmin } from "../../lib/local-server/admin-credential";
+import { claimProjectAsAdmin } from "../../lib/local-server/claim-as-admin";
+import { readPlatformRuntime } from "../../lib/local-server/runtime";
+import { readZitadelSecret, writeZitadelSecret } from "../../lib/project";
 import {
   createOrca,
   inspectScaffoldTarget,
@@ -26,10 +42,15 @@ import {
   type Orca,
   type ScaffoldTarget,
 } from "../../lib/orca";
-import { RENDERER_IDS } from "../../lib/orca/patchers/rule/next/renderers/registry";
+import {
+  AVAILABLE_RENDERER_IDS,
+  RENDERER_IDS,
+} from "../../lib/orca/patchers/rule/next/renderers/registry";
 import type { PatchContext } from "../../lib/orca/patchers/types";
 import { hasZitadelConfig, hasZitadelSecret } from "../../lib/project";
 import { publicCliCommand } from "../../lib/public-cli";
+import { derivePosture } from "../../lib/orca/patchers/posture";
+import { writeScaffoldManifest } from "../../lib/scaffold-manifest";
 import {
   materializeSetupResources,
   type MaterializeSetupResourcesResult,
@@ -37,11 +58,14 @@ import {
 import { installDependenciesForSetup } from "./install";
 import { PickFrameworkPrompt, SETUP_PROMPTS, type SetupAnswers } from "./prompts";
 import {
+  designWarnings,
   detectProjectFacts,
+  dim as styleDim,
   fileNameOf,
   formatFrameworkLine,
   id as styleId,
   path as stylePath,
+  relativeDisplayPath as relativeDisplay,
   renderSummary,
   url as styleUrl,
   type Row,
@@ -58,6 +82,22 @@ const FRAMEWORK_OPTIONS = createOrca()
   .availableFrameworks()
   .map((framework) => framework.id);
 
+/**
+ * `--renderer` offers only ids `getRenderer` will resolve: a
+ * declared-but-unpublished renderer (ADR 006) keeps its registry entry to
+ * reserve the id, but is surfaced as unavailable in the flag description
+ * instead of in `options`, so `--help` never advertises a value that is
+ * guaranteed to fail and an explicit pass is rejected at parse time — before
+ * any remote project is created.
+ */
+const UNAVAILABLE_RENDERER_IDS = RENDERER_IDS.filter(
+  (id) => !AVAILABLE_RENDERER_IDS.includes(id),
+);
+const RENDERER_FLAG_DESCRIPTION =
+  UNAVAILABLE_RENDERER_IDS.length === 0
+    ? "Renderer (default: react)."
+    : `Renderer (default: react). Not yet available: ${UNAVAILABLE_RENDERER_IDS.join(", ")}.`;
+
 /** `zitadel setup` — create a project and scaffold local auth.
  *
  * Detects (or, for an empty directory, scaffolds then re-detects) the
@@ -72,15 +112,18 @@ const FRAMEWORK_OPTIONS = createOrca()
  */
 export default class Setup extends BaseCommand {
   static override description = "Create a Zitadel project and scaffold local auth.";
+  static override group = CommandGroups.project;
+  static override groupOrder = 1;
   static override examples = [
     "<%= config.bin %> setup --framework next",
     "<%= config.bin %> setup --framework react --dev-port 3000",
   ];
   static override flags = {
+    force: Flags.boolean({ char: "f", description: "Overwrite managed files that already exist." }),
     framework: Flags.string({ description: "Framework to target.", options: FRAMEWORK_OPTIONS }),
     renderer: Flags.string({
-      description: "Renderer (default: react).",
-      options: [...RENDERER_IDS],
+      description: RENDERER_FLAG_DESCRIPTION,
+      options: [...AVAILABLE_RENDERER_IDS],
     }),
     "dev-port": Flags.integer({
       description:
@@ -101,7 +144,7 @@ export default class Setup extends BaseCommand {
     }),
     design: Flags.string({
       description:
-        "Login design to eject into .zitadel/branding/ and publish as branding revision 1. When omitted, the login uses the built-in template; run the `branding eject` command later to customize.",
+        "Login design to eject into .zitadel/branding/ and publish as branding revision 1. Skips the wizard's design question. When omitted in non-interactive runs, the login uses the built-in template; run the `branding eject` command later to customize. Split-family designs (split, split-right, hero) collapse their brand pane by container width: narrow containers — including widget-posture embeds at card width — render the compact brand mark instead (logo_url, else hero_url, from .zitadel/branding/branding.json; hero falls back to editable text).",
       options: [...BRANDING_DESIGNS],
     }),
   };
@@ -163,6 +206,7 @@ export default class Setup extends BaseCommand {
       dev_port_explicit: flags["dev-port"] !== undefined,
       preset: flags.preset ?? DEFAULT_SETUP_PRESET,
       use_case: flags["use-case"] ?? DEFAULT_SETUP_USE_CASE,
+      design: flags.design ?? "built-in",
       step: "framework_resolved",
     });
 
@@ -192,6 +236,7 @@ export default class Setup extends BaseCommand {
       devPort: framework.devPort,
       preset: (flags.preset as SetupPreset | undefined) ?? DEFAULT_SETUP_PRESET,
       useCase: (flags["use-case"] as SetupUseCase | undefined) ?? DEFAULT_SETUP_USE_CASE,
+      design: flags.design as BrandingDesign | undefined,
     };
 
     if (!nonInteractive && !dryRun) {
@@ -203,6 +248,7 @@ export default class Setup extends BaseCommand {
         devPortFromFlag: flags["dev-port"] !== undefined,
         presetFromFlag: flags.preset !== undefined,
         useCaseFromFlag: flags["use-case"] !== undefined,
+        designFromFlag: flags.design !== undefined,
       };
       for (const prompt of SETUP_PROMPTS) {
         answers = await prompt.ask(answers, promptCtx);
@@ -210,10 +256,14 @@ export default class Setup extends BaseCommand {
       outro("Configuration captured");
     }
 
-    // The interactive prompts can override the flag/default preset and use
-    // case recorded at framework_resolved — re-record so telemetry carries
-    // the values that actually scaffold.
-    this.recordTelemetry({ preset: answers.preset, use_case: answers.useCase });
+    // The interactive prompts can override the flag/default preset, use
+    // case, and design recorded at framework_resolved — re-record so
+    // telemetry carries the values that actually scaffold.
+    this.recordTelemetry({
+      preset: answers.preset,
+      use_case: answers.useCase,
+      design: answers.design ?? "built-in",
+    });
 
     const issuer = issuerFromPort(answers.devPort);
     // The DevPortPrompt can change the port interactively, so fold the answer
@@ -240,19 +290,23 @@ export default class Setup extends BaseCommand {
           issuer,
           {
             // Resolved values, not raw flags: the wizard may have picked the
-            // preset or dev port interactively, and the retry must reproduce
-            // those choices — the issuer registered with the project derives
-            // from the port.
+            // preset, design, or dev port interactively, and the retry must
+            // reproduce those choices — the issuer registered with the
+            // project derives from the port.
             ...retryOptionsFromFlags(flags),
             framework: framework.id,
             preset: answers.preset,
             useCase: answers.useCase,
+            design: answers.design,
             devPort: answers.devPort,
           },
         );
     consola.success(`Created project ${project.id}`);
     this.recordTelemetry({ step: "project_created" });
 
+    // Fresh scaffolds keep the widgets' full-page chrome; a pre-existing
+    // route-based app gets embeddable cards inside its own layout (ADR 044).
+    const posture = derivePosture(framework.id, scaffoldedFramework);
     const ctx: PatchContext = {
       framework,
       rendererId: flags.renderer ?? "react",
@@ -261,6 +315,7 @@ export default class Setup extends BaseCommand {
       server: answers.server,
       cliVersion: this.meta.cliVersion,
       scaffoldedFramework,
+      posture,
       preset: answers.preset,
       useCase: answers.useCase,
     };
@@ -279,12 +334,17 @@ export default class Setup extends BaseCommand {
         ? { filesWritten: [] }
         : await materializeSetupResources({
             cwd,
-            client: createZitadelClient({ baseUrl: answers.server, token: project.projectSecret }),
+            // Verbatim: the canonical bodies are written back to the project.
+            client: createZitadelClient(
+              { baseUrl: answers.server, token: project.project_secret },
+              { verbatim: true },
+            ),
             projectId: project.id,
             force,
             preset: answers.preset,
             useCase: answers.useCase,
-            design: flags.design,
+            design: answers.design,
+            cliVersion: this.meta.cliVersion,
           });
     } catch (error) {
       // Setup is not atomic: the patcher already wrote `zitadel.json` (the
@@ -319,6 +379,29 @@ export default class Setup extends BaseCommand {
       files_written_count: allFilesWritten.length,
     });
 
+    if (!dryRun) {
+      // Record what was actually scaffolded so `doctor` can later verify the
+      // app files without guessing from current templates (missing vs edited
+      // vs user-adopted) and `doctor --fix` can restore exactly the missing
+      // ones. Best-effort: a failure here only degrades doctor to its
+      // template-derived fallback, it never breaks setup.
+      try {
+        await writeScaffoldManifest({
+          cwd,
+          actions: orca.patcherFor(framework.id).artifacts({
+            framework,
+            rendererId: ctx.rendererId,
+          }),
+          written: [...result.filesWritten, ...result.filesSkipped],
+          scaffoldedFramework,
+          devPort: answers.devPort,
+          posture,
+        });
+      } catch (error) {
+        consola.debug("Failed to record the scaffold manifest", error);
+      }
+    }
+
     const installOutcome = await installDependenciesForSetup({
       cliVersion: this.meta.cliVersion,
       cwd,
@@ -337,32 +420,132 @@ export default class Setup extends BaseCommand {
     });
 
     const writtenRel = allFilesWritten.map((file) => relativeDisplay(cwd, file));
+    // The nudge rides both surfaces from one decision: the box for humans, the
+    // envelope for agents.
+    //
+    // It joins `boxActions` rather than being held back from it. That list is
+    // journey-staged by *omission* (customize/publish is absent until login
+    // works, see `install.ts`), and this is not part of that journey: attaching
+    // a team is orthogonal to whether login works yet, exactly as in `status`.
+    // Position in the list carries no staging meaning, so appending is not a
+    // way of deferring it.
+    //
+    // Nudged on the cloud, and on a local server that actually hosts the
+    // platform plane: `claimState` is offline and gates local to
+    // not-applicable, but setup is online anyway, so it asks the server's
+    // runtime document (see localServerHostsPlatform). A dry run contacts no
+    // platform, so it previews the nudge for local servers optimistically
+    // instead of probing.
+    // The deadline is concrete because the server enforces the claim window
+    // at claim time and the project was created moments ago, so created_at
+    // computes the same date the platform will hold the user to. A dry run
+    // gets the generic wording: its stand-in project has a fixed past
+    // created_at, and no real window started anyway.
+    // On a CLI-managed local server the developer already exists as the local
+    // admin, so the project is attached to their team right away and
+    // `zitadel claim` has nothing left to do. Claiming an anonymous project
+    // stays a cloud journey.
+    let ownedByLocalAdmin: { email: string; team_id: string } | undefined;
+    if (!dryRun && serverKind.value(answers.server) === "local") {
+      // The runtime document naming the platform project does not prove a
+      // claim can complete (a deployment can pin that project without the
+      // platform bootstrap, which leaves the admin without a personal team),
+      // so attaching the project is best-effort: on failure the project stays
+      // unclaimed and setup falls back to the usual claim nudge instead of
+      // failing after it has already written the app files. Reading the admin
+      // belongs inside the guard for the same reason — a malformed
+      // `admin.json` must not fail a setup that already wrote the app.
+      try {
+        const admin = await readLocalAdmin(cwd);
+        if (admin && (await localServerHostsPlatform(answers.server))) {
+          const owner = await claimProjectAsAdmin({
+            serverUrl: answers.server,
+            projectId: project.id,
+            projectSecret: project.project_secret,
+            admin,
+          });
+          // The team is whichever one the platform attached the project to —
+          // the admin's earliest active membership, which need not be the team
+          // its bootstrap document named.
+          const secret = await readZitadelSecret(cwd);
+          await writeZitadelSecret(cwd, {
+            ...secret,
+            team_id: owner.team_id,
+            claimed_at: owner.claimed_at,
+          });
+          ownedByLocalAdmin = { email: admin.email, team_id: owner.team_id };
+          consola.success(`Project owned by ${admin.email} (team ${owner.team_id})`);
+        }
+      } catch (error) {
+        consola.warn(
+          `Could not attach the project to the local admin: ${toZitadelError(error).message}`,
+        );
+      }
+    }
+
+    const deadline = dryRun ? undefined : claimWindowDeadline(project.created_at);
+    const nudgeClaim =
+      !ownedByLocalAdmin &&
+      (claimState({ secret: {}, server: answers.server }).kind === "detached" ||
+        (serverKind.value(answers.server) === "local" &&
+          (dryRun || (await localServerHostsPlatform(answers.server)))));
+    const claimNudge = nudgeClaim
+      ? {
+          actions: [claimAction(this.meta.cliVersion, deadline)],
+          boxActions: [claimBoxAction(this.meta.cliVersion, deadline)],
+          commands: [claimCommand(this.meta.cliVersion)],
+        }
+      : { actions: [], boxActions: [], commands: [] };
     // The structured report is human-only. Under `--json` we let the
     // envelope returned from `this.emit(...)` be the sole stdout
     // payload (oclif requires single-doc JSON).
+    // The split-family brand pane collapses to the compact brand mark once the
+    // login's container is narrow — and the template only emits that mark when
+    // branding.json names an asset. Say so at setup time instead of letting the
+    // branding's absence read as a rendering bug. Keyed to the design alone:
+    // the collapse is a container query, so posture doesn't decide it (see
+    // `designWarnings`).
+    const warnings = designWarnings(answers.design);
     if (!this.jsonEnabled()) {
       const projectFacts = await detectProjectFacts(cwd, framework.id);
       const sections = buildSummary({
         projectFacts,
         writtenRel,
+        depsAdded: result.depsAdded,
         project,
         server: answers.server,
         issuer,
         scaffoldedFramework,
+        design: answers.design,
       });
       // Frame the report in a consola box so it reads as a distinct
       // status panel separate from the per-step narration above it.
       // `box` accepts ANSI-styled text in the message body, so our
       // pre-coloured rows (path/url/id helpers) survive intact.
+      // `wrapForBox` caps the content at the terminal width: consola sizes
+      // the frame to the longest line, so an unwrapped sentence wider than
+      // the window would break the right border.
       consola.box({
         title: "Zitadel is ready",
-        message: [renderSummary(sections), "", installOutcome.boxActions.join("\n")].join("\n"),
+        message: wrapForBox(
+          [
+            renderSummary(sections),
+            "",
+            renderBoxActions([...installOutcome.boxActions, ...claimNudge.boxActions]),
+          ].join("\n"),
+        ),
         style: { padding: 1, borderStyle: "rounded", borderColor: "green" },
       });
+      // The envelope's `warnings` never render in non-JSON mode (setup
+      // passes `pretty: ""`), so surface them to humans here.
+      for (const warning of warnings) {
+        consola.warn(warning);
+      }
     }
 
     return this.emit({
       status: "ok",
+      warnings,
       // Human-facing output was already shown via consola (box + per-step
       // narration). Pass an empty `pretty` so the base command's fallback
       // renderer doesn't duplicate the summary on stdout. The JSON envelope
@@ -374,10 +557,28 @@ export default class Setup extends BaseCommand {
         framework: framework.id,
         server: answers.server,
         files_written: allFilesWritten.map((file) => relativeDisplay(cwd, file)),
+        // Typed per-artifact rows for the scaffolded app files (the sync
+        // resources continue to report through files_written): one row per
+        // touched path with kind (file/dir) and action (create/update), so
+        // agents can verify what setup did without parsing narration.
+        files: result.files.map((file) => ({
+          path: relativeDisplay(cwd, file.path),
+          kind: file.kind,
+          action: file.action,
+        })),
         files_skipped: result.filesSkipped.map((file) => relativeDisplay(cwd, file)),
         install: installOutcome.install,
-        next_actions: installOutcome.nextActions,
-        next_commands: installOutcome.nextCommands,
+        // The chosen login design, or null for the built-in template — so
+        // agents can verify what setup published without diffing the repo.
+        design: answers.design ?? null,
+        // Branding guidance before the claim nudge: make it yours, then
+        // claim to keep it (the same order the manifesto's journey walks).
+        next_actions: [
+          ...installOutcome.nextActions,
+          brandingGuidanceAction(answers.design, this.meta.cliVersion),
+          ...claimNudge.actions,
+        ],
+        next_commands: [...installOutcome.nextCommands, ...claimNudge.commands],
       },
     });
   }
@@ -421,14 +622,33 @@ async function resolveScaffoldFramework(
   return new PickFrameworkPrompt().ask(orca.availableFrameworks());
 }
 
+/**
+ * Whether a local server hosts the platform plane, i.e. whether a claim
+ * started against it can actually complete. `platform.bootstrap_project`
+ * pins the deployment's default project to the well-known proj_platform, and
+ * the console runtime document publishes that resolution, so one public GET
+ * answers the question. Fail closed: an unreadable, absent, or hanging
+ * document means no nudge, never a nudge into a flow that would 401 at
+ * claim/complete — the timeout mirrors checkLocalServerHealth so a socket
+ * that accepts and stalls cannot hang setup after the real work is done.
+ * Exported so the fail-closed behavior is testable without a live server.
+ */
+export async function localServerHostsPlatform(
+  server: string,
+  timeoutMs = 1500,
+): Promise<boolean> {
+  return Boolean(await readPlatformRuntime(server, timeoutMs));
+}
+
 /** A deterministic stand-in project for `--dry-run`, so no remote call is made. */
 function dryRunProject(issuer: string): CreateProject201 {
   return {
     id: "dry-run-0000",
-    projectSecret: "sk_proj_dry_run_full",
-    previewSecret: "sk_proj_dry_run_preview",
-    previewOrigins: [issuer],
-    createdAt: "2026-04-21T14:03:11.000Z",
+    name: "dry-run",
+    project_secret: "sk_proj_dry_run_full",
+    preview_secret: "sk_proj_dry_run_preview",
+    preview_origins: [issuer],
+    created_at: "2026-04-21T14:03:11.000Z",
   };
 }
 
@@ -515,10 +735,10 @@ async function createProjectWithLocalHint(
   try {
     // API contract requires a project name; generated TS models may lag
     // briefly until `packages/api` regeneration catches up.
-    const payload = { name: projectName, previewOrigins: [issuer], seedDefaults: false } as {
+    const payload = { name: projectName, preview_origins: [issuer], seed_defaults: false } as {
       name: string;
-      previewOrigins: string[];
-      seedDefaults: false;
+      preview_origins: string[];
+      seed_defaults: false;
     };
     // Register the app's own origin so the backend's origin check allows the
     // requests the dev proxy forwards from it.
@@ -569,11 +789,6 @@ function localSetupHint(error: unknown, retry: SetupRetryOptions, cliVersion: st
   });
 }
 
-/** Renders an absolute path relative to `cwd` for human-readable output. */
-function relativeDisplay(cwd: string, path: string): string {
-  return path.startsWith(cwd) ? path.slice(cwd.length + 1) : path;
-}
-
 /**
  * Replaces the user's `$HOME` with `~` in a path for compact terminal output.
  * Falls back to the raw path when `HOME` isn't set or doesn't match.
@@ -598,25 +813,13 @@ function pickWrittenFile(written: string[], suffix: string): string | undefined 
 
 /**
  * Translates a patcher-written path into a single sentence the user can
- * read at narration speed. Returns `null` for directories and other
- * scaffolding artefacts that aren't worth narrating individually — the
- * file count in the closing `success(...)` and the summary's INSTALLED
- * section already cover them. The verb tense flips for `--dry-run` so
- * the user sees a preview ("Would write ...") instead of a claim that
- * something happened.
+ * read at narration speed. The patch result's `filesWritten` carries
+ * deduplicated file paths only (directories stay in the typed `files`
+ * rows), so no artefact filtering is needed here. The verb tense flips
+ * for `--dry-run` so the user sees a preview ("Would write ...") instead
+ * of a claim that something happened.
  */
 function describeWrittenFile(relPath: string, dryRun: boolean): string | null {
-  // Mkdir ops surface in `filesWritten` alongside actual file writes.
-  // They're noise at the per-step layer (the files inside them get
-  // narrated on their own lines), so swallow them here.
-  if (
-    relPath === ".zitadel" ||
-    relPath === ".zitadel/flows" ||
-    relPath === ".zitadel/schemas" ||
-    relPath === ".zitadel/meta"
-  ) {
-    return null;
-  }
   const verb = dryRun ? "Would write" : "Wrote";
   const sentence = SENTENCE_BY_PATH[relPath];
   if (sentence) {
@@ -647,6 +850,10 @@ const SENTENCE_BY_PATH: Record<string, { subject: string }> = {
   ".zitadel/meta/flow-definition.json": { subject: "the flow dialect spec (editor $schema)" },
   ".zitadel/meta/user-schema.json": { subject: "the user-schema dialect spec" },
   ".zitadel/meta/user-property.json": { subject: "the user-property dialect spec" },
+  ".zitadel/meta/branding.json": { subject: "the branding dialect spec" },
+  ".zitadel/branding/branding.json": { subject: "the branding descriptor (layout + asset URLs)" },
+  ".zitadel/branding/login.liquid": { subject: "the editable login template" },
+  ".zitadel/branding/README.md": { subject: "the branding folder README" },
   "AGENTS.md": { subject: "the agent guidance (golden journey + config dialect)" },
   "README.md": { subject: "the README's Zitadel section" },
   "app/page.tsx": { subject: "the home page redirect" },
@@ -663,13 +870,23 @@ const SENTENCE_BY_PATH: Record<string, { subject: string }> = {
 function buildSummary(opts: {
   projectFacts: Awaited<ReturnType<typeof detectProjectFacts>>;
   writtenRel: string[];
+  depsAdded: ReadonlyArray<string>;
   project: CreateProject201;
   server: string;
   issuer: string;
   scaffoldedFramework: boolean;
+  design?: BrandingDesign;
 }): Section[] {
-  const { projectFacts, writtenRel, project, server, issuer, scaffoldedFramework } = opts;
-  const sdkPackage = "@zitadel/sdk-next";
+  const {
+    projectFacts,
+    writtenRel,
+    depsAdded,
+    project,
+    server,
+    issuer,
+    scaffoldedFramework,
+    design,
+  } = opts;
   const packageJsonHit = pickWrittenFile(writtenRel, "package.json");
 
   const detected: Row[] = [{ label: "Framework", value: formatFrameworkLine(projectFacts) }];
@@ -678,13 +895,17 @@ function buildSummary(opts: {
   }
 
   const installedRows: Row[] = [];
-  if (packageJsonHit) {
+  if (packageJsonHit && depsAdded.length > 0) {
     installedRows.push({
       label: "Package",
-      value: sdkPackage,
+      value: depsAdded.join(", "),
       secondary: stylePath(fileNameOf(packageJsonHit)),
     });
   }
+  // A union over every framework's scaffold artifacts: rows only render when
+  // the patcher actually wrote the file, so entries for other frameworks are
+  // inert. Suffixes are matched case-sensitively (src/App.tsx is React/Solid,
+  // src/app.tsx is Qwik, app.vue is the Nuxt shell, src/App.vue is Vue).
   for (const [label, suffix] of [
     ["Home redirect", "app/page.tsx"],
     ["Login page", "app/login/page.tsx"],
@@ -692,21 +913,61 @@ function buildSummary(opts: {
     ["Profile page", "app/profile/page.tsx"],
     ["Request proxy", "proxy.ts"],
     ["Middleware", "middleware.ts"],
+    ["App entry", "src/App.tsx"],
+    ["App entry", "src/app.tsx"],
+    ["App entry", "src/App.vue"],
+    ["App entry", "src/App.svelte"],
+    ["App entry", "src/app/app.ts"],
+    ["Routes", "src/app/app.routes.ts"],
+    ["Request proxy", "proxy.conf.cjs"],
+    ["App shell", "app.vue"],
+    ["Home redirect", "pages/index.vue"],
+    ["Login page", "pages/login.vue"],
+    ["Register page", "pages/register.vue"],
+    ["Profile page", "pages/profile.vue"],
     ["Env vars", ".env.local"],
   ] as const) {
     const hit = pickWrittenFile(writtenRel, suffix);
     if (hit) installedRows.push({ label, value: stylePath(hit) });
+  }
+  // The Vite config merge carries the /__nextgen dev proxy; the file name
+  // varies (ts/js/mts/mjs), so it can't ride the suffix table above.
+  const viteConfigHit = writtenRel.find((file) => /(^|\/)vite\.config\.[cm]?[jt]s$/.test(file));
+  if (viteConfigHit) {
+    installedRows.push({ label: "Dev proxy", value: stylePath(viteConfigHit) });
+  }
+
+  // The login-customization entry points. These are what a user edits to
+  // change what the login collects, how it authenticates, and how it looks —
+  // burying them in the verbose per-file narration above the box means users
+  // don't find them (each folder ships a README with the workflow).
+  const customizeRows: Row[] = [];
+  for (const [label, suffix, dir] of [
+    ["User schema", ".zitadel/schemas/default-human-user.json", ".zitadel/schemas/"],
+    ["Login flow", ".zitadel/flows/default-login.json", ".zitadel/flows/"],
+    ["Login template", ".zitadel/branding/login.liquid", ".zitadel/branding/"],
+  ] as const) {
+    const hit = pickWrittenFile(writtenRel, suffix);
+    if (hit) customizeRows.push({ label, value: stylePath(dir), secondary: "see its README.md" });
   }
 
   const projectRows: Row[] = [
     { label: "Project id", value: styleId(project.id) },
     { label: "Server", value: styleUrl(server) },
     { label: "App will run", value: styleUrl(issuer) },
+    design
+      ? {
+          label: "Login design",
+          value: brandingDesignLabel(design),
+          secondary: `${design} · ${stylePath(".zitadel/branding/")}`,
+        }
+      : { label: "Login design", value: styleDim("built-in template") },
   ];
 
   return [
     { title: "Detected", rows: detected },
     { title: "Installed", rows: installedRows },
+    { title: "Customize", rows: customizeRows },
     { title: "Project", rows: projectRows },
   ];
 }

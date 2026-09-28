@@ -14,19 +14,17 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/secrets"
 	"github.com/zitadel/nextgen/internal/service"
-	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 type Harness struct {
-	encryptionKey dependency[[]byte]
-	signingKey    dependency[*rsa.PrivateKey]
+	signingKey dependency[*rsa.PrivateKey]
 
-	dBPool          dependency[database.Pool]
-	dB              dependency[*service.DB]
+	DB *service.DB
+
 	httpClient      dependency[*http.Client]
 	testServer      dependency[*httptest.Server]
-	hasher          dependency[*crypto.PasswapHasher]
-	rootKEKs        dependency[*domain.RootKEKs]
+	hasherFactory   dependency[*crypto.HasherFactory]
+	masterKeys      dependency[*domain.MasterKeys]
 	secretGenerator dependency[secrets.Generator]
 	joseSigner      dependency[jose.Signer]
 
@@ -34,16 +32,21 @@ type Harness struct {
 	handler         dependency[*api.Handler]
 	securityHandler dependency[*api.SecurityHandler]
 
+	platformProject dependency[*domain.Project]
+
 	schemaService         dependency[*service.SchemaService]
 	sessionService        dependency[service.SessionService]
 	flowService           dependency[service.FlowService]
 	authAttemptService    dependency[service.AuthAttemptService]
 	projectService        dependency[service.ProjectService]
 	flowDefinitionService dependency[service.FlowDefinitionService]
-	userService           dependency[*service.UserService]
+	userService           dependency[service.UserService]
 	flowStateMachine      dependency[*domain.FlowStateMachineRuntime]
 	teamService           dependency[*service.TeamService]
 	brandingService       dependency[*service.BrandingService]
+	environmentService    dependency[*service.EnvironmentService]
+	releaseService        dependency[service.ReleaseService]
+	eventService          dependency[*service.EventService]
 	keyService            dependency[service.KeyService]
 	tokenService          dependency[service.TokenService]
 

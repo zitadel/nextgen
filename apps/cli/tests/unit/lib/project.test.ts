@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -9,6 +9,7 @@ import {
   hasZitadelSecret,
   readZitadelConfig,
   readZitadelSecret,
+  writeZitadelSecret,
 } from "../../../src/lib/project";
 import { ZitadelError } from "../../../src/lib/errors";
 
@@ -148,5 +149,66 @@ describe("readZitadelSecret", () => {
 
     await expect(readZitadelSecret(cwd)).rejects.toThrow();
     await expect(readZitadelSecret(cwd)).rejects.not.toBeInstanceOf(ZitadelError);
+  });
+});
+
+describe("writeZitadelSecret", () => {
+  async function seed(cwd: string, extra: Record<string, unknown> = {}): Promise<void> {
+    await mkdir(join(cwd, ".zitadel"), { recursive: true });
+    await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify({ ...VALID_SECRET, ...extra }));
+  }
+
+  it("round-trips through readZitadelSecret", async () => {
+    const cwd = await makeTempDir();
+    await seed(cwd);
+
+    const secret = await readZitadelSecret(cwd);
+    await writeZitadelSecret(cwd, {
+      ...secret,
+      claimed_at: "2026-02-02T00:00:00.000Z",
+      team_id: "team-42",
+    });
+
+    await expect(readZitadelSecret(cwd)).resolves.toEqual({
+      ...VALID_SECRET,
+      claimed_at: "2026-02-02T00:00:00.000Z",
+      team_id: "team-42",
+    });
+  });
+
+  it("preserves keys it does not know about", async () => {
+    const cwd = await makeTempDir();
+    await seed(cwd, { future_field: { nested: true } });
+
+    const secret = await readZitadelSecret(cwd);
+    await writeZitadelSecret(cwd, { ...secret, team_id: "team-42" });
+
+    const written = await readZitadelSecret(cwd);
+    expect(written).toMatchObject({ future_field: { nested: true }, team_id: "team-42" });
+  });
+
+  it("writes at 0600 and leaves no temp file behind", async () => {
+    const cwd = await makeTempDir();
+    await seed(cwd);
+
+    await writeZitadelSecret(cwd, await readZitadelSecret(cwd));
+
+    const mode = (await stat(join(cwd, ".zitadel/secret"))).mode & 0o777;
+    expect(mode).toBe(0o600);
+    expect(await readdir(join(cwd, ".zitadel"))).toEqual(["secret"]);
+  });
+
+  it("writes deterministic, newline-terminated JSON", async () => {
+    const cwd = await makeTempDir();
+    await seed(cwd);
+    const secret = await readZitadelSecret(cwd);
+
+    await writeZitadelSecret(cwd, secret);
+    const first = await readFile(join(cwd, ".zitadel/secret"), "utf8");
+    await writeZitadelSecret(cwd, { ...secret });
+    const second = await readFile(join(cwd, ".zitadel/secret"), "utf8");
+
+    expect(first).toBe(second);
+    expect(first.endsWith("\n")).toBe(true);
   });
 });

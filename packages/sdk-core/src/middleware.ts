@@ -85,15 +85,26 @@ export function filterResponseHeaders(upstream: Headers): Headers {
 // ─── Middleware types ──────────────────────────────────────────────────────────
 
 /**
- * The authenticated session for a signed-in user.
+ * The authenticated session for a signed-in user. Identity follows the
+ * user-ref vocabulary (ADR 058): render `display`, falling back to
+ * `identifier`, then `userId`.
  */
 export type NextgenSession = {
   /** The user's unique identifier (`sub` claim). */
   userId: string;
-  /** The user's email address, or `null` if not present in the token. */
-  email: string | null;
-  /** The user's display name, or `null` if not present in the token. */
-  name: string | null;
+  /**
+   * The user schema's designated identifier value (the login identifier,
+   * e.g. an email address or username), or `null` when unresolved. On the
+   * JWT path this carries the `email` claim.
+   */
+  identifier: string | null;
+  /**
+   * The schema property `identifier` came from (e.g. `"email"`), or `null`
+   * when unknown — JWT-claim identities carry no property attribution.
+   */
+  identifierProperty: string | null;
+  /** The user's display name rendering, or `null` when the schema designates none. */
+  display: string | null;
   /** The raw verified JWT. */
   token: string;
 };
@@ -106,6 +117,34 @@ export type UnauthState = { isAuthenticated: false; session: null };
 
 /** Union of all possible auth states. */
 export type AuthResult = AuthState | UnauthState;
+
+/**
+ * The client-safe session exposed to app UI (headers, account menus).
+ * Identical to {@link NextgenSession} but omits `token` — the raw session
+ * token must never reach client-side JavaScript, whether through an SSR
+ * payload or a client-side fetch result.
+ */
+export type ClientSession = {
+  /** The user's unique identifier (`sub` claim). */
+  userId: string;
+  /** The designated identifier value (login identifier), or `null`. */
+  identifier: string | null;
+  /** The schema property the identifier came from, or `null`. */
+  identifierProperty: string | null;
+  /** The display name rendering, or `null`. */
+  display: string | null;
+};
+
+/** Client-safe auth state when the user is signed in. */
+export type ClientAuthState = { isAuthenticated: true; session: ClientSession };
+
+/**
+ * Union of all possible client-safe auth states. Returned by the client
+ * session reads (`useAuth()` in sdk-nuxt, `getSession()` in sdk-next).
+ * Token is intentionally absent — use the server-side helpers when the raw
+ * token is needed.
+ */
+export type ClientAuthResult = ClientAuthState | UnauthState;
 
 /**
  * Options passed to the SDK middleware factory (`nextgenMiddleware` in

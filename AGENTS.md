@@ -38,9 +38,15 @@ maps roles, not an exhaustive inventory — the authoritative project list is
 Go server:
 
 - `main.go` + `cmd/` — Go entrypoint and command wiring.
-- `internal/` — Go server implementation. `internal/staticui/` serves the
+- `internal/` — Go server implementation. `internal/api/` owns the HTTP
+  handlers, `internal/service/` the service layer, `internal/domain/` the
+  domain model and error sentinels, `internal/storage/` the multi-dialect
+  storage layer (see [internal/storage/AGENTS.md](internal/storage/AGENTS.md)),
+  `internal/authz/` the authorization subsystem (OpenFGA parser, profile
+  validator, compiler — ADRs 032–034), and `internal/staticui/` serves the
   embedded UI builds.
-- `api/openapi/` — OpenAPI 3.1 source files. `api/generated/` is ogen
+- `api/openapi/` — OpenAPI 3.1 source files; wire rules in
+  [api/openapi/AGENTS.md](api/openapi/AGENTS.md). `api/generated/` is ogen
   output; edit the OpenAPI source instead.
 
 Product surfaces (`apps/`):
@@ -72,9 +78,10 @@ Published libraries (`packages/`):
 - `packages/sdk-*` — public TypeScript SDKs: `sdk-core` plus one package per
   supported framework (currently next, nuxt, react, vue, angular, qwik,
   solid, svelte).
-- `packages/components/` (shared Lit atoms), `packages/ui-react/` (paired
-  React implementations), `packages/design-tokens/` and
-  `packages/shared-component-styles/` (shared visual design).
+- `packages/components/` — the Lit atoms (`<zl-*>`) and the `<zitadel-login>`
+  orchestrator that make up the login surface; each atom's CSS sits beside it.
+- `packages/design-tokens/` — the Figma-driven `--zl-*` variables, the one
+  contract the login surface and the console share (ADR 055).
 - `packages/api/` — generated TypeScript API client.
 - `packages/config/` — versioned local config schemas and defaults.
 - `packages/api-mock/` — in-process MSW handlers and the standalone mock
@@ -161,10 +168,14 @@ scripts so server processes are signaled and cleaned up directly.
 startup, then runs `go run .`. Direct `go run .` callers must build the embedded
 UI surfaces themselves or disable both embedded UI surfaces.
 
-Checked-in demo end-to-end tests are **opt-in local checks**; they do not run
-in CI. They are not part of the default `moon ci :lint :typecheck :build :test`
-invocation because they boot real dev servers and need browsers installed
-(more in
+Checked-in end-to-end tests are **opt-in for local runs** — they are not part
+of the default `moon ci :lint :typecheck :build :test` invocation because they
+boot real dev servers and need browsers installed. CI does run selected lanes:
+their tasks carry `runInCI: false` only to keep them out of moon's automatic
+selection, and the `full-pr` job runs the real-instance and embedded-surface
+lanes through explicit workflow steps — the canonical statement of that
+interaction is in
+[packages/testing/AGENTS.md](packages/testing/AGENTS.md). (More in
 [CONTRIBUTING.md](CONTRIBUTING.md#running-integration-and-end-to-end-tests)):
 
 ```sh
@@ -224,9 +235,13 @@ upward**. When deciding where a new test belongs:
    `*.browser.spec.ts`.
 3. **End-to-end (Playwright)** — full HTTP path through framework
    middleware, the `/__nextgen` proxy, real `Set-Cookie` round-trip,
-   and full-page navigation. Owned by `apps/<demo>-e2e/`. Each framework
-   SDK (`sdk-next`, `sdk-nuxt`) has its own e2e project because the proxy
-   and route-protection layers are framework-specific.
+   and full-page navigation. Owned by the `apps/*-e2e/` projects: the demo
+   projects (`demo-next-e2e`, `demo-nuxt-e2e` — each with a mock lane and,
+   for next, an `e2e-real` lane on `@zitadel/testing`), `console-e2e`
+   (shell smoke, dev-proxy real-instance, and binary-served embedded lanes),
+   and `cli-journey-e2e` (the framework matrix across all 8 SDKs).
+   Middleware-owning SDKs get their own e2e project because
+   the proxy and route-protection layers are framework-specific.
 
 The consumer journey suite is the exception to the checked-in demo ownership
 rule: it belongs in `apps/cli-journey-e2e/` and must exercise a freshly
@@ -245,46 +260,91 @@ changes.
 ## Building UI (console and design system)
 
 Console screens and shared UI are driven by the Figma **Design System** file
-(`Zitadel - Design System - External`), not by flattened app mocks. Before
+(`Zitadel - Design System - External`), not by flattened app mocks. There are
+two UI surfaces and they do not share components — only tokens (ADR 055). Before
 building any UI under `apps/console/**` or
-`packages/{components,ui-react,shared-component-styles,design-tokens}/**`,
-**classify the component first** (see
-[`apps/console/docs/styling.md`](apps/console/docs/styling.md)):
+`packages/{components,design-tokens}/**`, **decide which surface it belongs to**
+(see [`apps/console/docs/styling.md`](apps/console/docs/styling.md)):
 
-1. **Existing pair** (`Button`, `Card`, `Pill`, `Icon`, `TextField`, `Select`,
-   `Checkbox`, `Alert`) — compose it from `@zitadel/ui-react`.
-2. **Console-only chrome** (shell, page layout, tables, app widgets) — build in
-   `apps/console` with `zl-*` Tailwind utilities. Most console UI is this; do
-   not pre-build a Lit twin for it.
-3. **A new primitive the login / web-component surface also needs** — build it
-   as a Lit + React pair via the Storybook recipe
-   ([`apps/storybook/AGENTS.md`](apps/storybook/AGENTS.md)) and iterate there
-   behind the parity + a11y gates, not on a console mock.
+1. **The console** (shell, page layout, tables, app widgets — most console UI) —
+   compose **shadcn/ui** from `apps/console/src/components/ui/`, installing from
+   the registry when a component is missing, and style with the **unprefixed
+   shadcn utility contract** (`bg-background`, `text-muted-foreground`, …) from
+   `@zitadel/design-tokens/css/shadcn.css`. Do **not** use `bg-zl-*`/`text-zl-*`
+   utilities there — the canonical statement of this console exception is in
+   [`packages/design-tokens/AGENTS.md`](packages/design-tokens/AGENTS.md).
+   Do not import login atoms into console UI, and do not build a Lit twin for it.
+2. **The login surface** (`<zitadel-login>` and the `<zl-*>` atoms) — Lit in
+   shadow DOM, vanilla CSS keyed to `--zl-*`. No Tailwind, no shadcn components:
+   neither survives the shadow boundary. Add or change an atom via the Storybook
+   recipe ([`apps/storybook/AGENTS.md`](apps/storybook/AGENTS.md)) and iterate
+   there behind the a11y gate, not on a console mock.
 
-**Caveat — the pairs are not theme-portable yet.** Every pair's surface CSS in
-`packages/shared-component-styles/src/*.css` still uses the **legacy dark-only
-login tokens** (`--zl-color-surface-default-*`, `--zl-color-text-button-*`,
-`--zl-color-gray-*`), which do **not** flip with `data-theme`. The login surface
-is dark-only for v1 (ADR-014 §5). So composing a pair into the light/dark console
-renders the login treatment in both themes — wrong in light. Until the pairs'
-surface CSS migrates to the current semantic taxonomy (`surface/*`, `text/*`,
-`border/*`), **bucket 1 is dormant for the console**: build console screens
-console-local (bucket 2) with theme-flipping `zl-*` utilities even where a pair
-nominally exists, and swap to the pair after it migrates. (`Icon` is the
-exception — it renders a glyph with `currentColor` and is theme-safe.)
+Both surfaces are theme-portable: tokens are authored as `{ dark, light }` pairs
+and flip via `[data-theme="light"]` (amended ADR 014 §5). When adding atom CSS,
+never reach for the raw `--zl-color-gray-*` ramp — it is mode-independent by
+design; use the semantic tokens.
 
-Where the component lives decides the iteration tool: console-local UI iterates
-on the console dev server, verified at light/dark and each breakpoint; pairs
+Where the component lives decides the iteration tool: console UI iterates on the
+console dev server, verified at light/dark and each breakpoint; login atoms
 iterate in Storybook. A missing visual value is a **new token** in
 `@zitadel/design-tokens`, never a magic value — except licensed brand assets
 (e.g. display fonts), which stay in the consuming app because
 `@zitadel/design-tokens` ships as a public npm package.
 
+## Resource identifiers
+
+Resource primary keys are dialect-owned `prefix_<opaque>` strings
+([ADR 047](docs/adrs/047-dialect-id-generation.md)). Never add custom
+ULID/UUID generation in domain, service, API, or other packages. The canonical
+minting contract (`Ensure` / `NewManagedID`, the `idgen` boundary) lives in
+[`internal/storage/AGENTS.md`](internal/storage/AGENTS.md).
+
 ## Generated Files
 
 - Do not hand-edit `api/generated/**`; update `api/openapi/**` and run
-  `moon run server:generate` or `go generate ./...`. CI enforces committed
-  generated output through `server:check-generate` (via `server:test`).
+  `moon run server:generate`. CI enforces committed generated output through
+  `server:check-generate` (via `server:test`). Bare `go generate ./...` produces
+  the same output, but runs every directive serially — slower, though not by the
+  multiple the parallelism suggests, because `./api` is itself a serial chain and
+  the larger half of the run (`scripts/go-generate.mjs` carries the numbers). Both go
+  through the same `//go:generate` directives; the moon task just schedules them
+  (`scripts/go-generate.mjs`). Either path works over a pruned tree. The one
+  thing that makes that non-trivial lives in `api/cmd/gen_openapi_errors`, which
+  type-loads `./internal/...` to infer each operation's error set: the load needs
+  `api/generated`, which only ogen — the last link of api's own chain — writes,
+  and it needs enumer's output, which `./...` reaches only after `api`. The
+  generator resolves both itself, running those two directives (`go generate
+  -run`) over a placeholder spec before analyzing. Neither caller knows about the
+  cycle; do not reintroduce a scheduler-side bootstrap pass.
+  Wire fields are `snake_case`, enforced by the redocly rules and
+  `workspace:check-openapi-rules` — the wire contract rules live in
+  [api/openapi/AGENTS.md](api/openapi/AGENTS.md).
+- The consolidated `mockgen` directives live in the mock packages
+  (`internal/domain/mock`, `internal/service/mocks`, `internal/crypto/mock`),
+  not beside the interfaces they mock. mockgen has to type-check the source
+  package, which does not compile until its `*_enumer.go` files exist, so the
+  directive has to run after them. `go generate ./...` walks packages in
+  import-path order, which sequences it correctly. Moving one of these
+  directives back next to its interfaces breaks generation from a clean tree.
+- Generating never deletes. A generated file whose directive stopped producing
+  it — a renamed destination, an interface no longer mocked — stays on disk and
+  stays committed, still compiling and still importable. `server:generate`
+  cannot tell you about it, because it only ever writes.
+
+  To prune, remove everything and regenerate:
+
+  ```sh
+  moon run server:clean-generated && moon run server:generate
+  ```
+
+  Whatever does not come back was orphaned; commit its deletion. Do this when
+  you change where a generator writes, drop an interface from a mockgen
+  directive, or delete a type that had an `enumer` directive.
+  `moon run server:clean-generated -- --dry-run` lists what would go without
+  touching anything. Generation restores everything that is still generated —
+  which is the point: what stays missing was the orphan — so cleaning is safe at
+  any time.
 - Do not hand-edit generated package output under `dist/`.
 - Do not hand-edit `apps/console/src/routeTree.gen.ts`; update route files and
   let the TanStack Router plugin regenerate it.
@@ -309,10 +369,15 @@ For customer-local runtime workflows, agents should prefer
 
 ## Release, Licensing, And Secrets
 
-- PR titles must pass the Semantic PR check: use the conventional format
-  `<type>(optional-scope): <summary>`, with `.github/semantic.yml` as the
-  source of truth for allowed types and scopes. Omit the scope when unsure;
-  do not invent scopes.
+- PR titles use `<type>(optional-scope): <summary>`, with
+  [`.github/semantic.yml`](.github/semantic.yml) as the source of truth for
+  allowed types and scopes. Omit the scope when unsure; do not invent scopes.
+- Pick the type by **who the change reaches, not how much work it was**. If the
+  change needs no changeset it is not `feat` or `fix`; if it changes what a user
+  receives it is not `docs` or `chore`. CI enforces the first of those. Ladder,
+  worked examples, and summary voice:
+  [CONTRIBUTING.md](CONTRIBUTING.md#title-format). Self-check before opening:
+  `node scripts/check-pr-title.mjs --title "<title>"`.
 - Agent-created or agent-updated PRs must include a concise description with
   `Summary`, `Validation`, `Release notes / changeset`, and `Notes` sections
   before handoff. In **Release notes / changeset**, state the outcome from
@@ -354,13 +419,6 @@ is tool-specific.
 The repo requires the Node.js version from `.nvmrc`; sandbox images often
 ship an older default. Ensure the `.nvmrc` version is first on `$PATH` (for
 example via nvm) before running any `corepack` or `pnpm` command.
-
-### System dependencies for Go tests
-
-`libicu-dev` and `libssl-dev` are required at runtime by `embedded-postgres`
-(the Go test helper that auto-downloads PostgreSQL, currently 18). If Go
-tests fail with missing-library errors, install them once with
-`sudo apt-get install -y -qq libicu-dev libssl-dev`.
 
 ### Playwright browser install gotcha
 

@@ -8,8 +8,9 @@ brand, while Zitadel guards the credentials, sessions, and tokens underneath.
 > surface, so it ships as a preview in its own repository and is intended to
 > merge back into [zitadel/zitadel](https://github.com/zitadel/zitadel) as the
 > foundation of a future major version. APIs, CLI flags, package surfaces, and
-> docs are still in flux; create-first, claim-later is the product direction,
-> but `zitadel claim` is not shipped in this repo yet. The full story is in
+> docs are still in flux. Create-first, claim-later is the product direction,
+> and `zitadel claim` ships in this repo
+> ([ADR 046](docs/adrs/046-claim-lifecycle-v2.md)). The full story is in
 > [VISION.md](VISION.md).
 
 ## Workflow front doors
@@ -23,14 +24,15 @@ and release workflows. Agent-facing workspace rules live in
 
 ### I am adding Zitadel to my app
 
-| I want to...                      | Run                                                            |
-| --------------------------------- | -------------------------------------------------------------- |
-| Check local runtime prerequisites | `npx @zitadel/cli@alpha doctor`                                |
-| Start local Zitadel               | `npx @zitadel/cli@alpha start`                                 |
-| Add auth to my app                | `npx @zitadel/cli@alpha setup --server local`                  |
-| Check generated app files         | `npx @zitadel/cli@alpha doctor`                                |
-| Stop local Zitadel, keeping data  | `npx @zitadel/cli@alpha stop`                                  |
-| Delete local Zitadel data         | `npx @zitadel/cli@alpha reset --force`                         |
+| I want to...                                         | Run                                           |
+| ---------------------------------------------------- | --------------------------------------------- |
+| Check local runtime prerequisites                    | `npx @zitadel/cli@alpha doctor`               |
+| Start local Zitadel                                  | `npx @zitadel/cli@alpha start`                |
+| Add auth to my app                                   | `npx @zitadel/cli@alpha setup --server local` |
+| Open the local console, signed in as the local admin | `npx @zitadel/cli@alpha console`              |
+| Check generated app files                            | `npx @zitadel/cli@alpha doctor`               |
+| Stop local Zitadel, keeping data                     | `npx @zitadel/cli@alpha stop`                 |
+| Delete local Zitadel data                            | `npx @zitadel/cli@alpha reset --force`        |
 
 The published `zitadel` runtime commands run the released local runtime through
 the `@zitadel/server` npm binary by default and do not require Docker, Go, Moon,
@@ -52,18 +54,71 @@ text at `/llms.txt`, `/llms-full.txt`, and page-level `.md` URLs.
 mkdir myapp
 cd myapp
 npx @zitadel/cli@alpha doctor
+```
+
+Pick a server before running `setup`. It cannot be changed on this app
+afterwards. Use `--server local` for local development, or point at a hosted
+Zitadel Cloud instance if you want the project to belong to your team there.
+
+### Local
+
+```sh
 npx @zitadel/cli@alpha start
 npx @zitadel/cli@alpha setup --server local
 npm run dev
 ```
 
-Open http://localhost:3000/login and register your first local user. The
-managed Zitadel runtime stores its metadata and data under
-`.zitadel/local/`; `stop` preserves that data and `reset --force`
-deletes it. In a fresh directory, `setup` walks through the scaffold choices
-(such as which framework and use case) and writes the app into the current
-directory. It installs dependencies with the detected package manager; pass
-`--skip-install` if you want to install them yourself.
+`start` boots the local Zitadel runtime and creates a local admin,
+`admin@zitadel.localhost`. It ends by printing a sign-in link for the
+management console. That link works once.
+
+`setup --server local` creates the project and, by default, attaches it to
+that admin's team, so the project is owned from the start and `zitadel claim`
+reports it as already owned. If that attempt fails, setup prints a warning and
+`zitadel claim` remains the way to attach it. If you turned the platform
+bootstrap off, the server has no local admin and no claiming at all, so the
+project simply has no owning team.
+
+Any time you need the console again, print a fresh link:
+
+```sh
+npx @zitadel/cli@alpha console
+```
+
+The console shows your project and lets you add colleagues as project admins
+by their email address. Pass `--no-open` to print the link instead of opening
+a browser. For the admin credential file, how its password is handled, and
+how to turn the local admin off, see [apps/cli/SKILLS.md](apps/cli/SKILLS.md).
+
+Open http://localhost:3000/login and register your first user. That user is
+an end user of your app, a different identity from the console admin above.
+`setup` walks through the scaffold choices (such as which framework and use
+case) and writes the app into the current directory; pass `--skip-install` if
+you want to install dependencies yourself. The managed Zitadel runtime stores
+its metadata and data under `.zitadel/local/`; `stop` preserves that data and
+`reset --force` deletes it.
+
+### Zitadel Cloud
+
+```sh
+npx @zitadel/cli@alpha setup --server https://api.zitadel.cloud
+npm run dev
+```
+
+A hosted server has no local runtime to manage, so `start`, `stop`, `reset`
+and `console` do not apply there. Once the app is up, attach the project to
+your team:
+
+```sh
+npx @zitadel/cli@alpha claim
+```
+
+This opens a browser so you can sign in with your own Zitadel account (not
+one of the app's end users) and attach the project to your team. The link
+prints before any browser opens, so it works over SSH or headless too
+(`--no-open`); nothing about the running project changes. Claiming only
+works within 14 days of running `setup`. After that, `setup` a fresh
+project instead.
 
 ## Manual Docker quick start
 
@@ -81,6 +136,11 @@ docker compose up -d
 | Management console | http://localhost:8080/ui/console/ |
 | Sign-in shell      | http://localhost:8080/ui/login/   |
 | Health             | http://localhost:8080/healthz     |
+
+A fresh Compose server has no project and no user yet, so this console shows
+its setup prompt until you seed one (see
+[docker-compose.md](docs/quick-start/docker-compose.md)). On the CLI path
+above, `zitadel console` signs you in as the local admin instead.
 
 Details: [docs/quick-start/index.md](docs/quick-start/index.md). To build from source: [CONTRIBUTING.md](CONTRIBUTING.md).
 
@@ -110,8 +170,9 @@ For product direction and the four pillars, see [VISION.md](VISION.md).
 Pull requests are gated by the GitHub Actions context `full-pr`, shown in the
 pull request UI as `ci / full-pr`. On a 16-core runner it runs a Go
 generated-file drift check, lint, type checks, builds, unit and browser
-tests, Go tests including Postgres integration, a non-publishing release
-snapshot, and fresh-app journeys against the snapshot's npm tarballs.
+tests, Go tests including Postgres/Spanner/SQLite dialect integration, a
+non-publishing release snapshot, and fresh-app journeys against the snapshot's
+npm tarballs.
 Changesets version PRs run a smaller release validation path instead, and
 Changesets comments give release-intent feedback without adding a blocking
 gate. The full step list lives in

@@ -2,31 +2,36 @@
 
 import { createContext, useContext, type ReactNode } from "react";
 
-import type { AuthResult, NextgenSession } from "./types";
+import type { ClientAuthResult } from "./types.js";
 
-const defaultValue: AuthResult = { isAuthenticated: false, session: null };
+const defaultValue: ClientAuthResult = { isAuthenticated: false, session: null };
 
-const NextgenAuthContext = createContext<AuthResult>(defaultValue);
+const NextgenAuthContext = createContext<ClientAuthResult>(defaultValue);
 
-export function NextgenProvider({
-  session,
+/**
+ * Client-side context carrier. In the standard server-seeded setup, render
+ * {@link NextgenProvider} from `@zitadel/sdk-next/server` instead — it
+ * normalises the server's `auth()` result to the client-safe shape (dropping
+ * the raw session token) *before* the value crosses the server→client
+ * component boundary, and its `server-only` guard keeps it out of client
+ * wrappers where that strip would come too late.
+ *
+ * Render this component directly only from client code that already holds a
+ * client-safe value — e.g. seeding from a `getSession()` read.
+ *
+ * The `value` prop is deliberately typed as {@link ClientAuthResult}: the
+ * raw session token must never enter client-side state.
+ */
+export function AuthContextProvider({
+  value,
   children,
 }: {
-  session: AuthResult | NextgenSession | null;
+  value: ClientAuthResult;
   children: ReactNode;
 }) {
-  let value: AuthResult;
-  if (!session) {
-    value = { isAuthenticated: false, session: null };
-  } else if ("isAuthenticated" in session) {
-    value = session as AuthResult;
-  } else {
-    value = { isAuthenticated: true, session: session as NextgenSession };
-  }
-
   return <NextgenAuthContext.Provider value={value}>{children}</NextgenAuthContext.Provider>;
 }
 
-export function useAuthContext(): AuthResult {
+export function useAuthContext(): ClientAuthResult {
   return useContext(NextgenAuthContext);
 }

@@ -109,8 +109,8 @@ func TestGetJSON(t *testing.T) {
 			},
 			verifyDst: func(t *testing.T, dst any) {
 				t.Helper()
-				m, ok := dst.(*map[string]any)
-				require.True(t, ok, "dst type: got %T", dst)
+				require.IsType(t, &map[string]any{}, dst, "dst type")
+				m := dst.(*map[string]any)
 				assert.Equal(t, map[string]any{"answer": float64(42)}, *m)
 			},
 		},

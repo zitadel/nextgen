@@ -17,13 +17,28 @@ type Handler struct {
 	authAttemptService    service.AuthAttemptService
 	sessionService        service.SessionService
 	projectService        service.ProjectService
-	userService           *service.UserService
+	userService           service.UserService
 	schemaService         *service.SchemaService
 	flowDefinitionService service.FlowDefinitionService
 	teamService           *service.TeamService
 	brandingService       *service.BrandingService
+	environmentService    *service.EnvironmentService
+	releaseService        service.ReleaseService
+	eventService          *service.EventService
 	tokenService          service.TokenService
 	keyService            service.KeyService
+	claimService          service.ClaimService
+	grantService          *service.GrantService
+	variableService       service.VariableService
+	pool                  *service.DB
+
+	// platformProjectID is the configured platform.project_id pin (ADR 046 §2).
+	// Empty means the platform project is unresolved, so claim/complete rejects
+	// every session.
+	platformProjectID string
+	// personalTeams is optional (see WithPersonalTeamEnsurer); nil skips the
+	// exchange-time ensure.
+	personalTeams service.PersonalTeamEnsurer
 }
 
 func NewHandler(
@@ -31,13 +46,21 @@ func NewHandler(
 	authAttemptService service.AuthAttemptService,
 	sessionService service.SessionService,
 	projectService service.ProjectService,
-	userService *service.UserService,
+	userService service.UserService,
 	schemaService *service.SchemaService,
 	flowDefinitionService service.FlowDefinitionService,
 	teamService *service.TeamService,
 	brandingService *service.BrandingService,
+	environmentService *service.EnvironmentService,
+	releaseService service.ReleaseService,
+	eventService *service.EventService,
 	tokenService service.TokenService,
 	keyService service.KeyService,
+	claimService service.ClaimService,
+	grantService *service.GrantService,
+	variableService service.VariableService,
+	pool *service.DB,
+	platformProjectID string,
 ) *Handler {
 	return &Handler{
 		flowService:           flowService,
@@ -49,9 +72,26 @@ func NewHandler(
 		flowDefinitionService: flowDefinitionService,
 		teamService:           teamService,
 		brandingService:       brandingService,
+		environmentService:    environmentService,
+		releaseService:        releaseService,
+		eventService:          eventService,
 		tokenService:          tokenService,
 		keyService:            keyService,
+		claimService:          claimService,
+		grantService:          grantService,
+		variableService:       variableService,
+		pool:                  pool,
+		platformProjectID:     platformProjectID,
 	}
+}
+
+// WithPersonalTeamEnsurer wires the session-exchange self-heal for platform
+// personal teams (#527). A chainable setter rather than a constructor
+// parameter so the existing NewHandler call sites (tests included) stay
+// untouched; without it the exchange simply skips the ensure.
+func (h *Handler) WithPersonalTeamEnsurer(e service.PersonalTeamEnsurer) *Handler {
+	h.personalTeams = e
+	return h
 }
 
 // NewError implements the api.Handler interface and is used by ogen to convert any error

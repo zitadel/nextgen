@@ -12,7 +12,7 @@ const BASE = `http://localhost:${PORT}`;
 const okHandlers = [
   http.post(`${BASE}/projects`, () =>
     HttpResponse.json(
-      { id: "proj_1", projectSecret: "secret_1", previewSecret: "preview_1" },
+      { id: "proj_1", project_secret: "secret_1", preview_secret: "preview_1" },
       { status: 201 },
     ),
   ),

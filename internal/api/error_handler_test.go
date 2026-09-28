@@ -60,7 +60,7 @@ func TestOgenErrorHandlerInvalidSessionCookie(t *testing.T) {
 	t.Parallel()
 	mock := gomock.NewController(t)
 	tokenService := mocks.NewMockTokenService(mock)
-	tokenService.EXPECT().VerifyToken(gomock.Any(), gomock.Any()).Return(nil, errors.New("bad token"))
+	tokenService.EXPECT().IntrospectToken(gomock.Any(), "garbage").Return(nil, errors.New("bad token"))
 
 	srv := newErrorHandlerTestServer(t, tokenService)
 
@@ -98,16 +98,229 @@ func TestOgenErrorHandlerSecurityErrorNormalizedMessage(t *testing.T) {
 	t.Parallel()
 	srv := newErrorHandlerTestServer(t, nil)
 
-	// listSessions requires oauth2; without credentials the security check
-	// fails before parameter decode and before any handler method runs.
+	// querySessions requires oauth2; without credentials the security check
+	// fails before body and parameter decode and before any handler method runs.
 	rec := httptest.NewRecorder()
-	srv.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/sessions", nil))
+	srv.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/sessions/query", nil))
 
 	require.Equal(t, http.StatusUnauthorized, rec.Code)
 	require.JSONEq(t,
 		`{"code":"auth.unauthorized","message":"The request lacks valid authentication credentials."}`,
 		rec.Body.String(),
 	)
+}
+
+func TestOgenErrorHandlerGrantSecurityStaysCredentialNeutral(t *testing.T) {
+	t.Parallel()
+
+	const want = `{"code":"auth.unauthorized","message":"The request lacks valid authentication credentials."}`
+	require.False(t, sessionCookieOperations[api.QueryGrantsOperation])
+
+	t.Run("missing credentials", func(t *testing.T) {
+		t.Parallel()
+		srv := newErrorHandlerTestServer(t, nil)
+		tests := []struct {
+			name string
+			req  *http.Request
+		}{
+			{
+				name: "create",
+				req:  httptest.NewRequest(http.MethodPost, "/grants?project_id=proj_1", strings.NewReader(`{"principal_type":"user","principal_id":"user_1","relation":"viewer"}`)),
+			},
+			{
+				name: "get",
+				req:  httptest.NewRequest(http.MethodGet, "/grants/asgn_1?project_id=proj_1", nil),
+			},
+			{
+				name: "delete",
+				req:  httptest.NewRequest(http.MethodDelete, "/grants/asgn_1?project_id=proj_1", nil),
+			},
+			{
+				name: "query",
+				req:  httptest.NewRequest(http.MethodPost, "/grants/query?project_id=proj_1", strings.NewReader(`{}`)),
+			},
+		}
+		for _, tc := range tests {
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+				if tc.req.Method == http.MethodPost {
+					tc.req.Header.Set("Content-Type", "application/json")
+				}
+				rec := httptest.NewRecorder()
+				srv.ServeHTTP(rec, tc.req)
+				require.Equal(t, http.StatusUnauthorized, rec.Code)
+				require.JSONEq(t, want, rec.Body.String())
+			})
+		}
+	})
+
+	t.Run("invalid bearer", func(t *testing.T) {
+		t.Parallel()
+		tests := []struct {
+			name string
+			req  *http.Request
+		}{
+			{
+				name: "create",
+				req:  httptest.NewRequest(http.MethodPost, "/grants?project_id=proj_1", strings.NewReader(`{"principal_type":"user","principal_id":"user_1","relation":"viewer"}`)),
+			},
+			{
+				name: "query",
+				req:  httptest.NewRequest(http.MethodPost, "/grants/query?project_id=proj_1", strings.NewReader(`{}`)),
+			},
+		}
+		for _, tc := range tests {
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+				mock := gomock.NewController(t)
+				tokenService := mocks.NewMockTokenService(mock)
+				tokenService.EXPECT().IntrospectToken(gomock.Any(), "garbage").Return(nil, errors.New("bad token"))
+				srv := newErrorHandlerTestServer(t, tokenService)
+
+				tc.req.Header.Set("Content-Type", "application/json")
+				tc.req.Header.Set("Authorization", "Bearer garbage")
+				rec := httptest.NewRecorder()
+				srv.ServeHTTP(rec, tc.req)
+
+				require.Equal(t, http.StatusUnauthorized, rec.Code)
+				require.JSONEq(t, want, rec.Body.String())
+			})
+		}
+	})
+}
+
+func TestOgenErrorHandlerQueryUsersSecurityStaysCredentialNeutral(t *testing.T) {
+	t.Parallel()
+
+	const want = `{"code":"auth.unauthorized","message":"The request lacks valid authentication credentials."}`
+	require.False(t, sessionCookieOperations[api.QueryUsersOperation])
+
+	t.Run("missing credentials", func(t *testing.T) {
+		t.Parallel()
+		srv := newErrorHandlerTestServer(t, nil)
+		req := httptest.NewRequest(http.MethodPost, "/users/query", strings.NewReader(`{}`))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		srv.ServeHTTP(rec, req)
+		require.Equal(t, http.StatusUnauthorized, rec.Code)
+		require.JSONEq(t, want, rec.Body.String())
+	})
+
+	t.Run("invalid bearer", func(t *testing.T) {
+		t.Parallel()
+		mock := gomock.NewController(t)
+		tokenService := mocks.NewMockTokenService(mock)
+		tokenService.EXPECT().IntrospectToken(gomock.Any(), "garbage").Return(nil, errors.New("bad token"))
+		srv := newErrorHandlerTestServer(t, tokenService)
+
+		req := httptest.NewRequest(http.MethodPost, "/users/query", strings.NewReader(`{}`))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer garbage")
+		rec := httptest.NewRecorder()
+		srv.ServeHTTP(rec, req)
+
+		require.Equal(t, http.StatusUnauthorized, rec.Code)
+		require.JSONEq(t, want, rec.Body.String())
+	})
+}
+
+func TestOgenErrorHandlerDualSchemeInvalidCookieStaysCredentialNeutral(t *testing.T) {
+	t.Parallel()
+
+	const want = `{"code":"auth.unauthorized","message":"The request lacks valid authentication credentials."}`
+	for _, op := range []api.OperationName{
+		api.CreateGrantOperation,
+		api.GetGrantOperation,
+		api.DeleteGrantOperation,
+		api.QueryGrantsOperation,
+		api.QueryUsersOperation,
+		api.QueryTeamsOperation,
+		api.GetTeamOperation,
+	} {
+		require.False(t, sessionCookieOperations[op], "%s must stay off the session-only 401 rewrite", op)
+	}
+
+	tests := []struct {
+		name   string
+		method string
+		path   string
+		body   string
+	}{
+		{"grant create", http.MethodPost, "/grants?project_id=proj_1", `{"principal_type":"user","principal_id":"user_1","relation":"viewer"}`},
+		{"grant get", http.MethodGet, "/grants/asgn_1?project_id=proj_1", ""},
+		{"grant delete", http.MethodDelete, "/grants/asgn_1?project_id=proj_1", ""},
+		{"grant query", http.MethodPost, "/grants/query?project_id=proj_1", `{}`},
+		{"users query", http.MethodPost, "/users/query", `{}`},
+		{"teams query", http.MethodPost, "/teams/query?project_id=proj_1", `{}`},
+		{"team get", http.MethodGet, "/teams/team_1", ""},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			mock := gomock.NewController(t)
+			tokenService := mocks.NewMockTokenService(mock)
+			tokenService.EXPECT().IntrospectToken(gomock.Any(), "garbage").Return(nil, errors.New("bad token"))
+			srv := newErrorHandlerTestServer(t, tokenService)
+
+			req := httptest.NewRequest(tc.method, tc.path, strings.NewReader(tc.body))
+			if tc.method == http.MethodPost {
+				req.Header.Set("Content-Type", "application/json")
+			}
+			req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: "garbage"})
+			rec := httptest.NewRecorder()
+			srv.ServeHTTP(rec, req)
+
+			require.Equal(t, http.StatusUnauthorized, rec.Code)
+			require.JSONEq(t, want, rec.Body.String())
+		})
+	}
+}
+
+func TestOgenErrorHandlerAnonymousSessionOnDualSchemeStays401(t *testing.T) {
+	t.Parallel()
+
+	const want = `{"code":"auth.unauthorized","message":"The request lacks valid authentication credentials."}`
+
+	tests := []struct {
+		name   string
+		method string
+		path   string
+		body   string
+	}{
+		{"grant create", http.MethodPost, "/grants?project_id=proj_1", `{"principal_type":"user","principal_id":"user_1","relation":"viewer"}`},
+		{"grant get", http.MethodGet, "/grants/asgn_1?project_id=proj_1", ""},
+		{"grant delete", http.MethodDelete, "/grants/asgn_1?project_id=proj_1", ""},
+		{"grant query", http.MethodPost, "/grants/query?project_id=proj_1", `{}`},
+		{"users query", http.MethodPost, "/users/query", `{}`},
+		{"teams query", http.MethodPost, "/teams/query?project_id=proj_1", `{}`},
+		{"team get", http.MethodGet, "/teams/team_1", ""},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			token := &domain.Token{
+				ProjectID: "project-1",
+				TokenID:   "token-1",
+				Type:      domain.TokenTypeSessionToken,
+				SessionID: new("session-1"),
+			}
+			mock := gomock.NewController(t)
+			tokenService := mocks.NewMockTokenService(mock)
+			tokenService.EXPECT().IntrospectToken(gomock.Any(), "building").Return(token, nil)
+			srv := newErrorHandlerTestServer(t, tokenService)
+
+			req := httptest.NewRequest(tc.method, tc.path, strings.NewReader(tc.body))
+			if tc.method == http.MethodPost {
+				req.Header.Set("Content-Type", "application/json")
+			}
+			req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: "building"})
+			rec := httptest.NewRecorder()
+			srv.ServeHTTP(rec, req)
+
+			require.Equal(t, http.StatusUnauthorized, rec.Code)
+			require.JSONEq(t, want, rec.Body.String())
+		})
+	}
 }
 
 func TestDomainErrorDetailsOmitsDiagnostics(t *testing.T) {
@@ -118,4 +331,60 @@ func TestDomainErrorDetailsOmitsDiagnostics(t *testing.T) {
 	require.Equal(t, api.ErrorCode("internal"), details.Code)
 	require.Equal(t, "An unexpected error occurred.", details.Message)
 	require.False(t, details.Details.Set, "parent/location diagnostics must not be serialized")
+}
+
+// A transaction that exhausted its abort retries is transient, so the caller
+// needs a status that says "retry", not the 500 it used to get.
+func TestErrorResponseUnavailableIs503(t *testing.T) {
+	t.Parallel()
+
+	got := errorResponse(domain.ErrUnavailable().WithParent(errors.New("transaction aborted")))
+
+	require.Equal(t, http.StatusServiceUnavailable, got.StatusCode)
+	require.Equal(t, api.ErrorCode("unavailable"), got.Response.Code)
+}
+
+func TestErrorResponseInternalStays500(t *testing.T) {
+	t.Parallel()
+
+	got := errorResponse(domain.ErrInternal(errors.New("boom")))
+
+	require.Equal(t, http.StatusInternalServerError, got.StatusCode,
+		"only transient failures may claim 503")
+}
+
+func TestDomainErrorDetails_requestInvalidField(t *testing.T) {
+	t.Parallel()
+
+	details := domainErrorDetails(
+		domain.ErrRequestInvalid().
+			WithMessage(`invalid value for field "age"`).
+			WithDetails(domain.RequestInvalidFieldDetails{Field: "age"}),
+	)
+
+	require.Equal(t, api.ErrorCode("req.invalid"), details.Code)
+	require.Equal(t, `invalid value for field "age"`, details.Message)
+	require.True(t, details.Details.Set)
+	require.JSONEq(t, `{"field":"age"}`, string(details.Details.Value["details"]))
+	_, hasParent := details.Details.Value["parent"]
+	require.False(t, hasParent, "parent must stay off when FullErrorInResponse is false")
+}
+
+func TestDomainErrorDetails_fullErrorInResponseComposesWithProducerDetails(t *testing.T) {
+	// Mutates package-global FullErrorInResponse; must not run parallel with
+	// other tests that assume the default (false).
+	prev := FullErrorInResponse.Load()
+	FullErrorInResponse.Store(true)
+	t.Cleanup(func() { FullErrorInResponse.Store(prev) })
+
+	details := domainErrorDetails(
+		domain.ErrRequestInvalid().
+			WithMessage(`invalid value for field "age"`).
+			WithDetails(domain.RequestInvalidFieldDetails{Field: "age"}).
+			WithParent(errors.New("json: cannot unmarshal number")),
+	)
+
+	require.True(t, details.Details.Set)
+	require.JSONEq(t, `{"field":"age"}`, string(details.Details.Value["details"]))
+	require.Contains(t, string(details.Details.Value["parent"]), "json: cannot unmarshal number")
 }

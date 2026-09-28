@@ -4,8 +4,7 @@ import { classMap } from "lit/directives/class-map.js";
 import { ifDefined } from "lit/directives/if-defined.js";
 import { live } from "lit/directives/live.js";
 
-import selectHost from "@zitadel/shared-component-styles/lit/select-host.css?inline";
-import selectSurface from "@zitadel/shared-component-styles/select.css?inline";
+import selectStyles from "./zl-select.css?inline";
 
 import { emit } from "../internal/emit.js";
 import { nextUid } from "../internal/unique-id.js";
@@ -27,9 +26,6 @@ export type ZlSelectChangeDetail = { name: string; value: string };
 /**
  * Atom: `<zl-select>` — a select bound to a single choice.
  *
- * Spec lineage (file `8UjCXw8yemgljmbkWGrSfE`, "Zitadel - Design System - External"):
- *   - trigger + open/selected matrix:  node `4397:4816` (Dropdown)
- *   - option (Items) state matrix:      node `4397:4098` (Input text)
  *
  * Agent-first contract (see `packages/components/AGENTS.md` → "Input atoms expose
  * a real native control"): the operable, accessible, form-associated, and
@@ -57,7 +53,7 @@ export class ZlSelect extends LitElement {
 
   static override styles = [
     baseHostStyles,
-    ...surfaceStyles(selectHost, selectSurface),
+    ...surfaceStyles(selectStyles),
   ];
 
   /**

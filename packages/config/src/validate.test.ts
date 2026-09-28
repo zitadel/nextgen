@@ -23,8 +23,8 @@ type TestStep = {
   name: string;
   fields: string[];
   actions: Array<{ name: string; kind: string; primary?: boolean; text_key?: string }>;
-  transitions: Record<string, { target: string; action?: string }>;
-  sso_providers?: Array<Record<string, string>>;
+  transitions: Record<string, { target: string; action?: string; purpose?: string }>;
+  sso_providers?: string[];
   on_success?: string;
   complete?: string;
 };
@@ -40,6 +40,29 @@ type TestFlow = {
 /** Deep-cloned default login flow; mutate freely per test. */
 function flow(): TestFlow {
   return structuredClone(getDefaultLoginFlow()) as unknown as TestFlow;
+}
+
+/**
+ * The default flow with passkey put back on `identifier`, `password` and
+ * `register`.
+ *
+ * The shipped default offers no passkey action — it was removed after testers
+ * hit broken passkey legs — but `schema/passkey-actions` is a rule about any
+ * definition, not about the default, so the tests below build the shape the
+ * rule guards rather than assuming the default still carries it.
+ */
+function passkeyFlow(): TestFlow {
+  const def = flow();
+  const identifier = step(def, "identifier");
+  identifier.actions.push({ name: "passkey", kind: "passkey" });
+  identifier.transitions.passkey = { target: "done" };
+  const password = step(def, "password");
+  password.actions.push({ name: "passkey", kind: "passkey" });
+  password.transitions.passkey = { target: "done" };
+  const register = step(def, "register");
+  register.actions.push({ name: "passkey_register", kind: "passkey_register" });
+  register.transitions.passkey_register = { target: "done" };
+  return def;
 }
 
 function step(def: TestFlow, name: string): TestStep {
@@ -71,10 +94,28 @@ describe("validateFlowDefinition — valid flows", () => {
     expect(validateFlowDefinition(flow())).toEqual([]);
   });
 
+  it("does not treat an undesignated unique field as an identifier", () => {
+    // Mirrors the Go resolver (ADR 057): x-unique alone no longer carries
+    // the identifier challenge, so the login path loses its identifier and
+    // the on_success manifest fails upstream.
+    const undesignated = structuredClone(schema);
+    delete undesignated["x-identifier"];
+    const msgs = messages(errors(validateFlowDefinition(flow(), undesignated)));
+    expect(msgs.some((m) => m.includes('requires "identifier" to be collected upstream'))).toBe(
+      true,
+    );
+  });
+
   it("accepts a login-only flow without user_not_found (no register purpose)", () => {
     const def = flow();
     def.purposes = { login: "identifier" };
     delete step(def, "identifier").transitions.user_not_found;
+    // A login-only flow has no register purpose to switch to: drop the
+    // default's purpose-switch navigation along with the register steps.
+    delete step(def, "identifier").transitions.register;
+    step(def, "identifier").actions = step(def, "identifier").actions.filter(
+      (a) => a.name !== "register",
+    );
     // register/register-password become unreachable; drop them.
     def.steps = def.steps.filter((s) =>
       ["identifier", "password", "done"].includes(s.name),
@@ -202,7 +243,7 @@ describe("steps", () => {
   it("rejects sso_providers without transitions.callback", () => {
     const def = flow();
     const s = step(def, "identifier");
-    s.sso_providers = [{ id: "idp", name: "IdP", template: "generic" }];
+    s.sso_providers = ["idp"];
     expect(messages(validateFlowDefinition(def))).toContain(
       'step "identifier": has sso_providers but is missing transitions.callback',
     );
@@ -210,9 +251,9 @@ describe("steps", () => {
 
   it("rejects an action without a matching transition", () => {
     const def = flow();
-    delete step(def, "identifier").transitions.passkey;
+    delete step(def, "identifier").transitions.register;
     expect(messages(validateFlowDefinition(def))).toContain(
-      'step "identifier": action "passkey" has no matching transition',
+      'step "identifier": action "register" has no matching transition',
     );
   });
 
@@ -220,7 +261,7 @@ describe("steps", () => {
     const def = flow();
     step(def, "identifier").transitions.jump = { target: "done" };
     expect(messages(validateFlowDefinition(def))).toContain(
-      'step "identifier": transition key "jump" is not an action name or reserved outcome (user_not_found, user_already_exists, callback)',
+      'step "identifier": transition key "jump" is not an action name or reserved outcome (user_not_found, user_already_exists, identity_unknown, callback)',
     );
   });
 
@@ -248,6 +289,63 @@ describe("graph / cycles / flip-table", () => {
     step(def, "password").transitions.submit = { target: "other-flow", action: "jump" };
     expect(messages(validateFlowDefinition(def))).toContain(
       'step "password": transition "submit" has invalid action "jump"',
+    );
+  });
+
+  it("accepts the default flow's purpose-switch navigations", () => {
+    // The default flow ships them (identifier → register, register →
+    // identifier); the blanket valid-flow test covers this, but pin the
+    // shape here so the graph rules keep accepting it explicitly.
+    const def = flow();
+    expect(step(def, "identifier").transitions.register).toEqual({
+      target: "register",
+      purpose: "register",
+    });
+    expect(errors(validateFlowDefinition(def, schema))).toEqual([]);
+  });
+
+  it("rejects a transition that declares both purpose and action", () => {
+    const def = flow();
+    step(def, "identifier").transitions.register = {
+      target: "register",
+      purpose: "register",
+      action: "switch",
+    };
+    expect(messages(validateFlowDefinition(def))).toContain(
+      'step "identifier": transition "register" declares both purpose and action; a transition either re-purposes locally or targets another flow',
+    );
+  });
+
+  it("rejects a purposed transition to a purpose the flow does not serve", () => {
+    const def = flow();
+    step(def, "identifier").transitions.register = {
+      target: "register",
+      purpose: "recovery",
+    };
+    expect(messages(validateFlowDefinition(def))).toContain(
+      'step "identifier": transition "register" re-purposes to "recovery", which this definition does not serve',
+    );
+  });
+
+  it("rejects a purposed transition that misses the purpose's entry step", () => {
+    const def = flow();
+    step(def, "identifier").transitions.register = {
+      target: "password",
+      purpose: "register",
+    };
+    expect(messages(validateFlowDefinition(def))).toContain(
+      'step "identifier": transition "register" re-purposes to "register" but targets "password"; it must target that purpose\'s entry step "register"',
+    );
+  });
+
+  it("rejects an unknown purpose value on a transition", () => {
+    const def = flow();
+    step(def, "identifier").transitions.register = {
+      target: "register",
+      purpose: "shopping",
+    };
+    expect(messages(validateFlowDefinition(def))).toContain(
+      'step "identifier": transition "register" has invalid purpose',
     );
   });
 
@@ -333,6 +431,137 @@ describe("schema-dependent rules", () => {
     );
   });
 
+  // A nested property is addressed by the same dotted path the attribute
+  // store keys it under (walkUserProperty in the Go resolver).
+  describe("nested properties", () => {
+    const nested = () => {
+      const withNested = structuredClone(schema);
+      (withNested.properties as Record<string, unknown>).address = {
+        type: "object",
+        required: ["street"],
+        properties: {
+          street: { type: "string" },
+          city: { type: "string" },
+        },
+      };
+      return withNested;
+    };
+
+    it("accepts a nested leaf addressed by its dotted path", () => {
+      const def = flow();
+      step(def, "register").fields.push("address.street");
+      expect(errors(validateFlowDefinition(def, nested()))).toEqual([]);
+    });
+
+    it("rejects an unknown nested leaf", () => {
+      const def = flow();
+      step(def, "register").fields.push("address.country");
+      expect(messages(validateFlowDefinition(def, nested()))).toContain(
+        'step "register": flow field: not a property in the user schema: "address.country"',
+      );
+    });
+
+    it("rejects a path through a scalar intermediate", () => {
+      const def = flow();
+      step(def, "register").fields.push("email.domain");
+      expect(messages(validateFlowDefinition(def, nested()))).toContain(
+        'step "register": flow field: not a property in the user schema: "email.domain"',
+      );
+    });
+
+    it("rejects naming the object itself", () => {
+      const def = flow();
+      step(def, "register").fields.push("address");
+      expect(messages(validateFlowDefinition(def, nested()))).toContain(
+        'step "register": flow field: not a scalar property, name a nested leaf instead: "address"',
+      );
+    });
+
+    it("demands a required object's required leaf by its path", () => {
+      const withRequired = nested();
+      withRequired.required = ["address"];
+      const def = flow();
+      step(def, "identifier").fields = ["email"];
+      step(def, "register").fields = ["email"];
+      expect(messages(validateFlowDefinition(def, withRequired))).toContain(
+        "required fields [address.street] in user schema are missing in the flow definition steps",
+      );
+    });
+
+    it("covers a required object without its own required by any leaf beneath it", () => {
+      const withRequired = structuredClone(schema);
+      (withRequired.properties as Record<string, unknown>).address = {
+        type: "object",
+        properties: {
+          street: { type: "string" },
+          city: { type: "string" },
+        },
+      };
+      withRequired.required = ["address"];
+      const def = flow();
+      step(def, "register").fields.push("address.city");
+      expect(errors(validateFlowDefinition(def, withRequired))).toEqual([]);
+    });
+
+    // An optional object exists in the collected document only because a
+    // step collected something beneath it, and from that point the
+    // document validator enforces its `required` list.
+    it("demands an optional object's required leaf once a step collects into it", () => {
+      const def = flow();
+      step(def, "register").fields.push("address.city");
+      expect(messages(validateFlowDefinition(def, nested()))).toContain(
+        "required fields [address.street] in user schema are missing in the flow definition steps",
+      );
+    });
+
+    it("accepts an optional object whose required leaf is collected too", () => {
+      const def = flow();
+      step(def, "register").fields.push("address.city", "address.street");
+      expect(errors(validateFlowDefinition(def, nested()))).toEqual([]);
+    });
+
+    it("demands nothing from an optional object no step collects into", () => {
+      const def = flow();
+      expect(errors(validateFlowDefinition(def, nested()))).toEqual([]);
+    });
+
+    // The same rule one level down: `geo` is optional inside `address`,
+    // which is itself required, so the descent has to keep alternating
+    // between required names and materialized ones.
+    it("demands the leaf of an optional object nested in a required one", () => {
+      const withGeo = structuredClone(schema);
+      withGeo.required = ["address"];
+      (withGeo.properties as Record<string, unknown>).address = {
+        type: "object",
+        required: ["street"],
+        properties: {
+          street: { type: "string" },
+          city: { type: "string" },
+          geo: {
+            type: "object",
+            required: ["lat"],
+            properties: { lat: { type: "string" }, lng: { type: "string" } },
+          },
+        },
+      };
+      const def = flow();
+      step(def, "register").fields.push("address.street", "address.geo.lng");
+      expect(messages(validateFlowDefinition(def, withGeo))).toContain(
+        "required fields [address.geo.lat] in user schema are missing in the flow definition steps",
+      );
+    });
+
+    it("rejects a property carrying items but no type", () => {
+      const withItems = structuredClone(schema);
+      (withItems.properties as Record<string, unknown>).tags = { items: { type: "string" } };
+      const def = flow();
+      step(def, "register").fields.push("tags");
+      expect(messages(validateFlowDefinition(def, withItems))).toContain(
+        'step "register": flow field: not a scalar property, name a nested leaf instead: "tags"',
+      );
+    });
+  });
+
   it("rejects an ambiguous JSON type union but accepts the nullable idiom", () => {
     const withUnions = structuredClone(schema);
     (withUnions.properties as Record<string, unknown>).mixed = { type: ["string", "number"] };
@@ -348,6 +577,81 @@ describe("schema-dependent rules", () => {
     );
   });
 
+  // The nullable idiom reduces before the composite test, so a nullable
+  // object is still an object. Reading the raw union instead would match
+  // none of the composite clauses and accept it as a scalar.
+  it("rejects a nullable object", () => {
+    const withNullableObject = structuredClone(schema);
+    (withNullableObject.properties as Record<string, unknown>).address = {
+      type: ["null", "object"],
+    };
+    const def = flow();
+    step(def, "register").fields.push("address");
+    expect(messages(validateFlowDefinition(def, withNullableObject))).toContain(
+      'step "register": flow field: not a scalar property, name a nested leaf instead: "address"',
+    );
+  });
+
+  // An ambiguous union is reported as one even when the property also
+  // carries `properties`, because Go reduces the type before it looks for
+  // a composite.
+  it("reports an ambiguous union on a property that also declares properties", () => {
+    const withBoth = structuredClone(schema);
+    (withBoth.properties as Record<string, unknown>).address = {
+      type: ["string", "number"],
+      properties: { street: { type: "string" } },
+    };
+    const def = flow();
+    step(def, "register").fields.push("address");
+    expect(messages(validateFlowDefinition(def, withBoth))).toContain(
+      'step "register": flow field: unsupported JSON type: [string number]',
+    );
+  });
+
+  // Segment lookup is an own-property test, mirroring a Go map index.
+  // Reaching through the prototype chain would resolve these as schema
+  // properties and report nothing.
+  it("rejects Object.prototype member names as fields", () => {
+    for (const name of ["toString", "valueOf", "constructor"]) {
+      const def = flow();
+      step(def, "register").fields.push(name);
+      expect(messages(validateFlowDefinition(def, schema))).toContain(
+        `step "register": flow field: not a property in the user schema: ${JSON.stringify(name)}`,
+      );
+    }
+  });
+
+  it("rejects an inherited member reached through a nested path", () => {
+    const withNested = structuredClone(schema);
+    (withNested.properties as Record<string, unknown>).address = {
+      type: "object",
+      properties: { street: { type: "string" } },
+    };
+    const def = flow();
+    step(def, "register").fields.push("address.toString");
+    expect(messages(validateFlowDefinition(def, withNested))).toContain(
+      'step "register": flow field: not a property in the user schema: "address.toString"',
+    );
+  });
+
+  // Go accumulates required paths into a set, so a name repeated in
+  // `required` reports the missing path once.
+  it("reports a repeated required name once", () => {
+    const withDuplicate = structuredClone(schema);
+    (withDuplicate.properties as Record<string, unknown>).address = {
+      type: "object",
+      required: ["street"],
+      properties: { street: { type: "string" } },
+    };
+    withDuplicate.required = ["address", "address"];
+    const def = flow();
+    step(def, "identifier").fields = ["email"];
+    step(def, "register").fields = ["email"];
+    expect(messages(validateFlowDefinition(def, withDuplicate))).toContain(
+      "required fields [address.street] in user schema are missing in the flow definition steps",
+    );
+  });
+
   it("rejects a non-password auth-method field", () => {
     const def = flow();
     step(def, "password").fields.push("x-auth-methods#sms");
@@ -358,7 +662,7 @@ describe("schema-dependent rules", () => {
 
   it("rejects x-auth-methods#password when the method is disabled", () => {
     const disabled = structuredClone(schema);
-    (disabled["x-auth-methods"] as Record<string, { enabled: boolean }>).password.enabled = false;
+    (disabled["x-auth-methods"] as Record<string, { enabled: boolean }>).password!.enabled = false;
     expect(messages(validateFlowDefinition(flow(), disabled))).toContain(
       'step "password": "password" is not an enabled authentication method',
     );
@@ -366,8 +670,8 @@ describe("schema-dependent rules", () => {
 
   it("rejects every step offering a passkey action when the schema disables passkey", () => {
     const disabled = structuredClone(schema);
-    (disabled["x-auth-methods"] as Record<string, { enabled: boolean }>).passkey.enabled = false;
-    const issues = validateFlowDefinition(flow(), disabled);
+    (disabled["x-auth-methods"] as Record<string, { enabled: boolean }>).passkey!.enabled = false;
+    const issues = validateFlowDefinition(passkeyFlow(), disabled);
     const msgs = messages(issues);
     expect(msgs).toContain(
       'step "identifier": action "passkey" offers passkey but "passkey" is not an enabled authentication method',
@@ -384,15 +688,15 @@ describe("schema-dependent rules", () => {
   it("rejects passkey actions when the schema has no passkey entry", () => {
     const absent = structuredClone(schema);
     delete (absent["x-auth-methods"] as Record<string, unknown>).passkey;
-    expect(messages(validateFlowDefinition(flow(), absent))).toContain(
+    expect(messages(validateFlowDefinition(passkeyFlow(), absent))).toContain(
       'step "identifier": action "passkey" offers passkey but "passkey" is not an enabled authentication method',
     );
   });
 
   it("accepts passkey and passkey_register actions when passkey is enabled", () => {
-    // The default schema enables passkey; the default flow offers passkey
-    // on identifier/password and passkey_register on register.
-    expect(validateFlowDefinition(flow(), schema)).toEqual([]);
+    // The default schema keeps passkey enabled even though the shipped default
+    // flow no longer offers it, so a definition that does offer it validates.
+    expect(validateFlowDefinition(passkeyFlow(), schema)).toEqual([]);
   });
 
   it("rejects on_success create_user without an upstream identifier", () => {
@@ -528,7 +832,7 @@ describe("drift audit (Go validator)", () => {
     const goFuncs = [...source.matchAll(/^func (\w+)\(/gm)].map((m) => m[1]).sort();
     const ported = Object.values(FLOW_VALIDATION_RULES)
       .map((rule) => rule.goRef)
-      .filter((ref): ref is string => ref !== null);
+      .filter((ref) => ref !== null);
     // Traversal/aggregation helpers of already-ported rules, plus the
     // orchestrator itself. NOT a place to park an unported rule: the
     // "still exists" check above is one-directional and can never

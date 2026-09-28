@@ -5,10 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
+	"time"
 
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/ianlancetaylor/jsonschema"
@@ -18,7 +21,8 @@ import (
 
 	"github.com/zitadel/nextgen/internal/domain"
 	domainmock "github.com/zitadel/nextgen/internal/domain/mock"
-	"github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/httputil"
+	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 func mustJSONSchemaCache(t *testing.T, size int) *lru.TwoQueueCache[string, *jsonschema.Schema] {
@@ -357,5 +361,383 @@ func TestJSONSchemaResolver_BuiltinEmbedded(t *testing.T) {
 		schema, err := r.Resolve(ctx, store, "proj-1", userSchemaURL, nil)
 		require.NoError(t, err)
 		require.NotNil(t, schema)
+	})
+}
+
+func TestNewJSONSchema_ReservedProperties(t *testing.T) {
+	const projectID = "proj-1"
+
+	// The user object carries `id` and `metadata` as system-managed fields
+	// (see api/openapi/endpoints/users/user.yaml), so a tenant schema must not
+	// declare them itself.
+	t.Run("rejected", func(t *testing.T) {
+		tests := []struct {
+			name    string
+			schema  string
+			message string
+		}{
+			{
+				name:    "id",
+				schema:  `{"type":"object","properties":{"id":{"type":"string"}}}`,
+				message: "schema cannot have property id",
+			},
+			{
+				name:    "metadata",
+				schema:  `{"type":"object","properties":{"metadata":{"type":"object"}}}`,
+				message: "schema cannot have property metadata",
+			},
+			{
+				name:    "id alongside legitimate properties",
+				schema:  `{"type":"object","properties":{"email":{"type":"string"},"id":{"type":"string"}}}`,
+				message: "schema cannot have property id",
+			},
+			{
+				name:    "metadata alongside legitimate properties",
+				schema:  `{"type":"object","properties":{"email":{"type":"string"},"metadata":{"type":"object"}}}`,
+				message: "schema cannot have property metadata",
+			},
+			{
+				// id is checked first, so it is the one reported.
+				name:    "both reserved properties reports id",
+				schema:  `{"type":"object","properties":{"id":{"type":"string"},"metadata":{"type":"object"}}}`,
+				message: "schema cannot have property id",
+			},
+			{
+				// The check tests for the key, not for a well-formed subschema.
+				name:    "id holding a non-schema value",
+				schema:  `{"type":"object","properties":{"id":true}}`,
+				message: "schema cannot have property id",
+			},
+			{
+				name:    "metadata holding a non-schema value",
+				schema:  `{"type":"object","properties":{"metadata":"reserved"}}`,
+				message: "schema cannot have property metadata",
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				schema, err := domain.NewJSONSchema(projectID, []byte(tt.schema))
+				require.Error(t, err)
+				assert.Nil(t, schema)
+				assert.ErrorIs(t, err, domain.ErrJSONSchemaInvalid())
+				assert.EqualError(t, err, tt.message)
+			})
+		}
+	})
+
+	t.Run("accepted", func(t *testing.T) {
+		tests := []struct {
+			name   string
+			schema string
+		}{
+			{
+				name:   "no properties at all",
+				schema: `{"type":"object"}`,
+			},
+			{
+				name:   "empty properties",
+				schema: `{"type":"object","properties":{}}`,
+			},
+			{
+				name:   "only customer-defined properties",
+				schema: `{"type":"object","properties":{"email":{"type":"string"},"givenName":{"type":"string"}}}`,
+			},
+			{
+				// Only the top level is reserved: a nested object may still
+				// carry its own id, e.g. an address with its own identifier.
+				name:   "id nested inside another property",
+				schema: `{"type":"object","properties":{"address":{"type":"object","properties":{"id":{"type":"string"},"metadata":{"type":"object"}}}}}`,
+			},
+			{
+				// The reserved keys are matched exactly, so differently-cased
+				// names remain available to customers.
+				name:   "differently cased names",
+				schema: `{"type":"object","properties":{"ID":{"type":"string"},"Id":{"type":"string"},"Metadata":{"type":"object"}}}`,
+			},
+			{
+				name:   "names merely containing the reserved words",
+				schema: `{"type":"object","properties":{"identifier":{"type":"string"},"metadataUrl":{"type":"string"}}}`,
+			},
+			{
+				// properties is not an object, so there are no keys to reserve;
+				// such a schema fails later, at JSON Schema compilation.
+				name:   "properties is not an object",
+				schema: `{"type":"object","properties":"nonsense"}`,
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				schema, err := domain.NewJSONSchema(projectID, []byte(tt.schema))
+				require.NoError(t, err)
+				require.NotNil(t, schema)
+				assert.Equal(t, projectID, schema.ProjectID)
+				assert.Equal(t, []byte(tt.schema), schema.Schema)
+			})
+		}
+	})
+
+	t.Run("a reserved key with a null value is not rejected", func(t *testing.T) {
+		// Characterisation test, not an endorsement: maputil.Get[any] reports a
+		// JSON null as absent, because a type assertion on a nil interface
+		// fails. Switching the check to a plain `_, ok := props["id"]` lookup
+		// would close this gap — flip these to require.Error if that happens.
+		for _, schema := range []string{
+			`{"type":"object","properties":{"id":null}}`,
+			`{"type":"object","properties":{"metadata":null}}`,
+		} {
+			got, err := domain.NewJSONSchema(projectID, []byte(schema))
+			require.NoError(t, err)
+			require.NotNil(t, got)
+		}
+	})
+}
+
+func TestNewJSONSchema_Metadata(t *testing.T) {
+	const projectID = "proj-1"
+
+	t.Run("uses $id as the URL when present", func(t *testing.T) {
+		schema, err := domain.NewJSONSchema(projectID, []byte(`{"$id":"https://example.test/user.json","type":"object"}`))
+		require.NoError(t, err)
+		assert.Equal(t, "https://example.test/user.json", schema.URL)
+	})
+
+	t.Run("carries objectType through when present", func(t *testing.T) {
+		schema, err := domain.NewJSONSchema(projectID, []byte(`{"type":"object","objectType":"human-user"}`))
+		require.NoError(t, err)
+		require.NotNil(t, schema.ObjectType)
+		assert.Equal(t, "human-user", *schema.ObjectType)
+	})
+
+	t.Run("leaves objectType nil when absent", func(t *testing.T) {
+		schema, err := domain.NewJSONSchema(projectID, []byte(`{"type":"object"}`))
+		require.NoError(t, err)
+		assert.Nil(t, schema.ObjectType)
+	})
+
+	t.Run("rejects a payload that is not JSON", func(t *testing.T) {
+		schema, err := domain.NewJSONSchema(projectID, []byte(`{not json`))
+		require.Error(t, err)
+		assert.Nil(t, schema)
+		assert.ErrorIs(t, err, domain.ErrJSONSchemaInvalid())
+	})
+}
+
+func TestNewJSONSchema_Kind(t *testing.T) {
+	const projectID = "proj-1"
+
+	tests := []struct {
+		name   string
+		schema string
+		want   domain.JSONSchemaKind
+	}{
+		{
+			name:   "declared kind is read from the document",
+			schema: `{"type":"object","kind":"user-schema"}`,
+			want:   domain.JSONSchemaKindUserSchema,
+		},
+		{
+			// The meta-schema requires kind and rejects the document, but
+			// NewJSONSchema runs first and still has to store something.
+			name:   "absent kind is unknown",
+			schema: `{"type":"object"}`,
+			want:   domain.JSONSchemaKindUnknown,
+		},
+		{
+			name:   "unrecognised kind is unknown rather than stored verbatim",
+			schema: `{"type":"object","kind":"not-a-kind"}`,
+			want:   domain.JSONSchemaKindUnknown,
+		},
+		{
+			name:   "non-string kind is unknown",
+			schema: `{"type":"object","kind":42}`,
+			want:   domain.JSONSchemaKindUnknown,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			schema, err := domain.NewJSONSchema(projectID, []byte(tc.schema))
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, schema.Kind)
+		})
+	}
+}
+
+// TestJSONSchemaResolver_EgressGuards covers #1114's acceptance criteria:
+// distinct errors for a denied address, an oversized document, a slow origin,
+// and a $ref chain that exceeds the whole-resolution envelope.
+func TestJSONSchemaResolver_EgressGuards(t *testing.T) {
+	ctx := context.Background()
+	const projectID = "proj-1"
+
+	newStore := func(ctrl *gomock.Controller) *domainmock.MockJSONSchemaStore {
+		store := domainmock.NewMockJSONSchemaStore(ctrl)
+		store.EXPECT().GetJSONSchemaByID(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(nil, database.NewNoRowFoundError(nil)).AnyTimes()
+		store.EXPECT().CreateJSONSchema(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+		return store
+	}
+	newEgressClient := func(t *testing.T, cfg httputil.ClientConfig) *http.Client {
+		t.Helper()
+		client, err := cfg.NewClient()
+		require.NoError(t, err)
+		return client
+	}
+	serveJSON := func(body string) http.HandlerFunc {
+		return func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(body))
+		}
+	}
+	const simpleSchema = `{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object"}`
+
+	t.Run("denied address yields fetch_denied with the URL in details", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		srv := httptest.NewServer(serveJSON(simpleSchema))
+		defer srv.Close()
+
+		client := newEgressClient(t, httputil.ClientConfig{DenyList: []string{"127.0.0.0/8", "::1/128"}})
+		resolver := newTestResolver(t, client)
+
+		_, err := resolver.Resolve(ctx, newStore(ctrl), projectID, srv.URL, nil)
+		require.ErrorIs(t, err, domain.ErrJSONSchemaFetchDenied())
+		de, ok := errors.AsType[domain.Error](err)
+		require.True(t, ok)
+		assert.Equal(t, domain.SchemaFetchDetails{URL: srv.URL}, de.Details)
+	})
+
+	t.Run("oversized document yields fetch_too_large", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		srv := httptest.NewServer(serveJSON(`{"padding":"` + strings.Repeat("x", 256) + `"}`))
+		defer srv.Close()
+
+		client := newEgressClient(t, httputil.ClientConfig{MaxBodySize: 64})
+		resolver := newTestResolver(t, client)
+
+		_, err := resolver.Resolve(ctx, newStore(ctrl), projectID, srv.URL, nil)
+		require.ErrorIs(t, err, domain.ErrJSONSchemaFetchTooLarge())
+	})
+
+	t.Run("slow origin yields fetch_timeout", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			time.Sleep(300 * time.Millisecond)
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(simpleSchema))
+		}))
+		defer srv.Close()
+
+		client := newEgressClient(t, httputil.ClientConfig{Timeout: 50 * time.Millisecond})
+		resolver := newTestResolver(t, client)
+
+		_, err := resolver.Resolve(ctx, newStore(ctrl), projectID, srv.URL, nil)
+		require.ErrorIs(t, err, domain.ErrJSONSchemaFetchTimeout())
+	})
+
+	t.Run("oversized body behind a redirect names the final hop", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		mux := http.NewServeMux()
+		srv := httptest.NewServer(mux)
+		defer srv.Close()
+		mux.HandleFunc("/start.json", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, srv.URL+"/big.json", http.StatusFound)
+		})
+		mux.HandleFunc("/big.json", func(w http.ResponseWriter, r *http.Request) {
+			// Chunked (no Content-Length), so the overrun surfaces mid-read,
+			// after redirects, where no *url.Error wraps it by default.
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			w.(http.Flusher).Flush()
+			_, _ = w.Write([]byte(`{"padding":"` + strings.Repeat("x", 256) + `"}`))
+		})
+
+		client := newEgressClient(t, httputil.ClientConfig{MaxBodySize: 64, MaxRedirects: 5})
+		resolver := newTestResolver(t, client)
+
+		_, err := resolver.Resolve(ctx, newStore(ctrl), projectID, srv.URL+"/start.json", nil)
+		require.ErrorIs(t, err, domain.ErrJSONSchemaFetchTooLarge())
+		de, ok := errors.AsType[domain.Error](err)
+		require.True(t, ok)
+		assert.Equal(t, domain.SchemaFetchDetails{URL: srv.URL + "/big.json"}, de.Details,
+			"details must name the hop the oversized body came from, not the requested URL")
+	})
+
+	t.Run("redirect loop yields fetch_too_many_redirects", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		mux := http.NewServeMux()
+		srv := httptest.NewServer(mux)
+		defer srv.Close()
+		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, srv.URL, http.StatusFound)
+		})
+
+		client := newEgressClient(t, httputil.ClientConfig{MaxRedirects: 2})
+		resolver := newTestResolver(t, client)
+
+		_, err := resolver.Resolve(ctx, newStore(ctrl), projectID, srv.URL, nil)
+		require.ErrorIs(t, err, domain.ErrJSONSchemaFetchTooManyRedirects())
+	})
+
+	t.Run("an envelope that expires during compilation is not cached as success", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		// The root document is supplied inline, so compilation performs no
+		// I/O that would observe the context; only the post-compile check
+		// can catch the already-expired 1ns envelope.
+		client := newEgressClient(t, httputil.ClientConfig{})
+		resolver := domain.NewJSONSchemaResolver(mustJSONSchemaCache(t, 128), 0, time.Nanosecond, client, nil)
+
+		// The resolver reports the expiry raw; the schema service is what
+		// classifies it into fetch_timeout, keeping fetch codes off
+		// operations whose resolver cannot egress.
+		_, err := resolver.Resolve(ctx, newStore(ctrl), projectID, "https://example.test/inline.json", []byte(simpleSchema))
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+
+		_, err = resolver.Resolve(ctx, newStore(ctrl), projectID, "https://example.test/inline.json", []byte(simpleSchema))
+		require.ErrorIs(t, err, context.DeadlineExceeded, "the expired result must not have been cached")
+	})
+
+	t.Run("a nested lookup's deadline error survives the ref loader", func(t *testing.T) {
+		// The jsonschema library flattens loader errors; a store lookup that
+		// observed the expired envelope must still surface as a deadline
+		// error (which the service classifies), not as a flattened string
+		// that becomes internal.
+		ctrl := gomock.NewController(t)
+		store := domainmock.NewMockJSONSchemaStore(ctrl)
+		store.EXPECT().GetJSONSchemaByID(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(nil, fmt.Errorf("query aborted: %w", context.DeadlineExceeded)).AnyTimes()
+
+		client := newEgressClient(t, httputil.ClientConfig{})
+		resolver := newTestResolver(t, client)
+		root := `{"$schema":"https://json-schema.org/draft/2020-12/schema","$ref":"https://example.test/leaf.json"}`
+
+		_, err := resolver.Resolve(ctx, store, projectID, "https://example.test/root.json", []byte(root))
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+	})
+
+	t.Run("resolve timeout bounds the whole ref chain, not each hop", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		mux := http.NewServeMux()
+		srv := httptest.NewServer(mux)
+		defer srv.Close()
+		// Each hop stays comfortably inside the generous per-request timeout;
+		// only their sum exceeds the 150ms envelope.
+		mux.HandleFunc("/root.json", func(w http.ResponseWriter, r *http.Request) {
+			time.Sleep(100 * time.Millisecond)
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"$schema":"https://json-schema.org/draft/2020-12/schema","$ref":"` + srv.URL + `/leaf.json"}`))
+		})
+		mux.HandleFunc("/leaf.json", func(w http.ResponseWriter, r *http.Request) {
+			time.Sleep(100 * time.Millisecond)
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(simpleSchema))
+		})
+
+		client := newEgressClient(t, httputil.ClientConfig{Timeout: time.Second})
+		resolver := domain.NewJSONSchemaResolver(mustJSONSchemaCache(t, 128), 0, 150*time.Millisecond, client, nil)
+
+		_, err := resolver.Resolve(ctx, newStore(ctrl), projectID, srv.URL+"/root.json", nil)
+		require.ErrorIs(t, err, domain.ErrJSONSchemaFetchTimeout())
 	})
 }

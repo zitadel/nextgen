@@ -1,0 +1,17 @@
+type: object
+description: Paginated list of projects, ordered by project id.
+required:
+  - projects
+properties:
+  projects:
+    type: array
+    items:
+      $ref: ../../../projects/project-response.yaml
+  next_page_token:
+    description: |
+      Token to pass as `page_token` in the next request to fetch the following page.
+      Present when the page was full. A following request may return an empty page
+      and no token, which ends the listing.
+    oneOf:
+      - $ref: ../../../../components/schemas/page-token.yaml
+      - type: 'null'

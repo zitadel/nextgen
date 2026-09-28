@@ -6,12 +6,16 @@ Zitadel auth UI.
 The package exports:
 
 - **Atoms** — `<zl-field>`, `<zl-button>`, `<zl-alert>`, `<zl-icon>`,
-  `<zl-pill>`, `<zl-card>`, `<zl-page-shell>`. Form-associated, accessible,
+  `<zl-pill>`, `<zl-card>`, `<zl-checkbox>`, `<zl-select>`,
+  `<zl-page-shell>`, and `<zl-passkey>` (an invisible WebAuthn ceremony
+  handler — no rendered surface). Form-associated, accessible,
   branding-aware Lit elements that map 1:1 to the flow API
   field/action/error primitives and the Figma design system.
-- **Orchestrator** — `<zitadel-login>`. A single drop-in element that calls
+- **Orchestrators** — `<zitadel-login>`, a single drop-in element that calls
   the flow API, renders each step through a Liquid template, manages focus
-  and form submission, and applies branding/theme/locale.
+  and form submission, and applies branding/theme/locale; `<zitadel-logout>`
+  for sign-out; and `<zitadel-session>`, the post-sign-in "signed in" card
+  (session read + sign-out in one element).
 - **Tokens & manifests** — design tokens (`--zl-*` CSS custom properties), a
   Liquid template registry, and per-atom manifests describing allowed
   attributes/parts/events for sanitiser allowlists.
@@ -128,20 +132,21 @@ fixtures:
   `applyBranding(...)` injects a tenant branding overlay merged into every
   response (presets include `font_url` for Inter).
 - **Framework demos (TCP server)** — `moon run api-mock:start`
-  serves the same handlers on port 4000 with `defaultDevBranding` (Arimo
-  `font_url`) applied at boot. See [`apps/demo-next`](../../apps/demo-next/README.md)
+  serves the same handlers on port 8080 (set `PORT` to override) with
+  `defaultDevBranding` (Arimo `font_url`) applied at boot. See
+  [`apps/demo-next`](../../apps/demo-next/README.md)
   and [`apps/demo-nuxt`](../../apps/demo-nuxt/README.md).
 
 ### Preview surfaces
 
 | Surface | Moon command | What it gives you |
 | --- | --- | --- |
-| **Storybook** | `moon run storybook:dev` ([:6006](http://localhost:6006)) | The workbench for both the Lit atoms and the paired React components, plus the `<zitadel-login>` orchestrator (MSW via `msw-storybook-addon`, flow/branding as controls). |
+| **Storybook** | `moon run storybook:dev` ([:6006](http://localhost:6006)) | The workbench for the Lit atoms and the `<zitadel-login>` orchestrator (MSW via `msw-storybook-addon`, flow/branding as controls). |
 | **demo-next** | `moon run api-mock:start` + `moon run demo-next:dev` | Next.js SDK, middleware, cookies, built `dist/` ([:3002/login](http://localhost:3002/login)). See [`apps/demo-next`](../../apps/demo-next/README.md). |
 | **demo-nuxt** | mock on `:8080`, then `moon run demo-nuxt:dev` | Nuxt SDK, middleware, cookies, built `dist/` ([:3001/login](http://localhost:3001/login)). See [`apps/demo-nuxt`](../../apps/demo-nuxt/README.md). |
 
-Storybook consumes the built `@zitadel/components` / `@zitadel/ui-react`
-artifacts, so rebuild after source changes (`moon run components:build`) or
+Storybook consumes the built `@zitadel/components` artifact, so rebuild
+after source changes (`moon run components:build`) or
 keep the Storybook dev server running — its tasks depend on the relevant
 build tasks.
 
@@ -185,7 +190,7 @@ embedding app wins:
 zitadel-login {
   --zl-color-text-primary-white: #101828;
   --zl-color-surface-default-primary-gray: #ffffff;
-  --zl-radius-m: 0.25rem;
+  --zl-radius-md: 0.25rem;
 }
 ```
 
@@ -285,7 +290,6 @@ the SDK handle, and clears the session. Uses the same token adoption as
 | --- | --- | --- |
 | `project` | `ZitadelProject` | SDK handle from `configureZitadel()`. Object property; falls back to the global handle from `getZitadelConfig()` |
 | `postSignOutUrl` / `post-sign-out-url` | `string` | Navigate here after sign-out |
-| `clientId` / `client-id` | `string` | Optional OIDC client id forwarded to `getEndSessionUrl()` |
 
 Supports a light-DOM `<template>` slot for a fully custom menu; default UI is
 the avatar trigger + dropdown.
@@ -345,8 +349,10 @@ See [`src/atoms/`](src/atoms) for full TypeScript types and JSDoc.
 packages/components/
 ├── src/
 │   ├── atoms/             zl-field, zl-button, zl-alert, zl-icon, zl-pill,
-│   │                       zl-card, zl-page-shell + tests
-│   ├── orchestrator/      <zitadel-login>, <zitadel-logout>, api-client, liquid, branding
+│   │                       zl-card, zl-checkbox, zl-select, zl-page-shell,
+│   │                       zl-passkey + tests
+│   ├── orchestrator/      <zitadel-login>, <zitadel-logout>, <zitadel-session>,
+│   │                       api-client, liquid, branding
 │   │   ├── locales/       bundled English fallback
 │   │   └── templates/     default.liquid (all steps) + layout-chrome.css
 │   ├── tokens/            re-export of @zitadel/design-tokens
@@ -357,7 +363,7 @@ packages/components/
 └── vitest.config.ts       jsdom (unit) + chromium (browser) projects
 ```
 
-The interactive workbench (atoms, paired React, and the `<zitadel-login>`
+The interactive workbench (the atoms and the `<zitadel-login>`
 orchestrator) lives in [`apps/storybook`](../../apps/storybook/README.md).
 
 ## Develop
@@ -373,7 +379,7 @@ corepack pnpm install
 
 # --- Workbench ---
 
-# Storybook: atoms, paired React, and the <zitadel-login> orchestrator
+# Storybook: the atoms and the <zitadel-login> orchestrator
 moon run storybook:dev
 # → http://localhost:6006
 

@@ -21,8 +21,8 @@ Two routes, and they compose.
 
 ```css
 zitadel-login {
-  --zl-color-text-primary-white: #101828;
-  --zl-radius-m: 0.25rem;
+  --zl-foreground: #101828;
+  --zl-radius-md: 0.25rem;
 }
 ```
 
@@ -46,7 +46,7 @@ zitadel-login::part(button-root)::after {
 }
 ```
 
-The orchestrator additionally exposes its own chrome parts directly: `form`, `attribution`, `attribution-pill`.
+The orchestrator additionally exposes its own chrome parts directly: `form`, `attribution`, `attribution-mark`.
 
 **Directly composed atoms** — a page using atoms without the orchestrator addresses bare part names: `zl-field::part(input)`.
 

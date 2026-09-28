@@ -1,0 +1,74 @@
+/* Styles for `<zl-page-shell>` — shadow host rules first, then the painted surface. */
+
+:host {
+  display: block;
+  /* Page-oriented by default; embedding hosts size the whole widget to
+     content by setting `--zl-page-min-height: auto` on the element (the
+     property inherits across shadow boundaries). */
+  min-height: var(--zl-page-min-height, 100vh);
+  background: var(--zl-background);
+  color: var(--zl-foreground);
+}
+/* Playground / embed preview — parent sets height (e.g. `.page-shell-frame`). */
+:host([data-embedded]) {
+  min-height: 100%;
+  height: 100%;
+}
+:host([data-embedded]) .zr-page-shell {
+  min-height: 100%;
+}
+/* Widget mode — stamped by the <zitadel-login> orchestrator when its
+   `variant` is `widget` (the default): content-sized, paints nothing, and
+   pads nothing — the page padding is page chrome, and the embedding app
+   owns spacing around the card. Distinct from [data-embedded], which means
+   "parent sets the height". */
+:host([data-widget]) {
+  min-height: auto;
+  background: transparent;
+}
+:host([data-widget]) .zr-page-shell {
+  min-height: var(--zl-page-min-height, auto);
+  background: transparent;
+  padding: 0;
+}
+.zr-page-shell ::slotted([slot="header"]),
+.zr-page-shell ::slotted([slot="footer"]) {
+  margin: 0;
+}
+
+/* The paint sits on the shell div as well as the host: the div is what fills
+   the viewport, so anything measuring "what colour is the page" — a contrast
+   check, a screenshot diff — reads it rather than the host box. */
+.zr-page-shell {
+  min-height: inherit;
+  background: var(--zl-background);
+  color: var(--zl-foreground);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  /* Card → trustmark. */
+  gap: var(--zl-spacing-6);
+  padding: var(--zl-spacing-6);
+}
+@media (min-width: 48rem) {
+  .zr-page-shell {
+    padding: var(--zl-spacing-10);
+  }
+}
+.zr-page-shell__header,
+.zr-page-shell__main,
+.zr-page-shell__footer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+.zr-page-shell__main {
+  flex: 0 0 auto;
+}
+/* Slots stay mounted even when nothing is projected into them; an empty region
+   would otherwise still claim a `gap`. */
+.zr-page-shell__region--empty {
+  display: none;
+}

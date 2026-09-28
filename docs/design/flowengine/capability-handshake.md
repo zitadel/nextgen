@@ -16,10 +16,10 @@ participant Server
     Server-->>Client: Returns JSON array of schemas
     Note over Client, Server: [<br/>  { "flow_schema_version": "1.1.0", "is_deprecated": true },<br/>  { "flow_schema_version": "1.2.0" },<br/>  { "flow_schema_version": "2.0.0" }<br/>]
     Note left of Client: Client evaluates available schemas.<br/>Determines its UI supports ^1.1.0 (compatible with 1.x).
-    Client->>Server: POST /flows<br/>{"purpose": "login", "supported_versions": "^1.1.0"}
+    Client->>Server: POST /flow<br/>{"purpose": "login", "supported_versions": "^1.1.0"}
     Note right of Server: Server parses SemVer constraint.<br/>Selects optimal schema (v1.2.0).
     Server-->>Client: Returns initial step for v1.2.0 login flow
-    Client->>Server: POST /flows/session_id_1234/submit<br/>{"identifier": "user@example.com"}
+    Client->>Server: POST /flow/flow_1234/submit<br/>{"identifier": "user@example.com"}
 ```
 
 ### Bootstrapping Phase

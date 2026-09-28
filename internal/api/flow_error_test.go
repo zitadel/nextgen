@@ -131,7 +131,9 @@ func TestMapFlowErrorStatus_usesFlowSentinels(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := mapFlowErrorStatus(tt.err)
+			// The handlers return normalizeFlowError's result and let
+			// OgenErrorHandler build the response, so assert on that pairing.
+			got := errorResponse(normalizeFlowError(tt.err))
 			require.NotNil(t, got)
 			assert.Equal(t, tt.wantStatus, got.StatusCode)
 			assert.Equal(t, tt.wantCode, string(got.Response.Code))

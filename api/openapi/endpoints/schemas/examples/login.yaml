@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=../flow-definition.yaml
+# yaml-language-server: $schema=../flow-definition.json
 #
 # Example flow definition: a login flow with identifier + password,
 # a captcha gate, two SSO providers, a switch to register when the
@@ -9,6 +9,7 @@
 # switch vs pivot transitions, and a terminal step.
 
 name: standard-login
+status: active
 user_schema: https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/human-user.yaml
 
 purposes:
@@ -18,20 +19,13 @@ steps:
   - name: identify
     fields: [email]
     actions:
-      submit:
-        primary: true
-      forgot_password: {}
+      - { name: submit, kind: submit, primary: true }
+      - { name: forgot_password, kind: navigate }
     gates:
       bot_check:
         kind: captcha
         provider: altcha
-    sso_providers:
-      - id: google
-        name: Google
-        template: google
-      - id: corp_idp
-        name: Acme SSO
-        template: entraid
+    sso_providers: [google, corp_idp]
     transitions:
       submit: { target: authenticate }
       user_not_found: { target: register, action: switch }
@@ -41,8 +35,7 @@ steps:
   - name: authenticate
     fields: [password]
     actions:
-      submit:
-        primary: true
+      - { name: submit, kind: submit, primary: true }
     transitions:
       submit: { target: done }
 

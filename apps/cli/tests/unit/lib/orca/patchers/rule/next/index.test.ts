@@ -18,10 +18,10 @@ function ctxFor(
     rendererId: "react",
     project: {
       id: "proj-1",
-      projectSecret: "sk_proj_full",
-      previewSecret: "sk_proj_preview",
-      previewOrigins: [],
-      createdAt: "2026-01-01T00:00:00.000Z",
+      project_secret: "sk_proj_full",
+      preview_secret: "sk_proj_preview",
+      preview_origins: [],
+      created_at: "2026-01-01T00:00:00.000Z",
     },
     issuer: "http://localhost:3000",
     server: "https://api.zitadel.cloud",
@@ -60,6 +60,10 @@ describe("NextPatcher.plan", () => {
     expect(writeContents(plan, "app/login/page.tsx")).toContain('variant="page"');
     expect(writeContents(plan, "app/login/page.tsx")).not.toContain("#0f0f11");
     expect(writeContents(plan, "app/login/page.tsx")).toContain('colorScheme: "dark"');
+    // The embedding alternative is named where a developer will see it, and
+    // a minimal scaffold keeps the widget's neutral built-in copy.
+    expect(writeContents(plan, "app/login/page.tsx")).toContain('variant="widget"');
+    expect(writeContents(plan, "app/login/page.tsx")).not.toContain("businessLocales");
     expect(writeContents(plan, "app/login/page.tsx")).not.toContain('alignItems: "center"');
     expect(writeContents(plan, "app/login/page.tsx")).not.toContain('padding: "48px 24px"');
     expect(writeContents(plan, "app/register/page.tsx")).toContain(MANAGED_MARKER);
@@ -73,6 +77,35 @@ describe("NextPatcher.plan", () => {
     expect(plan.ops.some((op) => op.kind === "add-dep")).toBe(true);
   });
 
+  it("wires the business copy overlay for business-use-case projects", () => {
+    const plan = new NextPatcher().plan({ ...ctxFor("app"), useCase: "business" });
+    for (const path of ["app/login/page.tsx", "app/register/page.tsx"]) {
+      const page = writeContents(plan, path);
+      // The overlay ships with the SDK: the page pulls it from the client
+      // entry it already imports and assigns it through the ref — a JSX
+      // locales prop would decay to an attribute on React 18 (sdk-next's
+      // floor) and silently keep the neutral copy.
+      expect(page).toContain("businessLocales, configureZitadel");
+      expect(page).toContain("element.locales = businessLocales");
+      expect(page).not.toContain("locales={businessLocales}");
+    }
+    // Consumer scaffolds keep the neutral built-ins, like minimal ones.
+    const consumer = new NextPatcher().plan({ ...ctxFor("app"), useCase: "consumer" });
+    expect(writeContents(consumer, "app/login/page.tsx")).not.toContain("businessLocales");
+  });
+
+  it("leaves profile page chrome to the session card's page surface", () => {
+    const plan = new NextPatcher().plan(ctxFor("app"));
+    const profile = writeContents(plan, "app/profile/page.tsx");
+    expect(profile).toContain('variant="page"');
+    // The card paints its own full-page chrome from design tokens — no
+    // duplicated token hex or forced viewport height in generated markup.
+    expect(profile).not.toContain("#0f0f11");
+    expect(profile).not.toContain("minHeight");
+    expect(profile).toContain('colorScheme: "dark"');
+    expect(profile).toContain('variant="widget"');
+  });
+
   it("replaces the starter home page for a freshly scaffolded Next app", () => {
     const plan = new NextPatcher().plan(ctxFor("app", 15, true));
     const homePage = editContents(plan, "app/page.tsx", "starter");
@@ -80,6 +113,44 @@ describe("NextPatcher.plan", () => {
     expect(homePage).toContain(MANAGED_MARKER);
     expect(homePage).toContain('redirect("/login")');
     expect(homePage).not.toContain("Sign in, create an account");
+  });
+
+  it("embeds widget cards with theme=auto for the widget posture (ADR 044)", () => {
+    const plan = new NextPatcher().plan({ ...ctxFor("app"), posture: "widget" });
+    for (const path of ["app/login/page.tsx", "app/register/page.tsx"]) {
+      const page = writeContents(plan, path);
+      expect(page).toContain('variant="widget"\n          theme="auto"');
+      // Layout-neutral wrapper: no forced color scheme, no <main> that would
+      // nest inside the host app's own landmark.
+      expect(page).not.toContain('colorScheme: "dark"');
+      expect(page).not.toContain("<main");
+      expect(page).toContain('justifyContent: "center"');
+      // The full-page alternative stays named for discoverability.
+      expect(page).toContain('variant="page"');
+    }
+    const profile = writeContents(plan, "app/profile/page.tsx");
+    expect(profile).toContain('variant="widget"\n          theme="auto"');
+    expect(profile).not.toContain('colorScheme: "dark"');
+    expect(profile).toContain('justifyContent: "center"');
+  });
+
+  it("keeps the business overlay ref wiring in the widget posture", () => {
+    const plan = new NextPatcher().plan({
+      ...ctxFor("app"),
+      useCase: "business",
+      posture: "widget",
+    });
+    const page = writeContents(plan, "app/login/page.tsx");
+    expect(page).toContain('variant="widget"');
+    expect(page).toContain("element.locales = businessLocales");
+  });
+
+  it("treats absent posture as the page posture (legacy restores)", () => {
+    const dflt = new NextPatcher().plan(ctxFor("app"));
+    const paged = new NextPatcher().plan({ ...ctxFor("app"), posture: "page" });
+    for (const path of ["app/login/page.tsx", "app/register/page.tsx", "app/profile/page.tsx"]) {
+      expect(writeContents(paged, path)).toBe(writeContents(dflt, path));
+    }
   });
 
   it("emits proxy.ts for Next 16 projects", () => {
@@ -107,7 +178,7 @@ describe("NextPatcher.plan", () => {
     const base = ctxFor("app");
     const ctx = {
       ...base,
-      project: { ...base.project, previewOrigins: ["https://nextgen.dev.mrida.ng"] },
+      project: { ...base.project, preview_origins: ["https://nextgen.dev.mrida.ng"] },
     };
     const zitadelJson = JSON.parse(
       writeContents(new NextPatcher().plan(ctx), "zitadel.json") ?? "{}",

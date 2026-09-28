@@ -95,16 +95,16 @@ function wrap(
  * meant every consumer of this mock was exercising a screen the server never
  * emits; see this package's AGENTS.md.
  *
- * `register` and `recover` are mock-only affordances: the real flow reaches
- * `register` through the engine's `user_not_found` transition rather than a link,
- * and defines no recovery step yet. They are kept so those screens stay
- * reachable for Storybook and tests — but they are the one place this fixture
- * knowingly exceeds the real definition.
+ * `register` is real: the default flow declares it as a navigate action whose
+ * transition re-purposes to register (alongside the engine's `user_not_found`
+ * fallback). `recover` remains the one mock-only affordance on this step — the
+ * default defines no recovery step yet, and the screen is kept reachable for
+ * Storybook and tests. `default-conformance.spec.ts` enforces that split.
  */
 export function identifierStep(input: StepFixtureInput): CreateFlow201 {
   return wrap(input, {
     name: "identifier",
-    texts: { title_key: "identifier.title" },
+    texts: { title_key: "identifier.title", description_key: "identifier.description" },
     fields: [
       {
         name: "email",
@@ -115,7 +115,6 @@ export function identifierStep(input: StepFixtureInput): CreateFlow201 {
     ],
     actions: [
       { name: "submit", kind: "submit", text_key: "identifier.action.continue", primary: true },
-      { name: "passkey", kind: "passkey", text_key: "identifier.action.passkey" },
       { name: "register", kind: "navigate", text_key: "identifier.action.register.link" },
       { name: "recover", kind: "navigate", text_key: "action.forgot_password" },
     ],
@@ -127,7 +126,7 @@ export function identifierStep(input: StepFixtureInput): CreateFlow201 {
 export function registerStep(input: StepFixtureInput): CreateFlow201 {
   return wrap(input, {
     name: "register",
-    texts: { title_key: "register.title" },
+    texts: { title_key: "register.title", description_key: "register.description" },
     fields: [
       {
         name: "email",
@@ -169,7 +168,6 @@ export function registerStep(input: StepFixtureInput): CreateFlow201 {
     ],
     actions: [
       { name: "submit", kind: "submit", text_key: "register.action.password", primary: true },
-      { name: "passkey_register", kind: "passkey_register", text_key: "register.action.passkey" },
       { name: "sign_in", kind: "navigate", text_key: "register.action.sign_in.link" },
     ],
     gates: {},
@@ -207,6 +205,7 @@ export function registerPasswordStep(input: StepFixtureInput): CreateFlow201 {
         text_key: "register-password.action.submit",
         primary: true,
       },
+      { name: "back", kind: "back", text_key: "action.back" },
     ],
     gates: {},
   });
@@ -228,7 +227,7 @@ export function registerPasswordStep(input: StepFixtureInput): CreateFlow201 {
 export function passwordStep(input: StepFixtureInput): CreateFlow201 {
   return wrap(input, {
     name: "password",
-    texts: { title_key: "password.title" },
+    texts: { title_key: "password.title", description_key: "password.description" },
     fields: [
       {
         name: PASSWORD_FIELD,
@@ -239,7 +238,6 @@ export function passwordStep(input: StepFixtureInput): CreateFlow201 {
     ],
     actions: [
       { name: "submit", kind: "submit", text_key: "password.action.signin", primary: true },
-      { name: "passkey", kind: "passkey", text_key: "password.action.passkey" },
       { name: "back", kind: "back", text_key: "action.back" },
     ],
     gates: {},

@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "test": "node --test scripts/*.test.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
     "prepare-app": "node scripts/prepare-app.mjs",
     "publish-tarballs": "node scripts/publish-tarballs.mjs",
     "verify-tarballs": "node scripts/verify-tarballs.mjs",
@@ -12,6 +13,8 @@
   },
   "devDependencies": {
     "@playwright/test": "catalog:",
-    "eslint-plugin-playwright": "catalog:"
+    "@zitadel/testing": "workspace:*",
+    "eslint-plugin-playwright": "catalog:",
+    "typescript": "catalog:"
   }
 }

@@ -5,24 +5,16 @@ import (
 	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/domain/idgen"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
 func (h *Harness) EnsureCreateUserHandler(t *testing.T) *service.FlowCreateUserWithPasswordHandler {
 	t.Helper()
 	return service.NewFlowCreateUserHandler(
-		h.EnsureHasher(t),
+		h.EnsureProjectHashers(t),
 		h.EnsureUserService(t),
 		h.EnsureSchemaStore(t),
-	)
-}
-
-func (h *Harness) EnsureFlowCreateUserForPasskeyHandler(t *testing.T) *service.FlowCreateUserForPasskeyHandler {
-	t.Helper()
-	return service.NewFlowCreateUserForPasskeyHandler(
-		h.EnsureUserService(t),
-		h.EnsureSchemaStore(t),
+		h.EnsureServiceDB(t),
 	)
 }
 
@@ -35,7 +27,6 @@ func (h *Harness) EnsureFlowService(t *testing.T) service.FlowService {
 		h.flowService.value = service.NewFlowService(
 			h.EnsureServiceDB(t),
 			h.EnsureFlowStateMachine(t),
-			idgen.NewULID(),
 		)
 	}
 	return h.flowService.value
@@ -48,21 +39,13 @@ func (h *Harness) EnsureFlowStateMachine(t *testing.T) *domain.FlowStateMachineR
 
 	if h.flowStateMachine.value == nil {
 		fields := domain.NewSchemaFieldResolver()
-		authAdapter := service.NewFlowAuthAttemptAdapter(h.EnsureAuthAttemptService(t))
-		passkeyRegSvc := service.NewPasskeyRegistrationService(
-			h.EnsureServiceDB(t),
-			idgen.NewULID(),
-		)
-		passkeyRegAdapter := service.NewFlowPasskeyRegistrationAdapter(passkeyRegSvc)
+		authAdapter := service.NewFlowAuthAttemptAdapter(h.EnsureAuthAttemptService(t), h.EnsureSchemaStore(t))
 		h.flowStateMachine.value = domain.NewFlowStateMachine(
 			h.EnsureSchemaResolver(t),
 			h.EnsureSchemaStore(t),
 			fields,
 			h.EnsureCreateUserHandler(t),
-			h.EnsureFlowCreateUserForPasskeyHandler(t),
 			authAdapter,
-			passkeyRegAdapter,
-			idgen.NewULID(),
 			time.Now,
 		)
 	}

@@ -3,8 +3,7 @@ import { customElement, property } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import { unsafeSVG } from "lit/directives/unsafe-svg.js";
 
-import iconHost from "@zitadel/shared-component-styles/lit/icon-host.css?inline";
-import iconSurface from "@zitadel/shared-component-styles/icon.css?inline";
+import iconStyles from "./zl-icon.css?inline";
 import {
   ArrowLeft,
   ArrowRight,
@@ -29,18 +28,17 @@ import { surfaceStyles } from "../styles/index.js";
 /**
  * Atom: `<zl-icon>` — renders a curated glyph from the Lucide icon library.
  *
- * The Figma design system (file `8UjCXw8yemgljmbkWGrSfE`, Icons set
- * `4103:10466`, sizes `16 | 24`) is explicitly built on Lucide. Rather than redrawing every glyph as an
+ * The design system's icon set is explicitly built on Lucide, at 16 and 24px.
+ * Rather than redrawing every glyph as an
  * inline `<path>` (which inevitably drifts), we curate the auth surface's
  * subset by importing each canonical Lucide node and exposing a stable
  * kebab-case `name` API. To add a glyph: import it from `lucide`, add an
  * entry to {@link ICON_NODES}, and extend the {@link IconName} union.
  *
- * Colour: by default the icon inherits `currentColor`. Set `tone` to one
- * of the semantic states to pick up `--zl-color-icon-{error|success|disabled}`
- * directly. The "palette" colour tokens (`--zl-color-icon-default-*`) are
- * not exposed as `tone` values; consumers wanting those set `color:` on
- * the host.
+ * Colour: by default the icon inherits `currentColor`, which is what most
+ * usages want — the glyph takes the colour of the control it sits in. Set
+ * `tone` to pick up `--zl-destructive`, `--zl-success` or
+ * `--zl-muted-foreground` instead. Any other colour is a `color:` on the host.
  *
  * Accessibility: glyphs with an entry in {@link DEFAULT_LABELS} expose an
  * `aria-label` so they're meaningful when used standalone. When the icon
@@ -52,7 +50,7 @@ import { surfaceStyles } from "../styles/index.js";
 @customElement("zl-icon")
 export class ZlIcon extends LitElement {
   /* No baseHostStyles — would force white on :host; icons inherit context color. */
-  static override styles = surfaceStyles(iconHost, iconSurface);
+  static override styles = surfaceStyles(iconStyles);
 
   @property() accessor name: IconName = "plus";
 

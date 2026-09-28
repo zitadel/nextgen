@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { generateKeyPairSync, createSign } from "node:crypto";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 import { nextgenMiddleware } from "../middleware";
 
@@ -63,6 +63,10 @@ function mockJwks(kid: string): ReturnType<typeof vi.fn> {
 describe("nextgenMiddleware", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it("public route with no token passes through with empty x-nextgen-auth-token", async () => {
@@ -430,6 +434,95 @@ describe("nextgenMiddleware", () => {
 
       const setCookie = res.headers.get("set-cookie") ?? "";
       expect(setCookie).toBe("__nextgen_session=abc; HttpOnly; SameSite=Lax");
+    });
+  });
+
+  describe("proxy: credential planes", () => {
+    it.each([
+      ["GET", "/__nextgen/sessions/me"],
+      ["DELETE", "/__nextgen/sessions/me"],
+      ["POST", "/__nextgen/flow"],
+      ["GET", "/__nextgen/projects"],
+      ["GET", "/__nextgen/sessions/exchange"],
+      ["POST", "/__nextgen/sessions/exchange/extra"],
+    ])("does not attach the project secret to %s %s", async (method, pathname) => {
+      vi.stubEnv("ZITADEL_PROJECT_SECRET", "project-secret");
+      let capturedHeaders: Headers | undefined;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockImplementation((_url: string, init: RequestInit) => {
+          capturedHeaders = init.headers as Headers;
+          return Promise.resolve(new Response("{}", { status: 200 }));
+        }),
+      );
+
+      await nextgenMiddleware(new NextRequest(`http://localhost:3000${pathname}`, { method }), {
+        url: "http://localhost:4000",
+      });
+
+      expect((capturedHeaders as Headers).has("authorization")).toBe(false);
+    });
+
+    it("attaches the project secret only to POST /sessions/exchange, ignoring the query", async () => {
+      vi.stubEnv("ZITADEL_PROJECT_SECRET", "project-secret");
+      let capturedHeaders: Headers | undefined;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockImplementation((_url: string, init: RequestInit) => {
+          capturedHeaders = init.headers as Headers;
+          return Promise.resolve(new Response("{}", { status: 200 }));
+        }),
+      );
+
+      await nextgenMiddleware(
+        new NextRequest("http://localhost:3000/__nextgen/sessions/exchange?source=browser", {
+          method: "POST",
+        }),
+        { url: "http://localhost:4000" },
+      );
+
+      expect((capturedHeaders as Headers).get("authorization")).toBe("Bearer project-secret");
+    });
+
+    it("preserves an explicit caller credential on the exchange", async () => {
+      vi.stubEnv("ZITADEL_PROJECT_SECRET", "project-secret");
+      let capturedHeaders: Headers | undefined;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockImplementation((_url: string, init: RequestInit) => {
+          capturedHeaders = init.headers as Headers;
+          return Promise.resolve(new Response("{}", { status: 200 }));
+        }),
+      );
+
+      await nextgenMiddleware(
+        new NextRequest("http://localhost:3000/__nextgen/sessions/exchange", {
+          method: "POST",
+          headers: { authorization: "Bearer caller-key" },
+        }),
+        { url: "http://localhost:4000" },
+      );
+
+      expect((capturedHeaders as Headers).get("authorization")).toBe("Bearer caller-key");
+    });
+
+    it("preserves the upstream session cache policy", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue(
+          new Response("{}", {
+            status: 200,
+            headers: { "cache-control": "private, no-store" },
+          }),
+        ),
+      );
+
+      const response = await nextgenMiddleware(
+        new NextRequest("http://localhost:3000/__nextgen/sessions/me"),
+        { url: "http://localhost:4000" },
+      );
+
+      expect(response.headers.get("cache-control")).toBe("private, no-store");
     });
   });
 

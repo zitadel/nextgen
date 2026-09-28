@@ -45,11 +45,14 @@ export default defineComponent({
     },
     postSignInUrl: { type: String, default: undefined },
     locales: {
-      type: Object as PropType<Record<string, Record<string, string>>>,
+      type: Object as PropType<Record<string, Partial<Record<string, string>>>>,
       default: undefined,
     },
     lang: { type: String, default: undefined },
     flowName: { type: String, default: undefined },
+    variant: { type: String as PropType<"widget" | "page">, default: undefined },
+    theme: { type: String as PropType<"light" | "dark" | "auto">, default: undefined },
+    suppressHeader: { type: Boolean, default: undefined },
   },
   emits: ["flowStep", "flowInput", "flowComplete", "flowError"],
   setup(props, { emit, expose }) {
@@ -74,6 +77,9 @@ export default defineComponent({
         locales: props.locales === undefined ? undefined : toRaw(props.locales),
         lang: props.lang,
         "flow-name": props.flowName,
+        variant: props.variant,
+        theme: props.theme,
+        suppressHeader: props.suppressHeader,
         onZitadelFlowStep: (event: CustomEvent<ZitadelFlowStepDetail>) => {
           emit("flowStep", event.detail);
         },

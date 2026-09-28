@@ -34,6 +34,7 @@ initialize({ onUnhandledRequest: "bypass" });
 interface OrchestratorArgs {
   purpose: "login" | "register";
   branding: BrandingPresetId;
+  theme: "" | "light" | "dark" | "auto";
 }
 
 const mock = setupMockHandlers();
@@ -46,7 +47,7 @@ const meta: Meta<OrchestratorArgs> = {
     layout: "fullscreen",
     msw: { handlers: mock.handlers },
   },
-  args: { purpose: "login", branding: "centered" },
+  args: { purpose: "login", branding: "centered", theme: "" },
   argTypes: {
     purpose: {
       control: "inline-radio",
@@ -58,14 +59,20 @@ const meta: Meta<OrchestratorArgs> = {
       options: Object.keys(brandingPresets),
       description: "Tenant branding the mock overlays on every response.",
     },
+    theme: {
+      control: "inline-radio",
+      options: ["", "light", "dark", "auto"],
+      description:
+        "The embedding page's own preference. Empty defers to the revision's mode; a side the revision does not publish cannot be selected.",
+    },
   },
   beforeEach: ({ args }) => {
     mock.reset();
     clearBranding();
     applyBranding(brandingPresets[args.branding]);
   },
-  render: ({ purpose }) =>
-    html`<zitadel-login variant="page" .purpose=${purpose}></zitadel-login>`,
+  render: ({ purpose, theme }) =>
+    html`<zitadel-login variant="page" .purpose=${purpose} theme=${theme}></zitadel-login>`,
 };
 
 export default meta;

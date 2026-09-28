@@ -1,0 +1,34 @@
+type: object
+description: |
+  Request to begin a WebAuthn registration ceremony for the user.
+
+  Management callers are not browsers, so the relying-party parameters cannot
+  be derived from an Origin header and must be supplied explicitly.
+required:
+  - rp_id
+  - rp_origins
+additionalProperties: false
+properties:
+  rp_id:
+    type: string
+    minLength: 1
+    description: Relying Party ID the credential is scoped to.
+    example: example.com
+  rp_origins:
+    type: array
+    description: Allowed origins for this ceremony's attestation.
+    minItems: 1
+    items:
+      type: string
+      format: uri
+    example: [ 'https://example.com' ]
+  username:
+    type: string
+    description: |
+      Browser-visible account label for the credential picker. Optional: when
+      omitted, a neutral default is used.
+    example: alice@example.com
+  display_name:
+    type: string
+    description: Browser-visible display name. Optional; defaults to the username.
+    example: Alice Example

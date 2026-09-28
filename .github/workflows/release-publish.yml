@@ -103,8 +103,6 @@ jobs:
           ref: ${{ github.event_name == 'push' && github.sha || 'main' }}
           fetch-depth: 0
 
-      - uses: moonrepo/setup-toolchain@v0
-
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
@@ -134,6 +132,11 @@ jobs:
 
       - name: Install dependencies
         run: corepack pnpm install --frozen-lockfile
+
+      # Bare `moon` below is the workspace's own pinned @moonrepo/cli, so CI
+      # runs the exact version the lockfile resolves — same as local dev.
+      - name: Put workspace binaries on PATH
+        run: echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
 
       - name: Configure Changesets git tag author
         if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && ! inputs.dry_run) }}

@@ -13,7 +13,7 @@ get:
     - Authentication Attempts
   security:
     - oauth2:
-        - auth_attempts.read
+        - auth_attempt.read
   parameters:
     - $ref: ../../../components/parameters/attempt-id.yaml
   responses:

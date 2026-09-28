@@ -5,6 +5,8 @@ package integration_test
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -33,6 +35,24 @@ func TestCreateSchema(t *testing.T) {
 			{
 				name:   "user-schema in body",
 				schema: harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema,
+			},
+			{
+				name: "password schema with a designated identifier",
+				schema: fmt.Sprintf(`{
+                  "title": "password with identifier",
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "$id": "https://example.com/schemas/pw-with-identifier.json",
+                  "metaSchema": "%s/user-schema.json",
+                  "kind": "user-schema",
+                  "type": "object",
+                  "x-identifier": "email",
+                  "x-auth-methods": {
+                    "password": { "enabled": true }
+                  },
+                  "properties": {
+                    "email": { "type": "string", "format": "email", "x-unique": "project" }
+                  }
+                }`, helpers.BuiltinSchemaBaseURL),
 			},
 			// TODO: add this test case once we have a public github-repo from which to get a schema
 			//{
@@ -77,9 +97,8 @@ func TestCreateSchema(t *testing.T) {
 				"kind":       "does not exist",
 				"title":      "an invalid user schema",
 				"x-auth-methods": map[string]any{
-					"password": map[string]any{
-						"enabled":  true,
-						"position": 0,
+					"passkey": map[string]any{
+						"enabled": true,
 					},
 				},
 			})
@@ -99,7 +118,8 @@ func TestCreateSchema(t *testing.T) {
 
 			resp, err := client.CreateSchema(t.Context(), req, params)
 			assert.NoError(t, err)
-			assert.IsType(t, &api.CreateSchemaBadRequest{}, resp, helpers.MustMarshal(t, resp))
+			require.IsType(t, &api.CreateSchemaErrorResponseStatusCode{}, resp, helpers.MustMarshal(t, resp))
+			assert.Equal(t, http.StatusBadRequest, resp.(*api.CreateSchemaErrorResponseStatusCode).StatusCode)
 		})
 
 		t.Run("duplicates are not allowed", func(t *testing.T) {
@@ -114,7 +134,7 @@ func TestCreateSchema(t *testing.T) {
                   "kind": "user-schema",
                   "type": "object",
                   "x-auth-methods": {
-                    "password": { "enabled": true, "position": 1 }
+                    "passkey": { "enabled": true }
                   },
                   "properties": {
                     "givenName": { "type": "string" }
@@ -145,8 +165,43 @@ func TestCreateSchema(t *testing.T) {
 			resp, err := client.CreateSchema(t.Context(), req, params)
 			assert.NoError(t, err)
 
-			assert.IsType(t, &api.CreateSchemaConflict{}, resp, helpers.MustMarshal(t, resp))
+			require.IsType(t, &api.CreateSchemaErrorResponseStatusCode{}, resp, helpers.MustMarshal(t, resp))
+			assert.Equal(t, http.StatusConflict, resp.(*api.CreateSchemaErrorResponseStatusCode).StatusCode)
 		})
+
+		t.Run("password without a designated identifier is rejected with the rule named", func(t *testing.T) {
+			t.Parallel()
+
+			schema := fmt.Sprintf(`{
+                  "title": "password without identifier",
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "$id": "https://example.com/schemas/pw-no-identifier.json",
+                  "metaSchema": "%s/user-schema.json",
+                  "kind": "user-schema",
+                  "type": "object",
+                  "x-auth-methods": {
+                    "password": { "enabled": true }
+                  },
+                  "properties": {
+                    "email": { "type": "string", "x-unique": "project" }
+                  }
+                }`, helpers.BuiltinSchemaBaseURL)
+
+			apiSchema := api.UserSchema{}
+			require.NoError(t, apiSchema.UnmarshalJSON([]byte(schema)))
+
+			resp, err := client.CreateSchema(t.Context(), api.CreateSchemaReq{
+				Type:       api.UserSchemaCreateSchemaReq,
+				UserSchema: apiSchema,
+			}, api.CreateSchemaParams{ProjectID: api.ProjectID(project.ID)})
+			assert.NoError(t, err)
+			require.IsType(t, &api.CreateSchemaErrorResponseStatusCode{}, resp, helpers.MustMarshal(t, resp))
+			assert.Equal(t, http.StatusBadRequest, resp.(*api.CreateSchemaErrorResponseStatusCode).StatusCode)
+			// The rule text must reach the client, not vanish into an
+			// unserialized Parent.
+			assert.Contains(t, helpers.MustMarshal(t, resp), "x-identifier")
+		})
+
 	})
 }
 
@@ -166,15 +221,31 @@ func TestGetSchema(t *testing.T) {
 		t.Run("simple", func(t *testing.T) {
 			t.Parallel()
 
-			schemaID := harness.CreateUserSchema(t, project, harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema)
+			// Omit $id so Create mints a unique sch_* id. The shared fixture's
+			// URL-shaped $id contains '/' segments that ogen rejects as a leaf
+			// path param; composite RSI PK (#809) scopes URL reuse per project.
+			schemaJSON := []byte(harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema)
+			var schemaObj map[string]any
+			require.NoError(t, json.Unmarshal(schemaJSON, &schemaObj))
+			delete(schemaObj, "$id")
+			schemaJSON, err := json.Marshal(schemaObj)
+			require.NoError(t, err)
+
+			schemaID := harness.CreateUserSchema(t, project, string(schemaJSON))
+			require.True(t, strings.HasPrefix(schemaID, "sch_"), "want managed sch_* id, got %q", schemaID)
 
 			resp, err := client.GetSchemaById(t.Context(), api.GetSchemaByIdParams{
-				ID:        schemaID,
-				ProjectID: api.ProjectID(project.ID),
+				ID: schemaID,
 			})
 			assert.NoError(t, err)
 
-			assert.IsType(t, &api.GetSchemaByIdOK{}, resp, helpers.MustMarshal(t, resp))
+			if assert.IsType(t, &api.Schema{}, resp, helpers.MustMarshal(t, resp)) {
+				schema := resp.(*api.Schema)
+				assert.Equal(t, schemaID, schema.ID)
+				assert.False(t, schema.Metadata.CreatedAt.IsZero())
+				_, ok := schema.Schema.GetUserSchema()
+				assert.True(t, ok, "envelope should carry the user-schema document")
+			}
 		})
 	})
 
@@ -185,12 +256,12 @@ func TestGetSchema(t *testing.T) {
 			t.Parallel()
 
 			resp, err := client.GetSchemaById(t.Context(), api.GetSchemaByIdParams{
-				ID:        "does-not-exist",
-				ProjectID: api.ProjectID(project.ID),
+				ID: "does-not-exist",
 			})
 			assert.NoError(t, err)
 
-			assert.IsType(t, &api.GetSchemaByIdNotFound{}, resp, helpers.MustMarshal(t, resp))
+			require.IsType(t, &api.GetSchemaByIdErrorResponseStatusCode{}, resp, helpers.MustMarshal(t, resp))
+			assert.Equal(t, http.StatusNotFound, resp.(*api.GetSchemaByIdErrorResponseStatusCode).StatusCode)
 		})
 	})
 }
@@ -223,7 +294,7 @@ func TestSchemaRevisions(t *testing.T) {
                   "kind": "user-schema",
                   "type": "object",
                   "x-auth-methods": {
-                    "password": { "enabled": true, "position": 1 }
+                    "passkey": { "enabled": true }
                   },
                   "properties": {
                     "givenName": { "type": "string" }
@@ -239,7 +310,7 @@ func TestSchemaRevisions(t *testing.T) {
                   "kind": "user-schema",
                   "type": "object",
                   "x-auth-methods": {
-                    "password": { "enabled": true, "position": 1 }
+                    "passkey": { "enabled": true }
                   },
                   "properties": {
                     "firstName": { "type": "string" }
@@ -255,7 +326,7 @@ func TestSchemaRevisions(t *testing.T) {
                   "kind": "user-schema",
                   "type": "object",
                   "x-auth-methods": {
-                    "password": { "enabled": true, "position": 0 }
+                    "passkey": { "enabled": true }
                   },
                   "properties": {
                     "givenName": { "type": "string" }
@@ -296,13 +367,90 @@ func TestSchemaRevisions(t *testing.T) {
 			)
 			require.NoError(t, err)
 			if assert.IsType(t, &api.ListSchemasResponse{}, resp, helpers.MustMarshal(t, resp)) {
-				list := *(resp.(*api.ListSchemasResponse))
+				list := resp.(*api.ListSchemasResponse).Schemas
 				// ensure all revisions are present
 				assert.Len(t, list, len(tc.schemaRevisions))
 
 				// ensure list endpoint is LIFO and latest items match
 				assert.Equal(t, list[0].ID, lastCreatedID)
+
+				// every row carries the full document alongside the envelope
+				for _, item := range list {
+					doc, ok := item.Schema.GetUserSchema()
+					if assert.True(t, ok, "list row should carry the user-schema document") {
+						assert.Equal(t, tc.objectType, doc.ObjectType.Value)
+					}
+					assert.False(t, item.Metadata.CreatedAt.IsZero())
+				}
 			}
 		})
 	}
+}
+
+// A schema created through the posted-body path records the `kind` its document
+// declares, and listing by that kind returns it. The exclusion half of the
+// contract — a different kind, and an unparsed schema stored as `unknown` — is
+// proven in stmttest, where a schema can be written directly; the API cannot
+// produce either, because `kind` is an enum of one and the create path always
+// populates it.
+func TestSchemaKindFilter(t *testing.T) {
+	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+
+	objectType := "kind-filter-" + strings.ToLower(helpers.ProjectName())
+	sch := api.UserSchema{}
+	require.NoError(t, sch.UnmarshalJSON([]byte(fmt.Sprintf(
+		`{
+          "title": "kind filter",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "objectType": %q,
+          "metaSchema": "%s/user-schema.json",
+          "kind": "user-schema",
+          "type": "object",
+          "x-auth-methods": {
+            "passkey": { "enabled": true }
+          },
+          "properties": {
+            "givenName": { "type": "string" }
+          }
+        }`, objectType, helpers.BuiltinSchemaBaseURL))))
+
+	created, err := client.CreateSchema(
+		t.Context(),
+		api.CreateSchemaReq{Type: api.UserSchemaCreateSchemaReq, UserSchema: sch},
+		api.CreateSchemaParams{ProjectID: api.ProjectID(project.ID)},
+	)
+	require.NoError(t, err)
+	require.IsType(t, &api.CreateSchemaResponse{}, created, helpers.MustMarshal(t, created))
+	createdID := created.(*api.CreateSchemaResponse).ID
+
+	list := func(t *testing.T, params api.ListSchemasParams) []api.Schema {
+		t.Helper()
+		resp, err := client.ListSchemas(t.Context(), params)
+		require.NoError(t, err)
+		require.IsType(t, &api.ListSchemasResponse{}, resp, helpers.MustMarshal(t, resp))
+		return resp.(*api.ListSchemasResponse).Schemas
+	}
+
+	base := api.ListSchemasParams{
+		ProjectID:  api.ProjectID(project.ID),
+		ObjectType: api.OptString{Value: objectType, Set: true},
+	}
+
+	withKind := base
+	withKind.Kind = api.OptListSchemasKind{Value: api.ListSchemasKindUserSchema, Set: true}
+
+	filtered := list(t, withKind)
+	require.Len(t, filtered, 1)
+	assert.Equal(t, createdID, filtered[0].ID)
+
+	// The kind filter neither drops the schema nor adds anything to it: the same
+	// query without a kind returns the same single row.
+	assert.Len(t, list(t, base), 1)
 }

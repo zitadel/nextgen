@@ -40,7 +40,7 @@ describe.each([...SETUP_USE_CASES])("use case %s", (useCase) => {
   });
 
   it("collects exactly its field set, with email the only required property", () => {
-    const schema = getDefaultHumanUserSchema({ useCase }) as {
+    const schema = getDefaultHumanUserSchema({ useCase }) as unknown as {
       properties: Record<string, unknown>;
       required: string[];
     };
@@ -72,7 +72,8 @@ describe("use-case selection", () => {
     };
     expect(schema.properties.companyName).toMatchObject({ type: "string" });
     // companyName is not required and carries no identity/claim wiring yet.
-    expect(schema.properties.companyName["x-claim"]).toBeUndefined();
+    // (The line above asserts presence, so the assertion here is safe.)
+    expect(schema.properties.companyName!["x-claim"]).toBeUndefined();
   });
 
   it("keeps the field set identical across sign-in presets (schema owns fields, not the flow)", () => {

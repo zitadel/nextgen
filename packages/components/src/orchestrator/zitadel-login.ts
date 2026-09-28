@@ -9,35 +9,38 @@ import type {
   SubmitFlowStepBodyFields,
 } from "@zitadel/api/generated/model";
 import { ApiError, apiErrorMessage } from "@zitadel/api/runtime/fetch";
+import { zitadelTrustmarkInnerHtml } from "../internal/attribution-markup.js";
+import type { Liquid, Template } from "liquidjs";
 import { css, html, LitElement, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import { unsafeHTML } from "lit/directives/unsafe-html.js";
-import type { Liquid, Template } from "liquidjs";
 
 import "../atoms/index.js";
+import { unsafeHTML } from "lit/directives/unsafe-html.js";
+
+import { emit } from "../internal/emit.js";
+import { escapeHtml } from "../internal/escape-html.js";
 import {
   exchangeSession,
   getCurrentStep,
   startFlow as apiStartFlow,
   submitStep as apiSubmitStep,
 } from "./api-client.js";
-import { resolveApi, type ProjectAttrs } from "./resolve-api.js";
-import type { Branding } from "./branding.js";
-import { applyBaseTokens, applyBrandingTokens } from "./branding-to-tokens.js";
+import { armAssetFallbacks } from "./asset-fallback.js";
 import { validateBranding } from "./branding-validator.js";
+import { resolveLogoUrl } from "./branding.js";
+import type { ResolvedTheme } from "./theme-controller.js";
+import type { Branding } from "./branding.js";
 import { stampExportparts } from "./exportparts.js";
-import { applyDefaultFont, applyFontUrl } from "./font-loader.js";
-import { emit } from "../internal/emit.js";
-import { escapeHtml } from "../internal/escape-html.js";
 import { createLiquidEngine, localiseFlowErrorKeys } from "./liquid.js";
-import { TEMPLATE_NAMES } from "./template-names.js";
 import { en, builtinLocales, type Locale } from "./locales/index.js";
 import { patchMandatoryGates } from "./mandatory-gates.js";
-import { zitadelAttributionPillInnerHtml } from "@zitadel/shared-component-styles/attribution-markup";
+import { resolveApi, type ProjectAttrs } from "./resolve-api.js";
 import { createSanitiser } from "./sanitiser.js";
+import { ZitadelSurface } from "./surface.js";
 import type { FlowError, FlowIdentity, LiquidContext } from "./template-context.js";
+import { TEMPLATE_NAMES } from "./template-names.js";
+
 import layoutChromeCss from "./templates/layout-chrome.css?inline";
-import { ThemeController, type ThemeMode } from "./theme-controller.js";
 
 /**
  * The uniform value contract every input atom exposes (`<zl-field>`,
@@ -86,7 +89,7 @@ function isFieldAtom(el: Element): el is FieldAtom {
  * - `docs/design/flowengine/template-security.md`
  */
 @customElement("zitadel-login")
-export class ZitadelLogin extends LitElement {
+export class ZitadelLogin extends ZitadelSurface {
   static override shadowRootOptions: ShadowRootInit = {
     ...LitElement.shadowRootOptions,
     delegatesFocus: true,
@@ -104,28 +107,9 @@ export class ZitadelLogin extends LitElement {
     }
   `;
 
-  /**
-   * Sizing/chrome mode. Components size to content; pages compose them —
-   * so the default is `widget`: content-sized, transparent host, no
-   * document-level default-font injection, no initial focus grab (matching
-   * the polarity of `<zitadel-logout>`). Dedicated login routes — the
-   * hosted shell and the scaffolded pages — opt into `page`, which claims
-   * the viewport, paints the surface background, ships the brand font, and
-   * focuses the first field on load. Fine-grained height override in both
-   * modes: `--zl-page-min-height`.
-   */
-  @property({ type: String, reflect: true }) accessor variant: "widget" | "page" = "widget";
-
-  /**
-   * Colour mode: `light`, `dark`, or `auto` (follow `prefers-color-scheme`).
-   * Empty means "not stated", and resolution falls through to the tenant's
-   * `branding.theme.mode`, then to a variant-derived default — `dark` for
-   * `page` (the hosted design system surface) and `auto` for `widget`, so an
-   * embedded widget matches the visitor's preference instead of forcing a
-   * dark card onto a light page. Set it explicitly when your app's surface
-   * is fixed: `<zitadel-login theme="light">`.
-   */
-  @property({ type: String }) accessor theme: "" | ThemeMode = "";
+  // `variant` and `theme` come from `ZitadelSurface`. Login adds one
+  // variant-specific behavior on top of the shared surface polarity: `page`
+  // focuses the first field on load, `widget` never steals focus.
 
   @property({ type: String }) accessor purpose: CreateFlowBodyPurpose = "login";
 
@@ -189,18 +173,21 @@ export class ZitadelLogin extends LitElement {
   @property({ type: String }) override accessor lang = "";
 
   /**
-   * Custom locale dictionaries keyed by language code. When set, these take
-   * precedence over the built-in dictionaries for matching language codes.
+   * Custom locale dictionaries keyed by language code. Entries may be
+   * partial — each is merged over the built-in dictionary for its language,
+   * so a preset like {@link businessLocales} (or a hand-written subset) is
+   * directly assignable:
    *
    * ```ts
-   * import { en } from "@zitadel/components";
-   * const locales = {
-   *   en: { ...en, "identifier.title": "Welcome" },
-   *   de: myGermanDict,
-   * };
+   * import { businessLocales } from "@zitadel/components";
+   * loginElement.locales = businessLocales;
+   * // or override individual keys:
+   * loginElement.locales = { en: { "identifier.title": "Welcome" } };
    * ```
    */
-  @property({ attribute: false }) accessor locales: Record<string, Locale> | undefined;
+  @property({ attribute: false }) accessor locales:
+    | Readonly<Record<string, Partial<Locale>>>
+    | undefined;
 
   @state() private accessor response: CreateFlow201 | null = null;
 
@@ -208,13 +195,22 @@ export class ZitadelLogin extends LitElement {
 
   @state() private accessor loading = false;
 
+  /** Terminal step that navigates away, so its screen is never painted. */
+  @state() private accessor completing = false;
+
   @state() private accessor startupError: string | null = null;
 
   @state() private accessor formValues: Record<string, string> = {};
 
-  private readonly themeController = new ThemeController(this);
-
   private engine: Liquid | null = null;
+
+  /**
+   * The theme the last commit rendered with. The template output carries the
+   * resolved side's mark, so a theme change rewrites the string and
+   * `unsafeHTML` rebuilds the form — which drops what the visitor had typed
+   * unless it is put back.
+   */
+  private lastRenderedTheme: ResolvedTheme | null = null;
 
   private readonly sanitise = createSanitiser();
 
@@ -223,6 +219,28 @@ export class ZitadelLogin extends LitElement {
    * every `formValues` change otherwise re-parses the same template.
    */
   private tenantTemplateCache: { source: string; template: Template[] } | null = null;
+
+  /**
+   * Whether the widget currently owns a same-document history entry (the
+   * "sentinel"). The sentinel exists so the browser's back gesture fires
+   * `popstate` instead of leaving the page. Exactly one sentinel is on
+   * the stack at a time: it is pushed when a step with a `kind: "back"`
+   * action renders, re-armed by `onPopState` after the browser consumes
+   * it, and retired by `applyResponse` when a step without a back action
+   * renders. The entry reuses the current URL, so the host page's
+   * location (including any hash-router fragment) is never modified.
+   */
+  private armed = false;
+
+  /**
+   * Set immediately before a self-initiated `history.back()` so the
+   * resulting `popstate` is ignored instead of being interpreted as a
+   * user back gesture.
+   */
+  private ignoreNextPop = false;
+
+  /** Bound `popstate` handler stored for cleanup in `disconnectedCallback`. */
+  private readonly handlePopState = this.onPopState.bind(this);
 
   override createRenderRoot(): HTMLElement | DocumentFragment {
     const root = super.createRenderRoot();
@@ -264,6 +282,20 @@ export class ZitadelLogin extends LitElement {
     return root;
   }
 
+  override connectedCallback(): void {
+    super.connectedCallback();
+    if (typeof window !== "undefined") {
+      window.addEventListener("popstate", this.handlePopState);
+    }
+  }
+
+  override disconnectedCallback(): void {
+    super.disconnectedCallback();
+    if (typeof window !== "undefined") {
+      window.removeEventListener("popstate", this.handlePopState);
+    }
+  }
+
   /**
    * Start the flow after the first render rather than in `connectedCallback`.
    * Frameworks that wrap web components (e.g. `@lit/react` in the console)
@@ -297,36 +329,22 @@ export class ZitadelLogin extends LitElement {
     const primary = (code.split("-")[0] ?? "").toLowerCase();
     const builtin = builtinLocales[primary] ?? en;
     const custom = this.locales?.[primary];
+    if (!custom) return builtin;
 
-    return custom ? { ...builtin, ...custom } : builtin;
+    // Entries are Partial — merge key-by-key and skip explicit `undefined`
+    // values, which a plain spread would let shadow the built-in copy.
+    const merged: Locale = { ...builtin };
+    for (const [key, value] of Object.entries(custom)) {
+      if (value !== undefined) merged[key] = value;
+    }
+    return merged;
   }
 
   override willUpdate(changed: PropertyValues<this>): void {
     if (!this.engine || changed.has("locales") || changed.has("lang")) {
       this.engine = createLiquidEngine({ locale: this.resolveLocale() });
     }
-    // Resolve before reading `themeController.theme` below: a page owns its
-    // surface (dark), a widget defers to the visitor's preference (auto).
-    this.themeController.setModePreference(
-      this.theme === "" ? undefined : this.theme,
-      this.variant === "page" ? "dark" : "auto",
-    );
-    const root = this.shadowRoot;
-    if (root) {
-      applyBaseTokens(root);
-      applyBrandingTokens(root, this.branding, this.themeController.theme);
-      // Ship the design-system brand face by default on dedicated login
-      // pages; drop it when a tenant font takes over so we don't fire a
-      // redundant request. Widget mode never injects the default into the
-      // host document — the embedding app owns its typography (and its
-      // visitors' font-CDN connections). Tenant `font_url` is explicit
-      // server-side branding state, so it applies in both modes.
-      const tenantFontUrl = this.branding?.font_url ?? null;
-      applyDefaultFont(root, this.variant === "page" && !tenantFontUrl ? undefined : null);
-      applyFontUrl(root, tenantFontUrl);
-    }
-    this.dataset.theme = this.themeController.theme;
-    this.toggleAttribute("data-theme-dark", this.themeController.theme === "dark");
+    this.applySurfaceTheme(this.branding);
     this.setAttribute("aria-busy", this.loading ? "true" : "false");
   }
 
@@ -339,26 +357,49 @@ export class ZitadelLogin extends LitElement {
     // `:host([variant])` selector.
     if (this.shadowRoot) {
       stampExportparts(this.shadowRoot);
+      // A configured-but-dead logo_url/hero_url is invisible everywhere else
+      // in the pipeline; this is the only layer that can see the image fail.
+      armAssetFallbacks(this.shadowRoot);
       const widget = this.variant !== "page";
       for (const shell of this.shadowRoot.querySelectorAll("zl-page-shell")) {
         shell.toggleAttribute("data-widget", widget);
+        // CSS-level so it also covers user-ejected templates: the rule in
+        // layout-chrome.css hides `.zl-card-title`/`.zl-card-subtitle`
+        // visually while keeping the step's accessible name.
+        shell.toggleAttribute("data-suppress-header", this.suppressHeader);
+      }
+      // Stamped on the card too: its header REGION must leave the flex flow
+      // (card-host.css) or the card keeps a blank 32px header band — the
+      // slotted headings alone going sr-only doesn't collapse the region.
+      for (const card of this.shadowRoot.querySelectorAll("zl-card")) {
+        card.toggleAttribute("data-suppress-header", this.suppressHeader);
       }
     }
+    const previousTheme = this.lastRenderedTheme;
+    this.lastRenderedTheme = this.themeController.theme;
+
     const props = changed as Map<string, unknown>;
-    if (!props.has("response")) return;
-    // `changed` holds the OLD value: nullish (`null` initializer, or
-    // undefined when the property never changed before) means this commit
-    // applied the first response — the initial paint, not a user-driven
-    // step swap.
-    void this.hydrateStepAfterRender(props.get("response") == null);
+    if (props.has("response")) {
+      // `changed` holds the OLD value: nullish (`null` initializer, or
+      // undefined when the property never changed before) means this commit
+      // applied the first response — the initial paint, not a user-driven
+      // step swap.
+      void this.hydrateStepAfterRender(props.get("response") == null);
+      return;
+    }
+    if (previousTheme !== null && previousTheme !== this.lastRenderedTheme) {
+      // A flip mid-step is not a step change: restore what was typed, but
+      // leave focus where the visitor put it.
+      void this.restoreValuesAfterRender();
+    }
   }
 
   /**
    * Apply captured values and move focus once the new step has fully
-   * rendered. This commit produces the step's `zl-field`/`zl-button` atoms,
-   * but those render their own shadow DOM on a later microtask — so await
-   * this element's update *and* the child atoms' first render before touching
-   * them, rather than guessing a frame with `requestAnimationFrame`.
+   * rendered. This commit produces the step's field/action atoms, but those
+   * render their own shadow DOM on a later microtask — so await this element's
+   * update *and* the child atoms' first render before touching them, rather
+   * than guessing a frame with `requestAnimationFrame`.
    *
    * Focus on the *initial* response is page-mode-only: a dedicated login
    * route should focus its first field, but a widget embedded further down
@@ -366,24 +407,48 @@ export class ZitadelLogin extends LitElement {
    * swaps are user-initiated, so focus moves in both modes.
    */
   private async hydrateStepAfterRender(initial = false): Promise<void> {
+    await this.restoreValuesAfterRender();
+    if (!initial || this.variant === "page") {
+      this.moveFocusToFirstField(initial && this.variant === "page");
+    }
+  }
+
+  /**
+   * Put captured values back once the rebuilt subtree has rendered. Awaits the
+   * child atoms' own first render before touching them, rather than guessing a
+   * frame with `requestAnimationFrame`.
+   */
+  private async restoreValuesAfterRender(): Promise<void> {
     await this.updateComplete;
-    const atoms = this.shadowRoot?.querySelectorAll<LitElement>("zl-field, zl-button");
+    const atoms = this.shadowRoot?.querySelectorAll<LitElement>(
+      "zl-field, zl-select, zl-checkbox, zl-button",
+    );
     if (atoms) {
       await Promise.all(Array.from(atoms).map((atom) => atom.updateComplete));
     }
     this.applyValuesToFields();
-    if (!initial || this.variant === "page") {
-      this.moveFocusToFirstField();
-    }
   }
 
   override render() {
     if (this.startupError) {
+      // Same chrome a step renders into (page shell + card), because this is
+      // still the login surface — just one that could not start. Without the
+      // shell the alert lands bare in the top-left corner of an otherwise
+      // empty page, which reads as a broken app rather than as auth reporting
+      // a problem: the most common trigger is a misconfigured origin, where
+      // the first step paints normally and only the submit fails.
       return html`<form class="zl-mount" novalidate>
-        <zl-alert severity="error">${this.startupError}</zl-alert>
+        <zl-page-shell>
+          <zl-card>
+            <zl-alert severity="error">${this.startupError}</zl-alert>
+          </zl-card>
+        </zl-page-shell>
       </form>`;
     }
-    if (!this.response || !this.engine) {
+    // `completing` holds the loader through the terminal step: painting a
+    // success screen the host immediately navigates away from shows the user
+    // two confirmations for one sign-in.
+    if (!this.response || !this.engine || this.completing) {
       return html`<slot name="loader"></slot>`;
     }
     const rendered = this.injectAttribution(this.renderStep(this.response.step, this.engine));
@@ -410,12 +475,38 @@ export class ZitadelLogin extends LitElement {
    * any tenant-supplied values (`custom_link`) are escaped via `escapeHtml`.
    */
   private injectAttribution(rendered: string): string {
-    const html = this.renderAttributionHtml();
+    // A template that names where the trustmark goes wins over the footer slot.
+    // The split designs use it to keep the mark with their form column: the
+    // shell's footer spans both panes, so it would otherwise sit 24px below the
+    // *row*, and the row is as tall as the brand pane rather than the card.
+    // `ALLOW_DATA_ATTR` keeps the anchor through the sanitiser, which may have
+    // normalised it to `data-zl-attribution-anchor=""`.
+    const anchor = /<div\s+data-zl-attribution-anchor(?:="")?\s*>\s*<\/div>/;
+    if (anchor.test(rendered)) {
+      // Suppressed attribution replaces the anchor with nothing, so the form
+      // column does not keep a 24px gap below an element that renders empty.
+      return rendered.replace(anchor, this.renderAttributionHtml("inline"));
+    }
+    const html = this.renderAttributionHtml("footer");
     if (!html) return rendered;
     if (rendered.includes("</zl-page-shell>")) {
       return rendered.replace("</zl-page-shell>", `${html}</zl-page-shell>`);
     }
     return rendered + html;
+  }
+
+  /**
+   * The branding a template renders against, with `logo_url` already resolved
+   * to the mark for the active side. Templates read one logo field and get the
+   * right file per surface; the per-side URLs stay on `theme` for a template
+   * that wants to reach them itself.
+   */
+  private brandingForTemplate(): Branding | Record<string, never> {
+    if (!this.branding) {
+      return {};
+    }
+    const logoUrl = resolveLogoUrl(this.branding, this.themeController.theme);
+    return { ...this.branding, logo_url: logoUrl };
   }
 
   /**
@@ -425,19 +516,31 @@ export class ZitadelLogin extends LitElement {
    * community / OSS deployments. Licensed tenants can suppress the badge
    * entirely or swap it for a `custom_link` value.
    */
-  private renderAttributionHtml(): string {
+  private renderAttributionHtml(placement: "footer" | "inline" = "footer"): string {
     const attribution = this.branding?.attribution;
     const show = attribution?.show_zitadel !== false;
     const custom = attribution?.custom_link;
     if (!show && !custom) {
       return "";
     }
-    if (custom) {
-      const safeHref = escapeHtml(String(custom.href));
-      const safeLabel = escapeHtml(String(custom.label));
-      return `<div slot="footer" part="attribution" class="zl-attribution"><zl-pill tone="neutral" href="${safeHref}">${safeLabel}</zl-pill></div>`;
-    }
-    return `<div slot="footer" part="attribution" class="zl-attribution"><zl-pill tone="neutral" href="https://zitadel.com" part="attribution-pill" aria-label="Secured with Zitadel">${zitadelAttributionPillInnerHtml()}</zl-pill></div>`;
+    // The design sets the trustmark as plain text beside the logotype rather
+    // than inside a chip, and draws a badge beside it. The widget does not
+    // render that badge: nothing on the flow response carries a duration to
+    // put in it, and an invented one would be worse than none. It exposes the
+    // position instead — the `attribution-trailing` slot — so a host that does
+    // have something true to say there can say it. The console's claim page is
+    // the first: it knows how long the project can still be claimed.
+    //
+    // A `<slot>` is `display: contents` by default, so an unfilled one is not
+    // a flex item and contributes no gap. Every existing embed renders exactly
+    // as it did.
+    const mark = custom
+      ? `<a class="zl-trustmark__mark" part="attribution-mark" href="${escapeHtml(
+          String(custom.href),
+        )}">${escapeHtml(String(custom.label))}</a>`
+      : `<a class="zl-trustmark__mark" part="attribution-mark" href="https://zitadel.com" aria-label="Secured with Zitadel">${zitadelTrustmarkInnerHtml()}</a>`;
+    const slot = placement === "footer" ? ` slot="footer"` : "";
+    return `<div${slot} part="attribution" class="zl-attribution zl-trustmark">${mark}<slot name="attribution-trailing"></slot></div>`;
   }
 
   /** Declarative config read from this element's attributes. */
@@ -513,8 +616,13 @@ export class ZitadelLogin extends LitElement {
   private applyResponse(wire: CreateFlow201): void {
     // A fresh response carries fresh (or no) errors — un-dismiss.
     this.stepErrorDismissed = false;
+    // Decided before the step is assigned: `maybeCompleteFlow` navigates a
+    // turn later, and by then the terminal screen has already painted.
+    this.completing = navigatesOnComplete(wire, this.postSignInUrl);
     this.response = wire;
-    const { branding, issues } = validateBranding(wire.branding);
+    const { branding, issues } = validateBranding(wire.branding, {
+      renderingOrigin: this.ownerDocument.location.origin,
+    });
     this.branding = branding;
     this.themeController.setBranding(branding);
     if (issues.length > 0) {
@@ -523,6 +631,54 @@ export class ZitadelLogin extends LitElement {
     // Defaults seed every declared field; existing entries (typed input,
     // carry-over from prior steps) win on conflict.
     this.formValues = { ...collectInitialValues(wire.step), ...this.formValues };
+
+    // History API (ADR 022): keep exactly one same-document entry — the
+    // sentinel — on the stack while the current step supports
+    // back-navigation, so the browser's back gesture fires `popstate`
+    // (handled in `onPopState`) instead of leaving the page. Arming only
+    // on the unarmed → armed transition means consecutive back-capable
+    // steps (and re-renders of the same step, e.g. after a failed submit)
+    // never grow the stack. Steps without a `kind: "back"` action retire
+    // the sentinel — the next back press then navigates the host page
+    // (leaves the flow), which is correct.
+    if (typeof window !== "undefined") {
+      const hasBack = Boolean(wire.step.actions?.some((a) => a.kind === "back"));
+      if (hasBack && !this.armed) {
+        // Spread the host's state: vue-router (Nuxt) keeps `position` /
+        // `back` / `forward` here and reads them on popstate. Replacing it
+        // wholesale leaves the sentinel opaque to the host router.
+        history.pushState({ ...history.state, zl: true }, "");
+        this.armed = true;
+      } else if (!hasBack && this.armed) {
+        this.armed = false;
+        // Only traverse while we still own the current entry. If the host
+        // pushed its own entry after we armed, `history.back()` would pop
+        // *that* one and trigger a host back-navigation the user never
+        // asked for. Leaving a stale sentinel behind is the lesser evil —
+        // same tradeoff as disconnect; the popstate handler skips stale
+        // sentinels in one extra hop from either direction.
+        if ((history.state as { zl?: boolean } | null)?.zl === true) {
+          if (this.completing) {
+            // A terminal step that navigates away: retire the sentinel in
+            // place instead of traversing. `history.back()` fires `popstate`
+            // in the host, and a host router that reloads on popstate would
+            // re-read the session `maybeCompleteFlow` is about to establish
+            // and act on it in a document that is already being replaced —
+            // the console claim page spent its single-use challenge that way,
+            // once here and once in the document it navigated to. The
+            // retired entry stays on the stack under the destination (a
+            // same-URL destination, like the claim page, replaces it); a back
+            // press from there lands on the host page signed in, which is the
+            // same stale-sentinel tradeoff as above, one hop at most.
+            history.replaceState({ ...history.state, zl: false }, "");
+          } else {
+            this.ignoreNextPop = true;
+            history.back();
+          }
+        }
+      }
+    }
+
     void this.maybeCompleteFlow(wire);
   }
 
@@ -620,7 +776,7 @@ export class ZitadelLogin extends LitElement {
       messages: [],
       identity: this.deriveIdentity(),
       errors,
-      branding: this.branding ?? {},
+      branding: this.brandingForTemplate(),
       loading: this.loading,
     };
 
@@ -970,11 +1126,27 @@ export class ZitadelLogin extends LitElement {
     return primary?.getAttribute("action") || null;
   }
 
-  private moveFocusToFirstField(): void {
+  /**
+   * On the initial paint, only a field earns focus: script-moved focus with
+   * no prior interaction matches `:focus-visible`, so autofocusing a button
+   * on a field-less step (passkey-first) paints a ring that reads as a
+   * pre-selected state. Step swaps keep button focus — there the browser
+   * derives the modality from the user's actual input.
+   */
+  private moveFocusToFirstField(fieldsOnly = false): void {
     const root = this.shadowRoot;
     if (!root) return;
-    const focusables = root.querySelectorAll<HTMLElement>("zl-field, zl-button");
-    const target = Array.from(focusables).find((el) => !el.hasAttribute("disabled"));
+    const focusables = fieldsOnly
+      ? this.fieldAtoms()
+      : Array.from(
+          root.querySelectorAll<HTMLElement>("zl-field, zl-select, zl-checkbox, zl-button"),
+        );
+    const target = focusables.find(
+      (el) =>
+        !el.hasAttribute("disabled") &&
+        !el.hasAttribute("hidden") &&
+        el.getAttribute("type") !== "hidden",
+    );
     target?.focus();
   }
 
@@ -1008,6 +1180,56 @@ export class ZitadelLogin extends LitElement {
     }
   }
 
+  /**
+   * Handle the browser's back/forward gesture (ADR 022). When `popstate`
+   * fires:
+   *
+   * - **Self-initiated** (`ignoreNextPop`) → `applyResponse` is retiring
+   *   the sentinel; ignore.
+   * - **Back press while armed** → the browser consumed the sentinel.
+   *   Re-arm it immediately — so the stack shape is identical on every
+   *   step and repeated presses behave the same at any flow depth — then
+   *   submit the step's `kind: "back"` action.
+   * - **Landing on the sentinel while armed** → the host page pushed an
+   *   entry above the sentinel (e.g. an in-page `#anchor` click) and the
+   *   user backed out of it. They are back where the widget expects them
+   *   — not asking the flow to go back; do nothing.
+   * - **Forward press onto a retired sentinel** (it survives as a forward
+   *   entry after `history.back()`) → bounce back: flow state is
+   *   server-authoritative, the browser cannot skip ahead
+   *   (ADR 022 §Edge cases).
+   * - Anything else is host-page traversal — leave the browser alone.
+   */
+  private onPopState(event: PopStateEvent): void {
+    if (this.ignoreNextPop) {
+      this.ignoreNextPop = false;
+      return;
+    }
+
+    if (this.armed) {
+      if ((event.state as { zl?: boolean } | null)?.zl === true) {
+        // Traversal landed ON the sentinel from an entry above it that the
+        // host page created after we armed. Position is as expected; the
+        // gesture was aimed at the host entry, not the flow.
+        return;
+      }
+      // Back press: the browser popped the sentinel.
+      this.armed = false;
+      const backAction = this.response?.step?.actions?.find((a) => a.kind === "back");
+      if (backAction) {
+        history.pushState({ zl: true }, "");
+        this.armed = true;
+        void this.submit(backAction.name);
+      }
+      return;
+    }
+
+    if ((event.state as { zl?: boolean } | null)?.zl === true) {
+      this.ignoreNextPop = true;
+      history.back();
+    }
+  }
+
   private handleTransportError(error: unknown): void {
     // For API rejections, prefer the server's error-envelope message (e.g.
     // which origins a project allows) over the generic "POST … returned N".
@@ -1032,6 +1254,20 @@ export class ZitadelLogin extends LitElement {
  */
 function isAllowedSelectValue(field: CreateFlow201StepFieldsItem, value: string): boolean {
   return field.validation?.enum?.includes(value) ?? false;
+}
+
+/**
+ * Whether a terminal step ends in a navigation rather than a screen: a
+ * `redirect` with a URI, or a `show` whose handoff the widget exchanges before
+ * sending the browser to `post-sign-in-url`. A `show` without a
+ * `post-sign-in-url` is the host handling the handoff itself, and that screen
+ * is the flow's own last word — it still renders.
+ */
+function navigatesOnComplete(wire: CreateFlow201, postSignInUrl: string | undefined): boolean {
+  const behavior = wire.step.complete;
+  if (behavior === "redirect") return Boolean(wire.redirect_uri);
+  if (behavior === "show") return Boolean(wire.handoff_token && postSignInUrl);
+  return false;
 }
 
 function collectInitialValues(step: CreateFlow201Step): Record<string, string> {

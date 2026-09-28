@@ -3,47 +3,63 @@ package service_test
 import (
 	"context"
 	"errors"
+	"reflect"
 	"slices"
 	"testing"
 	"time"
 
 	"go.uber.org/mock/gomock"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
-	"github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-// userReaderStub implements service.UserIdentityReader and records the
-// identity lookup inputs so tests can assert which user was hydrated.
-type userReaderStub struct {
-	getFunc          func(context.Context, string, string, ...string) (*domain.User, error)
-	gotProjectID     string
-	gotUserID        string
-	gotAttributeKeys []string
+// refResolverStub implements service.UserRefResolver and records the
+// resolution inputs so tests can assert which users were hydrated.
+type refResolverStub struct {
+	resolveFunc  func(context.Context, string, []string) (map[string]domain.UserRef, error)
+	gotProjectID string
+	gotUserIDs   []string
 }
 
-func (s *userReaderStub) GetIdentity(ctx context.Context, projectID, userID string, attributeKeys ...string) (*domain.User, error) {
-	s.gotProjectID, s.gotUserID = projectID, userID
-	s.gotAttributeKeys = attributeKeys
-	if s.getFunc == nil {
-		panic("unexpected users.GetIdentity call")
+func (s *refResolverStub) ResolveUserRefs(ctx context.Context, projectID string, userIDs []string) (map[string]domain.UserRef, error) {
+	s.gotProjectID, s.gotUserIDs = projectID, userIDs
+	if s.resolveFunc == nil {
+		panic("unexpected refs.ResolveUserRefs call")
 	}
-	return s.getFunc(ctx, projectID, userID, attributeKeys...)
+	return s.resolveFunc(ctx, projectID, userIDs)
+}
+
+// ResolveRefsForUsers satisfies the widened port; the session service
+// resolves by id only, so any call here is a test failure.
+func (s *refResolverStub) ResolveRefsForUsers(context.Context, string, []*domain.User) (map[string]domain.UserRef, error) {
+	panic("unexpected refs.ResolveRefsForUsers call")
 }
 
 func sessionConfigForTest() service.SessionConfig {
 	return service.SessionConfig{DefaultTTL: time.Hour, MaxTTL: 24 * time.Hour}
 }
 
-func newMockedSessionService(t *testing.T, users service.UserIdentityReader, cfg service.SessionConfig) (service.SessionService, *servicemocks.MockAllStatements) {
+func newMockedSessionService(t *testing.T, refs service.UserRefResolver, cfg service.SessionConfig) (service.SessionService, *servicemocks.MockAllStatements) {
 	t.Helper()
 	ctrl := gomock.NewController(t)
 	pool := servicemocks.NewMockStatementPool(ctrl)
 	statements := servicemocks.NewMockAllStatements(ctrl)
+	statementer := servicemocks.NewMockStatementer[service.AllStatements](ctrl)
 	pool.EXPECT().Statements().Return(statements).AnyTimes()
-	return service.NewSessionService(pool, users, cfg), statements
+	pool.EXPECT().
+		Transaction(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(ctx context.Context, fn func(context.Context, service.Statementer[service.AllStatements]) error) error {
+			return fn(ctx, statementer)
+		}).
+		AnyTimes()
+	statementer.EXPECT().Statements().Return(statements).AnyTimes()
+	statements.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	return service.NewSessionService(pool, refs, cfg), statements
 }
 
 func TestSessionService_Create(t *testing.T) {
@@ -81,15 +97,16 @@ func TestSessionService_Create(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			svc, statements := newMockedSessionService(t, &userReaderStub{}, sessionConfigForTest())
+			svc, statements := newMockedSessionService(t, &refResolverStub{}, sessionConfigForTest())
 			statements.EXPECT().
 				CreateSession(gomock.Any(), gomock.Any()).
 				DoAndReturn(func(_ context.Context, gotSession *domain.Session) error {
 					if gotSession.ProjectID != tt.input.ProjectID {
 						t.Fatalf("Create session.ProjectID = %q, want %q", gotSession.ProjectID, tt.input.ProjectID)
 					}
-					if gotSession.UserAgent != tt.input.UserAgent {
-						t.Fatalf("Create session.UserAgent = %p, want %p", gotSession.UserAgent, tt.input.UserAgent)
+					// NewSession clones the user agent, so compare by value, not identity.
+					if !reflect.DeepEqual(gotSession.UserAgent, tt.input.UserAgent) {
+						t.Fatalf("Create session.UserAgent = %+v, want %+v", gotSession.UserAgent, tt.input.UserAgent)
 					}
 					if gotSession.TimeToLive != domain.SessionAnonymousTTL {
 						t.Fatalf("Create session.TimeToLive = %v, want %v", gotSession.TimeToLive, domain.SessionAnonymousTTL)
@@ -202,7 +219,7 @@ func TestSessionService_Exchange(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			svc, statements := newMockedSessionService(t, &userReaderStub{}, cfg)
+			svc, statements := newMockedSessionService(t, &refResolverStub{}, cfg)
 			if tt.repoResult != nil || tt.repoErr != nil {
 				statements.EXPECT().
 					ExchangeSession(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
@@ -269,7 +286,7 @@ func TestSessionService_Get(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			svc, statements := newMockedSessionService(t, &userReaderStub{}, sessionConfigForTest())
+			svc, statements := newMockedSessionService(t, &refResolverStub{}, sessionConfigForTest())
 			statements.EXPECT().
 				GetSessionByID(gomock.Any(), gomock.Any(), gomock.Any()).
 				DoAndReturn(func(_ context.Context, projectID, sessionID string) (*domain.Session, error) {
@@ -290,54 +307,54 @@ func TestSessionService_Get(t *testing.T) {
 
 func TestSessionService_Get_UserIdentity(t *testing.T) {
 	userID := "user-1"
-	identityUser := &domain.User{
-		ProjectID: "proj",
-		ID:        userID,
-		Attributes: []domain.Attribute{
-			{Key: "email", Value: "ada@example.com"},
-			{Key: "given_name", Value: "Ada"},
-		},
+	adaRef := domain.UserRef{
+		UserID:             userID,
+		Identifier:         "ada@example.com",
+		IdentifierProperty: "email",
+		Display:            "Ada Lovelace",
 	}
 
 	for _, tt := range []struct {
 		name          string
 		sessionUserID *string
-		userResult    *domain.User
-		userErr       error
-		wantUser      *domain.User
+		refs          map[string]domain.UserRef
+		refErr        error
+		wantUser      *domain.UserRef
 		wantErr       error
 	}{
 		{
-			name:          "hydrates the linked user",
+			name:          "resolves the linked user's ref",
 			sessionUserID: &userID,
-			userResult:    identityUser,
-			wantUser:      identityUser,
+			refs:          map[string]domain.UserRef{userID: adaRef},
+			wantUser:      &adaRef,
 		},
 		{
 			name:          "skips anonymous sessions",
 			sessionUserID: nil,
 		},
 		{
+			// Missing users are absent from the resolution result (ADR 058
+			// §4); the session renders with its user id only.
 			name:          "tolerates a session that outlived its user",
 			sessionUserID: &userID,
-			userErr:       database.NewNoRowFoundError(nil),
+			refs:          map[string]domain.UserRef{},
 		},
 		{
-			name:          "wraps unexpected user lookup error",
+			name:          "wraps resolution error",
 			sessionUserID: &userID,
-			userErr:       errors.New("boom"),
+			refErr:        errors.New("boom"),
 			wantErr:       domain.ErrInternal(nil),
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			users := &userReaderStub{}
+			refs := &refResolverStub{}
 			if tt.sessionUserID != nil {
-				users.getFunc = func(_ context.Context, projectID, uid string, keys ...string) (*domain.User, error) {
-					return tt.userResult, tt.userErr
+				refs.resolveFunc = func(context.Context, string, []string) (map[string]domain.UserRef, error) {
+					return tt.refs, tt.refErr
 				}
 			}
 
-			svc, statements := newMockedSessionService(t, users, sessionConfigForTest())
+			svc, statements := newMockedSessionService(t, refs, sessionConfigForTest())
 			statements.EXPECT().
 				GetSessionByID(gomock.Any(), gomock.Any(), gomock.Any()).
 				Return(&domain.Session{ProjectID: "proj", ID: "sess", UserID: tt.sessionUserID}, nil)
@@ -353,17 +370,18 @@ func TestSessionService_Get_UserIdentity(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Get returned error: %v", err)
 			}
-			if got.User != tt.wantUser {
+			if tt.wantUser == nil {
+				if got.User != nil {
+					t.Fatalf("Get session.User = %v, want nil", got.User)
+				}
+			} else if got.User == nil || *got.User != *tt.wantUser {
 				t.Fatalf("Get session.User = %v, want %v", got.User, tt.wantUser)
 			}
 			if tt.sessionUserID == nil {
 				return
 			}
-			if users.gotProjectID != "proj" || users.gotUserID != userID {
-				t.Fatalf("users queried with (%q, %q), want (%q, %q)", users.gotProjectID, users.gotUserID, "proj", userID)
-			}
-			if !slices.Equal(users.gotAttributeKeys, domain.IdentityAttributeKeys) {
-				t.Fatalf("users.GetIdentity keys = %v, want %v", users.gotAttributeKeys, domain.IdentityAttributeKeys)
+			if refs.gotProjectID != "proj" || !slices.Equal(refs.gotUserIDs, []string{userID}) {
+				t.Fatalf("refs resolved with (%q, %v), want (%q, %v)", refs.gotProjectID, refs.gotUserIDs, "proj", []string{userID})
 			}
 		})
 	}
@@ -387,5 +405,361 @@ func assertSessionResult(t *testing.T, operation string, got *domain.Session, er
 	}
 	if got != want {
 		t.Fatalf("%s = %v, want %v", operation, got, want)
+	}
+}
+
+func TestSessionService_List(t *testing.T) {
+	t.Parallel()
+
+	createdAt := time.Now().UTC().Truncate(time.Second)
+
+	tests := []struct {
+		name         string
+		input        service.ListSessionInput
+		result       *database.ListResult[*domain.Session]
+		statementErr error
+		wantErr      error
+		checkOpts    func(t *testing.T, opts *database.ListOptions[domain.SessionField])
+		checkResp    func(t *testing.T, resp *service.ListSessionsResponse)
+	}{
+		{
+			name:  "defaults to newest first",
+			input: service.ListSessionInput{ProjectID: "proj_a"},
+			result: &database.ListResult[*domain.Session]{
+				Items:      []*domain.Session{{ID: "sess_b"}, {ID: "sess_a"}},
+				NextCursor: []byte("next"),
+			},
+			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.SessionField]) {
+				assert.Equal(t, uint32(20), opts.Pagination.Limit)
+				assert.Empty(t, opts.Pagination.Cursor)
+				assert.Equal(t, database.OrderDesc, opts.Pagination.OrderBy.Direction)
+				assert.Equal(t, []database.Column[domain.SessionField]{
+					database.Col(domain.SessionFieldCreatedAt),
+					database.Col(domain.SessionFieldID),
+				}, opts.Pagination.OrderBy.Columns)
+				assert.Equal(t, database.And(
+					database.Equal(database.Col(domain.SessionFieldProjectID), "proj_a"),
+				), opts.Filter)
+			},
+			checkResp: func(t *testing.T, resp *service.ListSessionsResponse) {
+				assert.Len(t, resp.Sessions, 2)
+				assert.Equal(t, "next", resp.NextPageToken)
+			},
+		},
+		{
+			name:   "limit clamped to max",
+			input:  service.ListSessionInput{ProjectID: "proj_a", Limit: 500},
+			result: &database.ListResult[*domain.Session]{},
+			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.SessionField]) {
+				assert.Equal(t, uint32(100), opts.Pagination.Limit)
+			},
+		},
+		{
+			name:   "zero limit uses default",
+			input:  service.ListSessionInput{ProjectID: "proj_a", Limit: 0},
+			result: &database.ListResult[*domain.Session]{},
+			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.SessionField]) {
+				assert.Equal(t, uint32(20), opts.Pagination.Limit)
+			},
+		},
+		{
+			name: "sort direction respected",
+			input: service.ListSessionInput{
+				ProjectID: "proj_a",
+				Sorting:   &service.Sorting{Field: "created_at", Direction: "asc"},
+			},
+			result: &database.ListResult[*domain.Session]{},
+			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.SessionField]) {
+				assert.Equal(t, database.OrderAsc, opts.Pagination.OrderBy.Direction)
+			},
+		},
+		{
+			name: "sort by user_id appends id tiebreaker",
+			input: service.ListSessionInput{
+				ProjectID: "proj_a",
+				Sorting:   &service.Sorting{Field: "user_id", Direction: "desc"},
+			},
+			result: &database.ListResult[*domain.Session]{},
+			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.SessionField]) {
+				assert.Equal(t, database.OrderDesc, opts.Pagination.OrderBy.Direction)
+				assert.Equal(t, []database.Column[domain.SessionField]{
+					database.Col(domain.SessionFieldUserID),
+					database.Col(domain.SessionFieldID),
+				}, opts.Pagination.OrderBy.Columns)
+			},
+		},
+		{
+			name: "filter by user_id",
+			input: service.ListSessionInput{
+				ProjectID: "proj_a",
+				Filters:   []service.Filter{{Field: "user_id", Operation: "equals", Value: "usr_1"}},
+			},
+			result: &database.ListResult[*domain.Session]{},
+			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.SessionField]) {
+				assert.Equal(t, database.And(
+					database.Equal(database.Col(domain.SessionFieldProjectID), "proj_a"),
+					database.StringEqual(database.Col(domain.SessionFieldUserID), "usr_1"),
+				), opts.Filter)
+			},
+		},
+		{
+			name: "filter by lifecycle_owner_team_id builds the correlated ownership predicate",
+			input: service.ListSessionInput{
+				ProjectID: "proj_a",
+				Filters:   []service.Filter{{Field: "lifecycle_owner_team_id", Operation: "equals", Value: "team_1"}},
+			},
+			result: &database.ListResult[*domain.Session]{},
+			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.SessionField]) {
+				assert.Equal(t, database.And(
+					database.Equal(database.Col(domain.SessionFieldProjectID), "proj_a"),
+					database.CorrelatedEqual(database.Col(domain.SessionFieldLifecycleOwnerTeamID), "team_1"),
+				), opts.Filter)
+			},
+		},
+		{
+			name: "filter greater_than createdAt parses RFC3339",
+			input: service.ListSessionInput{
+				ProjectID: "proj_a",
+				Filters:   []service.Filter{{Field: "created_at", Operation: "greater_than", Value: createdAt.Format(time.RFC3339)}},
+			},
+			result: &database.ListResult[*domain.Session]{},
+			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.SessionField]) {
+				assert.Equal(t, database.And(
+					database.Equal(database.Col(domain.SessionFieldProjectID), "proj_a"),
+					database.GreaterThan(database.Col(domain.SessionFieldCreatedAt), createdAt),
+				), opts.Filter)
+			},
+		},
+		{
+			name:   "page token passed through as cursor",
+			input:  service.ListSessionInput{ProjectID: "proj_a", PageToken: "tok"},
+			result: &database.ListResult[*domain.Session]{},
+			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.SessionField]) {
+				assert.Equal(t, []byte("tok"), opts.Pagination.Cursor)
+			},
+		},
+		{
+			name:         "statement error is wrapped",
+			input:        service.ListSessionInput{ProjectID: "proj_a"},
+			statementErr: errors.New("boom"),
+			wantErr:      domain.ErrInternal(nil),
+		},
+		{
+			name:         "invalid cursor maps to request invalid",
+			input:        service.ListSessionInput{ProjectID: "proj_a", PageToken: "bad"},
+			statementErr: database.ErrInvalidCursor(),
+			wantErr:      domain.ErrRequestInvalid(),
+		},
+		{
+			name:         "cursor order mismatch maps to request invalid",
+			input:        service.ListSessionInput{ProjectID: "proj_a", PageToken: "bad"},
+			statementErr: database.ErrCursorOrderMismatch(),
+			wantErr:      domain.ErrRequestInvalid(),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			svc, statements := newMockedSessionService(t, &refResolverStub{}, sessionConfigForTest())
+
+			var gotOpts *database.ListOptions[domain.SessionField]
+			statements.EXPECT().ListSessions(gomock.Any(), gomock.Any()).DoAndReturn(
+				func(_ context.Context, opts *database.ListOptions[domain.SessionField]) (*database.ListResult[*domain.Session], error) {
+					gotOpts = opts
+					return tc.result, tc.statementErr
+				})
+
+			resp, err := svc.List(context.Background(), tc.input)
+			if tc.wantErr != nil {
+				require.ErrorIs(t, err, tc.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			if tc.checkOpts != nil {
+				tc.checkOpts(t, gotOpts)
+			}
+			if tc.checkResp != nil {
+				tc.checkResp(t, resp)
+			}
+		})
+	}
+}
+
+func TestSessionService_List_ValidationErrors(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		input   service.ListSessionInput
+		wantErr error
+	}{
+		{
+			name:    "missing project id is refused",
+			input:   service.ListSessionInput{},
+			wantErr: domain.ErrProjectMissingID(),
+		},
+		{
+			name: "unknown filter field is invalid",
+			input: service.ListSessionInput{
+				ProjectID: "proj_a",
+				Filters:   []service.Filter{{Field: "token_id", Operation: "equals", Value: "x"}},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "unknown sort field is invalid",
+			input: service.ListSessionInput{
+				ProjectID: "proj_a",
+				Sorting:   &service.Sorting{Field: "state"},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "unknown sort direction is invalid",
+			input: service.ListSessionInput{
+				ProjectID: "proj_a",
+				Sorting:   &service.Sorting{Field: "created_at", Direction: "sideways"},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "missing sort direction is invalid",
+			input: service.ListSessionInput{
+				ProjectID: "proj_a",
+				Sorting:   &service.Sorting{Field: "created_at"},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "non-string user_id value is invalid",
+			input: service.ListSessionInput{
+				ProjectID: "proj_a",
+				Filters:   []service.Filter{{Field: "user_id", Operation: "equals", Value: 42}},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "ordering operation on user_id is invalid",
+			input: service.ListSessionInput{
+				ProjectID: "proj_a",
+				Filters:   []service.Filter{{Field: "user_id", Operation: "less_than", Value: "usr_1"}},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "unparseable createdAt value is invalid",
+			input: service.ListSessionInput{
+				ProjectID: "proj_a",
+				Filters:   []service.Filter{{Field: "created_at", Operation: "equals", Value: "not-a-time"}},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "unknown state value is invalid",
+			input: service.ListSessionInput{
+				ProjectID: "proj_a",
+				Filters:   []service.Filter{{Field: "state", Operation: "equals", Value: "revoked"}},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "non-string state value is invalid",
+			input: service.ListSessionInput{
+				ProjectID: "proj_a",
+				Filters:   []service.Filter{{Field: "state", Operation: "equals", Value: 1}},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "state not_equals not implemented",
+			input: service.ListSessionInput{
+				ProjectID: "proj_a",
+				Filters:   []service.Filter{{Field: "state", Operation: "not_equals", Value: "active"}},
+			},
+			wantErr: domain.ErrNotImplemented(),
+		},
+		{
+			name: "ordering operation on state is invalid",
+			input: service.ListSessionInput{
+				ProjectID: "proj_a",
+				Filters:   []service.Filter{{Field: "state", Operation: "greater_than", Value: "active"}},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "unknown operation on state is invalid",
+			input: service.ListSessionInput{
+				ProjectID: "proj_a",
+				Filters:   []service.Filter{{Field: "state", Operation: "like", Value: "active"}},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "non-string lifecycle_owner_team_id value is invalid",
+			input: service.ListSessionInput{
+				ProjectID: "proj_a",
+				Filters:   []service.Filter{{Field: "lifecycle_owner_team_id", Operation: "equals", Value: 42}},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "lifecycle_owner_team_id not_equals not implemented",
+			input: service.ListSessionInput{
+				ProjectID: "proj_a",
+				Filters:   []service.Filter{{Field: "lifecycle_owner_team_id", Operation: "not_equals", Value: "team_1"}},
+			},
+			wantErr: domain.ErrNotImplemented(),
+		},
+		{
+			// The binding is a correlated sub-query taking one team id, so
+			// there is nothing for a substring match to match against.
+			name: "contains operation on lifecycle_owner_team_id is invalid",
+			input: service.ListSessionInput{
+				ProjectID: "proj_a",
+				Filters:   []service.Filter{{Field: "lifecycle_owner_team_id", Operation: "contains", Value: "team"}},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "ordering operation on lifecycle_owner_team_id is invalid",
+			input: service.ListSessionInput{
+				ProjectID: "proj_a",
+				Filters:   []service.Filter{{Field: "lifecycle_owner_team_id", Operation: "greater_than", Value: "team_1"}},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "unknown operation on lifecycle_owner_team_id is invalid",
+			input: service.ListSessionInput{
+				ProjectID: "proj_a",
+				Filters:   []service.Filter{{Field: "lifecycle_owner_team_id", Operation: "like", Value: "team_1"}},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			// lifecycle_owner_team_id matches many sessions per team and
+			// lives on another table, so it must never become a cursor column.
+			name: "sort by lifecycle_owner_team_id is invalid",
+			input: service.ListSessionInput{
+				ProjectID: "proj_a",
+				Sorting:   &service.Sorting{Field: "lifecycle_owner_team_id", Direction: "asc"},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			// The statement must never be reached: validation fails first, so no
+			// ListSessions expectation is set and gomock would flag an unexpected call.
+			svc, _ := newMockedSessionService(t, &refResolverStub{}, sessionConfigForTest())
+
+			_, err := svc.List(context.Background(), tc.input)
+			require.ErrorIs(t, err, tc.wantErr)
+		})
 	}
 }

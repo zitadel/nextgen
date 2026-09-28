@@ -2,55 +2,38 @@ import { LitElement, html, nothing } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 
-import pillHost from "@zitadel/shared-component-styles/lit/pill-host.css?inline";
-import pillSurface from "@zitadel/shared-component-styles/pill.css?inline";
+import pillStyles from "./zl-pill.css?inline";
 
 import type { AtomManifest } from "../manifest.js";
 import { baseHostStyles, surfaceStyles } from "../styles/index.js";
 
 /**
- * Atom: `<zl-pill>` — small inline chip used for status and attribution.
+ * Atom: `<zl-pill>` — the shadcn `Badge`, used for status and for the session
+ * chip in the trustmark.
  *
- * Spec lineage (file `xkvBjkOJ8ENuHdTGZHXezK`):
- *   - canonical instance: node `6593:141767` ("Social media" frame =
- *     "Secured with Zitadel" attribution pill on every sign-in screen).
+ * Figma values:
  *
- * Two roles in scope:
- *   - **Attribution pill** ("Secured with Zitadel") rendered by the
- *     orchestrator footer when `branding.attribution` is enabled. This is
- *     the only canonical pill in the Figma screens; its spec is the
- *     source of truth for every dimension.
- *   - **Status pill** (decorative `tone` variants — pink / purple /
- *     orange / success) reuses the same geometry and typography, only
- *     swapping the tint colour. The tones don't have screen instances in
- *     Figma yet; when they ship, re-verify each tone against its master.
+ *   height      20px, with the 1px border inside it — left to hug, the same
+ *               padding and line-height render 22px
+ *   padding     8px inline, 2px block
+ *   radius      full
+ *   gap         4px
+ *   font        14/20 at `--zl-font-weight-medium`
+ *   surface     `--zl-secondary` / `--zl-secondary-foreground`
  *
- * Per-state Figma values (from node `6593:141767`):
+ * The gradient sheen and 40px height it used to carry belonged to the old
+ * attribution pill, which the trustmark no longer wraps in a chip: "Secured
+ * with" and the logotype are plain text beside the badge now.
  *
- *   surface     bg layered linear-gradient(182deg,
- *                 rgba(72,74,87,0.6) 28.65%,
- *                 rgba(15,15,17,0.6) 81.82%)
- *                 over surface.default-primary-gray (#252528)
-   *   border      1px solid #484a57 (our token: border.default-gray-200 —
-   *                 Figma calls this "default-gray-100"; our gray primitive
-   *                 ladder is offset by one slot, so map to gray-200)
- *   radius      100px (full pill)
- *   size        186×40px frame (`get_metadata` on `6593:141767`)
- *   padding     16px inline (spacing-03) / 10px block (spacing metadata:
- *                 text y=10, line 20px, frame height 40px)
- *   gap         8px (spacing-02)
- *   font        Arimo Regular 14/20, letter-spacing 0, color
- *               text.primary-white (#f4f4f6), text-transform none
- *   focus-vis   2px solid focus.color, offset 2px
- *
- *   content     "Secured with" + 65×16 logotype SVG (`attribution-markup.ts`);
- *               logotype `margin-top: 2px` (Figma text y=10, logotype y=12)
+ * `tone` follows the Badge's variants. The decorative pink / purple / orange
+ * tints are gone: they had no instance in any frame and were the last
+ * consumers of the retired `--zl-color-text-subtitle-*` tokens.
  */
 @customElement("zl-pill")
 export class ZlPill extends LitElement {
-  static override styles = [baseHostStyles, ...surfaceStyles(pillHost, pillSurface)];
+  static override styles = [baseHostStyles, ...surfaceStyles(pillStyles)];
 
-  @property() accessor tone: "neutral" | "pink" | "purple" | "orange" | "success" = "neutral";
+  @property() accessor tone: "neutral" | "outline" | "success" | "error" = "neutral";
 
   @property() accessor href: string | undefined = undefined;
 

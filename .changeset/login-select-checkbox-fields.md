@@ -1,7 +1,5 @@
 ---
 "@zitadel/components": patch
-"@zitadel/ui-react": patch
-"@zitadel/shared-component-styles": patch
 ---
 
 Login flow: render and submit `select` and `checkbox` user-schema fields.

@@ -17,6 +17,8 @@ import { SCHEMAS_DIR } from "../../../src/lib/user-schema";
 import { hashForState } from "../../../src/lib/sync";
 import type { ZitadelState } from "../../../src/lib/sync/types";
 
+const TEST_CLI_VERSION = "0.1.0-alpha.18";
+
 let cwd: string;
 
 beforeEach(async () => {
@@ -45,6 +47,7 @@ describe("materializeSetupResources", () => {
     await expect(
       materializeSetupResources({
         cwd,
+        cliVersion: TEST_CLI_VERSION,
         client,
         projectId: "project_123",
         force: false,
@@ -74,6 +77,7 @@ describe("materializeSetupResources", () => {
 
     await materializeSetupResources({
       cwd,
+      cliVersion: TEST_CLI_VERSION,
       client,
       projectId: "project_123",
       force: false,
@@ -90,18 +94,24 @@ describe("materializeSetupResources", () => {
       objectType: "human-user",
       kind: "user-schema",
       title: "ServerCanonicalTitle",
-      properties: { email: { type: "string", "x-editable": true } },
+      properties: { email: { type: "string", "x-audit": false } },
     };
     const client = {
       createSchema: vi.fn().mockResolvedValue({ id: "sch_01KWHF" }),
-      getSchemaById: vi.fn().mockResolvedValue(canonical),
+      // `GET /schemas/{id}` serves the `{id, schema, metadata}` envelope;
+      // write-back must unwrap the document before it reaches disk.
+      getSchemaById: vi.fn().mockResolvedValue({
+        id: "sch_01KWHF",
+        schema: canonical,
+        metadata: { created_at: "2026-01-01T00:00:00Z" },
+      }),
       createFlowDefinition: vi.fn().mockResolvedValue({
         id: "flow_01KWHG",
         status: "active",
       }),
     } as unknown as ZitadelClient;
 
-    await materializeSetupResources({ cwd, client, projectId: "project_123", force: false });
+    await materializeSetupResources({ cwd, client, projectId: "project_123", force: false, cliVersion: TEST_CLI_VERSION });
 
     const schemaFile = JSON.parse(
       await readFile(join(cwd, DEFAULT_SCHEMA_CONFIG_PATH), "utf8"),
@@ -110,7 +120,7 @@ describe("materializeSetupResources", () => {
     // schema bytes as uploaded, so a spelled-out meta-schema default must
     // survive write-back or the next revision would publish without it.
     expect(schemaFile.title).toBe("ServerCanonicalTitle");
-    expect(schemaFile.properties).toEqual({ email: { type: "string", "x-editable": true } });
+    expect(schemaFile.properties).toEqual({ email: { type: "string", "x-audit": false } });
 
     const state = JSON.parse(
       await readFile(join(cwd, ".zitadel/state.json"), "utf8"),
@@ -118,6 +128,27 @@ describe("materializeSetupResources", () => {
     expect(state.resources[DEFAULT_SCHEMA_CONFIG_PATH]?.hash).toBe(
       hashForState({ normalize: normalizeSchemaBody }, schemaFile),
     );
+  });
+
+  // Setup reconciliation used to pre-encode the created schema's id. The
+  // generated client owns the encoding now (#1272), so pre-encoding here sent
+  // `%25` for every delimiter in a `$id` URL and the fetch 404'd.
+  it("fetches the created schema by its id verbatim, leaving encoding to the client", async () => {
+    const id = "https://nextgen.com/api/schemas/default-human-user.json";
+    const getSchemaById = vi.fn().mockResolvedValue({
+      id,
+      schema: { objectType: "human-user", kind: "user-schema", title: "T" },
+      metadata: { created_at: "2026-01-01T00:00:00Z" },
+    });
+    const client = {
+      createSchema: vi.fn().mockResolvedValue({ id }),
+      getSchemaById,
+      createFlowDefinition: vi.fn().mockResolvedValue({ id: "flow_01KWHG", status: "active" }),
+    } as unknown as ZitadelClient;
+
+    await materializeSetupResources({ cwd, client, projectId: "project_123", force: false, cliVersion: TEST_CLI_VERSION });
+
+    expect(getSchemaById).toHaveBeenCalledWith(id);
   });
 
   it("keeps the server's empty audience echo out of the flow file and hashes past it", async () => {
@@ -132,7 +163,7 @@ describe("materializeSetupResources", () => {
       })),
     } as unknown as ZitadelClient;
 
-    await materializeSetupResources({ cwd, client, projectId: "project_123", force: false });
+    await materializeSetupResources({ cwd, client, projectId: "project_123", force: false, cliVersion: TEST_CLI_VERSION });
 
     const flowFile = JSON.parse(
       await readFile(join(cwd, DEFAULT_FLOW_CONFIG_PATH), "utf8"),
@@ -161,6 +192,7 @@ describe("materializeSetupResources", () => {
 
     await materializeSetupResources({
       cwd,
+      cliVersion: TEST_CLI_VERSION,
       client,
       projectId: "project_123",
       force: false,
@@ -200,6 +232,7 @@ describe("materializeSetupResources", () => {
 
     const result = await materializeSetupResources({
       cwd,
+      cliVersion: TEST_CLI_VERSION,
       client,
       projectId: "project_123",
       force: false,
@@ -215,6 +248,13 @@ describe("materializeSetupResources", () => {
         join(cwd, FLOWS_DIR, "README.md"),
       ]),
     );
+    // The bare `zitadel` command doesn't exist in a scaffolded app (the CLI
+    // is not one of its dependencies) — every command mention must be the
+    // runnable public npx form.
+    for (const readme of [schemasReadme, flowsReadme]) {
+      expect(readme).toContain(`npx @zitadel/cli@${TEST_CLI_VERSION} plan`);
+      expect(readme).not.toMatch(/`zitadel /);
+    }
   });
 
   it("preserves an existing README so a developer's edits are not overwritten", async () => {
@@ -230,6 +270,7 @@ describe("materializeSetupResources", () => {
 
     const result = await materializeSetupResources({
       cwd,
+      cliVersion: TEST_CLI_VERSION,
       client,
       projectId: "project_123",
       force: false,
@@ -258,6 +299,7 @@ describe("materializeSetupResources branding design", () => {
 
     await materializeSetupResources({
       cwd,
+      cliVersion: TEST_CLI_VERSION,
       client,
       projectId: "project_123",
       force: false,
@@ -279,7 +321,7 @@ describe("materializeSetupResources branding design", () => {
       await readFile(join(cwd, DEFAULT_BRANDING_CONFIG_PATH), "utf8"),
     ) as Record<string, unknown>;
     expect(descriptor.$schema).toBe("../meta/branding.json");
-    expect(descriptor.liquid_template_file).toBe("./login.liquid");
+    expect(descriptor.liquid_template).toEqual({ $file: "./login.liquid" });
 
     const template = await readFile(join(cwd, DEFAULT_BRANDING_TEMPLATE_PATH), "utf8");
     expect(template).toBe(getDefaultBrandingConfig("split").template);
@@ -291,6 +333,10 @@ describe("materializeSetupResources branding design", () => {
       id: "brnd_01KWHH",
       hash: expect.stringMatching(/^[a-f0-9]{64}$/),
     });
+
+    const brandingReadme = await readFile(join(cwd, ".zitadel/branding/README.md"), "utf8");
+    expect(brandingReadme).toContain(`npx @zitadel/cli@${TEST_CLI_VERSION} plan`);
+    expect(brandingReadme).not.toMatch(/`zitadel /);
   });
 
   it("scaffolds no branding files when no design is chosen", async () => {
@@ -301,7 +347,7 @@ describe("materializeSetupResources branding design", () => {
       createBranding,
     } as unknown as ZitadelClient;
 
-    await materializeSetupResources({ cwd, client, projectId: "project_123", force: false });
+    await materializeSetupResources({ cwd, client, projectId: "project_123", force: false, cliVersion: TEST_CLI_VERSION });
 
     expect(createBranding).not.toHaveBeenCalled();
     const state = JSON.parse(

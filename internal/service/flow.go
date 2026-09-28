@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/domain/idgen"
-	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 // FlowService is the flow engine's use-case surface. The API handler
@@ -31,6 +31,7 @@ type StartFlowRequest struct {
 	RedirectURI   *string
 	AuthRequestID *string
 	SessionID     *string
+	UserAgent     *domain.UserAgent
 }
 
 type SubmitFlowRequest struct {
@@ -71,19 +72,16 @@ type ResolveFlowHint struct {
 func NewFlowService(
 	v2Pool *DB,
 	stateMachine domain.FlowStateMachine,
-	ids idgen.Generator,
 ) FlowService {
 	return &flowService{
 		v2Pool:       v2Pool,
 		stateMachine: stateMachine,
-		ids:          ids,
 	}
 }
 
 type flowService struct {
 	v2Pool       *DB
 	stateMachine domain.FlowStateMachine
-	ids          idgen.Generator
 }
 
 var _ FlowService = (*flowService)(nil)
@@ -96,18 +94,18 @@ func (s *flowService) Resolve(ctx context.Context, req ResolveFlowRequest) (*dom
 }
 
 func (s *flowService) resolveByName(ctx context.Context, req ResolveFlowRequest) (*domain.FlowDefinition, error) {
-	filters := []v2database.Filter[domain.FlowDefinitionField]{
-		v2database.Equal(v2database.Col(domain.FlowDefinitionFieldProjectID), req.ProjectID),
-		v2database.Equal(v2database.Col(domain.FlowDefinitionFieldName), *req.Name),
-		v2database.Equal(v2database.Col(domain.FlowDefinitionFieldStatus), domain.FlowDefinitionStatusActive.String()),
+	filters := []database.Filter[domain.FlowDefinitionField]{
+		database.Equal(database.Col(domain.FlowDefinitionFieldProjectID), req.ProjectID),
+		database.Equal(database.Col(domain.FlowDefinitionFieldName), *req.Name),
+		database.Equal(database.Col(domain.FlowDefinitionFieldStatus), domain.FlowDefinitionStatusActive.String()),
 	}
 	if req.SchemaVersion != nil {
-		filters = append(filters, v2database.Equal(v2database.Col(domain.FlowDefinitionFieldSchemaVersion), *req.SchemaVersion))
+		filters = append(filters, database.Equal(database.Col(domain.FlowDefinitionFieldSchemaVersion), *req.SchemaVersion))
 	}
 
-	result, err := s.v2Pool.Statements().ListFlowDefinitions(ctx, &v2database.ListOptions[domain.FlowDefinitionField]{
-		Filter: v2database.And(filters...),
-	})
+	result, err := s.v2Pool.Statements().ListFlowDefinitions(WithAuthzListUnrestricted(ctx), &database.ListOptions[domain.FlowDefinitionField]{
+		Filter: database.And(filters...),
+	}, FlowDefinitionQueryOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +113,7 @@ func (s *flowService) resolveByName(ctx context.Context, req ResolveFlowRequest)
 		return nil, domain.ErrFlowDefinitionNotFound()
 	}
 
-	def := pickLatestFlowVersion(result.Items)
+	def := pickNewestFlowRevision(result.Items)
 	if !flowServesPurpose(def, req.Purpose) {
 		return nil, domain.ErrFlowDefinitionPurposeMismatch()
 	}
@@ -135,18 +133,18 @@ func (s *flowService) resolveByName(ctx context.Context, req ResolveFlowRequest)
 // Ties break newest-first (created_at, then id, so one bulk apply with
 // colliding timestamps still yields a stable pick).
 func (s *flowService) resolveByAudience(ctx context.Context, req ResolveFlowRequest) (*domain.FlowDefinition, error) {
-	filters := []v2database.Filter[domain.FlowDefinitionField]{
-		v2database.Equal(v2database.Col(domain.FlowDefinitionFieldProjectID), req.ProjectID),
-		v2database.Equal(v2database.Col(domain.FlowDefinitionFieldStatus), domain.FlowDefinitionStatusActive.String()),
-		v2database.ArrayContains(v2database.Col(domain.FlowDefinitionFieldPurposes), req.Purpose.String()),
+	filters := []database.Filter[domain.FlowDefinitionField]{
+		database.Equal(database.Col(domain.FlowDefinitionFieldProjectID), req.ProjectID),
+		database.Equal(database.Col(domain.FlowDefinitionFieldStatus), domain.FlowDefinitionStatusActive.String()),
+		database.ArrayContains(database.Col(domain.FlowDefinitionFieldPurposes), req.Purpose.String()),
 	}
 	if req.SchemaVersion != nil {
-		filters = append(filters, v2database.Equal(v2database.Col(domain.FlowDefinitionFieldSchemaVersion), *req.SchemaVersion))
+		filters = append(filters, database.Equal(database.Col(domain.FlowDefinitionFieldSchemaVersion), *req.SchemaVersion))
 	}
 
-	result, err := s.v2Pool.Statements().ListFlowDefinitions(ctx, &v2database.ListOptions[domain.FlowDefinitionField]{
-		Filter: v2database.And(filters...),
-	})
+	result, err := s.v2Pool.Statements().ListFlowDefinitions(WithAuthzListUnrestricted(ctx), &database.ListOptions[domain.FlowDefinitionField]{
+		Filter: database.And(filters...),
+	}, FlowDefinitionQueryOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -184,7 +182,7 @@ func flowAudienceScore(def *domain.FlowDefinition, hint ResolveFlowHint) int {
 	}
 }
 
-// flowCreatedAfter reports whether a was created after b (id as the
+// flowCreatedAfter reports whether the flow definition `a` was created after `b` (id as the
 // timestamp tie-break).
 func flowCreatedAfter(a, b *domain.FlowDefinition) bool {
 	if !a.CreatedAt.Equal(b.CreatedAt) {
@@ -193,22 +191,49 @@ func flowCreatedAfter(a, b *domain.FlowDefinition) bool {
 	return a.ID > b.ID
 }
 
+// resolveFlowSession returns the id of the session the flow runs against:
+// the one the client supplied (a pre-created anonymous session, or an existing
+// session for step-up),
+// or a freshly persisted anonymous session when none is supplied.
+//
+// Linking the auth-attempt to this session lets exchange upgrade it in
+// place (building -> active) instead of minting a second one.
+func (s *flowService) resolveFlowSession(ctx context.Context, req StartFlowRequest) (string, error) {
+	if req.SessionID != nil {
+		return *req.SessionID, nil
+	}
+	session, err := domain.NewSession(req.Definition.ProjectID, req.UserAgent)
+	if err != nil {
+		return "", fmt.Errorf("flow service: create anonymous session: %w", err)
+	}
+	if err := s.v2Pool.Statements().CreateSession(ctx, session); err != nil {
+		return "", fmt.Errorf("flow service: persist anonymous session: %w", err)
+	}
+	return session.ID, nil
+}
+
 func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (domain.FlowStepResult, error) {
 	if req.Definition == nil {
 		return domain.FlowStepResult{}, fmt.Errorf("flow service: start without definition")
 	}
-
-	// TODO(wim): use SessionService to create sessions (#412)
-	sessionID := ""
-	if req.SessionID != nil {
-		sessionID = *req.SessionID
-	} else {
-		id, err := s.ids.New("sess")
-		if err != nil {
-			return domain.FlowStepResult{}, fmt.Errorf("flow service: mint session id: %w", err)
-		}
-		sessionID = id
+	// A supplied session id must name a real session; reject an empty value up
+	// front so it maps to 400 rather than silently producing an unlinked flow.
+	if req.SessionID != nil && *req.SessionID == "" {
+		return domain.FlowStepResult{}, domain.ErrRequestInvalid().WithMessage("session_id must not be empty")
 	}
+
+	sessionID, err := s.resolveFlowSession(ctx, req)
+	if err != nil {
+		return domain.FlowStepResult{}, err
+	}
+
+	// Mint and stamp before the state machine so Path B emits during Start
+	// (auth.attempt.created) share flow_id / session_id with Path A request.api.
+	flowID, err := s.v2Pool.Statements().NewManagedID(string(domain.PrefixFlow))
+	if err != nil {
+		return domain.FlowStepResult{}, fmt.Errorf("flow service: mint flow id: %w", err)
+	}
+	audit.BindPublicRequest(ctx, req.Definition.ProjectID, flowID, sessionID)
 
 	in := domain.FlowStartInput{
 		Definition:    req.Definition,
@@ -224,11 +249,6 @@ func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (domain.F
 	result, err := s.stateMachine.Start(ctx, in)
 	if err != nil {
 		return domain.FlowStepResult{}, err
-	}
-
-	flowID, err := s.ids.New("flow")
-	if err != nil {
-		return domain.FlowStepResult{}, fmt.Errorf("flow service: mint flow id: %w", err)
 	}
 	result.State.ID = flowID
 
@@ -286,12 +306,19 @@ func flowServesPurpose(def *domain.FlowDefinition, purpose domain.FlowDefinition
 	return ok
 }
 
-// pickLatestFlowVersion is a lexicographic compare — sufficient while
-// versions stay zero-padded MAJOR.MINOR.PATCH. Caller ensures defs non-empty.
-func pickLatestFlowVersion(defs []*domain.FlowDefinition) *domain.FlowDefinition {
+// pickNewestFlowRevision prefers the highest schema version (a lexicographic
+// compare, sufficient while versions stay zero-padded MAJOR.MINOR.PATCH) and,
+// among revisions of one version, the newest created. Revisions of a name
+// share a version, so the pick must not depend on list order. This differs
+// from GET /flow_definitions, which orders by creation time alone.
+func pickNewestFlowRevision(defs []*domain.FlowDefinition) *domain.FlowDefinition {
+	if len(defs) == 0 {
+		return nil
+	}
 	winner := defs[0]
 	for _, def := range defs[1:] {
-		if def.SchemaVersion > winner.SchemaVersion {
+		if def.SchemaVersion > winner.SchemaVersion ||
+			(def.SchemaVersion == winner.SchemaVersion && flowCreatedAfter(def, winner)) {
 			winner = def
 		}
 	}

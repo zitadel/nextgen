@@ -23,39 +23,40 @@ func assertDomainErrorCode(t *testing.T, err error, want string) {
 	assert.Equal(t, want, de.Code)
 }
 
-func TestNewDEK(t *testing.T) {
+func TestNewEncryptionKey(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		kek := &crypto.InverseCrypter{}
 
 		projectID := "proj-1"
 		alg := jose.A256GCM
 
-		dek, err := NewDEK(projectID, alg, kek)
+		key, err := NewEncryptionKey(projectID, EncryptionKeyPurposeKEK, alg, kek)
 		require.NoError(t, err)
-		require.NotNil(t, dek)
+		require.NotNil(t, key)
 
-		assert.NotEmpty(t, dek.ID)
-		assert.Equal(t, projectID, dek.ProjectID)
-		assert.Equal(t, alg, dek.Algorithm)
-		assert.Equal(t, KeyStateNotActiveYet, dek.State)
+		assert.Empty(t, key.ID, "ID is assigned by the dialect on create")
+		assert.Equal(t, projectID, key.ProjectID)
+		assert.Equal(t, alg, key.Algorithm)
+		assert.Equal(t, KeyStateNotActiveYet, key.State)
 
 		// Key is stored encrypted: it is not empty and decrypts back to a
 		// full 32-byte random key.
-		require.NotEmpty(t, dek.Key)
-		decrypted, err := kek.Decrypt(string(dek.Key))
+		require.NotEmpty(t, key.Key)
+		decrypted, err := kek.Decrypt(string(key.Key))
 		require.NoError(t, err)
 		assert.Len(t, []byte(decrypted), 32, "the length of an AES key must be 32 bytes")
 		assert.NotEqual(t, make([]byte, 32), []byte(decrypted), "generated key must not be all zeros")
 	})
 
-	t.Run("two DEKs get distinct random keys", func(t *testing.T) {
+	t.Run("two keys get distinct random keys", func(t *testing.T) {
 		kek := &crypto.InverseCrypter{}
-		a, err := NewDEK("proj", jose.A256GCM, kek)
+		a, err := NewEncryptionKey("proj", EncryptionKeyPurposeKEK, jose.A256GCM, kek)
 		require.NoError(t, err)
-		b, err := NewDEK("proj", jose.A256GCM, kek)
+		b, err := NewEncryptionKey("proj", EncryptionKeyPurposeKEK, jose.A256GCM, kek)
 		require.NoError(t, err)
 		assert.NotEqual(t, a.Key, b.Key)
-		assert.NotEqual(t, a.ID, b.ID)
+		assert.Empty(t, a.ID)
+		assert.Empty(t, b.ID)
 	})
 
 	t.Run("encrypt error is propagated", func(t *testing.T) {
@@ -63,7 +64,7 @@ func TestNewDEK(t *testing.T) {
 		kek := cryptomock.NewMockCrypter(gomock.NewController(t))
 		kek.EXPECT().Encrypt(gomock.Any()).Return("", sentinel)
 
-		_, err := NewDEK("proj", jose.A256GCM, kek)
+		_, err := NewEncryptionKey("proj", EncryptionKeyPurposeKEK, jose.A256GCM, kek)
 		require.Error(t, err)
 		var de Error
 		require.ErrorAs(t, err, &de)
@@ -71,7 +72,7 @@ func TestNewDEK(t *testing.T) {
 	})
 }
 
-func TestDEK_Activate(t *testing.T) {
+func TestEncryptionKey_Activate(t *testing.T) {
 	t.Run("no current key", func(t *testing.T) {
 		k := &EncryptionKey{State: KeyStateNotActiveYet}
 		k.Activate(nil)
@@ -93,7 +94,7 @@ func TestDEK_Activate(t *testing.T) {
 	})
 }
 
-func TestDEK_DecryptedKey(t *testing.T) {
+func TestEncryptionKey_DecryptedKey(t *testing.T) {
 	t.Run("round trips the stored key", func(t *testing.T) {
 		kek := &crypto.InverseCrypter{}
 		want := "ABCDEFGHIJKLMNOPQRSTUVWXYZ012345"
@@ -120,15 +121,15 @@ func TestDEK_DecryptedKey(t *testing.T) {
 	})
 }
 
-func TestDEK_Crypter(t *testing.T) {
+func TestEncryptionKey_Crypter(t *testing.T) {
 	t.Run("AES-GCM round trip", func(t *testing.T) {
 		kek := &crypto.InverseCrypter{}
 		key := "abcdefghijklmnopqrstuvwxyz012345"
 		encrypted, err := kek.Encrypt(key)
 		require.NoError(t, err)
 
-		dek := &EncryptionKey{ID: "dek_1", Key: encrypted, Algorithm: jose.A256GCM}
-		crypter, err := dek.Crypter(kek)
+		encKey := &EncryptionKey{ID: "enc_key_1", Key: encrypted, Algorithm: jose.A256GCM}
+		crypter, err := encKey.Crypter(kek)
 		require.NoError(t, err)
 		require.NotNil(t, crypter)
 
@@ -146,8 +147,8 @@ func TestDEK_Crypter(t *testing.T) {
 		encrypted, err := kek.Encrypt(key)
 		require.NoError(t, err)
 
-		dek := &EncryptionKey{Key: encrypted, Algorithm: "rot13"}
-		_, err = dek.Crypter(kek)
+		encKey := &EncryptionKey{Key: encrypted, Algorithm: "rot13"}
+		_, err = encKey.Crypter(kek)
 		require.Error(t, err)
 		assertDomainErrorCode(t, err, ErrSupportedEncryptionAlgorithm("rot13").Code)
 	})
@@ -157,8 +158,8 @@ func TestDEK_Crypter(t *testing.T) {
 		kek := cryptomock.NewMockCrypter(gomock.NewController(t))
 		kek.EXPECT().Decrypt(gomock.Any()).Return("", sentinel)
 
-		dek := &EncryptionKey{Key: "x", Algorithm: jose.A256GCM}
-		_, err := dek.Crypter(kek)
+		encKey := &EncryptionKey{Key: "x", Algorithm: jose.A256GCM}
+		_, err := encKey.Crypter(kek)
 		require.Error(t, err)
 		assertDomainErrorCode(t, err, ErrDecryptionFailed(nil).Code)
 	})

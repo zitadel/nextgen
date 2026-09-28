@@ -20,10 +20,10 @@ export const de: Locale = {
   "identifier.title": "Anmelden",
   "identifier.description": "Gib deine E-Mail-Adresse ein, um fortzufahren",
   "identifier.field.email": "E-Mail",
-  "identifier.field.email.placeholder": "du@unternehmen.com",
+  "identifier.field.email.placeholder": "du@beispiel.de",
   "identifier.field.password": "Passwort",
   "identifier.action.submit": "Anmelden",
-  "identifier.action.continue": "Anmelden",
+  "identifier.action.continue": "Weiter",
   "identifier.action.passkey": "Mit Passkey anmelden",
   "identifier.action.register.lead": "Noch kein Konto? ",
   "identifier.action.register.link": "Registrieren",
@@ -50,7 +50,7 @@ export const de: Locale = {
   "collect-credentials.title": "Konto erstellen",
   "collect-credentials.description": "Richte E-Mail und Passwort ein",
   "collect-credentials.field.email": "E-Mail",
-  "collect-credentials.field.email.placeholder": "du@unternehmen.com",
+  "collect-credentials.field.email.placeholder": "du@beispiel.de",
   "collect-credentials.field.password": "Passwort",
   "collect-credentials.action.submit": "Registrieren",
 
@@ -82,7 +82,7 @@ export const de: Locale = {
   "collect-passkey-email.description":
     "Gib deine E-Mail-Adresse ein, um einen Passkey einzurichten",
   "collect-passkey-email.field.email": "E-Mail",
-  "collect-passkey-email.field.email.placeholder": "du@unternehmen.com",
+  "collect-passkey-email.field.email.placeholder": "du@beispiel.de",
   "collect-passkey-email.action.submit": "Weiter",
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -110,10 +110,10 @@ export const de: Locale = {
   "password.action.register.link": "Registrieren",
 
   "register.title": "Konto erstellen",
-  // Leer per Design — die Registrierungskarte hat keine Unterzeile (Figma 6593:141743).
-  "register.description": "",
+  // Leer per Design — die Registrierungskarte hat keine Unterzeile.
+  "register.description": "Gib deine Daten ein, um loszulegen",
   "register.field.email": "E-Mail",
-  "register.field.email.placeholder": "du@unternehmen.com",
+  "register.field.email.placeholder": "du@beispiel.de",
   "register.field.password": "Passwort",
   "register.field.givenName": "Vorname",
   "register.field.familyName": "Nachname",

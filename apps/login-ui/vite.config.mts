@@ -36,6 +36,14 @@ function devServerConfig(mode: string) {
   return {
     ...baseServerConfig(),
     proxy: {
+      // The deployment runtime document `src/main.ts` falls back to for the
+      // default project id and its publishable key. Served at a root path by
+      // the Go mux, so forward it as-is; without this the dev server answers
+      // with index.html and discovery silently yields nothing.
+      "/console/runtime.json": {
+        target: env.VITE_BACKEND_URL || defaultBackendUrl,
+        changeOrigin: true,
+      },
       [proxyPath]: {
         target: env.VITE_BACKEND_URL || defaultBackendUrl,
         rewrite: (path: string) => {

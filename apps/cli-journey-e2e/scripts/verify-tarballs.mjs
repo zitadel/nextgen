@@ -5,13 +5,20 @@ import { spawnSync } from "node:child_process";
 
 import { PUBLIC_PACKAGE_DIRS } from "../../../scripts/release-manifest.mjs";
 
-const tarballsDir = process.argv[2];
-if (!tarballsDir) {
-  throw new Error("usage: node scripts/verify-tarballs.mjs <tarballs-dir>");
+const [tarballsDir, ...flags] = process.argv.slice(2);
+if (!tarballsDir || tarballsDir.startsWith("--")) {
+  throw new Error(
+    "usage: node apps/cli-journey-e2e/scripts/verify-tarballs.mjs <tarballs-dir>",
+  );
+}
+if (flags.length > 0) {
+  throw new Error(`unknown flags: ${flags.join(", ")}`);
 }
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, "../../..");
+// Journey registries and release artifact dirs carry the same set: exactly
+// the public release packages, nothing on top.
 const requiredPackageNames = new Set(
   await Promise.all(PUBLIC_PACKAGE_DIRS.map(packageName)),
 );

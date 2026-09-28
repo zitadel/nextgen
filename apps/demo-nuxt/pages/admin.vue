@@ -3,7 +3,9 @@
     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px">
       <h1 style="font-size: 24px; font-weight: 700; margin: 0">Admin</h1>
       <ClientOnly>
-        <zitadel-logout :project="project" post-sign-out-url="/login" />
+        <!-- The admin page's surface is fixed light, so declare it — same
+             contract as the login page's widget. -->
+        <zitadel-logout :project="project" theme="light" post-sign-out-url="/login" />
       </ClientOnly>
     </div>
     <template v-if="auth?.isAuthenticated">

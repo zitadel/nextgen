@@ -298,7 +298,7 @@ describe("LiquidJS engine", () => {
       identity: null,
     };
     const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
-    expect(result).toContain('<zl-alert severity="error"');
+    expect(result).toContain("<zl-alert data-zl-step-error");
     expect(result).toContain("The passkey prompt was closed before completing.");
     expect(result).toContain('action="setup"');
     expect(result).not.toContain("invalid");
@@ -324,7 +324,7 @@ describe("LiquidJS engine", () => {
       identity: null,
     };
     const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
-    expect(result).toContain('<zl-alert severity="error"');
+    expect(result).toContain("<zl-alert data-zl-step-error");
     expect(result).toContain("This passkey could not be verified");
     expect(result).not.toContain("error.passkey_invalid");
   });
@@ -350,7 +350,7 @@ describe("LiquidJS engine", () => {
       identity: null,
     };
     const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
-    expect(result).toContain('<zl-alert severity="error"');
+    expect(result).toContain("<zl-alert data-zl-step-error");
     expect(result).toContain("The new passkey could not be verified");
     expect(result).not.toContain("error.passkey_registration_invalid");
   });
@@ -435,7 +435,7 @@ describe("LiquidJS engine", () => {
   // A template-capability test, not the default flow: the default flow splits
   // email and credential across two steps. The template must still render
   // whatever field set a tenant's flow definition declares on one step,
-  // including an email+password pair (Figma `6593:141983`).
+  // including an email+password pair.
   it("renders an email+password step on one card: autocomplete, forgot link, sign-in CTA", () => {
     const engine = createLiquidEngine({ locale: fullLocale });
     const f = toArray({
@@ -463,9 +463,9 @@ describe("LiquidJS engine", () => {
     const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
     expect(result).toContain('autocomplete="email"');
     expect(result).toContain('autocomplete="current-password"');
-    expect(result).toContain('class="zl-card-forgot"');
-    expect(result).toContain('data-action="recover"');
-    expect(result).not.toContain("forgot-password-href");
+    expect(result).toContain('forgot-password-action="recover"');
+    expect(result).toContain("forgot-password-href");
+    expect(result).not.toContain('class="zl-card-forgot"');
     expect(result).toContain('label="Sign in"');
     expect(result).not.toContain('label="Continue"');
     const passkeyButtons =
@@ -500,7 +500,7 @@ describe("LiquidJS engine", () => {
     expect(result).not.toContain('hierarchy="secondary"');
   });
 
-  it("renders sign-in wrong credentials (6602:180268): inline password error, no form alert", () => {
+  it("renders sign-in wrong credentials: inline password error, no form alert", () => {
     const engine = createLiquidEngine({ locale: fullLocale });
     const f = toArray({
       email: { type: "email", text_key: "identifier.field.email", required: true },
@@ -526,11 +526,10 @@ describe("LiquidJS engine", () => {
     expect(result).toContain("Wrong email or password.");
     expect(result).toContain('name="password"');
     expect(result).toContain("invalid");
-    expect(result).not.toContain('<zl-alert severity="error">Wrong email');
-    expect(result).not.toContain('<zl-alert severity="error"');
+    expect(result).not.toContain("<zl-alert data-zl-step-error");
   });
 
-  it("renders sign-in server error (6594:125237): heading + body alert, fields unchanged", () => {
+  it("renders sign-in server error: heading + body alert, fields unchanged", () => {
     const engine = createLiquidEngine({ locale: fullLocale });
     const f = toArray({
       email: { type: "email", text_key: "identifier.field.email", required: true },
@@ -560,7 +559,7 @@ describe("LiquidJS engine", () => {
     expect(result).not.toContain("Wrong email or password.");
   });
 
-  it("renders sign-up field annotations (6593:141741): autocomplete, help, inline email error", () => {
+  it("renders sign-up field annotations: autocomplete, help, inline email error", () => {
     const engine = createLiquidEngine({ locale: fullLocale });
     const f = toArray({
       email: { type: "email", text_key: "register.field.email", required: true },
@@ -593,7 +592,7 @@ describe("LiquidJS engine", () => {
     expect(result).not.toContain("Use YYYY-MM-DD.");
     expect(result).toContain("An account with this email already exists");
     expect(result).not.toContain("forgot-password-href");
-    expect(result).not.toContain('<zl-alert severity="error">An account');
+    expect(result).not.toContain("<zl-alert data-zl-step-error");
     expect(result).not.toContain("forgot-password-href");
     expect(result).not.toContain('data-action="sign_in"');
     expect(result).not.toContain('class="zl-card-nav"');
@@ -728,9 +727,9 @@ describe("localiseFlowErrorKeys", () => {
     // field the inline outlet doesn't exist — without the downgrade the
     // error would render nowhere.
     // The label resolves through the step's catalog entry
-    // (`register.field.email` → "Work email"), not the bare field name.
+    // (`register.field.email` → "Email"), not the bare field name.
     expect(localiseFlowErrorKeys("error.email_required", { ...ctx, fields: ["password"] })).toEqual(
-      [{ message: "Work email is required." }],
+      [{ message: "Email is required." }],
     );
     // Inline key without a recognised rule suffix: its catalog copy
     // becomes the banner message verbatim.

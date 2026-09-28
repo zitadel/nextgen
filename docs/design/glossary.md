@@ -21,7 +21,7 @@ Three layers. Long-form in [`api/hierarchy.md`](api/hierarchy.md).
 | **Team** | A tenant-grouping inside any project. Two canonical shapes: (a) a team inside the **platform project** represents a paying customer / developer account; (b) a team inside a **customer project** represents a B2B end-customer tenant. Same resource, different project context. |
 | **User** | An identity inside any project. A user inside the platform project is what used to be called a "platform_user" (a developer/admin). A user inside a customer project is an end-user. Team participation attaches users to teams; lifecycle ownership is explicit policy. |
 
-The platform project's `project_id` is discoverable via the authenticated `/capabilities` response (`defaults.project_id`). Self-hosted returns a singleton; cloud returns whichever project is the caller's platform project.
+Discovering the platform project's `project_id` from the server is target design (the planned `/capabilities` endpoint — see [`api/conventions.md`](api/conventions.md#direction-not-shipped)); no discovery endpoint is shipped today. Self-hosted runs a singleton platform project; cloud resolves whichever project is the caller's platform project.
 
 ---
 
@@ -69,9 +69,9 @@ Core nouns used across the API. Full endpoint map in [`api/resource-map.md`](api
 | **grant** | Explicit access record binding a principal to a permission/relation at a scope (user ↔ app, team ↔ project, member ↔ role, or a raw permission/relation assignment). Long-form in [ADR 032](../adrs/032-permission-catalogs.md). |
 | **role** | Named permission bundle inside an app_group. |
 | **team_membership** | Dedicated team roster/status shape when team participation is stored outside FGA tuples. It can carry roles, provisioning metadata, and member status, but it is not lifecycle ownership; FGA may consume or mirror it for authorization. |
-| **auth_attempt** | Ephemeral state machine driving a single authentication attempt. Exposes *auth primitives* (challenges, verify, handoff). OIDC context is owned by the OIDC adapter (`auth_requests`), not by auth_attempt. Long-form in [`api/authn-and-auth-flows.md`](api/authn-and-auth-flows.md). |
+| **auth_attempt** | Ephemeral state machine driving a single authentication or credential-enrollment ceremony (ADR 056). Exposes *auth primitives* (challenges, verify, handoff). OIDC context is owned by the OIDC adapter (`auth_requests`), not by auth_attempt. Long-form in [`api/authn-and-auth-flows.md`](api/authn-and-auth-flows.md). |
 | **handoff_token** | Short-lived, audience-bound token produced by `POST /auth_attempts/{id}/handoff`, consumed by `POST /sessions/exchange`. |
-| **challenge** | A single-factor challenge (password prompt, OTP, passkey, OIDC redirect) issued inside an auth_attempt. |
+| **challenge** | A single challenge (password prompt, OTP, passkey assertion, passkey registration, OIDC redirect) issued inside an auth_attempt. |
 | **bootstrap** | The `/bootstrap/*` endpoint family. Two distinct concepts share the prefix: *project bootstrap* (`POST /projects` for anonymous project creation — see [`platform/claim-flow.md`](platform/claim-flow.md)) and *challenge bootstrap* (`POST /bootstrap/challenge` for origin-bound browser nonces — see [`api/authn-and-auth-flows.md`](api/authn-and-auth-flows.md)). |
 | **claim** | The transaction that attaches a team (in the platform project) and an accountable human to a customer project. Free. Forced at first production deploy. See [`platform/claim-flow.md`](platform/claim-flow.md). |
 
@@ -107,16 +107,23 @@ From the configuration surface, flow engine, and branding. Long-form in [`platfo
 | **audience** | The resolution hierarchy for flow definitions: `app > team > schema > project default`. |
 | **environment** | A config-version slot: `development`, `preview`, `production`. Governs origin wildcard rules (see [`api/security-and-origins.md`](api/security-and-origins.md)). |
 | **drift** | Divergence between the repo's `zitadel.json` and server-side state. Resolves silently in favor of repo. |
-| **branding** | The per-project login-appearance resource: layout, asset URLs, and the Liquid template, published as immutable revisions via the Branding API / `zitadel apply`. Flow responses resolve the newest revision. Decisions in [ADR 040](../adrs/040-tenant-login-templates-editable-config.md). |
-| **template** (branding) | The LiquidJS artifact the login component renders per step — the `branding.liquid_template` wire field, authored locally as `login.liquid`. What you edit after ejecting; security rules in [`flowengine/template-security.md`](flowengine/template-security.md). Distinct from the `renderer` enum value above. |
-| **design** | A named starting point from the shipped catalog (`centered`, `split`, `split-right`, `hero`, `minimal`) that `zitadel branding eject --design` scaffolds. A design *produces* a template; once edited, what you own is a template, no longer a design. Same relationship as sign-in **preset** : flow definition. |
+| **branding** | The per-project login-appearance resource: layout, asset URLs, and the Liquid template, published as immutable revisions via the Branding API / `zitadel apply`. Flow responses resolve the newest revision. Decisions in [ADR 040](../adrs/040-tenant-login-templates-editable-config.md). Carries widget appearance, widget structure, and project translations — not page chrome. Placement of each kind of change: [`branding/customization-strategy.md`](branding/customization-strategy.md), [ADR 057](../adrs/057-login-customization-categories.md). |
+| **translations** | Project-scoped locale × key copy overlays for login strings ([ADR 045](../adrs/045-copy-overlays-as-branding-revisions.md)). A different setting from branding appearance ([#1038](https://github.com/zitadel/nextgen/issues/1038)). Page-local override is `lang` / `locales` on the element ([ADR 018](../adrs/018-widget-owned-locale-resolution.md)). Placement: [`branding/customization-strategy.md`](branding/customization-strategy.md), [ADR 057](../adrs/057-login-customization-categories.md). |
+| **widget template** | Advanced widget structure: the LiquidJS artifact the login component renders per step (`branding.liquid_template` / `login.liquid`). Strict scope — `<zl-*>` against the step payload, no page chrome — and **shared by embedded and Zitadel-served login** when it ships. Not setup, not the first visual iteration. Security rules in [`flowengine/template-security.md`](flowengine/template-security.md). Distinct from the `renderer` enum value and from a proposed **page template**. |
+| **template** (branding) | Prefer **widget template** when both Liquid artifacts are in play. Bare "template" still means `login.liquid` in older docs (ADR 040, [`branding/templates.md`](branding/templates.md)). |
+| **design** | Historical: a named Liquid starting point (`centered`, `split`, `split-right`, `hero`, `minimal`) that `zitadel branding eject --design` still scaffolds today. [ADR 057](../adrs/057-login-customization-categories.md) retires that catalog as the setup path — those files are page chrome, not widget structure. |
 | **layout** | The `branding.layout` wire enum (`centered \| split`) the bundled default template branches on, and the degrade target when a custom template is rejected. Deliberately small — richer looks ship as designs (templates), not new enum values. |
+| **page chrome** | Everything outside `<zitadel-login>`: split page, modal host, left-pane marketing. Embedders write application code. Zitadel-served page chrome is **unset**. [ADR 057](../adrs/057-login-customization-categories.md). |
+| **page template** | Proposed later Liquid document (`page.liquid`) with a `login_widget` hole for Zitadel-served page chrome. Not a settled requirement; not used by embeds. |
+| **embedded login** | `<zitadel-login>` rendered by the customer's application. The customer owns the document. Orthogonal to whether the Zitadel *server* is cloud or customer-operated. |
+| **Zitadel-served login** | Zitadel presents the login page (today `/ui/login/`). Same widget; branding/content reuse where applicable. Independent of Cloud vs customer-operated server. Alias: **hosted login**. |
+| **fully custom frontend** | Customer-owned authentication UI on Zitadel's supported APIs. A presentation model, not an embed escape hatch. |
 
 ---
 
 ## 7. URL shape
 
-**LOCKED: no version segment in paths.** All endpoints live directly under the root (`POST /users`, `GET /teams/{id}`). Versioning is header-selected via `Zitadel-Version: 2026-04-21`, pinned per API key and per webhook endpoint. See [`api/conventions.md`](api/conventions.md#versioning).
+**LOCKED: no version segment in paths.** All endpoints live directly under the root (`POST /users`, `GET /teams/{id}`). Header-selected versioning (`Zitadel-Version`, pinned per API key and per webhook endpoint) is target design — the shipped API is unversioned; breaking changes ride the alpha release train. See [`api/conventions.md`](api/conventions.md#direction-not-shipped).
 
 ---
 

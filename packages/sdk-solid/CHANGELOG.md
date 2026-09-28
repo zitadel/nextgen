@@ -1,5 +1,90 @@
 # @zitadel/sdk-solid
 
+## 1.0.0-alpha.23
+
+### Patch Changes
+
+- Updated dependencies [[`3a10eb6`](https://github.com/zitadel/nextgen/commit/3a10eb61dd7e597ccd5b62d8a39453fb7645673e), [`f8c5a24`](https://github.com/zitadel/nextgen/commit/f8c5a24aa87015e722f2f6ecfb276b839d46f4de), [`93cac33`](https://github.com/zitadel/nextgen/commit/93cac336402cae09a3e6dfb8622556d13794ab71), [`93cac33`](https://github.com/zitadel/nextgen/commit/93cac336402cae09a3e6dfb8622556d13794ab71), [`fc1bb82`](https://github.com/zitadel/nextgen/commit/fc1bb8299cd1dddde0b5490d74385576b83e4ad4), [`1162dc9`](https://github.com/zitadel/nextgen/commit/1162dc91c274fcd96bf3dada5b474356242cc1b9), [`85db700`](https://github.com/zitadel/nextgen/commit/85db70036625cdf6dc4560487c4f7cf6f6694a1d), [`583a8ed`](https://github.com/zitadel/nextgen/commit/583a8ed0c6142539539eb6e082de8dbfe11a3246), [`6c3f4a3`](https://github.com/zitadel/nextgen/commit/6c3f4a35e6466e9335ebb00b9943902faef8f2f8), [`205cef5`](https://github.com/zitadel/nextgen/commit/205cef525ee26250b652ee40f0b35622dc05caea), [`85fb5ab`](https://github.com/zitadel/nextgen/commit/85fb5abc1edd8699b86898e57d31c4938a6228a5), [`58c25fd`](https://github.com/zitadel/nextgen/commit/58c25fd9dd9776ab3d92a86515c879d6f4888de4), [`8fc4472`](https://github.com/zitadel/nextgen/commit/8fc44720d0b93f6d5450bff85cb8ed984712156a), [`b70e520`](https://github.com/zitadel/nextgen/commit/b70e52035b433e7c3293c54be43352bb59e78dc2), [`ce3c67c`](https://github.com/zitadel/nextgen/commit/ce3c67c10b7ef7f20a30335fedb07325b6146cad)]:
+  - @zitadel/api@1.0.0-alpha.23
+  - @zitadel/components@1.0.0-alpha.23
+  - @zitadel/sdk-core@1.0.0-alpha.23
+
+## 1.0.0-alpha.22
+
+### Patch Changes
+
+- Updated dependencies [[`82186ce`](https://github.com/zitadel/nextgen/commit/82186ce7da8dd96cd0f178a3a7c9994d7ee00cea), [`af21963`](https://github.com/zitadel/nextgen/commit/af21963a99d6f827699249fa524fbc64f2e6baab)]:
+  - @zitadel/api@1.0.0-alpha.22
+  - @zitadel/components@1.0.0-alpha.22
+  - @zitadel/sdk-core@1.0.0-alpha.22
+
+## 1.0.0-alpha.21
+
+### Patch Changes
+
+- Updated dependencies [[`a59b288`](https://github.com/zitadel/nextgen/commit/a59b288e4e52a3274c1ab4b5e4c241f1083aac6b), [`7a06425`](https://github.com/zitadel/nextgen/commit/7a06425a1b30a448bf05da8d870bd4570d304060)]:
+  - @zitadel/api@1.0.0-alpha.21
+  - @zitadel/components@1.0.0-alpha.21
+  - @zitadel/sdk-core@1.0.0-alpha.21
+
+## 1.0.0-alpha.20
+
+### Patch Changes
+
+- Updated dependencies [[`de7534a`](https://github.com/zitadel/nextgen/commit/de7534aa6a140e9ea32173a59694c71e61214e7b), [`de7534a`](https://github.com/zitadel/nextgen/commit/de7534aa6a140e9ea32173a59694c71e61214e7b), [`de7534a`](https://github.com/zitadel/nextgen/commit/de7534aa6a140e9ea32173a59694c71e61214e7b)]:
+  - @zitadel/components@1.0.0-alpha.20
+  - @zitadel/api@1.0.0-alpha.20
+  - @zitadel/sdk-core@1.0.0-alpha.20
+
+## 0.1.0-alpha.19
+
+### Minor Changes
+
+- [#830](https://github.com/zitadel/nextgen/pull/830) [`35d25c3`](https://github.com/zitadel/nextgen/commit/35d25c3add44611197363ff088fc940ee3858c78) Thanks [@fforootd](https://github.com/fforootd)! - Theming and header controls for the login surface:
+  - The primary button now consumes the semantic `--zl-primary` /
+    `--zl-primary-foreground` pair (Figma-owned values; the previous legacy
+    role tokens remain as fallback). Expect a slight visual shift on stock
+    buttons; setting the pair on the host element — or
+    `branding.palette.primary` / `branding.palette.on_primary`, which now
+    feed both vocabularies — restyles the CTA. Hover intentionally stays on
+    the legacy hover role until Figma publishes a primary-scoped hover value.
+  - `branding.palette.link` finally reaches the links: card navigation,
+    forgot-password, and field links consume a new `--zl-color-text-link`
+    contract variable (defined by default as an alias of the existing purple
+    accent, which resolves per theme). Previously the palette key recolored
+    pills instead of links.
+  - New `suppress-header` boolean on `<zitadel-login>` and
+    `<zitadel-session>` (and a `suppressHeader` prop on every framework
+    wrapper): visually hides the widget's own heading block while keeping it
+    in the accessibility tree — for embeds whose page already carries the
+    heading. Works with user-ejected branding templates too.
+
+### Patch Changes
+
+- [#856](https://github.com/zitadel/nextgen/pull/856) [`b17b2c9`](https://github.com/zitadel/nextgen/commit/b17b2c9fb3fae00f99a1864d37f3b51142ea4344) Thanks [@fforootd](https://github.com/fforootd)! - The package documentation now matches what the packages actually do. The Next and Nuxt guides drop the removed `api-base` attribute in favor of `configureZitadel()` and the `project` property; the Nuxt guide documents the Nuxt module (what `zitadel setup` wires) with its real options and the `useAuth()` / `useZitadelProject()` composables, alongside the hand-rolled middleware path with its full option set. `@zitadel/sdk-core` and `@zitadel/api` gain real documentation of their entry points, `@zitadel/config` gains a package README, and the SPA guides document the `ZitadelSession` card and point local no-proxy experiments at the local runtime's actual default port (8080). The flow-editing guide copied into `.zitadel/flows/` no longer suggests cross-flow `switch`/`pivot` transitions, which the runtime does not execute yet, and API examples use the real prefixed ID format (`proj_…`, `team_…`) instead of a retired naming scheme.
+
+- Updated dependencies [[`d1e967d`](https://github.com/zitadel/nextgen/commit/d1e967d74ee339f9695f73185dd3097b19f527a2), [`c2888bd`](https://github.com/zitadel/nextgen/commit/c2888bdfd3c2a21fefd76a9b7fa80507d97cd88b), [`61a0eee`](https://github.com/zitadel/nextgen/commit/61a0eee0abb310a834d94b72a74f351035021be8), [`b17b2c9`](https://github.com/zitadel/nextgen/commit/b17b2c9fb3fae00f99a1864d37f3b51142ea4344), [`fc3d154`](https://github.com/zitadel/nextgen/commit/fc3d154f2fabb722c6f94633fd6c10bc60d0a657), [`35d25c3`](https://github.com/zitadel/nextgen/commit/35d25c3add44611197363ff088fc940ee3858c78), [`e26f376`](https://github.com/zitadel/nextgen/commit/e26f37617f5d3a3f92f00c07aad89a98ee9d754f), [`b7235f7`](https://github.com/zitadel/nextgen/commit/b7235f7a0ede460e504376974b370d3d95e0d3c6), [`f1049fd`](https://github.com/zitadel/nextgen/commit/f1049fd1b07086ffd070ecdd0b2d80958efd72f2), [`37e9cb9`](https://github.com/zitadel/nextgen/commit/37e9cb903943d34eebadfb44457872892f296823), [`11e6ab5`](https://github.com/zitadel/nextgen/commit/11e6ab57d611f4dc0f9732b958bff1302d4ea689), [`11e6ab5`](https://github.com/zitadel/nextgen/commit/11e6ab57d611f4dc0f9732b958bff1302d4ea689)]:
+  - @zitadel/components@0.1.0-alpha.19
+  - @zitadel/api@0.1.0-alpha.19
+  - @zitadel/sdk-core@0.1.0-alpha.19
+
+## 0.1.0-alpha.18
+
+### Minor Changes
+
+- [#711](https://github.com/zitadel/nextgen/pull/711) [`5208d86`](https://github.com/zitadel/nextgen/commit/5208d863015f78c9618317398ceda1e959c13296) Thanks [@fforootd](https://github.com/fforootd)! - The framework SDK packages (react, vue, angular, svelte, solid, qwik, nuxt) now re-export the `businessLocales` copy overlay from `@zitadel/components`, so an app that only declares its framework SDK as a direct dependency can wire the work-email wording without reaching into `@zitadel/components` (which strict package managers would not resolve). `zitadel setup --use-case business` uses this to wire the overlay into every framework's generated auth pages — previously only Next scaffolds got the business copy; the SPA scaffolds pass a plain `locales` prop to the wrapper components, and `doctor --fix` regenerates the same markup from the recorded use case.
+
+- [#686](https://github.com/zitadel/nextgen/pull/686) [`e375e18`](https://github.com/zitadel/nextgen/commit/e375e1811b9d03ceae8b517cf2230f52957e8a5c) Thanks [@fforootd](https://github.com/fforootd)! - The framework SDK wrappers now expose the widgets' surface contract: `ZitadelLogin` and `ZitadelSession` accept `variant` (`widget` | `page`) and `theme` (`light` | `dark` | `auto`), and `ZitadelLogout` accepts `theme`, across the React, Vue, Angular, Svelte, Qwik, and Solid wrappers. The `locales` prop additionally accepts partial dictionaries, so presets like `businessLocales` are directly assignable. Apps scaffolded by `zitadel setup` pin `variant="page"` on the generated `/profile` page's `<zitadel-session>` (keeping it full-page under the new widget-first default) and reference the SDK-shipped React JSX declarations instead of carrying a hand-maintained copy.
+
+### Patch Changes
+
+- [#561](https://github.com/zitadel/nextgen/pull/561) [`d9607d1`](https://github.com/zitadel/nextgen/commit/d9607d19949c516f241de058aea69994b084f90b) Thanks [@fforootd](https://github.com/fforootd)! - docs: replace `@zitadel/edge-proxy` production guidance in the package READMEs with the ADR 036 model — platform rewrites/minimal worker plus a publishable key, no secrets on the platform (scaffolding tracked in zitadel/nextgen#560)
+
+- Updated dependencies [[`7120ce3`](https://github.com/zitadel/nextgen/commit/7120ce328eb9c63bbc6ff0bad0465c7f1f49e602), [`ff66683`](https://github.com/zitadel/nextgen/commit/ff66683eeb0daa3a12e7d11fed01076ac8c2ba58), [`e375e18`](https://github.com/zitadel/nextgen/commit/e375e1811b9d03ceae8b517cf2230f52957e8a5c), [`7ea32f8`](https://github.com/zitadel/nextgen/commit/7ea32f82b582e37944535b537940f035bdda8cde), [`2c63b47`](https://github.com/zitadel/nextgen/commit/2c63b47c025e1255683b0b8cd2c48a3e25f79b3a), [`2ece0b1`](https://github.com/zitadel/nextgen/commit/2ece0b1242b07b7e369668bd4d313b44d56e553c), [`2ece0b1`](https://github.com/zitadel/nextgen/commit/2ece0b1242b07b7e369668bd4d313b44d56e553c), [`1f66979`](https://github.com/zitadel/nextgen/commit/1f6697956ee81a5a28812905283ddb94f649250f), [`2ece0b1`](https://github.com/zitadel/nextgen/commit/2ece0b1242b07b7e369668bd4d313b44d56e553c), [`310014f`](https://github.com/zitadel/nextgen/commit/310014f1ec8df441b161d12bb01658d27aa1f478), [`2ece0b1`](https://github.com/zitadel/nextgen/commit/2ece0b1242b07b7e369668bd4d313b44d56e553c), [`d2bca36`](https://github.com/zitadel/nextgen/commit/d2bca36bdaa09168363e8e581cc4f0ef5db7eeb8), [`e0b8d3d`](https://github.com/zitadel/nextgen/commit/e0b8d3d66356f80d658198edccca3d6d77077c29), [`97470b2`](https://github.com/zitadel/nextgen/commit/97470b2d51fdf815463336ffe7999f864e510f13), [`ca91e8f`](https://github.com/zitadel/nextgen/commit/ca91e8f0368a59f9b96df2f380ec708b3b678f6c), [`ca91e8f`](https://github.com/zitadel/nextgen/commit/ca91e8f0368a59f9b96df2f380ec708b3b678f6c), [`e58a4c1`](https://github.com/zitadel/nextgen/commit/e58a4c1161d11d519d04cb944ab2875270ddc8c2), [`e375e18`](https://github.com/zitadel/nextgen/commit/e375e1811b9d03ceae8b517cf2230f52957e8a5c), [`2ece0b1`](https://github.com/zitadel/nextgen/commit/2ece0b1242b07b7e369668bd4d313b44d56e553c), [`4b984af`](https://github.com/zitadel/nextgen/commit/4b984afbbde622b6f86d90ff327f4b21f9526785), [`40c8537`](https://github.com/zitadel/nextgen/commit/40c8537efc12203fce05855b9536500a4a78621a), [`e375e18`](https://github.com/zitadel/nextgen/commit/e375e1811b9d03ceae8b517cf2230f52957e8a5c), [`6394228`](https://github.com/zitadel/nextgen/commit/6394228f61426eed4bd28d0df781a98b42a9ac95), [`1395911`](https://github.com/zitadel/nextgen/commit/1395911519a40ceb4e06e8b68729376553d2768d), [`cb42772`](https://github.com/zitadel/nextgen/commit/cb427725b28a650739c5c86e72187f3df1529570), [`e375e18`](https://github.com/zitadel/nextgen/commit/e375e1811b9d03ceae8b517cf2230f52957e8a5c), [`f2cec14`](https://github.com/zitadel/nextgen/commit/f2cec1417437c4f7d33dc4bd2281b802cfebe406), [`41a2de2`](https://github.com/zitadel/nextgen/commit/41a2de240cb446cd12b438a442a55e7b90287e80), [`2975c4d`](https://github.com/zitadel/nextgen/commit/2975c4dabec68ac1a8569d6a34960de50dced1b8), [`fc441fe`](https://github.com/zitadel/nextgen/commit/fc441fed87b8f15c1b17ccdda07272d61803c862), [`2ece0b1`](https://github.com/zitadel/nextgen/commit/2ece0b1242b07b7e369668bd4d313b44d56e553c), [`65da8b1`](https://github.com/zitadel/nextgen/commit/65da8b18b8a1af4e484d7cf494f8142f0539fb41)]:
+  - @zitadel/api@0.1.0-alpha.18
+  - @zitadel/components@0.1.0-alpha.18
+  - @zitadel/sdk-core@0.1.0-alpha.18
+
 ## 0.1.0-alpha.17
 
 ### Patch Changes

@@ -4,12 +4,14 @@ import { ZitadelError } from "../lib/errors";
 import { binaryLogs, followBinaryLogs } from "../lib/local-server/binary";
 import { containerLogs, followContainerLogs } from "../lib/local-server/docker";
 import { DEFAULT_LOCAL_SERVER_URL, readRuntimeMetadata } from "../lib/local-server/runtime";
-import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
+import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
 import { resolveCwd } from "../lib/paths";
 import { publicCliCommand } from "../lib/public-cli";
 
 export default class Logs extends BaseCommand {
   static override description = "Show local Zitadel server logs.";
+  static override group = CommandGroups.localServer;
+  static override groupOrder = 4;
   static override flags = {
     follow: Flags.boolean({ description: "Follow logs." }),
     tail: Flags.integer({ description: "Number of lines to show.", default: 200 }),

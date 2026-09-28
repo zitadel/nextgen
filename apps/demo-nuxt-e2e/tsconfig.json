@@ -6,10 +6,8 @@
     "sourceMap": false,
     "types": ["node"]
   },
-  "include": ["playwright.config.mts", "src/**/*.spec.ts", "src/**/*.d.ts"],
-  "references": [
-    {
-      "path": "../../packages/api-mock"
-    }
-  ]
+  // No project references — same reasoning as demo-next-e2e: nothing here
+  // imports api-mock types, and a reference would redirect any transitive
+  // workspace import onto stale out-tsc declaration outputs.
+  "include": ["playwright*.config.mts", "src/**/*.ts"]
 }

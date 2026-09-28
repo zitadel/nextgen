@@ -12,7 +12,7 @@ const SDK_DEPENDENCY = "@zitadel/sdk-vue";
  * `.zitadel/` base files from {@link AbstractRulePatcher} and contributes the
  * managed `src/App.vue` auth entry, a non-destructive `vite.config.*` merge
  * that adds the `/__nextgen` dev proxy (attaching the project secret from
- * `ZITADEL_PROJECT_SECRET` to every proxied request), the `VITE_`-prefixed
+ * `ZITADEL_PROJECT_SECRET` only to `POST /sessions/exchange`), the `VITE_`-prefixed
  * project id, and the SDK dep.
  */
 export class VuePatcher extends AbstractRulePatcher implements ViteSupport {
@@ -26,7 +26,7 @@ export class VuePatcher extends AbstractRulePatcher implements ViteSupport {
 
   protected routeOps(ctx: PatchContext): FileOp[] {
     return [
-      { kind: "write", path: "src/App.vue", contents: appTemplate() },
+      { kind: "write", path: "src/App.vue", contents: appTemplate(ctx) },
       this.viteProxyOp(ctx.framework.devPort, ctx.server),
       { kind: "merge-env", path: ".env.example", entries: { VITE_ZITADEL_PROJECT_ID: "" } },
       {

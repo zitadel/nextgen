@@ -1,6 +1,6 @@
 # ADR 040: Tenant Login Templates as Editable Config
 
-> **Status:** Proposed
+> **Status:** Proposed (amended 2026-08-27 by [ADR 057](057-login-customization-categories.md); amended 2026-09-15: `$file` references)
 > **Date:** 2026-07-20
 > **Context:** How tenant-authored LiquidJS login templates ("branding") are stored, validated, delivered to the login component, and edited through the CLI. Completes the write path for the read-only `Branding` projection already defined in [`flow-api` components](../../api/openapi/components/flows/branding.yaml) and consumed by `@zitadel/components`.
 
@@ -114,11 +114,11 @@ seen in dev.
 
 ### 3. Validation: authoritative in the CLI, lexical gate on the server
 
-| Layer | Where | What |
-|---|---|---|
+| Layer                     | Where                                                               | What                                                                                                                                                                   |
+| ------------------------- | ------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Authoring (authoritative) | `@zitadel/config` template validator, run by `zitadel plan`/`apply` | Real LiquidJS parse; `{% mandatory_gates %}` presence; `\| raw` usage; `<script>`/`<style>`/inline `on*=` handlers; issue list in the same shape as the flow validator |
-| Save (gate) | Go domain validator on `POST /branding` | Size cap, UTF-8, banned lexical patterns, https-only asset URLs, layout enum |
-| Render (safety net) | `@zitadel/components` (unchanged) | Escaping, `raw` neutered, DOMPurify, CSP, `{% mandatory_gates %}` |
+| Save (gate)               | Go domain validator on `POST /branding`                             | Size cap, UTF-8, banned lexical patterns, https asset URLs with the canonical loopback-development exception below, layout enum                                        |
+| Render (safety net)       | `@zitadel/components`                                               | Escaping, `raw` neutered, DOMPurify, CSP, `{% mandatory_gates %}`; drops loopback HTTP assets unless the embedding document is itself on loopback HTTP                 |
 
 The TS validator is authoritative because it runs the same engine that
 will render the template; the Go gate is deliberately lexical because a
@@ -128,8 +128,18 @@ not depend on it. Caveat recorded in
 returns raw template strings, and consumers that render outside the
 official component own their own sanitisation.
 
+**Loopback HTTP is a local-development exception for `logo_url` and
+`hero_url` only.** The accepted authorities are `localhost`, canonical dotted
+decimal `127.0.0.0/8`, and `[::1]`, with an optional numeric port. Shorthand,
+integer, hexadecimal, expanded/mapped IPv6, leading-zero, userinfo, lookalike,
+and private-network spellings are rejected consistently by the CLI, server,
+component, and editor schema. Because branding revisions are project-wide, the
+component preserves these HTTP URLs only when its embedding document also runs
+on loopback HTTP; a public login page must never request a persisted development
+asset from each visitor's device. All other asset fields remain HTTPS-only.
+
 **`font_url` is read-only in v1.** The component must load the tenant
-font stylesheet at *document* level (shadow-scoped `@font-face` rules
+font stylesheet at _document_ level (shadow-scoped `@font-face` rules
 never register faces — see `font-loader.ts`), so accepting an arbitrary
 URL on `POST /branding` would hand `branding.write` document-level CSS
 control over every page that embeds the login — precisely the boundary
@@ -137,7 +147,7 @@ the template sandbox exists to hold. The field stays on the wire shape
 (the read projection and a future hierarchy still need it), but the save
 gate rejects a non-empty value and the config dialect omits it. Safe
 delivery options for a follow-up: the CSS Font Loading API against font
-*binaries* (registers faces without executing stylesheet CSS, at the
+_binaries_ (registers faces without executing stylesheet CSS, at the
 cost of the Google-Fonts-CSS convenience) or an origin allowlist limited
 to pure font-CSS providers. Until then, tenant fonts load from the
 embedding page, which already owns document-level CSS.
@@ -171,8 +181,8 @@ project setup and uploads revision 1. Designs
 (`centered`, `split`, `split-right`, `hero`, `minimal`) are full template files in
 `@zitadel/config` defaults — the catalog documented in
 [branding/templates.md](../design/branding/templates.md). The wire
-`layout` enum stays `centered | split`: richer designs are delivered *as
-templates* (the escape hatch templates.md reserves), with the descriptor's
+`layout` enum stays `centered | split`: richer designs are delivered _as
+templates_ (the escape hatch templates.md reserves), with the descriptor's
 `layout` set to the nearest built-in so a template that fails component
 validation degrades to something sane. Every shipped design must pass the
 authoritative validator and a component-level render test.
@@ -214,3 +224,23 @@ authoritative validator and a component-level render test.
   Already rejected in [branding/schema.md](../design/branding/schema.md);
   the override ladder (tokens → inline vars → `::part()` → eject) covers
   CSS needs without a second sandboxing surface.
+
+## Amendment (2026-08-27)
+
+[ADR 057](057-login-customization-categories.md) keeps this ADR's storage,
+validation, and eject→apply path for the **widget template** (advanced
+structure inside the widget, shared by embedded and Zitadel-served login,
+strict scope, later). It amends §5's catalog: `split` / `split-right` /
+`hero` are page chrome. Setup must not publish those files as
+`login.liquid`. Zitadel-served page chrome is unset; `page.liquid` is a
+proposal, not a requirement.
+
+## Amendment (2026-09-15): `$file` references
+
+§4's `liquid_template_file` key is replaced by a general reference form. A
+descriptor now writes `"liquid_template": { "$file": "./login.liquid" }`. The
+OpenAPI YAML marks the field `x-local: file`, the generated editor
+meta-schema accepts either the string or the reference, and the CLI replaces
+any `$file` reference with the file's content before upload and writes the
+published value back to the file. The on-disk layout and the round-trip are
+unchanged; only the key is.

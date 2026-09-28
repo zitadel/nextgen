@@ -3,6 +3,10 @@
 > **Status:** Proposed
 > **Date:** 2026-06-01
 > **Context:** User schema, flow engine credential references
+>
+> **Amended by:** [ADR 052](052-user-envelope-and-attributes.md) — the user
+> schema describes the response's `attributes` object, not the whole response
+> body.
 
 ## Context
 
@@ -62,11 +66,11 @@ $schema: https://json-schema.org/draft/2020-12/schema
 kind: user-schema
 metaSchema: https://nextgen.com/api/schemas/user-schema-v1.0.json
 x-auth-methods:
-  password: { enabled: true, position: 1 }
-  passkey:  { enabled: true, position: 0 }
+  password: { enabled: true }
+  passkey:  { enabled: true }
 required: [email, given_name, family_name, password]
 properties:
-  email:       { type: string, format: email, x-unique: project, x-identifier: true }
+  email:       { type: string, format: email, x-unique: project }
   given_name:  { type: string }
   family_name: { type: string }
   password:    { type: string, minLength: 8, x-password: true }   # ← credential as attribute
@@ -81,16 +85,18 @@ $schema: https://json-schema.org/draft/2020-12/schema
 kind: user-schema
 metaSchema: https://nextgen.com/api/schemas/user-schema-v1.1.json
 x-auth-methods:
-  password: { enabled: true, position: 1 }
-  passkey:  { enabled: true, position: 0 }
+  password: { enabled: true }
+  passkey:  { enabled: true }
 required: [email, given_name, family_name]
 properties:
-  email:       { type: string, format: email, x-unique: project, x-identifier: true }
+  email:       { type: string, format: email, x-unique: project }
   given_name:  { type: string }
   family_name: { type: string }
 ```
 
 The v2 document is now a valid shape for `GET /users/{id}` responses.
+
+> Amended by [ADR 052](052-user-envelope-and-attributes.md): it describes the `attributes` object within that response. `id`, `schema` and `metadata` are the server-owned envelope around it and are not schema properties.
 
 ### Flow definition
 
@@ -150,6 +156,8 @@ picks; the wiring is on the descriptor.
 
 - User schema cleanly describes the user object including the
   `GET /users/{id}` response shape. Credentials cannot leak through it.
+  *(Amended by [ADR 052](052-user-envelope-and-attributes.md): the described
+  shape is the response's `attributes` object.)*
 - Schema, flow engine, and storage agree that credentials are not
   attributes.
 - Adding a new credential kind extends `x-auth-methods` and the

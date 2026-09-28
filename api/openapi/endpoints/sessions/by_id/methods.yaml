@@ -11,7 +11,6 @@ get:
   tags:
     - Sessions
   parameters:
-    - $ref: ../../../components/parameters/project-id.yaml
     - $ref: ../../../components/parameters/session-id.yaml
   security:
     - oauth2:
@@ -24,7 +23,13 @@ get:
           schema:
             $ref: ../session-response.yaml
     '401':
-      description: Missing or invalid session token.
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '403':
+      description: Insufficient permissions.
       content:
         application/json:
           schema:
@@ -42,46 +47,36 @@ delete:
   operationId: revokeSession
   summary: Revoke session
   description: |
-    Revokes the session immediately (`state: revoked`). This is the logout operation.
+    Permanently deletes the session, terminating it immediately.
 
-    The session_token issued at creation (or superseded by a handoff exchange) is required.
-    After revocation, any tokens derived from this session are invalidated.
+    This is the operator revoke path and requires the `session.delete` scope on a
+    project-bound credential. End-user logout with the `__nextgen_session` cookie is
+    `DELETE /sessions/me` (`nextgenSession` scheme).
+
+    Idempotent: deleting a session that does not exist (or was already deleted)
+    still returns 204. After deletion, any tokens derived from the session are
+    invalidated.
   tags:
     - Sessions
   parameters:
-    - $ref: ../../../components/parameters/project-id.yaml
     - $ref: ../../../components/parameters/session-id.yaml
   security:
     - oauth2:
         - session.delete
   responses:
     '204':
-      description: Session revoked successfully.
-      headers:
-        Set-Cookie:
-          $ref: ../../../components/headers/set-cookie-session-token.yaml
+      description: Session deleted. Idempotent — also returned when the session was already absent.
     '401':
-      description: Missing or invalid session token.
+      description: Missing or invalid credentials.
       content:
         application/json:
           schema:
             $ref: ../../../components/error-details.yaml
-    '404':
-      description: Session not found.
-      content:
-        application/json:
-          schema:
-            $ref: ../../../components/error-details.yaml
-    '409':
-      description: Session already revoked or expired.
+    '403':
+      description: Insufficient permissions.
       content:
         application/json:
           schema:
             $ref: ../../../components/error-details.yaml
     default:
-      description: Unexpected error.
-      content:
-        application/json:
-          schema:
-            $ref: ../../../components/error-details.yaml
-
+      $ref: revokeSession-error-response.yaml

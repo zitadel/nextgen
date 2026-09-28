@@ -4,8 +4,10 @@ import (
 	"time"
 )
 
+const PrefixUserRecoveryCodes ResourcePrefix = "urc"
+
 type UserRecoveryCodes struct {
-	ID                  int64
+	ID                  string
 	ProjectID           string
 	UserID              string
 	RecoveryCodes       []string
@@ -16,6 +18,7 @@ type UserRecoveryCodes struct {
 }
 
 type CreateRecoveryCodes struct {
+	ID            string
 	ProjectID     string
 	UserID        string
 	RecoveryCodes []string

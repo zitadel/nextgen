@@ -1,0 +1,43 @@
+type: object
+description: |
+  One entry of the set a release pins: the revision of a single resource that
+  this release includes.
+required:
+  - kind
+  - handle
+  - revision_id
+properties:
+  kind:
+    $ref: ../../components/schemas/release-pointer-kind.yaml
+  handle:
+    type: string
+    minLength: 1
+    maxLength: 256
+    description: |
+      Which resource this pointer pins, independent of which revision of it.
+      `revision_id` chooses the revision; `handle` says what the revision is a
+      revision *of*. Determined when the release is assembled, not supplied by
+      the caller:
+
+      - `schema` — the document's `objectType`, so `human-user` and
+        `machine-user` are separate resources a release pins separately
+      - `flow_definition` — the definition's `name`, likewise for
+        `default-login` and `b2b-login`
+      - `branding` — always `default`. A project has one branding, so there is
+        nothing to distinguish; it is revisioned like everything else, and
+        `revision_id` is what varies between releases.
+
+      Resources inside a release reference each other by handle rather than by
+      revision id, so the same handle names the same resource in every release.
+    example: human-user
+  revision_id:
+    type: string
+    minLength: 1
+    maxLength: 512
+    description: |
+      The revision of that resource this release pins.
+
+      Deliberately not constrained to a prefixed id: for `kind: schema` this is
+      the schema's `$id`, which is a URL whenever the document supplied one and
+      only a generated `sch_*` value otherwise.
+    example: https://example.com/schemas/default-human-user.json

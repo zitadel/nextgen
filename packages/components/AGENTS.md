@@ -5,10 +5,21 @@ Scoped instructions for `packages/components/`. Read together with the
 
 ## What's in here
 
-Lit-based atoms (`<zl-*>`) and the `<zitadel-login>` orchestrator for the
-auth flow API. Consumed directly by tenant pages and indirectly by the
-`apps/console` shell. See [`README.md`](README.md) for consumer-facing
-docs.
+Lit-based atoms (`<zl-*>`) and the orchestrators for the auth flow API:
+`<zitadel-login>` (flow runner), `<zitadel-logout>`, and `<zitadel-session>`
+(session surface), all under `src/orchestrator/`. Consumed directly by tenant
+pages and indirectly by the `apps/console` shell. See [`README.md`](README.md)
+for consumer-facing docs.
+
+## Theming
+
+Mode resolution is owned by `src/orchestrator/theme-controller.ts` +
+`surface.ts`, which stamp `data-theme` / `data-theme-dark` on the host. The
+precedence is strongest-first: the embedding page's `theme` property → stored
+branding `theme.mode` → a variant-derived default (`dark` for
+`variant="page"`, `auto` for `variant="widget"`) — see amended ADR 014 §5 and
+`theme.browser.spec.ts`. Never hardcode mode-specific colors in orchestrator
+CSS; consume the semantic tokens, which flip via `[data-theme="light"]`.
 
 The orchestrator calls `@zitadel/api` (orval-generated typed fetch
 client) through the wrappers in `src/orchestrator/api-client.ts`. There is
@@ -32,11 +43,13 @@ There are exactly three places types live in this package:
 - **Wire shapes** — never declared here; imported from
   `@zitadel/api/generated/model` (`CreateFlow201`,
   `CreateFlow201Step`, `CreateFlowBody`, `SubmitFlowStepBody`, …).
-- **Branding** — `src/orchestrator/branding.ts` carries the client-side
-  branding extensions (`Branding`, `BrandingPalette`, `BrandingShape`,
-  `BrandingTheme`, `BrandingTypography`, `BrandingAssets`, `FlowLayout`).
-  These are real client extensions of the OpenAPI Branding component
-  (palette / typography / shape / theme tokenisation aren't on the wire).
+- **Branding** — `src/orchestrator/branding.ts` names the branding shape the
+  orchestrator paints (`Branding`, `BrandingPalette`, `BrandingShape`,
+  `BrandingTheme`, `BrandingThemeSide`, `BrandingTypography`, `FlowLayout`).
+  The appearance blocks are wire fields, so these are aliases of the generated
+  model, not declarations. `attribution` is the one real client extension: it
+  belongs to the embedding, not to the stored revision. Do not add an
+  appearance key here — add it to `api/openapi/` and re-export it.
 - **Template context** — `src/orchestrator/template-context.ts` carries
   the projection tenant Liquid templates can reference (`FlowMessage`,
   `FlowIdentity`, `FlowError[]`, `LiquidContext`). Lifted from the wire
@@ -224,9 +237,8 @@ the relevant build tasks so CI is safe; manual loops need a fresh
 ### Workbench
 
 The interactive workbench is [`apps/storybook`](../../apps/storybook/README.md)
-(`moon run storybook:dev`, `:6006`): the Lit atoms, the paired React
-components, and the `<zitadel-login>` orchestrator (MSW via
-`msw-storybook-addon`). It loads the built `dist/`, so rebuild after source
+(`moon run storybook:dev`, `:6006`): the Lit atoms and the
+`<zitadel-login>` orchestrator (MSW via `msw-storybook-addon`). It loads the built `dist/`, so rebuild after source
 changes (`moon run components:build`) — the Storybook tasks depend on it.
 
 ## Build

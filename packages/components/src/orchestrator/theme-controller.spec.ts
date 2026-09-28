@@ -161,4 +161,50 @@ describe("ThemeController", () => {
       expect(controller.theme).toBe("dark");
     });
   });
+
+  describe("published sides", () => {
+    const lightOnly = {
+      theme: { light: { palette: { primary: "#4F46E5" } } },
+    } as Branding;
+
+    it("resolves the only published side, whatever the mode says", () => {
+      const controller = new ThemeController(host);
+      controller.setBranding({
+        theme: { mode: "dark", light: { palette: { primary: "#4F46E5" } } },
+      } as Branding);
+      expect(controller.theme).toBe("light");
+    });
+
+    it("does not let the element select a side the revision never published", () => {
+      const controller = new ThemeController(host);
+      controller.setBranding(lightOnly);
+      controller.setModePreference("dark", "dark");
+      expect(controller.theme).toBe("light");
+    });
+
+    it("ignores the operating system when only one side is published", () => {
+      const { mql, matchMedia } = fakeMatchMedia(true);
+      globalThis.matchMedia = matchMedia;
+      const controller = new ThemeController(host);
+      controller.setBranding(lightOnly);
+      controller.setModePreference("auto", "auto");
+      expect(controller.theme).toBe("light");
+      mql.__triggerChange(false);
+      expect(controller.theme).toBe("light");
+    });
+
+    it("hands both sides back to the normal precedence", () => {
+      const controller = new ThemeController(host);
+      controller.setBranding({
+        theme: {
+          mode: "dark",
+          light: { palette: { primary: "#4F46E5" } },
+          dark: { palette: { primary: "#A5B4FC" } },
+        },
+      } as Branding);
+      expect(controller.theme).toBe("dark");
+      controller.setModePreference("light", "auto");
+      expect(controller.theme).toBe("light");
+    });
+  });
 });

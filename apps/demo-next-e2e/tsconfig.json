@@ -6,13 +6,9 @@
     "sourceMap": false,
     "types": ["node"]
   },
-  "include": ["playwright.config.mts", "src/**/*.spec.ts", "src/**/*.d.ts"],
-  "references": [
-    {
-      "path": "../../packages/sdk-next"
-    },
-    {
-      "path": "../../packages/api-mock"
-    }
-  ]
+  // No project references: the specs' only workspace type dep
+  // (@zitadel/testing) resolves to source via the @zitadel/source condition.
+  // Referencing sdk-next/api-mock here redirects transitive @zitadel/api
+  // imports onto their stale out-tsc declaration outputs instead.
+  "include": ["playwright*.config.mts", "src/**/*.ts", "src-real/**/*.ts"]
 }

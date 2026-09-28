@@ -15,13 +15,63 @@ export type ResourceEntry = {
 };
 
 /**
+ * Ownership class of one scaffolded app file, recorded in the scaffold
+ * manifest. `infrastructure` files (the request boundary, the provider, the
+ * custom-elements declarations) are load-bearing for the auth integration —
+ * a missing one fails `doctor`. `presentation` files (the generated pages)
+ * are released to the user as a starting point — a missing one only warns.
+ */
+export type ScaffoldFileClass = "infrastructure" | "presentation";
+
+/**
+ * Embedding posture of the scaffolded auth/profile pages (ADR 044). `page`
+ * pins the widgets to their full-page chrome — the fresh-scaffold default.
+ * `widget` embeds the cards in a layout-neutral wrapper inside the app's own
+ * shell — the default when setup meets a pre-existing route-based app (Next,
+ * Nuxt). Recorded in the scaffold manifest so `doctor --fix` restores the
+ * posture setup actually emitted; absence restores `page` (every scaffold
+ * before this record existed was full-page).
+ */
+export type ScaffoldPosture = "page" | "widget";
+
+/**
+ * One scaffolded app file as recorded at `zitadel setup` time: the sha256 of
+ * the bytes the CLI wrote (or found already matching), plus its ownership
+ * class. Keys of the containing record are project-root-relative posix paths.
+ */
+export type ScaffoldFileEntry = {
+  hash: string;
+  class: ScaffoldFileClass;
+};
+
+/**
+ * The scaffold manifest: which app files `zitadel setup` actually wrote, so
+ * `doctor` can distinguish missing/edited/adopted files without guessing from
+ * current templates. `scaffolded_framework` records whether setup created the
+ * app skeleton itself (fresh directory) — repair needs it to know whether the
+ * framework home page is CLI-managed. `dev_port` preserves the issuer port for
+ * context reconstruction. `posture` records the emitted embedding posture of
+ * the auth/profile pages (ADR 044) so restoration reproduces it. Absent on
+ * apps scaffolded by older CLI versions; consumers fall back to
+ * template-derived expectations.
+ */
+export type ScaffoldManifest = {
+  files: Record<string, ScaffoldFileEntry>;
+  scaffolded_framework?: boolean;
+  dev_port?: number;
+  posture?: ScaffoldPosture;
+};
+
+/**
  * The persisted contents of `.zitadel/state.json`. Maps each managed file path
  * (relative to the project root) to its sync entry, plus the framework id
- * captured during `zitadel setup`.
+ * captured during `zitadel setup` and, since the manifest was introduced, the
+ * scaffold manifest of generated app files.
  */
 export type ZitadelState = {
   framework: string;
   resources: Record<string, ResourceEntry>;
+  scaffold?: ScaffoldManifest;
 };
 
 /**
@@ -70,7 +120,7 @@ export interface ResourceSyncer {
   /**
    * Reduce a body to its canonical comparison form: strip server-echoed
    * noise (empty `audience`) and spelled-out meta-schema defaults
-   * (`x-editable` et al) so hashing and diff rendering treat semantically
+   * (`x-audit` et al) so hashing and diff rendering treat semantically
    * identical bodies as identical. Comparison only — never applied to
    * upload payloads or written to files (the server does not materialize
    * the stripped defaults, so dropping them from stored bytes would lose
@@ -112,17 +162,18 @@ export type SyncPlanSummary = {
  * new revision (see `.zitadel/flows/README.md`).
  */
 /**
- * Present on flow create/update actions whose `user_schema` pins a schema
- * revision that is superseded in the same run (a pending `revise`) or was
- * superseded by an interrupted earlier run. The executor rewrites
+ * Present on flow create/update/revise actions whose `user_schema` pins a
+ * schema revision that is superseded in the same run (a pending `revise`) or
+ * was superseded by an interrupted earlier run. The executor rewrites
  * `user_schema` to the new revision id — `newId` when the revision already
  * exists (crash recovery), otherwise the id minted by this run's revise.
  */
 export type FlowRepin = { previousId: string; schemaPath: string; newId?: string };
 
 /**
- * A non-blocking finding from plan-time flow validation (severity
- * `warning` in `@zitadel/config/validate`). Rendered as `# warning:`
+ * A non-blocking plan-time finding: a flow-validation issue of severity
+ * `warning` (`@zitadel/config/validate`), or a branding asset URL the
+ * probe could not fetch (`asset-probe.ts`). Rendered as `# warning:`
  * comment lines in the plan and `consola.warn`ed during apply; never
  * fails the run.
  */
@@ -158,6 +209,8 @@ export type SyncAction =
       previousId: string;
       oldContent: object | null;
       affectedPaths: ReadonlyArray<string>;
+      repin?: FlowRepin;
+      warnings?: ReadonlyArray<SyncActionWarning>;
     }
   | { kind: "delete"; path: string; syncer: ResourceSyncer; id: string; oldContent: object | null }
   | { kind: "skip"; path: string; reason: "immutable" | "no-change" };

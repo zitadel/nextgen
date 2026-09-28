@@ -3,8 +3,9 @@ import { customElement, property, state } from "lit/decorators.js";
 import { type ZitadelProject } from "@zitadel/api/config";
 
 import { getSession, revokeSession } from "./api-client.js";
-import { applyBaseTokens } from "./branding-to-tokens.js";
+import { applyBaseTokens, applyBrandingTokens } from "./branding-to-tokens.js";
 import { resolveApi, type ProjectAttrs } from "./resolve-api.js";
+import { ThemeController, type ThemeMode } from "./theme-controller.js";
 import { emit } from "../internal/emit.js";
 import { baseHostStyles, focusVisibleStyles, t } from "../styles/index.js";
 
@@ -24,15 +25,14 @@ import { baseHostStyles, focusVisibleStyles, t } from "../styles/index.js";
  * action, and calls the typed `revokeMySession` operation in `@zitadel/api`
  * (`DELETE /sessions/me`). The server clears the session cookie via
  * `Set-Cookie: Max-Age=0`; on success the element fires `zitadel-signout`
- * and optionally navigates to `post-sign-out-url`. (`getEndSessionUrl()`
- * additionally exposes the OIDC end-session URL for consumers that prefer a
- * user-agent-driven redirect.)
+ * and optionally navigates to `post-sign-out-url`.
  *
  * ## Template-slot mode
  *
  * When the consumer projects a `<template>` child the element renders the
- * template's clone into its light DOM with `{{name}}`, `{{email}}`, and
- * `{{initial}}` substituted. Any element with `data-action="logout"` inside
+ * template's clone into its light DOM with `{{display}}`, `{{identifier}}`,
+ * and `{{initial}}` substituted (`{{name}}` and `{{email}}` fill as legacy
+ * aliases of the first two). Any element with `data-action="logout"` inside
  * the cloned template triggers the sign-out flow. This mirrors the
  * placeholder `<nextgen-logout>`'s contract so existing markup keeps working.
  *
@@ -56,8 +56,8 @@ export class ZitadelLogout extends LitElement {
         width: 2.5rem;
         height: 2.5rem;
         border-radius: 9999px;
-        background: ${t.color.surface.defaultWhite};
-        color: ${t.color.text.buttonDefault};
+        background: ${t.theme.primary};
+        color: ${t.theme.primaryForeground};
         font-size: 0.875rem;
         font-weight: 600;
         display: inline-flex;
@@ -71,17 +71,17 @@ export class ZitadelLogout extends LitElement {
         ${focusVisibleStyles};
       }
       .trigger[aria-expanded="true"] {
-        box-shadow: 0 0 0 2px ${t.focus.color};
+        box-shadow: 0 0 0 2px ${t.theme.ring};
       }
 
       .dropdown {
         position: absolute;
-        top: calc(100% + ${t.spacing["02"]});
+        top: calc(100% + ${t.spacing["2"]});
         right: 0;
         width: 14rem;
-        background: ${t.color.surface.defaultPrimaryGray};
-        border: 1px solid ${t.color.border.defaultGray100};
-        border-radius: ${t.radius.m};
+        background: ${t.theme.popover};
+        border: 1px solid ${t.theme.border};
+        border-radius: ${t.radius.lg};
         box-shadow: 0 12px 32px rgba(0, 0, 0, 0.32);
         z-index: 9999;
         overflow: hidden;
@@ -90,17 +90,17 @@ export class ZitadelLogout extends LitElement {
       .preview {
         display: flex;
         align-items: center;
-        gap: ${t.spacing["03"]};
-        padding: ${t.spacing["03"]};
-        border-bottom: 1px solid ${t.color.border.defaultGray100};
+        gap: ${t.spacing["4"]};
+        padding: ${t.spacing["4"]};
+        border-bottom: 1px solid ${t.theme.border};
       }
       .preview-avatar {
         flex-shrink: 0;
         width: 2.5rem;
         height: 2.5rem;
         border-radius: 9999px;
-        background: ${t.color.surface.defaultWhite};
-        color: ${t.color.text.buttonDefault};
+        background: ${t.theme.primary};
+        color: ${t.theme.primaryForeground};
         font-size: 0.875rem;
         font-weight: 600;
         display: inline-flex;
@@ -114,14 +114,14 @@ export class ZitadelLogout extends LitElement {
       .preview-name {
         font-size: 0.875rem;
         font-weight: 600;
-        color: ${t.color.text.primaryWhite};
+        color: ${t.theme.foreground};
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
       }
       .preview-email {
         font-size: 0.75rem;
-        color: ${t.color.text.secondaryGray};
+        color: ${t.theme.mutedForeground};
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -129,24 +129,24 @@ export class ZitadelLogout extends LitElement {
       }
 
       .actions {
-        padding: ${t.spacing["02"]};
+        padding: ${t.spacing["2"]};
       }
       .signout-btn {
         all: unset;
         cursor: pointer;
         display: flex;
         align-items: center;
-        gap: ${t.spacing["02"]};
+        gap: ${t.spacing["2"]};
         width: 100%;
-        padding: ${t.spacing["02"]} ${t.spacing["03"]};
-        border-radius: ${t.radius.s};
-        color: ${t.color.text.error};
+        padding: ${t.spacing["2"]} ${t.spacing["4"]};
+        border-radius: ${t.radius.md};
+        color: ${t.theme.destructive};
         font-size: 0.875rem;
         font-weight: 500;
         box-sizing: border-box;
       }
       .signout-btn:hover:not([disabled]) {
-        background: color-mix(in srgb, ${t.color.text.error} 12%, transparent);
+        background: color-mix(in srgb, ${t.theme.destructive} 12%, transparent);
       }
       .signout-btn:focus-visible {
         ${focusVisibleStyles};
@@ -174,11 +174,11 @@ export class ZitadelLogout extends LitElement {
       }
 
       .error-bar {
-        padding: ${t.spacing["02"]} ${t.spacing["03"]};
+        padding: ${t.spacing["2"]} ${t.spacing["4"]};
         font-size: 0.75rem;
-        color: ${t.color.text.error};
-        background: color-mix(in srgb, ${t.color.text.error} 12%, transparent);
-        border-top: 1px solid ${t.color.border.defaultGray100};
+        color: ${t.theme.destructive};
+        background: color-mix(in srgb, ${t.theme.destructive} 12%, transparent);
+        border-top: 1px solid ${t.theme.border};
       }
     `,
   ];
@@ -214,18 +214,19 @@ export class ZitadelLogout extends LitElement {
   @property({ type: String, attribute: "post-sign-out-url" }) accessor postSignOutUrl = "";
 
   /**
-   * OIDC `client_id` to forward as a query parameter on the end-session
-   * request, mirroring the standard end-session contract. Optional —
-   * leaving this empty is fine when the backend can resolve the client
-   * from the session cookie alone.
+   * Colour mode: `light`, `dark`, or `auto` (follow `prefers-color-scheme`).
+   * Empty means "not stated" and defaults to `auto` — the control lives
+   * inside the app's own chrome, so it follows the visitor's preference
+   * rather than forcing the dark login surface. Set it explicitly when the
+   * surrounding app surface is fixed: `<zitadel-logout theme="dark">`.
    */
-  @property({ type: String, attribute: "client-id" }) accessor clientId = "";
+  @property({ type: String }) accessor theme: "" | ThemeMode = "";
 
-  @state() private accessor displayName = "";
+  @state() private accessor userDisplay = "";
 
-  @state() private accessor displayEmail = "";
+  @state() private accessor userIdentifier = "";
 
-  @state() private accessor displayUserId = "";
+  @state() private accessor userId = "";
 
   @state() private accessor open = false;
 
@@ -250,9 +251,10 @@ export class ZitadelLogout extends LitElement {
   // after a framework assigns the `project` property post-mount.
   private identityRequested = false;
 
+  private readonly themeController = new ThemeController(this);
+
   override connectedCallback(): void {
     super.connectedCallback();
-    this.dataset.theme = "dark";
 
     const tmpl = this.querySelector("template");
     if (tmpl instanceof HTMLTemplateElement) {
@@ -275,11 +277,21 @@ export class ZitadelLogout extends LitElement {
     document.removeEventListener("keydown", this.handleDocumentKeydown);
   }
 
-  override updated(): void {
+  override willUpdate(): void {
+    // No branding payload reaches this element (yet); the empty overrides
+    // call keeps the token pipeline identical to the other orchestrator
+    // surfaces so a future branding input only has to change the argument.
+    this.themeController.setModePreference(this.theme === "" ? undefined : this.theme, "auto");
     const root = this.shadowRoot;
     if (root && !this.templateMode) {
       applyBaseTokens(root);
+      applyBrandingTokens(root, undefined);
     }
+    this.dataset.theme = this.themeController.theme;
+    this.toggleAttribute("data-theme-dark", this.themeController.theme === "dark");
+  }
+
+  override updated(): void {
     // Retry once config becomes resolvable (e.g. a framework set `project`
     // after mount). No-ops after the first successful request.
     this.maybeLoadIdentity();
@@ -313,9 +325,9 @@ export class ZitadelLogout extends LitElement {
   private async loadIdentity(api: ReturnType<typeof resolveApi>["api"]): Promise<void> {
     try {
       const session = await getSession(api);
-      this.displayName = session.name ?? "";
-      this.displayEmail = session.email ?? "";
-      this.displayUserId = session.user_id ?? "";
+      this.userDisplay = session.user?.display ?? "";
+      this.userIdentifier = session.user?.identifier ?? "";
+      this.userId = session.user_id ?? "";
     } catch {
       // No active session — render the control without identity.
     } finally {
@@ -325,13 +337,14 @@ export class ZitadelLogout extends LitElement {
   }
 
   private get initial(): string {
-    const source = this.displayName || this.displayEmail || this.displayUserId;
+    const source = this.userDisplay || this.userIdentifier || this.userId;
     return source ? source.charAt(0).toUpperCase() : "?";
   }
 
   /**
    * Clones the consumer-supplied `<template>` into the light DOM, fills the
-   * `{{name}}`, `{{email}}`, and `{{initial}}` tokens via a TreeWalker, and
+   * `{{display}}`, `{{identifier}}`, and `{{initial}}` tokens (plus the
+   * legacy `{{name}}`/`{{email}}` aliases) via a TreeWalker, and
    * wires every element with `data-action="logout"` to trigger sign-out.
    * Light-DOM mounting is deliberate so the consumer's existing CSS applies.
    *
@@ -343,7 +356,7 @@ export class ZitadelLogout extends LitElement {
     if (!this.templateMode || !this.pendingTemplate) return;
 
     const clone = this.pendingTemplate.content.cloneNode(true) as DocumentFragment;
-    fillTemplateTokens(clone, this.displayName, this.displayEmail, this.initial);
+    fillTemplateTokens(clone, this.userDisplay, this.userIdentifier, this.initial);
 
     const container = document.createElement("span");
     container.appendChild(clone);
@@ -401,26 +414,11 @@ export class ZitadelLogout extends LitElement {
     this.open = false;
     this.loading = false;
 
-    emit(this, "zitadel-signout", { name: this.displayName, email: this.displayEmail });
+    emit(this, "zitadel-signout", { display: this.userDisplay, identifier: this.userIdentifier });
 
     if (this.postSignOutUrl && typeof window !== "undefined") {
       window.location.href = this.postSignOutUrl;
     }
-  }
-
-  /**
-   * Returns the absolute URL the end-session request will hit. Useful for
-   * test assertions and for consumers that prefer to navigate the browser
-   * directly (instead of fetching) so the OIDC session-end redirect is
-   * driven by the user agent.
-   */
-  getEndSessionUrl(): string {
-    const params = {
-      ...(this.clientId ? { client_id: this.clientId } : {}),
-      ...(this.postSignOutUrl ? { post_logout_redirect_uri: this.postSignOutUrl } : {}),
-    };
-    const { api } = resolveApi(this.project, this.projectAttrs, "<zitadel-logout>");
-    return api.getEndSessionUrl(params);
   }
 
   private handleSignOutClick(event: Event): void {
@@ -455,10 +453,10 @@ export class ZitadelLogout extends LitElement {
                 <div class="preview-avatar" aria-hidden="true">${this.initial}</div>
                 <div class="preview-info">
                   <div class="preview-name">
-                    ${this.displayName || this.displayEmail || this.displayUserId}
+                    ${this.userDisplay || this.userIdentifier || this.userId}
                   </div>
-                  ${this.displayName && this.displayEmail
-                    ? html`<div class="preview-email">${this.displayEmail}</div>`
+                  ${this.userDisplay && this.userIdentifier
+                    ? html`<div class="preview-email">${this.userIdentifier}</div>`
                     : nothing}
                 </div>
               </div>
@@ -504,24 +502,36 @@ export class ZitadelLogout extends LitElement {
 }
 
 /**
- * Substitutes `{{name}}`, `{{email}}`, and `{{initial}}` placeholders inside
- * a fragment's text nodes. Walking text nodes (rather than running a regex
- * over `outerHTML`) keeps attributes and structural markup untouched.
+ * Substitutes `{{display}}`, `{{identifier}}`, and `{{initial}}` placeholders
+ * inside a fragment's text nodes; `{{name}}` and `{{email}}` fill as legacy
+ * aliases of display and identifier so pre-ref templates keep rendering.
+ * Walking text nodes (rather than running a regex over `outerHTML`) keeps
+ * attributes and structural markup untouched.
  */
 function fillTemplateTokens(
   fragment: DocumentFragment,
-  name: string,
-  email: string,
+  display: string,
+  identifier: string,
   initial: string,
 ): void {
+  // Single pass with a callback: substituted values are never rescanned, so
+  // an identity value containing a token-like substring (or a `$&`-style
+  // replacement pattern) renders literally instead of being re-substituted.
+  const values: Record<string, string> = {
+    display,
+    identifier,
+    name: display,
+    email: identifier,
+    initial,
+  };
   const walker = document.createTreeWalker(fragment, NodeFilter.SHOW_TEXT);
   let node = walker.nextNode() as Text | null;
   while (node) {
     if (node.textContent) {
-      node.textContent = node.textContent
-        .replace(/\{\{name\}\}/g, name)
-        .replace(/\{\{email\}\}/g, email)
-        .replace(/\{\{initial\}\}/g, initial);
+      node.textContent = node.textContent.replace(
+        /\{\{(display|identifier|name|email|initial)\}\}/g,
+        (_, token: string) => values[token] ?? "",
+      );
     }
     node = walker.nextNode() as Text | null;
   }

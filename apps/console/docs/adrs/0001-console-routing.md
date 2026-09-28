@@ -127,6 +127,15 @@ Detail routes use TanStack Router's `$param` file convention
 render a "not available yet" state rather than calling a non-existent
 endpoint.
 
+> **Amendment (2026-08-11):** the shipped tree has evolved past this sketch in
+> two ways. First, every screen now lives under the pathless `_authed/` layout
+> introduced by [ADR 0003](0003-console-authentication.md)
+> (`src/routes/_authed/…`), with `login.tsx` outside the guard. Second,
+> schemas is no longer a placeholder — #762 shipped schema list and detail
+> (`_authed/schemas/{index,$schemaId}.tsx`) — and a `teams/` route was never
+> created. Sessions list now speaks `POST /sessions/query` (the `GET /sessions`
+> list endpoint was replaced by #757).
+
 ### 5. Data loading: route loaders, with three required boundaries
 
 Data for a route is fetched in its **`loader`**, using the typed API client
@@ -199,5 +208,6 @@ the sidebar.
   [`apps/console/vite.config.mts`](../../vite.config.mts).
 - [`internal/staticui/handler.go`](../../../../internal/staticui/handler.go)
   — SPA fallback that makes deep links survive refresh.
-- Root [ADR 014: Design tokens and paired React components](../../../../docs/adrs/014-design-tokens-and-ui-react-pairs.md)
-  — the `@zitadel/ui-react` chrome the shell is built from.
+- Root [ADR 055: A Lit-only login surface, with the console on shadcn/ui](../../../../docs/adrs/055-lit-only-login-surface.md)
+  — the shell is built from shadcn/ui in `src/components/ui/`, sharing only
+  `--zl-*` with the login atoms.

@@ -3,12 +3,15 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/url"
+	"strings"
 	"time"
 
+	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
-	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 // ---- Service interface -------------------------------------------------------
@@ -37,7 +40,7 @@ type AuthAttemptService interface {
 	// For passkey challenges, the user check must already be verified, so the user ID is known
 	// for retrieving registered credentials.
 	//
-	// errors: domain.ErrAuthAttemptNotFound, domain.ErrAuthAttemptInvalidRequest, domain.ErrAuthAttemptInvalidState, domain.ErrAuthAttemptAlreadyCompleted, domain.ErrInternal
+	// errors: domain.ErrAuthAttemptNotFound, domain.ErrAuthAttemptInvalidRequest, domain.ErrAuthAttemptInvalidState, domain.ErrAuthAttemptAlreadyHandedOff, domain.ErrInternal
 	IssueChallenge(ctx context.Context, input IssueChallengeInput) (*domain.AuthAttempt, error)
 
 	// VerifyProof verifies the submitted proof against the challenge identified by ChallengeID.
@@ -50,7 +53,7 @@ type AuthAttemptService interface {
 	// The ChallengeID must match the ID returned by IssueChallenge to prevent use of
 	// stale proofs after a challenge is re-issued.
 	//
-	// errors: domain.ErrAuthAttemptNotFound, domain.ErrAuthAttemptStaleChallenge, domain.ErrAuthAttemptInvalidRequest, domain.ErrAuthAttemptProofRejected, domain.ErrAuthAttemptInvalidState, domain.ErrAuthAttemptAlreadyCompleted, domain.ErrInternal
+	// errors: domain.ErrAuthAttemptNotFound, domain.ErrAuthAttemptStaleChallenge, domain.ErrAuthAttemptInvalidRequest, domain.ErrAuthAttemptProofRejected, domain.ErrAuthAttemptInvalidState, domain.ErrAuthAttemptAlreadyHandedOff, domain.ErrInternal
 	VerifyProof(ctx context.Context, input VerifyProofInput) (*domain.AuthAttempt, error)
 
 	// Handoff mints a single-use handoff token for a completed attempt.
@@ -60,14 +63,25 @@ type AuthAttemptService interface {
 	//
 	// The attempt must be in a completed state and not expired.
 	//
-	// errors: domain.ErrAuthAttemptNotFound, domain.ErrAuthAttemptInvalidState, domain.ErrAuthAttemptNotCompleted, domain.ErrInternal
+	// errors: domain.ErrAuthAttemptNotFound, domain.ErrAuthAttemptInvalidState, domain.ErrAuthAttemptNotCompleted, domain.ErrAuthAttemptAlreadyHandedOff, domain.ErrInternal
 	Handoff(ctx context.Context, input HandoffInput) (*domain.AuthAttempt, error)
 
-	// RegisterCreatedUser registers a newly-created user's ID as a verified user
-	// factor directly on the auth attempt, bypassing the challenge/proof cycle.
-	// Used after on_success: create_user and passkey registration so the session
-	// receives user_id after exchange.
-	RegisterCreatedUser(ctx context.Context, projectID, attemptID, userID string) error
+	// BeginPasskeyEnrollment starts a management-plane enrollment ceremony on
+	// an internal attempt: the target user is pinned as a verified user
+	// factor and a registration challenge is issued. RegistrationID is the
+	// internal attempt's id, but the attempt is invisible on the attempt
+	// surface — internal attempts cannot be read, handed off, or exchanged.
+	//
+	// errors: domain.ErrAuthAttemptInvalidRequest, domain.ErrInternal
+	BeginPasskeyEnrollment(ctx context.Context, input BeginPasskeyEnrollmentInput) (*BeginPasskeyEnrollmentOutput, error)
+
+	// FinishPasskeyEnrollment verifies the attestation against the ceremony
+	// and persists the credential; the internal attempt is consumed in the
+	// same transaction, so a completed ceremony cannot be replayed and no
+	// best-effort cleanup is needed.
+	//
+	// errors: domain.ErrAuthAttemptNotFound, domain.ErrAuthAttemptStaleChallenge, domain.ErrAuthAttemptInvalidRequest, domain.ErrAuthAttemptProofRejected, domain.ErrInternal
+	FinishPasskeyEnrollment(ctx context.Context, input FinishPasskeyEnrollmentInput) (*FinishPasskeyEnrollmentOutput, error)
 }
 
 // ---- Input types -------------------------------------------------------------
@@ -80,6 +94,43 @@ type CreateAuthAttemptInput struct {
 	// Used by the OIDC adapter (acr_values) and flow engine.
 	// If nil the project's DefaultRequiredChecks are used.
 	RequiredChecks []domain.AuthCheckType
+	// Internal marks a server-orchestrated ceremony (see
+	// [domain.AuthAttempt.Internal]). Never settable through the REST surface.
+	Internal bool
+}
+
+// BeginPasskeyEnrollmentInput starts a management-plane enrollment ceremony
+// for an existing user.
+type BeginPasskeyEnrollmentInput struct {
+	ProjectID   string
+	UserID      string
+	Username    string
+	DisplayName string
+	RPID        string
+	RPOrigins   []url.URL
+}
+
+type BeginPasskeyEnrollmentOutput struct {
+	// RegistrationID identifies the ceremony on finish.
+	RegistrationID string
+	// Options is the PublicKeyCredentialCreationOptions JSON.
+	Options []byte
+}
+
+type FinishPasskeyEnrollmentInput struct {
+	ProjectID      string
+	RegistrationID string
+	// UserID must match the user the ceremony was begun for.
+	UserID      string
+	Attestation []byte
+	// Name optionally labels the credential; empty derives a name.
+	Name string
+}
+
+type FinishPasskeyEnrollmentOutput struct {
+	PasskeyID string
+	Name      string
+	CreatedAt time.Time
 }
 
 type IssueChallengeInput struct {
@@ -133,6 +184,23 @@ type PasskeyChallenge struct {
 
 func (PasskeyChallenge) ChallengeCheckType() domain.AuthCheckType { return domain.AuthCheckTypePasskey }
 
+// PasskeyRegistrationChallenge starts a WebAuthn credential-enrollment ceremony.
+// UserID targets an existing user (must match a pinned user factor when one
+// exists); empty UserID on an attempt without a user factor makes the ceremony
+// provisional: a user handle is minted and the user row is created when the
+// attestation is verified.
+type PasskeyRegistrationChallenge struct {
+	UserID      string
+	Username    string
+	DisplayName string
+	RPID        string
+	RPOrigins   []url.URL
+}
+
+func (PasskeyRegistrationChallenge) ChallengeCheckType() domain.AuthCheckType {
+	return domain.AuthCheckTypePasskeyRegistration
+}
+
 // ---- Proof types (discriminated union) --------------------------------------
 
 // Proof is implemented by each check-type-specific proof value.
@@ -140,7 +208,15 @@ type Proof interface {
 	proofCheckType() domain.AuthCheckType
 }
 
-// UserProof identifies the user by login name (email, username, phone).
+// UserProof identifies the user by login name.
+//
+// AttributeName names the property the login name is a value of. The flow path
+// sets it from the step it rendered, whose field must be the bound schema's
+// designated identifier. Left empty — the direct-API path, which renders
+// nothing — the login name resolves against the designated identifier of every
+// user schema in the project instead, and must match exactly one user. A
+// direct-API caller never chooses the property. See resolveIdentifier for how
+// the two paths are scoped today.
 type UserProof struct {
 	AttributeName string
 	LoginName     string
@@ -162,9 +238,27 @@ type PasskeyProof struct {
 
 func (PasskeyProof) proofCheckType() domain.AuthCheckType { return domain.AuthCheckTypePasskey }
 
-// ---- Secondary ports -------------------------------------------------------------
+// PasskeyRegistrationProof carries the raw WebAuthn attestation response bytes.
+type PasskeyRegistrationProof struct {
+	AttestationResponse []byte
+	// Name labels the credential in passkey management surfaces. Optional:
+	// when empty, a name is derived from the credential itself
+	// ([domain.GeneratePasskeyCredentialName]).
+	Name string
+	// CreateUser, when set, builds the actions that create the ceremony's
+	// user inside the success transaction, so user creation, credential
+	// persistence, and check success land atomically. The service invokes it
+	// with the stored challenge's authoritative user handle — a caller cannot
+	// create a row under a different id than the credential binds to. Only
+	// consulted for provisional ceremonies.
+	CreateUser func(userID string) []UserAction
+}
 
-//go:generate go tool mockgen -typed -package mocks -destination ./mocks/auth_attempt.mock.go . SessionResolver,UserLookup
+func (PasskeyRegistrationProof) proofCheckType() domain.AuthCheckType {
+	return domain.AuthCheckTypePasskeyRegistration
+}
+
+// ---- Secondary ports -------------------------------------------------------------
 
 type SessionResolver interface {
 	Get(ctx context.Context, projectID, sessionID string) (*domain.Session, error)
@@ -222,8 +316,25 @@ func (s *authAttemptService) Create(ctx context.Context, input CreateAuthAttempt
 	if err != nil {
 		return nil, err
 	}
+	attempt.Internal = input.Internal
 
-	if err = s.stmts.Statements().CreateAuthAttempt(ctx, attempt); err != nil {
+	if err = s.stmts.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		if err := tx.Statements().CreateAuthAttempt(ctx, attempt); err != nil {
+			return err
+		}
+		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
+			Type:       domain.EventTypeAuthAttemptCreated,
+			Category:   domain.EventCategoryAuth,
+			ProjectID:  attempt.ProjectID,
+			EntityType: "auth_attempt",
+			EntityID:   attempt.ID,
+			SessionID:  attempt.SessionID,
+			Payload:    domain.AuthAttemptCreatedPayload{},
+		})
+	}); err != nil {
+		if de, ok := errors.AsType[domain.Error](err); ok {
+			return nil, de
+		}
 		return nil, domain.ErrInternal(err).WithMessage("Failed to create the auth attempt.")
 	}
 	return attempt, nil
@@ -271,17 +382,37 @@ func (s *authAttemptService) VerifyProof(ctx context.Context, input VerifyProofI
 		return nil, err
 	}
 
-	challenge, factor, err := s.verify(ctx, attempt, input.Proof, input.ChallengeID)
+	challenge, factor, txExtra, err := s.verify(ctx, attempt, input.Proof, input.ChallengeID)
 	if err != nil {
-		// Record the failure for rate-limiting — best effort, don't shadow
-		// the original error. Skip when verify couldn't identify a challenge row.
-		if challenge != nil {
-			_ = s.stmts.Statements().AuthAttemptChallengeFailed(ctx, input.ProjectID, input.AttemptID, challenge)
-		}
+		s.recordProofFailure(ctx, attempt, challenge)
 		return nil, err
 	}
 
-	if err = s.stmts.Statements().AuthAttemptChallengeSucceeded(ctx, input.ProjectID, input.AttemptID, factor, challenge.GetID()); err != nil {
+	err = s.stmts.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		// txExtra carries proof-type-specific writes that must commit atomically
+		// with the check success (e.g. registration persists the user row and
+		// credential). It runs first so FK ordering holds.
+		if txExtra != nil {
+			if err := txExtra(ctx, tx.Statements()); err != nil {
+				return err
+			}
+		}
+		if err := tx.Statements().AuthAttemptChallengeSucceeded(ctx, input.ProjectID, input.AttemptID, factor, challenge.GetID()); err != nil {
+			return err
+		}
+		return emitAuthCheck(ctx, tx.Statements(), attempt, challenge, true)
+	})
+	if err != nil {
+		// A provisional registration's create-user action can lose the
+		// uniqueness race inside the transaction. Surfacing the stable code
+		// explicitly also puts user.already_exists into the generated error
+		// unions: erroranalysis cannot look into the txExtra closure.
+		if errors.Is(err, domain.ErrUserAlreadyExists()) {
+			return nil, domain.ErrUserAlreadyExists().WithParent(err)
+		}
+		if de, ok := errors.AsType[domain.Error](err); ok {
+			return nil, de
+		}
 		return nil, err
 	}
 	attempt.SetCheck(factor) // Update the attempt with the successful factor for accurate state in the response
@@ -301,23 +432,98 @@ func (s *authAttemptService) Handoff(ctx context.Context, input HandoffInput) (*
 		return nil, err
 	}
 
-	if err := s.stmts.Statements().HandoffAuthAttempt(ctx, attempt); err != nil {
+	err = s.stmts.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		if err := tx.Statements().HandoffAuthAttempt(ctx, attempt); err != nil {
+			return err
+		}
+		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
+			Type:       domain.EventTypeAuthAttemptHandedOff,
+			Category:   domain.EventCategoryAuth,
+			ProjectID:  attempt.ProjectID,
+			EntityType: "auth_attempt",
+			EntityID:   attempt.ID,
+			SessionID:  attempt.SessionID,
+			Payload:    domain.AuthAttemptHandedOffPayload{},
+		})
+	})
+	if err != nil {
 		return nil, err
 	}
 	return attempt, nil
 }
 
-// RegisterCreatedUser registers a newly-created user's ID as a verified user
-// factor on the auth attempt without a challenge/proof cycle. It issues a
-// synthetic user challenge and immediately marks it succeeded so the exchange
-// can promote the user_id to the session.
-func (s *authAttemptService) RegisterCreatedUser(ctx context.Context, projectID, attemptID, userID string) error {
-	challenge := &domain.AuthChallengeUser{}
-	if err := s.stmts.Statements().SetAuthAttemptChallenge(ctx, projectID, attemptID, challenge); err != nil {
-		return err
+// recordDirectAuthFactor upserts a proof-equivalent factor on the attempt and
+// emits its auth.check.succeeded event, inside the caller's transaction. A
+// direct write is legitimate only when the fact was just established by other
+// verified means in the same transaction: a created user during sign-up, or a
+// user resolved cryptographically from a discoverable assertion.
+func recordDirectAuthFactor(ctx context.Context, stmts AllStatements, attempt *domain.AuthAttempt, factor domain.AuthFactor) (string, error) {
+	checkID, err := stmts.SetAuthAttemptFactor(ctx, attempt.ProjectID, attempt.ID, factor)
+	if err != nil {
+		return "", err
 	}
-	factor := &domain.AuthFactorUser{UserID: userID}
-	return s.stmts.Statements().AuthAttemptChallengeSucceeded(ctx, projectID, attemptID, factor, challenge.GetID())
+	return checkID, audit.Emit(ctx, stmts, audit.EmitSpec{
+		Type:       domain.EventTypeAuthCheckSucceeded,
+		Category:   domain.EventCategoryAuth,
+		ProjectID:  attempt.ProjectID,
+		EntityType: "check",
+		EntityID:   checkID,
+		SessionID:  attempt.SessionID,
+		Payload: domain.AuthCheckPayload{
+			CheckID:       checkID,
+			CheckType:     factor.Type().String(),
+			AuthAttemptID: attempt.ID,
+		},
+	})
+}
+
+func emitAuthCheck(ctx context.Context, stmts EventStatements, attempt *domain.AuthAttempt, challenge domain.AuthChallenge, succeeded bool) error {
+	eventType := domain.EventTypeAuthCheckFailed
+	if succeeded {
+		eventType = domain.EventTypeAuthCheckSucceeded
+	}
+	return audit.Emit(ctx, stmts, audit.EmitSpec{
+		Type:       eventType,
+		Category:   domain.EventCategoryAuth,
+		ProjectID:  attempt.ProjectID,
+		EntityType: "check",
+		EntityID:   challenge.GetID(),
+		SessionID:  attempt.SessionID,
+		Payload: domain.AuthCheckPayload{
+			CheckID:       challenge.GetID(),
+			CheckType:     challenge.Type().String(),
+			AuthAttemptID: attempt.ID,
+		},
+	})
+}
+
+const passkeyRegistrationDefaultUsername = "Passkey account"
+
+// passkeyRegistrationLabels normalizes the browser-visible labels for a
+// registration ceremony: a neutral default when no identifier was collected,
+// and the username doubling as display name when only it is known.
+func passkeyRegistrationLabels(username, displayName string) (string, string) {
+	username = strings.TrimSpace(username)
+	displayName = strings.TrimSpace(displayName)
+	if username == "" {
+		return passkeyRegistrationDefaultUsername, ""
+	}
+	if displayName == "" {
+		displayName = username
+	}
+	return username, displayName
+}
+
+func parseOrigins(raw []string) ([]url.URL, error) {
+	origins := make([]url.URL, 0, len(raw))
+	for _, o := range raw {
+		u, err := url.Parse(o)
+		if err != nil {
+			return nil, fmt.Errorf("parse origin %q: %w", o, err)
+		}
+		origins = append(origins, *u)
+	}
+	return origins, nil
 }
 
 // buildChallenge constructs the challenge for the given check type.
@@ -353,50 +559,108 @@ func (s *authAttemptService) buildChallenge(ctx context.Context, attempt *domain
 		}
 		return attempt.SetPasskeyChallenge(passkeyChallenge), nil
 
+	case PasskeyRegistrationChallenge:
+		userID, provisional, err := attempt.PreparePasskeyRegistrationChallenge(typ.UserID)
+		if err != nil {
+			return nil, err
+		}
+		// A provisional handle becomes a user id at verification, so it must
+		// be server-minted: a caller-supplied handle is kept only when it
+		// matches the attempt's own in-flight provisional ceremony (a
+		// re-issued challenge); any other handle is replaced by a fresh mint.
+		// Enrollment for an existing user always rides a verified user factor
+		// on the attempt — every authenticated path persists one, including
+		// discoverable passkey login — so store-existence is never consulted.
+		if provisional && userID != "" && !attempt.HasProvisionalRegistrationHandle(userID) {
+			userID = ""
+		}
+		if userID == "" {
+			userID, err = s.stmts.Statements().NewManagedID(string(domain.PrefixUser))
+			if err != nil {
+				return nil, domain.ErrInternal(err).WithMessage("failed to mint user id")
+			}
+		}
+		var passkeys []*domain.UserPasskey
+		if !provisional {
+			passkeys, err = s.listUserPasskeys(ctx, attempt.ProjectID, userID)
+			if err != nil {
+				return nil, domain.ErrInternal(err).WithMessage("failed to load user passkeys")
+			}
+		}
+		username, displayName := passkeyRegistrationLabels(typ.Username, typ.DisplayName)
+		registrationChallenge, err := domain.CreatePasskeyRegistrationChallenge(userID, username, displayName, passkeys, typ.RPID, typ.RPOrigins)
+		if err != nil {
+			// The WebAuthn library rejects malformed relying-party
+			// configuration (empty rp id, bad origins) — caller input, not a
+			// server fault.
+			return nil, domain.ErrAuthAttemptInvalidRequest().WithParent(err).WithMessage("invalid relying-party configuration")
+		}
+		return attempt.SetPasskeyRegistrationChallenge(registrationChallenge, provisional), nil
+
 	default:
 		return nil, domain.ErrAuthAttemptInvalidRequest()
 	}
 }
 
+// resolveIdentifier finds the user a login name identifies.
+//
+// With an attribute name — the flow path — it looks the value up in that
+// property across the project. That lookup is not yet scoped to the flow's
+// bound schema, which ADR 058 §5 asks for so a same-named team-unique property
+// on another schema cannot collide with it; that predates this resolution and
+// is left for a follow-up.
+//
+// Without one — the direct-API path — the value resolves against the project's
+// designated identifiers. Any status, as the flow path: whether a login may
+// reach an inactive user is decided with status enforcement, not here.
+func (s *authAttemptService) resolveIdentifier(ctx context.Context, projectID string, p UserProof) (*domain.User, error) {
+	if p.AttributeName != "" {
+		return s.users.GetByAttributes(ctx, projectID, []domain.Attribute{{
+			Key:   domain.AttributeKey(p.AttributeName),
+			Value: p.LoginName,
+		}})
+	}
+	return resolveDesignatedUser(ctx, s.stmts.Statements(), projectID, p.LoginName, false, "auth_attempt")
+}
+
 // verify dispatches proof verification to the appropriate secondary port.
-// Returns the checker to persist (always, even on failure) and any error.
-func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAttempt, proof Proof, challengeID string) (domain.AuthChallenge, domain.AuthFactor, error) {
+// Returns the checker to persist (always, even on failure), an optional
+// closure with extra writes that must commit atomically with the check
+// success, and any error.
+func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAttempt, proof Proof, challengeID string) (domain.AuthChallenge, domain.AuthFactor, func(context.Context, AllStatements) error, error) {
 	switch p := proof.(type) {
 	case UserProof:
 		userChallenge, err := attempt.PrepareUserVerification(challengeID)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
-		user, err := s.users.GetByAttributes(ctx, attempt.ProjectID, []domain.Attribute{{
-			Key:   p.AttributeName,
-			Value: p.LoginName,
-		}})
+		user, err := s.resolveIdentifier(ctx, attempt.ProjectID, p)
 		if err != nil {
-			return userChallenge, nil, domain.ErrAuthAttemptProofRejected(err)
+			return userChallenge, nil, nil, domain.ErrAuthAttemptProofRejected(err)
 		}
-		return userChallenge, attempt.SetUserFactor(user), nil
+		return userChallenge, attempt.SetUserFactor(user), nil, nil
 
 	case PasswordProof:
 		passwordChallenge, userFactor, err := attempt.PreparePasswordVerification(challengeID)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
-		password, err := s.stmts.Statements().GetUserPassword(ctx, v2database.And(
-			v2database.Equal(v2database.Col(domain.UserPasswordFieldProjectID), attempt.ProjectID),
-			v2database.Equal(v2database.Col(domain.UserPasswordFieldUserID), userFactor.UserID),
+		password, err := s.stmts.Statements().GetUserPassword(ctx, database.And(
+			database.Equal(database.Col(domain.UserPasswordFieldProjectID), attempt.ProjectID),
+			database.Equal(database.Col(domain.UserPasswordFieldUserID), userFactor.UserID),
 		))
 		if err != nil {
-			return passwordChallenge, nil, domain.ErrAuthAttemptProofRejected(err)
+			return passwordChallenge, nil, nil, domain.ErrAuthAttemptProofRejected(err)
 		}
 		if err := password.Verify(p.Password, s.passwordVerifier); err != nil {
-			return passwordChallenge, nil, domain.ErrAuthAttemptProofRejected(err)
+			return passwordChallenge, nil, nil, domain.ErrAuthAttemptProofRejected(err)
 		}
-		return passwordChallenge, attempt.SetPasswordFactor(), nil
+		return passwordChallenge, attempt.SetPasswordFactor(), nil, nil
 
 	case PasskeyProof:
 		challenge, userFactor, err := attempt.PreparePasskeyVerification(challengeID)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		passkeyChallenge := challenge.(*domain.AuthChallengePasskey)
 		// userID is empty for a discoverable (usernameless) login; the user is then resolved
@@ -409,7 +673,7 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 			userID = userFactor.UserID
 			passkeys, err = s.listUserPasskeys(ctx, attempt.ProjectID, userID)
 			if err != nil {
-				return nil, nil, err
+				return nil, nil, nil, err
 			}
 		}
 		verification, err := domain.VerifyPasskeyChallenge(
@@ -422,22 +686,220 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 			},
 		)
 		if err != nil {
-			return passkeyChallenge, nil, domain.ErrAuthAttemptProofRejected(err)
+			return passkeyChallenge, nil, nil, domain.ErrAuthAttemptProofRejected(err)
 		}
 		// Discoverable login resolves the user cryptographically from the assertion; bind it onto
-		// the attempt so the subject is pinned and the session/handoff carries the user id. For an
-		// identified login the user factor is already present and unchanged.
+		// the attempt — including the persisted user check row, which downstream consumers
+		// (exchange user binding, password step-up, enrollment targeting) key on — so the
+		// subject is pinned and the session/handoff carries the user id. For an identified
+		// login the user factor is already present and unchanged.
+		var txExtra func(context.Context, AllStatements) error
 		if userFactor == nil && verification.UserID != "" {
-			attempt.SetUserFactor(&domain.User{ID: verification.UserID})
+			resolvedUser := attempt.SetUserFactor(&domain.User{ID: verification.UserID})
+			txExtra = func(ctx context.Context, stmts AllStatements) error {
+				_, err := recordDirectAuthFactor(ctx, stmts, attempt, resolvedUser)
+				return err
+			}
 		}
 		// Use the verified user as the source of truth: it is set for both identified and
 		// discoverable logins, whereas userFactor is nil in the discoverable case.
 		s.recordPasskeyUsage(ctx, attempt.ProjectID, verification)
-		return passkeyChallenge, attempt.SetPasskeyFactor(verification), nil
+		return passkeyChallenge, attempt.SetPasskeyFactor(verification), txExtra, nil
+
+	case PasskeyRegistrationProof:
+		registrationChallenge, err := attempt.PreparePasskeyRegistrationVerification(challengeID)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		newPasskey, err := domain.VerifyPasskeyRegistration(registrationChallenge.PasskeyRegistrationChallenge, p.AttestationResponse, p.Name)
+		if err != nil {
+			return registrationChallenge, nil, nil, domain.ErrAuthAttemptProofRejected(err)
+		}
+		// The stored challenge is authoritative for the credential's owner.
+		newPasskey.ProjectID = attempt.ProjectID
+		newPasskey.UserID = registrationChallenge.UserID
+		var createActions []UserAction
+		if registrationChallenge.Provisional && p.CreateUser != nil {
+			// The factory receives the challenge's handle, so the created row
+			// cannot diverge from the user the credential binds to.
+			createActions = p.CreateUser(registrationChallenge.UserID)
+			for _, action := range createActions {
+				if err := action.Prepare(ctx); err != nil {
+					return nil, nil, nil, err
+				}
+			}
+		}
+		// Captured before the in-memory pin below: writing the user check
+		// without a proof is only legitimate when no user factor exists yet
+		// (provisional sign-up, or enrollment for a user pinned in flow state
+		// only). Re-enrolling on an authenticated attempt must not rewrite
+		// the proof-backed user check or emit a synthetic check event.
+		_, hadUserFactor := domain.CheckAs[*domain.AuthFactorUser](attempt, domain.AuthCheckTypeUser)
+		factor := attempt.SetPasskeyRegistrationFactor(newPasskey)
+		userFactor := attempt.SetUserFactor(&domain.User{ID: registrationChallenge.UserID})
+		txExtra := func(ctx context.Context, stmts AllStatements) error {
+			for _, action := range createActions {
+				if err := action.Apply(ctx, stmts); err != nil {
+					return err
+				}
+			}
+			if err := stmts.CreateUserPasskey(ctx, newPasskey); err != nil {
+				return fmt.Errorf("passkey registration: store credential: %w", err)
+			}
+			// The credential row's identity rides on the factor so the caller
+			// can answer from the verify result without a read-back.
+			factor.PasskeyID = newPasskey.ID
+			factor.Name = newPasskey.Name
+			if !hadUserFactor {
+				if _, err := recordDirectAuthFactor(ctx, stmts, attempt, userFactor); err != nil {
+					return err
+				}
+			}
+			return audit.Emit(ctx, stmts, audit.EmitSpec{
+				Type:       domain.EventTypeAuthFactorPasskeyEnrolled,
+				Category:   domain.EventCategoryAuth,
+				ProjectID:  attempt.ProjectID,
+				EntityType: "user_passkey",
+				EntityID:   newPasskey.ID,
+				SessionID:  attempt.SessionID,
+				Payload: domain.AuthFactorPayload{
+					UserID:   registrationChallenge.UserID,
+					FactorID: newPasskey.ID,
+				},
+			})
+		}
+		return registrationChallenge, factor, txExtra, nil
 
 	default:
-		return nil, nil, domain.ErrAuthAttemptInvalidRequest().WithDetails("unsupported proof type")
+		return nil, nil, nil, domain.ErrAuthAttemptInvalidRequest().WithMessage("unsupported proof type")
 	}
+}
+
+// recordProofFailure records a failed proof for rate limiting — best effort,
+// never shadowing the original error. Skipped when verify could not identify
+// a challenge row.
+func (s *authAttemptService) recordProofFailure(ctx context.Context, attempt *domain.AuthAttempt, challenge domain.AuthChallenge) {
+	if challenge == nil {
+		return
+	}
+	_ = s.stmts.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		if err := tx.Statements().AuthAttemptChallengeFailed(ctx, attempt.ProjectID, attempt.ID, challenge); err != nil {
+			return err
+		}
+		return emitAuthCheck(ctx, tx.Statements(), attempt, challenge, false)
+	})
+}
+
+// BeginPasskeyEnrollment starts a management-plane enrollment ceremony on an
+// internal attempt (see the interface doc).
+func (s *authAttemptService) BeginPasskeyEnrollment(ctx context.Context, input BeginPasskeyEnrollmentInput) (*BeginPasskeyEnrollmentOutput, error) {
+	attempt, err := s.Create(ctx, CreateAuthAttemptInput{ProjectID: input.ProjectID, Internal: true})
+	if err != nil {
+		return nil, err
+	}
+	// Pin the target user before issuing: the management caller (user.write)
+	// vouches for the enrollment target, and the pinned factor is what makes
+	// the ceremony non-provisional.
+	userFactor := attempt.SetUserFactor(&domain.User{ID: input.UserID})
+	if err := s.stmts.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		_, err := recordDirectAuthFactor(ctx, tx.Statements(), attempt, userFactor)
+		return err
+	}); err != nil {
+		return nil, err
+	}
+
+	issued, err := s.IssueChallenge(ctx, IssueChallengeInput{
+		ProjectID: input.ProjectID,
+		AttemptID: attempt.ID,
+		Challenge: PasskeyRegistrationChallenge{
+			UserID:      input.UserID,
+			Username:    input.Username,
+			DisplayName: input.DisplayName,
+			RPID:        input.RPID,
+			RPOrigins:   input.RPOrigins,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	check, ok := issued.ChallengeByType(domain.AuthCheckTypePasskeyRegistration)
+	if !ok {
+		return nil, domain.ErrInternal(nil).WithMessage("registration challenge missing after issue")
+	}
+	registrationCh, ok := check.(*domain.AuthChallengePasskeyRegistration)
+	if !ok {
+		return nil, domain.ErrInternal(nil).WithMessage("unexpected registration challenge type")
+	}
+	options, err := domain.BuildPasskeyCreationOptions(registrationCh)
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to build creation options")
+	}
+	return &BeginPasskeyEnrollmentOutput{RegistrationID: attempt.ID, Options: options}, nil
+}
+
+// FinishPasskeyEnrollment verifies the attestation and consumes the internal
+// attempt atomically (see the interface doc).
+func (s *authAttemptService) FinishPasskeyEnrollment(ctx context.Context, input FinishPasskeyEnrollmentInput) (*FinishPasskeyEnrollmentOutput, error) {
+	attempt, err := s.stmts.Statements().GetAuthAttemptByID(ctx, input.ProjectID, input.RegistrationID)
+	if err != nil {
+		return nil, err
+	}
+	if !attempt.Internal {
+		// An ordinary attempt id must not be consumable as an enrollment
+		// ceremony; report it like a consumed one.
+		return nil, domain.ErrAuthAttemptNotFound()
+	}
+	check, ok := attempt.ChallengeByType(domain.AuthCheckTypePasskeyRegistration)
+	if !ok {
+		return nil, domain.ErrAuthAttemptStaleChallenge()
+	}
+	registrationCh, ok := check.(*domain.AuthChallengePasskeyRegistration)
+	if !ok {
+		return nil, domain.ErrInternal(nil).WithMessage("unexpected registration challenge type")
+	}
+	if registrationCh.UserID != input.UserID {
+		return nil, domain.ErrAuthAttemptInvalidRequest().WithMessage("The registration does not belong to this user.")
+	}
+
+	proof := PasskeyRegistrationProof{AttestationResponse: input.Attestation, Name: input.Name}
+	challenge, factor, txExtra, err := s.verify(ctx, attempt, proof, check.GetID())
+	if err != nil {
+		s.recordProofFailure(ctx, attempt, challenge)
+		return nil, err
+	}
+	err = s.stmts.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		if txExtra != nil {
+			if err := txExtra(ctx, tx.Statements()); err != nil {
+				return err
+			}
+		}
+		if err := tx.Statements().AuthAttemptChallengeSucceeded(ctx, attempt.ProjectID, attempt.ID, factor, challenge.GetID()); err != nil {
+			return err
+		}
+		if err := emitAuthCheck(ctx, tx.Statements(), attempt, challenge, true); err != nil {
+			return err
+		}
+		// Consume the internal attempt in the same transaction: the ceremony
+		// outcome is fully audited by the check and enrollment events, and
+		// the row must never be read, replayed, or handed off (same
+		// no-attempt-event precedent as the exchange's delete).
+		return tx.Statements().DeleteAuthAttemptByID(ctx, attempt.ProjectID, attempt.ID)
+	})
+	if err != nil {
+		if de, ok := errors.AsType[domain.Error](err); ok {
+			return nil, de
+		}
+		return nil, err
+	}
+	registrationFactor, ok := factor.(*domain.AuthFactorPasskeyRegistration)
+	if !ok || registrationFactor.PasskeyID == "" {
+		return nil, domain.ErrInternal(nil).WithMessage("registration factor missing after verify")
+	}
+	return &FinishPasskeyEnrollmentOutput{
+		PasskeyID: registrationFactor.PasskeyID,
+		Name:      registrationFactor.Name,
+		CreatedAt: registrationFactor.GetLastVerifiedAt(),
+	}, nil
 }
 
 // recordPasskeyUsage persists sign count, backup state, and last-used time after a
@@ -453,10 +915,10 @@ func (s *authAttemptService) recordPasskeyUsage(ctx context.Context, projectID s
 }
 
 func (s *authAttemptService) listUserPasskeys(ctx context.Context, projectID, userID string) ([]*domain.UserPasskey, error) {
-	result, err := s.stmts.Statements().ListUserPasskeys(ctx, &v2database.ListOptions[domain.UserPasskeyField]{
-		Filter: v2database.And(
-			v2database.Equal(v2database.Col(domain.UserPasskeyFieldProjectID), projectID),
-			v2database.Equal(v2database.Col(domain.UserPasskeyFieldUserID), userID),
+	result, err := s.stmts.Statements().ListUserPasskeys(ctx, &database.ListOptions[domain.UserPasskeyField]{
+		Filter: database.And(
+			database.Equal(database.Col(domain.UserPasskeyFieldProjectID), projectID),
+			database.Equal(database.Col(domain.UserPasskeyFieldUserID), userID),
 		),
 	})
 	if err != nil {
@@ -465,11 +927,11 @@ func (s *authAttemptService) listUserPasskeys(ctx context.Context, projectID, us
 	return result.Items, nil
 }
 
-func userPasskeyKeyFilter(projectID, userID, credentialID string) v2database.Filter[domain.UserPasskeyField] {
-	return v2database.And(
-		v2database.Equal(v2database.Col(domain.UserPasskeyFieldProjectID), projectID),
-		v2database.Equal(v2database.Col(domain.UserPasskeyFieldUserID), userID),
-		v2database.Equal(v2database.Col(domain.UserPasskeyFieldCredentialID), credentialID),
+func userPasskeyKeyFilter(projectID, userID, credentialID string) database.Filter[domain.UserPasskeyField] {
+	return database.And(
+		database.Equal(database.Col(domain.UserPasskeyFieldProjectID), projectID),
+		database.Equal(database.Col(domain.UserPasskeyFieldUserID), userID),
+		database.Equal(database.Col(domain.UserPasskeyFieldCredentialID), credentialID),
 	)
 }
 

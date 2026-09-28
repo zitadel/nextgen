@@ -15,6 +15,19 @@ const (
 	AuthCheckTypePasskeyRegistration
 )
 
+// Class returns the factor class a check type competes in. Passkey
+// enrollment proves the same thing an assertion does for that credential
+// (ADR 056), so AuthCheckTypePasskeyRegistration shares the passkey class;
+// every other type is its own class. Anything comparing "which kind of factor
+// is this" — required-check matching, session merging, wire rendering —
+// compares classes, not raw types.
+func (t AuthCheckType) Class() AuthCheckType {
+	if t == AuthCheckTypePasskeyRegistration {
+		return AuthCheckTypePasskey
+	}
+	return t
+}
+
 type AuthCheck interface {
 	Type() AuthCheckType
 	Payload() any

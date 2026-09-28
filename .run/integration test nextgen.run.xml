@@ -2,8 +2,8 @@
   <configuration default="false" name="integration test nextgen" type="GoTestRunConfiguration" factoryName="Go Test">
     <module name="nextgen" />
     <working_directory value="$PROJECT_DIR$" />
+    <go_parameters value="-tags postgres_integration" />
     <useCustomBuildTags value="true" />
-    <parameters value="-tags postgres_integration" />
     <kind value="DIRECTORY" />
     <package value="github.com/zitadel/nextgen/internal/api/integration_test" />
     <directory value="$PROJECT_DIR$" />

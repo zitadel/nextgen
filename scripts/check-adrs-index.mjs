@@ -7,7 +7,20 @@ import { forwardedArgs, isDirectRun } from "./dev-process.mjs";
 
 const ADR_FILENAME_PATTERN = /^(\d{3})-[a-z0-9-]+\.md$/;
 const ADR_HEADING_PATTERN = /^#\s*ADR\s+(\d{3}):\s*(.+)\s*$/;
+const ADR_STATUS_PATTERN = /^>\s*\*\*Status:\*\*\s*(.+?)\s*$/;
 const README_ROW_PATTERN = /^\|\s*\[(\d{3})\]\(([^)]+)\)\s*\|\s*([^|]+)\|\s*([^|]+)\|\s*([^|]+)\|\s*$/;
+
+// The canonical status vocabulary. A status line may carry a suffix or
+// parenthetical after the leading token ("Accepted — 2026-05-19",
+// "Superseded by [ADR 002](…)"); only the leading token is compared.
+const ADR_CANONICAL_STATUSES = [
+  "Draft",
+  "Proposed",
+  "Accepted",
+  "Implemented",
+  "Withdrawn",
+  "Superseded",
+];
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const defaultAdrsDir = join(repoRoot, "docs", "adrs");
@@ -115,7 +128,36 @@ export function parseAdrHeading(content) {
   return null;
 }
 
-export function validateAdrIndex({ files, readmeRows, headings = new Map() }) {
+export function parseAdrStatus(content) {
+  for (const line of content.replace(/\r\n/g, "\n").split("\n")) {
+    const match = line.match(ADR_STATUS_PATTERN);
+    if (match) {
+      return match[1].trim();
+    }
+  }
+  return null;
+}
+
+export function normalizeAdrStatus(raw) {
+  if (typeof raw !== "string") {
+    return null;
+  }
+  const token = raw.trim().match(/^([A-Za-z]+)/);
+  if (!token) {
+    return null;
+  }
+  const canonical = ADR_CANONICAL_STATUSES.find(
+    (status) => status.toLowerCase() === token[1].toLowerCase(),
+  );
+  return canonical ?? null;
+}
+
+export function validateAdrIndex({
+  files,
+  readmeRows,
+  headings = new Map(),
+  statuses = new Map(),
+}) {
   const errors = [];
   const filesById = groupBy(files, (file) => file.id);
   const readmeByFilename = groupBy(readmeRows, (row) => row.filename);
@@ -223,6 +265,43 @@ export function validateAdrIndex({ files, readmeRows, headings = new Map() }) {
     }
   }
 
+  for (const file of files) {
+    const rawStatus = statuses.get(file.filename);
+    if (rawStatus == null) {
+      errors.push({
+        code: "status-missing",
+        message: `${file.filename} is missing a '> **Status:** <status>' line`,
+      });
+      continue;
+    }
+    const bodyStatus = normalizeAdrStatus(rawStatus);
+    if (!bodyStatus) {
+      errors.push({
+        code: "status-invalid",
+        message: `${file.filename} status "${rawStatus}" does not start with one of: ${ADR_CANONICAL_STATUSES.join(", ")}`,
+      });
+      continue;
+    }
+
+    const rows = readmeByFilename.get(file.filename) ?? [];
+    for (const row of rows) {
+      const rowStatus = normalizeAdrStatus(row.status);
+      if (!rowStatus) {
+        errors.push({
+          code: "status-invalid",
+          message: `docs/adrs/README.md status "${row.status.trim()}" for ${file.filename} does not start with one of: ${ADR_CANONICAL_STATUSES.join(", ")}`,
+        });
+        continue;
+      }
+      if (rowStatus !== bodyStatus) {
+        errors.push({
+          code: "status-mismatch",
+          message: `docs/adrs/README.md lists ${file.filename} as ${rowStatus} but the ADR body says ${bodyStatus}`,
+        });
+      }
+    }
+  }
+
   return {
     ok: errors.length === 0,
     errors,
@@ -241,17 +320,26 @@ export async function checkAdrsIndex(options = {}) {
   const readmeRows = parseReadmeIndex(readmeMarkdown);
 
   const headings = options.headings ?? new Map();
-  if (!options.headings) {
+  const statuses = options.statuses ?? new Map();
+  if (!options.headings || !options.statuses) {
     for (const file of files) {
       const content = await readFile(join(adrsDir, file.filename), "utf8");
-      const heading = parseAdrHeading(content);
-      if (heading) {
-        headings.set(file.filename, heading);
+      if (!options.headings) {
+        const heading = parseAdrHeading(content);
+        if (heading) {
+          headings.set(file.filename, heading);
+        }
+      }
+      if (!options.statuses) {
+        const status = parseAdrStatus(content);
+        if (status != null) {
+          statuses.set(file.filename, status);
+        }
       }
     }
   }
 
-  const validation = validateAdrIndex({ files, readmeRows, headings });
+  const validation = validateAdrIndex({ files, readmeRows, headings, statuses });
   return {
     ok: scanErrors.length === 0 && validation.ok,
     errors: [...scanErrors, ...validation.errors],
@@ -293,7 +381,9 @@ function groupBy(items, selector) {
 function printUsage() {
   console.log(`Usage: node scripts/check-adrs-index.mjs
 
-Validates ADR numbering, docs/adrs/README.md index sync, and ADR heading IDs.
+Validates ADR numbering, docs/adrs/README.md index sync, ADR heading IDs, and
+that each index row's status matches the ADR body's '> **Status:**' line
+(leading token; suffixes like dates or "superseded by" notes are ignored).
 `);
 }
 

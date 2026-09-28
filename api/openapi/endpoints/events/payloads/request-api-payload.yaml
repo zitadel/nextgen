@@ -1,0 +1,33 @@
+title: RequestAPIPayload
+type: object
+description: Payload for `request.api` events.
+required:
+  - operation_id
+  - method
+  - route_template
+  - status
+  - duration_ms
+properties:
+  operation_id:
+    type: string
+  method:
+    type: string
+    description: HTTP method.
+    enum:
+      - GET
+      - POST
+      - PUT
+      - PATCH
+      - DELETE
+      - HEAD
+      - OPTIONS
+  route_template:
+    type: string
+  status:
+    type: integer
+    minimum: 100
+    maximum: 599
+  duration_ms:
+    type: integer
+    format: int64
+    minimum: 0

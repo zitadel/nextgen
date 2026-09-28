@@ -1,0 +1,26 @@
+title: ReleaseCreatedPayload
+type: object
+description: |
+  Allowlisted fields for `release.created`. The release id is already the
+  event's `entity_id`; the pinned set is repeated here so the audit stream
+  answers what a release contained without reading the release itself.
+properties:
+  content_hash:
+    type: string
+  message:
+    type: string
+  git_sha:
+    type: string
+  git_dirty:
+    type: boolean
+  pointers:
+    type: array
+    items:
+      type: object
+      properties:
+        kind:
+          type: string
+        handle:
+          type: string
+        revision_id:
+          type: string

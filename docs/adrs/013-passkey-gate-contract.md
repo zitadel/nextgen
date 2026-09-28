@@ -77,13 +77,14 @@ Passkey availability is declared via `x-auth-methods` on the user schema:
 
 ```json
 "x-auth-methods": {
-  "password": { "enabled": true, "position": 1 },
-  "passkey":  { "enabled": true, "position": 0 }
+  "password": { "enabled": true },
+  "passkey":  { "enabled": true }
 }
 ```
 
 - Policy engine uses this to determine if passkey can be required.
-- Flow engine uses `position` for action ordering hints.
+- The flow engine takes action ordering from the order of a step's actions in
+  the flow definition, not from the schema.
 - The credential itself is stored off-schema, registered via auth_attempts.
 
 ## Context

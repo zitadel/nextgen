@@ -1,10 +1,11 @@
 import { spawn } from "node:child_process";
 import { createReadStream } from "node:fs";
-import { mkdir, open, readFile, rm, stat } from "node:fs/promises";
+import { mkdir, open, readFile, stat } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 
 import { ZitadelError } from "../errors";
+import { EMPTY_ENV, type ResolvedEnv, envSummary } from "./env-vars";
 import {
   type BinaryRuntimeMetadata,
   type RuntimeMetadata,
@@ -13,6 +14,7 @@ import {
 
 export const SERVER_NPM_PACKAGE = "@zitadel/server";
 const START_COMMAND_ENV = "ZITADEL_SERVER_BINARY";
+const START_COMMAND_VERSION_ENV = "ZITADEL_SERVER_BINARY_VERSION";
 const STOP_TIMEOUT_MS = 10_000;
 const STOP_KILL_TIMEOUT_MS = 2_000;
 
@@ -24,6 +26,10 @@ export type BinaryRunSpec = {
   logPath: string;
   port: number;
   serverUrl: string;
+  /** Project variables for the child's environment, never its argv. */
+  env?: ResolvedEnv;
+  /** Bootstrap user document for the local admin, passed as `--user-file`. */
+  userFile?: string;
 };
 
 export type StopBinaryRuntimeResult = Readonly<{
@@ -32,27 +38,6 @@ export type StopBinaryRuntimeResult = Readonly<{
   status: "failed" | "stale" | "stopped";
   target: "process" | "process-group";
 }>;
-
-export type ReapEmbeddedPostgresResult = Readonly<{
-  // `absent`: no lock file, nothing to reap. `stale`: lock file pointed at a
-  // dead process or was corrupt; we cleared it. `stopped`: we terminated a live
-  // postmaster. `failed`: a live postmaster ignored SIGINT and SIGKILL.
-  status: "absent" | "failed" | "stale" | "stopped";
-  pid?: number;
-  signal?: NodeJS.Signals;
-}>;
-
-// The local server binary launches embedded Postgres through `pg_ctl start`,
-// which double-forks and setsid()s the postmaster into its own session. That
-// deliberately escapes the server's process group, so the group SIGTERM that
-// stopBinaryRuntime sends never reaches Postgres. The server itself stops it on
-// a graceful shutdown (`pg_ctl stop`), but any path that skips that shutdown — a
-// SIGKILL escalation, a crash, or a SIGTERM during the startup window before the
-// server installs its signal handler — leaves the postmaster orphaned (reparented
-// to PID 1) still holding this lock, which blocks the next `pg_ctl start` with
-// "another server might be running". Mirrors embeddedPostgresOptions in
-// cmd/server/server.go.
-const EMBEDDED_POSTGRES_PID_FILE = join("embedded-postgres", "data", "postmaster.pid");
 
 export function resolveServerCommand(env: NodeJS.ProcessEnv = process.env): {
   command: string;
@@ -65,7 +50,7 @@ export function resolveServerCommand(env: NodeJS.ProcessEnv = process.env): {
       command: env[START_COMMAND_ENV],
       args: [],
       serverPackage: SERVER_NPM_PACKAGE,
-      serverVersion: "override",
+      serverVersion: env[START_COMMAND_VERSION_ENV]?.trim() || "override",
     };
   }
 
@@ -81,15 +66,30 @@ export function resolveServerCommand(env: NodeJS.ProcessEnv = process.env): {
 
 export async function startBinaryRuntime(spec: BinaryRunSpec): Promise<BinaryRuntimeMetadata> {
   const command = resolveServerCommand();
+  const env = spec.env ?? EMPTY_ENV;
   await mkdir(dirname(spec.logPath), { recursive: true, mode: 0o700 });
   const log = await open(spec.logPath, "a", 0o600);
   try {
-    const child = spawn(command.command, command.args, {
+    const args = withMigrateFlag([
+      ...command.args,
+      ...(spec.userFile ? ["--user-file", spec.userFile] : []),
+    ]);
+    const child = spawn(command.command, args, {
       detached: true,
       env: {
         ...process.env,
+        // Declared project variables ride the child's environment, never argv.
+        ...env.values,
         NEXTGEN_SERVER_ADDRESS: `:${String(spec.port)}`,
         NEXTGEN_SERVER_DATA_DIR: spec.dataDir,
+        // Browser-facing URLs (claim, dashboard) must point at this local
+        // server, not the cloud default the server config falls back to.
+        NEXTGEN_SERVER_PUBLIC_BASE: spec.serverUrl,
+        // The platform project and the local admin travel together: the admin
+        // is a user of it. The caller decides by passing a user file, and an
+        // opted-out start passes none — leaving whatever the environment says
+        // (by default nothing, which the server reads as disabled).
+        ...(spec.userFile ? { NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT: "true" } : {}),
       },
       stdio: ["ignore", log.fd, log.fd],
     });
@@ -101,7 +101,7 @@ export async function startBinaryRuntime(spec: BinaryRunSpec): Promise<BinaryRun
       schema_version: 1,
       backend: "binary",
       pid: child.pid,
-      command: [command.command, ...command.args].join(" "),
+      command: [command.command, ...args].join(" "),
       log_path: spec.logPath,
       server_package: command.serverPackage,
       server_version: command.serverVersion,
@@ -110,6 +110,7 @@ export async function startBinaryRuntime(spec: BinaryRunSpec): Promise<BinaryRun
       data_dir: spec.dataDir,
       created_at: new Date().toISOString(),
       cli_version: spec.cliVersion,
+      env: envSummary(env),
     };
   } finally {
     await log.close();
@@ -135,85 +136,6 @@ export async function stopBinaryRuntime(pid: number): Promise<StopBinaryRuntimeR
     }
   }
   return { pid, status: "failed", target: term.target, signal: "SIGKILL" };
-}
-
-export type ReapEmbeddedPostgresOptions = {
-  // How long to wait for the postmaster to honour the SIGINT fast-shutdown
-  // before escalating, and then for the SIGKILL to take effect. Defaults match
-  // stopBinaryRuntime; exposed mainly so tests can keep the escalation fast.
-  fastShutdownTimeoutMs?: number;
-  killTimeoutMs?: number;
-};
-
-/**
- * Best-effort reap of an embedded Postgres left behind for `dataDir`. Reads the
- * postmaster's own lock file, and if that process is still alive, stops it
- * directly — the CLI-side safety net for the orphan cases the server's graceful
- * shutdown cannot cover (see {@link EMBEDDED_POSTGRES_PID_FILE}). SIGINT triggers
- * Postgres' "fast shutdown"; its backends exit on their own once the postmaster
- * is gone, so signalling the postmaster PID is enough. Escalates to SIGKILL.
- * A no-op (`absent`) when the data directory has no live embedded Postgres, so it
- * is safe to call on every stop and before every start.
- */
-export async function reapEmbeddedPostgres(
-  dataDir: string,
-  options: ReapEmbeddedPostgresOptions = {},
-): Promise<ReapEmbeddedPostgresResult> {
-  const fastShutdownTimeoutMs = options.fastShutdownTimeoutMs ?? STOP_TIMEOUT_MS;
-  const killTimeoutMs = options.killTimeoutMs ?? STOP_KILL_TIMEOUT_MS;
-  const pidFile = join(dataDir, EMBEDDED_POSTGRES_PID_FILE);
-  const raw = await readLockFile(pidFile);
-  if (raw === undefined) {
-    return { status: "absent" };
-  }
-  const pid = parsePostmasterPid(raw);
-  if (pid === undefined) {
-    // A lock file whose first line is not a pid is corrupt (e.g. a torn write
-    // during a crash). No owner can be identified, so clear it — leaving it
-    // would keep blocking `pg_ctl start`, the exact failure this reap prevents.
-    await rm(pidFile, { force: true });
-    return { status: "stale" };
-  }
-  if (!isProcessRunning(pid)) {
-    // A dead owner is a stale lock. `pg_ctl start` would clear it itself, but
-    // leaving a pristine directory keeps the next start's failure modes simple.
-    await rm(pidFile, { force: true });
-    return { status: "stale", pid };
-  }
-
-  signalProcess(pid, "SIGINT");
-  if (await waitForExit(pid, fastShutdownTimeoutMs)) {
-    await rm(pidFile, { force: true });
-    return { status: "stopped", pid, signal: "SIGINT" };
-  }
-
-  signalProcess(pid, "SIGKILL");
-  if (await waitForExit(pid, killTimeoutMs)) {
-    await rm(pidFile, { force: true });
-    return { status: "stopped", pid, signal: "SIGKILL" };
-  }
-  return { status: "failed", pid };
-}
-
-async function readLockFile(pidFile: string): Promise<string | undefined> {
-  try {
-    return await readFile(pidFile, "utf8");
-  } catch (error) {
-    if (isErrno(error, "ENOENT")) {
-      return undefined;
-    }
-    throw error;
-  }
-}
-
-function parsePostmasterPid(raw: string): number | undefined {
-  // postmaster.pid records the postmaster PID on its first line.
-  const firstLine = (raw.split(/\r?\n/, 1)[0] ?? "").trim();
-  if (!/^\d+$/.test(firstLine)) {
-    return undefined;
-  }
-  const pid = Number.parseInt(firstLine, 10);
-  return pid > 0 && Number.isSafeInteger(pid) ? pid : undefined;
 }
 
 export function isProcessRunning(pid: number): boolean {
@@ -364,4 +286,10 @@ function errorMessage(error: unknown): string {
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolveDelay) => setTimeout(resolveDelay, ms));
+}
+
+const MIGRATE_FLAG = "--migrate";
+
+function withMigrateFlag(args: string[]): string[] {
+  return args.includes(MIGRATE_FLAG) ? args : [...args, MIGRATE_FLAG];
 }

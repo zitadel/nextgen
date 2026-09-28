@@ -21,6 +21,7 @@ const locale: Record<string, string> = {
   "identifier.action.register.link": "Create an account",
   "submit.continue": "Continue",
   "action.recover": "Forgot password?",
+  "action.back": "Back",
 };
 
 const step: CreateFlow201Step = {
@@ -30,9 +31,9 @@ const step: CreateFlow201Step = {
     { name: "remember", type: "checkbox", text_key: "identifier.field.remember" },
   ],
   actions: [
-    { name: "submit", text_key: "submit.continue", primary: true },
-    { name: "register", text_key: "identifier.action.register.link" },
-    { name: "recover", text_key: "action.recover" },
+    { name: "submit", kind: "submit", text_key: "submit.continue", primary: true },
+    { name: "register", kind: "navigate", text_key: "identifier.action.register.link" },
+    { name: "recover", kind: "navigate", text_key: "action.recover" },
   ],
   gates: {},
 };
@@ -71,6 +72,10 @@ describe("branding design catalog", () => {
         expect(html).toContain('data-testid="zitadel-field-remember"');
         expect(html).toContain('data-testid="zitadel-action-submit"');
         expect(html).toContain('data-action="register"');
+        // Recovery normally rides on the password field's label row. This step
+        // declares no password field, so it falls back to a row of its own
+        // rather than dropping the affordance.
+        expect(html).not.toContain('forgot-password-action="recover"');
         expect(html).toContain('data-action="recover"');
       });
 
@@ -85,6 +90,21 @@ describe("branding design catalog", () => {
       it("survives sanitisation structurally", () => {
         expect(html).toContain("<zl-page-shell");
       });
+
+      it("renders no visible control for a kind: back action (gesture-only)", () => {
+        const engine = createLiquidEngine({ locale });
+        const { template } = getDefaultBrandingConfig(design);
+        const rendered = engine.parseAndRenderSync(template, {
+          ...context,
+          actions: [...step.actions, { name: "back", kind: "back", text_key: "action.back" }],
+        });
+        const html2 = createSanitiser()(rendered);
+        // Back-navigation is gesture-only (ADR 022): the template renders no
+        // control for the action, and the kind-based exclusion keeps it out
+        // of the secondary-button loop.
+        expect(html2).not.toContain("back-action");
+        expect(html2).not.toContain('data-testid="zitadel-action-back"');
+      });
     });
   }
 
@@ -97,6 +117,21 @@ describe("branding design catalog", () => {
 
     const right = renderDesign("split-right");
     expect(right).toContain("zl-split--right");
+  });
+
+  it("split designs render the placeholder panel until an asset is set", () => {
+    const engine = createLiquidEngine({ locale });
+    const noAssets = { ...context, branding: {} };
+    for (const design of ["split", "split-right"]) {
+      const { template } = getDefaultBrandingConfig(design);
+      const bare = createSanitiser()(engine.parseAndRenderSync(template, noAssets));
+      // An empty brand pane renders the whole design as a lonely off-centre
+      // card; the decorative panel must survive the sanitiser.
+      expect(bare, design).toContain("zl-split__placeholder");
+
+      const branded = createSanitiser()(engine.parseAndRenderSync(template, context));
+      expect(branded, design).not.toContain("zl-split__placeholder");
+    }
   });
 
   it("split-family designs render the mobile compact brand header", () => {

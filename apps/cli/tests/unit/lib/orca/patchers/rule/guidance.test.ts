@@ -14,10 +14,10 @@ const ctx: PatchContext = {
   rendererId: "react",
   project: {
     id: "proj_test",
-    projectSecret: "sk",
-    previewSecret: "pk",
-    previewOrigins: [],
-    createdAt: "2026-01-01T00:00:00Z",
+    project_secret: "sk",
+    preview_secret: "pk",
+    preview_origins: [],
+    created_at: "2026-01-01T00:00:00Z",
   },
   issuer: "http://localhost:3000",
   server: "http://localhost:8080",
@@ -136,5 +136,72 @@ describe("guidance content", () => {
   it("omits the passkey verification note for password-first scaffolds", () => {
     const passwordCtx = { ...ctx, preset: "password-first" } as PatchContext;
     expect(agentsGuidanceSection(passwordCtx)).not.toContain("passkey ceremonies");
+  });
+
+  it("tells each framework how its own chrome reads session state", () => {
+    // Next: the client helper (works on any page), plus the server-side
+    // auth() with its matcher precondition.
+    const agents = agentsGuidanceSection(ctx);
+    expect(agents).toContain("@zitadel/sdk-next/session");
+    expect(agents).toContain("`matcher`");
+    expect(agents).toContain("no-store");
+    expect(agents).toContain("401/auth.unauthorized");
+    expect(agents).toContain("404/sess.not_found");
+    expect(agents).toContain("non-empty `user_id`");
+
+    // Nuxt: the composable the scaffolded auth plugin seeds — no Next helper.
+    const nuxtCtx = {
+      ...ctx,
+      framework: { id: "nuxt", devPort: 3000, url: "http://localhost:3000" },
+    } as PatchContext;
+    const nuxtAgents = agentsGuidanceSection(nuxtCtx);
+    expect(nuxtAgents).toContain("useAuth()");
+    expect(nuxtAgents).not.toContain("@zitadel/sdk-next/session");
+
+    // SPA frameworks: no framework helper exists yet, so the guidance names
+    // the raw proxy read instead of a package that would not resolve.
+    const reactCtx = {
+      ...ctx,
+      framework: { id: "react", devPort: 5173, url: "http://localhost:5173" },
+    } as PatchContext;
+    const reactAgents = agentsGuidanceSection(reactCtx);
+    expect(reactAgents).toContain("/__nextgen/sessions/me");
+    expect(reactAgents).toContain('cache: "no-store"');
+    expect(reactAgents).toContain("401/auth.unauthorized");
+    expect(reactAgents).toContain("404/sess.not_found");
+    expect(reactAgents).toContain("unknown/error, never signed-out");
+    expect(reactAgents).not.toContain("@zitadel/sdk-next/session");
+    expect(reactAgents).not.toContain("useAuth()");
+  });
+
+  it("describes the emitted posture in the presentation paragraph (ADR 044)", () => {
+    // Default (fresh scaffold / legacy): pages pin the full-page chrome.
+    const page = agentsGuidanceSection(ctx);
+    expect(page).toContain('pin the sign-in widgets to `variant="page"`');
+    // Widget posture: the guidance must not claim full-page chrome the
+    // embedded cards don't have, and still name the alternative.
+    const widget = agentsGuidanceSection({ ...ctx, posture: "widget" } as PatchContext);
+    expect(widget).toContain('embed the sign-in widgets as `variant="widget"` cards');
+    expect(widget).toContain('switch to `variant="page"`');
+    expect(widget).not.toContain('pin the sign-in widgets to `variant="page"`');
+    // The theme knob and (on Next) the JSX-types pointer survive both ways.
+    expect(widget).toContain("(`light` | `dark` | `auto`)");
+    expect(widget).toContain("@zitadel/sdk-next/jsx");
+  });
+
+  it("names the presentation knobs and, on Next, the shipped JSX types", () => {
+    const agents = agentsGuidanceSection(ctx);
+    expect(agents).toContain('variant="widget"');
+    expect(agents).toContain("(`light` | `dark` | `auto`)");
+    expect(agents).toContain("@zitadel/sdk-next/jsx");
+    // JSX typing is a Next/React concern — other frameworks type the
+    // elements through their own SDK wrappers, so the pointer stays out.
+    const nuxtCtx = {
+      ...ctx,
+      framework: { id: "nuxt", devPort: 3000, url: "http://localhost:3000" },
+    } as PatchContext;
+    const nuxtAgents = agentsGuidanceSection(nuxtCtx);
+    expect(nuxtAgents).toContain('variant="widget"');
+    expect(nuxtAgents).not.toContain("@zitadel/sdk-next/jsx");
   });
 });

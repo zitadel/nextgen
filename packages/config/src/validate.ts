@@ -61,7 +61,12 @@ export const FLOW_VALIDATION_RULES = {
 export type FlowValidationRuleId = keyof typeof FLOW_VALIDATION_RULES;
 
 /** Mirrors `reservedOutcomes` in flow_definition_validator.go. */
-export const RESERVED_OUTCOMES = ["user_not_found", "user_already_exists", "callback"] as const;
+export const RESERVED_OUTCOMES = [
+  "user_not_found",
+  "user_already_exists",
+  "identity_unknown",
+  "callback",
+] as const;
 
 /** Mirrors the `FlowDefinitionPurpose` enum (snake transform) in flow_definition.go. */
 export const FLOW_PURPOSES = [
@@ -73,7 +78,13 @@ export const FLOW_PURPOSES = [
   "link_account",
 ] as const;
 
-/** Mirrors `purposeFlipTargets` in flow_definition_validator.go. */
+/**
+ * Mirrors `purposeFlipTargets` in flow_definition_validator.go: the
+ * identifier outcomes only. `identity_unknown` comes only from SSO
+ * resolution and is left out here; requiring it on every combined entry
+ * step would reject the shipped default flow. A rule on steps carrying
+ * sso_providers is future work (#1044).
+ */
 export const PURPOSE_FLIP_TARGETS: Readonly<Record<string, Readonly<Record<string, string>>>> = {
   login: { user_not_found: "register" },
   register: { user_already_exists: "login" },
@@ -174,7 +185,7 @@ type FlowStep = {
   actions: { name: string; kind: string }[];
   gateCount: number;
   ssoProviderCount: number;
-  transitions: Map<string, { target: string; action: string | null }>;
+  transitions: Map<string, { target: string; action: string | null; purpose: string | null }>;
   onSuccess: string | undefined;
   terminal: boolean;
 };
@@ -212,13 +223,17 @@ function readFlow(flow: object): FlowDef {
   if (Array.isArray(raw.steps)) {
     for (const value of raw.steps) {
       if (!isPlainObject(value)) continue;
-      const transitions = new Map<string, { target: string; action: string | null }>();
+      const transitions = new Map<
+        string,
+        { target: string; action: string | null; purpose: string | null }
+      >();
       if (isPlainObject(value.transitions)) {
         for (const [key, t] of Object.entries(value.transitions)) {
           const entry = isPlainObject(t) ? t : {};
           transitions.set(key, {
             target: str(entry.target),
             action: typeof entry.action === "string" ? entry.action : null,
+            purpose: typeof entry.purpose === "string" ? entry.purpose : null,
           });
         }
       }
@@ -359,7 +374,7 @@ function validateStep(step: FlowStep): FlowValidationIssue[] {
       issues.push(
         error(
           "steps",
-          `step ${q(name)}: transition key ${q(transitionKey)} is not an action name or reserved outcome (user_not_found, user_already_exists, callback)`,
+          `step ${q(name)}: transition key ${q(transitionKey)} is not an action name or reserved outcome (user_not_found, user_already_exists, identity_unknown, callback)`,
           name,
         ),
       );
@@ -422,6 +437,49 @@ function validateGraph(def: FlowDef, stepNames: Set<string>): FlowValidationIssu
 
   for (const step of def.steps) {
     for (const [key, t] of step.transitions) {
+      if (t.purpose !== null) {
+        // Local re-purposing: never combined with a cross-flow action,
+        // only to a purpose this definition serves, and only to that
+        // purpose's entry step. Mirrors the server-side validator.
+        if (t.action !== null) {
+          issues.push(
+            error(
+              "graph",
+              `step ${q(step.name)}: transition ${q(key)} declares both purpose and action; a transition either re-purposes locally or targets another flow`,
+              step.name,
+            ),
+          );
+        } else if (!(FLOW_PURPOSES as readonly string[]).includes(t.purpose)) {
+          // Verbatim-identical to the Go validator's message (which cannot
+          // print the raw value — its parse layer rejects it earlier).
+          issues.push(
+            error(
+              "graph",
+              `step ${q(step.name)}: transition ${q(key)} has invalid purpose`,
+              step.name,
+            ),
+          );
+        } else {
+          const entry = def.purposes.get(t.purpose);
+          if (entry === undefined) {
+            issues.push(
+              error(
+                "graph",
+                `step ${q(step.name)}: transition ${q(key)} re-purposes to ${q(t.purpose)}, which this definition does not serve`,
+                step.name,
+              ),
+            );
+          } else if (t.target !== entry) {
+            issues.push(
+              error(
+                "graph",
+                `step ${q(step.name)}: transition ${q(key)} re-purposes to ${q(t.purpose)} but targets ${q(t.target)}; it must target that purpose's entry step ${q(entry)}`,
+                step.name,
+              ),
+            );
+          }
+        }
+      }
       if (isCurrentFlow(t)) {
         if (!stepNames.has(t.target)) {
           issues.push(
@@ -539,6 +597,51 @@ function schemaRequired(schema: Record<string, unknown>): string[] {
   return Array.isArray(schema.required) ? schema.required.map(str).filter((n) => n !== "") : [];
 }
 
+/**
+ * Mirrors `schemaReader.RequiredPaths`: every name in `required`,
+ * recursed through the nested `required` of each required object. A
+ * required object declaring no `required` of its own ends the descent at
+ * the object itself.
+ *
+ * An optional object contributes its own `required` too once it appears
+ * in `materialized`. It only exists in the document because something
+ * beneath it was collected, and from that point document validation
+ * enforces the rest of its `required` list.
+ */
+function requiredPaths(
+  schema: Record<string, unknown>,
+  materialized: ReadonlySet<string>,
+  prefix = "",
+): string[] {
+  const properties = schemaProperties(schema);
+  const required = schemaRequired(schema);
+  // A set, like the Go `map[string]struct{}`, so a name repeated in
+  // `required` yields the path once.
+  const out = new Set<string>();
+
+  for (const name of required) {
+    const path = prefix === "" ? name : `${prefix}.${name}`;
+    const property =
+      properties !== undefined && Object.hasOwn(properties, name) ? properties[name] : undefined;
+    if (!isPlainObject(property) || schemaRequired(property).length === 0) {
+      out.add(path);
+      continue;
+    }
+    for (const nested of requiredPaths(property, materialized, path)) out.add(nested);
+  }
+
+  // An optional object is invisible to the loop above, so descend into
+  // the ones a collected field materializes.
+  for (const [name, property] of Object.entries(properties ?? {})) {
+    if (required.includes(name) || !isPlainObject(property)) continue;
+    const path = prefix === "" ? name : `${prefix}.${name}`;
+    if (!materialized.has(path)) continue;
+    for (const nested of requiredPaths(property, materialized, path)) out.add(nested);
+  }
+
+  return [...out];
+}
+
 /** Mirrors `xAuthMethodsReader.IsEnabled` in flow_field_resolver_schema.go. */
 function authMethodEnabled(schema: Record<string, unknown>, method: string): boolean {
   if (!isPlainObject(schema["x-auth-methods"])) return false;
@@ -569,28 +672,63 @@ function resolveFieldChallenge(
     return { challenge: "password" };
   }
 
-  const property = properties[field];
-  if (property === undefined) {
-    return { message: `flow field: not a property in the user schema: ${q(field)}` };
+  // Mirrors walkUserProperty: a nested property is addressed by its
+  // dotted path, descending one `properties` level per segment.
+  const segments = field.split(".");
+  let property: unknown = undefined;
+  let level: Record<string, unknown> | undefined = properties;
+  for (const [i, segment] of segments.entries()) {
+    // Own properties only: Go indexes a map, where an inherited name like
+    // `toString` is simply absent.
+    property = level !== undefined && Object.hasOwn(level, segment) ? level[segment] : undefined;
+    if (property === undefined) {
+      return { message: `flow field: not a property in the user schema: ${q(field)}` };
+    }
+    const nested = isPlainObject(property) ? schemaProperties(property) : undefined;
+    if (i < segments.length - 1 && nested === undefined) {
+      return { message: `flow field: not a property in the user schema: ${q(field)}` };
+    }
+    level = nested;
   }
+
   if (!isPlainObject(property)) {
     return { challenge: null };
   }
 
   // Mirrors schemaReader.JSONType: the nullable idiom `["null", X]`
-  // reduces to X; any other multi-entry union is unsupported.
-  const jsonType = property.type;
+  // reduces to X; any other multi-entry union is unsupported. Go reduces
+  // before it tests for a composite, so the union error wins and the
+  // object/array test below reads the reduced type rather than the union.
+  let jsonType = property.type;
   if (Array.isArray(jsonType)) {
     const nonNull = jsonType.filter((t) => t !== "null");
     if (nonNull.length > 1) {
       return { message: `flow field: unsupported JSON type: [${jsonType.map(str).join(" ")}]` };
     }
+    // Undefined when every entry was "null", matching Go's empty-string case.
+    jsonType = nonNull[0];
   }
 
-  // Mirrors deriveUnique + deriveIdentifierChallenge: any recognized
-  // non-empty x-unique scope makes the property an identifier.
-  const unique = property["x-unique"];
-  if (unique === "project" || unique === "team") {
+  // Mirrors deriveUserPropertyType: an object or array has no
+  // field-shaped input. A property carrying `properties` is an object,
+  // and one carrying `items` is an array, even when it omits the `type`
+  // keyword.
+  if (
+    jsonType === "object" ||
+    jsonType === "array" ||
+    schemaProperties(property) !== undefined ||
+    "items" in property
+  ) {
+    return {
+      message: `flow field: not a scalar property, name a nested leaf instead: ${q(field)}`,
+    };
+  }
+
+  // Mirrors deriveIdentifierChallenge: the field naming the schema-root
+  // `x-identifier` designation is the identifier (ADR 057); other
+  // properties — unique or not — carry no identifier challenge.
+  const identifier = schema["x-identifier"];
+  if (typeof identifier === "string" && identifier !== "" && field === identifier) {
     return { challenge: "identifier" };
   }
   return { challenge: null };
@@ -607,14 +745,23 @@ function validateAgainstSchema(def: FlowDef, schema: object): FlowValidationIssu
   }
 
   // Required-fields coverage (validateRequiredUserSchemaFields).
-  const collected = new Set<string>();
+  // Collecting `address.street` covers the leaf and every object above
+  // it, since an object materializes once one of its children is
+  // collected. The same prefixes are what the schema treats as
+  // materialized, so an optional object's own `required` list comes into
+  // force here too.
+  const covered = new Set<string>();
   for (const step of def.steps) {
     for (const field of step.fields) {
-      collected.add(field);
+      let path = "";
+      for (const node of field.split(".")) {
+        path = path === "" ? node : `${path}.${node}`;
+        covered.add(path);
+      }
     }
   }
-  const missing = schemaRequired(raw)
-    .filter((field) => !collected.has(field))
+  const missing = requiredPaths(raw, covered)
+    .filter((field) => !covered.has(field))
     .sort();
   if (missing.length > 0) {
     issues.push(

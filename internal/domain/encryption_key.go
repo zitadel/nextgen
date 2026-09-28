@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	PrefixEncryptionKey ResourcePrefix = "encryption_key"
+	PrefixEncryptionKey ResourcePrefix = "enc_key"
 )
 
 func ErrSupportedEncryptionAlgorithm(alg jose.ContentEncryption) Error {
@@ -46,8 +46,18 @@ const (
 type EncryptionKeyPurpose string
 
 const (
-	EncryptionKeyPurposeDEK EncryptionKeyPurpose = "dek"
+	// EncryptionKeyPurposeKEK indicates the key is the project's key encryption
+	// key which is used to encrypt the purpose-scoped keys of the project. It is
+	// itself encrypted by the master key.
 	EncryptionKeyPurposeKEK EncryptionKeyPurpose = "kek"
+	// EncryptionKeyPurposeToken indicates the key is used to encrypt tokens
+	EncryptionKeyPurposeToken EncryptionKeyPurpose = "token"
+	// EncryptionKeyPurposeSecret indicates the key is used to encrypt
+	// third-party secrets like client-secrets, passwords,... for third party
+	// applications
+	EncryptionKeyPurposeSecret EncryptionKeyPurpose = "secret"
+	// EncryptionKeyPurposeCookie indicates the key is used to encrypt cookies
+	EncryptionKeyPurposeCookie EncryptionKeyPurpose = "cookie"
 )
 
 type EncryptionKey struct {
@@ -62,39 +72,38 @@ type EncryptionKey struct {
 	RetiredAt   *time.Time
 }
 
-func NewDEK(projectID string, algorithm jose.ContentEncryption, kek crypto.Crypter) (*EncryptionKey, error) {
-	id, err := newID(PrefixEncryptionKey)
-	if err != nil {
-		return nil, err
-	}
-
+func NewEncryptionKey(
+	projectID string,
+	purpose EncryptionKeyPurpose,
+	algorithm jose.ContentEncryption,
+	kek crypto.Crypter,
+) (*EncryptionKey, error) {
 	var key [32]byte
-	_, err = rand.Read(key[:])
+	_, err := rand.Read(key[:])
 	if err != nil {
-		return nil, ErrInternal(err).WithMessage("failed to generate new DEK key")
+		return nil, ErrInternal(err).WithMessage("failed to generate new encryption key")
 	}
 
 	encryptedKey, err := kek.Encrypt(string(key[:]))
 	if err != nil {
-		return nil, ErrInternal(err).WithMessage("failed to encrypt dek")
+		return nil, ErrInternal(err).WithMessage("failed to encrypt the new encryption key")
 	}
 
 	// createdAt is set by db
 	return &EncryptionKey{
-		ID:        id,
 		ProjectID: projectID,
 		Key:       encryptedKey,
 		Algorithm: algorithm,
 		State:     KeyStateNotActiveYet,
-		Purpose:   EncryptionKeyPurposeDEK,
+		Purpose:   purpose,
 	}, nil
 }
 
-func (k *EncryptionKey) Activate(currentDEK *EncryptionKey) {
+func (k *EncryptionKey) Activate(currentKey *EncryptionKey) {
 	now := time.Now().UTC()
-	if currentDEK != nil {
-		currentDEK.State = KeyStateExpired
-		currentDEK.RetiredAt = new(now)
+	if currentKey != nil {
+		currentKey.State = KeyStateExpired
+		currentKey.RetiredAt = new(now)
 	}
 	k.State = KeyStateActive
 	k.ActivatedAt = new(now)
@@ -120,13 +129,15 @@ func (k *EncryptionKey) DecryptedKey(kek crypto.Decrypter) ([32]byte, error) {
 	return [32]byte(decryptedBs), nil
 }
 
-func (k *EncryptionKey) MigrateToNewKEK(oldKEK crypto.Crypter, newKEK crypto.Crypter) error {
-	decrypted, err := oldKEK.Decrypt(k.Key)
+// MigrateToNewMasterKey re-wraps the key material under newMasterKey without
+// changing the key itself, so nothing encrypted by this key has to be touched.
+func (k *EncryptionKey) MigrateToNewMasterKey(oldMasterKey crypto.Crypter, newMasterKey crypto.Crypter) error {
+	decrypted, err := oldMasterKey.Decrypt(k.Key)
 	if err != nil {
 		return ErrDecryptionFailed(err)
 	}
 
-	encrypted, err := newKEK.Encrypt(decrypted)
+	encrypted, err := newMasterKey.Encrypt(decrypted)
 	if err != nil {
 		return ErrEncryptionFailed(err)
 	}
@@ -151,7 +162,7 @@ func (k *EncryptionKey) Crypter(kek crypto.Crypter) (crypto.Crypter, error) {
 type EncryptionKeyField uint8
 
 const (
-	DEKFieldUnspecified EncryptionKeyField = iota
+	EncryptionKeyFieldUnspecified EncryptionKeyField = iota
 	EncryptionKeyFieldID
 	EncryptionKeyFieldProjectID
 	EncryptionKeyFieldKey
@@ -163,39 +174,39 @@ const (
 	EncryptionKeyFieldPurpose
 )
 
-type RootKEK struct {
+type MasterKey struct {
 	ID                        string
 	key                       rsa.PrivateKey
 	ShouldBeUsedForEncryption bool
 }
 
-func NewRootKEK(
+func NewMasterKey(
 	id string,
 	key rsa.PrivateKey,
 	shouldBeUsedForEncryption bool,
-) RootKEK {
-	return RootKEK{
+) MasterKey {
+	return MasterKey{
 		ID:                        id,
 		key:                       key,
 		ShouldBeUsedForEncryption: shouldBeUsedForEncryption,
 	}
 }
 
-// rootKEKKeyAlgorithm and rootKEKContentEncryption are the JWE algorithms used
-// to wrap keys with a root KEK. RSA-OAEP-256 fixes the OAEP hash to SHA-256.
+// masterKeyAlgorithm and masterKeyContentEncryption are the JWE algorithms used
+// to wrap keys with a master key. RSA-OAEP-256 fixes the OAEP hash to SHA-256.
 const (
-	rootKEKKeyAlgorithm      = jose.RSA_OAEP_256
-	rootKEKContentEncryption = jose.A256GCM
+	masterKeyAlgorithm         = jose.RSA_OAEP_256
+	masterKeyContentEncryption = jose.A256GCM
 )
 
-// Encrypt wraps decrypted with the root KEK and returns a JWE compact
-// serialization. The JWE protected header carries the KEK's ID as "kid" so the
-// key can later be resolved without trying every configured KEK.
-func (k *RootKEK) Encrypt(decrypted string) (string, error) {
+// Encrypt wraps decrypted with the master key and returns a JWE compact
+// serialization. The JWE protected header carries the master key's ID as "kid"
+// so the key can later be resolved without trying every configured master key.
+func (k *MasterKey) Encrypt(decrypted string) (string, error) {
 	encrypter, err := jose.NewEncrypter(
-		rootKEKContentEncryption,
+		masterKeyContentEncryption,
 		jose.Recipient{
-			Algorithm: rootKEKKeyAlgorithm,
+			Algorithm: masterKeyAlgorithm,
 			Key:       &k.key.PublicKey,
 			KeyID:     k.ID,
 		},
@@ -217,11 +228,11 @@ func (k *RootKEK) Encrypt(decrypted string) (string, error) {
 	return serialized, nil
 }
 
-func (k *RootKEK) Decrypt(encrypted string) (string, error) {
+func (k *MasterKey) Decrypt(encrypted string) (string, error) {
 	jwe, err := jose.ParseEncrypted(
 		encrypted,
-		[]jose.KeyAlgorithm{rootKEKKeyAlgorithm},
-		[]jose.ContentEncryption{rootKEKContentEncryption},
+		[]jose.KeyAlgorithm{masterKeyAlgorithm},
+		[]jose.ContentEncryption{masterKeyContentEncryption},
 	)
 	if err != nil {
 		return "", ErrDecryptionFailed(err)
@@ -234,13 +245,13 @@ func (k *RootKEK) Decrypt(encrypted string) (string, error) {
 	return string(decrypted), nil
 }
 
-type RootKEKs struct {
-	Keys          []RootKEK
-	EncryptionKey RootKEK
+type MasterKeys struct {
+	Keys          []MasterKey
+	EncryptionKey MasterKey
 }
 
-func NewRootKEKs(keys []RootKEK) (*RootKEKs, error) {
-	var encryptionKey *RootKEK
+func NewMasterKeys(keys []MasterKey) (*MasterKeys, error) {
+	var encryptionKey *MasterKey
 	switch len(keys) {
 	case 0:
 		return nil, ErrRequestInvalid().WithMessage("no root encryption key provided")
@@ -264,17 +275,17 @@ func NewRootKEKs(keys []RootKEK) (*RootKEKs, error) {
 		return nil, ErrRequestInvalid().WithMessage("no key is marked for encryption")
 	}
 
-	return &RootKEKs{
+	return &MasterKeys{
 		Keys:          keys,
 		EncryptionKey: *encryptionKey,
 	}, nil
 }
 
-func (ks RootKEKs) Encrypt(decrypted string) (string, error) {
+func (ks MasterKeys) Encrypt(decrypted string) (string, error) {
 	return ks.EncryptionKey.Encrypt(decrypted)
 }
 
-func (ks RootKEKs) Decrypt(encrypted string) (string, error) {
+func (ks MasterKeys) Decrypt(encrypted string) (string, error) {
 	header, err := DecodeJWEHeader(encrypted)
 	if err != nil {
 		return "", ErrDecryptionFailed(err).WithDetails("failed to decode JWE header")
@@ -289,7 +300,7 @@ func (ks RootKEKs) Decrypt(encrypted string) (string, error) {
 	return kek.Decrypt(encrypted)
 }
 
-func (ks RootKEKs) GetByKeyID(id string) *RootKEK {
+func (ks MasterKeys) GetByKeyID(id string) *MasterKey {
 	if ks.EncryptionKey.ID == id {
 		return new(ks.EncryptionKey)
 	}

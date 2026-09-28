@@ -37,11 +37,71 @@ tasks:
       cache: false
       runInCI: false
 
+  # Starts a built image the way an operator would — no flags, no volumes, no
+  # --user override — and asserts it serves. Covers the container contract that
+  # unit tests cannot: the Dockerfile's data dir default against the non-root
+  # USER it declares. Needs a local Docker daemon and an image built by
+  # `node scripts/build-local-runtime-image.mjs`, so it stays out of CI.
+  smoke-container:
+    command: "node scripts/smoke-container.mjs"
+    options:
+      cache: false
+      runInCI: false
+
   check:
     command: "node scripts/check.mjs"
     options:
       cache: false
       runInCI: false
+
+  # Matched by the `:test` target in the ci workflow's `moon ci` call, so the
+  # affected-gate and release-body logic never become test files nothing
+  # executes.
+  test:
+    script: "node --test scripts/ci-mode.test.mjs scripts/release-github.test.mjs && corepack pnpm exec tsx --test scripts/generate-meta-schemas.test.ts"
+    inputs:
+      - "scripts/ci-mode.mjs"
+      - "scripts/ci-mode.test.mjs"
+      - "scripts/dev-process.mjs"
+      - "scripts/generate-meta-schemas.ts"
+      - "scripts/generate-meta-schemas.test.ts"
+      - "scripts/release-artifacts.mjs"
+      - "scripts/release-github.mjs"
+      - "scripts/release-github.test.mjs"
+      - "scripts/release-manifest.mjs"
+    options:
+      cache: true
+      runInCI: true
+
+  check-typecheck:
+    script: "node --test scripts/check-typecheck-programs.test.mjs && node scripts/check-typecheck-programs.mjs"
+    inputs:
+      - "scripts/check-typecheck-programs.mjs"
+      - "scripts/check-typecheck-programs.test.mjs"
+      - "apps/*/moon.yml"
+      - "packages/*/moon.yml"
+      - "apps/*/package.json"
+      - "packages/*/package.json"
+      - "apps/*/tsconfig*.json"
+      - "packages/*/tsconfig*.json"
+    options:
+      cache: true
+      runInCI: true
+
+  # The wire-casing rules are config, so a wrong subject type or regex breaks
+  # nothing loudly — the spec just stops being checked. These fixtures fail
+  # instead.
+  check-openapi-rules:
+    command: "node --test scripts/openapi-casing-rules.test.mjs"
+    inputs:
+      - "scripts/openapi-casing-rules.test.mjs"
+      - "scripts/testdata/openapi-casing/**"
+      - "/redocly.yaml"
+      # The test reads the pinned redocly version from this file.
+      - "apps/server/moon.yml"
+    options:
+      cache: true
+      runInCI: true
 
   check-adrs:
     command: "node scripts/check-adrs-index.mjs"

@@ -202,6 +202,5 @@ type CollectedFlowData struct {
 }
 
 type CollectedAuthMethodData struct {
-	Password                       string
-	HasProvisionedUserIDForPasskey bool
+	Password string
 }

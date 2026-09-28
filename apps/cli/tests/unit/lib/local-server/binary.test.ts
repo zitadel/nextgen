@@ -1,19 +1,101 @@
 import { spawn } from "node:child_process";
-import { mkdir, mkdtemp, rm, stat, writeFile } from "node:fs/promises";
+import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
-  reapEmbeddedPostgres,
+  resolveServerCommand,
+  startBinaryRuntime,
   stopBinaryRuntime,
 } from "../../../../src/lib/local-server/binary";
+
+vi.mock("node:child_process", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:child_process")>();
+  return { ...actual, spawn: vi.fn(() => ({ pid: 4242, unref: () => undefined })) };
+});
 
 describe("local server binary helpers", () => {
   afterEach(() => {
     vi.useRealTimers();
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+  });
+
+  it("spawns the server with the address, data dir, and public base env", async () => {
+    vi.stubEnv("ZITADEL_SERVER_BINARY", "/tmp/fake-nextgen-server");
+    const dir = await mkdtemp(join(tmpdir(), "zitadel-binary-test-"));
+
+    const runtime = await startBinaryRuntime({
+      cliVersion: "0.0.0-test",
+      dataDir: join(dir, "data"),
+      logPath: join(dir, "logs", "server.log"),
+      port: 8091,
+      serverUrl: "http://localhost:8091",
+    });
+
+    const [command, args, options] = vi.mocked(spawn).mock.calls[0] as unknown as [
+      string,
+      string[],
+      { env: NodeJS.ProcessEnv },
+    ];
+    expect(command).toBe("/tmp/fake-nextgen-server");
+    expect(args).toEqual(["--migrate"]);
+    expect(runtime.command).toBe("/tmp/fake-nextgen-server --migrate");
+    expect(options.env.NEXTGEN_SERVER_ADDRESS).toBe(":8091");
+    expect(options.env.NEXTGEN_SERVER_PUBLIC_BASE).toBe("http://localhost:8091");
+    expect(runtime.env).toEqual({ injected: [] });
+  });
+
+  it("passes resolved project variables through the child environment, never argv", async () => {
+    vi.stubEnv("ZITADEL_SERVER_BINARY", "/tmp/fake-nextgen-server");
+    const dir = await mkdtemp(join(tmpdir(), "zitadel-binary-test-"));
+
+    const runtime = await startBinaryRuntime({
+      cliVersion: "0.0.0-test",
+      dataDir: join(dir, "data"),
+      logPath: join(dir, "logs", "server.log"),
+      port: 8091,
+      serverUrl: "http://localhost:8091",
+      env: {
+        values: { GOOGLE_CLIENT_SECRET: "canary-secret" },
+        injected: ["GOOGLE_CLIENT_SECRET"],
+      },
+    });
+
+    const [command, args, options] = vi.mocked(spawn).mock.calls[0] as unknown as [
+      string,
+      string[],
+      { env: NodeJS.ProcessEnv },
+    ];
+    expect(options.env.GOOGLE_CLIENT_SECRET).toBe("canary-secret");
+    expect([command, ...args].join(" ")).not.toContain("canary-secret");
+    expect(runtime.command).not.toContain("canary-secret");
+    expect(runtime.env).toEqual({
+      injected: ["GOOGLE_CLIENT_SECRET"],
+    });
+    expect(JSON.stringify(runtime)).not.toContain("canary-secret");
+  });
+
+  it("records an explicit source build version with a binary override", () => {
+    expect(
+      resolveServerCommand({
+        ZITADEL_SERVER_BINARY: "/repo/dist/server/nextgen",
+        ZITADEL_SERVER_BINARY_VERSION: "dev+abcdef123456",
+      }),
+    ).toEqual({
+      command: "/repo/dist/server/nextgen",
+      args: [],
+      serverPackage: "@zitadel/server",
+      serverVersion: "dev+abcdef123456",
+    });
+  });
+
+  it("keeps the generic label for an unversioned user override", () => {
+    expect(
+      resolveServerCommand({ ZITADEL_SERVER_BINARY: "/tmp/custom-nextgen" }).serverVersion,
+    ).toBe("override");
   });
 
   it("falls back from process-group SIGTERM to pid SIGTERM and reports a stale process", async () => {
@@ -59,130 +141,6 @@ describe("local server binary helpers", () => {
     });
     expect(kill).toHaveBeenCalledWith(-12345, "SIGTERM");
     expect(kill).toHaveBeenCalledWith(-12345, "SIGKILL");
-  });
-});
-
-describe("reapEmbeddedPostgres", () => {
-  const dataDirs: string[] = [];
-  const strayPids: number[] = [];
-
-  afterEach(async () => {
-    vi.useRealTimers();
-    vi.restoreAllMocks();
-    for (const pid of strayPids.splice(0)) {
-      try {
-        process.kill(pid, "SIGKILL");
-      } catch {
-        // Already reaped by the code under test.
-      }
-    }
-    for (const dir of dataDirs.splice(0)) {
-      await rm(dir, { recursive: true, force: true });
-    }
-  });
-
-  async function dataDirWithPostmasterPid(content: string | undefined): Promise<string> {
-    const dataDir = await mkdtemp(join(tmpdir(), "zitadel-reap-"));
-    dataDirs.push(dataDir);
-    if (content !== undefined) {
-      const pidDir = join(dataDir, "embedded-postgres", "data");
-      await mkdir(pidDir, { recursive: true });
-      await writeFile(join(pidDir, "postmaster.pid"), content);
-    }
-    return dataDir;
-  }
-
-  function pidFileFor(dataDir: string): string {
-    return join(dataDir, "embedded-postgres", "data", "postmaster.pid");
-  }
-
-  it("is a no-op when the data directory has no postmaster.pid", async () => {
-    const dataDir = await dataDirWithPostmasterPid(undefined);
-    const kill = vi.spyOn(process, "kill");
-
-    await expect(reapEmbeddedPostgres(dataDir)).resolves.toEqual({ status: "absent" });
-    expect(kill).not.toHaveBeenCalled();
-  });
-
-  it("clears a corrupt lock file whose first line is not a pid", async () => {
-    // e.g. a torn write during a crash. Leaving it would keep blocking
-    // `pg_ctl start` with no identifiable owner to stop.
-    const dataDir = await dataDirWithPostmasterPid("garbage\n/some/data\n");
-    const kill = vi.spyOn(process, "kill");
-
-    await expect(reapEmbeddedPostgres(dataDir)).resolves.toEqual({ status: "stale" });
-    expect(kill).not.toHaveBeenCalled();
-    await expect(stat(pidFileFor(dataDir))).rejects.toMatchObject({ code: "ENOENT" });
-  });
-
-  it("clears a stale lock file left by a dead postmaster", async () => {
-    // A pid far above any real process reads as dead through the real kill(pid, 0).
-    const dataDir = await dataDirWithPostmasterPid("999999999\n/some/data\n");
-
-    await expect(reapEmbeddedPostgres(dataDir)).resolves.toMatchObject({
-      status: "stale",
-      pid: 999_999_999,
-    });
-    await expect(stat(pidFileFor(dataDir))).rejects.toMatchObject({ code: "ENOENT" });
-  });
-
-  it("stops a live postmaster with SIGINT and clears the lock", async () => {
-    const pid = 4242;
-    let alive = true;
-    vi.spyOn(process, "kill").mockImplementation(
-      (_pid: number, signal?: NodeJS.Signals | number) => {
-        if (_pid === pid && signal === "SIGINT") {
-          alive = false;
-          return true;
-        }
-        if (_pid === pid && signal === 0) {
-          if (alive) {
-            return true;
-          }
-          throw errno("ESRCH");
-        }
-        return true;
-      },
-    );
-    const dataDir = await dataDirWithPostmasterPid(`${String(pid)}\n`);
-
-    await expect(reapEmbeddedPostgres(dataDir)).resolves.toEqual({
-      status: "stopped",
-      pid,
-      signal: "SIGINT",
-    });
-    expect(process.kill).toHaveBeenCalledWith(pid, "SIGINT");
-    await expect(stat(pidFileFor(dataDir))).rejects.toMatchObject({ code: "ENOENT" });
-  });
-
-  it("escalates to SIGKILL when the postmaster ignores the SIGINT fast shutdown", async () => {
-    // A real child that ignores SIGINT (as Postgres could, deciding not to fast
-    // shut down) but cannot ignore SIGKILL. It prints "ready" only after its
-    // SIGINT handler is installed, so the reap below cannot race bootstrap.
-    const child = spawn(
-      process.execPath,
-      ["-e", "process.on('SIGINT', () => {}); console.log('ready'); setInterval(() => {}, 1 << 30);"],
-      { stdio: ["ignore", "pipe", "ignore"] },
-    );
-    if (!child.pid) {
-      // Never push a falsy pid: kill(0) would signal the test runner's own
-      // process group during cleanup.
-      throw new Error("test child did not expose a pid");
-    }
-    strayPids.push(child.pid);
-    await new Promise<void>((resolve, reject) => {
-      child.stdout.once("data", () => resolve());
-      child.once("error", reject);
-    });
-    const dataDir = await dataDirWithPostmasterPid(`${String(child.pid)}\n`);
-
-    const result = await reapEmbeddedPostgres(dataDir, {
-      fastShutdownTimeoutMs: 300,
-      killTimeoutMs: 2_000,
-    });
-
-    expect(result).toEqual({ status: "stopped", pid: child.pid, signal: "SIGKILL" });
-    await expect(stat(pidFileFor(dataDir))).rejects.toMatchObject({ code: "ENOENT" });
   });
 });
 

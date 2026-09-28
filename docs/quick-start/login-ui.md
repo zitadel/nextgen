@@ -3,6 +3,10 @@
 The server ships the hosted-login shell for the `<zitadel-login>` web component
 from `@zitadel/components`. It is **not** the Next.js or Nuxt demo apps.
 
+How hosted login fits the customization categories (page chrome vs widget
+knobs vs Liquid) is in
+[`../design/branding/customization-strategy.md`](../design/branding/customization-strategy.md).
+
 ## URL
 
 ```text
@@ -18,7 +22,7 @@ http://<host>:<port>/ui/login/
 Example:
 
 ```text
-http://localhost:8080/ui/login/?project_id=river-8421
+http://localhost:8080/ui/login/?project_id=proj_01hexample
 ```
 
 ## How it works

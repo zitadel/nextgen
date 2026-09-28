@@ -90,10 +90,134 @@ func TestValidateBranding(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			// Read-only in v1: even a well-formed https value is rejected —
-			// the field would load an arbitrary stylesheet at document level.
-			name:    "font url rejected even when https",
-			mutate:  func(b *Branding) { b.FontURL = "https://fonts.example.com/css2" },
+			// Loopback HTTP is the dev-posture carve-out: assets served from
+			// the app's own dev server (same exception the cookie Secure flag
+			// makes for the CLI local runtime).
+			name:   "http localhost logo url allowed",
+			mutate: func(b *Branding) { b.LogoURL = "http://localhost:3000/logo.svg" },
+		},
+		{
+			name:   "http 127.0.0.1 hero url allowed",
+			mutate: func(b *Branding) { b.HeroURL = "http://127.0.0.1:8080/hero.png" },
+		},
+		{
+			name:   "http ipv6 loopback logo url allowed",
+			mutate: func(b *Branding) { b.LogoURL = "http://[::1]:3000/logo.svg" },
+		},
+		{
+			// Only loopback gets the http carve-out — a lookalike host or a
+			// private-range IP stays https-only so a mis-typed production URL
+			// fails closed.
+			name:    "http localhost lookalike rejected",
+			mutate:  func(b *Branding) { b.LogoURL = "http://localhost.evil.example/logo.svg" },
+			wantErr: true,
+		},
+		{
+			name:    "http private-range ip rejected",
+			mutate:  func(b *Branding) { b.HeroURL = "http://192.168.1.10/hero.png" },
+			wantErr: true,
+		},
+		{
+			name: "font url with a family",
+			mutate: func(b *Branding) {
+				b.Typography = BrandingTypography{
+					FontFamily: "Inter, sans-serif",
+					FontURL:    "https://fonts.example.com/css2",
+				}
+			},
+		},
+		{
+			// A stylesheet alone names no face to render in.
+			name:    "font url without a family rejected",
+			mutate:  func(b *Branding) { b.Typography.FontURL = "https://fonts.example.com/css2" },
+			wantErr: true,
+		},
+		{
+			// No loopback carve-out for the font: a stylesheet is styling, not
+			// an image, so it stays https even in the dev posture.
+			name: "http loopback font url rejected",
+			mutate: func(b *Branding) {
+				b.Typography = BrandingTypography{
+					FontFamily: "Inter, sans-serif",
+					FontURL:    "http://localhost:3000/font.css",
+				}
+			},
+			wantErr: true,
+		},
+		{
+			name: "theme sides carry their own logo",
+			mutate: func(b *Branding) {
+				b.Theme = BrandingTheme{
+					Mode:  BrandingThemeAuto,
+					Light: &BrandingThemeSide{LogoURL: "https://cdn.example.com/on-light.svg"},
+					Dark:  &BrandingThemeSide{LogoURL: "https://cdn.example.com/on-dark.svg"},
+				}
+			},
+		},
+		{
+			name: "http theme side logo rejected",
+			mutate: func(b *Branding) {
+				b.Theme = BrandingTheme{Dark: &BrandingThemeSide{LogoURL: "http://cdn.example.com/on-dark.svg"}}
+			},
+			wantErr: true,
+		},
+		{
+			name:    "unknown theme mode",
+			mutate:  func(b *Branding) { b.Theme = BrandingTheme{Mode: "sepia"} },
+			wantErr: true,
+		},
+		{
+			name: "blank palette colour rejected",
+			mutate: func(b *Branding) {
+				b.Theme = BrandingTheme{Light: &BrandingThemeSide{Palette: &BrandingPalette{Primary: "   "}}}
+			},
+			wantErr: true,
+		},
+		{
+			name: "radius preset",
+			mutate: func(b *Branding) {
+				b.Shape = BrandingShape{Radius: BrandingRadius{Preset: BrandingRadiusLg}}
+			},
+		},
+		{
+			name: "radius pixels",
+			mutate: func(b *Branding) {
+				b.Shape = BrandingShape{Radius: BrandingRadius{Pixels: new(10)}}
+			},
+		},
+		{
+			name: "zero radius pixels is a value, not an omission",
+			mutate: func(b *Branding) {
+				b.Shape = BrandingShape{Radius: BrandingRadius{Pixels: new(0)}}
+			},
+		},
+		{
+			name: "radius pixels above the cap",
+			mutate: func(b *Branding) {
+				b.Shape = BrandingShape{Radius: BrandingRadius{Pixels: new(33)}}
+			},
+			wantErr: true,
+		},
+		{
+			name: "unknown radius preset",
+			mutate: func(b *Branding) {
+				b.Shape = BrandingShape{Radius: BrandingRadius{Preset: "rounded"}}
+			},
+			wantErr: true,
+		},
+		{
+			name:    "unknown density",
+			mutate:  func(b *Branding) { b.Shape = BrandingShape{Density: "roomy"} },
+			wantErr: true,
+		},
+		{
+			name:    "logo scale out of range",
+			mutate:  func(b *Branding) { b.Shape = BrandingShape{LogoScale: 3} },
+			wantErr: true,
+		},
+		{
+			name:    "typography scale out of range",
+			mutate:  func(b *Branding) { b.Typography = BrandingTypography{Scale: 2} },
 			wantErr: true,
 		},
 	}
@@ -109,21 +233,57 @@ func TestValidateBranding(t *testing.T) {
 	}
 }
 
+func TestValidateBrandingAssetURLLoopbackParity(t *testing.T) {
+	for _, value := range []string{
+		"http://localhost:3000/logo.svg",
+		"HTTP://LOCALHOST:3000/logo.svg",
+		"http://127.0.0.1:8080/logo.svg",
+		"http://127.255.255.255/logo.svg",
+		"http://[::1]:3000/logo.svg",
+	} {
+		t.Run("accept "+value, func(t *testing.T) {
+			if err := validateBrandingAssetURL("logo_url", value); err != nil {
+				t.Fatalf("validateBrandingAssetURL() error = %v", err)
+			}
+		})
+	}
+
+	for _, value := range []string{
+		"http://localhost.evil.example/logo.svg",
+		"http://localhost:3000@evil.example/logo.svg",
+		"http://192.168.1.10/logo.svg",
+		"http://127.1/logo.svg",
+		"http://2130706433/logo.svg",
+		"http://0x7f000001/logo.svg",
+		"http://127.00.0.1/logo.svg",
+		"http://[0:0:0:0:0:0:0:1]/logo.svg",
+		"http://[::ffff:127.0.0.1]/logo.svg",
+		"http://localhost:/logo.svg",
+		"http://localhost:65536/logo.svg",
+	} {
+		t.Run("reject "+value, func(t *testing.T) {
+			if err := validateBrandingAssetURL("logo_url", value); err == nil {
+				t.Fatal("validateBrandingAssetURL() succeeded, want error")
+			}
+		})
+	}
+}
+
 func TestNewBrandingDefaultsLayout(t *testing.T) {
-	b, err := NewBranding("proj_test", "", "", "", "", "")
+	b, err := NewBranding("proj_test", "", "", "", "", BrandingTheme{}, BrandingTypography{}, BrandingShape{})
 	if err != nil {
 		t.Fatalf("NewBranding() error = %v", err)
 	}
 	if b.Layout != BrandingLayoutCentered {
 		t.Errorf("layout = %q, want %q", b.Layout, BrandingLayoutCentered)
 	}
-	if !strings.HasPrefix(b.ID, "brnd_") {
-		t.Errorf("id = %q, want brnd_ prefix", b.ID)
+	if b.ID != "" {
+		t.Errorf("id = %q, want empty until dialect create", b.ID)
 	}
 }
 
 func TestNewBrandingRequiresProjectID(t *testing.T) {
-	if _, err := NewBranding("", "", "", "", "", ""); err == nil {
+	if _, err := NewBranding("", "", "", "", "", BrandingTheme{}, BrandingTypography{}, BrandingShape{}); err == nil {
 		t.Fatal("NewBranding() with empty project id should fail")
 	}
 }

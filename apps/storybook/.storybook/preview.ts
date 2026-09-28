@@ -15,10 +15,8 @@ customElements.define = (name, constructor, options) => {
   nativeDefine(name, constructor, options);
 };
 
-// Design-system variables on :root so both renderers resolve `var(--zl-*)`.
+// Design-system variables on :root so the atoms resolve `var(--zl-*)`.
 import "@zitadel/design-tokens/css/tokens.css";
-// Shared `.zr-*` surface CSS for the React pairs (Lit atoms inline their own).
-import "@zitadel/ui-react/styles.css";
 // Side-effect: register every `<zl-*>` atom AND the `<zitadel-login>` orchestrator.
 import "@zitadel/components";
 // Workbench chrome (dark canvas to match the Figma dark mode).

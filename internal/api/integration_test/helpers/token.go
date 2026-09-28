@@ -14,6 +14,7 @@ func (h *Harness) EnsureTokenService(t *testing.T) service.TokenService {
 	if h.tokenService.value == nil {
 		h.tokenService.value = service.NewTokenService(
 			h.EnsureKeyService(t),
+			h.EnsureServiceDB(t),
 		)
 	}
 	return h.tokenService.value

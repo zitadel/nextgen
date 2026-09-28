@@ -1,9 +1,5 @@
 import { MANAGED_MARKER } from "../../../../paths";
-
-// Enforce the dark surface the Zitadel widgets are designed for, so pages never
-// follow the OS light/dark setting.
-const MAIN_STYLE =
-  "min-height: 100vh; background: #0f0f11; color: #f4f4f6; color-scheme: dark";
+import type { PatchContext } from "../../types";
 
 /** `app.vue` — renders the page router. Marker in an HTML comment. */
 export function appVueTemplate(): string {
@@ -35,43 +31,104 @@ await navigateTo("/login", { replace: true });
 `;
 }
 
-/** A login/register page rendering `<zitadel-login>` inside `<ClientOnly>`. */
-function authPage(purpose: "login" | "register"): string {
+/**
+ * A login/register page rendering `<zitadel-login>` inside `<ClientOnly>`.
+ * Business-use-case projects additionally bind the SDK's `businessLocales`
+ * overlay, restoring work-email copy on top of the widget's neutral built-in
+ * dictionaries. A plain `:locales` binding suffices even on the raw custom
+ * element: Vue sets bindings whose key exists on the element as DOM
+ * properties (unlike React 18, which is why the Next template needs a ref).
+ */
+function authPage(purpose: "login" | "register", ctx: PatchContext): string {
+  const business = ctx.useCase === "business";
+  const importNames = business ? "businessLocales, useZitadelProject" : "useZitadelProject";
+  // The overlay ships with the SDK, so the generated page only wires it up
+  // (and stays plain otherwise).
+  const localesComment = business
+    ? `
+// Set up for a business audience: businessLocales overlays work-email copy on
+// the login widget's neutral built-in dictionaries. Remove the :locales
+// binding to fall back to the neutral wording.`
+    : "";
+  const localesAttr = business ? '\n        :locales="businessLocales"' : "";
   const purposeAttr = purpose === "register" ? '\n        purpose="register"' : "";
-  // variant="page" makes the widget paint the full-page chrome itself
-  // (viewport height, surface background) from design tokens; the <main>
-  // wrapper only pins the color scheme.
+  // Posture (ADR 044): page posture paints the widget's full-page chrome and
+  // pins the color scheme via the <main> wrapper; widget posture embeds the
+  // card in the host app's own layout inside a layout-neutral centered <div>.
+  const widget = ctx.posture === "widget";
+  const variantAttrs = widget ? 'variant="widget"\n        theme="auto"' : 'variant="page"';
+  const postureComment = widget
+    ? `<!-- variant="widget" embeds the card in this app's own layout.
+           theme="auto" follows the OS light/dark preference
+           (prefers-color-scheme), not the app's own theme — set
+           theme="light" or theme="dark" to match an app that pins its
+           scheme. variant="page" would paint the widget's full-page
+           chrome instead. -->`
+    : `<!-- variant="page" paints the widget's full-page chrome from design
+           tokens; variant="widget" embeds the card inside a layout you own. -->`;
+  const wrapperOpen = widget
+    ? '<div style="display: flex; justify-content: center; padding: 4rem 1rem">'
+    : '<main style="color-scheme: dark">';
+  const wrapperClose = widget ? "</div>" : "</main>";
   return `<script setup lang="ts">
 ${MANAGED_MARKER}
-import { useZitadelProject } from "@zitadel/sdk-nuxt";
+import { ${importNames} } from "@zitadel/sdk-nuxt";${localesComment}
 
 const project = useZitadelProject();
 </script>
 
 <template>
-  <main style="color-scheme: dark">
+  ${wrapperOpen}
     <ClientOnly>
+      ${postureComment}
       <zitadel-login
-        variant="page"
-        :project="project"${purposeAttr}
+        ${variantAttrs}
+        :project="project"${localesAttr}${purposeAttr}
         post-sign-in-url="/profile"
       />
     </ClientOnly>
-  </main>
+  ${wrapperClose}
 </template>
 `;
 }
 
-export function loginPageTemplate(): string {
-  return authPage("login");
+export function loginPageTemplate(ctx: PatchContext): string {
+  return authPage("login", ctx);
 }
 
-export function registerPageTemplate(): string {
-  return authPage("register");
+export function registerPageTemplate(ctx: PatchContext): string {
+  return authPage("register", ctx);
 }
 
 /** `pages/profile.vue` — the post-sign-in "signed in as" session card. */
-export function profilePageTemplate(): string {
+export function profilePageTemplate(ctx: PatchContext): string {
+  // Same posture hinge as the auth pages (ADR 044).
+  const widget = ctx.posture === "widget";
+  const variantAttrs = widget ? 'variant="widget"\n        theme="auto"' : 'variant="page"';
+  const postureComment = widget
+    ? `<!-- variant="widget" embeds the session card in this app's own layout.
+           theme="auto" follows the OS light/dark preference
+           (prefers-color-scheme), not the app's own theme — set
+           theme="light" or theme="dark" to match an app that pins its
+           scheme. variant="page" would paint the card's full-page chrome
+           instead. Your own components (a header, an account menu) read
+           the same session state with the auto-imported useAuth()
+           composable. -->`
+    : `<!-- variant="page" paints the session card's full-page chrome from design
+           tokens; variant="widget" embeds the card inside a layout you own.
+           Your own components (a header, an account menu) read the same session
+           state with the auto-imported useAuth() composable. -->`;
+  const wrapperOpen = widget
+    ? '<div style="display: flex; justify-content: center; padding: 4rem 1rem">'
+    : '<main style="color-scheme: dark">';
+  const wrapperClose = widget ? "</div>" : "</main>";
+  const element = widget
+    ? `<zitadel-session
+        ${variantAttrs}
+        :project="project"
+        post-sign-out-url="/login"
+      />`
+    : `<zitadel-session variant="page" :project="project" post-sign-out-url="/login" />`;
   return `<script setup lang="ts">
 ${MANAGED_MARKER}
 import { useZitadelProject } from "@zitadel/sdk-nuxt";
@@ -80,11 +137,12 @@ const project = useZitadelProject();
 </script>
 
 <template>
-  <main style="${MAIN_STYLE}">
+  ${wrapperOpen}
     <ClientOnly>
-      <zitadel-session :project="project" post-sign-out-url="/login" />
+      ${postureComment}
+      ${element}
     </ClientOnly>
-  </main>
+  ${wrapperClose}
 </template>
 `;
 }
@@ -120,8 +178,9 @@ export default defineNuxtPlugin(() => {
         isAuthenticated: true,
         session: {
           userId: auth.session.userId,
-          email: auth.session.email,
-          name: auth.session.name,
+          identifier: auth.session.identifier,
+          identifierProperty: auth.session.identifierProperty,
+          display: auth.session.display,
         },
       }
     : { isAuthenticated: false, session: null };

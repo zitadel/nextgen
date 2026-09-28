@@ -49,7 +49,7 @@ func TestConsoleRuntimeHandlerServesPublicMetadata(t *testing.T) {
 }
 
 // A deployment with no project yet answers with mode only: the console shows
-// its "run zitadel setup" state until the first project exists (ADR 0004 §3).
+// its "run zitadel setup" state until the first project exists (ADR 0004 §2).
 func TestConsoleRuntimeHandlerOmitsAbsentProject(t *testing.T) {
 	handler := newConsoleRuntimeHandler(staticResolver(consoleRuntime{Mode: ConsoleModeStandalone}, nil))
 
@@ -124,7 +124,7 @@ func TestConsoleRuntimeHandlerRejectsNonReadMethods(t *testing.T) {
 	assert.Equal(t, "GET, HEAD", rec.Header().Get("Allow"))
 }
 
-// TestLoadConfigReadsPlatformProjectIDEnv locks in the Console ADR 0004 §3
+// TestLoadConfigReadsPlatformProjectIDEnv locks in the Console ADR 0004 §2
 // config surface: NEXTGEN_PLATFORM_PROJECT_ID pins the default project,
 // and the empty default means "first-created project wins".
 func TestLoadConfigReadsPlatformProjectIDEnv(t *testing.T) {
@@ -163,15 +163,23 @@ func (f *fakeProjectService) Create(context.Context, string, []string, bool) (*d
 	panic("unused")
 }
 
+func (f *fakeProjectService) CreateWithID(context.Context, string, string, []string, bool) (*domain.Project, error) {
+	panic("unused")
+}
+
 func (f *fakeProjectService) Get(context.Context, string) (*domain.Project, error) {
 	panic("unused")
 }
 
-func (f *fakeProjectService) Update(context.Context, string, string) (*domain.Project, error) {
+func (f *fakeProjectService) Update(context.Context, service.UpdateProjectRequest) (*domain.Project, error) {
 	panic("unused")
 }
 
 func (f *fakeProjectService) List(context.Context, service.ListProjectsRequest) (*service.ListProjectsResponse, error) {
+	panic("unused")
+}
+
+func (f *fakeProjectService) ListAuthorized(context.Context, service.ListAuthorizedProjectsRequest) (*service.ListProjectsResponse, error) {
 	panic("unused")
 }
 
@@ -185,30 +193,43 @@ func (f *fakeProjectService) DefaultProject(context.Context, string) (*domain.Pr
 
 func TestStandaloneRuntimeResolverWithoutProject(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	keys := servicemocks.NewMockKeyService(ctrl)
-	keys.EXPECT().GetProjectDEKCrypter(gomock.Any(), gomock.Any()).Times(0)
+	tokens := servicemocks.NewMockTokenService(ctrl)
+	tokens.EXPECT().GetActivePreviewToken(gomock.Any(), gomock.Any()).Times(0)
+	tokens.EXPECT().GenerateJWE(gomock.Any(), gomock.Any()).Times(0)
 
-	resolve := standaloneRuntimeResolver(&fakeProjectService{}, keys, "")
+	resolve := standaloneRuntimeResolver(&fakeProjectService{}, tokens, servicemocks.NewMockKeyService(ctrl), "")
 	meta, err := resolve(context.Background())
 
 	require.NoError(t, err)
 	assert.Equal(t, consoleRuntime{Mode: ConsoleModeStandalone}, meta)
 }
 
-func TestStandaloneRuntimeResolverDerivesPublishableKey(t *testing.T) {
+// The document is resolved per request, so the project's existing preview
+// record is re-encrypted rather than replaced: no token row per page load, and
+// revoking the preview secret retires the published key with it.
+func TestStandaloneRuntimeResolverReusesPreviewToken(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	dek := cryptomock.NewMockCrypter(ctrl)
-	// PreviewSecret serializes the read-only token and encrypts it with the
-	// project DEK; the mocked crypter stands in for the JWE output.
-	dek.EXPECT().Encrypt(gomock.Any()).Return("pk_preview", nil)
-	keys := servicemocks.NewMockKeyService(ctrl)
-	keys.EXPECT().GetProjectDEKCrypter(gomock.Any(), "proj_first").Return(dek, nil)
+	project := &domain.Project{ID: "proj_first"}
 
-	resolve := standaloneRuntimeResolver(
-		&fakeProjectService{project: &domain.Project{ID: "proj_first"}},
-		keys,
-		"",
-	)
+	tokens := servicemocks.NewMockTokenService(ctrl)
+	tokens.EXPECT().
+		GetActivePreviewToken(gomock.Any(), project.ID).
+		Return(&domain.Token{ProjectID: project.ID, TokenID: "tkn_preview", Type: domain.TokenTypeProjectPreview}, nil)
+	tokens.EXPECT().GenerateJWE(gomock.Any(), gomock.Any()).Times(0)
+
+	crypter := cryptomock.NewMockCrypter(ctrl)
+	crypter.EXPECT().
+		Encrypt(gomock.Any()).
+		DoAndReturn(func(payload string) (string, error) {
+			assert.Contains(t, payload, `"TokenID":"tkn_preview"`)
+			return "pk_preview", nil
+		})
+	keys := servicemocks.NewMockKeyService(ctrl)
+	keys.EXPECT().
+		GetProjectCrypter(gomock.Any(), project.ID, domain.EncryptionKeyPurposeToken).
+		Return(crypter, nil)
+
+	resolve := standaloneRuntimeResolver(&fakeProjectService{project: project}, tokens, keys, "")
 	meta, err := resolve(context.Background())
 
 	require.NoError(t, err)
@@ -219,11 +240,53 @@ func TestStandaloneRuntimeResolverDerivesPublishableKey(t *testing.T) {
 	}, meta)
 }
 
+// A project with no preview record yet — a fresh deployment, or one whose
+// preview secret was revoked — mints one, or the console never boots.
+func TestStandaloneRuntimeResolverMintsWhenPreviewTokenIsGone(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	project := &domain.Project{ID: "proj_first"}
+
+	tokens := servicemocks.NewMockTokenService(ctrl)
+	tokens.EXPECT().
+		GetActivePreviewToken(gomock.Any(), project.ID).
+		Return(nil, domain.TokenNotFound())
+	tokens.EXPECT().
+		GenerateJWE(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, token *domain.Token) (string, error) {
+			assert.Equal(t, domain.TokenTypeProjectPreview, token.Type)
+			return "pk_minted", nil
+		})
+
+	resolve := standaloneRuntimeResolver(&fakeProjectService{project: project}, tokens, servicemocks.NewMockKeyService(ctrl), "")
+	meta, err := resolve(context.Background())
+
+	require.NoError(t, err)
+	assert.Equal(t, "pk_minted", meta.PublishableKey)
+}
+
+// A lookup that fails for any other reason must not fall through to minting:
+// that would write a row per request whenever the read is broken.
+func TestStandaloneRuntimeResolverPropagatesPreviewTokenError(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	project := &domain.Project{ID: "proj_first"}
+
+	tokens := servicemocks.NewMockTokenService(ctrl)
+	tokens.EXPECT().
+		GetActivePreviewToken(gomock.Any(), project.ID).
+		Return(nil, domain.ErrInternal(errors.New("db down")))
+	tokens.EXPECT().GenerateJWE(gomock.Any(), gomock.Any()).Times(0)
+
+	resolve := standaloneRuntimeResolver(&fakeProjectService{project: project}, tokens, servicemocks.NewMockKeyService(ctrl), "")
+	_, err := resolve(context.Background())
+
+	assert.Error(t, err)
+}
+
 func TestStandaloneRuntimeResolverPropagatesProjectError(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	keys := servicemocks.NewMockKeyService(ctrl)
+	tokens := servicemocks.NewMockTokenService(ctrl)
 
-	resolve := standaloneRuntimeResolver(&fakeProjectService{err: errors.New("db down")}, keys, "")
+	resolve := standaloneRuntimeResolver(&fakeProjectService{err: errors.New("db down")}, tokens, servicemocks.NewMockKeyService(ctrl), "")
 	_, err := resolve(context.Background())
 
 	assert.Error(t, err)

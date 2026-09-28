@@ -7,32 +7,112 @@ Example file: [`docs/operations/nextgen.example.yaml`](../operations/nextgen.exa
 
 ## Server
 
-| YAML key                 | Environment                      | Default                                               | Description                                                                                             |
-|--------------------------|----------------------------------|-------------------------------------------------------|---------------------------------------------------------------------------------------------------------|
-| `server.address`         | `NEXTGEN_SERVER_ADDRESS`         | `:8080`                                               | Listen address                                                                                          |
-| `server.data_dir`        | `NEXTGEN_SERVER_DATA_DIR`        | `nextgen-data` next to the binary                     | Local runtime data root                                                                                 |
-| `server.encryption_keys` | — (YAML only)                    | auto-generated RSA KEK under `<server.data_dir>/keks` | Root key-encryption keys (KEKs) that wrap data-encryption keys; see [Encryption keys](#encryption-keys) |
-| `server.console_enabled` | `NEXTGEN_SERVER_CONSOLE_ENABLED` | `true`                                                | Serve embedded management console                                                                       |
-| `server.console_path`    | `NEXTGEN_SERVER_CONSOLE_PATH`    | `/ui/console`                                         | Console URL prefix                                                                                      |
-| `server.login_enabled`   | `NEXTGEN_SERVER_LOGIN_ENABLED`   | `true`                                                | Serve embedded login shell                                                                              |
-| `server.login_path`      | `NEXTGEN_SERVER_LOGIN_PATH`      | `/ui/login`                                           | Login URL prefix                                                                                        |
+| YAML key                 | Environment                      | Default                                                             | Description                                                                                            |
+| ------------------------ | -------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `server.address`         | `NEXTGEN_SERVER_ADDRESS`         | `:8080`                                                             | Listen address                                                                                         |
+| `server.data_dir`        | `NEXTGEN_SERVER_DATA_DIR`        | `nextgen-data` next to the binary                                   | Local runtime data root                                                                                |
+| `server.master_keys`     | — (YAML only)                    | auto-generated RSA master key under `<server.data_dir>/master-keys` | Master keys that wrap each project's key encryption key (KEK); see [Encryption keys](#encryption-keys) |
+| `server.generate_master_key` | `NEXTGEN_SERVER_GENERATE_MASTER_KEY` | `true`                                                          | Mint a master key when none is configured and the master key directory is empty; `false` (or `--disable-master-key-generation`) fails the start instead |
+| `server.console_enabled` | `NEXTGEN_SERVER_CONSOLE_ENABLED` | `true`                                                              | Serve embedded management console                                                                      |
+| `server.console_path`    | `NEXTGEN_SERVER_CONSOLE_PATH`    | `/ui/console`                                                       | Console URL prefix                                                                                     |
+| `server.login_enabled`   | `NEXTGEN_SERVER_LOGIN_ENABLED`   | `true`                                                              | Serve embedded login shell                                                                             |
+| `server.login_path`      | `NEXTGEN_SERVER_LOGIN_PATH`      | `/ui/login`                                                         | Login URL prefix                                                                                       |
+| `server.public_base`     | `NEXTGEN_SERVER_PUBLIC_BASE`     | `https://nextgen.zitadel.cloud`                                     | Public origin browsers reach this deployment at; feeds the claim and dashboard URLs. Set to `http://localhost:8080` when running the server locally by hand; the CLI runtime (`zitadel start`) sets it itself. |
+
+## Platform
+
+| YAML key                     | Environment                          | Default | Description                                                                                                                                            |
+| ----------------------------- | ------------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `platform.bootstrap_project` | `NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT`  | `false` | Provisions the well-known platform project (encryption/signing keys, default user schema, default login flow) at startup. Needed for `zitadel claim` and self-registration to work on this deployment. `zitadel start` turns it on itself; set it to `false` to opt out of the platform project and the local admin.   |
+| `platform.project_id`        | `NEXTGEN_PLATFORM_PROJECT_ID`         | (empty) | Pins an existing project as the standalone Console's sign-in target, overriding the first-created-project fallback. Does **not** provision the platform project or enable claiming, self-registration, or personal teams — only `bootstrap_project` does that. Mutually exclusive with `bootstrap_project` unless set to its built-in id. Transitional ([Console ADR 0004](../../apps/console/docs/adrs/0004-console-deployment-modes.md)); expect it to be removed once bootstrap always provisions the platform project. |
+
+On a server you start by hand (Docker Compose, or the Go binary), set both to
+make claiming work against that deployment:
+
+```sh
+export NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=true
+export NEXTGEN_SERVER_PUBLIC_BASE=http://localhost:8080
+```
+
+A runtime started by `zitadel start` needs neither: the CLI sets both values
+itself and creates a local admin you reach with `zitadel console`.
 
 ## Database
 
-Configure exactly one dialect:
+Configure exactly one dialect under `database:`, or omit it for the local
+default.
+
+| Backend        | When to use                                                        | Config key / env                                  |
+| -------------- | ------------------------------------------------------------------ | ------------------------------------------------- |
+| **SQLite**     | Local development, CLI binary runtime, small single-node / homelab | `database.sqlite` / `NEXTGEN_DATABASE_SQLITE`     |
+| **PostgreSQL** | Production and Docker Compose                                      | `database.postgres` / `NEXTGEN_DATABASE_POSTGRES` |
+| **Spanner**    | Production on Google Cloud Spanner                                 | `database.spanner` / `NEXTGEN_DATABASE_SPANNER`   |
+
+When `database:` is omitted, the server uses **SQLite** at
+`<server.data_dir>/zitadel.db` (local / homelab default).
+
+Override examples:
+
+```yaml
+database:
+  sqlite: ./nextgen-data/zitadel.db
+```
 
 ```yaml
 database:
   postgres: postgres://zitadel:zitadel@localhost:5432/nextgen?sslmode=disable
 ```
 
+```yaml
+database:
+  spanner: projects/PROJECT/instances/INSTANCE/databases/DATABASE
+```
+
 Or via environment:
 
 ```sh
+export NEXTGEN_DATABASE_SQLITE='./nextgen-data/zitadel.db'
+# or
 export NEXTGEN_DATABASE_POSTGRES='postgres://zitadel:zitadel@localhost:5432/nextgen?sslmode=disable'
+# or
+export NEXTGEN_DATABASE_SPANNER='projects/PROJECT/instances/INSTANCE/databases/DATABASE'
 ```
 
+SQLite is intended for local development and small single-node deployments
+(single-writer limits apply). Use PostgreSQL or Spanner for production.
+`IgnoreCase` string filters use SQLite's `LOWER()`, which only folds ASCII —
+non-ASCII case folding (for example `Ü`/`ü`) can diverge from Postgres.
+Spanner authentication uses Application Default Credentials (ADC); this guide
+does not cover IAM setup.
+
 Migrations run automatically when the server starts.
+
+## Logging
+
+| YAML key                      | Environment                           | Default                                       | Description                   |
+| ----------------------------- | ------------------------------------- | --------------------------------------------- | ----------------------------- |
+| `instrumentation.log.level`   | `NEXTGEN_INSTRUMENTATION_LOG_LEVEL`   | `info`                                        | Minimum log level             |
+| `instrumentation.log.format`  | `NEXTGEN_INSTRUMENTATION_LOG_FORMAT`  | `text`                                        | Log output encoding           |
+| `instrumentation.log.streams` | `NEXTGEN_INSTRUMENTATION_LOG_STREAMS` | `[runtime, ready, request, service, storage]` | Which log streams are enabled |
+
+`level`, `format`, and each entry of `streams` accept either their documented
+string name (below) or the underlying numeric value; string values are
+resolved case-insensitively via each type's `encoding.TextUnmarshaler`.
+
+- `level`: `debug`, `info`, `warn`, `error` (`zlog.Level` is `slog.Level`
+  under the hood, so an offset suffix like `warn+4` is also accepted; the
+  GCP-only severities — notice, critical, alert, emergency — have no string
+  form and must be set by their numeric value).
+- `format`: `disabled`, `text`, `json`, `gcp`, `gcp_error_reporting`.
+- `streams`: `runtime`, `ready`, `request`, `service`, `storage`.
+
+```yaml
+instrumentation:
+  log:
+    level: debug
+    format: json
+    streams: [request, service]
+```
 
 ## Config file search paths
 
@@ -44,14 +124,14 @@ When `-c` is not passed, the server looks for `nextgen.yaml` in:
 
 ## Encryption keys
 
-The server wraps its data-encryption keys (DEKs) with one or more root key-encryption keys (KEKs), configured under
-`server.encryption_keys`:
+The server wraps every project's key encryption key (KEK) with one or more master keys, configured under
+`server.master_keys`:
 
 ```yaml
 server:
-  encryption_keys:
+  master_keys:
     # Each key is keyed by its ID; the ID identifies which key wrapped a value.
-    root-kek:
+    master-key:
       use_for_encryption: true
       # RSA private key inline as PEM (incl. OpenSSH) or JWK ...
       private_key: |
@@ -59,24 +139,35 @@ server:
         ...
         -----END PRIVATE KEY-----
       # ... or point at a file instead of inlining:
-      # file: /etc/nextgen/keys/root-kek.pem
+      # file: /etc/nextgen/keys/master-key.pem
 ```
 
 Exactly one key must be marked `use_for_encryption: true`.
 
-For local development, leave `server.encryption_keys` unset and persist
-`server.data_dir`: the server generates an RSA KEK at
-`<server.data_dir>/keks/root-kek.pem` and reuses it on subsequent starts.
+For local development, leave `server.master_keys` unset and persist
+`server.data_dir`: the server generates an RSA master key at
+`<server.data_dir>/master-keys/master-key.pem` and reuses it on subsequent starts.
 
-To rotate the KEK, add a new key marked `use_for_encryption: true` and keep the previous key (s) (as extra entries or as
-files in the KEK directory) for decryption; existing DEKs are re-encrypted under the new KEK on the next start. For
-shared or production deployments, provide the key material through managed secrets rather than committing it to source
-control.
+For anything else, turn that generation off with `server.generate_master_key: false` (or
+`--disable-master-key-generation`, which outranks the file and the environment). A start with no key then fails with an
+error naming the directory it looked in, instead of minting a key. This matters most on ephemeral storage: without the
+guard every instance and every revision mints its own key, and a project KEK wrapped by one of them cannot be unwrapped
+by the next — a failure that surfaces later, as data that cannot be decrypted.
 
-Files in `<server.data_dir>/keks/` are merged into `server.encryption_keys` on every start, even when the setting is
+`server.master_keys` cannot be set from the environment: it is a map keyed by key id, and environment variables cannot
+populate map keys. `NEXTGEN_SERVER_MASTER_KEYS_*` variables are ignored, and the server logs a warning naming them at
+startup. Use the config file, or mount the key file into `<server.data_dir>/master-keys/`, where it is picked up by
+file name.
+
+To rotate the master key, add a new key marked `use_for_encryption: true` and keep the previous key (s) (as extra
+entries or as files in the master key directory) for decryption; existing project KEKs are re-encrypted under the new
+master key on the next start. For shared or production deployments, provide the key material through managed secrets
+rather than committing it to source control.
+
+Files in `<server.data_dir>/master-keys/` are merged into `server.master_keys` on every start, even when the setting is
 configured explicitly. A file whose name matches a config entry's ID replaces that entry outright, dropping an inline
-`private_key` and `use_for_encryption` — so keep the KEK directory empty when you configure keys yourself, and never
-name an entry after a file that could appear there.
+`private_key` and `use_for_encryption` — so keep the master key directory empty when you configure keys yourself, and
+never name an entry after a file that could appear there.
 
-For the full picture — the KEK/DEK envelope, key generation, the KEK-directory discovery rules, and the rotation
-procedure — see [Encryption keys (KEK / DEK)](../operations/encryption-keys.md).
+For the full picture — the key envelope, key generation, the master-key-directory discovery rules, and the rotation
+procedure — see [Encryption keys (master key / project KEK)](../operations/encryption-keys.md).

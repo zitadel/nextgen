@@ -41,7 +41,7 @@ const identifierStep: CreateFlow201 = {
         required: true,
       },
     ],
-    actions: [{ name: "submit", text_key: "submit.signin", primary: true }],
+    actions: [{ name: "submit", kind: "submit", text_key: "submit.signin", primary: true }],
     gates: {},
   },
 };
@@ -55,8 +55,8 @@ const passkeyUpsellStep: CreateFlow201 = {
     texts: { title_key: "passkey-upsell.title" },
     fields: [],
     actions: [
-      { name: "setup", text_key: "passkey-upsell.action.setup", primary: true },
-      { name: "skip", text_key: "passkey-upsell.action.skip" },
+      { name: "setup", kind: "passkey_register", text_key: "passkey-upsell.action.setup", primary: true },
+      { name: "skip", kind: "navigate", text_key: "passkey-upsell.action.skip" },
     ],
     gates: {},
   },
@@ -405,7 +405,7 @@ describe("<zitadel-login> form + focus (chromium)", () => {
           validation: { enum: ["Red", "Green", "Blue"] },
         },
       ],
-      actions: [{ name: "submit", text_key: "submit.register", primary: true }],
+      actions: [{ name: "submit", kind: "submit", text_key: "submit.register", primary: true }],
       gates: {},
     },
   };
@@ -489,7 +489,7 @@ describe("<zitadel-login> form + focus (chromium)", () => {
           required: true,
         },
       ],
-      actions: [{ name: "submit", text_key: "submit.register", primary: true }],
+      actions: [{ name: "submit", kind: "submit", text_key: "submit.register", primary: true }],
       gates: {},
     },
   };

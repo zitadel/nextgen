@@ -24,7 +24,6 @@ export default defineNuxtConfig({
     transpile: [
       "@zitadel/api",
       "@zitadel/components",
-      "@zitadel/shared-component-styles",
       "@zitadel/design-tokens",
     ],
   },

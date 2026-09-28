@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/design-tokens",
-  "version": "0.1.0-alpha.0",
+  "version": "0.1.0-alpha.1",
   "private": true,
   "description": "Figma-driven design tokens for the pre-release Zitadel preview — CSS variables, typed TypeScript constants, and a Tailwind v4 @theme block built from the published Zitadel Design System library.",
   "license": "MIT",

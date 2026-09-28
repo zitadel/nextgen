@@ -49,7 +49,7 @@ export type ZitadelClientOptions = {
  * generated orval function:
  *
  *     const client = createZitadelClient({ baseUrl, token });
- *     await client.createProject({ previewOrigins: [] });
+ *     await client.createProject({ preview_origins: [] });
  *     await client.createSchema(body, { project_id });
  */
 export function createZitadelClient(opts: ZitadelClientOptions): ZitadelClient {

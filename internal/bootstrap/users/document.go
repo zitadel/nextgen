@@ -4,13 +4,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+
+	"github.com/zitadel/nextgen/internal/domain"
 )
 
 // Document is the on-disk shape for a single bootstrap user (one file per user).
 type Document struct {
-	Header         Header                     `json:"header"`
-	Attributes     map[string]json.RawMessage `json:"attributes"`
-	Authenticators map[string]json.RawMessage `json:"authenticators"`
+	Header         Header                                  `json:"header"`
+	Attributes     map[domain.AttributeKey]json.RawMessage `json:"attributes"`
+	Authenticators map[domain.AttributeKey]json.RawMessage `json:"authenticators"`
 }
 
 // Header holds users-table metadata.

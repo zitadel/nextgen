@@ -15,7 +15,7 @@ import type { ZitadelSession } from "./zitadel-session.js";
 const API_BASE = "https://session.test.invalid";
 const deleteLog: { url: string; method: string; credentials: string }[] = [];
 
-function sessionBody(email: string, userId: string) {
+function sessionBody(identifier: string, userId: string) {
   const body: Record<string, unknown> = {
     session_id: "sess_test",
     project_id: "test",
@@ -26,7 +26,12 @@ function sessionBody(email: string, userId: string) {
     created_at: new Date().toISOString(),
     expires_at: new Date(Date.now() + 3_600_000).toISOString(),
   };
-  if (email) body.email = email;
+  const user: Record<string, string> = { user_id: userId };
+  if (identifier) {
+    user.identifier = identifier;
+    user.identifier_property = "email";
+  }
+  body.user = user;
   return body;
 }
 
@@ -116,7 +121,7 @@ describe("<zitadel-session>", () => {
     return host.querySelector("zitadel-session") as ZitadelSession;
   }
 
-  it("renders the heading and the email fetched from GET /sessions/me", async () => {
+  it("renders the heading and the resolved identifier fetched from GET /sessions/me", async () => {
     currentEmail = "alice@acme.com";
     const element = mount();
     await flush(element);
@@ -124,7 +129,7 @@ describe("<zitadel-session>", () => {
     expect(shadowQuery<HTMLElement>(element, ".identity").textContent?.trim()).toBe("alice@acme.com");
   });
 
-  it("falls back to user_id when the session response has no email", async () => {
+  it("falls back to user_id when the session ref carries no identifier", async () => {
     currentEmail = "";
     currentUserId = "user_01ABC";
     const element = mount();
@@ -137,6 +142,35 @@ describe("<zitadel-session>", () => {
     const element = mount();
     await flush(element);
     expect(element.shadowRoot?.querySelector(".identity")).toBeNull();
+  });
+
+  it("suppress-header visually hides the heading but keeps it accessible", async () => {
+    currentEmail = "alice@acme.com";
+    const element = mount('<zitadel-session suppress-header></zitadel-session>');
+    await flush(element);
+    // Boolean attribute reflects into the property (and back — reflect
+    // keeps DOM assertions honest under React 19's property-first binding).
+    expect(element.suppressHeader).toBe(true);
+    expect(element.hasAttribute("suppress-header")).toBe(true);
+    const title = shadowQuery<HTMLElement>(element, ".title");
+    // sr-only, not removed: the card keeps its accessible name.
+    expect(title.classList.contains("sr-only")).toBe(true);
+    expect(title.textContent?.trim()).toBe("Signed in as");
+    // The identity line is content, not header — it stays visible.
+    const identity = shadowQuery<HTMLElement>(element, ".identity");
+    expect(identity.classList.contains("sr-only")).toBe(false);
+    expect(identity.hasAttribute("slot")).toBe(false);
+  });
+
+  it("renders the heading normally without suppress-header", async () => {
+    currentEmail = "alice@acme.com";
+    const element = mount();
+    await flush(element);
+    expect(element.suppressHeader).toBe(false);
+    expect(
+      shadowQuery<HTMLElement>(element, ".title").classList.contains("sr-only"),
+    ).toBe(false);
+    expect(shadowQuery<HTMLElement>(element, ".identity").getAttribute("slot")).toBe("header");
   });
 
   it("renders a single primary Sign out action", async () => {
@@ -165,7 +199,7 @@ describe("<zitadel-session>", () => {
     expect(deleteLog[0]?.url).toBe(`${API_BASE}/sessions/me`);
     expect(deleteLog[0]?.credentials).toBe("include");
     expect(events).toHaveLength(1);
-    expect(events[0]?.detail).toEqual({ name: "", email: "alice@acme.com" });
+    expect(events[0]?.detail).toEqual({ display: "", identifier: "alice@acme.com" });
   });
 
   it("navigates to post-sign-out-url after a successful revoke", async () => {

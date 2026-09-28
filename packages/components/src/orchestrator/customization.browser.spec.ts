@@ -35,7 +35,7 @@ const identifierStep: CreateFlow201 = {
     fields: [
       { name: "email", type: "email", text_key: "identifier.field.email", required: true },
     ],
-    actions: [{ name: "submit", text_key: "submit.continue", primary: true }],
+    actions: [{ name: "submit", kind: "submit", text_key: "submit.continue", primary: true }],
     gates: {},
   },
 };
@@ -43,7 +43,16 @@ const identifierStep: CreateFlow201 = {
 /** The same step, but with a tenant that has its own brand colour set. */
 const brandedStep: CreateFlow201 = {
   ...identifierStep,
-  branding: { theme: { mode: "dark" }, palette: { primary: "#00ff00" } },
+  branding: { theme: { mode: "dark", dark: { palette: { primary: "#00ff00" } } } },
+} as unknown as CreateFlow201;
+
+/** A tenant that publishes a font stylesheet alongside the family it loads. */
+const TENANT_FONT_HREF = "https://fonts.example.com/css2?family=Inter";
+const fontStep: CreateFlow201 = {
+  ...identifierStep,
+  branding: {
+    typography: { font_family: "Inter, sans-serif", font_url: TENANT_FONT_HREF },
+  },
 } as unknown as CreateFlow201;
 
 const HOST_RED = "rgb(255, 0, 0)";
@@ -120,11 +129,15 @@ describe("<zitadel-login> host-app customisation (chromium)", () => {
   }
 
   it("host-page --zl-* tokens repaint through both shadow boundaries", async () => {
-    appStylesheet(`zitadel-login { --zl-color-text-primary-white: ${HOST_RED}; }`);
+    // Both roles, because the two boundaries read different ones: card chrome
+    // takes `card-foreground`, a control on that card takes `foreground`.
+    appStylesheet(
+      `zitadel-login { --zl-foreground: ${HOST_RED}; --zl-card-foreground: ${HOST_RED}; }`,
+    );
     const element = await mount(identifierStep);
 
     // On the host element itself.
-    expect(getComputedStyle(element).getPropertyValue("--zl-color-text-primary-white")).toBe(
+    expect(getComputedStyle(element).getPropertyValue("--zl-foreground")).toBe(
       HOST_RED,
     );
     // Boundary 1: chrome the orchestrator renders in its own shadow root.
@@ -142,10 +155,187 @@ describe("<zitadel-login> host-app customisation (chromium)", () => {
   it("the embedding app's CSS outranks the tenant's server-side branding", async () => {
     // The app owns its page: a first-party embed must be able to match its
     // own design system even when the tenant has brand colours configured.
-    appStylesheet(`zitadel-login { --zl-color-text-primary-white: ${HOST_RED}; }`);
+    appStylesheet(`zitadel-login { --zl-card-foreground: ${HOST_RED}; }`);
     const element = await mount(brandedStep);
     const title = element.shadowRoot?.querySelector(".zl-card-title") as HTMLElement;
     expect(getComputedStyle(title).color).toBe(HOST_RED);
+  });
+
+  it("the primary button consumes the --zl-primary pair from the host", async () => {
+    // The semantic brand knob: setting the Figma `primary` pair on the host
+    // element restyles the primary CTA through both shadow boundaries.
+    const HOST_BLUE = "rgb(0, 0, 255)";
+    appStylesheet(
+      `zitadel-login { --zl-primary: ${HOST_RED}; --zl-primary-foreground: ${HOST_BLUE}; }`,
+    );
+    const element = await mount(identifierStep);
+    const atom = element.shadowRoot?.querySelector("zl-button") as HTMLElement;
+    expect(atom).toBeTruthy();
+    const button = atom.shadowRoot?.querySelector(".zr-btn--primary") as HTMLElement;
+    expect(button).toBeTruthy();
+    expect(getComputedStyle(button).backgroundColor).toBe(HOST_RED);
+    expect(getComputedStyle(button).color).toBe(HOST_BLUE);
+  });
+
+  it("suppress-header collapses the card's header region, not just the text", async () => {
+    // The headings going sr-only is not enough: the card's flex layout kept
+    // a blank 32px header band while the header slot stayed assigned. The
+    // stamped attribute pulls the header region out of the flow.
+    const plain = await mount(identifierStep);
+    const plainCard = plain.shadowRoot?.querySelector("zl-card") as HTMLElement;
+    const plainHeight = plainCard.getBoundingClientRect().height;
+    plain.remove();
+    stub?.restore();
+
+    const suppressed = await mount(identifierStep, (el) => {
+      el.suppressHeader = true;
+    });
+    const suppressedCard = suppressed.shadowRoot?.querySelector("zl-card") as HTMLElement;
+    const suppressedHeight = suppressedCard.getBoundingClientRect().height;
+    // Title (2rem line) + the 32px header/body gap must be gone — well over
+    // 40px shorter, not merely equal.
+    expect(suppressedHeight).toBeLessThan(plainHeight - 40);
+  });
+
+  it("tenant palette.link recolors card links and nothing else", async () => {
+    // Regression for the broken bridge: `palette.link` used to target the
+    // pill token while the links kept a hard-coded purple accent.
+    const linkedStep = {
+      ...identifierStep,
+      step: {
+        ...identifierStep.step,
+        actions: [
+          ...identifierStep.step.actions,
+          { name: "register", kind: "navigate", text_key: "identifier.action.register.link" },
+        ],
+      },
+      branding: { theme: { dark: { palette: { link: "#ff0000" } } } },
+    } as unknown as CreateFlow201;
+    const element = await mount(linkedStep);
+    const link = element.shadowRoot?.querySelector(".zl-card-nav__link") as HTMLElement;
+    expect(link).toBeTruthy();
+    expect(getComputedStyle(link).color).toBe(HOST_RED);
+  });
+
+  it("takes the mark from the side the widget resolved", async () => {
+    // The two files are the same lockup in different ink. Painting the light
+    // one on a dark card is invisible, so the side owns its own mark.
+    const ON_DARK = "https://cdn.example.com/on-dark.svg";
+    const logoStep = {
+      ...identifierStep,
+      branding: {
+        theme: {
+          mode: "dark",
+          light: { logo_url: "https://cdn.example.com/on-light.svg" },
+          dark: { logo_url: ON_DARK },
+        },
+      },
+    } as unknown as CreateFlow201;
+    const element = await mount(logoStep);
+    const logo = element.shadowRoot?.querySelector(".zl-card-logo") as HTMLImageElement;
+    expect(logo?.getAttribute("src")).toBe(ON_DARK);
+  });
+
+  it("keeps what was typed when the theme flips mid-step", async () => {
+    // The rendered string carries the resolved side's mark, so a flip rebuilds
+    // the form. Whatever the visitor had typed has to survive that.
+    const twoSided = {
+      ...identifierStep,
+      branding: {
+        theme: {
+          mode: "dark",
+          light: { logo_url: "https://cdn.example.com/on-light.svg" },
+          dark: { logo_url: "https://cdn.example.com/on-dark.svg" },
+        },
+      },
+    } as unknown as CreateFlow201;
+    const element = await mount(twoSided);
+    const field = element.shadowRoot?.querySelector("zl-field") as HTMLElement & {
+      formValue: string;
+    };
+    const input = field.shadowRoot?.querySelector("input") as HTMLInputElement;
+    input.value = "someone@example.com";
+    input.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    element.theme = "light";
+    await element.updateComplete;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    const after = element.shadowRoot?.querySelector("zl-field") as HTMLElement & {
+      formValue: string;
+    };
+    expect(element.dataset.theme).toBe("light");
+    expect(after.formValue).toBe("someone@example.com");
+  });
+
+  it("does not carry a key from the unresolved side across a theme flip", async () => {
+    // `link` is set on dark only. After flipping to light it must fall back to
+    // the maintained default rather than keeping the dark brand colour.
+    const oneSidedKey = {
+      ...identifierStep,
+      step: {
+        ...identifierStep.step,
+        actions: [
+          ...identifierStep.step.actions,
+          { name: "register", kind: "navigate", text_key: "identifier.action.register.link" },
+        ],
+      },
+      branding: {
+        theme: {
+          mode: "dark",
+          light: { palette: { background: "#FFFFFF" } },
+          dark: { palette: { background: "#0A0A0A", link: "#00ff00" } },
+        },
+      },
+    } as unknown as CreateFlow201;
+    const element = await mount(oneSidedKey);
+    const linkColor = (): string => {
+      const link = element.shadowRoot?.querySelector(".zl-card-nav__link") as HTMLElement;
+      return getComputedStyle(link).color;
+    };
+    expect(linkColor()).toBe("rgb(0, 255, 0)");
+
+    element.theme = "light";
+    await element.updateComplete;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(linkColor()).not.toBe("rgb(0, 255, 0)");
+  });
+
+  it("does not paint a light key onto the dark surface", async () => {
+    const isolatedStep = {
+      ...identifierStep,
+      branding: {
+        theme: {
+          mode: "dark",
+          light: { palette: { primary: HOST_RED } },
+          dark: { palette: { link: "#00ff00" } },
+        },
+      },
+    } as unknown as CreateFlow201;
+    const element = await mount(isolatedStep);
+    const atom = element.shadowRoot?.querySelector("zl-button") as HTMLElement;
+    const button = atom.shadowRoot?.querySelector(".zr-btn--primary") as HTMLElement;
+    expect(getComputedStyle(button).backgroundColor).not.toBe(HOST_RED);
+  });
+
+  it("suppress-header hides the card heading visually but keeps it accessible", async () => {
+    const element = await mount(identifierStep, (el) => {
+      el.suppressHeader = true;
+    });
+    // Reflected on the host and stamped onto the template shell, so the
+    // CSS covers user-ejected templates too.
+    expect(element.hasAttribute("suppress-header")).toBe(true);
+    const shell = element.shadowRoot?.querySelector("zl-page-shell") as HTMLElement;
+    expect(shell.hasAttribute("data-suppress-header")).toBe(true);
+    const title = element.shadowRoot?.querySelector(".zl-card-title") as HTMLElement;
+    expect(title).toBeTruthy();
+    expect(title.textContent?.trim()).not.toBe("");
+    // Screen-reader-only, not display:none.
+    const style = getComputedStyle(title);
+    expect(style.position).toBe("absolute");
+    expect(style.width).toBe("1px");
+    expect(style.display).not.toBe("none");
   });
 
   it("the host page owns placement, width, and flow position", async () => {
@@ -170,6 +360,26 @@ describe("<zitadel-login> host-app customisation (chromium)", () => {
     });
     const title = element.shadowRoot?.querySelector(".zl-card-title") as HTMLElement;
     expect(title.textContent?.trim()).toBe("Welcome back to Acme");
+  });
+
+  // A font stylesheet has to be linked at document level — `@font-face` inside
+  // a shadow tree never registers — so injecting one is a page-wide grant over
+  // a document we do not own. `branding.write` must not carry that into an
+  // embedding app, which is why the widget applies the family and leaves the
+  // loading to the page around it.
+  it("widget mode does not inject the tenant font into the embedding document", async () => {
+    const element = await mount(fontStep);
+    expect(element.variant).not.toBe("page");
+    expect(document.getElementById("zl-font-link")).toBeNull();
+    expect(document.getElementById("zl-default-font-link")).toBeNull();
+  });
+
+  it("page mode does inject it, because the document is ours", async () => {
+    await mount(fontStep, (el) => {
+      el.variant = "page";
+    });
+    const link = document.getElementById("zl-font-link") as HTMLLinkElement | null;
+    expect(link?.href).toBe(TENANT_FONT_HREF);
   });
 
   it("emits flow events the host app can drive its own UI from", async () => {

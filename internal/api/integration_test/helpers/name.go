@@ -9,6 +9,11 @@ func ProjectName() string {
 	return "project-" + RandString(8)
 }
 
+// TeamName returns a unique team name for integration tests.
+func TeamName() string {
+	return "team-" + RandString(8)
+}
+
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyz")
 
 func RandString(n int) string {

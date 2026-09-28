@@ -45,6 +45,23 @@ moon run demo-nuxt:dev
 
 Open [http://localhost:3001/login](http://localhost:3001/login). Any email/password combination is accepted by the mock server.
 
+### Running against the Go server
+
+The full walkthrough (start the server with `moon run workspace:cli -- start`
+— SQLite by default, at `.zitadel/local/nextgen-data/zitadel.db` — create a project,
+configure the env, start the demo) is documented once in
+[`apps/demo-next/README.md`](../demo-next/README.md#running-against-the-go-server).
+The nuxt differences:
+
+| demo-next | demo-nuxt |
+| --- | --- |
+| port 3002 | port 3001 |
+| `apps/demo-next/.env.local` | `apps/demo-nuxt/.env` |
+| `NEXT_PUBLIC_ZITADEL_PROJECT_ID` | `NUXT_PUBLIC_ZITADEL_PROJECT_ID` |
+| `moon run demo-next:dev` | `moon run demo-nuxt:dev` |
+
+---
+
 **UI-only iteration** (no Nuxt, no TCP mock): the Storybook workbench runs the
 Lit atoms, the paired React components, and the `<zitadel-login>` orchestrator
 (MSW in the browser via `msw-storybook-addon`):

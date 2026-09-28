@@ -1,0 +1,4 @@
+<!-- A conventional landscape banner: intrinsic size, ratio far wider than the
+     hero's height cap. The counterpart to `square-unsized-asset.svg` — it must
+     stay uncropped, which is what keeps the cap a cap and not a hard slot. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="300" viewBox="0 0 1200 300" role="img" aria-label="wide test asset"><rect width="1200" height="300" rx="8" fill="#f48aa0"/></svg>

@@ -11,6 +11,11 @@ Start with:
 - [internal/storage/AGENTS.md](internal/storage/AGENTS.md)
 - [apps/cli-journey-e2e/AGENTS.md](apps/cli-journey-e2e/AGENTS.md)
 
+Minting a resource ID? Never write custom ULID/UUID helpers — the canonical
+minting contract lives in
+[internal/storage/AGENTS.md](internal/storage/AGENTS.md) (context:
+[ADR 047](docs/adrs/047-dialect-id-generation.md)).
+
 Building console or design-system UI (from Figma or otherwise)? Before you
 edit `apps/console/**` or `packages/{components,ui-react,shared-component-styles,design-tokens}/**`,
 read these first and classify the component before building — do not

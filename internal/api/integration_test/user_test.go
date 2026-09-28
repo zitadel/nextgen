@@ -1,19 +1,23 @@
-//go:build postgres_integration
+//go:build postgres_integration || spanner_integration
 
 // TODO: enable spanner tests once user repository supports it
 
 package integration_test
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	api "github.com/zitadel/nextgen/api/generated"
+	apischemas "github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
+	"github.com/zitadel/nextgen/internal/api/integration_test/test_data"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 )
@@ -24,8 +28,9 @@ func TestCreateUser(t *testing.T) {
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 
-	team, err := harness.EnsureTeamService(t).CreateTeam(t.Context(), service.CreateTeamInput{
+	team, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
 		ProjectID: project.ID,
+		Name:      helpers.TeamName(),
 	})
 	require.NoError(t, err)
 
@@ -52,12 +57,14 @@ func TestCreateUser(t *testing.T) {
 					ProjectID: api.ProjectID(project.ID),
 				},
 				userjson: helpers.MustMarshal(t, map[string]any{
-					"$schema":     "https://test.example.schemas.com/schemas/default-human-user.json",
-					"email":       "john.doe.withalloptionalproperties@example.com",
-					"givenName":   "John",
-					"familyName":  "Doe",
-					"dateOfBirth": "1990-05-12",
-					"password":    "my-strong-password",
+					"schema": test_data.UserSchemaURL,
+					"attributes": map[string]any{
+						"email":       "john.doe.withalloptionalproperties@example.com",
+						"givenName":   "John",
+						"familyName":  "Doe",
+						"dateOfBirth": "1990-05-12",
+						"password":    "my-strong-password",
+					},
 				}),
 			},
 			{
@@ -66,11 +73,13 @@ func TestCreateUser(t *testing.T) {
 					ProjectID: api.ProjectID(project.ID),
 				},
 				userjson: helpers.MustMarshal(t, map[string]any{
-					"$schema":    "https://test.example.schemas.com/schemas/default-human-user.json",
-					"email":      "john.doe.withoutoptionalproperties@example.com",
-					"givenName":  "John",
-					"familyName": "Doe",
-					"password":   "my-strong-password",
+					"schema": test_data.UserSchemaURL,
+					"attributes": map[string]any{
+						"email":      "john.doe.withoutoptionalproperties@example.com",
+						"givenName":  "John",
+						"familyName": "Doe",
+						"password":   "my-strong-password",
+					},
 				}),
 			},
 			{
@@ -79,11 +88,13 @@ func TestCreateUser(t *testing.T) {
 					ProjectID: api.ProjectID(project.ID),
 				},
 				userjson: helpers.MustMarshal(t, map[string]any{
-					"$schema":    "https://test.example.schemas.com/schemas/default-human-user.json",
-					"email":      "john.doe.withoutteammembership@example.com",
-					"givenName":  "John",
-					"familyName": "Doe",
-					"password":   "my-strong-password",
+					"schema": test_data.UserSchemaURL,
+					"attributes": map[string]any{
+						"email":      "john.doe.withoutteammembership@example.com",
+						"givenName":  "John",
+						"familyName": "Doe",
+						"password":   "my-strong-password",
+					},
 				}),
 			},
 			{
@@ -93,11 +104,13 @@ func TestCreateUser(t *testing.T) {
 					TeamID:    api.OptTeamID{Set: true, Value: api.TeamID(team.ID)},
 				},
 				userjson: helpers.MustMarshal(t, map[string]any{
-					"$schema":    "https://test.example.schemas.com/schemas/default-human-user.json",
-					"email":      "john.doe.withteammembermship@example.com",
-					"givenName":  "John",
-					"familyName": "Doe",
-					"password":   "my-strong-password",
+					"schema": test_data.UserSchemaURL,
+					"attributes": map[string]any{
+						"email":      "john.doe.withteammembermship@example.com",
+						"givenName":  "John",
+						"familyName": "Doe",
+						"password":   "my-strong-password",
+					},
 				}),
 			},
 			{
@@ -106,11 +119,13 @@ func TestCreateUser(t *testing.T) {
 					ProjectID: api.ProjectID(project.ID),
 				},
 				userjson: helpers.MustMarshal(t, map[string]any{
-					"$schema":     "https://test.example.schemas.com/schemas/default-human-user.json",
-					"email":       "john.doe.emptyvalueoptionalproperties@example.com",
-					"password":    "my-strong-password",
-					"name":        "",
-					"phoneNumber": "",
+					"schema": test_data.UserSchemaURL,
+					"attributes": map[string]any{
+						"email":       "john.doe.emptyvalueoptionalproperties@example.com",
+						"password":    "my-strong-password",
+						"name":        "",
+						"phoneNumber": "",
+					},
 				}),
 			},
 		}
@@ -118,16 +133,45 @@ func TestCreateUser(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				t.Parallel()
 
-				user := &api.User{}
+				user := &api.CreateUserRequest{}
 				err := user.UnmarshalJSON([]byte(tc.userjson))
 				require.NoError(t, err)
 
-				resp, err := client.CreateUser(t.Context(), user, params)
+				resp, err := client.CreateUser(t.Context(), user, tc.params)
 				assert.NoError(t, err)
 
-				assert.IsType(t, &api.CreateUserResponse{}, resp, helpers.MustMarshal(t, resp))
+				assert.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
 			})
 		}
+
+		t.Run("attributes may use envelope names", func(t *testing.T) {
+			t.Parallel()
+
+			// The envelope and the schema-defined content are separate
+			// namespaces, so a schema is free to declare `id` or `metadata`.
+			// Neither collides with the server's own fields.
+			user := &api.CreateUserRequest{}
+			require.NoError(t, user.UnmarshalJSON([]byte(helpers.MustMarshal(t, map[string]any{
+				"schema": test_data.UserSchemaURL,
+				"attributes": map[string]any{
+					"email":    "john.doe.envelopenames@example.com",
+					"password": "my-strong-password",
+					"id":       "the-schema-owns-this-one",
+					"metadata": "so-is-this",
+				},
+			}))))
+
+			resp, err := client.CreateUser(t.Context(), user, params)
+			require.NoError(t, err)
+			require.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
+
+			created := resp.(*api.User)
+			assert.True(t, strings.HasPrefix(string(created.ID), "user_"),
+				"the envelope id is the minted one, not the attribute")
+			assert.Equal(t, "the-schema-owns-this-one", userProp(t, *created, "id"))
+			assert.Equal(t, "so-is-this", userProp(t, *created, "metadata"))
+			assert.Equal(t, api.UserMetadataStatusActive, created.Metadata.Status)
+		})
 	})
 
 	t.Run("error", func(t *testing.T) {
@@ -149,10 +193,25 @@ func TestCreateUser(t *testing.T) {
 					// flow_field_validation_test.go.)
 					name: "missing required email property",
 					userjson: helpers.MustMarshal(t, map[string]any{
-						"$schema":    "https://test.example.schemas.com/schemas/default-human-user.json",
-						"givenName":  "John",
-						"familyName": "Doe",
-						"password":   "my-strong-password",
+						"schema": test_data.UserSchemaURL,
+						"attributes": map[string]any{
+							"givenName":  "John",
+							"familyName": "Doe",
+							"password":   "my-strong-password",
+						},
+					}),
+				},
+				{
+					// A user is stored as its attribute rows, so an empty
+					// document has nothing to write and the dialects refuse
+					// it — this pins that the answer is 400 and not their
+					// 500. Against this schema `required` reports it first;
+					// the guard itself is pinned on an all-optional schema in
+					// TestNewCreateUser_AttributesRequired.
+					name: "empty attributes",
+					userjson: helpers.MustMarshal(t, map[string]any{
+						"schema":     test_data.UserSchemaURL,
+						"attributes": map[string]any{},
 					}),
 				},
 			}
@@ -161,7 +220,7 @@ func TestCreateUser(t *testing.T) {
 				t.Run(tc.name, func(t *testing.T) {
 					t.Parallel()
 
-					user := &api.User{}
+					user := &api.CreateUserRequest{}
 					err := user.UnmarshalJSON([]byte(tc.userjson))
 					require.NoError(t, err)
 
@@ -173,22 +232,160 @@ func TestCreateUser(t *testing.T) {
 			}
 		})
 
+		t.Run("a caller-supplied id is refused", func(t *testing.T) {
+			t.Parallel()
+
+			// ADR 047 section 4: a create body must not carry a client-chosen
+			// resource primary key. The request schema is closed, so the field
+			// is refused rather than skipped — the generated client cannot
+			// express it, hence the raw request.
+			body := helpers.MustMarshal(t, map[string]any{
+				"schema":     test_data.UserSchemaURL,
+				"id":         "user_supplied_by_the_caller",
+				"attributes": harness.EnsureTestData(t).Generator.GenerateUser(t, "testcreateuser.suppliedid@example.com"),
+			})
+
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodPost,
+				harness.EnsureTestServer(t).URL+"/users?project_id="+project.ID, strings.NewReader(body))
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Authorization", "Bearer "+harness.ProjectSecret(t, project))
+
+			resp, err := harness.EnsureHttpClient(t).Do(req)
+			require.NoError(t, err)
+			defer resp.Body.Close()
+
+			answer, err := io.ReadAll(resp.Body)
+			require.NoError(t, err)
+
+			assert.Equal(t, http.StatusBadRequest, resp.StatusCode, string(answer))
+		})
+
 		t.Run("duplicate mail address", func(t *testing.T) {
 			t.Parallel()
 
-			usermap := harness.EnsureTestData(t).Generator.GenerateUser(t, "testcreateuser.error.duplicatemailaddress@example.com")
-
-			user := &api.User{}
-			err := user.UnmarshalJSON([]byte(helpers.MustMarshal(t, usermap)))
+			user := &api.CreateUserRequest{}
+			err := user.UnmarshalJSON([]byte(helpers.MustMarshal(t, map[string]any{
+				"schema":     test_data.UserSchemaURL,
+				"attributes": harness.EnsureTestData(t).Generator.GenerateUser(t, "testcreateuser.error.duplicatemailaddress@example.com"),
+			})))
 			require.NoError(t, err)
 
 			resp, err := client.CreateUser(t.Context(), user, params)
 			require.NoError(t, err)
-			require.IsType(t, &api.CreateUserResponse{}, resp, helpers.MustMarshal(t, resp))
+			require.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
 
 			resp, err = client.CreateUser(t.Context(), user, params)
 			assert.NoError(t, err)
 			assert.IsType(t, &api.CreateUserConflict{}, resp, helpers.MustMarshal(t, resp))
+		})
+	})
+}
+
+func TestDeleteUser(t *testing.T) {
+	t.Parallel()
+
+	// ARRANGE
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+
+	t.Run("ok", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("simple delete", func(t *testing.T) {
+			t.Parallel()
+
+			user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
+				ProjectID:  project.ID,
+				SchemaURL:  test_data.UserSchemaURL,
+				Attributes: harness.EnsureTestData(t).Generator.GenerateUser(t, "testdeleteuser@example.com"),
+			})
+			require.NoError(t, err)
+
+			// ACT
+			deleteParams := api.DeleteUserByIDParams{
+				UserID: api.UserID(user.ID),
+			}
+			deleteResp, err := client.DeleteUserByID(t.Context(), deleteParams)
+			require.NoError(t, err)
+
+			// ASSERT
+			assert.IsType(t, &api.DeleteUserByIDNoContent{}, deleteResp, helpers.MustMarshal(t, deleteResp))
+
+			getUserParams := api.GetUserByIDParams{
+				UserID: api.UserID(user.ID),
+			}
+			getResp, err := client.GetUserByID(t.Context(), getUserParams)
+			require.NoError(t, err)
+
+			assert.IsType(t, &api.GetUserByIDNotFound{}, getResp, helpers.MustMarshal(t, getResp))
+		})
+
+		t.Run("unknown user should not return 404", func(t *testing.T) {
+			t.Parallel()
+
+			// ACT
+			deleteParams := api.DeleteUserByIDParams{
+				UserID: api.UserID("user_idwhichdoesnotexist"),
+			}
+			deleteResp, err := client.DeleteUserByID(t.Context(), deleteParams)
+			require.NoError(t, err)
+
+			// ASSERT
+			assert.IsType(t, &api.DeleteUserByIDNoContent{}, deleteResp, helpers.MustMarshal(t, deleteResp))
+		})
+
+		t.Run("delete user with active session", func(t *testing.T) {
+			t.Parallel()
+
+			const email = "testdeleteuserwithsession@example.com"
+			const password = "pass123$"
+
+			userService := harness.EnsureUserService(t)
+
+			user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
+				ProjectID:  project.ID,
+				SchemaURL:  test_data.UserSchemaURL,
+				Attributes: harness.EnsureTestData(t).Generator.GenerateUser(t, email),
+			})
+			require.NoError(t, err)
+			userID := user.ID
+
+			err = userService.SetPassword(t.Context(), service.SetPasswordInput{
+				ProjectID: project.ID,
+				UserID:    userID,
+				Password:  password,
+			})
+			require.NoError(t, err)
+
+			_, err = helpers.CreateSessionUsingPassword(t,
+				harness.EnsureAuthAttemptService(t),
+				harness.EnsureSessionService(t),
+				project.ID, email, password,
+			)
+			require.NoError(t, err)
+
+			// ACT
+			deleteParams := api.DeleteUserByIDParams{
+				UserID: api.UserID(userID),
+			}
+			deleteResp, err := client.DeleteUserByID(t.Context(), deleteParams)
+			require.NoError(t, err)
+
+			// ASSERT
+			assert.IsType(t, &api.DeleteUserByIDNoContent{}, deleteResp, helpers.MustMarshal(t, deleteResp))
+
+			getUserParams := api.GetUserByIDParams{
+				UserID: api.UserID(userID),
+			}
+			getResp, err := client.GetUserByID(t.Context(), getUserParams)
+			require.NoError(t, err)
+
+			assert.IsType(t, &api.GetUserByIDNotFound{}, getResp, helpers.MustMarshal(t, getResp))
 		})
 	})
 }
@@ -210,14 +407,14 @@ func TestSetUserPassword(t *testing.T) {
 	createUser := func(t *testing.T, email string) (api.SetUserPasswordParams, string) {
 		t.Helper()
 		user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
-			ProjectID: project.ID,
-			User:      harness.EnsureTestData(t).Generator.GenerateUser(t, email),
+			ProjectID:  project.ID,
+			SchemaURL:  test_data.UserSchemaURL,
+			Attributes: harness.EnsureTestData(t).Generator.GenerateUser(t, email),
 		})
 		require.NoError(t, err)
 		return api.SetUserPasswordParams{
-			ProjectID: api.ProjectID(project.ID),
-			UserID:    api.UserID(user["id"].(string)),
-		}, user["email"].(string)
+			UserID: api.UserID(user.ID),
+		}, user.StringAttribute("email")
 	}
 
 	t.Run("ok", func(t *testing.T) {
@@ -305,8 +502,7 @@ func TestSetUserPassword(t *testing.T) {
 				Password: "fake-password",
 			}
 			params := api.SetUserPasswordParams{
-				ProjectID: api.ProjectID(project.ID),
-				UserID:    api.UserID("user_does-not-exist"),
+				UserID: api.UserID("user_does-not-exist"),
 			}
 
 			resp, err := projClient.SetUserPassword(t.Context(), request, params)
@@ -324,8 +520,9 @@ func TestGetUser(t *testing.T) {
 	require.NoError(t, err)
 
 	user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
-		ProjectID: project.ID,
-		User:      harness.EnsureTestData(t).Generator.GenerateUser(t, "testgetuser@example.com"),
+		ProjectID:  project.ID,
+		SchemaURL:  test_data.UserSchemaURL,
+		Attributes: harness.EnsureTestData(t).Generator.GenerateUser(t, "testgetuser@example.com"),
 	})
 	require.NoError(t, err)
 
@@ -334,14 +531,327 @@ func TestGetUser(t *testing.T) {
 	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	params := api.GetUserByIDParams{
-		ProjectID: api.ProjectID(project.ID),
-		UserID:    api.UserID(user["id"].(string)),
+		UserID: api.UserID(user.ID),
 	}
 
 	resp, err := client.GetUserByID(t.Context(), params)
 	assert.NoError(t, err)
 
-	assert.IsType(t, &api.GetUserByIDOK{}, resp, helpers.MustMarshal(t, resp))
+	require.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
+
+	// The roster lives at /users/{user_id}/teams; the user itself only reports
+	// who owns its lifecycle, and this one is self-owned.
+	assert.True(t, resp.(*api.User).Metadata.LifecycleOwnerTeamID.Null)
+}
+
+func TestPatchUser(t *testing.T) {
+	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+
+	createUser := func(t *testing.T, email string) *domain.User {
+		t.Helper()
+		user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
+			ProjectID:  project.ID,
+			SchemaURL:  test_data.UserSchemaURL,
+			Attributes: harness.EnsureTestData(t).Generator.GenerateUser(t, email),
+		})
+		require.NoError(t, err)
+		return user
+	}
+	patchReq := func(t *testing.T, body map[string]any) *api.PatchUserRequest {
+		t.Helper()
+		req := &api.PatchUserRequest{}
+		require.NoError(t, req.UnmarshalJSON([]byte(helpers.MustMarshal(t, body))))
+		return req
+	}
+
+	t.Run("ok", func(t *testing.T) {
+		t.Parallel()
+		user := createUser(t, "testpatchuser.ok@example.com")
+
+		resp, err := client.PatchUserByID(t.Context(), patchReq(t, map[string]any{
+			"attributes": map[string]any{
+				"email":    "testpatchuser.ok.patched@example.com",
+				"nickname": "Patched",
+			},
+		}), api.PatchUserByIDParams{UserID: api.UserID(user.ID)})
+		require.NoError(t, err)
+		require.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
+
+		patched := resp.(*api.User)
+		assert.Equal(t, "testpatchuser.ok.patched@example.com", userProp(t, *patched, "email"))
+		assert.Equal(t, "Patched", userProp(t, *patched, "nickname"))
+	})
+
+	t.Run("null deletes an attribute", func(t *testing.T) {
+		t.Parallel()
+		user := createUser(t, "testpatchuser.null@example.com")
+		params := api.PatchUserByIDParams{UserID: api.UserID(user.ID)}
+
+		resp, err := client.PatchUserByID(t.Context(), patchReq(t, map[string]any{
+			"attributes": map[string]any{"nickname": "Ephemeral"},
+		}), params)
+		require.NoError(t, err)
+		require.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
+
+		resp, err = client.PatchUserByID(t.Context(), patchReq(t, map[string]any{
+			"attributes": map[string]any{"nickname": nil},
+		}), params)
+		require.NoError(t, err)
+		require.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
+		_, stillThere := resp.(*api.User).Attributes["nickname"]
+		assert.False(t, stillThere, "null deletes the attribute")
+	})
+
+	t.Run("merged result is validated against the schema", func(t *testing.T) {
+		t.Parallel()
+		user := createUser(t, "testpatchuser.invalid@example.com")
+
+		resp, err := client.PatchUserByID(t.Context(), patchReq(t, map[string]any{
+			"attributes": map[string]any{"email": 5},
+		}), api.PatchUserByIDParams{UserID: api.UserID(user.ID)})
+		require.NoError(t, err)
+		assert.IsType(t, &api.PatchUserByIDBadRequest{}, resp, helpers.MustMarshal(t, resp))
+	})
+
+	t.Run("an unknown schema pointer is refused", func(t *testing.T) {
+		t.Parallel()
+		user := createUser(t, "testpatchuser.unknownschema@example.com")
+
+		resp, err := client.PatchUserByID(t.Context(), patchReq(t, map[string]any{
+			"schema": "https://example.com/schemas/does-not-exist",
+		}), api.PatchUserByIDParams{UserID: api.UserID(user.ID)})
+		require.NoError(t, err)
+		assert.IsType(t, &api.PatchUserByIDBadRequest{}, resp, helpers.MustMarshal(t, resp))
+	})
+
+	t.Run("duplicate mail address", func(t *testing.T) {
+		t.Parallel()
+		createUser(t, "testpatchuser.taken@example.com")
+		userB := createUser(t, "testpatchuser.claimant@example.com")
+
+		resp, err := client.PatchUserByID(t.Context(), patchReq(t, map[string]any{
+			"attributes": map[string]any{"email": "testpatchuser.taken@example.com"},
+		}), api.PatchUserByIDParams{UserID: api.UserID(userB.ID)})
+		require.NoError(t, err)
+		assert.IsType(t, &api.PatchUserByIDConflict{}, resp, helpers.MustMarshal(t, resp))
+	})
+
+	t.Run("unknown user", func(t *testing.T) {
+		t.Parallel()
+
+		resp, err := client.PatchUserByID(t.Context(), patchReq(t, map[string]any{
+			"attributes": map[string]any{"nickname": "Nobody"},
+		}), api.PatchUserByIDParams{UserID: api.UserID("user_does-not-exist")})
+		require.NoError(t, err)
+		assert.IsType(t, &api.PatchUserByIDNotFound{}, resp, helpers.MustMarshal(t, resp))
+	})
+
+	t.Run("empty patch is refused", func(t *testing.T) {
+		t.Parallel()
+		user := createUser(t, "testpatchuser.empty@example.com")
+
+		// The request schema requires at least one property, so the generated
+		// client cannot express an empty patch — raw request.
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodPatch,
+			harness.EnsureTestServer(t).URL+"/users/"+user.ID, strings.NewReader(`{}`))
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+harness.ProjectSecret(t, project))
+
+		resp, err := harness.EnsureHttpClient(t).Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		body, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusBadRequest, resp.StatusCode, string(body))
+	})
+}
+
+func TestPatchMyUser(t *testing.T) {
+	t.Parallel()
+
+	t.Run("ok", func(t *testing.T) {
+		t.Parallel()
+
+		project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+		require.NoError(t, err)
+		client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+		require.NoError(t, err)
+
+		userService := harness.EnsureUserService(t)
+		user, err := userService.CreateUser(t.Context(), service.CreateUserInput{
+			ProjectID:  project.ID,
+			SchemaURL:  test_data.UserSchemaURL,
+			Attributes: harness.EnsureTestData(t).Generator.GenerateUser(t, "testpatchmyuser@example.com"),
+		})
+		require.NoError(t, err)
+
+		const password = "fake-password"
+		require.NoError(t, userService.SetPassword(t.Context(), service.SetPasswordInput{
+			ProjectID: project.ID,
+			UserID:    user.ID,
+			Password:  password,
+		}))
+
+		session, err := helpers.CreateSessionUsingPassword(t,
+			harness.EnsureAuthAttemptService(t),
+			harness.EnsureSessionService(t),
+			project.ID,
+			user.StringAttribute("email"),
+			password,
+		)
+		require.NoError(t, err)
+		tokenCrypter, err := harness.EnsureKeyService(t).GetProjectCrypter(t.Context(), project.ID, domain.EncryptionKeyPurposeToken)
+		require.NoError(t, err)
+		sessionToken, err := session.Token(tokenCrypter)
+		require.NoError(t, err)
+		client.SetSessionToken(sessionToken)
+
+		patch := &api.PatchMyUserRequest{}
+		require.NoError(t, patch.UnmarshalJSON([]byte(helpers.MustMarshal(t, map[string]any{
+			"attributes": map[string]any{"nickname": "Myself"},
+		}))))
+
+		resp, err := client.PatchMyUser(t.Context(), patch)
+		require.NoError(t, err)
+		require.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, "Myself", userProp(t, *resp.(*api.User), "nickname"))
+	})
+
+	t.Run("missing session cookie", func(t *testing.T) {
+		t.Parallel()
+
+		// The generated client refuses to send an unauthenticated request, so
+		// exercise the server's missing-credential path with a raw request.
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodPatch,
+			harness.EnsureTestServer(t).URL+"/users/me", strings.NewReader(`{"attributes":{"nickname":"Nobody"}}`))
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := harness.EnsureHttpClient(t).Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		body, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+
+		assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+		var answer struct {
+			Code    string `json:"code"`
+			Message string `json:"message"`
+		}
+		require.NoError(t, json.Unmarshal(body, &answer))
+		assert.Equal(t, "auth.unauthorized", answer.Code)
+		assert.Equal(t, "Missing or invalid session token.", answer.Message)
+	})
+}
+
+// TestListUserTeams pins the roster endpoint and the line ADR 024 draws: the
+// roster (`GET /users/{user_id}/teams`, N:N, paginated) and lifecycle ownership
+// (`metadata.lifecycleOwnerTeamId`, at most one team) are different answers and
+// need not agree.
+func TestListUserTeams(t *testing.T) {
+	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	teams := harness.EnsureTeamService(t)
+	unique := helpers.RandString(8)
+	owner, err := teams.Create(t.Context(), service.CreateTeamInput{ProjectID: project.ID, Name: helpers.TeamName()})
+	require.NoError(t, err)
+	alpha, err := teams.Create(t.Context(), service.CreateTeamInput{ProjectID: project.ID, Name: "a-roster-" + unique})
+	require.NoError(t, err)
+	beta, err := teams.Create(t.Context(), service.CreateTeamInput{ProjectID: project.ID, Name: "b-roster-" + unique})
+	require.NoError(t, err)
+
+	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
+	users := harness.EnsureUserFixture(t)
+	emailAttr, err := domain.NewCreateAttribute("email", "roster@example.com", domain.AttributeUniquenessProject)
+	require.NoError(t, err)
+	require.NoError(t, users.Create(t.Context(), &domain.CreateUser{
+		ProjectID:               project.ID,
+		SchemaURL:               schemaURL,
+		ID:                      "user_roster-01",
+		LifecycleOwnerTeamID:    &owner.ID,
+		InitialMembershipTeamID: &alpha.ID,
+		Attributes:              domain.CreateAttributes{*emailAttr},
+	}))
+	require.NoError(t, harness.EnsureTeamMembershipFixture(t).Create(t.Context(), &domain.TeamMembership{
+		ProjectID: project.ID,
+		TeamID:    beta.ID,
+		UserID:    "user_roster-01",
+		Status:    domain.MembershipStatusPending,
+	}))
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+
+	listTeams := func(t *testing.T, params api.ListUserTeamsParams) *api.ListUserTeamsResponse {
+		t.Helper()
+		res, err := client.ListUserTeams(t.Context(), params)
+		require.NoError(t, err)
+		require.IsType(t, &api.ListUserTeamsResponse{}, res, helpers.MustMarshal(t, res))
+		return res.(*api.ListUserTeamsResponse)
+	}
+	rosterParams := api.ListUserTeamsParams{
+		UserID: api.UserID("user_roster-01"),
+	}
+
+	// The whole roster, ordered by team name, each entry naming its team.
+	roster := listTeams(t, rosterParams)
+	require.Len(t, roster.Teams, 2)
+	assert.False(t, roster.NextPageToken.IsSet(), "the whole roster fits in one page")
+
+	assert.Equal(t, alpha.ID, roster.Teams[0].ID)
+	assert.Equal(t, alpha.Name, roster.Teams[0].Name, "the team name travels with the entry")
+	assert.Equal(t, api.UserTeamMembershipStatusActive, roster.Teams[0].MembershipStatus)
+	assert.False(t, roster.Teams[0].CreatedAt.IsZero())
+
+	assert.Equal(t, beta.ID, roster.Teams[1].ID)
+	assert.Equal(t, beta.Name, roster.Teams[1].Name)
+	assert.Equal(t, api.UserTeamMembershipStatusPending, roster.Teams[1].MembershipStatus,
+		"a pending invite is on the roster and says so")
+
+	// The window walks the roster one page at a time, in the same order.
+	page := listTeams(t, api.ListUserTeamsParams{
+		UserID: rosterParams.UserID,
+		Limit:  api.NewOptLimit(1),
+	})
+	require.Len(t, page.Teams, 1)
+	assert.Equal(t, alpha.ID, page.Teams[0].ID)
+	pageToken, ok := page.NextPageToken.Get()
+	require.True(t, ok, "a full page carries a cursor")
+
+	page = listTeams(t, api.ListUserTeamsParams{
+		UserID:    rosterParams.UserID,
+		Limit:     api.NewOptLimit(1),
+		PageToken: api.NewOptPageToken(pageToken),
+	})
+	require.Len(t, page.Teams, 1)
+	assert.Equal(t, beta.ID, page.Teams[0].ID)
+
+	// The user endpoint answers the other question, and answers it differently.
+	userResp, err := client.GetUserByID(t.Context(), api.GetUserByIDParams{
+		UserID: rosterParams.UserID,
+	})
+	require.NoError(t, err)
+	require.IsType(t, &api.User{}, userResp, helpers.MustMarshal(t, userResp))
+	assert.Equal(t, api.NewOptNilString(owner.ID), userResp.(*api.User).Metadata.LifecycleOwnerTeamID,
+		"the lifecycle owner is not one of the roster teams")
+
+	// An unknown user is a 404, not an empty roster.
+	missing, err := client.ListUserTeams(t.Context(), api.ListUserTeamsParams{
+		UserID: api.UserID("user_does-not-exist"),
+	})
+	require.NoError(t, err)
+	assert.IsType(t, &api.ListUserTeamsNotFound{}, missing, helpers.MustMarshal(t, missing))
 }
 
 func TestGetMyUser(t *testing.T) {
@@ -360,12 +870,13 @@ func TestGetMyUser(t *testing.T) {
 		userService := harness.EnsureUserService(t)
 
 		user, err := userService.CreateUser(t.Context(), service.CreateUserInput{
-			ProjectID: project.ID,
-			User:      harness.EnsureTestData(t).Generator.GenerateUser(t, "testgetuser@example.com"),
+			ProjectID:  project.ID,
+			SchemaURL:  test_data.UserSchemaURL,
+			Attributes: harness.EnsureTestData(t).Generator.GenerateUser(t, "testgetuser@example.com"),
 		})
 		require.NoError(t, err)
-		userID := user["id"].(string)
-		userEmail := user["email"].(string)
+		userID := user.ID
+		userEmail := user.StringAttribute("email")
 
 		const password = "fake-password"
 		err = userService.SetPassword(t.Context(), service.SetPasswordInput{
@@ -387,9 +898,9 @@ func TestGetMyUser(t *testing.T) {
 		require.NoError(t, err)
 
 		keyService := harness.EnsureKeyService(t)
-		projectDEK, err := keyService.GetProjectDEKCrypter(t.Context(), project.ID)
+		tokenCrypter, err := keyService.GetProjectCrypter(t.Context(), project.ID, domain.EncryptionKeyPurposeToken)
 		require.NoError(t, err)
-		sessionToken, err := session.Token(projectDEK)
+		sessionToken, err := session.Token(tokenCrypter)
 		require.NoError(t, err)
 
 		// GET USER USING TOKEN
@@ -398,7 +909,7 @@ func TestGetMyUser(t *testing.T) {
 		resp, err := client.GetMyUser(t.Context())
 		assert.NoError(t, err)
 
-		assert.IsType(t, &api.GetMyUserOK{}, resp, helpers.MustMarshal(t, resp))
+		assert.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
 	})
 
 	t.Run("missing session cookie", func(t *testing.T) {
@@ -417,9 +928,105 @@ func TestGetMyUser(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
-		assert.JSONEq(t,
-			`{"code":"auth.unauthorized","message":"Missing or invalid session token."}`,
-			string(body),
-		)
+
+		// Only the client-facing code and message are pinned: these tests run
+		// with api.FullErrorInResponse on, which attaches the unwrapped cause
+		// under `details` (never present in production responses).
+		var answer struct {
+			Code    string `json:"code"`
+			Message string `json:"message"`
+		}
+		require.NoError(t, json.Unmarshal(body, &answer))
+		assert.Equal(t, "auth.unauthorized", answer.Code)
+		assert.Equal(t, "Missing or invalid session token.", answer.Message)
+	})
+}
+
+func TestListPasskeys(t *testing.T) {
+	t.Parallel()
+
+	dependencies := func(t *testing.T) (project *domain.Project, user *domain.User, client *helpers.ApiClient) {
+		project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+		require.NoError(t, err)
+
+		user, err = harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
+			ProjectID:  project.ID,
+			SchemaURL:  test_data.UserSchemaURL,
+			Attributes: harness.EnsureTestData(t).Generator.GenerateUser(t, "testgetuser@example.com"),
+		})
+		require.NoError(t, err)
+
+		client, err = helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+		require.NoError(t, err)
+		harness.SetProjectSecretOnApiClient(t, client, project)
+
+		return project, user, client
+	}
+
+	t.Run("ok", func(t *testing.T) {
+		t.Run("lists registered passkeys", func(t *testing.T) {
+			t.Parallel()
+
+			project, user, client := dependencies(t)
+
+			userID := user.ID
+			harness.RegisterPasskey(t, project.ID, userID, "first passkey")
+			harness.RegisterPasskey(t, project.ID, userID, "second passkey")
+
+			params := api.ListUserPasskeysParams{
+				UserID: api.UserID(userID),
+			}
+
+			resp, err := client.ListUserPasskeys(t.Context(), params)
+			require.NoError(t, err)
+
+			if assert.IsType(t, &api.ListUserPasskeysResponse{}, resp, helpers.MustMarshal(t, resp)) {
+				passkeys := resp.(*api.ListUserPasskeysResponse)
+				require.Len(t, passkeys.Passkeys, 2)
+
+				names := []string{passkeys.Passkeys[0].Name, passkeys.Passkeys[1].Name}
+				assert.ElementsMatch(t, []string{"first passkey", "second passkey"}, names)
+
+				for _, pk := range passkeys.Passkeys {
+					assert.NotEmpty(t, pk.ID)
+					assert.False(t, pk.CreatedAt.IsZero())
+				}
+			}
+		})
+
+		t.Run("empty passkeys", func(t *testing.T) {
+			t.Parallel()
+
+			_, user, client := dependencies(t)
+
+			params := api.ListUserPasskeysParams{
+				UserID: api.UserID(user.ID),
+			}
+
+			resp, err := client.ListUserPasskeys(t.Context(), params)
+			require.NoError(t, err)
+
+			if assert.IsType(t, &api.ListUserPasskeysResponse{}, resp, helpers.MustMarshal(t, resp)) {
+				passkeys := resp.(*api.ListUserPasskeysResponse)
+				require.Len(t, passkeys.Passkeys, 0)
+			}
+		})
+	})
+
+	t.Run("unknown user returns 404", func(t *testing.T) {
+		t.Parallel()
+
+		project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+		require.NoError(t, err)
+
+		client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+		require.NoError(t, err)
+		harness.SetProjectSecretOnApiClient(t, client, project)
+
+		resp, err := client.ListUserPasskeys(t.Context(), api.ListUserPasskeysParams{
+			UserID: "user_does_not_exist",
+		})
+		require.NoError(t, err)
+		assert.IsType(t, &api.ListUserPasskeysNotFound{}, resp, helpers.MustMarshal(t, resp))
 	})
 }

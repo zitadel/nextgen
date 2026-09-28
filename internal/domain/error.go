@@ -114,9 +114,24 @@ func ErrInternal(err error) Error {
 	return newError("internal", "An unexpected error occurred.", nil, err)
 }
 
+// ErrUnavailable is returned when a request failed for a transient reason and
+// retrying it may succeed, typically a database transaction that exhausted its
+// abort retries under contention. Separate from [ErrInternal] because the
+// caller's correct response differs: retry, rather than report a bug.
+func ErrUnavailable() Error {
+	return newError("unavailable", "The service could not complete the request right now. Try again.", nil, nil)
+}
+
 // ErrRequestInvalid is returned when an incoming HTTP request fails structural
 // validation (missing required fields, wrong types, failed regex, etc.)
 // before it reaches domain logic.
 func ErrRequestInvalid() Error {
 	return newError("req.invalid", "The request is invalid and fails base validation (missing required fields, wrong types, failed regex, etc.). Check the details for more information.", nil, nil)
+}
+
+// RequestInvalidFieldDetails names a request field that failed validation.
+// Producers must attach only the field path — never parser text or payload
+// fragments (ADR 030 Decision 4 + 6).
+type RequestInvalidFieldDetails struct {
+	Field string `json:"field"`
 }

@@ -1,0 +1,10 @@
+type: object
+description: A claim challenge that is still awaiting the browser leg.
+required:
+  - status
+properties:
+  status:
+    type: string
+    enum:
+      - pending
+    description: The claim has not completed yet.

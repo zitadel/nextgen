@@ -7,7 +7,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
-	"github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 const dialectSpanner = "spanner"
@@ -43,13 +43,30 @@ func ensureProject(ctx context.Context, stmts service.AllStatements, projectID s
 }
 
 func ensureTeam(ctx context.Context, stmts service.AllStatements, projectID, teamID string) error {
-	err := stmts.CreateTeam(ctx, &domain.Team{
+	// Team names are unique per project too, so a UniqueError from the insert
+	// below does not prove the team exists.
+	_, err := stmts.GetTeamByID(ctx, projectID, teamID)
+	if err == nil {
+		return nil
+	}
+	// Only a missing row means we still have to create it.
+	if _, ok := errors.AsType[*database.NoRowFoundError](err); !ok {
+		return fmt.Errorf("get team %q: %w", teamID, err)
+	}
+	// The bootstrap header carries no team name, so derive a placeholder
+	// name from the team ID to satisfy the NOT NULL name column.
+	if err := stmts.CreateTeam(ctx, &domain.Team{
 		ProjectID: projectID,
 		ID:        teamID,
-	})
-	if err != nil {
+		Name:      "team-" + teamID,
+	}); err != nil {
+		// Another replica may have created the team since the read above. A
+		// violation of the name index leaves it missing, so read again instead
+		// of reading the constraint name, which not every dialect reports.
 		if _, ok := errors.AsType[*database.UniqueError](err); ok {
-			return nil
+			if _, getErr := stmts.GetTeamByID(ctx, projectID, teamID); getErr == nil {
+				return nil
+			}
 		}
 		return fmt.Errorf("ensure team %q: %w", teamID, err)
 	}
@@ -57,9 +74,12 @@ func ensureTeam(ctx context.Context, stmts service.AllStatements, projectID, tea
 }
 
 func ensureJSONSchema(ctx context.Context, stmts service.AllStatements, projectID, schemaURL string) error {
+	// The placeholder document is empty, so it declares no kind and is not a
+	// user schema — listing by kind must not surface it.
 	err := stmts.CreateJSONSchema(ctx, &domain.JSONSchema{
 		ProjectID: projectID,
 		URL:       schemaURL,
+		Kind:      domain.JSONSchemaKindUnknown,
 		Schema:    []byte("{}"),
 	})
 	if err != nil {

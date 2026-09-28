@@ -13,7 +13,6 @@ get:
       required: true
       schema:
         type: string
-    - $ref: ../../../components/parameters/project-id.yaml
   responses:
     '200':
       description: The branding revision was retrieved successfully.

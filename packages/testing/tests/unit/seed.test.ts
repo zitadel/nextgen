@@ -56,11 +56,14 @@ describe("seedUser via connectZitadel", () => {
     expect(user.email).toMatch(/^e2e-[0-9a-f]{8}@example\.com$/);
     expect(user.password.length).toBeGreaterThanOrEqual(8);
 
-    expect(captured.userBody).toMatchObject({ $schema: "sch_1", email: user.email });
+    expect(captured.userBody).toMatchObject({
+      schema: "sch_1",
+      attributes: { email: user.email },
+    });
     expect(captured.userAuth).toBe("Bearer secret_1");
     expect(captured.userQuery).toBe("proj_1");
     expect(captured.passwordUserId).toBe("user_1");
-    expect(captured.passwordBody).toEqual({ password: user.password, isChangeRequired: false });
+    expect(captured.passwordBody).toEqual({ password: user.password, is_change_required: false });
   });
 
   it("honors explicit email, password, and extra attributes", async () => {
@@ -77,24 +80,25 @@ describe("seedUser via connectZitadel", () => {
       password: "hunter2-hunter2",
     });
     expect(captured.userBody).toMatchObject({
-      $schema: "sch_1",
-      email: "alice@acme.com",
-      firstName: "Alice",
+      schema: "sch_1",
+      attributes: { email: "alice@acme.com", firstName: "Alice" },
     });
   });
 
-  it("never lets attributes override reserved fields", async () => {
+  it("keeps the envelope out of reach of the attributes", async () => {
     const zitadel = connectZitadel(handle);
     const user = await zitadel.seedUser({
       email: "real@acme.com",
-      attributes: { email: "evil@acme.com", $schema: "sch_evil", firstName: "Mallory" },
+      attributes: { email: "evil@acme.com", schema: "sch_evil", firstName: "Mallory" },
     });
 
+    // `email` is the one attribute the caller cannot override, since the
+    // returned SeededUser has to match what was created. A `schema` attribute
+    // is just a schema property now, and does not reach the envelope.
     expect(user.email).toBe("real@acme.com");
     expect(captured.userBody).toMatchObject({
-      $schema: "sch_1",
-      email: "real@acme.com",
-      firstName: "Mallory",
+      schema: "sch_1",
+      attributes: { email: "real@acme.com", schema: "sch_evil", firstName: "Mallory" },
     });
   });
 
@@ -117,5 +121,42 @@ describe("seedUser via connectZitadel", () => {
       NEXT_PUBLIC_ZITADEL_PROJECT_ID: "proj_1",
       ZITADEL_PROJECT_SECRET: "secret_1",
     });
+  });
+});
+
+describe("seed vocabulary", () => {
+  it("identity() mints unique unused credentials and touches no API", () => {
+    const zitadel = connectZitadel(handle);
+    const one = zitadel.identity();
+    const two = zitadel.identity();
+    expect(one.email).toMatch(/^e2e-[0-9a-f]{8}@example\.com$/);
+    expect(one.email).not.toBe(two.email);
+    expect(one.password).not.toBe(two.password);
+    // onUnhandledRequest: "error" would fail this test if anything was called.
+  });
+
+  it("seedUsers applies the per-index template and keeps unique defaults", async () => {
+    let nextId = 0;
+    server.use(
+      http.post(`${BASE}/users`, async ({ request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        nextId += 1;
+        return HttpResponse.json({ id: `user_${nextId}`, echo: body }, { status: 201 });
+      }),
+    );
+    const zitadel = connectZitadel(handle);
+    const users = await zitadel.seedUsers(3, {
+      email: (index) => `fixture-${index}@example.com`,
+      attributes: (index) => ({ givenName: `User${index}` }),
+    });
+
+    expect(users.map((user) => user.id)).toEqual(["user_1", "user_2", "user_3"]);
+    expect(users.map((user) => user.email)).toEqual([
+      "fixture-0@example.com",
+      "fixture-1@example.com",
+      "fixture-2@example.com",
+    ]);
+    // Untemplated passwords stay unique per user.
+    expect(new Set(users.map((user) => user.password)).size).toBe(3);
   });
 });

@@ -1,5 +1,13 @@
+import { createHash } from "node:crypto";
+
+import { escapeControlCharacters } from "../api-client";
 import { stableStringify } from "../json";
-import type { ResourceSyncer, SyncAction, SyncPlanSummary } from "./types.js";
+import type {
+  ResourceSyncer,
+  SyncAction,
+  SyncActionWarning,
+  SyncPlanSummary,
+} from "./types.js";
 
 /**
  * Count the non-`skip` actions in a {@link buildSyncPlan} result. Pure; the
@@ -27,14 +35,21 @@ export function collectPlanWarnings(
 ): Array<{ path: string; rule: string; message: string }> {
   const out: Array<{ path: string; rule: string; message: string }> = [];
   for (const action of actions) {
-    if (action.kind !== "create" && action.kind !== "update") {
-      continue;
-    }
-    for (const warning of action.warnings ?? []) {
+    for (const warning of warningsOf(action)) {
       out.push({ path: action.path, rule: warning.rule, message: warning.message });
     }
   }
   return out;
+}
+
+/**
+ * The warnings an action carries. Only the three kinds that upload a body can
+ * have any: a `delete` has no content to judge, and a `skip` was never judged.
+ */
+function warningsOf(action: SyncAction): ReadonlyArray<SyncActionWarning> {
+  return action.kind === "create" || action.kind === "update" || action.kind === "revise"
+    ? (action.warnings ?? [])
+    : [];
 }
 
 /**
@@ -136,14 +151,7 @@ export function renderPlan(actions: ReadonlyArray<SyncAction>, tty: boolean): st
 
   out.push(paint(`Plan: ${parts.join(", ")}.`, A.bold, tty));
 
-  const warningCount = active.reduce(
-    (count, action) =>
-      count +
-      ((action.kind === "create" || action.kind === "update") && action.warnings
-        ? action.warnings.length
-        : 0),
-    0,
-  );
+  const warningCount = active.reduce((count, action) => count + warningsOf(action).length, 0);
   if (warningCount > 0) {
     out.push(
       paint(
@@ -179,13 +187,30 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
 
 const KNOWN_AFTER_APPLY = "(known after apply)";
 
+/**
+ * Quote-escape a string value, then escape whatever could still drive the
+ * terminal. The plan prints what the server stores, and `plan` and `apply`
+ * read it verbatim so the diff and the write-back see the real bytes; this is
+ * where it is made safe to print.
+ */
 function escapeString(s: string): string {
-  return s
-    .replace(/\\/g, "\\\\")
-    .replace(/"/g, '\\"')
-    .replace(/\n/g, "\\n")
-    .replace(/\r/g, "\\r")
-    .replace(/\t/g, "\\t");
+  return escapeControlCharacters(
+    s
+      .replace(/\\/g, "\\\\")
+      .replace(/"/g, '\\"')
+      .replace(/\n/g, "\\n")
+      .replace(/\r/g, "\\r")
+      .replace(/\t/g, "\\t"),
+  );
+}
+
+/**
+ * A field name as printed: a server-side key is as untrusted as a value.
+ * Backslashes are doubled first, as `sanitizeResponse` does for keys, so a key
+ * holding a raw ESC and one holding the literal text `\x1b` get two labels.
+ */
+function fieldLabel(key: string): string {
+  return escapeControlCharacters(key.replaceAll("\\", "\\\\"), { keepLayout: false });
 }
 
 function fmtPrimitive(v: string | number | boolean | null): string {
@@ -199,6 +224,44 @@ function fmtPrimitive(v: string | number | boolean | null): string {
     return `"${escapeString(v)}"`;
   }
   return String(v);
+}
+
+/**
+ * A multi-line string is a document, not a scalar: branding inlines a whole
+ * `login.liquid` into `liquid_template`, and escaping 200 lines onto one
+ * `"…\n…\n…"` line buries every real change in the same block. Such values
+ * render as a summary (and, when they changed, as a line diff) instead.
+ */
+function isBlockString(v: unknown): v is string {
+  return typeof v === "string" && v !== KNOWN_AFTER_APPLY && v.includes("\n");
+}
+
+/** Trailing-newline-insensitive line count: `"a\nb\n"` is two lines, not three. */
+function lineCount(value: string): number {
+  const lines = value.split("\n");
+  return lines.length > 1 && lines[lines.length - 1] === "" ? lines.length - 1 : lines.length;
+}
+
+/** Short content fingerprint, so two summarised blocks can be told apart. */
+function shortHash(value: string): string {
+  return createHash("sha256").update(value).digest("hex").slice(0, 8);
+}
+
+function plural(count: number, noun: string): string {
+  return `${count} ${noun}${count === 1 ? "" : "s"}`;
+}
+
+function blockSummary(value: string): string {
+  return `(${plural(lineCount(value), "line")}, sha256:${shortHash(value)})`;
+}
+
+function unchangedBlockSummary(value: string): string {
+  return `(unchanged, ${plural(lineCount(value), "line")}, sha256:${shortHash(value)})`;
+}
+
+/** {@link fmtPrimitive}, with multi-line strings summarised. */
+function fmtScalar(v: string | number | boolean | null): string {
+  return isBlockString(v) ? blockSummary(v) : fmtPrimitive(v);
 }
 
 /**
@@ -240,14 +303,14 @@ function renderFields(
   const col = (s: string) => paint(s, ansi, ctx.tty);
 
   const keys = Object.keys(obj).sort();
-  const maxLen = keys.reduce((m, k) => Math.max(m, k.length), 0);
+  const maxLen = keys.reduce((m, k) => Math.max(m, fieldLabel(k).length), 0);
 
   for (const key of keys) {
     const val = obj[key];
-    const pk = key.padEnd(maxLen);
+    const pk = fieldLabel(key).padEnd(maxLen);
 
     if (isPrimitive(val)) {
-      const formatted = fmtPrimitive(val);
+      const formatted = fmtScalar(val);
       const suffix = ctx.deleteMode ? " -> null" : "";
       lines.push(col(`${pad}${prefix} ${pk} = ${formatted}${suffix}`));
     } else if (Array.isArray(val)) {
@@ -289,7 +352,7 @@ function renderArrayItems(
 
   for (const item of arr) {
     if (isPrimitive(item)) {
-      const formatted = fmtPrimitive(item);
+      const formatted = fmtScalar(item);
       lines.push(col(`${pad}${prefix} ${formatted},`));
     } else if (Array.isArray(item)) {
       if (item.length === 0) {
@@ -308,6 +371,136 @@ function renderArrayItems(
         lines.push(col(`${" ".repeat(prefixCol + 2)}},`));
       }
     }
+  }
+}
+
+/** Changed-line budget for one block-string diff, before the "more" trailer. */
+const MAX_BLOCK_DIFF_LINES = 20;
+
+/**
+ * LCS cell budget (500 × 500 changed lines). Above it the middle section
+ * renders as one remove/add block instead — quadratic DP over a pathological
+ * template is not worth the memory, and a whole-block replace is still an
+ * honest rendering. The shipped designs are under 200 lines *before* the
+ * prefix/suffix trim, so real templates never come close.
+ */
+const MAX_LCS_CELLS = 250_000;
+
+type LineOp = { kind: "same" | "del" | "add"; line: string };
+
+function asLines(v: string | number | boolean | null): string[] {
+  return typeof v === "string" ? v.split("\n") : [fmtPrimitive(v)];
+}
+
+/**
+ * Line-level diff of two block strings. Common prefix and suffix are trimmed
+ * first — a template edit touches one region, so this alone usually reduces
+ * the problem to a handful of lines — and the remaining middle goes through
+ * an LCS pass (or, past {@link MAX_LCS_CELLS}, renders as a wholesale
+ * replacement).
+ */
+function diffLines(oldLines: readonly string[], newLines: readonly string[]): LineOp[] {
+  let start = 0;
+  while (
+    start < oldLines.length &&
+    start < newLines.length &&
+    oldLines[start] === newLines[start]
+  ) {
+    start += 1;
+  }
+  let endOld = oldLines.length;
+  let endNew = newLines.length;
+  while (endOld > start && endNew > start && oldLines[endOld - 1] === newLines[endNew - 1]) {
+    endOld -= 1;
+    endNew -= 1;
+  }
+
+  const midOld = oldLines.slice(start, endOld);
+  const midNew = newLines.slice(start, endNew);
+  if (midOld.length * midNew.length > MAX_LCS_CELLS) {
+    return [
+      ...midOld.map((line): LineOp => ({ kind: "del", line })),
+      ...midNew.map((line): LineOp => ({ kind: "add", line })),
+    ];
+  }
+  return lcsDiff(midOld, midNew);
+}
+
+/** Classic LCS-length DP, walked back into an op list. */
+function lcsDiff(a: readonly string[], b: readonly string[]): LineOp[] {
+  const table: number[][] = [];
+  // Reads past the filled edge are the recurrence's base case: an empty suffix, length 0.
+  const cell = (i: number, j: number): number => table[i]?.[j] ?? 0;
+
+  for (let i = a.length - 1; i >= 0; i -= 1) {
+    const row = new Array<number>(b.length + 1).fill(0);
+    table[i] = row;
+    for (let j = b.length - 1; j >= 0; j -= 1) {
+      row[j] = a[i] === b[j] ? cell(i + 1, j + 1) + 1 : Math.max(cell(i + 1, j), cell(i, j + 1));
+    }
+  }
+
+  const ops: LineOp[] = [];
+  let i = 0;
+  let j = 0;
+  while (i < a.length && j < b.length) {
+    const left = a[i];
+    const right = b[j];
+    if (left === undefined || right === undefined) break;
+    if (left === right) {
+      ops.push({ kind: "same", line: left });
+      i += 1;
+      j += 1;
+    } else if (cell(i + 1, j) >= cell(i, j + 1)) {
+      ops.push({ kind: "del", line: left });
+      i += 1;
+    } else {
+      ops.push({ kind: "add", line: right });
+      j += 1;
+    }
+  }
+  for (const line of a.slice(i)) ops.push({ kind: "del", line });
+  for (const line of b.slice(j)) ops.push({ kind: "add", line });
+  return ops;
+}
+
+/**
+ * Render a changed block string as a header plus its changed lines. Context
+ * lines are deliberately omitted: the file is on disk, and the plan's job is
+ * to name what moved, not to reproduce the template.
+ */
+function renderBlockStringDiff(
+  paddedKey: string,
+  oldVal: string | number | boolean | null,
+  newVal: string | number | boolean | null,
+  prefixCol: number,
+  tty: boolean,
+  lines: string[],
+): void {
+  const pad = " ".repeat(prefixCol);
+  const bodyPad = " ".repeat(prefixCol + 4);
+  const changed = diffLines(asLines(oldVal), asLines(newVal)).filter((op) => op.kind !== "same");
+  const total = typeof newVal === "string" ? lineCount(newVal) : 1;
+  const fingerprints =
+    typeof oldVal === "string" && typeof newVal === "string"
+      ? `, sha256:${shortHash(oldVal)} -> sha256:${shortHash(newVal)}`
+      : "";
+
+  lines.push(
+    paint(
+      `${pad}~ ${paddedKey} = (${plural(changed.length, "line")} changed of ${total}${fingerprints})`,
+      A.yellow,
+      tty,
+    ),
+  );
+  for (const op of changed.slice(0, MAX_BLOCK_DIFF_LINES)) {
+    const del = op.kind === "del";
+    const line = escapeControlCharacters(op.line);
+    lines.push(paint(`${bodyPad}${del ? "-" : "+"} ${line}`, del ? A.red : A.green, tty));
+  }
+  const omitted = changed.length - MAX_BLOCK_DIFF_LINES;
+  if (omitted > 0) {
+    lines.push(`${bodyPad}  # (${plural(omitted, "more changed line")} not shown)`);
   }
 }
 
@@ -330,12 +523,12 @@ function renderDiff(
   lines: string[],
 ): boolean {
   const allKeys = [...new Set([...Object.keys(oldObj), ...Object.keys(newObj)])].sort();
-  const maxLen = allKeys.reduce((m, k) => Math.max(m, k.length), 0);
+  const maxLen = allKeys.reduce((m, k) => Math.max(m, fieldLabel(k).length), 0);
   const pad = " ".repeat(prefixCol);
   let hasChanges = false;
 
   for (const key of allKeys) {
-    const pk = key.padEnd(maxLen);
+    const pk = fieldLabel(key).padEnd(maxLen);
     const hasOld = Object.prototype.hasOwnProperty.call(oldObj, key);
     const hasNew = Object.prototype.hasOwnProperty.call(newObj, key);
     const oldVal = oldObj[key];
@@ -345,7 +538,7 @@ function renderDiff(
       hasChanges = true;
       const col = (s: string) => paint(s, A.green, tty);
       if (isPrimitive(newVal)) {
-        lines.push(col(`${pad}+ ${pk} = ${fmtPrimitive(newVal)}`));
+        lines.push(col(`${pad}+ ${pk} = ${fmtScalar(newVal)}`));
       } else if (Array.isArray(newVal)) {
         lines.push(col(`${pad}+ ${pk} = [`));
         renderArrayItems(newVal, "+", prefixCol + 4, { tty, deleteMode: false }, lines);
@@ -359,7 +552,7 @@ function renderDiff(
       hasChanges = true;
       const col = (s: string) => paint(s, A.red, tty);
       if (isPrimitive(oldVal)) {
-        lines.push(col(`${pad}- ${pk} = ${fmtPrimitive(oldVal)} -> null`));
+        lines.push(col(`${pad}- ${pk} = ${fmtScalar(oldVal)} -> null`));
       } else if (Array.isArray(oldVal)) {
         lines.push(col(`${pad}- ${pk} = [`));
         renderArrayItems(oldVal, "-", prefixCol + 4, { tty, deleteMode: false }, lines);
@@ -371,7 +564,14 @@ function renderDiff(
       }
     } else if (isPrimitive(oldVal) && isPrimitive(newVal)) {
       if (oldVal === newVal) {
-        lines.push(`${pad}  ${pk} = ${fmtPrimitive(newVal)}`);
+        lines.push(
+          isBlockString(newVal)
+            ? `${pad}  ${pk} = ${unchangedBlockSummary(newVal)}`
+            : `${pad}  ${pk} = ${fmtPrimitive(newVal)}`,
+        );
+      } else if (isBlockString(oldVal) || isBlockString(newVal)) {
+        hasChanges = true;
+        renderBlockStringDiff(pk, oldVal, newVal, prefixCol, tty, lines);
       } else {
         hasChanges = true;
         const col = (s: string) => paint(s, A.yellow, tty);
@@ -429,10 +629,10 @@ function renderDiff(
       const colR = (s: string) => paint(s, A.red, tty);
       const colA = (s: string) => paint(s, A.green, tty);
       if (isPrimitive(oldVal)) {
-        lines.push(colR(`${pad}- ${pk} = ${fmtPrimitive(oldVal)} -> null`));
+        lines.push(colR(`${pad}- ${pk} = ${fmtScalar(oldVal)} -> null`));
       }
       if (isPrimitive(newVal)) {
-        lines.push(colA(`${pad}+ ${pk} = ${fmtPrimitive(newVal)}`));
+        lines.push(colA(`${pad}+ ${pk} = ${fmtScalar(newVal)}`));
       }
     }
   }
@@ -563,27 +763,41 @@ function renderBlock(action: SyncAction, tty: boolean): string[] {
     }
 
     case "revise": {
-      const header = `${blkPad}# ${action.path} will publish a new revision`;
+      const headerSuffix = action.repin ? " (re-pin user_schema)" : "";
+      const header = `${blkPad}# ${action.path} will publish a new revision${headerSuffix}`;
       const opening = `${blkPad}~ resource "${action.syncer.kind}" "${resourceName(action.path)}" {`;
       lines.push(paint(header, A.bold, tty));
       lines.push(paint(opening, A.yellow, tty));
 
+      // A repin revision ships with `user_schema` rewritten to the revision
+      // id the schema revise mints (or already minted, for crash recovery) —
+      // render the content the executor will actually POST.
+      const newWithId: Record<string, unknown> = {
+        id: KNOWN_AFTER_APPLY,
+        ...normalized(action.syncer, action.content),
+        ...(action.repin ? { user_schema: action.repin.newId ?? KNOWN_AFTER_APPLY } : {}),
+      };
       if (action.oldContent) {
         const oldWithId: Record<string, unknown> = {
           id: action.previousId,
           ...normalized(action.syncer, action.oldContent),
         };
-        const newWithId: Record<string, unknown> = {
-          id: KNOWN_AFTER_APPLY,
-          ...normalized(action.syncer, action.content),
-        };
         renderDiff(oldWithId, newWithId, FIELD_COL, tty, lines);
+      } else if (action.repin) {
+        lines.push(
+          paint(
+            `${" ".repeat(FIELD_COL)}~ user_schema = "${action.repin.previousId}" -> ${action.repin.newId ? `"${action.repin.newId}"` : KNOWN_AFTER_APPLY}`,
+            A.yellow,
+            tty,
+          ),
+        );
       } else {
         lines.push(
           `${" ".repeat(FIELD_COL)}  # (field diff unavailable — no read endpoint for ${action.syncer.kind})`,
         );
       }
       lines.push(`${closePad}}`);
+      renderWarnings(action.warnings, blkPad, tty, lines);
       if (action.affectedPaths.length > 0) {
         lines.push(
           paint(

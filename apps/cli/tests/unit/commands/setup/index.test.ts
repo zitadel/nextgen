@@ -274,8 +274,8 @@ describe("setup command pre-flight", () => {
     expect(capture.body).toBeTruthy();
     expect(capture.body).toMatchObject({
       name: expect.any(String),
-      previewOrigins: expect.arrayContaining([expect.any(String)]),
-      seedDefaults: false,
+      preview_origins: expect.arrayContaining([expect.any(String)]),
+      seed_defaults: false,
     });
     const projectName = capture.body?.name;
     expect(typeof projectName).toBe("string");
@@ -283,6 +283,125 @@ describe("setup command pre-flight", () => {
       throw new Error("expected create-project payload name to be a string");
     }
     expect(projectName.trim().length).toBeGreaterThan(0);
+  });
+
+  it("warns about the split brand pane's narrow-container fallback, not about this app", async () => {
+    const cwd = await makeTempDir();
+    // Widget posture (a pre-existing Next app, ADR 044): the card is meant to
+    // move into a layout the CLI doesn't own, so a narrow container is the
+    // likely end state.
+    await mkdir(join(cwd, "app"), { recursive: true });
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({ name: "demo", dependencies: { next: "^16" } }),
+    );
+    const capture = await startCreateProjectCaptureServer();
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--design",
+      "split-right",
+      "--server",
+      capture.url,
+      "--non-interactive",
+      "--json",
+      "--skip-install",
+    ]);
+
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as { status: string; warnings: string[] };
+    expect(json.status).toBe("ok");
+    expect(json.warnings).toHaveLength(1);
+    // The wrapper setup scaffolds around the widget is full-width, so the
+    // brand pane does render in the page we just wrote. Telling the user it
+    // shows the compact mark "instead" sends them hunting a rendering bug
+    // that isn't happening — the warning states the container-width contract
+    // and the branding.json fix for the narrow case.
+    expect(json.warnings[0]).not.toMatch(/this app/i);
+    expect(json.warnings[0]).toContain("container is wide");
+    expect(json.warnings[0]).toContain(".zitadel/branding/branding.json");
+  });
+
+  it("warns in page posture too — the collapse is a container query, not a posture", async () => {
+    const cwd = await makeTempDir();
+    // A pre-existing React app: not route-based, so `derivePosture` returns
+    // "page" without a scaffold (ADR 044). A full-page split login hits the
+    // same collapse on a phone that an embedded card hits in a sidebar, and
+    // the template emits no compact mark without logo_url/hero_url — so
+    // suppressing the advice here would leave that dead state unexplained.
+    await mkdir(join(cwd, "src"), { recursive: true });
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({ name: "demo", dependencies: { react: "^19", vite: "^7" } }),
+    );
+    // The React patcher merges the /__nextgen dev proxy into the Vite config
+    // and fails loudly without one.
+    await writeFile(
+      join(cwd, "vite.config.ts"),
+      'import { defineConfig } from "vite";\n\nexport default defineConfig({});\n',
+    );
+    const capture = await startCreateProjectCaptureServer();
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--design",
+      "split",
+      "--server",
+      capture.url,
+      "--non-interactive",
+      "--json",
+      "--skip-install",
+    ]);
+
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as { status: string; warnings: string[] };
+    expect(json.status).toBe("ok");
+    expect(json.warnings).toHaveLength(1);
+    expect(json.warnings[0]).toContain("The split design");
+    expect(json.warnings[0]).toContain(".zitadel/branding/branding.json");
+  });
+});
+
+describe("setup --renderer surface", () => {
+  it("--help advertises only implemented renderers", async () => {
+    const res = await runCliForTest(["setup", "--help"]);
+
+    expect(res.exitCode).toBe(0);
+    // oclif renders the flag's `options` as `<options: a|b>`; a renderer that
+    // getRenderer would reject with E_NOT_IMPLEMENTED must not be offered as
+    // a selectable value, only mentioned as not yet available (ADR 006).
+    // Whitespace is collapsed because oclif wraps help text mid-sentence.
+    const help = res.stdout.replace(/\s+/g, " ");
+    expect(res.stdout).toContain("<options: react>");
+    expect(help).not.toContain("react|web-component");
+    expect(help).toContain("Not yet available: web-component.");
+  });
+
+  it("rejects a declared-but-unpublished renderer at parse time", async () => {
+    const cwd = await makeTempDir();
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--renderer",
+      "web-component",
+      "--non-interactive",
+      "--json",
+    ]);
+
+    // Fails during flag parsing — before any remote project is created. The
+    // registry's E_NOT_IMPLEMENTED path still guards renderer ids read from
+    // persisted config (see the renderer registry unit tests).
+    expect(res.exitCode).toBe(3);
+    const json = parseJson(res.stdout) as { status: string; code: string; message: string };
+    expect(json.status).toBe("error");
+    expect(json.code).toBe("E_VALIDATION");
+    expect(json.message).toContain("web-component");
   });
 });
 
@@ -335,10 +454,10 @@ async function startCreateProjectCaptureServer(): Promise<{
         JSON.stringify({
           id: "proj_test",
           name: "demo",
-          projectSecret: "sk_proj_test_full",
-          previewSecret: "sk_proj_test_preview",
-          previewOrigins: [],
-          createdAt: "2026-06-01T00:00:00.000Z",
+          project_secret: "sk_proj_test_full",
+          preview_secret: "sk_proj_test_preview",
+          preview_origins: [],
+          created_at: "2026-06-01T00:00:00.000Z",
         }),
       );
       return;
@@ -347,7 +466,7 @@ async function startCreateProjectCaptureServer(): Promise<{
       res.writeHead(201, { "content-type": "application/json" }).end(
         JSON.stringify({
           id: "sch_test",
-          createdAt: "2026-06-01T00:00:00.000Z",
+          created_at: "2026-06-01T00:00:00.000Z",
         }),
       );
       return;
@@ -356,7 +475,17 @@ async function startCreateProjectCaptureServer(): Promise<{
       res.writeHead(201, { "content-type": "application/json" }).end(
         JSON.stringify({
           id: "flow_test",
-          createdAt: "2026-06-01T00:00:00.000Z",
+          created_at: "2026-06-01T00:00:00.000Z",
+        }),
+      );
+      return;
+    }
+    if (req.method === "POST" && path === "/branding") {
+      res.writeHead(201, { "content-type": "application/json" }).end(
+        JSON.stringify({
+          id: "brand_test",
+          revision: 1,
+          created_at: "2026-06-01T00:00:00.000Z",
         }),
       );
       return;

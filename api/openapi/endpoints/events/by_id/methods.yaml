@@ -1,0 +1,53 @@
+get:
+  operationId: getEvent
+  summary: Get event by ID
+  description: |
+    Loads a single event by `(project_id, id)`. Requires `events.read`.
+    Events are not registered in `resource_scope_index`; project scope is
+    required on the query (ADR 049). Misses and cross-project ids return 404.
+
+    Pre-claim projects return 404 (stored events stay invisible until claim).
+  tags:
+    - Events
+  security:
+    - oauth2:
+        - events.read
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Managed event id (`evt_<opaque>`).
+    - $ref: ../../../components/parameters/project-id.yaml
+  responses:
+    '200':
+      description: The event was retrieved successfully.
+      content:
+        application/json:
+          schema:
+            $ref: ../event.yaml
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '403':
+      description: Insufficient permissions.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '404':
+      description: No event was found for the given project and id (or the project is pre-claim).
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    default:
+      description: Unexpected error response.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml

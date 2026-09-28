@@ -1,0 +1,14 @@
+type: string
+description: |
+  Field to sort users by. Only stored columns are sortable: the keyset cursor
+  holds the last row's sort values, so a value computed per request would skip
+  or duplicate rows between pages.
+
+  Sorting by `lifecycle_owner_team_id` groups self-owned users together, since
+  the column is null for them.
+enum:
+  - created_at
+  - id
+  - schema
+  - status
+  - lifecycle_owner_team_id

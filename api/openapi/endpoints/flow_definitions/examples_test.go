@@ -24,10 +24,11 @@ var exampleUserSchema = []byte(`{
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.com/schemas/flow-engine-examples-user.json",
   "type": "object",
+  "x-identifier": "email",
   "required": ["email"],
   "x-auth-methods": {
-    "password": { "enabled": true, "position": 1 },
-    "passkey":  { "enabled": true, "position": 2 }
+    "password": { "enabled": true },
+    "passkey":  { "enabled": true }
   },
   "properties": {
     "email":       { "type": "string", "format": "email", "x-unique": "project" },
@@ -135,4 +136,26 @@ func TestDefaultLoginFlowDefinition(t *testing.T) {
 
 	_, err = domain.ValidateFlowDefinition(&userSchema, *defs[0])
 	require.NoError(t, err)
+
+	// Regression guard for #1084: convertStepTransitions must preserve each
+	// transition's purpose through embedded default-flow seeding, or the
+	// Sign Up / Sign In navigations lose their re-purposing and the engine
+	// desyncs.
+	var identifierStep, registerStep *domain.FlowDefinitionStep
+	for i, step := range defs[0].Steps {
+		switch step.Name {
+		case "identifier":
+			identifierStep = &defs[0].Steps[i]
+		case "register":
+			registerStep = &defs[0].Steps[i]
+		}
+	}
+	require.NotNil(t, identifierStep, "default-login.json must have an identifier step")
+	require.NotNil(t, registerStep, "default-login.json must have a register step")
+
+	require.NotNil(t, identifierStep.Transitions["register"].Purpose, "identifier->register transition must preserve purpose")
+	require.Equal(t, domain.FlowDefinitionPurposeRegister, *identifierStep.Transitions["register"].Purpose)
+
+	require.NotNil(t, registerStep.Transitions["sign_in"].Purpose, "register->sign_in transition must preserve purpose")
+	require.Equal(t, domain.FlowDefinitionPurposeLogin, *registerStep.Transitions["sign_in"].Purpose)
 }

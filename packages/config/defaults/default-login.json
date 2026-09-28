@@ -21,21 +21,22 @@
           "text_key": "identifier.action.continue"
         },
         {
-          "name": "passkey",
-          "kind": "passkey",
+          "name": "register",
+          "kind": "navigate",
           "primary": false,
-          "text_key": "identifier.action.passkey"
+          "text_key": "identifier.action.register.link"
         }
       ],
       "transitions": {
         "submit": {
           "target": "password"
         },
-        "passkey": {
-          "target": "done"
-        },
         "user_not_found": {
           "target": "register"
+        },
+        "register": {
+          "target": "register",
+          "purpose": "register"
         }
       }
     },
@@ -50,19 +51,10 @@
           "kind": "submit",
           "primary": true,
           "text_key": "password.action.signin"
-        },
-        {
-          "name": "passkey",
-          "kind": "passkey",
-          "primary": false,
-          "text_key": "password.action.passkey"
         }
       ],
       "transitions": {
         "submit": {
-          "target": "done"
-        },
-        "passkey": {
           "target": "done"
         }
       }
@@ -80,21 +72,22 @@
           "text_key": "register.action.password"
         },
         {
-          "name": "passkey_register",
-          "kind": "passkey_register",
+          "name": "sign_in",
+          "kind": "navigate",
           "primary": false,
-          "text_key": "register.action.passkey"
+          "text_key": "register.action.sign_in.link"
         }
       ],
       "transitions": {
         "submit": {
           "target": "register-password"
         },
-        "passkey_register": {
-          "target": "done"
-        },
         "user_already_exists": {
           "target": "password"
+        },
+        "sign_in": {
+          "target": "identifier",
+          "purpose": "login"
         }
       }
     },

@@ -1,4 +1,17 @@
+import { afterEach, beforeEach } from "vitest";
+import { _resetConfigForTesting } from "@zitadel/api/config";
 import "@testing-library/jest-dom/vitest";
+
+// configureZitadel is write-once on globalThis so duplicate module copies
+// share one slot. That slot also survives Vitest's per-file isolate, and
+// this file's top-level body is not guaranteed to re-run for every spec in
+// a worker. A file that bound the DEV `/api` default then leaked it into
+// later files: CI fetched `http://localhost:3000/api` while MSW waited on
+// `http://localhost/api`. Reset before and after each test so the next
+// file's module init sees an empty slot even when setupFiles are cached.
+_resetConfigForTesting();
+beforeEach(_resetConfigForTesting);
+afterEach(_resetConfigForTesting);
 
 // @ts-expect-error Needed for tests
 global.IS_REACT_ACT_ENVIRONMENT = true;
@@ -44,8 +57,23 @@ if (typeof window !== "undefined") {
   window.scrollTo = (() => undefined) as typeof window.scrollTo;
 }
 
-// Hermetic env: Vitest (via Vite) loads `.env.local`, so without this stub a
-// developer's local VITE_CONSOLE_PROJECT_ID would leak into test requests and
-// make outcomes depend on gitignored local files. Specs that need a value
-// stub their own (vi.stubEnv wins over this default).
+// jsdom implements no Pointer Capture API and no scrollIntoView. Radix's
+// popover/dropdown triggers call `hasPointerCapture` while deciding whether a
+// pointerdown became a drag, and cmdk scrolls its active option into view — so
+// without these a combobox never opens under test (the click is swallowed
+// before Radix toggles state).
+if (typeof Element !== "undefined") {
+  Element.prototype.hasPointerCapture ??= () => false;
+  Element.prototype.releasePointerCapture ??= () => undefined;
+  Element.prototype.setPointerCapture ??= () => undefined;
+  Element.prototype.scrollIntoView ??= () => undefined;
+}
+
+// Hermetic env: Vitest (via Vite) loads `.env.local`, so without these stubs a
+// developer's local VITE_CONSOLE_PROJECT_ID would leak into test requests, and
+// a local VITE_CONSOLE_RUNTIME_FALLBACK would turn runtime-discovery failures
+// back into the standalone fallback (Console ADR 0004 §3) — both make outcomes
+// depend on gitignored local files. Specs that need a value stub their own
+// (vi.stubEnv wins over these defaults).
 vi.stubEnv("VITE_CONSOLE_PROJECT_ID", "");
+vi.stubEnv("VITE_CONSOLE_RUNTIME_FALLBACK", "");

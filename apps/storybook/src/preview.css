@@ -1,8 +1,8 @@
 /* Dark canvas matching the design system's only published mode (ADR 014). */
 body.sb-show-main {
-  background: var(--zl-color-surface-default-black, #0f0f11);
-  color: var(--zl-color-text-primary-white, #f4f4f6);
-  font-family: var(--zl-font-family-sans, system-ui, sans-serif);
+  background: var(--zl-background);
+  color: var(--zl-foreground);
+  font-family: var(--zl-font-family-sans);
 }
 
 /*
@@ -12,8 +12,8 @@ body.sb-show-main {
  * behind the light atom text and contrast checks pass.
  */
 .sb-canvas {
-  background: var(--zl-color-surface-default-black, #0f0f11);
-  color: var(--zl-color-text-primary-white, #f4f4f6);
-  font-family: var(--zl-font-family-sans, system-ui, sans-serif);
+  background: var(--zl-background);
+  color: var(--zl-foreground);
+  font-family: var(--zl-font-family-sans);
   padding: 2rem;
 }

@@ -1,0 +1,4 @@
+<!-- A portrait lockup with a real intrinsic size and a 1:4 ratio. Unlike
+     `square-unsized-asset.svg` this one is not bounded by the brand pane's
+     width cap: clamped to 16rem wide it still resolves to 1024px tall. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="500" height="2000" viewBox="0 0 500 2000" role="img" aria-label="tall test asset"><rect width="500" height="2000" rx="24" fill="#bba5e4"/></svg>

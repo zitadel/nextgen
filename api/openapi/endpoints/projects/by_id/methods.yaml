@@ -17,13 +17,18 @@ get:
         # browser-plane preview secret, so it cannot gate an operator read
         # until ADR 036 splits the credential planes into distinct schemes.
         - project.write
+    # A signed-in person holding a grant on the project (root ADR 053 §6):
+    # `GET /users/me/projects` lists it for them, so they must be able to
+    # open it. Authorization is the same project check the secret goes
+    # through, evaluated for the session's user principal.
+    - nextgenSession: []
   responses:
     '200':
       description: Project state.
       content:
         application/json:
           schema:
-            $ref: ../get-project-response.yaml
+            $ref: ../project-response.yaml
     '401':
       description: Missing or invalid credentials.
       content:
@@ -37,11 +42,7 @@ get:
           schema:
             $ref: ../../../components/error-details.yaml
     default:
-      description: Unexpected error response.
-      content:
-        application/json:
-          schema:
-            $ref: ../../../components/error-details.yaml
+      $ref: getProject-error-response.yaml
 
 patch:
   operationId: patchProject
@@ -59,6 +60,9 @@ patch:
   security:
     - oauth2:
         - project.write
+    # Same as getProject: a granted person may rename a project they can act
+    # on, subject to the project write check for their principal.
+    - nextgenSession: []
   requestBody:
     description: The new state of the project.
     required: true
@@ -72,7 +76,7 @@ patch:
       content:
         application/json:
           schema:
-            $ref: ../get-project-response.yaml
+            $ref: ../project-response.yaml
     '400':
       description: Invalid request body.
       content:
@@ -92,8 +96,4 @@ patch:
           schema:
             $ref: ../../../components/error-details.yaml
     default:
-      description: Unexpected error response.
-      content:
-        application/json:
-          schema:
-            $ref: ../../../components/error-details.yaml
+      $ref: patchProject-error-response.yaml

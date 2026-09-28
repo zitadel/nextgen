@@ -14,25 +14,18 @@ type FakeSecuritySource struct {
 	Token  string
 	Scopes []string
 
-	Username string
-	Password string
-	Roles    []string
-
 	SessionToken string
 }
 
 func (f FakeSecuritySource) OAuth2(ctx context.Context, operationName api.OperationName) (api.OAuth2, error) {
+	// Skip empty oauth2 only when a session cookie is set; both empty still
+	// sends Bearer so oauth2-only 401 tests reach the server.
+	if f.Token == "" && f.SessionToken != "" {
+		return api.OAuth2{}, ogenerrors.ErrSkipClientSecurity
+	}
 	return api.OAuth2{
 		Token:  f.Token,
 		Scopes: f.Scopes,
-	}, nil
-}
-
-func (f FakeSecuritySource) UsernamePassword(ctx context.Context, operationName api.OperationName) (api.UsernamePassword, error) {
-	return api.UsernamePassword{
-		Username: f.Username,
-		Password: f.Password,
-		Roles:    f.Roles,
 	}, nil
 }
 
@@ -74,28 +67,43 @@ func NewApiClient(
 func (c *ApiClient) SetToken(token string) {
 	c.securitySource.Token = token
 }
+func (c *ApiClient) Token() string {
+	return c.securitySource.Token
+}
 func (c *ApiClient) SetScopes(scopes []string) {
 	c.securitySource.Scopes = scopes
-}
-func (c *ApiClient) SetUsername(username string) {
-	c.securitySource.Username = username
-}
-func (c *ApiClient) SetPassword(password string) {
-	c.securitySource.Password = password
-}
-func (c *ApiClient) SetRoles(roles []string) {
-	c.securitySource.Roles = roles
 }
 func (c *ApiClient) SetSessionToken(token string) {
 	c.securitySource.SessionToken = token
 }
 
+// ProjectSecret mints the project's bearer, for tests that send a raw request
+// instead of going through the generated client.
+func (h *Harness) ProjectSecret(t *testing.T, project *domain.Project) string {
+	t.Helper()
+
+	secret, err := h.EnsureTokenService(t).GenerateJWE(t.Context(), project.Token())
+	require.NoError(t, err)
+
+	return secret
+}
+
 func (h *Harness) SetProjectSecretOnApiClient(t *testing.T, client *ApiClient, project *domain.Project) {
 	t.Helper()
 
-	dek, err := h.EnsureKeyService(t).GetProjectDEKCrypter(t.Context(), project.ID)
-	require.NoError(t, err)
-	secret, err := project.ProjectSecret(dek)
+	client.SetToken(h.ProjectSecret(t, project))
+}
+
+// SetScopedTokenOnApiClient mints a bearer with exactly the given scopes.
+// Production only mints project and preview secrets, so this is the only way
+// for a test to hold a finer scope like session.read until ADR 036's
+// credential planes mint such tokens for real.
+func (h *Harness) SetScopedTokenOnApiClient(t *testing.T, client *ApiClient, project *domain.Project, scopes ...string) {
+	t.Helper()
+
+	tok := project.Token()
+	tok.Scope = scopes
+	secret, err := h.EnsureTokenService(t).GenerateJWE(t.Context(), tok)
 	require.NoError(t, err)
 
 	client.SetToken(secret)
@@ -104,9 +112,8 @@ func (h *Harness) SetProjectSecretOnApiClient(t *testing.T, client *ApiClient, p
 func (h *Harness) SetPreviewSecretOnApiClient(t *testing.T, client *ApiClient, project *domain.Project) {
 	t.Helper()
 
-	dek, err := h.EnsureKeyService(t).GetProjectDEKCrypter(t.Context(), project.ID)
-	require.NoError(t, err)
-	secret, err := project.PreviewSecret(dek)
+	token := project.PreviewToken()
+	secret, err := h.EnsureTokenService(t).GenerateJWE(t.Context(), token)
 	require.NoError(t, err)
 
 	client.SetToken(secret)

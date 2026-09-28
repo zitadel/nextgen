@@ -1,107 +1,78 @@
-import { readFileSync } from "node:fs";
-import { isAbsolute, join, relative, resolve } from "node:path";
-
 import { ZitadelError } from "../errors";
+import {
+  type FileReferenceContext,
+  inlineFileReferences,
+  restoreFileReferences,
+} from "../local-files";
 
 /**
  * Relative directory (from the project root) where local branding files live:
  * the `branding.json` descriptor plus the sibling `.liquid` template it
  * references. Owned here so commands, syncers, and tests share one source of
- * truth; only `*.json` files are sync-discovered, the template rides along
- * via `liquid_template_file`.
+ * truth; only `*.json` files are sync-discovered, the template rides along as
+ * a `$file` reference in `liquid_template`.
  */
 export const BRANDING_DIR = ".zitadel/branding";
 
-type BrandingDescriptor = {
-  liquid_template?: string;
-  liquid_template_file?: string;
-  [key: string]: unknown;
-};
+/**
+ * The key descriptors used before `$file` references. It is still recognised
+ * so plan can say how to migrate instead of reporting an unknown key.
+ */
+const LEGACY_TEMPLATE_FILE_KEY = "liquid_template_file";
 
 /**
- * Resolves a descriptor's `liquid_template_file` reference to an absolute
- * path. References are relative to the descriptor's directory (all
- * descriptors live flat in {@link BRANDING_DIR}) and must stay inside the
- * project — a reference escaping `cwd` is an error because apply would later
- * write server state back to that path.
+ * References in a descriptor resolve against its directory; all descriptors
+ * live flat in {@link BRANDING_DIR}.
  */
-export function resolveTemplatePath(cwd: string, ref: string): string {
-  const absolute = isAbsolute(ref) ? ref : resolve(join(cwd, BRANDING_DIR), ref);
-  const rel = relative(cwd, absolute);
-  if (rel.startsWith("..") || isAbsolute(rel)) {
-    throw new ZitadelError(
-      "E_VALIDATION",
-      `liquid_template_file ${JSON.stringify(ref)} points outside the project`,
-      { hint: `Keep the template next to its descriptor in ${BRANDING_DIR}/.` },
-    );
+const referenceContext = (cwd: string): FileReferenceContext => ({ cwd, baseDir: BRANDING_DIR });
+
+/** E_VALIDATION with a migration hint when a descriptor still carries `liquid_template_file`. */
+export function assertNoLegacyTemplateKey(data: object): void {
+  const legacy = (data as Record<string, unknown>)[LEGACY_TEMPLATE_FILE_KEY];
+  if (legacy === undefined) {
+    return;
   }
-  return absolute;
+  const path = typeof legacy === "string" ? legacy : "./login.liquid";
+  throw new ZitadelError("E_VALIDATION", `${LEGACY_TEMPLATE_FILE_KEY} is no longer supported`, {
+    hint: `Replace it with "liquid_template": { "$file": ${JSON.stringify(path)} }.`,
+  });
 }
 
 /**
- * Returns the template string a descriptor carries — the inline
- * `liquid_template`, or the content of `liquid_template_file`. Returns
- * undefined when the descriptor has neither (a legal descriptor that only
- * sets layout/asset URLs).
+ * Returns the template string a descriptor carries, inline or behind a
+ * `$file` reference. Undefined when it has none (a legal descriptor that only
+ * sets layout or asset URLs); E_VALIDATION when a reference cannot be read.
  */
 export function readDescriptorTemplate(cwd: string, data: object): string | undefined {
-  const descriptor = data as BrandingDescriptor;
-  if (typeof descriptor.liquid_template === "string") {
-    return descriptor.liquid_template;
-  }
-  if (typeof descriptor.liquid_template_file !== "string") {
-    return undefined;
-  }
-  const path = resolveTemplatePath(cwd, descriptor.liquid_template_file);
-  try {
-    return readFileSync(path, "utf8");
-  } catch (error) {
-    throw new ZitadelError(
-      "E_VALIDATION",
-      `liquid_template_file ${JSON.stringify(descriptor.liquid_template_file)} cannot be read`,
-      {
-        hint: "Create the template file or fix the reference; the `branding eject` command scaffolds a starting point.",
-        details: { cause: error instanceof Error ? error.message : String(error) },
-      },
-    );
-  }
+  const { liquid_template } = inlineFileReferences(
+    data as { liquid_template?: unknown },
+    referenceContext(cwd),
+    { onMissing: "throw" },
+  );
+  return typeof liquid_template === "string" ? liquid_template : undefined;
 }
 
 /**
- * Converts a local descriptor to the wire body of `POST /branding`: strips
- * the editor `$schema` affordance and replaces `liquid_template_file` with
- * the inlined template content. Non-throwing on a missing template file (the
- * field is simply left out) — `validate` reports that case with a hint
- * before any planning happens.
+ * Converts a local descriptor to the wire body of `POST /branding`: strips the
+ * editor `$schema` affordance and inlines every `$file` reference. Non-throwing
+ * on an unreadable file (the field is left out) so normalizing and hashing stay
+ * total; `validate` reports that case with a hint before any planning happens.
  */
 export function toBrandingWireBody(cwd: string, data: object): object {
-  const { $schema, liquid_template_file, ...rest } = data as BrandingDescriptor & {
-    $schema?: string;
-  };
+  const { $schema, ...rest } = data as { $schema?: unknown };
   void $schema;
-  const out: Record<string, unknown> = { ...rest };
-  if (typeof liquid_template_file === "string" && out.liquid_template === undefined) {
-    try {
-      out.liquid_template = readFileSync(resolveTemplatePath(cwd, liquid_template_file), "utf8");
-    } catch {
-      // Reported by validate(); keep normalize/hashing total.
-    }
-  }
-  return out;
+  return inlineFileReferences(rest, referenceContext(cwd), { onMissing: "omit" });
 }
 
 /**
- * Converts the server's canonical wire body back to the local descriptor
- * form: when the local descriptor references a template file, the template
- * string moves back out of the JSON into that reference. The caller writes
- * the template content to the referenced file separately.
+ * Converts the server's canonical wire body back to the local descriptor form:
+ * wherever the local descriptor holds a `$file` reference, the canonical value
+ * is written to that file when it differs and the JSON keeps the reference.
  */
-export function toLocalBrandingBody(canonicalWire: object, localData: object): object {
-  const local = localData as BrandingDescriptor;
-  if (typeof local.liquid_template_file !== "string") {
-    return canonicalWire;
-  }
-  const { liquid_template, ...rest } = canonicalWire as BrandingDescriptor;
-  void liquid_template;
-  return { ...rest, liquid_template_file: local.liquid_template_file };
+export function toLocalBrandingBody(
+  cwd: string,
+  canonicalWire: object,
+  localData: object,
+): { document: object; written: string[] } {
+  return restoreFileReferences(canonicalWire, localData, referenceContext(cwd));
 }

@@ -1,0 +1,10 @@
+title: AuthFactorPayload
+type: object
+description: Payload for `auth.factor.*` events.
+required:
+  - user_id
+properties:
+  user_id:
+    type: string
+  factor_id:
+    type: string

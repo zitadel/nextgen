@@ -37,12 +37,16 @@ type Schemas struct {
 
 type DataGenerator struct{}
 
-// GenerateUser generates a user according to the [default-human-user-schema.json]
+// UserSchemaURL names the schema the generated attributes satisfy.
+const UserSchemaURL = "https://test.example.schemas.com/schemas/default-human-user.json"
+
+// GenerateUser generates the attributes of a user according to the
+// [default-human-user-schema.json]. The result is the document the schema
+// validates, so it carries no envelope fields.
 func (g *DataGenerator) GenerateUser(t *testing.T, email string) map[string]any {
 	t.Helper()
 
 	u := map[string]any{
-		"$schema":    "https://test.example.schemas.com/schemas/default-human-user.json",
 		"email":      email,
 		"password":   "my-strong-password",
 		"givenName":  faker.FirstName(),

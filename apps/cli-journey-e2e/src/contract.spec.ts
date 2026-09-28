@@ -25,6 +25,33 @@ test("setup completed and installed local registry packages", async () => {
   });
 });
 
+test("doctor detects and repairs managed-file drift", async () => {
+  const outputDir = requiredEnv("JOURNEY_OUTPUT_DIR");
+  const metadata = JSON.parse(await readFile(join(outputDir, "metadata.json"), "utf8"));
+  test.skip(metadata.framework !== "next", "the drift probe runs on the Next suite only");
+
+  type Check = { name: string; status: string };
+  const drift = JSON.parse(await readFile(join(outputDir, "doctor-drift.json"), "utf8")) as {
+    status: string;
+    code: string;
+    details?: { checks?: Check[] };
+  };
+  expect(drift.status).toBe("error");
+  expect(drift.code).toBe("E_VALIDATION");
+  const driftCheck = (drift.details?.checks ?? []).find((check) => check.name === "managed-files");
+  expect(driftCheck?.status).toBe("fail");
+
+  const fix = JSON.parse(await readFile(join(outputDir, "doctor-fix.json"), "utf8")) as {
+    status: string;
+    data: { ok: boolean; checks?: Check[] };
+  };
+  expect(fix.status).toBe("ok");
+  expect(fix.data.ok).toBe(true);
+  expect(
+    (fix.data.checks ?? []).find((check) => check.name === "managed-files")?.status,
+  ).toBe("pass");
+});
+
 async function expectLocalLockfileResolution(input: {
   appDir: string;
   registryUrl: string;

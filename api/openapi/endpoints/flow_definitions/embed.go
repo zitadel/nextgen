@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"slices"
 	"strings"
 
 	api "github.com/zitadel/nextgen/api/generated"
@@ -67,6 +68,9 @@ func DefaultLoginFlowDefinitions(serverURL string, projectID string, userSchemaU
 			steps,
 			status,
 		)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return defs, nil
@@ -117,7 +121,7 @@ func convertSteps(steps []api.FlowDefinitionStep) ([]domain.FlowDefinitionStep, 
 			Fields:       domain.FieldsFromStrings(step.GetFields()),
 			Actions:      actions,
 			Gates:        gates,
-			SSOProviders: convertStepSSOProviders(step.GetSSOProviders()),
+			SSOProviders: slices.Clone(step.GetSSOProviders()),
 			OnSuccess:    onSuccess,
 			Complete:     complete,
 			Transitions:  transitions,
@@ -139,20 +143,42 @@ func convertStepTransitions(transitions api.OptFlowDefinitionStepTransitions) (m
 			return nil, err
 		}
 
+		purpose, err := convertStepTransitionPurpose(transition.GetPurpose())
+		if err != nil {
+			return nil, err
+		}
+
 		ret[name] = domain.FlowStepTransition{
-			Action: action,
-			Target: transition.GetTarget(),
+			Action:  action,
+			Target:  transition.GetTarget(),
+			Purpose: purpose,
 		}
 	}
 	return ret, nil
 }
 
-func convertStepTransitionAction(action api.OptNilFlowDefinitionStepTransitionsItemAction) (*domain.FlowDefinitionTransitionAction, error) {
-	if !action.IsSet() {
+func convertStepTransitionPurpose(purpose api.OptNilFlowDefinitionStepTransitionsItemPurpose) (*domain.FlowDefinitionPurpose, error) {
+	// Get() is false for absent and explicit-null values alike; IsSet() alone
+	// would map an explicit `null` to the zero enum and fail the conversion.
+	value, ok := purpose.Get()
+	if !ok {
 		return nil, nil
 	}
 
-	ret, err := domain.FlowDefinitionTransitionActionString(string(action.Value))
+	ret, err := domain.FlowDefinitionPurposeString(string(value))
+	if err != nil {
+		return nil, err
+	}
+	return &ret, nil
+}
+
+func convertStepTransitionAction(action api.OptNilFlowDefinitionStepTransitionsItemAction) (*domain.FlowDefinitionTransitionAction, error) {
+	value, ok := action.Get()
+	if !ok {
+		return nil, nil
+	}
+
+	ret, err := domain.FlowDefinitionTransitionActionString(string(value))
 	if err != nil {
 		return nil, err
 	}
@@ -181,18 +207,6 @@ func convertOnSuccess(success api.OptFlowDefinitionStepOnSuccess) (*domain.FlowO
 		return nil, err
 	}
 	return &ret, nil
-}
-
-func convertStepSSOProviders(providers []api.SSOProvider) []domain.FlowSSOProvider {
-	ret := make([]domain.FlowSSOProvider, len(providers))
-	for i, ssoProvider := range providers {
-		ret[i] = domain.FlowSSOProvider{
-			ID:       ssoProvider.GetID(),
-			Name:     ssoProvider.GetName(),
-			Template: ssoProvider.GetTemplate(),
-		}
-	}
-	return ret
 }
 
 func convertStepGates(gates api.OptFlowDefinitionStepGates) (map[string]domain.FlowStepGate, error) {

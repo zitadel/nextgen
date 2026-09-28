@@ -3,15 +3,17 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 
+	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
 // consoleRuntimePath is where the embedded console discovers its pre-session
-// runtime metadata (Console ADR 0004 §2). Served by the mux directly — like
+// runtime metadata (Console ADR 0004 §3). Served by the mux directly — like
 // the static UI mounts, this is a console-internal contract, deliberately
 // outside the OpenAPI product surface.
 const consoleRuntimePath = "/console/runtime.json"
@@ -23,12 +25,12 @@ const ConsoleModeStandalone = "standalone"
 // consoleRuntime is the payload of GET /console/runtime.json. Every field is
 // public runtime metadata in the root ADR 005 sense — ids and an enum, never
 // secrets or feature inventories (per-surface gating rides effective
-// permissions, Console ADR 0004 §4).
+// permissions, Console ADR 0004 §5).
 type consoleRuntime struct {
 	// Mode is "standalone" or, in the future, "platform".
 	Mode string `json:"mode"`
 	// ConsoleProjectID is the one project the console signs into and
-	// manages: the resolved default in standalone (Console ADR 0004 §3),
+	// manages: the resolved default in standalone (Console ADR 0004 §2),
 	// the platform project in future platform mode. Omitted while the
 	// deployment has no project yet — the customer's integration
 	// (`zitadel setup`) creates the first project, which becomes the
@@ -50,8 +52,13 @@ type runtimeResolver func(ctx context.Context) (consoleRuntime, error)
 
 // standaloneRuntimeResolver resolves the standalone runtime document from
 // the deployment's default project (configured pin or first-created),
-// including the project's publishable key derived from its DEK.
-func standaloneRuntimeResolver(projects service.ProjectService, keys service.KeyService, cfgProjectID string) runtimeResolver {
+// including the project's publishable key derived from its token encryption key.
+func standaloneRuntimeResolver(
+	projects service.ProjectService,
+	tokens service.TokenService,
+	keys service.KeyService,
+	cfgProjectID string,
+) runtimeResolver {
 	return func(ctx context.Context) (consoleRuntime, error) {
 		project, err := projects.DefaultProject(ctx, cfgProjectID)
 		if err != nil {
@@ -63,17 +70,36 @@ func standaloneRuntimeResolver(projects service.ProjectService, keys service.Key
 		}
 		meta.ConsoleProjectID = project.ID
 
-		dek, err := keys.GetProjectDEKCrypter(ctx, project.ID)
+		key, err := publishableKey(ctx, tokens, keys, project)
 		if err != nil {
 			return consoleRuntime{}, err
 		}
-		publishableKey, err := project.PreviewSecret(dek)
-		if err != nil {
-			return consoleRuntime{}, err
-		}
-		meta.PublishableKey = publishableKey
+		meta.PublishableKey = key
 		return meta, nil
 	}
+}
+
+func publishableKey(
+	ctx context.Context,
+	tokens service.TokenService,
+	keys service.KeyService,
+	project *domain.Project,
+) (string, error) {
+	previewToken, err := tokens.GetActivePreviewToken(ctx, project.ID)
+	if err != nil {
+		// No record yet (or none that still grants anything): mint one. Any
+		// other failure is a real one and must not silently issue a key.
+		if !errors.Is(err, domain.TokenNotFound()) {
+			return "", err
+		}
+		return tokens.GenerateJWE(ctx, project.PreviewToken())
+	}
+
+	tokenCrypter, err := keys.GetProjectCrypter(ctx, project.ID, domain.EncryptionKeyPurposeToken)
+	if err != nil {
+		return "", err
+	}
+	return previewToken.JWE(tokenCrypter)
 }
 
 // newConsoleRuntimeHandler serves the runtime document.
@@ -89,7 +115,7 @@ func newConsoleRuntimeHandler(resolve runtimeResolver) http.Handler {
 		if err != nil {
 			// This endpoint bootstraps the console: a failure here surfaces in
 			// the browser as a blank sign-in screen with nothing to explain it,
-			// and the causes are all server-side (default-project lookup, DEK
+			// and the causes are all server-side (default-project lookup, key
 			// access, key derivation). Without this line the only signal is a
 			// bare 500 in the access log.
 			runtimeLogger(ctx).Error(

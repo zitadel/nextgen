@@ -1,0 +1,54 @@
+title: Grant
+description: |
+  A collaboration grant binding a user or a team to a project relation.
+  Discriminate on which of `user` or `team` is present. Those objects are
+  always refs (`user_id` / `team_id`); expand adds extra fields on the same
+  object rather than a sibling.
+type: object
+required:
+  - id
+  - project_id
+  - object_type
+  - relation
+  - created_at
+properties:
+  id:
+    type: string
+    description: Managed assignment id (`asgn_<opaque>`).
+  project_id:
+    type: string
+    description: Project this grant is scoped to.
+  object_type:
+    type: string
+    enum:
+      - project
+    description: Catalog object type. Always `project` for this API.
+  relation:
+    type: string
+    enum:
+      - viewer
+      - editor
+      - admin
+    description: Catalog relation on the project.
+  created_at:
+    type: string
+    format: date-time
+    description: When the grant was created.
+  expires_at:
+    description: |
+      When the grant expires. Null when it does not expire. GET still
+      returns expired unrevoked grants; authorization ignores them.
+    oneOf:
+      - type: string
+        format: date-time
+      - type: 'null'
+  user:
+    description: |
+      Present on a user grant. Omit on a team grant. Always a user-ref
+      (`user_id`); expand adds envelope fields on this same object.
+    $ref: grant-user.yaml
+  team:
+    description: |
+      Present on a team grant. Omit on a user grant. Always a team-ref
+      (`team_id`); expand adds envelope fields on this same object.
+    $ref: grant-team.yaml

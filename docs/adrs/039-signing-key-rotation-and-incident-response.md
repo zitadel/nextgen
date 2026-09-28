@@ -7,7 +7,7 @@
 ## Context
 
 This document defines the lifecycle and rotation of the platform's cryptographic keys, the
-per-project signing keys and the encryption-at-rest KEK/DEK envelope, together with the emergency
+per-project signing keys and the encryption-at-rest master-key/KEK envelope, together with the emergency
 procedures for handling their compromise. It builds on the key hierarchy and rotation policy in
 [ADR 029](029-cryptography-secrets-and-key-lifecycle.md).
 
@@ -125,8 +125,9 @@ If an active signing key is compromised:
    compromised key at the same instant, so the replacement signs immediately.
 2. Delete the compromised key. It leaves the JWKS and isn't chosen for signing.
 3. The project's sessions and refresh tokens may also be revoked. These opaque tokens are signed by
-   the same key but also encrypted under the DEK, so a signing-key compromise alone cannot forge them: an
-   attacker would also need the DEK. Revoking them is a precaution against a broader breach, forcing
+   the same key but also encrypted under the project's token encryption key, so a signing-key
+   compromise alone cannot forge them: an attacker would also need that key. Revoking them is a
+   precaution against a broader breach, forcing
    re-authentication. PATs are out of scope in the
    current MVP ([ADR 037](037-token-lifecycle.md#personal-access-tokens)), and their exposure depends
    on their eventual token format ([Open Question 4](#questions)).
@@ -143,72 +144,76 @@ If an active signing key is compromised:
 - The exposure from a compromised signing key is forged _self-contained_ tokens (access tokens).
   Deleting the key removes it from the JWKS immediately, but clients holding a cached copy keep
   honoring the `kid` until their cache expires, so forged tokens remain accepted for at most one
-  JWKS cache lifetime. Opaque tokens are signed by the key too but cannot be forged without the DEK,
-  so this compromise does not expose them; revoking them (step 3) is a separate precaution.
+  JWKS cache lifetime. Opaque tokens are signed by the key too but cannot be forged without the
+  token encryption key, so this compromise does not expose them; revoking them (step 3) is a separate
+  precaution.
 
 ### 2. Encryption-at-Rest Key Rotation
 
-Nextgen's encryption-at-rest uses the KEK/DEK envelope per
-[ADR 029](029-cryptography-secrets-and-key-lifecycle.md#master-key). An asymmetric KEK wraps a
-symmetric DEK, and the DEK performs the AES-GCM encryption of secrets at rest. KEK generation and
-provisioning are out of scope for this document.
+Nextgen's encryption-at-rest uses the envelope defined in
+[ADR 029](029-cryptography-secrets-and-key-lifecycle.md#master-key). An asymmetric master key wraps
+a symmetric key encryption key (KEK) per project, that KEK wraps the project's purpose-scoped keys
+(token, secret and cookie encryption, plus the signing keys), and those purpose-scoped keys perform
+the AES-GCM encryption of secrets at rest. Master-key generation and provisioning are out of scope
+for this document.
 
-This document assumes one DEK per project, matching the per-project scope of signing keys in
-[ADR 029](029-cryptography-secrets-and-key-lifecycle.md#scope). A per-project DEK contains a
-DEK-level compromise to a single project. The KEK stays global
-([Question 2](#questions)), so a KEK compromise still reaches every DEK it wrapped, and the
-emergency procedure below stays platform-wide. The procedures are written per project; a global DEK
-would collapse each per-project step into one.
+Each project has exactly one active KEK, matching the per-project scope of signing keys in
+[ADR 029](029-cryptography-secrets-and-key-lifecycle.md#scope). A per-project KEK contains a
+KEK-level compromise to a single project. The master key stays global
+([Question 2](#questions)), so a master-key compromise still reaches every KEK it wrapped, and the
+emergency procedure below stays platform-wide. The procedures are written per project.
 
-The DEK itself is not rotated on a schedule. It is only re-wrapped under a new KEK during routine
-KEK rotation (below) and regenerated during emergency compromise handling. The DEK never leaves the
-database and is only ever exposed in memory after a successful KEK unwrap.
+Because each class of data has its own key, a purpose-scoped key can be rotated on its own without
+touching anything the other keys protect. Rotating the token encryption key, for instance, does not
+re-encrypt third-party secrets.
 
-#### Routine KEK Rotation
+Neither the KEK nor the purpose-scoped keys are rotated on a schedule. The KEK is re-wrapped under a
+new master key during routine master-key rotation (below) and regenerated during emergency
+compromise handling. It never leaves the database and is only ever exposed in memory after a
+successful master-key unwrap.
 
-1. Supply a new KEK key pair through configuration and mark it as the wrapping key. Per
+#### Routine Master Key Rotation
+
+1. Supply a new master key pair through configuration and mark it as the wrapping key. Per
    [ADR 029](029-cryptography-secrets-and-key-lifecycle.md#master-key), more than one master key may
    be configured at a time, with exactly one marked for encryption and the rest usable for
    decryption only.
-2. The previous KEK stays in configuration as a decrypt-only key, so its private key can still
-   unwrap the DEKs stored under it.
-3. For each project, unwrap the DEK with the old KEK private key, re-wrap it with the new KEK's
-   public key, and update the wrapped DEK in the database.
-4. Remove the old KEK from configuration once every project's DEK has been re-wrapped, since nothing
-   is encrypted under it any longer.
+2. The previous master key stays in configuration as a decrypt-only key, so its private key can still
+   unwrap the KEKs stored under it.
+3. For each project, unwrap the KEK with the old master key's private key, re-wrap it with the new
+   master key's public key, and update the wrapped KEK in the database. The purpose-scoped keys stay
+   untouched: they are wrapped by the KEK, not by the master key.
+4. Remove the old master key from configuration once every project's KEK has been re-wrapped, since
+   nothing is encrypted under it any longer.
 
-#### Emergency KEK Compromise Handling
+#### Emergency Master Key Compromise Handling
 
 Per the key hierarchy in
-[ADR 029](029-cryptography-secrets-and-key-lifecycle.md#signingencryption-keys), the DEK protects
-four classes of material: signing keys, opaque tokens, third-party secrets, and authenticator
-secrets (TOTP shared secrets). Passwords and recovery codes are hashed and passkeys store only
-public keys, so those are not exposed by a DEK compromise.
+[ADR 029](029-cryptography-secrets-and-key-lifecycle.md#signingencryption-keys), a project's KEK
+transitively protects four classes of material through its purpose-scoped keys: signing keys, opaque
+tokens, third-party secrets, and authenticator secrets (TOTP shared secrets). Passwords and recovery
+codes are hashed and passkeys store only public keys, so those are not exposed by a key compromise.
 
-Encrypting opaque tokens under the DEK reflects the current single-DEK decision in
-[ADR 029](029-cryptography-secrets-and-key-lifecycle.md#signingencryption-keys).
-Because opaque tokens leave the system, a dedicated token-encryption key stored under
-the DEK could keep token-key rotation from re-encrypting everything else the DEK protects. That is a
-possible future amendment to ADR 029 and is out of scope here.
+##### When a master key is compromised
 
-##### When a KEK is compromised
+As the KEKs are stored in the database, when only the master key is compromised, the KEKs are
+unaffected. In this case, rotating the master key and re-wrapping the KEKs is sufficient. Follow the
+steps in [Routine Master Key Rotation](#routine-master-key-rotation) above to rotate the compromised
+master key.
 
-As the DEKs are stored in the database, when only the KEK is compromised, the DEKs are unaffected.
-In this case, rotating the KEK and re-wrapping the DEKs is sufficient. Follow the steps in
-[Routine KEK Rotation](#routine-kek-rotation) above to rotate the compromised KEK.
+##### When a master key and the database are both compromised
 
-##### When a KEK and the database are both compromised
+When both the master key and the database are compromised, every KEK the master key wrapped can be
+unwrapped, and therefore every secret those KEKs transitively protected is exposed in plaintext to
+whoever holds that database copy. Re-encrypting those plaintexts under fresh keys restores
+confidentiality of the ciphertext but does nothing for the secrets themselves. They must be rotated,
+not re-wrapped.
 
-When both the KEK and the database are compromised, every DEK the KEK wrapped can be unwrapped, and
-therefore every secret those DEKs protected is exposed in plaintext to whoever holds that database
-copy. Re-encrypting those plaintexts under fresh DEKs restores confidentiality of the ciphertext but
-does nothing for the secrets themselves. They must be rotated, not re-wrapped.
-
-1. Provision a replacement KEK, generate a new DEK per project, and wrap each new DEK with the new
-   KEK's public key.
+1. Provision a replacement master key, generate a new KEK and a new set of purpose-scoped keys per
+   project, and wrap each new KEK with the new master key's public key.
 2. **Signing keys.** Every project's signing key private half is compromised. Run the
    [emergency signing key procedure](#emergency-compromise-handling) for every project.
-   Re-encrypting the old private halves under the new DEK is not sufficient.
+   Re-encrypting the old private halves under the new KEK is not sufficient.
 3. **Opaque tokens.** Every session token and refresh token is forgeable. Revoke all of them
    platform-wide.
 4. **Third-party secrets.** Stored IdP secrets and API keys are compromised. The platform cannot
@@ -216,22 +221,22 @@ does nothing for the secrets themselves. They must be rotated, not re-wrapped.
    happen:
    - _Rotate at source._ Operators must be notified so they can rotate each secret with the third
      party. The stored value is replaced once they do.
-   - _Re-encrypt under the project's new DEK._ Rows left under the old DEK stay readable to whoever
-     holds the compromised KEK, so a later copy of the database hands them every secret not yet
-     rotated. It is a small migration: one row per configured IdP or API key.
+   - _Re-encrypt under the project's new secret encryption key._ Rows left under the old key stay
+     readable to whoever holds the compromised master key, so a later copy of the database hands them
+     every secret not yet rotated. It is a small migration: one row per configured IdP or API key.
 5. **Authenticator secrets.** Every TOTP shared secret is exposed, so an attacker holding the
    database can compute valid codes. Invalidate all TOTP secrets and require affected users to
    re-enroll. Until they do, users fall back to their other factors, or to account recovery
    ([ADR 038, Section 4](038-user-credential-migration-and-recovery.md#4-account-recovery)) if TOTP
    was their only second factor.
-6. Once secrets in steps 4 and 5 are re-encrypted, remove the compromised KEK from configuration and
-   destroy it at its source (for example, through the cert-manager or equivalent tooling that
-   provisioned it). The KEK is supplied by config, so there is no in-application revocation
-   mechanism to invoke.
-7. Destroy the compromised DEKs once nothing references them.
+6. Once secrets in steps 4 and 5 are re-encrypted, remove the compromised master key from
+   configuration and destroy it at its source (for example, through the cert-manager or equivalent
+   tooling that provisioned it). The master key is supplied by config, so there is no in-application
+   revocation mechanism to invoke.
+7. Destroy the compromised KEKs and purpose-scoped keys once nothing references them.
 
 This is not a more expensive version of routine rotation. Routine rotation re-wraps a value that was
-never exposed. A KEK compromise is a full platform credential compromise, and step 4 in particular
+never exposed. A master key compromise is a full platform credential compromise, and step 4 in particular
 has a recovery time bounded by third parties rather than by the platform.
 
 ## Consequences
@@ -244,13 +249,17 @@ has a recovery time bounded by third parties rather than by the platform.
 - Per-project signing keys with explicit, auditable lifecycles give tenants the key isolation and
   rotation evidence for compliance reasons, and support the per-project NIST/FIPS profiles
   in [ADR 029](029-cryptography-secrets-and-key-lifecycle.md#nist).
-- Routine KEK rotation ([Section 2](#2-encryption-at-rest-key-rotation)) is inexpensive because only
-  wrapped DEKs are re-wrapped rather than every stored secret, and it keeps master-key lifecycle
-  ownership on external infra tooling (e.g., cert-manager) rather than the application.
+- Routine master key rotation ([Section 2](#2-encryption-at-rest-key-rotation)) is inexpensive
+  because only the wrapped per-project KEKs are re-wrapped rather than every stored secret, and it
+  keeps master-key lifecycle ownership on external infra tooling (e.g., cert-manager) rather than the
+  application.
+- Purpose-scoped keys under the project KEK keep the blast radius and the cost of a rotation
+  proportional to the class of data affected: rotating the token encryption key does not re-encrypt
+  third-party secrets, and vice versa.
 
 ### Negative / Risks
 
-- Emergency KEK compromise handling in case of KEK and database compromise
+- Emergency master key compromise handling in case of master key and database compromise
   ([Section 2](#2-encryption-at-rest-key-rotation)) is not a larger routine rotation. It is a full
   platform credential compromise: every signing key must be rotated, every opaque token revoked, and
   every third-party secret re-issued by the third party that owns it. Recovery time is therefore
@@ -268,16 +277,16 @@ has a recovery time bounded by third parties rather than by the platform.
      longest token lifetime?
    - Whether to retain the key pair past purgeable as rotation/audit evidence, and for how long.
 
-2. **(Resolved)** Should the KEK be per project as well as the DEK
-   ([Section 2](#2-encryption-at-rest-key-rotation))? A per-project KEK would contain even a KEK
-   compromise to one project, closing the gap a per-project DEK under a global KEK leaves open. But
-   the KEK is provisioned externally (cert-manager, per
-   [ADR 029](029-cryptography-secrets-and-key-lifecycle.md#master-key)), so one KEK per project
-   means provisioning and rotating a key pair per tenant through that external tooling, and coupling
-   tenant onboarding to it.
+2. **(Resolved)** Should the master key be per project as well as the KEK
+   ([Section 2](#2-encryption-at-rest-key-rotation))? A per-project master key would contain even a
+   master-key compromise to one project, closing the gap a per-project KEK under a global master key
+   leaves open. But the master key is provisioned externally (cert-manager, per
+   [ADR 029](029-cryptography-secrets-and-key-lifecycle.md#master-key)), so one master key per
+   project means provisioning and rotating a key pair per tenant through that external tooling, and
+   coupling tenant onboarding to it.
 
-   **Answer:** The KEK stays global and externally provisioned for now; the per-project DEK remains
-   the isolation boundary.
+   **Answer:** The master key stays global and externally provisioned for now; the per-project KEK
+   remains the isolation boundary.
 
 3. Should an explicit status column supplement the `retired_at` model
    ([Section 1](#1-signing-key-lifecycle))? Section 1 decides the lifecycle state is the two
@@ -293,8 +302,9 @@ has a recovery time bounded by third parties rather than by the platform.
    rotate keys and purge expired ones. Whether to add the column is open.
 
 4. How does a compromised or rotated signing key interact with PATs once they come into scope
-   ([ADR 037](037-token-lifecycle.md#personal-access-tokens) defers them)? If opaque, the DEK
-   protects them like a session or refresh token; if self-contained, a signing-key compromise can
+   ([ADR 037](037-token-lifecycle.md#personal-access-tokens) defers them)? If opaque, the token
+   encryption key protects them like a session or refresh token; if self-contained, a signing-key
+   compromise can
    forge them. If PATs can live indefinitely, what is the policy for retiring the keys that signed
    them, and do we need a max cap (product decision)?
 

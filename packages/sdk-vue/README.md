@@ -25,29 +25,18 @@ const project = configureZitadel({
 
 `<ZitadelLogout :project="project" postSignOutUrl="/login" />` works the same way.
 
+The signed-in session card is `<ZitadelSession :project="project" />` (exported as `ZitadelSession`).
+
 ## Proxying to the backend (deployment)
 
-The widgets call `${proxyPath}/…` same-origin (default `/__nextgen`). A SPA has no
-server, so on Vercel use `@zitadel/edge-proxy` to forward those calls:
+The widgets call `${proxyPath}/…` same-origin (default `/__nextgen`). In
+production the same-origin path must come from your hosting platform — until
+the CLI can scaffold those configs, **production SPA deployment is not yet
+supported**; see
+[ADR 036](https://github.com/zitadel/nextgen/blob/main/docs/adrs/036-api-credential-planes.md)
+and [zitadel/nextgen#560](https://github.com/zitadel/nextgen/issues/560). The
+CLI dev proxy covers local development.
 
-```ts
-// api/__nextgen/[...path].ts  (Vercel Edge Function)
-import { handleProxy, resolveConfig } from '@zitadel/edge-proxy';
-export const config = { runtime: 'edge' };
-const proxyConfig = resolveConfig({
-  apiUrl: process.env.NEXTGEN_API_URL ?? '',
-});
-export default (req: Request) => handleProxy(req, proxyConfig);
-```
-
-```json
-// vercel.json
-{
-  "rewrites": [
-    { "source": "/__nextgen/(.*)", "destination": "/api/__nextgen/$1" }
-  ]
-}
-```
-
-For local development you can skip the proxy and point `proxyPath` straight at the
-backend (cross-origin), e.g. `proxyPath: "http://localhost:4000"`.
+For local development you can also skip the proxy and point `proxyPath`
+straight at the backend (cross-origin), e.g. `proxyPath: "http://localhost:8080"`
+(the `zitadel start` local runtime default port).

@@ -5,7 +5,25 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 type ReleaseArtifactsModule = {
+  buildServerBinaries: (options: {
+    repoRoot: string;
+    outDir: string;
+    version: string;
+    gitInfo: { commit: string; shortCommit: string; date: string };
+    platforms: Array<{ goos: string; goarch: string }>;
+    runCapture?: (
+      command: string,
+      args: string[],
+      options: { cwd: string },
+    ) => Promise<{ stdout: string }>;
+    run: (
+      command: string,
+      args: string[],
+      options: { cwd: string; env: NodeJS.ProcessEnv },
+    ) => Promise<void>;
+  }) => Promise<unknown>;
   containerTags: (input: { image?: string; version: string; prerelease: boolean }) => string[];
+  TAG_PRERELEASE_AS_LATEST: boolean;
   readServerRelease: (repoRoot: string) => Promise<{
     name: string;
     version: string;
@@ -59,6 +77,44 @@ afterEach(async () => {
 });
 
 describe("release artifact helpers", () => {
+  it("stamps the runtime metadata package in release binaries", async () => {
+    const { buildServerBinaries } = await loadModule();
+    const repoRoot = await mkdtemp(join(tmpdir(), "zitadel-release-build-"));
+    tempDirs.push(repoRoot);
+    const calls: Array<{ command: string; args: string[] }> = [];
+
+    await buildServerBinaries({
+      repoRoot,
+      outDir: join(repoRoot, "dist/release/0.1.0-alpha.6"),
+      version: "0.1.0-alpha.6",
+      gitInfo: {
+        commit: "abcdef1234567890",
+        shortCommit: "abcdef123456",
+        date: "2026-06-16T00:00:00Z",
+      },
+      platforms: [{ goos: "linux", goarch: "amd64" }],
+      // The ldflags target package is verified via `go list` before any build.
+      runCapture: async () => ({ stdout: "github.com/zitadel/nextgen/internal/build\n" }),
+      run: async (command, args) => {
+        calls.push({ command, args });
+      },
+    });
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({
+      command: "go",
+      args: [
+        "build",
+        "-trimpath",
+        "-ldflags",
+        "-s -w -X github.com/zitadel/nextgen/internal/build.version=0.1.0-alpha.6 -X github.com/zitadel/nextgen/internal/build.commit=abcdef1234567890 -X github.com/zitadel/nextgen/internal/build.date=2026-06-16T00:00:00Z",
+        "-o",
+        expect.stringMatching(/dist\/release\/0\.1\.0-alpha\.6\/build\/linux\/amd64\/nextgen$/),
+        ".",
+      ],
+    });
+  });
+
   it("reads the server npm package as the product version source", async () => {
     const { readServerRelease } = await loadModule();
     const repoRoot = await mkdtemp(join(tmpdir(), "zitadel-server-package-"));
@@ -80,14 +136,25 @@ describe("release artifact helpers", () => {
     });
   });
 
-  it("only adds latest for stable container releases", async () => {
+  it("adds latest for stable container releases", async () => {
     const { containerTags } = await loadModule();
 
-    expect(containerTags({ version: "1.2.3-alpha.1", prerelease: true })).toEqual([
-      "ghcr.io/zitadel/nextgen:1.2.3-alpha.1",
-    ]);
     expect(containerTags({ version: "1.2.3", prerelease: false })).toEqual([
       "ghcr.io/zitadel/nextgen:1.2.3",
+      "ghcr.io/zitadel/nextgen:latest",
+    ]);
+  });
+
+  // Temporary, paired with TAG_PRERELEASE_AS_LATEST in release-artifacts.mjs:
+  // pre-GA there is no stable release to own `:latest`, so the alpha train
+  // carries it. Delete this and restore the prerelease case above when the flag
+  // goes back to false on `changeset pre exit`.
+  it("also adds latest for prereleases while the alpha train owns it", async () => {
+    const { containerTags, TAG_PRERELEASE_AS_LATEST } = await loadModule();
+
+    expect(TAG_PRERELEASE_AS_LATEST).toBe(true);
+    expect(containerTags({ version: "1.2.3-alpha.1", prerelease: true })).toEqual([
+      "ghcr.io/zitadel/nextgen:1.2.3-alpha.1",
       "ghcr.io/zitadel/nextgen:latest",
     ]);
   });

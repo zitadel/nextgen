@@ -20,42 +20,49 @@
  *   afterAll(() => server.close());
  *   afterEach(() => { server.resetHandlers(); resetPlatformStore(); });
  */
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 
 import type {
+  CompleteClaim200,
   CreateFlowDefinition201,
   CreateProject201,
   CreateSchema201,
+  GetClaimWindow200,
+  GetClaimStatus200,
   GetFlowDefinition200,
   GetProject200,
   GetSchemaById200,
+  GetSchemaById200Schema,
+  InitClaim201,
   ListFlowDefinitions200,
-  ListFlowDefinitions200FlowDefinitionsItem,
-  UpdateFlowDefinition200,
+  ListSchemas200,
 } from "@zitadel/api/generated/model";
 import {
+  CompleteClaimResponse,
   CreateFlowDefinitionBody,
   CreateProjectBody,
   CreateSchemaBody,
   CreateSchemaQueryParams,
-  DeleteFlowDefinitionParams,
+  GetClaimStatusParams,
+  GetClaimStatusQueryParams,
+  GetClaimStatusResponse,
+  GetClaimWindowParams,
+  GetClaimWindowQueryParams,
+  GetClaimWindowResponse,
   GetFlowDefinitionParams,
   GetFlowDefinitionResponse,
   GetProjectParams,
   GetProjectResponse,
   GetSchemaByIdParams,
   GetSchemaByIdQueryParams,
+  InitClaimParams,
   ListFlowDefinitionsQueryParams,
   ListFlowDefinitionsResponse,
-  ListUsersQueryParams,
-  UpdateFlowDefinitionBody,
-  UpdateFlowDefinitionParams,
-  UpdateFlowDefinitionQueryParams,
-  UpdateFlowDefinitionResponse,
+  ListSchemasQueryParams,
+  QueryUsersBody,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import { validateFlowDefinition } from "@zitadel/config/validate";
 import {
-  DEFAULT_FLOW_SCHEMA_URI,
   getDefaultHumanUserSchema,
   getDefaultLoginFlow,
 } from "@zitadel/config/defaults";
@@ -64,6 +71,14 @@ import type { z } from "zod";
 
 function shortId(): string {
   return randomUUID().replaceAll("-", "").slice(0, 12);
+}
+
+// Claim challenge id. Matches the `ch_`-prefixed opaque contract in
+// `components/schemas/challenge-id.yaml` and mints the 128 bits of
+// cryptographic randomness ADR 046 requires, since this value authorizes
+// a project claim from the browser.
+function challengeId(): string {
+  return `ch_${randomBytes(16).toString("base64url")}`;
 }
 
 function nowIso(): string {
@@ -153,36 +168,68 @@ type ProjectRecord = {
 
 /**
  * Server-side metadata wrapped around the flow body so the mock can answer
- * `flow-definition-detail-response` per the OpenAPI contract.
+ * `flow-definition-response` per the OpenAPI contract.
  */
 type FlowDefinitionRecord = {
   id: string;
-  name: string;
   projectId: string;
-  schemaUri: string;
   status: string;
   createdAt: string;
   updatedAt: string;
+  seq: number;
   body: Record<string, unknown>;
 };
 
 /**
  * Server-side metadata wrapped around the schema body so the mock can answer
- * `POST /schemas` (returns id), `GET /schemas/:id` (returns body), and
- * `GET /schemas` (list — id + createdAt, filterable by object_type).
+ * `POST /schemas` (returns id) and, for `GET /schemas/:id` and `GET /schemas`,
+ * build the `{id, schema, metadata}` envelope around the stored document
+ * (list filterable by object_type).
  */
 type SchemaRecord = {
   id: string;
   projectId: string;
   objectType?: string;
   createdAt: string;
-  body: GetSchemaById200;
+  seq: number;
+  body: GetSchemaById200Schema;
+};
+
+/**
+ * The ephemeral claim challenge (ADR 046): minted by `claim/init`, polled by
+ * `claim/status`, and spent by `claim/complete`. `initiatingSecret` records the
+ * project secret that started the challenge so `status` can 403 a foreign secret.
+ */
+type ClaimChallengeRecord = {
+  challengeId: string;
+  projectId: string;
+  initiatingSecret: string;
+  status: "pending" | "completed";
+  expiresAt: string;
+};
+
+/**
+ * The grant a completed claim writes. Keyed by project id (a project belongs to
+ * exactly one team), mirroring the permission-engine grant ADR 046 describes —
+ * there is no `claimed` status field on the project itself.
+ */
+type ClaimRecord = {
+  teamId: string;
+  claimedAt: string;
+  dashboardUrl: string;
 };
 
 type Store = {
   projects: Map<string, ProjectRecord>;
   schemas: Map<string, SchemaRecord>;
   flowDefinitions: Map<string, FlowDefinitionRecord>;
+  claimChallenges: Map<string, ClaimChallengeRecord>;
+  claims: Map<string, ClaimRecord>;
+  // Publication order. `nowIso()` is millisecond-resolution and ids are
+  // random, so two records minted back to back would tie with nothing to say
+  // which came first. Only some server dialects mint time-ordered ids, so
+  // this stands in for the id tiebreak rather than reproducing it.
+  lastSeq: number;
 };
 
 function makeStore(): Store {
@@ -190,45 +237,57 @@ function makeStore(): Store {
     projects: new Map(),
     schemas: new Map(),
     flowDefinitions: new Map(),
+    claimChallenges: new Map(),
+    claims: new Map(),
+    lastSeq: 0,
   };
 }
 
+const CLAIM_CHALLENGE_TTL_MS = 10 * 60 * 1000;
+
+// Mirrors domain.ClaimWindow (internal/domain/claim.go): an unclaimed project
+// can only be claimed within 14 days of creation; init and complete both 410
+// with proj.claim_window_expired after that, and the already-claimed 409 wins
+// over the closed window, matching the server's check order.
+const CLAIM_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
+const CLAIM_WINDOW_EXPIRED_MESSAGE =
+  "the project was not claimed within 14 days of creation and can no longer be claimed";
+
+function claimWindowClosed(createdAt: string): boolean {
+  return Date.now() - new Date(createdAt).getTime() > CLAIM_WINDOW_MS;
+}
+
+/** Extract a bearer token from the Authorization header, or "" when absent. */
+function bearerToken(request: Request): string {
+  return (request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
+}
+
 /**
- * Build a `flow-definition-detail-response` envelope around a stored body, as
- * specified by `api/openapi/components/flows/flow-definition-detail-response.yaml`.
+ * Build a `flow-definition-response` envelope around a stored body, as
+ * specified by `api/openapi/components/flows/flow-definition-response.yaml`.
+ * Every read serves this — list included, which is the point of #939.
  * The Go server unconditionally echoes an `audience` (empty `{}` when the
  * stored flow has none — `internal/api/flow_definition.go`); mirror that so
  * consumers exercise the same wire shape the live server produces.
  */
-function flowDetailResponse(r: FlowDefinitionRecord): GetFlowDefinition200 {
+function flowResponse(r: FlowDefinitionRecord): GetFlowDefinition200 {
   return {
     id: r.id,
     project_id: r.projectId,
-    schema_uri: r.schemaUri,
-    status: r.status,
     flow_definition: {
       audience: {},
       ...(r.body as Record<string, unknown>),
+      // After the spread: an update that omits `status` keeps the stored one,
+      // which is what the endpoint documents.
+      status: r.status,
     } as unknown as GetFlowDefinition200['flow_definition'],
     created_at: r.createdAt,
     updated_at: r.updatedAt,
   } as unknown as GetFlowDefinition200;
 }
 
-function flowListItemResponse(r: FlowDefinitionRecord): ListFlowDefinitions200FlowDefinitionsItem {
-  return {
-    id: r.id,
-    name: r.name,
-    project_id: r.projectId,
-    schema_uri: r.schemaUri,
-    status: r.status as ListFlowDefinitions200FlowDefinitionsItem["status"],
-    created_at: r.createdAt,
-    updated_at: r.updatedAt,
-  };
-}
-
-function defaultHumanUserSchema(): GetSchemaById200 {
-  return getDefaultHumanUserSchema() as unknown as GetSchemaById200;
+function defaultHumanUserSchema(): GetSchemaById200Schema {
+  return getDefaultHumanUserSchema() as unknown as GetSchemaById200Schema;
 }
 
 function seedDefaultProjectResources(projectID: string, createdAt: string): void {
@@ -239,39 +298,93 @@ function seedDefaultProjectResources(projectID: string, createdAt: string): void
     projectId: projectID,
     objectType: schemaObjectType(body),
     createdAt,
+    seq: ++store.lastSeq,
     body,
   });
-  const id = `flow_${shortId()}`;
+  const id = `flowdef_${shortId()}`;
   store.flowDefinitions.set(id, {
     id,
-    name: "default-login",
     projectId: projectID,
-    schemaUri: DEFAULT_FLOW_SCHEMA_URI,
     status: "active",
     createdAt,
     updatedAt: createdAt,
+    seq: ++store.lastSeq,
     body: getDefaultLoginFlow({ userSchemaUrl: schemaId }) as unknown as Record<string, unknown>,
   });
 }
 
-function schemaObjectType(body: GetSchemaById200): string | undefined {
+function schemaObjectType(body: GetSchemaById200Schema): string | undefined {
   const value = (body as unknown as { objectType?: unknown }).objectType;
   return typeof value === "string" ? value : undefined;
 }
 
-function requiredProjectID(
-  request: Request,
-): { ok: true; data: string } | { ok: false; response: HttpResponse<ErrorBody> } {
-  const projectID = new URL(request.url).searchParams.get("project_id");
-  if (projectID) {
-    return { ok: true, data: projectID };
+function schemaKind(body: GetSchemaById200Schema): string | undefined {
+  const value = (body as unknown as { kind?: unknown }).kind;
+  return typeof value === "string" ? value : undefined;
+}
+
+/**
+ * `created_at DESC, id DESC`, the order the server lists in. `seq` stands in
+ * for the id tiebreak.
+ */
+function compareNewestFirst(
+  a: { createdAt: string; seq: number },
+  b: { createdAt: string; seq: number },
+): number {
+  if (a.createdAt !== b.createdAt) {
+    return a.createdAt < b.createdAt ? 1 : -1;
   }
-  return {
-    ok: false,
-    response: HttpResponse.json(errorBody("invalid_query", "project_id is required"), {
-      status: 400,
-    }),
-  };
+  return b.seq - a.seq;
+}
+
+/**
+ * `revisions=latest` keeps the newest revision of each `objectType`. Takes the
+ * list already sorted newest-first, so the first record of an `objectType` is
+ * the one to keep. A record without an `objectType` is a revision of nothing
+ * and is kept rather than grouped — matching the server's anti-join, which
+ * cannot correlate a NULL either.
+ */
+function latestSchemaRevisions(newestFirst: SchemaRecord[]): SchemaRecord[] {
+  const seen = new Set<string>();
+  return newestFirst.filter((r) => {
+    if (r.objectType === undefined) {
+      return true;
+    }
+    if (seen.has(r.objectType)) {
+      return false;
+    }
+    seen.add(r.objectType);
+    return true;
+  });
+}
+
+/**
+ * Mirrors the server's `purpose` filter: `purposes` maps each served purpose
+ * to its entry step, so a flow serves a purpose when the key is present.
+ */
+function flowServesPurpose(body: Record<string, unknown>, purpose: string): boolean {
+  const purposes = body.purposes;
+  return typeof purposes === "object" && purposes !== null && Object.hasOwn(purposes, purpose);
+}
+
+/**
+ * `revisions=latest` keeps the newest revision of each flow `name`. Takes the
+ * list already sorted newest-first, so the first record of a name is the one
+ * to keep — matching the server's anti-join on `(project_id, name)`.
+ */
+function latestFlowRevisions(newestFirst: FlowDefinitionRecord[]): FlowDefinitionRecord[] {
+  const seen = new Set<string>();
+  return newestFirst.filter((r) => {
+    const name = r.body.name;
+    if (typeof name !== "string") {
+      return true;
+    }
+    if (seen.has(name)) {
+      return false;
+    }
+    seen.add(name);
+    return true;
+  });
 }
 
 function schemaID(id: string): string {
@@ -293,9 +406,18 @@ export type PlatformStoreSnapshot = {
   projects: number;
   schemas: number;
   flowDefinitions: number;
+  claimChallenges: number;
+  claims: number;
   projectIds: string[];
   schemaIds: string[];
   flowDefinitionIds: string[];
+  /**
+   * Ids of the live challenges. A caller that drove `claim/init` over HTTP
+   * (a CLI under test, say) never sees the response body, so this is the only
+   * way to learn the id it needs to hand to {@link completeClaimChallenge} or
+   * {@link expireClaimChallenge}.
+   */
+  claimChallengeIds: string[];
 };
 
 export function snapshotPlatformStore(): PlatformStoreSnapshot {
@@ -303,10 +425,106 @@ export function snapshotPlatformStore(): PlatformStoreSnapshot {
     projects: store.projects.size,
     schemas: store.schemas.size,
     flowDefinitions: store.flowDefinitions.size,
+    claimChallenges: store.claimChallenges.size,
+    claims: store.claims.size,
     projectIds: [...store.projects.keys()],
     schemaIds: [...store.schemas.keys()],
     flowDefinitionIds: [...store.flowDefinitions.keys()],
+    claimChallengeIds: [...store.claimChallenges.keys()],
   };
+}
+
+/**
+ * Test/server mutators for the claim challenge lifecycle. Exported so the
+ * conformance suite can force expiry and the Express `claim/complete` route
+ * (which needs the module-scoped session store) can spend a challenge.
+ */
+export function expireClaimChallenge(challengeId: string): void {
+  const challenge = store.claimChallenges.get(challengeId);
+  if (challenge) {
+    challenge.expiresAt = new Date(Date.now() - 1000).toISOString();
+  }
+}
+
+/** Backdates the project past the claim window, for window-expiry tests. */
+export function expireClaimWindow(projectId: string): void {
+  const project = store.projects.get(projectId);
+  if (project) {
+    project.createdAt = new Date(Date.now() - CLAIM_WINDOW_MS - 1000).toISOString();
+  }
+}
+
+export function completeClaimChallenge(
+  challengeId: string,
+  projectId: string,
+): { status: number; body: CompleteClaim200 | ErrorBody } {
+  const challenge = store.claimChallenges.get(challengeId);
+  if (!challenge || challenge.projectId !== projectId) {
+    return { status: 404, body: errorBody("claim_challenge.not_found", "claim challenge not found") };
+  }
+  // Fail closed on a challenge without its project, mirroring the server's
+  // proj.not_found: a claim must never be minted from an inconsistent store,
+  // and letting it through would also bypass the window check below.
+  const project = store.projects.get(projectId);
+  if (!project) {
+    return { status: 404, body: errorBody("proj.not_found", "project not found") };
+  }
+  // First-claim-wins and single-use, checked before both expiry answers
+  // (server order): once the project has a grant — whether from this challenge
+  // on an earlier call or from another challenge entirely — completion reports
+  // it as already claimed instead of minting a second grant or silently
+  // succeeding again. A completed challenge always has the grant, so it lands
+  // here, never on the expiry answers below.
+  const existing = store.claims.get(projectId);
+  if (existing) {
+    return {
+      status: 409,
+      body: errorBody("proj.already_claimed", "the project is already claimed by a team", {
+        team_id: existing.teamId,
+        dashboard_url: existing.dashboardUrl,
+      }),
+    };
+  }
+  // The closed window outranks challenge expiry (server order): both are 410,
+  // but only challenge expiry recovers with a fresh init, so a both-expired
+  // complete must report the final refusal.
+  if (claimWindowClosed(project.createdAt)) {
+    return {
+      status: 410,
+      body: errorBody("proj.claim_window_expired", CLAIM_WINDOW_EXPIRED_MESSAGE),
+    };
+  }
+  if (new Date(challenge.expiresAt).getTime() < Date.now()) {
+    return {
+      status: 410,
+      body: errorBody("proj.claim_expired", "the claim challenge has expired"),
+    };
+  }
+
+  const teamId = `team-${shortId()}`;
+  const claim: ClaimRecord = {
+    teamId,
+    claimedAt: nowIso(),
+    dashboardUrl: `https://dashboard.example.com/teams/${teamId}`,
+  };
+  store.claims.set(projectId, claim);
+  challenge.status = "completed";
+
+  const responseBody: CompleteClaim200 = {
+    project_id: projectId,
+    team_id: claim.teamId,
+    claimed_at: claim.claimedAt,
+  };
+  const out = CompleteClaimResponse.safeParse(responseBody);
+  if (!out.success) {
+    return {
+      status: 500,
+      body: errorBody("mock_response_invalid", "mock response does not conform to spec", {
+        issues: out.error.issues,
+      }),
+    };
+  }
+  return { status: 200, body: out.data as CompleteClaim200 };
 }
 
 /**
@@ -363,21 +581,21 @@ export function setupPlatformHandlers() {
         name: body.data.name,
         projectSecret: `sk_proj_${id.replaceAll("-", "")}_full`,
         previewSecret: `sk_proj_${id.replaceAll("-", "")}_preview`,
-        previewOrigins: body.data.previewOrigins ?? [],
+        previewOrigins: body.data.preview_origins ?? [],
         createdAt,
         updatedAt: createdAt,
       };
       store.projects.set(id, project);
-      if (body.data.seedDefaults ?? true) {
+      if (body.data.seed_defaults ?? true) {
         seedDefaultProjectResources(project.id, createdAt);
       }
       const responseBody: CreateProject201 = {
         id: project.id,
         name: project.name,
-        projectSecret: project.projectSecret,
-        previewSecret: project.previewSecret,
-        previewOrigins: project.previewOrigins,
-        createdAt: project.createdAt,
+        project_secret: project.projectSecret,
+        preview_secret: project.previewSecret,
+        preview_origins: project.previewOrigins,
+        created_at: project.createdAt,
       };
       return HttpResponse.json(responseBody, { status: 201 });
     }),
@@ -395,10 +613,192 @@ export function setupPlatformHandlers() {
       const responseBody: GetProject200 = {
         id: project.id,
         name: project.name,
-        createdAt: project.createdAt,
-        updatedAt: project.updatedAt,
+        created_at: project.createdAt,
+        updated_at: project.updatedAt,
       };
       const out = parse(GetProjectResponse, responseBody, "mock_response_invalid");
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data);
+    }),
+
+    // POST /projects/:project_id/claim/init — mint a claim challenge. Auth
+    // mirrors the real server: the project secret is the bearer (as in GET
+    // /users). First-claim-wins is a 409 derived from the existing claim.
+    http.post("*/projects/:project_id/claim/init", ({ params, request }) => {
+      const path = parse(InitClaimParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+      const token = bearerToken(request);
+      const authed = [...store.projects.values()].find((p) => p.projectSecret === token);
+      if (!authed) {
+        return HttpResponse.json(errorBody("auth.unauthorized", "missing or invalid credentials"), {
+          status: 401,
+        });
+      }
+      // The project secret is project-scoped: it may only initiate a claim for
+      // its own project. A secret belonging to a different project cannot reach
+      // this project, so it is treated as not found rather than authorized.
+      if (authed.id !== path.data.project_id) {
+        return HttpResponse.json(errorBody("proj.not_found", "project not found"), { status: 404 });
+      }
+      const project = authed;
+      const claim = store.claims.get(project.id);
+      if (claim) {
+        return HttpResponse.json(
+          errorBody("proj.already_claimed", "the project is already claimed by a team", {
+            team_id: claim.teamId,
+            dashboard_url: claim.dashboardUrl,
+          }),
+          { status: 409 },
+        );
+      }
+
+      if (claimWindowClosed(project.createdAt)) {
+        return HttpResponse.json(
+          errorBody("proj.claim_window_expired", CLAIM_WINDOW_EXPIRED_MESSAGE),
+          { status: 410 },
+        );
+      }
+
+      const id = challengeId();
+      const expiresAt = new Date(Date.now() + CLAIM_CHALLENGE_TTL_MS).toISOString();
+      store.claimChallenges.set(id, {
+        challengeId: id,
+        projectId: project.id,
+        initiatingSecret: token,
+        status: "pending",
+        expiresAt,
+      });
+      const responseBody: InitClaim201 = {
+        claim_url: `${new URL(request.url).origin}/claim/${id}`,
+        challenge_id: id,
+        expires_at: expiresAt,
+      };
+      return HttpResponse.json(responseBody, { status: 201 });
+    }),
+
+    // GET /projects/:project_id/claim/status — poll a challenge. The bearer
+    // must be a valid project secret (401 otherwise) and specifically the one
+    // that initiated the challenge (403 otherwise). Outbound-validated like
+    // GET /projects/:id so the mock cannot lie about its own output.
+    http.get("*/projects/:project_id/claim/status", ({ params, request }) => {
+      const path = parse(GetClaimStatusParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+      const query = parse(GetClaimStatusQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+
+      // A missing, malformed, or unknown bearer is unauthenticated (401),
+      // distinct from a valid secret that simply did not initiate this
+      // challenge (403 below).
+      const token = bearerToken(request);
+      const authed = [...store.projects.values()].find((p) => p.projectSecret === token);
+      if (!authed) {
+        return HttpResponse.json(errorBody("auth.unauthorized", "missing or invalid credentials"), {
+          status: 401,
+        });
+      }
+
+      const challenge = store.claimChallenges.get(query.data.challenge_id);
+      if (!challenge || challenge.projectId !== path.data.project_id) {
+        return HttpResponse.json(errorBody("claim_challenge.not_found", "claim challenge not found"), {
+          status: 404,
+        });
+      }
+      if (challenge.initiatingSecret !== token) {
+        return HttpResponse.json(
+          errorBody("proj.permission_denied", "the presented project secret did not initiate this challenge"),
+          { status: 403 },
+        );
+      }
+      // The grant, not the polled challenge, is the claim source of truth
+      // (server order): a project claimed through any challenge reports
+      // completed with its owning team, surviving challenge expiry and the
+      // closed window alike. `authed` initiated this challenge (403 above),
+      // so it is the challenge's own project.
+      const claim = store.claims.get(challenge.projectId);
+      let responseBody: GetClaimStatus200;
+      if (claim) {
+        responseBody = {
+          status: "completed",
+          team_id: claim.teamId,
+          claimed_at: claim.claimedAt,
+          dashboard_url: claim.dashboardUrl,
+        };
+        const completedOut = parse(GetClaimStatusResponse, responseBody, "mock_response_invalid");
+        if (!completedOut.ok) {
+          return completedOut.response;
+        }
+        return HttpResponse.json(completedOut.data);
+      }
+      // The closed claim window outranks challenge expiry for a pending
+      // challenge: both are 410, but only challenge expiry recovers with a
+      // fresh init, so the poller must learn the final refusal (mirrors the
+      // server's check order).
+      if (claimWindowClosed(authed.createdAt)) {
+        return HttpResponse.json(
+          errorBody("proj.claim_window_expired", CLAIM_WINDOW_EXPIRED_MESSAGE),
+          { status: 410 },
+        );
+      }
+      if (new Date(challenge.expiresAt).getTime() < Date.now()) {
+        return HttpResponse.json(
+          errorBody("proj.claim_expired", "the claim challenge has expired"),
+          { status: 410 },
+        );
+      }
+
+      responseBody = { status: "pending" };
+      const out = parse(GetClaimStatusResponse, responseBody, "mock_response_invalid");
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data);
+    }),
+
+    // GET /projects/:project_id/claim/window — the claim page's countdown
+    // read. Unauthenticated by contract: the browser runs it before the
+    // developer signs in, and the challenge from the claim URL is the
+    // capability. An unknown challenge is the only refusal, so a caller
+    // learns nothing about which project ids exist.
+    http.get("*/projects/:project_id/claim/window", ({ params, request }) => {
+      const path = parse(GetClaimWindowParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+      const query = parse(GetClaimWindowQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+
+      const challenge = store.claimChallenges.get(query.data.challenge_id);
+      if (!challenge || challenge.projectId !== path.data.project_id) {
+        return HttpResponse.json(errorBody("claim_challenge.not_found", "claim challenge not found"), {
+          status: 404,
+        });
+      }
+      const project = store.projects.get(challenge.projectId);
+      if (!project) {
+        return HttpResponse.json(errorBody("claim_challenge.not_found", "claim challenge not found"), {
+          status: 404,
+        });
+      }
+
+      // The window belongs to the project, not the challenge: a spent or
+      // lapsed challenge still reports it, because the page shows the
+      // deadline beside the outcome it is explaining.
+      const expiresAt = new Date(new Date(project.createdAt).getTime() + CLAIM_WINDOW_MS);
+      const responseBody: GetClaimWindow200 = {
+        expires_at: expiresAt.toISOString(),
+        expired: expiresAt.getTime() < Date.now(),
+      };
+      const out = parse(GetClaimWindowResponse, responseBody, "mock_response_invalid");
       if (!out.ok) {
         return out.response;
       }
@@ -410,15 +810,12 @@ export function setupPlatformHandlers() {
     // freshly set-up project is in, and what `status` keys its journey-staged
     // guidance on. Auth mirrors the real server: the project secret is the
     // bearer and scopes the (empty) result.
-    http.get("*/users", ({ request }) => {
-      // Both spec'd query params (offset, limit) are numeric, but URLs carry
-      // strings and the generated zod does not coerce — convert before parsing.
-      const raw = Object.fromEntries(
-        Object.entries(queryRecord(request)).map(([key, value]) => [key, Number(value)]),
-      );
-      const query = parse(ListUsersQueryParams, raw, "invalid_query");
-      if (!query.ok) {
-        return query.response;
+    http.post("*/users/query", async ({ request }) => {
+      // The query body is JSON, so `limit` arrives already numeric — unlike the
+      // query string this endpoint replaced, which needed it coerced by hand.
+      const body = parse(QueryUsersBody, await request.json(), "invalid_request");
+      if (!body.ok) {
+        return body.response;
       }
       const token = (request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
       const project = [...store.projects.values()].find((p) => p.projectSecret === token);
@@ -427,7 +824,7 @@ export function setupPlatformHandlers() {
           status: 401,
         });
       }
-      return HttpResponse.json([]);
+      return HttpResponse.json({ users: [] });
     }),
 
     http.post("*/schemas", async ({ request }) => {
@@ -445,13 +842,14 @@ export function setupPlatformHandlers() {
         return body.response;
       }
 
-      const schemaBody = raw as unknown as GetSchemaById200;
+      const schemaBody = raw as unknown as GetSchemaById200Schema;
       const id = `sch_${shortId()}`;
       store.schemas.set(id, {
         id,
         projectId: query.data.project_id,
         objectType: schemaObjectType(schemaBody),
         createdAt: nowIso(),
+        seq: ++store.lastSeq,
         body: schemaBody,
       });
       const responseBody: CreateSchema201 = { id };
@@ -459,21 +857,47 @@ export function setupPlatformHandlers() {
     }),
 
     http.get("*/schemas", ({ request }) => {
-      const url = new URL(request.url);
-      const projectId = url.searchParams.get("project_id");
-      if (!projectId) {
-        return HttpResponse.json(errorBody("invalid_query", "project_id is required"), {
-          status: 400,
-        });
+      // Same `limit` coercion caveat as `GET /users` above: URLs carry strings
+      // and the generated zod does not coerce, so out-of-range limits are
+      // rejected by the schema (1-100) rather than silently normalised.
+      const { limit, ...rest } = queryRecord(request);
+      const raw = { ...rest, ...(limit === undefined ? {} : { limit: Number(limit) }) };
+      const query = parse(ListSchemasQueryParams, raw, "invalid_query");
+      if (!query.ok) {
+        return query.response;
       }
-      const objectTypeFilter = url.searchParams.get("object_type") ?? undefined;
-      const records = [...store.schemas.values()]
-        .filter((r) => r.projectId === projectId)
-        .filter((r) => !objectTypeFilter || r.objectType === objectTypeFilter)
-        .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
-      return HttpResponse.json(
-        records.map((r) => ({ id: r.id, createdAt: r.createdAt })),
+      const matching = [...store.schemas.values()]
+        .filter((r) => r.projectId === query.data.project_id)
+        .filter((r) => !query.data.object_type || r.objectType === query.data.object_type)
+        .sort(compareNewestFirst);
+      // The server's anti-join repeats none of the caller's filters, and only
+      // object_type can correlate a suppressing row — so narrowing by
+      // object_type before selecting the latest is equivalent, while narrowing
+      // by kind is not: a newer revision of another kind still supersedes an
+      // older one, and the schema drops out of a kind-filtered result entirely.
+      const current =
+        query.data.revisions === "latest" ? latestSchemaRevisions(matching) : matching;
+      const records = current.filter(
+        (r) => !query.data.kind || schemaKind(r.body) === query.data.kind,
       );
+      // The real cursor is opaque; the mock's is the next start index. A token
+      // it never minted is rejected with req.invalid, like the real server.
+      const start = query.data.page_token === undefined ? 0 : Number(query.data.page_token);
+      if (!Number.isInteger(start) || start < 0) {
+        return HttpResponse.json(errorBody("req.invalid", "invalid page token"), { status: 400 });
+      }
+      const page = records.slice(start, start + query.data.limit);
+      const next =
+        start + query.data.limit < records.length ? String(start + query.data.limit) : undefined;
+      const responseBody: ListSchemas200 = {
+        schemas: page.map((r) => ({
+          id: r.id,
+          schema: r.body,
+          metadata: { created_at: r.createdAt },
+        })),
+        next_page_token: next,
+      };
+      return HttpResponse.json(responseBody);
     }),
 
     http.get("*/schemas/:id", ({ params, request }) => {
@@ -481,18 +905,23 @@ export function setupPlatformHandlers() {
       if (!path.ok) {
         return path.response;
       }
+      // Flat-by-id: OpenAPI dropped required project_id; optional team_id may
+      // still appear. Authz on the real server resolves ownership via RSI.
       const query = parse(GetSchemaByIdQueryParams, queryRecord(request), "invalid_query");
       if (!query.ok) {
         return query.response;
       }
 
-      // Scoped by (project_id, id) like the real repository (GetByID takes
-      // both); a schema belonging to another project reads as absent.
       const record = store.schemas.get(schemaID(path.data.id));
-      if (!record || record.projectId !== query.data.project_id) {
+      if (!record) {
         return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
       }
-      return HttpResponse.json(record.body);
+      const responseBody: GetSchemaById200 = {
+        id: record.id,
+        schema: record.body,
+        metadata: { created_at: record.createdAt },
+      };
+      return HttpResponse.json(responseBody);
     }),
 
     http.delete("*/schemas/:id", ({ params, request }) => {
@@ -505,10 +934,9 @@ export function setupPlatformHandlers() {
         return query.response;
       }
 
-      // Same project scoping as GET: never delete another project's schema.
       const key = schemaID(path.data.id);
       const record = store.schemas.get(key);
-      if (!record || record.projectId !== query.data.project_id) {
+      if (!record) {
         return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
       }
       store.schemas.delete(key);
@@ -531,21 +959,19 @@ export function setupPlatformHandlers() {
         return invalid;
       }
 
-      const id = `flow_${shortId()}`;
+      const id = `flowdef_${shortId()}`;
       const now = nowIso();
-      const flowDef = body.data.flow_definition as Record<string, unknown>;
       const record: FlowDefinitionRecord = {
         id,
-        name: flowDef.name as string,
         projectId: body.data.project_id,
-        schemaUri: body.data.schema_uri ?? DEFAULT_FLOW_SCHEMA_URI,
         status: "active",
         createdAt: now,
         updatedAt: now,
+        seq: ++store.lastSeq,
         body: body.data.flow_definition as unknown as Record<string, unknown>,
       };
       store.flowDefinitions.set(id, record);
-      const responseBody: CreateFlowDefinition201 = flowDetailResponse(record);
+      const responseBody: CreateFlowDefinition201 = flowResponse(record);
       return HttpResponse.json(responseBody, { status: 201 });
     }),
 
@@ -559,10 +985,25 @@ export function setupPlatformHandlers() {
         return query.response;
       }
 
+      // Newest by creation first, matching the server's
+      // `created_at DESC, id DESC`.
+      const matching = [...store.flowDefinitions.values()]
+        .filter((record) => record.projectId === query.data.project_id)
+        .filter((record) => !query.data.name || record.body.name === query.data.name)
+        .sort(compareNewestFirst);
+      // `name` is the column the server's anti-join correlates on, so
+      // narrowing by name before selecting the latest is equivalent. The
+      // purpose predicate is not: the server applies it to the outer query
+      // only, so a flow whose newest revision lacks the purpose drops out
+      // rather than falling back to an older matching revision — filter
+      // after selecting the latest to match.
+      const current =
+        query.data.revisions === "latest" ? latestFlowRevisions(matching) : matching;
+      const records = current.filter(
+        (r) => !query.data.purpose || flowServesPurpose(r.body, query.data.purpose),
+      );
       const responseBody: ListFlowDefinitions200 = {
-        flow_definitions: [...store.flowDefinitions.values()]
-          .filter((record) => record.projectId === query.data.project_id)
-          .map(flowListItemResponse),
+        flow_definitions: records.map(flowResponse),
         next_page_token: null,
       };
       const out = parse(ListFlowDefinitionsResponse, responseBody, "mock_response_invalid");
@@ -572,95 +1013,24 @@ export function setupPlatformHandlers() {
       return HttpResponse.json(out.data);
     }),
 
-    http.get("*/flow_definitions/:id", ({ params, request }) => {
+    http.get("*/flow_definitions/:id", ({ params }) => {
       const path = parse(GetFlowDefinitionParams, params, "invalid_request");
       if (!path.ok) {
         return path.response;
       }
-      const query = requiredProjectID(request);
-      if (!query.ok) {
-        return query.response;
-      }
 
+      // Flat-by-id: no project_id query — ownership is resolved via RSI+Check
+      // on the real server.
       const record = store.flowDefinitions.get(path.data.id);
-      if (!record || record.projectId !== query.data) {
+      if (!record) {
         return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
       }
-      const responseBody: GetFlowDefinition200 = flowDetailResponse(record);
+      const responseBody: GetFlowDefinition200 = flowResponse(record);
       const out = parse(GetFlowDefinitionResponse, responseBody, "mock_response_invalid");
       if (!out.ok) {
         return out.response;
       }
       return HttpResponse.json(out.data);
-    }),
-
-    http.put("*/flow_definitions/:id", async ({ params, request }) => {
-      const path = parse(UpdateFlowDefinitionParams, params, "invalid_request");
-      if (!path.ok) {
-        return path.response;
-      }
-      const query = parse(
-        UpdateFlowDefinitionQueryParams,
-        queryRecord(request),
-        "invalid_query",
-      );
-      if (!query.ok) {
-        return query.response;
-      }
-
-      const record = store.flowDefinitions.get(path.data.id);
-      if (!record || record.projectId !== query.data.project_id) {
-        return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
-      }
-      const raw = await readJson(request);
-      if (raw === null) {
-        return HttpResponse.json(INVALID_JSON, { status: 400 });
-      }
-      const body = parse(UpdateFlowDefinitionBody, raw, "invalid_request");
-      if (!body.ok) {
-        return body.response;
-      }
-      const invalid = invalidFlowDefinitionResponse(
-        body.data.flow_definition as unknown as Record<string, unknown>,
-      );
-      if (invalid) {
-        return invalid;
-      }
-
-      const flowDefinition = body.data.flow_definition as unknown as Record<string, unknown>;
-      record.body = flowDefinition;
-      record.name = typeof flowDefinition.name === "string" ? flowDefinition.name : record.name;
-      record.schemaUri = body.data.schema_uri ?? record.schemaUri;
-      record.status =
-        typeof flowDefinition.status === "string" ? flowDefinition.status : record.status;
-      record.updatedAt = nowIso();
-      const responseBody: UpdateFlowDefinition200 = flowDetailResponse(record);
-      const out = parse(UpdateFlowDefinitionResponse, responseBody, "mock_response_invalid");
-      if (!out.ok) {
-        return out.response;
-      }
-      return HttpResponse.json(out.data, { status: 200 });
-    }),
-
-    http.delete("*/flow_definitions/:id", ({ params, request }) => {
-      const path = parse(DeleteFlowDefinitionParams, params, "invalid_request");
-      if (!path.ok) {
-        return path.response;
-      }
-      const query = requiredProjectID(request);
-      if (!query.ok) {
-        return query.response;
-      }
-
-      const record = store.flowDefinitions.get(path.data.id);
-      if (!record || record.projectId !== query.data) {
-        return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
-      }
-      const existed = store.flowDefinitions.delete(path.data.id);
-      if (!existed) {
-        return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
-      }
-      return new HttpResponse(null, { status: 204 });
     }),
   ];
 }

@@ -23,6 +23,7 @@ import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import "./zitadel-login.js";
+import type { ZlAlert } from "../atoms/zl-alert.js";
 import type { ZitadelLogin } from "./zitadel-login.js";
 
 const API_BASE = "https://flow.test.invalid";
@@ -30,7 +31,10 @@ const API_BASE = "https://flow.test.invalid";
 let mock: MockHandle = setupMockHandlers();
 const server = setupServer(...mock.handlers);
 
-let testProject = configureZitadel({ proxyPath: API_BASE, projectId: "demo-project" });
+let testProject = configureZitadel({
+  proxyPath: API_BASE,
+  projectId: "demo-project",
+});
 
 beforeAll(() => {
   server.listen({ onUnhandledRequest: "error" });
@@ -38,7 +42,10 @@ beforeAll(() => {
 
 beforeEach(() => {
   _resetConfigForTesting();
-  testProject = configureZitadel({ proxyPath: API_BASE, projectId: "demo-project" });
+  testProject = configureZitadel({
+    proxyPath: API_BASE,
+    projectId: "demo-project",
+  });
   mock = setupMockHandlers();
   mock.reset();
   server.resetHandlers(...mock.handlers);
@@ -227,7 +234,10 @@ describe("<zitadel-login> against the typed Flow API", () => {
         "*/flow",
         () =>
           HttpResponse.json(
-            { code: "flowdef.not_found", message: "flow definition: not found" },
+            {
+              code: "flowdef.not_found",
+              message: "flow definition: not found",
+            },
             { status: 404 },
           ),
         { once: true },
@@ -317,6 +327,43 @@ describe("<zitadel-login> against the typed Flow API", () => {
     expect(completeEvents[0]?.detail.handoff_token).toBeTruthy();
   });
 
+  it("does not paint the terminal step when it is about to navigate away", async () => {
+    const assign = vi.fn();
+    const { location } = window;
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...location, assign },
+    });
+
+    try {
+      const element = document.createElement("zitadel-login") as ZitadelLogin;
+      element.purpose = "login";
+      element.project = testProject;
+      element.postSignInUrl = "/admin";
+      host.appendChild(element);
+      await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
+
+      await advanceMockLoginFlow(element);
+      await waitFor(() => (assign.mock.calls.length > 0 ? assign : null));
+
+      // The host's own signed-in screen is next; a "you are signed in" card
+      // here would be the second confirmation of one sign-in.
+      expect(element.shadowRoot?.querySelector("zl-card")).toBeNull();
+      expect(element.shadowRoot?.querySelector('slot[name="loader"]')).not.toBeNull();
+    } finally {
+      Object.defineProperty(window, "location", { configurable: true, value: location });
+    }
+  });
+
+  it("still shows the terminal step when the host handles the handoff itself", async () => {
+    // No post-sign-in-url: nothing navigates, so the terminal screen is the
+    // flow's last word and must render.
+    const element = await mount(host);
+    await advanceMockLoginFlow(element);
+    await waitFor(() => element.shadowRoot?.querySelector("zl-card"));
+    expect(element.shadowRoot?.querySelector("zl-card")).not.toBeNull();
+  });
+
   it("exchanges the handoff token and navigates when post-sign-in-url is set", async () => {
     const assign = vi.fn();
     const { location } = window;
@@ -401,10 +448,20 @@ describe("<zitadel-login> against the typed Flow API", () => {
     expect(errorEvents[0]?.detail.message).toBe(serverMessage);
     await waitFor(() => element.shadowRoot?.querySelector("zl-alert"));
     expect(element.shadowRoot?.querySelector("zl-alert")?.textContent).toContain(serverMessage);
+    // The failure keeps the login surface: the alert renders inside the same
+    // page-shell/card chrome a step would, not bare on an otherwise empty
+    // page — a misconfigured origin is the common trigger and used to blank
+    // the app after the first step had painted normally.
+    const alert = element.shadowRoot?.querySelector("zl-alert");
+    expect(alert?.closest("zl-card")).not.toBeNull();
+    expect(alert?.closest("zl-page-shell")).not.toBeNull();
   });
 
   it("renders branding overlay applied via api-mock applyBranding", async () => {
-    applyBranding({ layout: "split", logo_url: "https://logo.example/img.svg" });
+    applyBranding({
+      layout: "split",
+      logo_url: "https://logo.example/img.svg",
+    });
     await mount(host);
     const captured = mock.getCaptured();
     expect(captured[0]).toEqual({
@@ -425,7 +482,9 @@ describe("<zitadel-login> against the typed Flow API", () => {
   });
 
   it("renders a server-sent branding.liquid_template instead of the bundled default", async () => {
-    applyBranding({ liquid_template: '<p data-testid="tenant-template">tenant-owned</p>' });
+    applyBranding({
+      liquid_template: '<p data-testid="tenant-template">tenant-owned</p>',
+    });
     const element = attachLogin(host);
 
     // Can't use mount(): the marker is what signals the render completed.
@@ -457,7 +516,13 @@ describe("<zitadel-login> against the typed Flow API", () => {
               name: "passkey-first",
               texts: { title_key: "identifier.title" },
               fields: [],
-              actions: [{ name: "passkey", text_key: "identifier.action.passkey", primary: true }],
+              actions: [
+                {
+                  name: "passkey",
+                  text_key: "identifier.action.passkey",
+                  primary: true,
+                },
+              ],
               gates: {},
             },
           },
@@ -564,7 +629,10 @@ describe("<zitadel-login> against the typed Flow API", () => {
     });
     Object.defineProperty(navigator, "credentials", {
       configurable: true,
-      value: { create: create as unknown as CredentialsContainer["create"], get: vi.fn() },
+      value: {
+        create: create as unknown as CredentialsContainer["create"],
+        get: vi.fn(),
+      },
     });
 
     try {
@@ -750,7 +818,10 @@ describe("<zitadel-login> against the typed Flow API", () => {
     });
     Object.defineProperty(navigator, "credentials", {
       configurable: true,
-      value: { create: create as unknown as CredentialsContainer["create"], get: vi.fn() },
+      value: {
+        create: create as unknown as CredentialsContainer["create"],
+        get: vi.fn(),
+      },
     });
 
     try {
@@ -953,7 +1024,11 @@ describe("<zitadel-login> against the typed Flow API", () => {
       ),
     );
     element.shadowRoot?.dispatchEvent(
-      new CustomEvent("zl-submit", { bubbles: true, composed: true, detail: { action: "submit" } }),
+      new CustomEvent("zl-submit", {
+        bubbles: true,
+        composed: true,
+        detail: { action: "submit" },
+      }),
     );
 
     const field = await waitFor(() => {
@@ -1003,7 +1078,11 @@ describe("<zitadel-login> against the typed Flow API", () => {
       ),
     );
     element.shadowRoot?.dispatchEvent(
-      new CustomEvent("zl-submit", { bubbles: true, composed: true, detail: { action: "submit" } }),
+      new CustomEvent("zl-submit", {
+        bubbles: true,
+        composed: true,
+        detail: { action: "submit" },
+      }),
     );
 
     // Both fields are rendered, so both violations route inline to their
@@ -1054,7 +1133,11 @@ describe("<zitadel-login> against the typed Flow API", () => {
       ),
     );
     element.shadowRoot?.dispatchEvent(
-      new CustomEvent("zl-submit", { bubbles: true, composed: true, detail: { action: "submit" } }),
+      new CustomEvent("zl-submit", {
+        bubbles: true,
+        composed: true,
+        detail: { action: "submit" },
+      }),
     );
 
     const alert = await waitFor(() => {
@@ -1096,7 +1179,11 @@ describe("<zitadel-login> against the typed Flow API", () => {
       ),
     );
     element.shadowRoot?.dispatchEvent(
-      new CustomEvent("zl-submit", { bubbles: true, composed: true, detail: { action: "submit" } }),
+      new CustomEvent("zl-submit", {
+        bubbles: true,
+        composed: true,
+        detail: { action: "submit" },
+      }),
     );
 
     const alert = await waitFor(() => {
@@ -1147,7 +1234,11 @@ describe("<zitadel-login> against the typed Flow API", () => {
       ),
     );
     element.shadowRoot?.dispatchEvent(
-      new CustomEvent("zl-submit", { bubbles: true, composed: true, detail: { action: "submit" } }),
+      new CustomEvent("zl-submit", {
+        bubbles: true,
+        composed: true,
+        detail: { action: "submit" },
+      }),
     );
     await waitFor(() => ready(element));
     return element;
@@ -1161,7 +1252,11 @@ describe("<zitadel-login> against the typed Flow API", () => {
 
   function typeInto(element: ZitadelLogin, name: string, value: string): void {
     element.shadowRoot?.dispatchEvent(
-      new CustomEvent("zl-input", { bubbles: true, composed: true, detail: { name, value } }),
+      new CustomEvent("zl-input", {
+        bubbles: true,
+        composed: true,
+        detail: { name, value },
+      }),
     );
   }
 
@@ -1236,7 +1331,11 @@ describe("<zitadel-login> against the typed Flow API", () => {
       ),
     );
     element.shadowRoot?.dispatchEvent(
-      new CustomEvent("zl-submit", { bubbles: true, composed: true, detail: { action: "submit" } }),
+      new CustomEvent("zl-submit", {
+        bubbles: true,
+        composed: true,
+        detail: { action: "submit" },
+      }),
     );
     await waitFor(() => (Reflect.get(element, "loading") === true ? true : null));
     await element.updateComplete;
@@ -1252,7 +1351,11 @@ describe("<zitadel-login> against the typed Flow API", () => {
     // The 400 handler from mountWithStepErrorBanner is still active: the
     // server re-reports the same error on the next submit.
     element.shadowRoot?.dispatchEvent(
-      new CustomEvent("zl-submit", { bubbles: true, composed: true, detail: { action: "submit" } }),
+      new CustomEvent("zl-submit", {
+        bubbles: true,
+        composed: true,
+        detail: { action: "submit" },
+      }),
     );
     await waitFor(() => element.shadowRoot?.querySelector("zl-alert[data-zl-step-error]"));
   });
@@ -1260,9 +1363,15 @@ describe("<zitadel-login> against the typed Flow API", () => {
   it("keeps an explicitly dismissed banner away through the next loading render", async () => {
     const element = await mountWithStepErrorBanner(host, "user_not_found");
 
-    const closeButton = element.shadowRoot
-      ?.querySelector("zl-alert[data-zl-step-error]")
-      ?.shadowRoot?.querySelector<HTMLButtonElement>('[part="close"]');
+    // The shipped templates render the design's non-dismissible alert, so the
+    // close control has to be opted into here — as a tenant template opting
+    // into `dismissible` would. What is under test is the orchestrator holding
+    // the dismissal across the next render, not who renders the control.
+    const banner = element.shadowRoot?.querySelector<ZlAlert>("zl-alert[data-zl-step-error]");
+    expect(banner).toBeTruthy();
+    banner?.setAttribute("dismissible", "");
+    await banner?.updateComplete;
+    const closeButton = banner?.shadowRoot?.querySelector<HTMLButtonElement>('[part="close"]');
     expect(closeButton).toBeTruthy();
     closeButton?.click();
     expect(element.shadowRoot?.querySelector("zl-alert[data-zl-step-error]")).toBeNull();
@@ -1293,7 +1402,11 @@ describe("<zitadel-login> against the typed Flow API", () => {
       ),
     );
     element.shadowRoot?.dispatchEvent(
-      new CustomEvent("zl-submit", { bubbles: true, composed: true, detail: { action: "submit" } }),
+      new CustomEvent("zl-submit", {
+        bubbles: true,
+        composed: true,
+        detail: { action: "submit" },
+      }),
     );
     await waitFor(() => (Reflect.get(element, "loading") === true ? true : null));
     await element.updateComplete;
@@ -1336,6 +1449,325 @@ describe("<zitadel-login> against the typed Flow API", () => {
     expect(submits[0]?.body.fields).toEqual({ email: "" });
   });
 
+  describe("back-navigation (ADR 022)", () => {
+    /** Navigate from identifier → register → register-password (has back action). */
+    async function navigateToRegisterPassword(element: ZitadelLogin): Promise<void> {
+      // identifier → register
+      element.shadowRoot?.dispatchEvent(
+        new CustomEvent("zl-submit", {
+          bubbles: true,
+          composed: true,
+          detail: { action: "register" },
+        }),
+      );
+      await waitFor(() => {
+        const title = element.shadowRoot?.querySelector(".zl-card-title");
+        return title?.textContent?.includes("Create") ? title : null;
+      });
+
+      // Fill required register fields
+      for (const [name, value] of Object.entries({
+        email: "alice@acme.com",
+        given_name: "Alice",
+        family_name: "Acme",
+      })) {
+        element.shadowRoot?.dispatchEvent(
+          new CustomEvent("zl-input", {
+            bubbles: true,
+            composed: true,
+            detail: { name, value },
+          }),
+        );
+      }
+
+      // register → register-password
+      element.shadowRoot?.dispatchEvent(
+        new CustomEvent("zl-submit", {
+          bubbles: true,
+          composed: true,
+          detail: { action: "submit" },
+        }),
+      );
+      await waitFor(() => element.shadowRoot?.querySelector('zl-field[type="password"]'));
+    }
+
+    it("renders no visible control for the kind: back action (gesture-only)", async () => {
+      const element = await mount(host);
+      await navigateToRegisterPassword(element);
+
+      // The step carries a kind: "back" action on the wire, but the template
+      // renders nothing for it — the browser's back gesture is the affordance
+      // (ADR 022). The kind-based exclusion also keeps it out of the generic
+      // secondary-button loop.
+      expect(element.shadowRoot?.querySelector('[data-action="back"]')).toBeNull();
+      expect(
+        element.shadowRoot?.querySelector('[data-testid="zitadel-action-back"]'),
+      ).toBeNull();
+    });
+
+    it("pushes a single sentinel entry without touching the URL", async () => {
+      await settleHistory();
+      const pushState = vi.spyOn(history, "pushState");
+      try {
+        const element = await mount(host);
+        await navigateToRegisterPassword(element);
+
+        // Exactly one sentinel for the back-capable step, and no URL
+        // argument — the host page's location (including any hash-router
+        // fragment) stays untouched.
+        const zlCalls = pushState.mock.calls.filter(
+          ([state]) => (state as { zl?: boolean } | null)?.zl === true,
+        );
+        expect(zlCalls).toHaveLength(1);
+        expect(zlCalls[0]?.[2]).toBeUndefined();
+      } finally {
+        pushState.mockRestore();
+      }
+    });
+
+    /**
+     * jsdom performs `history.back()` traversals asynchronously — a retire
+     * from a previous test can deliver its `popstate` into the current
+     * one. Drain the queue (including any bounce responses) before
+     * installing spies so assertions only see this test's activity.
+     */
+    async function settleHistory(): Promise<void> {
+      for (let i = 0; i < 5; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
+    }
+
+    it("browser back gesture submits the back action, re-arms, then retires the sentinel", async () => {
+      const pushState = vi.spyOn(history, "pushState");
+      const back = vi.spyOn(history, "back");
+      try {
+        const element = await mount(host);
+        await navigateToRegisterPassword(element);
+        await settleHistory();
+        const zlPushesBefore = pushState.mock.calls.filter(
+          ([state]) => (state as { zl?: boolean } | null)?.zl === true,
+        ).length;
+        const backCallsBefore = back.mock.calls.length;
+
+        // Simulate the browser consuming the sentinel (back gesture).
+        window.dispatchEvent(new PopStateEvent("popstate", { state: null }));
+
+        // The gesture maps to the step's back action…
+        await waitFor(() => {
+          const pw = element.shadowRoot?.querySelector('zl-field[type="password"]');
+          return pw === null ? true : null;
+        });
+        const submits = mock
+          .getCaptured()
+          .filter(
+            (req): req is Extract<CapturedRequest, { kind: "submitFlowStep" }> =>
+              req.kind === "submitFlowStep",
+          );
+        expect(submits.find((s) => s.body.action === "back")).toBeDefined();
+
+        // …the sentinel was re-armed before submitting…
+        const zlPushesAfter = pushState.mock.calls.filter(
+          ([state]) => (state as { zl?: boolean } | null)?.zl === true,
+        ).length;
+        expect(zlPushesAfter).toBe(zlPushesBefore + 1);
+
+        // …and retired once the resulting step (register, no back action)
+        // rendered, so the next back press leaves the widget.
+        expect(back.mock.calls.length).toBe(backCallsBefore + 1);
+      } finally {
+        back.mockRestore();
+        pushState.mockRestore();
+      }
+    });
+
+    it("ignores a popstate that lands on the sentinel itself", async () => {
+      const element = await mount(host);
+      await navigateToRegisterPassword(element);
+      await settleHistory();
+      const submitsBefore = mock
+        .getCaptured()
+        .filter((req) => req.kind === "submitFlowStep").length;
+
+      // The host page pushed an entry above the sentinel (e.g. an in-page
+      // #anchor click) and the user backed out of it: the traversal lands
+      // ON the sentinel. That is not a request to go back in the flow.
+      window.dispatchEvent(new PopStateEvent("popstate", { state: { zl: true } }));
+
+      const submitsAfter = mock
+        .getCaptured()
+        .filter((req) => req.kind === "submitFlowStep").length;
+      expect(submitsAfter).toBe(submitsBefore);
+
+      // The widget stays armed: a real back press still maps to the back
+      // action afterwards.
+      window.dispatchEvent(new PopStateEvent("popstate", { state: null }));
+      await waitFor(() => {
+        const pw = element.shadowRoot?.querySelector('zl-field[type="password"]');
+        return pw === null ? true : null;
+      });
+      const backSubmit = mock
+        .getCaptured()
+        .filter(
+          (req): req is Extract<CapturedRequest, { kind: "submitFlowStep" }> =>
+            req.kind === "submitFlowStep",
+        )
+        .find((s) => s.body.action === "back");
+      expect(backSubmit).toBeDefined();
+    });
+
+    it("does not pop a host-pushed entry when retiring the sentinel", async () => {
+      const element = await mount(host);
+      await navigateToRegisterPassword(element);
+      await settleHistory();
+
+      // The host app pushes its own entry after the widget armed — the
+      // sentinel is no longer the top entry.
+      history.pushState({ host: true }, "");
+      const back = vi.spyOn(history, "back");
+      try {
+        // Completing the step renders a step without a back action, which
+        // disarms the widget. It must NOT traverse: history.back() here
+        // would pop the host's entry and trigger a host navigation. The
+        // sentinel leaks instead (skipped later by the popstate handler).
+        type(element, PASSWORD_FIELD, "hunter2secure");
+        submit(element);
+        await waitFor(() => {
+          const pw = element.shadowRoot?.querySelector('zl-field[type="password"]');
+          return pw === null ? true : null;
+        });
+
+        expect(back).not.toHaveBeenCalled();
+      } finally {
+        back.mockRestore();
+      }
+    });
+
+    it("retires the sentinel in place when the terminal step navigates away", async () => {
+      // The claim-page double spend: retiring with `history.back()` fires
+      // `popstate` in the host, whose router reloads the route, finds the
+      // session the handoff exchange has just created, and completes the
+      // claim in a document that `location.assign` is already replacing.
+      const assign = vi.fn();
+      const { location } = window;
+      Object.defineProperty(window, "location", {
+        configurable: true,
+        value: { ...location, assign },
+      });
+      let hostPopstates = 0;
+      const onPopstate = () => {
+        hostPopstates += 1;
+      };
+      const back = vi.spyOn(history, "back");
+      const replaceState = vi.spyOn(history, "replaceState");
+      try {
+        const element = attachLogin(host);
+        element.postSignInUrl = "/admin";
+        await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
+        await navigateToRegisterPassword(element);
+        await settleHistory();
+        expect((history.state as { zl?: boolean } | null)?.zl).toBe(true);
+        window.addEventListener("popstate", onPopstate);
+        const backCallsBefore = back.mock.calls.length;
+
+        // register-password → done, which navigates via post-sign-in-url.
+        type(element, PASSWORD_FIELD, "hunter2secure");
+        submit(element);
+        await waitFor(() => (assign.mock.calls.length > 0 ? assign : null));
+        await settleHistory();
+
+        expect(assign).toHaveBeenCalledWith("/admin");
+        // No traversal, so nothing for the host to react to…
+        expect(back.mock.calls.length).toBe(backCallsBefore);
+        expect(hostPopstates).toBe(0);
+        // …but the sentinel is still retired: the entry no longer claims to
+        // be the widget's, so a later back press is plain host navigation.
+        expect(replaceState).toHaveBeenCalledWith(expect.objectContaining({ zl: false }), "");
+        expect((history.state as { zl?: boolean } | null)?.zl).toBe(false);
+      } finally {
+        window.removeEventListener("popstate", onPopstate);
+        replaceState.mockRestore();
+        back.mockRestore();
+        Object.defineProperty(window, "location", { configurable: true, value: location });
+      }
+    });
+
+    it("back gesture on a step without a back action leaves history alone", async () => {
+      await mount(host);
+      await settleHistory();
+      const pushState = vi.spyOn(history, "pushState");
+      const back = vi.spyOn(history, "back");
+      const forward = vi.spyOn(history, "forward");
+      try {
+        const submitsBefore = mock
+          .getCaptured()
+          .filter((req) => req.kind === "submitFlowStep").length;
+
+        // Initial step is never armed — a popstate here is host-page
+        // traversal and must not be intercepted or bounced.
+        window.dispatchEvent(new PopStateEvent("popstate", { state: null }));
+
+        const submitsAfter = mock
+          .getCaptured()
+          .filter((req) => req.kind === "submitFlowStep").length;
+        expect(submitsAfter).toBe(submitsBefore);
+        expect(back).not.toHaveBeenCalled();
+        expect(forward).not.toHaveBeenCalled();
+        const zlCalls = pushState.mock.calls.filter(
+          ([state]) => (state as { zl?: boolean } | null)?.zl === true,
+        );
+        expect(zlCalls).toHaveLength(0);
+      } finally {
+        forward.mockRestore();
+        back.mockRestore();
+        pushState.mockRestore();
+      }
+    });
+
+    it("forward press onto a retired sentinel bounces back", async () => {
+      await mount(host);
+      await settleHistory();
+      const back = vi.spyOn(history, "back");
+      try {
+        // A retired sentinel survives as a forward entry; traversing onto
+        // it must bounce — the flow cannot move forward through browser
+        // navigation (ADR 022 §Edge cases).
+        window.dispatchEvent(new PopStateEvent("popstate", { state: { zl: true } }));
+
+        expect(back).toHaveBeenCalledTimes(1);
+      } finally {
+        back.mockRestore();
+      }
+    });
+
+    it("does not call history.pushState when step has no back action", async () => {
+      const pushState = vi.spyOn(history, "pushState");
+      try {
+        await mount(host);
+
+        // Identifier step has no back action — no zl-tagged pushState calls
+        const zlCalls = pushState.mock.calls.filter(
+          ([state]) => (state as { zl?: boolean } | null)?.zl === true,
+        );
+        expect(zlCalls).toHaveLength(0);
+      } finally {
+        pushState.mockRestore();
+      }
+    });
+
+    it("removes the popstate listener on disconnect", async () => {
+      const removeSpy = vi.spyOn(window, "removeEventListener");
+      try {
+        const element = await mount(host);
+        element.remove();
+
+        const popstateCalls = removeSpy.mock.calls.filter(([event]) => event === "popstate");
+        expect(popstateCalls.length).toBeGreaterThanOrEqual(1);
+      } finally {
+        removeSpy.mockRestore();
+      }
+    });
+  });
+
   it("captures <zl-select> and <zl-checkbox> values on submit", async () => {
     // A step whose only inputs are the non-text atoms. Regression: the
     // orchestrator used to read `.value` from `<zl-field>` only, so a chosen
@@ -1355,7 +1787,9 @@ describe("<zitadel-login> against the typed Flow API", () => {
                   type: "select",
                   text_key: "register.field.maritalStatus",
                   required: false,
-                  validation: { enum: ["Single", "Married", "Divorced", "Widowed"] },
+                  validation: {
+                    enum: ["Single", "Married", "Divorced", "Widowed"],
+                  },
                 },
                 {
                   name: "newsletterOptIn",
@@ -1377,7 +1811,9 @@ describe("<zitadel-login> against the typed Flow API", () => {
     let submittedFields: Record<string, unknown> | undefined;
     server.use(
       http.post("*/flow/*/submit", async ({ request }) => {
-        const body = (await request.json()) as { fields: Record<string, unknown> };
+        const body = (await request.json()) as {
+          fields: Record<string, unknown>;
+        };
         submittedFields = body.fields;
         return HttpResponse.json({
           id: "flow_test",
@@ -1413,14 +1849,21 @@ describe("<zitadel-login> against the typed Flow API", () => {
     checkbox.checked = true;
 
     element.shadowRoot?.dispatchEvent(
-      new CustomEvent("zl-submit", { bubbles: true, composed: true, detail: { action: "submit" } }),
+      new CustomEvent("zl-submit", {
+        bubbles: true,
+        composed: true,
+        detail: { action: "submit" },
+      }),
     );
 
     // A checkbox maps to a JSON boolean property, so a ticked box submits the
     // real boolean `true` (not the "true"/"on" value token) to satisfy the
     // server's schema-type validation on create_user.
     await waitFor(() => submittedFields ?? null);
-    expect(submittedFields).toEqual({ maritalStatus: "Married", newsletterOptIn: true });
+    expect(submittedFields).toEqual({
+      maritalStatus: "Married",
+      newsletterOptIn: true,
+    });
   });
 
   it("submits an unticked checkbox as boolean false", async () => {
@@ -1456,7 +1899,9 @@ describe("<zitadel-login> against the typed Flow API", () => {
     let submittedFields: Record<string, unknown> | undefined;
     server.use(
       http.post("*/flow/*/submit", async ({ request }) => {
-        const body = (await request.json()) as { fields: Record<string, unknown> };
+        const body = (await request.json()) as {
+          fields: Record<string, unknown>;
+        };
         submittedFields = body.fields;
         return HttpResponse.json({
           id: "flow_test",
@@ -1482,7 +1927,11 @@ describe("<zitadel-login> against the typed Flow API", () => {
     );
 
     element.shadowRoot?.dispatchEvent(
-      new CustomEvent("zl-submit", { bubbles: true, composed: true, detail: { action: "submit" } }),
+      new CustomEvent("zl-submit", {
+        bubbles: true,
+        composed: true,
+        detail: { action: "submit" },
+      }),
     );
 
     await waitFor(() => submittedFields ?? null);
@@ -1516,7 +1965,9 @@ describe("<zitadel-login> against the typed Flow API", () => {
                   type: "select",
                   text_key: "register.field.maritalStatus",
                   required: false,
-                  validation: { enum: ["Single", "Married", "Divorced", "Widowed"] },
+                  validation: {
+                    enum: ["Single", "Married", "Divorced", "Widowed"],
+                  },
                 },
               ],
               actions: [{ name: "submit", text_key: "submit.register", primary: true }],
@@ -1532,7 +1983,9 @@ describe("<zitadel-login> against the typed Flow API", () => {
     let submittedFields: Record<string, string> | undefined;
     server.use(
       http.post("*/flow/*/submit", async ({ request }) => {
-        const body = (await request.json()) as { fields: Record<string, string> };
+        const body = (await request.json()) as {
+          fields: Record<string, string>;
+        };
         submittedFields = body.fields;
         return HttpResponse.json({
           id: "flow_test",
@@ -1559,7 +2012,11 @@ describe("<zitadel-login> against the typed Flow API", () => {
     );
 
     element.shadowRoot?.dispatchEvent(
-      new CustomEvent("zl-submit", { bubbles: true, composed: true, detail: { action: "submit" } }),
+      new CustomEvent("zl-submit", {
+        bubbles: true,
+        composed: true,
+        detail: { action: "submit" },
+      }),
     );
 
     await waitFor(() => submittedFields ?? null);

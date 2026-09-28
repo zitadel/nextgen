@@ -3,7 +3,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 
-import type { InstanceHandle } from "./types";
+import type { InstanceHandle, PlatformCredentials } from "./types";
 
 /**
  * The handshake file carries an InstanceHandle across process boundaries:
@@ -46,14 +46,42 @@ export async function waitForHandshake(path: string, timeoutMs = 60_000): Promis
 }
 
 function validateHandle(value: unknown, source: string): InstanceHandle {
-  const handle = value as Partial<InstanceHandle> | null;
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new Error(`handshake file ${source} is not an object`);
+  }
+  const handle = value as Partial<InstanceHandle>;
   for (const field of ["baseUrl", "projectId", "projectSecret", "schemaId"] as const) {
-    if (typeof handle?.[field] !== "string" || handle[field].length === 0) {
+    if (typeof handle[field] !== "string" || handle[field].length === 0) {
       throw new Error(`handshake file ${source} is missing "${field}"`);
     }
   }
   if (!URL.canParse(handle.baseUrl as string)) {
     throw new Error(`handshake file ${source} has a malformed "baseUrl": ${handle.baseUrl}`);
   }
+  if (handle.platform !== undefined) {
+    validatePlatform(handle.platform, source);
+  }
   return handle as InstanceHandle;
+}
+
+/**
+ * The handshake is the cross-process contract, so a malformed platform block
+ * must fail here with the field name, not later with a less actionable error.
+ */
+function validatePlatform(value: unknown, source: string): void {
+  const fail = (detail: string): never => {
+    throw new Error(`handshake file ${source} has a malformed "platform" block: ${detail}`);
+  };
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    fail("not an object");
+  }
+  const platform = value as Partial<PlatformCredentials>;
+  for (const field of ["projectId", "publishableKey"] as const) {
+    if (typeof platform[field] !== "string" || platform[field].length === 0) {
+      fail(`"${field}" is required`);
+    }
+  }
+  // Unknown extra fields pass through on purpose: future platform
+  // credentials join additively, and an older reader must not reject a
+  // newer producer's handle.
 }

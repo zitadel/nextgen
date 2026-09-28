@@ -32,6 +32,7 @@ import { confirm, isCancel, select, text } from "@clack/prompts";
 import { detectHealthyLocalServer } from "../../../../src/lib/local-server/runtime";
 
 import {
+  DesignPrompt,
   DevPortPrompt,
   FrameworkConfirmPrompt,
   PickFrameworkPrompt,
@@ -281,5 +282,58 @@ describe("SignInPresetPrompt", () => {
     await expect(
       new SignInPresetPrompt().ask(baseAnswers({ preset: "password-first" }), ctx),
     ).rejects.toMatchObject({ code: "E_VALIDATION" });
+  });
+});
+
+describe("DesignPrompt", () => {
+  it("writes the selected design into the answers", async () => {
+    vi.mocked(select).mockResolvedValueOnce("split" as never);
+
+    const answers = await new DesignPrompt().ask(baseAnswers(), ctx);
+
+    expect(answers.design).toBe("split");
+    expect(vi.mocked(select).mock.calls[0]?.[0]).toMatchObject({ initialValue: "built-in" });
+  });
+
+  it("offers the built-in template plus every shipped design", async () => {
+    vi.mocked(select).mockResolvedValueOnce("built-in" as never);
+
+    await new DesignPrompt().ask(baseAnswers(), ctx);
+
+    expect(selectOptionsFromFirstCall().map((option) => option.value)).toEqual([
+      "built-in",
+      "centered",
+      "split",
+      "split-right",
+      "hero",
+      "minimal",
+    ]);
+  });
+
+  it("maps the built-in choice to an unset design", async () => {
+    vi.mocked(select).mockResolvedValueOnce("built-in" as never);
+
+    const answers = await new DesignPrompt().ask(baseAnswers(), ctx);
+
+    expect(answers.design).toBeUndefined();
+  });
+
+  it("skips and keeps the flagged design when --design was passed", async () => {
+    const answers = await new DesignPrompt().ask(baseAnswers({ design: "minimal" }), {
+      ...ctx,
+      designFromFlag: true,
+    });
+
+    expect(answers.design).toBe("minimal");
+    expect(select).not.toHaveBeenCalled();
+  });
+
+  it("throws E_VALIDATION on Ctrl-C", async () => {
+    vi.mocked(select).mockResolvedValueOnce(Symbol("cancel") as never);
+    vi.mocked(isCancel).mockReturnValueOnce(true);
+
+    await expect(new DesignPrompt().ask(baseAnswers(), ctx)).rejects.toMatchObject({
+      code: "E_VALIDATION",
+    });
   });
 });

@@ -10,6 +10,11 @@ tasks:
   lint:
     command: "corepack pnpm exec oxlint ."
 
+  # No workspace build deps: the specs only import @playwright/test — the
+  # api-mock and demo-nuxt dependencies are dev-server commands, not types.
+  typecheck:
+    command: "corepack pnpm run typecheck"
+
   e2e:
     command: "corepack pnpm exec playwright test"
     deps:

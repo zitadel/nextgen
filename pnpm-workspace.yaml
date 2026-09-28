@@ -10,7 +10,7 @@ catalog:
   "@faker-js/faker": ^10.4.0
   '@fontsource/arimo': ^5.2.8
   "@fumapress/ai": ^0.6.2
-  "@moonrepo/cli": ^2.3.3
+  "@moonrepo/cli": ^2.4.6
   "@mswjs/http-middleware": ^0.10.3
   '@oclif/core': ^4.11.4
   '@oclif/plugin-autocomplete': ^3.2.50
@@ -38,11 +38,13 @@ catalog:
   "@testing-library/user-event": ^14.6.1
   "@tsdown/css": ^0.21.10
   '@types/cookie-parser': ^1.4.10
+  '@types/culori': ^4.0.1
   "@types/express": ^4.17.21
   "@types/mdx": ^2.0.14
   "@types/node": ^25.6.0
   "@types/react": ^19.2.14
   "@types/react-dom": ^19.2.3
+  "@types/semver": ^7.7.1
   "@typescript/native-preview": 7.0.0-dev.20260421.2
   "@vitejs/plugin-react": ^6.0.1
   "@vitest/browser": ^4.1.9
@@ -50,8 +52,10 @@ catalog:
   ajv: ^8.20.0
   class-variance-authority: ^0.7.1
   clsx: ^2.1.1
+  cmdk: ^1.1.1
   cookie-parser: ^1.4.7
-  dompurify: ^3.4.12
+  culori: ^4.0.2
+  dompurify: ^3.4.13
   eslint: ^9.0.0
   eslint-config-prettier: ^10.0.0
   eslint-import-resolver-typescript: ^3.7.0
@@ -65,29 +69,32 @@ catalog:
   fumadocs-openapi: ^11.0.2
   fumadocs-ui: ^16.10.3
   fumapress: ^0.6.2
-  hono: ^4.12.31
+  hono: ^4.12.34
   jsdom: ^29.0.2
   json-schema-typed: ^8.0.2
   lightningcss: ^1.30.1
-  liquidjs: ^10.26.0
+  liquidjs: ^10.27.2
   lit: ^3.3.2
   lucide: ^1.16.0
   lucide-react: ^1.16.0
   msw: ^2.14.6
   msw-storybook-addon: ^2.0.7
+  nuxt: ^4.5.1
   oclif: ^4.17.46
-  orval: ^8.10.0
+  orval: ^8.37.0
   oxfmt: ^0.46.0
   oxlint: ^1.61.0
   playwright: ^1.60.0
   prettier: ^3.0.0
   radix-ui: ^1.6.4
-  react: ^19.2.5
-  react-dom: ^19.2.5
-  react-server-dom-webpack: 19.2.5
+  react: ^19.2.8
+  react-dom: ^19.2.8
+  react-server-dom-webpack: 19.2.8
   safe-stable-stringify: ^2.5.0
+  semver: ^7.7.3
   sharp: ^0.35.3
   shiki: ^4.2.0
+  sonner: ^2.0.7
   storybook: ^10.3.6
   tailwind-merge: ^3.6.0
   tailwindcss: ^4.2.4
@@ -103,9 +110,11 @@ catalog:
   vite-plugin-dts: ^4.5.0
   vite-plugin-web-components-hmr: ^0.1.3
   vitest: ^4.1.9
+  vue: ^3.5.41
   vue-tsc: ^3.2.8
   waku: ^1.0.0-beta.3
   xstate: ^5.31.1
+  yaml: ^2.9.0
   zod: ^4.3.6
 
 catalogMode: strict

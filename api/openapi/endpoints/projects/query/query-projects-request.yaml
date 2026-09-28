@@ -4,7 +4,10 @@ properties:
   limit:
     $ref: ../../../components/schemas/limit.yaml
   page_token:
-    description: Token to retrieve the next page of results.
+    description: |
+      Token to retrieve the next page of results. Must be sent with the same
+      `sorting` as the request that issued the token. Omitting `sorting` reuses
+      the default sort and only succeeds when that default matches the token.
     oneOf:
       - $ref: ../../../components/schemas/page-token.yaml
       - type: 'null'

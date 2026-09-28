@@ -2,25 +2,35 @@
 
 > **Status:** Accepted  
 > **Date:** 2026-05-20  
+> **Updated:** 2026-08-03  
 > **Context:** HTTP/OpenAPI surface for nextgen  
-> **Depends on:** [ADR 011](011-resource-identifiers.md)
+> **Depends on:** [ADR 011](011-resource-identifiers.md), [ADR 047](047-dialect-id-generation.md)
 
 ## Context
 
-[ADR 011](011-resource-identifiers.md) stores ephemeral resource identifiers as database-generated integers and represents them in Go as decimal strings via `database.Identity`. Previous OpenAPI drafts documented prefixed string patterns (for example `sess_…`, `att_…`) that did not match storage behavior.
+[ADR 011](011-resource-identifiers.md) / [ADR 047](047-dialect-id-generation.md)
+store **all** resource primary keys as dialect-minted prefixed opaque strings.
+“Ephemeral” resources (sessions, auth attempts, checks) still have short
+lifetimes, but their IDs use the same prefix rule as durable resources.
 
-Before exposing ephemeral ids on public endpoints, we must decide how integers appear in JSON, path parameters, and agent-facing CLI output.
+Earlier text of this ADR required **unprefixed** decimal strings for ephemeral
+API fields. That matched BIGINT identity storage and is superseded.
 
 ## Decision
 
-Ephemeral identifiers are represented externally without resource-type prefixes.
+Ephemeral resource identifiers on the API **are** prefixed opaque strings:
 
-- `session_id`, `attempt_id`, and `challenge_id` no longer carry `sess_`, `att_`, `chal_`, or similar prefixes.
-- API clients must treat these identifiers as opaque strings.
-- The current server implementation maps these IDs directly from `database.Identity` (decimal string representation).
+- `session_id` → `sess_…`
+- `attempt_id` → `att_…`
+- `challenge_id` / check id → `ch_…`
+- token row ids → `tkn_…`
+
+Clients must treat them as opaque (do not parse ULID vs UUID). OpenAPI schemas
+document the required prefix. Secrets (session token material, handoff tokens)
+remain separate from row PKs.
 
 ## Consequences
 
-- OpenAPI schemas and examples for `session_id`, `attempt_id`, and `challenge_id` must not imply prefixed formats.
-- Existing clients that validated or generated prefixed ephemeral IDs must be updated.
-- Storage and repository behavior remains aligned with ADR 011 and requires no additional identifier encoding layer.
+- OpenAPI examples and patterns use the domain prefixes.
+- Mocks and fixtures should mint prefixed ids.
+- No separate decimal encoding layer for ephemeral ids.

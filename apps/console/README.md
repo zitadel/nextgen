@@ -83,15 +83,47 @@ caveats (including the widget's dark-only styling for now).
 
 At boot the console fetches `GET /console/runtime.json` (public, served by
 the Go server; proxied in dev) to learn the deployment `mode` and which
-project to sign into. A standalone (self-host) deployment **tracks exactly
-one project, and the server never creates it**: the first project created —
-by the customer's `zitadel setup` (`POST /projects`) — becomes the default
-the console signs into and manages. `platform.project_id` /
-`NEXTGEN_PLATFORM_PROJECT_ID` pins a specific existing project instead.
-While no project exists yet, the login screen shows a "run `zitadel setup`"
-hint; refresh after setup and the console picks the new project up. Only
-`standalone` mode exists today; `platform` (cloud portal) mode is future
-work.
+project to sign into.
+
+The target model (ADR 0004 §1) gives every deployment a reserved *platform*
+project that the console signs into, with customer projects selected after
+sign-in; nothing enforces a one-project ceiling. **What ships today is the
+transitional fallback from §2's cutover rule:** the server never creates the
+sign-in project, and the first project created — by the customer's
+`zitadel setup` (`POST /projects`) — becomes the one the console signs into
+and manages. `platform.project_id` / `NEXTGEN_PLATFORM_PROJECT_ID` pins a
+specific existing project instead. The fallback stays until a human-usable
+seed transport ships the reserved platform project end to end.
+
+A deployment can opt out of the fallback today by setting
+`platform.bootstrap_project` (`NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT`), which
+provisions the reserved platform project itself at startup (keys, default
+schema, default login flow) and is what makes `zitadel claim` and
+self-registration work. It still lacks §2's server-discovered seed transport
+for membership and owner assignment, but it is no longer only a manual
+opt-in: `zitadel start` sets the flag and hands the server an initial
+operator, `admin@zitadel.localhost`, through `--user-file`. So on a
+CLI-started server that keeps the default bootstrap the console signs into
+`proj_platform`, and `zitadel console` prints a one-time link that signs that
+operator in. Setting `NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=false` or pinning
+another project turns both the platform project and the local admin off.
+
+The "run `zitadel setup`" hint on the login screen therefore only shows where
+the platform project is off and no project exists yet; refresh after setup and
+the console picks the new project up. Only `standalone` mode exists today;
+`platform` (cloud portal) mode is future work.
+
+**A server the console cannot reach is an error, not a mode** (ADR 0004 §3).
+An unreachable endpoint, a non-2xx answer, or a body that is not a runtime
+document renders a retryable "Server unavailable" screen instead of the app —
+deliberately distinct from the setup hint, because "no project yet" would send
+an operator to `zitadel setup` for a problem setup cannot fix. Running the
+console against something that serves no runtime document (a backend-less
+`vite preview`, the api-mock loop below) is the one legitimate case for the
+old behavior, and it says so explicitly: set `VITE_CONSOLE_RUNTIME_FALLBACK=1`
+*for the build or dev server*, and discovery failures resolve to `standalone`
+again with a warning in the browser console. Never set it for the embedded
+production build.
 
 The runtime document also carries the default project's **publishable key**
 (root ADR 036): a browser-safe, origin-scoped bearer the login widget sends
@@ -112,8 +144,8 @@ a fiction. **Default to the real-data loop.**
 moon run console:dev-real
 ```
 
-One command: boots an ephemeral real instance (binary runtime + embedded
-Postgres, no Docker) via `@zitadel/testing`, bootstraps a project with the
+One command: boots an ephemeral real instance (binary runtime + SQLite by
+default, no Docker) via `@zitadel/testing`, bootstraps a project with the
 default schema and login flow, seeds users, then starts the dev server with the
 proxy bound to that instance. It prints the sign-in credentials
 (`dev@zitadel.local` / `Console-dev-1` by default). HMR is the normal Vite loop.
@@ -125,16 +157,26 @@ Vite, for pointing a separately-running console at a fresh instance. Overrides:
 `CONSOLE_DEV_EMAIL`, `CONSOLE_DEV_PASSWORD`, `CONSOLE_DEV_ZITADEL_PORT`,
 `CONSOLE_DEV_ORIGIN`. See [`scripts/dev-real.mts`](scripts/dev-real.mts).
 
-Note `listUsers` requires `user.read`, which only the **project secret** carries
+Note `queryUsers` requires `user.read`, which only the **project secret** carries
 — the browser-plane publishable key is deliberately refused
 (`internal/api/user.go`). So real list screens need the proxy's
 `CONSOLE_PROJECT_SECRET`, which this script supplies; sign-in alone does not.
+
+The proxy injects that secret only for requests aimed at the seeded project
+(no `project_id`, or the seeded one). A request scoped to another project —
+one you were granted access to, or one added with
+[`scripts/dev-real-add-project.mts`](scripts/dev-real-add-project.mts) — goes
+through on the session cookie alone, because the server lets a Bearer win over
+the cookie and the seeded project's secret would only hide the other project
+as a 404. That is also why the Add-admin picker on a project's page lists the
+seeded project's users for every project: `POST /users/query` names no project.
 
 ### Mock backend
 
 ```sh
 PORT=8080 moon run api-mock:start          # terminal 1
 VITE_CONSOLE_PROJECT_ID=proj_dev_mock \
+  VITE_CONSOLE_RUNTIME_FALLBACK=1 \
   moon run console:dev                     # terminal 2
 ```
 
@@ -143,8 +185,11 @@ Fast and offline, and the full sign-in loop works (the mock serves
 `identifier` → `password` flow the real server emits. Use it only for chrome that
 needs no real data: it has **no user store**, so list screens cannot be
 meaningful and nothing about authorization can be proven there. It also serves no
-`/console/runtime.json`, so runtime discovery falls back to `standalone` and the
-project id must come from `VITE_CONSOLE_PROJECT_ID`.
+`/console/runtime.json`, which is why the two variables above are both required:
+`VITE_CONSOLE_RUNTIME_FALLBACK` opts this loop into the standalone fallback
+(without it the console stops on the connectivity screen, correctly — the
+document really is missing), and the project id then has to come from
+`VITE_CONSOLE_PROJECT_ID`.
 
 ### Embedded build
 
@@ -161,8 +206,11 @@ embed base path.
 | --- | --- | --- |
 | `CONSOLE_BACKEND_URL` | Node (dev proxy) | Upstream API origin (defaults in `vite.config.mts`) |
 | `CONSOLE_PROJECT_SECRET` | Node (dev proxy) | Bearer attached by the proxy; never shipped to the browser |
+| `CONSOLE_PROJECT_SECRET_PROJECT_ID` | Node (dev proxy) | The project that secret belongs to; the proxy attaches the secret only to requests scoped to it (or to none). Defaults to `VITE_CONSOLE_PROJECT_ID`, which differs only in claim mode |
+| `CONSOLE_DEV_PROXY_LOG` | Node (dev proxy) | Set to `1` to print which credential each proxied request went out with (project secret, caller's authorization, or cookie only) — for a screen that answers 401/403/404 when it is not obvious who the server saw |
 | `VITE_CONSOLE_API_BASE` | Client | Same-origin API base the SDK calls (default `/api`) |
 | `VITE_CONSOLE_PROJECT_ID` | Client | Dev override for the project id; when unset it is discovered from `/console/runtime.json` (Console ADR 0004) |
+| `VITE_CONSOLE_RUNTIME_FALLBACK` | Client (build/dev time) | Opt-in for runs with no `/console/runtime.json` (`vite preview`, api-mock): failed discovery resolves to `standalone` instead of the connectivity error. Never set it for the embedded build |
 
 ## Commands
 

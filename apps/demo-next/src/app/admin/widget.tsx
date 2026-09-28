@@ -7,7 +7,9 @@ const ZitadelLogout = dynamic(
     const { demoProject } = await import("@/zitadel");
     await import("@zitadel/components");
     return function ZitadelLogoutElement() {
-      return <zitadel-logout project={demoProject} post-sign-out-url="/login" />;
+      // The admin page's surface is fixed light, so declare it — same
+      // contract as the login page's widget.
+      return <zitadel-logout project={demoProject} theme="light" post-sign-out-url="/login" />;
     };
   },
   { ssr: false },

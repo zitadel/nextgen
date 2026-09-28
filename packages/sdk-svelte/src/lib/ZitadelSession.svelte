@@ -11,6 +11,9 @@
     postSignOutUrl,
     heading,
     logoutLabel,
+    variant,
+    theme,
+    suppressHeader,
     onSignout,
   }: ZitadelSessionProps = $props();
 
@@ -47,4 +50,7 @@
   post-sign-out-url={postSignOutUrl}
   {heading}
   logout-label={logoutLabel}
+  {variant}
+  {theme}
+  {suppressHeader}
 ></zitadel-session>

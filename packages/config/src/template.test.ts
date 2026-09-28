@@ -88,7 +88,7 @@ describe("branding designs", () => {
     for (const design of BRANDING_DESIGNS) {
       const { branding } = getDefaultBrandingConfig(design);
       expect(["centered", "split"]).toContain(branding.layout);
-      expect(branding.liquid_template_file).toBe("./login.liquid");
+      expect(branding.liquid_template).toEqual({ $file: "./login.liquid" });
     }
   });
 

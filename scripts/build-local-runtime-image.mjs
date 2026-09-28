@@ -12,6 +12,7 @@ import {
   prepareDockerContext,
   readServerRelease,
 } from "./release-artifacts.mjs";
+import { localServerVersion } from "./server-build.mjs";
 
 export const LOCAL_RUNTIME_IMAGE = "ghcr.io/zitadel/nextgen:local-dev";
 
@@ -52,10 +53,15 @@ export async function buildLocalRuntimeImage(options = {}) {
     await buildServerBinaries({
       repoRoot,
       outDir: contextRoot,
-      version: release.version,
+      // A local dev image is not a release. Stamping release.version here would
+      // make `zitadel start --runtime docker` report the published version — in
+      // logs and in OTel service.version — for a binary built off arbitrary
+      // local HEAD. The image tag and Docker context still carry `release`.
+      version: localServerVersion(info),
       gitInfo: info,
       platforms: [platform],
       run: runFn,
+      runCapture: runCaptureFn,
       env: baseEnv,
     });
     const contextDir = await prepareDockerContextFn({

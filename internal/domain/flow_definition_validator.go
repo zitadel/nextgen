@@ -10,6 +10,7 @@ import (
 var reservedOutcomes = map[string]struct{}{
 	"user_not_found":      {},
 	"user_already_exists": {},
+	"identity_unknown":    {},
 	"callback":            {},
 }
 
@@ -115,7 +116,7 @@ func resolveAllStepFields(schema *jsonschema.Schema, steps []FlowDefinitionStep)
 	}
 
 	// validate that all required fields in the schema are present in the flow definition
-	if err := validateRequiredUserSchemaFields(sr.RequiredSet(), steps); err != nil {
+	if err := validateRequiredUserSchemaFields(sr, steps); err != nil {
 		return nil, err
 	}
 
@@ -179,28 +180,43 @@ func validatePasskeyActionsEnabled(sr schemaReader, steps []FlowDefinitionStep) 
 
 // validateRequiredUserSchemaFields checks that all required fields in the
 // user schema are present in the flow definition.
-func validateRequiredUserSchemaFields(required map[string]struct{}, steps []FlowDefinitionStep) error {
-	if len(required) == 0 {
+func validateRequiredUserSchemaFields(sr schemaReader, steps []FlowDefinitionStep) error {
+	// Collecting `address.street` covers the leaf and every object above
+	// it, since an object materializes once one of its children is
+	// collected. The same prefixes are what the schema treats as
+	// materialized, so an optional object's own `required` list comes
+	// into force here too.
+	covered := make(map[string]struct{})
+	cover := func(field Field) {
+		var path AttributeKey
+		for _, node := range AttributeKey(field.String()).Nodes() {
+			path = path.AppendNode(node)
+			covered[string(path)] = struct{}{}
+		}
+	}
+	for _, step := range steps {
+		for _, field := range step.Fields {
+			cover(field)
+		}
+	}
+
+	requiredPaths := sr.RequiredPaths(covered)
+	if len(requiredPaths) == 0 {
 		return nil
 	}
-	// gather all the fields set in the flow definition steps
-	fields := make(map[string]struct{})
-	for _, step := range steps {
-		for _, f := range step.Fields {
-			fields[string(f)] = struct{}{}
+
+	missing := make([]string, 0, len(requiredPaths))
+	for path := range requiredPaths {
+		if _, ok := covered[path]; !ok {
+			missing = append(missing, path)
 		}
 	}
-	missingFields := make([]string, 0, len(required))
-	for requiredField := range required {
-		if _, ok := fields[requiredField]; !ok {
-			missingFields = append(missingFields, requiredField)
-		}
+	if len(missing) == 0 {
+		return nil
 	}
-	if len(missingFields) > 0 {
-		slices.Sort(missingFields)
-		return ErrFlowDefinitionInvalid(fmt.Sprintf("required fields %v in user schema are missing in the flow definition steps", missingFields), nil)
-	}
-	return nil
+
+	slices.Sort(missing)
+	return ErrFlowDefinitionInvalid(fmt.Sprintf("required fields %v in user schema are missing in the flow definition steps", missing), nil)
 }
 
 // validateSteps checks the structural shape of each step (terminal vs
@@ -281,11 +297,12 @@ func validateSteps(steps []FlowDefinitionStep) error {
 			_, isReserved := reservedOutcomes[transitionKey]
 			if !isAction && !isReserved {
 				return ErrFlowDefinitionInvalid(fmt.Sprintf(
-					"step %q: transition key %q is not an action name or reserved outcome (user_not_found, user_already_exists, callback)", step.Name, transitionKey), nil)
+					"step %q: transition key %q is not an action name or reserved outcome (user_not_found, user_already_exists, identity_unknown, callback)", step.Name, transitionKey), nil)
 			}
 		}
 
-		// todo (grvijayan): a step with an x-identifier field defines a user_not_found transition or return an error
+		// todo (grvijayan): a step with an identifier field (a property carrying
+		// a non-empty x-unique scope) defines a user_not_found transition or return an error
 	}
 	return nil
 }
@@ -324,6 +341,28 @@ func validateGraph(flowDefinition FlowDefinition) ([]PivotingTarget, error) {
 	// 1. validate all transition targets
 	for _, step := range flowDefinition.Steps {
 		for key, t := range step.Transitions {
+			if t.Purpose != nil {
+				// Local re-purposing: never combined with a cross-flow
+				// action, only to a purpose this definition serves, and
+				// only to that purpose's entry step.
+				if t.Action != nil {
+					return nil, ErrFlowDefinitionInvalid(fmt.Sprintf(
+						"step %q: transition %q declares both purpose and action; a transition either re-purposes locally or targets another flow", step.Name, key), nil)
+				}
+				if !t.Purpose.IsAFlowDefinitionPurpose() {
+					return nil, ErrFlowDefinitionInvalid(fmt.Sprintf(
+						"step %q: transition %q has invalid purpose", step.Name, key), nil)
+				}
+				entry, ok := flowDefinition.Purposes[*t.Purpose]
+				if !ok {
+					return nil, ErrFlowDefinitionInvalid(fmt.Sprintf(
+						"step %q: transition %q re-purposes to %q, which this definition does not serve", step.Name, key, t.Purpose.String()), nil)
+				}
+				if t.Target != entry {
+					return nil, ErrFlowDefinitionInvalid(fmt.Sprintf(
+						"step %q: transition %q re-purposes to %q but targets %q; it must target that purpose's entry step %q", step.Name, key, t.Purpose.String(), t.Target, entry), nil)
+				}
+			}
 			if t.IsCurrentFlow() {
 				// target must be a step in this flow definition
 				if _, ok := stepNames[t.Target]; !ok {
@@ -482,8 +521,12 @@ func validateFlipTableCoverage(def FlowDefinition) error {
 	return nil
 }
 
-// purposeFlipTargets mirrors the engine's flip table. Kept separate so
-// the validator stays pure.
+// purposeFlipTargets mirrors the identifier half of the engine's flip
+// table. Kept separate so the validator stays pure. identity_unknown also
+// flips login → register but comes only from SSO resolution, so it is
+// left out here: requiring it on every combined entry step would reject
+// the shipped default flow. A rule on steps carrying sso_providers is
+// future work (#1014).
 var purposeFlipTargets = map[FlowDefinitionPurpose]map[string]FlowDefinitionPurpose{
 	FlowDefinitionPurposeLogin: {
 		FlowImplicitOutcomeUserNotFound: FlowDefinitionPurposeRegister,

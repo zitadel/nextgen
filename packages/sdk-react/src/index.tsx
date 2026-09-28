@@ -28,6 +28,10 @@ export { configureZitadel, getApi, getZitadelConfig };
 export type { ZitadelConfig, ZitadelProject };
 export * from "./types";
 
+// Re-exported so scaffolded apps can wire the business copy overlay without a
+// direct @zitadel/components dependency (strict package managers reject those).
+export { businessLocales } from "@zitadel/components";
+
 /**
  * React components for the Zitadel auth widgets.
  *
@@ -93,7 +97,14 @@ const ZitadelSessionElementReact = createComponent({
  * A forwarded `ref` resolves to the underlying `<zitadel-login>` DOM element,
  * so consumers can imperatively access the upgraded web component.
  */
-export const ZitadelLogin = React.forwardRef<ZitadelLoginElement, ZitadelLoginProps>(
+/**
+ * `ZitadelLoginProps` is framework-agnostic, so it carries no `children`.
+ * React hosts need them: the widget exposes slots (`attribution-trailing`)
+ * that are filled with light-DOM content.
+ */
+export type ZitadelLoginReactProps = ZitadelLoginProps & { children?: React.ReactNode };
+
+export const ZitadelLogin = React.forwardRef<ZitadelLoginElement, ZitadelLoginReactProps>(
   function ZitadelLogin(
     { purpose, onFlowStep, onFlowInput, onFlowComplete, onFlowError, ...props },
     ref,

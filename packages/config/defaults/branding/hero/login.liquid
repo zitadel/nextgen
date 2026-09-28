@@ -19,7 +19,8 @@
         <nav class="zl-hero__nav">
           <span class="zl-hero__brand">
             {% if branding.logo_url %}
-              <img class="zl-hero__brand-logo" src="{{ branding.logo_url }}" alt="" />
+              <img class="zl-hero__brand-logo" src="{{ branding.logo_url }}" alt="" data-zl-asset-fallback />
+              <span class="zl-hero__brand-mark" aria-hidden="true" hidden data-zl-asset-fallback-content></span>
             {% else %}
               <span class="zl-hero__brand-mark" aria-hidden="true"></span>
             {% endif %}
@@ -54,7 +55,8 @@
     </aside>
     <section class="zl-split__form">
     {% if branding.logo_url %}
-      <img class="zl-split__compact" src="{{ branding.logo_url }}" alt="" />
+      <img class="zl-split__compact" src="{{ branding.logo_url }}" alt="" data-zl-asset-fallback />
+      <p class="zl-split__compact zl-hero__compact-brand" hidden data-zl-asset-fallback-content>Your brand</p>
     {% else %}
       <p class="zl-split__compact zl-hero__compact-brand">Your brand</p>
     {% endif %}
@@ -67,18 +69,9 @@
         {% endif %}
       {% endif %}
 
-      {% if errors and errors.size > 0 %}
-        {% for err in errors %}
-          {% if err | formLevelError %}
-            {% assign alert_heading = err.text_key | alertHeading %}
-            {% assign alert_body = err.text_key | alertBody %}
-            <zl-alert severity="error" dismissible data-zl-step-error{% if alert_heading != "" %} heading="{{ alert_heading | t }}"{% endif %}>
-              {% if alert_body != "" %}{{ alert_body | t }}{% elsif err.text_key %}{{ err.text_key | t }}{% else %}{{ err.message }}{% endif %}
-            </zl-alert>
-          {% endif %}
-        {% endfor %}
-      {% endif %}
-
+      {% assign recover = actions | where: "name", "recover" | first %}
+      {% assign password_field = fields | where: "type", "password" | first %}
+      <div class="zl-field-group">
       {% for f in fields %}
         {% assign field_placeholder = f.text_key | fieldPlaceholder %}
         {% assign field_help = f.text_key | fieldHelp %}
@@ -123,6 +116,7 @@
             {% if f.required %}required{% endif %}
             {% if field_placeholder != "" %}placeholder="{{ field_placeholder }}"{% endif %}
             {% if field_err != "" %}invalid error="{{ field_err }}"{% endif %}
+            {% if recover and f.type == 'password' %}forgot-password-href="#" forgot-password-action="{{ recover.name }}" forgot-password-label="{{ recover.text_key | t }}"{% endif %}
           >
             {% if field_help != "" %}
               <span slot="help">{{ field_help }}</span>
@@ -131,8 +125,26 @@
         {% endcase %}
       {% endfor %}
 
-      {% assign recover = actions | where: "name", "recover" | first %}
-      {% if recover %}
+      {% if errors and errors.size > 0 %}
+        {% for err in errors %}
+          {% if err | formLevelError %}
+            {% assign alert_heading = err.text_key | alertHeading %}
+            {% assign alert_body = err.text_key | alertBody %}
+            <zl-alert data-zl-step-error{% if alert_heading != "" %} heading="{{ alert_heading | t }}"{% endif %}>
+              {% if alert_body != "" %}{{ alert_body | t }}{% elsif err.text_key %}{{ err.text_key | t }}{% else %}{{ err.message }}{% endif %}
+            </zl-alert>
+          {% endif %}
+        {% endfor %}
+      {% endif %}
+      </div>
+
+      <div class="zl-card-actions">
+      {% comment %}
+        A step can offer recovery without asking for a password (an identifier-only
+        screen, say). With no label row to sit on, the affordance keeps its own row
+        rather than disappearing.
+      {% endcomment %}
+      {% if recover and password_field == nil %}
         <p class="zl-card-forgot">
           <a href="#" class="zl-card-forgot__link" data-action="recover">{{ recover.text_key | t }}</a>
         </p>
@@ -154,7 +166,7 @@
       {% endfor %}
 
       {% for a in actions %}
-        {% unless a.primary or a.name == 'passkey' or a.name == 'register' or a.name == 'sign_in' or a.name == 'recover' %}
+        {% unless a.primary or a.kind == 'back' or a.name == 'passkey' or a.name == 'register' or a.name == 'sign_in' or a.name == 'recover' %}
           <zl-button
             hierarchy="secondary"
             size="medium"
@@ -181,7 +193,6 @@
         {% endunless %}
       {% endif %}
 
-
       {% assign register = actions | where: "name", "register" | first %}
       {% if register %}
         <p class="zl-card-nav">
@@ -195,6 +206,7 @@
           {{ 'register.action.sign_in.lead' | t }}<a href="#" class="zl-card-nav__link" data-action="sign_in" data-testid="zitadel-action-sign_in-link">{{ 'register.action.sign_in.link' | t }}</a>
         </p>
       {% endif %}
+      </div>
 
       {% if challenge %}
         {% if challenge.method == "passkey" or challenge.method == "passkey_register" %}
@@ -217,6 +229,10 @@
 
       {% mandatory_gates %}
     </zl-card>
+    {% comment %} The orchestrator swaps this for the trustmark, so it sits with
+       the card rather than under the seam between the panes. Removing it falls
+       back to the page-shell footer. {% endcomment %}
+    <div data-zl-attribution-anchor></div>
     </section>
   </div>
 </zl-page-shell>

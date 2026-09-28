@@ -2,11 +2,13 @@ post:
   operationId: createSchema
   summary: Create new schema
   description: |
-    Create a new schema. The schema definition must include a unique $id field,
-    which will be used to identify the schema in future requests. The $id must 
-    be a valid URI and should ideally point to the location where the schema 
-    can be accessed.
-    
+    Create a new schema. The optional `$id` field is the JSON Schema document
+    URI used to identify the schema in future requests (GitOps-stable identity,
+    not a free-form resource primary key). When `$id` is omitted, the server
+    generates a `sch_*` URL. When provided, `$id` must be unique within the
+    project and should ideally be a valid URI pointing at where the schema can
+    be accessed.
+
     The schema can either be a concrete schema, e.g. a user schema, or a 
     schema-url which will be resolved by the server.
   tags:
@@ -54,24 +56,8 @@ post:
               summary: |
                 An example of a successful response for creating a user schema.
               externalValue: examples/create-user-schema-response-example.yaml
-    '400':
-      description: The provided input was not valid
-      content:
-        application/json:
-          schema:
-            $ref: ../../components/error-details.yaml
-    '409':
-      description: A schema with the same $id already exists
-      content:
-        application/json:
-          schema:
-            $ref: ../../components/error-details.yaml
     default:
-      description: Unexpected error response.
-      content:
-        application/json:
-          schema:
-            $ref: ../../components/error-details.yaml
+      $ref: createSchema-error-response.yaml
 
 get:
   operationId: listSchemas
@@ -83,7 +69,7 @@ get:
     - Schemas
   parameters:
     - $ref: ../../components/parameters/project-id.yaml
-    - $ref: ../../components/parameters/offset.yaml
+    - $ref: ../../components/parameters/limit.yaml
     - $ref: ../../components/parameters/page-token.yaml
     - name: object_type
       in: query
@@ -91,6 +77,43 @@ get:
       schema:
         type: string
         maxLength: 256
+    - name: revisions
+      in: query
+      description: |
+        Which revisions to return. Schemas are immutable and versioned by URL,
+        so editing one mints a new row sharing its `objectType`.
+
+        `all` (the default) returns every revision — the full history an
+        export, an audit or a GitOps diff needs. `latest` returns the newest
+        revision of each `objectType`, which is one row per schema.
+
+        A schema stored without an `objectType` is a revision of nothing, and
+        is returned by both.
+
+        A `page_token` is bound to the mode it was issued in and is rejected by
+        the other.
+      schema:
+        type: string
+        default: all
+        enum:
+          - all
+          - latest
+    - name: kind
+      in: query
+      description: |
+        The kind of schema to filter by, read from the stored document's
+        `kind` property.
+
+        `schema-url` is not a kind: it discriminates the create request body,
+        not a stored schema. A schema registered by URL is stored as whatever
+        document the URL served, and declares its own kind.
+
+        A schema stored without its document being parsed has no kind that
+        could be read, and is excluded from every filtered result.
+      schema:
+        type: string
+        enum:
+          - user-schema
   security:
     - oauth2:
         - schema.read
@@ -102,8 +125,4 @@ get:
           schema:
             $ref: list-schemas-response.yaml
     default:
-      description: Unexpected error response.
-      content:
-        application/json:
-          schema:
-            $ref: ../../components/error-details.yaml
+      $ref: listSchemas-error-response.yaml

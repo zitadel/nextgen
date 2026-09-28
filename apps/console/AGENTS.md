@@ -8,35 +8,74 @@ take precedence over, the root [`AGENTS.md`](../../AGENTS.md) for files under
 
 Before changing console routing, navigation, the app shell, or how the console
 talks to the API, read the console-scoped ADRs in
-[`docs/adrs/`](docs/adrs/README.md). They are **Accepted** (team-reviewed) and
-are the agreed direction for upcoming work (issue
+[`docs/adrs/`](docs/adrs/README.md) (statuses in that index; 0001/0002 are
+Accepted, 0003/0004 Proposed and largely implemented). They are the agreed
+direction for the console build-out (issue
 [#440](https://github.com/zitadel/nextgen/issues/440)):
 
 - [ADR 0001: Routing](docs/adrs/0001-console-routing.md) — file-based routing,
   one router factory, `basepath` derived from the Vite `base`, route loaders +
   pending/error/not-found boundaries, `staticData`-driven sidebar.
 - [ADR 0002: API access and auth interceptors](docs/adrs/0002-console-api-access.md)
-  — server-side proxy injects the project secret; the console holds no
-  credential; reuse `configureZitadel()` / `getApi()` rather than a bespoke
-  client.
+  — the console holds no script-readable credential and calls the API
+  same-origin; the embedded browser carries its HttpOnly first-party session
+  cookie. Reuse `configureZitadel()` / `getApi()` rather than a bespoke client.
+  The base is `/api` **only** under the dev server (whose proxy temporarily
+  injects the project secret); the embedded build talks to the origin root,
+  where the Go binary serves the API. The `/api` shim §1 once deferred to the
+  server was withdrawn in the 2026-08-12 revision — do not reintroduce it.
 - [ADR 0003: Console authentication](docs/adrs/0003-console-authentication.md)
   — `/login` embeds the login widget (`@zitadel/sdk-react`); the pathless
   `_authed` layout owns the session guard (`GET /sessions/me`) and the app
-  shell; the session cookie authenticates the UI while management calls stay
-  on the server-held secret until session-derived permissions exist.
+  shell; the first-party session cookie is the embedded Console's human
+  operator credential. Management calls stay on the dev-only proxy secret
+  until ADR 053's session-derived target authorization exists; embedded calls
+  fail closed in the meantime.
 - [ADR 0004: Deployment modes](docs/adrs/0004-console-deployment-modes.md)
-  — one build serves cloud and self-host; the initial standalone Console uses
-  one default project (the first project created by `zitadel setup` through
-  `POST /projects`; the server never creates it). A minimal per-request
-  runtime document carries `mode` + the sign-in project id, and portal surfaces
-  (billing,
-  multi-project, support) render from **effective permissions** (user
-  grants ∩ deployment profile, computed server-side) via
-  `staticData.permission` — never build-time flags, never a parallel
-  console-facing feature array.
+  — one build and one authorization model serve cloud and self-host. **Target:**
+  every deployment uses a reserved platform project for Console identities; an
+  explicit testkit or future server-file seed fully provisions it, its initial
+  user, membership, separate owner assignment, and optional customer project.
+  **Today:** the Console signs into the pinned or first-created project — an
+  ordinary customer project — under §2's cutover rule, unless
+  `platform.bootstrap_project` is set, which provisions the reserved platform
+  project itself (keys, default schema, default login flow — but not the
+  initial user/membership/owner assignment the target seed transport adds)
+  and is what makes claiming and self-registration work. `zitadel start` is
+  the exception to "today": it sets that flag and hands the server an initial
+  operator through `--user-file`, so on a CLI-started server with the default
+  bootstrap the Console signs into `proj_platform` (setting the flag to
+  `false` or pinning another project keeps the fallback). Do not remove that
+  fallback (or the `platform.project_id` pin) until the seed transport ships;
+  doing so strands self-hosters. Standalone optimizes for one project but does
+  not forbid more. The runtime document carries only public sign-in metadata;
+  portal surfaces render from target-scoped **effective permissions**, never
+  membership, build-time flags, or a parallel console-facing feature array.
+  A runtime document the Console cannot read is an **error, not a mode** (§3):
+  keep "unreachable/erroring" and "no project yet" separate states, and do not
+  reintroduce a silent fallback to `standalone` — backend-less dev and preview
+  runs opt in with `VITE_CONSOLE_RUNTIME_FALLBACK` instead.
 
 If an implementation needs to diverge from an ADR, update the ADR in the same
 change rather than letting code and decision drift.
+
+## Styling: classify before building
+
+Before building any console UI, read
+[`docs/styling.md`](docs/styling.md) — where a component lives decides how it
+is styled (unprefixed shadcn utilities for console chrome vs a Lit+React pair),
+and the retired `*-zl-*` console utility names must not come back. The 3-way
+classification and token authority live there; the pair recipe lives in
+[`apps/storybook/AGENTS.md`](../storybook/AGENTS.md).
+
+## Screen conventions
+
+List/detail screens follow the shipped patterns under `src/routes/_authed/`
+(users, schemas, flow-definitions): loader-fetched data, status columns where
+the resource has lifecycle state, `$param` detail routes. The sessions screen
+speaks `POST /sessions/query` (structured filters + cursor pagination); there
+is no `GET /sessions` list, and sessions have no `revoked` state — revocation
+deletes the session.
 
 ## Generated files
 
@@ -49,11 +88,42 @@ rule).
 
 ```sh
 moon run console:dev-real   # seeded real backend + dev server (default loop)
+moon run console:dev-claim  # same, but for the claim page (see below)
 moon run console:dev        # dev server only on http://localhost:5174
 moon run console:typecheck
 moon run console:test
 moon run console:build
 ```
+
+## The claim page needs `dev-claim`, not `dev-real`
+
+`dev-real` boots one ordinary project and signs the console into it. The claim
+page is the console acting as the *platform's* claim surface, and
+`claim/complete` only accepts a session belonging to the platform project — so
+on `dev-real` the page renders but the claim always fails with "This account
+can't claim the project". That is the harness, not a defect.
+
+`moon run console:dev-claim` boots the platform project, pins the console to it,
+and prints a ready claim link. The trade-off is why it is opt-in: pinning the
+console to `proj_platform` changes the standalone semantics the demo and
+embedded suites rely on, and the seeded users live in the project being claimed
+rather than the platform one, so list screens read empty and you register on the
+claim page instead of signing in with the seeded credentials.
+
+Three things that break either loop before it starts, none of which say so
+clearly:
+
+- **Build the CLI first** (`moon run cli:build`). Both loops shell out to it to
+  start the server; without a built bundle the server starts unmigrated and dies
+  with `no such table: projects`.
+- **Reinstall after a rebase** (`pnpm install`). A stale `node_modules` fails the
+  built CLI on a missing transitive dependency, not on anything you changed.
+- **A raw binary needs `--migrate`.** Migrations are opt-in since #1152; the CLI
+  passes the flag for you, so this only bites when launching `dist/server/nextgen`
+  by hand.
+
+`CONSOLE_DEV_ORIGIN` sets the console's port for both loops, so a second worktree
+can run beside the first.
 
 ## Develop against real data, not the mock
 
@@ -61,16 +131,8 @@ The console manages an instance, so **use `console:dev-real`** — it boots a re
 ephemeral instance and seeds users, so list screens show real API responses.
 `@zitadel/api-mock` has no user store; a users list read from it is a fiction.
 
-Two things to know:
-
-- `listUsers` requires `user.read`, which only the project secret carries — the
-  publishable key is deliberately refused (`internal/api/user.go`). A signed-in
-  console is not sufficient for real list data; the proxy secret is.
-- The mock's flow shape now mirrors the real default flow (split
-  `identifier` → `password`), so it is trustworthy for chrome — but it has no user
-  store and cannot prove authorization. Keep it that way: the authority is
-  `packages/config/defaults/default-login.json`, and a step fixture must be
-  diffed against it before being changed (`packages/api-mock/AGENTS.md`).
-
-See the Local development section of [`README.md`](README.md) for all three
-backends and when each applies.
+Why the mock cannot substitute (authorization, the `user.read` scope, and the
+publishable-key refusal) is documented canonically in the Local development
+section of [`README.md`](README.md) — read it for all three backends and when
+each applies. The mock's flow-shape authority rule lives in
+[`packages/api-mock/AGENTS.md`](../../packages/api-mock/AGENTS.md).

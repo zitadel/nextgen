@@ -17,15 +17,14 @@
 export const en: Record<string, string> = {
   // ═══════════════════════════════════════════════════════════════════════════
   // Step: identifier (email entry — first screen)
-  // Figma 2xl `6593:141983`, card `6593:141985`, stack `6593:141989`
   // ═══════════════════════════════════════════════════════════════════════════
   "identifier.title": "Sign in",
   "identifier.description": "Enter your email to continue",
-  "identifier.field.email": "Work email",
-  "identifier.field.email.placeholder": "you@company.com",
+  "identifier.field.email": "Email",
+  "identifier.field.email.placeholder": "you@example.com",
   "identifier.field.password": "Password",
   "identifier.action.submit": "Sign in",
-  "identifier.action.continue": "Sign in",
+  "identifier.action.continue": "Continue",
   "identifier.action.passkey": "Sign in with a passkey",
   "identifier.action.register.lead": "Don't have an account? ",
   "identifier.action.register.link": "Sign up",
@@ -51,8 +50,8 @@ export const en: Record<string, string> = {
   // ═══════════════════════════════════════════════════════════════════════════
   "collect-credentials.title": "Create your account",
   "collect-credentials.description": "Set up your email and password",
-  "collect-credentials.field.email": "Work email",
-  "collect-credentials.field.email.placeholder": "you@company.com",
+  "collect-credentials.field.email": "Email",
+  "collect-credentials.field.email.placeholder": "you@example.com",
   "collect-credentials.field.password": "Password",
   // No static password rule hint: the only enforced rule is the schema's
   // minLength, and "symbol + number" was never enforced. The client will build
@@ -71,7 +70,6 @@ export const en: Record<string, string> = {
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Step: passkey-upsell (passkey enrollment offer — after registration)
-  // Figma `6594:630`, heading `6594:89142`, body `6594:12796`
   // ═══════════════════════════════════════════════════════════════════════════
   "passkey-upsell.title": "Sign in faster next time",
   "passkey-upsell.description": "No password needed ever again.",
@@ -79,7 +77,7 @@ export const en: Record<string, string> = {
   "passkey-upsell.description.line2": "Sign in with Face ID, Touch ID, or PIN.",
   "passkey-upsell.action.passkey_register": "Set up passkey",
   "passkey-upsell.action.skip": "Skip for now",
-  // Figma `6594:630` setup-passkey annotations — kept for backward compat.
+  // Setup-passkey copy — kept for backward compat.
   "passkey-upsell.action.setup": "Set up passkey",
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -87,8 +85,8 @@ export const en: Record<string, string> = {
   // ═══════════════════════════════════════════════════════════════════════════
   "collect-passkey-email.title": "Create your account",
   "collect-passkey-email.description": "Enter your email to set up a passkey",
-  "collect-passkey-email.field.email": "Work email",
-  "collect-passkey-email.field.email.placeholder": "you@company.com",
+  "collect-passkey-email.field.email": "Email",
+  "collect-passkey-email.field.email.placeholder": "you@example.com",
   "collect-passkey-email.action.submit": "Continue",
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -100,7 +98,6 @@ export const en: Record<string, string> = {
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Step: done (terminal — signed-in confirmation)
-  // Figma `6596:132846`
   // ═══════════════════════════════════════════════════════════════════════════
   "done.title": "You're signed in as",
   "done.description": "",
@@ -116,10 +113,9 @@ export const en: Record<string, string> = {
   "password.action.register.link": "Sign up",
 
   "register.title": "Create your account",
-  // Empty by design — the sign-up card has no subheadline (Figma 6593:141743).
-  "register.description": "",
-  "register.field.email": "Work email",
-  "register.field.email.placeholder": "you@company.com",
+  "register.description": "Enter your details to get started",
+  "register.field.email": "Email",
+  "register.field.email.placeholder": "you@example.com",
   "register.field.password": "Password",
   "register.field.givenName": "Given name",
   "register.field.familyName": "Family name",
@@ -190,7 +186,7 @@ export const en: Record<string, string> = {
   "error.password_required": "Please enter a password",
   "error.password_incorrect": "Wrong email or password.",
   "error.email_exists": "An account with this email already exists.",
-  /** Figma sign-in error `6602:180268` — inline on password field. */
+  /** Sign-in error, inline on the password field. */
   "error.invalid_credentials": "Wrong email or password.",
   "error.required": "This field is required.",
 
@@ -203,7 +199,7 @@ export const en: Record<string, string> = {
   "error.field_max_length": "{0} is too long.",
   "error.field_invalid": "Please check {0}.",
 
-  // --- Sign-in form-level alert (Figma `6594:125237`, alert `6596:132779`) ---
+  // --- Sign-in form-level alert ---
   "error.sign_in_server.title": "We couldn't complete your sign in.",
   "error.sign_in_server.body": "Please try again in a few minutes",
 };

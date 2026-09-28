@@ -11,17 +11,18 @@ import (
 	"github.com/descope/virtualwebauthn"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/crypto"
 	cryptomock "github.com/zitadel/nextgen/internal/crypto/mock"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/service/mocks"
-	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/database"
 	"go.uber.org/mock/gomock"
 )
 
 func expectListUserPasskeys(stmts *mocks.MockAllStatements, keys []*domain.UserPasskey) {
-	stmts.EXPECT().ListUserPasskeys(gomock.Any(), gomock.Any()).Return(&v2database.ListResult[*domain.UserPasskey]{Items: keys}, nil)
+	stmts.EXPECT().ListUserPasskeys(gomock.Any(), gomock.Any()).Return(&database.ListResult[*domain.UserPasskey]{Items: keys}, nil)
 }
 
 const (
@@ -116,7 +117,16 @@ func newAuthAttemptSvcWithVerifier(
 	verifier crypto.HashVerifier,
 ) service.AuthAttemptService {
 	pool := mocks.NewMockPool(ctrl)
+	statementer := mocks.NewMockStatementer[service.AllStatements](ctrl)
 	pool.EXPECT().Statements().Return(stmts).AnyTimes()
+	pool.EXPECT().
+		Transaction(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(ctx context.Context, fn func(context.Context, service.Statementer[service.AllStatements]) error) error {
+			return fn(ctx, statementer)
+		}).
+		AnyTimes()
+	statementer.EXPECT().Statements().Return(stmts).AnyTimes()
+	stmts.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	return service.NewAuthAttemptService(service.NewPool(pool), sessions, users, verifier)
 }
 
@@ -145,6 +155,41 @@ func TestAuthAttemptService_Create(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, got)
 		assert.Same(t, got, created, "Create must persist and return the same attempt instance")
+	})
+
+	t.Run("copies flow_id from actor slot onto the event", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		stmts := mocks.NewMockAllStatements(ctrl)
+		stmts.EXPECT().CreateAuthAttempt(gomock.Any(), gomock.Any()).Return(nil)
+		var gotEvent *domain.Event
+		stmts.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, ev *domain.Event) error {
+			gotEvent = ev
+			return nil
+		})
+		pool := mocks.NewMockPool(ctrl)
+		statementer := mocks.NewMockStatementer[service.AllStatements](ctrl)
+		pool.EXPECT().Statements().Return(stmts).AnyTimes()
+		pool.EXPECT().Transaction(gomock.Any(), gomock.Any()).DoAndReturn(
+			func(ctx context.Context, fn func(context.Context, service.Statementer[service.AllStatements]) error) error {
+				return fn(ctx, statementer)
+			},
+		)
+		statementer.EXPECT().Statements().Return(stmts).AnyTimes()
+		svc := service.NewAuthAttemptService(service.NewPool(pool), nil, nil, nil)
+
+		ctx := audit.WithActorSlot(t.Context())
+		audit.BindPublicRequest(ctx, "proj", "flow_1", "sess_1")
+		_, err := svc.Create(ctx, service.CreateAuthAttemptInput{
+			ProjectID:      "proj",
+			RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypeUser},
+		})
+		require.NoError(t, err)
+		require.NotNil(t, gotEvent)
+		require.NotNil(t, gotEvent.FlowID)
+		assert.Equal(t, "flow_1", *gotEvent.FlowID)
+		require.NotNil(t, gotEvent.SessionID)
+		assert.Equal(t, "sess_1", *gotEvent.SessionID)
+		assert.Equal(t, domain.EventTypeAuthAttemptCreated, gotEvent.EventType)
 	})
 
 	t.Run("copies session factors for step-up", func(t *testing.T) {
@@ -405,8 +450,8 @@ func TestAuthAttemptService_VerifyProof(t *testing.T) {
 
 		require.NoError(t, err)
 		require.NotNil(t, got)
-		userFactor, ok := succeededFactor.(*domain.AuthFactorUser)
-		require.True(t, ok, "ChallengeSucceeded factor must be *domain.AuthFactorUser")
+		require.IsType(t, &domain.AuthFactorUser{}, succeededFactor, "ChallengeSucceeded factor must be *domain.AuthFactorUser")
+		userFactor := succeededFactor.(*domain.AuthFactorUser)
 		assert.Equal(t, "user-1", userFactor.UserID)
 	})
 
@@ -641,8 +686,8 @@ func TestAuthAttemptService_IssuePasskeyChallenge(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	challenge, ok := setChallenge.(*domain.AuthChallengePasskey)
-	require.True(t, ok, "SetChallenge must receive a *domain.AuthChallengePasskey")
+	require.IsType(t, &domain.AuthChallengePasskey{}, setChallenge, "SetChallenge must receive a *domain.AuthChallengePasskey")
+	challenge := setChallenge.(*domain.AuthChallengePasskey)
 	assert.NotEmpty(t, challenge.Challenge, "issued passkey challenge must carry a WebAuthn challenge")
 	assert.Equal(t, passkeyRPID, challenge.RPID)
 }
@@ -671,7 +716,7 @@ func TestAuthAttemptService_VerifyPasskeyProof(t *testing.T) {
 			gomock.Any(),
 			gomock.Any(),
 			gomock.Any(),
-		).DoAndReturn(func(_ context.Context, _ v2database.Filter[domain.UserPasskeyField], updates ...domain.UserPasskeyUpdate) error {
+		).DoAndReturn(func(_ context.Context, _ database.Filter[domain.UserPasskeyField], updates ...domain.UserPasskeyUpdate) error {
 			for _, u := range updates {
 				if sc, ok := u.(*domain.UserPasskeySignCountUpdate); ok {
 					persistedSignCount = sc.SignCount
@@ -690,8 +735,8 @@ func TestAuthAttemptService_VerifyPasskeyProof(t *testing.T) {
 
 		require.NoError(t, err)
 		require.NotNil(t, got)
-		factor, ok := succeededFactor.(*domain.AuthFactorPasskey)
-		require.True(t, ok, "ChallengeSucceeded factor must be *domain.AuthFactorPasskey")
+		require.IsType(t, &domain.AuthFactorPasskey{}, succeededFactor, "ChallengeSucceeded factor must be *domain.AuthFactorPasskey")
+		factor := succeededFactor.(*domain.AuthFactorPasskey)
 		assert.Equal(t, passkeyUserID, factor.UserID, "verified passkey factor must carry the user")
 		assert.Equal(t, f.cred.ID, factor.CredentialID)
 		assert.Equal(t, int64(1), persistedSignCount)

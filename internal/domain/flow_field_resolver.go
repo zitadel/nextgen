@@ -7,12 +7,10 @@ import (
 	"github.com/ianlancetaylor/jsonschema"
 )
 
-//go:generate go tool mockgen -typed -package domainmock -destination ./mock/flow_field_resolver.mock.go . FlowFieldResolver
-
 // FlowFieldResolver maps property names referenced by a flow step to
 // fully-resolved [FlowField] payloads, surfaces the implicit transition
-// outcomes the schema implies (a property with `x-unique` set implies a
-// `user_not_found` outcome), and validates submitted values against the
+// outcomes the schema implies (the designated `x-identifier` property
+// implies a `user_not_found` outcome), and validates submitted values against the
 // schema-derived rules.
 //
 // The contract is shaped to the user meta-schema at
@@ -50,7 +48,8 @@ type FlowResolvedFields struct {
 
 // FlowField is the resolved per-field metadata.
 type FlowField struct {
-	// Name is the user-schema property name this field collects.
+	// Name is the user-schema property this field collects, as a dotted
+	// path for a nested property (`address.street`).
 	Name string
 
 	// Type is the UI input kind the client should render. It is
@@ -64,7 +63,10 @@ type FlowField struct {
 	// `field.email`). Resolved client-side via the `| t` filter.
 	TextKey string
 
-	// Required reflects membership in the schema's top-level `required` array.
+	// Required reflects membership in the schema's `required` array at
+	// every level of the field's path: a nested leaf is required only
+	// when each of its ancestors is required too, matching what schema
+	// validation accepts for the document as a whole.
 	Required bool
 
 	// Value is an optional pre-fill (e.g. an identifier carried over
@@ -83,10 +85,10 @@ type FlowField struct {
 
 	// Challenge names the auth-attempt challenge the field maps to, or
 	// [FlowFieldChallengeNone] when the field carries neither an
-	// identifier nor a credential proof. Derivation paths: a non-empty
-	// `x-unique` annotation on the property surfaces as
-	// [FlowFieldChallengeIdentifier] (any uniquely-keyed property can
-	// identify a user); the reserved `x-auth-methods#password` field
+	// identifier nor a credential proof. Derivation paths: the field
+	// naming the schema's designated identifier (the schema-root
+	// `x-identifier` path, ADR 058) surfaces as
+	// [FlowFieldChallengeIdentifier]; the reserved `x-auth-methods#password` field
 	// name combined with `x-auth-methods.password.enabled = true` at
 	// the schema root surfaces as [FlowFieldChallengePassword]. Other
 	// credential kinds (passkey, magic_link, sso, otp) do not have
@@ -101,8 +103,8 @@ type FlowField struct {
 // FlowFieldChallenge names the auth-attempt challenge a field maps
 // to. Values mirror the keys of `x-auth-methods` in the user
 // meta-schema (api/openapi/endpoints/schemas/user-schema.yaml).
-// `identifier` is sourced from a non-empty `x-unique` scope on the
-// property; `password` is sourced from the reserved
+// `identifier` is sourced from the schema-root `x-identifier`
+// designation; `password` is sourced from the reserved
 // `x-auth-methods#password` field name combined with
 // `x-auth-methods.password.enabled` at the schema root. The remaining
 // credential values (passkey, magic_link, sso, otp) have no
@@ -240,6 +242,12 @@ const FlowImplicitOutcomeUserNotFound = "user_not_found"
 // FlowImplicitOutcomeUserAlreadyExists drives the register → login flip.
 const FlowImplicitOutcomeUserAlreadyExists = "user_already_exists"
 
+// FlowImplicitOutcomeIdentityUnknown drives the login → register flip when
+// SSO resolution finds no user for the provider's subject. Raised only by
+// ceremony resolution, never by a typed identifier, so a shared entry step
+// can route the two apart.
+const FlowImplicitOutcomeIdentityUnknown = "identity_unknown"
+
 // implicitOutcomesByChallenge lists the transition outcomes a field
 // contributes by virtue of its [FlowFieldChallenge]. New mappings
 // (e.g. a future challenge that also implies an outcome) land here as
@@ -268,3 +276,9 @@ var ErrFlowFieldUnknown = errors.New("flow field: not a property in the user sch
 // reduced to X and does not trigger this error; any other multi-entry
 // union does.
 var ErrFlowFieldUnsupportedType = errors.New("flow field: unsupported JSON type")
+
+// ErrFlowFieldNotScalar is returned by [FlowFieldResolver.Resolve] when a
+// field names an object- or array-typed property. An object is collected
+// one leaf at a time through its dotted path (`address.street`); an array
+// has no field-shaped input.
+var ErrFlowFieldNotScalar = errors.New("flow field: not a scalar property, name a nested leaf instead")

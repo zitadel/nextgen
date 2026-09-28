@@ -1,0 +1,8 @@
+x-meta-schema: true
+type: object
+required: [enabled]
+additionalProperties: false
+properties:
+  enabled:
+    type: boolean
+    description: Whether the authentication method is enabled or not

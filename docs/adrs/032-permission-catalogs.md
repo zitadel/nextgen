@@ -56,7 +56,7 @@ Resources.
 |---|---|
 | **FGA (Fine-Grained Authorization)** | An authorization model that decides access per resource and per relationship, instead of checking only a small number of coarse, static roles. |
 | **ReBAC (Relationship-Based Access Control)** | Access decided by walking relationships — "Alice is a member of Team X, Team X owns Project Y, so Alice can read Project Y" — rather than only checking a role name. FGA systems are usually ReBAC systems with some RBAC-style bundling on top for convenience. |
-| **Relation / permission** | The named action or relationship being checked, e.g. `users.read`, `viewer`, `can_manage`. |
+| **Relation / permission** | The named action or relationship being checked, e.g. `user.read`, `viewer`, `can_manage`. |
 | **Permission expression** | The rule that computes whether a relation/permission holds for a given principal and resource: a direct assignment, a union of other rules, or bounded inheritance across the resource hierarchy. |
 | **Tuple** | OpenFGA's atomic fact shape: `(object, relation, user)`, e.g. `(project:42, viewer, user:alice)`. We use tuples as an *authoring and interchange* shape (see §2 below); our runtime storage is relational rows, not a tuple store. |
 | **Userset** | A set of principals defined implicitly through a relation on another object — "everyone who is a `member` of `team:9`" — instead of one explicitly listed user. |
@@ -145,7 +145,7 @@ Internal and external permissions use the same primitives:
 
 | Primitive | Meaning |
 |---|---|
-| Permission / relation | Stable action or relation name such as `users.read`, `orders.refund`, `viewer`, or `can_manage`. |
+| Permission / relation | Stable action or relation name such as `user.read`, `orders.refund`, `viewer`, or `can_manage`. |
 | Permission expression | The compiled rule that derives a permission/relation from direct assignments, usersets, unions, and bounded inheritance. |
 | Grant / assignment | Principal, permission/relation, and scope binding. |
 | Delegation | Explicit authority granted to an agent or machine principal. |
@@ -398,11 +398,19 @@ policies without reintroducing hard-coded levels and special cases.
 ## Follow-ups
 
 1. Design relational migrations for catalogs, permission/relation
-   definitions, expression edges, and assignments shared by both catalogs.
-   (Catalog-specific tables — `resource_scope_index` and app grants — are
+   definitions, expression edges / relation references, and assignments
+   shared by both catalogs.
+   Wave 0 DDL spike and locked decisions:
+   [`docs/design/api/permission-storage.md`](../design/api/permission-storage.md)
+   (implementation tracked by [issue #422](https://github.com/zitadel/nextgen/issues/422)).
+   Wave 1 (#422) ships `authz_expression_edges` + `authz_relation_references`
+   as compiled #720 storage (superseding the Wave 0 D5/D14 “relations+closure
+   only” deferral for MVP); bundle tables remain unfilled by the v1 mapper.
+   Catalog-specific tables — `resource_scope_index` and app grants — are
    tracked in [ADR 033](033-internal-permission-management.md) and
    [ADR 034](034-external-permission-management.md); staff/support grant
-   tables are tracked by [issue #333](https://github.com/zitadel/nextgen/issues/333).)
+   product is tracked by [issue #333](https://github.com/zitadel/nextgen/issues/333)
+   (storage depiction in the Wave 0 / Wave 1 doc).
 2. Add resolver conformance tests that compare single-resource checks and
    list predicates across PostgreSQL and Spanner.
 3. Validate the Leopard-style flattening approach for relation closure

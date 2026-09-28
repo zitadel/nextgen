@@ -58,10 +58,23 @@ describe("branding eject", () => {
     ) as Record<string, unknown>;
     expect(descriptor.$schema).toBe("../meta/branding.json");
     expect(descriptor.layout).toBe("centered");
-    expect(descriptor.liquid_template_file).toBe("./login.liquid");
+    expect(descriptor.liquid_template).toEqual({ $file: "./login.liquid" });
 
     const template = await readFile(join(cwd, ".zitadel/branding/login.liquid"), "utf8");
     expect(template).toBe(getDefaultBrandingConfig("centered").template);
+
+    // The README's command mentions must be runnable: the scaffolded app has
+    // no `zitadel` binary, so prose is normalized to the public npx form.
+    const readme = await readFile(join(cwd, ".zitadel/branding/README.md"), "utf8");
+    expect(readme).toContain("npx @zitadel/cli@");
+    expect(readme).not.toMatch(/`zitadel /);
+
+    // Same rule for the dialect file: its `description` strings are the
+    // editor tooltip on branding.json, so a bare `zitadel apply` there reads
+    // as a command the generated app doesn't have.
+    const meta = await readFile(join(cwd, ".zitadel/meta/branding.json"), "utf8");
+    expect(meta).toContain("npx @zitadel/cli@");
+    expect(meta).not.toMatch(/`zitadel /);
   });
 
   it("--design split writes the split template and layout", async () => {

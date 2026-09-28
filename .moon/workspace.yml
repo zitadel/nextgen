@@ -28,10 +28,8 @@ projects:
     sdk-solid: "packages/sdk-solid"
     sdk-svelte: "packages/sdk-svelte"
     sdk-vue: "packages/sdk-vue"
-    shared-component-styles: "packages/shared-component-styles"
     testing: "packages/testing"
     storybook: "apps/storybook"
-    ui-react: "packages/ui-react"
 
 vcs:
   defaultBranch: "main"

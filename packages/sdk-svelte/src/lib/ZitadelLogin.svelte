@@ -19,6 +19,9 @@
     postSignInUrl,
     locales,
     lang,
+    variant,
+    theme,
+    suppressHeader,
     onFlowStep,
     onFlowInput,
     onFlowComplete,
@@ -72,4 +75,7 @@
   proxy-path={proxyPath}
   post-sign-in-url={postSignInUrl}
   flow-name={flowName}
+  variant={variant}
+  theme={theme}
+  suppressHeader={suppressHeader}
 ></zitadel-login>

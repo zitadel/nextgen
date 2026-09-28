@@ -20,9 +20,6 @@ type SecurityHandler interface {
 	HandleNextgenSession(ctx context.Context, operationName OperationName, t NextgenSession) (context.Context, error)
 	// HandleOAuth2 handles oauth2 security.
 	HandleOAuth2(ctx context.Context, operationName OperationName, t OAuth2) (context.Context, error)
-	// HandleUsernamePassword handles usernamePassword security.
-	// Authorization requests (oauth).
-	HandleUsernamePassword(ctx context.Context, operationName OperationName, t UsernamePassword) (context.Context, error)
 }
 
 func findAuthorization(h http.Header, prefix string) (string, bool) {
@@ -42,8 +39,20 @@ func findAuthorization(h http.Header, prefix string) (string, bool) {
 
 // operationRolesNextgenSession is a private map storing roles per operation.
 var operationRolesNextgenSession = map[string][]string{
+	CompleteClaimOperation:   []string{},
+	CreateGrantOperation:     []string{},
+	DeleteGrantOperation:     []string{},
+	GetGrantOperation:        []string{},
 	GetMySessionOperation:    []string{},
 	GetMyUserOperation:       []string{},
+	GetProjectOperation:      []string{},
+	GetTeamOperation:         []string{},
+	ListMyProjectsOperation:  []string{},
+	PatchMyUserOperation:     []string{},
+	PatchProjectOperation:    []string{},
+	QueryGrantsOperation:     []string{},
+	QueryTeamsOperation:      []string{},
+	QueryUsersOperation:      []string{},
 	RevokeMySessionOperation: []string{},
 }
 
@@ -70,26 +79,35 @@ func GetRolesForNextgenSession(operation string) []string {
 
 // oauth2ScopesOAuth2 is a private map storing OAuth2 scopes per operation.
 var oauth2ScopesOAuth2 = map[string][]string{
-	ActivateFlowDefinitionOperation: []string{
-		"flow_definitions.write",
+	BeginUserPasskeyRegistrationOperation: []string{
+		"user.write",
 	},
 	CreateAuthAttemptOperation: []string{
-		"auth_attempts.write",
+		"auth_attempt.write",
 	},
 	CreateBrandingOperation: []string{
 		"branding.write",
 	},
 	CreateFlowDefinitionOperation: []string{
-		"flow_definitions.write",
+		"flow_definition.write",
+	},
+	CreateGrantOperation: []string{
+		"project.write",
 	},
 	CreateHandoffOperation: []string{
-		"auth_attempts.write",
+		"auth_attempt.write",
+	},
+	CreateIdpOperation: []string{
+		"idp.write",
+	},
+	CreateReleaseOperation: []string{
+		"release.write",
 	},
 	CreateSchemaOperation: []string{
 		"schema.write",
 	},
 	CreateSessionOperation: []string{
-		"sessions.write",
+		"session.write",
 	},
 	CreateTeamOperation: []string{
 		"team.write",
@@ -97,26 +115,56 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	CreateUserOperation: []string{
 		"user.write",
 	},
-	DeactivateFlowDefinitionOperation: []string{
-		"flow_definitions.write",
+	DeleteGrantOperation: []string{
+		"project.write",
 	},
-	DeleteFlowDefinitionOperation: []string{
-		"flow_definitions.delete",
+	DeleteTeamOperation: []string{
+		"team.delete",
+	},
+	DeleteUserByIDOperation: []string{
+		"user.delete",
+	},
+	DeleteVariableOperation: []string{
+		"variable.write",
 	},
 	ExchangeHandoffOperation: []string{
-		"sessions.write",
+		"session.write",
+	},
+	FinishUserPasskeyRegistrationOperation: []string{
+		"user.write",
 	},
 	GetAuthAttemptOperation: []string{
-		"auth_attempts.read",
+		"auth_attempt.read",
 	},
 	GetBrandingByIdOperation: []string{
 		"branding.read",
 	},
+	GetClaimStatusOperation: []string{
+		"project.write",
+	},
+	GetEnvironmentByNameOperation: []string{
+		"environment.read",
+	},
+	GetEventOperation: []string{
+		"events.read",
+	},
 	GetFlowDefinitionOperation: []string{
-		"flow_definitions.read",
+		"flow_definition.read",
+	},
+	GetGrantOperation: []string{
+		"project.read",
+	},
+	GetIdpByIdOperation: []string{
+		"idp.read",
+	},
+	GetIdpRevisionByIdOperation: []string{
+		"idp.read",
 	},
 	GetProjectOperation: []string{
 		"project.write",
+	},
+	GetReleaseByIdOperation: []string{
+		"release.read",
 	},
 	GetSchemaByIdOperation: []string{
 		"schema.read",
@@ -130,44 +178,84 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	GetUserByIDOperation: []string{
 		"user.read",
 	},
-	GetUserInfoOperation: []string{},
-	IntrospectOperation:  []string{},
+	GetVariableOperation: []string{
+		"variable.read",
+	},
+	GetVariablesOperation: []string{
+		"variable.read",
+	},
+	InitClaimOperation: []string{
+		"project.write",
+	},
 	IssueChallengeOperation: []string{
-		"auth_attempts.write",
+		"auth_attempt.write",
 	},
 	ListBrandingOperation: []string{
 		"branding.read",
 	},
+	ListEnvironmentsOperation: []string{
+		"environment.read",
+	},
+	ListEventsOperation: []string{
+		"events.read",
+	},
 	ListFlowDefinitionsOperation: []string{
-		"flow_definitions.read",
+		"flow_definition.read",
+	},
+	ListIdpRevisionsOperation: []string{
+		"idp.read",
+	},
+	ListReleasesOperation: []string{
+		"release.read",
 	},
 	ListSchemasOperation: []string{
 		"schema.read",
 	},
-	ListSessionsOperation: []string{
-		"sessions.read",
-	},
-	ListUsersOperation: []string{
+	ListUserPasskeysOperation: []string{
 		"user.read",
+	},
+	ListUserTeamsOperation: []string{
+		"user.read",
+		"team_membership.read",
 	},
 	PatchProjectOperation: []string{
 		"project.write",
 	},
+	PatchUserByIDOperation: []string{
+		"user.write",
+	},
+	QueryGrantsOperation: []string{
+		"project.read",
+	},
+	QueryIdpsOperation: []string{
+		"idp.read",
+	},
 	QueryProjectsOperation: []string{
 		"project.write",
+	},
+	QuerySessionsOperation: []string{
+		"session.read",
+	},
+	QueryTeamsOperation: []string{
+		"team.read",
+	},
+	QueryUsersOperation: []string{
+		"user.read",
 	},
 	RevokeSessionOperation: []string{
 		"session.delete",
 	},
-	RevokeTokenOperation: []string{},
 	SetUserPasswordOperation: []string{
 		"user.write",
 	},
-	UpdateFlowDefinitionOperation: []string{
-		"flow_definitions.write",
+	UpdateTeamOperation: []string{
+		"team.write",
+	},
+	UpdateVariablesOperation: []string{
+		"variable.write",
 	},
 	VerifyChallengeProofOperation: []string{
-		"auth_attempts.write",
+		"auth_attempt.write",
 	},
 }
 
@@ -190,34 +278,6 @@ func GetOAuth2ScopesForOAuth2(operation string) []string {
 	// Return a copy to prevent external modification
 	result := make([]string, len(scopes))
 	copy(result, scopes)
-	return result
-}
-
-// operationRolesUsernamePassword is a private map storing roles per operation.
-var operationRolesUsernamePassword = map[string][]string{
-	AuthorizeGetOperation: []string{},
-	EndSessionOperation:   []string{},
-	GetTokenOperation:     []string{},
-}
-
-// GetRolesForUsernamePassword returns the required roles for the given operation.
-//
-// This is useful for authorization scenarios where you need to know which roles
-// are required for an operation.
-//
-// Example:
-//
-//	requiredRoles := GetRolesForUsernamePassword(AddPetOperation)
-//
-// Returns nil if the operation has no role requirements or if the operation is unknown.
-func GetRolesForUsernamePassword(operation string) []string {
-	roles, ok := operationRolesUsernamePassword[operation]
-	if !ok {
-		return nil
-	}
-	// Return a copy to prevent external modification
-	result := make([]string, len(roles))
-	copy(result, roles)
 	return result
 }
 
@@ -261,27 +321,6 @@ func (s *Server) securityOAuth2(ctx context.Context, operationName OperationName
 	return rctx, true, err
 }
 
-func (s *Server) securityUsernamePassword(ctx context.Context, operationName OperationName, req *http.Request) (context.Context, bool, error) {
-	var t UsernamePassword
-	if _, ok := findAuthorization(req.Header, "Basic"); !ok {
-		return ctx, false, nil
-	}
-	username, password, ok := req.BasicAuth()
-	if !ok {
-		return nil, false, errors.New("invalid basic auth")
-	}
-	t.Username = username
-	t.Password = password
-	t.Roles = operationRolesUsernamePassword[operationName]
-	rctx, err := s.sec.HandleUsernamePassword(ctx, operationName, t)
-	if errors.Is(err, ogenerrors.ErrSkipServerSecurity) {
-		return nil, false, nil
-	} else if err != nil {
-		return nil, false, err
-	}
-	return rctx, true, err
-}
-
 // SecuritySource is provider of security values (tokens, passwords, etc.).
 type SecuritySource interface {
 	// NextgenSession provides nextgenSession security value.
@@ -291,9 +330,6 @@ type SecuritySource interface {
 	NextgenSession(ctx context.Context, operationName OperationName) (NextgenSession, error)
 	// OAuth2 provides oauth2 security value.
 	OAuth2(ctx context.Context, operationName OperationName) (OAuth2, error)
-	// UsernamePassword provides usernamePassword security value.
-	// Authorization requests (oauth).
-	UsernamePassword(ctx context.Context, operationName OperationName) (UsernamePassword, error)
 }
 
 func (s *Client) securityNextgenSession(ctx context.Context, operationName OperationName, req *http.Request) error {
@@ -313,13 +349,5 @@ func (s *Client) securityOAuth2(ctx context.Context, operationName OperationName
 		return errors.Wrap(err, "security source \"OAuth2\"")
 	}
 	req.Header.Set("Authorization", "Bearer "+t.Token)
-	return nil
-}
-func (s *Client) securityUsernamePassword(ctx context.Context, operationName OperationName, req *http.Request) error {
-	t, err := s.sec.UsernamePassword(ctx, operationName)
-	if err != nil {
-		return errors.Wrap(err, "security source \"UsernamePassword\"")
-	}
-	req.SetBasicAuth(t.Username, t.Password)
 	return nil
 }

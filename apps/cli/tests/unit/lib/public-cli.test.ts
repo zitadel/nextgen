@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   normalizePublicCliCommand,
+  normalizePublicCliJson,
+  normalizePublicCliProse,
   npmDistTagForCliVersion,
   npmSelectorForCliVersion,
   publicCliCommand,
@@ -39,5 +41,81 @@ describe("public CLI command formatting", () => {
     );
     expect(normalizePublicCliCommand("npm install", "0.1.0-alpha.1")).toBe("npm install");
     expect(normalizePublicCliCommand("docker version", "0.1.0-alpha.1")).toBe("docker version");
+  });
+});
+
+describe("normalizePublicCliProse", () => {
+  it("rewrites inline code spans to the public npx form", () => {
+    expect(
+      normalizePublicCliProse("2. `zitadel plan` — validates the template.", "0.1.0-alpha.1"),
+    ).toBe("2. `npx @zitadel/cli@0.1.0-alpha.1 plan` — validates the template.");
+    expect(
+      normalizePublicCliProse(
+        "Start over with `zitadel branding eject --design <name>`.",
+        "0.1.0-alpha.1",
+      ),
+    ).toBe(
+      "Start over with `npx @zitadel/cli@0.1.0-alpha.1 branding eject --design <name>`.",
+    );
+  });
+
+  it("rewrites a bare `zitadel` span and fenced-block command lines", () => {
+    expect(normalizePublicCliProse("run `zitadel` for help", "0.1.0-alpha.1")).toBe(
+      "run `npx @zitadel/cli@0.1.0-alpha.1` for help",
+    );
+    expect(normalizePublicCliProse("```sh\nzitadel apply\n```", "0.1.0-alpha.1")).toBe(
+      "```sh\nnpx @zitadel/cli@0.1.0-alpha.1 apply\n```",
+    );
+  });
+
+  it("leaves file names and unrelated prose untouched", () => {
+    const prose = "Edit `zitadel.json` and `.zitadel/branding/branding.json`; `zitadel.db` stays.";
+    expect(normalizePublicCliProse(prose, "0.1.0-alpha.1")).toBe(prose);
+    expect(normalizePublicCliProse("`npm install` then `git push`", "0.1.0-alpha.1")).toBe(
+      "`npm install` then `git push`",
+    );
+  });
+});
+
+describe("normalizePublicCliJson", () => {
+  it("rewrites command spans in nested strings without mutating the input", () => {
+    const body = {
+      description: "`zitadel apply` publishes this as a revision.",
+      properties: { layout: { examples: ["run `zitadel branding eject --design split`"] } },
+    };
+    const before = JSON.stringify(body);
+
+    const out = normalizePublicCliJson(body, "0.1.0-alpha.1");
+
+    expect(out.description).toBe(
+      "`npx @zitadel/cli@0.1.0-alpha.1 apply` publishes this as a revision.",
+    );
+    expect(out.properties.layout.examples[0]).toBe(
+      "run `npx @zitadel/cli@0.1.0-alpha.1 branding eject --design split`",
+    );
+    expect(JSON.stringify(body)).toBe(before);
+  });
+
+  it("leaves non-string leaves and unspanned prose alone", () => {
+    const out = normalizePublicCliJson(
+      {
+        // A description is prose, not a command line: the fenced-block rule
+        // `normalizePublicCliProse` applies must not fire here.
+        description: "zitadel resolves the latest revision per project.",
+        maxLength: 131072,
+        additionalProperties: false,
+        pattern: "^https://",
+        nothing: null,
+      },
+      "0.1.0-alpha.1",
+    );
+
+    expect(out).toEqual({
+      description: "zitadel resolves the latest revision per project.",
+      maxLength: 131072,
+      additionalProperties: false,
+      pattern: "^https://",
+      nothing: null,
+    });
   });
 });

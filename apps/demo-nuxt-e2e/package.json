@@ -2,10 +2,14 @@
   "name": "@zitadel/demo-nuxt-e2e",
   "version": "0.0.1",
   "private": true,
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
   "devDependencies": {
     "@zitadel/sdk-nuxt": "workspace:*",
     "@playwright/test": "catalog:",
     "@zitadel/api-mock": "workspace:*",
-    "eslint-plugin-playwright": "catalog:"
+    "eslint-plugin-playwright": "catalog:",
+    "typescript": "catalog:"
   }
 }

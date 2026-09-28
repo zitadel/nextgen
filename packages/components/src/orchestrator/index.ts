@@ -27,7 +27,7 @@ export { applyFontUrl } from "./font-loader.js";
 // the same reason (re-exporting it from `liquid.js` would pull that `Liquid`
 // import back into the public declaration bundle).
 export { TEMPLATE_NAMES } from "./template-names.js";
-export { en, de, it, builtinLocales, type Locale } from "./locales/index.js";
+export { en, de, it, builtinLocales, businessLocales, type Locale } from "./locales/index.js";
 export {
   patchMandatoryGates,
   mandatoryGatesMarkerComment,
@@ -37,20 +37,22 @@ export { createSanitiser } from "./sanitiser.js";
 export { default as defaultTemplate } from "./templates/default.liquid";
 export { default as layoutChromeCss } from "./templates/layout-chrome.css?inline";
 export { startFlow, submitStep, getCurrentStep } from "./api-client.js";
-export { validateBranding, type BrandingValidationResult } from "./branding-validator.js";
+export {
+  validateBranding,
+  type BrandingValidationContext,
+  type BrandingValidationResult,
+} from "./branding-validator.js";
+export { publishedSides, resolveLogoUrl } from "./branding.js";
 export type {
   Branding,
-  BrandingAssets,
   BrandingAttribution,
   BrandingPalette,
   BrandingShape,
   BrandingTheme,
+  BrandingThemeSide,
   BrandingTypography,
   FlowLayout,
+  PublishedSides,
+  ResolvableSide,
 } from "./branding.js";
-export type {
-  FlowError,
-  FlowIdentity,
-  FlowMessage,
-  LiquidContext,
-} from "./template-context.js";
+export type { FlowError, FlowIdentity, FlowMessage, LiquidContext } from "./template-context.js";

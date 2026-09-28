@@ -1,0 +1,40 @@
+title: UserTeam
+type: object
+description: |
+  One entry of a user's team roster: a team the user belongs to, with the
+  membership's participation state. The team's `name` travels with the entry, so
+  a page renders without a follow-up `POST /teams/query` per row.
+
+  Roster membership is not lifecycle ownership. A user can belong to many teams
+  while still owning their own lifecycle — that single owning team is reported
+  as `metadata.lifecycle_owner_team_id` on the user itself.
+required:
+  - id
+  - name
+  - membership_status
+  - created_at
+  - updated_at
+properties:
+  id:
+    type: string
+    description: The unique identifier of the team.
+  name:
+    type: string
+    description: The name of the team.
+  membership_status:
+    type: string
+    description: |
+      The user's participation state on this team. Memberships the user was
+      removed from are not returned.
+    enum:
+      - pending
+      - active
+      - inactive
+  created_at:
+    type: string
+    format: date-time
+    description: The time when the user joined this team.
+  updated_at:
+    type: string
+    format: date-time
+    description: The time when this membership was last changed.

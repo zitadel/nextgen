@@ -1,7 +1,10 @@
 get:
   operationId: getSchemaById
   summary: Get schema by ID
-  description: Get a schema by its ID. This will return the default revision of the schema.
+  description: |
+    Get a schema by its ID. A schema ID identifies one immutable revision, so
+    this returns exactly that revision. To find the current revision of an
+    object type, list with `revisions=latest`.
   tags:
     - Schemas
   security:
@@ -13,7 +16,6 @@ get:
       required: true
       schema:
         type: string
-    - $ref: ../../../components/parameters/project-id.yaml
     - $ref: ../../../components/parameters/team-id.yaml
   responses:
     '200':
@@ -21,27 +23,6 @@ get:
       content:
         application/json:
           schema:
-            oneOf:
-              - $ref: ../user-schema.yaml
-            discriminator:
-              propertyName: kind
-              mapping:
-                user-schema: ../user-schema.yaml
-    '400':
-      description: The provided input was not valid
-      content:
-        application/json:
-          schema:
-            $ref: ../../../components/error-details.yaml
-    '404':
-      description: No schema was found with the given id
-      content:
-        application/json:
-          schema:
-            $ref: ../../../components/error-details.yaml
+            $ref: ../schema.yaml
     default:
-      description: Unexpected error response.
-      content:
-        application/json:
-          schema:
-            $ref: ../../../components/error-details.yaml
+      $ref: getSchemaById-error-response.yaml

@@ -1,6 +1,5 @@
 ---
 "@zitadel/components": patch
-"@zitadel/shared-component-styles": patch
 "@zitadel/sdk-core": patch
 "@zitadel/cli": patch
 "@zitadel/config": patch

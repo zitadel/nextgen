@@ -30,6 +30,11 @@ The common workflow:
 2. Run `zitadel plan` to preview the change.
 3. Run `zitadel apply` to publish it.
 
+Every apply of an edited flow publishes a new immutable revision. Earlier
+revisions stay readable by id. A login that pins the flow's name serves its
+newest revision. A login without a pin serves the project's newest active
+unscoped flow, whatever its name, so revising a flow can make it the default.
+
 Typical edits:
 
 - **Change which fields a step collects** — edit `steps[].fields[]`.
@@ -37,8 +42,25 @@ Typical edits:
   tokens).
 - **Add or remove a step** — extend `steps[]`.
 - **Rewire transitions** — edit `steps[].transitions` to point at a
-  different next step, or use `action: switch` / `pivot` to jump to
-  another flow.
+  different next step. Cross-flow jumps (`action: switch` / `pivot`)
+  validate in a definition but are **not yet executed by the runtime** —
+  submitting through one fails with a 400 (`code: "flow.unsupported"`);
+  keep transitions within one flow, using a purpose switch (next bullet)
+  for login ↔ register navigation.
+- **Offer a purpose switch in the card** — pair a `kind: navigate`
+  action with a transition that declares a local `purpose`. The default
+  login flow ships this in both directions:
+
+  ```json
+  "register": { "target": "register", "purpose": "register" }
+  ```
+
+  Navigation skips field validation (an empty email box can't block the
+  link), and the declared purpose is what makes the landing leg run with
+  the right semantics — register creates the user instead of trying to
+  verify one. Rules: the purpose must be one this flow's `purposes`
+  serves, the target must be that purpose's entry step, and `purpose`
+  never combines with `action` (which targets another flow instead).
 - **Add another flow** — drop a new JSON file with its own `purposes`
   and a distinct `name` (e.g. a per-team login). See
   [Multiple flows](#multiple-flows) for how it gets selected at runtime.
@@ -70,8 +92,8 @@ experiment can't silently take over `/login` — scope it or pin
 
 ## Presets
 
-`zitadel setup` scaffolds this folder from a preset (`--preset
-password-first` or `--preset passkey-first`). The passkey-first flow
+`zitadel setup` scaffolds this folder from a preset: `password-first` (the
+default root files) or `--preset passkey-first`. The passkey-first flow
 enters login on a fields-less passkey step with an email → password
 fallback path. The preset only decides the starting point — edit
 anything here afterwards.
@@ -80,7 +102,7 @@ anything here afterwards.
 
 Editing a schema publishes a new immutable revision. When you `apply` a
 schema edit, the CLI rewrites `user_schema` in the flow files pinned to
-the old revision and updates the flows in the same run — the plan
-announces the re-pin beforehand, and the rewrite shows up in your git
-diff. Remember to update `steps[].fields[]` yourself when the edit
-added or removed properties the flow should collect.
+the old revision and publishes new revisions of those flows in the same
+run — the plan announces the re-pin beforehand, and the rewrite shows up
+in your git diff. Remember to update `steps[].fields[]` yourself when the
+edit added or removed properties the flow should collect.

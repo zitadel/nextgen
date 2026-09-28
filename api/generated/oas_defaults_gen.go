@@ -27,6 +27,14 @@ func (s *CreateProjectRequest) setDefaults() {
 }
 
 // setDefaults set default value of fields.
+func (s *CreateReleaseRequest) setDefaults() {
+	{
+		val := bool(false)
+		s.GitDirty.SetTo(val)
+	}
+}
+
+// setDefaults set default value of fields.
 func (s *Field) setDefaults() {
 	{
 		val := bool(false)
@@ -35,22 +43,62 @@ func (s *Field) setDefaults() {
 }
 
 // setDefaults set default value of fields.
-func (s *OpenidConfiguration) setDefaults() {
+func (s *FlowStepAction) setDefaults() {
 	{
 		val := bool(false)
-		s.ClaimsParameterSupported.SetTo(val)
+		s.Primary.SetTo(val)
 	}
+}
+
+// setDefaults set default value of fields.
+func (s *IdpConnectionOAuth2) setDefaults() {
 	{
-		val := bool(false)
-		s.RequestParameterSupported.SetTo(val)
+		val := IdpConnectionOAuth2TokenEndpointAuthMethod("client_secret_basic")
+		s.TokenEndpointAuthMethod.SetTo(val)
 	}
 	{
 		val := bool(true)
-		s.RequestURIParameterSupported.SetTo(val)
+		s.PkceEnabled.SetTo(val)
 	}
+}
+
+// setDefaults set default value of fields.
+func (s *IdpConnectionOidc) setDefaults() {
 	{
 		val := bool(false)
-		s.RequireRequestURIRegistration.SetTo(val)
+		s.IDTokenMapping.SetTo(val)
+	}
+	{
+		val := IdpConnectionOidcTokenEndpointAuthMethod("client_secret_basic")
+		s.TokenEndpointAuthMethod.SetTo(val)
+	}
+	{
+		val := bool(true)
+		s.PkceEnabled.SetTo(val)
+	}
+}
+
+// setDefaults set default value of fields.
+func (s *IdpConnectionProvisioning) setDefaults() {
+	{
+		val := IdpConnectionProvisioningCreation("auto")
+		s.Creation.SetTo(val)
+	}
+}
+
+// setDefaults set default value of fields.
+func (s *QueryGrantsRequest) setDefaults() {
+	{
+		val := int(20)
+		s.Limit.SetTo(Limit(val))
+	}
+}
+
+// setDefaults set default value of fields.
+func (s *QueryIdpsRequest) setDefaults() {
+	{
+		val := int(20)
+		s.Limit.SetTo(Limit(val))
 	}
 }
 
@@ -59,6 +107,38 @@ func (s *QueryProjectsRequest) setDefaults() {
 	{
 		val := int(20)
 		s.Limit.SetTo(Limit(val))
+	}
+}
+
+// setDefaults set default value of fields.
+func (s *QuerySessionsRequest) setDefaults() {
+	{
+		val := int(20)
+		s.Limit.SetTo(Limit(val))
+	}
+}
+
+// setDefaults set default value of fields.
+func (s *QueryTeamsRequest) setDefaults() {
+	{
+		val := int(20)
+		s.Limit.SetTo(Limit(val))
+	}
+}
+
+// setDefaults set default value of fields.
+func (s *QueryUsersRequest) setDefaults() {
+	{
+		val := int(20)
+		s.Limit.SetTo(Limit(val))
+	}
+}
+
+// setDefaults set default value of fields.
+func (s *ReleaseMetadata) setDefaults() {
+	{
+		val := bool(false)
+		s.GitDirty = val
 	}
 }
 
@@ -73,15 +153,7 @@ func (s *StepAction) setDefaults() {
 // setDefaults set default value of fields.
 func (s *UserProperty) setDefaults() {
 	{
-		val := bool(true)
-		s.XMinusEditable.SetTo(val)
-	}
-	{
 		val := bool(false)
-		s.XMinusSensitive.SetTo(val)
-	}
-	{
-		val := bool(false)
-		s.XMinusMfa.SetTo(val)
+		s.XMinusAudit.SetTo(val)
 	}
 }

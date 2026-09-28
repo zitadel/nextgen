@@ -4,6 +4,7 @@ import { MANAGED_MARKER } from "../../../../paths";
 import type { FileOp } from "../file-writer/types";
 import type { PatchContext, PatchView } from "../../types";
 import { AbstractRulePatcher } from "../base";
+import { devScriptPortOp } from "../dev-script-port";
 import { getRenderer } from "./renderers/registry";
 import type { RendererSpec } from "./renderers/types";
 
@@ -52,8 +53,45 @@ export class NextPatcher extends AbstractRulePatcher {
     return nextCodeFilePaths(view.framework, getRenderer(view.rendererId));
   }
 
+  protected override infrastructureFiles(view: PatchView): ReadonlyArray<string> {
+    return nextInfrastructureFilePaths(view.framework, getRenderer(view.rendererId));
+  }
+
+  protected override conditionallyScaffoldedFiles(view: PatchView): ReadonlyArray<string> {
+    // Written only when setup created the app skeleton itself; on a
+    // pre-existing app the homepage stays user-owned (see nextCodeOps).
+    return [join(view.framework.appDir, "page.tsx")];
+  }
+
+  protected override retiredAlternateFiles(
+    view: PatchView,
+  ): Readonly<Record<string, ReadonlyArray<string>>> {
+    // Next renamed the request boundary in v16 (middleware.ts → proxy.ts)
+    // and throws at build time when both exist — but only in the ≥16
+    // direction. On Next 15, proxy.ts was not a reserved convention, so a
+    // root proxy.ts there is the user's own file, never a conflicting
+    // boundary. Declaring the alternate one-way keeps a healthy Next 15 app
+    // with an unrelated proxy.ts passing.
+    const current = requestBoundaryFile(view.framework).filename;
+    if (current !== "proxy.ts") {
+      return {};
+    }
+    return {
+      [join(view.framework.appDir, "../proxy.ts")]: [
+        join(view.framework.appDir, "../middleware.ts"),
+      ],
+    };
+  }
+
   protected routeDeps(view: PatchView): ReadonlyArray<string> {
     return [getRenderer(view.rendererId).dependency.name];
+  }
+
+  protected override routeConfigEdits(_view: PatchView): ReadonlyArray<string> {
+    // The `dev` script gets the project's dev-server port pinned into it via
+    // an `edit` op eject can't auto-revert, so it has to be surfaced as a
+    // manual cleanup step like any other in-place config merge.
+    return ["package.json"];
   }
 
   protected summary(ctx: PatchContext): { title: string; detail: string } {
@@ -93,10 +131,33 @@ function nextCodeFilePaths(
   return paths;
 }
 
+/**
+ * The subset of {@link nextCodeFilePaths} that is load-bearing for the auth
+ * integration rather than a presentation starting point: the request boundary
+ * (proxy/middleware), the provider file, and the custom-elements declarations.
+ * Shares path construction with {@link nextCodeFilePaths} so the two cannot
+ * drift; the `doctor` managed-files check fails when one of these is missing.
+ */
+function nextInfrastructureFilePaths(
+  framework: PatchView["framework"],
+  renderer: RendererSpec,
+): ReadonlyArray<string> {
+  const appDir = framework.appDir;
+  const paths = [join(appDir, `../${requestBoundaryFile(framework).filename}`)];
+  if (renderer.templates.provider) {
+    paths.push(join(appDir, renderer.templates.provider.filename));
+  }
+  if (renderer.templates.customElementsDts) {
+    paths.push(join(appDir, "../custom-elements.d.ts"));
+  }
+  return paths;
+}
+
 /** The Next route/request-boundary write ops plus the SDK dependency. */
 function nextCodeOps(ctx: PatchContext, renderer: RendererSpec): FileOp[] {
   const appDir = ctx.framework.appDir;
-  const profile = renderer.templates.profilePage?.();
+  const pageContext = { useCase: ctx.useCase, posture: ctx.posture };
+  const profile = renderer.templates.profilePage?.(pageContext);
   const provider = renderer.templates.provider;
   const dts = renderer.templates.customElementsDts?.();
   const boundary = requestBoundaryFile(ctx.framework);
@@ -106,17 +167,20 @@ function nextCodeOps(ctx: PatchContext, renderer: RendererSpec): FileOp[] {
           kind: "edit",
           path: join(appDir, "page.tsx"),
           edit: () => homePageTemplate(),
+          // Replaces create-next-app's default homepage wholesale; the
+          // missing-only repair path must not replay it over user content.
+          overwrites: true,
         }
       : undefined,
     {
       kind: "write",
       path: join(appDir, "login/page.tsx"),
-      contents: renderer.templates.authPage("login").contents,
+      contents: renderer.templates.authPage("login", pageContext).contents,
     },
     {
       kind: "write",
       path: join(appDir, "register/page.tsx"),
-      contents: renderer.templates.authPage("register").contents,
+      contents: renderer.templates.authPage("register", pageContext).contents,
     },
     profile
       ? { kind: "write", path: join(appDir, "profile/page.tsx"), contents: profile.contents }
@@ -144,6 +208,9 @@ function nextCodeOps(ctx: PatchContext, renderer: RendererSpec): FileOp[] {
       name: renderer.dependency.name,
       version: dependencyVersionForCli(ctx.cliVersion, renderer.dependency.version),
     },
+    // `next dev` takes its port from the command line only, so without this
+    // the app can serve a port the project does not allow as an origin.
+    devScriptPortOp(ctx.issuer),
   ].filter((op): op is FileOp => op !== undefined);
 }
 

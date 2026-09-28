@@ -1,5 +1,353 @@
 # @zitadel/api
 
+## 1.0.0-alpha.23
+
+### Major Changes
+
+- [#1121](https://github.com/zitadel/nextgen/pull/1121) [`583a8ed`](https://github.com/zitadel/nextgen/commit/583a8ed0c6142539539eb6e082de8dbfe11a3246) Thanks [@grvijayan](https://github.com/grvijayan)! - Remove `PUT /flow_definitions/{id}` and `DELETE /flow_definitions/{id}`. A
+  flow definition is an immutable revision: publish a new one with
+  `POST /flow_definitions` to change it. Nothing emits `flowdef.updated` or
+  `flowdef.deleted` any more; both stay in the events API so stored rows
+  keep decoding.
+
+### Minor Changes
+
+- [#1241](https://github.com/zitadel/nextgen/pull/1241) [`f8c5a24`](https://github.com/zitadel/nextgen/commit/f8c5a24aa87015e722f2f6ecfb276b839d46f4de) Thanks [@wim07101993](https://github.com/wim07101993)! - Deleting a team that still owns a project is refused with `409 team.owns_project` instead of deactivating it and leaving the project without an owner. The `deleteTeam` contract carries the new status and error code.
+
+- [#1179](https://github.com/zitadel/nextgen/pull/1179) [`93cac33`](https://github.com/zitadel/nextgen/commit/93cac336402cae09a3e6dfb8622556d13794ab71) Thanks [@vitorbari](https://github.com/vitorbari)! - An embedded widget no longer injects the tenant font stylesheet into the
+  embedding application's document. The widget applies `typography.font_family`
+  and leaves loading the face to the page around it; a Zitadel-served page still
+  injects, because it owns its own document.
+
+  `typography.scale` and `shape.logo_scale` no longer declare a schema `default`,
+  so an omitted key stays omitted through decoding rather than being persisted as
+  an explicit `1`.
+
+  `zitadel plan` now applies the server's URL rules to `typography.font_url` and
+  rejects credentials in any branding URL, so a value that would fail on publish
+  fails locally first.
+
+- [#1179](https://github.com/zitadel/nextgen/pull/1179) [`93cac33`](https://github.com/zitadel/nextgen/commit/93cac336402cae09a3e6dfb8622556d13794ab71) Thanks [@vitorbari](https://github.com/vitorbari)! - Branding revisions carry login appearance.
+
+  `theme` publishes complete `light` and `dark` sides, each with its own logo and
+  semantic palette; neither side inherits from the other, and a side that is not
+  published is never resolved. `typography` names one face for body and headings
+  plus the stylesheet that loads it. `shape` carries a corner radius — a preset
+  name or a pixel value — along with density and a logo scale.
+
+  `font_url` becomes writable and moves onto `typography`, beside the family it
+  loads. It is stored, not injected: an embedded widget applies the family and
+  relies on the embedding page having loaded the face.
+
+  Appearance values are held to an allowlist, because the widget writes them into
+  a CSS declaration. A colour must be hex, a colour name, or a colour function; a
+  font stack must be identifiers or quoted names. `url()` and `var()` are
+  rejected, asset URLs may not carry credentials, and colours, font stacks and
+  URLs all have length caps. The contract states the same shapes as a JSON Schema
+  `pattern`, so generated clients reject them too.
+
+  Revisions published before these fields existed keep working and use the
+  maintained defaults.
+
+- [#1224](https://github.com/zitadel/nextgen/pull/1224) [`1162dc9`](https://github.com/zitadel/nextgen/commit/1162dc91c274fcd96bf3dada5b474356242cc1b9) Thanks [@mridang](https://github.com/mridang)! - The branding and flow definition editor schemas now flag what the server rejects: asset URLs that carry `user:password@`, `typography.font_url` without `typography.font_family`, a terminal step that also collects or acts, a step that does nothing, `sso_providers` without a `callback` transition, and a transition that sets both `purpose` and `action`. The API client's Zod schemas reject credentials in branding asset URLs, and `zitadel plan` measures asset URL length in bytes, as the server does.
+
+- [#1260](https://github.com/zitadel/nextgen/pull/1260) [`6c3f4a3`](https://github.com/zitadel/nextgen/commit/6c3f4a35e6466e9335ebb00b9943902faef8f2f8) Thanks [@mridang](https://github.com/mridang)! - A flow step now names the identity providers it offers by connection slug: `"sso_providers": ["google"]` instead of `[{ "id": "google", "name": "Google", "template": "google" }]`. The connection under `.zitadel/idps/` owns the display name and template, so renaming a provider there reaches every step without editing the flow. The flow definition API, the editor schema and stored revisions all take the slug list together, and revisions stored with the object form still load, each object read as its `id`. The step the login page receives is unchanged and still carries `{id, name, template}` objects.
+
+  **Breaking:** creating a flow definition with `sso_providers` objects now fails with a 400, and a definition read back lists slugs instead of objects. Send the connection slug in place of each object. No shipped flow uses `sso_providers` and the engine does not act on it yet, so nothing that works today stops working.
+
+- [#1217](https://github.com/zitadel/nextgen/pull/1217) [`205cef5`](https://github.com/zitadel/nextgen/commit/205cef525ee26250b652ee40f0b35622dc05caea) Thanks [@grvijayan](https://github.com/grvijayan)! - The identity provider connection endpoints are now part of the API contract, and the generated clients carry them.
+
+  `POST /idps` creates or revises a connection document. If the slug does not already exist, a new connection is created. If a connection with that slug already exists, a revision is created. `POST /idps/query` pages through a project's connections. `GET /idps/{id}` reads one connection at its newest revision. `GET /idps/{id}/revisions` lists a connection's revisions newest first. `GET /idps/revisions/{revision_id}` reads one revision.
+
+  The request and response bodies mirror the `idp-connection.json` schema, so a connection is typed the same way in a client as it is in a `.zitadel/idps/<slug>.json` file.
+
+  No handler ships yet. Until the handlers ship, calling one of these endpoints returns 500 with the `internal` code.
+
+- [#1243](https://github.com/zitadel/nextgen/pull/1243) [`85fb5ab`](https://github.com/zitadel/nextgen/commit/85fb5abc1edd8699b86898e57d31c4938a6228a5) Thanks [@IAM-marco](https://github.com/IAM-marco)! - Add `GET /users/me/projects`: the list of projects the signed-in person can act
+  on. It answers from the grants they hold, either directly or through a team they
+  belong to, so the list spans projects instead of being pinned to the one the
+  calling credential is bound to. Authenticated with the session cookie, ordered
+  by project id, and paged with `limit` and `page_token`.
+
+- [#1145](https://github.com/zitadel/nextgen/pull/1145) [`8fc4472`](https://github.com/zitadel/nextgen/commit/8fc44720d0b93f6d5450bff85cb8ed984712156a) Thanks [@wim07101993](https://github.com/wim07101993)! - Configuration values that differ per environment can now be stored as variables, and managed over the API.
+
+  A variable belongs to a project, and optionally to one of its environments. A configuration document references one as `${{ NAME }}`, and the value entered at the owner serving the request is substituted in. A reference that is the whole field keeps the value's type, so `"${{ RETRY_COUNT }}"` resolves to `10` rather than `"10"`; a reference inside a longer string is rendered into it, so `"https://${{ HOST }}/callback"` resolves to a URL; and a reference nothing was entered for is left as it stands. A variable marked secret is encrypted with the project's own key and stays readable after that key is rotated.
+
+  The project level and each environment are separate owners, not a hierarchy: a variable is read, written and deleted at exactly the owner addressed, and nothing is inherited in either direction. A value that has to hold in several environments is entered in each of them.
+
+  Four endpoints, all scoped to a project by the usual `project_id` and addressing one of its environments with an optional `environment_name`:
+  - `GET /variables` returns the variables entered at that owner, keyed by name.
+  - `PATCH /variables` enters, replaces and removes variables there. Names absent from the body are untouched, so a partial body is a partial update rather than a truncation, and the body is applied whole or not at all.
+  - `GET /variables/{variable_name}` reads one name at that owner.
+  - `DELETE /variables/{variable_name}` removes what that owner entered.
+
+  Because owners do not inherit, a name one owner holds reads as `var.not_found` from another, and deleting it there leaves the original standing.
+
+  An `environment_name` has to name an environment the project actually has. Writing to one that does not exist answers `env.not_found` rather than storing a variable at an owner nothing would ever read from. With no inheritance to fall back on, a typo would otherwise read as empty instead of as the project's value. Deleting an environment removes the variables entered on it; the project's own are untouched.
+
+  A variable is written as a bare scalar — `{"RETRY_COUNT": 10}` — or, to state secrecy, as `{"GITHUB_CLIENT_SECRET": {"value": "s3cr3t", "secret": true}}`. The shorthand always means "not a secret", so a value can never become secret by accident, and marking one always leaves a trace in the request.
+
+  A name whose value is `null` is removed from that owner, following RFC 7386 (JSON Merge Patch). One request can therefore enter, replace and remove any number of names together, which is how several variables are removed at once.
+
+  **Secrets are write-only.** A read reports that a secret is held and nothing more: `{"GITHUB_CLIENT_SECRET": {"secret": true}}`. The value stays usable without being readable — a configuration document referencing `${{ GITHUB_CLIENT_SECRET }}` still resolves against the decrypted value when it is served.
+
+- [#1129](https://github.com/zitadel/nextgen/pull/1129) [`b70e520`](https://github.com/zitadel/nextgen/commit/b70e52035b433e7c3293c54be43352bb59e78dc2) Thanks [@vitorbari](https://github.com/vitorbari)! - Releases can now be created over the API.
+
+  `POST /releases` bundles a release from revisions that already exist, supplied as `(kind, revision_id)` pairs; the handle each revision declares is read from the revision itself and recorded on the release. Submitting a set that a release already pins returns that release with `200` instead of creating a second one, so re-running a deploy on unchanged configuration is a no-op.
+
+  A release pins at most 50 revisions. The bound counts resources rather than revisions — a release holds one revision of each — so it limits how much a project configures, not how often it changes.
+
+  Every release is recorded in the audit stream as `release.created`, carrying what it pinned.
+
+- [#1130](https://github.com/zitadel/nextgen/pull/1130) [`ce3c67c`](https://github.com/zitadel/nextgen/commit/ce3c67c10b7ef7f20a30335fedb07325b6146cad) Thanks [@vitorbari](https://github.com/vitorbari)! - Releases can now be read back over the API.
+
+  `GET /releases` lists a project's releases newest first, carrying metadata only — the pinned set is omitted. `GET /releases/{release_id}` returns one release with the revisions it pins.
+
+### Patch Changes
+
+- [#1256](https://github.com/zitadel/nextgen/pull/1256) [`3a10eb6`](https://github.com/zitadel/nextgen/commit/3a10eb61dd7e597ccd5b62d8a39453fb7645673e) Thanks [@mridang](https://github.com/mridang)! - The auth-attempt API can now identify a user, so a client that renders no login step can sign one in. `POST /auth_attempts/{id}/challenges/{id}/verify` resolved an identifier proof against an attribute with an empty name, which matched nobody, so every proof was rejected. It now resolves the login name against the identifier each user schema designates (`x-identifier`), among that schema's users and uniquely registered values only, and it must identify exactly one user — none, or users of more than one schema, rejects the proof. The request is unchanged; the caller never names the property. The completed-factor payloads in an attempt response now also declare the `method` they are discriminated on, pinned per variant, which the server always sent but the schema forbade.
+
+## 1.0.0-alpha.22
+
+### Minor Changes
+
+- [#1093](https://github.com/zitadel/nextgen/pull/1093) [`82186ce`](https://github.com/zitadel/nextgen/commit/82186ce7da8dd96cd0f178a3a7c9994d7ee00cea) Thanks [@grvijayan](https://github.com/grvijayan)! - Flow definitions are revisioned: `POST /flow_definitions` publishes a new
+  revision on every call, so a repeated `name` no longer returns 409, and
+  `GET /flow_definitions` accepts a `name` filter that lists one flow's
+  revisions newest first.
+
+- [#1155](https://github.com/zitadel/nextgen/pull/1155) [`af21963`](https://github.com/zitadel/nextgen/commit/af21963a99d6f827699249fa524fbc64f2e6baab) Thanks [@vitorbari](https://github.com/vitorbari)! - The events API defines the `release.created` event type and its payload.
+
+  The payload carries the release's `content_hash`, its audit metadata (`message`, `git_sha`, `git_dirty`) and the `(kind, handle, revision_id)` tuples the release pins, so an audit stream answers what a release changed without reading the releases table. Nothing emits the event until `POST /releases` is implemented.
+
+## 1.0.0-alpha.21
+
+### Minor Changes
+
+- [#1085](https://github.com/zitadel/nextgen/pull/1085) [`a59b288`](https://github.com/zitadel/nextgen/commit/a59b288e4e52a3274c1ab4b5e4c241f1083aac6b) Thanks [@livio-a](https://github.com/livio-a)! - Session responses identify their user through a resolved **user ref** derived
+  from the user schema's own `x-identifier`/`x-display` designations (ADR 058),
+  replacing the convention-resolved flat `name`/`email` fields this supersedes
+  (see the earlier `GET /sessions/me` identity changeset). Rendering follows one
+  chain everywhere: `display`, falling back to `identifier`, then `user_id`.
+  - `@zitadel/server`: `GET /sessions/me`, session get, and query sessions embed
+    `user` (`{user_id, identifier, identifier_property, display}`), the list
+    path hydrated with one batch resolution per page — listed sessions now carry
+    user identity at all. The conventional attribute-name resolver
+    (`name`/`givenName`+`familyName`/`email`) is removed.
+  - `@zitadel/api`: the regenerated client types the new `user` ref component.
+  - `@zitadel/components`: `<zitadel-session>`/`<zitadel-logout>` render from
+    the ref; the `zitadel-signout` detail is now `{display, identifier}`;
+    logout templates substitute `{{display}}`/`{{identifier}}` (the old
+    `{{name}}`/`{{email}}` tokens keep filling as aliases).
+  - `@zitadel/sdk-core` (and every SPA SDK via the shared contract):
+    `NextgenSession`/`ClientSession` become `{userId, identifier,
+identifierProperty, display}`; JWT-claim identities map `name` → `display`
+    and `email` → `identifier`.
+  - `@zitadel/sdk-next` / `@zitadel/sdk-nuxt`: server and client session reads
+    return the new shape.
+  - `@zitadel/cli`: scaffolded Nuxt auth plugins emit the new fields.
+
+  **Breaking:** the flat `name`/`email` session fields and the old SDK session
+  shape are gone. An unknown property is dropped rather than rejected, so a
+  client left on the old fields reads silently empty values instead of failing
+  loudly — update server, SDKs, and app chrome together.
+
+- [#1092](https://github.com/zitadel/nextgen/pull/1092) [`7a06425`](https://github.com/zitadel/nextgen/commit/7a06425a1b30a448bf05da8d870bd4570d304060) Thanks [@livio-a](https://github.com/livio-a)! - User responses carry the derived identity of ADR 058 §3a: the envelope
+  gains read-only `identifier`, `identifier_property`, and `display`,
+  resolved live from each user's own schema designations
+  (`x-identifier`/`x-display`) on every read path — query users (one batch
+  resolution per page), get by id, `users/me`, and the create read-back.
+  Clients render `display`, falling back to `identifier`, then `id`, with
+  zero designation logic of their own. The embedded console (shipped inside
+  `@zitadel/server`) renders them: the users list gains a leading **User**
+  identity column on exactly that chain plus a dedicated role-named
+  **Identifier** column (platform-derived, outside the schema-driven column
+  set), the user detail heads with the identity, and the console's
+  convention-based display-name guesser is removed.
+
+## 1.0.0-alpha.20
+
+## 0.1.0-alpha.19
+
+### Minor Changes
+
+- [#900](https://github.com/zitadel/nextgen/pull/900) [`e26f376`](https://github.com/zitadel/nextgen/commit/e26f37617f5d3a3f92f00c07aad89a98ee9d754f) Thanks [@vitorbari](https://github.com/vitorbari)! - Nest a user's schema-defined content under `attributes`. `POST /users` takes `schema` plus an `attributes` document, and every user response carries `id`, `schema`, `attributes` and `metadata`. The user schema now validates `attributes` alone, so closed-world keywords such as `additionalProperties: false` behave as their author intended and a schema may declare a property named `id` or `metadata`. The schema pointer is named `schema` rather than `$schema`, and `POST /users` answers with the same representation a read returns.
+
+  A user is stored as its attribute rows, so an empty `attributes` document is
+  rejected with `user.invalid`, even where the schema itself accepts it. `POST
+/users` also documents its `500`: when the user was created but could not be
+  read back, the body carries its id in `details.user_id`, and the caller should
+  fetch that user rather than repeat the create.
+
+### Patch Changes
+
+- [#856](https://github.com/zitadel/nextgen/pull/856) [`b17b2c9`](https://github.com/zitadel/nextgen/commit/b17b2c9fb3fae00f99a1864d37f3b51142ea4344) Thanks [@fforootd](https://github.com/fforootd)! - The package documentation now matches what the packages actually do. The Next and Nuxt guides drop the removed `api-base` attribute in favor of `configureZitadel()` and the `project` property; the Nuxt guide documents the Nuxt module (what `zitadel setup` wires) with its real options and the `useAuth()` / `useZitadelProject()` composables, alongside the hand-rolled middleware path with its full option set. `@zitadel/sdk-core` and `@zitadel/api` gain real documentation of their entry points, `@zitadel/config` gains a package README, and the SPA guides document the `ZitadelSession` card and point local no-proxy experiments at the local runtime's actual default port (8080). The flow-editing guide copied into `.zitadel/flows/` no longer suggests cross-flow `switch`/`pivot` transitions, which the runtime does not execute yet, and API examples use the real prefixed ID format (`proj_…`, `team_…`) instead of a retired naming scheme.
+
+- [#829](https://github.com/zitadel/nextgen/pull/829) [`fc3d154`](https://github.com/zitadel/nextgen/commit/fc3d154f2fabb722c6f94633fd6c10bc60d0a657) Thanks [@fforootd](https://github.com/fforootd)! - Preserve purpose across in-card navigation: a flow transition can declare a
+  local `purpose` (`{"target": "register", "purpose": "register"}`), and taking
+  it moves the flow's dispatch mode while the original purpose stays pinned.
+  The default login flow (and the passkey-first preset) now ship visible
+  "Sign up" / "Sign in" navigations on their entry steps built on this —
+  previously the only in-card path to registration was submitting an unknown
+  email. Validators (server-side and `@zitadel/config`) enforce that the purpose
+  is one the definition serves, that the transition targets that purpose's entry
+  step, and that `purpose` never combines with the cross-flow `action`. Navigate
+  actions now also clear a pending passkey challenge, so an abandoned prompt
+  cannot re-attach after navigating away.
+
+  Existing scaffolded apps keep their local `.zitadel/flows/default-login.json`
+  unchanged (local config stays authoritative). To adopt the in-card
+  navigations, add the two navigate actions and their purposed transitions to
+  your flow file — or re-eject the default — then `zitadel plan` / `apply`.
+
+## 0.1.0-alpha.18
+
+### Minor Changes
+
+- [#739](https://github.com/zitadel/nextgen/pull/739) [`7120ce3`](https://github.com/zitadel/nextgen/commit/7120ce328eb9c63bbc6ff0bad0465c7f1f49e602) Thanks [@IAM-marco](https://github.com/IAM-marco)! - Add the project claim lifecycle endpoints to the API: `POST /projects/{project_id}/claim/init`, `GET /projects/{project_id}/claim/status`, and `POST /projects/{project_id}/claim/complete`, with matching methods on the generated `@zitadel/api` client. These let a developer start a claim from the CLI, poll its status, and finish it from the browser. The status response is modelled as discriminated `pending`/`completed` variants, and the contract carries the `proj.already_claimed` (409) and `proj.claim_expired` (410) error codes plus `429` rate-limit responses on polling and completion. The server handlers arrive separately, so the operations currently respond `501 Not Implemented`.
+
+- [#637](https://github.com/zitadel/nextgen/pull/637) [`7ea32f8`](https://github.com/zitadel/nextgen/commit/7ea32f82b582e37944535b537940f035bdda8cde) Thanks [@wim07101993](https://github.com/wim07101993)! - Add `DELETE /users/{user_id}` to delete a user from a project. Requires an OAuth2 bearer with the `user.write` scope and returns `204 No Content`.
+
+- [#778](https://github.com/zitadel/nextgen/pull/778) [`2c63b47`](https://github.com/zitadel/nextgen/commit/2c63b47c025e1255683b0b8cd2c48a3e25f79b3a) Thanks [@wim07101993](https://github.com/wim07101993)! - Drop the OIDC/OAuth surface from the OpenAPI contract. The spec described
+  discovery, authorize, token, keys, userinfo, revoke, introspect, device
+  authorization, and end-session endpoints that this server does not serve,
+  so the generated clients advertised operations that could never succeed.
+
+  Removed operations from the generated `@zitadel/api` client:
+  - `getOpenIDConfiguration`, `authorizeGet`, `authorizeDevice`, `getToken`,
+    `getUserInfo`, `getKeys`, `revokeToken`, `introspect`, `endSession`
+  - `submitFlowEvent` (`POST /flow/{id}/event`)
+  - `activateFlowDefinition` / `deactivateFlowDefinition`
+    (`POST /flow_definitions/{id}/activate` and `/deactivate`)
+
+  The `usernamePassword` security scheme is gone with them; `oauth2` and
+  `nextgenSession` are unchanged.
+
+  Sign-out is the `revokeMySession` operation (`DELETE /sessions/me`). JWKS
+  for local development is still served by `@zitadel/api-mock` at
+  `/auth/keys`, but as a mock-only route rather than a contract operation.
+
+- [#777](https://github.com/zitadel/nextgen/pull/777) [`1f66979`](https://github.com/zitadel/nextgen/commit/1f6697956ee81a5a28812905283ddb94f649250f) Thanks [@wim07101993](https://github.com/wim07101993)! - Add operation-specific error response schemas to the OpenAPI spec, so the
+  generated client exposes typed error models per endpoint.
+
+  Each operation's error set is inferred from the implementation rather than a
+  hand-maintained doc comment, and the inference now starts at the API handler
+  instead of the service it calls. That closes two gaps where an endpoint could
+  return an error its schema did not list — the authorization guard's
+  `not_found` / `permission_denied`, raised before any service is reached, and
+  the transport's `auth.unauthorized` / `req.invalid`, raised before a handler
+  runs at all. Because the generated client discriminates the error response on
+  `code`, an omitted code made a real response fail to decode instead of
+  surfacing as the error it is.
+
+  `auth.unauthorized` is listed only where the operation declares a security
+  requirement, so the health probes and the pre-authentication flow steps no
+  longer advertise an answer they cannot give.
+
+- [#640](https://github.com/zitadel/nextgen/pull/640) [`e0b8d3d`](https://github.com/zitadel/nextgen/commit/e0b8d3d66356f80d658198edccca3d6d77077c29) Thanks [@wim07101993](https://github.com/wim07101993)! - Add `GET /users/{user_id}/passkeys` to list a user's registered passkeys,
+  returning each passkey's `id`, `name`, and `created_at`. Requires an OAuth2
+  bearer with the `user.read` scope.
+
+  Registered passkeys now get a name of their own instead of reusing the user's
+  display name, which was the same for every passkey a user registered (and empty
+  whenever the flow collected no identifier). A passkey takes the name the
+  registering caller supplies, and otherwise one derived from the credential
+  itself: `Security key`, `Synced passkey`, or `Device-bound passkey`.
+
+- [#752](https://github.com/zitadel/nextgen/pull/752) [`97470b2`](https://github.com/zitadel/nextgen/commit/97470b2d51fdf815463336ffe7999f864e510f13) Thanks [@wim07101993](https://github.com/wim07101993)! - New endpoint `GET /users/{user_id}/teams` serves a user's team roster, so a
+  client can finally get from a user to the teams they belong to.
+
+  Each entry is `{ id, name, membership_status, created_at, updated_at }`. The
+  team's **name** travels with the entry, so a page of the roster renders without
+  a follow-up `POST /teams/query` per row. Entries come back ordered by team name
+  and page with `limit` / `page_token` like the other list endpoints;
+  memberships the user was removed from are not returned. An unknown user is a
+  404, which is a different answer from a user with an empty roster.
+
+  The user read endpoints (`GET /users`, `GET /users/{user_id}`,
+  `GET /users/me`) also gain `metadata.lifecycle_owner_team_id` — the single team
+  that owns the user's identity lifecycle, or `null` when the user is self-owned.
+  That is a different concept from the roster and the two need not agree
+  (ADR 024): roster membership is collaboration, lifecycle ownership decides who
+  may deprovision the user. The roster itself stays out of the user payload; it
+  is unbounded, so it gets its own paginated resource.
+
+- [#580](https://github.com/zitadel/nextgen/pull/580) [`e58a4c1`](https://github.com/zitadel/nextgen/commit/e58a4c1161d11d519d04cb944ab2875270ddc8c2) Thanks [@fforootd](https://github.com/fforootd)! - The management API (schemas, flow definitions, users, teams, project
+  queries — the operator plane of ADR 036) now enforces the access model
+  settled for branding in ADR 037, closing two holes:
+  - **Project binding with anti-oracle responses.** Every management
+    operation requires the bearer to be bound to the requested project;
+    before, any project's secret could read and write any other project's
+    schemas, flow definitions, users, and teams (including setting user
+    passwords). Foreign projects answer exactly like nonexistent ones, so
+    project ids cannot be probed.
+  - **The browser plane is locked out.** The preview secret ships to
+    visitors' browsers by design (`project.read` only); it can no longer
+    call any management operation — previously it could create schemas,
+    manage flow definitions, list users, and set passwords. Denials are
+    `403 <resource>.permission_denied`.
+
+  Contract fixes that ride along: `createTeam` was declared `security: []`
+  (callable with no credential at all) and now requires the bearer with
+  `team.write`; the drifted `users.read`/`teams.read` scope names are
+  normalized to `user.read`/`team.read`; the oauth2 scheme's scope
+  registry now lists the team and flow-definition scopes. `project.write`
+  implies the finer per-resource scopes until ADR 036's credential planes
+  make them mintable.
+
+- [#649](https://github.com/zitadel/nextgen/pull/649) [`4b984af`](https://github.com/zitadel/nextgen/commit/4b984afbbde622b6f86d90ff327f4b21f9526785) Thanks [@wim07101993](https://github.com/wim07101993)! - Give every project a full key set at creation. The project key encryption key (KEK) now wraps purpose-scoped keys — token, secret and cookie encryption plus an EdDSA token signing key — and callers resolve them by purpose instead of sharing a single data-encryption key. Adds a `signing_keys` table and per-purpose "one active key per project" constraints.
+
+- [#617](https://github.com/zitadel/nextgen/pull/617) [`40c8537`](https://github.com/zitadel/nextgen/commit/40c8537efc12203fce05855b9536500a4a78621a) Thanks [@peintnermax](https://github.com/peintnermax)! - Add publishable-key support (ADR 036, first slice): `configureZitadel()` and the `ZitadelProject` handle accept an optional browser-safe `publishableKey`, which `getApi()` sends as the bearer on every call from that handle — enabling the browser to authenticate the handoff exchange without server-side secret injection. The server's console runtime document (`GET /console/runtime.json`) now serves the default project's publishable key (the origin-scoped preview credential, `project.read` only) alongside the project id, and the embedded console's login widget uses it.
+
+- [#672](https://github.com/zitadel/nextgen/pull/672) [`f2cec14`](https://github.com/zitadel/nextgen/commit/f2cec1417437c4f7d33dc4bd2281b802cfebe406) Thanks [@grvijayan](https://github.com/grvijayan)! - Rename a team with `PATCH /teams/{team_id}`. The name is trimmed and must be 1 to 200 characters. It must be unique within the project ignoring case, so a taken name returns 409. Only active teams can be renamed: a deactivated or unknown team returns 404. `createTeam` now declares its 403 and 404 responses, which were missing from the contract. The team response schema is now shared between `getTeam` and `updateTeam`, renaming the generated `GetTeamResponse` type to `TeamResponse`.
+
+- [#563](https://github.com/zitadel/nextgen/pull/563) [`41a2de2`](https://github.com/zitadel/nextgen/commit/41a2de240cb446cd12b438a442a55e7b90287e80) Thanks [@fforootd](https://github.com/fforootd)! - Tenant-customizable login templates land end to end (ADR 040): eject a
+  design, edit real Liquid, `plan`/`apply` publishes it, and the login
+  renders it.
+  - `@zitadel/server`: new Branding API (`POST /branding`,
+    `GET /branding`, `GET /branding/{id}`) storing immutable per-project
+    branding revisions with a lexical template gate (size, encoding,
+    `<script>`/`<style>`, inline handlers, `javascript:` URLs, `| raw`).
+    Flow responses now resolve the latest revision per project instead of
+    the hardcoded default.
+  - `@zitadel/api`: generated client and zod schemas for the Branding API.
+  - `@zitadel/config`: the authoritative LiquidJS template validator
+    (`@zitadel/config/template`), the `branding.json` config dialect
+    meta-schema, and the ejectable design catalog (`centered`, `split`,
+    `split-right`, `minimal`) with `getDefaultBrandingConfig`.
+  - `@zitadel/components`: split/minimal layout chrome for the design
+    catalog; the `{% mandatory_gates %}` tag name is now single-sourced
+    from `@zitadel/config/template`.
+  - `@zitadel/cli`: `.zitadel/branding/` becomes a synced resource — a
+    `branding.json` descriptor plus a sibling `login.liquid` the CLI
+    inlines on upload. `zitadel branding eject [--design <name>]`
+    scaffolds it, `zitadel setup --design <name>` does so at setup and
+    publishes revision 1, and `plan`/`apply` validate templates with the
+    authoritative validator and publish edits as new revisions.
+
+- [#721](https://github.com/zitadel/nextgen/pull/721) [`2975c4d`](https://github.com/zitadel/nextgen/commit/2975c4dabec68ac1a8569d6a34960de50dced1b8) Thanks [@wim07101993](https://github.com/wim07101993)! - Every user the API returns now carries its `id` and a read-only `metadata`
+  object with `createdAt`, `updatedAt`, and `status` (`active`, `suspended`,
+  `deactivated`, or `pending_purge`). `GET /users`, `GET /users/{user_id}`, and
+  `GET /users/me` all serve this same typed `User` shape instead of an untyped
+  object, so the generated clients describe the fields rather than handing back a
+  free-form map.
+
+  Two changes to `GET /users` need action:
+  - Pagination moved from `offset` to `page_token`. Pass the `next_page_token`
+    from the previous response instead of an offset; `offset` no longer exists.
+    `limit` is unchanged.
+  - The response is an object — `{ "users": [...], "next_page_token": "..." }` —
+    rather than a bare array, and users come back newest-first instead of
+    oldest-first. `next_page_token` is absent on the last page.
+
+  `POST /users` now rejects a body that sets `id` or `metadata`; both are
+  server-owned.
+
+### Patch Changes
+
+- [#558](https://github.com/zitadel/nextgen/pull/558) [`d2bca36`](https://github.com/zitadel/nextgen/commit/d2bca36bdaa09168363e8e581cc4f0ef5db7eeb8) Thanks [@fforootd](https://github.com/fforootd)! - Strip trailing slashes from base URLs with an `endsWith` loop instead of a
+  regex CodeQL flags as polynomial on uncontrolled input.
+
 ## 0.1.0-alpha.17
 
 ## 0.1.0-alpha.16

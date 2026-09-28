@@ -8,27 +8,25 @@ import (
 
 // Handler handles operations described by OpenAPI v3 specification.
 type Handler interface {
-	// ActivateFlowDefinition implements activateFlowDefinition operation.
+	// BeginUserPasskeyRegistration implements beginUserPasskeyRegistration operation.
 	//
-	// Activate a flow definition by transitioning it from a `draft` state to an `active` state.
-	// Alternatively, the status of a flow definition can also be set via the `POST /flow_definitions`
-	// and `PUT /flow_definitions/{id}` endpoints by setting the `status` attribute in the flow
-	// definition payload.
+	// Starts a WebAuthn registration ceremony for the user and returns the
+	// creation options for `navigator.credentials.create()`. Complete the
+	// ceremony with `POST /users/{user_id}/passkeys/registrations/{registration_id}` within
+	// five minutes. Credentials already registered for the user are excluded
+	// automatically.
 	//
-	// POST /flow_definitions/{id}/activate
-	ActivateFlowDefinition(ctx context.Context, params ActivateFlowDefinitionParams) (ActivateFlowDefinitionRes, error)
-	// AuthorizeDevice implements authorizeDevice operation.
+	// POST /users/{user_id}/passkeys/registrations
+	BeginUserPasskeyRegistration(ctx context.Context, req *BeginUserPasskeyRegistrationRequest, params BeginUserPasskeyRegistrationParams) (BeginUserPasskeyRegistrationRes, error)
+	// CompleteClaim implements completeClaim operation.
 	//
-	// Authorize a device.
+	// Called by the browser after the developer authenticates on the claim page.
+	// Authenticated by the `__nextgen_session` cookie, it attaches the project to
+	// the developer's personal team using the `challenge_id` from the claim URL as
+	// its single-use, browser-safe authorization.
 	//
-	// GET /auth/device-authorization
-	AuthorizeDevice(ctx context.Context, params AuthorizeDeviceParams) (AuthorizeDeviceRes, error)
-	// AuthorizeGet implements authorizeGet operation.
-	//
-	// Authorize a user.
-	//
-	// GET /auth/authorize
-	AuthorizeGet(ctx context.Context, params AuthorizeGetParams) (AuthorizeGetRes, error)
+	// POST /projects/{project_id}/claim/complete
+	CompleteClaim(ctx context.Context, req *CompleteClaimRequest, params CompleteClaimParams) (CompleteClaimRes, error)
 	// CreateAuthAttempt implements createAuthAttempt operation.
 	//
 	// Starts a new authentication attempt. This is the entry point for the auth_attempts state machine.
@@ -43,8 +41,7 @@ type Handler interface {
 	//
 	// Publishes a new immutable branding revision for the project. Branding
 	// revisions cannot be updated or deleted; every edit publishes a new
-	// revision, and flow responses resolve the latest revision per project
-	// (see ADR 040).
+	// revision, and flow responses resolve the latest revision per project.
 	// The `liquid_template` is validated lexically on save (size, encoding,
 	// banned patterns such as `<script>` tags, inline event handlers, and the
 	// `| raw` filter). Authoritative LiquidJS validation runs at authoring
@@ -58,7 +55,7 @@ type Handler interface {
 	// the first capability step. Creates a new session implicitly unless
 	// `session_id` is provided (for step-up / reauth on an existing session).
 	// The response contains an `id` field — the flow handle. Use it as the path
-	// parameter for all subsequent `/flow/{id}/submit` and `/flow/{id}/event` calls.
+	// parameter for all subsequent `/flow/{id}/submit` calls.
 	// The response also sets an encrypted `HttpOnly` cookie (`_zflow`) containing
 	// the flow's orchestration state (current step, collected data, history).
 	// The server is stateless between requests — all flow state lives in this
@@ -68,14 +65,41 @@ type Handler interface {
 	CreateFlow(ctx context.Context, req *CreateFlowRequest) (CreateFlowRes, error)
 	// CreateFlowDefinition implements createFlowDefinition operation.
 	//
-	// Creates a new flow definition.
+	// Publishes a new flow definition revision.
 	// Flow definitions are templates that define the sequence of steps (capabilities)
 	// for a particular user journey (e.g., registration, login, password reset).
 	// Flow definitions are created based on the flow definition schema, which includes the flow's
 	// purpose, audience, and the steps involved.
+	// Every call allocates a new opaque id. Revisions of one flow share its
+	// `name`; posting a definition under an existing `name` publishes a new
+	// revision of that flow, it is not a conflict. List with `name` to see a
+	// flow's revisions, newest by creation time first.
 	//
 	// POST /flow_definitions
 	CreateFlowDefinition(ctx context.Context, req *CreateFlowDefinitionRequest) (CreateFlowDefinitionRes, error)
+	// CreateGrant implements createGrant operation.
+	//
+	// Bind a user or team to `project.viewer`, `project.editor`, or
+	// `project.admin` on the project identified by the `project-id` header.
+	// Name the principal with `user` (`user_id` or `identifier`) or `team`
+	// (`team_id` or `name`). IDs are `asgn_<opaque>`. Owning-team
+	// (`project.team`) grants are not created here — claim owns that path. An
+	// unrevoked grant with the same principal and relation occupies the unique
+	// key even after `expires_at`; DELETE it before re-creating.
+	// Create does not accept `expand`. The `user_id` and team locators
+	// return 201, whose `user` / `team` carry only `user_id` / `team_id`,
+	// and still 404 / 409 when the principal is missing or the tuple
+	// already exists. Creating by `user.identifier` answers 202 with no
+	// body on every outcome. Granting the session caller's own user is
+	// `grant.invalid` on either user locator. Read the grant back for
+	// identifier and display.
+	// Accepts either a project secret (`oauth2`) or a user-bound Console
+	// session cookie (`nextgenSession`). Session callers are authorized as
+	// the human against the target project (home may differ). CSRF/Origin
+	// for cookie mutations is a follow-up (#1140).
+	//
+	// POST /grants
+	CreateGrant(ctx context.Context, req *CreateGrantRequest, params CreateGrantParams) (CreateGrantRes, error)
 	// CreateHandoff implements createHandoff operation.
 	//
 	// Completes the authentication attempt and mints a `handoff_token`.
@@ -89,18 +113,60 @@ type Handler interface {
 	//
 	// POST /auth_attempts/{attempt_id}/handoff
 	CreateHandoff(ctx context.Context, params CreateHandoffParams) (CreateHandoffRes, error)
+	// CreateIdp implements createIdp operation.
+	//
+	// Creates or revises a connection document. If the slug does not already
+	// exist, a new connection is created. If a connection with that slug already
+	// exists, a revision is created.
+	// A revision gets a new `revision_id` and does not modify the connection
+	// `id`, so identity links that reference the connection keep resolving while
+	// releases and auth attempts stay pinned to the revision they captured.
+	// Identity fields are fixed for the life of the connection and a revision
+	// that changes one is rejected: `protocol`, `subject_claim`, and the
+	// endpoints that name the authority (`issuer` for OIDC, `token_endpoint`
+	// and `userinfo_endpoint` for OAuth 2.0). Their values decide which provider
+	// account a stored subject belongs to, so changing one would silently
+	// repoint existing identities at a different provider.
+	// `subject_claim` is optional for OIDC and required for OAuth 2.0. For an
+	// OIDC connection, `sub` is used as the default value. If a revision updates
+	// `subject_claim` to a different value than the one set during creation, the
+	// request is rejected.
+	// The document is validated against the `idp-connection.json` schema before
+	// anything is stored.
+	//
+	// POST /idps
+	CreateIdp(ctx context.Context, req *CreateIdpRequest, params CreateIdpParams) (CreateIdpRes, error)
 	// CreateProject implements createProject operation.
 	//
 	// Create project.
 	//
 	// POST /projects
 	CreateProject(ctx context.Context, req *CreateProjectRequest) (CreateProjectRes, error)
+	// CreateRelease implements createRelease operation.
+	//
+	// Bundles a release from revisions that already exist, supplied as
+	// `(kind, revision_id)` pairs. No new revisions are allocated — use the
+	// per-kind create endpoints for that, then pin the ids here.
+	// Every referenced `revision_id` must exist in the project. Each one's handle
+	// is read from the revision itself and recorded on the release, so a resource
+	// is always pinned under the identity it declares.
+	// Creating a release does not deploy it. A release is environment-agnostic
+	// and the same release can later be deployed to any number of environments
+	// unchanged.
+	// Idempotent on the pinned set: metadata is excluded from the comparison, so
+	// re-submitting the same revisions with a different `message` returns the
+	// release that already pins them rather than creating a second one.
+	//
+	// POST /releases
+	CreateRelease(ctx context.Context, req *CreateReleaseRequest, params CreateReleaseParams) (CreateReleaseRes, error)
 	// CreateSchema implements createSchema operation.
 	//
-	// Create a new schema. The schema definition must include a unique $id field,
-	// which will be used to identify the schema in future requests. The $id must
-	// be a valid URI and should ideally point to the location where the schema
-	// can be accessed.
+	// Create a new schema. The optional `$id` field is the JSON Schema document
+	// URI used to identify the schema in future requests (GitOps-stable identity,
+	// not a free-form resource primary key). When `$id` is omitted, the server
+	// generates a `sch_*` URL. When provided, `$id` must be unique within the
+	// project and should ideally be a valid URI pointing at where the schema can
+	// be accessed.
 	// The schema can either be a concrete schema, e.g. a user schema, or a
 	// schema-url which will be resolved by the server.
 	//
@@ -114,8 +180,15 @@ type Handler interface {
 	// - Pre-allocate a `session_id` before the user is known, so device/telemetry signals
 	// can be correlated with the eventual authenticated session from the start.
 	// - Track anonymous state (bot detection, device fingerprint) that survives until authentication.
-	// The returned `session_token` authorises GET and DELETE on this session.
-	// It is superseded when a handoff exchange completes — clients must replace it at that point.
+	// Creating a session is an app-plane operation on the project credential
+	// (`session.write`). The returned `session_token` is a session credential for the
+	// end-user client, not a management scope: it is delivered as the
+	// `__nextgen_session` cookie and authorises the self-service operations
+	// `GET /sessions/me` and `DELETE /sessions/me` (`nextgenSession` scheme). The
+	// by-id operations `GET /sessions/{session_id}` and `DELETE /sessions/{session_id}`
+	// are operator endpoints and require `session.read` / `session.delete` instead.
+	// The `session_token` is superseded when a handoff exchange completes — clients must
+	// replace it at that point.
 	// Anonymous sessions expire aggressively (10-minute TTL). The TTL resets to the configured
 	// full session TTL when the first authentication factor is written via a completing `auth_attempt`.
 	//
@@ -132,33 +205,49 @@ type Handler interface {
 	// Create user.
 	//
 	// POST /users
-	CreateUser(ctx context.Context, req *User, params CreateUserParams) (CreateUserRes, error)
-	// DeactivateFlowDefinition implements deactivateFlowDefinition operation.
+	CreateUser(ctx context.Context, req *CreateUserRequest, params CreateUserParams) (CreateUserRes, error)
+	// DeleteGrant implements deleteGrant operation.
 	//
-	// Deactivates a flow definition in the `active` state by transitioning it to the `draft` state.
-	// Flow definitions in `draft` state cannot be used to start new flows. Existing flows that use the
-	// deactivated flow definition must gracefully handle this.
-	// Alternatively, the status of a flow definition can also be set via the `POST /flow_definitions`
-	// and `PUT /flow_definitions/{id}` endpoints by setting the `status` attribute in the flow
-	// definition payload.
+	// Soft-revokes a grant this API manages and emits `authz.revoked`.
+	// Already-revoked, missing, project-secret setup, and owning-team grants
+	// return 404. The row is not un-revoked. Expired grants can still be
+	// revoked so the unique binding can be reused.
+	// Accepts either a project secret (`oauth2`) or a user-bound Console
+	// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
+	// is a follow-up (#1140).
 	//
-	// POST /flow_definitions/{id}/deactivate
-	DeactivateFlowDefinition(ctx context.Context, params DeactivateFlowDefinitionParams) (DeactivateFlowDefinitionRes, error)
-	// DeleteFlowDefinition implements deleteFlowDefinition operation.
+	// DELETE /grants/{id}
+	DeleteGrant(ctx context.Context, params DeleteGrantParams) (DeleteGrantRes, error)
+	// DeleteTeam implements deleteTeam operation.
 	//
-	// Delete a flow definition by id.
-	// If the flow definition is currently being used by a flow, the deletion will fail.
-	// If the flow definition is the last active flow definition for a given purpose, the deletion will
-	// fail to prevent disruption of new flows being started for that purpose.
+	// Deactivates the team.
+	// The team is tombstoned rather than erased: it stays readable through
+	// getTeam with status `deactivated`. Its memberships are removed and the
+	// users whose lifecycle it owns are deactivated with it.
+	// The request is idempotent. Deleting a team that is already deactivated
+	// or doesn't exist succeeds without changing anything.
+	// A team that still owns a project is refused with `409
+	// team.owns_project`: deactivating it would leave the project owned by a
+	// dead team and so unmanageable. No endpoint releases that ownership yet,
+	// so such a team cannot currently be deactivated through the API.
 	//
-	// DELETE /flow_definitions/{id}
-	DeleteFlowDefinition(ctx context.Context, params DeleteFlowDefinitionParams) (DeleteFlowDefinitionRes, error)
-	// EndSession implements endSession operation.
+	// DELETE /teams/{team_id}
+	DeleteTeam(ctx context.Context, params DeleteTeamParams) (DeleteTeamRes, error)
+	// DeleteUserByID implements DeleteUserByID operation.
 	//
-	// End a session.
+	// Delete user by ID.
 	//
-	// GET /auth/end-session
-	EndSession(ctx context.Context, params EndSessionParams) (EndSessionRes, error)
+	// DELETE /users/{user_id}
+	DeleteUserByID(ctx context.Context, params DeleteUserByIDParams) (DeleteUserByIDRes, error)
+	// DeleteVariable implements deleteVariable operation.
+	//
+	// Removes the variable this owner entered under this name.
+	// A variable is deletable only by the owner that entered it. Deleting a name
+	// another owner of the same project holds answers `var.not_found` and leaves
+	// that owner's value standing.
+	//
+	// DELETE /variables/{variable_name}
+	DeleteVariable(ctx context.Context, params DeleteVariableParams) (DeleteVariableRes, error)
 	// ExchangeHandoff implements exchangeHandoff operation.
 	//
 	// Consumes a one-time `handoff_token` minted by `POST /auth_attempts/{id}/handoff`
@@ -178,6 +267,17 @@ type Handler interface {
 	//
 	// POST /sessions/exchange
 	ExchangeHandoff(ctx context.Context, req *ExchangeRequest, params ExchangeHandoffParams) (ExchangeHandoffRes, error)
+	// FinishUserPasskeyRegistration implements finishUserPasskeyRegistration operation.
+	//
+	// Verifies the attestation against the ceremony started by
+	// `POST /users/{user_id}/passkeys/registrations` and persists the new credential. A
+	// rejected attestation counts against the ceremony's failure budget and the
+	// ceremony stays open for a retry. An expired ceremony surfaces as
+	// `att.stale_challenge`; an unknown or already-consumed registration id
+	// surfaces as `att.not_found`.
+	//
+	// POST /users/{user_id}/passkeys/registrations/{registration_id}
+	FinishUserPasskeyRegistration(ctx context.Context, req *FinishUserPasskeyRegistrationRequest, params FinishUserPasskeyRegistrationParams) (FinishUserPasskeyRegistrationRes, error)
 	// GetAuthAttempt implements getAuthAttempt operation.
 	//
 	// Polls the current state of an authentication attempt.
@@ -194,6 +294,47 @@ type Handler interface {
 	//
 	// GET /branding/{id}
 	GetBrandingById(ctx context.Context, params GetBrandingByIdParams) (GetBrandingByIdRes, error)
+	// GetClaimStatus implements getClaimStatus operation.
+	//
+	// Polled by the CLI while a browser completes the claim. Authorized by the
+	// project secret that initiated the challenge. Returns `pending`, or
+	// `completed` with the owning team, the claim timestamp, and the dashboard
+	// URL once the project is claimed. The claim grant, not the polled
+	// challenge, is the source of truth: a project claimed through another
+	// concurrent challenge also reports `completed`, and a completed claim
+	// keeps reporting `completed` past this challenge's expiry and past the
+	// project's claim window.
+	//
+	// GET /projects/{project_id}/claim/status
+	GetClaimStatus(ctx context.Context, params GetClaimStatusParams) (GetClaimStatusRes, error)
+	// GetClaimWindow implements getClaimWindow operation.
+	//
+	// Read by the claim page in the browser to show how long is left to claim the
+	// project. Unauthenticated by design: the claim page runs this before the
+	// developer has signed in, and holding the `challenge_id` from the claim URL
+	// is the authorization — the same capability `claim/complete` accepts. It
+	// reveals only the window, never the project itself, and unlike
+	// `claim/complete` it spends nothing, so a reload is free.
+	//
+	// GET /projects/{project_id}/claim/window
+	GetClaimWindow(ctx context.Context, params GetClaimWindowParams) (GetClaimWindowRes, error)
+	// GetEnvironmentByName implements getEnvironmentByName operation.
+	//
+	// Reads one environment of the project by its name.
+	// The lookup is scoped to the project in `project_id`: a name that exists in
+	// another project answers `env.not_found` exactly as an unused name does.
+	//
+	// GET /environments/{name}
+	GetEnvironmentByName(ctx context.Context, params GetEnvironmentByNameParams) (GetEnvironmentByNameRes, error)
+	// GetEvent implements getEvent operation.
+	//
+	// Loads a single event by `(project_id, id)`. Requires `events.read`.
+	// Events are not registered in `resource_scope_index`; project scope is
+	// required on the query (ADR 049). Misses and cross-project ids return 404.
+	// Pre-claim projects return 404 (stored events stay invisible until claim).
+	//
+	// GET /events/{id}
+	GetEvent(ctx context.Context, params GetEventParams) (GetEventRes, error)
 	// GetFlowDefinition implements getFlowDefinition operation.
 	//
 	// Get a flow definition by id.
@@ -207,18 +348,48 @@ type Handler interface {
 	//
 	// GET /flow/{id}
 	GetFlowStep(ctx context.Context, params GetFlowStepParams) (GetFlowStepRes, error)
+	// GetGrant implements getGrant operation.
+	//
+	// Loads a grant by `(project_id, id)` that this API manages (user or team
+	// bound to viewer, editor, or admin) and that has not been revoked.
+	// "Active" here means not revoked: expired grants stay visible so the
+	// client can DELETE before re-granting the same binding. Authorization
+	// still ignores expired grants. Grants are not registered in
+	// `resource_scope_index`; project scope is required on the query (same as
+	// events). Misses, revoked rows, project-secret setup (`sk_proj`),
+	// owning-team (`relation=team`) rows, and cross-project ids return 404.
+	// `expand=principal` adds envelope fields on `user` or `team` and requires
+	// `user.read` and `team.read` in addition to `project.read` for project
+	// secrets. A user-bound Console session that already passed the project
+	// Check may expand without those scopes.
+	// Accepts either a project secret (`oauth2`) or a user-bound Console
+	// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
+	// is a follow-up (#1140).
+	//
+	// GET /grants/{id}
+	GetGrant(ctx context.Context, params GetGrantParams) (GetGrantRes, error)
 	// GetHealth implements getHealth operation.
 	//
 	// Check whether the server is healthy.
 	//
 	// GET /healthz
 	GetHealth(ctx context.Context) (GetHealthRes, error)
-	// GetKeys implements getKeys operation.
+	// GetIdpById implements getIdpById operation.
 	//
-	// Get public keys.
+	// Reads a connection by its id, at its newest revision.
+	// `GET /idps/{id}/revisions` lists every revision of the connection.
+	// The lookup is scoped to the project in `project_id`.
 	//
-	// GET /auth/keys
-	GetKeys(ctx context.Context) (GetKeysRes, error)
+	// GET /idps/{id}
+	GetIdpById(ctx context.Context, params GetIdpByIdParams) (GetIdpByIdRes, error)
+	// GetIdpRevisionById implements getIdpRevisionById operation.
+	//
+	// Reads one revision of a connection by its `revision_id`, the value an auth
+	// attempt or a release pins.
+	// The lookup is scoped to the project in `project_id`.
+	//
+	// GET /idps/revisions/{revision_id}
+	GetIdpRevisionById(ctx context.Context, params GetIdpRevisionByIdParams) (GetIdpRevisionByIdRes, error)
 	// GetLive implements getLive operation.
 	//
 	// Check whether the server is started.
@@ -241,12 +412,6 @@ type Handler interface {
 	//
 	// GET /users/me
 	GetMyUser(ctx context.Context) (GetMyUserRes, error)
-	// GetOpenIDConfiguration implements getOpenIDConfiguration operation.
-	//
-	// Retrieve the OpenID Connect configuration.
-	//
-	// GET /.well-known/openid-configuration
-	GetOpenIDConfiguration(ctx context.Context) (GetOpenIDConfigurationRes, error)
 	// GetProject implements getProject operation.
 	//
 	// Returns the current state of a project.
@@ -259,9 +424,24 @@ type Handler interface {
 	//
 	// GET /readyz
 	GetReady(ctx context.Context) (GetReadyRes, error)
+	// GetReleaseById implements getReleaseById operation.
+	//
+	// Reads one release: its metadata and the `(kind, handle, revision_id)`
+	// tuples it pins.
+	// Does not embed resource content. Resolve each `revision_id` through the
+	// per-kind read endpoints when the bytes are needed.
+	// The lookup is scoped to the project in `project_id`: a release id belonging
+	// to another project answers not found exactly as an unknown id does, so the
+	// endpoint cannot be used to probe for releases in projects the caller cannot
+	// read.
+	//
+	// GET /releases/{release_id}
+	GetReleaseById(ctx context.Context, params GetReleaseByIdParams) (GetReleaseByIdRes, error)
 	// GetSchemaById implements getSchemaById operation.
 	//
-	// Get a schema by its ID. This will return the default revision of the schema.
+	// Get a schema by its ID. A schema ID identifies one immutable revision, so
+	// this returns exactly that revision. To find the current revision of an
+	// object type, list with `revisions=latest`.
 	//
 	// GET /schemas/{id}
 	GetSchemaById(ctx context.Context, params GetSchemaByIdParams) (GetSchemaByIdRes, error)
@@ -277,34 +457,50 @@ type Handler interface {
 	GetSession(ctx context.Context, params GetSessionParams) (GetSessionRes, error)
 	// GetTeam implements getTeam operation.
 	//
-	// Returns the current state of a team.
+	// Returns a Team by its id.
 	//
 	// GET /teams/{team_id}
 	GetTeam(ctx context.Context, params GetTeamParams) (GetTeamRes, error)
-	// GetToken implements getToken operation.
-	//
-	// Get access token.
-	//
-	// POST /auth/token
-	GetToken(ctx context.Context, req *PostTokenRequest) (GetTokenRes, error)
 	// GetUserByID implements GetUserByID operation.
 	//
 	// Get user by ID.
 	//
 	// GET /users/{user_id}
 	GetUserByID(ctx context.Context, params GetUserByIDParams) (GetUserByIDRes, error)
-	// GetUserInfo implements getUserInfo operation.
+	// GetVariable implements getVariable operation.
 	//
-	// Get user info.
+	// Reads one variable by name from the owner this request addresses — one
+	// environment of the project with `environment_name`, the project level
+	// itself without it.
+	// A name that owner has not entered answers `var.not_found`, even when
+	// another owner of the same project holds it: nothing is inherited. A secret
+	// is found but not disclosed: the response is `{"secret": true}`.
 	//
-	// GET /auth/userinfo
-	GetUserInfo(ctx context.Context) (GetUserInfoRes, error)
-	// Introspect implements introspect operation.
+	// GET /variables/{variable_name}
+	GetVariable(ctx context.Context, params GetVariableParams) (GetVariableRes, error)
+	// GetVariables implements getVariables operation.
 	//
-	// Introspect a token.
+	// Returns the variables entered at the owner this request addresses, keyed by
+	// name — one environment of the project with `environment_name`, the project
+	// level itself without it.
+	// Owners are separate, not a ladder: an environment does not inherit the
+	// project's variables and the project does not see its environments'. Reading
+	// everything a project holds therefore means reading each owner in turn.
+	// Secret values are not returned. A secret appears as `{"secret": true}`,
+	// which says a value is held without disclosing it.
 	//
-	// POST /auth/introspect
-	Introspect(ctx context.Context, req *IntrospectRequest) (IntrospectRes, error)
+	// GET /variables
+	GetVariables(ctx context.Context, params GetVariablesParams) (GetVariablesRes, error)
+	// InitClaim implements initClaim operation.
+	//
+	// Starts a claim challenge for an unclaimed project. Authenticated by the
+	// project secret, this mints a single-use, short-lived challenge and returns
+	// the `claim_url` the developer opens in a browser to complete the claim,
+	// together with the `challenge_id` the CLI polls with. The exact expiry is
+	// carried by `expires_at` on the response.
+	//
+	// POST /projects/{project_id}/claim/init
+	InitClaim(ctx context.Context, params InitClaimParams) (InitClaimRes, error)
 	// IssueChallenge implements issueChallenge operation.
 	//
 	// Issues a single-factor verification challenge within an auth attempt.
@@ -319,19 +515,67 @@ type Handler interface {
 	//
 	// Lists branding revisions for the project, newest first, capped at the
 	// 100 most recent. The first entry is the revision flow responses
-	// currently resolve. Deliberately unpaginated in v1 — list endpoints
-	// gain a real query mechanism together (ADR 031); advertising pagination
-	// parameters the server ignores would be worse than none.
+	// currently resolve. Deliberately unpaginated in v1 — list endpoints gain a
+	// real query mechanism together; advertising pagination parameters the
+	// server ignores would be worse than none.
 	//
 	// GET /branding
 	ListBranding(ctx context.Context, params ListBrandingParams) (ListBrandingRes, error)
+	// ListEnvironments implements listEnvironments operation.
+	//
+	// Lists the project's environments ordered by name.
+	//
+	// GET /environments
+	ListEnvironments(ctx context.Context, params ListEnvironmentsParams) (ListEnvironmentsRes, error)
+	// ListEvents implements listEvents operation.
+	//
+	// Returns project-scoped audit events, newest-first by keyset on
+	// `(created_at, id)` (ADR 027 / ADR 049). Pass `order=asc` for oldest-first.
+	// Requires `events.read`.
+	// Pre-claim projects return an empty list (events are stored but not
+	// visible until claim succeeds). Team-scoped credentials see only events
+	// whose emit-time `team_id` matches the credential team (enforced when
+	// team-scoped tokens exist).
+	// Clients discriminate each item via `event_type` (OpenAPI Event oneOf) —
+	// see docs/design/api/events-catalog.md.
+	//
+	// GET /events
+	ListEvents(ctx context.Context, params ListEventsParams) (ListEventsRes, error)
 	// ListFlowDefinitions implements listFlowDefinitions operation.
 	//
-	// Retrieves a list of all flow definitions.
+	// Retrieves a list of all flow definitions, newest by creation time first.
 	// This endpoint can be used to view existing flow definitions and their configurations.
+	// Filter by `name` to list the revisions of one flow.
 	//
 	// GET /flow_definitions
 	ListFlowDefinitions(ctx context.Context, params ListFlowDefinitionsParams) (ListFlowDefinitionsRes, error)
+	// ListIdpRevisions implements listIdpRevisions operation.
+	//
+	// Returns every revision of one connection, newest first, paginated with a
+	// cursor. The order is fixed, so there is no `sorting`.
+	// The lookup is scoped to the project in `project_id`.
+	//
+	// GET /idps/{id}/revisions
+	ListIdpRevisions(ctx context.Context, params ListIdpRevisionsParams) (ListIdpRevisionsRes, error)
+	// ListMyProjects implements listMyProjects operation.
+	//
+	// The projects the signed-in user holds an active grant on, either directly or
+	// through a team they are a member of. Ordered by project id and paged with an
+	// opaque cursor.
+	// This is not the same question as `queryProjects`, which answers with the one
+	// project the calling credential is bound to. Here the session is the caller
+	// and the grants are the answer, so the list spans projects.
+	//
+	// GET /users/me/projects
+	ListMyProjects(ctx context.Context, params ListMyProjectsParams) (ListMyProjectsRes, error)
+	// ListReleases implements listReleases operation.
+	//
+	// Lists the project's releases, newest first.
+	// Entries carry metadata only — the pinned set is omitted. Read one release
+	// with `GET /releases/{release_id}` to get its pointers.
+	//
+	// GET /releases
+	ListReleases(ctx context.Context, params ListReleasesParams) (ListReleasesRes, error)
 	// ListSchemas implements listSchemas operation.
 	//
 	// Retrieve a list of all schemas available in the system. This endpoint
@@ -339,67 +583,134 @@ type Handler interface {
 	//
 	// GET /schemas
 	ListSchemas(ctx context.Context, params ListSchemasParams) (ListSchemasRes, error)
-	// ListSessions implements listSessions operation.
+	// ListUserPasskeys implements listUserPasskeys operation.
 	//
-	// Returns a paginated list of sessions for a project.
-	// Requires a project service key (OAuth2 client credentials).
+	// List user passkeys.
 	//
-	// GET /sessions
-	ListSessions(ctx context.Context, params ListSessionsParams) (ListSessionsRes, error)
-	// ListUsers implements listUsers operation.
+	// GET /users/{user_id}/passkeys
+	ListUserPasskeys(ctx context.Context, params ListUserPasskeysParams) (ListUserPasskeysRes, error)
+	// ListUserTeams implements listUserTeams operation.
 	//
-	// List users.
+	// The user's team roster, ordered by team name. Each entry carries the
+	// team's name, so a client renders a page without resolving ids one by one.
+	// This is the N:N roster and it is not lifecycle ownership: the single team
+	// that owns the user's lifecycle is reported as `metadata.lifecycle_owner_team_id`
+	// on the user read endpoints. Memberships the user was removed from are not
+	// returned.
 	//
-	// GET /users
-	ListUsers(ctx context.Context, params ListUsersParams) (ListUsersRes, error)
+	// GET /users/{user_id}/teams
+	ListUserTeams(ctx context.Context, params ListUserTeamsParams) (ListUserTeamsRes, error)
+	// PatchMyUser implements patchMyUser operation.
+	//
+	// Partially updates the caller's own schema-defined attributes. The merged
+	// result is validated against the user's schema before commit. Concurrent
+	// writes are last-write-wins.
+	//
+	// PATCH /users/me
+	PatchMyUser(ctx context.Context, req *PatchMyUserRequest) (PatchMyUserRes, error)
 	// PatchProject implements patchProject operation.
 	//
 	// Updates the state of a project.
 	//
 	// PATCH /projects/{project_id}
 	PatchProject(ctx context.Context, req *PatchProjectRequest, params PatchProjectParams) (PatchProjectRes, error)
+	// PatchUserByID implements PatchUserByID operation.
+	//
+	// Partially updates a user's schema-defined attributes, and optionally
+	// moves the user to another registered schema. The merged result is
+	// validated against the schema before commit. Concurrent writes are
+	// last-write-wins.
+	//
+	// PATCH /users/{user_id}
+	PatchUserByID(ctx context.Context, req *PatchUserRequest, params PatchUserByIDParams) (PatchUserByIDRes, error)
+	// QueryGrants implements queryGrants operation.
+	//
+	// Returns the collaboration grants of a project, paginated with a cursor.
+	// Only unrevoked grants this API manages are listed (user or team bound to
+	// viewer, editor, or admin), including expired grants so a client can
+	// DELETE before re-granting. Project-secret setup (`sk_proj`) and
+	// owning-team (`relation=team`) rows are not returned. Grants are not in
+	// `resource_scope_index`; project scope is required on the query (same as
+	// get). Requires `project.read`. `expand: ["principal"]` adds envelope
+	// fields on `user` / `team` and additionally requires `user.read` and
+	// `team.read` for project secrets (documented on the expand enum; those
+	// scopes cannot be ANDed onto this security block because they are
+	// body-conditional). A user-bound Console session that already passed
+	// the project Check may expand without those scopes.
+	// Accepts either a project secret (`oauth2`) or a user-bound Console
+	// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
+	// is a follow-up (#1140).
+	//
+	// POST /grants/query
+	QueryGrants(ctx context.Context, req *QueryGrantsRequest, params QueryGrantsParams) (QueryGrantsRes, error)
+	// QueryIdps implements queryIdps operation.
+	//
+	// Returns the identity provider connections of a project, paginated with a
+	// cursor. One row per connection, carrying its newest revision.
+	//
+	// POST /idps/query
+	QueryIdps(ctx context.Context, req *QueryIdpsRequest, params QueryIdpsParams) (QueryIdpsRes, error)
 	// QueryProjects implements queryProjects operation.
 	//
 	// Query projects.
 	//
 	// POST /projects/query
 	QueryProjects(ctx context.Context, req *QueryProjectsRequest) (QueryProjectsRes, error)
+	// QuerySessions implements querySessions operation.
+	//
+	// Returns the sessions of a project, paginated with a cursor.
+	// Sessions of every lifecycle state are returned; each carries its `state`.
+	// Requires `session.read` permission.
+	//
+	// POST /sessions/query
+	QuerySessions(ctx context.Context, req *QuerySessionsRequest, params QuerySessionsParams) (QuerySessionsRes, error)
+	// QueryTeams implements queryTeams operation.
+	//
+	// Returns the teams of a project, paginated with a cursor.
+	//
+	// POST /teams/query
+	QueryTeams(ctx context.Context, req *QueryTeamsRequest, params QueryTeamsParams) (QueryTeamsRes, error)
+	// QueryUsers implements queryUsers operation.
+	//
+	// Returns the users of a project, paginated with a cursor.
+	// The project comes from the credential, not from a parameter: the
+	// operation is bound to the credential's home project by construction
+	// (oauth2 secret or user-bound session). This is why it takes no
+	// `project_id`, unlike the other query endpoints.
+	// Accepts either a project secret (`oauth2`) or a user-bound Console
+	// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
+	// is a follow-up (#1140).
+	//
+	// POST /users/query
+	QueryUsers(ctx context.Context, req *QueryUsersRequest) (QueryUsersRes, error)
 	// RevokeMySession implements revokeMySession operation.
 	//
-	// Revokes the session immediately (`state: revoked`). This is the logout operation.
-	// The __nextgen_session cookie issued at creation (or superseded by a handoff exchange) is required.
-	// After revocation, any tokens derived from this session are invalidated including the cookie itself,
-	//  which is cleared in the response.
+	// Logs out by permanently deleting the session.
+	// The `__nextgen_session` cookie issued at creation (or superseded by a handoff
+	// exchange) is required. Idempotent: if the session is already gone this still
+	// returns 204. Any tokens derived from the session are invalidated, and the
+	// cookie itself is cleared in the response.
 	//
 	// DELETE /sessions/me
 	RevokeMySession(ctx context.Context) (RevokeMySessionRes, error)
 	// RevokeSession implements revokeSession operation.
 	//
-	// Revokes the session immediately (`state: revoked`). This is the logout operation.
-	// The session_token issued at creation (or superseded by a handoff exchange) is required.
-	// After revocation, any tokens derived from this session are invalidated.
+	// Permanently deletes the session, terminating it immediately.
+	// This is the operator revoke path and requires the `session.delete` scope on a
+	// project-bound credential. End-user logout with the `__nextgen_session` cookie is
+	// `DELETE /sessions/me` (`nextgenSession` scheme).
+	// Idempotent: deleting a session that does not exist (or was already deleted)
+	// still returns 204. After deletion, any tokens derived from the session are
+	// invalidated.
 	//
 	// DELETE /sessions/{session_id}
 	RevokeSession(ctx context.Context, params RevokeSessionParams) (RevokeSessionRes, error)
-	// RevokeToken implements revokeToken operation.
-	//
-	// Revoke an access token or refresh token.
-	//
-	// POST /auth/revoke
-	RevokeToken(ctx context.Context, req *RevokeRequest) (RevokeTokenRes, error)
 	// SetUserPassword implements setUserPassword operation.
 	//
 	// Set user password.
 	//
 	// PUT /users/{user_id}/password
 	SetUserPassword(ctx context.Context, req *SetUserPasswordRequest, params SetUserPasswordParams) (SetUserPasswordRes, error)
-	// SubmitFlowEvent implements submitFlowEvent operation.
-	//
-	// Submits telemetry or fingerprint data from the frontend.
-	// Does not advance the state machine. Used for risk evaluation.
-	//
-	// POST /flow/{id}/event
-	SubmitFlowEvent(ctx context.Context, req *FlowEventRequest, params SubmitFlowEventParams) (SubmitFlowEventRes, error)
 	// SubmitFlowStep implements submitFlowStep operation.
 	//
 	// Submits user input for the current step. The server validates,
@@ -426,13 +737,31 @@ type Handler interface {
 	//
 	// POST /flow/{id}/submit
 	SubmitFlowStep(ctx context.Context, req *FlowSubmitRequest, params SubmitFlowStepParams) (SubmitFlowStepRes, error)
-	// UpdateFlowDefinition implements updateFlowDefinition operation.
+	// UpdateTeam implements updateTeam operation.
 	//
-	// Update a flow definition by id. This endpoint replaces the existing flow definition.
-	// If `flow_definition.status` is omitted, the current status is preserved.
+	// Update team. Only active teams can be updated.
 	//
-	// PUT /flow_definitions/{id}
-	UpdateFlowDefinition(ctx context.Context, req *FlowDefinitionUpdateRequest, params UpdateFlowDefinitionParams) (UpdateFlowDefinitionRes, error)
+	// PATCH /teams/{team_id}
+	UpdateTeam(ctx context.Context, req *UpdateTeamRequest, params UpdateTeamParams) (UpdateTeamRes, error)
+	// UpdateVariables implements updateVariables operation.
+	//
+	// Enters, replaces and removes variables at the owner this request
+	// addresses.
+	// Every name in the body is applied at exactly that owner — the project, or
+	// the environment named by `environment_name` — and reaches no other. Names
+	// not in the body are untouched.
+	// A bare scalar enters a non-secret value. `{"value": …, "secret": true}`
+	// stores the value encrypted under the project's active `secret` key, after
+	// which it can be referenced but not read back. `null` removes the name from
+	// this owner (RFC 7386), which is how several variables are removed in one
+	// request; removing a name this owner does not hold is a no-op rather than an
+	// error.
+	// The body is applied whole or not at all, so a rejected request leaves the
+	// owner exactly as it was. Writing the same name and owner twice replaces the
+	// value rather than duplicating it, which makes a retry safe.
+	//
+	// PATCH /variables
+	UpdateVariables(ctx context.Context, req UpdateVariablesRequest, params UpdateVariablesParams) (UpdateVariablesRes, error)
 	// VerifyChallengeProof implements verifyChallengeProof operation.
 	//
 	// Submits a proof (credential, code, assertion) to verify a factor challenge.

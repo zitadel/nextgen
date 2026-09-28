@@ -1,0 +1,14 @@
+title: AuthCheckPayload
+type: object
+description: |
+  Payload for `auth.check.failed` / `auth.check.succeeded`.
+  `auth_attempt_id` joins the check to its attempt for SIEM correlation.
+required:
+  - check_id
+properties:
+  check_id:
+    type: string
+  check_type:
+    type: string
+  auth_attempt_id:
+    type: string

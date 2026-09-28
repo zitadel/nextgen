@@ -1,4 +1,4 @@
-//go:build postgres_integration
+//go:build postgres_integration || spanner_integration
 
 package integration_test
 
@@ -26,8 +26,9 @@ func TestPasswordLoginFlow(t *testing.T) {
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 
-	team, err := harness.EnsureTeamService(t).CreateTeam(t.Context(), service.CreateTeamInput{
+	team, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
 		ProjectID: project.ID,
+		Name:      helpers.TeamName(),
 	})
 	require.NoError(t, err)
 
@@ -48,7 +49,7 @@ func TestPasswordLoginFlow(t *testing.T) {
 		SchemaURL:               schemaURL,
 		ID:                      userID,
 		InitialMembershipTeamID: &team.ID,
-		Attributes:              []*domain.CreateAttribute{emailAttr},
+		Attributes:              domain.CreateAttributes{*emailAttr},
 	}))
 
 	hasher := harness.EnsureHasher(t)
@@ -71,15 +72,15 @@ func TestPasswordLoginFlow(t *testing.T) {
 		FlowDefinition: passwordLoginFlowDefinition(schemaURL),
 	})
 	require.NoError(t, err)
-	require.IsType(t, &api.FlowDefinitionDetailResponse{}, defResp, "create flow definition: %+v", defResp)
+	require.IsType(t, &api.FlowDefinitionResponse{}, defResp, "create flow definition: %s", helpers.MustMarshal(t, defResp))
 
 	createResp, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{
 		ProjectID: api.ProjectID(project.ID),
 		Purpose:   api.CreateFlowRequestPurposeLogin,
 	})
 	require.NoError(t, err)
-	flowHeaders, ok := createResp.(*api.FlowResponseHeaders)
-	require.True(t, ok, "expected FlowResponseHeaders, got %T", createResp)
+	require.IsType(t, &api.FlowResponseHeaders{}, createResp, helpers.MustMarshal(t, createResp))
+	flowHeaders := createResp.(*api.FlowResponseHeaders)
 
 	flowID := flowHeaders.Response.ID
 	require.Equal(t, "identifier", flowHeaders.Response.Step.Name)
@@ -96,8 +97,8 @@ func TestPasswordLoginFlow(t *testing.T) {
 		Zflow: zflow,
 	})
 	require.NoError(t, err)
-	idOK, ok := idResp.(*api.SubmitFlowStepOK)
-	require.True(t, ok, "expected SubmitFlowStepOK on identifier, got %T: %+v", idResp, idResp)
+	require.IsType(t, &api.SubmitFlowStepOK{}, idResp, helpers.MustMarshal(t, idResp))
+	idOK := idResp.(*api.SubmitFlowStepOK)
 	require.Equal(t, "password", idOK.Response.Step.Name)
 	zflow = mustExtractZflow(t, idOK.SetCookie.Value)
 
@@ -112,8 +113,8 @@ func TestPasswordLoginFlow(t *testing.T) {
 		Zflow: zflow,
 	})
 	require.NoError(t, err)
-	pwOK, ok := pwResp.(*api.SubmitFlowStepOK)
-	require.True(t, ok, "expected SubmitFlowStepOK on password, got %T: %+v", pwResp, pwResp)
+	require.IsType(t, &api.SubmitFlowStepOK{}, pwResp, helpers.MustMarshal(t, pwResp))
+	pwOK := pwResp.(*api.SubmitFlowStepOK)
 	require.Equal(t, "done", pwOK.Response.Step.Name)
 	require.True(t, pwOK.Response.Step.Complete.Set, "expected terminal step")
 
@@ -140,15 +141,15 @@ func TestPasswordLoginFlow_UnknownEmail(t *testing.T) {
 		FlowDefinition: passwordLoginFlowWithNotFoundFlowDefinition(schemaURL),
 	})
 	require.NoError(t, err)
-	require.IsType(t, &api.FlowDefinitionDetailResponse{}, defResp, "create flow definition: %+v", defResp)
+	require.IsType(t, &api.FlowDefinitionResponse{}, defResp, "create flow definition: %s", helpers.MustMarshal(t, defResp))
 
 	createResp, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{
 		ProjectID: api.ProjectID(project.ID),
 		Purpose:   api.CreateFlowRequestPurposeLogin,
 	})
 	require.NoError(t, err)
-	flowHeaders, ok := createResp.(*api.FlowResponseHeaders)
-	require.True(t, ok, "expected FlowResponseHeaders, got %T", createResp)
+	require.IsType(t, &api.FlowResponseHeaders{}, createResp, helpers.MustMarshal(t, createResp))
+	flowHeaders := createResp.(*api.FlowResponseHeaders)
 	flowID := flowHeaders.Response.ID
 	zflow := mustExtractZflow(t, flowHeaders.SetCookie.Value)
 
@@ -162,8 +163,8 @@ func TestPasswordLoginFlow_UnknownEmail(t *testing.T) {
 		Zflow: zflow,
 	})
 	require.NoError(t, err)
-	idOK, ok := idResp.(*api.SubmitFlowStepOK)
-	require.True(t, ok, "expected SubmitFlowStepOK on identifier, got %T: %+v", idResp, idResp)
+	require.IsType(t, &api.SubmitFlowStepOK{}, idResp, helpers.MustMarshal(t, idResp))
+	idOK := idResp.(*api.SubmitFlowStepOK)
 	require.Equal(t, "not_found", idOK.Response.Step.Name, "user_not_found must route to not_found terminal")
 	require.True(t, idOK.Response.Step.Complete.Set, "expected terminal step")
 
@@ -191,15 +192,15 @@ func TestPasswordRegisterFlow(t *testing.T) {
 		FlowDefinition: passwordRegisterFlowDefinition(schemaURL),
 	})
 	require.NoError(t, err)
-	require.IsType(t, &api.FlowDefinitionDetailResponse{}, defResp, "create flow definition: %+v", defResp)
+	require.IsType(t, &api.FlowDefinitionResponse{}, defResp, "create flow definition: %s", helpers.MustMarshal(t, defResp))
 
 	createResp, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{
 		ProjectID: api.ProjectID(project.ID),
 		Purpose:   api.CreateFlowRequestPurposeRegister,
 	})
 	require.NoError(t, err)
-	flowHeaders, ok := createResp.(*api.FlowResponseHeaders)
-	require.True(t, ok, "expected FlowResponseHeaders, got %T", createResp)
+	require.IsType(t, &api.FlowResponseHeaders{}, createResp, helpers.MustMarshal(t, createResp))
+	flowHeaders := createResp.(*api.FlowResponseHeaders)
 	flowID := flowHeaders.Response.ID
 	require.Equal(t, "signup", flowHeaders.Response.Step.Name)
 	zflow := mustExtractZflow(t, flowHeaders.SetCookie.Value)
@@ -220,8 +221,8 @@ func TestPasswordRegisterFlow(t *testing.T) {
 		Zflow: zflow,
 	})
 	require.NoError(t, err)
-	submitOK, ok := submitResp.(*api.SubmitFlowStepOK)
-	require.True(t, ok, "expected SubmitFlowStepOK, got %T: %+v", submitResp, submitResp)
+	require.IsType(t, &api.SubmitFlowStepOK{}, submitResp, helpers.MustMarshal(t, submitResp))
+	submitOK := submitResp.(*api.SubmitFlowStepOK)
 	require.Equal(t, "done", submitOK.Response.Step.Name)
 	require.True(t, submitOK.Response.Step.Complete.Set, "expected terminal step")
 
@@ -250,8 +251,9 @@ func TestPasswordRegisterFlow_DuplicateEmail(t *testing.T) {
 
 	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
 
-	team, err := harness.EnsureTeamService(t).CreateTeam(t.Context(), service.CreateTeamInput{
+	team, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
 		ProjectID: project.ID,
+		Name:      helpers.TeamName(),
 	})
 	require.NoError(t, err)
 
@@ -264,7 +266,7 @@ func TestPasswordRegisterFlow_DuplicateEmail(t *testing.T) {
 		SchemaURL:               schemaURL,
 		ID:                      "pwregister-conflict-seed",
 		InitialMembershipTeamID: &team.ID,
-		Attributes:              []*domain.CreateAttribute{emailAttr},
+		Attributes:              domain.CreateAttributes{*emailAttr},
 	}))
 
 	server := harness.EnsureTestServer(t)
@@ -277,15 +279,15 @@ func TestPasswordRegisterFlow_DuplicateEmail(t *testing.T) {
 		FlowDefinition: passwordRegisterFlowDefinition(schemaURL),
 	})
 	require.NoError(t, err)
-	require.IsType(t, &api.FlowDefinitionDetailResponse{}, defResp)
+	require.IsType(t, &api.FlowDefinitionResponse{}, defResp)
 
 	createResp, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{
 		ProjectID: api.ProjectID(project.ID),
 		Purpose:   api.CreateFlowRequestPurposeRegister,
 	})
 	require.NoError(t, err)
-	flowHeaders, ok := createResp.(*api.FlowResponseHeaders)
-	require.True(t, ok)
+	require.IsType(t, &api.FlowResponseHeaders{}, createResp, helpers.MustMarshal(t, createResp))
+	flowHeaders := createResp.(*api.FlowResponseHeaders)
 	flowID := flowHeaders.Response.ID
 	zflow := mustExtractZflow(t, flowHeaders.SetCookie.Value)
 
@@ -302,8 +304,8 @@ func TestPasswordRegisterFlow_DuplicateEmail(t *testing.T) {
 	require.NoError(t, err)
 	// Without a user_already_exists transition the engine surfaces the error
 	// on the same step and the HTTP layer maps it to 400.
-	badResp, ok := submitResp.(*api.SubmitFlowStepBadRequest)
-	require.True(t, ok, "expected SubmitFlowStepBadRequest, got %T: %+v", submitResp, submitResp)
+	require.IsType(t, &api.SubmitFlowStepBadRequest{}, submitResp, helpers.MustMarshal(t, submitResp))
+	badResp := submitResp.(*api.SubmitFlowStepBadRequest)
 	require.Equal(t, "signup", badResp.Response.Step.Name, "duplicate email must keep flow on signup step")
 	errVal, errSet := badResp.Response.Step.Error.Get()
 	require.True(t, errSet, "expected an error on the step")

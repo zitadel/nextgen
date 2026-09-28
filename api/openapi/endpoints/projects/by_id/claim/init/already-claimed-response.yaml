@@ -1,0 +1,21 @@
+description: |
+  The project is already claimed by a team. The `details` carry the owning
+  team and the dashboard where it can be managed.
+allOf:
+  - $ref: ../../../../../components/schemas/errors/proj-already_claimed.yaml
+  - type: object
+    required:
+      - details
+    properties:
+      details:
+        type: object
+        required:
+          - team_id
+          - dashboard_url
+        properties:
+          team_id:
+            $ref: ../../../../../components/schemas/team-id.yaml
+          dashboard_url:
+            type: string
+            format: uri
+            description: The dashboard URL for the team that owns the project.

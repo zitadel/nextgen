@@ -11,7 +11,7 @@ export const baseHostStyles = css`
   :host {
     box-sizing: border-box;
     font-family: ${t.font.family.sans};
-    color: ${t.color.text.primaryWhite};
+    color: ${t.theme.foreground};
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
   }

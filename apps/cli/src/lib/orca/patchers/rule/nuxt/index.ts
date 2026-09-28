@@ -5,6 +5,7 @@ import { configCandidates } from "../config-paths";
 import type { FileOp } from "../file-writer/types";
 import type { PatchContext, PatchView } from "../../types";
 import { AbstractRulePatcher } from "../base";
+import { devScriptPortOp } from "../dev-script-port";
 import { nuxtConfigEdit } from "./nuxt-config";
 import {
   appVueTemplate,
@@ -37,11 +38,18 @@ export class NuxtPatcher extends AbstractRulePatcher {
     return [
       // app.vue/pages/plugins live under the Nuxt srcDir (`app/` on Nuxt 4, the
       // root on Nuxt 3); nuxt.config, env, and the dep stay at the project root.
-      { kind: "write", path: src("app.vue"), contents: appVueTemplate() },
-      { kind: "write", path: src("pages/index.vue"), contents: indexPageTemplate() },
-      { kind: "write", path: src("pages/login.vue"), contents: loginPageTemplate() },
-      { kind: "write", path: src("pages/register.vue"), contents: registerPageTemplate() },
-      { kind: "write", path: src("pages/profile.vue"), contents: profilePageTemplate() },
+      // The app shell and homepage redirect are written only when setup created
+      // the skeleton itself — a pre-existing app keeps its own shell, theme,
+      // and landing page (ADR 044), same as the Next homepage.
+      ...(ctx.scaffoldedFramework
+        ? ([
+            { kind: "write", path: src("app.vue"), contents: appVueTemplate() },
+            { kind: "write", path: src("pages/index.vue"), contents: indexPageTemplate() },
+          ] satisfies FileOp[])
+        : []),
+      { kind: "write", path: src("pages/login.vue"), contents: loginPageTemplate(ctx) },
+      { kind: "write", path: src("pages/register.vue"), contents: registerPageTemplate(ctx) },
+      { kind: "write", path: src("pages/profile.vue"), contents: profilePageTemplate(ctx) },
       {
         kind: "write",
         path: src("plugins/zitadel-components.client.ts"),
@@ -52,6 +60,8 @@ export class NuxtPatcher extends AbstractRulePatcher {
         kind: "edit",
         path: [...NUXT_CONFIG_PATHS],
         edit: nuxtConfigEdit({ projectId: ctx.project.id, server: ctx.server }),
+        // Runtime config + proxy wiring: auth breaks without it.
+        wiring: "infrastructure",
       },
       { kind: "merge-env", path: ".env.example", entries: { NUXT_PUBLIC_ZITADEL_PROJECT_ID: "" } },
       {
@@ -64,6 +74,9 @@ export class NuxtPatcher extends AbstractRulePatcher {
         name: SDK_DEPENDENCY,
         version: npmDistTagForCliVersion(ctx.cliVersion),
       },
+      // `nuxt dev` takes its port from the command line only, so without this
+      // the app can serve a port the project does not allow as an origin.
+      devScriptPortOp(ctx.issuer),
     ];
   }
 
@@ -80,12 +93,29 @@ export class NuxtPatcher extends AbstractRulePatcher {
     ];
   }
 
+  protected override infrastructureFiles(view: PatchView): ReadonlyArray<string> {
+    const src = (rel: string) => join(view.framework.appDir, rel);
+    // The plugins are the auth plumbing: component registration on the
+    // client and the server-side auth/session hook. The pages and app shell
+    // are the user's customization surface.
+    return [src("plugins/zitadel-components.client.ts"), src("plugins/auth.server.ts")];
+  }
+
+  protected override conditionallyScaffoldedFiles(view: PatchView): ReadonlyArray<string> {
+    // Written only when setup created the app skeleton itself; on a
+    // pre-existing app the shell and homepage stay user-owned (see routeOps).
+    const src = (rel: string) => join(view.framework.appDir, rel);
+    return [src("app.vue"), src("pages/index.vue")];
+  }
+
   protected routeDeps(_view: PatchView): ReadonlyArray<string> {
     return [SDK_DEPENDENCY];
   }
 
   protected override routeConfigEdits(_view: PatchView): ReadonlyArray<string> {
-    return ["nuxt.config.*"];
+    // package.json: the `dev` script gets the project's dev-server port
+    // pinned into it, another in-place edit eject can't auto-revert.
+    return ["nuxt.config.*", "package.json"];
   }
 
   protected summary(_ctx: PatchContext): { title: string; detail: string } {

@@ -1,0 +1,38 @@
+type: object
+required: [name, kind]
+additionalProperties: false
+description: |
+  An action the engine offers on a runtime step. Every declared action of the
+  definition's step appears here, plus the engine-injected `back` whenever
+  returning to the previous step is possible.
+properties:
+  name:
+    type: string
+    minLength: 1
+    description: Action identifier. Sent back in the submit request as `action`.
+    example: submit
+  kind:
+    type: string
+    enum: [submit, passkey, passkey_register, navigate, back]
+    example: submit
+    description: |
+      How the client should treat the action:
+      - `submit`: collect the step's fields and submit.
+      - `passkey`: run a WebAuthn assertion, then submit the result.
+      - `passkey_register`: run a WebAuthn registration, then submit the result.
+      - `navigate`: submit without collecting fields; pure routing.
+      - `back`: return the user to the previous step. Engine-injected, never
+        declared in a flow definition.
+  primary:
+    type: boolean
+    default: false
+    example: true
+    description: |
+      Marks this as the default/primary action. The runtime template uses
+      this hint to choose visual emphasis.
+  text_key:
+    type: string
+    description: |
+      Localization key for the action's label, resolved client-side from a
+      locale dictionary.
+    example: actions.signin.submit

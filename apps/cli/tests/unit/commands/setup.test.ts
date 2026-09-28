@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -10,6 +10,7 @@ import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
+import { localServerHostsPlatform } from "../../../src/commands/setup";
 import { parseJson, runCliForTest } from "../../helpers/run-cli";
 
 const tempDirs: string[] = [];
@@ -185,6 +186,102 @@ describe("setup command", () => {
     expect(json.data.next_commands[2]).toMatch(/^npx @zitadel\/cli@\S+ plan$/);
   });
 
+  // Every project starts unattached, so setup is where the developer first
+  // learns the project is temporary and that `zitadel claim` exists.
+  //
+  // Asserted through `--dry-run`, which previews the real output verbatim:
+  // the install, start, and verify actions all name a project dry run never
+  // created, so the claim nudge appearing alongside them is the consistent
+  // behaviour, not a leak. Suppressing only this one would make dry run a
+  // dishonest preview of the surface under test.
+  it("tells a new cloud project it is temporary until claimed", async () => {
+    const cwd = await makeNextProject();
+
+    const res = await setup(cwd, ["--dry-run", "--framework", "next"]);
+
+    const json = parseJson(res.stdout) as {
+      data: { next_actions: string[]; next_commands: string[] };
+    };
+    expect(json.data.next_actions.join("\n")).toContain("temporary and its data may be lost");
+    expect(json.data.next_commands.at(-1)).toMatch(/^npx @zitadel\/cli@\S+ claim$/);
+  });
+
+  // A bootstrapped local server hosts its own platform project and claim
+  // page. A real run probes the server's runtime document before nudging
+  // (localServerHostsPlatform, covered below); dry run contacts no platform,
+  // so its preview shows the nudge optimistically.
+  it("nudges claim when setting up against the local server (dry run previews it)", async () => {
+    const cwd = await makeNextProject();
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--json",
+      "--server",
+      "http://localhost:8080",
+      "--dry-run",
+      "--framework",
+      "next",
+    ]);
+
+    const json = parseJson(res.stdout) as {
+      data: { next_actions: string[]; next_commands: string[] };
+    };
+    expect(json.data.next_actions.join("\n")).toContain("temporary and its data may be lost");
+    expect(json.data.next_commands.at(-1)).toMatch(/^npx @zitadel\/cli@\S+ claim$/);
+  });
+
+  // The probe behind the real-run local nudge: only a runtime document
+  // naming the well-known platform project counts, and every failure mode
+  // (wrong project, missing document, dead server) fails closed so setup
+  // never nudges into a claim that would 401 at complete.
+  it("detects the platform plane from the local runtime document, failing closed", async () => {
+    server.use(
+      http.get("http://localhost:9931/console/runtime.json", () =>
+        HttpResponse.json({
+          mode: "standalone",
+          console_project_id: "proj_platform",
+          publishable_key: "pk_platform",
+        }),
+      ),
+      http.get("http://localhost:9932/console/runtime.json", () =>
+        HttpResponse.json({ mode: "standalone", console_project_id: "proj_someone" }),
+      ),
+      http.get("http://localhost:9933/console/runtime.json", () =>
+        HttpResponse.json({ error: "nope" }, { status: 404 }),
+      ),
+      http.get("http://localhost:9934/console/runtime.json", () => HttpResponse.error()),
+    );
+
+    await expect(localServerHostsPlatform("http://localhost:9931")).resolves.toBe(true);
+    await expect(localServerHostsPlatform("http://localhost:9932")).resolves.toBe(false);
+    await expect(localServerHostsPlatform("http://localhost:9933")).resolves.toBe(false);
+    await expect(localServerHostsPlatform("http://localhost:9934")).resolves.toBe(false);
+  });
+
+  it("says nothing about teams when setting up against a self-hosted server", async () => {
+    const cwd = await makeNextProject();
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--json",
+      "--server",
+      "https://zitadel.example.com",
+      "--dry-run",
+      "--framework",
+      "next",
+    ]);
+
+    const json = parseJson(res.stdout) as {
+      data: { next_actions: string[]; next_commands: string[] };
+    };
+    expect(json.data.next_actions.join("\n")).not.toContain("Claim your Project");
+    expect(json.data.next_commands.join("\n")).not.toMatch(/claim/);
+  });
+
   it.each(FRAMEWORK_FIXTURES)(
     "dry-run setup supports $framework projects",
     async ({ create, expectedFile, framework }) => {
@@ -211,6 +308,33 @@ describe("setup command", () => {
     },
   );
 
+  // The INSTALLED section reports the dependency the patcher actually added;
+  // it used to hardcode @zitadel/sdk-next from the Next-only era, which lied
+  // for every other framework.
+  it("names the actually installed SDK package in the summary box", async () => {
+    const react = FRAMEWORK_FIXTURES.find((fixture) => fixture.framework === "react");
+    if (!react) throw new Error("react fixture missing");
+    const cwd = await react.create();
+
+    // No `--json`: the summary box is human-facing consola narration.
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--server",
+      "https://api.zitadel.cloud",
+      "--dry-run",
+      "--skip-install",
+      "--framework",
+      "react",
+    ]);
+
+    expect(res.exitCode).toBe(0);
+    const output = `${res.stdout}${res.stderr}`;
+    expect(output).toContain("@zitadel/sdk-react");
+    expect(output).not.toContain("@zitadel/sdk-next");
+  });
+
   it("creates CLI-managed projects with a name and without server default seeding", async () => {
     const cwd = await makeNextProject();
     let createProjectBody: unknown;
@@ -222,10 +346,10 @@ describe("setup command", () => {
           {
             id: "proj-test",
             name: "demo",
-            projectSecret: "sk_proj_test_full",
-            previewSecret: "sk_proj_test_preview",
-            previewOrigins: ["http://localhost:3000"],
-            createdAt: "2026-04-21T14:03:11.000Z",
+            project_secret: "sk_proj_test_full",
+            preview_secret: "sk_proj_test_preview",
+            preview_origins: ["http://localhost:3000"],
+            created_at: "2026-04-21T14:03:11.000Z",
           },
           { status: 201 },
         );
@@ -237,8 +361,8 @@ describe("setup command", () => {
     expect(res.exitCode).toBe(0);
     expect(createProjectBody).toMatchObject({
       name: expect.any(String),
-      previewOrigins: expect.arrayContaining(["http://localhost:3000"]),
-      seedDefaults: false,
+      preview_origins: expect.arrayContaining(["http://localhost:3000"]),
+      seed_defaults: false,
     });
     const projectName = (createProjectBody as { name?: unknown }).name;
     expect(typeof projectName).toBe("string");
@@ -246,6 +370,57 @@ describe("setup command", () => {
       throw new Error("expected create-project payload name to be a string");
     }
     expect(projectName.trim().length).toBeGreaterThan(0);
+  });
+
+  // A runtime document naming the platform project does not guarantee a claim
+  // can complete, so attaching the project to the local admin must not fail a
+  // setup that has already written the app files.
+  it("keeps the project unclaimed when attaching it to the local admin fails", async () => {
+    const cwd = await makeNextProject();
+    await mkdir(join(cwd, ".zitadel/local"), { recursive: true });
+    await writeFile(
+      join(cwd, ".zitadel/local/admin.json"),
+      JSON.stringify({
+        email: "admin@zitadel.localhost",
+        password: "local-admin-password",
+        user_id: "user_localadmin",
+        team_id: "team_localadmin",
+      }),
+    );
+    server.use(
+      http.get("http://localhost:9941/console/runtime.json", () =>
+        HttpResponse.json({
+          mode: "standalone",
+          console_project_id: "proj_platform",
+          publishable_key: "pk_platform",
+        }),
+      ),
+      http.post("http://localhost:9941/projects/:projectId/claim/init", () =>
+        HttpResponse.json({ code: "internal", message: "claim unavailable" }, { status: 500 }),
+      ),
+    );
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--json",
+      "--server",
+      "http://localhost:9941",
+      "--non-interactive",
+      "--skip-install",
+      "--framework",
+      "next",
+    ]);
+
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as { status: string; data: { next_commands: string[] } };
+    expect(json.status).toBe("ok");
+    const secret = JSON.parse(await readFile(join(cwd, ".zitadel/secret"), "utf8")) as {
+      team_id?: string;
+    };
+    expect(secret.team_id).toBeUndefined();
+    expect(json.data.next_commands.at(-1)).toMatch(/^npx @zitadel\/cli@\S+ claim$/);
   });
 
   it("errors in a non-interactive empty directory without --framework", async () => {

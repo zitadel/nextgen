@@ -7,10 +7,11 @@ import { consola } from "consola";
 import { ZitadelError } from "../errors";
 import { FLOWS_DIR } from "../flows";
 import { stableStringify } from "../json";
+import { annotateAssetWarnings } from "./asset-probe.js";
 import { validatePlannedFlows } from "./flow-validation.js";
 import type { PlanResourceChange } from "./plan-renderer.js";
 import { readState, removeFromState, updateState } from "./state.js";
-import type { ResourceEntry, ResourceSyncer, SyncAction } from "./types.js";
+import type { FlowRepin, ResourceEntry, ResourceSyncer, SyncAction } from "./types.js";
 
 /**
  * Compute the sync plan for `cwd` against the state file and (when
@@ -156,11 +157,21 @@ export async function buildSyncPlan(
       // or merely reordered file a skip; a spurious mismatch here would
       // publish a garbage schema revision. Writes always store the new
       // format, so state converges on the next real change.
+      //
+      // Only the two pre-normalization formats are accepted, not earlier
+      // generations of a normalizer. Widening a normalizer changes this
+      // hash for the bodies it newly touches, which costs one no-op
+      // revision on the next apply; keeping a copy of every past
+      // normalizer to avoid that would outlast the state files it serves.
       const unchanged =
         entry.hash === hash ||
         entry.hash === hashResourceContent(content) ||
         entry.hash === hashResourceContent(JSON.parse(stableStringify(content)) as object);
-      if (unchanged && !(repin && syncer.mutable)) {
+      // A re-pin is an upload of an otherwise unchanged file, so it needs a
+      // syncer that can upload: an update for a mutable one, a new revision
+      // for a revisioned one (flows).
+      const canRepin = syncer.mutable || syncer.revisioned;
+      if (unchanged && !(repin && canRepin)) {
         actions.push({ kind: "skip", path: relPath, reason: "no-change" });
         continue;
       }
@@ -177,6 +188,7 @@ export async function buildSyncPlan(
           previousId: entry.id,
           oldContent,
           affectedPaths: findFlowsPinnedTo(entry.id, localFlows),
+          ...(repin ? { repin } : {}),
         });
         continue;
       }
@@ -204,6 +216,11 @@ export async function buildSyncPlan(
   // server would otherwise enforce mid-apply, after the schema revision
   // already published. Throws E_VALIDATION before any mutation.
   validatePlannedFlows({ actions, scannedContents, stateResources: state.resources });
+
+  // Reachability pre-flight for branding asset URLs. Annotates warnings only:
+  // the machine planning is not necessarily the machine rendering the login
+  // page, so a URL this host cannot fetch is never a reason to fail.
+  await annotateAssetWarnings(actions);
 
   return actions;
 }
@@ -246,7 +263,7 @@ export async function runSyncLoop(
 ): Promise<SyncLoopResult> {
   const actions = await buildSyncPlan(cwd, syncers);
   for (const action of actions) {
-    if (action.kind === "create" || action.kind === "update") {
+    if (action.kind === "create" || action.kind === "update" || action.kind === "revise") {
       for (const warning of action.warnings ?? []) {
         consola.warn(`${action.path}: ${warning.message}`);
       }
@@ -254,9 +271,31 @@ export async function runSyncLoop(
   }
   const filesUpdated: string[] = [];
   const applied: PlanResourceChange[] = [];
-  // Revisions published by this run: superseded id → new id. Update actions
+  // Revisions published by this run: superseded id → new id. Flow actions
   // carrying a `repin` patch their `user_schema` from here.
   const repinned = new Map<string, string>();
+
+  // The revision id a flow's `user_schema` must adopt: the one this run's
+  // revise minted, else the one an interrupted earlier run recorded in state.
+  const repinTarget = (repin: FlowRepin | undefined): string | undefined =>
+    repin ? (repinned.get(repin.previousId) ?? repin.newId) : undefined;
+
+  // Patch the pin in memory so the wire request adopts the new revision
+  // without re-reading disk, and rewrite the file. The rewrite is a no-op
+  // when this run's schema revise already re-pinned it — it matters for
+  // crash recovery, where no revise ran this time.
+  const adoptRepin = async (
+    path: string,
+    content: object,
+    repin: FlowRepin,
+    newId: string,
+  ): Promise<object> => {
+    if (await repinFlowFile(cwd, path, repin.previousId, newId)) {
+      filesUpdated.push(path);
+      consola.info(`Re-pinned user_schema in ${path} to ${newId}`);
+    }
+    return { ...(content as Record<string, unknown>), user_schema: newId };
+  };
 
   const writeBack = async (
     action: Extract<SyncAction, { kind: "create" | "revise" | "update" }>,
@@ -278,9 +317,7 @@ export async function runSyncLoop(
     switch (action.kind) {
       case "create": {
         let content = action.content;
-        const newId = action.repin
-          ? (repinned.get(action.repin.previousId) ?? action.repin.newId)
-          : undefined;
+        const newId = repinTarget(action.repin);
         if (newId) {
           // A flow created in the same run as (or after an interrupted)
           // schema revise must adopt the new revision — POSTing the stale
@@ -299,13 +336,19 @@ export async function runSyncLoop(
         break;
       }
       case "revise": {
-        const { id, canonical } = await action.syncer.create(action.content);
+        const newId = repinTarget(action.repin);
+        const content =
+          newId && action.repin
+            ? await adoptRepin(action.path, action.content, action.repin, newId)
+            : action.content;
+        const { id, canonical } = await action.syncer.create(content);
+        const fallbackHash = newId ? hashForState(action.syncer, content) : action.hash;
         // `previousId` lands in state before the flow files are rewritten:
         // if the process dies in between, the next plan recovers the re-pin
         // from state instead of publishing a duplicate revision.
         const entry: ResourceEntry = {
           id,
-          hash: await writeBack(action, canonical, action.hash),
+          hash: await writeBack(action, canonical, fallbackHash),
           previousId: action.previousId,
         };
         await updateState(cwd, action.path, entry);
@@ -329,22 +372,11 @@ export async function runSyncLoop(
         break;
       }
       case "update": {
-        let content = action.content;
-        const newId = action.repin
-          ? (repinned.get(action.repin.previousId) ?? action.repin.newId)
-          : undefined;
-        if (newId && action.repin) {
-          // The plan captured the flow before the revise rewrote its file;
-          // patch the pin in memory so the wire request adopts the new
-          // revision without re-reading disk. The file rewrite below is a
-          // no-op when this run's revise already re-pinned it — it matters
-          // for crash recovery, where no revise ran this time.
-          content = { ...(content as Record<string, unknown>), user_schema: newId };
-          if (await repinFlowFile(cwd, action.path, action.repin.previousId, newId)) {
-            filesUpdated.push(action.path);
-            consola.info(`Re-pinned user_schema in ${action.path} to ${newId}`);
-          }
-        }
+        const newId = repinTarget(action.repin);
+        const content =
+          newId && action.repin
+            ? await adoptRepin(action.path, action.content, action.repin, newId)
+            : action.content;
         const { canonical } = await action.syncer.update(action.id, content);
         const fallbackHash = newId ? hashForState(action.syncer, content) : action.hash;
         await updateState(cwd, action.path, {

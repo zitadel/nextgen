@@ -386,7 +386,55 @@ describe("renderPlan — string escaping", () => {
     expect(renderPlan(actions, false)).toContain('"say \\"hello\\""');
   });
 
-  it("escapes newlines inside string values", () => {
+  it("escapes tabs and carriage returns inside single-line string values", () => {
+    const actions: SyncAction[] = [
+      {
+        kind: "create",
+        path: ".zitadel/schemas/user.json",
+        syncer: schema,
+        content: { text: "col1\tcol2\r" },
+        hash: "a",
+      },
+    ];
+    expect(renderPlan(actions, false)).toContain('"col1\\tcol2\\r"');
+  });
+
+  // `plan` and `apply` read the server verbatim, so the renderer is what
+  // keeps a stored ESC or OSC sequence from reaching the terminal.
+  it("escapes terminal control characters in a value and in a key", () => {
+    const actions: SyncAction[] = [
+      {
+        kind: "create",
+        path: ".zitadel/schemas/user.json",
+        syncer: schema,
+        content: { "k\u001b[2J": "v\u001b]0;pwned\u0007\u202e" },
+        hash: "a",
+      },
+    ];
+    const out = renderPlan(actions, false);
+    expect(out).toContain('+ k\\x1b[2J = "v\\x1b]0;pwned\\x07\\u202e"');
+    expect(out).not.toContain("\u001b");
+  });
+
+  it("gives two keys distinct labels when one spells out the other's escape", () => {
+    const actions: SyncAction[] = [
+      {
+        kind: "create",
+        path: ".zitadel/schemas/user.json",
+        syncer: schema,
+        content: { "k\u001b": "raw", "k\\x1b": "literal" },
+        hash: "a",
+      },
+    ];
+    const out = renderPlan(actions, false);
+    expect(out).toContain('+ k\\x1b  = "raw"');
+    expect(out).toContain('+ k\\\\x1b = "literal"');
+  });
+
+  // Multi-line strings are documents, not scalars — see the block-string
+  // suite below. Escaping one onto a single line is what made a branding
+  // plan unreadable.
+  it("summarises a multi-line string instead of escaping it", () => {
     const actions: SyncAction[] = [
       {
         kind: "create",
@@ -396,7 +444,9 @@ describe("renderPlan — string escaping", () => {
         hash: "a",
       },
     ];
-    expect(renderPlan(actions, false)).toContain('"line1\\nline2"');
+    const out = renderPlan(actions, false);
+    expect(out).not.toContain('"line1\\nline2"');
+    expect(out).toMatch(/\+ text = \(2 lines, sha256:[0-9a-f]{8}\)/);
   });
 });
 
@@ -444,7 +494,7 @@ describe("renderPlan — normalized diffs", () => {
         previousId: "sch_A",
         oldContent: {
           properties: {
-            email: { type: "string", "x-editable": true, "x-sensitive": false },
+            email: { type: "string", "x-audit": false },
           },
         },
         affectedPaths: [],
@@ -454,8 +504,7 @@ describe("renderPlan — normalized diffs", () => {
     const out = renderPlan(actions, false);
     // The only property-level change is the added `company`; the defaults
     // spelled out on the server side must not read as removals.
-    expect(out).not.toContain("x-editable");
-    expect(out).not.toContain("x-sensitive");
+    expect(out).not.toContain("x-audit");
     expect(out).toContain("company");
   });
 });
@@ -523,6 +572,26 @@ describe("renderPlan — re-pin messaging", () => {
     const out = renderPlan(actions, false);
     expect(out).toContain('~ user_schema = "sch_A" -> "sch_B"');
   });
+
+  it("renders a repin revision with the user_schema the executor will POST", () => {
+    const actions: SyncAction[] = [
+      {
+        kind: "revise",
+        path: ".zitadel/flows/default.json",
+        syncer: makeSyncer("flow", ".zitadel/flows", { revisioned: true }),
+        content: { name: "login", user_schema: "sch_A" },
+        hash: "h",
+        previousId: "flow-001",
+        oldContent: { name: "login", user_schema: "sch_A" },
+        affectedPaths: [],
+        repin: { previousId: "sch_A", schemaPath: ".zitadel/schemas/user.json" },
+      },
+    ];
+
+    const out = renderPlan(actions, false);
+    expect(out).toContain("will publish a new revision (re-pin user_schema)");
+    expect(out).toContain('~ user_schema = "sch_A" -> (known after apply)');
+  });
 });
 
 describe("renderPlan — validation warnings", () => {
@@ -566,10 +635,132 @@ describe("renderPlan — validation warnings", () => {
     expect(renderPlan(actions, false)).toContain(`# warning: ${warning.message}`);
   });
 
+  // Branding is revisioned, so a broken logo_url can only ever surface on a
+  // `revise` — the kind that used to have nowhere to put a warning.
+  it("renders warnings under a revise block and counts them in the summary", () => {
+    const assetWarning = {
+      rule: "warn/asset-unreachable",
+      message: "logo_url https://cdn.example.com/logo.svg returned HTTP 404",
+    };
+    const actions: SyncAction[] = [
+      {
+        kind: "revise",
+        path: ".zitadel/branding/branding.json",
+        syncer: makeSyncer("branding", ".zitadel/branding", { revisioned: true }),
+        content: { logo_url: "https://cdn.example.com/logo.svg" },
+        hash: "h",
+        previousId: "brd_1",
+        oldContent: { logo_url: "https://cdn.example.com/old.svg" },
+        affectedPaths: [],
+        warnings: [assetWarning],
+      },
+    ];
+
+    const out = renderPlan(actions, false);
+    expect(out).toContain(`# warning: ${assetWarning.message}`);
+    expect(out).toContain("Warnings: 1 (non-blocking");
+  });
+
   it("emits no warning summary when the plan is warning-free", () => {
     const actions: SyncAction[] = [
       { kind: "create", path: "a", syncer: flow, content: {}, hash: "h" },
     ];
     expect(renderPlan(actions, false)).not.toContain("Warnings:");
+  });
+});
+
+describe("renderPlan — block strings (liquid_template)", () => {
+  const branding = makeSyncer("branding", ".zitadel/branding", { revisioned: true });
+  const template = [
+    "<zl-page-shell>",
+    "  <aside class=\"zl-split__brand\">",
+    "    {% if branding.logo_url %}",
+    "      <img class=\"zl-split__logo\" src=\"{{ branding.logo_url }}\" alt=\"\" />",
+    "    {% endif %}",
+    "  </aside>",
+    "</zl-page-shell>",
+    "",
+  ].join("\n");
+
+  function revise(content: object, oldContent: object): SyncAction[] {
+    return [
+      {
+        kind: "revise",
+        path: ".zitadel/branding/branding.json",
+        syncer: branding,
+        content,
+        hash: "h",
+        previousId: "brd_1",
+        oldContent,
+        affectedPaths: [],
+      },
+    ];
+  }
+
+  it("summarises an unchanged template instead of dumping it on one line", () => {
+    const out = renderPlan(
+      revise({ layout: "split", liquid_template: template }, { layout: "centered", liquid_template: template }),
+      false,
+    );
+
+    expect(out).toMatch(/liquid_template = \(unchanged, 7 lines, sha256:[0-9a-f]{8}\)/);
+    expect(out).not.toContain("zl-split__brand");
+    // The field that really moved stays visible.
+    expect(out).toContain('~ layout          = "centered" -> "split"');
+  });
+
+  it("renders a changed template as a line diff, not two escaped blobs", () => {
+    const edited = template.replace('alt=""', 'alt="Acme"');
+
+    const out = renderPlan(
+      revise({ liquid_template: edited }, { liquid_template: template }),
+      false,
+    );
+
+    expect(out).toMatch(/~ liquid_template = \(2 lines changed of 7, sha256:[0-9a-f]{8} -> sha256:[0-9a-f]{8}\)/);
+    expect(out).toContain('- ' + '      <img class="zl-split__logo" src="{{ branding.logo_url }}" alt="" />');
+    expect(out).toContain('+ ' + '      <img class="zl-split__logo" src="{{ branding.logo_url }}" alt="Acme" />');
+    // Untouched lines never reach the output.
+    expect(out).not.toContain("<zl-page-shell>");
+  });
+
+  it("escapes terminal control characters in a changed line", () => {
+    const edited = template.replace('alt=""', 'alt="\u001b[2J"');
+
+    const out = renderPlan(
+      revise({ liquid_template: edited }, { liquid_template: template }),
+      false,
+    );
+
+    expect(out).toContain('alt="\\x1b[2J"');
+    expect(out).not.toContain("\u001b");
+  });
+
+  it("caps the changed-line body and says how much it dropped", () => {
+    const long = Array.from({ length: 40 }, (_, i) => `line ${i}`).join("\n");
+    const rewritten = Array.from({ length: 40 }, (_, i) => `LINE ${i}`).join("\n");
+
+    const out = renderPlan(revise({ liquid_template: rewritten }, { liquid_template: long }), false);
+
+    expect(out).toContain("(80 lines changed of 40");
+    expect(out).toContain("# (60 more changed lines not shown)");
+  });
+
+  it("summarises the template on a first-revision create", () => {
+    const out = renderPlan(
+      [
+        {
+          kind: "create",
+          path: ".zitadel/branding/branding.json",
+          syncer: branding,
+          content: { layout: "split", liquid_template: template },
+          hash: "h",
+        },
+      ],
+      false,
+    );
+
+    expect(out).toMatch(/\+ liquid_template = \(7 lines, sha256:[0-9a-f]{8}\)/);
+    expect(out).not.toContain("zl-split__brand");
   });
 });

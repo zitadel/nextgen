@@ -2,29 +2,22 @@ package api
 
 import (
 	"context"
+	"errors"
+	"slices"
 
+	"github.com/zitadel/nextgen/internal/authz/resolver"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
+	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-// The management API (the operator plane of ADR 036: schemas, flow
-// definitions, users, teams, project queries) is uniformly strict, following
-// the access model settled for branding in ADR 037: every operation requires
-// a bearer bound to the requested project, carrying a management-grade scope.
-//
-// Two properties fall out of the single binding check below:
-//
-//   - Anti-oracle responses. A foreign project — existing or not — answers
-//     exactly like a nonexistent one, because both fail the same
-//     "requested == token's project" comparison. Callers cannot probe which
-//     project ids exist.
-//   - The browser plane is excluded. The preview secret ships to visitors'
-//     browsers by design and carries project.read only; no management
-//     operation accepts it, so a leaked preview token cannot read or write
-//     management state — not even on its own project.
+// The management API is gated by resolver.Check after credential → ScopeContext.
+// Path-id ops resolve RSI then Check; create uses requireProjectAccess.
+// Lists use requireProjectListAccess: project-wide Allow stamps a one-shot
+// EXISTS skip, Forbidden attaches the predicate, NotFound 404s. Preview secrets
+// (project.read only) cannot call management APIs (ADR 037).
 
-// accessOp classifies a management operation for scope checking. Delete is
-// distinct from write because the contract declares *.delete scopes
-// separately (flow_definitions.delete); write does not imply delete.
+// accessOp classifies a management operation for relation mapping and miss shaping.
 type accessOp int
 
 const (
@@ -33,129 +26,465 @@ const (
 	opDelete
 )
 
-// resourceAccess is one resource's row in the management access model: which
-// finer scopes grant which operation, and the resource-flavored errors the
-// guard answers with. The error split follows requireBrandingAccess: reads
-// miss with the resource's not-found, writes with its nonexistent-project
-// answer, and scope failures are permission_denied (mapped to 403 by the
-// resource's errorResponse switch).
+// errResourceGone means path.id has no RSI row in the caller's project scope.
+// Idempotent deletes map this to 204 only for credential-plane operators
+// (project.write); others get readMiss. Deliberate tradeoff: operators with any
+// project secret can still distinguish fabricated ids (204) from real foreign
+// resources (404/403 after RSI hit). Full oracle close would require RSI miss
+// → readMiss unless the principal has a foothold, at the cost of repeated-delete 204s.
+var errResourceGone = errors.New("authz: resource gone")
+
+// projectRelation is the catalog relation checked for an accessOp. Roles are
+// monotonic in the seeded catalog: an admin assignment closes to editor and
+// viewer, an editor one to viewer, so a stronger grant passes a weaker check.
+func projectRelation(op accessOp) string {
+	switch op {
+	case opRead:
+		return "viewer"
+	case opWrite:
+		return "editor"
+	case opDelete:
+		return "admin"
+	default:
+		return "admin"
+	}
+}
+
+// resourceAccess is one resource's row in the management access model: the
+// resource-flavored errors the gate answers with, plus the RSI kind the route
+// expects for path-id ops.
 type resourceAccess struct {
-	// scopes lists, per operation, the finer per-resource scopes declared in
-	// the OpenAPI contract (which become mintable with ADR 036's credential
-	// planes; until then the legacy operator-grade project.write implies all
-	// of them and is accepted everywhere without being listed here).
-	scopes map[accessOp][]string
-	// readMiss and writeMiss are the anti-oracle answers for a project the
-	// token is not bound to; writeMiss doubles as the nonexistent-project
-	// answer since the guard cannot (and must not) tell the two apart.
+	// kind is the expected resource_scope_index.resource_kind for path-id ops.
+	// Empty means no kind check (project-scoped create/list only).
+	kind domain.ResourceKind
+	// readMiss / writeMiss are anti-oracle answers when Check finds no foothold;
+	// writeMiss also covers nonexistent projects on create/list.
 	readMiss  func() domain.Error
 	writeMiss func() domain.Error
 	denied    func() domain.Error
 }
 
+func (res resourceAccess) miss(op accessOp) error {
+	if op == opWrite {
+		return res.writeMiss()
+	}
+	return res.readMiss()
+}
+
 var schemaAccess = resourceAccess{
-	scopes: map[accessOp][]string{
-		opRead:  {"schema.read", "schema.write"},
-		opWrite: {"schema.write"},
-	},
+	kind:      domain.ResourceKindSchema,
 	readMiss:  domain.ErrJSONSchemaNotFound,
 	writeMiss: func() domain.Error { return domain.ErrJSONSchemaInvalid().WithDetails("project does not exist") },
 	denied:    domain.ErrJSONSchemaPermissionDenied,
 }
 
 var flowDefinitionAccess = resourceAccess{
-	scopes: map[accessOp][]string{
-		opRead:   {"flow_definitions.read", "flow_definitions.write"},
-		opWrite:  {"flow_definitions.write"},
-		opDelete: {"flow_definitions.delete"},
-	},
+	kind:      domain.ResourceKindFlowDefinition,
 	readMiss:  domain.ErrFlowDefinitionNotFound,
 	writeMiss: func() domain.Error { return domain.ErrFlowDefinitionInvalid("project does not exist", nil) },
 	denied:    domain.ErrFlowDefinitionPermissionDenied,
 }
 
 var userAccess = resourceAccess{
-	scopes: map[accessOp][]string{
-		opRead:  {"user.read", "user.write"},
-		opWrite: {"user.write"},
-	},
+	kind:      domain.ResourceKindUser,
 	readMiss:  domain.ErrUserNotFound,
 	writeMiss: func() domain.Error { return domain.ErrUserInvalid().WithDetails("project does not exist") },
 	denied:    domain.ErrUserPermissionDenied,
 }
 
 var teamAccess = resourceAccess{
-	scopes: map[accessOp][]string{
-		opRead:  {"team.read", "team.write"},
-		opWrite: {"team.write"},
-	},
+	kind:     domain.ResourceKindTeam,
 	readMiss: domain.ErrTeamNotFound,
-	// The team service already answers nonexistent projects with
-	// team.project_not_found; foreign projects must be indistinguishable.
+	// team.project_not_found matches the service's nonexistent-project answer.
 	writeMiss: domain.ErrTeamProjectNotFound,
 	denied:    domain.ErrTeamPermissionDenied,
 }
 
-// brandingAccess is the row this access model was generalized from (ADR 040,
-// "Access model"): managing templates and rendering them during login are
-// different planes, and the login path never calls the branding management
-// API — branding arrives inline on flow responses.
+// sessionAccess gates operator session get/list/revoke. Create/exchange stay
+// on the runtime plane. MVP: same project.write ceiling + project relation
+// Check as other management resources (replacing the old fail-closed session.*
+// scope gate until #420).
+var sessionAccess = resourceAccess{
+	kind:      domain.ResourceKindSession,
+	readMiss:  domain.ErrSessionNotFound,
+	writeMiss: domain.ErrSessionNotFound,
+	denied:    domain.ErrSessionPermissionDenied,
+}
+
 var brandingAccess = resourceAccess{
-	scopes: map[accessOp][]string{
-		opRead:  {"branding.read", "branding.write"},
-		opWrite: {"branding.write"},
-	},
+	kind:      domain.ResourceKindBranding,
 	readMiss:  domain.ErrBrandingNotFound,
 	writeMiss: func() domain.Error { return domain.ErrBrandingInvalid("project does not exist", nil) },
 	denied:    domain.ErrBrandingPermissionDenied,
 }
 
-// projectAccess deliberately lists no finer read scope: project.read is the
-// preview secret's scope — a browser-plane credential — so it cannot gate an
-// operator read. Until ADR 036 splits the schemes, project.write is the only
-// scope that reaches project management operations.
+// environmentAccess gates the project's runtime slots (ADR 035, #534).
+// Reads are project-scoped: the list carries a project_id and the get
+// addresses an environment by name, so no route resolves a path id through
+// RSI and the kind is only used to narrow a partial-access list.
+var environmentAccess = resourceAccess{
+	kind:      domain.ResourceKindEnvironment,
+	readMiss:  domain.ErrEnvironmentNotFound,
+	writeMiss: domain.ErrEnvironmentProjectNotFound,
+	denied:    domain.ErrEnvironmentPermissionDenied,
+}
+
+// variableAccess gates the project's variables and secrets (ADR 062). Like
+// grants and events, a variable has no minted id and no resource_scope_index
+// row — it is addressed by name under the project_id the request carries — so
+// every op is project-scoped and there is no kind to check.
+var variableAccess = resourceAccess{
+	readMiss:  domain.ErrVariableNotFound,
+	writeMiss: domain.ErrVariableNotFound,
+	denied:    domain.ErrVariablePermissionDenied,
+}
+
+// releaseAccess gates the project's release snapshots (ADR 035, #531).
+// Create and get are project-scoped: both carry a project_id and the get
+// filters its lookup by it, so no route resolves a path id through RSI and the
+// kind is only used to narrow a partial-access list.
+var releaseAccess = resourceAccess{
+	kind:      domain.ResourceKindRelease,
+	readMiss:  domain.ErrReleaseNotFound,
+	writeMiss: domain.ErrReleaseProjectNotFound,
+	denied:    domain.ErrReleasePermissionDenied,
+}
+
+// eventsAccess gates the operator audit stream (ADR 049). List/get are
+// project-scoped (no RSI kind); credential ceiling is project.write like other
+// management resources until #420 mints a fine-grained events relation.
+var eventsAccess = resourceAccess{
+	readMiss:  domain.ErrEventNotFound,
+	writeMiss: domain.ErrEventNotFound,
+	denied:    domain.ErrEventPermissionDenied,
+}
+
+// grantAccess gates create/get/query/revoke. Grants are not in resource_scope_index;
+// every op takes project_id from the query (same as events).
+var grantAccess = resourceAccess{
+	readMiss:  domain.ErrGrantNotFound,
+	writeMiss: domain.ErrGrantNotFound,
+	denied:    domain.ErrGrantPermissionDenied,
+}
+
 var projectAccess = resourceAccess{
-	scopes:    map[accessOp][]string{},
+	kind:      domain.ResourceKindProject,
 	readMiss:  domain.ErrProjectNotFound,
 	writeMiss: domain.ErrProjectNotFound,
 	denied:    domain.ErrProjectPermissionDenied,
 }
 
-// requireProjectAccess gates a management operation: the bearer must be bound
-// to the requested project and carry a management-grade scope for op. See the
-// package comment above for the two properties this construction guarantees.
-func requireProjectAccess(ctx context.Context, projectID string, res resourceAccess, op accessOp) error {
-	scope, ok := GetScopeContext(ctx)
-	if !ok || scope.ProjectID == "" || scope.ProjectID != projectID {
-		// opWrite ops (create, update, set-password — every mutation except
-		// delete) answer with the resource's invalid-project shape; reads and
-		// deletes answer "nothing there", matching what a read or delete of
-		// an unknown id inside your own project returns.
-		if op == opWrite {
-			return res.writeMiss()
-		}
-		return res.readMiss()
-	}
-	if !scopeAllowed(scope.Scope, res.scopes[op]) {
-		return res.denied()
-	}
-	return nil
+// resourceAccessStmts is the statement surface requireResourceAccess needs.
+type resourceAccessStmts interface {
+	service.AuthzResolverStatements
+	service.ResourceScopeStatements
 }
 
-// scopeAllowed reports whether any granted scope reaches the operation:
-// project.write is the operator-grade legacy scope every project secret
-// carries and implies every finer per-resource scope; accepted lists the
-// contract-declared finer scopes for this specific operation.
-func scopeAllowed(granted, accepted []string) bool {
+// requireResourceAccess resolves path.id via resource_scope_index (project-scoped
+// when the credential carries project_id), then runs the project-scoped Check.
+// RSI miss on read/write → resource 404; on delete → errResourceGone for
+// operators (handlers map to 204), else readMiss. Returns project_id for DAL calls.
+func (h *Handler) requireResourceAccess(ctx context.Context, resourceID string, res resourceAccess, op accessOp) (projectID string, err error) {
+	if h == nil || h.pool == nil {
+		return "", domain.ErrInternal(errors.New("authz statements not configured"))
+	}
+	return requireResourceAccess(ctx, h.pool.Statements(), resourceID, res, op)
+}
+
+func lookupResourceScope(ctx context.Context, stmts resourceAccessStmts, resourceID string, res resourceAccess) (*domain.ResourceScope, error) {
+	if res.kind != "" {
+		if cred, ok := GetScopeContext(ctx); ok && cred.ProjectID != "" {
+			scope, err := stmts.GetResourceScopeInProject(ctx, res.kind, cred.ProjectID, resourceID)
+			if err == nil {
+				return scope, nil
+			}
+			if !errors.Is(err, new(database.NoRowFoundError)) {
+				return nil, err
+			}
+			// Same-project row under a different kind (e.g. schema id on a user route).
+			if same, gerr := stmts.GetResourceScopeByIDInProject(ctx, cred.ProjectID, resourceID); gerr == nil {
+				return same, nil
+			} else if !errors.Is(gerr, new(database.NoRowFoundError)) {
+				return nil, gerr
+			}
+			return nil, new(database.NoRowFoundError)
+		}
+	}
+	return stmts.GetResourceScope(ctx, resourceID)
+}
+
+func requireResourceAccess(ctx context.Context, stmts resourceAccessStmts, resourceID string, res resourceAccess, op accessOp) (string, error) {
+	scope, err := lookupResourceScope(ctx, stmts, resourceID, res)
+	if err != nil {
+		if errors.Is(err, new(database.NoRowFoundError)) {
+			if op == opDelete {
+				cred, ok := GetScopeContext(ctx)
+				if ok && hasOperatorProjectWrite(cred.Scope) {
+					// Idempotent 204 only when the id is gone everywhere. Foreign
+					// presence (any other project) must not 204 — readMiss matches
+					// Check NotFound for a foreign sk_proj.
+					elsewhere, xerr := stmts.ExistsResourceScopeElsewhere(ctx, res.kind, resourceID, cred.ProjectID)
+					if xerr != nil {
+						return "", domain.ErrInternal(xerr).WithMessage("resource scope lookup failed")
+					}
+					if elsewhere {
+						return "", res.readMiss()
+					}
+					return "", errResourceGone
+				}
+				return "", res.readMiss()
+			}
+			// Flat-by-id: unknown path id is always the resource 404 shape.
+			return "", res.readMiss()
+		}
+		return "", domain.ErrInternal(err).WithMessage("resource scope lookup failed")
+	}
+	if res.kind != "" && scope.ResourceKind != res.kind {
+		// Wrong kind for this route: same anti-oracle shape as unknown id.
+		return "", res.readMiss()
+	}
+	if err := requireProjectAccessAfterRSI(ctx, stmts, scope, res, op); err != nil {
+		return "", err
+	}
+	return scope.ProjectID, nil
+}
+
+// requireProjectAccess gates a management operation via resolver.Check when
+// project_id is already known (create, project by-id, or after RSI).
+// Management lists use requireProjectListAccess, not this gate.
+// DecisionNotFound → resource not-found / invalid-project shapes (404).
+// DecisionForbidden → permission_denied (403).
+func (h *Handler) requireProjectAccess(ctx context.Context, projectID string, res resourceAccess, op accessOp) error {
+	if h == nil || h.pool == nil {
+		return domain.ErrInternal(errors.New("authz statements not configured"))
+	}
+	return requireProjectAccess(ctx, h.pool.Statements(), projectID, res, op)
+}
+
+func requireProjectAccess(ctx context.Context, stmts service.AuthzResolverStatements, projectID string, res resourceAccess, op accessOp) error {
+	return requireProjectAccessMapped(ctx, stmts, projectID, res, op, nil)
+}
+
+// requireProjectAccessAfterRSI is requireProjectAccess for by-id ops after an
+// RSI hit: DecisionNotFound always uses readMiss (not writeMiss) so PATCH routes
+// do not leak existence via mismatched codes. Team-/resource-scoped grants may
+// Allow when RSI.team_id / path id match the grant (authz.md scoped Allow).
+func requireProjectAccessAfterRSI(ctx context.Context, stmts service.AuthzResolverStatements, rsi *domain.ResourceScope, res resourceAccess, op accessOp) error {
+	return requireProjectAccessMapped(ctx, stmts, rsi.ProjectID, res, op, rsi)
+}
+
+func requireProjectAccessMapped(ctx context.Context, stmts service.AuthzResolverStatements, projectID string, res resourceAccess, op accessOp, rsi *domain.ResourceScope) error {
+	dec, err := checkProjectAccess(ctx, resolver.New(), stmts, projectID, op, rsi)
+	if err != nil {
+		return mapCeilingError(err, res, op, rsi)
+	}
+	if rsi != nil {
+		return mapAuthzDecisionAfterRSI(dec, res)
+	}
+	return mapAuthzDecision(dec, res, op)
+}
+
+var (
+	errAuthzNoScope       = errors.New("authz: missing credential scope")
+	errAuthzPreviewDenied = errors.New("authz: preview credential denied")
+)
+
+func mapCeilingError(err error, res resourceAccess, op accessOp, rsi *domain.ResourceScope) error {
+	switch {
+	case errors.Is(err, errAuthzNoScope):
+		if rsi != nil {
+			return res.readMiss()
+		}
+		return res.miss(op)
+	case errors.Is(err, errAuthzPreviewDenied):
+		return res.denied()
+	default:
+		return err
+	}
+}
+
+func projectCheckRequest(scope ScopeContext, projectID string, op accessOp, rsi *domain.ResourceScope) resolver.Request {
+	req := resolver.Request{
+		PrincipalType: scope.PrincipalType,
+		PrincipalID:   scope.PrincipalID,
+		ProjectID:     projectID,
+		HomeProjectID: scope.ProjectID,
+		ObjectType:    "project",
+		Relation:      projectRelation(op),
+		TeamID:        scope.TeamID,
+	}
+	if rsi != nil {
+		req.ResourceID = rsi.ResourceID
+		if rsi.TeamID != nil {
+			req.ResourceTeamID = *rsi.TeamID
+		}
+	}
+	return req
+}
+
+// checkProjectAccess runs the credential ceiling then resolver.Check.
+// Ceiling failures are errAuthzNoScope / errAuthzPreviewDenied; Check
+// failures are already domain.ErrInternal.
+func checkProjectAccess(ctx context.Context, r *resolver.Resolver, stmts service.AuthzResolverStatements, projectID string, op accessOp, rsi *domain.ResourceScope) (resolver.Decision, error) {
+	scope, ok := GetScopeContext(ctx)
+	if !ok || scope.PrincipalType == "" || scope.PrincipalID == "" {
+		return resolver.DecisionUnspecified, errAuthzNoScope
+	}
+	if err := credentialCeiling(scope, projectID); err != nil {
+		return resolver.DecisionUnspecified, err
+	}
+	dec, err := r.Check(ctx, stmts, projectCheckRequest(scope, projectID, op, rsi))
+	if err != nil {
+		return resolver.DecisionUnspecified, domain.ErrInternal(err).WithMessage("authz permission check failed")
+	}
+	return dec, nil
+}
+
+// credentialCeiling is the pre-resolver gate on the credential plane.
+// Empty home fails closed. Users skip the secret write ceiling; secrets
+// still need project.write (ADR 053 §5).
+func credentialCeiling(scope ScopeContext, targetProjectID string) error {
+	if scope.ProjectID == "" {
+		return errAuthzNoScope
+	}
+	if scope.PrincipalType == domain.AuthzPrincipalTypeUser {
+		return nil
+	}
+	if hasOperatorProjectWrite(scope.Scope) {
+		return nil
+	}
+	if scope.ProjectID != targetProjectID {
+		return errAuthzNoScope
+	}
+	return errAuthzPreviewDenied
+}
+
+// hasOperatorProjectWrite is the credential-plane ceiling: only the full
+// project secret (project.write) may call management APIs. Preview
+// (project.read only) is browser-plane (ADR 037).
+func hasOperatorProjectWrite(granted []string) bool {
 	for _, s := range granted {
 		if s == "project.write" {
 			return true
 		}
-		for _, a := range accepted {
-			if s == a {
-				return true
-			}
-		}
 	}
 	return false
+}
+
+func hasGranularOrOperator(ctx context.Context, scope string) bool {
+	sc, ok := GetScopeContext(ctx)
+	return ok && (slices.Contains(sc.Scope, scope) || hasOperatorProjectWrite(sc.Scope))
+}
+
+// requireExpandScope gates an ADR 059 expand that reads a related resource.
+// The operator project.write fallback is interim until #420 mints granular
+// scopes. WithMessage keeps the sentinel code so errors.Is still matches.
+func requireExpandScope(ctx context.Context, scope string, denied func() domain.Error, msg string) error {
+	if hasGranularOrOperator(ctx, scope) {
+		return nil
+	}
+	return denied().WithMessage(msg)
+}
+
+func requireMembershipRead(ctx context.Context) error {
+	return requireExpandScope(ctx, "team_membership.read", domain.ErrUserPermissionDenied,
+		"reading a user's team memberships requires team_membership.read")
+}
+
+func requireTeamRead(ctx context.Context) error {
+	return requireExpandScope(ctx, "team.read", domain.ErrUserPermissionDenied,
+		"expanding a user's lifecycle owner team requires team.read")
+}
+
+func mapAuthzDecision(dec resolver.Decision, res resourceAccess, op accessOp) error {
+	switch dec {
+	case resolver.DecisionAllow:
+		return nil
+	case resolver.DecisionForbidden:
+		return res.denied()
+	case resolver.DecisionNotFound, resolver.DecisionUnspecified:
+		return res.miss(op)
+	default:
+		return res.miss(op)
+	}
+}
+
+// requireProjectListAccess gates a management list and attaches the list
+// context: Allow stamps a one-shot EXISTS skip (consumed by the next
+// compileList / ListUsers); Forbidden attaches the EXISTS predicate via
+// the same Resolver used for Check; NotFound 404s.
+func (h *Handler) requireProjectListAccess(ctx context.Context, projectID string, res resourceAccess, kind domain.ResourceKind) (context.Context, error) {
+	if h == nil || h.pool == nil {
+		return ctx, domain.ErrInternal(errors.New("authz statements not configured"))
+	}
+	return requireProjectListAccess(ctx, h.pool.Statements(), projectID, res, kind)
+}
+
+func requireProjectListAccess(ctx context.Context, stmts service.AuthzResolverStatements, projectID string, res resourceAccess, kind domain.ResourceKind) (context.Context, error) {
+	r := resolver.New()
+	dec, err := checkProjectAccess(ctx, r, stmts, projectID, opRead, nil)
+	if err != nil {
+		return ctx, mapCeilingError(err, res, opRead, nil)
+	}
+	switch dec {
+	case resolver.DecisionAllow:
+		return service.WithAuthzListSkipOnce(ctx), nil
+	case resolver.DecisionForbidden:
+		return withAuthzListFilter(ctx, r, stmts, projectID, kind, opRead)
+	case resolver.DecisionNotFound, resolver.DecisionUnspecified:
+		return ctx, res.miss(opRead)
+	default:
+		return ctx, res.miss(opRead)
+	}
+}
+
+// mapAuthzDecisionAfterRSI maps Check results after RSI already located the
+// resource. NotFound/Unspecified always use readMiss so write ops do not
+// advertise a different code than reads.
+func mapAuthzDecisionAfterRSI(dec resolver.Decision, res resourceAccess) error {
+	switch dec {
+	case resolver.DecisionAllow:
+		return nil
+	case resolver.DecisionForbidden:
+		return res.denied()
+	case resolver.DecisionNotFound, resolver.DecisionUnspecified:
+		return res.readMiss()
+	default:
+		return res.readMiss()
+	}
+}
+
+// withAuthzListFilter attaches the EXISTS list predicate using the same
+// CheckParams builder as resolver.Check (including ConstraintTeamID).
+func withAuthzListFilter(ctx context.Context, r *resolver.Resolver, stmts service.AuthzResolverStatements, projectID string, kind domain.ResourceKind, op accessOp) (context.Context, error) {
+	scope, ok := GetScopeContext(ctx)
+	if !ok || scope.PrincipalType == "" || scope.PrincipalID == "" {
+		return ctx, domain.ErrInternal(nil).WithMessage("authz list filter requires credential scope")
+	}
+	params, err := r.CheckParams(ctx, stmts, projectCheckRequest(scope, projectID, op, nil))
+	if err != nil {
+		return ctx, domain.ErrInternal(err).WithMessage("authz catalog lookup failed")
+	}
+	return service.WithAuthzListFilter(ctx, service.AuthzListFilter{
+		AuthzCheckParams: params,
+		ResourceKind:     kind,
+	}), nil
+}
+
+// requireTeamDelete gates deleteTeam via the team's RSI. Unknown teams are
+// gone (204) for operators. Check denials (including foreign foothold misses)
+// stay permission_denied for the historical deleteTeam contract. Internal
+// errors pass through unwrapped so operators see 500, not a false 403.
+func (h *Handler) requireTeamDelete(ctx context.Context, teamID string) (projectID string, err error) {
+	projectID, err = h.requireResourceAccess(ctx, teamID, teamAccess, opDelete)
+	if err != nil {
+		if errors.Is(err, errResourceGone) {
+			return "", err
+		}
+		if errors.Is(err, domain.ErrInternal(nil)) {
+			return "", err
+		}
+		return "", domain.ErrTeamPermissionDenied().WithParent(err)
+	}
+	return projectID, nil
 }

@@ -1,8 +1,0 @@
-type: object
-properties:
-  token:
-    type: string
-    description: The token to revoke (access token or refresh token)
-  token_type_hint:
-    type: string
-    description: Optional hint about the type of the token being revoked (access_token or refresh_token)

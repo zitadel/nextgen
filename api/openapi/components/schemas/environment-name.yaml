@@ -1,0 +1,10 @@
+type: string
+maxLength: 63
+pattern: '^[a-z0-9]([a-z0-9-]*[a-z0-9])?$'
+example: prod
+description: |
+  An environment's public handle, unique within its project and immutable.
+
+  It addresses the environment on the wire and names a deploy target in the
+  CLI, so it is a lowercase DNS-style label: letters, digits, and hyphens
+  between them.
