@@ -29,7 +29,7 @@ import {
   toLocalBrandingBody,
 } from "../branding";
 import { FLOWS_DIR, flowEnvRefs } from "../flows";
-import { POLICIES_DIR, toPolicyWireBody } from "../policies";
+import { POLICIES_DIR, policyFileName, toPolicyWireBody } from "../policies";
 import { SCHEMAS_DIR } from "../user-schema";
 import { ZitadelError } from "../errors";
 import type { ResourceSyncer } from "./types.js";
@@ -356,6 +356,11 @@ class PolicySyncer implements ResourceSyncer {
 
   /** The comparison form is the wire body: the file minus its `$schema`. */
   readonly normalize = (data: object): object => toPolicyWireBody(data);
+
+  /** One file per operation: `<operation>.json`, so two files cannot publish the same instance. */
+  expectedFileName(data: object): string {
+    return policyFileName((data as { operation: string }).operation);
+  }
 
   validate(data: object): void {
     const result = policyConfigSchema.safeParse(data);

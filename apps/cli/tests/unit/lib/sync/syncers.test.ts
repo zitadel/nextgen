@@ -568,6 +568,7 @@ describe("PolicySyncer", () => {
     expect(policy.mutable).toBe(false);
     expect(policy.revisioned).toBe(true);
     expect(policy.singletonFile).toBeUndefined();
+    expect(policy.expectedFileName?.(instance)).toBe("user.password.save.json");
   });
 
   it("validate accepts a well-formed instance and rejects a bad envelope", () => {

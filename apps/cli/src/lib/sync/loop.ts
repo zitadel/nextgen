@@ -92,8 +92,23 @@ export async function buildSyncPlan(
       }
     }
 
-    for (const content of onDisk.values()) {
+    for (const [absPath, content] of onDisk) {
       syncer.validate(content);
+      if (syncer.expectedFileName) {
+        const expected = syncer.expectedFileName(content);
+        const name = basename(absPath);
+        if (name !== expected) {
+          throw new ZitadelError(
+            "E_VALIDATION",
+            `${syncer.directory}/${name} must be named ${expected}`,
+            {
+              hint:
+                `a ${syncer.kind} file is named after the resource it describes, one file per ` +
+                `resource; rename it or remove the duplicate.`,
+            },
+          );
+        }
+      }
     }
 
     for (const [filePath, entry] of Object.entries(state.resources)) {

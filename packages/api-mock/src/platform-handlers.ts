@@ -1082,9 +1082,11 @@ export function setupPlatformHandlers() {
       if (!query.ok) {
         return query.response;
       }
+      // The platform caps the list at the 100 newest revisions.
       const responseBody: ListPolicies200Item[] = [...store.policies.values()]
         .filter((record) => record.projectId === query.data.project_id)
         .sort(compareNewestFirst)
+        .slice(0, 100)
         .map((record) => ({
           id: record.id,
           operation: record.body.operation,

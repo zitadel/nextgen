@@ -87,6 +87,25 @@ describe("buildSyncPlan", () => {
     }
   });
 
+  it("fails the scan when a file is not named after the resource it describes", async () => {
+    const cwd = makeCwd();
+    try {
+      await writeState(cwd, { framework: "next", resources: {} });
+      await writeResource(cwd, ".zitadel/policies", "user.password.save.json", { operation: "user.password.save" });
+      await writeResource(cwd, ".zitadel/policies", "stricter.json", { operation: "user.password.save" });
+
+      const syncer = makeSyncer({
+        kind: "policy",
+        directory: ".zitadel/policies",
+        expectedFileName: (data) => `${(data as { operation: string }).operation}.json`,
+      });
+
+      await expect(buildSyncPlan(cwd, [syncer])).rejects.toThrow(/stricter\.json must be named user\.password\.save\.json/);
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
   it("returns skip(no-change) when an unchanged file already has an id in state", async () => {
     const cwd = makeCwd();
     try {
