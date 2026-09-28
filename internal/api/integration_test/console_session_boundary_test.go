@@ -15,6 +15,7 @@ import (
 	internalapi "github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/api/integration_test/test_data"
+	"github.com/zitadel/nextgen/internal/domain"
 )
 
 // consoleCall sends one request with the session cookie (and the CSRF token on
@@ -38,6 +39,19 @@ func consoleCall(t *testing.T, cookie *http.Cookie, method, path, body string) (
 	return resp.StatusCode, string(raw)
 }
 
+// ownSessionUser signs a new user into a home project of the test's own,
+// instead of the shared platform project, so the user, its team, the session
+// and its token go when the project is deleted at the end of the test
+// (internal/AGENTS.md). A session reaches other projects through grants alone,
+// so which project it is homed in does not change what these tests pin.
+func ownSessionUser(t *testing.T) (home *domain.Project, userID string, cookie *http.Cookie) {
+	t.Helper()
+	home, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	userID, _ = harness.CreateUserOwnedByTeam(t, home.ID)
+	return home, userID, sessionCookieIn(t, home, userID)
+}
+
 // unknownLike returns an id of the same prefix and length as id that names
 // nothing, so a lookup miss cannot differ from a denial by id shape.
 func unknownLike(id string) string {
@@ -53,9 +67,7 @@ func unknownLike(id string) string {
 func TestConsoleSessionForeignTargetIsIndistinguishable(t *testing.T) {
 	t.Parallel()
 
-	console := harness.EnsurePlatformProject(t)
-	strangerID, _ := harness.CreateUserOwnedByTeam(t, console.ID)
-	cookie := platformSessionCookie(t, strangerID)
+	_, strangerID, cookie := ownSessionUser(t)
 
 	other, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
@@ -153,9 +165,7 @@ func TestConsoleSessionForeignTargetIsIndistinguishable(t *testing.T) {
 func TestConsoleSessionFootholdWithoutPermissionIsForbidden(t *testing.T) {
 	t.Parallel()
 
-	console := harness.EnsurePlatformProject(t)
-	viewerID, _ := harness.CreateUserOwnedByTeam(t, console.ID)
-	cookie := platformSessionCookie(t, viewerID)
+	_, viewerID, cookie := ownSessionUser(t)
 
 	other, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
@@ -178,6 +188,10 @@ func TestConsoleSessionFootholdWithoutPermissionIsForbidden(t *testing.T) {
 		path   string
 		body   string
 	}{
+		{"create user", http.MethodPost, "/users?project_id=" + proj, helpers.MustMarshal(t, map[string]any{
+			"schema":     test_data.UserSchemaURL,
+			"attributes": map[string]any{"email": "foothold-" + viewerID + "@example.com", "password": "my-strong-password"},
+		})},
 		{"delete user", http.MethodDelete, "/users/" + otherUserID, ""},
 		{"update team", http.MethodPatch, "/teams/" + otherTeamID, `{"name":"x"}`},
 		{"create team", http.MethodPost, "/teams?project_id=" + proj, `{"name":"x"}`},
