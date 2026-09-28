@@ -496,8 +496,7 @@ func TestConsoleSessionExpandsUserTeams(t *testing.T) {
 func TestConsoleSessionPartialAccessDoesNotExpand(t *testing.T) {
 	t.Parallel()
 
-	console := harness.EnsurePlatformProject(t)
-	operatorID, _ := harness.CreateUserOwnedByTeam(t, console.ID)
+	_, operatorID, cookie := ownSessionUser(t)
 
 	customer, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
@@ -513,7 +512,9 @@ func TestConsoleSessionPartialAccessDoesNotExpand(t *testing.T) {
 	asgn.ApplyScope(domain.NewTeamAssignmentScope(teamID))
 	require.NoError(t, harness.EnsureServiceDB(t).Statements().CreateAuthzAssignment(t.Context(), asgn))
 
-	session := sessionClientForUser(t, operatorID)
+	session, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	session.SetSessionToken(cookie.Value)
 	params := api.QueryUsersParams{ProjectID: api.NewOptProjectID(api.ProjectID(customer.ID))}
 
 	listed, err := session.QueryUsers(t.Context(), &api.QueryUsersRequest{}, params)
