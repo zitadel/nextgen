@@ -196,18 +196,18 @@ func TestCreateIdpRejectsInvalidDocuments(t *testing.T) {
 	tests := []struct {
 		name string
 		body string
-		// property is the part of the document the error details name. The
-		// request decoder rejects some documents before the schema check, and
-		// its answer carries no details.
+		// property is the part of the document the error details name.
 		property string
 	}{
 		{
-			name: "a literal client secret",
-			body: `{"idp":{"slug":"literal","protocol":"oidc","display_name":"X","oidc":{` + oidcBlock + `,"client_secret":"hunter2"}}}`,
+			name:     "a literal client secret",
+			body:     `{"idp":{"slug":"literal","protocol":"oidc","display_name":"X","oidc":{` + oidcBlock + `,"client_secret":"hunter2"}}}`,
+			property: "idp.oidc.client_secret",
 		},
 		{
-			name: "a cleartext endpoint",
-			body: `{"idp":{"slug":"cleartext","protocol":"oidc","display_name":"X","oidc":{"issuer":"http://accounts.example.com","client_id":"id","scopes":["openid"],"client_secret":"${{ S }}"}}}`,
+			name:     "a cleartext endpoint",
+			body:     `{"idp":{"slug":"cleartext","protocol":"oidc","display_name":"X","oidc":{"issuer":"http://accounts.example.com","client_id":"id","scopes":["openid"],"client_secret":"${{ S }}"}}}`,
+			property: "idp.oidc.issuer",
 		},
 		{
 			name:     "a protocol without its block",
@@ -220,9 +220,7 @@ func TestCreateIdpRejectsInvalidDocuments(t *testing.T) {
 			status, details := f.postRaw(t, tt.body)
 			assert.Equal(t, http.StatusBadRequest, status)
 			assert.Equal(t, api.ErrorCode(domain.ErrRequestInvalid().Code), details.Code)
-			if tt.property != "" {
-				assert.Contains(t, string(details.Details.Value["details"]), tt.property)
-			}
+			assert.Contains(t, string(details.Details.Value["details"]), tt.property)
 		})
 	}
 
