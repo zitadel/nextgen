@@ -32,8 +32,20 @@ func TestTeamReadsAcceptSession(t *testing.T) {
 
 	session := sessionClientForUser(t, claimerID)
 
+	// The platform project is shared by parallel tests that each add teams,
+	// so an unfiltered list can page the claimer's team past the default
+	// limit. Filter by its (random) name to keep the assertion about access,
+	// not about page position.
+	claimerTeam, err := harness.EnsureTeamService(t).Get(t.Context(), console.ID, claimerTeamID)
+	require.NoError(t, err)
+	claimerTeamOnly := &api.QueryTeamsRequest{Filter: []api.QueryTeamsRequestFilterItem{{
+		Field:     api.TeamFilterFieldName,
+		Operation: api.FilterOperationEquals,
+		Value:     api.NewOptFilterValue(api.NewStringFilterValue(claimerTeam.Name)),
+	}}}
+
 	t.Run("queryTeams returns the claimer's team", func(t *testing.T) {
-		resp, err := session.QueryTeams(t.Context(), &api.QueryTeamsRequest{},
+		resp, err := session.QueryTeams(t.Context(), claimerTeamOnly,
 			api.QueryTeamsParams{ProjectID: api.ProjectID(console.ID)})
 		require.NoError(t, err)
 		listed, ok := resp.(*api.QueryTeamsResponse)
@@ -56,7 +68,7 @@ func TestTeamReadsAcceptSession(t *testing.T) {
 		require.NoError(t, err)
 		harness.SetProjectSecretOnApiClient(t, secret, console)
 
-		resp, err := secret.QueryTeams(t.Context(), &api.QueryTeamsRequest{},
+		resp, err := secret.QueryTeams(t.Context(), claimerTeamOnly,
 			api.QueryTeamsParams{ProjectID: api.ProjectID(console.ID)})
 		require.NoError(t, err)
 		listed, ok := resp.(*api.QueryTeamsResponse)

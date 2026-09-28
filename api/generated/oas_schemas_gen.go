@@ -5956,8 +5956,8 @@ type Branding struct {
 	Schema OptString `json:"$schema"`
 	// Degrade preset (`centered` or `split`) the bundled default template
 	// branches on, and the fallback when a custom template fails validation.
-	// Not the complete design catalog: all named designs (`centered`, `split`,
-	// `split-right`, `hero`, `minimal`) ship as templates and map onto one of
+	// Not a design catalog: the ejectable designs (`centered`, `minimal`)
+	// ship as templates and map onto one of
 	// these two values; switch designs with
 	// `zitadel branding eject --design <name>` instead of editing this field.
 	// Ejected templates may ignore it. Selects a template rather than restyling
@@ -6555,8 +6555,8 @@ func (s *BrandingCreatedPayload) SetHeroURL(val OptString) {
 
 // Degrade preset (`centered` or `split`) the bundled default template
 // branches on, and the fallback when a custom template fails validation.
-// Not the complete design catalog: all named designs (`centered`, `split`,
-// `split-right`, `hero`, `minimal`) ship as templates and map onto one of
+// Not a design catalog: the ejectable designs (`centered`, `minimal`)
+// ship as templates and map onto one of
 // these two values; switch designs with
 // `zitadel branding eject --design <name>` instead of editing this field.
 // Ejected templates may ignore it. Selects a template rather than restyling
