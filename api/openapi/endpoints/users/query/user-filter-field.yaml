@@ -26,6 +26,8 @@ description: |
 
   Filtering on `team_id` requires `team_membership.read` in addition to
   `user.read`: it reads the same memberships that `expand: ["teams"]` embeds.
+  A Console session, which carries no scopes, may filter on it once it is
+  authorized to list the project's users.
 enum:
   - created_at
   - id

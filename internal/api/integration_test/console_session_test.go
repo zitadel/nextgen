@@ -450,6 +450,42 @@ func TestConsoleSessionReadsTargetProjectByID(t *testing.T) {
 	})
 }
 
+// TestConsoleSessionExpandsUserTeams pins #1300 §4 (relaxed): a session mints
+// no scopes, so the team_membership.read / team.read ceilings on
+// queryUsers' expansions let a user principal through once it has passed the
+// Check on the target project. The Console's Team column depends on it.
+func TestConsoleSessionExpandsUserTeams(t *testing.T) {
+	t.Parallel()
+
+	console := harness.EnsurePlatformProject(t)
+	operatorID, _ := harness.CreateUserOwnedByTeam(t, console.ID)
+
+	customer, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	harness.SeedProjectAdmin(t, customer.ID, operatorID)
+	// Owned by the team as well as a member of it, so both expansions have
+	// something to resolve.
+	memberID, memberTeamID := harness.CreateUserOwnedByTeam(t, customer.ID)
+
+	session := sessionClientForUser(t, operatorID)
+	resp, err := session.QueryUsers(t.Context(), &api.QueryUsersRequest{
+		Expand: []api.UserExpand{api.UserExpandTeams, api.UserExpandLifecycleOwnerTeam},
+	}, api.QueryUsersParams{ProjectID: api.NewOptProjectID(api.ProjectID(customer.ID))})
+	require.NoError(t, err)
+	listed, ok := resp.(*api.QueryUsersResponse)
+	require.True(t, ok, helpers.MustMarshal(t, resp))
+
+	idx := slices.IndexFunc(listed.Users, func(u api.User) bool { return userID(t, u) == memberID })
+	require.GreaterOrEqual(t, idx, 0, helpers.MustMarshal(t, listed))
+	member := listed.Users[idx]
+
+	require.True(t, slices.ContainsFunc(member.Teams, func(team api.UserTeam) bool { return team.ID == memberTeamID }),
+		"expand teams must embed the member's team: %s", helpers.MustMarshal(t, member))
+	owner, ok := member.Metadata.LifecycleOwnerTeam.Get()
+	require.True(t, ok, "expand lifecycle_owner_team must embed the owner: %s", helpers.MustMarshal(t, member))
+	assert.Equal(t, memberTeamID, owner.ID)
+}
+
 // TestConsoleManagementBearerIgnoresStaleCookie pins the dual-scheme
 // precedence: a valid project secret authorizes the request even when a stale
 // or malformed session cookie rides along, instead of the cookie's failure
