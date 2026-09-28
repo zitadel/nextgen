@@ -12,6 +12,12 @@ interface ImportMetaEnv {
    * embedded production build.
    */
   readonly VITE_CONSOLE_RUNTIME_FALLBACK?: string;
+  /**
+   * Dev server only: fall back to the Figma design-review fixtures
+   * (`src/dev/fixtures/`) when the backend answers with an error or an empty
+   * list. Ignored by production builds.
+   */
+  readonly VITE_CONSOLE_FIXTURES?: string;
 }
 
 interface ImportMeta {

@@ -14,8 +14,21 @@ async function clearStaleServiceWorkers(): Promise<void> {
   await Promise.all(registrations.map((registration) => registration.unregister()));
 }
 
+/**
+ * Design-review fixtures (`src/dev/fixtures/`): dev-server only, opt-in with
+ * `VITE_CONSOLE_FIXTURES=1`. In a production build the condition is the literal
+ * `false`, so the import — and the fixture data — never reach the bundle.
+ */
+async function installDevFixtures(): Promise<void> {
+  if (import.meta.env.DEV && import.meta.env.VITE_CONSOLE_FIXTURES) {
+    const { installFixtureFallback } = await import("./dev/fixtures");
+    installFixtureFallback();
+  }
+}
+
 async function main(): Promise<void> {
   await clearStaleServiceWorkers();
+  await installDevFixtures();
 
   const rootElement = document.getElementById("app");
   if (!rootElement || rootElement.innerHTML) return;
