@@ -337,6 +337,16 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, def *FlowDefiniti
 		return FlowStepResult{}, fmt.Errorf("%w: gate proofs", ErrFlowUnsupported())
 	}
 
+	// Reserved outcomes are server-side routing tokens: they are produced by a
+	// provider callback or an identifier lookup and arrive through
+	// ResumeWithOutcome, never from the client. Accepting one as a submitted
+	// action would let a caller take the transition it keys -- e.g. POST
+	// `callback` on the sso conflict step and follow its `callback` route to a
+	// completion with the colliding account already pinned, verifying nothing.
+	if _, reserved := reservedOutcomes[in.Action]; reserved {
+		return FlowStepResult{}, fmt.Errorf("%w: %q is a server outcome, not a submittable action", ErrFlowInvalidAction(), in.Action)
+	}
+
 	currentStep, ok := def.FindStep(state.CurrentStep)
 	if !ok {
 		return FlowStepResult{}, fmt.Errorf("%w: current step %q missing from definition", ErrFlowIntegrity(), state.CurrentStep)

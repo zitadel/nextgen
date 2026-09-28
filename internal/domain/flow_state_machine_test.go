@@ -4380,3 +4380,50 @@ func TestResumeWithOutcome_UnknownStep_IsIntegrityError(t *testing.T) {
 
 	require.ErrorIs(t, err, domain.ErrFlowIntegrity())
 }
+
+// Security regression (Copilot review on #1280): reserved outcomes are
+// server-side routing tokens. A client that POSTs one as an action could take
+// the transition it keys -- on the sso conflict step, `callback -> done` would
+// reach a handoff with the colliding account already pinned and nothing proved.
+func TestFlowStateMachine_Process_RejectsReservedOutcomeAsAction(t *testing.T) {
+	t.Parallel()
+
+	for _, outcome := range []string{
+		"callback",
+		domain.FlowImplicitOutcomeUserAlreadyExists,
+		domain.FlowImplicitOutcomeIdentityUnknown,
+		domain.FlowImplicitOutcomeUserNotFound,
+	} {
+		t.Run(outcome, func(t *testing.T) {
+			t.Parallel()
+			w := newFlowTestWorld(t)
+			w.schemaResolver.EXPECT().
+				Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+				Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+				AnyTimes()
+			w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil).AnyTimes()
+			// Nothing may be handed off on this path.
+			w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).Times(0)
+
+			def := signupDefinition()
+			// Wire the outcome so a route genuinely exists: the guard, not a
+			// missing transition, has to be what refuses it.
+			def.Steps[0].Transitions[outcome] = domain.FlowStepTransition{Target: "done"}
+
+			start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+				Definition:    def,
+				Purpose:       domain.FlowDefinitionPurposeRegister,
+				Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+				UserSchemaURL: defaultSchemaURL,
+			})
+			require.NoError(t, err)
+
+			_, err = w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
+				Action: outcome,
+			})
+			require.Error(t, err, "a client must not be able to submit a server outcome as an action")
+			require.ErrorIs(t, err, domain.ErrFlowInvalidAction(),
+				"expected ErrFlowInvalidAction")
+		})
+	}
+}
