@@ -5,7 +5,7 @@ import { isObject } from "../../../json";
 import { publicCliCommand } from "../../../public-cli";
 import type { CommandResult, GlobalOptions } from "../../types";
 import { readRawBody } from "../body";
-import { bodyFieldFlags, bodyFromFlags, describeBody, fieldExample } from "../fields";
+import { bodyFieldFlags, bodyFromFlags, describeBody, fieldExample, needsRawBody } from "../fields";
 import { article, dryRunResult, idArg, idName, parseOrThrow } from "../shared";
 import type {
   CreateSpec,
@@ -49,7 +49,7 @@ const describeWrite = <Ctx, Spec extends { readonly schema: CreateSpec<Ctx>["sch
   verb: "create" | "update",
 ): OperationStatics => {
   const fields = describeBody(spec.schema);
-  const example = fieldExample(fields);
+  const example = needsRawBody(spec.schema) ? undefined : fieldExample(fields);
   const target = verb === "create" ? topic : `${topic} update <id>`;
   return {
     description:

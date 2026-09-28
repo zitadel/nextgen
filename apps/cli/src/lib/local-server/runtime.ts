@@ -20,6 +20,39 @@ export const LOCAL_CONTAINER_GROUP_FILE = ".zitadel/local/container-group";
 export const CONTAINER_DATA_DIR = "/var/lib/zitadel/nextgen-data";
 export const CONTAINER_HTTP_PORT = 8080;
 
+/**
+ * The well-known id of a deployment's platform project (`domain.PlatformProjectID`,
+ * `internal/domain/project.go`). A CLI-managed local server bootstraps it, which
+ * is what gives the developer a team to own their projects with.
+ */
+export const PLATFORM_PROJECT_ID = "proj_platform";
+
+/**
+ * The platform project's browser-safe key, read from the console runtime
+ * document, or `undefined` when the server does not host the platform project.
+ * The document sits outside the API, so the generated client does not cover
+ * it; it publishes the deployment's default project, which the platform
+ * bootstrap pins to {@link PLATFORM_PROJECT_ID}. Fail closed: an unreadable,
+ * absent or hanging document reads as not hosted.
+ */
+export async function readPlatformRuntime(
+  serverUrl: string,
+  timeoutMs = 1500,
+): Promise<{ publishable_key: string } | undefined> {
+  try {
+    const res = await fetch(new URL("/console/runtime.json", serverUrl), {
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!res.ok) return undefined;
+    const doc = (await res.json()) as { console_project_id?: unknown; publishable_key?: unknown };
+    return doc.console_project_id === PLATFORM_PROJECT_ID && typeof doc.publishable_key === "string"
+      ? { publishable_key: doc.publishable_key }
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export type RuntimeBackend = "binary" | "docker";
 
 type RuntimeMetadataBase = {

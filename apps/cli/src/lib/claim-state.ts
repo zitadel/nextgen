@@ -92,11 +92,10 @@ export function isAttached(
  *
  * **Why cloud only.** Claiming attaches a project to a team on the platform
  * that hosts it. The cloud always has one. A local or self-hosted server has
- * one only when it opted into `platform.bootstrap_project`, and that flag
- * also pins the deployment's console and hosted-login default project to
- * proj_platform, so it is deliberately NOT a `zitadel start` default — which
- * means this offline classifier cannot know whether a local claim could
- * complete. `setup` is online anyway and probes the local server's runtime
+ * one only when it opted into `platform.bootstrap_project`. `zitadel start`
+ * does opt in, but a server started any other way — or one that opted out with
+ * `NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=false` — has no platform project, so this
+ * offline classifier cannot know whether a local claim could complete. `setup` is online anyway and probes the local server's runtime
  * document to decide the nudge there; the offline surfaces (`status`,
  * `doctor`) stay cloud-gated rather than advertise a possibly impossible
  * action.

@@ -1642,6 +1642,55 @@ describe("<zitadel-login> against the typed Flow API", () => {
       }
     });
 
+    it("retires the sentinel in place when the terminal step navigates away", async () => {
+      // The claim-page double spend: retiring with `history.back()` fires
+      // `popstate` in the host, whose router reloads the route, finds the
+      // session the handoff exchange has just created, and completes the
+      // claim in a document that `location.assign` is already replacing.
+      const assign = vi.fn();
+      const { location } = window;
+      Object.defineProperty(window, "location", {
+        configurable: true,
+        value: { ...location, assign },
+      });
+      let hostPopstates = 0;
+      const onPopstate = () => {
+        hostPopstates += 1;
+      };
+      const back = vi.spyOn(history, "back");
+      const replaceState = vi.spyOn(history, "replaceState");
+      try {
+        const element = attachLogin(host);
+        element.postSignInUrl = "/admin";
+        await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
+        await navigateToRegisterPassword(element);
+        await settleHistory();
+        expect((history.state as { zl?: boolean } | null)?.zl).toBe(true);
+        window.addEventListener("popstate", onPopstate);
+        const backCallsBefore = back.mock.calls.length;
+
+        // register-password → done, which navigates via post-sign-in-url.
+        type(element, PASSWORD_FIELD, "hunter2secure");
+        submit(element);
+        await waitFor(() => (assign.mock.calls.length > 0 ? assign : null));
+        await settleHistory();
+
+        expect(assign).toHaveBeenCalledWith("/admin");
+        // No traversal, so nothing for the host to react to…
+        expect(back.mock.calls.length).toBe(backCallsBefore);
+        expect(hostPopstates).toBe(0);
+        // …but the sentinel is still retired: the entry no longer claims to
+        // be the widget's, so a later back press is plain host navigation.
+        expect(replaceState).toHaveBeenCalledWith(expect.objectContaining({ zl: false }), "");
+        expect((history.state as { zl?: boolean } | null)?.zl).toBe(false);
+      } finally {
+        window.removeEventListener("popstate", onPopstate);
+        replaceState.mockRestore();
+        back.mockRestore();
+        Object.defineProperty(window, "location", { configurable: true, value: location });
+      }
+    });
+
     it("back gesture on a step without a back action leaves history alone", async () => {
       await mount(host);
       await settleHistory();

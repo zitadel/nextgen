@@ -684,6 +684,38 @@ func TestDeleteTeam(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, domain.MembershipStatusRemoved, membership.Status)
 	})
+
+	// A team that owns a project may not be deactivated, or the project is
+	// left owned by a dead team that nobody can act through.
+	t.Run("refuses a team that owns a project", func(t *testing.T) {
+		t.Parallel()
+
+		owned, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			_, _ = harness.EnsureServiceDB(t).Statements().DeleteProjectByID(context.Background(), owned.ID)
+		})
+
+		team := createTeam(t)
+		stmts := harness.EnsureServiceDB(t).Statements()
+		asgn := domain.NewClaimTeamAssignment(owned.ID, team.ID)
+		require.NoError(t, stmts.CreateAuthzAssignment(t.Context(), asgn))
+
+		resp, err := client.DeleteTeam(t.Context(), api.DeleteTeamParams{TeamID: api.TeamID(team.ID)})
+		require.NoError(t, err)
+		conflict, ok := resp.(*api.DeleteTeamConflict)
+		require.True(t, ok, helpers.MustMarshal(t, resp))
+		assert.Equal(t, api.ErrorCode("team.owns_project"), conflict.Code)
+
+		// The refusal rolls back: the team is untouched, not half-deleted.
+		assert.Equal(t, api.TeamStatusActive, teamStatus(t, team.ID),
+			"a refused delete must leave the team active")
+
+		// Ownership released, the same request succeeds.
+		require.NoError(t, stmts.RevokeAuthzAssignment(t.Context(), owned.ID, asgn.ID))
+		deleteTeam(t, team.ID)
+		assert.Equal(t, api.TeamStatusDeactivated, teamStatus(t, team.ID))
+	})
 }
 
 func TestQueryTeams(t *testing.T) {

@@ -240,15 +240,11 @@ async function runFrameworkJourney(context) {
         JOURNEY_RUNTIME: options.runtime,
         JOURNEY_WORK_DIR: context.frameworkWorkDir,
         NPM_CONFIG_USERCONFIG: registryPaths.npmrcPath,
-        // The claim spec completes in the embedded console, which needs a
-        // platform project (claim/complete 401s without one) and the
-        // personal teams provisioned at session exchange. Framework lane
-        // only — the testkit lane's contract is a scrubbed, unconfigured
-        // binary. Reaches the server through prepare-app's `start` step env.
-        // Deliberately NOT a `zitadel start` default: platform.bootstrap_project
-        // pins the deployment's console/hosted-login default project to
-        // proj_platform, which would break the standalone semantics the
-        // embedded-surface suite proves.
+        // The claim spec needs a platform project (claim/complete 401s without
+        // one) and the personal teams provisioned at session exchange.
+        // `zitadel start` now opts in by itself, so this is belt and braces for
+        // the framework lane, and it keeps the intent explicit here. Reaches
+        // the server through prepare-app's `start` step env.
         NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT: "true",
         ...(localRuntimeImage ? { ZITADEL_LOCAL_IMAGE: localRuntimeImage } : {}),
       },

@@ -5,11 +5,8 @@ import type {
   CreateFlowDefinitionBodyFlowDefinition,
   CreatePolicy201,
   CreatePolicyBody,
-  GetBrandingById200,
   GetPolicyById200,
   CreateSchemaBody,
-  GetSchemaById200,
-  GetFlowDefinition200,
 } from "@zitadel/api/generated/model";
 import { consola } from "consola";
 
@@ -155,9 +152,7 @@ class SchemaSyncer implements ResourceSyncer {
     // Flat-by-id: authz resolves the project from RSI; no project_id query.
     // The response is the `{id, schema, metadata}` envelope; only the
     // customer-authored document is written back to `.zitadel/schemas/`.
-    const body = (await this.client.getSchemaById(
-      encodeURIComponent(id),
-    )) as unknown as GetSchemaById200;
+    const body = await this.client.getSchemaById(id);
     return body.schema;
   }
 }
@@ -235,7 +230,7 @@ class FlowDefinitionSyncer implements ResourceSyncer {
    * Flat-by-id: no `project_id` query — authz resolves the project from RSI.
    */
   async fetch(id: string): Promise<object> {
-    const envelope = (await this.client.getFlowDefinition(id)) as GetFlowDefinition200;
+    const envelope = await this.client.getFlowDefinition(id);
 
     return envelope.flow_definition as object;
   }
@@ -328,7 +323,7 @@ class BrandingSyncer implements ResourceSyncer {
 
   /** Wire form (template inlined); diffs compare in the normalized form. Flat-by-id: no project_id query. */
   async fetch(id: string): Promise<object> {
-    const envelope = (await this.client.getBrandingById(id)) as GetBrandingById200;
+    const envelope = await this.client.getBrandingById(id);
     return envelope.branding as object;
   }
 

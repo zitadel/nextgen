@@ -16,6 +16,14 @@ type RequestAPIPayload struct {
 type ProjectPayload struct {
 	Name           string   `json:"name,omitempty"`
 	PreviewOrigins []string `json:"preview_origins,omitempty"`
+	// PasswordHashAlgorithm records a change to the method the project's
+	// passwords are hashed with (ADR 029 §Hashing). It is a pointer so the
+	// delta can tell "not touched" (absent) from "handed back to the deployment
+	// default", which is the empty string: the project then names no algorithm
+	// of its own, which is the same thing the row stores. The cost parameters
+	// stay out of the audit trail -- the algorithm is what a reader is checking,
+	// and the full method is readable from the project.
+	PasswordHashAlgorithm *string `json:"password_hash_algorithm,omitempty"`
 }
 
 // ProjectCreatedPayload is an alias kept for call-site clarity.
@@ -243,6 +251,40 @@ func ReleasePayloadSnapshot(rel *Release) ReleasePayload {
 			Handle:     pointer.Handle,
 			RevisionID: pointer.RevisionID,
 		})
+	}
+	return payload
+}
+
+// DeploymentPayload records what went live where. It carries ids, not names:
+// the ids survive environment renames and, unlike the deployments table, this
+// event has no foreign key — so the audit trail of a deleted environment
+// lives on here (ADR 061).
+type DeploymentPayload struct {
+	EnvironmentID       string `json:"environment_id,omitempty"`
+	ReleaseID           string `json:"release_id,omitempty"`
+	Reason              string `json:"reason,omitempty"`
+	Message             string `json:"message,omitempty"`
+	SourceEnvironmentID string `json:"source_environment_id,omitempty"`
+}
+
+type DeploymentCreatedPayload = DeploymentPayload
+
+// DeploymentPayloadSnapshot is the allowlisted create snapshot for deployment
+// events.
+func DeploymentPayloadSnapshot(dep *Deployment) DeploymentPayload {
+	if dep == nil {
+		return DeploymentPayload{}
+	}
+	payload := DeploymentPayload{
+		EnvironmentID: dep.EnvironmentID,
+		ReleaseID:     dep.ReleaseID,
+		Reason:        dep.Metadata.Reason.String(),
+	}
+	if dep.Metadata.Message != nil {
+		payload.Message = *dep.Metadata.Message
+	}
+	if dep.Metadata.SourceEnvironmentID != nil {
+		payload.SourceEnvironmentID = *dep.Metadata.SourceEnvironmentID
 	}
 	return payload
 }

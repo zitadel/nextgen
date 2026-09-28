@@ -135,12 +135,14 @@ async function editFile(
   const candidates = (typeof pathOrPaths === "string" ? [pathOrPaths] : pathOrPaths).map((p) =>
     abs(cwd, p),
   );
-  if (candidates.length === 0) {
+  const [preferred] = candidates;
+  if (preferred === undefined) {
     throw new ZitadelError("E_VALIDATION", "An edit op needs at least one candidate path", {
       hint: "This is an internal patcher error — please report it if you hit it.",
     });
   }
-  let path = candidates[0];
+  // The first candidate is where the file is created when none of them exist.
+  let path = preferred;
   let source: string | undefined;
   let mode: number | undefined;
   for (const candidate of candidates) {
@@ -303,7 +305,9 @@ async function mergeEnv(
   }
 
   const commentLines = comment.map((line) => `# ${line}`);
-  const header = commentLines.length > 0 && !existing.includes(commentLines[0]) ? commentLines : [];
+  const [firstCommentLine] = commentLines;
+  const header =
+    firstCommentLine !== undefined && !existing.includes(firstCommentLine) ? commentLines : [];
   const block = [...header, ...additions.map(([key, value]) => `${key}=${value}`)].join("\n");
   const next = `${existing}${existing && !existing.endsWith("\n") ? "\n" : ""}${block}\n`;
   const action = raw === undefined ? "create" : "update";

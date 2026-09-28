@@ -140,6 +140,20 @@ describe("operation statics", () => {
     );
   });
 
+  it("offers no flags-only example when the body needs a nested object", () => {
+    // Flags cannot carry a nested object, so an example made of them would be
+    // an incomplete body the platform rejects. `--data` / `--file` remain.
+    const nested: CreateSpec<Ctx> = {
+      schema: z.object({ name: z.string(), owner: z.object({ id: z.string() }).optional() }),
+      call: async () => ({}),
+    };
+
+    const examples = CreateOperation.describe(definition(nested)).examples;
+
+    expect(examples[0]).toBe("<%= config.bin %> teams create --data '{...}' --json");
+    expect(examples.join(" ")).not.toContain("--name <name>");
+  });
+
   it("delete is spelled the same way whatever the server does to the resource", () => {
     // An endpoint that revokes rather than removes does not get its own verb:
     // the command is `delete` everywhere, and the outcome is in the result.

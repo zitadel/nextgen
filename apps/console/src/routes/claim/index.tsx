@@ -59,6 +59,16 @@ export const Route = createFileRoute("/claim/")({
     ]);
     return { session, window };
   },
+  // Loaded once per document, never on a navigation the router sees while the
+  // page is up. The sign-in widget moves the history stack for its back
+  // gesture (ADR 022), and each of those moves is a navigation to the router;
+  // a loader that reloaded on them could read the session the widget's
+  // handoff exchange had just created and hand the page to `CompleteClaim`
+  // in a document the widget is already navigating away from — spending the
+  // challenge here and again in the next document. The intended way back is
+  // a full-document navigation, so the initial read is the only one that
+  // matters.
+  shouldReload: false,
   component: ClaimScreen,
 });
 

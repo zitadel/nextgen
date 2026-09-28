@@ -7,6 +7,8 @@ import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig, loadEnv, type ProxyOptions } from "vite";
 
+import { targetsOtherProject } from "./src/lib/dev-proxy";
+
 const consoleBase = "/ui/console/";
 const consoleOutDir = "../../internal/staticui/console/dist";
 const defaultApiBase = "/api";
@@ -107,6 +109,26 @@ function devApiProxy(mode: string): Record<string, ProxyOptions> {
   const backendUrl =
     process.env.CONSOLE_BACKEND_URL || nodeEnv.CONSOLE_BACKEND_URL || defaultBackendUrl;
   const projectSecret = process.env.CONSOLE_PROJECT_SECRET ?? nodeEnv.CONSOLE_PROJECT_SECRET ?? "";
+  // The project the secret belongs to. The secret is injected only for calls
+  // that target it (or name no project): the server lets a Bearer win over the
+  // session cookie, so injecting it on a call scoped to another project would
+  // authorize as the wrong principal and hide that project as a 404. A call
+  // scoped elsewhere rides on the cookie alone — the session-derived access the
+  // person actually holds there (`GET /users/me/projects`, a project's admins).
+  //
+  // `CONSOLE_PROJECT_SECRET_PROJECT_ID` names that project explicitly; it falls
+  // back to the console's own pin, which is the same project except in claim
+  // mode, where the console is pinned to the platform project while the secret
+  // still belongs to the seeded one being claimed (`scripts/dev-real.mts`).
+  // `||`, not `??`: an empty assignment in `.env.local` means unset. With no
+  // project known at all the secret is injected as before this rule existed
+  // (`targetsOtherProject`), so a hand-pointed `console:dev` keeps working.
+  const secretProjectId =
+    process.env.CONSOLE_PROJECT_SECRET_PROJECT_ID ||
+    nodeEnv.CONSOLE_PROJECT_SECRET_PROJECT_ID ||
+    process.env.VITE_CONSOLE_PROJECT_ID ||
+    env.VITE_CONSOLE_PROJECT_ID ||
+    "";
 
   // Anchor the context to a path segment so a similarly-prefixed path (e.g.
   // `/api2/...`) is not accidentally proxied and rewritten.
@@ -129,8 +151,22 @@ function devApiProxy(mode: string): Record<string, ProxyOptions> {
       },
       configure: (proxy) => {
         proxy.on("proxyReq", (proxyReq) => {
-          if (projectSecret && !proxyReq.getHeader("authorization")) {
-            proxyReq.setHeader("authorization", `Bearer ${projectSecret}`);
+          const callerAuth = Boolean(proxyReq.getHeader("authorization"));
+          const inject =
+            Boolean(projectSecret) &&
+            !callerAuth &&
+            !targetsOtherProject(proxyReq.path, secretProjectId);
+          if (inject) proxyReq.setHeader("authorization", `Bearer ${projectSecret}`);
+          // `CONSOLE_DEV_PROXY_LOG=1` prints which credential each proxied
+          // request went out with — the thing to look at when a screen
+          // answers 401/403/404 and it is not obvious who the server saw.
+          if (process.env.CONSOLE_DEV_PROXY_LOG) {
+            const credential = inject
+              ? "project secret"
+              : callerAuth
+                ? "caller's authorization"
+                : "cookie only";
+            console.log(`[console-proxy] ${proxyReq.method} ${proxyReq.path} → ${credential}`);
           }
         });
       },

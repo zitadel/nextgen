@@ -73,6 +73,14 @@ WHERE project_id = ? AND object_type = 'project' AND relation = 'team'
 ORDER BY created_at, id
 LIMIT 1`
 
+	hasActiveOwningTeamGrantStmt = `
+SELECT EXISTS (
+    SELECT 1 FROM authz_assignments
+    WHERE principal_type = 'team' AND principal_id = ?
+      AND object_type = 'project' AND relation = 'team'
+      AND revoked_at IS NULL
+)`
+
 	listClaimedProjectIDsStmt = `
 SELECT DISTINCT project_id FROM authz_assignments
 WHERE object_type = 'project' AND relation = 'team' AND revoked_at IS NULL
@@ -200,6 +208,15 @@ func (s authzAssignmentStatements) GetActiveOwningTeamGrant(ctx context.Context,
 		return nil, wrapError(err)
 	}
 	return assignment, nil
+}
+
+// HasActiveOwningTeamGrant implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) HasActiveOwningTeamGrant(ctx context.Context, teamID string) (bool, error) {
+	var owns bool
+	if err := s.client.QueryRow(ctx, hasActiveOwningTeamGrantStmt, teamID).Scan(&owns); err != nil {
+		return false, wrapError(err)
+	}
+	return owns, nil
 }
 
 // ListClaimedProjectIDs implements [service.AuthzAssignmentStatements].
