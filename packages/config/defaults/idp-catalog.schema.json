@@ -150,27 +150,6 @@
           "pattern": "^[^$]",
           "description": "An exact top-level claim key: no path syntax, and `$`-prefixed values are reserved."
         }
-      },
-      "reference_endpoints": {
-        "type": "object",
-        "additionalProperties": false,
-        "description": "The vendor's own OAuth endpoints, as reference only: never written to a connection, which names the issuer and lets discovery resolve them. Used to offer a correct default when a development build asks where the provider lives, so pointing at a local stand-in keeps the vendor's paths and changes only the origin.",
-        "properties": {
-          "authorization_endpoint": {
-            "type": "string",
-            "format": "uri",
-            "pattern": "^https://"
-          },
-          "token_endpoint": {
-            "type": "string",
-            "format": "uri",
-            "pattern": "^https://"
-          }
-        },
-        "required": [
-          "authorization_endpoint",
-          "token_endpoint"
-        ]
       }
     }
   }

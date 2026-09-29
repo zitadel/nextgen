@@ -1,10 +1,6 @@
 import { text } from "@clack/prompts";
 
-import {
-  catalogIssuer,
-  derivedEndpoints,
-  type ConnectionEndpoints,
-} from "@zitadel/config/idp-catalog";
+import { catalogIssuer, type ConnectionEndpoints } from "@zitadel/config/idp-catalog";
 
 import { bailOnCancel } from "../prompt-cancel";
 
@@ -33,28 +29,14 @@ export async function askConnectionEndpoints(options: {
   if (!developmentBuild) {
     return undefined;
   }
-  const vendor = catalogIssuer(provider);
-  const issuer = await askUrl("Issuer", vendor, command);
-  if (issuer === vendor) {
-    // Nothing is being stood in for, so the endpoints are the vendor's and
-    // come from its discovery document. Asking would offer two defaults that
-    // are wrong for it -- Google's are not `<issuer>/authorize` and
-    // `<issuer>/token` -- and every answer would be discarded anyway.
-    return { issuer };
-  }
-  // The vendor's own paths on the stand-in's origin: a stand-in should answer
-  // where the provider answers and differ only in where it is hosted, so the
-  // default needs confirming rather than correcting.
-  const derived = derivedEndpoints(issuer, provider);
-  return {
-    issuer,
-    authorizationEndpoint: await askUrl(
-      "Authorization endpoint",
-      derived.authorizationEndpoint,
-      command,
-    ),
-    tokenEndpoint: await askUrl("Token endpoint", derived.tokenEndpoint, command),
-  };
+  // Only the issuer is asked for, and only the issuer is written. The engine
+  // accepts a connection that names every endpoint or none at all
+  // (`requireAllOrNoEndpoints`): naming two of the four it needs -- it also
+  // wants `jwks_uri`, and `userinfo_endpoint` unless id_token mapping is on --
+  // is rejected as `idp.endpoints_partial`. Asking for four URLs to satisfy
+  // that would be a worse question than asking for none, and a stand-in
+  // serves its own discovery document just as the vendor does.
+  return { issuer: await askUrl("Issuer", catalogIssuer(provider), command) };
 }
 
 /** One URL question, pre-filled with the answer that needs no thought. */

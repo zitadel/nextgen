@@ -84,10 +84,6 @@ export default class SsoEnable extends BaseCommand {
     "client-id": Flags.string({
       description: "Client id of the application registered with the provider.",
     }),
-    "no-open": Flags.boolean({
-      default: false,
-      description: "Do not offer to open the provider's console in a browser.",
-    }),
   };
 
   async run(): Promise<JsonEnvelope> {

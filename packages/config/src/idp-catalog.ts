@@ -42,16 +42,6 @@ export type IdpCatalogEntry = {
   };
   /** Schema property name → the provider's documented claim name. */
   readonly claim_table: Readonly<Record<string, string>>;
-  /**
-   * The vendor's own OAuth endpoints. Reference only — never written to a
-   * connection, which names the issuer and lets discovery resolve them. They
-   * exist so {@link derivedEndpoints} can offer a default that keeps the
-   * vendor's paths when a stand-in is hosted somewhere else.
-   */
-  readonly reference_endpoints?: Readonly<{
-    authorization_endpoint: string;
-    token_endpoint: string;
-  }>;
 };
 
 /**
@@ -167,15 +157,12 @@ export function claimMappingFor(
  * same protocol as the real vendor, and pointing at it should be a flag rather
  * than a hand edit of the document afterwards.
  *
- * `issuer` is usually the only one needed. The engine derives
- * `<issuer>/authorize` and `<issuer>/token` when the endpoints are absent, and
- * the catalog templates carry no explicit endpoints for exactly that reason.
- * The two overrides exist for a stand-in whose paths differ.
+ * Only the issuer: the engine accepts a connection naming every endpoint or
+ * none, so a stand-in names none and its discovery document supplies them,
+ * exactly as the vendor's does.
  */
 export type ConnectionEndpoints = {
   readonly issuer?: string;
-  readonly authorizationEndpoint?: string;
-  readonly tokenEndpoint?: string;
 };
 
 /** The issuer a catalog entry points at, for use as a prompt's default. */
@@ -187,72 +174,27 @@ export function catalogIssuer(provider: string): string {
   return block.oidc?.issuer ?? block.oauth2?.issuer ?? "";
 }
 
-/**
- * The vendor's own endpoint paths, moved onto `issuer`'s origin.
- *
- * A stand-in for a provider should answer on the provider's paths and differ
- * only in where it is hosted — that is the whole point of testing against one.
- * So `https://accounts.google.com/o/oauth2/v2/auth` becomes
- * `http://localhost:9100/o/oauth2/v2/auth`, and the developer confirms a
- * default that is already right instead of correcting a generic guess.
- *
- * Falls back to `<issuer>/authorize` and `<issuer>/token` for an entry that
- * names no reference endpoints, which is what the engine derives when a
- * connection names none either.
- */
-export function derivedEndpoints(
-  issuer: string,
-  provider?: string,
-): { authorizationEndpoint: string; tokenEndpoint: string } {
-  const base = issuer.replace(/\/$/, "");
-  const reference = provider === undefined ? undefined : idpCatalogEntry(provider).reference_endpoints;
-  const onIssuer = (vendor: string | undefined, fallback: string): string => {
-    if (vendor === undefined) {
-      return `${base}/${fallback}`;
-    }
-    try {
-      return `${base}${new URL(vendor).pathname}`;
-    } catch {
-      return `${base}/${fallback}`;
-    }
-  };
-  return {
-    authorizationEndpoint: onIssuer(reference?.authorization_endpoint, "authorize"),
-    tokenEndpoint: onIssuer(reference?.token_endpoint, "token"),
-  };
-}
 
 /**
- * The endpoint keys to write.
+ * The endpoint keys to write, which is the issuer or nothing.
  *
- * An issuer equal to the catalog's changes nothing, so nothing is written and
- * the vendor's own template stands. That case matters: the catalog names no
- * endpoints for a vendor on purpose, because they are resolved from its
- * discovery document, and Google's are not `<issuer>/authorize` and
- * `<issuer>/token` at all. Writing a guess there would break the connection
- * that needs no help.
- *
- * Once the issuer points somewhere else, all three are written. The connection
- * then says where it goes rather than leaving a reader to work out what the
- * engine would derive, and `idp-connection.yaml` treats a connection that
- * names every endpoint as authoritative instead of consulting discovery --
- * which a stand-in may not serve.
+ * An issuer equal to the catalog's changes nothing, so the vendor's template
+ * stands. A different one is written alone: the engine accepts a connection
+ * naming every endpoint or none (`requireAllOrNoEndpoints`), and it needs four
+ * -- authorization, token, `jwks_uri`, and `userinfo_endpoint` unless id_token
+ * mapping is on. Naming a subset is rejected as `idp.endpoints_partial`, so
+ * the issuer alone is both the smaller and the only valid choice; a stand-in
+ * serves its own discovery document just as the vendor does.
  */
 function endpointOverrides(
   endpoints: ConnectionEndpoints | undefined,
-  provider: string,
   catalogsIssuer: string,
 ): Record<string, string> {
   const issuer = endpoints?.issuer;
   if (issuer === undefined || issuer === "" || issuer === catalogsIssuer) {
     return {};
   }
-  const derived = derivedEndpoints(issuer, provider);
-  return {
-    issuer,
-    authorization_endpoint: endpoints?.authorizationEndpoint || derived.authorizationEndpoint,
-    token_endpoint: endpoints?.tokenEndpoint || derived.tokenEndpoint,
-  };
+  return { issuer };
 }
 
 /**

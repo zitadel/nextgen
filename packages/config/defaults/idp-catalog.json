@@ -6,10 +6,6 @@
     "console_url": "https://console.cloud.google.com/apis/credentials",
     "docs_url": "https://developers.google.com/identity/openid-connect/openid-connect",
     "callback_guidance": "multi_uri_client",
-    "reference_endpoints": {
-      "authorization_endpoint": "https://accounts.google.com/o/oauth2/v2/auth",
-      "token_endpoint": "https://oauth2.googleapis.com/token"
-    },
     "protocol_block": {
       "protocol": "oidc",
       "subject_claim": "sub",

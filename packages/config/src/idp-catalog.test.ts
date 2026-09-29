@@ -189,21 +189,20 @@ describe("scaffoldConnection endpoints", () => {
     expect(oidc.token_endpoint).toBeUndefined();
   });
 
-  it("names every endpoint once the issuer points at a stand-in", () => {
-    // The document says where it goes rather than leaving a reader to work
-    // out what the engine derives, and a connection naming them all is taken
-    // as authoritative instead of consulting discovery, which a stand-in may
-    // not serve.
+  it("names the stand-in's issuer and no endpoints", () => {
+    // The engine accepts a connection naming every endpoint or none
+    // (`requireAllOrNoEndpoints`), and it needs four — authorization, token,
+    // `jwks_uri`, and `userinfo_endpoint` unless id_token mapping is on.
+    // Naming a subset is rejected as `idp.endpoints_partial`, so the
+    // stand-in's own discovery document supplies them, as the vendor's does.
     const oidc = scaffoldConnection({
       ...base,
       endpoints: { issuer: "http://localhost:9100" },
     }).oidc as Record<string, unknown>;
 
-    // The vendor's own paths, moved onto the stand-in's origin: a stand-in
-    // should answer where the provider answers and differ only in hosting.
     expect(oidc.issuer).toBe("http://localhost:9100");
-    expect(oidc.authorization_endpoint).toBe("http://localhost:9100/o/oauth2/v2/auth");
-    expect(oidc.token_endpoint).toBe("http://localhost:9100/token");
+    expect(oidc.authorization_endpoint).toBeUndefined();
+    expect(oidc.token_endpoint).toBeUndefined();
   });
 
   it("writes nothing when the issuer is the vendor's own", () => {
@@ -220,19 +219,6 @@ describe("scaffoldConnection endpoints", () => {
     expect(oidc.token_endpoint).toBeUndefined();
   });
 
-  it("names the endpoints when the stand-in's paths differ", () => {
-    const oidc = scaffoldConnection({
-      ...base,
-      endpoints: {
-        issuer: "http://localhost:9100",
-        authorizationEndpoint: "http://localhost:9100/oauth/authorize",
-        tokenEndpoint: "http://localhost:9100/oauth/token",
-      },
-    }).oidc as Record<string, unknown>;
-
-    expect(oidc.authorization_endpoint).toBe("http://localhost:9100/oauth/authorize");
-    expect(oidc.token_endpoint).toBe("http://localhost:9100/oauth/token");
-  });
 
   it("leaves the credentials as references whatever the endpoints are", () => {
     // Overriding where the connection points must not change what it holds.
