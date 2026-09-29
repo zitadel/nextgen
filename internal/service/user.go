@@ -682,6 +682,10 @@ type PatchUserAction struct {
 	pool        StatementPool
 	schemaStore domain.JSONSchemaStore
 
+	// schemaJSON is the target schema document, kept from Prepare so Apply can
+	// filter emitted attribute values to x-audit fields (same rule as create).
+	schemaJSON []byte
+
 	patch *domain.PatchUser
 	// stale reports that Apply found the row moved past the updated_at the
 	// merge was computed against (or the user disappeared mid-flight). The
@@ -741,6 +745,7 @@ func (o *PatchUserAction) Prepare(ctx context.Context) error {
 		return domain.ErrInternal(err).WithMessage("failed to get schema from database")
 	}
 
+	o.schemaJSON = schemaEntity.Schema
 	o.patch, err = domain.NewPatchUser(domain.PatchUserParams{
 		Current:              user,
 		SchemaURL:            targetSchemaURL,
@@ -767,8 +772,18 @@ func (o *PatchUserAction) Apply(ctx context.Context, stmts AllStatements) error 
 		}
 		return domain.ErrInternal(err).WithMessage("failed to patch user in the database")
 	}
-	// No event here: user.updated is #877's to emit (events catalog).
-	return nil
+	attrKeys, attrValues := audit.UserAttributeAuditFields(o.Attributes, o.schemaJSON)
+	return audit.Emit(ctx, stmts, audit.EmitSpec{
+		Type:       domain.EventTypeUserUpdated,
+		Category:   domain.EventCategoryEntity,
+		ProjectID:  o.ProjectID,
+		EntityType: "user",
+		EntityID:   o.UserID,
+		Payload: domain.UserUpdatedPayload{
+			AttributeKeys: attrKeys,
+			Attributes:    attrValues,
+		},
+	})
 }
 
 // ---- Set Password ACTION -------------------------------------------------------------
