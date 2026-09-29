@@ -144,7 +144,7 @@ Utilities
   which              Show where a command comes from
 ```
 
-`plan` and `apply` are included because they are currently available, but they are transitional and will be replaced by the environment and release workflow.
+`apply` is included because it is currently available but transitional: `deploy` replaces it in the environment and release workflow, while `plan` has no replacement under the release model.
 
 Each level provides help for the commands available beneath it:
 
