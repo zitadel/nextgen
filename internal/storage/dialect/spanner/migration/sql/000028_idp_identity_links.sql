@@ -29,18 +29,9 @@ CREATE TABLE idp_identity_links (
 CREATE UNIQUE INDEX uq_idp_identity_links_connection_subject
     ON idp_identity_links (project_id, connection_id, subject)
 -- +goose StatementEnd
--- +goose StatementBegin
--- Spanner already backs the user FK with an index; this one keeps the schema
--- the same as the other dialects.
-CREATE INDEX idx_idp_identity_links_project_user
-    ON idp_identity_links (project_id, user_id)
--- +goose StatementEnd
 
 -- +goose Down
 -- +goose NO TRANSACTION
--- +goose StatementBegin
-DROP INDEX IF EXISTS idx_idp_identity_links_project_user
--- +goose StatementEnd
 -- +goose StatementBegin
 DROP INDEX IF EXISTS uq_idp_identity_links_connection_subject
 -- +goose StatementEnd
