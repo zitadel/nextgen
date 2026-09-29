@@ -142,10 +142,10 @@ Utilities
   which              Show where a command comes from
 
 Examples
-  zitadel setup       Set up a Project
-  zitadel schemas list  List user schemas
+  zitadel setup          Set up a Project
+  zitadel schemas list   List user schemas
 
-Run `zitadel --help` for flags and more details.
+Run zitadel --help for flags and more details.
 ```
 
 `apply` is included because it is currently available but transitional: `deploy` replaces it in the environment and release workflow, while `plan` has no replacement under the release model.
@@ -223,9 +223,7 @@ events
 resources
 ```
 
-All commands must support automation. When required input is missing in non-interactive mode, the CLI returns a clear validation error rather than prompting.
-
-`--no-input` suppresses all prompts. If required input is missing, the CLI returns a clear validation error. Structured output such as `--json` also never opens an interactive prompt.
+All commands must support automation. `--no-input` suppresses all prompts, and structured output such as `--json` never opens a prompt. If required input is missing, the CLI returns a clear validation error.
 
 ## Guidance and feedback
 
