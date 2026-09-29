@@ -364,6 +364,71 @@ func TestCreateUserAction_EventPayloadAttributeKeys(t *testing.T) {
 	assert.NotContains(t, string(gotEvent.Payload), `"user_id"`)
 }
 
+func TestPatchUserAction_EventPayloadAttributeKeys(t *testing.T) {
+	t.Parallel()
+	ctrl := gomock.NewController(t)
+	schemaStore := domainmock.NewMockJSONSchemaStore(ctrl)
+	pool := servicemocks.NewMockPool(ctrl)
+	stmts := servicemocks.NewMockAllStatements(ctrl)
+	pool.EXPECT().Statements().Return(stmts).AnyTimes()
+
+	schemaURL := "https://example.test/schema.json"
+	schemaJSON := []byte(`{
+		"$schema": "https://json-schema.org/draft/2020-12/schema",
+		"$id": "https://example.test/schema.json",
+		"type": "object",
+		"properties": {
+			"email": {"type": "string", "format": "email", "x-unique": "project", "x-audit": true},
+			"givenName": {"type": "string"}
+		}
+	}`)
+	stmts.EXPECT().GetUser(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(&domain.User{
+			ProjectID:  "proj_1",
+			ID:         "user_1",
+			SchemaURL:  schemaURL,
+			Attributes: domain.Attributes{{Key: "givenName", Value: "Alice"}},
+		}, nil)
+	stmts.EXPECT().GetUserUniqueAttributeScopes(gomock.Any(), "proj_1", "user_1").
+		Return(map[domain.AttributeKey]string{}, nil)
+	schemaStore.EXPECT().
+		GetJSONSchemaByID(gomock.Any(), "proj_1", schemaURL).
+		Return(&domain.JSONSchema{ProjectID: "proj_1", URL: schemaURL, Schema: schemaJSON}, nil)
+
+	action := service.NewPatchUserAction(service.PatchUserInput{
+		ProjectID: "proj_1",
+		UserID:    "user_1",
+		Attributes: map[string]any{
+			"email":     "alice@example.com",
+			"givenName": "Alice",
+		},
+	}, service.NewPool(pool), schemaStore)
+	require.NoError(t, action.Prepare(t.Context()))
+
+	var gotEvent *domain.Event
+	stmts.EXPECT().PatchUser(gomock.Any(), gomock.Any()).Return(nil)
+	stmts.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ context.Context, ev *domain.Event) error {
+			gotEvent = ev
+			return nil
+		},
+	)
+
+	require.NoError(t, action.Apply(t.Context(), stmts))
+	require.NotNil(t, gotEvent)
+	assert.Equal(t, domain.EventTypeUserUpdated, gotEvent.EventType)
+	assert.Equal(t, "user_1", *gotEvent.EntityID)
+
+	var payload domain.UserUpdatedPayload
+	require.NoError(t, json.Unmarshal(gotEvent.Payload, &payload))
+	assert.Equal(t, []string{"email", "givenName"}, payload.AttributeKeys)
+	require.NotNil(t, payload.Attributes)
+	assert.Equal(t, "alice@example.com", payload.Attributes["email"])
+	_, hasGiven := payload.Attributes["givenName"]
+	assert.False(t, hasGiven, "non-x-audit values must be omitted")
+	assert.NotContains(t, string(gotEvent.Payload), `"user_id"`)
+}
+
 func TestSetPasswordAction_UsesPasswordRowID(t *testing.T) {
 	t.Parallel()
 	ctrl := gomock.NewController(t)

@@ -33,6 +33,7 @@ oneOf:
   - $ref: types/user-create-failed-event.yaml
   - $ref: types/user-created-event.yaml
   - $ref: types/user-deleted-event.yaml
+  - $ref: types/user-updated-event.yaml
 discriminator:
   propertyName: event_type
   mapping:
@@ -66,3 +67,4 @@ discriminator:
     user.create.failed: types/user-create-failed-event.yaml
     user.created: types/user-created-event.yaml
     user.deleted: types/user-deleted-event.yaml
+    user.updated: types/user-updated-event.yaml
