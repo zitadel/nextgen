@@ -28,7 +28,7 @@ CREATE TABLE idp_identity_links (
 -- +goose StatementEnd
 
 -- +goose StatementBegin
--- The only constraint a create can trip; see the postgres migration.
+-- The constraint a create is expected to trip; see the postgres migration.
 CREATE UNIQUE INDEX uq_idp_identity_links_connection_subject
     ON idp_identity_links (project_id, connection_id, subject);
 -- +goose StatementEnd
