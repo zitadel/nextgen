@@ -309,11 +309,10 @@ func TestSessionStatements_List_RejectsOrderByFilterOnlyField(t *testing.T) {
 				},
 			},
 		})
-		require.Error(t, err)
-		assert.Equal(t,
-			database.ErrFieldNotOrderable(domain.SessionFieldHasVerifiedFactors).Error(),
-			err.Error(),
-		)
+		var de database.Error
+		require.ErrorAs(t, err, &de)
+		assert.Equal(t, database.ErrFieldNotOrderable(nil).Code, de.Code, "typed not-orderable code")
+		assert.Equal(t, domain.SessionFieldHasVerifiedFactors, de.Details, "details identify the offending field")
 	})
 }
 
