@@ -74,42 +74,6 @@ for the operation to proceed.
 
 ### Data Model
 
-#### Instance
-
-Each instance guards one operation and carries its own configuration under `config`.
-The envelope (`kind`, `operation`) is the same for every operation;
-`config` is what the operation's template defines, and `operation` is the
-discriminator that says which template that is.
-
-```json
-// .zitadel/policies/user.password.save.json
-{
-  "kind": "policy",
-  "operation": "user.password.save",
-  "config": {
-    "min_length": 15,
-    "history_depth": 4
-  }
-}
-```
-
-- An instance applies to its whole project: one instance per operation per
-  project, and every request to that operation in the project is evaluated
-  against it. Narrowing an instance to part of a project (a team, an app) is
-  the audience mechanism of the audience-scoped configuration draft
-  ([#1264](https://github.com/zitadel/nextgen/pull/1264)), which follows this
-  ADR and adds an `audience` envelope field; see [Applicability](#applicability).
-- `config` is validated against the template's config schema at write time.
-  A key the template does not declare is rejected.
-- The wire schema of the instance is a **discriminated union on `operation`**:
-  one branch per catalogued operation, each with the `config` object that
-  operation's template declares (its settings, bounds and defaults, no others).
-  The union is what the OpenAPI component publishes, what the generated client
-  types carry, and what the `policy.json` editor meta-schema is derived from,
-  so an editor completes `min_length` for `user.password.save` and rejects a
-  key that operation does not have. A test keeps every branch in parity with
-  its template.
-
 #### Template
 
 One template per operation, defined by Zitadel and versioned with the server.
@@ -149,6 +113,46 @@ A template is not release content: templates ship with the server and evolve wit
 as the flow engine's step vocabulary does for flow definitions. How a server
 upgrade treats deployed instances is the same question every configuration
 resource has, and is not answered here.
+
+#### Instance
+
+Each instance guards one operation and carries its own configuration under `config`.
+The envelope (`kind`, `operation`) is the same for every operation;
+`config` is what the operation's template defines, and `operation` is the
+discriminator that says which template that is.
+
+```json
+// .zitadel/policies/user.password.save.json
+{
+  "kind": "policy",
+  "operation": "user.password.save",
+  "config": {
+    "min_length": 15,
+    "history_depth": 4
+  }
+}
+```
+
+- An instance applies to its whole project: one instance per operation per
+  project, and every request to that operation in the project is evaluated
+  against it. Narrowing an instance to part of a project (a team, an app) is
+  the audience mechanism of the audience-scoped configuration draft
+  ([#1264](https://github.com/zitadel/nextgen/pull/1264)), which follows this
+  ADR and adds an `audience` envelope field; see [Applicability](#applicability).
+- `config` is validated against the template's config schema at write time.
+  A key the template does not declare is rejected.
+- A setting the instance omits takes the template's default, so evaluation
+  always sees a complete config; a project with no instance at all runs on the
+  template defaults. The example above therefore leaves `max_length` out (it
+  is fixed) and could leave `history_depth` out to keep the default of 0.
+- The wire schema of the instance is a **discriminated union on `operation`**:
+  one branch per catalogued operation, each with the `config` object that
+  operation's template declares (its settings, bounds and defaults, no others).
+  The union is what the OpenAPI component publishes, what the generated client
+  types carry, and what the `policy.json` editor meta-schema is derived from,
+  so an editor completes `min_length` for `user.password.save` and rejects a
+  key that operation does not have. A test keeps every branch in parity with
+  its template.
 
 ### Policy catalog
 
