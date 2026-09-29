@@ -15,7 +15,7 @@ flowchart LR
 
 Two routes, and they compose.
 
-**Server-side (the tenant's own branding).** Liquid maps branding into `--zl-*` on `:host` ([`tokens.md`](tokens.md)). Either put the `:host { ... }` block in `branding.liquid_template`, or (if the structured extension in [`schema.md`](schema.md) lands) let a bundled master template emit it from `branding.palette` / `branding.shape` / `branding.typography`.
+**Server-side (the tenant's own branding).** The orchestrator maps the branding revision's `theme`, `typography` and `shape` blocks ([`schema.md`](schema.md)) into `--zl-*` on its shadow root ([`tokens.md`](tokens.md)). Templates take no part in it.
 
 **Host-page (the app that embedded the widget).** A plain rule in the embedding app's stylesheet sets the same variables on the element:
 
@@ -82,7 +82,7 @@ Open question 6 in [`README.md`](README.md): after eject, do atoms keep reading 
 - Inline `style` on atom internals (use tokens / parts).
 - Styling via random DOM props (atoms use data attrs for behaviour, not theme).
 - Per-instance `className` on atoms.
-- `advanced.custom_css` (project-level hatch; see [`schema.md`](schema.md)).
+- Custom CSS on the branding object. It carries none; see [`schema.md`](schema.md) § No custom CSS.
 - Replacing `branding.liquid_template` (structural edit; see [`templates.md`](templates.md)).
 
 ## See also

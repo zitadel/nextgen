@@ -1,226 +1,78 @@
 # Tokens
 
-**Status:** Draft. Token catalogue open for feedback. **Parent:** [`README.md`](README.md).
+**Status:** Shipped. **Parent:** [`README.md`](README.md).
 
-Atoms use `var(--zl-*)` only. Liquid builds the DOM and may emit `:host { --zl-*: ... }`. Branding JSON is input to that Liquid (minimal five-field baseline from the flow API, or optional structured fields in [`schema.md`](schema.md)). Atoms do not read branding keys; Liquid is the only bridge.
+Atoms use `var(--zl-*)` only and never read branding keys. The orchestrator is the only bridge: it translates the branding object ([`schema.md`](schema.md)) into `--zl-*` declarations and adopts them onto its shadow root. Liquid templates structure HTML and emit no `<style>`.
 
-With the minimal five-field branding, tenants put `:host` rules inside `liquid_template`. If structured branding ships, a bundled master template can emit the same variables from `branding.palette` / `branding.shape` / etc.
+The variables themselves are the design system's, defined in [`packages/design-tokens`](../../../packages/design-tokens/README.md). Branding introduces no token surface of its own.
 
 ## Token delivery
 
-There are two supported paths from a branding payload to live `--zl-*` values on the widget root. Atoms behave identically in both cases.
-
 ```mermaid
 flowchart TB
-    subgraph pathA[Path A baseline]
-        A1[Minimal Branding] --> A2[liquid_template]
-        A2 --> A3["Tenant writes :host in Liquid"]
-    end
-    subgraph pathB[Path B extension]
-        B1[Branding + structured theme] --> B2[bundled master Liquid]
-        B2 --> B3["Package emits :host from JSON"]
-    end
-    A3 --> V["--zl-* on host"]
-    B3 --> V
-    V --> Z[Atoms use var]
+    D[design-tokens defaults] --> S1[base sheet]
+    B[Branding revision] --> T[branding-to-tokens] --> S2[branding sheet]
+    S1 --> R["adoptedStyleSheets on the shadow root"]
+    S2 --> R
+    H["host page: zitadel-login { --zl-* }"] --> R
+    R --> A[Atoms use var]
 ```
 
-### Path A: inline `liquid_template` (baseline)
+Two constructable stylesheets are adopted onto every `<zitadel-login>` shadow root (`packages/components/src/orchestrator/branding-to-tokens.ts`):
 
-The minimal baseline has no structured palette; anyone overriding tokens puts `:host` rules in their Liquid template:
+1. **Base sheet.** The full design-tokens set, rewritten from document selectors onto `:host` and `:host([data-theme="…"])`. It is adopted whether or not the host page imported `tokens.css`, so the widget paints correctly on any page.
+2. **Branding sheet.** Only the variables the revision sets. It is adopted after the base sheet and replaced whole when a new payload arrives, so nothing from the previous payload lingers.
 
-```liquid
-<style>
-  :host {
-    --zl-color-primary:     #4A90D9;
-    --zl-color-on-primary:  #FFFFFF;
-    --zl-radius-md:         0.5rem;
-    --zl-font-family:       'Arimo', ui-sans-serif, system-ui;
-    {% if branding.font_url %}
-      /* font-url stylesheet is injected by the orchestrator; nothing to do here */
-    {% endif %}
-  }
-</style>
+The branding sheet names the theme attributes in its selectors to match the base sheet's specificity, so adoption order decides and branding wins.
 
-<zl-card>
-  {% for pair in fields %}
-    <zl-field name="{{ pair[0] }}" label="{{ pair[1].text_key | t }}"></zl-field>
-  {% endfor %}
-  <zl-submit action="submit" label="{{ actions.submit.text_key | t }}"></zl-submit>
-</zl-card>
-```
+Shape and typography are shared across theme sides and land on one block. Each side's palette lands only under its own `data-theme` selector.
 
-[`../flowengine/template-security.md`](../flowengine/template-security.md) still applies to `<style>` and `{{ ... }}` inside Liquid.
+## What each branding key sets
 
-### Path B: master template + structured branding (extension)
+Branding keys are the stable, tenant-facing vocabulary. The variable names on the right are internal and can move without a revision changing.
 
-If the structured shape in [`schema.md`](schema.md) is adopted, the bundled `default.liquid` master template emits the `:host` block from typed fields, so customers never write a stylesheet by hand:
+### Palette (per theme side)
 
-```liquid
-{# default.liquid, bundled with the package #}
-<style>
-  :host {
-    {% if branding.palette.primary %}--zl-color-primary: {{ branding.palette.primary }};{% endif %}
-    {% if branding.palette.on_primary %}--zl-color-on-primary: {{ branding.palette.on_primary }};{% endif %}
-    {% if branding.shape.radius %}--zl-radius-md: {{ branding.shape.radius | radius_token }};{% endif %}
-    {% if branding.typography.font_family %}--zl-font-family: {{ branding.typography.font_family }};{% endif %}
-  }
-  {% if branding.theme.dark %}
-    :host([data-theme="dark"]) {
-      {% if branding.theme.dark.palette.background %}--zl-color-background: {{ branding.theme.dark.palette.background }};{% endif %}
-    }
-  {% endif %}
-</style>
-```
+| Key | Variables |
+| --- | --- |
+| `primary` | `--zl-primary` |
+| `on_primary` | `--zl-primary-foreground` |
+| `background` | `--zl-background` |
+| `surface` | `--zl-card`, `--zl-popover` |
+| `muted` | `--zl-muted`, `--zl-secondary`, `--zl-accent` |
+| `border` | `--zl-border`, `--zl-input` |
+| `text` | `--zl-foreground`, `--zl-card-foreground`, `--zl-popover-foreground`, `--zl-secondary-foreground`, `--zl-accent-foreground` |
+| `text_muted` | `--zl-muted-foreground` |
+| `link` | `--zl-link` |
+| `success` | `--zl-success` |
+| `warning` | `--zl-warning` |
+| `error` | `--zl-destructive` |
 
-Console validates each Branding axis independently on save and guarantees the emitted block is complete and consistent. Customers writing a `liquid_template` override opt out of this path and take on Path A's responsibilities.
+A key maps to several variables where the design system splits a role the branding object does not: a brand picks one border colour, and both the card edge and the control edge take it. `text` covers the foreground of every neutral surface, so a light `muted` on a dark side does not keep a near-white label.
 
-### Either way, atoms read the same tokens
-
-```css
-/* inside zl-submit */
-button {
-  background: var(--zl-color-primary, #4a90d9);
-  color: var(--zl-color-on-primary, #fff);
-  border-radius: var(--zl-radius-md, 0.5rem);
-  font-family: var(--zl-font-family, inherit);
-}
-```
-
-Every fallback is a sensible default so an atom used without a widget still looks reasonable.
-
-## Inline override (host element)
-
-Consumers of the widget can always set tokens as inline styles on the host element, bypassing branding entirely:
-
-```html
-<zitadel-login
-  style="
-  --zl-color-primary: #4A90D9;
-  --zl-radius-md: 0.5rem;
-  --zl-font-family: 'Arimo', ui-sans-serif, system-ui;
-"
-></zitadel-login>
-```
-
-Inline styles on the host beat `:host` rules by specificity (one-off host tweaks).
-
-## Catalogue
-
-Names are **stable**. Once an atom consumes a token, renaming it is a breaking change to the override contract. Additions are cheap; removals and renames are not.
-
-### Palette
-
-| Token                   | Purpose                                                                   |
-| ----------------------- | ------------------------------------------------------------------------- |
-| `--zl-color-primary`    | Primary action backgrounds, focus rings, active states                    |
-| `--zl-color-on-primary` | Text/icon on primary backgrounds                                          |
-| `--zl-color-background` | Page background behind the card                                           |
-| `--zl-color-surface`    | Card and elevated surfaces                                                |
-| `--zl-color-muted`      | Subtle fills (dividers, secondary buttons, input backgrounds)             |
-| `--zl-color-border`     | Input borders, card borders, divider lines                                |
-| `--zl-color-text`       | Default text                                                              |
-| `--zl-color-text-muted` | Secondary text, placeholders, helper copy                                 |
-| `--zl-color-link`       | Inline link colour; falls back to `--zl-color-primary`                    |
-| `--zl-color-success`    | Success messages                                                          |
-| `--zl-color-warning`    | Warning messages                                                          |
-| `--zl-color-error`      | Error messages, destructive actions                                       |
-| `--zl-color-focus-ring` | Explicit focus ring colour; falls back to `--zl-color-primary` with alpha |
+`--zl-link` defaults to `currentColor`: links take the surrounding text colour and are distinguished by an underline, so setting `link` tints exactly the links.
 
 ### Typography
 
-| Token                      | Purpose                                           |
-| -------------------------- | ------------------------------------------------- |
-| `--zl-font-family`         | Body and heading font stack                       |
-| `--zl-font-family-mono`    | Monospace (OTP codes, copy-to-clipboard surfaces) |
-| `--zl-font-size-xs`        | Helper text, captions                             |
-| `--zl-font-size-sm`        | Form labels, body small                           |
-| `--zl-font-size-md`        | Default body                                      |
-| `--zl-font-size-lg`        | Sub-headings                                      |
-| `--zl-font-size-xl`        | Card heading                                      |
-| `--zl-font-weight-regular` |                                                   |
-| `--zl-font-weight-medium`  |                                                   |
-| `--zl-font-weight-bold`    |                                                   |
-| `--zl-line-height-tight`   |                                                   |
-| `--zl-line-height-normal`  |                                                   |
+| Key | Variables |
+| --- | --- |
+| `font_family` | `--zl-font-family-sans`, `--zl-font-family-heading` |
+| `scale` | `--zl-text-{xs,sm,base,lg,xl}-size` and `-leading` |
+
+`scale` is clamped to `0.75`–`1.25` and multiplies both the size and its leading, so larger text gets the line box that goes with it. A separate display face is not part of a revision: a host page that has licensed one declares the `@font-face` and sets `--zl-font-family-heading` itself.
 
 ### Shape
 
-| Token                      | Purpose                           |
-| -------------------------- | --------------------------------- |
-| `--zl-radius-sm`           | Small controls (checkboxes, tags) |
-| `--zl-radius-md`           | Inputs and buttons                |
-| `--zl-radius-lg`           | Alerts                            |
-| `--zl-radius-xl`           | The auth card                     |
-| `--zl-radius-full`         | Circular (avatars, badges)        |
-| `--zl-border-width`        | Default 1px                       |
-| `--zl-border-width-strong` | Emphasised borders (focus, error) |
+| Key | Variables |
+| --- | --- |
+| `radius` | `--zl-radius-{xs,sm,md,lg,xl}` |
+| `density` | `--zl-spacing-4`, `--zl-spacing-8` |
+| `logo_scale` | `--zl-logo-scale` |
 
-### Density / spacing
-
-| Token                                 | Purpose                                        |
-| ------------------------------------- | ---------------------------------------------- |
-| `--zl-space-1` through `--zl-space-8` | Spacing scale; used for margins, padding, gaps |
-| `--zl-control-height-sm`              | Small buttons / inputs                         |
-| `--zl-control-height-md`              | Default                                        |
-| `--zl-control-height-lg`              | Prominent CTAs                                 |
-| `--zl-control-padding-x`              | Horizontal padding inside buttons / inputs     |
-
-Density presets (`compact` / `regular` / `comfortable` on the branding object) resolve to different values of these tokens; atoms never branch on the preset name.
-
-### Elevation
-
-| Token              | Purpose             |
-| ------------------ | ------------------- |
-| `--zl-shadow-none` |                     |
-| `--zl-shadow-sm`   | Inputs, subtle lift |
-| `--zl-shadow-md`   | Cards               |
-| `--zl-shadow-lg`   | Popovers, menus     |
-
-### Motion
-
-| Token                  | Purpose                  |
-| ---------------------- | ------------------------ |
-| `--zl-duration-fast`   | Hover, focus transitions |
-| `--zl-duration-normal` | Entrance, button-press   |
-| `--zl-ease-default`    | Timing function          |
-
-### Assets
-
-Asset URLs live on branding; the host loads them (img, link, background). They are not colour tokens.
-
-| Source                               | Applied as                                                                         |
-| ------------------------------------ | ---------------------------------------------------------------------------------- |
-| `logo_url` (baseline)                | Single-mark fallback, used only when neither side names one                        |
-| `hero_url` (baseline)                | `background-image` on `:host` when the `split` layout is active                    |
-| design-system default font           | Loaded by the orchestrator as `<link rel="stylesheet">` (`applyDefaultFont`, default Arimo) so the brand face paints with no branding; dropped when `typography.font_url` is set. See [ADR 025](../../adrs/025-default-brand-font-loading.md) |
-| `typography.font_url`                | Tenant override; injected by the orchestrator as `<link rel="stylesheet">` before the widget paints, replacing the default font. Page mode only — an embedded widget applies the family and leaves loading to the page that owns the document |
-| `theme.light.logo_url` / `theme.dark.logo_url` | The mark for that side. The orchestrator resolves one from the active theme and hands it to the template as `logo_url`; a side without a mark shows none, because a logo is pixels and is never recoloured |
-| `shape.logo_scale`                   | `--zl-logo-scale`, a multiplier on the logo height caps                            |
-
-## Dark-mode pairing
-
-Light and dark are independent sides of the revision, not a base plus overrides: each carries its own palette, and a key one side omits takes the maintained default for that side rather than the other side's value. Dark mode swaps token values on the root when `data-theme="dark"`. Names stay fixed:
-
-```css
-:host {
-  --zl-color-background: #ffffff;
-  --zl-color-text: #0f172a;
-}
-:host([data-theme="dark"]) {
-  --zl-color-background: #0a0a0a;
-  --zl-color-text: #fafafa;
-}
-```
-
-Atoms stay theme-blind.
-
-## Scale vs preset
-
-If the structured branding extension in [`schema.md`](schema.md) is adopted, it exposes high-level knobs (`shape.radius: "md"`, `shape.density: "regular"`) that the master template expands to specific token values. Atoms only see the expanded tokens. This keeps the public shape compact while preserving token stability:
+One `radius` value scales the whole corner ramp in proportion, so the card stays rounder than the controls inside it. The ratios come from the design system's own steps, so a change to the ramp moves branded corners with it.
 
 ```
-branding.shape.radius: "lg"          branding.shape.radius: 10
+shape.radius: "lg"                   shape.radius: 10
   → --zl-radius-xs: 0.1875rem          → --zl-radius-xs: 2.5px
     --zl-radius-sm: 0.5625rem            --zl-radius-sm: 7.5px
     --zl-radius-md: 0.75rem              --zl-radius-md: 10px
@@ -228,14 +80,56 @@ branding.shape.radius: "lg"          branding.shape.radius: 10
     --zl-radius-xl: 1.3125rem            --zl-radius-xl: 17.5px
 ```
 
-One value scales the whole ramp in proportion, so the card stays rounder than the controls inside it. A brand that has a specific corner value sends an integer number of pixels instead of a preset name.
+A preset name resolves to a `rem` value for the control step (`md`); an integer is that step in pixels. `full` sets every step to the pill radius. `density: regular` sets nothing. `logo_scale` is clamped to `0.5`–`2` and multiplies the logo height caps, which stay in the CSS that draws the mark.
 
-Preset-to-token tables ship in the component package, not in tenant JSON, so `lg` means the same everywhere.
+Preset-to-token tables ship in the component package, not in tenant JSON, so `lg` means the same everywhere. Atoms never branch on a preset name; they only see the expanded variables.
 
-## Open questions (token-specific)
+## Host override
 
-- Do we publish the preset-to-token mapping as JSON for third parties who want to render token values in design tools (Figma, Tokens Studio), or keep it internal to the component package?
-- Which tokens should be _customer-overridable_ on the branding object vs _read-only_ derivations? (Example: primary colour is an axis; focus-ring colour is likely a derivation.)
-- Motion tokens: do we expose them at all, or bake durations into atom CSS and let customers override via `::part` if they really need to?
+The page embedding the widget can set the same variables on the element, with a stylesheet rule or inline:
 
-See [`README.md`](README.md) for the full open-question list.
+```html
+<zitadel-login
+  style="
+  --zl-primary: #4A90D9;
+  --zl-radius-md: 0.5rem;
+"
+></zitadel-login>
+```
+
+This is tier 1 of the [override ladder](override-ladder.md), alongside the tenant's branding.
+
+## Assets
+
+Asset URLs live on branding; the orchestrator loads them. They are not colour tokens.
+
+| Source                               | Applied as                                                                         |
+| ------------------------------------ | ---------------------------------------------------------------------------------- |
+| `logo_url`                           | Single-mark fallback, used only when neither side names one                        |
+| `hero_url`                           | The brand pane image when the `split` layout is active                             |
+| design-system default font           | Loaded by the orchestrator as `<link rel="stylesheet">` (`applyDefaultFont`, default Arimo) so the brand face paints with no branding; dropped when `typography.font_url` is set. See [ADR 025](../../adrs/025-default-brand-font-loading.md) |
+| `typography.font_url`                | Tenant override; injected by the orchestrator as `<link rel="stylesheet">` before the widget paints, replacing the default font. Page mode only: an embedded widget applies the family and leaves loading to the page that owns the document |
+| `theme.light.logo_url` / `theme.dark.logo_url` | The mark for that side. The orchestrator resolves one from the active theme and hands it to the template as `logo_url`; a side without a mark shows none, because a logo is pixels and is never recoloured |
+| `shape.logo_scale`                   | `--zl-logo-scale`, a multiplier on the logo height caps                            |
+
+## Theme sides
+
+Light and dark are independent sides of the revision, not a base plus overrides: each carries its own palette, and a key one side omits takes the maintained default for that side rather than the other side's value. The orchestrator stamps the resolved side as `data-theme` on the host; names stay fixed and values swap:
+
+```css
+:host([data-theme="light"]) {
+  --zl-background: #ffffff;
+  --zl-foreground: #0f172a;
+}
+:host([data-theme="dark"]) {
+  --zl-background: #0a0a0a;
+  --zl-foreground: #fafafa;
+}
+```
+
+Atoms stay theme-blind. How the side is resolved is in [`schema.md`](schema.md) § Theme sides.
+
+## Open questions
+
+- Publish the preset-to-token mapping as JSON for third parties who render token values in design tools, or keep it internal to the component package.
+- Motion tokens: expose them on the branding object, or leave them to host overrides.
