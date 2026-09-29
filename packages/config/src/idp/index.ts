@@ -38,6 +38,13 @@ export function idpProvider(slug: string): IdpProvider {
   return provider;
 }
 
+export {
+  applySsoToFlow,
+  applySsoToSchema,
+  type SsoResult,
+  type SsoSkipped,
+} from "./sso.js";
+
 export { GoogleProvider } from "./google.js";
 export { OidcProvider } from "./oidc-provider.js";
 export {

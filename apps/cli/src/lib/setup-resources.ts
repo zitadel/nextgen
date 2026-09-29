@@ -23,8 +23,12 @@ import {
   type SetupPreset,
   type SetupUseCase,
 } from "@zitadel/config/defaults";
-import { idpProvider, type ConnectionEndpoints } from "@zitadel/config/idp";
-import { applySsoToFlow, applySsoToSchema } from "@zitadel/config/sso";
+import {
+  applySsoToFlow,
+  applySsoToSchema,
+  type ConnectionEndpoints,
+  idpProvider,
+} from "@zitadel/config/idp";
 import { normalizeFlowBody, normalizeSchemaBody } from "@zitadel/config/normalize";
 
 import { FLOWS_DIR } from "./flows";

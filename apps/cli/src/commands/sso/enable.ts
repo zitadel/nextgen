@@ -5,8 +5,14 @@ import { Flags } from "@oclif/core";
 import { password, text } from "@clack/prompts";
 import { consola } from "consola";
 
-import { credentialVariables, idpProvider, IDP_PROVIDERS } from "@zitadel/config/idp";
-import { applySsoToFlow, applySsoToSchema, type SsoSkipped } from "@zitadel/config/sso";
+import {
+  applySsoToFlow,
+  applySsoToSchema,
+  credentialVariables,
+  idpProvider,
+  IDP_PROVIDERS,
+  type SsoSkipped,
+} from "@zitadel/config/idp";
 
 import { createZitadelClient } from "../../lib/api-client";
 import { isDevelopmentBuild } from "../../lib/build-channel";

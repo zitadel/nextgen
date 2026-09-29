@@ -14,7 +14,7 @@ import { describe, expect, it } from "vitest";
 // protocol arms, scope requirements), so the receipt must be checkable from
 // the repo.
 
-const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "../../..");
+const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "../../../..");
 const readme = readFileSync(
   join(repoRoot, "docs/design/idp/README.md"),
   "utf8",
