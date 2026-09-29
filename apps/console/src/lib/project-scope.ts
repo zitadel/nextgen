@@ -51,7 +51,7 @@ export function validateProjectScopeSearch(search: Record<string, unknown>): Pro
  * when the person has to choose.
  *
  * Only a project the person can act on is ever chosen for them — one
- * `GET /users/me/projects` returns — because the session authorizes every
+ * `GET /users/me/projects` lists — because the session authorizes every
  * management call through their grants on it (#1300). Standalone optimises for
  * one project (ADR 0004 §6), so:
  *
@@ -68,15 +68,37 @@ export function validateProjectScopeSearch(search: Record<string, unknown>): Pro
  * an authorization error. A failed read selects nothing for the same reason.
  */
 export async function resolveDefaultProjectScope(): Promise<string | undefined> {
-  let projects: { id: string }[];
+  let page: Awaited<ReturnType<typeof listMyProjectsCached>>;
   try {
-    projects = (await listMyProjectsCached()).projects;
+    page = await listMyProjectsCached();
   } catch {
     return undefined;
   }
+  const { projects } = page;
+  const more = Boolean(page.next_page_token);
   const pinned = import.meta.env.VITE_CONSOLE_PROJECT_ID;
-  if (pinned && projects.some((project) => project.id === pinned)) return pinned;
-  return projects.length === 1 ? projects[0]?.id : undefined;
+  if (pinned && (await canManage(pinned, projects, more))) return pinned;
+  return projects.length === 1 && !more ? projects[0]?.id : undefined;
+}
+
+/**
+ * Whether `project` is one of the person's. The list is one page; past it,
+ * `GET /projects/{id}` answers a session only for a project it holds a grant
+ * on, so a pin further down the list is still recognised without walking it.
+ */
+async function canManage(
+  project: string,
+  listed: { id: string }[],
+  more: boolean,
+): Promise<boolean> {
+  if (listed.some((entry) => entry.id === project)) return true;
+  if (!more) return false;
+  try {
+    await api.getProject(project);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**
