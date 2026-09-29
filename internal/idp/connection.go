@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"slices"
+	"strings"
 
 	"github.com/zitadel/nextgen/internal/domain"
 )
@@ -150,10 +151,10 @@ func ParseConnection(revisionID string, body []byte) (Connection, error) {
 }
 
 // parseVerifiedClaims turns each raw verified_claims value into a
-// VerificationSource. The schema's rules are not re-checked: an unknown $
-// value read as a claim name matches nothing, and a value that is neither a
-// string nor true is dropped, so either evaluates as unverified, the same as
-// an absent entry.
+// VerificationSource. A $ value other than the strategy pointer is reserved
+// and dropped rather than read as a claim name, since a provider may send a
+// claim by that name. A value that is neither a string nor true is dropped
+// too. Either evaluates as unverified, the same as an absent entry.
 func parseVerifiedClaims(stored map[string]any) map[string]VerificationSource {
 	// An absent block stays nil, as ClaimMapping does.
 	if stored == nil {
@@ -169,6 +170,9 @@ func parseVerifiedClaims(stored map[string]any) map[string]VerificationSource {
 		case string:
 			if v == strategyPointer {
 				sources[property] = VerificationSource{Kind: VerifyByStrategy}
+				continue
+			}
+			if strings.HasPrefix(v, "$") {
 				continue
 			}
 			sources[property] = VerificationSource{Kind: VerifyByClaim, Claim: v}

@@ -47,14 +47,14 @@ func TestParseConnection(t *testing.T) {
 			},
 		},
 		{
-			name: "explicit values win over the defaults, and a verified_claims false is dropped",
+			name: "explicit values win over the defaults, and a verified_claims false or reserved $ value is dropped",
 			body: `{
 				"slug": "entra",
 				"protocol": "oidc",
 				"display_name": "Entra",
 				"subject_claim": "oid",
 				"claim_mapping": {"email": "email", "givenName": "name"},
-				"verified_claims": {"email": "email_verified", "givenName": true, "phone": "$supplementary_fetch", "familyName": false},
+				"verified_claims": {"email": "email_verified", "givenName": true, "phone": "$supplementary_fetch", "familyName": false, "picture": "$typo"},
 				"oidc": {
 					"issuer": "https://accounts.example.test",
 					"jwks_uri": "https://accounts.example.test/keys",
