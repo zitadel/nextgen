@@ -26,6 +26,8 @@ export {
 
 export { callbackUriFor } from "./callback";
 
+export { askConnectionEndpoints } from "./endpoints";
+
 export {
   ENV_EXAMPLE,
   ENV_LOCAL,

@@ -31,9 +31,9 @@ export type SsoAnswer = {
   readonly clientId: string;
   readonly secret: string;
   /**
-   * Where the connection points, when not at the vendor. Never prompted for
-   * — it comes from the hidden `--sso-issuer` family, whose one job is
-   * standing the provider up locally.
+   * Where the connection points, when not at the vendor. Asked for only on a
+   * development build, whose one job is standing the provider up locally —
+   * see {@link import("./social-sign-in").SocialSignInPrompt}.
    */
   readonly endpoints?: ConnectionEndpoints;
 };

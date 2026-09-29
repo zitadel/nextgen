@@ -1,16 +1,13 @@
 import { note, password, select, text } from "@clack/prompts";
 
 import {
-  catalogIssuer,
   clientSecretVariableName,
-  type ConnectionEndpoints,
-  derivedEndpoints,
   idpCatalogEntry,
   IDP_PROVIDERS,
   type IdpCatalogEntry,
 } from "@zitadel/config/idp-catalog";
 
-import { callbackUriFor } from "../../../lib/idp";
+import { askConnectionEndpoints, callbackUriFor } from "../../../lib/idp";
 import { issuerFromPort } from "../../../lib/orca";
 
 import { bail } from "./cancel";
@@ -49,7 +46,11 @@ export class SocialSignInPrompt implements SetupPrompt {
     const entry = idpCatalogEntry(provider);
     // Before the announcement, which names the vendor's console: on a
     // development build the provider may not be the vendor at all.
-    const endpoints = answers.sso?.endpoints ?? (await this.askEndpoints(provider, ctx));
+    const endpoints = answers.sso?.endpoints ?? (await askConnectionEndpoints({
+        provider,
+        developmentBuild: ctx.developmentBuild === true,
+        bail,
+      }));
     this.announce(entry, answers.devPort, endpoints?.issuer);
 
     const clientId =
@@ -112,64 +113,6 @@ export class SocialSignInPrompt implements SetupPrompt {
     );
   }
 
-  /**
-   * Where the provider lives, asked only on a development build.
-   *
-   * Someone working on the CLI runs it against a local stand-in constantly,
-   * and before this the connection document had to be hand-edited afterwards
-   * and re-applied. Someone who installed the CLI is configuring the real
-   * vendor and should never see the question, which is why the gate is the
-   * build stamp rather than a flag: a flag would have to be typed by exactly
-   * the people who should not need to know it exists.
-   *
-   * Returns `undefined` for a released build, and the catalog's own values are
-   * dropped when written, so an ordinary run produces the same document it
-   * would if none of this existed.
-   */
-  private async askEndpoints(
-    provider: string,
-    ctx: PromptContext,
-  ): Promise<ConnectionEndpoints | undefined> {
-    if (ctx.developmentBuild !== true) {
-      return undefined;
-    }
-    const vendor = catalogIssuer(provider);
-    const issuer = await this.askUrl("Issuer", vendor);
-    if (issuer === vendor) {
-      // Nothing is being stood in for, so the endpoints are the vendor's and
-      // come from its discovery document. Asking would offer two defaults
-      // that are wrong for it -- Google's are not `<issuer>/authorize` and
-      // `<issuer>/token` -- and every answer would be discarded anyway.
-      return { issuer };
-    }
-    const derived = derivedEndpoints(issuer, provider);
-    return {
-      issuer,
-      authorizationEndpoint: await this.askUrl(
-        "Authorization endpoint",
-        derived.authorizationEndpoint,
-      ),
-      tokenEndpoint: await this.askUrl("Token endpoint", derived.tokenEndpoint),
-    };
-  }
-
-  /** One URL question, pre-filled with the answer that needs no thought. */
-  private async askUrl(message: string, initialValue: string): Promise<string> {
-    const answer = await text({
-      message,
-      initialValue,
-      validate: (value) => {
-        try {
-          new URL(String(value ?? ""));
-          return undefined;
-        } catch {
-          return "Enter an absolute URL, e.g. http://localhost:9100.";
-        }
-      },
-    });
-    bail(answer);
-    return String(answer).trim();
-  }
 
   private async askClientId(): Promise<string> {
     const answer = await text({

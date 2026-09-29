@@ -6,6 +6,7 @@ import { cancel, isCancel, password, text } from "@clack/prompts";
 import { consola } from "consola";
 
 import {
+  catalogIssuer,
   clientIdVariableName,
   clientSecretVariableName,
   idpCatalogEntry,
@@ -15,9 +16,11 @@ import {
 import { applySsoToFlow, applySsoToSchema, type SsoSkipped } from "@zitadel/config/sso";
 
 import { createZitadelClient } from "../../lib/api-client";
+import { isDevelopmentBuild } from "../../lib/build-channel";
 import { ZitadelError } from "../../lib/errors";
 import { stableStringify } from "../../lib/json";
 import {
+  askConnectionEndpoints,
   callbackUriFor,
   CONNECTION_SCHEMA_REF,
   enabledMethods,
@@ -45,6 +48,17 @@ import {
 } from "../../lib/project";
 import { readState } from "../../lib/sync/state";
 import { readStdin } from "../../lib/variables";
+
+/**
+ * Turns a clack cancellation (Ctrl-C) into the command's own refusal, so a
+ * half-answered question never reaches the connection document.
+ */
+function bailOnCancel<T>(value: T | symbol): asserts value is T {
+  if (isCancel(value)) {
+    cancel("Enable cancelled.");
+    throw new ZitadelError("E_VALIDATION", "Enable cancelled by user");
+  }
+}
 
 /**
  * The `sso enable` command — add a provider to a Project's sign-in methods.
@@ -79,26 +93,6 @@ export default class SsoEnable extends BaseCommand {
     }),
     "client-id": Flags.string({
       description: "Client id of the application registered with the provider.",
-    }),
-    // Hidden, and for one job: standing the provider up locally. A mock on
-    // localhost speaks the same protocol as the vendor, and pointing at it
-    // should be a flag rather than a hand edit of the connection afterwards.
-    // The issuer is usually enough — the engine derives `<issuer>/authorize`
-    // and `<issuer>/token` when the endpoints are absent — so the other two
-    // are there only for a stand-in whose paths differ.
-    issuer: Flags.string({
-      hidden: true,
-      description: "Point the connection at this issuer instead of the provider's.",
-    }),
-    "authorization-endpoint": Flags.string({
-      hidden: true,
-      dependsOn: ["issuer"],
-      description: "Authorization endpoint, when it is not <issuer>/authorize.",
-    }),
-    "token-endpoint": Flags.string({
-      hidden: true,
-      dependsOn: ["issuer"],
-      description: "Token endpoint, when it is not <issuer>/token.",
     }),
     "no-open": Flags.boolean({
       default: false,
@@ -175,6 +169,13 @@ export default class SsoEnable extends BaseCommand {
       consola.info(`Callback URI   ${callbackUri}`);
       consola.info(`Create it at   ${entry.console_url}`);
 
+      // Before the credentials: on a development build the provider may be a
+      // local stand-in, and the client is registered with whatever answers.
+      const endpoints = await askConnectionEndpoints({
+        provider,
+        developmentBuild: isDevelopmentBuild() && !nonInteractive,
+        bail: bailOnCancel,
+      });
       const clientId =
         flags["client-id"] ?? (await this.askClientId(entry.display_name, nonInteractive));
       const secretValue = await this.askClientSecret(variable, nonInteractive);
@@ -185,17 +186,13 @@ export default class SsoEnable extends BaseCommand {
         slug: plan.slug,
         schemaProperties: schema.properties,
         schemaRef: CONNECTION_SCHEMA_REF,
-        endpoints: {
-          issuer: flags.issuer,
-          authorizationEndpoint: flags["authorization-endpoint"],
-          tokenEndpoint: flags["token-endpoint"],
-        },
+        endpoints,
       });
-      if (flags.issuer !== undefined) {
+      if (endpoints?.issuer !== undefined && endpoints.issuer !== catalogIssuer(provider)) {
         // Said out loud: a connection pointing somewhere other than the
         // vendor is not what the developer will want in the end, and nothing
         // else in the output would show it.
-        consola.warn(`${entry.display_name} points at ${flags.issuer}, not the provider`);
+        consola.warn(`${entry.display_name} points at ${endpoints.issuer}, not the provider`);
       }
       const target = join(cwd, plan.path);
       await mkdir(dirname(target), { recursive: true });

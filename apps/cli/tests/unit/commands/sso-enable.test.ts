@@ -223,45 +223,23 @@ describe("sso enable", () => {
     expect(json.hint).toContain("--provider google");
   });
 
-  it("points the connection at a stand-in issuer without touching the file afterwards", async () => {
-    // The hidden issuer flag exists so testing against a local provider is a
-    // flag rather than a hand edit of the connection document. Every endpoint
-    // is named, so the document says where it goes and a stand-in that serves
-    // no discovery document still works.
+  it("writes the vendor's own connection on a scripted run", async () => {
+    // Where a provider lives is asked for, and only on a development build:
+    // the question belongs to whoever is working on the CLI, and a scripted
+    // run has nobody to ask, so it gets the catalog's own issuer.
     const cwd = await makeProject();
 
-    const result = await enable(
-      cwd,
-      "--client-id",
-      "1234-abc.apps.googleusercontent.com",
-      "--issuer",
-      "http://localhost:9100",
-    );
+    const result = await enable(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
 
     expect(result.exitCode).toBe(0);
     const written = JSON.parse(
       await readFile(join(cwd, ".zitadel/idps/google.json"), "utf8"),
     ) as { oidc: Record<string, unknown> };
-    expect(written.oidc.issuer).toBe("http://localhost:9100");
-    expect(written.oidc.authorization_endpoint).toBe("http://localhost:9100/o/oauth2/v2/auth");
-    expect(written.oidc.token_endpoint).toBe("http://localhost:9100/token");
+    expect(written.oidc.issuer).toBe("https://accounts.google.com");
+    // No endpoints: the vendor's are resolved from its discovery document.
+    expect(written.oidc.authorization_endpoint).toBeUndefined();
+    expect(written.oidc.token_endpoint).toBeUndefined();
     expect(written.oidc.client_secret).toBe("${{ GOOGLE_CLIENT_SECRET }}");
-  });
-
-  it("refuses an endpoint override with no issuer to override", async () => {
-    // The endpoints only mean anything beside an issuer, so oclif's dependsOn
-    // refuses the pair rather than writing a half-pointed connection.
-    const cwd = await makeProject();
-
-    const result = await enable(
-      cwd,
-      "--client-id",
-      "1234-abc.apps.googleusercontent.com",
-      "--token-endpoint",
-      "http://localhost:9100/token",
-    );
-
-    expect(result.exitCode).not.toBe(0);
   });
 });
 
