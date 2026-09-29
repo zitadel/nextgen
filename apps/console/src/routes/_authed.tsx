@@ -1,7 +1,19 @@
-import { Outlet, createFileRoute, redirect, useRouter } from "@tanstack/react-router";
+import {
+  Outlet,
+  createFileRoute,
+  redirect,
+  retainSearchParams,
+  useRouter,
+} from "@tanstack/react-router";
 
 import { fetchSession, signOut } from "../auth/session";
 import { AppShell } from "../components/app-shell/AppShell";
+import {
+  PROJECT_SCOPE_PARAM,
+  resolveDefaultProjectScope,
+  validateProjectScopeSearch,
+  withoutTrailingSlash,
+} from "../lib/project-scope";
 
 /**
  * Pathless layout route owning console authentication (Console ADR 0003).
@@ -12,15 +24,45 @@ import { AppShell } from "../components/app-shell/AppShell";
  * redirected to `/login` with the originally requested path in `?next=` so
  * deep links survive the round trip.
  *
+ * It also owns the selected project (`src/lib/project-scope.ts`): `?project=`
+ * is validated here and retained on every navigation beneath the layout, so a
+ * sidebar link or a row link keeps the selection without naming it. Any
+ * screen opened without a selection is redirected to itself with the default
+ * one, so a single-project person gets it wherever they arrive. With no default
+ * — several projects to choose from — an unscoped screen renders as it is, and
+ * one declaring `staticData.scope: "project"` goes to Projects, carrying the
+ * requested location in `?next=` so choosing a project ends there.
+ *
  * The layout also renders the `AppShell` (moved here from `__root` so the
  * login screen stays shell-less) and feeds it the signed-in identity from the
  * route context plus the sign-out action.
  */
 export const Route = createFileRoute("/_authed")({
-  beforeLoad: async ({ location }) => {
+  validateSearch: validateProjectScopeSearch,
+  search: { middlewares: [retainSearchParams([PROJECT_SCOPE_PARAM])] },
+  beforeLoad: async ({ location, search, matches }) => {
     const session = await fetchSession();
     if (!session) {
       throw redirect({ to: "/login", search: { next: routerRelativeHref(location.href) } });
+    }
+    const leaf = matches[matches.length - 1];
+    if (!search.project && leaf) {
+      const project = await resolveDefaultProjectScope();
+      if (project) {
+        throw redirect({
+          to: withoutTrailingSlash(leaf.fullPath),
+          params: leaf.params,
+          search: { ...leaf.search, project },
+          replace: true,
+        });
+      }
+      if (leaf.staticData.scope === "project") {
+        throw redirect({
+          to: "/projects",
+          search: { next: routerRelativeHref(location.href) },
+          replace: true,
+        });
+      }
     }
     return { session };
   },

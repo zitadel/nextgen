@@ -77,17 +77,24 @@ The Vite development proxy may temporarily inject a project-secret bearer
 until the session-derived management path is implemented. That is a
 development compatibility mechanism, not the embedded deployment contract.
 
-The diagram below is the shape as revised in 2026-08-12 (see the note under
-it): one rule, two same-origin paths, and no browser-held secret on either.
+> **Amendment (2026-09-25, #1300):** the bridge is gone. The management
+> operations the Console uses accept the session cookie and authorize it through
+> the signed-in person's grants on the target project, and the Vite dev proxy no
+> longer injects a project secret — it forwards requests as-is. Dev and the
+> embedded build take the same credential path.
+
+The diagram below is the current shape (revised 2026-08-12, and 2026-09-25 for
+the amendment above): one rule, two same-origin paths, no browser-held secret
+on either, and no credential added by the dev proxy.
 
 ```mermaid
 flowchart LR
   browser["Console SPA (browser)\nno secret"]
-  proxy["Vite dev server /api\ninjects sk_proj_... bearer"]
+  proxy["Vite dev server /api\nstrips the prefix, adds nothing"]
   apiHandler["ogen API handler\n(Go binary, origin root)"]
 
-  browser -->|"dev: /api/... , no Authorization"| proxy
-  proxy -->|"+ Authorization: Bearer sk_proj_..."| apiHandler
+  browser -->|"dev: /api/... , session cookie"| proxy
+  proxy -->|"/... , session cookie"| apiHandler
   browser -->|"prod: /... , publishable key + session cookie"| apiHandler
 ```
 
@@ -152,8 +159,8 @@ responsibilities are deliberately narrow:
 - **No client token for management** — the app-wide client sets no bearer;
   `customFetch` leaves the `Authorization` header alone when no token is
   configured. The browser's HttpOnly first-party cookie is the management
-  credential in the embedded topology; the dev proxy temporarily supplies a
-  project-secret bearer until that path lands. The login screen's per-element
+  credential, in the embedded topology and behind the dev proxy alike (#1300).
+  The login screen's per-element
   handle is the one exception: it carries the runtime-discovered publishable
   key from ADR 036.
 - **Error mapping** — non-2xx throws `ApiError`; loaders let it propagate to
@@ -184,7 +191,7 @@ that follows from who serves the console:
 // vite.config.mts (dev only) — illustrative
 server: {
   proxy: {
-    // Vite proxy injects the project-secret bearer, then forwards to the Go API
+    // Vite proxy strips the /api prefix and forwards to the Go API; no credential
     "/api": { target: "http://localhost:8080", changeOrigin: true },
   },
 },
@@ -248,8 +255,10 @@ and ADR 053 amends it; cite 053, not 046, for the CSRF contract.
   and the session cookie. The lesson worth keeping is the second half — a
   recorded cross-surface dependency needs a _test_ that fails while it is
   open, not only a note.
-- **Management calls are fail-closed until the cookie is authorized.** The
-  dev proxy's secret is what carries `user.read` and friends today; the
+- **~~Management calls are fail-closed until the cookie is authorized.~~
+  Resolved 2026-09-25 (#1300):** the management operations accept the session
+  cookie and the dev proxy's secret is gone. As recorded at the time: the
+  dev proxy's secret carried `user.read` and friends; the
   publishable key is deliberately refused for them (`internal/api/user.go`).
   Root ADRs 032/033/053's session-derived target permissions make the embedded
   Console's list screens work without a proxy.

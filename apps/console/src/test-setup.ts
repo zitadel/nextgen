@@ -2,6 +2,8 @@ import { afterEach, beforeEach } from "vitest";
 import { _resetConfigForTesting } from "@zitadel/api/config";
 import "@testing-library/jest-dom/vitest";
 
+import { clearSessionCaches } from "./lib/session-cache";
+
 // configureZitadel is write-once on globalThis so duplicate module copies
 // share one slot. That slot also survives Vitest's per-file isolate, and
 // this file's top-level body is not guaranteed to re-run for every spec in
@@ -12,6 +14,10 @@ import "@testing-library/jest-dom/vitest";
 _resetConfigForTesting();
 beforeEach(_resetConfigForTesting);
 afterEach(_resetConfigForTesting);
+
+// Reads cached for the signed-in person (`GET /users/me/projects`) would
+// otherwise carry one test's mocked answer into the next.
+beforeEach(clearSessionCaches);
 
 // @ts-expect-error Needed for tests
 global.IS_REACT_ACT_ENVIRONMENT = true;
