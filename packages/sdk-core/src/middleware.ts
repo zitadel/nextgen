@@ -61,49 +61,48 @@ export function matchesRoutes(pathname: string, routes: readonly string[]): bool
 // ─── Response header filtering ───────────────────────────────────────────────
 
 /**
- * An upstream `Location` resolved against the app's own origin, or `undefined`
- * when it must not be forwarded.
+ * An upstream `Location`, pointed back at this app.
  *
- * A redirect survives only when it lands on the app's own origin. That keeps
- * both properties the blanket strip used to provide -- an internal hostname
- * can never reach the browser, and the app's own origin can never be turned
- * into an open redirect -- while letting the one redirect that has to work
- * through.
+ * Only the path, query and fragment survive; whatever origin the upstream
+ * named is discarded and the result is re-based onto the request's own URL.
+ * That keeps both properties the blanket strip was protecting -- an internal
+ * hostname can never reach the browser, and the redirect can only ever land on
+ * this app -- without needing to know what this app's public origin is.
  *
- * The result is absolute rather than a bare path: Next.js rejects a relative
- * `Location` on a response returned from middleware (`ERR_INVALID_URL`). It
- * costs nothing, because the origin has already been checked to be the app's
- * own -- the safeguard is that check, not the spelling.
+ * Comparing origins instead would have required that knowledge, and there is
+ * no reliable source for it: `X-Forwarded-Host` is attacker-settable on a
+ * direct request, and the request's own host is wrong behind a proxy that
+ * terminates TLS or rewrites it. Discarding the origin sidesteps the question
+ * -- a redirect to another origin becomes the same path on this one rather
+ * than being dropped, so a deployment behind such a proxy works instead of
+ * landing on a blank page.
  *
- * Every rejection funnels to `undefined`: an unparseable value, a
- * protocol-relative `//evil.com/x` (which resolves to another origin), an
- * absolute URL naming the upstream server, and a caller that did not say what
- * its own origin is.
+ * Nothing legitimate on this path points off-origin anyway: an outbound
+ * redirect to a provider travels as `step.redirect_url` in a JSON body and the
+ * widget performs it, never as a proxied header.
+ *
+ * A relative reference resolves against the path it came from (RFC 3986 §5),
+ * so `next?flow=x` answered to `/__nextgen/idp/callback` means
+ * `/__nextgen/idp/next?flow=x`. An unparseable value is the one case with
+ * nothing to forward.
  */
-function sameOriginLocation(location: string, selfUrl: string | undefined): string | undefined {
+function ontoThisApp(location: string, selfUrl: string | undefined): string | undefined {
   if (selfUrl === undefined || selfUrl === "") {
     return undefined;
   }
-  let base: URL;
-  let target: URL;
   try {
-    // The request's own URL, not just its origin: a relative `Location` is
-    // resolved against the path it came from (RFC 3986 §5), so `next?flow=x`
-    // answered to `/__nextgen/idp/callback` means `/__nextgen/idp/next?flow=x`
-    // and not `/next?flow=x`. Query-only and fragment-only references depend
-    // on the same base.
-    base = new URL(selfUrl);
-    target = new URL(location, base);
+    const base = new URL(selfUrl);
+    const target = new URL(location, base);
+    return new URL(`${target.pathname}${target.search}${target.hash}`, base).toString();
   } catch {
     return undefined;
   }
-  return target.origin === base.origin ? target.toString() : undefined;
 }
 
 /**
  * Filters upstream response headers for proxying: strips hop-by-hop headers
  * and `set-cookie` (handled separately via `getSetCookie()`), and reduces
- * `location` to a redirect that can only land on the app's own origin.
+ * `location` to a redirect that can only land on this app.
  *
  * `location` was stripped outright until the identity-provider callback
  * needed it: the provider returns the browser to `/__nextgen/idp/callback`,
@@ -127,9 +126,9 @@ export function filterResponseHeaders(upstream: Headers, selfUrl?: string): Head
       return;
     }
     if (name === "location") {
-      const sameOrigin = sameOriginLocation(value, selfUrl);
-      if (sameOrigin !== undefined) {
-        filtered.set("location", sameOrigin);
+      const onThisApp = ontoThisApp(value, selfUrl);
+      if (onThisApp !== undefined) {
+        filtered.set("location", onThisApp);
       }
       return;
     }
