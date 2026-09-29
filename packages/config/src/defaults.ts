@@ -81,10 +81,10 @@ export type BrandingDesign = (typeof BRANDING_DESIGNS)[number];
 export const DEFAULT_BRANDING_DESIGN: BrandingDesign = "centered";
 
 /**
- * Descriptor `layout` each design degrades to when its template is rejected.
- * Both shipped designs are widget structure and degrade to `centered`; the
- * wire enum still carries `split` for revisions published from the retired
- * page-layout designs (#1039), which no catalog entry produces any more.
+ * Descriptor `layout` each design's `branding.json` carries. Both shipped
+ * designs are widget structure and carry `centered`; the wire enum still has
+ * `split` for revisions published from the retired page-layout designs
+ * (#1039), which no catalog entry produces any more.
  */
 const DESIGN_LAYOUTS: Record<BrandingDesign, "centered"> = {
   centered: "centered",
