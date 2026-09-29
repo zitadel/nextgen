@@ -20,7 +20,9 @@ one per guarded operation, with the editor `$schema` pointing at the
 
 A file is validated locally against the operation-typed schema before it is
 sent: an unknown setting, a value outside the template's bounds, or a fixed
-setting fails `plan`.
+setting fails `plan`. A value below a setting's `x-recommended-minimum`
+(`min_length` under 15) publishes, with a warning on the plan and again on
+apply.
 
 ## Testing (not built yet)
 
