@@ -20,17 +20,17 @@ direction for the console build-out (issue
   — the console holds no script-readable credential and calls the API
   same-origin; the embedded browser carries its HttpOnly first-party session
   cookie. Reuse `configureZitadel()` / `getApi()` rather than a bespoke client.
-  The base is `/api` **only** under the dev server (whose proxy temporarily
-  injects the project secret); the embedded build talks to the origin root,
+  The base is `/api` **only** under the dev server (whose proxy forwards
+  without adding a credential); the embedded build talks to the origin root,
   where the Go binary serves the API. The `/api` shim §1 once deferred to the
   server was withdrawn in the 2026-08-12 revision — do not reintroduce it.
 - [ADR 0003: Console authentication](docs/adrs/0003-console-authentication.md)
   — `/login` embeds the login widget (`@zitadel/sdk-react`); the pathless
   `_authed` layout owns the session guard (`GET /sessions/me`) and the app
   shell; the first-party session cookie is the embedded Console's human
-  operator credential. Management calls stay on the dev-only proxy secret
-  until ADR 053's session-derived target authorization exists; embedded calls
-  fail closed in the meantime.
+  operator credential, and it authorizes the management calls too (#1300):
+  what a person can see and change is what their grants on the selected
+  project allow. No project secret is involved in dev or in production.
 - [ADR 0004: Deployment modes](docs/adrs/0004-console-deployment-modes.md)
   — one build and one authorization model serve cloud and self-host. **Target:**
   every deployment uses a reserved platform project for Console identities; an
@@ -76,6 +76,22 @@ the resource has lifecycle state, `$param` detail routes. The sessions screen
 speaks `POST /sessions/query` (structured filters + cursor pagination); there
 is no `GET /sessions` list, and sessions have no `revoked` state — revocation
 deletes the session.
+
+A screen that acts on one project declares `staticData.scope: "project"` and
+reads the **selected** project — `?project=`, retained by the `_authed` layout —
+through `src/lib/project-scope.ts` (`projectScopeDeps` + `requireProjectScope`
+in loaders, `useRequiredProjectScope` in components). Never scope a management
+call with `getConsoleProjectId()`: that is the project the console signs into
+(ADR 0004 §1), not the one being managed. The flag also hides the screen from
+the sidebar until a project is selected.
+
+The sidebar is the Projects overview, then the selected project's contents.
+Projects is the one unscoped entry, first, and the only one while nothing is
+selected; the project switcher's `All projects` footer links to it too, and a
+row there opens the project (selects it). The project's own page is the scoped `/project` (`Project
+settings`); `/projects/$projectId` only redirects there with that project
+selected. Screens outside every project (account, billing, deployment-wide
+operators) belong in the switcher or the Settings view, not in this list.
 
 ## Generated files
 
