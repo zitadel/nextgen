@@ -61,23 +61,71 @@ export function matchesRoutes(pathname: string, routes: readonly string[]): bool
 // ─── Response header filtering ───────────────────────────────────────────────
 
 /**
- * Filters upstream response headers for proxying: strips hop-by-hop headers,
- * `set-cookie` (handled separately via `getSetCookie()`), and `location`
- * (prevents leaking internal upstream URLs).
+ * An upstream `Location` resolved against the app's own origin, or `undefined`
+ * when it must not be forwarded.
+ *
+ * A redirect survives only when it lands on the app's own origin. That keeps
+ * both properties the blanket strip used to provide -- an internal hostname
+ * can never reach the browser, and the app's own origin can never be turned
+ * into an open redirect -- while letting the one redirect that has to work
+ * through.
+ *
+ * The result is absolute rather than a bare path: Next.js rejects a relative
+ * `Location` on a response returned from middleware (`ERR_INVALID_URL`). It
+ * costs nothing, because the origin has already been checked to be the app's
+ * own -- the safeguard is that check, not the spelling.
+ *
+ * Every rejection funnels to `undefined`: an unparseable value, a
+ * protocol-relative `//evil.com/x` (which resolves to another origin), an
+ * absolute URL naming the upstream server, and a caller that did not say what
+ * its own origin is.
+ */
+function sameOriginLocation(location: string, selfOrigin: string | undefined): string | undefined {
+  if (selfOrigin === undefined || selfOrigin === "") {
+    return undefined;
+  }
+  let target: URL;
+  try {
+    target = new URL(location, selfOrigin);
+  } catch {
+    return undefined;
+  }
+  return target.origin === selfOrigin ? target.toString() : undefined;
+}
+
+/**
+ * Filters upstream response headers for proxying: strips hop-by-hop headers
+ * and `set-cookie` (handled separately via `getSetCookie()`), and reduces
+ * `location` to a redirect that can only land on the app's own origin.
+ *
+ * `location` was stripped outright until the identity-provider callback
+ * needed it: the provider returns the browser to `/__nextgen/idp/callback`,
+ * and the engine answers `302` back to the page the sign-in started on. That
+ * is a top-level navigation with no JavaScript in the loop, so a dropped
+ * `Location` leaves the browser on an empty page. Outbound redirects to a
+ * provider do not travel this way -- they arrive as `step.redirect_url` in a
+ * JSON body and the widget navigates -- so nothing legitimate points off-origin.
  *
  * @param upstream - The upstream response headers.
+ * @param selfOrigin - The origin the app is served from. Omitting it keeps the
+ *   old behaviour of dropping every redirect.
  * @returns A new `Headers` object with filtered headers.
  */
-export function filterResponseHeaders(upstream: Headers): Headers {
+export function filterResponseHeaders(upstream: Headers, selfOrigin?: string): Headers {
   const filtered = new Headers();
   upstream.forEach((value, key) => {
-    if (
-      !HOP_BY_HOP.has(key.toLowerCase()) &&
-      key.toLowerCase() !== "set-cookie" &&
-      key.toLowerCase() !== "location"
-    ) {
-      filtered.set(key, value);
+    const name = key.toLowerCase();
+    if (HOP_BY_HOP.has(name) || name === "set-cookie") {
+      return;
     }
+    if (name === "location") {
+      const sameOrigin = sameOriginLocation(value, selfOrigin);
+      if (sameOrigin !== undefined) {
+        filtered.set("location", sameOrigin);
+      }
+      return;
+    }
+    filtered.set(key, value);
   });
   return filtered;
 }
