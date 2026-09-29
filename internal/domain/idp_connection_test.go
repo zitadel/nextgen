@@ -41,9 +41,22 @@ func TestIDPConnectionImmutableFieldsChanged(t *testing.T) {
 			want: []string{"oidc.issuer"},
 		},
 		{
-			name:   "setting a subject claim that was absent is a change",
+			name:   "absent OIDC subject_claim equals sub",
 			stored: oidcConnection,
 			next: `{"slug":"google","protocol":"oidc","display_name":"Google","subject_claim":"sub",
+				"oidc":{"issuer":"https://accounts.google.com","client_id":"id","client_secret":"${{ S }}","scopes":["openid"]}}`,
+		},
+		{
+			name: "dropping an OIDC subject_claim of sub is no change",
+			stored: `{"slug":"google","protocol":"oidc","display_name":"Google","subject_claim":"sub",
+				"oidc":{"issuer":"https://accounts.google.com","client_id":"id","client_secret":"${{ S }}","scopes":["openid"]}}`,
+			next: oidcConnection,
+		},
+		{
+			name: "sub to oid is reported",
+			stored: `{"slug":"google","protocol":"oidc","display_name":"Google","subject_claim":"sub",
+				"oidc":{"issuer":"https://accounts.google.com","client_id":"id","client_secret":"${{ S }}","scopes":["openid"]}}`,
+			next: `{"slug":"google","protocol":"oidc","display_name":"Google","subject_claim":"oid",
 				"oidc":{"issuer":"https://accounts.google.com","client_id":"id","client_secret":"${{ S }}","scopes":["openid"]}}`,
 			want: []string{"subject_claim"},
 		},

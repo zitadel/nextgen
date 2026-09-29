@@ -67,10 +67,12 @@ func parseIDPConnectionDocument(document []byte) (idpConnectionDocument, error) 
 
 // IDPConnectionImmutableFieldsChanged returns the dotted paths of the identity
 // fields that next changes against stored (see ErrIDPConnectionFieldImmutable).
-// Values are compared as written, so an absent subject_claim and "sub" differ.
-// subject_claim does not depend on the protocol, so it is always compared. On
-// a protocol change the endpoint fields are skipped: those of two protocols
-// are not comparable. The order is protocol, subject_claim, then endpoints.
+// subject_claim is always compared. On an OIDC connection whose protocol
+// stays OIDC, an absent subject_claim counts as "sub", because the engine
+// resolves it to that claim (internal/idp). On a protocol change it is
+// compared as written, since the two protocols' defaults differ, and the
+// endpoint fields are skipped: those of two protocols are not comparable.
+// The order is protocol, subject_claim, then endpoints.
 func IDPConnectionImmutableFieldsChanged(stored, next []byte) ([]string, error) {
 	before, err := parseIDPConnectionDocument(stored)
 	if err != nil {
@@ -85,7 +87,11 @@ func IDPConnectionImmutableFieldsChanged(stored, next []byte) ([]string, error) 
 	if protocolChanged {
 		changed = append(changed, "protocol")
 	}
-	if !sameString(before.SubjectClaim, after.SubjectClaim) {
+	beforeClaim, afterClaim := before.SubjectClaim, after.SubjectClaim
+	if !protocolChanged && sameString(before.Protocol, &oidcProtocol) {
+		beforeClaim, afterClaim = subOrClaim(beforeClaim), subOrClaim(afterClaim)
+	}
+	if !sameString(beforeClaim, afterClaim) {
 		changed = append(changed, "subject_claim")
 	}
 	if protocolChanged {
@@ -104,6 +110,16 @@ func IDPConnectionImmutableFieldsChanged(stored, next []byte) ([]string, error) 
 		}
 	}
 	return changed, nil
+}
+
+var oidcProtocol, oidcDefaultSubjectClaim = "oidc", "sub"
+
+// subOrClaim returns claim, or "sub" when it is absent.
+func subOrClaim(claim *string) *string {
+	if claim == nil {
+		return &oidcDefaultSubjectClaim
+	}
+	return claim
 }
 
 func sameString(a, b *string) bool {
