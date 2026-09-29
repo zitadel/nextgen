@@ -16,9 +16,9 @@ import {
 import { applySsoToFlow, applySsoToSchema, type SsoSkipped } from "@zitadel/config/sso";
 
 import { createZitadelClient } from "../../lib/api-client";
-import { bailOnCancel } from "../../lib/prompt-cancel";
 import { isDevelopmentBuild } from "../../lib/build-channel";
 import { ZitadelError } from "../../lib/errors";
+import { bailOnCancel } from "../../lib/prompt-cancel";
 import { stableStringify } from "../../lib/json";
 import {
   askConnectionEndpoints,
@@ -49,7 +49,6 @@ import {
 } from "../../lib/project";
 import { readState } from "../../lib/sync/state";
 import { readStdin } from "../../lib/variables";
-
 
 /**
  * The `sso enable` command — add a provider to a Project's sign-in methods.
@@ -141,12 +140,11 @@ export default class SsoEnable extends BaseCommand {
         pretty: `Would ${plan.action} ${plan.action === "reuse" ? plan.file.path : plan.path}`,
       });
     }
-    // An existing connection is reused as it stands — its credentials are
-    // already configured, and a second prompt would invite replacing them —
-    // but the schema and flow edits still run. Those are the point of the
-    // command, they are per-schema, and they are idempotent. Enabling the
-    // provider for a second user type, and finishing a run that was
-    // interrupted after the connection file was written, both arrive here.
+    // An existing connection is reused rather than rewritten, but the schema
+    // and flow edits still run: those are the point of the command, they are
+    // per-schema, and they are idempotent. Enabling the provider for a second
+    // user type, and finishing a run interrupted after the connection file was
+    // written, both arrive here.
     const reusing = plan.action === "reuse";
     const variable = clientSecretVariableName(plan.slug);
     const idVariable = clientIdVariableName(plan.slug);
@@ -299,35 +297,18 @@ export default class SsoEnable extends BaseCommand {
     cwd: string,
     schema: SchemaFile,
     slug: string,
-  ): Promise<{ written: string[]; skipped: SsoSkipped[]; flowsMatched: number }> {
-    const written: string[] = [];
-    const skipped: SsoSkipped[] = [];
-    let flowsMatched = 0;
-
-    const schemaResult = applySsoToSchema(schema.body, slug);
-    if (schemaResult.changed) {
-      await writeFile(join(cwd, schema.path), `${stableStringify(schemaResult.document)}\n`);
-      written.push(schema.path);
-    }
-
-    const methods = enabledMethods(schema);
+  ): Promise<{ written: string[]; skipped: SsoSkipped[] }> {
+    // Every target is found before anything is written. No flow means no
+    // button, however well the schema went, and the failure is invisible
+    // otherwise: `plan` and `apply` both succeed and the sign-in screen simply
+    // never offers the provider. Refusing after the schema had already gained
+    // `x-auth-methods.sso` would leave the Project half-enabled for a provider
+    // it cannot show.
     const publishedSchemaId = await publishedIdOf(cwd, schema.path);
-    for (const flow of await readFlowFiles(cwd)) {
-      if (!flowUsesSchema(flow.body, schema, publishedSchemaId)) {
-        continue;
-      }
-      flowsMatched += 1;
-      const result = applySsoToFlow(flow.body, slug, methods);
-      skipped.push(...result.skipped.map((entry) => ({ ...entry, region: `${flow.path} ${entry.region}` })));
-      if (result.changed) {
-        await writeFile(join(cwd, flow.path), `${stableStringify(result.document)}\n`);
-        written.push(flow.path);
-      }
-    }
-    // No flow means no button, however well the schema went — and the failure
-    // is invisible otherwise: `plan` and `apply` both succeed and the sign-in
-    // screen simply never offers the provider.
-    if (flowsMatched === 0) {
+    const flows = (await readFlowFiles(cwd)).filter((flow) =>
+      flowUsesSchema(flow.body, schema, publishedSchemaId),
+    );
+    if (flows.length === 0) {
       throw new ZitadelError("E_NOT_FOUND", `No login flow runs against ${schema.name}`, {
         hint:
           "The provider is offered by a flow, and none of the files under .zitadel/flows/ " +
@@ -336,7 +317,30 @@ export default class SsoEnable extends BaseCommand {
         details: { schema: schema.path },
       });
     }
-    return { written, skipped, flowsMatched };
+
+    const methods = enabledMethods(schema);
+    const schemaResult = applySsoToSchema(schema.body, slug);
+    const flowResults = flows.map((flow) => ({
+      flow,
+      result: applySsoToFlow(flow.body, slug, methods),
+    }));
+
+    const written: string[] = [];
+    const skipped: SsoSkipped[] = [];
+    if (schemaResult.changed) {
+      await writeFile(join(cwd, schema.path), `${stableStringify(schemaResult.document)}\n`);
+      written.push(schema.path);
+    }
+    for (const { flow, result } of flowResults) {
+      skipped.push(
+        ...result.skipped.map((entry) => ({ ...entry, region: `${flow.path} ${entry.region}` })),
+      );
+      if (result.changed) {
+        await writeFile(join(cwd, flow.path), `${stableStringify(result.document)}\n`);
+        written.push(flow.path);
+      }
+    }
+    return { written, skipped };
   }
 
   /** The machine-readable payload. Never the secret, only whether it is held. */

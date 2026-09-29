@@ -288,6 +288,7 @@ describe("sso enable", () => {
     const json = parseJson(result.stdout) as { code: string };
     expect(json.code).toBe("E_VALIDATION");
   });
+
 });
 
 describe("sso enable secret handling", () => {
@@ -430,9 +431,14 @@ describe("sso enable with a connection already on disk", () => {
     expect(schema["x-auth-methods"].sso?.enabled).toBe(true);
   });
 
-  it("refuses when no flow runs against the schema, instead of a silent no-op", async () => {
+  it("refuses when no flow runs against the schema, without touching anything", async () => {
+    // The schema is the first thing the command would rewrite, so finding the
+    // failure after writing it would leave `x-auth-methods.sso` enabled for a
+    // provider the sign-in screen can never offer.
     const cwd = await makeProject();
     await rm(join(cwd, ".zitadel/flows/default-human-user-login.json"));
+    const schemaPath = join(cwd, ".zitadel/schemas/default-human-user.json");
+    const before = await readFile(schemaPath, "utf8");
 
     const result = await enable(cwd, "--client-id", "abc");
 
@@ -440,5 +446,6 @@ describe("sso enable with a connection already on disk", () => {
     const json = parseJson(result.stdout) as { code: string; hint?: string };
     expect(json.code).toBe("E_NOT_FOUND");
     expect(json.hint).toContain(".zitadel/flows/");
+    expect(await readFile(schemaPath, "utf8")).toBe(before);
   });
 });
