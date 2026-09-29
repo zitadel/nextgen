@@ -492,9 +492,15 @@ function flowUsesSchema(
     return true;
   }
   const id = schema.body.$id;
-  if (typeof id === "string" && id === used) {
-    return true;
+  if (typeof id === "string") {
+    // An `$id` is the schema's own statement of what flows name it by, so a
+    // flow that names something else is about a different schema — even when
+    // the two URLs end in the same file name. Guessing past a disagreement is
+    // how `sso enable` would edit the wrong flow.
+    return id === used;
   }
+  // No `$id` to go on: a Project scaffolded but never applied names the
+  // schema by the URL setup wrote, whose last segment is the file name.
   return used.endsWith(`/${schema.name}.json`);
 }
 

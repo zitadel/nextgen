@@ -422,8 +422,12 @@ docker --image <ref>` remains the explicit image override for debugging.
   plus a `register-sso` step for a new external identity and an `sso-conflict`
   step for an email that already has an account, the latter offering only the
   methods that schema enables. Idempotent: a provider already configured is
-  reused, and two matching connections or a client id that disagrees with the
-  stored one stop the command without changing a file. The client secret is
+  reused, and a rerun that passes `--client-id` republishes it to the project
+  variable, so a changed id takes effect rather than being ignored. Two
+  matching connections stop the command without changing a file, as does a
+  `--client-id` that disagrees with a *literal* one already in the connection
+  file — a hand-written connection holding a real id rather than the scaffolded
+  `${{ NAME }}` reference. The client secret is
   never a flag — it is prompted for, or read from stdin on a non-interactive
   run, as `variables set` does — and only its `${{ NAME }}` reference reaches
   the connection file. A step edited by hand is left alone and reported. `setup`

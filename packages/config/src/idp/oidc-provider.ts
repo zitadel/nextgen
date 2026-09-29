@@ -96,7 +96,7 @@ export abstract class OidcProvider implements IdpProvider {
         issuer: issuer !== undefined && issuer !== "" ? issuer : this.issuer,
         scopes: [...this.scopes],
         ...(Object.keys(this.staticAuthorizeParameters).length > 0
-          ? { static_authorize_parameters: this.staticAuthorizeParameters }
+          ? { static_authorize_parameters: { ...this.staticAuthorizeParameters } }
           : {}),
         client_id: variableReference(variables.clientId),
         client_secret: variableReference(variables.clientSecret),

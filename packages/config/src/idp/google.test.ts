@@ -71,6 +71,18 @@ describe("the scaffolded connection", () => {
     expect(oidcOf(document).static_authorize_parameters).toEqual({ prompt: "select_account" });
   });
 
+  it("copies static_authorize_parameters, so one connection cannot edit the provider", () => {
+    // The provider is a shared singleton, so handing out a reference to its
+    // own object would let an edit to one generated document change Google's
+    // authorization behaviour for every document generated afterwards.
+    const first = oidcOf(connection()).static_authorize_parameters as Record<string, string>;
+    first.prompt = "none";
+
+    expect(oidcOf(connection()).static_authorize_parameters).toEqual({
+      prompt: "select_account",
+    });
+  });
+
   it("copies the scopes, so one connection cannot edit the next one's", () => {
     const first = oidcOf(connection()).scopes as string[];
     first.push("https://www.googleapis.com/auth/calendar");

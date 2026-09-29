@@ -512,6 +512,35 @@ describe("sso enable with a connection already on disk", () => {
     expect(result.exitCode).not.toBe(0);
     expect((parseJson(result.stdout) as { code: string }).code).not.toBe("E_NOT_FOUND");
   });
+
+  it("does not match a flow naming a different schema with the same file name", async () => {
+    // Two Projects' schemas can share a file name. The `$id` is the schema's
+    // own statement of what flows name it by, so a flow pointing somewhere
+    // else is about a different schema, and editing it would wire the
+    // provider into the wrong sign-in.
+    const cwd = await makeProject();
+    const schemaPath = join(cwd, ".zitadel/schemas/default-human-user.json");
+    const flowPath = join(cwd, ".zitadel/flows/default-human-user-login.json");
+    const schema = JSON.parse(await readFile(schemaPath, "utf8")) as Record<string, unknown>;
+    const flow = JSON.parse(await readFile(flowPath, "utf8")) as Record<string, unknown>;
+    await writeFile(
+      schemaPath,
+      JSON.stringify({ ...schema, $id: "https://a.example/default-human-user.json" }, null, 2),
+    );
+    await writeFile(
+      flowPath,
+      JSON.stringify(
+        { ...flow, user_schema: "https://b.example/default-human-user.json" },
+        null,
+        2,
+      ),
+    );
+
+    const result = await enable(cwd, "--client-id", "abc");
+
+    expect(result.exitCode).not.toBe(0);
+    expect((parseJson(result.stdout) as { code: string }).code).toBe("E_NOT_FOUND");
+  });
 });
 
 describe("sso enable preflight", () => {
