@@ -2,12 +2,12 @@
 
 Design notes for [ADR 066](../../adrs/066-operation-policies.md), which
 decides the model: a policy attaches to one domain operation and splits into a
-Zitadel-defined **template** (config schema, context schema, named boolean
-CEL rules) and a developer-authored **instance** (config values, revisioned in
+Zitadel-defined template (config schema, context schema, named boolean
+CEL rules) and a developer-authored instance (config values, revisioned in
 the release). The ADR holds the decisions and their rationale; these documents
 hold the detail an implementer or reviewer of the code needs.
 
-**Status:** the first consumer is `user.password.save`
+Status: the first consumer is `user.password.save`
 ([#898](https://github.com/zitadel/nextgen/issues/898)); the scope table below
 says what the policy stack ships and what follows.
 
@@ -15,11 +15,11 @@ says what the policy stack ships and what follows.
 
 | # | Area | Doc |
 |---|---|---|
-| 1 | **Template**: the settings markers (`fixed`, `public`, `recommended_minimum`), instance validation, publishing the catalog | [`1-template.md`](1-template.md) |
-| 2 | **Evaluation**: the context schema, the Go context builder, the limits every rule runs under | [`2-evaluation.md`](2-evaluation.md) |
-| 3 | **Constraints**: the pre-auth projection, how it reaches a login form today, the read endpoint | [`3-constraints.md`](3-constraints.md) |
-| 4 | **Authoring**: `.zitadel/policies/`, the CLI commands, testing a policy | [`4-authoring.md`](4-authoring.md) |
-| — | **Catalog**: every guarded operation, its template, and the function that evaluates it | [`catalog.md`](catalog.md) |
+| 1 | Template: the settings markers (`fixed`, `public`, `recommended_minimum`), instance validation, publishing the catalog | [`1-template.md`](1-template.md) |
+| 2 | Evaluation: the context schema, the Go context builder, the limits every rule runs under | [`2-evaluation.md`](2-evaluation.md) |
+| 3 | Constraints: the pre-auth projection, how it reaches a login form today, the read endpoint | [`3-constraints.md`](3-constraints.md) |
+| 4 | Authoring: `.zitadel/policies/`, the CLI commands, testing a policy | [`4-authoring.md`](4-authoring.md) |
+|   | Catalog: every guarded operation, its template, and the function that evaluates it | [`catalog.md`](catalog.md) |
 
 ## Scope
 

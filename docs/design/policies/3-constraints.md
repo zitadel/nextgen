@@ -3,7 +3,7 @@
 A login form has to render "at least 15 characters" *before* anyone types,
 which means part of the policy has to reach an unauthenticated client.
 Alongside `evaluate`, every policy therefore answers a second query,
-**`constraints`**: computed from the template and the instance's config
+`constraints`: computed from the template and the instance's config
 alone, with no request context, so it resolves before the user has typed
 anything.
 
@@ -33,8 +33,8 @@ With a rule list the invariant holds by construction: `constraints` is the
 list of rule names, each with the `public` settings it reads. A rule is in
 `constraints` because it exists, not because a conformance suite proved it.
 Which settings a rule reads is known statically from its checked expression,
-so nothing is authored twice. The invariant is about **rules being
-discoverable, not values being public**: a user learns that a blocklist check
+so nothing is authored twice. The invariant is about rules being
+discoverable, not values being public: a user learns that a blocklist check
 exists; they cannot download the blocklist.
 
 Client-side validation is UX, never enforcement. The server re-checks
@@ -80,20 +80,20 @@ GET /policies/user.password.save/constraints
 }
 ```
 
-Four properties of that endpoint are load-bearing rather than incidental:
+Four properties of that endpoint are load-bearing:
 
-- **The path names the projection, not the document.**
+- The path names the projection, not the document.
   `GET /policies/{operation}` would imply the instance itself, and that
   includes private settings. Returning `constraints` under its own path makes
   it structurally impossible to serve the private half by accident.
-- **It never 404s for a catalogued operation.** With no instance authored the
+- It never 404s for a catalogued operation. With no instance authored the
   template defaults apply, so the endpoint still answers. A 404 means the
   operation is not in the catalogue: a client bug, not an unconfigured
   project.
-- **It is cacheable on the release.** Constraints change only when a release
+- It is cacheable on the release. Constraints change only when a release
   is deployed, so the response carries its `release` id and that id is the
   `ETag`. This waits for release-pinned resolution; today the newest stored
   revision applies.
-- **It is scoped like any other public read**, resolving the project the same
+- It is scoped like any other public read, resolving the project the same
   way the rest of the unauthenticated surface does, and reading from that
   environment's active release.

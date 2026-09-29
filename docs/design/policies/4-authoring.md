@@ -28,12 +28,12 @@ apply.
 
 CEL has no `opa test`. Two things replace it:
 
-- **A test file next to the instance.**
+- A test file next to the instance.
   `.zitadel/policies/user.password.save.test.json` holds a table of
   `(config, context, expected decision)`. `zitadel policies test` runs it.
   The shape is the one every policy-as-code CLI converges on (`gator verify`,
   `kyverno test`, `sentinel test`, `fga model test`).
-- **A server-side dry run.** `POST /policies/{operation}/evaluate` takes an
+- A server-side dry run. `POST /policies/{operation}/evaluate` takes an
   explicit context and an optional instance, returns the decision, and has no
   side effects. The CLI test command calls it. Once scoped instances land
   ([#1264](https://github.com/zitadel/nextgen/pull/1264)) the same endpoint
