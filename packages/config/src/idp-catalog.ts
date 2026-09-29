@@ -155,19 +155,54 @@ export type ConnectionEndpoints = {
   readonly tokenEndpoint?: string;
 };
 
-/** The endpoint keys to write, skipping the ones left unset. */
-function endpointOverrides(endpoints: ConnectionEndpoints | undefined): Record<string, string> {
-  const named: ReadonlyArray<readonly [string, string | undefined]> = [
-    ["issuer", endpoints?.issuer],
-    ["authorization_endpoint", endpoints?.authorizationEndpoint],
-    ["token_endpoint", endpoints?.tokenEndpoint],
-  ];
-  return Object.fromEntries(
-    named.filter((pair): pair is readonly [string, string] => {
-      const value = pair[1];
-      return value !== undefined && value !== "";
-    }),
-  );
+/** The issuer a catalog entry points at, for use as a prompt's default. */
+export function catalogIssuer(provider: string): string {
+  const block = idpCatalogEntry(provider).protocol_block as {
+    oidc?: { issuer?: string };
+    oauth2?: { issuer?: string };
+  };
+  return block.oidc?.issuer ?? block.oauth2?.issuer ?? "";
+}
+
+/** `<issuer>/authorize` and `<issuer>/token`, the paths the engine derives. */
+export function derivedEndpoints(issuer: string): {
+  authorizationEndpoint: string;
+  tokenEndpoint: string;
+} {
+  const base = issuer.replace(/\/$/, "");
+  return { authorizationEndpoint: `${base}/authorize`, tokenEndpoint: `${base}/token` };
+}
+
+/**
+ * The endpoint keys to write, which is as few as possible.
+ *
+ * Anything matching what would happen anyway is left out: an issuer equal to
+ * the catalog's, and an endpoint equal to the one the engine derives from the
+ * issuer. A connection that names only what actually differs stays readable,
+ * and an ordinary run produces the same document it would if none of this
+ * existed.
+ */
+function endpointOverrides(
+  endpoints: ConnectionEndpoints | undefined,
+  catalogsIssuer: string,
+): Record<string, string> {
+  const issuer = endpoints?.issuer;
+  if (issuer === undefined || issuer === "") {
+    return {};
+  }
+  const derived = derivedEndpoints(issuer);
+  const written: Record<string, string> = {};
+  if (issuer !== catalogsIssuer) {
+    written.issuer = issuer;
+  }
+  const { authorizationEndpoint, tokenEndpoint } = endpoints ?? {};
+  if (authorizationEndpoint && authorizationEndpoint !== derived.authorizationEndpoint) {
+    written.authorization_endpoint = authorizationEndpoint;
+  }
+  if (tokenEndpoint && tokenEndpoint !== derived.tokenEndpoint) {
+    written.token_endpoint = tokenEndpoint;
+  }
+  return written;
 }
 
 /**
@@ -211,7 +246,7 @@ export function scaffoldConnection(options: {
   };
   // Last, so an override replaces the template's issuer rather than being
   // replaced by it.
-  const overrides = endpointOverrides(options.endpoints);
+  const overrides = endpointOverrides(options.endpoints, catalogIssuer(options.provider));
   const claimMapping = claimMappingFor(entry, options.schemaProperties);
 
   return {

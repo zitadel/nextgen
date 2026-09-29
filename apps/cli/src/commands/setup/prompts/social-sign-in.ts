@@ -1,7 +1,10 @@
 import { note, password, select, text } from "@clack/prompts";
 
 import {
+  catalogIssuer,
   clientSecretVariableName,
+  type ConnectionEndpoints,
+  derivedEndpoints,
   idpCatalogEntry,
   IDP_PROVIDERS,
   type IdpCatalogEntry,
@@ -44,7 +47,10 @@ export class SocialSignInPrompt implements SetupPrompt {
     }
 
     const entry = idpCatalogEntry(provider);
-    this.announce(entry, answers.devPort);
+    // Before the announcement, which names the vendor's console: on a
+    // development build the provider may not be the vendor at all.
+    const endpoints = answers.sso?.endpoints ?? (await this.askEndpoints(provider, ctx));
+    this.announce(entry, answers.devPort, endpoints?.issuer);
 
     const clientId =
       answers.sso?.clientId !== undefined && answers.sso.clientId !== ""
@@ -54,7 +60,7 @@ export class SocialSignInPrompt implements SetupPrompt {
       answers.sso?.secret !== undefined && answers.sso.secret !== ""
         ? answers.sso.secret
         : await this.askSecret(provider);
-    return { ...answers, sso: { provider, clientId, secret } };
+    return { ...answers, sso: { provider, clientId, secret, endpoints } };
   }
 
   /** The provider, or `undefined` when the developer wants none. */
@@ -89,17 +95,72 @@ export class SocialSignInPrompt implements SetupPrompt {
    * can be shown rather than left for the developer to work out, which
    * matters because the vendor matches it literally.
    */
-  private announce(entry: IdpCatalogEntry, devPort: number): void {
+  private announce(entry: IdpCatalogEntry, devPort: number, issuer?: string): void {
     note(
       [
-        "Register an OAuth application at:",
-        entry.console_url,
+        // Where to register depends on who is actually answering: pointing a
+        // developer at the vendor's console when the connection runs against
+        // their own stand-in would be worse than saying nothing.
+        ...(issuer === undefined
+          ? ["Register an OAuth application at:", entry.console_url]
+          : ["Register a client with the provider at:", issuer]),
         "",
         "Redirect URI:",
         callbackUriFor(issuerFromPort(devPort)),
       ].join("\n"),
       `${entry.display_name} sign-in`,
     );
+  }
+
+  /**
+   * Where the provider lives, asked only on a development build.
+   *
+   * Someone working on the CLI runs it against a local stand-in constantly,
+   * and before this the connection document had to be hand-edited afterwards
+   * and re-applied. Someone who installed the CLI is configuring the real
+   * vendor and should never see the question, which is why the gate is the
+   * build stamp rather than a flag: a flag would have to be typed by exactly
+   * the people who should not need to know it exists.
+   *
+   * Returns `undefined` for a released build, and the catalog's own values are
+   * dropped when written, so an ordinary run produces the same document it
+   * would if none of this existed.
+   */
+  private async askEndpoints(
+    provider: string,
+    ctx: PromptContext,
+  ): Promise<ConnectionEndpoints | undefined> {
+    if (ctx.developmentBuild !== true) {
+      return undefined;
+    }
+    const issuer = await this.askUrl("Issuer", catalogIssuer(provider));
+    const derived = derivedEndpoints(issuer);
+    return {
+      issuer,
+      authorizationEndpoint: await this.askUrl(
+        "Authorization endpoint",
+        derived.authorizationEndpoint,
+      ),
+      tokenEndpoint: await this.askUrl("Token endpoint", derived.tokenEndpoint),
+    };
+  }
+
+  /** One URL question, pre-filled with the answer that needs no thought. */
+  private async askUrl(message: string, initialValue: string): Promise<string> {
+    const answer = await text({
+      message,
+      initialValue,
+      validate: (value) => {
+        try {
+          new URL(String(value ?? ""));
+          return undefined;
+        } catch {
+          return "Enter an absolute URL, e.g. http://localhost:9100.";
+        }
+      },
+    });
+    bail(answer);
+    return String(answer).trim();
   }
 
   private async askClientId(): Promise<string> {

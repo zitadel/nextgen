@@ -22,6 +22,7 @@ import {
 import { consola } from "consola";
 
 import { createZitadelClient } from "../../lib/api-client";
+import { isDevelopmentBuild } from "../../lib/build-channel";
 import { renderBoxActions, wrapForBox } from "../../lib/box";
 import { setupDesignRemovedError } from "../../lib/branding/designs";
 import {
@@ -306,6 +307,7 @@ export default class Setup extends BaseCommand {
         presetFromFlag: flags.preset !== undefined,
         useCaseFromFlag: flags["use-case"] !== undefined,
         ssoFromFlag: flags.sso !== undefined,
+        developmentBuild: isDevelopmentBuild(),
       };
       for (const prompt of SETUP_PROMPTS) {
         answers = await prompt.ask(answers, promptCtx);

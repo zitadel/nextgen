@@ -97,6 +97,13 @@ export type PromptContext = {
    * and the piped secret answer.
    */
   readonly ssoFromFlag?: boolean;
+  /**
+   * Whether this CLI was built from source rather than released. Only a
+   * development build asks where a provider's endpoints are — see
+   * {@link import("./social-sign-in").SocialSignInPrompt}. Passed in rather
+   * than read from the bundle so a test can drive both answers.
+   */
+  readonly developmentBuild?: boolean;
 };
 
 /**

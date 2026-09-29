@@ -350,6 +350,47 @@ describe("SocialSignInPrompt", () => {
     );
   });
 
+
+  it("asks where the provider lives on a development build", async () => {
+    // Someone working on the CLI runs it against a local stand-in constantly.
+    // Before this the connection had to be hand-edited afterwards.
+    vi.mocked(select).mockResolvedValueOnce("google" as never);
+    vi.mocked(text)
+      .mockResolvedValueOnce("http://localhost:9100" as never)
+      .mockResolvedValueOnce("http://localhost:9100/authorize" as never)
+      .mockResolvedValueOnce("http://localhost:9100/token" as never)
+      .mockResolvedValueOnce("client-id" as never);
+    vi.mocked(password).mockResolvedValueOnce("the-secret" as never);
+
+    const answers = await new SocialSignInPrompt().ask(baseAnswers(), {
+      ...ctx,
+      developmentBuild: true,
+    });
+
+    expect(answers.sso?.endpoints).toEqual({
+      issuer: "http://localhost:9100",
+      authorizationEndpoint: "http://localhost:9100/authorize",
+      tokenEndpoint: "http://localhost:9100/token",
+    });
+  });
+
+  it("never asks on a released build", async () => {
+    // The gate is the build stamp, not a flag: someone who installed the CLI
+    // is configuring the real vendor and must not meet this question.
+    vi.mocked(select).mockResolvedValueOnce("google" as never);
+    vi.mocked(text).mockResolvedValueOnce("client-id" as never);
+    vi.mocked(password).mockResolvedValueOnce("the-secret" as never);
+
+    const answers = await new SocialSignInPrompt().ask(baseAnswers(), {
+      ...ctx,
+      developmentBuild: false,
+    });
+
+    expect(answers.sso?.endpoints).toBeUndefined();
+    // Only the client id was asked for, so no URL question was rendered.
+    expect(vi.mocked(text)).toHaveBeenCalledTimes(1);
+  });
+
   it("will not take an empty secret, because a provider without one cannot work", async () => {
     // The prompt re-asks rather than accepting nothing: the connection
     // references the secret as `${{ NAME }}` and the engine resolves it from
