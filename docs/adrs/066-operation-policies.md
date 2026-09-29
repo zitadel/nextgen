@@ -136,42 +136,16 @@ One template per operation, defined by Zitadel and versioned with the server.
 }
 ```
 
-- **`config`** is a JSON Schema fragment per setting: type, bounds, default. The
-  bounds are the floor and ceiling a developer can move within; the built-in
-  protections (`blocklist`) have no setting at all and therefore cannot be turned
-  off. This is the boundary #898 asks for: Zitadel owns the secure baseline, the
-  project chooses within it.
-- **`fixed: true`** marks a setting that is part of the baseline: an instance
-  may not set it, the default is the only value. It is still a setting rather
-  than a literal in the rule so that clients learn it through `constraints`
-  (`max_length` is 64 for everyone and every login form needs to know that).
-- **`recommended_minimum`** marks a legal-but-discouraged range. A value below
-  it is accepted and the authoring workflow warns (#898: 8 to 14 is allowed,
-  15 is what NIST requires for a single-factor password). The warning comes
-  from the catalog, so the CLI and the console never hardcode the threshold.
-  There is no API-level warning channel; the floor is the protection, the
-  warning is guidance.
-- **A rule reads every setting it gates on.** A setting that only steers the
-  Go context builder (say, how many history entries to compare) is invisible
-  to `constraints`. `history` therefore reads `config.history_depth` even
-  though the depth is applied in Go; that is what makes the depth renderable.
-- **`public: true`** marks a setting the unauthenticated `constraints` projection
-  may return (see [Constraints](../design/policies/2-constraints.md)).
-  Unmarked settings are private: `max_attempts` on a lockout policy would tell an
-  attacker their budget.
-- **`context`** is the schema of what the rules receive: derived values computed
-  in Go for this one evaluation, never the raw input. It is the CEL type
-  environment the rules are checked against.
-- **`rules`** is an ordered list. Each rule is one boolean expression; its name is
-  what a denial reports and what the `constraints` projection lists. Rules are
-  atomic by construction: an expression must type-check to `bool`, stays under a
-  length cap, and its statically estimated cost stays under a limit, all checked
-  when the server starts. A rule that needs more than that is two rules.
+`config` is a JSON Schema fragment per setting (type, bounds, default), the
+range a developer may move within; `fixed` pins a setting to its default and
+`public` allows the unauthenticated `constraints` projection to return it.
+`context` is the schema of the derived values the rules receive, never the raw
+input, and doubles as the CEL type environment. `rules` is an ordered list of
+named boolean expressions; a name is what a denial reports and what
+`constraints` lists. What each marker means and how a template is validated
+is in [Template](../design/policies/1-template.md).
 
-The template is also published read-only (`GET /policies/catalog`, after the
-policy stack), so the console, the CLI and the `constraints` endpoint render
-from the same source.
-It is not release content: templates ship with the server and evolve with it,
+A template is not release content: templates ship with the server and evolve with it,
 as the flow engine's step vocabulary does for flow definitions. How a server
 upgrade treats deployed instances is the same question every configuration
 resource has, and is not answered here.
@@ -314,7 +288,7 @@ sequenceDiagram
 2. **Submit.** The client posts the new password as the reserved field `x-auth-methods#password`.
 3. **Validation.** Flow-engine backend payload validation re-checks constraints.
 4. **Domain operation.** The flow engine calls `SetPasswordUserAction`. This is the guarded operation.
-5. **Prepare context.** Per-operation Go code derives the context (see [Evaluation](../design/policies/1-evaluation.md)).
+5. **Prepare context.** Per-operation Go code derives the context (see [Evaluation](../design/policies/2-evaluation.md)).
 6. **Evaluate.** Every rule runs over config plus context.
 7. **Return error** or **proceed with operation**.
 
@@ -342,7 +316,7 @@ Each rule is then one boolean expression, and CEL is the fit for exactly that:
 | Latency | in-process, microseconds | in-process, microseconds; or a sidecar round-trip | native call **(best)** |
 | Second language in the product | none: OpenFGA conditions are already CEL, so a widened FGA profile ([ADR 032](032-permission-catalogs.md)) reuses it **(best)** | Rego alongside CEL | none |
 | Extensibility | developer-authored rules later, append-only, same evaluator | developer replaces the program | server release per change |
-| Tooling | no `opa test` equivalent: covered by a release-side test file and a server-side dry-run (see [Authoring](../design/policies/3-authoring.md#testing-not-built-yet)) | `opa test`, `opa fmt`, Regal, coverage **(best)** | Go tests |
+| Tooling | no `opa test` equivalent: covered by a release-side test file and a server-side dry-run (see [Authoring](../design/policies/4-authoring.md#testing-not-built-yet)) | `opa test`, `opa fmt`, Regal, coverage **(best)** | Go tests |
 | Precedent | Kubernetes embedded CEL for in-tree policy and kept OPA as an external webhook; Google IAM Conditions, Firebase Rules, OpenFGA, SpiceDB, Envoy RBAC | CNCF-graduated, Gatekeeper, Conftest | n/a |
 
 The evaluator is [cel-go](https://github.com/cel-expr/cel-go), the same
@@ -455,12 +429,14 @@ The detail an implementer needs lives next to the code, under
 [`docs/design/policies/`](../design/policies/README.md), whose scope table says
 what the policy stack ships and what follows:
 
-- [Evaluation](../design/policies/1-evaluation.md): the context schema, the
+- [Template](../design/policies/1-template.md): the settings markers, how an
+  instance is validated against a template, how the catalog is published.
+- [Evaluation](../design/policies/2-evaluation.md): the context schema, the
   Go context builder, the limits every rule runs under.
-- [Constraints](../design/policies/2-constraints.md): the pre-auth projection,
+- [Constraints](../design/policies/3-constraints.md): the pre-auth projection,
   how it reaches the login form through the flow field validation today, and
   the read endpoint for clients the flow engine does not drive.
-- [Authoring](../design/policies/3-authoring.md): `.zitadel/policies/`, the
+- [Authoring](../design/policies/4-authoring.md): `.zitadel/policies/`, the
   CLI commands, and how a policy is tested.
 - [Catalog](../design/policies/catalog.md): every guarded operation, its
   template, and the function that evaluates it.
