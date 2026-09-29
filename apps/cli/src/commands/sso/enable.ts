@@ -80,6 +80,26 @@ export default class SsoEnable extends BaseCommand {
     "client-id": Flags.string({
       description: "Client id of the application registered with the provider.",
     }),
+    // Hidden, and for one job: standing the provider up locally. A mock on
+    // localhost speaks the same protocol as the vendor, and pointing at it
+    // should be a flag rather than a hand edit of the connection afterwards.
+    // The issuer is usually enough — the engine derives `<issuer>/authorize`
+    // and `<issuer>/token` when the endpoints are absent — so the other two
+    // are there only for a stand-in whose paths differ.
+    issuer: Flags.string({
+      hidden: true,
+      description: "Point the connection at this issuer instead of the provider's.",
+    }),
+    "authorization-endpoint": Flags.string({
+      hidden: true,
+      dependsOn: ["issuer"],
+      description: "Authorization endpoint, when it is not <issuer>/authorize.",
+    }),
+    "token-endpoint": Flags.string({
+      hidden: true,
+      dependsOn: ["issuer"],
+      description: "Token endpoint, when it is not <issuer>/token.",
+    }),
     "no-open": Flags.boolean({
       default: false,
       description: "Do not offer to open the provider's console in a browser.",
@@ -165,7 +185,18 @@ export default class SsoEnable extends BaseCommand {
         slug: plan.slug,
         schemaProperties: schema.properties,
         schemaRef: CONNECTION_SCHEMA_REF,
+        endpoints: {
+          issuer: flags.issuer,
+          authorizationEndpoint: flags["authorization-endpoint"],
+          tokenEndpoint: flags["token-endpoint"],
+        },
       });
+      if (flags.issuer !== undefined) {
+        // Said out loud: a connection pointing somewhere other than the
+        // vendor is not what the developer will want in the end, and nothing
+        // else in the output would show it.
+        consola.warn(`${entry.display_name} points at ${flags.issuer}, not the provider`);
+      }
       const target = join(cwd, plan.path);
       await mkdir(dirname(target), { recursive: true });
       // `wx` rather than a plain write: planConnection decided this file does

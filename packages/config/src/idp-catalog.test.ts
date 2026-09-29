@@ -182,3 +182,53 @@ describe("claim mapping", () => {
     expect(claimMappingFor(idpCatalogEntry("google"), [])).toEqual({});
   });
 });
+
+describe("scaffoldConnection endpoints", () => {
+  const base = { provider: "google", schemaProperties: ["email"] } as const;
+
+  it("keeps the catalog's issuer when nothing overrides it", () => {
+    const oidc = scaffoldConnection({ ...base }).oidc as Record<string, unknown>;
+
+    expect(oidc.issuer).toBe("https://accounts.google.com");
+    // The templates name no endpoints on purpose: the engine derives
+    // `<issuer>/authorize` and `<issuer>/token` from the issuer.
+    expect(oidc.authorization_endpoint).toBeUndefined();
+    expect(oidc.token_endpoint).toBeUndefined();
+  });
+
+  it("points at a stand-in issuer, leaving the endpoints to be derived", () => {
+    const oidc = scaffoldConnection({
+      ...base,
+      endpoints: { issuer: "http://localhost:9100" },
+    }).oidc as Record<string, unknown>;
+
+    expect(oidc.issuer).toBe("http://localhost:9100");
+    expect(oidc.authorization_endpoint).toBeUndefined();
+    expect(oidc.token_endpoint).toBeUndefined();
+  });
+
+  it("names the endpoints when the stand-in's paths differ", () => {
+    const oidc = scaffoldConnection({
+      ...base,
+      endpoints: {
+        issuer: "http://localhost:9100",
+        authorizationEndpoint: "http://localhost:9100/oauth/authorize",
+        tokenEndpoint: "http://localhost:9100/oauth/token",
+      },
+    }).oidc as Record<string, unknown>;
+
+    expect(oidc.authorization_endpoint).toBe("http://localhost:9100/oauth/authorize");
+    expect(oidc.token_endpoint).toBe("http://localhost:9100/oauth/token");
+  });
+
+  it("leaves the credentials as references whatever the endpoints are", () => {
+    // Overriding where the connection points must not change what it holds.
+    const oidc = scaffoldConnection({
+      ...base,
+      endpoints: { issuer: "http://localhost:9100" },
+    }).oidc as Record<string, unknown>;
+
+    expect(oidc.client_id).toBe("${{ GOOGLE_CLIENT_ID }}");
+    expect(oidc.client_secret).toBe("${{ GOOGLE_CLIENT_SECRET }}");
+  });
+});

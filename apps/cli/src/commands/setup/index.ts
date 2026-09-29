@@ -13,6 +13,7 @@ import {
   type SetupUseCase,
 } from "@zitadel/config/defaults";
 import {
+  type ConnectionEndpoints,
   clientIdVariableName,
   clientSecretVariableName,
   idpCatalogEntry,
@@ -171,6 +172,27 @@ export default class Setup extends BaseCommand {
     }),
     "sso-client-id": Flags.string({
       description: "Client id of the OAuth application registered with the --sso provider.",
+    }),
+    // Hidden, and for one job: standing the provider up locally. A mock on
+    // localhost speaks the same protocol as the vendor, and pointing at it
+    // should be a flag rather than a hand edit of the connection afterwards.
+    // The issuer is usually enough — the engine derives `<issuer>/authorize`
+    // and `<issuer>/token` when the endpoints are absent — so the other two
+    // are there only for a stand-in whose paths differ.
+    "sso-issuer": Flags.string({
+      hidden: true,
+      dependsOn: ["sso"],
+      description: "Point the connection at this issuer instead of the provider's.",
+    }),
+    "sso-authorization-endpoint": Flags.string({
+      hidden: true,
+      dependsOn: ["sso-issuer"],
+      description: "Authorization endpoint, when it is not <issuer>/authorize.",
+    }),
+    "sso-token-endpoint": Flags.string({
+      hidden: true,
+      dependsOn: ["sso-issuer"],
+      description: "Token endpoint, when it is not <issuer>/token.",
     }),
   };
 
@@ -440,6 +462,15 @@ export default class Setup extends BaseCommand {
         publish,
       });
       ssoSecret = await storeClientSecret({ cwd, name: variable, value: answers.sso.secret, publish });
+      if (answers.sso.endpoints?.issuer !== undefined) {
+        // Said out loud: a connection pointing somewhere other than the
+        // vendor is not what the developer will want in the end, and nothing
+        // else in the summary would show it.
+        consola.warn(
+          `${idpCatalogEntry(answers.sso.provider).display_name} points at ` +
+            `${answers.sso.endpoints.issuer}, not the provider`,
+        );
+      }
       reportClientIdOutcome(idVariable, ssoClientId, this.meta.cliVersion);
       reportSecretOutcome(ssoSecret, this.meta.cliVersion);
     }
@@ -721,6 +752,32 @@ function dryRunProject(issuer: string): CreateProject201 {
   };
 }
 
+/** The `--sso*` flags, as far as the connection is concerned. */
+type SsoFlags = {
+  sso?: string;
+  "sso-client-id"?: string;
+  "sso-issuer"?: string;
+  "sso-authorization-endpoint"?: string;
+  "sso-token-endpoint"?: string;
+};
+
+/**
+ * Where the connection should point, from the hidden `--sso-issuer` family.
+ *
+ * `undefined` for an ordinary run, so the catalog's own issuer stands and the
+ * document is written exactly as it would be without these flags existing.
+ */
+function endpointsFromFlags(flags: SsoFlags): ConnectionEndpoints | undefined {
+  if (flags["sso-issuer"] === undefined) {
+    return undefined;
+  }
+  return {
+    issuer: flags["sso-issuer"],
+    authorizationEndpoint: flags["sso-authorization-endpoint"],
+    tokenEndpoint: flags["sso-token-endpoint"],
+  };
+}
+
 /**
  * The provider a scripted run asked for, or `undefined` when it asked for
  * none — in which case the wizard's question decides.
@@ -737,10 +794,7 @@ function dryRunProject(issuer: string): CreateProject201 {
  * that case is treated as "not supplied".
  */
 async function ssoFromFlags(
-  flags: {
-    sso?: string;
-    "sso-client-id"?: string;
-  },
+  flags: SsoFlags,
   nonInteractive: boolean,
 ): Promise<SsoAnswer | undefined> {
   if (flags.sso === undefined) {
@@ -757,7 +811,7 @@ async function ssoFromFlags(
     // answers and no other, the way `--preset` does. Only a scripted run has
     // nobody to ask.
     if (!nonInteractive) {
-      return { provider: flags.sso, clientId: "", secret: "" };
+      return { provider: flags.sso, clientId: "", secret: "", endpoints: endpointsFromFlags(flags) };
     }
     throw new ZitadelError("E_VALIDATION", `--sso ${flags.sso} needs --sso-client-id`, {
       hint: `Register an OAuth application at ${idpCatalogEntry(flags.sso).console_url} and pass its client id.`,
@@ -766,7 +820,7 @@ async function ssoFromFlags(
   if (!nonInteractive) {
     // The wizard asks for the secret, the way it asks for a client id that
     // `--sso-client-id` did not answer.
-    return { provider: flags.sso, clientId, secret: "" };
+    return { provider: flags.sso, clientId, secret: "", endpoints: endpointsFromFlags(flags) };
   }
   const piped = process.stdin.isTTY ? "" : (await readStdin(process.stdin)).trim();
   if (piped === "") {
@@ -778,7 +832,7 @@ async function ssoFromFlags(
       hint: `Pipe it in, e.g. \`printf '%s' "$GOOGLE_CLIENT_SECRET" | zitadel setup --sso ${flags.sso} --sso-client-id ${clientId} ...\`.`,
     });
   }
-  return { provider: flags.sso, clientId, secret: piped };
+  return { provider: flags.sso, clientId, secret: piped, endpoints: endpointsFromFlags(flags) };
 }
 
 /**

@@ -138,6 +138,39 @@ export function claimMappingFor(
 }
 
 /**
+ * Where a connection's OIDC endpoints point, when they are not the catalog's.
+ *
+ * Only for standing a provider up locally: a mock on `localhost` speaks the
+ * same protocol as the real vendor, and pointing at it should be a flag rather
+ * than a hand edit of the document afterwards.
+ *
+ * `issuer` is usually the only one needed. The engine derives
+ * `<issuer>/authorize` and `<issuer>/token` when the endpoints are absent, and
+ * the catalog templates carry no explicit endpoints for exactly that reason.
+ * The two overrides exist for a stand-in whose paths differ.
+ */
+export type ConnectionEndpoints = {
+  readonly issuer?: string;
+  readonly authorizationEndpoint?: string;
+  readonly tokenEndpoint?: string;
+};
+
+/** The endpoint keys to write, skipping the ones left unset. */
+function endpointOverrides(endpoints: ConnectionEndpoints | undefined): Record<string, string> {
+  const named: ReadonlyArray<readonly [string, string | undefined]> = [
+    ["issuer", endpoints?.issuer],
+    ["authorization_endpoint", endpoints?.authorizationEndpoint],
+    ["token_endpoint", endpoints?.tokenEndpoint],
+  ];
+  return Object.fromEntries(
+    named.filter((pair): pair is readonly [string, string] => {
+      const value = pair[1];
+      return value !== undefined && value !== "";
+    }),
+  );
+}
+
+/**
  * Compose a connection document from a catalog entry. Pure: it returns the
  * object `zitadel setup` writes to `.zitadel/idps/<slug>.json`, and performs
  * no IO.
@@ -163,6 +196,8 @@ export function scaffoldConnection(options: {
   readonly slug?: string;
   /** `$schema` pointer, relative to `.zitadel/idps/`. */
   readonly schemaRef?: string;
+  /** Point the connection somewhere other than the vendor (local testing). */
+  readonly endpoints?: ConnectionEndpoints;
 }): Record<string, unknown> {
   const entry = idpCatalogEntry(options.provider);
   const slug = options.slug ?? options.provider;
@@ -174,6 +209,9 @@ export function scaffoldConnection(options: {
     client_id: clientIdReference(slug),
     client_secret: clientSecretReference(slug),
   };
+  // Last, so an override replaces the template's issuer rather than being
+  // replaced by it.
+  const overrides = endpointOverrides(options.endpoints);
   const claimMapping = claimMappingFor(entry, options.schemaProperties);
 
   return {
@@ -188,7 +226,7 @@ export function scaffoldConnection(options: {
       : {}),
     provisioning: { creation: "auto" },
     ...(protocol === "oidc"
-      ? { oidc: { ...(oidc as object), ...credentials } }
-      : { oauth2: { ...(oauth2 as object), ...credentials } }),
+      ? { oidc: { ...(oidc as object), ...credentials, ...overrides } }
+      : { oauth2: { ...(oauth2 as object), ...credentials, ...overrides } }),
   };
 }

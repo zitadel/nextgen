@@ -222,6 +222,45 @@ describe("sso enable", () => {
     expect(json.code).toBe("E_VALIDATION");
     expect(json.hint).toContain("--provider google");
   });
+
+  it("points the connection at a stand-in issuer without touching the file afterwards", async () => {
+    // The hidden issuer flag exists so testing against a local provider is a
+    // flag rather than a hand edit of the connection document. The endpoints
+    // stay absent: the engine derives them from the issuer.
+    const cwd = await makeProject();
+
+    const result = await enable(
+      cwd,
+      "--client-id",
+      "1234-abc.apps.googleusercontent.com",
+      "--issuer",
+      "http://localhost:9100",
+    );
+
+    expect(result.exitCode).toBe(0);
+    const written = JSON.parse(
+      await readFile(join(cwd, ".zitadel/idps/google.json"), "utf8"),
+    ) as { oidc: Record<string, unknown> };
+    expect(written.oidc.issuer).toBe("http://localhost:9100");
+    expect(written.oidc.authorization_endpoint).toBeUndefined();
+    expect(written.oidc.client_secret).toBe("${{ GOOGLE_CLIENT_SECRET }}");
+  });
+
+  it("refuses an endpoint override with no issuer to override", async () => {
+    // The endpoints only mean anything beside an issuer, so oclif's dependsOn
+    // refuses the pair rather than writing a half-pointed connection.
+    const cwd = await makeProject();
+
+    const result = await enable(
+      cwd,
+      "--client-id",
+      "1234-abc.apps.googleusercontent.com",
+      "--token-endpoint",
+      "http://localhost:9100/token",
+    );
+
+    expect(result.exitCode).not.toBe(0);
+  });
 });
 
 describe("sso enable secret handling", () => {

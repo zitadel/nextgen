@@ -23,7 +23,7 @@ import {
   type SetupPreset,
   type SetupUseCase,
 } from "@zitadel/config/defaults";
-import { scaffoldConnection } from "@zitadel/config/idp-catalog";
+import { scaffoldConnection, type ConnectionEndpoints } from "@zitadel/config/idp-catalog";
 import { applySsoToFlow, applySsoToSchema } from "@zitadel/config/sso";
 import { normalizeFlowBody, normalizeSchemaBody } from "@zitadel/config/normalize";
 
@@ -65,7 +65,7 @@ export async function materializeSetupResources(opts: {
    * and created before the schema and flow that reference it, so the Project
    * is never published naming a provider the platform does not hold.
    */
-  sso?: { provider: string; clientId: string };
+  sso?: { provider: string; clientId: string; endpoints?: ConnectionEndpoints };
   /**
    * CLI version used to render `zitadel …` command mentions in the scaffolded
    * READMEs as runnable `npx @zitadel/cli@<version> …` commands — the CLI is
@@ -94,6 +94,7 @@ export async function materializeSetupResources(opts: {
   const connection = opts.sso
     ? scaffoldConnection({
         provider: opts.sso.provider,
+        endpoints: opts.sso.endpoints,
         schemaProperties: Object.keys((schemaTemplate.properties as object | undefined) ?? {}),
         schemaRef: CONNECTION_SCHEMA_REF,
       })

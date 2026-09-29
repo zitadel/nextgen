@@ -1,4 +1,5 @@
 import type { SetupPreset, SetupUseCase } from "@zitadel/config/defaults";
+import type { ConnectionEndpoints } from "@zitadel/config/idp-catalog";
 
 import type { FrameworkFacts } from "../../../lib/orca";
 
@@ -29,6 +30,12 @@ export type SsoAnswer = {
   readonly provider: string;
   readonly clientId: string;
   readonly secret: string;
+  /**
+   * Where the connection points, when not at the vendor. Never prompted for
+   * — it comes from the hidden `--sso-issuer` family, whose one job is
+   * standing the provider up locally.
+   */
+  readonly endpoints?: ConnectionEndpoints;
 };
 
 export type SetupAnswers = {
