@@ -91,10 +91,14 @@ export type PromptContext = {
    */
   readonly useCaseFromFlag?: boolean;
   /**
-   * Whether `--sso` was passed explicitly. When set, the flag is
-   * authoritative and {@link import("./social-sign-in").SocialSignInPrompt}
-   * skips itself — including the credential questions, which `--sso-client-id`
-   * and the piped secret answer.
+   * Whether `--sso` was passed explicitly. When set, the flag answers the
+   * provider question and {@link import("./social-sign-in").SocialSignInPrompt}
+   * does not ask it.
+   *
+   * The credential questions are a separate matter: the prompt still asks for
+   * a client id or secret the invocation did not supply, because a connection
+   * missing either is one that cannot work. Only a `--non-interactive` run has
+   * nobody to ask, and that one is refused rather than left incomplete.
    */
   readonly ssoFromFlag?: boolean;
   /**

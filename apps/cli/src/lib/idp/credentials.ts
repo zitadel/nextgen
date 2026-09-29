@@ -40,9 +40,16 @@ export const ENV_EXAMPLE = ".env.example";
 export async function isSafeForSecrets(cwd: string, relPath: string): Promise<boolean> {
   try {
     await exec("git", ["rev-parse", "--is-inside-work-tree"], { cwd });
-  } catch {
-    // No repository, or no git at all: nothing here can be committed.
-    return true;
+  } catch (error) {
+    // Two of these mean nothing here can be committed, and one does not.
+    // `ENOENT` is git missing entirely; a non-zero exit is git saying this is
+    // not a work tree. Anything else -- a permission error, a timeout, a
+    // corrupt repository -- is git failing to answer, and an unanswered
+    // question about whether a file is ignored has to count as "not ignored".
+    // Treating it as safe would write a credential into a repository on the
+    // strength of a command that never ran.
+    const known = isErrno(error, "ENOENT") || typeof (error as { code?: unknown })?.code === "number";
+    return known;
   }
   try {
     // Exit 0 means ignored; anything else means it is not, or that we could

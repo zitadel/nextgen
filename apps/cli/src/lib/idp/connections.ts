@@ -143,7 +143,13 @@ export function planConnection(options: {
   const [match] = matches;
   if (match !== undefined) {
     const existing = clientIdOf(match);
-    if (options.clientId !== undefined && existing !== undefined && existing !== options.clientId) {
+    // A scaffolded connection stores `${{ NAME }}`, not an id, so there is no
+    // identity in the file to disagree with and the command stays idempotent.
+    // A hand-written connection may still hold a literal, and that one is
+    // worth refusing: rerunning with a different id would otherwise reuse a
+    // file configured for another client.
+    const literal = existing !== undefined && !existing.trim().startsWith("${{");
+    if (options.clientId !== undefined && literal && existing !== options.clientId) {
       throw new ZitadelError(
         "E_VALIDATION",
         `${match.path} already uses client id ${existing}, not ${options.clientId}`,

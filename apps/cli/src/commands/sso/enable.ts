@@ -164,6 +164,26 @@ export default class SsoEnable extends BaseCommand {
 
     if (reusing) {
       consola.success(`Reusing ${plan.file.path}`);
+      // The connection references its credentials rather than holding them, so
+      // reuse is not evidence they were ever published: a run interrupted
+      // between writing the file and publishing leaves the document pointing
+      // at variables that do not exist. A supplied credential is published
+      // again, which costs one call and makes the command idempotent --
+      // rerunning with a changed client id now takes effect instead of being
+      // silently ignored. Nothing is prompted for: an unattended rerun should
+      // not start asking for credentials the project already has.
+      const publish = this.publisher(secretFile);
+      if (flags["client-id"] !== undefined) {
+        clientIdState = await publishClientId({
+          name: idVariable,
+          value: flags["client-id"],
+          publish,
+        });
+      }
+      const piped = nonInteractive ? await this.pipedSecret() : undefined;
+      if (piped !== undefined) {
+        secret = await storeClientSecret({ cwd, name: variable, value: piped, publish });
+      }
     } else {
       consola.info(`${entry.display_name} needs an OAuth application.`);
       consola.info(`Callback URI   ${callbackUri}`);
@@ -394,6 +414,21 @@ export default class SsoEnable extends BaseCommand {
    * either way: the connection file is written regardless, and the developer
    * may prefer to paste the value into `.env.local` themselves.
    */
+  /**
+   * A secret piped in on a scripted rerun, or `undefined` when nothing was.
+   *
+   * Reuse never demands one: the project may already hold it, and refusing an
+   * unattended rerun for a credential that has not changed would be noise. It
+   * is only read so that a rerun *can* replace it.
+   */
+  private async pipedSecret(): Promise<string | undefined> {
+    if (process.stdin.isTTY) {
+      return undefined;
+    }
+    const piped = (await readStdin(process.stdin)).trim();
+    return piped === "" ? undefined : piped;
+  }
+
   /**
    * Required, like the client id. The connection document references the
    * secret as `${{ NAME }}` and the engine resolves that from the project's

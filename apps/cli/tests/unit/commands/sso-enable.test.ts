@@ -160,13 +160,24 @@ describe("sso enable", () => {
     expect(await readFile(join(cwd, ".zitadel/idps/google.json"), "utf8")).toBe(before);
   });
 
-  it("refuses a client id that is not the one already configured", async () => {
+  it("publishes a changed client id on reuse rather than ignoring it", async () => {
+    // The connection references the id rather than holding it, so a rerun with
+    // a different one has nothing in the file to disagree with. Republishing
+    // is what makes the second invocation mean what it says; the previous
+    // refusal only made sense while the id lived in the document.
     const cwd = await makeProject();
     await enable(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
 
     const result = await enable(cwd, "--client-id", "999-zzz.apps.googleusercontent.com");
-    expect(result.exitCode).not.toBe(0);
-    expect(result.stdout + result.stderr).toContain("999-zzz.apps.googleusercontent.com");
+
+    expect(result.exitCode).toBe(0);
+    const json = parseJson(result.stdout) as {
+      data: { connection: { action: string }; client_id: { variable: string } | null };
+    };
+    expect(json.data.connection.action).toBe("reuse");
+    // Attempted, not skipped. No server is listening here, so it reports the
+    // failure and the retry command rather than a publish.
+    expect(json.data.client_id?.variable).toBe("GOOGLE_CLIENT_ID");
   });
 
   it("names the schemas when the Project has more than one", async () => {
@@ -240,6 +251,42 @@ describe("sso enable", () => {
     expect(written.oidc.authorization_endpoint).toBeUndefined();
     expect(written.oidc.token_endpoint).toBeUndefined();
     expect(written.oidc.client_secret).toBe("${{ GOOGLE_CLIENT_SECRET }}");
+  });
+
+  it("reuses the connection when rerun with the same client id", async () => {
+    // A scaffolded connection stores `${{ GOOGLE_CLIENT_ID }}`, not an id, so
+    // there is nothing in the file for a supplied id to disagree with. Reading
+    // the reference as a literal made every rerun a conflict.
+    const cwd = await makeProject();
+    await enable(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
+
+    const again = await enable(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
+
+    expect(again.exitCode).toBe(0);
+    const json = parseJson(again.stdout) as { data: { connection: { action: string } } };
+    expect(json.data.connection.action).toBe("reuse");
+  });
+
+  it("still refuses a different client id on a hand-written connection", async () => {
+    // A connection someone wrote by hand may hold a literal id, and reusing it
+    // for another client would be silently wrong.
+    const cwd = await makeProject();
+    await mkdir(join(cwd, ".zitadel/idps"), { recursive: true });
+    await writeFile(
+      join(cwd, ".zitadel/idps/google.json"),
+      `${JSON.stringify({
+        slug: "google",
+        template: "google",
+        protocol: "oidc",
+        oidc: { issuer: "https://accounts.google.com", client_id: "literal-one", client_secret: "${{ GOOGLE_CLIENT_SECRET }}" },
+      })}\n`,
+    );
+
+    const result = await enable(cwd, "--client-id", "a-different-one");
+
+    expect(result.exitCode).not.toBe(0);
+    const json = parseJson(result.stdout) as { code: string };
+    expect(json.code).toBe("E_VALIDATION");
   });
 });
 
