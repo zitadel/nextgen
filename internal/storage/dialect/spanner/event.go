@@ -164,14 +164,7 @@ func (e eventStatements) ListEvents(ctx context.Context, filter *database.ListOp
 	if err != nil {
 		return nil, err
 	}
-	var nextCursor []byte
-	if filter.Pagination.Limit > 0 && len(items) == int(filter.Pagination.Limit) {
-		cursor := &pagination.Cursor[domain.EventField]{
-			Columns: filter.Pagination.OrderBy.Columns,
-			Values:  events.Schema.ValuesFrom(items[len(items)-1], filter.Pagination.OrderBy.Columns),
-		}
-		nextCursor = cursor.Marshal()
-	}
+	nextCursor := pagination.MarshalNext(filter.Pagination.OrderBy, items, events.Schema, filter.Pagination.Limit)
 	return &database.ListResult[*domain.Event]{
 		Items:      items,
 		NextCursor: nextCursor,
