@@ -16,9 +16,9 @@ import { useProjectScope, withoutTrailingSlash } from "../../lib/project-scope";
  * (`j3qqriDab6WQfrlgLujf4Y`). Desktop: 196px `bg-card` pills side-by-side.
  * Mobile (`Dashboard xs`): full-width stacked rows. Built on shadcn `Popover`.
  *
- * The project popover's footer links to the Projects overview (`All projects`):
- * the overview is not a sidebar entry, because the sidebar is the selected
- * project's contents, so this is its way in.
+ * The project popover's footer links to the Projects overview (`All projects`),
+ * the same screen as the sidebar's first entry, for someone already in the
+ * switcher looking for a project it does not list.
  *
  * There is deliberately no create action in the footer. One used to render here,
  * but because this component backs both switchers it said "Create team" inside

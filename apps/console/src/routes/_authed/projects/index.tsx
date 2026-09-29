@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { Box, Ellipsis, Loader2 } from "lucide-react";
+import { Box, Boxes, Ellipsis, Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import {
@@ -35,17 +35,19 @@ import { useProjectScope } from "../../../lib/project-scope";
 /**
  * Projects overview — every project the person can act on.
  *
- * Deliberately not a sidebar entry. The sidebar is the selected project's
- * contents (`staticData.scope`), and this screen is about none of them: it is
- * where one is picked. It is reached from the project switcher's `All projects`
- * link, and it is where the console lands when there are several projects and
- * none is selected yet (`routes/_authed.tsx`).
+ * The sidebar's first entry, above the selected project's contents. It is not
+ * scoped (`staticData.scope`), so it is listed with or without a selection and
+ * is the one entry while nothing is selected. The project switcher's `All
+ * projects` link leads here too, and it is where the console lands when there
+ * are several projects and none is selected yet (`routes/_authed.tsx`).
  *
  * A row opens the project — selects it and goes to its first screen — rather
  * than a detail page: the project's own page is `Project settings` in the
  * sidebar once it is selected, and the row menu links there directly.
  */
 export const Route = createFileRoute("/_authed/projects/")({
+  // Order 1: above Teams (2), the first of the selected project's screens.
+  staticData: { nav: { label: "Projects", order: 1, icon: Boxes } },
   loader: async () => {
     // The projects the signed-in person can act on (root ADR 053 §6), read with
     // the session cookie — not `POST /projects/query`, which the server pins to
@@ -118,8 +120,8 @@ function ProjectsScreen() {
       <div className={`${RESOURCE_HEADER} flex h-9 items-center`}>
         <h1 className="text-foreground font-serif text-2xl leading-6 tracking-tight">Projects</h1>
       </div>
-      {/* The sidebar is empty until a project is selected, so the page says why
-          and what to do about it. */}
+      {/* Until a project is selected the sidebar lists only this screen, so the
+          page says why and what to do about it. */}
       {!selected && projects.length > 0 && (
         <p className={`${RESOURCE_HEADER} text-muted-foreground mt-2 text-sm`}>
           Select a project to manage its teams, users and login flows.

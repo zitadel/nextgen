@@ -23,7 +23,7 @@ const PLATE = "flex size-9 items-center justify-center rounded-md bg-muted text-
  *
  * It is the one sidebar entry about the project rather than something in it,
  * and it is scoped like the rest: the page follows the selection, and the
- * Projects overview (reached from the project switcher) is where projects are
+ * Projects overview (the sidebar's first entry) is where projects are
  * compared and picked. `/projects/$projectId` redirects here with that project
  * selected, so a link to one project's page still lands on it.
  *

@@ -123,8 +123,8 @@ describe("projects screen", () => {
   });
 
   it("asks for a selection while none is made", async () => {
-    // The sidebar is empty until a project is selected, so this page is the
-    // one that explains what to do.
+    // Until a project is selected the sidebar lists only Projects, so this
+    // page is the one that explains what to do.
     server.use(
       http.get(PROJECTS_URL, () =>
         HttpResponse.json({
