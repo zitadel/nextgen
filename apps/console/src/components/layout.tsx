@@ -17,6 +17,11 @@ export function Page({ children }: { children: ReactNode }) {
   );
 }
 
+/** The fixed column every settings screen renders in, centred in the main area. */
+export function SettingsColumn({ children }: { children: ReactNode }) {
+  return <div className="mx-auto w-full max-w-(--zl-container-settings)">{children}</div>;
+}
+
 /**
  * 12-column content grid matching the Figma `layout/*` spec. Prefer
  * `--zl-layout-gutter` when the token pipeline emits it; fall back to 24px

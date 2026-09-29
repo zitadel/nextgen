@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
+import { SettingsColumn } from "@/components/layout";
 import { RESOURCE_PAGE, RESOURCE_TABLE_WRAP } from "@/components/resource-list";
 
 /**
@@ -20,20 +21,17 @@ export const Route = createFileRoute("/_authed/settings/")({
   component: SettingsEmpty,
 });
 
-/** The fixed column every settings screen renders in. */
-const SETTINGS_COLUMN = "mx-auto w-full max-w-(--zl-container-settings)";
-
 function SettingsEmpty() {
   return (
     <div className={`${RESOURCE_PAGE} pt-11`}>
-      <div className={SETTINGS_COLUMN}>
+      <SettingsColumn>
         <h1 className="text-foreground font-serif text-2xl leading-6 tracking-tight">Settings</h1>
         <div
           className={`${RESOURCE_TABLE_WRAP} text-muted-foreground mt-6 py-24 text-center text-xs`}
         >
           No settings yet.
         </div>
-      </div>
+      </SettingsColumn>
     </div>
   );
 }
