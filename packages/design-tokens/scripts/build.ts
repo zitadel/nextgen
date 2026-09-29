@@ -274,6 +274,9 @@ function build(): BuildResult {
   // Figma owns the pixel values; build owns which scale step each role uses.
   push(cssVarName("container", "auth-card"), pxToRem(containerStep("sm")), ["container", "authCard"]);
   push(cssVarName("container", "page"), pxToRem(containerStep("7xl")), ["container", "page"]);
+  for (const [name, value] of Object.entries(overrides.container)) {
+    push(cssVarName("container", name), value, ["container", name]);
+  }
 
   // ---- themed groups (syntax, gradient): themed like the shadcn colours, but
   // namespaced by group so they stay clear of both `--zl-color-*` and the flat

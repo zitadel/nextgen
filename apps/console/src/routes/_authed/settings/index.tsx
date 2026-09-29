@@ -20,8 +20,8 @@ export const Route = createFileRoute("/_authed/settings/")({
   component: SettingsEmpty,
 });
 
-/** Same fixed column the settings screens use; named as a token in #1064. */
-const SETTINGS_COLUMN = "mx-auto w-full max-w-[704px]";
+/** The fixed column every settings screen renders in. */
+const SETTINGS_COLUMN = "mx-auto w-full max-w-(--zl-container-settings)";
 
 function SettingsEmpty() {
   return (
