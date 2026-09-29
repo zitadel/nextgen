@@ -2,4 +2,4 @@
 "@zitadel/server": patch
 ---
 
-Fix descending keyset pagination on `GET /events`: the page cursor was marshaled without its sort direction, so it defaulted to ascending and the second page of a `order=desc` listing was rejected with a cursor/order mismatch. The three dialect list statements now record the direction on the cursor, and a contract test covers descending paging across pages.
+Fix descending keyset pagination on `GET /events`: newest-first listings (`order=desc`) failed on the second page with a cursor/order mismatch, because the page cursor did not carry its sort direction. Paging through an `order=desc` result now works across every page.
