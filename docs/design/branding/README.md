@@ -27,7 +27,7 @@ graph LR
 
 3. **Orchestrator:** reads the `Branding` object and generates `--zl-*` CSS tokens via `adoptedStyleSheets`. Templates never touch theming ([`tokens.md`](tokens.md)).
 
-4. **`Branding` object:** layout preset, URLs, optional theme fields ([`schema.md`](schema.md)). Input to the orchestrator's token generation.
+4. **`Branding` object:** asset URLs and the `theme`, `typography` and `shape` blocks ([`schema.md`](schema.md)). Input to the orchestrator's token generation.
 
 5. **`<zl-*>` atoms:** UI implementation; read CSS variables; overrides in [`override-ladder.md`](override-ladder.md).
 

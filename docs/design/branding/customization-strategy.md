@@ -224,7 +224,7 @@ own the CLI and structure work; #936 owns the first visual loop.
 
 | Surface | Today | First iteration |
 | --- | --- | --- |
-| Branding settings | Host CSS + proposed branding JSON; no Console appearance loop | Console: logo, colors, typography, theme on working embedded components. Preview, validate, publish, restore |
+| Branding settings | Host CSS, and a branding revision published through the CLI or API. The Console shows the revision in use read-only, beside a live login preview and contrast warnings | Console: edit logo, colors, typography, theme on working embedded components. Preview, validate, publish, restore |
 | Project look | Optional `branding.json` via CLI | Same branding resource. One appearance customization applies project-wide across the journeys #936 lists |
 | Surrounding application | Customer-owned | Still customer-owned. Not edited here |
 | Translations | Built-in dictionaries; optional element `locales` | **Different setting** ([#1038](https://github.com/zitadel/nextgen/issues/1038)). Not this iteration |
@@ -332,7 +332,7 @@ round-trip. Leave the host tokens unset and the project branding applies
 unchanged — which is what Zitadel-served login does, because that page is
 not a customer design system of its own.
 
-The same object, three doors — all compile to `--zl-*`:
+The same object, three doors, all compiling to `--zl-*`. The second and third ship. The first, an `appearance` property on the element, is proposed and the element does not have it; its shape below is a sketch:
 
 ```html
 <zitadel-login
@@ -352,34 +352,40 @@ The same object, three doors — all compile to `--zl-*`:
 zitadel-login {
   --zl-radius-md: 0.75rem;
   --zl-radius-xl: 1.25rem;
-  --zl-color-primary: #4F46E5;
-  --zl-font-family: Inter, ui-sans-serif, sans-serif;
+  --zl-primary: #4F46E5;
+  --zl-font-family-sans: Inter, ui-sans-serif, sans-serif;
 }
 ```
 
 ```json
 {
-  "logo_url": "https://cdn.acme.com/logo.svg",
-  "palette": { "primary": "#4F46E5", "on_primary": "#FFFFFF" },
+  "theme": {
+    "mode": "dark",
+    "dark": {
+      "logo_url": "https://cdn.acme.com/logo.svg",
+      "palette": { "primary": "#4F46E5", "on_primary": "#FFFFFF" }
+    }
+  },
   "shape": { "radius": "lg", "density": "regular" },
-  "typography": { "font_family": "Inter, ui-sans-serif, sans-serif" },
-  "theme": { "mode": "dark" }
+  "typography": { "font_family": "Inter, ui-sans-serif, sans-serif" }
 }
 ```
 
 | Knob | Values | Effect |
 | --- | --- | --- |
-| `palette.primary` / `on_primary` | CSS color | CTA, focus ring |
-| `palette.background` / `surface` / `text` / `border` | CSS color | page vs card |
-| `shape.radius` | `none` \| `sm` \| `md` \| `lg` \| `full` | `--zl-radius-*` scale |
-| `shape.density` | `compact` \| `regular` \| `comfortable` | control height + gaps |
-| `typography.font_family` | CSS stack | type (optional heading/mono) |
+| `theme.<side>.palette.primary` / `on_primary` | CSS color | CTA, focus ring |
+| `theme.<side>.palette.background` / `surface` / `text` / `border` | CSS color | page vs card |
+| `shape.radius` | `none` \| `sm` \| `md` \| `lg` \| `full`, or integer pixels | `--zl-radius-*` scale |
+| `shape.density` | `compact` \| `regular` \| `comfortable` | spacing |
+| `typography.font_family` | CSS stack | one face for body and headings |
 | `theme.mode` | `light` \| `dark` \| `auto` | `data-theme` |
-| `logo_url` | HTTPS URL | mark in the widget header |
-| `chrome` | `card` \| `plain` | card on/off (`minimal` without a template) |
+| `theme.<side>.logo_url` | HTTPS URL | mark in the widget header, per side |
+| `chrome` (proposed, not in the contract) | `card` \| `plain` | card on/off (`minimal` without a template) |
 
-A typed `appearance` property on the element is sugar over this shape, not
-a third vocabulary. `theme`, `variant`, `lang`, `locales`, `purpose` stay
+`<side>` is `light` or `dark`. The contract is [`schema.md`](schema.md).
+
+A typed `appearance` property on the element would be sugar over this shape,
+not a third vocabulary. `theme`, `variant`, `lang`, `locales`, `purpose` stay
 page-local element facts. Host CSS still beats the project object.
 
 ### 3. Widget structure
@@ -442,7 +448,7 @@ out of this table.
 | Category | Customer-embedded | Zitadel-served | Shared source of truth |
 | --- | --- | --- | --- |
 | **Page chrome** | App around the component. Not a Zitadel template. | Unset. First served ship is a polished default. `page.liquid` is a later proposal only. | *None shared.* Different documents. |
-| **Widget appearance** | Branding settings: `appearance` / host CSS / `theme`. Optional `branding.json`. Console in #936. | Same object when that milestone reuses branding. | Branding revision when the look must follow the project. |
+| **Widget appearance** | Host CSS / `theme`, and later `appearance`. Optional `branding.json`. Console in #936. | Same object when that milestone reuses branding. | Branding revision when the look must follow the project. |
 | **Widget structure** | Later: opt-in **widget template** from the bundled default. | Same file / later block editor. | `branding.liquid_template` — both models, strict scope, **later**. |
 | **Translations** | `lang` / `locales` on the element. Copy overlays later (ADR 045). | Same translations setting when it ships. | Locale × key overlay resource; element `locales` remains the embedder override. Not the branding-settings screen. |
 | **Behavior** | `.zitadel/flows/*.json` via plan/apply. | Console flow editor. | Flow definition (release-pinned per [ADR 035](../../adrs/035-configuration-environments.md)). |
@@ -598,7 +604,7 @@ milestone and not a product requirement yet.
 | **Page template** | Proposed later Liquid document (`page.liquid`) with a `login_widget` hole for Zitadel-served page chrome. **Unset.** Not a requirement. |
 | **Wrapper** | Embedder application code around the widget. Not a Zitadel template. |
 | **Design** | Retired as the setup noun. Historical Liquid starting points; no longer the path to a look. |
-| **Layout** | Wire degrade enum `centered \| split` for an invalid/missing *template*. Not how you get a split page. |
+| **Layout** | Wire enum `centered \| split` on the branding object. The bundled template does not read it. Not how you get a split page. |
 | **Branding** | Project resource for appearance, optional (later) widget template, assets, and copy. Not page chrome. |
 | **Zitadel-served login** | Zitadel presents the page (`/ui/login/` today). Alias: hosted login. Independent of Cloud vs customer-operated server. |
 

@@ -1,6 +1,6 @@
 # Override ladder
 
-**Status:** Stub. Detail deferred; see [`README.md`](README.md) open question 6 (eject and token normativity). **Parent:** [`README.md`](README.md).
+**Status:** Tiers 1 to 3 shipped; tier 4 is a design. **Parent:** [`README.md`](README.md).
 
 Four override levels, weakest to strongest.
 
@@ -67,15 +67,17 @@ Slots are declared per-atom; the set of available slots is part of each atom's m
 
 ## Tier 4: Eject
 
-When tiers 1–3 don't cover it, the customer runs:
+Design; the CLI has no command for it. When tiers 1–3 don't cover it, the customer would run:
 
 ```bash
 npx zitadel add zl-field
 ```
 
-The atom source lands in their repo. They own the code. Protocol-version pinning (see [`../platform/overview.md`](../platform/overview.md)) ensures ejected atoms stay compatible with the backend through a declared version window.
+The atom source lands in their repo and they own the code. Protocol-version pinning (see [`../platform/overview.md`](../platform/overview.md)) is what would keep ejected atoms compatible with the backend through a declared version window.
 
-Open question 6 in [`README.md`](README.md): after eject, do atoms keep reading `--zl-*` (Console branding still applies) or is the fork fully owned?
+Open: after eject, do atoms keep reading `--zl-*` (Console branding still applies) or is the fork fully owned?
+
+This is separate from `zitadel branding eject`, which ships and copies the login *template*, not an atom ([`templates.md`](templates.md)).
 
 ## Out of scope for this ladder
 
