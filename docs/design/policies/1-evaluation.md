@@ -74,4 +74,4 @@ rule. Kubernetes enforces the same pair (a static per-expression limit and a
 per-request runtime budget); OpenFGA caps condition cost the same way.
 
 The environment is the CEL standard library plus the `strings` and `lists`
-extensions, nothing else, pinned per catalog version.
+extensions, nothing else.
