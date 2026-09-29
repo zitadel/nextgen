@@ -278,7 +278,9 @@ func compileOrderBy[F ~uint8, T any](c *statementCompiler, orderBy database.Orde
 func compileLimit(c *statementCompiler, limit uint32) {
 	if limit > 0 {
 		c.WriteString(" LIMIT ")
-		writeArg(c, limit)
+		// Fetch one extra row as a look-ahead probe so Paginate can tell a full
+		// final page from a truncated one (#849); Paginate drops the probe.
+		writeArg(c, limit+1)
 	}
 }
 

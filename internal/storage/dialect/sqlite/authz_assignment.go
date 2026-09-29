@@ -171,7 +171,7 @@ func (s authzAssignmentStatements) ListManagedGrants(ctx context.Context, projec
 	if err != nil {
 		return nil, wrapError(err)
 	}
-	nextCursor := pagination.MarshalNext(
+	assignments, nextCursor := pagination.Paginate(
 		filter.Pagination.OrderBy,
 		assignments,
 		authz.AuthzAssignmentSchema,
@@ -270,9 +270,10 @@ func (s authzAssignmentStatements) ListAuthorizedProjects(ctx context.Context, h
 	if err != nil {
 		return nil, wrapError(err)
 	}
+	projects, nextCursor := pagination.Paginate(page.OrderBy, projects, projectSchema, page.Limit)
 	return &database.ListResult[*domain.Project]{
 		Items:      projects,
-		NextCursor: pagination.MarshalNext(page.OrderBy, projects, projectSchema, page.Limit),
+		NextCursor: nextCursor,
 	}, nil
 }
 

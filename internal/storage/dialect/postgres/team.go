@@ -130,7 +130,7 @@ func (ts teamStatements) ListTeams(ctx context.Context, filter *database.ListOpt
 		return nil, wrapError(err)
 	}
 
-	nextCursor := pagination.MarshalNext(
+	teams, nextCursor := pagination.Paginate(
 		filter.Pagination.OrderBy,
 		teams,
 		teamSchema,

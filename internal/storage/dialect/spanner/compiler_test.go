@@ -101,7 +101,7 @@ func TestCompileReadFilterAndOrderBy(t *testing.T) {
 	assert.Equal(t, wantSQL, sql)
 	require.Len(t, args, 2)
 	assert.Equal(t, "proj_1", args[0])
-	assert.Equal(t, int64(10), args[1])
+	assert.Equal(t, int64(11), args[1]) // compileLimit over-fetches by one (#849)
 }
 
 func TestCompileReadCompareGreater(t *testing.T) {
@@ -585,7 +585,7 @@ func TestCompileLimit(t *testing.T) {
 		sql, args := compileLimitOnly(t, 25)
 		assert.Equal(t, " LIMIT @p1", sql)
 		require.Len(t, args, 1)
-		assert.Equal(t, int64(25), args[0])
+		assert.Equal(t, int64(26), args[0])
 	})
 }
 

@@ -128,7 +128,7 @@ func (js jsonSchemaStatements) ListJSONSchemas(ctx context.Context, filter *data
 	if err != nil {
 		return nil, wrapError(err)
 	}
-	nextCursor := pagination.MarshalNext(
+	schemas, nextCursor := pagination.Paginate(
 		filter.Pagination.OrderBy,
 		schemas,
 		jsonSchemaSchema,

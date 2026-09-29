@@ -78,7 +78,7 @@ func (es environmentStatements) ListEnvironments(ctx context.Context, filter *da
 	if err != nil {
 		return nil, wrapError(err)
 	}
-	nextCursor := pagination.MarshalNext(
+	items, nextCursor := pagination.Paginate(
 		filter.Pagination.OrderBy,
 		items,
 		environment.Schema,

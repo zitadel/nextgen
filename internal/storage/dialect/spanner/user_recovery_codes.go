@@ -80,7 +80,7 @@ func (s userRecoveryCodesStatements) ListUserRecoveryCodes(ctx context.Context, 
 		return nil, err
 	}
 
-	nextCursor := pagination.MarshalNext(
+	items, nextCursor := pagination.Paginate(
 		filter.Pagination.OrderBy,
 		items,
 		userrecoverycodes.Schema,

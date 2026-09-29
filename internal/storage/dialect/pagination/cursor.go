@@ -28,18 +28,34 @@ func New[F ~uint8](orderBy database.OrderBy[F], values []any) *Cursor[F] {
 	}
 }
 
-// MarshalNext returns a marshaled keyset cursor when the page is full and OrderBy
-// has at least one column; otherwise nil. Empty OrderBy never emits a token.
-func MarshalNext[F ~uint8, T any](
+// Paginate splits an over-fetched result into the page to return and the token
+// for the next page. Callers fetch limit+1 rows: the extra row is a look-ahead
+// probe. When it is present there is a further page, so Paginate drops it,
+// returns the first limit rows, and emits a token built from the last returned
+// row. When it is absent this is the final page, so the items are returned
+// unchanged with no token — including when the total is an exact multiple of
+// the limit, which a page-full heuristic wrongly tokenized (#849).
+//
+// With limit 0 (unbounded) or an OrderBy with no columns there is no keyset to
+// resume, so the items are returned unchanged with no token.
+func Paginate[F ~uint8, T any](
 	orderBy database.OrderBy[F],
 	items []*T,
 	schema database.Schema[F, T],
 	limit uint32,
-) []byte {
-	if limit == 0 || len(items) != int(limit) || len(orderBy.Columns) == 0 {
-		return nil
+) ([]*T, []byte) {
+	if limit == 0 || uint32(len(items)) <= limit {
+		return items, nil
 	}
-	return New(orderBy, schema.ValuesFrom(items[len(items)-1], orderBy.Columns)).Marshal()
+	// The probe row came back, so trim to the requested page regardless of
+	// whether it can be tokenized. A bounded read with no OrderBy still capped
+	// its result at limit and must not leak the extra row.
+	page := items[:limit]
+	if len(orderBy.Columns) == 0 {
+		return page, nil
+	}
+	token := New(orderBy, schema.ValuesFrom(page[len(page)-1], orderBy.Columns)).Marshal()
+	return page, token
 }
 
 func CursorFromToken[F ~uint8](token []byte) (*Cursor[F], error) {

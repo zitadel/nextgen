@@ -153,7 +153,7 @@ func (e eventStatements) ListEvents(ctx context.Context, filter *database.ListOp
 	if err != nil {
 		return nil, wrapError(err)
 	}
-	nextCursor := pagination.MarshalNext(filter.Pagination.OrderBy, items, events.Schema, filter.Pagination.Limit)
+	items, nextCursor := pagination.Paginate(filter.Pagination.OrderBy, items, events.Schema, filter.Pagination.Limit)
 	return &database.ListResult[*domain.Event]{
 		Items:      items,
 		NextCursor: nextCursor,

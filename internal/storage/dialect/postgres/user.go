@@ -424,13 +424,14 @@ func (us userStatements) ListUsers(ctx context.Context, filter *database.ListOpt
 	if err != nil {
 		return nil, wrapError(err)
 	}
+	users, nextCursor := v2user.Paginate(users, filter.Pagination)
 	if err := us.hydrateUsers(ctx, users, opts); err != nil {
 		return nil, err
 	}
 
 	return &database.ListResult[*domain.User]{
 		Items:      users,
-		NextCursor: v2user.NextCursor(users, filter.Pagination),
+		NextCursor: nextCursor,
 	}, nil
 }
 

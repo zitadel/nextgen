@@ -187,7 +187,7 @@ func (ds deploymentStatements) ListDeployments(ctx context.Context, filter *data
 		return nil, err
 	}
 
-	nextCursor := pagination.MarshalNext(
+	items, nextCursor := pagination.Paginate(
 		filter.Pagination.OrderBy,
 		items,
 		deployment.Schema,

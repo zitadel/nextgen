@@ -111,7 +111,7 @@ func (s cryptoKeyStatements) ListEncryptionKeys(ctx context.Context, opts *datab
 		return nil, wrapError(err)
 	}
 
-	nextCursor := pagination.MarshalNext(
+	keys, nextCursor := pagination.Paginate(
 		opts.Pagination.OrderBy,
 		keys,
 		encryptionKeySchema,

@@ -96,7 +96,7 @@ func (ps userPasskeyStatements) ListUserPasskeys(ctx context.Context, filter *da
 		return nil, wrapError(err)
 	}
 
-	nextCursor := pagination.MarshalNext(
+	passkeys, nextCursor := pagination.Paginate(
 		filter.Pagination.OrderBy,
 		passkeys,
 		userpasskey.Schema,

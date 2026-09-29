@@ -128,7 +128,7 @@ func (rs releaseStatements) ListReleases(ctx context.Context, filter *database.L
 		return nil, wrapError(err)
 	}
 
-	nextCursor := pagination.MarshalNext(
+	items, nextCursor := pagination.Paginate(
 		filter.Pagination.OrderBy,
 		items,
 		release.Schema,

@@ -92,7 +92,7 @@ func (s teamMembershipStatements) ListTeamMemberships(ctx context.Context, filte
 	if err != nil {
 		return nil, wrapError(err)
 	}
-	nextCursor := pagination.MarshalNext(
+	memberships, nextCursor := pagination.Paginate(
 		filter.Pagination.OrderBy,
 		memberships,
 		teammembership.Schema,
@@ -116,7 +116,7 @@ func (s teamMembershipStatements) ListUserTeams(ctx context.Context, filter *dat
 	if err != nil {
 		return nil, wrapError(err)
 	}
-	nextCursor := pagination.MarshalNext(
+	teams, nextCursor := pagination.Paginate(
 		filter.Pagination.OrderBy,
 		teams,
 		userteam.Schema,

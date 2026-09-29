@@ -162,7 +162,7 @@ func (s idpConnectionStatements) list(ctx context.Context, opts *database.ListOp
 		return nil, wrapError(err)
 	}
 
-	nextCursor := pagination.MarshalNext(
+	items, nextCursor := pagination.Paginate(
 		opts.Pagination.OrderBy,
 		items,
 		idpconnection.Schema,

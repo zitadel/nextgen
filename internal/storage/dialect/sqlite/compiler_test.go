@@ -42,7 +42,7 @@ func TestCompileReadFilterAndOrderBy(t *testing.T) {
 	assert.Equal(t, testProjectQuery+" WHERE id = ? ORDER BY created_at, id LIMIT ?", sql)
 	require.Len(t, args, 2)
 	assert.Equal(t, "proj_1", args[0])
-	assert.Equal(t, int64(10), args[1])
+	assert.Equal(t, int64(11), args[1]) // compileLimit over-fetches by one (#849)
 }
 
 func TestWriteArgCoercesTimeAndDuration(t *testing.T) {

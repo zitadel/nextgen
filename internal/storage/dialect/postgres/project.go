@@ -132,7 +132,7 @@ func (ps projectStatements) ListProjects(ctx context.Context, filter *database.L
 		return nil, wrapError(err)
 	}
 
-	nextCursor := pagination.MarshalNext(
+	projects, nextCursor := pagination.Paginate(
 		filter.Pagination.OrderBy,
 		projects,
 		projectSchema,

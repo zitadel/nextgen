@@ -85,7 +85,7 @@ func (b brandingStatements) ListBrandings(ctx context.Context, filter *database.
 	if err != nil {
 		return nil, wrapError(err)
 	}
-	nextCursor := pagination.MarshalNext(
+	items, nextCursor := pagination.Paginate(
 		filter.Pagination.OrderBy,
 		items,
 		branding.Schema,

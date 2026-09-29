@@ -57,7 +57,7 @@ func (ss sessionStatements) ListSessions(ctx context.Context, filter *database.L
 	if sessions == nil {
 		sessions = []*domain.Session{}
 	}
-	nextCursor := pagination.MarshalNext(
+	sessions, nextCursor := pagination.Paginate(
 		filter.Pagination.OrderBy,
 		sessions,
 		sessionSchema,

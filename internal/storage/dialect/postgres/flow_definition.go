@@ -127,7 +127,7 @@ func (f flowDefinitionStatements) ListFlowDefinitions(ctx context.Context, filte
 		return nil, wrapError(err)
 	}
 
-	nextCursor := pagination.MarshalNext(
+	defs, nextCursor := pagination.Paginate(
 		opts.Pagination.OrderBy,
 		defs,
 		flowdefinition.Schema,

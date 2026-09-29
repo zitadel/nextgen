@@ -104,7 +104,7 @@ func (ps userPasswordStatements) ListUserPasswords(ctx context.Context, filter *
 		return nil, wrapError(err)
 	}
 
-	nextCursor := pagination.MarshalNext(
+	passwords, nextCursor := pagination.Paginate(
 		filter.Pagination.OrderBy,
 		passwords,
 		userpassword.Schema,

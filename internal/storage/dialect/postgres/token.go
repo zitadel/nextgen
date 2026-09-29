@@ -127,7 +127,7 @@ func (ts tokenStatements) ListTokens(ctx context.Context, filter *database.ListO
 		return nil, wrapError(err)
 	}
 
-	nextCursor := pagination.MarshalNext(
+	tokens, nextCursor := pagination.Paginate(
 		filter.Pagination.OrderBy,
 		tokens,
 		tokenSchema,
