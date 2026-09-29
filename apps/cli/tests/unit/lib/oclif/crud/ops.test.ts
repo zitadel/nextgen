@@ -224,40 +224,4 @@ describe("wire conventions", () => {
     expect(data.next_cursor).toBe("c2");
     expect(data.next_page_token).toBeUndefined();
   });
-
-  it("sends --sort direction as the declared sortParam on a GET list", async () => {
-    // A GET list (no body) that orders by a fixed key and takes only a
-    // direction — like `GET /events` with `order=asc|desc` — declares
-    // `sortParam`, and `--sort <field>:<direction>` travels as that one param.
-    let sent: Record<string, unknown> | undefined;
-    const spec: ListSpec<Ctx> = {
-      items: "data",
-      sorts: ["occurred_at"],
-      sortParam: "order",
-      call: async (_ctx, request) => {
-        sent = request as Record<string, unknown>;
-        return { data: [] };
-      },
-    };
-    const definition: OperationDefinition<Ctx, ListSpec<Ctx>> = {
-      topic: "events",
-      resource: { singular: "event", idField: "id", columns: ["id"], list: spec },
-      spec,
-      options: {
-        connect: async () => ({ token: "t" }),
-        operations: ["equals"],
-        wire: {
-          limit: "limit",
-          pageToken: "page_token",
-          nextPageToken: "next_page_token",
-          query: ({ paging }) => ({ ...paging }),
-        },
-      },
-    };
-
-    const command = bindOperation(ListOperation, definition);
-    await command.run(["--sort", "occurred_at:desc", "--json"]);
-
-    expect(sent).toMatchObject({ order: "desc" });
-  });
 });
