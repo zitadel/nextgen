@@ -205,12 +205,25 @@ type FlowAuthRequestRef struct {
 
 // FlowStateMachineRuntime is the production [FlowStateMachine].
 type FlowStateMachineRuntime struct {
-	schemas      SchemaResolver
-	schemaStore  JSONSchemaStore
-	fields       FlowFieldResolver
-	userCreater  FlowOnSuccessHandler
-	authAttempts FlowAuthAttemptService
-	now          func() time.Time
+	schemas           SchemaResolver
+	schemaStore       JSONSchemaStore
+	fields            FlowFieldResolver
+	userCreater       FlowOnSuccessHandler
+	authAttempts      FlowAuthAttemptService
+	passwordSaveRules FlowPasswordSaveRules
+	now               func() time.Time
+}
+
+// FlowPasswordSaveRules returns the validation a password field carries on a
+// step where the password is saved: the project's `user.password.save`
+// constraints (ADR 066). The state machine calls it with the flow's project.
+type FlowPasswordSaveRules func(ctx context.Context, projectID string) (*FlowFieldValidation, error)
+
+// WithPasswordSaveRules wires the project's password constraints into field
+// resolution. Without it a saved password keeps the built-in floor.
+func (r *FlowStateMachineRuntime) WithPasswordSaveRules(rules FlowPasswordSaveRules) *FlowStateMachineRuntime {
+	r.passwordSaveRules = rules
+	return r
 }
 
 // NewFlowStateMachine wires the runtime. The now hook is injectable so
@@ -1287,8 +1300,35 @@ func (r *FlowStateMachineRuntime) resolveStepFields(ctx context.Context, def *Fl
 	}
 	if passwordVerifiedOnStep(def, state, step) {
 		dropPasswordSaveRules(&resolved)
+		return resolved, nil
+	}
+	if err := r.applyPasswordSaveRules(ctx, state.ProjectID, &resolved); err != nil {
+		return FlowResolvedFields{}, fmt.Errorf("flow state machine: password constraints on step %q: %w", step.Name, err)
 	}
 	return resolved, nil
+}
+
+// applyPasswordSaveRules replaces the floor on a saved password field with
+// the project's `user.password.save` constraints, read once per resolution
+// and only when the step carries such a field.
+func (r *FlowStateMachineRuntime) applyPasswordSaveRules(ctx context.Context, projectID string, resolved *FlowResolvedFields) error {
+	if r.passwordSaveRules == nil {
+		return nil
+	}
+	var rules *FlowFieldValidation
+	for i := range resolved.Fields {
+		if resolved.Fields[i].Challenge != FlowFieldChallengePassword {
+			continue
+		}
+		if rules == nil {
+			var err error
+			if rules, err = r.passwordSaveRules(ctx, projectID); err != nil {
+				return err
+			}
+		}
+		resolved.Fields[i].Validation = rules
+	}
+	return nil
 }
 
 // passwordVerifiedOnStep reports whether a password submitted on step is

@@ -96,3 +96,34 @@ func TestFlowStateMachine_RegistrationPasswordKeepsSaveRules(t *testing.T) {
 	expected := domain.FlowFieldValidationError{Field: "x-auth-methods#password", Rule: domain.FlowFieldValidationRuleMinLength}
 	assert.Equal(t, expected.TextKey(), *result.Step.Error)
 }
+
+// The saved password's rules come from the project's policy, read with the
+// flow's project id, so a published instance reaches the registration form.
+func TestFlowStateMachine_RegistrationPasswordUsesProjectPolicy(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+
+	w.schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+		AnyTimes()
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
+
+	var askedFor string
+	w.sm.WithPasswordSaveRules(func(_ context.Context, projectID string) (*domain.FlowFieldValidation, error) {
+		askedFor = projectID
+		return &domain.FlowFieldValidation{MinLength: 8, MaxLength: 64}, nil
+	})
+
+	def := signupDefinition()
+	def.ProjectID = "proj_policy"
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeRegister,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "proj_policy", askedFor, "constraints are read for the flow's project")
+	assert.Equal(t, &domain.FlowFieldValidation{MinLength: 8, MaxLength: 64}, passwordField(t, start.Step).Validation)
+}

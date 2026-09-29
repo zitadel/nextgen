@@ -40,13 +40,6 @@ func (h *Harness) EnsureFlowStateMachine(t *testing.T) *domain.FlowStateMachineR
 
 	if h.flowStateMachine.value == nil {
 		fields := domain.NewSchemaFieldResolver()
-		fields.PasswordValidation = func() *domain.FlowFieldValidation {
-			v, err := h.EnsurePasswordPolicy(t).FieldValidation(t.Context(), "")
-			if err != nil {
-				return &domain.FlowFieldValidation{MinLength: domain.PasswordMinLengthFloor}
-			}
-			return v
-		}
 		authAdapter := service.NewFlowAuthAttemptAdapter(h.EnsureAuthAttemptService(t), h.EnsureSchemaStore(t))
 		h.flowStateMachine.value = domain.NewFlowStateMachine(
 			h.EnsureSchemaResolver(t),
@@ -55,7 +48,7 @@ func (h *Harness) EnsureFlowStateMachine(t *testing.T) *domain.FlowStateMachineR
 			h.EnsureCreateUserHandler(t),
 			authAdapter,
 			time.Now,
-		)
+		).WithPasswordSaveRules(h.EnsurePasswordPolicy(t).FieldValidation)
 	}
 	return h.flowStateMachine.value
 }
