@@ -24,6 +24,7 @@ export function parseLocalJourneyArgs(args) {
   let explicitFramework = false;
   let explicitSuite = false;
   let explicitPreset = false;
+  let explicitMatrix = false;
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
@@ -48,6 +49,7 @@ export function parseLocalJourneyArgs(args) {
       }
       case "--matrix": {
         parsed.matrix = parseMatrix(readValue(args, ++index, arg));
+        explicitMatrix = true;
         break;
       }
       case "--concurrency": {
@@ -125,6 +127,11 @@ export function parseLocalJourneyArgs(args) {
       );
     }
     return parsed;
+  }
+  // --matrix only shapes the fresh-app lane of the --ci set; without --ci it
+  // would be silently ignored, so reject it rather than run a different matrix.
+  if (explicitMatrix) {
+    throw new Error("--matrix only applies with --ci; drop it or add --ci");
   }
   if (parsed.suite === "testkit") {
     if (explicitFramework) {

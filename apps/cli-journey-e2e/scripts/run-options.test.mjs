@@ -146,6 +146,13 @@ test("--matrix validates its scope", () => {
   assert.throws(() => parseLocalJourneyArgs(["--matrix"]), /requires a value/);
 });
 
+test("--matrix without --ci is rejected rather than silently ignored", () => {
+  assert.throws(
+    () => parseLocalJourneyArgs(["--matrix", "single"]),
+    /--matrix only applies with --ci/,
+  );
+});
+
 test("--ci rejects the flags that pick a single variant's shape", () => {
   assert.throws(
     () => parseLocalJourneyArgs(["--ci", "--framework", "next"]),

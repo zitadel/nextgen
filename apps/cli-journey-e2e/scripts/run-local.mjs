@@ -109,8 +109,13 @@ try {
   await runWithConcurrency(
     journeyContexts,
     Math.min(options.concurrency, journeyContexts.length),
-    (context) =>
-      context.suite === "testkit" ? runTestkitJourney(context) : runFrameworkJourney(context),
+    (context) => {
+      const journey =
+        context.suite === "testkit" ? runTestkitJourney(context) : runFrameworkJourney(context);
+      // Release this lane's app server and runtime as soon as it finishes, so a
+      // full run never holds more than `concurrency` of them alive at once.
+      return journey.finally(() => teardownJourney(context));
+    },
   );
 
   success = true;
@@ -747,7 +752,7 @@ async function cleanup() {
     await stopChild(child);
   }
 
-  await Promise.all(journeyContexts.map(resetLocalRuntime));
+  await Promise.all(journeyContexts.map(teardownJourney));
 
   if (registryProcess) {
     try {
@@ -769,6 +774,19 @@ async function resetLocalRuntime(context) {
       `[journey-local] ${context.framework.id} local runtime reset failed: ${errorMessage(error)}`,
     );
   }
+}
+
+// Stop a finished lane's app server and reset its runtime. Called from each
+// worker's finally so services don't accumulate past the concurrency limit;
+// cleanup() calls it too for any lane cut short by a failure or signal. The
+// `toreDown` guard keeps it idempotent across both callers.
+async function teardownJourney(context) {
+  if (context.toreDown) return;
+  context.toreDown = true;
+  if (context.appProcess) {
+    await stopChild(context.appProcess);
+  }
+  await resetLocalRuntime(context);
 }
 
 async function stopChild(child) {
