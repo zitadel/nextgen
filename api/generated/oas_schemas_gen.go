@@ -46085,8 +46085,8 @@ func (s *PolicyUserPasswordSave) SetConfig(val PolicyUserPasswordSaveConfig) {
 type PolicyUserPasswordSaveConfig struct {
 	// Minimum password length in Unicode code points after NFC
 	// normalization. 15 is what NIST SP 800-63B requires for a password
-	// used as a single factor; values from 8 to 14 are accepted with a
-	// warning at authoring time.
+	// used as a single factor; values from 8 to 14 are accepted, and the
+	// CLI warns below `x-recommended-minimum`.
 	MinLength OptInt `json:"min_length"`
 	// How many previous passwords, the current one included, a new
 	// password may not match. 0 turns history off.

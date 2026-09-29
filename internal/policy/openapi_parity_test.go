@@ -56,10 +56,11 @@ func TestOpenAPIBranchesMatchTemplates(t *testing.T) {
 				Config struct {
 					AdditionalProperties bool `yaml:"additionalProperties"`
 					Properties           map[string]struct {
-						Type    string `yaml:"type"`
-						Minimum *int64 `yaml:"minimum"`
-						Maximum *int64 `yaml:"maximum"`
-						Default any    `yaml:"default"`
+						Type               string `yaml:"type"`
+						Minimum            *int64 `yaml:"minimum"`
+						Maximum            *int64 `yaml:"maximum"`
+						Default            any    `yaml:"default"`
+						RecommendedMinimum *int64 `yaml:"x-recommended-minimum"`
 					} `yaml:"properties"`
 				} `yaml:"config"`
 			} `yaml:"properties"`
@@ -91,6 +92,11 @@ func TestOpenAPIBranchesMatchTemplates(t *testing.T) {
 			}
 			if wantDefault, gotDefault := yamlScalar(setting.Default), yamlScalar(prop.Default); wantDefault != gotDefault {
 				t.Errorf("%s: %q default = %v, template %v", branchFile, name, gotDefault, wantDefault)
+			}
+			// The CLI warns below the recommended minimum from the wire
+			// schema alone, so the marker must travel with the template's.
+			if !equalBound(prop.RecommendedMinimum, setting.RecommendedMinimum) {
+				t.Errorf("%s: %q x-recommended-minimum differs from the template's recommended_minimum", branchFile, name)
 			}
 		}
 		for name := range branch.Properties.Config.Properties {

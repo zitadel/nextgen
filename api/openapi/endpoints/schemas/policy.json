@@ -54,7 +54,8 @@
               "minimum": 8,
               "maximum": 64,
               "default": 15,
-              "description": "Minimum password length in Unicode code points after NFC\nnormalization. 15 is what NIST SP 800-63B requires for a password\nused as a single factor; values from 8 to 14 are accepted with a\nwarning at authoring time.\n"
+              "x-recommended-minimum": 15,
+              "description": "Minimum password length in Unicode code points after NFC\nnormalization. 15 is what NIST SP 800-63B requires for a password\nused as a single factor; values from 8 to 14 are accepted, and the\nCLI warns below `x-recommended-minimum`.\n"
             },
             "history_depth": {
               "type": "integer",
