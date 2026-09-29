@@ -151,15 +151,16 @@ func resolveAuthMethodField(authMethods xAuthMethodsReader, field Field, stepNam
 		challenge = FlowFieldChallengePassword
 	}
 
+	// The floor every password meets. The state machine replaces it with
+	// the project's `user.password.save` constraints where the password is
+	// saved, and drops it where the password is verified.
 	return FlowField{
-		Name:      field.String(),
-		TextKey:   stepName + ".field." + field.AuthMethod(),
-		Type:      fieldType,
-		Challenge: challenge,
-		Required:  true,
-		Validation: &FlowFieldValidation{
-			MinLength: 8, // TODO: should come from policy or user-schema
-		},
+		Name:       field.String(),
+		TextKey:    stepName + ".field." + field.AuthMethod(),
+		Type:       fieldType,
+		Challenge:  challenge,
+		Required:   true,
+		Validation: &FlowFieldValidation{MinLength: PasswordMinLengthFloor},
 	}, nil
 }
 

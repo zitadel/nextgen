@@ -15,6 +15,7 @@ func (h *Harness) EnsureCreateUserHandler(t *testing.T) *service.FlowCreateUserW
 		h.EnsureUserService(t),
 		h.EnsureSchemaStore(t),
 		h.EnsureServiceDB(t),
+		service.WithFlowPasswordPolicy(h.EnsurePasswordPolicy(t)),
 	)
 }
 
@@ -47,7 +48,7 @@ func (h *Harness) EnsureFlowStateMachine(t *testing.T) *domain.FlowStateMachineR
 			h.EnsureCreateUserHandler(t),
 			authAdapter,
 			time.Now,
-		)
+		).WithPasswordSaveRules(h.EnsurePasswordPolicy(t).FieldValidation)
 	}
 	return h.flowStateMachine.value
 }

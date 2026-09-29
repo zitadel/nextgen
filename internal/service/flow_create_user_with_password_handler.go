@@ -11,10 +11,20 @@ import (
 // FlowCreateUserWithPasswordHandler implements the `create_user` on_success:
 // persist a new user from validated identifier + password fields.
 type FlowCreateUserWithPasswordHandler struct {
-	hashers     ProjectHasherResolver
-	userService UserService
-	schemaStore domain.JSONSchemaStore
-	db          StatementPool
+	hashers        ProjectHasherResolver
+	userService    UserService
+	schemaStore    domain.JSONSchemaStore
+	db             StatementPool
+	passwordPolicy *PasswordPolicy
+}
+
+// FlowCreateUserHandlerOption configures [NewFlowCreateUserHandler].
+type FlowCreateUserHandlerOption func(*FlowCreateUserWithPasswordHandler)
+
+// WithFlowPasswordPolicy gates the registration password on the
+// `user.password.save` policy (ADR 066).
+func WithFlowPasswordPolicy(p *PasswordPolicy) FlowCreateUserHandlerOption {
+	return func(h *FlowCreateUserWithPasswordHandler) { h.passwordPolicy = p }
 }
 
 func NewFlowCreateUserHandler(
@@ -22,13 +32,18 @@ func NewFlowCreateUserHandler(
 	userService UserService,
 	schemaStore domain.JSONSchemaStore,
 	db StatementPool,
+	opts ...FlowCreateUserHandlerOption,
 ) *FlowCreateUserWithPasswordHandler {
-	return &FlowCreateUserWithPasswordHandler{
+	h := &FlowCreateUserWithPasswordHandler{
 		userService: userService,
 		schemaStore: schemaStore,
 		hashers:     hashers,
 		db:          db,
 	}
+	for _, opt := range opts {
+		opt(h)
+	}
+	return h
 }
 
 var _ domain.FlowOnSuccessHandler = (*FlowCreateUserWithPasswordHandler)(nil)
@@ -60,7 +75,7 @@ func (h *FlowCreateUserWithPasswordHandler) Handle(ctx context.Context, in domai
 			Password:  password,
 		},
 		h.hashers,
-	)
+	).WithPasswordPolicy(h.passwordPolicy)
 	// The user just chose this password, so knowledge is proven: record real
 	// user + password factors on the attempt in the same transaction, so the
 	// exchanged session reflects how the user authenticated.

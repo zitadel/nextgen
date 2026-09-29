@@ -40,6 +40,7 @@ import (
 	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/instrumentation/zotel"
+	"github.com/zitadel/nextgen/internal/policy"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/staticui/console"
 	"github.com/zitadel/nextgen/internal/staticui/login"
@@ -285,12 +286,23 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	releaseService := service.NewReleaseService(serviceDBPool)
 	deploymentService := service.NewDeploymentService(serviceDBPool)
 	eventService := service.NewEventService(serviceDBPool)
+	// ── Operation policies (ADR 066) ──────────────────
+	// Templates ship with the binary; instances are not yet release-backed, so
+	// every project runs on the template defaults until a resolver reads them
+	// from the active release.
+	policyEngine, err := policy.New()
+	if err != nil {
+		return fmt.Errorf("compile policy catalog: %w", err)
+	}
+	passwordPolicy := service.NewPasswordPolicy(policyEngine, nil, passwordHasher)
+
 	projectHashers := service.NewProjectHasherResolver(serviceDBPool, hasherFactory)
 	userService := service.NewUserService(
 		serviceDBPool,
 		schemaStore,
 		projectHashers,
 		userRefs,
+		service.WithPasswordPolicy(passwordPolicy),
 	)
 
 	// The platform project's registration side effect (#527): every flow-created
@@ -313,6 +325,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		userService,
 		schemaStore,
 		serviceDBPool,
+		service.WithFlowPasswordPolicy(passwordPolicy),
 	)
 	stateMachine := domain.NewFlowStateMachine(
 		storageSchemaResolver,
@@ -321,7 +334,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		createUserHandler,
 		flowAuth,
 		time.Now,
-	)
+	).WithPasswordSaveRules(passwordPolicy.FieldValidation)
 
 	flowService := service.NewFlowService(serviceDBPool, stateMachine)
 	tokenService := service.NewTokenService(keyService, serviceDBPool)
