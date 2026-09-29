@@ -117,9 +117,13 @@ export function getRuntime(): ConsoleRuntime {
 }
 
 /**
- * The project the console operates on: the `VITE_CONSOLE_PROJECT_ID` dev
+ * The project the console signs into: the `VITE_CONSOLE_PROJECT_ID` dev
  * override when set (it must match the dev proxy's project secret),
  * otherwise the discovered `console_project_id` (ADR 0004 §3).
+ *
+ * Not the project being managed. Management calls use the selected project
+ * (`src/lib/project-scope.ts`); this one is for sign-in, claim, and the
+ * fallback selection when the person has no project of their own.
  */
 export function getConsoleProjectId(): string {
   return import.meta.env.VITE_CONSOLE_PROJECT_ID || getRuntime().console_project_id || "";
