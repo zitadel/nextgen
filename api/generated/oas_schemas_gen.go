@@ -44457,6 +44457,7 @@ func (*PatchMyUserConflict) patchMyUserRes() {}
 type PatchMyUserErrorResponse struct {
 	Type              PatchMyUserErrorResponseType // switch on this field
 	AuthUnauthorized  AuthUnauthorized
+	EvtInvalid        EvtInvalid
 	Internal          Internal
 	ReqInvalid        ReqInvalid
 	SessTokenInvalid  SessTokenInvalid
@@ -44472,6 +44473,7 @@ type PatchMyUserErrorResponseType string
 // Possible values for PatchMyUserErrorResponseType.
 const (
 	AuthUnauthorizedPatchMyUserErrorResponse  PatchMyUserErrorResponseType = "auth.unauthorized"
+	EvtInvalidPatchMyUserErrorResponse        PatchMyUserErrorResponseType = "evt.invalid"
 	InternalPatchMyUserErrorResponse          PatchMyUserErrorResponseType = "internal"
 	ReqInvalidPatchMyUserErrorResponse        PatchMyUserErrorResponseType = "req.invalid"
 	SessTokenInvalidPatchMyUserErrorResponse  PatchMyUserErrorResponseType = "sess.token_invalid"
@@ -44484,6 +44486,11 @@ const (
 // IsAuthUnauthorized reports whether PatchMyUserErrorResponse is AuthUnauthorized.
 func (s PatchMyUserErrorResponse) IsAuthUnauthorized() bool {
 	return s.Type == AuthUnauthorizedPatchMyUserErrorResponse
+}
+
+// IsEvtInvalid reports whether PatchMyUserErrorResponse is EvtInvalid.
+func (s PatchMyUserErrorResponse) IsEvtInvalid() bool {
+	return s.Type == EvtInvalidPatchMyUserErrorResponse
 }
 
 // IsInternal reports whether PatchMyUserErrorResponse is Internal.
@@ -44539,6 +44546,27 @@ func (s PatchMyUserErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok 
 func NewAuthUnauthorizedPatchMyUserErrorResponse(v AuthUnauthorized) PatchMyUserErrorResponse {
 	var s PatchMyUserErrorResponse
 	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetEvtInvalid sets PatchMyUserErrorResponse to EvtInvalid.
+func (s *PatchMyUserErrorResponse) SetEvtInvalid(v EvtInvalid) {
+	s.Type = EvtInvalidPatchMyUserErrorResponse
+	s.EvtInvalid = v
+}
+
+// GetEvtInvalid returns EvtInvalid and true boolean if PatchMyUserErrorResponse is EvtInvalid.
+func (s PatchMyUserErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
+	if !s.IsEvtInvalid() {
+		return v, false
+	}
+	return s.EvtInvalid, true
+}
+
+// NewEvtInvalidPatchMyUserErrorResponse returns new PatchMyUserErrorResponse from EvtInvalid.
+func NewEvtInvalidPatchMyUserErrorResponse(v EvtInvalid) PatchMyUserErrorResponse {
+	var s PatchMyUserErrorResponse
+	s.SetEvtInvalid(v)
 	return s
 }
 
@@ -45103,6 +45131,7 @@ func (*PatchUserByIDConflict) patchUserByIDRes() {}
 type PatchUserByIDErrorResponse struct {
 	Type                 PatchUserByIDErrorResponseType // switch on this field
 	AuthUnauthorized     AuthUnauthorized
+	EvtInvalid           EvtInvalid
 	Internal             Internal
 	ReqInvalid           ReqInvalid
 	UserAlreadyExists    UserAlreadyExists
@@ -45118,6 +45147,7 @@ type PatchUserByIDErrorResponseType string
 // Possible values for PatchUserByIDErrorResponseType.
 const (
 	AuthUnauthorizedPatchUserByIDErrorResponse     PatchUserByIDErrorResponseType = "auth.unauthorized"
+	EvtInvalidPatchUserByIDErrorResponse           PatchUserByIDErrorResponseType = "evt.invalid"
 	InternalPatchUserByIDErrorResponse             PatchUserByIDErrorResponseType = "internal"
 	ReqInvalidPatchUserByIDErrorResponse           PatchUserByIDErrorResponseType = "req.invalid"
 	UserAlreadyExistsPatchUserByIDErrorResponse    PatchUserByIDErrorResponseType = "user.already_exists"
@@ -45130,6 +45160,11 @@ const (
 // IsAuthUnauthorized reports whether PatchUserByIDErrorResponse is AuthUnauthorized.
 func (s PatchUserByIDErrorResponse) IsAuthUnauthorized() bool {
 	return s.Type == AuthUnauthorizedPatchUserByIDErrorResponse
+}
+
+// IsEvtInvalid reports whether PatchUserByIDErrorResponse is EvtInvalid.
+func (s PatchUserByIDErrorResponse) IsEvtInvalid() bool {
+	return s.Type == EvtInvalidPatchUserByIDErrorResponse
 }
 
 // IsInternal reports whether PatchUserByIDErrorResponse is Internal.
@@ -45185,6 +45220,27 @@ func (s PatchUserByIDErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, o
 func NewAuthUnauthorizedPatchUserByIDErrorResponse(v AuthUnauthorized) PatchUserByIDErrorResponse {
 	var s PatchUserByIDErrorResponse
 	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetEvtInvalid sets PatchUserByIDErrorResponse to EvtInvalid.
+func (s *PatchUserByIDErrorResponse) SetEvtInvalid(v EvtInvalid) {
+	s.Type = EvtInvalidPatchUserByIDErrorResponse
+	s.EvtInvalid = v
+}
+
+// GetEvtInvalid returns EvtInvalid and true boolean if PatchUserByIDErrorResponse is EvtInvalid.
+func (s PatchUserByIDErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
+	if !s.IsEvtInvalid() {
+		return v, false
+	}
+	return s.EvtInvalid, true
+}
+
+// NewEvtInvalidPatchUserByIDErrorResponse returns new PatchUserByIDErrorResponse from EvtInvalid.
+func NewEvtInvalidPatchUserByIDErrorResponse(v EvtInvalid) PatchUserByIDErrorResponse {
+	var s PatchUserByIDErrorResponse
+	s.SetEvtInvalid(v)
 	return s
 }
 

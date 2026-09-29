@@ -64949,6 +64949,22 @@ func (s PatchMyUserErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case EvtInvalidPatchMyUserErrorResponse:
+		e.FieldStart("code")
+		e.Str("evt.invalid")
+		{
+			s := s.EvtInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case InternalPatchMyUserErrorResponse:
 		e.FieldStart("code")
 		e.Str("internal")
@@ -65090,6 +65106,9 @@ func (s *PatchMyUserErrorResponse) Decode(d *jx.Decoder) error {
 				case "auth.unauthorized":
 					s.Type = AuthUnauthorizedPatchMyUserErrorResponse
 					found = true
+				case "evt.invalid":
+					s.Type = EvtInvalidPatchMyUserErrorResponse
+					found = true
 				case "internal":
 					s.Type = InternalPatchMyUserErrorResponse
 					found = true
@@ -65127,6 +65146,10 @@ func (s *PatchMyUserErrorResponse) Decode(d *jx.Decoder) error {
 	switch s.Type {
 	case AuthUnauthorizedPatchMyUserErrorResponse:
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
+			return err
+		}
+	case EvtInvalidPatchMyUserErrorResponse:
+		if err := s.EvtInvalid.Decode(d); err != nil {
 			return err
 		}
 	case InternalPatchMyUserErrorResponse:
@@ -65947,6 +65970,22 @@ func (s PatchUserByIDErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case EvtInvalidPatchUserByIDErrorResponse:
+		e.FieldStart("code")
+		e.Str("evt.invalid")
+		{
+			s := s.EvtInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case InternalPatchUserByIDErrorResponse:
 		e.FieldStart("code")
 		e.Str("internal")
@@ -66088,6 +66127,9 @@ func (s *PatchUserByIDErrorResponse) Decode(d *jx.Decoder) error {
 				case "auth.unauthorized":
 					s.Type = AuthUnauthorizedPatchUserByIDErrorResponse
 					found = true
+				case "evt.invalid":
+					s.Type = EvtInvalidPatchUserByIDErrorResponse
+					found = true
 				case "internal":
 					s.Type = InternalPatchUserByIDErrorResponse
 					found = true
@@ -66125,6 +66167,10 @@ func (s *PatchUserByIDErrorResponse) Decode(d *jx.Decoder) error {
 	switch s.Type {
 	case AuthUnauthorizedPatchUserByIDErrorResponse:
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
+			return err
+		}
+	case EvtInvalidPatchUserByIDErrorResponse:
+		if err := s.EvtInvalid.Decode(d); err != nil {
 			return err
 		}
 	case InternalPatchUserByIDErrorResponse:
