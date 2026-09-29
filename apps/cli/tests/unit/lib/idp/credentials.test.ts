@@ -1,76 +1,63 @@
 import { describe, expect, it } from "vitest";
 
-import { publishClientId, storeClientSecret, type SecretPublisher } from "../../../../src/lib/idp";
+import { republishCommand, republishCommands } from "../../../../src/lib/idp";
 
-/** A publisher that records what it was handed, standing in for the API. */
-function recorder(): { calls: Array<[string, string, boolean]>; publish: SecretPublisher } {
-  const calls: Array<[string, string, boolean]> = [];
-  return {
-    calls,
-    publish: async (name, value, { secret }) => {
-      calls.push([name, value, secret]);
-    },
-  };
-}
+const VERSION = "1.0.0-alpha.23";
 
-const NAME = "GOOGLE_CLIENT_SECRET";
-
-describe("storeClientSecret", () => {
-  it("publishes the secret to the project and writes nothing", async () => {
-    // The project is the only place a credential is written: no runtime reads
-    // it from the environment, and a copy in the working tree would be one
-    // `git add -A` away from being published.
-    const { calls, publish } = recorder();
-
-    expect(await storeClientSecret({ name: NAME, value: "s3cret", publish })).toEqual({
-      name: NAME,
-      published: "stored",
-    });
-    expect(calls).toEqual([[NAME, "s3cret", true]]);
+describe("the recovery command for a credential", () => {
+  it("is runnable rather than a bare subcommand", () => {
+    // A JSON result is read by agents, which execute these as shell commands.
+    expect(republishCommand("GOOGLE_CLIENT_ID", false, VERSION)).toMatch(/^npx .+ variables set /);
   });
 
-  it("reports a refused publish instead of raising it", async () => {
-    // The connection document is already on disk by now, and in `setup` the
-    // whole Project is provisioned, so failing here would leave more to clean
-    // up than `variables set` costs to run.
-    const publish: SecretPublisher = async () => {
-      throw new Error("403");
-    };
-
-    expect(await storeClientSecret({ name: NAME, value: "s3cret", publish })).toEqual({
-      name: NAME,
-      published: "failed",
-    });
-  });
-
-  it("publishes nothing when no value is supplied", async () => {
-    const { calls, publish } = recorder();
-
-    expect(await storeClientSecret({ name: NAME, publish })).toEqual({
-      name: NAME,
-      published: "deferred",
-    });
-    expect(calls).toEqual([]);
-  });
-
-  it("defers when there is no project behind the run", async () => {
-    expect(await storeClientSecret({ name: NAME, value: "s3cret" })).toEqual({
-      name: NAME,
-      published: "deferred",
-    });
+  it("marks a secret as one, so the value is not stored in the clear", () => {
+    expect(republishCommand("GOOGLE_CLIENT_SECRET", true, VERSION)).toContain(
+      "variables set GOOGLE_CLIENT_SECRET --secret",
+    );
+    expect(republishCommand("GOOGLE_CLIENT_ID", false, VERSION)).not.toContain("--secret");
   });
 });
 
-describe("publishClientId", () => {
-  it("publishes the id as an ordinary variable, not a secret", async () => {
-    // The id travels in the browser's authorize URL, so it is public by
-    // construction and storing it write-only would only cost the developer the
-    // ability to read back what was configured.
-    const { calls, publish } = recorder();
+describe("the recovery commands a result carries", () => {
+  it("says nothing when the project received everything", () => {
+    expect(
+      republishCommands(
+        [
+          { name: "GOOGLE_CLIENT_ID", secret: false, published: "stored" },
+          { name: "GOOGLE_CLIENT_SECRET", secret: true, published: "stored" },
+        ],
+        VERSION,
+      ),
+    ).toEqual([]);
+  });
 
-    expect(await publishClientId({ name: "GOOGLE_CLIENT_ID", value: "abc", publish })).toBe(
-      "stored",
+  it("names every credential that did not land, and only those", () => {
+    const commands = republishCommands(
+      [
+        { name: "GOOGLE_CLIENT_ID", secret: false, published: "stored" },
+        { name: "GOOGLE_CLIENT_SECRET", secret: true, published: "failed" },
+      ],
+      VERSION,
     );
-    expect(calls).toEqual([["GOOGLE_CLIENT_ID", "abc", false]]);
+
+    expect(commands).toHaveLength(1);
+    expect(commands[0]).toContain("variables set GOOGLE_CLIENT_SECRET --secret");
+  });
+
+  it("covers a deferred publish, not just a failed one", () => {
+    // Deferred means the value never reached the project either; the button
+    // fails at token exchange just the same.
+    expect(
+      republishCommands([{ name: "GOOGLE_CLIENT_ID", secret: false, published: "deferred" }], VERSION),
+    ).toHaveLength(1);
+  });
+
+  it("skips a credential this run never had", () => {
+    // No provider was enabled, or no secret was supplied: there is nothing to
+    // republish and a command naming an empty variable would be noise.
+    expect(republishCommands([{ name: undefined, secret: false, published: "failed" }], VERSION)).toEqual([]);
+    expect(
+      republishCommands([{ name: "GOOGLE_CLIENT_ID", secret: false, published: undefined }], VERSION),
+    ).toEqual([]);
   });
 });

@@ -43,6 +43,8 @@ export {
   type PublishState,
   reportClientIdOutcome,
   reportSecretOutcome,
+  republishCommand,
+  republishCommands,
   type SecretOutcome,
   type SecretPublisher,
   storeClientSecret,

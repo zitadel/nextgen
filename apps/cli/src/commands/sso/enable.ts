@@ -9,7 +9,8 @@ import { credentialVariables, idpProvider, IDP_PROVIDERS } from "@zitadel/config
 
 import { createZitadelClient } from "../../lib/api-client";
 import { isDevelopmentBuild } from "../../lib/build-channel";
-import { ZitadelError } from "../../lib/errors";
+import { isErrno, ZitadelError } from "../../lib/errors";
+import { publicCliCommand } from "../../lib/public-cli";
 import { bailOnCancel } from "../../lib/prompt-cancel";
 import { stableStringify } from "../../lib/json";
 import {
@@ -29,6 +30,7 @@ import {
   readFlowFiles,
   readSchemaFiles,
   reportClientIdOutcome,
+  republishCommands,
   ssoEditRefusal,
   type SsoEditTarget,
   type SsoSkipped,
@@ -115,7 +117,11 @@ export default class SsoEnable extends BaseCommand {
 
     const schema = selectSchema(await readSchemaFiles(cwd), flags.schema);
     const connections = await readConnectionFiles(cwd);
-    const plan = planConnection({ provider, files: connections, clientId: flags["client-id"] });
+    // Normalised once, here: `--client-id ""` (an unset shell variable, most
+    // often) is not a client id, and taking it as one would bypass the prompt
+    // on create and overwrite the project's variable with nothing on reuse.
+    const clientIdFlag = suppliedClientId(flags["client-id"]);
+    const plan = planConnection({ provider, files: connections, clientId: clientIdFlag });
 
     const reusing = plan.action === "reuse";
     // A reused connection may name its own variables — it is an editable file
@@ -170,10 +176,10 @@ export default class SsoEnable extends BaseCommand {
       // silently ignored. Nothing is prompted for: an unattended rerun should
       // not start asking for credentials the project already has.
       const publish = this.publisher(secretFile);
-      if (flags["client-id"] !== undefined) {
+      if (clientIdFlag !== undefined) {
         clientIdState = await publishClientId({
           name: idVariable,
-          value: flags["client-id"],
+          value: clientIdFlag,
           publish,
         });
       }
@@ -194,7 +200,7 @@ export default class SsoEnable extends BaseCommand {
         command: "Enable",
       });
       const clientId =
-        flags["client-id"] ?? (await this.askClientId(entry.displayName, nonInteractive));
+        clientIdFlag ?? (await this.askClientId(entry.displayName, nonInteractive));
       const secretValue = await this.askClientSecret(variable, nonInteractive);
 
       const publish = this.publisher(secretFile);
@@ -263,14 +269,15 @@ export default class SsoEnable extends BaseCommand {
         // carries its follow-ups in data.next_commands (errors use the
         // top-level nextCommands instead).
         next_commands: [
-          ...(clientIdState !== undefined && clientIdState !== "stored"
-            ? [`variables set ${idVariable}`]
-            : []),
-          ...(secret !== undefined && secret.published !== "stored"
-            ? [`variables set ${variable} --secret`]
-            : []),
-          "plan",
-          "apply",
+          ...republishCommands(
+            [
+              { name: idVariable, secret: false, published: clientIdState },
+              { name: variable, secret: true, published: secret?.published },
+            ],
+            this.meta.cliVersion,
+          ),
+          publicCliCommand("plan", this.meta.cliVersion),
+          publicCliCommand("apply", this.meta.cliVersion),
         ],
       },
       pretty: `Enabled ${entry.displayName} for ${schema.name}`,
@@ -491,6 +498,25 @@ function flowUsesSchema(
   return used.endsWith(`/${schema.name}.json`);
 }
 
+/**
+ * The client id `--client-id` supplied, or `undefined` when the flag was not
+ * given. A flag given but blank is refused rather than ignored: the developer
+ * asked for a specific id, and silently falling back to a prompt or to the
+ * stored value would hide that they passed nothing.
+ */
+function suppliedClientId(flag: string | undefined): string | undefined {
+  if (flag === undefined) {
+    return undefined;
+  }
+  const value = flag.trim();
+  if (value === "") {
+    throw new ZitadelError("E_VALIDATION", "--client-id was given an empty value", {
+      hint: "Pass the client id of the application registered with the provider, or omit the flag.",
+    });
+  }
+  return value;
+}
+
 /** Stop on a document whose region the SSO editors would overwrite. */
 function refuseUneditable(path: string, body: object, target: SsoEditTarget): void {
   const refusal = ssoEditRefusal(body, target);
@@ -520,7 +546,7 @@ async function publishedIdOf(cwd: string, path: string): Promise<string | undefi
     const state = await readState(cwd);
     return state.resources?.[path]?.id;
   } catch (error) {
-    if (isErrno(error, "ENOENT") || isErrno(error, "ENOTDIR")) {
+    if (isErrno(error, "ENOENT")) {
       return undefined;
     }
     throw new ZitadelError("E_VALIDATION", `Cannot read .zitadel/state.json: ${error instanceof Error ? error.message : String(error)}`, {
@@ -532,7 +558,3 @@ async function publishedIdOf(cwd: string, path: string): Promise<string | undefi
   }
 }
 
-/** Whether a caught error is the given `errno` code. */
-function isErrno(error: unknown, code: string): boolean {
-  return typeof error === "object" && error !== null && "code" in error && error.code === code;
-}

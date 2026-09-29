@@ -10,7 +10,7 @@ import {
   type IdpProvider,
 } from "@zitadel/config/idp";
 
-import { ZitadelError } from "../errors";
+import { isErrno, ZitadelError } from "../errors";
 import { isObject } from "../json";
 
 /**
@@ -27,11 +27,6 @@ export const IDPS_DIR = ".zitadel/idps";
  * `.zitadel/meta/`, so an editor validates the file as it is typed.
  */
 export const CONNECTION_SCHEMA_REF = "../meta/idp-connection.json";
-
-/** Whether a caught error is the given `errno` code. */
-function isErrno(error: unknown, code: string): boolean {
-  return typeof error === "object" && error !== null && "code" in error && error.code === code;
-}
 
 /** A connection file as it sits on disk, with the name needed to report it. */
 export type ConnectionFile = {

@@ -33,6 +33,7 @@ import {
   type PublishState,
   reportClientIdOutcome,
   reportSecretOutcome,
+  republishCommands,
   storeClientSecret,
   type SecretOutcome,
   type SecretPublisher,
@@ -651,7 +652,27 @@ export default class Setup extends BaseCommand {
           brandingGuidanceAction(this.meta.cliVersion),
           ...claimNudge.actions,
         ],
-        next_commands: [...installOutcome.nextCommands, ...claimNudge.commands],
+        // A JSON run prints no warnings, so a credential the project never
+        // received would otherwise appear only as a `published` status with
+        // nothing to act on. `sso enable` reports the same recovery step.
+        next_commands: [
+          ...republishCommands(
+            [
+              {
+                name:
+                  answers.sso === undefined
+                    ? undefined
+                    : credentialVariables(answers.sso.provider).clientId,
+                secret: false,
+                published: ssoClientId,
+              },
+              { name: ssoSecret?.name, secret: true, published: ssoSecret?.published },
+            ],
+            this.meta.cliVersion,
+          ),
+          ...installOutcome.nextCommands,
+          ...claimNudge.commands,
+        ],
       },
     });
   }

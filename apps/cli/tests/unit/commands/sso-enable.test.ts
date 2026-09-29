@@ -379,7 +379,11 @@ describe("sso enable secret handling", () => {
       variable: "GOOGLE_CLIENT_SECRET",
       published: "failed",
     });
-    expect(json.data.next_commands).toContain("variables set GOOGLE_CLIENT_SECRET --secret");
+    // Rendered as a command an agent can run, like every other result's.
+    expect(json.data.next_commands).toEqual(
+      expect.arrayContaining([expect.stringContaining("variables set GOOGLE_CLIENT_SECRET --secret")]),
+    );
+    expect(json.data.next_commands.every((command) => command.startsWith("npx "))).toBe(true);
   });
 
   it("refuses a scripted run that pipes nothing in, before writing anything", async () => {
@@ -480,6 +484,33 @@ describe("sso enable with a connection already on disk", () => {
     // it would leave a file and two published variables behind for a provider
     // the sign-in screen can never offer.
     await expect(readFile(join(cwd, ".zitadel/idps/google.json"), "utf8")).rejects.toThrow();
+  });
+
+  it("refuses a blank --client-id rather than taking it as one", async () => {
+    // `--client-id "$CLIENT_ID"` with the variable unset is the common way
+    // here. Taking it would bypass the prompt on create and, on reuse,
+    // overwrite the project's variable with nothing.
+    const cwd = await makeProject();
+
+    const result = await enable(cwd, "--client-id", "   ");
+
+    expect(result.exitCode).not.toBe(0);
+    const json = parseJson(result.stdout) as { code: string; message: string };
+    expect(json.code).toBe("E_VALIDATION");
+    expect(json.message).toContain("--client-id");
+    await expect(readFile(join(cwd, ".zitadel/idps/google.json"), "utf8")).rejects.toThrow();
+  });
+
+  it("reports only a missing schema directory as no schemas", async () => {
+    const cwd = await makeProject();
+    // A directory that cannot be listed is not an empty one.
+    await rm(join(cwd, ".zitadel/schemas"), { recursive: true });
+    await writeFile(join(cwd, ".zitadel/schemas"), "not a directory");
+
+    const result = await enable(cwd, "--client-id", "abc");
+
+    expect(result.exitCode).not.toBe(0);
+    expect((parseJson(result.stdout) as { code: string }).code).not.toBe("E_NOT_FOUND");
   });
 });
 

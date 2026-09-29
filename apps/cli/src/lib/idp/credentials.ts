@@ -102,6 +102,45 @@ async function publishSecret(
 }
 
 /**
+ * The command that puts a credential the project never received where the
+ * connection looks for it.
+ *
+ * Shared so the warning printed to a terminal and the `next_commands` a JSON
+ * run reports cannot drift apart — a JSON run prints no warnings at all, so
+ * that list is the only place the recovery step appears.
+ */
+export function republishCommand(name: string, secret: boolean, cliVersion: string): string {
+  return publicCliCommand(`variables set ${name}${secret ? " --secret" : ""}`, cliVersion);
+}
+
+/** A credential, and whether the project ended up holding it. */
+export type CredentialRecovery = {
+  /** `undefined` when there is no such credential in this run at all. */
+  readonly name: string | undefined;
+  readonly secret: boolean;
+  readonly published: PublishState | undefined;
+};
+
+/**
+ * The commands that finish the job for every credential the project did not
+ * receive — empty in the ordinary case, where both were stored.
+ *
+ * Built for a run that prints nothing: with `--json` consola is disabled, so
+ * the warnings above never appear and this list is the only place the recovery
+ * step is stated.
+ */
+export function republishCommands(
+  credentials: readonly CredentialRecovery[],
+  cliVersion: string,
+): string[] {
+  return credentials.flatMap(({ name, secret, published }) =>
+    name !== undefined && published !== undefined && published !== "stored"
+      ? [republishCommand(name, secret, cliVersion)]
+      : [],
+  );
+}
+
+/**
  * Say whether the project received a credential, and how to retry when it did
  * not. Shared by both credentials, because the project is the destination that
  * decides whether sign-in works and the wording should not drift between them.
@@ -142,7 +181,7 @@ export function reportSecretOutcome(
   reportPublished(
     outcome.name,
     outcome.published,
-    publicCliCommand(`variables set ${outcome.name} --secret`, cliVersion),
+    republishCommand(outcome.name, true, cliVersion),
     noValue,
   );
 }
@@ -158,5 +197,5 @@ export function reportClientIdOutcome(
   state: PublishState,
   cliVersion: string,
 ): void {
-  reportPublished(name, state, publicCliCommand(`variables set ${name}`, cliVersion), false);
+  reportPublished(name, state, republishCommand(name, false, cliVersion), false);
 }

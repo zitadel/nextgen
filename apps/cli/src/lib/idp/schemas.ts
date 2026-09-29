@@ -3,7 +3,7 @@ import { basename, join } from "node:path";
 
 import { FLOWS_DIR } from "../flows";
 import { SCHEMAS_DIR } from "../user-schema";
-import { ZitadelError } from "../errors";
+import { isErrno, ZitadelError } from "../errors";
 import { isObject } from "../json";
 
 /** A user-schema file, with what the command has to show about it. */
@@ -43,8 +43,14 @@ export async function readSchemaFiles(cwd: string): Promise<SchemaFile[]> {
   let entries: string[];
   try {
     entries = await readdir(dir);
-  } catch {
-    return [];
+  } catch (error) {
+    // Only an absent directory means the Project has none. A permission or
+    // I/O failure reported as "no user schema" would send the developer
+    // looking for a missing file that is sitting right there.
+    if (isErrno(error, "ENOENT")) {
+      return [];
+    }
+    throw error;
   }
   const files: SchemaFile[] = [];
   for (const entry of entries.filter((e) => e.endsWith(".json")).sort()) {
@@ -127,8 +133,14 @@ export async function readFlowFiles(cwd: string): Promise<FlowFile[]> {
   let entries: string[];
   try {
     entries = await readdir(dir);
-  } catch {
-    return [];
+  } catch (error) {
+    // Only an absent directory means the Project has none. A permission or
+    // I/O failure reported as "no user schema" would send the developer
+    // looking for a missing file that is sitting right there.
+    if (isErrno(error, "ENOENT")) {
+      return [];
+    }
+    throw error;
   }
   const files: FlowFile[] = [];
   for (const entry of entries.filter((e) => e.endsWith(".json")).sort()) {
