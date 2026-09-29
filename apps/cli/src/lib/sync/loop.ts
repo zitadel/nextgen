@@ -9,6 +9,7 @@ import { FLOWS_DIR } from "../flows";
 import { stableStringify } from "../json";
 import { annotateAssetWarnings } from "./asset-probe.js";
 import { validatePlannedFlows } from "./flow-validation.js";
+import { annotatePolicyWarnings } from "./policy-warnings.js";
 import type { PlanResourceChange } from "./plan-renderer.js";
 import { readState, removeFromState, updateState } from "./state.js";
 import type { FlowRepin, ResourceEntry, ResourceSyncer, SyncAction } from "./types.js";
@@ -236,6 +237,10 @@ export async function buildSyncPlan(
   // the machine planning is not necessarily the machine rendering the login
   // page, so a URL this host cannot fetch is never a reason to fail.
   await annotateAssetWarnings(actions);
+
+  // A policy value below the setting's recommended minimum publishes, with
+  // a warning: the floor is the protection, the recommendation is guidance.
+  annotatePolicyWarnings(actions);
 
   return actions;
 }

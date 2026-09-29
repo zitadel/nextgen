@@ -63,6 +63,12 @@ export const BRANDING_FILE_SCHEMA_REF = "../meta/branding.json";
  */
 export const POLICY_FILE_SCHEMA_REF = "../meta/policy.json";
 
+/**
+ * The policy dialect itself, for consumers that read a setting's markers
+ * (`x-recommended-minimum`) rather than validate a file against it.
+ */
+export const POLICY_META_SCHEMA: object = policyMetaSchema;
+
 export type MetaSchemaFile = { name: string; body: object };
 
 /**
