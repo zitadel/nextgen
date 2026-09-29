@@ -417,12 +417,36 @@ func TestIdpAccess(t *testing.T) {
 func TestQueryIdpsPartialGrant(t *testing.T) {
 	f := newIdpFixture(t)
 	granted := f.create(t, helpers.OIDCConnection("granted"))
-	f.create(t, helpers.OIDCConnection("hidden"))
+	hidden := f.create(t, helpers.OIDCConnection("hidden"))
 
 	replaceSecretGrant(t, f.project, domain.NewResourceAssignmentScope(granted.ID))
 
 	listed := f.queryOK(t, &api.QueryIdpsRequest{})
 	assert.Equal(t, []string{granted.ID}, idpIDs(listed.Idps))
+
+	// The by-id reads resolve the connection through the resource scope
+	// index, so the grant reaches the granted connection and its history.
+	got := f.get(t, granted.ID)
+	require.IsType(t, &api.IdpResponse{}, got, helpers.MustMarshal(t, got))
+	revisions := f.listRevisions(t, api.ListIdpRevisionsParams{ID: granted.ID})
+	require.IsType(t, &api.ListIdpRevisionsResponse{}, revisions, helpers.MustMarshal(t, revisions))
+	assert.Equal(t, []string{granted.RevisionID}, revisionIDs(revisions.(*api.ListIdpRevisionsResponse).Revisions))
+
+	// Another connection of the same project is found, but the grant does not
+	// cover it.
+	denied := domain.ErrIDPConnectionPermissionDenied().Code
+	hiddenGet := f.get(t, hidden.ID)
+	require.IsType(t, &api.GetIdpByIdForbidden{}, hiddenGet, helpers.MustMarshal(t, hiddenGet))
+	assertAuthzError(t, hiddenGet, denied)
+	hiddenRevisions := f.listRevisions(t, api.ListIdpRevisionsParams{ID: hidden.ID})
+	require.IsType(t, &api.ListIdpRevisionsForbidden{}, hiddenRevisions, helpers.MustMarshal(t, hiddenRevisions))
+	assertAuthzError(t, hiddenRevisions, denied)
+
+	// A single revision has no index row, so its read checks the whole
+	// project, which a grant on one connection does not cover.
+	revision := f.getRevision(t, granted.RevisionID)
+	require.IsType(t, &api.GetIdpRevisionByIdForbidden{}, revision, helpers.MustMarshal(t, revision))
+	assertAuthzError(t, revision, denied)
 }
 
 // replaceSecretGrant swaps the project secret's seeded admin grant for a

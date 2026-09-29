@@ -35,15 +35,17 @@ func (h *Handler) CreateIdp(ctx context.Context, req *api.CreateIdpRequest, para
 	return &revised, nil
 }
 
-// The IdP reads are scoped to the project the caller named rather than
-// resolved through the resource scope index, so a connection or revision of
-// another project reads as an unknown id and is no existence oracle.
+// Connection reads resolve the path id through the resource scope index in
+// the named project, so a grant scoped to one connection reaches that
+// connection and its revision list. A single revision is read project-scoped
+// because revisions have no index row, so it needs a project-level grant.
 
 func (h *Handler) GetIdpById(ctx context.Context, params api.GetIdpByIdParams) (api.GetIdpByIdRes, error) {
-	if err := h.requireProjectAccess(ctx, string(params.ProjectID), idpAccess, opRead); err != nil {
+	projectID, err := h.requireResourceAccessInProject(ctx, string(params.ProjectID), params.ID, idpAccess, opRead)
+	if err != nil {
 		return nil, err
 	}
-	entity, err := h.idpConnectionService.Get(ctx, string(params.ProjectID), params.ID)
+	entity, err := h.idpConnectionService.Get(ctx, projectID, params.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -70,15 +72,17 @@ func (h *Handler) GetIdpRevisionById(ctx context.Context, params api.GetIdpRevis
 }
 
 func (h *Handler) ListIdpRevisions(ctx context.Context, params api.ListIdpRevisionsParams) (api.ListIdpRevisionsRes, error) {
-	if err := h.requireProjectAccess(ctx, string(params.ProjectID), idpAccess, opRead); err != nil {
+	projectID, err := h.requireResourceAccessInProject(ctx, string(params.ProjectID), params.ID, idpAccess, opRead)
+	if err != nil {
 		return nil, err
 	}
 	// The revisions are a list statement, which fails closed without list
-	// authz on the context. The check above allowed the whole project, which
-	// is the case requireProjectListAccess answers with the same one-shot skip.
+	// authz on the context. The check above allowed the caller on this very
+	// connection, and every row of the list is one of its revisions, so the
+	// list needs no filter and takes the one-shot skip.
 	ctx = service.WithAuthzListSkipOnce(ctx)
 	result, err := h.idpConnectionService.ListRevisions(ctx, service.ListIDPConnectionRevisionsInput{
-		ProjectID: string(params.ProjectID),
+		ProjectID: projectID,
 		ID:        params.ID,
 		Limit:     int(params.Limit.Or(0)),
 		PageToken: string(params.PageToken.Or("")),
