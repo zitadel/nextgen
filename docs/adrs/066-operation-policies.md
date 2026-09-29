@@ -171,9 +171,10 @@ One template per operation, defined by Zitadel and versioned with the server.
 The template is also published read-only (`GET /policies/catalog`, after the
 policy stack), so the console, the CLI and the `constraints` endpoint render
 from the same source.
-It is not release content: a release pins the catalog version it was validated
-against, and instances keep evaluating under that version after a server upgrade
-(Kubernetes' "stored expressions" rule).
+It is not release content: templates ship with the server and evolve with it,
+as the flow engine's step vocabulary does for flow definitions. How a server
+upgrade treats deployed instances is the same question every configuration
+resource has, and is not answered here.
 
 ### Policy catalog
 
@@ -346,8 +347,7 @@ Each rule is then one boolean expression, and CEL is the fit for exactly that:
 
 The evaluator is [cel-go](https://github.com/cel-expr/cel-go), the same
 implementation OpenFGA embeds. The environment is deliberately minimal: the CEL
-standard library plus the `strings` and `lists` extensions, nothing else, and it
-is pinned per catalog version.
+standard library plus the `strings` and `lists` extensions, nothing else.
 
 Rego stays available as an external decision point if an enterprise customer
 insists on OPA: the Kubernetes model, not an embedded second engine.
@@ -447,7 +447,7 @@ Mitigated by construction: the context carries derived values computed in Go, an
 
 **Long expressions in JSON.** A rule list invites the temptation of one long expression. Mitigated by the caps (length, cost, `bool` result) and by the rule that a violation names one requirement.
 
-**Expression language drift.** cel-go gains features per release. Mitigated by the pinned environment per catalog version and the release recording which version it was validated against.
+**Expression language drift.** cel-go gains features per release. Mitigated by the minimal environment: a rule uses the standard library and two extensions, and every template is compiled and checked when the server starts.
 
 ## Design documents
 
@@ -533,7 +533,7 @@ than the link.
 ### Template and instance
 
 - [Kubernetes — ValidatingAdmissionPolicy](https://kubernetes.io/docs/reference/access-authn-authz/validating-admission-policy/) — CEL policy with `paramKind`, `matchConditions`, `validations[]`, `failurePolicy`; binding with `paramRef`, `matchResources`, `validationActions: Deny | Warn | Audit`. The closest shipped match to this ADR, and the precedent for embedding CEL in-process while keeping OPA as an external webhook.
-- [Kubernetes — CEL in Kubernetes](https://kubernetes.io/docs/reference/using-api/cel/) — static estimated cost limits, runtime cost budget, and the "stored expressions keep evaluating after a rollback" compatibility rule the catalog version copies.
+- [Kubernetes — CEL in Kubernetes](https://kubernetes.io/docs/reference/using-api/cel/) — static estimated cost limits and the runtime cost budget.
 - [OPA Gatekeeper](https://open-policy-agent.github.io/gatekeeper/website/docs/howto/) — ConstraintTemplate holds the logic and the parameter schema; Constraint holds the parameters and the match selector. `enforcementAction: deny | dryrun | warn`.
 - [Azure Policy — definition structure](https://learn.microsoft.com/en-us/azure/governance/policy/concepts/definition-structure) — `parameters` and `policyRule` in the definition, values and scope in the assignment, `enforcementMode: DoNotEnforce` for rollout.
 - [GitHub rulesets](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets) — enforcement `Active | Evaluate`, and "the most restrictive version of the rule applies" when several target the same branch.
