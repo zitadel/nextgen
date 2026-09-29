@@ -232,7 +232,8 @@ async function proxyRequest(
     signal: AbortSignal.timeout(proxyTimeoutMs),
   });
 
-  const responseHeaders = filterResponseHeaders(upstream.headers);
+  // The app's own origin: the only destination a proxied redirect may name.
+  const responseHeaders = filterResponseHeaders(upstream.headers, req.nextUrl.origin);
 
   const setCookies = upstream.headers.getSetCookie?.() ?? [];
   for (const cookie of setCookies) {
