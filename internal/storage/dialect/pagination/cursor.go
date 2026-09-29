@@ -46,7 +46,9 @@ func Paginate[F ~uint8, T any](
 	schema database.Schema[F, T],
 	limit uint32,
 ) ([]*T, []byte) {
-	if limit == 0 || uint32(len(items)) <= limit {
+	// Compare widths in uint64: len(items) can be limit+1 up to math.MaxUint32+1,
+	// which narrowing to uint32 would wrap to 0 and skip trimming the probe row.
+	if limit == 0 || uint64(len(items)) <= uint64(limit) {
 		return items, nil
 	}
 	// The probe row came back, so trim to the requested page regardless of
