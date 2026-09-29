@@ -127,8 +127,8 @@ export function getConsoleProjectId(): string {
 
 /**
  * The discovered publishable key, or `undefined` when the server does not
- * serve one (older servers, no project yet). Without it the login widget's
- * handoff exchange falls back to the dev proxy's secret injection.
+ * serve one (older servers, no project yet). The login widget's handoff
+ * exchange requires it: without it every sign-in answers 401.
  */
 export function getPublishableKey(): string | undefined {
   return getRuntime().publishable_key;
