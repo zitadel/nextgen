@@ -36,8 +36,10 @@ func New[F ~uint8](orderBy database.OrderBy[F], values []any) *Cursor[F] {
 // unchanged with no token — including when the total is an exact multiple of
 // the limit, which a page-full heuristic wrongly tokenized (#849).
 //
-// With limit 0 (unbounded) or an OrderBy with no columns there is no keyset to
-// resume, so the items are returned unchanged with no token.
+// With limit 0 the request is unbounded, so the items are returned unchanged
+// with no token. With a positive limit but an OrderBy with no columns there is
+// no keyset to resume, so an over-fetched result is still trimmed to limit (a
+// bounded read must not leak the probe row) but no token is emitted.
 func Paginate[F ~uint8, T any](
 	orderBy database.OrderBy[F],
 	items []*T,

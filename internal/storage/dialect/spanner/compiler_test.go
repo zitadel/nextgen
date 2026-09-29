@@ -2,6 +2,7 @@ package spanner
 
 import (
 	"context"
+	"math"
 	"testing"
 	"time"
 
@@ -586,6 +587,14 @@ func TestCompileLimit(t *testing.T) {
 		assert.Equal(t, " LIMIT @p1", sql)
 		require.Len(t, args, 1)
 		assert.Equal(t, int64(26), args[0])
+	})
+
+	t.Run("max uint32 does not overflow", func(t *testing.T) {
+		t.Parallel()
+
+		_, args := compileLimitOnly(t, math.MaxUint32)
+		require.Len(t, args, 1)
+		assert.Equal(t, int64(math.MaxUint32)+1, args[0], "limit+1 stays positive at the boundary")
 	})
 }
 

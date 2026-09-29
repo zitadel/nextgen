@@ -41,7 +41,7 @@ func TestCompileReadKeysetCursorAsc(t *testing.T) {
 	require.Len(t, args, 3)
 	assert.Equal(t, createdAt, args[0])
 	assert.Equal(t, "proj_1", args[1])
-	assert.Equal(t, uint32(6), args[2]) // compileLimit over-fetches by one (#849)
+	assert.Equal(t, int64(6), args[2]) // compileLimit over-fetches by one (#849)
 }
 
 func TestCompileReadCursorDoesNotMutateCallerFilter(t *testing.T) {

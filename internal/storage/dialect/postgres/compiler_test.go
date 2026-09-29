@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"math"
 	"testing"
 	"time"
 
@@ -87,7 +88,7 @@ func TestCompileReadFilterAndOrderBy(t *testing.T) {
 	assert.Equal(t, wantSQL, sql)
 	require.Len(t, args, 2)
 	assert.Equal(t, "proj_1", args[0])
-	assert.Equal(t, uint32(11), args[1]) // compileLimit over-fetches by one (#849)
+	assert.Equal(t, int64(11), args[1]) // compileLimit over-fetches by one (#849)
 }
 
 func TestCompileReadCompareGreater(t *testing.T) {
@@ -571,7 +572,15 @@ func TestCompileLimit(t *testing.T) {
 		sql, args := compileLimitOnly(t, 25)
 		assert.Equal(t, " LIMIT $1", sql)
 		require.Len(t, args, 1)
-		assert.Equal(t, uint32(26), args[0])
+		assert.Equal(t, int64(26), args[0])
+	})
+
+	t.Run("max uint32 does not overflow", func(t *testing.T) {
+		t.Parallel()
+
+		_, args := compileLimitOnly(t, math.MaxUint32)
+		require.Len(t, args, 1)
+		assert.Equal(t, int64(math.MaxUint32)+1, args[0], "limit+1 stays positive at the boundary")
 	})
 }
 

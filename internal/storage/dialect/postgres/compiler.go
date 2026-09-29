@@ -280,7 +280,9 @@ func compileLimit(c *statementCompiler, limit uint32) {
 		c.WriteString(" LIMIT ")
 		// Fetch one extra row as a look-ahead probe so Paginate can tell a full
 		// final page from a truncated one (#849); Paginate drops the probe.
-		writeArg(c, limit+1)
+		// int64 so limit+1 cannot wrap to 0 at math.MaxUint32 (dialect parity
+		// with sqlite/spanner).
+		writeArg(c, int64(limit)+1)
 	}
 }
 
