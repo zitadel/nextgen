@@ -74,8 +74,6 @@ zitadel sso connections activate <id>
 
 Which resources and operations are available is defined by their relevant product and resource ADRs.
 
-The detailed resource-command conventions are defined in [CLI Resource Commands](resource-commands.md) and [ADR 062](../../adrs/062-cli-resource-commands.md).
-
 ### Capability commands
 
 A capability may contain its own actions or child resources:
@@ -142,6 +140,12 @@ Utilities
   search             Search for a command
   version            Show the CLI version
   which              Show where a command comes from
+
+Examples
+  zitadel setup       Set up a Project
+  zitadel schemas list  List user schemas
+
+Run `zitadel --help` for flags and more details.
 ```
 
 `apply` is included because it is currently available but transitional: `deploy` replaces it in the environment and release workflow, while `plan` has no replacement under the release model.
@@ -221,7 +225,7 @@ resources
 
 All commands must support automation. When required input is missing in non-interactive mode, the CLI returns a clear validation error rather than prompting.
 
-Structured output such as `--json` never opens an interactive prompt.
+`--no-input` suppresses all prompts. If required input is missing, the CLI returns a clear validation error. Structured output such as `--json` also never opens an interactive prompt.
 
 ## Guidance and feedback
 
@@ -229,14 +233,13 @@ Commands should:
 
 - use sensible defaults, communicate the context being used and validate input before acting;
 - show progress where useful and clearly communicate the outcome;
-- provide actionable next steps, including how to recover from errors, and warn before destructive changes.
+- provide actionable next steps, including how to recover from errors;
+- match confirmation to the impact of an action: routine changes need no confirmation, destructive actions ask before proceeding in an interactive terminal, and especially consequential actions require explicit confirmation of the target. In non-interactive use, commands require an explicit flag for destructive actions instead of prompting.
 
 Guidance is shown only when it helps the user complete or recover from the current command. It must not interfere with structured output or require agents and automation to parse human-readable text.
 
 ## Detailed designs
 
-- [CLI Resource Commands](resource-commands.md) — CRUD structure, filtering, pagination, output and agent contracts
-- [ADR 062: CLI Resource Commands](../../adrs/062-cli-resource-commands.md) — decisions behind the resource-command surface
 - [ADR 035: Environment Releases for Configuration Resources](../../adrs/035-configuration-environments.md) — environments, releases, deployments, promotion and rollback
 - [CLI source](../../../apps/cli)
 - [CLI agent guidance](../../../apps/cli/SKILLS.md)
