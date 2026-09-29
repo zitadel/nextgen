@@ -11,8 +11,10 @@ secret-handling caveat live in [`README.md`](README.md).
 - `moon run console-e2e:e2e-real` — **real-instance resource coverage**: one
   ephemeral real instance via `@zitadel/testing`
   ([`packages/testing/AGENTS.md`](../../packages/testing/AGENTS.md)), console
-  served by the Vite dev server with the server-side project-secret proxy,
-  Playwright workers share the instance and seed a fresh user per test.
+  served by the Vite dev server through its (credential-free) API proxy; each
+  test's user is granted access through the API and signs in with its
+  session cookie (`src-real/support.ts`). Playwright workers share the
+  instance and seed a fresh user per test.
 - `moon run console-e2e:e2e-embedded` — **embedded production-path coverage**:
   the built Go binary serves the console, hosted login, and API from one
   origin, with no Vite proxy. This is the only lane that proves the API base
