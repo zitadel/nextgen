@@ -441,7 +441,7 @@ export default class Setup extends BaseCommand {
         value: answers.sso.clientId,
         publish,
       });
-      ssoSecret = await storeClientSecret({ cwd, name: variable, value: answers.sso.secret, publish });
+      ssoSecret = await storeClientSecret({ name: variable, value: answers.sso.secret, publish });
       if (answers.sso.endpoints?.issuer !== undefined) {
         // Said out loud: a connection pointing somewhere other than the
         // vendor is not what the developer will want in the end, and nothing
@@ -452,7 +452,9 @@ export default class Setup extends BaseCommand {
         );
       }
       reportClientIdOutcome(idVariable, ssoClientId, this.meta.cliVersion);
-      reportSecretOutcome(ssoSecret, this.meta.cliVersion);
+      // The wizard refuses an empty secret, so a deferred publish here only
+      // ever means there was no project to publish to.
+      reportSecretOutcome(ssoSecret, this.meta.cliVersion, false);
     }
 
     if (!dryRun) {
@@ -643,11 +645,7 @@ export default class Setup extends BaseCommand {
                 ? { variable: clientIdVariableName(answers.sso.provider), published: ssoClientId }
                 : null,
               secret: ssoSecret
-                ? {
-                    variable: ssoSecret.name,
-                    published: ssoSecret.published,
-                    mirrored: ssoSecret.mirrored,
-                  }
+                ? { variable: ssoSecret.name, published: ssoSecret.published }
                 : null,
             }
           : null,

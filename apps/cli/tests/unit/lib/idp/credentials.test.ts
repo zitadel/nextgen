@@ -1,168 +1,76 @@
-import { execFile } from "node:child_process";
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { promisify } from "node:util";
+import { describe, expect, it } from "vitest";
 
-import { beforeEach, describe, expect, it } from "vitest";
+import { publishClientId, storeClientSecret, type SecretPublisher } from "../../../../src/lib/idp";
 
-import {
-  ENV_LOCAL,
-  isSafeForSecrets,
-  mergeEnvFile,
-  storeClientSecret,
-  type SecretPublisher,
-} from "../../../../src/lib/idp";
-
-const exec = promisify(execFile);
-
-let cwd: string;
-
-/** A throwaway git repository, since the ignore check asks git itself. */
-async function initRepo(gitignore?: string): Promise<void> {
-  await exec("git", ["init", "--quiet"], { cwd });
-  if (gitignore !== undefined) {
-    await writeFile(join(cwd, ".gitignore"), gitignore, "utf8");
-  }
+/** A publisher that records what it was handed, standing in for the API. */
+function recorder(): { calls: Array<[string, string, boolean]>; publish: SecretPublisher } {
+  const calls: Array<[string, string, boolean]> = [];
+  return {
+    calls,
+    publish: async (name, value, { secret }) => {
+      calls.push([name, value, secret]);
+    },
+  };
 }
 
-beforeEach(async () => {
-  cwd = await mkdtemp(join(tmpdir(), "zitadel-idp-cred-"));
-});
-
-describe("isSafeForSecrets", () => {
-  it("is true for a file the repository ignores", async () => {
-    await initRepo(".env*\n!.env.example\n");
-    expect(await isSafeForSecrets(cwd, ENV_LOCAL)).toBe(true);
-  });
-
-  it("is false when nothing ignores it", async () => {
-    await initRepo("node_modules\n");
-    expect(await isSafeForSecrets(cwd, ENV_LOCAL)).toBe(false);
-  });
-
-  it("is false for a tracked file, whatever the patterns say", async () => {
-    await initRepo(".env*\n");
-    await writeFile(join(cwd, ENV_LOCAL), "EXISTING=1\n", "utf8");
-    // Tracking it beats the pattern: a commit would publish the secret.
-    await exec("git", ["add", "--force", ENV_LOCAL], { cwd });
-    expect(await isSafeForSecrets(cwd, ENV_LOCAL)).toBe(false);
-  });
-
-  it("is true outside a repository, where nothing can be committed", async () => {
-    // `zitadel setup` scaffolds .gitignore but does not run `git init`, so a
-    // fresh project sits here and must not be refused.
-    expect(await isSafeForSecrets(cwd, ENV_LOCAL)).toBe(true);
-  });
-});
-
-describe("mergeEnvFile", () => {
-  it("creates the file when it is missing", async () => {
-    expect(await mergeEnvFile(cwd, ".env.local", [{ name: "A", value: "1" }])).toEqual(["A"]);
-    expect(await readFile(join(cwd, ".env.local"), "utf8")).toBe("A=1\n");
-  });
-
-  it("keeps an existing value instead of replacing it", async () => {
-    await writeFile(join(cwd, ".env.local"), "A=mine\n", "utf8");
-    expect(await mergeEnvFile(cwd, ".env.local", [{ name: "A", value: "theirs" }])).toEqual([]);
-    expect(await readFile(join(cwd, ".env.local"), "utf8")).toBe("A=mine\n");
-  });
-
-  it("appends without disturbing what is there, adding a newline if needed", async () => {
-    await writeFile(join(cwd, ".env.local"), "# comment\nA=1", "utf8");
-    expect(await mergeEnvFile(cwd, ".env.local", [{ name: "B", value: "2" }])).toEqual(["B"]);
-    expect(await readFile(join(cwd, ".env.local"), "utf8")).toBe("# comment\nA=1\nB=2\n");
-  });
-
-  it("writes a name with no value for an example file", async () => {
-    await mergeEnvFile(cwd, ".env.example", [{ name: "GOOGLE_CLIENT_SECRET" }]);
-    expect(await readFile(join(cwd, ".env.example"), "utf8")).toBe("GOOGLE_CLIENT_SECRET=\n");
-  });
-});
+const NAME = "GOOGLE_CLIENT_SECRET";
 
 describe("storeClientSecret", () => {
-  const name = "GOOGLE_CLIENT_SECRET";
-
-  /** A publisher that records what it was handed, standing in for the API. */
-  function recorder(): { calls: Array<[string, string]>; publish: SecretPublisher } {
-    const calls: Array<[string, string]> = [];
-    return {
-      calls,
-      publish: async (variable, value) => {
-        calls.push([variable, value]);
-      },
-    };
-  }
-
-  it("publishes the value to the project and keeps a copy locally", async () => {
-    await initRepo(".env*\n!.env.example\n");
+  it("publishes the secret to the project and writes nothing", async () => {
+    // The project is the only place a credential is written: no runtime reads
+    // it from the environment, and a copy in the working tree would be one
+    // `git add -A` away from being published.
     const { calls, publish } = recorder();
-    expect(await storeClientSecret({ cwd, name, value: "s3cret", publish })).toEqual({
-      name,
-      published: "stored",
-      mirrored: "stored",
-    });
-    expect(calls).toEqual([[name, "s3cret"]]);
-    expect(await readFile(join(cwd, ENV_LOCAL), "utf8")).toContain("GOOGLE_CLIENT_SECRET=s3cret");
-    expect(await readFile(join(cwd, ".env.example"), "utf8")).toBe("GOOGLE_CLIENT_SECRET=\n");
-  });
 
-  it("still publishes when the local copy cannot be written", async () => {
-    await initRepo("node_modules\n");
-    const { calls, publish } = recorder();
-    expect(await storeClientSecret({ cwd, name, value: "s3cret", publish })).toEqual({
-      name,
+    expect(await storeClientSecret({ name: NAME, value: "s3cret", publish })).toEqual({
+      name: NAME,
       published: "stored",
-      mirrored: "not-ignored",
     });
-    // The project is what makes sign-in work, so a file git would commit
-    // costs the copy, never the publish.
-    expect(calls).toEqual([[name, "s3cret"]]);
-    await expect(readFile(join(cwd, ENV_LOCAL), "utf8")).rejects.toThrow();
-    // The name is still discoverable, just without its value.
-    expect(await readFile(join(cwd, ".env.example"), "utf8")).toBe("GOOGLE_CLIENT_SECRET=\n");
+    expect(calls).toEqual([[NAME, "s3cret", true]]);
   });
 
   it("reports a refused publish instead of raising it", async () => {
-    await initRepo(".env*\n!.env.example\n");
+    // The connection document is already on disk by now, and in `setup` the
+    // whole Project is provisioned, so failing here would leave more to clean
+    // up than `variables set` costs to run.
     const publish: SecretPublisher = async () => {
       throw new Error("403");
     };
-    expect(await storeClientSecret({ cwd, name, value: "s3cret", publish })).toEqual({
-      name,
+
+    expect(await storeClientSecret({ name: NAME, value: "s3cret", publish })).toEqual({
+      name: NAME,
       published: "failed",
-      // The copy is still kept: the developer needs the value to publish it
-      // themselves, and a secret variable can never be read back.
-      mirrored: "stored",
     });
   });
 
-  it("stores nothing when no value is supplied", async () => {
-    await initRepo(".env*\n!.env.example\n");
+  it("publishes nothing when no value is supplied", async () => {
     const { calls, publish } = recorder();
-    expect(await storeClientSecret({ cwd, name, publish })).toEqual({
-      name,
+
+    expect(await storeClientSecret({ name: NAME, publish })).toEqual({
+      name: NAME,
       published: "deferred",
-      mirrored: "deferred",
     });
     expect(calls).toEqual([]);
-    await expect(readFile(join(cwd, ENV_LOCAL), "utf8")).rejects.toThrow();
   });
 
-  it("defers the publish when there is no project behind the run", async () => {
-    await initRepo(".env*\n!.env.example\n");
-    expect(await storeClientSecret({ cwd, name, value: "s3cret" })).toEqual({
-      name,
+  it("defers when there is no project behind the run", async () => {
+    expect(await storeClientSecret({ name: NAME, value: "s3cret" })).toEqual({
+      name: NAME,
       published: "deferred",
-      mirrored: "stored",
     });
   });
+});
 
-  it("never replaces a secret the developer already set", async () => {
-    await initRepo(".env*\n!.env.example\n");
-    await writeFile(join(cwd, ENV_LOCAL), "GOOGLE_CLIENT_SECRET=original\n", "utf8");
-    const outcome = await storeClientSecret({ cwd, name, value: "replacement" });
-    expect(outcome.mirrored).toBe("already-set");
-    expect(await readFile(join(cwd, ENV_LOCAL), "utf8")).toBe("GOOGLE_CLIENT_SECRET=original\n");
+describe("publishClientId", () => {
+  it("publishes the id as an ordinary variable, not a secret", async () => {
+    // The id travels in the browser's authorize URL, so it is public by
+    // construction and storing it write-only would only cost the developer the
+    // ability to read back what was configured.
+    const { calls, publish } = recorder();
+
+    expect(await publishClientId({ name: "GOOGLE_CLIENT_ID", value: "abc", publish })).toBe(
+      "stored",
+    );
+    expect(calls).toEqual([["GOOGLE_CLIENT_ID", "abc", false]]);
   });
 });

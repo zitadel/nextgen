@@ -341,10 +341,11 @@ describe("sso enable secret handling", () => {
     );
 
     expect(result.exitCode).toBe(0);
-    const env = await readFile(join(cwd, ".env.local"), "utf8");
-    expect(env).toContain("GOOGLE_CLIENT_SECRET=piped-secret");
-    // The value is never echoed back, only where it went.
+    // Nothing is written to disk: the secret goes to the project's variables
+    // and nowhere else, so there is no copy in the working tree to leak.
+    await expect(readFile(join(cwd, ".env.local"), "utf8")).rejects.toThrow();
     expect(result.stdout).not.toContain("piped-secret");
+    expect(result.stderr).not.toContain("piped-secret");
   });
 
   it("reports a publish the project never received, and how to retry it", async () => {
@@ -377,9 +378,6 @@ describe("sso enable secret handling", () => {
     expect(json.data.secret).toEqual({
       variable: "GOOGLE_CLIENT_SECRET",
       published: "failed",
-      // The copy stays: a secret variable can be replaced but never read
-      // back, so it is the only record of what to publish.
-      mirrored: "stored",
     });
     expect(json.data.next_commands).toContain("variables set GOOGLE_CLIENT_SECRET --secret");
   });

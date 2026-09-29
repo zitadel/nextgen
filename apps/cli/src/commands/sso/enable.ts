@@ -176,7 +176,7 @@ export default class SsoEnable extends BaseCommand {
       }
       const piped = nonInteractive ? await this.pipedSecret() : undefined;
       if (piped !== undefined) {
-        secret = await storeClientSecret({ cwd, name: variable, value: piped, publish });
+        secret = await storeClientSecret({ name: variable, value: piped, publish });
       }
     } else {
       consola.info(`${entry.display_name} needs an OAuth application.`);
@@ -216,7 +216,7 @@ export default class SsoEnable extends BaseCommand {
       // The id first: it is the half the developer can read back afterwards,
       // and a connection missing either credential fails the same way.
       clientIdState = await publishClientId({ name: idVariable, value: clientId, publish });
-      secret = await storeClientSecret({ cwd, name: variable, value: secretValue, publish });
+      secret = await storeClientSecret({ name: variable, value: secretValue, publish });
       consola.success(`Wrote ${plan.path}`);
     }
 
@@ -235,7 +235,9 @@ export default class SsoEnable extends BaseCommand {
       reportClientIdOutcome(idVariable, clientIdState, this.meta.cliVersion);
     }
     if (secret) {
-      reportSecretOutcome(secret, this.meta.cliVersion);
+      // A reuse that piped nothing in had no value to publish; a create always
+      // has one, because the command refuses without it.
+      reportSecretOutcome(secret, this.meta.cliVersion, reusing);
     }
 
     return this.emit({
@@ -380,11 +382,7 @@ export default class SsoEnable extends BaseCommand {
       secret:
         input.secret === undefined
           ? null
-          : {
-              variable: input.secret.name,
-              published: input.secret.published,
-              mirrored: input.secret.mirrored,
-            },
+          : { variable: input.secret.name, published: input.secret.published },
     };
   }
 
@@ -404,22 +402,13 @@ export default class SsoEnable extends BaseCommand {
   }
 
   /**
-   * Ask for the secret, or read it from stdin on a scripted run, following
-   * `variables set`: never a flag, so it cannot reach shell history, a process
-   * listing or a CI log.
-   *
-   * A terminal on stdin means nothing was piped, and reading would block
-   * forever on a stream with no data and no end — so that case is treated as
-   * "not supplied" rather than waited on. Empty is a deliberate answer
-   * either way: the connection file is written regardless, and the developer
-   * may prefer to paste the value into `.env.local` themselves.
-   */
-  /**
    * A secret piped in on a scripted rerun, or `undefined` when nothing was.
    *
    * Reuse never demands one: the project may already hold it, and refusing an
    * unattended rerun for a credential that has not changed would be noise. It
-   * is only read so that a rerun *can* replace it.
+   * is only read so that a rerun *can* replace it. A terminal on stdin means
+   * nothing was piped, and reading would block forever on a stream with no
+   * data and no end, so that case is answered rather than waited on.
    */
   private async pipedSecret(): Promise<string | undefined> {
     if (process.stdin.isTTY) {

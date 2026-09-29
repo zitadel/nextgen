@@ -30,11 +30,6 @@ export { callbackUriFor } from "./callback";
 export { askConnectionEndpoints } from "./endpoints";
 
 export {
-  ENV_EXAMPLE,
-  ENV_LOCAL,
-  type EnvEntry,
-  isSafeForSecrets,
-  mergeEnvFile,
   publishClientId,
   type PublishState,
   reportClientIdOutcome,

@@ -131,9 +131,9 @@ export class SocialSignInPrompt implements SetupPrompt {
    * after setup reported success. "Not now" is answered by declining the
    * provider, which costs nothing — `sso enable` adds it later.
    *
-   * The message names the project rather than a file because that is where the
-   * value has to land: the connection references it as `${{ NAME }}` and the
-   * engine resolves that from the project's variables.
+   * The message names the project because that is the only place the value
+   * goes: the connection references it as `${{ NAME }}`, the engine resolves
+   * that from the project's variables, and nothing is written to disk.
    */
   private async askSecret(provider: string): Promise<string> {
     const answer = await password({
