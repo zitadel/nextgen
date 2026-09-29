@@ -73,8 +73,9 @@ func TestListSchemasPagination(t *testing.T) {
 		wantIDs = append(wantIDs, item.ID)
 	}
 
-	// A limit-1 walk visits the same rows in the same order, exactly once.
-	// Every full page carries a cursor; only the page past the end is empty.
+	// A limit-1 walk visits the same rows in the same order, exactly once. Each
+	// page but the last carries a cursor; the final page has none, because
+	// look-ahead sees no further row (#849) — there is no trailing empty page.
 	var gotIDs []string
 	var pageToken api.OptPageToken
 	for range len(wantIDs) {
@@ -85,17 +86,14 @@ func TestListSchemasPagination(t *testing.T) {
 		require.Len(t, page.Schemas, 1)
 		gotIDs = append(gotIDs, page.Schemas[0].ID)
 		token, ok := page.NextPageToken.Get()
-		require.True(t, ok, "a full page carries a cursor")
+		if len(gotIDs) == len(wantIDs) {
+			assert.False(t, ok, "the final page carries no cursor")
+			break
+		}
+		require.True(t, ok, "a non-final full page carries a cursor")
 		pageToken = api.NewOptPageToken(token)
 	}
 	assert.Equal(t, wantIDs, gotIDs, "paging must cover the list in order, each row exactly once")
-
-	past := listSchemas(t, api.ListSchemasParams{
-		Limit:     api.NewOptLimit(1),
-		PageToken: pageToken,
-	})
-	assert.Empty(t, past.Schemas)
-	assert.False(t, past.NextPageToken.IsSet())
 
 	// A token the server never minted is rejected, not ignored.
 	t.Run("malformed page token", func(t *testing.T) {
