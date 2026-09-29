@@ -28,7 +28,7 @@ Every field is optional. An omitted key takes the maintained default, so a revis
 | `typography` | `font_family`, `font_url`, `scale`. One face covers body and headings. | [`branding-typography.yaml`](../../../api/openapi/components/flows/branding-typography.yaml) |
 | `shape` | `radius` (preset or integer pixels), `density`, `logo_scale`. Shared across theme sides. | [`branding-shape.yaml`](../../../api/openapi/components/flows/branding-shape.yaml) |
 
-The appearance blocks (`theme`, `typography`, `shape`) are wire fields. The component re-exports their types from the generated API model (`packages/components/src/orchestrator/branding.ts`) rather than declaring its own. The one client-side addition is `attribution`, which belongs to the embedding and is not stored on a revision.
+The appearance blocks (`theme`, `typography`, `shape`) are wire fields. The component re-exports their types from the generated API model (`packages/components/src/orchestrator/branding.ts`) rather than declaring its own. The component's type adds one client-side block, `attribution`, which the contract does not carry. Nothing sets it today: a revision cannot store it and the element has no property for it, so the "Secured with Zitadel" mark always renders. No licence check exists.
 
 How each block becomes `--zl-*` values is in [`tokens.md`](tokens.md).
 

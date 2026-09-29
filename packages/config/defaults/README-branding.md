@@ -61,7 +61,9 @@ by re-applying an earlier template.
   (`centered`, `minimal`) carry `centered`. Switch designs with
   `zitadel branding eject --design <name>`, don't edit `layout`.
 
-- The "Secured with Zitadel" attribution is licence-gated and on by default.
+- The "Secured with Zitadel" attribution is always shown, and `branding.json`
+  has no setting for it. It sits below the card; to place it elsewhere, put
+  `<div data-zl-attribution-anchor></div>` where you want it in `login.liquid`.
 - Back-navigation: the engine injects a `kind: "back"` action on steps
   that can return to their predecessor, and the browser's back gesture
   submits it automatically — the shipped designs deliberately render **no
