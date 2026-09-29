@@ -26,6 +26,7 @@ import {
   CONNECTION_SCHEMA_REF,
   enabledMethods,
   IDPS_DIR,
+  credentialVariables,
   planConnection,
   publishClientId,
   type PublishState,
@@ -118,6 +119,16 @@ export default class SsoEnable extends BaseCommand {
     const connections = await readConnectionFiles(cwd);
     const plan = planConnection({ provider, files: connections, clientId: flags["client-id"] });
 
+    const reusing = plan.action === "reuse";
+    // A reused connection may name its own variables — it is an editable file
+    // — so the credentials go where it actually looks rather than where this
+    // command would have put them.
+    const names = reusing
+      ? credentialVariables(plan.file, plan.slug)
+      : { clientId: clientIdVariableName(plan.slug), clientSecret: clientSecretVariableName(plan.slug) };
+    const variable = names.clientSecret;
+    const idVariable = names.clientId;
+
     consola.info(`Project   ${secretFile.project_id}`);
     consola.info(`Schema    ${schema.path}${schema.methods.length > 0 ? ` (${schema.methods.join(", ")})` : ""}`);
 
@@ -132,6 +143,7 @@ export default class SsoEnable extends BaseCommand {
           callbackUri,
           secret: undefined,
           clientId: undefined,
+          idVariable,
         }),
         pretty: `Would ${plan.action} ${plan.action === "reuse" ? plan.file.path : plan.path}`,
       });
@@ -141,9 +153,6 @@ export default class SsoEnable extends BaseCommand {
     // per-schema, and they are idempotent. Enabling the provider for a second
     // user type, and finishing a run interrupted after the connection file was
     // written, both arrive here.
-    const reusing = plan.action === "reuse";
-    const variable = clientSecretVariableName(plan.slug);
-    const idVariable = clientIdVariableName(plan.slug);
     let secret: SecretOutcome | undefined;
     let clientIdState: PublishState | undefined;
 
@@ -239,6 +248,7 @@ export default class SsoEnable extends BaseCommand {
           callbackUri,
           secret,
           clientId: clientIdState,
+          idVariable,
           changed: edits.written,
           skipped: edits.skipped,
         }),
@@ -347,6 +357,8 @@ export default class SsoEnable extends BaseCommand {
     callbackUri: string;
     secret: SecretOutcome | undefined;
     clientId: PublishState | undefined;
+    /** The variable the connection names, which need not be the slug's. */
+    idVariable: string;
     changed?: string[];
     skipped?: SsoSkipped[];
   }): Record<string, unknown> {
@@ -364,7 +376,7 @@ export default class SsoEnable extends BaseCommand {
       client_id:
         input.clientId === undefined
           ? null
-          : { variable: clientIdVariableName(input.plan.slug), published: input.clientId },
+          : { variable: input.idVariable, published: input.clientId },
       secret:
         input.secret === undefined
           ? null

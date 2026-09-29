@@ -20,6 +20,7 @@ export {
   IDPS_DIR,
   type ConnectionFile,
   type ConnectionPlan,
+  credentialVariables,
   planConnection,
   readConnectionFiles,
 } from "./connections";

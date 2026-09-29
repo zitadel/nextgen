@@ -289,6 +289,36 @@ describe("sso enable", () => {
     expect(json.code).toBe("E_VALIDATION");
   });
 
+
+  it("publishes to the variables the reused connection actually names", async () => {
+    // A connection is an editable file and may point at its own variables.
+    // Publishing to a slug-derived name would store the credential where the
+    // connection never looks, and report it stored.
+    const cwd = await makeProject();
+    await mkdir(join(cwd, ".zitadel/idps"), { recursive: true });
+    await writeFile(
+      join(cwd, ".zitadel/idps/google.json"),
+      `${JSON.stringify({
+        slug: "google",
+        template: "google",
+        protocol: "oidc",
+        oidc: {
+          issuer: "https://accounts.google.com",
+          client_id: "${{ ACME_GOOGLE_ID }}",
+          client_secret: "${{ ACME_GOOGLE_SECRET }}",
+        },
+      })}\n`,
+    );
+
+    const result = await enable(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
+
+    expect(result.exitCode).toBe(0);
+    const json = parseJson(result.stdout) as {
+      data: { client_id: { variable: string } | null; secret: { variable: string } | null };
+    };
+    expect(json.data.client_id?.variable).toBe("ACME_GOOGLE_ID");
+    expect(json.data.secret?.variable).toBe("ACME_GOOGLE_SECRET");
+  });
 });
 
 describe("sso enable secret handling", () => {

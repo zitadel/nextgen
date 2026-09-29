@@ -2,8 +2,11 @@ import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import {
+  clientIdVariableName,
+  clientSecretVariableName,
   idpCatalogEntry,
   isVariableReference,
+  referencedVariable,
   type IdpCatalogEntry,
 } from "@zitadel/config/idp-catalog";
 
@@ -100,13 +103,40 @@ function describesProvider(file: ConnectionFile, entry: IdpCatalogEntry): boolea
 
 /** The client id a connection file carries, whichever protocol it uses. */
 function clientIdOf(file: ConnectionFile): string | undefined {
+  return credentialOf(file, "client_id");
+}
+
+/** One credential field, from whichever protocol block the file carries. */
+function credentialOf(file: ConnectionFile, field: "client_id" | "client_secret"): string | undefined {
   for (const key of ["oidc", "oauth2"] as const) {
     const block = file.body[key];
-    if (isObject(block) && typeof block.client_id === "string") {
-      return block.client_id;
+    if (isObject(block) && typeof block[field] === "string") {
+      return block[field];
     }
   }
   return undefined;
+}
+
+/**
+ * The variables a connection's credentials reference, falling back to the
+ * names this CLI would have written.
+ *
+ * A connection is editable and may name its own variables, so publishing to a
+ * slug-derived name would store the credential where the connection never
+ * looks and report it as stored.
+ */
+export function credentialVariables(
+  file: ConnectionFile,
+  slug: string,
+): { clientId: string; clientSecret: string } {
+  const named = (field: "client_id" | "client_secret", fallback: string): string => {
+    const stored = credentialOf(file, field);
+    return (stored === undefined ? undefined : referencedVariable(stored)) ?? fallback;
+  };
+  return {
+    clientId: named("client_id", clientIdVariableName(slug)),
+    clientSecret: named("client_secret", clientSecretVariableName(slug)),
+  };
 }
 
 /** What the caller should do with the provider's connection. */

@@ -119,7 +119,20 @@ function variableReference(name: string): string {
  * a whole-value placeholder naming one variable, with optional inner spacing.
  */
 export function isVariableReference(value: string): boolean {
-  return /^\$\{\{ *\w+ *\}\}$/.test(value.trim());
+  return referencedVariable(value) !== undefined;
+}
+
+/**
+ * The variable a `${{ NAME }}` reference names, or `undefined` when the value
+ * is not one.
+ *
+ * A connection is editable, so the name it references need not be the one this
+ * CLI would have chosen — a hand-written file may point at `ACME_SECRET`.
+ * Publishing to a name derived from the slug instead would store the
+ * credential where nothing reads it and report success.
+ */
+export function referencedVariable(value: string): string | undefined {
+  return /^\$\{\{ *(\w+) *\}\}$/.exec(value.trim())?.[1];
 }
 
 /** The reference written to a connection's `client_secret`. */
