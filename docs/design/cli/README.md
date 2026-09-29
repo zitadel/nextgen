@@ -208,7 +208,7 @@ Optional interaction should only help complete the requested command. It should 
 
 ### Non-interactive commands
 
-Read-only and diagnostic commands return their result directly without prompting:
+Read-only and diagnostic commands do not require prompts in non-interactive mode; interactive commands may still offer optional selection:
 
 ```text
 list
