@@ -168,61 +168,69 @@ jobs:
       # SDK, CLI, or journey surface moved — the flow widget is
       # framework-independent, so a server-only change proves as much on one
       # framework as on the full matrix (apps/cli-journey-e2e/scripts/frameworks.mjs).
-      - name: Run binary fresh-app journey
-        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.journey_fresh_app == 'true' }}
+      # SPIKE (throwaway — revert before merge): the four journey lanes below
+      # normally run as four sequential steps (~5m32s summed). This collapses
+      # them into ONE step that launches all four concurrently and waits, to
+      # measure the parallel wall time and prove they do not collide on ports
+      # or a moon workspace lock. Gated on mode=='full' only: editing .github/
+      # force-fulls the run, so all four fire. Restore the four separate gated
+      # steps to clean up.
+      - name: Run journeys in parallel (spike)
+        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
         env:
           JOURNEY_MATRIX: ${{ steps.ci-mode.outputs.journey_matrix }}
         run: |
+          set -uo pipefail
           version="$(node -p "require('./apps/server/package.json').version")"
+          tarballs="dist/release/${version}/npm"
           matrix_args=()
           if [ "$JOURNEY_MATRIX" = "single" ]; then
             matrix_args=(--framework next)
           fi
-          env -u CI -u GITHUB_ACTIONS moon run cli-journey-e2e:e2e-local -- \
-            --runtime binary \
-            --concurrency 5 \
-            "${matrix_args[@]}" \
-            --work-dir "${RUNNER_TEMP}/ci-journey" \
-            --tarballs-dir "dist/release/${version}/npm"
 
-      # One framework is enough here: the preset decides the scaffolded
-      # flow shape, not the SDK — the matrix above already covers SDKs.
-      - name: Run passkey-first preset journey
-        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.journey_passkey == 'true' }}
-        run: |
-          version="$(node -p "require('./apps/server/package.json').version")"
-          env -u CI -u GITHUB_ACTIONS moon run cli-journey-e2e:e2e-local -- \
-            --runtime binary \
-            --framework next \
-            --preset passkey-first \
-            --work-dir "${RUNNER_TEMP}/ci-journey-passkey-first" \
-            --tarballs-dir "dist/release/${version}/npm"
+          pids=()
+          names=()
+          start=$(date +%s)
 
-      # The ADR 044 widget posture end to end: seed minimal pre-existing Next
-      # and Nuxt apps, run setup against them, and drive the auth loop through
-      # the emitted variant="widget" pages inside the host apps' own shells.
-      # Fresh scaffolds keep covering the page posture in the matrix above.
-      - name: Run pre-existing-app journey
-        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.journey_preexisting == 'true' }}
-        run: |
-          version="$(node -p "require('./apps/server/package.json').version")"
-          env -u CI -u GITHUB_ACTIONS moon run cli-journey-e2e:e2e-local -- \
-            --runtime binary \
-            --preexisting-app \
-            --work-dir "${RUNNER_TEMP}/ci-journey-preexisting" \
-            --tarballs-dir "dist/release/${version}/npm"
+          launch() {
+            local name="$1"; shift
+            ( env -u CI -u GITHUB_ACTIONS moon run "$@" ) \
+              > "${RUNNER_TEMP}/journey-${name}.log" 2>&1 &
+            pids+=("$!")
+            names+=("$name")
+            echo "launched journey '${name}' (pid $!)"
+          }
 
-      # Customer-configuration proof for @zitadel/testing: a fresh app
-      # installs the kit from the journey registry and runs its withZitadel()
-      # suite against the published binary — embedded UIs, no repo env
-      # overrides (unlike the in-repo e2e-real lanes below).
-      - name: Run test-kit consumer journey
-        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.journey_testkit == 'true' }}
-        run: |
-          version="$(node -p "require('./apps/server/package.json').version")"
-          env -u CI -u GITHUB_ACTIONS moon run cli-journey-e2e:e2e-testkit -- \
-            --work-dir "${RUNNER_TEMP}/ci-journey-testkit" \
-            --tarballs-dir "dist/release/${version}/npm"
+          launch fresh-app cli-journey-e2e:e2e-local -- \
+            --runtime binary --concurrency 5 "${matrix_args[@]}" \
+            --work-dir "${RUNNER_TEMP}/ci-journey" --tarballs-dir "$tarballs"
+
+          launch passkey cli-journey-e2e:e2e-local -- \
+            --runtime binary --framework next --preset passkey-first \
+            --work-dir "${RUNNER_TEMP}/ci-journey-passkey-first" --tarballs-dir "$tarballs"
+
+          launch preexisting cli-journey-e2e:e2e-local -- \
+            --runtime binary --preexisting-app \
+            --work-dir "${RUNNER_TEMP}/ci-journey-preexisting" --tarballs-dir "$tarballs"
+
+          launch testkit cli-journey-e2e:e2e-testkit -- \
+            --work-dir "${RUNNER_TEMP}/ci-journey-testkit" --tarballs-dir "$tarballs"
+
+          rc=0
+          for i in "${!pids[@]}"; do
+            name="${names[$i]}"
+            if wait "${pids[$i]}"; then
+              status="PASSED"
+            else
+              status="FAILED"
+              rc=1
+            fi
+            echo "::group::journey ${name} ${status} ($(( $(date +%s) - start ))s elapsed)"
+            cat "${RUNNER_TEMP}/journey-${name}.log" || true
+            echo "::endgroup::"
+          done
+          echo "PARALLEL JOURNEYS wall time: $(( $(date +%s) - start ))s (rc=$rc)"
+          exit $rc
 
       # Gates the test-kit's central promise: boot a real seeded instance,
       # then drive the real browser login with per-test users. Reuses the Go
