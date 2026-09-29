@@ -224,7 +224,11 @@ func securityErrorDetails(err error) api.ErrorDetails {
 // validationFieldPaths returns the dotted paths of the fields ogen's request
 // validation rejected, or nil when decoding failed for another reason, such as
 // malformed JSON. Only the names are returned: a leaf error can quote the
-// rejected value.
+// rejected value. For map-typed fields (for example claim_mapping,
+// verified_claims, static_authorize_parameters) the generated validator names
+// an entry by the client's own key, so a path like idp.claim_mapping.<key>
+// echoes client input as a name, never a value or decoder text, which ADR 030
+// allows.
 func validationFieldPaths(err error) []string {
 	var verr *validate.Error
 	if !errors.As(err, &verr) {
