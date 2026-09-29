@@ -269,10 +269,10 @@ console.log(
     ...(claimMode
       ? [
           "  │",
-          `  │  claim mode: console is pinned to ${PLATFORM_PROJECT_ID}, so the`,
+          `  │  claim mode: console signs in to ${PLATFORM_PROJECT_ID}, so the`,
           "  │  seeded credentials above do not exist there — register on the",
-          "  │  claim page instead. List screens will look empty; that is the",
-          "  │  platform project, not the seeded one.",
+          "  │  claim page instead. After the claim the console selects the",
+          "  │  claimed project; until then there is no project to show.",
           ...(claimUrl
             ? ["  │", `  │  claim       ${claimUrl}`]
             : ["  │", "  │  claim       could not mint a link; see claim/init"]),

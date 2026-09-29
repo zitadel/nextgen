@@ -1,7 +1,6 @@
 import { useRouter, useSearch } from "@tanstack/react-router";
 
 import { api } from "../api/zitadel";
-import { getConsoleProjectId } from "../runtime/runtime";
 import { sessionCached } from "./session-cache";
 
 /**
@@ -51,33 +50,33 @@ export function validateProjectScopeSearch(search: Record<string, unknown>): Pro
  * The project to select when a screen is opened without one, or `undefined`
  * when the person has to choose.
  *
- * Standalone optimises for one project (ADR 0004 §6), so a single choice is
- * made for them:
+ * Only a project the person can act on is ever chosen for them — one
+ * `GET /users/me/projects` returns — because the session authorizes every
+ * management call through their grants on it (#1300). Standalone optimises for
+ * one project (ADR 0004 §6), so:
  *
- * 1. The `VITE_CONSOLE_PROJECT_ID` dev override is an explicit pin — it names
- *    the project the dev proxy's secret belongs to — and wins outright.
- * 2. Otherwise, the one project `GET /users/me/projects` returns.
- * 3. With none returned, the discovered sign-in project. That is today's
- *    standalone fallback (ADR 0004 §2), where the Console signs into the
- *    customer project it manages and its operator may hold no grant at all.
- * 4. With several, nothing: the Projects screen is where they pick.
+ * 1. The `VITE_CONSOLE_PROJECT_ID` dev pin, when it is one of their projects.
+ *    A pin they hold no grant on is ignored: in `dev-real --claim` it names the
+ *    platform project, which the claiming developer cannot manage.
+ * 2. Otherwise, their only project.
+ * 3. With none or several, nothing: scoped screens go to Projects, which lists
+ *    the choice or says there is none.
  *
- * A failed read degrades to step 3 rather than blocking every screen.
+ * The sign-in project (`getConsoleProjectId()`) is deliberately not a
+ * fallback. It is the platform project on a deployment that bootstraps one,
+ * and selecting a project without a grant on it only turns every screen into
+ * an authorization error. A failed read selects nothing for the same reason.
  */
 export async function resolveDefaultProjectScope(): Promise<string | undefined> {
-  const pinned = import.meta.env.VITE_CONSOLE_PROJECT_ID;
-  if (pinned) return pinned;
-
-  const signIn = getConsoleProjectId() || undefined;
   let projects: { id: string }[];
   try {
     projects = (await listMyProjectsCached()).projects;
   } catch {
-    return signIn;
+    return undefined;
   }
-  const [only, ...rest] = projects;
-  if (!only) return signIn;
-  return rest.length === 0 ? only.id : undefined;
+  const pinned = import.meta.env.VITE_CONSOLE_PROJECT_ID;
+  if (pinned && projects.some((project) => project.id === pinned)) return pinned;
+  return projects.length === 1 ? projects[0]?.id : undefined;
 }
 
 /**
