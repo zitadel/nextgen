@@ -65,7 +65,7 @@ Supported field input types:
 
 ## Action Capabilities
 
-An action's `kind` is one of `submit`, `passkey`, `passkey_register`, `navigate`. The bundled template picks the rendering from `primary` and the action's `name`:
+A runtime action's `kind` is one of `submit`, `passkey`, `passkey_register`, `navigate`, `back`. `back` is injected by the engine and cannot be declared in a flow definition. The bundled template picks the rendering from `primary` and the action's `name`:
 
 | Action | Rendering | Design purpose |
 |---|---|---|
@@ -74,6 +74,7 @@ An action's `kind` is one of `submit`, `passkey`, `passkey_register`, `navigate`
 | `register` | Link with `data-action` | Secondary navigation from login to registration. |
 | `sign_in` | Link with `data-action` | Secondary navigation back to login. |
 | `recover` | Link on the password field's label row, or its own row when the step has no password field | Forgot-password action. |
+| Actions of kind `back` | No visible control. The browser's back gesture submits it | Return to the previous step. |
 | Any other secondary action | `zl-button` (`hierarchy="secondary"`) | Alternative paths, such as falling back from passkey to password. |
 
 ## Gate And Supporting Capabilities
