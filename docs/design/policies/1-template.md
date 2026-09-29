@@ -35,11 +35,11 @@ pending `blocklist` rule) has no setting at all and therefore cannot be
 turned off. This is the boundary #898 asks for: Zitadel owns the secure
 baseline, the project chooses within it.
 
-- **`fixed: true`** marks a setting that is part of the baseline: an instance
+- `fixed: true` marks a setting that is part of the baseline: an instance
   may not set it, the default is the only value. It is still a setting rather
   than a literal in the rule so that clients learn it through `constraints`
   (`max_length` is 64 for everyone and every login form needs to know that).
-- **`recommended_minimum`** marks a legal-but-discouraged range. A value
+- `recommended_minimum` marks a legal-but-discouraged range. A value
   below it is accepted and the authoring workflow warns (#898: 8 to 14 is
   allowed, 15 is what NIST requires for a single-factor password). The
   threshold travels with the template: the engine reports it
@@ -47,7 +47,7 @@ baseline, the project chooses within it.
   `x-recommended-minimum`, which the parity test keeps equal, so the CLI warns
   at `plan` time without hardcoding a number. There is no API-level warning
   channel; the floor is the protection, the warning is guidance.
-- **`public: true`** marks a setting the unauthenticated `constraints`
+- `public: true` marks a setting the unauthenticated `constraints`
   projection may return (see [Constraints](3-constraints.md)). Unmarked
   settings are private: `max_attempts` on a lockout policy would tell an
   attacker their budget.
@@ -60,7 +60,7 @@ take their default, so the engine always evaluates a complete config.
 ## `context`
 
 The schema of what the rules receive: derived values computed in Go for this
-one evaluation, never the raw input. It is also the CEL type environment the
+one evaluation, with the raw input kept out. It is also the CEL type environment the
 rules are checked against, so a rule referencing an undeclared field fails at
 server start. The context builder per operation is described in
 [Evaluation](2-evaluation.md).
@@ -74,7 +74,7 @@ length cap, and its statically estimated cost stays under a limit, all
 checked when the server starts ([Evaluation](2-evaluation.md#limits)). A rule
 that needs more than that is two rules.
 
-**A rule reads every setting it gates on.** A setting that only steers the Go
+A rule reads every setting it gates on. A setting that only steers the Go
 context builder (say, how many history entries to compare) would be invisible
 to `constraints`. `history` therefore reads `config.history_depth` even though
 the depth is applied in Go; that is what makes the depth renderable.
