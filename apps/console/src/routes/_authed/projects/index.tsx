@@ -30,7 +30,8 @@ import {
 
 import { api } from "../../../api/zitadel";
 import { formatDate } from "../../../lib/date";
-import { useProjectScope } from "../../../lib/project-scope";
+import { sanitizeNextPath } from "../../../auth/session";
+import { useProjectScope, useSelectProjectTarget } from "../../../lib/project-scope";
 
 /**
  * Projects overview — every project the person can act on.
@@ -39,7 +40,9 @@ import { useProjectScope } from "../../../lib/project-scope";
  * scoped (`staticData.scope`), so it is listed with or without a selection and
  * is the one entry while nothing is selected. The project switcher's `All
  * projects` link leads here too, and it is where the console lands when there
- * are several projects and none is selected yet (`routes/_authed.tsx`).
+ * are several projects and none is selected yet (`routes/_authed.tsx`). The
+ * guard then passes the screen it was asked for as `?next=`, and a row goes
+ * back there with the project selected.
  *
  * A row opens the project — selects it and goes to its first screen — rather
  * than a detail page: the project's own page is `Project settings` in the
@@ -48,6 +51,10 @@ import { useProjectScope } from "../../../lib/project-scope";
 export const Route = createFileRoute("/_authed/projects/")({
   // Order 1: above Teams (2), the first of the selected project's screens.
   staticData: { nav: { label: "Projects", order: 1, icon: Boxes } },
+  // Sanitized like the login screen's: only a router-relative path is followed.
+  validateSearch: (search: Record<string, unknown>): { next?: string } => ({
+    next: sanitizeNextPath(typeof search.next === "string" ? search.next : undefined),
+  }),
   loader: async () => {
     // The projects the signed-in person can act on (root ADR 053 §6), read with
     // the session cookie — not `POST /projects/query`, which the server pins to
@@ -74,6 +81,7 @@ function ProjectsScreen() {
   const loaded = Route.useLoaderData();
   const navigate = useNavigate();
   const selected = useProjectScope();
+  const selectTarget = useSelectProjectTarget();
 
   // Pages fetched after the first live here rather than in the loader, so `Load
   // more` appends without re-running it and a route invalidation resets to the
@@ -149,7 +157,8 @@ function ProjectsScreen() {
             ) : (
               projects.map((project) => (
                 // The whole row opens the project: selects it and lands on its
-                // first screen, the same target as the switcher's row. The name
+                // first screen, or on the screen `?next=` names — the same
+                // target as the switcher's row. The name
                 // is a real link so the row is reachable by keyboard and the
                 // target shows in the status bar; the row handler is the pointer
                 // affordance on top of it, and `opensRow` keeps it out of the
@@ -160,16 +169,12 @@ function ProjectsScreen() {
                   className="hover:bg-muted/40 cursor-pointer border-0"
                   onClick={(event) => {
                     if (opensRow(event)) {
-                      void navigate({ to: "/", search: { project: project.id } });
+                      void navigate(selectTarget(project.id));
                     }
                   }}
                 >
                   <TableCell className={`${RESOURCE_CELL} truncate`}>
-                    <Link
-                      to="/"
-                      search={{ project: project.id }}
-                      className={RESOURCE_ROW_LINK}
-                    >
+                    <Link {...selectTarget(project.id)} className={RESOURCE_ROW_LINK}>
                       <Box aria-hidden strokeWidth={1.5} className={RESOURCE_ROW_ICON} />
                       {project.name}
                     </Link>

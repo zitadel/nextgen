@@ -1,7 +1,7 @@
 import type { AnyRoute } from "@tanstack/react-router";
 import { useRouter } from "@tanstack/react-router";
 
-import { useProjectScope } from "../../lib/project-scope";
+import { useProjectScope, withoutTrailingSlash } from "../../lib/project-scope";
 import { DESIGN_ONLY_NAV, type NavMeta, type NavView } from "../../nav";
 
 export interface NavItem {
@@ -52,8 +52,7 @@ export function useNavItems(view: NavView = "portal"): NavItem[] {
       // which declare one, keep their place.
       if (!nav || (nav.view ?? "portal") !== view) return undefined;
       if (route.options.staticData?.scope === "project" && !projectScope) return undefined;
-      const fullPath = route.fullPath;
-      const to = fullPath === "/" ? "/" : fullPath.replace(/\/$/, "");
+      const to = withoutTrailingSlash(route.fullPath);
       return { to, nav, children: [] };
     })
     .filter((item): item is NavItem => item !== undefined);

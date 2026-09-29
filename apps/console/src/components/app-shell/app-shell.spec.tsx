@@ -182,7 +182,11 @@ describe("settings view", () => {
   it("swaps the portal nav for the settings view on a settings URL", async () => {
     renderShell("/settings");
     // The way back out is present...
-    expect(await screen.findByRole("link", { name: "Back to app" })).toHaveAttribute("href", "/");
+    // One project, so it is selected here too, and the way back keeps it.
+    expect(await screen.findByRole("link", { name: "Back to app" })).toHaveAttribute(
+      "href",
+      scopedPath("/", "proj_1"),
+    );
     // ...and the portal list is gone rather than sitting underneath it.
     expect(screen.queryByRole("navigation", { name: "Primary" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /^Users/ })).not.toBeInTheDocument();
@@ -281,10 +285,35 @@ describe("project pill", () => {
     expect(list.queryAllByRole("button")).toEqual([]);
     expect(list.getByRole("link", { name: "River" })).toHaveAttribute(
       "href",
-      scopedPath("/teams", "proj_1"),
+      "/teams?project=proj_1&status=active",
     );
     expect(list.getByText("Delta").closest("li")).toHaveAttribute("aria-current", "true");
     expect(list.getByText("River").closest("li")).not.toHaveAttribute("aria-current");
+  });
+
+  it("keeps the list's filters when switching project", async () => {
+    server.use(
+      http.get(MY_PROJECTS, () =>
+        HttpResponse.json({
+          projects: [
+            { id: "proj_1", name: "River" },
+            { id: "proj_2", name: "Delta" },
+          ],
+        }),
+      ),
+    );
+    renderShell(scopedPath("/teams?status=deactivated&q=ops", "proj_2"));
+
+    await userEvent.click(await screen.findByRole("button", { name: "Switch project" }));
+    const list = within(await screen.findByRole("list", { name: "Switch project" }));
+    const href = list.getByRole("link", { name: "River" }).getAttribute("href") ?? "";
+    const target = new URL(href, "http://console.invalid");
+    expect(target.pathname).toBe("/teams");
+    expect(Object.fromEntries(target.searchParams)).toEqual({
+      project: "proj_1",
+      status: "deactivated",
+      q: "ops",
+    });
   });
 
   it("re-scopes the screen and closes the list when a row is followed", async () => {

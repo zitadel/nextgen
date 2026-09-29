@@ -187,9 +187,10 @@ the sidebar.
 
 > **Amendment (2026-09-28, #1299):** a route that acts on the selected project
 > also declares `staticData.scope: "project"`. The sidebar lists such a route
-> only while a project is selected, and the `_authed` guard redirects a scoped
-> route opened without one to a default selection, or to Projects when the
-> person has to choose. The Projects overview is the one unscoped entry, listed
+> only while a project is selected. The `_authed` guard gives any route opened
+> without a selection the default one; with none to give (several projects), a
+> scoped route goes to Projects with the requested location in `?next=`, and
+> choosing a project returns there. The Projects overview is the one unscoped entry, listed
 > first and alone until a project is selected; the selected project's screens
 > follow it.
 

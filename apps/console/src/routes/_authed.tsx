@@ -26,10 +26,12 @@ import {
  *
  * It also owns the selected project (`src/lib/project-scope.ts`): `?project=`
  * is validated here and retained on every navigation beneath the layout, so a
- * sidebar link or a row link keeps the selection without naming it. A screen
- * declaring `staticData.scope: "project"` opened without a selection is
- * redirected to itself with the default one, or to Projects when the person
- * has to choose.
+ * sidebar link or a row link keeps the selection without naming it. Any
+ * screen opened without a selection is redirected to itself with the default
+ * one, so a single-project person gets it wherever they arrive. With no default
+ * — several projects to choose from — an unscoped screen renders as it is, and
+ * one declaring `staticData.scope: "project"` goes to Projects, carrying the
+ * requested location in `?next=` so choosing a project ends there.
  *
  * The layout also renders the `AppShell` (moved here from `__root` so the
  * login screen stays shell-less) and feeds it the signed-in identity from the
@@ -44,16 +46,23 @@ export const Route = createFileRoute("/_authed")({
       throw redirect({ to: "/login", search: { next: routerRelativeHref(location.href) } });
     }
     const leaf = matches[matches.length - 1];
-    if (!search.project && leaf?.staticData.scope === "project") {
+    if (!search.project && leaf) {
       const project = await resolveDefaultProjectScope();
-      throw project
-        ? redirect({
-            to: withoutTrailingSlash(leaf.fullPath),
-            params: leaf.params,
-            search: { ...leaf.search, project },
-            replace: true,
-          })
-        : redirect({ to: "/projects", replace: true });
+      if (project) {
+        throw redirect({
+          to: withoutTrailingSlash(leaf.fullPath),
+          params: leaf.params,
+          search: { ...leaf.search, project },
+          replace: true,
+        });
+      }
+      if (leaf.staticData.scope === "project") {
+        throw redirect({
+          to: "/projects",
+          search: { next: routerRelativeHref(location.href) },
+          replace: true,
+        });
+      }
     }
     return { session };
   },

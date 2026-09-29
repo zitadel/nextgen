@@ -9,7 +9,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 import { api } from "../../api/zitadel";
-import { useProjectScope, withoutTrailingSlash } from "../../lib/project-scope";
+import {
+  listMyProjectsCached,
+  useProjectScope,
+  useSelectProjectTarget,
+  withoutTrailingSlash,
+} from "../../lib/project-scope";
 
 /**
  * Org / project pills — Figma `Sidebar / PopoverContextSwitcher`
@@ -115,6 +120,9 @@ export function ContextSwitcher() {
  * One page is enough: the pill shows the first project and the dropdown is a
  * reference list, not the directory — the Projects screen pages the full set.
  *
+ * The read is the one the `_authed` guard makes when it picks a default
+ * selection (`listMyProjectsCached`), so a landing asks once for both.
+ *
  * Loaded here rather than in the `_authed` loader so the shell paints
  * immediately and a failure degrades to an empty switcher instead of blocking
  * every screen behind it — the chrome is not worth a boundary.
@@ -127,8 +135,7 @@ function useProjects(): SwitcherOption[] | undefined {
 
   useEffect(() => {
     let cancelled = false;
-    void api
-      .listMyProjects()
+    void listMyProjectsCached()
       .then((result) => {
         if (cancelled) return;
         setProjects(
@@ -148,24 +155,30 @@ function useProjects(): SwitcherOption[] | undefined {
 
 /**
  * Where selecting a project goes. A project-scoped list stays where it is and
- * re-reads under the new project; anything else — a detail page, whose
- * resource belongs to the previous project, or an unscoped screen such as
- * Projects — goes to the console's landing for that project.
+ * re-reads under the new project, keeping its own filters (Teams' tab and
+ * search). Anything else — a detail page, whose resource belongs to the
+ * previous project, or an unscoped screen such as Projects — goes where a
+ * Projects row would (`useSelectProjectTarget`): the screen `?next=` names, or
+ * the console's landing for that project.
  */
 function useScopeTarget(): (projectId: string) => NonNullable<SwitcherOption["link"]> {
   const leaf = useMatches({ select: (matches) => matches[matches.length - 1] });
+  const selectTarget = useSelectProjectTarget();
   const stays = leaf?.staticData.scope === "project" && leaf.staticData.nav !== undefined;
   return (projectId) =>
     stays && leaf
-      ? { to: withoutTrailingSlash(leaf.fullPath), search: { project: projectId } }
-      : { to: "/", search: { project: projectId } };
+      ? {
+          to: withoutTrailingSlash(leaf.fullPath),
+          search: (prev: Record<string, unknown>) => ({ ...prev, project: projectId }),
+        }
+      : selectTarget(projectId);
 }
 
 /**
  * The option the pill shows. A selected project missing from the list — the
  * sign-in project the console falls back to, which its operator may hold no
  * grant on (`resolveDefaultProjectScope`) — is named by `GET /projects/{id}`,
- * and by its id if that read is refused.
+ * and by its id until that read answers or if it is refused.
  */
 function useSelectedOption(
   selected: string | undefined,
@@ -173,7 +186,8 @@ function useSelectedOption(
 ): SwitcherOption | undefined {
   const listed = selected ? projects?.find((project) => project.id === selected) : undefined;
   const missing = selected !== undefined && projects !== undefined && listed === undefined;
-  const [name, setName] = useState<{ id: string; label: string } | undefined>(undefined);
+  // Names read so far, by project id.
+  const [names, setNames] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!missing || !selected) return;
@@ -181,10 +195,11 @@ function useSelectedOption(
     void api
       .getProject(selected)
       .then((project) => {
-        if (!cancelled) setName({ id: selected, label: project.name });
+        if (!cancelled) setNames((known) => ({ ...known, [selected]: project.name }));
       })
       .catch(() => {
-        if (!cancelled) setName({ id: selected, label: selected });
+        if (cancelled) return;
+        setNames(({ [selected]: _refused, ...known }) => known);
       });
     return () => {
       cancelled = true;
@@ -193,7 +208,7 @@ function useSelectedOption(
 
   if (listed) return listed;
   if (!missing) return undefined;
-  return name?.id === selected ? name : { id: selected, label: selected };
+  return { id: selected, label: names[selected] ?? selected };
 }
 
 function Switcher({

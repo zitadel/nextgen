@@ -1,5 +1,6 @@
 import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
 import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
@@ -80,6 +81,55 @@ describe("landing routes", () => {
 
     await waitFor(() => expect(router.state.location.pathname).toBe("/projects"));
     expect(router.state.location.search).not.toHaveProperty("project");
+  });
+
+  it("keeps a scoped deep link's target while the person picks a project", async () => {
+    // A link shared before the selection was part of the URL: several projects
+    // to choose from, so the guard asks, and choosing one ends on the link.
+    server.use(
+      http.get("http://localhost/api/users/me/projects", () =>
+        HttpResponse.json({ projects: [project("proj_1", "Acme"), project("proj_2", "Globex")] }),
+      ),
+    );
+    const router = await renderAt("/users/usr_1");
+
+    await waitFor(() => expect(router.state.location.pathname).toBe("/projects"));
+    expect(router.state.location.search).toMatchObject({ next: "/users/usr_1" });
+
+    await userEvent.click(await screen.findByRole("link", { name: "Globex" }));
+    await waitFor(() => expect(router.state.location.pathname).toBe("/users/usr_1"));
+    expect(router.state.location.search).toEqual({ project: "proj_2" });
+  });
+
+  it("selects the only project on an unscoped screen too", async () => {
+    // `/projects` opened directly agrees with `/`: one project, so it is selected.
+    server.use(
+      http.get("http://localhost/api/users/me/projects", () =>
+        HttpResponse.json({ projects: [project("proj_1", "Acme")] }),
+      ),
+    );
+    const router = await renderAt("/projects");
+
+    await waitFor(() => expect(router.state.location.search).toMatchObject({ project: "proj_1" }));
+    expect(router.state.location.pathname).toBe("/projects");
+  });
+
+  it("asks for the person's projects once for the guard and the switcher", async () => {
+    // The Projects screen pages the list itself (`limit`); the guard and the
+    // switcher share one unpaged read.
+    let unpaged = 0;
+    server.use(
+      http.get("http://localhost/api/users/me/projects", ({ request }) => {
+        if (!new URL(request.url).searchParams.has("limit")) unpaged += 1;
+        return HttpResponse.json({ projects: [project("proj_1", "Acme"), project("proj_2", "Globex")] });
+      }),
+    );
+    const router = await renderAt("/");
+
+    await waitFor(() => expect(router.state.location.pathname).toBe("/projects"));
+    const pill = await screen.findByRole("button", { name: "Switch project" });
+    await waitFor(() => expect(pill).toHaveTextContent("Select a project"));
+    expect(unpaged).toBe(1);
   });
 
   it("takes the pinned dev project without asking", async () => {
