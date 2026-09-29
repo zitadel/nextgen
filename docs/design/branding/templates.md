@@ -101,9 +101,9 @@ The bundled default is the reference: `packages/components/src/orchestrator/temp
 
 Notes:
 
-- The `typography.font_url` stylesheet is injected by the orchestrator in page mode; the template does not emit the `<link>` tag itself.
+- The `typography.font_url` stylesheet is injected by the orchestrator when the element runs as `variant="page"`; the template does not emit the `<link>` tag itself.
 - `actions` is an ordered array of entries carrying `name` and a `primary: true` flag on the primary entry ([ADR 021](../../adrs/021-ordered-arrays-for-step-fields-actions-gates.md)); look an action up with `{% assign submit = actions | where: "name", "submit" | first %}`. There is no `actions.primary` alias.
-- Secondary navigation (`register`, `sign_in`, `recover`) renders as links carrying `data-action`, other secondary actions as `<zl-button hierarchy="secondary">`.
+- `register` and `sign_in` render as links carrying `data-action`. `recover` is passed to the password `<zl-field>` as `forgot-password-action`, and renders as a `data-action` link only on a step with no password field. Other secondary actions render as `<zl-button hierarchy="secondary">`.
 - `{% mandatory_gates %}` appends any required field and the primary action the template left out. The authoring validator requires the tag ([`validator.md`](validator.md)).
 
 ## Built-in set and the design catalog

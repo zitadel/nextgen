@@ -21,7 +21,7 @@ graph LR
 
 ## Responsibility split
 
-1. **Step JSON** (`fields`, `actions`, `gates`, `messages`, `errors`, `identity`): capability data, stable keys, labels via `text_key`. No UI chrome in this layer.
+1. **Step JSON** (`fields`, `actions`, `gates`, `sso_providers`, `challenge`, `error`): capability data, stable keys, labels via `text_key`. No UI chrome in this layer.
 
 2. **`branding.liquid_template`:** which `<zl-*>` elements appear and in what order. Pure structure — no `<style>` blocks or `:host` rules.
 

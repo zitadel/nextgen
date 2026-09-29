@@ -18,7 +18,7 @@ flowchart TB
     R --> A[Atoms use var]
 ```
 
-Two constructable stylesheets are adopted onto every `<zitadel-login>` shadow root (`packages/components/src/orchestrator/branding-to-tokens.ts`):
+Two constructable token stylesheets are adopted onto every `<zitadel-login>` shadow root (`packages/components/src/orchestrator/branding-to-tokens.ts`), beside the layout chrome sheet:
 
 1. **Base sheet.** The full design-tokens set, rewritten from document selectors onto `:host` and `:host([data-theme="…"])`. It is adopted whether or not the host page imported `tokens.css`, so the widget paints correctly on any page.
 2. **Branding sheet.** Only the variables the revision sets. It is adopted after the base sheet and replaced whole when a new payload arrives, so nothing from the previous payload lingers.
@@ -108,7 +108,7 @@ Asset URLs live on branding; the orchestrator loads them. They are not colour to
 | `logo_url`                           | Single-mark fallback, used only when neither side names one                        |
 | `hero_url`                           | An image in templates that reference it (revisions published from the split and hero designs); the bundled default does not use it |
 | design-system default font           | Loaded by the orchestrator as `<link rel="stylesheet">` (`applyDefaultFont`, default Arimo) so the brand face paints with no branding; dropped when `typography.font_url` is set. See [ADR 025](../../adrs/025-default-brand-font-loading.md) |
-| `typography.font_url`                | Tenant override; injected by the orchestrator as `<link rel="stylesheet">` before the widget paints, replacing the default font. Page mode only: an embedded widget applies the family and leaves loading to the page that owns the document |
+| `typography.font_url`                | Tenant override; injected by the orchestrator as `<link rel="stylesheet">` before the widget paints, replacing the default font. `variant="page"` only: in `variant="widget"` the component applies the family and leaves loading to the embedding page |
 | `theme.light.logo_url` / `theme.dark.logo_url` | The mark for that side. The orchestrator resolves one from the active theme and hands it to the template as `logo_url`; a side without a mark shows none, because a logo is pixels and is never recoloured |
 | `shape.logo_scale`                   | `--zl-logo-scale`, a multiplier on the logo height caps                            |
 

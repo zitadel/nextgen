@@ -34,7 +34,7 @@ How each block becomes `--zl-*` values is in [`tokens.md`](tokens.md).
 
 ## Theme sides
 
-Light and dark are independent surfaces. Neither inherits from the other: a palette key one side omits takes the maintained default for that side, and a side the revision does not publish is never used, whatever `mode` or the operating system asks for.
+Light and dark are independent surfaces. Neither inherits from the other: a palette key one side omits takes the maintained default for that side, and when a revision publishes one side, the other is never used, whatever `mode` or the operating system asks for. A revision that publishes neither side resolves as usual and paints the maintained defaults.
 
 `mode` is one input among three. Resolution runs strongest first: the embedding page's `<zitadel-login theme="…">` property, then `theme.mode`, then a variant-derived default (`dark` for `variant="page"`, `auto` for the embeddable `variant="widget"`). The element wins because the page hosting the widget knows its own surface better than stored branding does, but it selects among the published sides only. A revision that publishes one side resolves to that side regardless.
 
@@ -46,7 +46,7 @@ Asset URLs are HTTPS. `logo_url`, `hero_url`, and the per-side `logo_url` may us
 
 Shape validation cannot tell a live asset from a dead one, and a well-formed URL that serves nothing renders as a 0×0 `<img>`. Two layers cover that, neither of them a gate: `zitadel plan` / `apply` probe the top-level `logo_url` and `hero_url` and warn (`apps/cli/src/lib/sync/asset-probe.ts`; the per-side marks and `typography.font_url` are not probed), and the component hides an asset whose load fails, restoring either the split designs' decorative placeholder or a shipped design's authored no-asset content (`packages/components/src/orchestrator/asset-fallback.ts`). Templates cannot do the latter themselves: DOMPurify strips inline `onerror` along with every other event handler, so the listener is orchestrator-side. The CLI probe only contacts public HTTPS destinations and validates every redirect; loopback, private, and internal targets stay inconclusive so repo config cannot make the planning host scan its own network.
 
-`typography.font_url` loads in page mode only. The component must inject a font stylesheet at document level (a shadow-scoped `@font-face` never registers faces), and Zitadel does not inject a stylesheet into a document it does not own. An embedded widget applies `font_family` and leaves loading to the embedding page. See [ADR 025](../../adrs/025-default-brand-font-loading.md).
+`typography.font_url` loads only when the element runs as `variant="page"`. The component must inject a font stylesheet at document level (a shadow-scoped `@font-face` never registers faces), so in the default `variant="widget"` it injects nothing, applies `font_family`, and leaves loading to the embedding page. The gate is the variant, not who hosts the document. The sign-in pages `zitadel setup` generates use `variant="page"`, so an app built from them gets the stylesheet `<link>` added to its document head, which a content security policy on that site has to allow. See [ADR 025](../../adrs/025-default-brand-font-loading.md).
 
 ## No custom CSS
 

@@ -5971,7 +5971,8 @@ type Branding struct {
 	// `theme.dark.logo_url` is set. Prefer the per-side marks — one file
 	// cannot serve both surfaces.
 	LogoURL OptURI `json:"logo_url"`
-	// Hero/background image URL, used by the split layout.
+	// Hero image URL, for templates that reference `branding.hero_url`. The
+	// bundled default template does not use it.
 	HeroURL    OptURI                `json:"hero_url"`
 	Theme      OptBrandingTheme      `json:"theme"`
 	Typography OptBrandingTypography `json:"typography"`
@@ -7172,9 +7173,10 @@ type BrandingTypography struct {
 	// example. Must be https; unlike the logo and hero assets there is no
 	// loopback carve-out. Rejected without `font_family`, which would name
 	// nothing to paint with.
-	// Stored but not applied to an embedded widget: the embedding page loads
-	// the face, and Zitadel does not inject a stylesheet into a document it
-	// does not own.
+	// Loaded only when the login component runs as `variant="page"`, the
+	// full-page login. In the default `variant="widget"` it is stored but not
+	// loaded: the component injects no stylesheet, and the embedding page
+	// loads the face.
 	FontURL OptURI `json:"font_url"`
 	// Multiplier on the base text sizes, `1` when omitted.
 	Scale OptFloat64 `json:"scale"`

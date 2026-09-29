@@ -32,8 +32,10 @@ by re-applying an earlier template.
 - Brand asset URLs go in `branding.json` and must use `https://`. Each template
   decides which fields it renders: `centered` uses `logo_url`; `minimal` uses
   none until you add it to `login.liquid`. Set the typeface with
-  `typography.font_family`. `typography.font_url` loads it on a login page
-  Zitadel serves; an embedded widget leaves loading the font to your page.
+  `typography.font_family`. `typography.font_url` is loaded when the component
+  runs as `variant="page"`, which the sign-in pages `zitadel setup` generates
+  use: the component then adds that stylesheet to your page. With
+  `variant="widget"` it is not loaded, and your page loads the font.
 
   ```json
   {
@@ -62,7 +64,8 @@ by re-applying an earlier template.
   `zitadel branding eject --design <name>`, don't edit `layout`.
 
 - The "Secured with Zitadel" attribution is always shown, and `branding.json`
-  has no setting for it. It sits below the card; to place it elsewhere, put
+  has no setting for it. It sits at the foot of the login; to place it
+  elsewhere, put
   `<div data-zl-attribution-anchor></div>` where you want it in `login.liquid`.
 - Back-navigation: the engine injects a `kind: "back"` action on steps
   that can return to their predecessor, and the browser's back gesture
