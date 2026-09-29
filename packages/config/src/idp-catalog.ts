@@ -238,7 +238,7 @@ export function scaffoldConnection(options: {
   };
   // Last, so an override replaces the template's issuer rather than being
   // replaced by it.
-  const overrides = endpointOverrides(options.endpoints, options.provider, catalogIssuer(options.provider));
+  const overrides = endpointOverrides(options.endpoints, catalogIssuer(options.provider));
   const claimMapping = claimMappingFor(entry, options.schemaProperties);
 
   return {
