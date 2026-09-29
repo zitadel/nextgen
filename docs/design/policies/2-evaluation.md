@@ -7,8 +7,8 @@ every requirement the request missed.
 
 ## The context schema
 
-The template's `config` says what a developer may **configure**. Its
-`context` says what the rules **receive**, and doubles as the CEL type
+The template's `config` says what a developer may configure. Its
+`context` says what the rules receive, and doubles as the CEL type
 environment.
 
 ```json
@@ -25,11 +25,11 @@ Every field is a derived value. `history_matches[i]` says whether the
 candidate matched the i-th most recent previous password; the rule never sees
 a hash, let alone a password. A rule referencing a field outside the schema
 fails the type check at startup, which is what makes the context schema a
-contract rather than documentation. The blocklist rule adds
+contract the server enforces. The blocklist rule adds
 `candidate.in_blocklist` when it lands with #898.
 
-Shared envelope fields (`user`, `request`) are added to the context once a
-rule needs them, not before: every field in the context is an attack surface
+Shared envelope fields (`user`, `request`) are added to the context only once
+a rule needs them: every field in the context is an attack surface
 for a decision log.
 
 ## The context builder
@@ -37,7 +37,7 @@ for a decision log.
 Each operation has one Go function that derives the context, listed per
 operation in the [catalog](catalog.md). For `user.password.save` it is
 `service.PasswordPolicy.buildContext`, and it is where #898's password
-handling lives, not in the rules:
+handling lives:
 
 - the candidate is NFC-normalized before anything else
   (`domain.NormalizePassword`, applied on hashing and verification too);
@@ -54,16 +54,16 @@ A rule is an expression a customer may one day author, so the engine bounds
 what one rule can be and what it can cost. Four checks, the first three at
 server start for every rule in every template, the last on every evaluation:
 
-- **Type check.** The expression is compiled against the template's `config`
+- Type check. The expression is compiled against the template's `config`
   and `context` schemas and must produce a `bool`. A reference to a field the
   context does not declare fails here.
-- **Expression length.** The source text of one rule is capped. A rule that
+- Expression length. The source text of one rule is capped. A rule that
   needs more is two rules.
-- **Estimated cost.** cel-go estimates the worst-case work of an expression
+- Estimated cost. cel-go estimates the worst-case work of an expression
   without running it, by walking the parsed tree; since a list's length is
   unknown statically, context lists are assumed to hold a fixed maximum. The
   estimate must stay under a cap.
-- **Runtime cost.** cel-go counts evaluation steps while a rule runs and
+- Runtime cost. cel-go counts evaluation steps while a rule runs and
   aborts past a budget. The rule also runs under the request's context
   deadline.
 
