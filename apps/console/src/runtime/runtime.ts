@@ -118,12 +118,12 @@ export function getRuntime(): ConsoleRuntime {
 
 /**
  * The project the console signs into: the `VITE_CONSOLE_PROJECT_ID` dev
- * override when set (it must match the dev proxy's project secret),
- * otherwise the discovered `console_project_id` (ADR 0004 §3).
+ * override when set, otherwise the discovered `console_project_id` (ADR 0004
+ * §3).
  *
- * Not the project being managed. Management calls use the selected project
- * (`src/lib/project-scope.ts`); this one is for sign-in, claim, and the
- * fallback selection when the person has no project of their own.
+ * Not the project being managed, and never selected as one: management calls
+ * use the selected project (`src/lib/project-scope.ts`), chosen from the
+ * person's own projects. This one is for sign-in and claim.
  */
 export function getConsoleProjectId(): string {
   return import.meta.env.VITE_CONSOLE_PROJECT_ID || getRuntime().console_project_id || "";
@@ -131,8 +131,8 @@ export function getConsoleProjectId(): string {
 
 /**
  * The discovered publishable key, or `undefined` when the server does not
- * serve one (older servers, no project yet). Without it the login widget's
- * handoff exchange falls back to the dev proxy's secret injection.
+ * serve one (older servers, no project yet). The login widget's handoff
+ * exchange requires it: without it every sign-in answers 401.
  */
 export function getPublishableKey(): string | undefined {
   return getRuntime().publishable_key;

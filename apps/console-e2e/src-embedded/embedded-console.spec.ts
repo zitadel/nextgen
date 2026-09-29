@@ -14,11 +14,10 @@ import { grantProjectAdmin } from "../src-real/support";
  * mux that serves `/ui/login`, `/ui/console`, `/console/runtime.json`, `/`.
  *
  * Keep the assertions here about *reaching the API*. Console features belong
- * in `src-real/`, which runs the same screens with the dev proxy's project
- * secret and can therefore exercise the management calls this lane cannot.
+ * in `src-real/`, which runs the same screens through the Vite dev proxy.
  */
 
-test("signs in end to end against the embedded API", async ({ page, seed, zitadel }) => {
+test("signs in end to end against the embedded API", async ({ page, seed }) => {
   const user = await seed.user();
 
   await page.goto("/ui/console/");
@@ -39,8 +38,8 @@ test("signs in end to end against the embedded API", async ({ page, seed, zitade
   await page.getByLabel("Password").fill(user.password);
   // Registered before the terminal click, because the call fires as soon as
   // the console boots on the other side of the navigation.
-  const teamsQuery = page.waitForResponse(
-    (response) => new URL(response.url()).pathname === "/teams/query",
+  const myProjects = page.waitForResponse(
+    (response) => new URL(response.url()).pathname === "/users/me/projects",
   );
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
 
@@ -49,37 +48,59 @@ test("signs in end to end against the embedded API", async ({ page, seed, zitade
   // back into the console, where the guard's `GET /sessions/me` now answers
   // 200. Four more calls that only resolve if the base is right.
   await page.waitForURL((url) => !url.pathname.endsWith("/login"));
-  // `/` has no screen of its own and lands on Teams, so the redirect having run
-  // is what proves the console booted. The seeded user holds no grant, so no
-  // project is listed and the selection falls back to the one the console
-  // signed into (`resolveDefaultProjectScope`).
-  await expect(page).toHaveURL(
-    new RegExp(`/ui/console/teams\\?.*project=${zitadel.handle.projectId}`),
-  );
-  expect(new URL(page.url()).searchParams.get("status")).toBe("active");
-  // #1227 taught queryTeams to accept the session cookie, so the list no
-  // longer fails closed -- but this lane's seeded user has no team and no
-  // grant, so it has no foothold in the console project and the gate answers
-  // 404. Asserted rather than described: that status is the question #1227
-  // asked of this lane, and the sidebar below renders on a 401 just as
-  // happily. Rows need a grant, which is what `src-real/` has a secret for.
-  expect((await teamsQuery).status()).toBe(404);
+  // `/` has no screen of its own and lands on Teams, which acts on a selected
+  // project. The seeded user holds no grant, so `GET /users/me/projects` lists
+  // nothing and there is no project to select for them
+  // (`resolveDefaultProjectScope`): the guard sends them to Projects instead,
+  // never to the project the console signed into, which they could not manage.
+  // That read is authenticated by the session cookie alone (#1237), so it
+  // answering 200 is what proves the base and the cookie are right.
+  expect((await myProjects).status()).toBe(200);
+  await expect(page).toHaveURL(/\/ui\/console\/projects(\?|$)/);
+  expect(new URL(page.url()).searchParams.get("project")).toBeNull();
 
   // The shell, not the screen: it is what shows the signed-in console was
   // reached.
   await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();
-
-  // The project pill is the one management read that does resolve here: `GET
-  // /users/me/projects` is authenticated by the session cookie alone (#1237).
-  // It used to ask `POST /projects/query`, which only accepts a project secret,
-  // and stayed a skeleton for good on this lane. A seeded user holds no grant,
-  // so nothing is listed and the pill names the fallback selection — by id,
-  // since reading the project's name needs the same foothold. What matters is
-  // that it is an answer.
+  await expect(page.getByText("No projects yet.")).toBeVisible();
   // `toContainText`: the pill carries its label twice, once per breakpoint.
   await expect(page.getByRole("button", { name: "Switch project" })).toContainText(
-    zitadel.handle.projectId,
+    "No projects",
   );
+});
+
+test("manages the project with the session cookie alone", async ({ page, seed, zitadel }) => {
+  // #1300: nothing on this lane holds the project secret — the binary serves
+  // the console and the API at one origin and no proxy adds a credential — so
+  // a granted operator's session cookie is what authorizes a management read
+  // and a management write. The grant is written from the test process.
+  const operator = await seed.user();
+  await grantProjectAdmin(zitadel.handle, operator.id);
+  const colleague = await seed.user();
+
+  await page.goto("/ui/console/");
+  await page.getByLabel("Email").fill(operator.email);
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  await page.getByLabel("Password").fill(operator.password);
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.waitForURL((url) => !url.pathname.endsWith("/login"));
+  await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();
+
+  await page.goto("/ui/console/users");
+  await expect(page.getByRole("link", { name: colleague.email, exact: true })).toBeVisible();
+
+  const name = `Embedded ${Date.now().toString(36)}`;
+  await page.goto("/ui/console/teams?status=active");
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+  const drawer = page.getByRole("dialog", { name: "Add team" });
+  await drawer.getByLabel("Team name").fill(name);
+  const created = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname === "/teams" && response.request().method() === "POST",
+  );
+  await drawer.getByRole("button", { name: "Add team", exact: true }).click();
+  expect((await created).status()).toBe(201);
+  await expect(page.getByRole("link", { name, exact: true })).toBeVisible();
 });
 
 test("shows each user's team on the Users screen with the session cookie", async ({

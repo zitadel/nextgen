@@ -14,8 +14,8 @@ import { expectNoErrorBoundary, signIn } from "./support";
  * heading that says `USER SCHEMA`.
  */
 
-test("lists the seeded flow with a resolved schema name", async ({ page, seed }) => {
-  await signIn(page, await seed.user());
+test("lists the seeded flow with a resolved schema name", async ({ page, zitadel, seed }) => {
+  await signIn(page, zitadel.handle, await seed.user());
 
   await page.goto("/flow-definitions");
 
@@ -33,8 +33,8 @@ test("lists the seeded flow with a resolved schema name", async ({ page, seed })
   await expectNoErrorBoundary(page);
 });
 
-test("opens a flow and shows its steps and definition", async ({ page, seed }) => {
-  await signIn(page, await seed.user());
+test("opens a flow and shows its steps and definition", async ({ page, zitadel, seed }) => {
+  await signIn(page, zitadel.handle, await seed.user());
 
   await page.goto("/flow-definitions");
   await page.getByRole("link", { name: "Default login" }).click();
