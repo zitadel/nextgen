@@ -68,7 +68,6 @@ describe("the scaffolded connection", () => {
   it("passes idp-connection.json with a placeholder client id", () => {
     const connection = scaffoldConnection({
       provider: "google",
-      clientId: "placeholder.apps.googleusercontent.com",
       schemaProperties: DEFAULT_SCHEMA_PROPERTIES,
     });
 
@@ -78,7 +77,6 @@ describe("the scaffolded connection", () => {
   it("references the secret and never carries its value", () => {
     const connection = scaffoldConnection({
       provider: "google",
-      clientId: "abc",
       schemaProperties: DEFAULT_SCHEMA_PROPERTIES,
     }) as { oidc: { client_secret: string } };
 
@@ -88,12 +86,10 @@ describe("the scaffolded connection", () => {
   it("maps only the properties the target schema defines", () => {
     const onDefault = scaffoldConnection({
       provider: "google",
-      clientId: "abc",
       schemaProperties: DEFAULT_SCHEMA_PROPERTIES,
     }) as { claim_mapping: Record<string, string> };
     const onProfile = scaffoldConnection({
       provider: "google",
-      clientId: "abc",
       schemaProperties: PROFILE_SCHEMA_PROPERTIES,
     }) as { claim_mapping: Record<string, string> };
 
@@ -108,7 +104,6 @@ describe("the scaffolded connection", () => {
   it("keeps the vendor's protocol block intact", () => {
     const connection = scaffoldConnection({
       provider: "google",
-      clientId: "abc",
       schemaProperties: DEFAULT_SCHEMA_PROPERTIES,
     }) as {
       subject_claim: string;
@@ -125,7 +120,6 @@ describe("the scaffolded connection", () => {
   it("writes the entry key as the slug unless one is given", () => {
     const connection = scaffoldConnection({
       provider: "google",
-      clientId: "abc",
       schemaProperties: DEFAULT_SCHEMA_PROPERTIES,
       slug: "google_work",
     }) as { slug: string; oidc: { client_secret: string } };
@@ -140,7 +134,6 @@ describe("the scaffolded connection", () => {
   it("stays valid with the editor $schema pointer attached", () => {
     const connection = scaffoldConnection({
       provider: "google",
-      clientId: "abc",
       schemaProperties: DEFAULT_SCHEMA_PROPERTIES,
       schemaRef: "../meta/idp-connection.json",
     });
