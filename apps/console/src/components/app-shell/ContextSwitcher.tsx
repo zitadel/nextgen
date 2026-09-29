@@ -1,6 +1,6 @@
 // `Building2` returns with the parked organisation switcher below.
 import { Link, type LinkProps, useMatches } from "@tanstack/react-router";
-import { Boxes, ChevronsUpDown, LayoutList, type LucideIcon, Search } from "lucide-react";
+import { Boxes, ChevronsUpDown, type LucideIcon, Search } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -97,7 +97,7 @@ export function ContextSwitcher() {
         options={projects}
         emptyLabel={projects?.length === 0 ? NO_PROJECTS : NO_SELECTION}
         ariaLabel="Switch project"
-        footer={{ label: "All projects", icon: LayoutList, link: { to: "/projects" } }}
+        footer={{ label: "All projects", link: { to: "/projects" } }}
       />
     </div>
   );
@@ -220,7 +220,7 @@ function Switcher({
   emptyLabel: string;
   ariaLabel: string;
   /** A link beneath the options — for projects, the overview of all of them. */
-  footer?: { label: string; icon: LucideIcon; link: Pick<LinkProps, "to" | "search"> };
+  footer?: { label: string; link: Pick<LinkProps, "to" | "search"> };
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -347,9 +347,10 @@ function Switcher({
             <Link
               {...footer.link}
               onClick={() => setOpen(false)}
-              className="flex w-full items-center gap-3 rounded-sm px-3 py-2.5 text-left text-sm text-foreground outline-none hover:bg-accent focus-visible:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              // No icon, but indented like one: `pl-10` is a row's `px-3` plus its
+              // 16px icon and `gap-3`, so the label lines up with the names above.
+              className="flex w-full items-center rounded-sm py-2.5 pr-3 pl-10 text-left text-sm text-foreground outline-none hover:bg-accent focus-visible:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50"
             >
-              <footer.icon size={16} className="shrink-0 text-muted-foreground" aria-hidden />
               {footer.label}
             </Link>
           </div>
