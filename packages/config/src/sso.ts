@@ -127,11 +127,54 @@ export function applySsoToSchema(schema: object, slug: string): SsoResult<object
   return { document, changed: true, skipped: [] };
 }
 
-/** The step that collects what the provider did not supply. */
-function registerSsoStep(): Step {
+/**
+ * The properties this project collects when someone registers.
+ *
+ * Read from the register purpose's own entry step rather than from the schema:
+ * that step is where the project decided what to ask for, and the use case
+ * chosen at setup already shaped it (`minimal` asks for an email, `business`
+ * also for names and a company). Taking the schema instead would collect every
+ * property it defines, including ones the project deliberately does not ask
+ * about.
+ *
+ * Credential fields are dropped. `create_user_with_sso` mints an account whose
+ * proof is the provider, so a password box on this step would be asking for a
+ * credential the mutation never stores.
+ *
+ * Falls back to the identifier-collecting step, and then to nothing, so a flow
+ * shaped unlike the shipped one still produces a step that can collect the one
+ * property the mutation cannot do without.
+ */
+function registrationFields(flow: Json): string[] {
+  const purposes = isObject(flow.purposes) ? flow.purposes : {};
+  const named = typeof purposes.register === "string" ? purposes.register : "register";
+  for (const name of [named, "register", "identifier"]) {
+    const step = stepNamed(flow, name);
+    const fields = isObject(step) && Array.isArray(step.fields) ? step.fields : [];
+    const collected = fields.filter(
+      (field): field is string =>
+        typeof field === "string" && !field.startsWith("x-auth-methods#"),
+    );
+    if (collected.length > 0) {
+      return collected;
+    }
+  }
+  return [];
+}
+
+/**
+ * The step that collects what the provider did not supply.
+ *
+ * It asks for everything registration asks for, because a provider is not
+ * obliged to supply any of it: the engine creates the account outright when
+ * the claims satisfy the schema and shows this step when they do not, and a
+ * step that can only collect the identifier is a dead end for every property
+ * beyond it.
+ */
+function registerSsoStep(fields: string[]): Step {
   return {
     name: REGISTER_SSO,
-    fields: ["email"],
+    fields,
     actions: [{ name: "submit", kind: "submit", primary: true, text_key: `${REGISTER_SSO}.action.submit` }],
     on_success: "create_user_with_sso",
     transitions: {
@@ -293,7 +336,10 @@ export function applySsoToFlow(
   const list = steps(document);
   const terminalIndex = list.findIndex((step) => step.name === "done");
   const insertAt = terminalIndex === -1 ? list.length : terminalIndex;
-  const wanted: Step[] = [registerSsoStep(), ssoConflictStep(slug, enabled, loginEntry(document))];
+  const wanted: Step[] = [
+    registerSsoStep(registrationFields(document)),
+    ssoConflictStep(slug, enabled, loginEntry(document)),
+  ];
   let offset = 0;
   for (const step of wanted) {
     const name = step.name as string;

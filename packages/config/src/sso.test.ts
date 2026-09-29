@@ -229,3 +229,45 @@ describe("applySsoToFlow", () => {
     expect(names.indexOf("sso-conflict")).toBeLessThan(names.indexOf("done"));
   });
 });
+
+describe("register-sso collects what registration collects", () => {
+  /** The SSO step's fields, for a flow scaffolded with `useCase`. */
+  function ssoFields(useCase: "minimal" | "consumer" | "business"): unknown {
+    const flow = getDefaultLoginFlow({ useCase }) as unknown as Record<string, unknown>;
+    const { document } = applySsoToFlow(flow, "google", bothMethods);
+    return stepNamed(document, "register-sso").fields;
+  }
+
+  it.each([
+    ["minimal", ["email"]],
+    ["consumer", ["email", "givenName", "familyName"]],
+    ["business", ["email", "givenName", "familyName", "companyName"]],
+  ] as const)("follows the %s use case", (useCase, expected) => {
+    // A provider is not obliged to supply any of these, and the engine shows
+    // this step precisely when the claims did not satisfy the schema. A step
+    // that can only collect the identifier is a dead end for everything else,
+    // so it has to ask for whatever registration asks for.
+    expect(ssoFields(useCase)).toEqual(expected);
+  });
+
+  it("never asks for a credential", () => {
+    // `create_user_with_sso` mints an account whose proof is the provider, so
+    // a password box here would collect something the mutation never stores.
+    for (const useCase of ["minimal", "consumer", "business"] as const) {
+      const fields = ssoFields(useCase) as string[];
+      expect(fields.some((field) => field.startsWith("x-auth-methods#")), useCase).toBe(false);
+    }
+  });
+
+  it("follows the register step rather than the schema", () => {
+    // The project decides what to ask for. A field removed from registration
+    // is not one the provider path should start demanding.
+    const flow = getDefaultLoginFlow({ useCase: "business" }) as unknown as Record<string, unknown>;
+    const register = stepNamed(flow, "register");
+    register.fields = ["email", "givenName"];
+
+    const { document } = applySsoToFlow(flow, "google", bothMethods);
+
+    expect(stepNamed(document, "register-sso").fields).toEqual(["email", "givenName"]);
+  });
+});
