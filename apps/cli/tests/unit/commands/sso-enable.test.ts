@@ -475,5 +475,9 @@ describe("sso enable with a connection already on disk", () => {
     expect(json.code).toBe("E_NOT_FOUND");
     expect(json.hint).toContain(".zitadel/flows/");
     expect(await readFile(schemaPath, "utf8")).toBe(before);
+    // Nor the connection, which is written before the schema is: failing after
+    // it would leave a file and two published variables behind for a provider
+    // the sign-in screen can never offer.
+    await expect(readFile(join(cwd, ".zitadel/idps/google.json"), "utf8")).rejects.toThrow();
   });
 });

@@ -25,6 +25,7 @@ import {
   callbackUriFor,
   CONNECTION_SCHEMA_REF,
   enabledMethods,
+  type FlowFile,
   IDPS_DIR,
   credentialVariables,
   planConnection,
@@ -156,6 +157,10 @@ export default class SsoEnable extends BaseCommand {
     let secret: SecretOutcome | undefined;
     let clientIdState: PublishState | undefined;
 
+    // Before anything is written or published: a Project whose flows name
+    // another schema must fail having changed nothing.
+    const flows = await this.targetFlows(cwd, schema);
+
     if (reusing) {
       consola.success(`Reusing ${plan.file.path}`);
       // The connection references its credentials rather than holding them, so
@@ -220,7 +225,7 @@ export default class SsoEnable extends BaseCommand {
       consola.success(`Wrote ${plan.path}`);
     }
 
-    const edits = await this.enableInConfiguration(cwd, schema, plan.slug);
+    const edits = await this.enableInConfiguration(cwd, schema, plan.slug, flows);
 
     for (const file of edits.written) {
       consola.success(`Updated ${file}`);
@@ -301,17 +306,16 @@ export default class SsoEnable extends BaseCommand {
    * it, writing only what changed. A flow belonging to another schema is left
    * alone: enabling Google for customers must not touch the employee journey.
    */
-  private async enableInConfiguration(
-    cwd: string,
-    schema: SchemaFile,
-    slug: string,
-  ): Promise<{ written: string[]; skipped: SsoSkipped[] }> {
-    // Every target is found before anything is written. No flow means no
-    // button, however well the schema went, and the failure is invisible
-    // otherwise: `plan` and `apply` both succeed and the sign-in screen simply
-    // never offers the provider. Refusing after the schema had already gained
-    // `x-auth-methods.sso` would leave the Project half-enabled for a provider
-    // it cannot show.
+  /**
+   * The flows this provider must be added to, or a refusal.
+   *
+   * Called before the connection is written and before either credential is
+   * published, because no flow means no button however well everything else
+   * went: `plan` and `apply` both succeed and the sign-in screen simply never
+   * offers the provider. Failing afterwards would leave a connection file and
+   * two published variables behind for a provider that cannot be shown.
+   */
+  private async targetFlows(cwd: string, schema: SchemaFile): Promise<FlowFile[]> {
     const publishedSchemaId = await publishedIdOf(cwd, schema.path);
     const flows = (await readFlowFiles(cwd)).filter((flow) =>
       flowUsesSchema(flow.body, schema, publishedSchemaId),
@@ -325,7 +329,15 @@ export default class SsoEnable extends BaseCommand {
         details: { schema: schema.path },
       });
     }
+    return flows;
+  }
 
+  private async enableInConfiguration(
+    cwd: string,
+    schema: SchemaFile,
+    slug: string,
+    flows: FlowFile[],
+  ): Promise<{ written: string[]; skipped: SsoSkipped[] }> {
     const methods = enabledMethods(schema);
     const schemaResult = applySsoToSchema(schema.body, slug);
     const flowResults = flows.map((flow) => ({

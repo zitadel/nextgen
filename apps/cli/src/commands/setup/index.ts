@@ -201,7 +201,7 @@ export default class Setup extends BaseCommand {
     // inconsistent set of --sso flags is a mistake in the command line, and
     // reporting it after a project has been created would leave the developer
     // to clean up.
-    const ssoFromCommandLine = await ssoFromFlags(flags, nonInteractive);
+    const ssoFromCommandLine = await ssoFromFlags(flags, nonInteractive, dryRun);
 
     const orca = createOrca();
 
@@ -751,6 +751,7 @@ async function ssoFromFlags(
     "sso-client-id"?: string;
   },
   nonInteractive: boolean,
+  dryRun: boolean,
 ): Promise<SsoAnswer | undefined> {
   if (flags.sso === undefined) {
     if (flags["sso-client-id"] !== undefined) {
@@ -775,6 +776,12 @@ async function ssoFromFlags(
   if (!nonInteractive) {
     // The wizard asks for the secret, the way it asks for a client id that
     // `--sso-client-id` did not answer.
+    return { provider: flags.sso, clientId, secret: "" };
+  }
+  if (dryRun) {
+    // A preview publishes nothing and materialises nothing, so demanding a
+    // real credential to see what setup would do is a toll for no reason --
+    // and `sso enable --dry-run` returns before asking for one at all.
     return { provider: flags.sso, clientId, secret: "" };
   }
   const piped = process.stdin.isTTY ? "" : (await readStdin(process.stdin)).trim();
