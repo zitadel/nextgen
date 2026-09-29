@@ -41,10 +41,12 @@ baseline, the project chooses within it.
   (`max_length` is 64 for everyone and every login form needs to know that).
 - **`recommended_minimum`** marks a legal-but-discouraged range. A value
   below it is accepted and the authoring workflow warns (#898: 8 to 14 is
-  allowed, 15 is what NIST requires for a single-factor password). The warning
-  comes from the catalog (`policy.Engine.Warnings`), so the CLI and the
-  console never hardcode the threshold. There is no API-level warning channel;
-  the floor is the protection, the warning is guidance.
+  allowed, 15 is what NIST requires for a single-factor password). The
+  threshold travels with the template: the engine reports it
+  (`policy.Engine.Warnings`) and the wire schema carries it as
+  `x-recommended-minimum`, which the parity test keeps equal, so the CLI warns
+  at `plan` time without hardcoding a number. There is no API-level warning
+  channel; the floor is the protection, the warning is guidance.
 - **`public: true`** marks a setting the unauthenticated `constraints`
   projection may return (see [Constraints](3-constraints.md)). Unmarked
   settings are private: `max_attempts` on a lockout policy would tell an
