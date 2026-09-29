@@ -65,33 +65,32 @@ func (s *idpConnectionService) CreateOrRevise(ctx context.Context, projectID str
 	}
 
 	existing, err := s.get(ctx, projectID, domain.IDPConnectionFieldSlug, slug)
-	if errors.Is(err, domain.ErrIDPConnectionNotFound()) {
-		created, createErr := s.create(ctx, &domain.IDPConnection{ProjectID: projectID, Slug: slug, Document: document})
-		if createErr == nil {
-			return &CreateIDPConnectionOutput{Connection: created, Created: true}, nil
-		}
-		// project_id is the only foreign key on a new connection, so a
-		// violation means the project was deleted underneath the call.
-		if _, ok := errors.AsType[*database.ForeignKeyError](createErr); ok {
-			return nil, domain.ErrIDPConnectionNotFound().WithParent(createErr)
-		}
-		if _, raced := errors.AsType[*database.UniqueError](createErr); !raced {
-			return nil, domain.ErrInternal(createErr).WithMessage("failed to create identity provider connection")
-		}
-		// Another caller created the slug between the read and the insert.
-		// Its connection is the one this document now revises.
-		existing, err = s.get(ctx, projectID, domain.IDPConnectionFieldSlug, slug)
+	if err == nil {
+		return s.revise(ctx, projectID, existing.ID, document)
 	}
-	if err != nil {
+	if !errors.Is(err, domain.ErrIDPConnectionNotFound()) {
 		return nil, err
 	}
 
-	revised, err := s.revise(ctx, projectID, existing.ID, document)
+	created, err := s.create(ctx, &domain.IDPConnection{ProjectID: projectID, Slug: slug, Document: document})
+	if err == nil {
+		return &CreateIDPConnectionOutput{Connection: created, Created: true}, nil
+	}
+	if !errors.Is(err, errIDPSlugTaken) {
+		return nil, err
+	}
+	// Another caller created the slug between the read and the insert. Its
+	// connection is the one this document now revises.
+	existing, err = s.get(ctx, projectID, domain.IDPConnectionFieldSlug, slug)
 	if err != nil {
 		return nil, err
 	}
-	return &CreateIDPConnectionOutput{Connection: revised}, nil
+	return s.revise(ctx, projectID, existing.ID, document)
 }
+
+// errIDPSlugTaken reports that create lost the race for a slug to another
+// caller, which CreateOrRevise answers by revising the winner's connection.
+var errIDPSlugTaken = errors.New("identity provider connection slug taken")
 
 // validate checks document against the idp-connection.json schema and returns
 // its slug. The request decoder cannot do this alone: its model drops the
@@ -127,10 +126,18 @@ func (s *idpConnectionService) create(ctx context.Context, entity *domain.IDPCon
 		}
 		return emitIDPConnectionEvent(ctx, tx, domain.EventTypeIDPCreated, entity, payload)
 	})
-	if err != nil {
-		return nil, err
+	if err == nil {
+		return entity, nil
 	}
-	return entity, nil
+	// project_id is the only foreign key on a new connection, so a violation
+	// means the project was deleted underneath the call.
+	if _, ok := errors.AsType[*database.ForeignKeyError](err); ok {
+		return nil, domain.ErrIDPConnectionNotFound().WithParent(err)
+	}
+	if _, ok := errors.AsType[*database.UniqueError](err); ok {
+		return nil, fmt.Errorf("%w: %w", errIDPSlugTaken, err)
+	}
+	return nil, domain.ErrInternal(err).WithMessage("failed to create identity provider connection")
 }
 
 // revise appends document as a new revision of connection id. The newest
@@ -142,7 +149,7 @@ func (s *idpConnectionService) create(ctx context.Context, entity *domain.IDPCon
 // concurrent revisions could both read the same newest revision (a plain
 // read does not wait at READ COMMITTED), and the later one would compute its
 // delta against a revision that is no longer the one it follows.
-func (s *idpConnectionService) revise(ctx context.Context, projectID, id string, document []byte) (*domain.IDPConnection, error) {
+func (s *idpConnectionService) revise(ctx context.Context, projectID, id string, document []byte) (*CreateIDPConnectionOutput, error) {
 	var entity *domain.IDPConnection
 	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		if err := tx.Statements().LockIDPConnection(ctx, projectID, id); err != nil {
@@ -189,7 +196,7 @@ func (s *idpConnectionService) revise(ctx context.Context, projectID, id string,
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to revise identity provider connection")
 	}
-	return entity, nil
+	return &CreateIDPConnectionOutput{Connection: entity}, nil
 }
 
 func emitIDPConnectionEvent(ctx context.Context, tx Statementer[AllStatements], eventType domain.EventType, entity *domain.IDPConnection, payload domain.IDPConnectionPayload) error {
