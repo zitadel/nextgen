@@ -64,6 +64,12 @@ func compileList[F ~uint8, T any](ctx context.Context, c *statementCompiler, stm
 		maybeWriteAuthzListPredicate(ctx, c, &hasWhere, tableName, resourceIDCol)
 	}
 
+	if err := schema.EnsureOrderable(opt.Pagination.OrderBy); err != nil {
+		return err
+	}
+	if err := schema.EnsureOrderable(opt.Pagination.OrderBy); err != nil {
+		return err
+	}
 	compileOrderBy(c, opt.Pagination.OrderBy, schema)
 	compileLimit(c, opt.Pagination.Limit)
 
