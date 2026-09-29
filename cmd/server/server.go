@@ -320,13 +320,6 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 
 	// ── Flow engine ──────────────────
 	fields := domain.NewSchemaFieldResolver()
-	fields.PasswordValidation = func() *domain.FlowFieldValidation {
-		v, err := passwordPolicy.FieldValidation(context.Background(), "")
-		if err != nil {
-			return &domain.FlowFieldValidation{MinLength: domain.PasswordMinLengthFloor}
-		}
-		return v
-	}
 	flowAuth := service.NewFlowAuthAttemptAdapter(authAttemptSvc, schemaStore)
 	createUserHandler := service.NewFlowCreateUserHandler(
 		projectHashers,
@@ -342,7 +335,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		createUserHandler,
 		flowAuth,
 		time.Now,
-	)
+	).WithPasswordSaveRules(passwordPolicy.FieldValidation)
 
 	flowService := service.NewFlowService(serviceDBPool, stateMachine)
 	tokenService := service.NewTokenService(keyService, serviceDBPool)

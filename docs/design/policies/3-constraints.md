@@ -51,12 +51,15 @@ no new endpoint, and the client contract does not change:
 ```
 
 `service.PasswordPolicy.FieldValidation` projects the constraints onto
-`domain.FlowFieldValidation`, and `cmd/server/server.go` wires it into
-`domain.SchemaFieldResolver.PasswordValidation`, so the
-`x-auth-methods#password` field carries the policy's `minLength` and
-`maxLength`. The same resolver re-checks them server-side on submit
-(`SchemaFieldResolver.Validate`) before the domain operation and the full
-policy evaluation run.
+`domain.FlowFieldValidation`, and the flow state machine reads it with the
+flow's project id (`FlowStateMachineRuntime.WithPasswordSaveRules`, wired in
+`cmd/server/server.go`) for every step where the password is saved, so the
+`x-auth-methods#password` field carries the project's `minLength` and
+`maxLength`. Where the password is verified instead (a login), the field
+carries no length rules: a stored password that predates a stricter policy
+must still sign in. The field validator re-checks the rules server-side on
+submit (`SchemaFieldResolver.Validate`) before the domain operation and the
+full policy evaluation run.
 
 ## The read endpoint (not built yet)
 

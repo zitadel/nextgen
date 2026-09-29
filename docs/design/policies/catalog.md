@@ -43,10 +43,11 @@ The pre-auth projection ([`policy.Engine.Constraints`](../../../internal/policy/
 is what a client renders before the user types. Today it reaches the login
 surface through the flow field validation:
 [`service.PasswordPolicy.FieldValidation`](../../../internal/service/password_policy.go)
-is wired into `domain.SchemaFieldResolver.PasswordValidation` in
-[`cmd/server/server.go`](../../../cmd/server/server.go), so the
-`x-auth-methods#password` field carries `minLength` and `maxLength` from the
-policy instead of a constant. The unauthenticated
+is wired into `domain.FlowStateMachineRuntime.WithPasswordSaveRules` in
+[`cmd/server/server.go`](../../../cmd/server/server.go), so on a step that
+saves the password the `x-auth-methods#password` field carries the project's
+`minLength` and `maxLength` instead of a constant; a step that verifies it
+carries no length rules. The unauthenticated
 `GET /policies/{operation}/constraints` endpoint the ADR describes is not
 built yet.
 
