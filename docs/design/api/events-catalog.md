@@ -107,6 +107,7 @@ tracked below.
 | `DeleteProjectByID` (when a row was deleted) | `project.deleted` | `entity` | `project` | _(empty)_ |
 | `CreateUser` | `user.created` | `entity` | `user` | `schema_id`, `attribute_keys[]`, `attributes` (`x-audit` values only) |
 | Unique violation on create | `user.create.failed` | `entity` | `user` | `key_name` |
+| `PatchUser` (attribute patch) | `user.updated` | `entity` | `user` | `attribute_keys[]`, `attributes` (`x-audit` values only) |
 | `DeleteUserByID` | `user.deleted` | `entity` | `user` | _(empty)_ |
 | `CreateTeam` | `team.created` | `admin` | `team` | `name` |
 | `UpdateTeam` | `team.updated` | `admin` | `team` | delta: `name` |
@@ -158,7 +159,6 @@ Types planned but not yet emitted by a live producer. Follow-up issues:
 
 | `event_type` | Follow-up |
 |--------------|-----------|
-| `user.updated` | [#877](https://github.com/zitadel/nextgen/issues/877) attribute patch API — payload: keys touched + `x-audit` values (same rule as create) |
 | `user.deactivated` | [#878](https://github.com/zitadel/nextgen/issues/878) per-row emit from team cascade / UserService.Deactivate — `reason` enum; no primary-id echo |
 | `team.membership.updated` | [#879](https://github.com/zitadel/nextgen/issues/879) membership + claim CompleteClaim path — join ids + status |
 | `claim.challenge_created` / `claim.completed` | [#880](https://github.com/zitadel/nextgen/issues/880) claim lifecycle emitters |

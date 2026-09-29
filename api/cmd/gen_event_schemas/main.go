@@ -31,6 +31,7 @@ var payloadByEventType = map[string]string{
 
 	"user.created":       "user-created-payload.yaml",
 	"user.create.failed": "user-create-failed-payload.yaml",
+	"user.updated":       "user-updated-payload.yaml",
 	"user.deleted":       "empty-event-payload.yaml",
 
 	"team.created":     "team-payload.yaml",

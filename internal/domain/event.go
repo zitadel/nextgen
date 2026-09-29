@@ -44,6 +44,7 @@ const (
 
 	EventTypeUserCreated      EventType = "user.created"
 	EventTypeUserCreateFailed EventType = "user.create.failed"
+	EventTypeUserUpdated      EventType = "user.updated"
 	EventTypeUserDeleted      EventType = "user.deleted"
 
 	EventTypeTeamCreated     EventType = "team.created"
