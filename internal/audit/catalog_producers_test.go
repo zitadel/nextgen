@@ -23,6 +23,7 @@ var livePathBProducers = map[domain.EventType]string{
 	domain.EventTypeProjectDeleted:            "internal/service",
 	domain.EventTypeUserCreated:               "internal/service",
 	domain.EventTypeUserCreateFailed:          "internal/service",
+	domain.EventTypeUserUpdated:               "internal/service",
 	domain.EventTypeUserDeleted:               "internal/service",
 	domain.EventTypeTeamCreated:               "internal/service",
 	domain.EventTypeTeamUpdated:               "internal/service",

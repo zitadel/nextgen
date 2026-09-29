@@ -36,13 +36,13 @@ function expectedDate(value: string): string {
   });
 }
 
-async function renderProjects() {
+async function renderProjects(path = "/projects") {
   const [{ RouterProvider, createMemoryHistory }, { createAppRouter }] = await Promise.all([
     import("@tanstack/react-router"),
     import("../../../router"),
   ]);
   const router = createAppRouter({
-    history: createMemoryHistory({ initialEntries: ["/projects"] }),
+    history: createMemoryHistory({ initialEntries: [path] }),
   });
   render(<RouterProvider router={router} />);
   return router;
@@ -82,9 +82,11 @@ describe("projects screen", () => {
     await renderProjects();
 
     const table = within(await screen.findByRole("table"));
+    // A row opens the project — selects it and lands on its first screen —
+    // rather than a detail page, as the switcher's rows do.
     expect(table.getByRole("link", { name: "Granted to me" })).toHaveAttribute(
       "href",
-      "/projects/proj_theirs",
+      "/?project=proj_theirs",
     );
   });
 
@@ -103,7 +105,7 @@ describe("projects screen", () => {
     expect(pinned).toBe(0);
   });
 
-  it("offers View project from the row menu", async () => {
+  it("offers the project's settings from the row menu", async () => {
     server.use(
       http.get(PROJECTS_URL, () =>
         HttpResponse.json({
@@ -116,8 +118,67 @@ describe("projects screen", () => {
     await renderProjects();
 
     await userEvent.click(await screen.findByRole("button", { name: "Actions for River" }));
-    const item = await screen.findByRole("menuitem", { name: "View project" });
-    expect(item).toHaveAttribute("href", "/projects/proj_1");
+    const item = await screen.findByRole("menuitem", { name: "Project settings" });
+    expect(item).toHaveAttribute("href", "/project?project=proj_1");
+  });
+
+  it("asks for a selection while none is made", async () => {
+    // Until a project is selected the sidebar lists only Projects, so this
+    // page is the one that explains what to do. Two projects: with one, the
+    // `_authed` guard would select it.
+    server.use(
+      http.get(PROJECTS_URL, () =>
+        HttpResponse.json({
+          projects: [
+            { id: "proj_1", name: "River", created_at: "2026-07-08T09:00:00Z", updated_at: "2026-07-08T09:00:00Z" },
+            { id: "proj_2", name: "Delta", created_at: "2026-07-08T09:00:00Z", updated_at: "2026-07-08T09:00:00Z" },
+          ],
+        }),
+      ),
+    );
+    await renderProjects();
+
+    expect(
+      await screen.findByText("Select a project to manage its teams, users and login flows."),
+    ).toBeInTheDocument();
+  });
+
+  it("sends a row back to the screen the guard sent here", async () => {
+    server.use(
+      http.get(PROJECTS_URL, () =>
+        HttpResponse.json({
+          projects: [
+            { id: "proj_1", name: "River", created_at: "2026-07-08T09:00:00Z", updated_at: "2026-07-08T09:00:00Z" },
+            { id: "proj_2", name: "Delta", created_at: "2026-07-08T09:00:00Z", updated_at: "2026-07-08T09:00:00Z" },
+          ],
+        }),
+      ),
+    );
+    await renderProjects(`/projects?next=${encodeURIComponent("/teams?status=deactivated")}`);
+
+    expect(await screen.findByRole("link", { name: "Delta" })).toHaveAttribute(
+      "href",
+      "/teams?status=deactivated&project=proj_2",
+    );
+  });
+
+  it("ignores a next that leaves the console", async () => {
+    server.use(
+      http.get(PROJECTS_URL, () =>
+        HttpResponse.json({
+          projects: [
+            { id: "proj_1", name: "River", created_at: "2026-07-08T09:00:00Z", updated_at: "2026-07-08T09:00:00Z" },
+            { id: "proj_2", name: "Delta", created_at: "2026-07-08T09:00:00Z", updated_at: "2026-07-08T09:00:00Z" },
+          ],
+        }),
+      ),
+    );
+    await renderProjects(`/projects?next=${encodeURIComponent("//evil.example/x")}`);
+
+    expect(await screen.findByRole("link", { name: "Delta" })).toHaveAttribute(
+      "href",
+      "/?project=proj_2",
+    );
   });
 
   it("says so when there are no projects", async () => {
