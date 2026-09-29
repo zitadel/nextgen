@@ -74,7 +74,7 @@
     "BrandingTheme": {
       "type": "object",
       "additionalProperties": false,
-      "description": "The theme sides this project publishes, and which of them may run.\n\nPublishing one side makes it the only theme that resolves, even under `auto`\nor an operating-system preference for the other. Publishing both lets `auto`\nfollow the operating system, each side using its own logo and palette.\n\nThe element-level `theme` property overrides `mode`, but cannot select a\nside the project never published.\n",
+      "description": "The theme sides this project publishes, and which of them may run.\n\nPublishing one side makes it the only theme that resolves, even under `auto`\nor an operating-system preference for the other. Publishing both lets `auto`\nfollow the operating system, each side using its own logo and palette.\n\nThe element-level `theme` property overrides `mode`. When one side is\npublished it cannot select the other. Publishing neither side leaves\n`mode`, the `theme` property and the operating system to pick one, painted\nwith the maintained defaults.\n",
       "properties": {
         "mode": {
           "type": "string",
@@ -99,7 +99,7 @@
     "BrandingThemeSide": {
       "type": "object",
       "additionalProperties": false,
-      "description": "One complete theme side. Light and dark are independent surfaces — neither\ninherits from the other, and a side that is absent is never used, whatever\n`mode` or the operating system asks for.\n",
+      "description": "One complete theme side. Light and dark are independent surfaces — neither\ninherits from the other. When a revision publishes one side, the absent\nside is never used, whatever `mode` or the operating system asks for. When\nit publishes neither, either side can resolve and paints the maintained\ndefaults.\n",
       "properties": {
         "logo_url": {
           "type": "string",
