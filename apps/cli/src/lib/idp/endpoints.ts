@@ -1,6 +1,11 @@
 import { text } from "@clack/prompts";
 
-import { idpProvider, type ConnectionEndpoints } from "@zitadel/config/idp";
+import {
+  type ConnectionEndpoints,
+  idpProvider,
+  ISSUER_REQUIREMENT,
+  isSupportedIssuer,
+} from "@zitadel/config/idp";
 
 import { bailOnCancel } from "../prompt-cancel";
 
@@ -39,19 +44,20 @@ export async function askConnectionEndpoints(options: {
   return { issuer: await askUrl("Issuer", idpProvider(provider).issuer, command) };
 }
 
-/** One URL question, pre-filled with the answer that needs no thought. */
+/**
+ * One issuer question, pre-filled with the answer that needs no thought.
+ *
+ * Validated against the connection contract rather than merely parsed: `new
+ * URL` accepts `http://idp.internal:9100` and `file:///tmp/idp`, which would be
+ * written to a connection that then fails on apply. Refusing at the prompt puts
+ * the complaint where the value was typed.
+ */
 async function askUrl(message: string, initialValue: string, command: string): Promise<string> {
   const answer = await text({
     message,
     initialValue,
-    validate: (value) => {
-      try {
-        new URL(String(value ?? ""));
-        return undefined;
-      } catch {
-        return "Enter an absolute URL, e.g. http://localhost:9100.";
-      }
-    },
+    validate: (value) =>
+      isSupportedIssuer(String(value ?? "")) ? undefined : ISSUER_REQUIREMENT,
   });
   bailOnCancel(answer, command);
   return String(answer).trim();

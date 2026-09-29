@@ -99,6 +99,66 @@ function steps(flow: Json): Step[] {
   return Array.isArray(flow.steps) ? (flow.steps as Step[]) : [];
 }
 
+/** Which document a refusal is about, for the region names it reports. */
+export type SsoEditTarget = "flow" | "schema";
+
+/**
+ * Why this document cannot be edited for SSO, or `undefined` when it can.
+ *
+ * The editors below read a missing region as empty and write the generated one
+ * in its place. That is right for a document that has simply not got there yet,
+ * and wrong for one whose region holds something else: that value was put there
+ * by hand, and replacing it is the one thing these functions promise not to do.
+ * A flow whose `steps` is a string, for instance, would otherwise be read as
+ * having no steps and written back with two — the hand-written value gone, and
+ * nothing said about it.
+ *
+ * Reported rather than skipped: unlike a hand-edited step, which the caller can
+ * leave alone and still produce a working flow, none of the edits can proceed
+ * here, so a partial success would be a misleading thing to report.
+ */
+export function ssoEditRefusal(document: object, target: SsoEditTarget): string | undefined {
+  const body = document as Json;
+  return target === "flow" ? flowRefusal(body) : schemaRefusal(body);
+}
+
+function flowRefusal(flow: Json): string | undefined {
+  if (flow.steps !== undefined && !Array.isArray(flow.steps)) {
+    return "steps is not a list";
+  }
+  for (const [index, step] of steps(flow).entries()) {
+    if (!isObject(step)) {
+      return `steps[${index}] is not a step`;
+    }
+    if (step.transitions !== undefined && !isObject(step.transitions)) {
+      const name = typeof step.name === "string" ? step.name : String(index);
+      return `steps.${name}.transitions is not an object`;
+    }
+  }
+  return undefined;
+}
+
+function schemaRefusal(schema: Json): string | undefined {
+  const methods = schema["x-auth-methods"];
+  if (methods === undefined) {
+    return undefined;
+  }
+  if (!isObject(methods)) {
+    return "x-auth-methods is not an object";
+  }
+  if (methods.sso === undefined) {
+    return undefined;
+  }
+  if (!isObject(methods.sso)) {
+    return "x-auth-methods.sso is not an object";
+  }
+  const providers = methods.sso.providers;
+  if (providers !== undefined && !Array.isArray(providers)) {
+    return "x-auth-methods.sso.providers is not a list";
+  }
+  return undefined;
+}
+
 function stepNamed(flow: Json, name: string): Step | undefined {
   return steps(flow).find((step) => step.name === name);
 }

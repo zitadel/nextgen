@@ -11,6 +11,8 @@ import {
   credentialVariables,
   idpProvider,
   IDP_PROVIDERS,
+  ssoEditRefusal,
+  type SsoEditTarget,
   type SsoSkipped,
 } from "@zitadel/config/idp";
 
@@ -328,6 +330,13 @@ export default class SsoEnable extends BaseCommand {
         details: { schema: schema.path },
       });
     }
+    // The editors read a region they cannot recognise as absent and write the
+    // generated one over it. Refuse here, before anything is written or
+    // published, rather than discard whatever a developer put there.
+    refuseUneditable(schema.path, schema.body, "schema");
+    for (const flow of flows) {
+      refuseUneditable(flow.path, flow.body, "flow");
+    }
     return flows;
   }
 
@@ -484,6 +493,20 @@ function flowUsesSchema(
     return true;
   }
   return used.endsWith(`/${schema.name}.json`);
+}
+
+/** Stop on a document whose region the SSO editors would overwrite. */
+function refuseUneditable(path: string, body: object, target: SsoEditTarget): void {
+  const refusal = ssoEditRefusal(body, target);
+  if (refusal === undefined) {
+    return;
+  }
+  throw new ZitadelError("E_VALIDATION", `${path}: ${refusal}`, {
+    hint:
+      "Enabling a provider edits this file, and that region is not the shape it edits. " +
+      "Fix it against the dialect in .zitadel/meta/, then run the command again.",
+    details: { file: path, region: refusal },
+  });
 }
 
 /**

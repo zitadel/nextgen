@@ -484,31 +484,52 @@ describe("sso enable with a connection already on disk", () => {
 });
 
 describe("sso enable preflight", () => {
-it("fails a dry run for the same reason the real run would", async () => {
-  // A preview that reports "would create" for an invocation that cannot
-  // succeed is worse than no preview: it is checked precisely to find this
-  // out before committing to it.
-  const cwd = await makeProject();
-  await rm(join(cwd, ".zitadel/flows/default-human-user-login.json"));
+  it("fails a dry run for the same reason the real run would", async () => {
+    // A preview that reports "would create" for an invocation that cannot
+    // succeed is worse than no preview: it is checked precisely to find this
+    // out before committing to it.
+    const cwd = await makeProject();
+    await rm(join(cwd, ".zitadel/flows/default-human-user-login.json"));
 
-  const result = await enable(cwd, "--client-id", "abc", "--dry-run");
+    const result = await enable(cwd, "--client-id", "abc", "--dry-run");
 
-  expect(result.exitCode).not.toBe(0);
-  expect((parseJson(result.stdout) as { code: string }).code).toBe("E_NOT_FOUND");
-});
+    expect(result.exitCode).not.toBe(0);
+    expect((parseJson(result.stdout) as { code: string }).code).toBe("E_NOT_FOUND");
+  });
 
-it("reports a malformed state file rather than matching flows by filename", async () => {
-  // The fallback matches on a URL suffix rather than a synced id, so a
-  // corrupt state file could silently point the command at a flow bound to
-  // another schema.
-  const cwd = await makeProject();
-  await writeFile(join(cwd, ".zitadel/state.json"), "{ not json");
+  it("reports a malformed state file rather than matching flows by filename", async () => {
+    // The fallback matches on a URL suffix rather than a synced id, so a
+    // corrupt state file could silently point the command at a flow bound to
+    // another schema.
+    const cwd = await makeProject();
+    await writeFile(join(cwd, ".zitadel/state.json"), "{ not json");
 
-  const result = await enable(cwd, "--client-id", "abc", "--dry-run");
+    const result = await enable(cwd, "--client-id", "abc", "--dry-run");
 
-  expect(result.exitCode).not.toBe(0);
-  const json = parseJson(result.stdout) as { code: string; message: string };
-  expect(json.code).toBe("E_VALIDATION");
-  expect(json.message).toContain("state.json");
-});
+    expect(result.exitCode).not.toBe(0);
+    const json = parseJson(result.stdout) as { code: string; message: string };
+    expect(json.code).toBe("E_VALIDATION");
+    expect(json.message).toContain("state.json");
+  });
+
+  it("refuses a flow it cannot edit instead of overwriting the region", async () => {
+    // `steps: "broken"` would otherwise read as no steps and be written back
+    // as two generated ones, destroying whatever was there.
+    const cwd = await makeProject();
+    const flowPath = join(cwd, ".zitadel/flows/default-human-user-login.json");
+    const flow = JSON.parse(await readFile(flowPath, "utf8")) as Record<string, unknown>;
+    await writeFile(flowPath, JSON.stringify({ ...flow, steps: "broken" }, null, 2));
+
+    const result = await enable(cwd, "--client-id", "abc");
+
+    expect(result.exitCode).not.toBe(0);
+    const json = parseJson(result.stdout) as { code: string; message: string };
+    expect(json.code).toBe("E_VALIDATION");
+    expect(json.message).toContain("steps is not a list");
+    // Nothing written, nothing published: the flow keeps the value it had.
+    expect((JSON.parse(await readFile(flowPath, "utf8")) as { steps: unknown }).steps).toBe(
+      "broken",
+    );
+    await expect(readFile(join(cwd, ".zitadel/idps/google.json"), "utf8")).rejects.toThrow();
+  });
 });

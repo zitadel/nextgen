@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import { getDefaultHumanUserSchema, getDefaultLoginFlow } from "../defaults.js";
-import { applySsoToFlow, applySsoToSchema } from "./sso.js";
+import { applySsoToFlow, applySsoToSchema, ssoEditRefusal } from "./sso.js";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "../../../..");
 
@@ -269,5 +269,48 @@ describe("register-sso collects what registration collects", () => {
     const { document } = applySsoToFlow(flow, "google", bothMethods);
 
     expect(stepNamed(document, "register-sso").fields).toEqual(["email", "givenName"]);
+  });
+});
+
+describe("refusing a document the editors would overwrite", () => {
+  it("accepts the shipped flow and schema", () => {
+    expect(ssoEditRefusal(getDefaultLoginFlow(), "flow")).toBeUndefined();
+    expect(ssoEditRefusal(getDefaultHumanUserSchema(), "schema")).toBeUndefined();
+  });
+
+  it("accepts a document that has simply not got there yet", () => {
+    // An absent region is written, which is the whole point of the editors.
+    expect(ssoEditRefusal({}, "flow")).toBeUndefined();
+    expect(ssoEditRefusal({}, "schema")).toBeUndefined();
+    expect(ssoEditRefusal({ steps: [] }, "flow")).toBeUndefined();
+  });
+
+  it("refuses a flow whose steps are not a list", () => {
+    // Without this, `steps` reads as empty and is written back as two
+    // generated steps, the hand-written value gone and nothing said about it.
+    expect(ssoEditRefusal({ steps: "broken" }, "flow")).toBe("steps is not a list");
+    expect(ssoEditRefusal({ steps: { identifier: {} } }, "flow")).toBe("steps is not a list");
+  });
+
+  it("refuses a flow with an entry that is not a step", () => {
+    expect(ssoEditRefusal({ steps: ["identifier"] }, "flow")).toBe("steps[0] is not a step");
+  });
+
+  it("refuses a step whose transitions are not an object, naming the step", () => {
+    expect(ssoEditRefusal({ steps: [{ name: "identifier", transitions: "x" }] }, "flow")).toBe(
+      "steps.identifier.transitions is not an object",
+    );
+  });
+
+  it("refuses a schema whose auth-method regions are not the shape it edits", () => {
+    expect(ssoEditRefusal({ "x-auth-methods": "password" }, "schema")).toBe(
+      "x-auth-methods is not an object",
+    );
+    expect(ssoEditRefusal({ "x-auth-methods": { sso: true } }, "schema")).toBe(
+      "x-auth-methods.sso is not an object",
+    );
+    expect(ssoEditRefusal({ "x-auth-methods": { sso: { providers: "google" } } }, "schema")).toBe(
+      "x-auth-methods.sso.providers is not a list",
+    );
   });
 });
