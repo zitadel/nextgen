@@ -207,8 +207,9 @@ async function proxyRequest(
 
   // Build a web-standard Response with filtered headers. This is the
   // canonical representation — we write it to event.node.res at the end.
-  // The app's own origin: the only destination a proxied redirect may name.
-  const responseHeaders = filterResponseHeaders(upstream.headers, getRequestURL(event).origin);
+  // The app's own request URL: the origin a proxied redirect may name, and
+  // the base a relative one resolves against.
+  const responseHeaders = filterResponseHeaders(upstream.headers, getRequestURL(event).toString());
 
   const setCookieHeaders = upstream.headers.getSetCookie?.() ?? [];
   for (const cookie of setCookieHeaders) {
