@@ -175,10 +175,10 @@ function useScopeTarget(): (projectId: string) => NonNullable<SwitcherOption["li
 }
 
 /**
- * The option the pill shows. A selected project missing from the list — the
- * sign-in project the console falls back to, which its operator may hold no
- * grant on (`resolveDefaultProjectScope`) — is named by `GET /projects/{id}`,
- * and by its id until that read answers or if it is refused.
+ * The option the pill shows. A selected project missing from the list — one
+ * named by a shared link's `?project=` rather than chosen here — is named by
+ * `GET /projects/{id}`, and by its id until that read answers or if it is
+ * refused.
  */
 function useSelectedOption(
   selected: string | undefined,

@@ -132,9 +132,29 @@ describe("landing routes", () => {
     expect(unpaged).toBe(1);
   });
 
-  it("takes the pinned dev project without asking", async () => {
-    vi.stubEnv("VITE_CONSOLE_PROJECT_ID", "proj_pinned");
-    // One other project on offer: without the pin it would be the landing.
+  it("takes the pinned dev project among the person's own", async () => {
+    vi.stubEnv("VITE_CONSOLE_PROJECT_ID", "proj_2");
+    // Several on offer: without the pin the person would be asked to choose.
+    server.use(
+      http.get("http://localhost/api/users/me/projects", () =>
+        HttpResponse.json({ projects: [project("proj_1", "Acme"), project("proj_2", "Globex")] }),
+      ),
+      http.post("http://localhost/api/teams/query", () => HttpResponse.json({ teams: [] })),
+    );
+    try {
+      const router = await renderAt("/");
+
+      await waitFor(() => expect(router.state.location.pathname).toBe("/teams"));
+      expect(router.state.location.search).toMatchObject({ project: "proj_2" });
+    } finally {
+      vi.stubEnv("VITE_CONSOLE_PROJECT_ID", "");
+    }
+  });
+
+  it("ignores a pin the person holds no grant on", async () => {
+    // `dev-real --claim` pins the platform project, which the developer who
+    // just claimed a project cannot manage: their project is the default.
+    vi.stubEnv("VITE_CONSOLE_PROJECT_ID", "proj_platform");
     server.use(
       http.get("http://localhost/api/users/me/projects", () =>
         HttpResponse.json({ projects: [project("proj_1", "Acme")] }),
@@ -145,10 +165,77 @@ describe("landing routes", () => {
       const router = await renderAt("/");
 
       await waitFor(() => expect(router.state.location.pathname).toBe("/teams"));
-      expect(router.state.location.search).toMatchObject({ project: "proj_pinned" });
+      expect(router.state.location.search).toMatchObject({ project: "proj_1" });
     } finally {
       vi.stubEnv("VITE_CONSOLE_PROJECT_ID", "");
     }
+  });
+
+  it("recognises a pin further down the person's projects", async () => {
+    // The list is one page; a pin past it is checked by id, which the server
+    // answers only for a project the person holds a grant on.
+    vi.stubEnv("VITE_CONSOLE_PROJECT_ID", "proj_42");
+    server.use(
+      http.get("http://localhost/api/users/me/projects", () =>
+        HttpResponse.json({ projects: [project("proj_1", "Acme")], next_page_token: "page_2" }),
+      ),
+      http.get("http://localhost/api/projects/proj_42", () =>
+        HttpResponse.json(project("proj_42", "Far down")),
+      ),
+      http.post("http://localhost/api/teams/query", () => HttpResponse.json({ teams: [] })),
+    );
+    try {
+      const router = await renderAt("/");
+
+      await waitFor(() => expect(router.state.location.pathname).toBe("/teams"));
+      expect(router.state.location.search).toMatchObject({ project: "proj_42" });
+    } finally {
+      vi.stubEnv("VITE_CONSOLE_PROJECT_ID", "");
+    }
+  });
+
+  it("does not take one listed project as the only one while more pages follow", async () => {
+    server.use(
+      http.get("http://localhost/api/users/me/projects", () =>
+        HttpResponse.json({ projects: [project("proj_1", "Acme")], next_page_token: "page_2" }),
+      ),
+    );
+    const router = await renderAt("/");
+
+    await waitFor(() => expect(router.state.location.pathname).toBe("/projects"));
+    expect(router.state.location.search).not.toHaveProperty("project");
+  });
+
+  it("selects nothing for a person with no projects", async () => {
+    // Not the sign-in project either: on a platform deployment that is the
+    // platform project, and every screen in it would refuse this person.
+    vi.stubEnv("VITE_CONSOLE_PROJECT_ID", "proj_platform");
+    server.use(
+      http.get("http://localhost/api/users/me/projects", () => HttpResponse.json({ projects: [] })),
+    );
+    try {
+      const router = await renderAt("/");
+
+      await waitFor(() => expect(router.state.location.pathname).toBe("/projects"));
+      expect(router.state.location.search).not.toHaveProperty("project");
+      expect(await screen.findByText("No projects yet.")).toBeInTheDocument();
+    } finally {
+      vi.stubEnv("VITE_CONSOLE_PROJECT_ID", "");
+    }
+  });
+
+  it("selects nothing when the person's projects cannot be read", async () => {
+    server.use(
+      http.get("http://localhost/api/users/me/projects", ({ request }) =>
+        new URL(request.url).searchParams.has("limit")
+          ? HttpResponse.json({ projects: [] })
+          : HttpResponse.json({ code: "internal" }, { status: 500 }),
+      ),
+    );
+    const router = await renderAt("/");
+
+    await waitFor(() => expect(router.state.location.pathname).toBe("/projects"));
+    expect(router.state.location.search).not.toHaveProperty("project");
   });
 
   it("shows the empty settings view from settings", async () => {
