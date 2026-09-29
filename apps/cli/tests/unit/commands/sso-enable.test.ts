@@ -410,6 +410,7 @@ describe("sso enable secret handling", () => {
     expect(json.hint).toContain("stdin");
     await expect(readFile(join(cwd, ".zitadel/idps/google.json"), "utf8")).rejects.toThrow();
   });
+
 });
 
 describe("sso enable with a connection already on disk", () => {
@@ -480,4 +481,34 @@ describe("sso enable with a connection already on disk", () => {
     // the sign-in screen can never offer.
     await expect(readFile(join(cwd, ".zitadel/idps/google.json"), "utf8")).rejects.toThrow();
   });
+});
+
+describe("sso enable preflight", () => {
+it("fails a dry run for the same reason the real run would", async () => {
+  // A preview that reports "would create" for an invocation that cannot
+  // succeed is worse than no preview: it is checked precisely to find this
+  // out before committing to it.
+  const cwd = await makeProject();
+  await rm(join(cwd, ".zitadel/flows/default-human-user-login.json"));
+
+  const result = await enable(cwd, "--client-id", "abc", "--dry-run");
+
+  expect(result.exitCode).not.toBe(0);
+  expect((parseJson(result.stdout) as { code: string }).code).toBe("E_NOT_FOUND");
+});
+
+it("reports a malformed state file rather than matching flows by filename", async () => {
+  // The fallback matches on a URL suffix rather than a synced id, so a
+  // corrupt state file could silently point the command at a flow bound to
+  // another schema.
+  const cwd = await makeProject();
+  await writeFile(join(cwd, ".zitadel/state.json"), "{ not json");
+
+  const result = await enable(cwd, "--client-id", "abc", "--dry-run");
+
+  expect(result.exitCode).not.toBe(0);
+  const json = parseJson(result.stdout) as { code: string; message: string };
+  expect(json.code).toBe("E_VALIDATION");
+  expect(json.message).toContain("state.json");
+});
 });

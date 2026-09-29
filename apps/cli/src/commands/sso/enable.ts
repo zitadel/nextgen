@@ -129,6 +129,11 @@ export default class SsoEnable extends BaseCommand {
     const variable = names.clientSecret;
     const idVariable = names.clientId;
 
+    // Read-only, and before the dry-run return: a Project whose flows all name
+    // another schema must fail identically either way, or the preview says
+    // "would create" for a run that cannot succeed.
+    const flows = await this.targetFlows(cwd, schema);
+
     consola.info(`Project   ${secretFile.project_id}`);
     consola.info(`Schema    ${schema.path}${schema.methods.length > 0 ? ` (${schema.methods.join(", ")})` : ""}`);
 
@@ -155,10 +160,6 @@ export default class SsoEnable extends BaseCommand {
     // written, both arrive here.
     let secret: SecretOutcome | undefined;
     let clientIdState: PublishState | undefined;
-
-    // Before anything is written or published: a Project whose flows name
-    // another schema must fail having changed nothing.
-    const flows = await this.targetFlows(cwd, schema);
 
     if (reusing) {
       consola.success(`Reusing ${plan.file.path}`);
@@ -489,12 +490,30 @@ function flowUsesSchema(
  * The platform id a local file was last synced as, from `.zitadel/state.json`.
  * Absent before the first `apply`, and absent entirely on a Project that has
  * never synced — both mean "fall back to matching on the scaffolded URL".
+ *
+ * Only a missing file falls back. A malformed or unreadable state file is the
+ * authoritative record failing to answer, and the fallback matches on a URL
+ * suffix rather than an id, so it could pick a flow bound to a different
+ * schema. Saying so beats editing the wrong flow quietly.
  */
 async function publishedIdOf(cwd: string, path: string): Promise<string | undefined> {
   try {
     const state = await readState(cwd);
     return state.resources?.[path]?.id;
-  } catch {
-    return undefined;
+  } catch (error) {
+    if (isErrno(error, "ENOENT") || isErrno(error, "ENOTDIR")) {
+      return undefined;
+    }
+    throw new ZitadelError("E_VALIDATION", `Cannot read .zitadel/state.json: ${error instanceof Error ? error.message : String(error)}`, {
+      hint:
+        "The file records which platform resource each local file was synced as. " +
+        "Fix or remove it and run `zitadel apply`, then run this command again.",
+      details: { file: ".zitadel/state.json" },
+    });
   }
+}
+
+/** Whether a caught error is the given `errno` code. */
+function isErrno(error: unknown, code: string): boolean {
+  return typeof error === "object" && error !== null && "code" in error && error.code === code;
 }

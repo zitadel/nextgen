@@ -50,6 +50,16 @@ describe("the scaffolded connection", () => {
     expect(connection({ schemaProperties: [] })).not.toHaveProperty("claim_mapping");
   });
 
+  it("narrows verified_claims with the mapping, not independently of it", () => {
+    // A schema without `email` gets no email mapping, so an `email` entry in
+    // verified_claims would claim to verify a value the connection never
+    // supplies.
+    expect(connection({ schemaProperties: ["givenName"] })).not.toHaveProperty("verified_claims");
+    expect(connection({ schemaProperties: ["email"] }).verified_claims).toEqual({
+      email: "email_verified",
+    });
+  });
+
   it("keeps the vendor's protocol block intact", () => {
     const document = connection();
 

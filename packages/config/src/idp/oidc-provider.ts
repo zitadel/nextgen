@@ -38,8 +38,13 @@ export abstract class OidcProvider implements IdpProvider {
   /** The claim that carries the provider's stable, unique id for an account. */
   protected readonly subjectClaim: string = "sub";
 
-  /** Claim name → the boolean claim that says whether it is verified. */
-  protected readonly verifiedClaims: Readonly<Record<string, string>> = {};
+  /**
+   * Schema property name → how its value is verified: a claim to read, `true`
+   * for a provider trusted outright, or `"$supplementary_fetch"`.
+   *
+   * Keyed by schema property, like {@link claimTable}, so it narrows with it.
+   */
+  protected readonly verifiedClaims: Readonly<Record<string, string | true>> = {};
 
   /** Parameters the vendor wants on every authorization request. */
   protected readonly staticAuthorizeParameters: Readonly<Record<string, string>> = {};
@@ -69,6 +74,12 @@ export abstract class OidcProvider implements IdpProvider {
   connection(options: ScaffoldOptions): Record<string, unknown> {
     const slug = options.slug ?? this.slug;
     const claimMapping = this.claimMapping(options.schemaProperties);
+    // Verification is of a mapped value, so it narrows to what was mapped: a
+    // schema without `email` gets no email mapping, and an `email` entry here
+    // would then claim to verify a value this connection never supplies.
+    const verifiedClaims = Object.fromEntries(
+      Object.entries(this.verifiedClaims).filter(([property]) => property in claimMapping),
+    );
     const issuer = options.endpoints?.issuer;
     const variables = credentialVariables(slug);
     return {
@@ -78,9 +89,7 @@ export abstract class OidcProvider implements IdpProvider {
       template: this.template,
       display_name: this.displayName,
       subject_claim: this.subjectClaim,
-      ...(Object.keys(this.verifiedClaims).length > 0
-        ? { verified_claims: this.verifiedClaims }
-        : {}),
+      ...(Object.keys(verifiedClaims).length > 0 ? { verified_claims: verifiedClaims } : {}),
       ...(Object.keys(claimMapping).length > 0 ? { claim_mapping: claimMapping } : {}),
       provisioning: { creation: "auto" },
       oidc: {
