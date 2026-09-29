@@ -1,11 +1,6 @@
 {
-  "_comment": "Illustrative only. The authoritative contract is api/openapi/components/flows/branding.yaml.",
-
   "layout": "centered",
-  "liquid_template": null,
   "logo_url": "https://cdn.example.com/logo.svg",
-  "hero_url": null,
-
   "theme": {
     "mode": "auto",
     "light": {
@@ -43,13 +38,11 @@
       }
     }
   },
-
   "typography": {
     "font_family": "Arimo, ui-sans-serif, system-ui, sans-serif",
     "font_url": "https://fonts.googleapis.com/css2?family=Arimo:wght@400;500;700&display=swap",
     "scale": 1.0
   },
-
   "shape": {
     "radius": "md",
     "density": "regular",
