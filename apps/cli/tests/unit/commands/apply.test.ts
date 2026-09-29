@@ -87,6 +87,26 @@ describe("apply command pre-flight", () => {
     expect(json.code).toBe("E_VALIDATION");
     expect(json.message).toContain("Missing environment variables");
   });
+
+  it.each(["-e", "--environment"])("refuses %s, which addresses no environment", async (flag) => {
+    const cwd = await makeCwd({});
+
+    const res = await runCliForTest([
+      "apply",
+      flag,
+      "prod",
+      "--cwd",
+      cwd,
+      "--json",
+      "--server",
+      "https://api.zitadel.cloud",
+    ]);
+
+    expect(res.exitCode).toBe(3);
+    const json = parseJson(res.stdout) as { code: string; message: string };
+    expect(json.code).toBe("E_VALIDATION");
+    expect(json.message).toContain("Nonexistent flag");
+  });
 });
 
 const VALID_USER_SCHEMA = {

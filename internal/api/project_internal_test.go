@@ -34,7 +34,7 @@ func (stubProjectService) Get(context.Context, string) (*domain.Project, error) 
 func (stubProjectService) DefaultProject(context.Context, string) (*domain.Project, error) {
 	return nil, nil
 }
-func (stubProjectService) Update(context.Context, string, string) (*domain.Project, error) {
+func (stubProjectService) Update(context.Context, service.UpdateProjectRequest) (*domain.Project, error) {
 	return nil, domain.ErrProjectNotFound()
 }
 func (stubProjectService) List(context.Context, service.ListProjectsRequest) (*service.ListProjectsResponse, error) {

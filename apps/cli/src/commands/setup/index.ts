@@ -3,22 +3,20 @@ import { basename, join } from "node:path";
 
 import { intro, outro } from "@clack/prompts";
 import { Flags } from "@oclif/core";
-import { createZitadelClient } from "@zitadel/api/client";
 import type { CreateProject201 } from "@zitadel/api/generated/model";
 import {
-  BRANDING_DESIGNS,
   DEFAULT_SETUP_PRESET,
   DEFAULT_SETUP_USE_CASE,
   SETUP_PRESETS,
   SETUP_USE_CASES,
-  type BrandingDesign,
   type SetupPreset,
   type SetupUseCase,
 } from "@zitadel/config/defaults";
 import { consola } from "consola";
 
-import { brandingDesignLabel } from "../../lib/branding/designs";
+import { createZitadelClient } from "../../lib/api-client";
 import { renderBoxActions, wrapForBox } from "../../lib/box";
+import { setupDesignRemovedError } from "../../lib/branding/designs";
 import {
   claimAction,
   claimBoxAction,
@@ -30,6 +28,10 @@ import { toZitadelError, ZitadelError } from "../../lib/errors";
 import { brandingGuidanceAction } from "../../lib/journey-guidance";
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "../../lib/oclif";
 import { serverKind } from "../../lib/oclif/server-kind";
+import { readLocalAdmin } from "../../lib/local-server/admin-credential";
+import { claimProjectAsAdmin } from "../../lib/local-server/claim-as-admin";
+import { readPlatformRuntime } from "../../lib/local-server/runtime";
+import { readZitadelSecret, writeZitadelSecret } from "../../lib/project";
 import {
   createOrca,
   inspectScaffoldTarget,
@@ -54,9 +56,7 @@ import {
 import { installDependenciesForSetup } from "./install";
 import { PickFrameworkPrompt, SETUP_PROMPTS, type SetupAnswers } from "./prompts";
 import {
-  designWarnings,
   detectProjectFacts,
-  dim as styleDim,
   fileNameOf,
   formatFrameworkLine,
   id as styleId,
@@ -115,6 +115,7 @@ export default class Setup extends BaseCommand {
     "<%= config.bin %> setup --framework react --dev-port 3000",
   ];
   static override flags = {
+    force: Flags.boolean({ char: "f", description: "Overwrite managed files that already exist." }),
     framework: Flags.string({ description: "Framework to target.", options: FRAMEWORK_OPTIONS }),
     renderer: Flags.string({
       description: RENDERER_FLAG_DESCRIPTION,
@@ -137,15 +138,18 @@ export default class Setup extends BaseCommand {
         "Use case for the scaffolded schema fields: who signs in to the app (default: minimal).",
       options: [...SETUP_USE_CASES],
     }),
-    design: Flags.string({
-      description:
-        "Login design to eject into .zitadel/branding/ and publish as branding revision 1. Skips the wizard's design question. When omitted in non-interactive runs, the login uses the built-in template; run the `branding eject` command later to customize. Split-family designs (split, split-right, hero) collapse their brand pane by container width: narrow containers — including widget-posture embeds at card width — render the compact brand mark instead (logo_url, else hero_url, from .zitadel/branding/branding.json; hero falls back to editable text).",
-      options: [...BRANDING_DESIGNS],
-    }),
+    // Removed in #1039 — setup no longer applies a login template. Kept
+    // hidden so scripts and agents still passing it get a targeted error
+    // pointing at `branding eject` instead of oclif's unknown-flag error.
+    design: Flags.string({ hidden: true }),
   };
 
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(Setup);
+    // Before toMeta and before anything touches the server or the disk.
+    if (flags.design !== undefined) {
+      throw setupDesignRemovedError(this.config.version);
+    }
     try {
       await this.toMeta(flags);
     } catch (error) {
@@ -201,7 +205,6 @@ export default class Setup extends BaseCommand {
       dev_port_explicit: flags["dev-port"] !== undefined,
       preset: flags.preset ?? DEFAULT_SETUP_PRESET,
       use_case: flags["use-case"] ?? DEFAULT_SETUP_USE_CASE,
-      design: flags.design ?? "built-in",
       step: "framework_resolved",
     });
 
@@ -231,7 +234,6 @@ export default class Setup extends BaseCommand {
       devPort: framework.devPort,
       preset: (flags.preset as SetupPreset | undefined) ?? DEFAULT_SETUP_PRESET,
       useCase: (flags["use-case"] as SetupUseCase | undefined) ?? DEFAULT_SETUP_USE_CASE,
-      design: flags.design as BrandingDesign | undefined,
     };
 
     if (!nonInteractive && !dryRun) {
@@ -243,7 +245,6 @@ export default class Setup extends BaseCommand {
         devPortFromFlag: flags["dev-port"] !== undefined,
         presetFromFlag: flags.preset !== undefined,
         useCaseFromFlag: flags["use-case"] !== undefined,
-        designFromFlag: flags.design !== undefined,
       };
       for (const prompt of SETUP_PROMPTS) {
         answers = await prompt.ask(answers, promptCtx);
@@ -251,13 +252,12 @@ export default class Setup extends BaseCommand {
       outro("Configuration captured");
     }
 
-    // The interactive prompts can override the flag/default preset, use
-    // case, and design recorded at framework_resolved — re-record so
+    // The interactive prompts can override the flag/default preset and use
+    // case recorded at framework_resolved — re-record so
     // telemetry carries the values that actually scaffold.
     this.recordTelemetry({
       preset: answers.preset,
       use_case: answers.useCase,
-      design: answers.design ?? "built-in",
     });
 
     const issuer = issuerFromPort(answers.devPort);
@@ -285,14 +285,13 @@ export default class Setup extends BaseCommand {
           issuer,
           {
             // Resolved values, not raw flags: the wizard may have picked the
-            // preset, design, or dev port interactively, and the retry must
+            // preset, use case, or dev port interactively, and the retry must
             // reproduce those choices — the issuer registered with the
             // project derives from the port.
             ...retryOptionsFromFlags(flags),
             framework: framework.id,
             preset: answers.preset,
             useCase: answers.useCase,
-            design: answers.design,
             devPort: answers.devPort,
           },
         );
@@ -329,12 +328,15 @@ export default class Setup extends BaseCommand {
         ? { filesWritten: [] }
         : await materializeSetupResources({
             cwd,
-            client: createZitadelClient({ baseUrl: answers.server, token: project.project_secret }),
+            // Verbatim: the canonical bodies are written back to the project.
+            client: createZitadelClient(
+              { baseUrl: answers.server, token: project.project_secret },
+              { verbatim: true },
+            ),
             projectId: project.id,
             force,
             preset: answers.preset,
             useCase: answers.useCase,
-            design: answers.design,
             cliVersion: this.meta.cliVersion,
           });
     } catch (error) {
@@ -432,11 +434,54 @@ export default class Setup extends BaseCommand {
     // computes the same date the platform will hold the user to. A dry run
     // gets the generic wording: its stand-in project has a fixed past
     // created_at, and no real window started anyway.
+    // On a CLI-managed local server the developer already exists as the local
+    // admin, so the project is attached to their team right away and
+    // `zitadel claim` has nothing left to do. Claiming an anonymous project
+    // stays a cloud journey.
+    let ownedByLocalAdmin: { email: string; team_id: string } | undefined;
+    if (!dryRun && serverKind.value(answers.server) === "local") {
+      // The runtime document naming the platform project does not prove a
+      // claim can complete (a deployment can pin that project without the
+      // platform bootstrap, which leaves the admin without a personal team),
+      // so attaching the project is best-effort: on failure the project stays
+      // unclaimed and setup falls back to the usual claim nudge instead of
+      // failing after it has already written the app files. Reading the admin
+      // belongs inside the guard for the same reason — a malformed
+      // `admin.json` must not fail a setup that already wrote the app.
+      try {
+        const admin = await readLocalAdmin(cwd);
+        if (admin && (await localServerHostsPlatform(answers.server))) {
+          const owner = await claimProjectAsAdmin({
+            serverUrl: answers.server,
+            projectId: project.id,
+            projectSecret: project.project_secret,
+            admin,
+          });
+          // The team is whichever one the platform attached the project to —
+          // the admin's earliest active membership, which need not be the team
+          // its bootstrap document named.
+          const secret = await readZitadelSecret(cwd);
+          await writeZitadelSecret(cwd, {
+            ...secret,
+            team_id: owner.team_id,
+            claimed_at: owner.claimed_at,
+          });
+          ownedByLocalAdmin = { email: admin.email, team_id: owner.team_id };
+          consola.success(`Project owned by ${admin.email} (team ${owner.team_id})`);
+        }
+      } catch (error) {
+        consola.warn(
+          `Could not attach the project to the local admin: ${toZitadelError(error).message}`,
+        );
+      }
+    }
+
     const deadline = dryRun ? undefined : claimWindowDeadline(project.created_at);
     const nudgeClaim =
-      claimState({ secret: {}, server: answers.server }).kind === "detached" ||
-      (serverKind.value(answers.server) === "local" &&
-        (dryRun || (await localServerHostsPlatform(answers.server))));
+      !ownedByLocalAdmin &&
+      (claimState({ secret: {}, server: answers.server }).kind === "detached" ||
+        (serverKind.value(answers.server) === "local" &&
+          (dryRun || (await localServerHostsPlatform(answers.server)))));
     const claimNudge = nudgeClaim
       ? {
           actions: [claimAction(this.meta.cliVersion, deadline)],
@@ -447,13 +492,6 @@ export default class Setup extends BaseCommand {
     // The structured report is human-only. Under `--json` we let the
     // envelope returned from `this.emit(...)` be the sole stdout
     // payload (oclif requires single-doc JSON).
-    // The split-family brand pane collapses to the compact brand mark once the
-    // login's container is narrow — and the template only emits that mark when
-    // branding.json names an asset. Say so at setup time instead of letting the
-    // branding's absence read as a rendering bug. Keyed to the design alone:
-    // the collapse is a container query, so posture doesn't decide it (see
-    // `designWarnings`).
-    const warnings = designWarnings(answers.design);
     if (!this.jsonEnabled()) {
       const projectFacts = await detectProjectFacts(cwd, framework.id);
       const sections = buildSummary({
@@ -464,7 +502,6 @@ export default class Setup extends BaseCommand {
         server: answers.server,
         issuer,
         scaffoldedFramework,
-        design: answers.design,
       });
       // Frame the report in a consola box so it reads as a distinct
       // status panel separate from the per-step narration above it.
@@ -484,16 +521,10 @@ export default class Setup extends BaseCommand {
         ),
         style: { padding: 1, borderStyle: "rounded", borderColor: "green" },
       });
-      // The envelope's `warnings` never render in non-JSON mode (setup
-      // passes `pretty: ""`), so surface them to humans here.
-      for (const warning of warnings) {
-        consola.warn(warning);
-      }
     }
 
     return this.emit({
       status: "ok",
-      warnings,
       // Human-facing output was already shown via consola (box + per-step
       // narration). Pass an empty `pretty` so the base command's fallback
       // renderer doesn't duplicate the summary on stdout. The JSON envelope
@@ -516,14 +547,11 @@ export default class Setup extends BaseCommand {
         })),
         files_skipped: result.filesSkipped.map((file) => relativeDisplay(cwd, file)),
         install: installOutcome.install,
-        // The chosen login design, or null for the built-in template — so
-        // agents can verify what setup published without diffing the repo.
-        design: answers.design ?? null,
         // Branding guidance before the claim nudge: make it yours, then
         // claim to keep it (the same order the manifesto's journey walks).
         next_actions: [
           ...installOutcome.nextActions,
-          brandingGuidanceAction(answers.design, this.meta.cliVersion),
+          brandingGuidanceAction(this.meta.cliVersion),
           ...claimNudge.actions,
         ],
         next_commands: [...installOutcome.nextCommands, ...claimNudge.commands],
@@ -585,24 +613,14 @@ export async function localServerHostsPlatform(
   server: string,
   timeoutMs = 1500,
 ): Promise<boolean> {
-  try {
-    const res = await fetch(new URL("/console/runtime.json", server), {
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-    if (!res.ok) {
-      return false;
-    }
-    const doc = (await res.json()) as { console_project_id?: unknown };
-    return doc.console_project_id === "proj_platform";
-  } catch {
-    return false;
-  }
+  return Boolean(await readPlatformRuntime(server, timeoutMs));
 }
 
 /** A deterministic stand-in project for `--dry-run`, so no remote call is made. */
 function dryRunProject(issuer: string): CreateProject201 {
   return {
     id: "dry-run-0000",
+    name: "dry-run",
     project_secret: "sk_proj_dry_run_full",
     preview_secret: "sk_proj_dry_run_preview",
     preview_origins: [issuer],
@@ -619,7 +637,6 @@ type SetupRetryOptions = {
   framework?: string;
   preset?: SetupPreset;
   useCase?: SetupUseCase;
-  design?: string;
   renderer?: string;
   devPort?: number;
   nonInteractive?: boolean;
@@ -640,9 +657,6 @@ function setupRetryFlags(opts: SetupRetryOptions): string {
   }
   if (opts.useCase && opts.useCase !== DEFAULT_SETUP_USE_CASE) {
     parts.push(`--use-case ${opts.useCase}`);
-  }
-  if (opts.design) {
-    parts.push(`--design ${opts.design}`);
   }
   if (opts.renderer && opts.renderer !== "react") {
     parts.push(`--renderer ${opts.renderer}`);
@@ -666,7 +680,6 @@ function retryOptionsFromFlags(flags: {
   framework?: string;
   preset?: string;
   "use-case"?: string;
-  design?: string;
   renderer?: string;
   "dev-port"?: number;
   "non-interactive"?: boolean;
@@ -675,7 +688,6 @@ function retryOptionsFromFlags(flags: {
     framework: flags.framework,
     preset: flags.preset as SetupPreset | undefined,
     useCase: flags["use-case"] as SetupUseCase | undefined,
-    design: flags.design,
     renderer: flags.renderer,
     devPort: flags["dev-port"],
     nonInteractive: Boolean(flags["non-interactive"]),
@@ -809,9 +821,6 @@ const SENTENCE_BY_PATH: Record<string, { subject: string }> = {
   ".zitadel/meta/user-schema.json": { subject: "the user-schema dialect spec" },
   ".zitadel/meta/user-property.json": { subject: "the user-property dialect spec" },
   ".zitadel/meta/branding.json": { subject: "the branding dialect spec" },
-  ".zitadel/branding/branding.json": { subject: "the branding descriptor (layout + asset URLs)" },
-  ".zitadel/branding/login.liquid": { subject: "the editable login template" },
-  ".zitadel/branding/README.md": { subject: "the branding folder README" },
   "AGENTS.md": { subject: "the agent guidance (golden journey + config dialect)" },
   "README.md": { subject: "the README's Zitadel section" },
   "app/page.tsx": { subject: "the home page redirect" },
@@ -833,7 +842,6 @@ function buildSummary(opts: {
   server: string;
   issuer: string;
   scaffoldedFramework: boolean;
-  design?: BrandingDesign;
 }): Section[] {
   const {
     projectFacts,
@@ -843,7 +851,6 @@ function buildSummary(opts: {
     server,
     issuer,
     scaffoldedFramework,
-    design,
   } = opts;
   const packageJsonHit = pickWrittenFile(writtenRel, "package.json");
 
@@ -896,14 +903,13 @@ function buildSummary(opts: {
   }
 
   // The login-customization entry points. These are what a user edits to
-  // change what the login collects, how it authenticates, and how it looks —
+  // change what the login collects and how it authenticates —
   // burying them in the verbose per-file narration above the box means users
   // don't find them (each folder ships a README with the workflow).
   const customizeRows: Row[] = [];
   for (const [label, suffix, dir] of [
     ["User schema", ".zitadel/schemas/default-human-user.json", ".zitadel/schemas/"],
     ["Login flow", ".zitadel/flows/default-login.json", ".zitadel/flows/"],
-    ["Login template", ".zitadel/branding/login.liquid", ".zitadel/branding/"],
   ] as const) {
     const hit = pickWrittenFile(writtenRel, suffix);
     if (hit) customizeRows.push({ label, value: stylePath(dir), secondary: "see its README.md" });
@@ -913,13 +919,6 @@ function buildSummary(opts: {
     { label: "Project id", value: styleId(project.id) },
     { label: "Server", value: styleUrl(server) },
     { label: "App will run", value: styleUrl(issuer) },
-    design
-      ? {
-          label: "Login design",
-          value: brandingDesignLabel(design),
-          secondary: `${design} · ${stylePath(".zitadel/branding/")}`,
-        }
-      : { label: "Login design", value: styleDim("built-in template") },
   ];
 
   return [

@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/zitadel/nextgen/internal/audit"
-	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
@@ -139,7 +138,7 @@ type UserService interface {
 type userService struct {
 	v2Pool      StatementPool
 	schemaStore domain.JSONSchemaStore
-	hasher      crypto.Hasher
+	hashers     ProjectHasherResolver
 	refs        UserRefResolver
 }
 
@@ -152,13 +151,13 @@ type userService struct {
 func NewUserService(
 	v2Pool StatementPool,
 	schemaStore domain.JSONSchemaStore,
-	hasher crypto.Hasher,
+	hashers ProjectHasherResolver,
 	refs UserRefResolver,
 ) UserService {
 	return &userService{
 		v2Pool:      v2Pool,
 		schemaStore: schemaStore,
-		hasher:      hasher,
+		hashers:     hashers,
 		refs:        refs,
 	}
 }
@@ -565,7 +564,7 @@ func (s *userService) PatchMyUser(ctx context.Context, input PatchMyUserInput) (
 }
 
 func (s *userService) SetPassword(ctx context.Context, input SetPasswordInput) (err error) {
-	action := NewSetUserPasswordAction(input, s.hasher)
+	action := NewSetUserPasswordAction(input, s.hashers)
 	return s.ApplyActions(ctx, action)
 }
 
@@ -683,6 +682,10 @@ type PatchUserAction struct {
 	pool        StatementPool
 	schemaStore domain.JSONSchemaStore
 
+	// schemaJSON is the target schema document, kept from Prepare so Apply can
+	// filter emitted attribute values to x-audit fields (same rule as create).
+	schemaJSON []byte
+
 	patch *domain.PatchUser
 	// stale reports that Apply found the row moved past the updated_at the
 	// merge was computed against (or the user disappeared mid-flight). The
@@ -742,6 +745,7 @@ func (o *PatchUserAction) Prepare(ctx context.Context) error {
 		return domain.ErrInternal(err).WithMessage("failed to get schema from database")
 	}
 
+	o.schemaJSON = schemaEntity.Schema
 	o.patch, err = domain.NewPatchUser(domain.PatchUserParams{
 		Current:              user,
 		SchemaURL:            targetSchemaURL,
@@ -768,8 +772,18 @@ func (o *PatchUserAction) Apply(ctx context.Context, stmts AllStatements) error 
 		}
 		return domain.ErrInternal(err).WithMessage("failed to patch user in the database")
 	}
-	// No event here: user.updated is #877's to emit (events catalog).
-	return nil
+	attrKeys, attrValues := audit.UserAttributeAuditFields(o.Attributes, o.schemaJSON)
+	return audit.Emit(ctx, stmts, audit.EmitSpec{
+		Type:       domain.EventTypeUserUpdated,
+		Category:   domain.EventCategoryEntity,
+		ProjectID:  o.ProjectID,
+		EntityType: "user",
+		EntityID:   o.UserID,
+		Payload: domain.UserUpdatedPayload{
+			AttributeKeys: attrKeys,
+			Attributes:    attrValues,
+		},
+	})
 }
 
 // ---- Set Password ACTION -------------------------------------------------------------
@@ -777,20 +791,28 @@ func (o *PatchUserAction) Apply(ctx context.Context, stmts AllStatements) error 
 type SetPasswordUserAction struct {
 	SetPasswordInput
 
-	hasher crypto.Hasher
+	hashers ProjectHasherResolver
 
 	hash string
 }
 
-func NewSetUserPasswordAction(input SetPasswordInput, hasher crypto.Hasher) *SetPasswordUserAction {
+func NewSetUserPasswordAction(input SetPasswordInput, hashers ProjectHasherResolver) *SetPasswordUserAction {
 	return &SetPasswordUserAction{
 		SetPasswordInput: input,
-		hasher:           hasher,
+		hashers:          hashers,
 	}
 }
 
-func (o *SetPasswordUserAction) Prepare(_ context.Context) (err error) {
-	o.hash, err = domain.HashPassword(o.Password, o.hasher)
+// Prepare hashes outside the transaction, which is also where the project's
+// hashing method is resolved: the policy is read for the password in front of
+// it rather than for a hasher wired in at startup, so an admin's change takes
+// effect on the next password rather than the next restart.
+func (o *SetPasswordUserAction) Prepare(ctx context.Context) (err error) {
+	hasher, err := o.hashers.HasherForProject(ctx, o.ProjectID)
+	if err != nil {
+		return err
+	}
+	o.hash, err = domain.HashPassword(o.Password, hasher)
 	return err
 }
 

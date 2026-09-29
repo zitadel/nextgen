@@ -1,10 +1,11 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
-import { ZitadelLogin, type ZitadelProject } from "@zitadel/sdk-react";
-import { useMemo } from "react";
+import { createZitadelClient } from "@zitadel/api/client";
+import { ZitadelLogin } from "@zitadel/sdk-react";
 
 import { apiBase } from "../api/zitadel";
 import { fetchSession, sanitizeNextPath } from "../auth/session";
 import { ZitadelMark } from "../components/app-shell/icons";
+import { useConsoleProject } from "../hooks/use-console-project";
 import { getConsoleProjectId, getPublishableKey } from "../runtime/runtime";
 import { useTheme } from "../theme";
 
@@ -39,10 +40,21 @@ import { useTheme } from "../theme";
  * the sign-in screen follows the same preference as the rest of the console.
  */
 export const Route = createFileRoute("/login")({
-  validateSearch: (search: Record<string, unknown>): { next?: string } => ({
+  validateSearch: (search: Record<string, unknown>): { next?: string; handoff?: string } => ({
     next: sanitizeNextPath(typeof search.next === "string" ? search.next : undefined),
+    handoff: typeof search.handoff === "string" ? search.handoff : undefined,
   }),
   beforeLoad: async ({ search }) => {
+    // A sign-in link (`/login?handoff=<token>`) printed by the CLI carries a
+    // one-time handoff token; trade it for the session cookie before deciding
+    // whether to show the widget. Only on a loopback console: the link is a
+    // bearer credential for whoever minted it, so honouring it on a deployed
+    // console would let a crafted link silently sign a visitor into the
+    // link-maker's session. Minting one requires an account on the server that
+    // issued it, which for a developer's own local instance is the developer.
+    if (search.handoff && isLoopbackConsole()) {
+      await exchangeLinkHandoff(search.handoff);
+    }
     const session = await fetchSession();
     if (session) {
       // Already signed in — skip the widget. `next` is router-relative by
@@ -54,24 +66,47 @@ export const Route = createFileRoute("/login")({
   component: LoginScreen,
 });
 
+/**
+ * Whether this console is served from the developer's own machine, which is
+ * where `zitadel start` prints sign-in links. `localhost`, the `127.0.0.0/8`
+ * block, and `[::1]` (how WHATWG URLs spell IPv6 loopback).
+ */
+function isLoopbackConsole(): boolean {
+  const { hostname } = window.location;
+  return hostname === "localhost" || hostname === "[::1]" || /^127(\.\d{1,3}){3}$/.test(hostname);
+}
+
+/**
+ * Exchanges a sign-in link's handoff token for the `__nextgen_session`
+ * cookie, the same `POST /sessions/exchange` the widget calls at the end of a
+ * login flow. Failures fall through to the normal sign-in widget.
+ */
+async function exchangeLinkHandoff(handoffToken: string): Promise<void> {
+  const projectId = getConsoleProjectId();
+  if (!projectId) return;
+  // The console's shared client was configured before the runtime document
+  // resolved, so it carries no key; this one carries the publishable key the
+  // exchange requires.
+  await createZitadelClient({ baseUrl: apiBase, token: getPublishableKey() })
+    .exchangeHandoff(
+      { handoff_token: handoffToken },
+      { project_id: projectId },
+      { credentials: "include" },
+    )
+    // Fall through to the widget.
+    .catch(() => undefined);
+}
+
 function LoginScreen() {
   const { next } = Route.useSearch();
   const { resolved: theme } = useTheme();
-  const projectId = getConsoleProjectId();
   const base = import.meta.env.BASE_URL.replace(/\/$/, "");
   const postSignInUrl = `${base}${next ?? "/"}` || "/";
 
-  // Stable per config tuple: a fresh object every render would re-set the
-  // element property and miss the SDK's per-handle client cache. The
-  // runtime-discovered publishable key (root ADR 036) makes the widget send
-  // the public-plane bearer itself — the handoff exchange then needs no
-  // server-side secret injection.
-  const publishableKey = getPublishableKey();
-  const project = useMemo<ZitadelProject | undefined>(
-    () =>
-      projectId ? Object.freeze({ projectId, proxyPath: apiBase, publishableKey }) : undefined,
-    [projectId, publishableKey],
-  );
+  // With the runtime-discovered publishable key the widget sends the
+  // public-plane bearer itself, so the handoff exchange needs no server-side
+  // secret injection.
+  const project = useConsoleProject();
 
   return (
     <main className="flex min-h-svh flex-col items-center justify-center gap-8 bg-background px-4 py-10">

@@ -44,6 +44,7 @@ const (
 
 	EventTypeUserCreated      EventType = "user.created"
 	EventTypeUserCreateFailed EventType = "user.create.failed"
+	EventTypeUserUpdated      EventType = "user.updated"
 	EventTypeUserDeleted      EventType = "user.deleted"
 
 	EventTypeTeamCreated     EventType = "team.created"
@@ -75,6 +76,8 @@ const (
 	EventTypeEnvironmentCreated EventType = "environment.created"
 
 	EventTypeReleaseCreated EventType = "release.created"
+
+	EventTypeDeploymentCreated EventType = "deployment.created"
 
 	EventTypeAuthzGranted EventType = "authz.granted"
 	EventTypeAuthzRevoked EventType = "authz.revoked"

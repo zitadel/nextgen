@@ -337,6 +337,9 @@ func TestUserService_PatchUser_LastWriteWinsRetry(t *testing.T) {
 		Return(&database.ListResult[*domain.JSONSchema]{}, nil).AnyTimes()
 	stmts.EXPECT().GetUserUniqueAttributeScopes(gomock.Any(), "proj_1", "user_1").
 		Return(map[domain.AttributeKey]string{}, nil).AnyTimes()
+	// The successful attempt emits user.updated (#877); the payload is asserted
+	// in TestPatchUserAction_EventPayloadAttributeKeys, not here.
+	stmts.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 
 	schemaStore := domainmock.NewMockJSONSchemaStore(ctrl)
 	schemaStore.EXPECT().GetJSONSchemaByID(gomock.Any(), "proj_1", "https://example.test/schema.json").

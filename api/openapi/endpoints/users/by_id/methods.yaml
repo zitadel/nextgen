@@ -31,6 +31,7 @@ get:
   security:
     - oauth2:
         - user.read
+    - nextgenSession: []
   responses:
     '200':
       description: Current user information retrieved successfully
@@ -135,6 +136,7 @@ delete:
     security:
       - oauth2:
           - user.delete
+      - nextgenSession: []
     responses:
       '204':
         description: User deleted successfully.

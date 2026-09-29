@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -128,6 +129,27 @@ describe("materializeSetupResources", () => {
     expect(state.resources[DEFAULT_SCHEMA_CONFIG_PATH]?.hash).toBe(
       hashForState({ normalize: normalizeSchemaBody }, schemaFile),
     );
+  });
+
+  // Setup reconciliation used to pre-encode the created schema's id. The
+  // generated client owns the encoding now (#1272), so pre-encoding here sent
+  // `%25` for every delimiter in a `$id` URL and the fetch 404'd.
+  it("fetches the created schema by its id verbatim, leaving encoding to the client", async () => {
+    const id = "https://nextgen.com/api/schemas/default-human-user.json";
+    const getSchemaById = vi.fn().mockResolvedValue({
+      id,
+      schema: { objectType: "human-user", kind: "user-schema", title: "T" },
+      metadata: { created_at: "2026-01-01T00:00:00Z" },
+    });
+    const client = {
+      createSchema: vi.fn().mockResolvedValue({ id }),
+      getSchemaById,
+      createFlowDefinition: vi.fn().mockResolvedValue({ id: "flow_01KWHG", status: "active" }),
+    } as unknown as ZitadelClient;
+
+    await materializeSetupResources({ cwd, client, projectId: "project_123", force: false, cliVersion: TEST_CLI_VERSION });
+
+    expect(getSchemaById).toHaveBeenCalledWith(id);
   });
 
   it("keeps the server's empty audience echo out of the flow file and hashes past it", async () => {
@@ -261,64 +283,8 @@ describe("materializeSetupResources", () => {
   });
 });
 
-describe("materializeSetupResources branding design", () => {
-  it("scaffolds the design files and publishes branding revision 1", async () => {
-    const { DEFAULT_BRANDING_CONFIG_PATH, DEFAULT_BRANDING_TEMPLATE_PATH, getDefaultBrandingConfig } =
-      await import("@zitadel/config/defaults");
-    const createBranding = vi.fn().mockResolvedValue({
-      id: "brnd_01KWHH",
-      created_at: "2026-07-20T00:00:00Z",
-      branding: {},
-    });
-    const client = {
-      createSchema: vi.fn().mockResolvedValue({ id: "sch_01KWHF" }),
-      createFlowDefinition: vi.fn().mockResolvedValue({ id: "flow_01KWHG" }),
-      createBranding,
-    } as unknown as ZitadelClient;
-
-    await materializeSetupResources({
-      cwd,
-      cliVersion: TEST_CLI_VERSION,
-      client,
-      projectId: "project_123",
-      force: false,
-      design: "split",
-    });
-
-    // The wire body carries the inlined template, not the file reference.
-    const [wireBody, params] = createBranding.mock.calls[0] as [
-      Record<string, unknown>,
-      Record<string, unknown>,
-    ];
-    expect(wireBody.layout).toBe("split");
-    expect(String(wireBody.liquid_template)).toContain('class="zl-split"');
-    expect(wireBody).not.toHaveProperty("liquid_template_file");
-    expect(wireBody).not.toHaveProperty("$schema");
-    expect(params).toEqual({ project_id: "project_123" });
-
-    const descriptor = JSON.parse(
-      await readFile(join(cwd, DEFAULT_BRANDING_CONFIG_PATH), "utf8"),
-    ) as Record<string, unknown>;
-    expect(descriptor.$schema).toBe("../meta/branding.json");
-    expect(descriptor.liquid_template).toEqual({ $file: "./login.liquid" });
-
-    const template = await readFile(join(cwd, DEFAULT_BRANDING_TEMPLATE_PATH), "utf8");
-    expect(template).toBe(getDefaultBrandingConfig("split").template);
-
-    const state = JSON.parse(
-      await readFile(join(cwd, ".zitadel/state.json"), "utf8"),
-    ) as ZitadelState;
-    expect(state.resources[DEFAULT_BRANDING_CONFIG_PATH]).toMatchObject({
-      id: "brnd_01KWHH",
-      hash: expect.stringMatching(/^[a-f0-9]{64}$/),
-    });
-
-    const brandingReadme = await readFile(join(cwd, ".zitadel/branding/README.md"), "utf8");
-    expect(brandingReadme).toContain(`npx @zitadel/cli@${TEST_CLI_VERSION} plan`);
-    expect(brandingReadme).not.toMatch(/`zitadel /);
-  });
-
-  it("scaffolds no branding files when no design is chosen", async () => {
+describe("materializeSetupResources branding", () => {
+  it("never scaffolds branding files or publishes a branding revision (#1039)", async () => {
     const createBranding = vi.fn();
     const client = {
       createSchema: vi.fn().mockResolvedValue({ id: "sch_01KWHF" }),
@@ -329,6 +295,7 @@ describe("materializeSetupResources branding design", () => {
     await materializeSetupResources({ cwd, client, projectId: "project_123", force: false, cliVersion: TEST_CLI_VERSION });
 
     expect(createBranding).not.toHaveBeenCalled();
+    expect(existsSync(join(cwd, ".zitadel/branding"))).toBe(false);
     const state = JSON.parse(
       await readFile(join(cwd, ".zitadel/state.json"), "utf8"),
     ) as ZitadelState;

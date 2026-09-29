@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
+import { Agent } from "undici";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -13,6 +14,7 @@ import {
 import { buildSyncPlan } from "../../../../src/lib/sync/loop";
 import { collectPlanWarnings } from "../../../../src/lib/sync/plan-renderer";
 import type { ResourceSyncer, SyncAction } from "../../../../src/lib/sync/types";
+import { userAgentInterceptor } from "../../../../src/lib/user-agent";
 
 const { lookupMock } = vi.hoisted(() => ({ lookupMock: vi.fn() }));
 vi.mock("node:dns/promises", () => ({ lookup: lookupMock }));
@@ -90,6 +92,26 @@ describe("annotateAssetWarnings", () => {
     await annotateAssetWarnings(actions);
 
     expect(warningsOf(actions)).toEqual([]);
+  });
+
+  // MSW answers above the dispatcher, so assert the wiring rather than the
+  // header: the probe's private agent bypasses the global dispatcher and
+  // would otherwise send Node's bare `node` user agent.
+  it("identifies the CLI to asset hosts", async () => {
+    const compose = vi.spyOn(Agent.prototype, "compose");
+    try {
+      server.use(
+        http.head("https://cdn.example.com/logo.svg", () =>
+          HttpResponse.text("", { headers: { "content-type": "image/svg+xml" } }),
+        ),
+      );
+
+      await annotateAssetWarnings(reviseBranding({ logo_url: "https://cdn.example.com/logo.svg" }));
+
+      expect(compose).toHaveBeenCalledWith(userAgentInterceptor);
+    } finally {
+      compose.mockRestore();
+    }
   });
 
   // The Elina case: the URL clears the CLI's zod gate and the server's save
