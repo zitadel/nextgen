@@ -12,12 +12,7 @@ import {
   type SetupPreset,
   type SetupUseCase,
 } from "@zitadel/config/defaults";
-import {
-  clientIdVariableName,
-  clientSecretVariableName,
-  idpCatalogEntry,
-  IDP_PROVIDERS,
-} from "@zitadel/config/idp-catalog";
+import { credentialVariables, idpProvider, IDP_PROVIDERS } from "@zitadel/config/idp";
 import { consola } from "consola";
 
 import { createZitadelClient } from "../../lib/api-client";
@@ -433,8 +428,8 @@ export default class Setup extends BaseCommand {
     let ssoSecret: SecretOutcome | undefined;
     let ssoClientId: PublishState | undefined;
     if (answers.sso && !dryRun) {
-      const idVariable = clientIdVariableName(answers.sso.provider);
-      const variable = clientSecretVariableName(answers.sso.provider);
+      const idVariable = credentialVariables(answers.sso.provider).clientId;
+      const variable = credentialVariables(answers.sso.provider).clientSecret;
       const publish = ssoCredentialPublisher(answers.server, project);
       ssoClientId = await publishClientId({
         name: idVariable,
@@ -447,7 +442,7 @@ export default class Setup extends BaseCommand {
         // vendor is not what the developer will want in the end, and nothing
         // else in the summary would show it.
         consola.warn(
-          `${idpCatalogEntry(answers.sso.provider).display_name} points at ` +
+          `${idpProvider(answers.sso.provider).displayName} points at ` +
             `${answers.sso.endpoints.issuer}, not the provider`,
         );
       }
@@ -642,7 +637,7 @@ export default class Setup extends BaseCommand {
               client_id: answers.sso.clientId,
               connection: `.zitadel/idps/${answers.sso.provider}.json`,
               client_id_variable: ssoClientId
-                ? { variable: clientIdVariableName(answers.sso.provider), published: ssoClientId }
+                ? { variable: credentialVariables(answers.sso.provider).clientId, published: ssoClientId }
                 : null,
               secret: ssoSecret
                 ? { variable: ssoSecret.name, published: ssoSecret.published }
@@ -770,7 +765,7 @@ async function ssoFromFlags(
       return { provider: flags.sso, clientId: "", secret: "" };
     }
     throw new ZitadelError("E_VALIDATION", `--sso ${flags.sso} needs --sso-client-id`, {
-      hint: `Register an OAuth application at ${idpCatalogEntry(flags.sso).console_url} and pass its client id.`,
+      hint: `Register an OAuth application at ${idpProvider(flags.sso).consoleUrl} and pass its client id.`,
     });
   }
   if (!nonInteractive) {
@@ -1125,7 +1120,7 @@ function buildSummary(opts: {
   if (sso) {
     customizeRows.push({
       label: "Social sign-in",
-      value: idpCatalogEntry(sso.provider).display_name,
+      value: idpProvider(sso.provider).displayName,
       secondary: stylePath(`.zitadel/idps/${sso.provider}.json`),
     });
   }

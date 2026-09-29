@@ -31,7 +31,7 @@ vi.mock("../../../../src/lib/local-server/runtime", async (importOriginal) => ({
 }));
 
 import { confirm, isCancel, note, password, select, text } from "@clack/prompts";
-import { IDP_PROVIDERS } from "@zitadel/config/idp-catalog";
+import { IDP_PROVIDERS } from "@zitadel/config/idp";
 
 import { detectHealthyLocalServer } from "../../../../src/lib/local-server/runtime";
 

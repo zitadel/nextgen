@@ -6,7 +6,7 @@
  * **Source of truth.** The connection document's shape is
  * `idp-connection.json`, the meta-schema generated from the OpenAPI spec and
  * shipped by `@zitadel/config`; the vendor knowledge a connection is built
- * from is the catalog in `@zitadel/config/idp-catalog`. This module owns only
+ * from is the provider classes in `@zitadel/config/idp`. This module owns only
  * the CLI-specific concerns: locating a Project's connection files, deciding
  * whether a provider already has one, and keeping the client secret out of
  * anything committable.
@@ -20,7 +20,7 @@ export {
   IDPS_DIR,
   type ConnectionFile,
   type ConnectionPlan,
-  credentialVariables,
+  credentialVariablesOf,
   planConnection,
   readConnectionFiles,
 } from "./connections";

@@ -5,14 +5,7 @@ import { Flags } from "@oclif/core";
 import { password, text } from "@clack/prompts";
 import { consola } from "consola";
 
-import {
-  catalogIssuer,
-  clientIdVariableName,
-  clientSecretVariableName,
-  idpCatalogEntry,
-  IDP_PROVIDERS,
-  scaffoldConnection,
-} from "@zitadel/config/idp-catalog";
+import { credentialVariables, idpProvider, IDP_PROVIDERS } from "@zitadel/config/idp";
 import { applySsoToFlow, applySsoToSchema, type SsoSkipped } from "@zitadel/config/sso";
 
 import { createZitadelClient } from "../../lib/api-client";
@@ -27,7 +20,7 @@ import {
   enabledMethods,
   type FlowFile,
   IDPS_DIR,
-  credentialVariables,
+  credentialVariablesOf,
   planConnection,
   publishClientId,
   type PublishState,
@@ -102,7 +95,7 @@ export default class SsoEnable extends BaseCommand {
         hint: `Pass --provider, e.g. --provider ${IDP_PROVIDERS[0]}.`,
       });
     }
-    const entry = idpCatalogEntry(provider);
+    const entry = idpProvider(provider);
 
     // The Project is read before anything is asked for: being turned away
     // after typing a secret would mean typing it again.
@@ -125,8 +118,8 @@ export default class SsoEnable extends BaseCommand {
     // — so the credentials go where it actually looks rather than where this
     // command would have put them.
     const names = reusing
-      ? credentialVariables(plan.file, plan.slug)
-      : { clientId: clientIdVariableName(plan.slug), clientSecret: clientSecretVariableName(plan.slug) };
+      ? credentialVariablesOf(plan.file, plan.slug)
+      : credentialVariables(plan.slug);
     const variable = names.clientSecret;
     const idVariable = names.clientId;
 
@@ -184,9 +177,9 @@ export default class SsoEnable extends BaseCommand {
         secret = await storeClientSecret({ name: variable, value: piped, publish });
       }
     } else {
-      consola.info(`${entry.display_name} needs an OAuth application.`);
+      consola.info(`${entry.displayName} needs an OAuth application.`);
       consola.info(`Callback URI   ${callbackUri}`);
-      consola.info(`Create it at   ${entry.console_url}`);
+      consola.info(`Create it at   ${entry.consoleUrl}`);
 
       // Before the credentials: on a development build the provider may be a
       // local stand-in, and the client is registered with whatever answers.
@@ -196,22 +189,21 @@ export default class SsoEnable extends BaseCommand {
         command: "Enable",
       });
       const clientId =
-        flags["client-id"] ?? (await this.askClientId(entry.display_name, nonInteractive));
+        flags["client-id"] ?? (await this.askClientId(entry.displayName, nonInteractive));
       const secretValue = await this.askClientSecret(variable, nonInteractive);
 
       const publish = this.publisher(secretFile);
-      const connection = scaffoldConnection({
-        provider,
+      const connection = entry.connection({
         slug: plan.slug,
         schemaProperties: schema.properties,
         schemaRef: CONNECTION_SCHEMA_REF,
         endpoints,
       });
-      if (endpoints?.issuer !== undefined && endpoints.issuer !== catalogIssuer(provider)) {
+      if (endpoints?.issuer !== undefined && endpoints.issuer !== entry.issuer) {
         // Said out loud: a connection pointing somewhere other than the
         // vendor is not what the developer will want in the end, and nothing
         // else in the output would show it.
-        consola.warn(`${entry.display_name} points at ${endpoints.issuer}, not the provider`);
+        consola.warn(`${entry.displayName} points at ${endpoints.issuer}, not the provider`);
       }
       const target = join(cwd, plan.path);
       await mkdir(dirname(target), { recursive: true });
@@ -234,7 +226,7 @@ export default class SsoEnable extends BaseCommand {
       consola.warn(`Left ${skipped.region} alone: it has been edited by hand. Update it yourself.`);
     }
     if (edits.written.length === 0 && edits.skipped.length === 0) {
-      consola.info(`${schema.name} and its login flow already offer ${entry.display_name}`);
+      consola.info(`${schema.name} and its login flow already offer ${entry.displayName}`);
     }
     if (clientIdState) {
       reportClientIdOutcome(idVariable, clientIdState, this.meta.cliVersion);
@@ -276,7 +268,7 @@ export default class SsoEnable extends BaseCommand {
           "apply",
         ],
       },
-      pretty: `Enabled ${entry.display_name} for ${schema.name}`,
+      pretty: `Enabled ${entry.displayName} for ${schema.name}`,
     });
   }
 

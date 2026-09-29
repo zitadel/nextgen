@@ -2,13 +2,13 @@ import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import {
-  clientIdVariableName,
-  clientSecretVariableName,
-  idpCatalogEntry,
+  credentialVariables,
+  type CredentialVariables,
+  idpProvider,
   isVariableReference,
   referencedVariable,
-  type IdpCatalogEntry,
-} from "@zitadel/config/idp-catalog";
+  type IdpProvider,
+} from "@zitadel/config/idp";
 
 import { ZitadelError } from "../errors";
 import { isObject } from "../json";
@@ -92,13 +92,12 @@ export async function readConnectionFiles(cwd: string): Promise<ConnectionFile[]
  * pointing at Google is a Google connection whatever its template says — so a
  * disagreement still counts as a match and is left for the caller to report.
  */
-function describesProvider(file: ConnectionFile, entry: IdpCatalogEntry): boolean {
+function describesProvider(file: ConnectionFile, entry: IdpProvider): boolean {
   if (file.body.template === entry.template) {
     return true;
   }
-  const issuer = (entry.protocol_block as { oidc?: { issuer?: string } }).oidc?.issuer;
   const oidc = file.body.oidc;
-  return issuer !== undefined && isObject(oidc) && oidc.issuer === issuer;
+  return isObject(oidc) && oidc.issuer === entry.issuer;
 }
 
 /** The client id a connection file carries, whichever protocol it uses. */
@@ -125,17 +124,18 @@ function credentialOf(file: ConnectionFile, field: "client_id" | "client_secret"
  * slug-derived name would store the credential where the connection never
  * looks and report it as stored.
  */
-export function credentialVariables(
+export function credentialVariablesOf(
   file: ConnectionFile,
   slug: string,
-): { clientId: string; clientSecret: string } {
+): CredentialVariables {
   const named = (field: "client_id" | "client_secret", fallback: string): string => {
     const stored = credentialOf(file, field);
     return (stored === undefined ? undefined : referencedVariable(stored)) ?? fallback;
   };
+  const scaffolded = credentialVariables(slug);
   return {
-    clientId: named("client_id", clientIdVariableName(slug)),
-    clientSecret: named("client_secret", clientSecretVariableName(slug)),
+    clientId: named("client_id", scaffolded.clientId),
+    clientSecret: named("client_secret", scaffolded.clientSecret),
   };
 }
 
@@ -162,13 +162,13 @@ export function planConnection(options: {
   readonly files: readonly ConnectionFile[];
   readonly clientId?: string;
 }): ConnectionPlan {
-  const entry = idpCatalogEntry(options.provider);
+  const entry = idpProvider(options.provider);
   const slug = options.provider;
   const matches = options.files.filter((file) => describesProvider(file, entry));
 
   if (matches.length > 1) {
     const names = matches.map((m) => m.path).join(", ");
-    throw new ZitadelError("E_CONFLICT", `More than one ${entry.display_name} connection exists: ${names}`, {
+    throw new ZitadelError("E_CONFLICT", `More than one ${entry.displayName} connection exists: ${names}`, {
       hint: "Keep the one this Project should use and remove the others, then run the command again.",
       details: { provider: options.provider, files: matches.map((m) => m.path) },
     });
@@ -203,7 +203,7 @@ export function planConnection(options: {
   const path = `${IDPS_DIR}/${name}`;
   const occupied = options.files.find((file) => file.name === name);
   if (occupied !== undefined) {
-    throw new ZitadelError("E_CONFLICT", `${path} already exists and is not a ${entry.display_name} connection`, {
+    throw new ZitadelError("E_CONFLICT", `${path} already exists and is not a ${entry.displayName} connection`, {
       hint: "Rename or remove that file, then run the command again.",
       details: { file: path },
     });

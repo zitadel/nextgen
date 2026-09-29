@@ -1,5 +1,5 @@
 import type { SetupPreset, SetupUseCase } from "@zitadel/config/defaults";
-import type { ConnectionEndpoints } from "@zitadel/config/idp-catalog";
+import type { ConnectionEndpoints } from "@zitadel/config/idp";
 
 import type { FrameworkFacts } from "../../../lib/orca";
 

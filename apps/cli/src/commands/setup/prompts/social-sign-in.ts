@@ -1,11 +1,11 @@
 import { note, password, select, text } from "@clack/prompts";
 
 import {
-  clientSecretVariableName,
-  idpCatalogEntry,
+  credentialVariables,
+  idpProvider,
   IDP_PROVIDERS,
-  type IdpCatalogEntry,
-} from "@zitadel/config/idp-catalog";
+  type IdpProvider,
+} from "@zitadel/config/idp";
 
 import { askConnectionEndpoints, callbackUriFor } from "../../../lib/idp";
 import { issuerFromPort } from "../../../lib/orca";
@@ -43,7 +43,7 @@ export class SocialSignInPrompt implements SetupPrompt {
       return answers;
     }
 
-    const entry = idpCatalogEntry(provider);
+    const entry = idpProvider(provider);
     // Before the announcement, which names the vendor's console: on a
     // development build the provider may not be the vendor at all.
     const endpoints = answers.sso?.endpoints ?? (await askConnectionEndpoints({
@@ -81,7 +81,7 @@ export class SocialSignInPrompt implements SetupPrompt {
         },
         ...IDP_PROVIDERS.map((provider) => ({
           value: provider,
-          label: `Continue with ${idpCatalogEntry(provider).display_name}`,
+          label: `Continue with ${idpProvider(provider).displayName}`,
           hint: "needs an OAuth app you register with the provider",
         })),
       ],
@@ -96,20 +96,20 @@ export class SocialSignInPrompt implements SetupPrompt {
    * can be shown rather than left for the developer to work out, which
    * matters because the vendor matches it literally.
    */
-  private announce(entry: IdpCatalogEntry, devPort: number, issuer?: string): void {
+  private announce(entry: IdpProvider, devPort: number, issuer?: string): void {
     note(
       [
         // Where to register depends on who is actually answering: pointing a
         // developer at the vendor's console when the connection runs against
         // their own stand-in would be worse than saying nothing.
         ...(issuer === undefined
-          ? ["Register an OAuth application at:", entry.console_url]
+          ? ["Register an OAuth application at:", entry.consoleUrl]
           : ["Register a client with the provider at:", issuer]),
         "",
         "Redirect URI:",
         callbackUriFor(issuerFromPort(devPort)),
       ].join("\n"),
-      `${entry.display_name} sign-in`,
+      `${entry.displayName} sign-in`,
     );
   }
 
@@ -137,7 +137,7 @@ export class SocialSignInPrompt implements SetupPrompt {
    */
   private async askSecret(provider: string): Promise<string> {
     const answer = await password({
-      message: `Client secret (published to the project as ${clientSecretVariableName(provider)})`,
+      message: `Client secret (published to the project as ${credentialVariables(provider).clientSecret})`,
       // Vendors format these differently, so only emptiness can be checked.
       validate: (value) => ((value ?? "").trim() === "" ? "Enter the client secret." : undefined),
     });

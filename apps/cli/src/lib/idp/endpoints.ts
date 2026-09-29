@@ -1,6 +1,6 @@
 import { text } from "@clack/prompts";
 
-import { catalogIssuer, type ConnectionEndpoints } from "@zitadel/config/idp-catalog";
+import { idpProvider, type ConnectionEndpoints } from "@zitadel/config/idp";
 
 import { bailOnCancel } from "../prompt-cancel";
 
@@ -36,7 +36,7 @@ export async function askConnectionEndpoints(options: {
   // is rejected as `idp.endpoints_partial`. Asking for four URLs to satisfy
   // that would be a worse question than asking for none, and a stand-in
   // serves its own discovery document just as the vendor does.
-  return { issuer: await askUrl("Issuer", catalogIssuer(provider), command) };
+  return { issuer: await askUrl("Issuer", idpProvider(provider).issuer, command) };
 }
 
 /** One URL question, pre-filled with the answer that needs no thought. */

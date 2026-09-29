@@ -158,9 +158,17 @@ preview       excluded: declared by issuer_pattern, not an exact issuer
 
 Following Area 1's principle that
 ["vendor knowledge is data"](1-resource-model.md#vendor-knowledge-is-data), the
-catalog is a table bundled in `packages/config`, so scaffolding works offline.
+catalog is bundled in `packages/config`, so scaffolding works offline.
 Epic 851 includes two entries: `google` and `github`.
 [`schemas/catalog.json`](schemas/catalog.json) is an example of the full table.
+
+The values below are the vendor knowledge; how a connection is composed from
+them is not. `packages/config/src/idp/` therefore holds one class per provider
+over a shared `IdpProvider` interface, rather than a JSON table the callers
+interpret: GitHub speaks OAuth2 rather than OIDC, emits no family name, and
+needs a second request to read an email at all, and a table would push each of
+those differences into a branch in shared code. Adding a provider is a class
+and a line in the registry.
 
 Not in the table:
 

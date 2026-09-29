@@ -23,7 +23,7 @@ import {
   type SetupPreset,
   type SetupUseCase,
 } from "@zitadel/config/defaults";
-import { scaffoldConnection, type ConnectionEndpoints } from "@zitadel/config/idp-catalog";
+import { idpProvider, type ConnectionEndpoints } from "@zitadel/config/idp";
 import { applySsoToFlow, applySsoToSchema } from "@zitadel/config/sso";
 import { normalizeFlowBody, normalizeSchemaBody } from "@zitadel/config/normalize";
 
@@ -92,8 +92,7 @@ export async function materializeSetupResources(opts: {
   // platform does not hold. Its claim mapping reads the template's properties,
   // which enabling the provider does not change.
   const connection = opts.sso
-    ? scaffoldConnection({
-        provider: opts.sso.provider,
+    ? idpProvider(opts.sso.provider).connection({
         endpoints: opts.sso.endpoints,
         schemaProperties: Object.keys((schemaTemplate.properties as object | undefined) ?? {}),
         schemaRef: CONNECTION_SCHEMA_REF,
