@@ -19,6 +19,11 @@ lifetime. The preview-environments prototype
 ([PR #1258](https://github.com/zitadel/nextgen/pull/1258)) answered both. This
 ADR records the answers so the remaining milestone work has one place to cite.
 
+The API and CLI will be able to maintain different projects on different
+servers and deploy configuration to each of them; every project keeps its own
+isolated data. The exact CLI commands to manage these projects and
+environments are out of scope for this ADR.
+
 ## Decision
 
 ### Data isolation
