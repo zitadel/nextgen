@@ -8,10 +8,12 @@ const PREEXISTING_FRAMEWORK_IDS = ["next", "nuxt"];
 
 export function parseLocalJourneyArgs(args) {
   const parsed = {
+    ci: false,
     concurrency: 5,
     frameworkIds: [...frameworkIds],
     image: "",
     keep: false,
+    matrix: "full",
     preexistingApp: false,
     preset: "",
     runtime: "binary",
@@ -20,6 +22,8 @@ export function parseLocalJourneyArgs(args) {
     workDir: "",
   };
   let explicitFramework = false;
+  let explicitSuite = false;
+  let explicitPreset = false;
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
@@ -38,6 +42,14 @@ export function parseLocalJourneyArgs(args) {
           ].join(" "),
         );
       }
+      case "--ci": {
+        parsed.ci = true;
+        break;
+      }
+      case "--matrix": {
+        parsed.matrix = parseMatrix(readValue(args, ++index, arg));
+        break;
+      }
       case "--concurrency": {
         parsed.concurrency = parseConcurrency(readValue(args, ++index, arg));
         break;
@@ -51,6 +63,7 @@ export function parseLocalJourneyArgs(args) {
       }
       case "--suite": {
         parsed.suite = parseSuite(readValue(args, ++index, arg));
+        explicitSuite = true;
         break;
       }
       case "--image": {
@@ -60,6 +73,7 @@ export function parseLocalJourneyArgs(args) {
       }
       case "--preset": {
         parsed.preset = readValue(args, ++index, arg);
+        explicitPreset = true;
         break;
       }
       case "--runtime": {
@@ -94,6 +108,23 @@ export function parseLocalJourneyArgs(args) {
 
   if (parsed.runtime === "binary" && parsed.image) {
     throw new Error("--image requires --runtime docker");
+  }
+  if (parsed.ci) {
+    // --ci runs a fixed set of variants (fresh-app matrix, passkey preset,
+    // pre-existing app, testkit) in one process, so the flags that pick a
+    // single variant's shape have no meaning alongside it.
+    const conflicting = [
+      explicitFramework && "--framework",
+      explicitSuite && "--suite",
+      explicitPreset && "--preset",
+      parsed.preexistingApp && "--preexisting-app",
+    ].filter(Boolean);
+    if (conflicting.length > 0) {
+      throw new Error(
+        `--ci runs the full CI journey set in one process; drop ${conflicting.join(", ")} (the variant set is fixed)`,
+      );
+    }
+    return parsed;
   }
   if (parsed.suite === "testkit") {
     if (explicitFramework) {
@@ -134,6 +165,13 @@ function parseSuite(value) {
     return value;
   }
   throw new Error(`--suite must be frameworks or testkit, got ${value}`);
+}
+
+function parseMatrix(value) {
+  if (value === "single" || value === "full") {
+    return value;
+  }
+  throw new Error(`--matrix must be single or full, got ${value}`);
 }
 
 function parseRuntime(value) {
