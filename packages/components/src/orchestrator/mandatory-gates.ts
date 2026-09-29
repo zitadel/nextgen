@@ -1,13 +1,11 @@
 /**
  * `{% mandatory_gates %}` runtime patcher.
  *
- * Per `docs/design/branding/validator.md` §Runtime safety net:
- *
- *   "After the template finishes rendering, the tag inspects the produced DOM
- *    and appends:
- *      - Any required `fields[*]` without a matching `<zl-field>`.
- *      - Any required `gates[*]` without a matching consumer.
- *      - A primary `<zl-button type="submit">` if none was reached."
+ * Per `docs/design/branding/validator.md` §Runtime safety net, after the
+ * template finishes rendering this appends:
+ *   - any required `fields[*]` with no field atom of that name, and
+ *   - the step's primary action as a `<zl-button>`, if none was rendered.
+ * It does not append gate consumers.
  *
  * Implementation: the LiquidJS `{% mandatory_gates %}` tag emits a unique
  * marker comment. After Liquid renders, this patcher parses the produced

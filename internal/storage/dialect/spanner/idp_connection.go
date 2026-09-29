@@ -79,7 +79,7 @@ func (s idpConnectionStatements) CreateIDPConnection(ctx context.Context, entity
 		// insert must bind the value this attempt returned, not one an earlier
 		// attempt left on the entity.
 		var createdAt time.Time
-		if err := tx.Write(ctx, stmt, scanIDPConnectionTimestamp(&createdAt)); err != nil {
+		if err := tx.Write(ctx, stmt, scanReturnedTimestamp(&createdAt)); err != nil {
 			return err
 		}
 		revision := buildStatement(createFirstIDPConnectionRevisionStmt,
@@ -120,16 +120,16 @@ func (s idpConnectionStatements) ReviseIDPConnection(ctx context.Context, entity
 		entity.ID,
 		document,
 	).statement()
-	if err := s.db.Write(ctx, revision, scanIDPConnectionTimestamp(&entity.UpdatedAt)); err != nil {
+	if err := s.db.Write(ctx, revision, scanReturnedTimestamp(&entity.UpdatedAt)); err != nil {
 		return idpconnection.ReviseNotFound(err)
 	}
 	entity.RevisionID = revisionID
 	return nil
 }
 
-// scanIDPConnectionTimestamp reads the created_at a write returned into dst,
+// scanReturnedTimestamp reads the created_at a write returned into dst,
 // in UTC like the reads.
-func scanIDPConnectionTimestamp(dst *time.Time) func(*spanner.RowIterator) error {
+func scanReturnedTimestamp(dst *time.Time) func(*spanner.RowIterator) error {
 	return func(iter *spanner.RowIterator) error {
 		_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
 			if err := row.Columns(dst); err != nil {

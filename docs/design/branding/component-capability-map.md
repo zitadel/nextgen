@@ -1,6 +1,6 @@
 # Component Capability Map
 
-> **Status:** Design reference
+> **Status:** Design reference. The component columns name shipped atoms; rows marked *not built* have no atom yet.
 > **See also:** [Branding and Templates](README.md) · [Templates](templates.md) · [Step Response Shape](../flowengine/flow-engine-nodes.md) · [User Schema Integration](../flowengine/user-schema.md)
 
 This document maps flow-engine capabilities to frontend components for design
@@ -15,19 +15,19 @@ For example, `given_name`, `family_name`, `display_name`, and `company` are all
 text fields and should render with the same base field component.
 
 ```json
-{
-  "given_name": { "type": "text", "text_key": "register.field.given_name" },
-  "family_name": { "type": "text", "text_key": "register.field.family_name" }
-}
+[
+  { "name": "given_name", "type": "text", "text_key": "register.field.given_name" },
+  { "name": "family_name", "type": "text", "text_key": "register.field.family_name" }
+]
 ```
 
 Both map to:
 
 ```liquid
 <zl-field
-  name="{{ field[0] }}"
-  type="{{ field[1].type }}"
-  label="{{ field[1].text_key | t }}"
+  name="{{ f.name }}"
+  type="{{ f.type }}"
+  label="{{ f.text_key | t }}"
 ></zl-field>
 ```
 
@@ -38,7 +38,7 @@ Both map to:
 | `identifier` | `zl-field` | `email` or `text` | First login field. Usually email address or username. Often the primary field on the first screen. |
 | `email` | `zl-field` | `email` | Email collection for registration, recovery, verification, or profile flows. Should support email keyboard, browser autocomplete, and clear validation states. |
 | `password` | `zl-field` | `password` | Secret credential input. Needs masked value, password-manager compatibility, and room for future reveal or strength affordances. |
-| `code` | `zl-field` | `code` or `text` | OTP or verification-code input. Should visually support short codes and can later evolve into segmented input without changing the schema field. |
+| `code` | `zl-field` | `text` | OTP or verification-code input. Should visually support short codes and can later evolve into segmented input without changing the schema field. |
 | `given_name` | `zl-field` | `text` | First name. Same component as other text fields; often paired side-by-side with `family_name`. |
 | `family_name` | `zl-field` | `text` | Last name. Same component as `given_name`; design should support grouped name layouts. |
 | `display_name` | `zl-field` | `text` | Profile or public display name. Same text input with profile-oriented label and help text. |
@@ -59,50 +59,50 @@ Supported field input types:
 | `tel` | `zl-field` | Telephone keyboard and phone-friendly input. |
 | `url` | `zl-field` | URL keyboard and validation semantics. |
 | `number` | `zl-field` | Numeric input. Use carefully for values where browser number controls are appropriate. |
-| `code` | `zl-field` | Short verification codes. Can be rendered as a normal input initially. |
+| `date`, `hidden` | `zl-field` | In the contract's type list. The bundled template routes them to `zl-field` like any other non-checkbox, non-select type. |
+| `checkbox` | `zl-checkbox` | Boolean fields. |
+| `select` | `zl-select` | Fields with a closed set of values. |
 
 ## Action Capabilities
 
-| Action | Component | Design purpose |
+A runtime action's `kind` is one of `submit`, `passkey`, `passkey_register`, `navigate`, `back`. `back` is injected by the engine and cannot be declared in a flow definition. The bundled template picks the rendering from `primary` and the action's `name`:
+
+| Action | Rendering | Design purpose |
 |---|---|---|
-| `submit` | `zl-submit` | Main form CTA. Usually primary when `primary: true`. |
-| `authenticate` | `zl-submit` or passkey-specific CTA | Primary passkey action. |
-| `register` | `zl-action` | Secondary navigation from login to registration. |
-| `login` | `zl-action` | Secondary navigation back to login. |
-| `recover` | `zl-action` | Forgot-password action. Usually link-like or low-emphasis. |
-| `resend` | `zl-action` | Secondary action for verification-code screens. |
-| `back` | `zl-action` | Secondary navigation. |
-| `fallback` | `zl-action` | Alternative authentication method, such as falling back from passkey to password. |
-| `accept` | `zl-submit` | Primary consent or terms action. |
-| `deny` | `zl-action` | Negative secondary consent action. |
-| `decline` | `zl-action` | Negative secondary terms action. |
+| The `primary: true` action | `zl-button` (`hierarchy="primary"`, `type="submit"`) | Main form CTA. |
+| `passkey`, when not primary | `zl-button` (`hierarchy="secondary"`) | Offer a passkey beside the main path. |
+| `register` | Link with `data-action` | Secondary navigation from login to registration. |
+| `sign_in` | Link with `data-action` | Secondary navigation back to login. |
+| `recover` | Link on the password field's label row, or its own row when the step has no password field | Forgot-password action. |
+| Actions of kind `back` | No visible control. The browser's back gesture submits it | Return to the previous step. |
+| Any other secondary action | `zl-button` (`hierarchy="secondary"`) | Alternative paths, such as falling back from passkey to password. |
 
 ## Gate And Supporting Capabilities
 
 | Capability | Component | Design purpose |
 |---|---|---|
-| `captcha` gate | `zl-captcha` | Bot-protection block. Should fit into forms without looking like a normal user-data field. |
-| `passkey` gate | `zl-passkey` | Passkey ceremony, status, or prompt area. Used with passkey actions such as `authenticate` and `fallback`. |
-| `sso_providers` | `zl-sso-providers` | Provider button group or list. Supports SSO-first or SSO-secondary layouts. |
-| `messages` | `zl-message` | Informational or warning notices at step or form level. |
-| `errors` | `zl-error` | Step-level or form-level errors. |
-| `texts.title_key` | Template heading | Screen title. Usually rendered by the Liquid template rather than a dedicated atom. |
-| `texts.description_key` | Template body copy | Supporting explanatory copy. Usually rendered by the Liquid template rather than a dedicated atom. |
+| `captcha` gate | *not built* | Bot-protection block. Should fit into forms without looking like a normal user-data field. |
+| `challenge` (passkey) | `zl-passkey` | Runs the WebAuthn ceremony for a pending challenge. Passkeys are modelled as a challenge on the step, not as a gate. |
+| `sso_providers` | *not built* | Provider button group or list. Supports SSO-first or SSO-secondary layouts. |
+| `messages` | *not built* | Informational or warning notices. The component passes an empty list today. |
+| `errors` | `zl-alert` for step-level errors; the field atom's `error` attribute for field-level ones | Step-level or form-level errors. |
+| `texts.title_key` | Template heading | Screen title, rendered by the Liquid template into the card's `header` slot. |
+| `texts.description_key` | Template body copy | Supporting explanatory copy, rendered by the Liquid template. |
 
-## Minimal Component Inventory
+## Component Inventory
 
-The current schema and flow catalogue can be covered by this component set:
+The shipped atoms (`packages/components/src/manifests.ts`):
 
 | Component | Covers |
 |---|---|
-| `zl-field` | All normal schema fields: text, email, password, phone, URL, number, code, and custom fields. |
-| `zl-submit` | Primary submit-like actions. |
-| `zl-action` | Secondary actions and navigation actions. |
-| `zl-captcha` | Captcha gates. |
-| `zl-passkey` | Passkey gates and ceremony UI. |
-| `zl-sso-providers` | SSO provider lists. |
-| `zl-message` | Informational and warning messages. |
-| `zl-error` | Error messages. |
+| `zl-field` | Every field type except `checkbox` and `select`, including custom fields. |
+| `zl-select` | `select` fields. |
+| `zl-checkbox` | `checkbox` fields. |
+| `zl-button` | Primary and secondary actions. |
+| `zl-passkey` | The passkey ceremony. |
+| `zl-alert` | Errors. |
+| `zl-card`, `zl-page-shell` | The card and the shell around it. |
+| `zl-icon`, `zl-pill` | Glyphs and status pills. |
 
 Specialized components should be introduced only when the interaction is truly
 different from a normal field. Layout differences, such as placing first and

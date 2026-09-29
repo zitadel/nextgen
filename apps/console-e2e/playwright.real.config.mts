@@ -20,11 +20,12 @@ const consoleOrigin = process.env.REAL_CONSOLE_ORIGIN ?? "http://localhost:5174"
 
 /**
  * The console reads console-shaped env names: the Vite proxy needs the
- * backend and the operator credential, the client pins the project id.
+ * backend, the client pins the project id. No credential: the browser
+ * authenticates with the signed-in user's session cookie (#1300), and the
+ * specs grant that user access through the API (`src-real/support.ts`).
  */
 const consoleAppEnv: AppEnvTemplate = {
   VITE_CONSOLE_PROJECT_ID: "projectId",
-  CONSOLE_PROJECT_SECRET: "projectSecret",
   CONSOLE_BACKEND_URL: "baseUrl",
 };
 

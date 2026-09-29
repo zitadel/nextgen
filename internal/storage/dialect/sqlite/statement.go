@@ -23,6 +23,7 @@ type statements struct {
 	environmentStatements
 	releaseStatements
 	idpConnectionStatements
+	idpIdentityLinkStatements
 	deploymentStatements
 	teamStatements
 	teamMembershipStatements
@@ -61,6 +62,7 @@ func newStatements(client queryExecutor) statements {
 		environmentStatements:         newEnvironmentStatements(client),
 		releaseStatements:             newReleaseStatements(client),
 		idpConnectionStatements:       newIDPConnectionStatements(client),
+		idpIdentityLinkStatements:     newIDPIdentityLinkStatements(client),
 		deploymentStatements:          newDeploymentStatements(client),
 		teamStatements:                newTeamStatements(client),
 		teamMembershipStatements:      newTeamMembershipStatements(client),

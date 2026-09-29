@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { scopedPath } from "@/lib/project-scope.fixture";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
@@ -40,19 +41,30 @@ function project(overrides: Record<string, unknown> = {}) {
   };
 }
 
-async function renderDetail() {
+async function renderDetail(path = scopedPath("/project", PROJECT_ID)) {
   const [{ RouterProvider, createMemoryHistory }, { createAppRouter }] = await Promise.all([
     import("@tanstack/react-router"),
     import("../../../router"),
   ]);
   const router = createAppRouter({
-    history: createMemoryHistory({ initialEntries: [`/projects/${PROJECT_ID}`] }),
+    history: createMemoryHistory({ initialEntries: [path] }),
   });
   render(<RouterProvider router={router} />);
   return router;
 }
 
 describe("project detail", () => {
+  it("opens the page a project link names, with that project selected", async () => {
+    // `/projects/{id}` is kept for links that name a project; the page lives at
+    // the scoped `/project`, so the sidebar and switcher follow the one named.
+    server.use(http.get(PROJECT_URL, () => HttpResponse.json(project())));
+    const router = await renderDetail(`/projects/${PROJECT_ID}`);
+
+    expect(await screen.findByRole("heading", { name: "River" })).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe("/project");
+    expect(router.state.location.search).toMatchObject({ project: PROJECT_ID });
+  });
+
   it("renders the name, the id and the created date", async () => {
     server.use(http.get(PROJECT_URL, () => HttpResponse.json(project())));
     await renderDetail();
