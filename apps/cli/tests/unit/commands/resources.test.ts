@@ -1116,6 +1116,24 @@ describe("other resources", () => {
     const json = parseJson(res.stdout) as { data: { items: Array<{ id: string }> } };
     expect(json.data.items[0]?.id).toBe("evt_1");
   });
+
+  it("events list maps --sort direction onto the order query parameter", async () => {
+    const cwd = await makeProject();
+    let url = "";
+    server.use(
+      http.get(`${SERVER}/events`, ({ request }) => {
+        url = request.url;
+        return HttpResponse.json({ data: [] });
+      }),
+    );
+    // The events registry declares `sortParam: "order"`, so the shared
+    // `--sort <field>:<direction>` grammar reaches `GET /events` as the flat
+    // `order` parameter the endpoint spells its direction as — a newest-first
+    // audit view is `--sort occurred_at:desc`.
+    const res = await run(cwd, ["events", "list", "--sort", "occurred_at:desc"]);
+    expect(res.exitCode).toBe(0);
+    expect(new URL(url).searchParams.get("order")).toBe("desc");
+  });
 });
 
 describe("configuration resources are read-only", () => {
