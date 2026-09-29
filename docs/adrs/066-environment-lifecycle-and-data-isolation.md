@@ -19,12 +19,18 @@ lifetime. The preview-environments prototype
 ([PR #1258](https://github.com/zitadel/nextgen/pull/1258)) answered both. This
 ADR records the answers so the remaining milestone work has one place to cite.
 
-The API and CLI will be able to maintain different projects on different
-servers and deploy configuration to each of them; every project keeps its own
-isolated data. The exact CLI commands to manage these projects and
-environments are out of scope for this ADR.
-
 ## Decision
+
+The API and CLI will be able to maintain different projects on different
+servers and deploy configuration to each of them. An app's own development,
+staging and production deployments each bind to a different project, and
+nothing requires those projects to share a server: the CLI holds the mapping
+in `zitadel.json`, one server-and-project pair per app environment, so
+development may run against a local instance while production runs against
+the cloud. Each project keeps its own isolated data and has its `live` and
+previews; the server itself knows no environment kinds and never sees the
+app's mapping. The exact CLI commands to manage these projects and
+environments are out of scope for this ADR.
 
 ### Data isolation
 
@@ -74,13 +80,6 @@ not a revival of the old one.
 There are no other environment kinds. The draft taxonomy of long-lived dev,
 staging and prod peers per project
 ([PR #1211](https://github.com/zitadel/nextgen/pull/1211)) is rejected.
-
-An app's own development, staging and production deployments each bind to a
-different project, and nothing requires those projects to share a server: the
-CLI holds the mapping in `zitadel.json`, one server-and-project pair per app
-environment, so development may run against a local instance while production
-runs against the cloud. Each project again has its `live` and previews; the
-server itself knows no environment kinds and never sees the app's mapping.
 
 Projects and environments topology:
 <img width="3424" height="1968" alt="Projects and environments topology" src="https://github.com/user-attachments/assets/f9e4c68e-e719-448d-907b-9a119b0ca083" />
