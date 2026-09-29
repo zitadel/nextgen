@@ -80,17 +80,24 @@ export function matchesRoutes(pathname: string, routes: readonly string[]): bool
  * absolute URL naming the upstream server, and a caller that did not say what
  * its own origin is.
  */
-function sameOriginLocation(location: string, selfOrigin: string | undefined): string | undefined {
-  if (selfOrigin === undefined || selfOrigin === "") {
+function sameOriginLocation(location: string, selfUrl: string | undefined): string | undefined {
+  if (selfUrl === undefined || selfUrl === "") {
     return undefined;
   }
+  let base: URL;
   let target: URL;
   try {
-    target = new URL(location, selfOrigin);
+    // The request's own URL, not just its origin: a relative `Location` is
+    // resolved against the path it came from (RFC 3986 §5), so `next?flow=x`
+    // answered to `/__nextgen/idp/callback` means `/__nextgen/idp/next?flow=x`
+    // and not `/next?flow=x`. Query-only and fragment-only references depend
+    // on the same base.
+    base = new URL(selfUrl);
+    target = new URL(location, base);
   } catch {
     return undefined;
   }
-  return target.origin === selfOrigin ? target.toString() : undefined;
+  return target.origin === base.origin ? target.toString() : undefined;
 }
 
 /**
@@ -107,11 +114,12 @@ function sameOriginLocation(location: string, selfOrigin: string | undefined): s
  * JSON body and the widget navigates -- so nothing legitimate points off-origin.
  *
  * @param upstream - The upstream response headers.
- * @param selfOrigin - The origin the app is served from. Omitting it keeps the
- *   old behaviour of dropping every redirect.
+ * @param selfUrl - The app's own request URL, which is both the origin a
+ *   redirect must land on and the base a relative one resolves against.
+ *   Omitting it keeps the old behaviour of dropping every redirect.
  * @returns A new `Headers` object with filtered headers.
  */
-export function filterResponseHeaders(upstream: Headers, selfOrigin?: string): Headers {
+export function filterResponseHeaders(upstream: Headers, selfUrl?: string): Headers {
   const filtered = new Headers();
   upstream.forEach((value, key) => {
     const name = key.toLowerCase();
@@ -119,7 +127,7 @@ export function filterResponseHeaders(upstream: Headers, selfOrigin?: string): H
       return;
     }
     if (name === "location") {
-      const sameOrigin = sameOriginLocation(value, selfOrigin);
+      const sameOrigin = sameOriginLocation(value, selfUrl);
       if (sameOrigin !== undefined) {
         filtered.set("location", sameOrigin);
       }

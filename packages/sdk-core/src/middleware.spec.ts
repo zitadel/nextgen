@@ -8,6 +8,8 @@ function upstream(entries: Record<string, string>): Headers {
 }
 
 const APP = "https://app.example.com";
+/** The callback the provider returns the browser to. */
+const CALLBACK = `${APP}/__nextgen/idp/callback?code=abc`;
 
 describe("filterResponseHeaders", () => {
   it("forwards a same-origin redirect", () => {
@@ -28,6 +30,31 @@ describe("filterResponseHeaders", () => {
     expect(
       filterResponseHeaders(upstream({ location: "/login?flow=x" }), APP).get("location"),
     ).toBe(`${APP}/login?flow=x`);
+  });
+
+  it("resolves a path-relative redirect against the request, not the origin root", () => {
+    // RFC 3986 §5: a relative reference resolves against the URL it came from.
+    // `next?flow=x` answered to `/__nextgen/idp/callback` means a sibling of
+    // that path, and resolving from `/` would silently send the browser
+    // somewhere else on the same origin.
+    const filtered = filterResponseHeaders(upstream({ location: "next?flow=x" }), CALLBACK);
+
+    expect(filtered.get("location")).toBe(`${APP}/__nextgen/idp/next?flow=x`);
+  });
+
+  it("keeps a query-only reference on the same path", () => {
+    const filtered = filterResponseHeaders(upstream({ location: "?flow=x" }), CALLBACK);
+
+    expect(filtered.get("location")).toBe(`${APP}/__nextgen/idp/callback?flow=x`);
+  });
+
+  it("still refuses another origin when resolved from a path", () => {
+    for (const location of ["https://evil.com/x", "//evil.com/x"]) {
+      expect(
+        filterResponseHeaders(upstream({ location }), CALLBACK).has("location"),
+        location,
+      ).toBe(false);
+    }
   });
 
   it("drops a redirect naming the upstream server", () => {
