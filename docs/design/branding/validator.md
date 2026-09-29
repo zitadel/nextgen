@@ -1,8 +1,19 @@
 # Validator
 
-**Status:** Stub. See [`README.md`](README.md) open question 7. **Parent:** [`README.md`](README.md). **Scope:** Structural checks only (required atoms present, `{% mandatory_gates %}`). Security (XSS, CSP, filters, DOMPurify) is [`../flowengine/template-security.md`](../flowengine/template-security.md). Run both.
+**Status:** Part shipped, part design; each section says which. **Parent:** [`README.md`](README.md). **Scope:** Structural checks only (required atoms present, `{% mandatory_gates %}`). Security (XSS, CSP, filters, DOMPurify) is [`../flowengine/template-security.md`](../flowengine/template-security.md).
 
-A template is structurally valid if, for every reachable step, required fields and gates have matching `<zl-*>` tags. Static pass before render; `{% mandatory_gates %}` patches gaps at runtime.
+## What ships
+
+- **Authoring validator** (`validateLoginTemplate` in `@zitadel/config/template`), run by `zitadel plan` / `apply`. It checks four things: the template is within the size cap, contains none of the banned patterns, carries a `{% mandatory_gates %}` tag, and parses as LiquidJS. It does not look at steps, fields, or atoms.
+- **Server gate**, on publish. It mirrors the size cap and the banned patterns only; it cannot parse the LiquidJS dialect.
+- **Runtime safety net** in the component, described below.
+- **Atom manifests** (`packages/components/src/manifests.ts`), one per shipped atom. Nothing validates templates against them yet.
+
+The component runs no validator. It parses and renders the template, and a template that throws renders the bundled default instead.
+
+## Structural validity (design)
+
+A template is structurally valid if, for every reachable step, required fields and gates have matching `<zl-*>` tags. The design is a static pass before render, with `{% mandatory_gates %}` patching gaps at runtime. Only the runtime half exists.
 
 ```mermaid
 flowchart TB
@@ -18,13 +29,14 @@ flowchart TB
 | Concern | Validator | Source | Runs when |
 |---|---|---|---|
 | XSS, auto-escape, banned filters (`raw`), CSP enforcement, DOMPurify sanitisation | **Security** | [`../flowengine/template-security.md`](../flowengine/template-security.md) | Server-side on save. Non-negotiable. |
-| Required fields/gates present, one primary action, no unknown atoms, `{% mandatory_gates %}` emitted | **Structural** (this doc) | Atom manifests + flow definition | Client-side on load + editor/CI. Falls back on failure. |
+| `{% mandatory_gates %}` emitted, template parses | **Authoring** (shipped) | `@zitadel/config/template` | `zitadel plan` / `apply`. |
+| Required fields/gates present, one primary action, no unknown atoms | **Structural** (design) | Atom manifests + flow definition | Not built. |
 
 Authoritative XSS/CSP rules live in `template-security.md`. This file is capability coverage only.
 
 ## Atom manifest
 
-Every `<zl-*>` atom ships a machine-readable manifest the validator and editor consume:
+Every `<zl-*>` atom ships a machine-readable manifest for a validator and editor to consume. The examples below illustrate the shape; the shipped manifests are in `packages/components/src/atoms/`.
 
 ```json
 {
@@ -54,7 +66,7 @@ Every `<zl-*>` atom ships a machine-readable manifest the validator and editor c
 
 Manifests are the single source of truth for parts, slots, and what an atom binds to on the step.
 
-## Static validation
+## Static validation (design)
 
 Given a flow definition (from the flow engine) and a template:
 
@@ -68,17 +80,18 @@ Given a flow definition (from the flow engine) and a template:
    - A trailing `{% mandatory_gates %}` tag is present.
    - No `<zl-*>` tags are unknown to the manifest registry.
 
-Output is structured: `{ step_name, missing[], unknown[], duplicated[] }`. The editor surfaces these inline; `npx zitadel push` surfaces them before upload.
+Output is structured: `{ step_name, missing[], unknown[], duplicated[] }`. An editor would surface these inline, and `zitadel plan` / `apply` before upload.
 
 ## Runtime safety net
 
-`{% mandatory_gates %}` is a Liquid tag the built-in templates place at the end of their body. After the template finishes rendering, the tag inspects the produced DOM and appends:
+Shipped (`packages/components/src/orchestrator/mandatory-gates.ts`). `{% mandatory_gates %}` is a Liquid tag the built-in templates place at the end of their body. After the template finishes rendering, the component inspects the produced DOM and appends:
 
-- Any required `fields[*]` without a matching `<zl-field>`.
-- Any required `gates[*]` without a matching consumer.
-- A `<zl-submit>` if none was reached.
+- Any required `fields[*]` with no `<zl-field>`, `<zl-select>` or `<zl-checkbox>` of that name.
+- The step's primary action as a `<zl-button>`, if no primary button was rendered.
 
-Appended nodes use token defaults only. Static validation should catch bad templates before ship; the tag is a last resort.
+It does not append gate consumers.
+
+Appended nodes use token defaults only.
 
 ## What the validator does not check
 
@@ -90,13 +103,13 @@ Appended nodes use token defaults only. Static validation should catch bad templ
 
 ## Frontend trigger points
 
-Open question 7 in [`README.md`](README.md). Candidates (frontend only):
+Open for the structural pass. Candidates:
 
 - Editor-time only (designer sees squiggles while authoring).
-- `npx zitadel push` refuses to upload an invalid template.
+- `zitadel plan` / `apply` refuses to upload an invalid template, beside the authoring checks it already runs.
 - Both.
 
-When the branding object reaches the component at runtime, the static validator runs once before first paint regardless of where else it ran. A failing template falls back to the nearest built-in (see [`schema.md`](schema.md) §Shape invariants).
+No validator runs in the component at paint time. See [`schema.md`](schema.md) § Where each check runs.
 
 ## See also
 

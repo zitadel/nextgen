@@ -20,10 +20,10 @@ Every field is optional. An omitted key takes the maintained default, so a revis
 
 | Field | What it is | Contract |
 | --- | --- | --- |
-| `layout` | Degrade preset (`centered` \| `split`) the bundled default template branches on, and the fallback when a custom template fails validation. It selects a template, so it is not an appearance control. | [`branding.yaml`](../../../api/openapi/components/flows/branding.yaml) |
+| `layout` | `centered` \| `split`. The component validates it and hands it to the template as `branding.layout`. The bundled default template does not read it, so it is not an appearance control. | [`branding.yaml`](../../../api/openapi/components/flows/branding.yaml) |
 | `liquid_template` | LiquidJS template for the step. Structure only, no `<style>`. | [`branding.yaml`](../../../api/openapi/components/flows/branding.yaml), [`templates.md`](templates.md), [`validator.md`](validator.md) |
 | `logo_url` | Single-mark fallback, used only when neither theme side names a mark. | [`branding.yaml`](../../../api/openapi/components/flows/branding.yaml) |
-| `hero_url` | Hero image for the split layout. | [`branding.yaml`](../../../api/openapi/components/flows/branding.yaml) |
+| `hero_url` | Hero image, for templates that reference it: revisions published from the split and hero designs. The bundled default template does not use it. | [`branding.yaml`](../../../api/openapi/components/flows/branding.yaml) |
 | `theme` | `mode`, plus the `light` and `dark` sides, each with its own `logo_url` and `palette`. | [`branding-theme.yaml`](../../../api/openapi/components/flows/branding-theme.yaml), [`branding-theme-side.yaml`](../../../api/openapi/components/flows/branding-theme-side.yaml), [`branding-palette.yaml`](../../../api/openapi/components/flows/branding-palette.yaml), [`branding-color.yaml`](../../../api/openapi/components/flows/branding-color.yaml) |
 | `typography` | `font_family`, `font_url`, `scale`. One face covers body and headings. | [`branding-typography.yaml`](../../../api/openapi/components/flows/branding-typography.yaml) |
 | `shape` | `radius` (preset or integer pixels), `density`, `logo_scale`. Shared across theme sides. | [`branding-shape.yaml`](../../../api/openapi/components/flows/branding-shape.yaml) |
@@ -65,18 +65,18 @@ A failing field is dropped and reported as a console warning, and the widget ren
 
 | Check | Runs in |
 | --- | --- |
-| Field types, colour and font grammar, template lexical gate ([`../flowengine/template-security.md`](../flowengine/template-security.md)) | The server, on publish |
-| Structural template validation ([`validator.md`](validator.md)) | The CLI, on `zitadel plan` / `apply` |
+| Field types, colour and font grammar, template size and banned patterns ([`../flowengine/template-security.md`](../flowengine/template-security.md)) | The server, on publish |
+| The same template size and banned patterns, plus two the server cannot run: the template parses as LiquidJS and carries `{% mandatory_gates %}` (`@zitadel/config/template`) | The CLI, on `zitadel plan` / `apply` |
 | URL and `layout` checks, as above | The component, per flow response |
 | Output sanitising (DOMPurify) | The component, per render |
 
-The component does not validate a template's structure. It parses and renders `liquid_template`, and a template that throws falls back to the bundled default. Three things keep a poor template usable at paint time:
+Nothing checks that a template renders every field and gate a step requires; the per-step structural pass in [`validator.md`](validator.md) is a design. The component parses and renders `liquid_template`, and a template that throws falls back to the bundled default. Three things keep a poor template usable at paint time:
 
 1. **Render fallback**: a parse or render error renders the bundled default template for the step.
-2. **Runtime safety net**: `{% mandatory_gates %}` appends missing required UI so the step stays submittable.
+2. **Runtime safety net**: `{% mandatory_gates %}` appends any required field and the primary action the template left out, so the step stays submittable.
 3. **Asset degradation**: an `<img>` that fails to load is hidden and, in the split designs, replaced by the decorative brand-pane placeholder. Armed per commit; a failure is warned about once on the console.
 
-A revision published straight through the API skips the CLI's structural pass, so these three are what it relies on.
+A revision published straight through the API skips the CLI's two extra checks, so these three are what it relies on.
 
 ## Contrast
 
