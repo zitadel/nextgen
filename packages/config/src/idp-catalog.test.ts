@@ -196,13 +196,31 @@ describe("scaffoldConnection endpoints", () => {
     expect(oidc.token_endpoint).toBeUndefined();
   });
 
-  it("points at a stand-in issuer, leaving the endpoints to be derived", () => {
+  it("names every endpoint once the issuer points at a stand-in", () => {
+    // The document says where it goes rather than leaving a reader to work
+    // out what the engine derives, and a connection naming them all is taken
+    // as authoritative instead of consulting discovery, which a stand-in may
+    // not serve.
     const oidc = scaffoldConnection({
       ...base,
       endpoints: { issuer: "http://localhost:9100" },
     }).oidc as Record<string, unknown>;
 
     expect(oidc.issuer).toBe("http://localhost:9100");
+    expect(oidc.authorization_endpoint).toBe("http://localhost:9100/authorize");
+    expect(oidc.token_endpoint).toBe("http://localhost:9100/token");
+  });
+
+  it("writes nothing when the issuer is the vendor's own", () => {
+    // Google's endpoints are not `<issuer>/authorize` and `<issuer>/token`;
+    // the catalog names none so discovery resolves them. Writing a derived
+    // guess here would break the one connection that needs no help.
+    const oidc = scaffoldConnection({
+      ...base,
+      endpoints: { issuer: "https://accounts.google.com" },
+    }).oidc as Record<string, unknown>;
+
+    expect(oidc.issuer).toBe("https://accounts.google.com");
     expect(oidc.authorization_endpoint).toBeUndefined();
     expect(oidc.token_endpoint).toBeUndefined();
   });

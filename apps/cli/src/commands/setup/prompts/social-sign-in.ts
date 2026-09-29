@@ -133,7 +133,15 @@ export class SocialSignInPrompt implements SetupPrompt {
     if (ctx.developmentBuild !== true) {
       return undefined;
     }
-    const issuer = await this.askUrl("Issuer", catalogIssuer(provider));
+    const vendor = catalogIssuer(provider);
+    const issuer = await this.askUrl("Issuer", vendor);
+    if (issuer === vendor) {
+      // Nothing is being stood in for, so the endpoints are the vendor's and
+      // come from its discovery document. Asking would offer two defaults
+      // that are wrong for it -- Google's are not `<issuer>/authorize` and
+      // `<issuer>/token` -- and every answer would be discarded anyway.
+      return { issuer };
+    }
     const derived = derivedEndpoints(issuer);
     return {
       issuer,

@@ -374,6 +374,27 @@ describe("SocialSignInPrompt", () => {
     });
   });
 
+
+  it("asks only the issuer when it is left at the vendor's", async () => {
+    // Keeping the vendor means its own endpoints, resolved from discovery.
+    // Offering `<issuer>/authorize` there would be a wrong default, so the
+    // question is not asked at all.
+    vi.mocked(select).mockResolvedValueOnce("google" as never);
+    vi.mocked(text)
+      .mockResolvedValueOnce("https://accounts.google.com" as never)
+      .mockResolvedValueOnce("client-id" as never);
+    vi.mocked(password).mockResolvedValueOnce("the-secret" as never);
+
+    const answers = await new SocialSignInPrompt().ask(baseAnswers(), {
+      ...ctx,
+      developmentBuild: true,
+    });
+
+    expect(answers.sso?.endpoints).toEqual({ issuer: "https://accounts.google.com" });
+    // The issuer and the client id, and no endpoint questions between them.
+    expect(vi.mocked(text)).toHaveBeenCalledTimes(2);
+  });
+
   it("never asks on a released build", async () => {
     // The gate is the build stamp, not a flag: someone who installed the CLI
     // is configuring the real vendor and must not meet this question.

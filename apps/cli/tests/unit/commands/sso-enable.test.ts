@@ -225,8 +225,9 @@ describe("sso enable", () => {
 
   it("points the connection at a stand-in issuer without touching the file afterwards", async () => {
     // The hidden issuer flag exists so testing against a local provider is a
-    // flag rather than a hand edit of the connection document. The endpoints
-    // stay absent: the engine derives them from the issuer.
+    // flag rather than a hand edit of the connection document. Every endpoint
+    // is named, so the document says where it goes and a stand-in that serves
+    // no discovery document still works.
     const cwd = await makeProject();
 
     const result = await enable(
@@ -242,7 +243,8 @@ describe("sso enable", () => {
       await readFile(join(cwd, ".zitadel/idps/google.json"), "utf8"),
     ) as { oidc: Record<string, unknown> };
     expect(written.oidc.issuer).toBe("http://localhost:9100");
-    expect(written.oidc.authorization_endpoint).toBeUndefined();
+    expect(written.oidc.authorization_endpoint).toBe("http://localhost:9100/authorize");
+    expect(written.oidc.token_endpoint).toBe("http://localhost:9100/token");
     expect(written.oidc.client_secret).toBe("${{ GOOGLE_CLIENT_SECRET }}");
   });
 

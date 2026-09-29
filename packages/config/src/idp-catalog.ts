@@ -174,35 +174,35 @@ export function derivedEndpoints(issuer: string): {
 }
 
 /**
- * The endpoint keys to write, which is as few as possible.
+ * The endpoint keys to write.
  *
- * Anything matching what would happen anyway is left out: an issuer equal to
- * the catalog's, and an endpoint equal to the one the engine derives from the
- * issuer. A connection that names only what actually differs stays readable,
- * and an ordinary run produces the same document it would if none of this
- * existed.
+ * An issuer equal to the catalog's changes nothing, so nothing is written and
+ * the vendor's own template stands. That case matters: the catalog names no
+ * endpoints for a vendor on purpose, because they are resolved from its
+ * discovery document, and Google's are not `<issuer>/authorize` and
+ * `<issuer>/token` at all. Writing a guess there would break the connection
+ * that needs no help.
+ *
+ * Once the issuer points somewhere else, all three are written. The connection
+ * then says where it goes rather than leaving a reader to work out what the
+ * engine would derive, and `idp-connection.yaml` treats a connection that
+ * names every endpoint as authoritative instead of consulting discovery --
+ * which a stand-in may not serve.
  */
 function endpointOverrides(
   endpoints: ConnectionEndpoints | undefined,
   catalogsIssuer: string,
 ): Record<string, string> {
   const issuer = endpoints?.issuer;
-  if (issuer === undefined || issuer === "") {
+  if (issuer === undefined || issuer === "" || issuer === catalogsIssuer) {
     return {};
   }
   const derived = derivedEndpoints(issuer);
-  const written: Record<string, string> = {};
-  if (issuer !== catalogsIssuer) {
-    written.issuer = issuer;
-  }
-  const { authorizationEndpoint, tokenEndpoint } = endpoints ?? {};
-  if (authorizationEndpoint && authorizationEndpoint !== derived.authorizationEndpoint) {
-    written.authorization_endpoint = authorizationEndpoint;
-  }
-  if (tokenEndpoint && tokenEndpoint !== derived.tokenEndpoint) {
-    written.token_endpoint = tokenEndpoint;
-  }
-  return written;
+  return {
+    issuer,
+    authorization_endpoint: endpoints?.authorizationEndpoint || derived.authorizationEndpoint,
+    token_endpoint: endpoints?.tokenEndpoint || derived.tokenEndpoint,
+  };
 }
 
 /**
