@@ -32,6 +32,8 @@ const (
 	createFirstIDPConnectionRevisionStmt = `INSERT INTO idp_connection_revisions ` +
 		`(project_id, id, connection_id, document, created_at) VALUES (@p1, @p2, @p3, @p4, @p5)`
 
+	lockIDPConnectionStmt = `SELECT id FROM idp_connections WHERE project_id = @p1 AND id = @p2 FOR UPDATE`
+
 	// One row per revision, carrying its connection's identity. The last column
 	// is the revision's created_at, which reads serve as UpdatedAt.
 	idpConnectionQuery = `SELECT c.project_id, c.id, c.slug, r.id, r.document, c.created_at, r.created_at
@@ -142,12 +144,17 @@ func scanIDPConnectionTimestamp(dst *time.Time) func(*spanner.RowIterator) error
 
 // LockIDPConnection implements [service.IDPConnectionStatements].
 //
-// A plain keyed read is enough: inside a read-write transaction it takes a
-// lock on the connection row, and a conflicting commit aborts one of the
-// transactions, which ReadWriteTransaction then retries from the start.
+// FOR UPDATE takes an exclusive lock on the connection row. A plain read would
+// take only a shared lock, which two revises can hold at once, so both would
+// read the same newest revision and both commit. With the exclusive lock a
+// concurrent revise of the same connection aborts, and ReadWriteTransaction
+// replays it after the first commits. The emulator cannot prove this: it runs
+// one read-write transaction at a time process-wide.
 func (s idpConnectionStatements) LockIDPConnection(ctx context.Context, projectID, id string) error {
-	_, err := s.db.ReadRow(ctx, "idp_connections", spanner.Key{projectID, id}, []string{"id"})
-	return err
+	return s.db.Query(ctx, buildStatement(lockIDPConnectionStmt, projectID, id).statement(), func(iter *spanner.RowIterator) error {
+		_, err := collectOneRow(iter, func(*spanner.Row) (struct{}, error) { return struct{}{}, nil })
+		return err
+	})
 }
 
 // GetIDPConnection implements [service.IDPConnectionStatements].
