@@ -27,10 +27,13 @@ secret-handling caveat live in [`README.md`](README.md).
   screens run in a project other than the one the console signs into.
 
 Console screens act on the selected project (`?project=`, see
-[`apps/console/AGENTS.md`](../console/AGENTS.md)). The `e2e-real` lane pins it
-through `VITE_CONSOLE_PROJECT_ID`; a spec that navigates by URL either lets the
-guard fill it in or names it, and asserts it survives navigation where that is
-the point.
+[`apps/console/AGENTS.md`](../console/AGENTS.md)). The guard only ever selects
+a project the signed-in person holds a grant on: the `VITE_CONSOLE_PROJECT_ID`
+pin when it is one of theirs, else their only project, else none. `e2e-real`
+grants each signed-in user its project (`signIn` in `src-real/support.ts`), so
+the pin selects it there; a user with no grant lands on Projects with nothing
+selected. A spec that navigates by URL either lets the guard fill it in or
+names it, and asserts it survives navigation where that is the point.
 
 All four tasks carry `runInCI: false` — that only keeps them out of moon's
 automatic selection. The `full-pr` job explicitly runs `e2e-real`,
