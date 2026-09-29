@@ -25,9 +25,9 @@ describe("filterResponseHeaders", () => {
   it("makes a relative redirect absolute, because Next rejects a relative one", () => {
     // A `Location` that is only a path fails with ERR_INVALID_URL when it
     // comes back from Next middleware, so the resolved form is forwarded.
-    expect(filterResponseHeaders(upstream({ location: "/login?flow=x" }), APP).get("location")).toBe(
-      `${APP}/login?flow=x`,
-    );
+    expect(
+      filterResponseHeaders(upstream({ location: "/login?flow=x" }), APP).get("location"),
+    ).toBe(`${APP}/login?flow=x`);
   });
 
   it("drops a redirect naming the upstream server", () => {
