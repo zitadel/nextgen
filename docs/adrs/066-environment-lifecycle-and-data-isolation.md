@@ -21,17 +21,6 @@ ADR records the answers so the remaining milestone work has one place to cite.
 
 ## Decision
 
-The API and CLI will be able to maintain different projects on different
-servers and deploy configuration to each of them. An app's own development,
-staging and production deployments each bind to a different project, and
-nothing requires those projects to share a server: the CLI holds the mapping
-in `zitadel.json`, one server-and-project pair per app environment, so
-development may run against a local instance while production runs against
-the cloud. Each project keeps its own isolated data and has its `live` and
-previews; the server itself knows no environment kinds and never sees the
-app's mapping. The exact CLI commands to manage these projects and
-environments are out of scope for this ADR.
-
 ### Data isolation
 
 There is no runtime data isolation between the environments of a project.
@@ -83,6 +72,21 @@ staging and prod peers per project
 
 Projects and environments topology:
 <img width="3424" height="1968" alt="Projects and environments topology" src="https://github.com/user-attachments/assets/f9e4c68e-e719-448d-907b-9a119b0ca083" />
+
+## Conclusion
+
+Data isolation at the project boundary, one `live` plus ephemeral previews
+per project, and an API and CLI that can maintain different projects on
+different servers together cover every combination an app needs. A preview
+that shares data with production is a preview environment on the production
+project. A staging with isolated data is a separate project — on the same
+server or another — with its own `live` and its own previews. An app's own
+development, staging and production deployments each bind to a different
+project through `zitadel.json`, one server-and-project pair per app
+environment, so development may run against a local instance while production
+runs against the cloud; the server itself knows no environment kinds and
+never sees the app's mapping. The exact CLI commands to manage these projects
+and environments are out of scope for this ADR.
 
 ## Consequences
 
