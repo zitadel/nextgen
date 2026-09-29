@@ -134,6 +134,38 @@ func TestEventStatements_ListKeyset(t *testing.T) {
 	})
 }
 
+func TestEventStatements_ListKeyset_Desc(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, _ := uniqueEventIDs(t)
+		ensureEventProject(t, d.stmts, projectID)
+
+		first := sampleEvent(projectID, "evt-001")
+		require.NoError(t, d.stmts.InsertEvent(t.Context(), first))
+		second := sampleEvent(projectID, "evt-002")
+		second.EventType = domain.EventTypeUserDeleted
+		require.NoError(t, d.stmts.InsertEvent(t.Context(), second))
+
+		descOpts := func() *database.ListOptions[domain.EventField] {
+			opts := events.ListOptions(projectID, 1)
+			opts.Pagination.OrderBy = events.CreatedAtDesc()
+			return opts
+		}
+
+		page1, err := d.stmts.ListEvents(t.Context(), descOpts())
+		require.NoError(t, err)
+		require.Len(t, page1.Items, 1)
+		assert.Equal(t, "evt-002", page1.Items[0].ID, "descending keyset serves the newest event first")
+		require.NotEmpty(t, page1.NextCursor)
+
+		opts := descOpts()
+		opts.Pagination.Cursor = page1.NextCursor
+		page2, err := d.stmts.ListEvents(t.Context(), opts)
+		require.NoError(t, err)
+		require.Len(t, page2.Items, 1)
+		assert.Equal(t, "evt-001", page2.Items[0].ID, "the descending cursor pages back through older events")
+	})
+}
+
 func TestEventStatements_Get_NotFound(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID, _ := uniqueEventIDs(t)

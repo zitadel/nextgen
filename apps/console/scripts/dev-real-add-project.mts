@@ -38,8 +38,9 @@
  *   --project-id <proj_…>   grant on an existing project instead of creating
  *   --secret <secret>       that project's secret (printed when this script
  *                           created it); required with --project-id. For the
- *                           seeded project, use the console's own Settings →
- *                           Admins instead: it grants with your session.
+ *                           seeded project, use the Admins section on the
+ *                           project's page in the console instead: it grants
+ *                           with your session.
  *
  * Environment (all optional, same defaults as dev-real):
  *   CONSOLE_DEV_ORIGIN        console dev server, default http://localhost:5174
@@ -70,7 +71,7 @@ const principal: Principal = args.identifier
   : { user_id: args["user-id"] ?? (await resolveUserId(email)) };
 if (args["project-id"] && !args.secret) {
   fail(
-    "--project-id needs that project's --secret (for the seeded project, use Settings → Admins in the console)",
+    "--project-id needs that project's --secret (for the seeded project, add the admin from the project's page in the console)",
   );
 }
 const projectId = args["project-id"] ?? (await createProject(name));
