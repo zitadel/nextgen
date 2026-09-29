@@ -10,6 +10,8 @@ import (
 	"io"
 	"maps"
 	"net/http"
+	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
@@ -184,9 +186,33 @@ func (c *OIDCClient) exchange(ctx context.Context, code, pkceVerifier, clientSec
 	ctx = context.WithValue(ctx, oauth2.HTTPClient, c.party.HttpClient())
 	token, err := config.Exchange(ctx, code, opts...)
 	if err != nil {
-		return nil, domain.ErrIDPExchangeFailed(err)
+		// The provider wrote the error description, the error URI, and a
+		// non-JSON body, and the code and secret it was just sent could
+		// be echoed there. The log keeps the status and the error code,
+		// the latter only when it is a plain token.
+		if re, ok := errors.AsType[*oauth2.RetrieveError](err); ok {
+			code := re.ErrorCode
+			if !oauthErrorCode.MatchString(code) {
+				code = ""
+			}
+			return nil, domain.ErrIDPExchangeFailed(fmt.Errorf("token endpoint: status %d, error %q", re.Response.StatusCode, code))
+		}
+		return nil, domain.ErrIDPExchangeFailed(transportCause(err))
 	}
 	return token, nil
+}
+
+// oauthErrorCode is the shape of an RFC 6749 error code the log may carry.
+var oauthErrorCode = regexp.MustCompile(`^[a-z_]+$`)
+
+// transportCause strips the URL from a request error: the http client
+// wraps every failure in one, and the URL may carry the endpoint's query
+// string. What remains names the dial or the deadline, not the address.
+func transportCause(err error) error {
+	if ue, ok := errors.AsType[*url.Error](err); ok {
+		return ue.Err
+	}
+	return err
 }
 
 // verifyIDToken checks the id_token from the token response against the
@@ -249,7 +275,7 @@ func (c *OIDCClient) extractClaims(ctx context.Context, token *oauth2.Token, idT
 	req.Header.Set("Accept", "application/json")
 	resp, err := c.party.HttpClient().Do(req)
 	if err != nil {
-		return nil, domain.ErrIDPUserinfoFailed(err)
+		return nil, domain.ErrIDPUserinfoFailed(transportCause(err))
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {

@@ -256,7 +256,28 @@ func TestExchange(t *testing.T) {
 			},
 			authMethod:   ClientSecretBasic,
 			wantErr:      domain.ErrIDPExchangeFailed(nil),
-			wantCauseMsg: `oauth2: "invalid_grant" "code expired"`,
+			wantCauseMsg: `token endpoint: status 400, error "invalid_grant"`,
+		},
+		{
+			name: "an error response whose code is not a plain token loses it",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = w.Write([]byte(`{"error":"the-code"}`))
+			},
+			authMethod:   ClientSecretBasic,
+			wantErr:      domain.ErrIDPExchangeFailed(nil),
+			wantCauseMsg: `token endpoint: status 400, error ""`,
+		},
+		{
+			name: "an error response that is not JSON keeps only its status",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusBadGateway)
+				_, _ = w.Write([]byte(`<html>the-code</html>`))
+			},
+			authMethod:   ClientSecretBasic,
+			wantErr:      domain.ErrIDPExchangeFailed(nil),
+			wantCauseMsg: `token endpoint: status 502, error ""`,
 		},
 		{
 			name: "a token response without an access token fails",
@@ -945,8 +966,8 @@ func TestCoerceSubject(t *testing.T) {
 }
 
 // TestCallbackLeaksNothing runs every failing step with planted values and
-// checks that none reach the user-facing text or details, and that no
-// secret, verifier, or token reaches the log-only cause either.
+// checks that none reach the user-facing text, the details, or the log-only
+// cause.
 func TestCallbackLeaksNothing(t *testing.T) {
 	const (
 		secret   = "planted-secret"
@@ -977,11 +998,22 @@ func TestCallbackLeaksNothing(t *testing.T) {
 		wantErr error
 	}{
 		{
-			name: "the token endpoint rejects the exchange",
+			name: "the token endpoint echoes the exchange in its error response",
+			handler: func(t *testing.T, p *provider) http.HandlerFunc {
+				return func(w http.ResponseWriter, r *http.Request) {
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusBadRequest)
+					_, _ = fmt.Fprintf(w, `{"error":%q,"error_description":%q,"error_uri":"https://idp.example.test/?%s"}`, code, secret, query)
+				}
+			},
+			wantErr: domain.ErrIDPExchangeFailed(nil),
+		},
+		{
+			name: "the token endpoint echoes the exchange in a body that is not JSON",
 			handler: func(t *testing.T, p *provider) http.HandlerFunc {
 				return func(w http.ResponseWriter, r *http.Request) {
 					w.WriteHeader(http.StatusBadRequest)
-					_, _ = w.Write([]byte(`{"error":"invalid_client"}`))
+					_, _ = fmt.Fprintf(w, "%s %s", code, secret)
 				}
 			},
 			wantErr: domain.ErrIDPExchangeFailed(nil),
@@ -1079,9 +1111,7 @@ func TestCallbackLeaksNothing(t *testing.T) {
 			for _, planted := range []string{secret, verifier, code, nonce, access, email, query, "eyJ"} {
 				assert.NotContains(t, visible, planted, "user-facing text")
 			}
-			// The cause may carry the token endpoint's error body and its
-			// URL, so the code and the query are not checked here.
-			for _, planted := range []string{secret, verifier, nonce, access, email, "eyJ"} {
+			for _, planted := range []string{secret, verifier, code, nonce, access, email, query, "eyJ"} {
 				assert.NotContains(t, de.Parent.Error(), planted, "log-only cause")
 			}
 		})
