@@ -99,6 +99,14 @@ export interface ResourceSyncer {
    */
   readonly singletonFile?: string;
   /**
+   * When set, every file in `directory` must carry the basename this
+   * returns for its body. A resource whose identity is a field of the
+   * document (a policy's `operation`) is otherwise open to two files
+   * publishing revisions of the same resource, whichever is scanned last
+   * winning the live slot.
+   */
+  expectedFileName?(data: object): string;
+  /**
    * Assert that a single on-disk file body is valid for this resource.
    * Throws `E_VALIDATION` (a `ZitadelError`) on the first invalid input.
    * The sync engine calls this for every file it reads, so a malformed

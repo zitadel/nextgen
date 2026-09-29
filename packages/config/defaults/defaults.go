@@ -18,6 +18,12 @@ var schemasReadme []byte
 //go:embed README-flows.md
 var flowsReadme []byte
 
+//go:embed default-password-policy.json
+var defaultPasswordPolicy []byte
+
+//go:embed README-policies.md
+var policiesReadme []byte
+
 // DefaultHumanUserSchema returns a copy of the default human user schema template.
 func DefaultHumanUserSchema() []byte {
 	return append([]byte(nil), defaultHumanUserSchema...)
@@ -38,4 +44,16 @@ func SchemasReadme() []byte {
 // `.zitadel/flows/README.md` at setup time.
 func FlowsReadme() []byte {
 	return append([]byte(nil), flowsReadme...)
+}
+
+// DefaultPasswordPolicy returns a copy of the default `user.password.save`
+// policy instance the CLI scaffolds (ADR 066).
+func DefaultPasswordPolicy() []byte {
+	return append([]byte(nil), defaultPasswordPolicy...)
+}
+
+// PoliciesReadme returns the README content the CLI copies to
+// `.zitadel/policies/README.md` at setup time.
+func PoliciesReadme() []byte {
+	return append([]byte(nil), policiesReadme...)
 }

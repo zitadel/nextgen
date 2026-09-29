@@ -5,6 +5,8 @@ import { consola } from "consola";
 
 import type {
   CreateFlowDefinition201,
+  CreatePolicy201,
+  CreatePolicyBody,
   CreateSchema201,
   CreateSchemaBody,
 } from "@zitadel/api/generated/model";
@@ -12,19 +14,25 @@ import type { ZitadelClient } from "@zitadel/api/client";
 import {
   DEFAULT_FLOW_CONFIG_PATH,
   DEFAULT_FLOW_SCHEMA_URI,
+  DEFAULT_POLICY_CONFIG_PATH,
   DEFAULT_SCHEMA_CONFIG_PATH,
   DEFAULT_SETUP_PRESET,
   DEFAULT_SETUP_USE_CASE,
   flowsReadmeContent,
   getDefaultHumanUserSchema,
   getDefaultLoginFlow,
+  getDefaultPasswordPolicy,
+  policiesReadmeContent,
   schemasReadmeContent,
   type SetupPreset,
   type SetupUseCase,
 } from "@zitadel/config/defaults";
+import { POLICY_FILE_SCHEMA_REF } from "@zitadel/config/meta-schemas";
+
 import { normalizeFlowBody, normalizeSchemaBody } from "@zitadel/config/normalize";
 
 import { FLOWS_DIR } from "./flows";
+import { POLICIES_DIR, toPolicyWireBody } from "./policies";
 import { stableStringify } from "./json";
 import { normalizePublicCliProse } from "./public-cli";
 import { hashForState, writeBackResource } from "./sync";
@@ -147,6 +155,33 @@ export async function materializeSetupResources(opts: {
     name: flowBody.name,
     status: flowBody.status,
   });
+
+  // The password policy instance (ADR 066): the template defaults, copied
+  // into the project so the tunable settings are visible and versioned, and
+  // published as revision 1 so `plan` starts from a known server state.
+  await mkdir(join(opts.cwd, POLICIES_DIR), { recursive: true });
+  const policyDocument = { ...getDefaultPasswordPolicy(), $schema: POLICY_FILE_SCHEMA_REF };
+  if (await writeResourceFile(opts.cwd, DEFAULT_POLICY_CONFIG_PATH, policyDocument, opts.force)) {
+    filesWritten.push(join(opts.cwd, DEFAULT_POLICY_CONFIG_PATH));
+  }
+  const createdPolicy = (await opts.client.createPolicy(
+    toPolicyWireBody(policyDocument) as CreatePolicyBody,
+    { project_id: opts.projectId },
+  )) as CreatePolicy201;
+  await updateState(opts.cwd, DEFAULT_POLICY_CONFIG_PATH, {
+    id: requiredString(createdPolicy.id, "created policy revision id"),
+    hash: hashForState({ normalize: toPolicyWireBody }, policyDocument),
+  });
+  const policiesReadme = join(POLICIES_DIR, "README.md");
+  if (
+    await writeReadmeFile(
+      opts.cwd,
+      policiesReadme,
+      normalizePublicCliProse(policiesReadmeContent(), opts.cliVersion),
+    )
+  ) {
+    filesWritten.push(join(opts.cwd, policiesReadme));
+  }
 
   const schemasReadme = join(SCHEMAS_DIR, "README.md");
   const flowsReadme = join(FLOWS_DIR, "README.md");

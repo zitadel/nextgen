@@ -152,6 +152,8 @@ which ships in this package.
 * [`zitadel idps list`](#zitadel-idps-list)
 * [`zitadel logs`](#zitadel-logs)
 * [`zitadel plan`](#zitadel-plan)
+* [`zitadel policies get ID`](#zitadel-policies-get-id)
+* [`zitadel policies list`](#zitadel-policies-list)
 * [`zitadel projects get ID`](#zitadel-projects-get-id)
 * [`zitadel projects list`](#zitadel-projects-list)
 * [`zitadel projects update ID`](#zitadel-projects-update-id)
@@ -1207,6 +1209,85 @@ GLOBAL FLAGS
 
 DESCRIPTION
   Validate config without mutation and preview the sync diff.
+```
+
+## `zitadel policies get ID`
+
+Get one policy revision by id.
+
+```
+USAGE
+  $ zitadel policies get ID [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [--verbose] [--debug] [--telemetry] [--fields <value>] [-e
+    development|preview|production]
+
+ARGUMENTS
+  ID  policy revision id
+
+FLAGS
+  -c, --cwd=<value>           Project directory to operate on.
+  -e, --environment=<option>  Target environment (default: development).
+                              <options: development|preview|production>
+  -n, --non-interactive       Disable prompts. Required when scripting or
+                              running as an agent.
+  -s, --server=<value>        Override the resolved server URL.
+      --debug                 Debug logging.
+      --dry-run               Preview without mutating files or the platform.
+      --fields=<value>        Fields to show, comma-separated dot-paths.
+                              Defaults to the resource's own; `--json` is
+                              unaffected.
+      --[no-]telemetry        Send anonymous usage analytics. Disable with
+                              --no-telemetry.
+      --verbose               Verbose logging.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Get one policy revision by id.
+
+EXAMPLES
+  $ zitadel policies get <id>
+
+  $ zitadel policies get <id> --json
+```
+
+## `zitadel policies list`
+
+List policies.
+
+```
+USAGE
+  $ zitadel policies list [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [--verbose] [--debug] [--telemetry] [--fields <value>] [--plain]
+    [-e development|preview|production]
+
+FLAGS
+  -c, --cwd=<value>           Project directory to operate on.
+  -e, --environment=<option>  Target environment (default: development).
+                              <options: development|preview|production>
+  -n, --non-interactive       Disable prompts. Required when scripting or
+                              running as an agent.
+  -s, --server=<value>        Override the resolved server URL.
+      --debug                 Debug logging.
+      --dry-run               Preview without mutating files or the platform.
+      --fields=<value>        Columns to show, comma-separated dot-paths (e.g.
+                              id,attributes.email). Defaults to the resource's
+                              own columns; `--json` is unaffected.
+      --plain                 Tab-separated rows with no header, for piping.
+                              Implied when stdout is not a terminal.
+      --[no-]telemetry        Send anonymous usage analytics. Disable with
+                              --no-telemetry.
+      --verbose               Verbose logging.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  List policies.
+
+EXAMPLES
+  $ zitadel policies list --json
 ```
 
 ## `zitadel projects get ID`

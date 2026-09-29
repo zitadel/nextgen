@@ -27,6 +27,14 @@ export function brandingReadmeContent(): string {
   return readFileSync(readmeUrl("README-branding.md"), "utf8");
 }
 
+/**
+ * README content the CLI copies to `.zitadel/policies/README.md` during
+ * setup. Source of truth is `packages/config/defaults/README-policies.md`.
+ */
+export function policiesReadmeContent(): string {
+  return readFileSync(readmeUrl("README-policies.md"), "utf8");
+}
+
 function readmeUrl(filename: string): string {
   return fileURLToPath(new URL(`../defaults/${filename}`, import.meta.url));
 }

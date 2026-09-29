@@ -9,6 +9,7 @@ import { FLOWS_DIR } from "../flows";
 import { stableStringify } from "../json";
 import { annotateAssetWarnings } from "./asset-probe.js";
 import { validatePlannedFlows } from "./flow-validation.js";
+import { annotatePolicyWarnings } from "./policy-warnings.js";
 import type { PlanResourceChange } from "./plan-renderer.js";
 import { readState, removeFromState, updateState } from "./state.js";
 import type { FlowRepin, ResourceEntry, ResourceSyncer, SyncAction } from "./types.js";
@@ -92,8 +93,23 @@ export async function buildSyncPlan(
       }
     }
 
-    for (const content of onDisk.values()) {
+    for (const [absPath, content] of onDisk) {
       syncer.validate(content);
+      if (syncer.expectedFileName) {
+        const expected = syncer.expectedFileName(content);
+        const name = basename(absPath);
+        if (name !== expected) {
+          throw new ZitadelError(
+            "E_VALIDATION",
+            `${syncer.directory}/${name} must be named ${expected}`,
+            {
+              hint:
+                `a ${syncer.kind} file is named after the resource it describes, one file per ` +
+                `resource; rename it or remove the duplicate.`,
+            },
+          );
+        }
+      }
     }
 
     for (const [filePath, entry] of Object.entries(state.resources)) {
@@ -221,6 +237,10 @@ export async function buildSyncPlan(
   // the machine planning is not necessarily the machine rendering the login
   // page, so a URL this host cannot fetch is never a reason to fail.
   await annotateAssetWarnings(actions);
+
+  // A policy value below the setting's recommended minimum publishes, with
+  // a warning: the floor is the protection, the recommendation is guidance.
+  annotatePolicyWarnings(actions);
 
   return actions;
 }

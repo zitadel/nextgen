@@ -61,6 +61,11 @@ Each invocation prints one JSON object:
   revision: the login renders the maintained `<zitadel-login>` component.
   Taking ownership of the widget template is the separate, opt-in
   `branding eject` command.
+- `setup` writes `.zitadel/policies/user.password.save.json` (the password
+  policy at its template defaults) and publishes it as revision 1, so `plan`
+  starts from a known server state. Edit the file and run `plan` / `apply` to
+  publish a new revision; `policies list` and `policies get <id>` read
+  revisions back.
 - `E_LOCAL_SERVER_NOT_RUNNING`: start the local runtime with
   `npx @zitadel/cli@alpha start`, then retry with `--server local`.
 - `E_NOT_FOUND`: an HTTP 404 from the target server. With the platform's
@@ -110,7 +115,8 @@ Runtime resources — users, teams, sessions, events, grants, projects — have 
 uniform `zitadel <resource> <verb>` surface built from one registry
 (`src/commands/resources.ts`); the conventions are documented in
 `docs/design/cli/resource-commands.md`. Config resources (schemas, flows,
-branding) stay on `plan` / `apply`; the resource commands never write them.
+branding, policies) stay on `plan` / `apply`; the resource commands never
+write them.
 
 | Resource   | Verbs                                  |
 | ---------- | -------------------------------------- |
@@ -504,8 +510,10 @@ exercises fresh-app setup plus registration, logout, and login across the
 supported frameworks.
 
 Repo config is authoritative: edit `zitadel.json` or files under `.zitadel/`,
-then re-run `plan` and `apply`. Schema and flow files are synced from
-`.zitadel/schemas/*.json` and `.zitadel/flows/*.json`. Login templates
+then re-run `plan` and `apply`. Schema, flow and policy files are synced from
+`.zitadel/schemas/*.json`, `.zitadel/flows/*.json` and
+`.zitadel/policies/<operation>.json` (one file per guarded operation, named
+after its `operation`). Login templates
 (branding) are synced from `.zitadel/branding/`: a single `branding.json`
 descriptor (layout, asset URLs) plus a sibling `login.liquid` LiquidJS
 template referenced as `"liquid_template": { "$file": "./login.liquid" }`. Scaffold them with the

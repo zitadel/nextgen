@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 
 import type {
   CreateFlowDefinitionBodyFlowDefinition,
+  CreatePolicyBody,
   CreateSchemaBody,
 } from "@zitadel/api/generated/model";
 
@@ -12,6 +13,9 @@ import defaultHumanUserSchemaTemplate from "../defaults/default-human-user.json"
 import defaultLoginFlowTemplate from "../defaults/default-login.json" with {
   type: "json",
 };
+import defaultPasswordPolicyTemplate from "../defaults/default-password-policy.json" with {
+  type: "json",
+};
 import passkeyFirstHumanUserSchemaTemplate from "../defaults/presets/passkey-first/human-user.json" with {
   type: "json",
 };
@@ -19,7 +23,12 @@ import passkeyFirstLoginFlowTemplate from "../defaults/presets/passkey-first/log
   type: "json",
 };
 
-export { brandingReadmeContent, flowsReadmeContent, schemasReadmeContent } from "./readmes.js";
+export {
+  brandingReadmeContent,
+  flowsReadmeContent,
+  policiesReadmeContent,
+  schemasReadmeContent,
+} from "./readmes.js";
 
 export const DEFAULT_BUILTIN_SCHEMA_BASE = "https://nextgen.com/api/schemas";
 export const DEFAULT_FLOW_SCHEMA_URI = "https://nextgen.com/flow-definition.json";
@@ -27,6 +36,20 @@ export const DEFAULT_SCHEMA_CONFIG_PATH = ".zitadel/schemas/default-human-user.j
 export const DEFAULT_FLOW_CONFIG_PATH = ".zitadel/flows/default-login.json";
 export const DEFAULT_BRANDING_CONFIG_PATH = ".zitadel/branding/branding.json";
 export const DEFAULT_BRANDING_TEMPLATE_PATH = ".zitadel/branding/login.liquid";
+/**
+ * The password policy instance `zitadel setup` scaffolds (ADR 066): one file
+ * per guarded operation under `.zitadel/policies/`, named after the operation.
+ */
+export const DEFAULT_POLICY_CONFIG_PATH = ".zitadel/policies/user.password.save.json";
+
+/**
+ * The default `user.password.save` instance: the template defaults, spelled
+ * out so the file shows what can be tuned. Carries the editor `$schema`
+ * pointer; the CLI strips it before upload.
+ */
+export function getDefaultPasswordPolicy(): CreatePolicyBody & { $schema: string } {
+  return structuredClone(defaultPasswordPolicyTemplate) as CreatePolicyBody & { $schema: string };
+}
 
 /**
  * Named schema+flow bundles `zitadel setup` can scaffold (#448: the prompt
