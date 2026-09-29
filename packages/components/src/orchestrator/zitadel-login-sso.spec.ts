@@ -235,6 +235,35 @@ describe("<zitadel-login> with identity providers", () => {
     expect(redirects).toHaveLength(0);
   });
 
+
+  it("resumes the flow a provider callback left in the URL", async () => {
+    // The callback finishes by navigating the browser back with `?flow=<id>`.
+    // It is a fresh page load, so nothing of the previous document survives:
+    // a widget that ignores the parameter starts a new flow, and the user
+    // lands on a blank sign-in screen having just signed in.
+    const seen: string[] = [];
+    const record = ({ request }: { request: Request }) => {
+      seen.push(`${request.method} ${new URL(request.url).pathname}`);
+    };
+    server.events.on("request:start", record);
+    const original = window.location.href;
+    window.history.replaceState({}, "", "/login?flow=flow_mock");
+
+    try {
+      const element = document.createElement("zitadel-login") as ZitadelLogin;
+      element.purpose = "login";
+      element.project = testProject;
+      host.appendChild(element);
+      await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
+    } finally {
+      window.history.replaceState({}, "", original);
+      server.events.removeListener("request:start", record);
+    }
+
+    expect(seen).toContain("GET /flow/flow_mock");
+    expect(seen).not.toContain("POST /flow");
+  });
+
   it("offers no providers when the project has enabled none", async () => {
     clearSsoProviders();
     const element = document.createElement("zitadel-login") as ZitadelLogin;

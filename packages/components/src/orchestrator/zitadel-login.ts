@@ -96,6 +96,32 @@ function isFieldAtom(el: Element): el is FieldAtom {
  * - `docs/design/flowengine/template-security.md`
  */
 
+/**
+ * The flow handle a provider callback left in the URL, if any.
+ *
+ * The identity-provider callback finishes by navigating the browser back to
+ * the page the sign-in started on with `?flow=<id>` appended -- a full page
+ * load, so nothing of the previous document survives to carry the handle.
+ * Reading it here means every host page resumes correctly without code of its
+ * own; doing it per framework would mean the same few lines in each of the
+ * scaffolded templates, and a page that forgot them would silently restart the
+ * flow instead of completing the sign-in.
+ *
+ * A handle from the URL is not a capability: `GET /flow/{id}` only answers
+ * when the sealed flow cookie names that same id, so an id someone else put
+ * there resolves to nothing.
+ */
+function flowIdFromLocation(): string {
+  if (typeof window === "undefined") {
+    return "";
+  }
+  try {
+    return new URLSearchParams(window.location.search).get("flow") ?? "";
+  } catch {
+    return "";
+  }
+}
+
 @customElement("zitadel-login")
 export class ZitadelLogin extends ZitadelSurface {
   static override shadowRootOptions: ShadowRootInit = {
@@ -170,6 +196,10 @@ export class ZitadelLogin extends ZitadelSurface {
    * the orchestrator hits `GET /flow/{id}` instead of `POST /flow` on
    * mount, so a page reload after a network blip can re-render the same
    * step without losing collected state.
+   *
+   * Leaving it empty falls back to the `flow` query parameter, which is how a
+   * provider callback hands the flow back (see {@link flowIdFromLocation}), so
+   * a host page needs no code of its own for external sign-in to finish.
    */
   @property({ type: String, attribute: "resume-flow-id" }) accessor resumeFlowId = "";
 
@@ -569,8 +599,9 @@ export class ZitadelLogin extends ZitadelSurface {
       // unhandled promise rejection from `firstUpdated`'s microtask.
       const { project: cfg, api } = resolveApi(this.project, this.projectAttrs, "<zitadel-login>");
       let wire: CreateFlow201;
-      if (this.resumeFlowId) {
-        wire = await getCurrentStep(api, this.resumeFlowId);
+      const resumeId = this.resumeFlowId || flowIdFromLocation();
+      if (resumeId) {
+        wire = await getCurrentStep(api, resumeId);
       } else {
         if (!cfg.projectId) {
           throw new Error(
