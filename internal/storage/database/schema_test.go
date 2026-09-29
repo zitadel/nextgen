@@ -70,8 +70,10 @@ func TestSchemaEnsureOrderable(t *testing.T) {
 		Columns: []database.Column[domain.ProjectField]{database.Col(domain.ProjectFieldName)},
 	}
 	err := schema.EnsureOrderable(notOrderable)
-	require.Error(t, err)
-	assert.Equal(t, database.ErrFieldNotOrderable(domain.ProjectFieldName).Error(), err.Error())
+	var de database.Error
+	require.ErrorAs(t, err, &de)
+	assert.Equal(t, database.ErrFieldNotOrderable(nil).Code, de.Code, "typed not-orderable code")
+	assert.Equal(t, domain.ProjectFieldName, de.Details, "details identify the offending field")
 }
 
 func TestSchemaColumnNullability(t *testing.T) {

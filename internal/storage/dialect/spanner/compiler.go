@@ -64,12 +64,6 @@ func compileList[F ~uint8, T any](ctx context.Context, c *statementCompiler, stm
 		maybeWriteAuthzListPredicate(ctx, c, &hasWhere, tableName, resourceIDCol)
 	}
 
-	if err := schema.EnsureOrderable(opt.Pagination.OrderBy); err != nil {
-		return err
-	}
-	if err := schema.EnsureOrderable(opt.Pagination.OrderBy); err != nil {
-		return err
-	}
 	compileOrderBy(c, opt.Pagination.OrderBy, schema)
 	compileLimit(c, opt.Pagination.Limit)
 
@@ -80,6 +74,12 @@ func compileList[F ~uint8, T any](ctx context.Context, c *statementCompiler, stm
 // the page, or nil when the page starts from the beginning. Statements that
 // assemble their own WHERE call it directly; compileList calls it for the rest.
 func cursorFilter[F ~uint8, T any](page database.Page[F], schema database.Schema[F, T]) (database.Filter[F], error) {
+	// A filter-only field has no accessor and cannot back a keyset cursor;
+	// reject it before any cursor coercion so the not-orderable error is
+	// returned on the first page and on cursor-bearing pages alike (#850).
+	if err := schema.EnsureOrderable(page.OrderBy); err != nil {
+		return nil, err
+	}
 	if len(page.Cursor) == 0 {
 		return nil, nil
 	}

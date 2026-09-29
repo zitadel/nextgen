@@ -291,9 +291,6 @@ func TestSessionStatements_List_LimitBoundsSessions(t *testing.T) {
 	})
 }
 
-// TestSessionStatements_List_LimitKeepsFactorsComplete lists a two-check
-// session with limit 1. A limit on joined rows would cut inside the session's
-// check rows and truncate its factor list.
 // Ordering by a filter-only computed field (has_verified_factors is a
 // correlated EXISTS with no accessor) must be refused with a typed error, not
 // crash during cursor marshaling (#850).
@@ -320,6 +317,9 @@ func TestSessionStatements_List_RejectsOrderByFilterOnlyField(t *testing.T) {
 	})
 }
 
+// TestSessionStatements_List_LimitKeepsFactorsComplete lists a two-check
+// session with limit 1. A limit on joined rows would cut inside the session's
+// check rows and truncate its factor list.
 func TestSessionStatements_List_LimitKeepsFactorsComplete(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
