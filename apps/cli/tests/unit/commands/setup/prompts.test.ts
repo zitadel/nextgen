@@ -357,7 +357,7 @@ describe("SocialSignInPrompt", () => {
     vi.mocked(select).mockResolvedValueOnce("google" as never);
     vi.mocked(text)
       .mockResolvedValueOnce("http://localhost:9100" as never)
-      .mockResolvedValueOnce("http://localhost:9100/authorize" as never)
+      .mockResolvedValueOnce("http://localhost:9100/o/oauth2/v2/auth" as never)
       .mockResolvedValueOnce("http://localhost:9100/token" as never)
       .mockResolvedValueOnce("client-id" as never);
     vi.mocked(password).mockResolvedValueOnce("the-secret" as never);
@@ -369,7 +369,7 @@ describe("SocialSignInPrompt", () => {
 
     expect(answers.sso?.endpoints).toEqual({
       issuer: "http://localhost:9100",
-      authorizationEndpoint: "http://localhost:9100/authorize",
+      authorizationEndpoint: "http://localhost:9100/o/oauth2/v2/auth",
       tokenEndpoint: "http://localhost:9100/token",
     });
   });

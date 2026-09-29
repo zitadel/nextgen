@@ -206,8 +206,10 @@ describe("scaffoldConnection endpoints", () => {
       endpoints: { issuer: "http://localhost:9100" },
     }).oidc as Record<string, unknown>;
 
+    // The vendor's own paths, moved onto the stand-in's origin: a stand-in
+    // should answer where the provider answers and differ only in hosting.
     expect(oidc.issuer).toBe("http://localhost:9100");
-    expect(oidc.authorization_endpoint).toBe("http://localhost:9100/authorize");
+    expect(oidc.authorization_endpoint).toBe("http://localhost:9100/o/oauth2/v2/auth");
     expect(oidc.token_endpoint).toBe("http://localhost:9100/token");
   });
 

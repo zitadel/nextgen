@@ -6,12 +6,20 @@
   "propertyNames": {
     "$comment": "Every key but the editor pointer is a provider, and doubles as the default connection slug, so it obeys the slug grammar `idp-connection.json` enforces.",
     "anyOf": [
-      { "const": "$schema" },
-      { "pattern": "^[a-z0-9][a-z0-9_-]*$", "maxLength": 64 }
+      {
+        "const": "$schema"
+      },
+      {
+        "pattern": "^[a-z0-9][a-z0-9_-]*$",
+        "maxLength": 64
+      }
     ]
   },
   "properties": {
-    "$schema": { "type": "string", "minLength": 1 }
+    "$schema": {
+      "type": "string",
+      "minLength": 1
+    }
   },
   "additionalProperties": {
     "type": "object",
@@ -51,36 +59,80 @@
       },
       "callback_guidance": {
         "type": "string",
-        "enum": ["multi_uri_client", "app_per_environment"],
+        "enum": [
+          "multi_uri_client",
+          "app_per_environment"
+        ],
         "description": "Whether the vendor accepts many redirect URIs on one client, or needs an application per environment. Surfaced during the announce step to guide app registration."
       },
       "protocol_block": {
         "type": "object",
         "description": "Merged into the scaffolded connection file verbatim. Holds vendor conduct only: the prompted `client_id`, the derived `client_secret` reference, `slug`, `display_name`, `template`, `claim_mapping` and `provisioning` are composed at scaffold time, never stored here.",
-        "required": ["protocol"],
+        "required": [
+          "protocol"
+        ],
         "properties": {
-          "protocol": { "type": "string", "enum": ["oidc", "oauth2"] },
-          "subject_claim": { "type": "string", "minLength": 1 },
-          "verified_claims": { "type": "object" },
-          "oidc": { "type": "object" },
-          "oauth2": { "type": "object" }
+          "protocol": {
+            "type": "string",
+            "enum": [
+              "oidc",
+              "oauth2"
+            ]
+          },
+          "subject_claim": {
+            "type": "string",
+            "minLength": 1
+          },
+          "verified_claims": {
+            "type": "object"
+          },
+          "oidc": {
+            "type": "object"
+          },
+          "oauth2": {
+            "type": "object"
+          }
         },
         "allOf": [
           {
             "if": {
-              "properties": { "protocol": { "const": "oidc" } },
-              "required": ["protocol"]
+              "properties": {
+                "protocol": {
+                  "const": "oidc"
+                }
+              },
+              "required": [
+                "protocol"
+              ]
             },
-            "then": { "required": ["oidc"], "properties": { "oauth2": false } }
+            "then": {
+              "required": [
+                "oidc"
+              ],
+              "properties": {
+                "oauth2": false
+              }
+            }
           },
           {
             "if": {
-              "properties": { "protocol": { "const": "oauth2" } },
-              "required": ["protocol"]
+              "properties": {
+                "protocol": {
+                  "const": "oauth2"
+                }
+              },
+              "required": [
+                "protocol"
+              ]
             },
             "then": {
-              "required": ["oauth2", "subject_claim"],
-              "properties": { "oidc": false }
+              "required": [
+                "oauth2",
+                "subject_claim"
+              ],
+              "properties": {
+                "oidc": false
+              }
             }
           }
         ]
@@ -89,13 +141,36 @@
         "type": "object",
         "description": "Maps a user-schema property name to the provider's documented claim name. Authored per provider, not derived. At scaffold the rows whose key the active schema defines become the connection's `claim_mapping`; the rest stay unmapped.",
         "minProperties": 1,
-        "propertyNames": { "minLength": 1 },
+        "propertyNames": {
+          "minLength": 1
+        },
         "additionalProperties": {
           "type": "string",
           "minLength": 1,
           "pattern": "^[^$]",
           "description": "An exact top-level claim key: no path syntax, and `$`-prefixed values are reserved."
         }
+      },
+      "reference_endpoints": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "The vendor's own OAuth endpoints, as reference only: never written to a connection, which names the issuer and lets discovery resolve them. Used to offer a correct default when a development build asks where the provider lives, so pointing at a local stand-in keeps the vendor's paths and changes only the origin.",
+        "properties": {
+          "authorization_endpoint": {
+            "type": "string",
+            "format": "uri",
+            "pattern": "^https://"
+          },
+          "token_endpoint": {
+            "type": "string",
+            "format": "uri",
+            "pattern": "^https://"
+          }
+        },
+        "required": [
+          "authorization_endpoint",
+          "token_endpoint"
+        ]
       }
     }
   }

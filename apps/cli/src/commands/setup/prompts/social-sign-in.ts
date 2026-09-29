@@ -142,7 +142,7 @@ export class SocialSignInPrompt implements SetupPrompt {
       // `<issuer>/token` -- and every answer would be discarded anyway.
       return { issuer };
     }
-    const derived = derivedEndpoints(issuer);
+    const derived = derivedEndpoints(issuer, provider);
     return {
       issuer,
       authorizationEndpoint: await this.askUrl(

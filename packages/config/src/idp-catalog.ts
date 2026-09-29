@@ -42,6 +42,16 @@ export type IdpCatalogEntry = {
   };
   /** Schema property name → the provider's documented claim name. */
   readonly claim_table: Readonly<Record<string, string>>;
+  /**
+   * The vendor's own OAuth endpoints. Reference only — never written to a
+   * connection, which names the issuer and lets discovery resolve them. They
+   * exist so {@link derivedEndpoints} can offer a default that keeps the
+   * vendor's paths when a stand-in is hosted somewhere else.
+   */
+  readonly reference_endpoints?: Readonly<{
+    authorization_endpoint: string;
+    token_endpoint: string;
+  }>;
 };
 
 /**
@@ -164,13 +174,39 @@ export function catalogIssuer(provider: string): string {
   return block.oidc?.issuer ?? block.oauth2?.issuer ?? "";
 }
 
-/** `<issuer>/authorize` and `<issuer>/token`, the paths the engine derives. */
-export function derivedEndpoints(issuer: string): {
-  authorizationEndpoint: string;
-  tokenEndpoint: string;
-} {
+/**
+ * The vendor's own endpoint paths, moved onto `issuer`'s origin.
+ *
+ * A stand-in for a provider should answer on the provider's paths and differ
+ * only in where it is hosted — that is the whole point of testing against one.
+ * So `https://accounts.google.com/o/oauth2/v2/auth` becomes
+ * `http://localhost:9100/o/oauth2/v2/auth`, and the developer confirms a
+ * default that is already right instead of correcting a generic guess.
+ *
+ * Falls back to `<issuer>/authorize` and `<issuer>/token` for an entry that
+ * names no reference endpoints, which is what the engine derives when a
+ * connection names none either.
+ */
+export function derivedEndpoints(
+  issuer: string,
+  provider?: string,
+): { authorizationEndpoint: string; tokenEndpoint: string } {
   const base = issuer.replace(/\/$/, "");
-  return { authorizationEndpoint: `${base}/authorize`, tokenEndpoint: `${base}/token` };
+  const reference = provider === undefined ? undefined : idpCatalogEntry(provider).reference_endpoints;
+  const onIssuer = (vendor: string | undefined, fallback: string): string => {
+    if (vendor === undefined) {
+      return `${base}/${fallback}`;
+    }
+    try {
+      return `${base}${new URL(vendor).pathname}`;
+    } catch {
+      return `${base}/${fallback}`;
+    }
+  };
+  return {
+    authorizationEndpoint: onIssuer(reference?.authorization_endpoint, "authorize"),
+    tokenEndpoint: onIssuer(reference?.token_endpoint, "token"),
+  };
 }
 
 /**
@@ -191,13 +227,14 @@ export function derivedEndpoints(issuer: string): {
  */
 function endpointOverrides(
   endpoints: ConnectionEndpoints | undefined,
+  provider: string,
   catalogsIssuer: string,
 ): Record<string, string> {
   const issuer = endpoints?.issuer;
   if (issuer === undefined || issuer === "" || issuer === catalogsIssuer) {
     return {};
   }
-  const derived = derivedEndpoints(issuer);
+  const derived = derivedEndpoints(issuer, provider);
   return {
     issuer,
     authorization_endpoint: endpoints?.authorizationEndpoint || derived.authorizationEndpoint,
@@ -246,7 +283,7 @@ export function scaffoldConnection(options: {
   };
   // Last, so an override replaces the template's issuer rather than being
   // replaced by it.
-  const overrides = endpointOverrides(options.endpoints, catalogIssuer(options.provider));
+  const overrides = endpointOverrides(options.endpoints, options.provider, catalogIssuer(options.provider));
   const claimMapping = claimMappingFor(entry, options.schemaProperties);
 
   return {

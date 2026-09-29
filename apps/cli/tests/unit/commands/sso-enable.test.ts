@@ -243,7 +243,7 @@ describe("sso enable", () => {
       await readFile(join(cwd, ".zitadel/idps/google.json"), "utf8"),
     ) as { oidc: Record<string, unknown> };
     expect(written.oidc.issuer).toBe("http://localhost:9100");
-    expect(written.oidc.authorization_endpoint).toBe("http://localhost:9100/authorize");
+    expect(written.oidc.authorization_endpoint).toBe("http://localhost:9100/o/oauth2/v2/auth");
     expect(written.oidc.token_endpoint).toBe("http://localhost:9100/token");
     expect(written.oidc.client_secret).toBe("${{ GOOGLE_CLIENT_SECRET }}");
   });
