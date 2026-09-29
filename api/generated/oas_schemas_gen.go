@@ -5954,14 +5954,15 @@ type Branding struct {
 	// editor validates and autocompletes it. The CLI strips it before upload;
 	// the platform ignores it.
 	Schema OptString `json:"$schema"`
-	// Degrade preset (`centered` or `split`) the bundled default template
-	// branches on, and the fallback when a custom template fails validation.
+	// Layout preset the revision declares, `centered` or `split`. It is
+	// validated on publish and handed to the template as `branding.layout`.
+	// The bundled default template does not read it, so changing it alone
+	// changes nothing on screen, and it is not an appearance control.
 	// Not a design catalog: the ejectable designs (`centered`, `minimal`)
-	// ship as templates and map onto one of
-	// these two values; switch designs with
+	// ship as templates and both carry `centered`; switch designs with
 	// `zitadel branding eject --design <name>` instead of editing this field.
-	// Ejected templates may ignore it. Selects a template rather than restyling
-	// the widget, so it is not an appearance control.
+	// `split` is carried by revisions published from the earlier split
+	// designs.
 	Layout OptBrandingLayout `json:"layout"`
 	// The LiquidJS template for rendering this step. The orchestrator renders
 	// it into its Shadow DOM with the capability dictionaries as context.
@@ -6553,14 +6554,15 @@ func (s *BrandingCreatedPayload) SetHeroURL(val OptString) {
 	s.HeroURL = val
 }
 
-// Degrade preset (`centered` or `split`) the bundled default template
-// branches on, and the fallback when a custom template fails validation.
+// Layout preset the revision declares, `centered` or `split`. It is
+// validated on publish and handed to the template as `branding.layout`.
+// The bundled default template does not read it, so changing it alone
+// changes nothing on screen, and it is not an appearance control.
 // Not a design catalog: the ejectable designs (`centered`, `minimal`)
-// ship as templates and map onto one of
-// these two values; switch designs with
+// ship as templates and both carry `centered`; switch designs with
 // `zitadel branding eject --design <name>` instead of editing this field.
-// Ejected templates may ignore it. Selects a template rather than restyling
-// the widget, so it is not an appearance control.
+// `split` is carried by revisions published from the earlier split
+// designs.
 type BrandingLayout string
 
 const (
