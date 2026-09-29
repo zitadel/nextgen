@@ -15732,6 +15732,7 @@ type Event struct {
 	UserCreateFailedEvent          UserCreateFailedEvent
 	UserCreatedEvent               UserCreatedEvent
 	UserDeletedEvent               UserDeletedEvent
+	UserUpdatedEvent               UserUpdatedEvent
 }
 
 // EventType is oneOf type of Event.
@@ -15769,6 +15770,7 @@ const (
 	UserCreateFailedEventEvent          EventType = "user.create.failed"
 	UserCreatedEventEvent               EventType = "user.created"
 	UserDeletedEventEvent               EventType = "user.deleted"
+	UserUpdatedEventEvent               EventType = "user.updated"
 )
 
 // IsAuthAttemptCreatedEvent reports whether Event is AuthAttemptCreatedEvent.
@@ -15862,6 +15864,9 @@ func (s Event) IsUserCreatedEvent() bool { return s.Type == UserCreatedEventEven
 
 // IsUserDeletedEvent reports whether Event is UserDeletedEvent.
 func (s Event) IsUserDeletedEvent() bool { return s.Type == UserDeletedEventEvent }
+
+// IsUserUpdatedEvent reports whether Event is UserUpdatedEvent.
+func (s Event) IsUserUpdatedEvent() bool { return s.Type == UserUpdatedEventEvent }
 
 // SetAuthAttemptCreatedEvent sets Event to AuthAttemptCreatedEvent.
 func (s *Event) SetAuthAttemptCreatedEvent(v AuthAttemptCreatedEvent) {
@@ -16490,6 +16495,27 @@ func (s Event) GetUserDeletedEvent() (v UserDeletedEvent, ok bool) {
 func NewUserDeletedEventEvent(v UserDeletedEvent) Event {
 	var s Event
 	s.SetUserDeletedEvent(v)
+	return s
+}
+
+// SetUserUpdatedEvent sets Event to UserUpdatedEvent.
+func (s *Event) SetUserUpdatedEvent(v UserUpdatedEvent) {
+	s.Type = UserUpdatedEventEvent
+	s.UserUpdatedEvent = v
+}
+
+// GetUserUpdatedEvent returns UserUpdatedEvent and true boolean if Event is UserUpdatedEvent.
+func (s Event) GetUserUpdatedEvent() (v UserUpdatedEvent, ok bool) {
+	if !s.IsUserUpdatedEvent() {
+		return v, false
+	}
+	return s.UserUpdatedEvent, true
+}
+
+// NewUserUpdatedEventEvent returns new Event from UserUpdatedEvent.
+func NewUserUpdatedEventEvent(v UserUpdatedEvent) Event {
+	var s Event
+	s.SetUserUpdatedEvent(v)
 	return s
 }
 
@@ -39434,6 +39460,69 @@ func (o OptNilUserPropertyXMinusUnique) Or(d UserPropertyXMinusUnique) UserPrope
 	return d
 }
 
+// NewOptNilUserUpdatedEventActorType returns new OptNilUserUpdatedEventActorType with value set to v.
+func NewOptNilUserUpdatedEventActorType(v UserUpdatedEventActorType) OptNilUserUpdatedEventActorType {
+	return OptNilUserUpdatedEventActorType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilUserUpdatedEventActorType is optional nullable UserUpdatedEventActorType.
+type OptNilUserUpdatedEventActorType struct {
+	Value UserUpdatedEventActorType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilUserUpdatedEventActorType was set.
+func (o OptNilUserUpdatedEventActorType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilUserUpdatedEventActorType) Reset() {
+	var v UserUpdatedEventActorType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilUserUpdatedEventActorType) SetTo(v UserUpdatedEventActorType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilUserUpdatedEventActorType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilUserUpdatedEventActorType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v UserUpdatedEventActorType
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilUserUpdatedEventActorType) Get() (v UserUpdatedEventActorType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilUserUpdatedEventActorType) Or(d UserUpdatedEventActorType) UserUpdatedEventActorType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptNotImplementedDetails returns new OptNotImplementedDetails with value set to v.
 func NewOptNotImplementedDetails(v NotImplementedDetails) OptNotImplementedDetails {
 	return OptNotImplementedDetails{
@@ -43298,6 +43387,98 @@ func (o OptUserSchemaProperties) Or(d UserSchemaProperties) UserSchemaProperties
 	return d
 }
 
+// NewOptUserUpdatedEventDelegationType returns new OptUserUpdatedEventDelegationType with value set to v.
+func NewOptUserUpdatedEventDelegationType(v UserUpdatedEventDelegationType) OptUserUpdatedEventDelegationType {
+	return OptUserUpdatedEventDelegationType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptUserUpdatedEventDelegationType is optional UserUpdatedEventDelegationType.
+type OptUserUpdatedEventDelegationType struct {
+	Value UserUpdatedEventDelegationType
+	Set   bool
+}
+
+// IsSet returns true if OptUserUpdatedEventDelegationType was set.
+func (o OptUserUpdatedEventDelegationType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptUserUpdatedEventDelegationType) Reset() {
+	var v UserUpdatedEventDelegationType
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptUserUpdatedEventDelegationType) SetTo(v UserUpdatedEventDelegationType) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptUserUpdatedEventDelegationType) Get() (v UserUpdatedEventDelegationType, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptUserUpdatedEventDelegationType) Or(d UserUpdatedEventDelegationType) UserUpdatedEventDelegationType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptUserUpdatedPayloadAttributes returns new OptUserUpdatedPayloadAttributes with value set to v.
+func NewOptUserUpdatedPayloadAttributes(v UserUpdatedPayloadAttributes) OptUserUpdatedPayloadAttributes {
+	return OptUserUpdatedPayloadAttributes{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptUserUpdatedPayloadAttributes is optional UserUpdatedPayloadAttributes.
+type OptUserUpdatedPayloadAttributes struct {
+	Value UserUpdatedPayloadAttributes
+	Set   bool
+}
+
+// IsSet returns true if OptUserUpdatedPayloadAttributes was set.
+func (o OptUserUpdatedPayloadAttributes) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptUserUpdatedPayloadAttributes) Reset() {
+	var v UserUpdatedPayloadAttributes
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptUserUpdatedPayloadAttributes) SetTo(v UserUpdatedPayloadAttributes) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptUserUpdatedPayloadAttributes) Get() (v UserUpdatedPayloadAttributes, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptUserUpdatedPayloadAttributes) Or(d UserUpdatedPayloadAttributes) UserUpdatedPayloadAttributes {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptVarInvalidNameDetails returns new OptVarInvalidNameDetails with value set to v.
 func NewOptVarInvalidNameDetails(v VarInvalidNameDetails) OptVarInvalidNameDetails {
 	return OptVarInvalidNameDetails{
@@ -44276,6 +44457,7 @@ func (*PatchMyUserConflict) patchMyUserRes() {}
 type PatchMyUserErrorResponse struct {
 	Type              PatchMyUserErrorResponseType // switch on this field
 	AuthUnauthorized  AuthUnauthorized
+	EvtInvalid        EvtInvalid
 	Internal          Internal
 	ReqInvalid        ReqInvalid
 	SessTokenInvalid  SessTokenInvalid
@@ -44291,6 +44473,7 @@ type PatchMyUserErrorResponseType string
 // Possible values for PatchMyUserErrorResponseType.
 const (
 	AuthUnauthorizedPatchMyUserErrorResponse  PatchMyUserErrorResponseType = "auth.unauthorized"
+	EvtInvalidPatchMyUserErrorResponse        PatchMyUserErrorResponseType = "evt.invalid"
 	InternalPatchMyUserErrorResponse          PatchMyUserErrorResponseType = "internal"
 	ReqInvalidPatchMyUserErrorResponse        PatchMyUserErrorResponseType = "req.invalid"
 	SessTokenInvalidPatchMyUserErrorResponse  PatchMyUserErrorResponseType = "sess.token_invalid"
@@ -44303,6 +44486,11 @@ const (
 // IsAuthUnauthorized reports whether PatchMyUserErrorResponse is AuthUnauthorized.
 func (s PatchMyUserErrorResponse) IsAuthUnauthorized() bool {
 	return s.Type == AuthUnauthorizedPatchMyUserErrorResponse
+}
+
+// IsEvtInvalid reports whether PatchMyUserErrorResponse is EvtInvalid.
+func (s PatchMyUserErrorResponse) IsEvtInvalid() bool {
+	return s.Type == EvtInvalidPatchMyUserErrorResponse
 }
 
 // IsInternal reports whether PatchMyUserErrorResponse is Internal.
@@ -44358,6 +44546,27 @@ func (s PatchMyUserErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok 
 func NewAuthUnauthorizedPatchMyUserErrorResponse(v AuthUnauthorized) PatchMyUserErrorResponse {
 	var s PatchMyUserErrorResponse
 	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetEvtInvalid sets PatchMyUserErrorResponse to EvtInvalid.
+func (s *PatchMyUserErrorResponse) SetEvtInvalid(v EvtInvalid) {
+	s.Type = EvtInvalidPatchMyUserErrorResponse
+	s.EvtInvalid = v
+}
+
+// GetEvtInvalid returns EvtInvalid and true boolean if PatchMyUserErrorResponse is EvtInvalid.
+func (s PatchMyUserErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
+	if !s.IsEvtInvalid() {
+		return v, false
+	}
+	return s.EvtInvalid, true
+}
+
+// NewEvtInvalidPatchMyUserErrorResponse returns new PatchMyUserErrorResponse from EvtInvalid.
+func NewEvtInvalidPatchMyUserErrorResponse(v EvtInvalid) PatchMyUserErrorResponse {
+	var s PatchMyUserErrorResponse
+	s.SetEvtInvalid(v)
 	return s
 }
 
@@ -44922,6 +45131,7 @@ func (*PatchUserByIDConflict) patchUserByIDRes() {}
 type PatchUserByIDErrorResponse struct {
 	Type                 PatchUserByIDErrorResponseType // switch on this field
 	AuthUnauthorized     AuthUnauthorized
+	EvtInvalid           EvtInvalid
 	Internal             Internal
 	ReqInvalid           ReqInvalid
 	UserAlreadyExists    UserAlreadyExists
@@ -44937,6 +45147,7 @@ type PatchUserByIDErrorResponseType string
 // Possible values for PatchUserByIDErrorResponseType.
 const (
 	AuthUnauthorizedPatchUserByIDErrorResponse     PatchUserByIDErrorResponseType = "auth.unauthorized"
+	EvtInvalidPatchUserByIDErrorResponse           PatchUserByIDErrorResponseType = "evt.invalid"
 	InternalPatchUserByIDErrorResponse             PatchUserByIDErrorResponseType = "internal"
 	ReqInvalidPatchUserByIDErrorResponse           PatchUserByIDErrorResponseType = "req.invalid"
 	UserAlreadyExistsPatchUserByIDErrorResponse    PatchUserByIDErrorResponseType = "user.already_exists"
@@ -44949,6 +45160,11 @@ const (
 // IsAuthUnauthorized reports whether PatchUserByIDErrorResponse is AuthUnauthorized.
 func (s PatchUserByIDErrorResponse) IsAuthUnauthorized() bool {
 	return s.Type == AuthUnauthorizedPatchUserByIDErrorResponse
+}
+
+// IsEvtInvalid reports whether PatchUserByIDErrorResponse is EvtInvalid.
+func (s PatchUserByIDErrorResponse) IsEvtInvalid() bool {
+	return s.Type == EvtInvalidPatchUserByIDErrorResponse
 }
 
 // IsInternal reports whether PatchUserByIDErrorResponse is Internal.
@@ -45004,6 +45220,27 @@ func (s PatchUserByIDErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, o
 func NewAuthUnauthorizedPatchUserByIDErrorResponse(v AuthUnauthorized) PatchUserByIDErrorResponse {
 	var s PatchUserByIDErrorResponse
 	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetEvtInvalid sets PatchUserByIDErrorResponse to EvtInvalid.
+func (s *PatchUserByIDErrorResponse) SetEvtInvalid(v EvtInvalid) {
+	s.Type = EvtInvalidPatchUserByIDErrorResponse
+	s.EvtInvalid = v
+}
+
+// GetEvtInvalid returns EvtInvalid and true boolean if PatchUserByIDErrorResponse is EvtInvalid.
+func (s PatchUserByIDErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
+	if !s.IsEvtInvalid() {
+		return v, false
+	}
+	return s.EvtInvalid, true
+}
+
+// NewEvtInvalidPatchUserByIDErrorResponse returns new PatchUserByIDErrorResponse from EvtInvalid.
+func NewEvtInvalidPatchUserByIDErrorResponse(v EvtInvalid) PatchUserByIDErrorResponse {
+	var s PatchUserByIDErrorResponse
+	s.SetEvtInvalid(v)
 	return s
 }
 
@@ -60740,6 +60977,490 @@ func (s *UserTeamMembershipStatus) UnmarshalText(data []byte) error {
 	default:
 		return errors.Errorf("invalid value: %q", data)
 	}
+}
+
+// Merged schema.
+// Ref: #
+type UserUpdatedEvent struct {
+	// Managed event id (`evt_<opaque>`).
+	ID        string    `json:"id"`
+	ProjectID ProjectID `json:"project_id"`
+	// Emit-time team scope, when the actor operated under a team.
+	TeamID OptNilString `json:"team_id"`
+	// Merged property.
+	EventType string `json:"event_type"`
+	// Wide-event category.
+	Category UserUpdatedEventCategory `json:"category"`
+	// When the action happened (server/storage clock, dialect-owned).
+	OccurredAt time.Time `json:"occurred_at"`
+	// When the row was inserted (server/storage clock, dialect-owned).
+	CreatedAt time.Time `json:"created_at"`
+	// Who triggered the event.
+	ActorID OptNilString `json:"actor_id"`
+	// Actor kind.
+	ActorType OptNilUserUpdatedEventActorType `json:"actor_type"`
+	// Resource type affected.
+	EntityType OptNilString `json:"entity_type"`
+	// Resource id affected.
+	EntityID OptNilString `json:"entity_id"`
+	// Application or agent that produced the event.
+	ClientID string `json:"client_id"`
+	// Token id present at emit time, when any.
+	TokenID OptString `json:"token_id"`
+	// Delegation kind (omit when unset).
+	DelegationType OptUserUpdatedEventDelegationType `json:"delegation_type"`
+	DelegationID   OptString                         `json:"delegation_id"`
+	Grantor        OptString                         `json:"grantor"`
+	// Device fingerprint correlation id.
+	Fingerprint OptString `json:"fingerprint"`
+	// HTTP request correlation id.
+	RequestID OptNilString `json:"request_id"`
+	// Session correlation id.
+	SessionID OptNilString `json:"session_id"`
+	// Login flow correlation id.
+	FlowID   OptNilString       `json:"flow_id"`
+	Metadata OptEventMetadata   `json:"metadata"`
+	Payload  UserUpdatedPayload `json:"payload"`
+}
+
+// GetID returns the value of ID.
+func (s *UserUpdatedEvent) GetID() string {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *UserUpdatedEvent) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *UserUpdatedEvent) GetTeamID() OptNilString {
+	return s.TeamID
+}
+
+// GetEventType returns the value of EventType.
+func (s *UserUpdatedEvent) GetEventType() string {
+	return s.EventType
+}
+
+// GetCategory returns the value of Category.
+func (s *UserUpdatedEvent) GetCategory() UserUpdatedEventCategory {
+	return s.Category
+}
+
+// GetOccurredAt returns the value of OccurredAt.
+func (s *UserUpdatedEvent) GetOccurredAt() time.Time {
+	return s.OccurredAt
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *UserUpdatedEvent) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetActorID returns the value of ActorID.
+func (s *UserUpdatedEvent) GetActorID() OptNilString {
+	return s.ActorID
+}
+
+// GetActorType returns the value of ActorType.
+func (s *UserUpdatedEvent) GetActorType() OptNilUserUpdatedEventActorType {
+	return s.ActorType
+}
+
+// GetEntityType returns the value of EntityType.
+func (s *UserUpdatedEvent) GetEntityType() OptNilString {
+	return s.EntityType
+}
+
+// GetEntityID returns the value of EntityID.
+func (s *UserUpdatedEvent) GetEntityID() OptNilString {
+	return s.EntityID
+}
+
+// GetClientID returns the value of ClientID.
+func (s *UserUpdatedEvent) GetClientID() string {
+	return s.ClientID
+}
+
+// GetTokenID returns the value of TokenID.
+func (s *UserUpdatedEvent) GetTokenID() OptString {
+	return s.TokenID
+}
+
+// GetDelegationType returns the value of DelegationType.
+func (s *UserUpdatedEvent) GetDelegationType() OptUserUpdatedEventDelegationType {
+	return s.DelegationType
+}
+
+// GetDelegationID returns the value of DelegationID.
+func (s *UserUpdatedEvent) GetDelegationID() OptString {
+	return s.DelegationID
+}
+
+// GetGrantor returns the value of Grantor.
+func (s *UserUpdatedEvent) GetGrantor() OptString {
+	return s.Grantor
+}
+
+// GetFingerprint returns the value of Fingerprint.
+func (s *UserUpdatedEvent) GetFingerprint() OptString {
+	return s.Fingerprint
+}
+
+// GetRequestID returns the value of RequestID.
+func (s *UserUpdatedEvent) GetRequestID() OptNilString {
+	return s.RequestID
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *UserUpdatedEvent) GetSessionID() OptNilString {
+	return s.SessionID
+}
+
+// GetFlowID returns the value of FlowID.
+func (s *UserUpdatedEvent) GetFlowID() OptNilString {
+	return s.FlowID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *UserUpdatedEvent) GetMetadata() OptEventMetadata {
+	return s.Metadata
+}
+
+// GetPayload returns the value of Payload.
+func (s *UserUpdatedEvent) GetPayload() UserUpdatedPayload {
+	return s.Payload
+}
+
+// SetID sets the value of ID.
+func (s *UserUpdatedEvent) SetID(val string) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *UserUpdatedEvent) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *UserUpdatedEvent) SetTeamID(val OptNilString) {
+	s.TeamID = val
+}
+
+// SetEventType sets the value of EventType.
+func (s *UserUpdatedEvent) SetEventType(val string) {
+	s.EventType = val
+}
+
+// SetCategory sets the value of Category.
+func (s *UserUpdatedEvent) SetCategory(val UserUpdatedEventCategory) {
+	s.Category = val
+}
+
+// SetOccurredAt sets the value of OccurredAt.
+func (s *UserUpdatedEvent) SetOccurredAt(val time.Time) {
+	s.OccurredAt = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *UserUpdatedEvent) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetActorID sets the value of ActorID.
+func (s *UserUpdatedEvent) SetActorID(val OptNilString) {
+	s.ActorID = val
+}
+
+// SetActorType sets the value of ActorType.
+func (s *UserUpdatedEvent) SetActorType(val OptNilUserUpdatedEventActorType) {
+	s.ActorType = val
+}
+
+// SetEntityType sets the value of EntityType.
+func (s *UserUpdatedEvent) SetEntityType(val OptNilString) {
+	s.EntityType = val
+}
+
+// SetEntityID sets the value of EntityID.
+func (s *UserUpdatedEvent) SetEntityID(val OptNilString) {
+	s.EntityID = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *UserUpdatedEvent) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetTokenID sets the value of TokenID.
+func (s *UserUpdatedEvent) SetTokenID(val OptString) {
+	s.TokenID = val
+}
+
+// SetDelegationType sets the value of DelegationType.
+func (s *UserUpdatedEvent) SetDelegationType(val OptUserUpdatedEventDelegationType) {
+	s.DelegationType = val
+}
+
+// SetDelegationID sets the value of DelegationID.
+func (s *UserUpdatedEvent) SetDelegationID(val OptString) {
+	s.DelegationID = val
+}
+
+// SetGrantor sets the value of Grantor.
+func (s *UserUpdatedEvent) SetGrantor(val OptString) {
+	s.Grantor = val
+}
+
+// SetFingerprint sets the value of Fingerprint.
+func (s *UserUpdatedEvent) SetFingerprint(val OptString) {
+	s.Fingerprint = val
+}
+
+// SetRequestID sets the value of RequestID.
+func (s *UserUpdatedEvent) SetRequestID(val OptNilString) {
+	s.RequestID = val
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *UserUpdatedEvent) SetSessionID(val OptNilString) {
+	s.SessionID = val
+}
+
+// SetFlowID sets the value of FlowID.
+func (s *UserUpdatedEvent) SetFlowID(val OptNilString) {
+	s.FlowID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *UserUpdatedEvent) SetMetadata(val OptEventMetadata) {
+	s.Metadata = val
+}
+
+// SetPayload sets the value of Payload.
+func (s *UserUpdatedEvent) SetPayload(val UserUpdatedPayload) {
+	s.Payload = val
+}
+
+type UserUpdatedEventActorType string
+
+const (
+	UserUpdatedEventActorTypeHuman   UserUpdatedEventActorType = "human"
+	UserUpdatedEventActorTypeService UserUpdatedEventActorType = "service"
+	UserUpdatedEventActorTypeSystem  UserUpdatedEventActorType = "system"
+	UserUpdatedEventActorTypeAgent   UserUpdatedEventActorType = "agent"
+)
+
+// AllValues returns all UserUpdatedEventActorType values.
+func (UserUpdatedEventActorType) AllValues() []UserUpdatedEventActorType {
+	return []UserUpdatedEventActorType{
+		UserUpdatedEventActorTypeHuman,
+		UserUpdatedEventActorTypeService,
+		UserUpdatedEventActorTypeSystem,
+		UserUpdatedEventActorTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s UserUpdatedEventActorType) MarshalText() ([]byte, error) {
+	switch s {
+	case UserUpdatedEventActorTypeHuman:
+		return []byte(s), nil
+	case UserUpdatedEventActorTypeService:
+		return []byte(s), nil
+	case UserUpdatedEventActorTypeSystem:
+		return []byte(s), nil
+	case UserUpdatedEventActorTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *UserUpdatedEventActorType) UnmarshalText(data []byte) error {
+	switch UserUpdatedEventActorType(data) {
+	case UserUpdatedEventActorTypeHuman:
+		*s = UserUpdatedEventActorTypeHuman
+		return nil
+	case UserUpdatedEventActorTypeService:
+		*s = UserUpdatedEventActorTypeService
+		return nil
+	case UserUpdatedEventActorTypeSystem:
+		*s = UserUpdatedEventActorTypeSystem
+		return nil
+	case UserUpdatedEventActorTypeAgent:
+		*s = UserUpdatedEventActorTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Wide-event category.
+type UserUpdatedEventCategory string
+
+const (
+	UserUpdatedEventCategoryRequest UserUpdatedEventCategory = "request"
+	UserUpdatedEventCategoryAuth    UserUpdatedEventCategory = "auth"
+	UserUpdatedEventCategorySession UserUpdatedEventCategory = "session"
+	UserUpdatedEventCategoryAdmin   UserUpdatedEventCategory = "admin"
+	UserUpdatedEventCategoryEntity  UserUpdatedEventCategory = "entity"
+	UserUpdatedEventCategorySignal  UserUpdatedEventCategory = "signal"
+)
+
+// AllValues returns all UserUpdatedEventCategory values.
+func (UserUpdatedEventCategory) AllValues() []UserUpdatedEventCategory {
+	return []UserUpdatedEventCategory{
+		UserUpdatedEventCategoryRequest,
+		UserUpdatedEventCategoryAuth,
+		UserUpdatedEventCategorySession,
+		UserUpdatedEventCategoryAdmin,
+		UserUpdatedEventCategoryEntity,
+		UserUpdatedEventCategorySignal,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s UserUpdatedEventCategory) MarshalText() ([]byte, error) {
+	switch s {
+	case UserUpdatedEventCategoryRequest:
+		return []byte(s), nil
+	case UserUpdatedEventCategoryAuth:
+		return []byte(s), nil
+	case UserUpdatedEventCategorySession:
+		return []byte(s), nil
+	case UserUpdatedEventCategoryAdmin:
+		return []byte(s), nil
+	case UserUpdatedEventCategoryEntity:
+		return []byte(s), nil
+	case UserUpdatedEventCategorySignal:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *UserUpdatedEventCategory) UnmarshalText(data []byte) error {
+	switch UserUpdatedEventCategory(data) {
+	case UserUpdatedEventCategoryRequest:
+		*s = UserUpdatedEventCategoryRequest
+		return nil
+	case UserUpdatedEventCategoryAuth:
+		*s = UserUpdatedEventCategoryAuth
+		return nil
+	case UserUpdatedEventCategorySession:
+		*s = UserUpdatedEventCategorySession
+		return nil
+	case UserUpdatedEventCategoryAdmin:
+		*s = UserUpdatedEventCategoryAdmin
+		return nil
+	case UserUpdatedEventCategoryEntity:
+		*s = UserUpdatedEventCategoryEntity
+		return nil
+	case UserUpdatedEventCategorySignal:
+		*s = UserUpdatedEventCategorySignal
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Delegation kind (omit when unset).
+type UserUpdatedEventDelegationType string
+
+const (
+	UserUpdatedEventDelegationTypeDirect    UserUpdatedEventDelegationType = "direct"
+	UserUpdatedEventDelegationTypeDelegated UserUpdatedEventDelegationType = "delegated"
+	UserUpdatedEventDelegationTypePatShared UserUpdatedEventDelegationType = "pat_shared"
+	UserUpdatedEventDelegationTypeExchanged UserUpdatedEventDelegationType = "exchanged"
+)
+
+// AllValues returns all UserUpdatedEventDelegationType values.
+func (UserUpdatedEventDelegationType) AllValues() []UserUpdatedEventDelegationType {
+	return []UserUpdatedEventDelegationType{
+		UserUpdatedEventDelegationTypeDirect,
+		UserUpdatedEventDelegationTypeDelegated,
+		UserUpdatedEventDelegationTypePatShared,
+		UserUpdatedEventDelegationTypeExchanged,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s UserUpdatedEventDelegationType) MarshalText() ([]byte, error) {
+	switch s {
+	case UserUpdatedEventDelegationTypeDirect:
+		return []byte(s), nil
+	case UserUpdatedEventDelegationTypeDelegated:
+		return []byte(s), nil
+	case UserUpdatedEventDelegationTypePatShared:
+		return []byte(s), nil
+	case UserUpdatedEventDelegationTypeExchanged:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *UserUpdatedEventDelegationType) UnmarshalText(data []byte) error {
+	switch UserUpdatedEventDelegationType(data) {
+	case UserUpdatedEventDelegationTypeDirect:
+		*s = UserUpdatedEventDelegationTypeDirect
+		return nil
+	case UserUpdatedEventDelegationTypeDelegated:
+		*s = UserUpdatedEventDelegationTypeDelegated
+		return nil
+	case UserUpdatedEventDelegationTypePatShared:
+		*s = UserUpdatedEventDelegationTypePatShared
+		return nil
+	case UserUpdatedEventDelegationTypeExchanged:
+		*s = UserUpdatedEventDelegationTypeExchanged
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Payload for `user.updated`. Same attribute rules as create: keys touched
+// plus `x-audit` values only.
+// Ref: #
+type UserUpdatedPayload struct {
+	AttributeKeys []string                        `json:"attribute_keys"`
+	Attributes    OptUserUpdatedPayloadAttributes `json:"attributes"`
+}
+
+// GetAttributeKeys returns the value of AttributeKeys.
+func (s *UserUpdatedPayload) GetAttributeKeys() []string {
+	return s.AttributeKeys
+}
+
+// GetAttributes returns the value of Attributes.
+func (s *UserUpdatedPayload) GetAttributes() OptUserUpdatedPayloadAttributes {
+	return s.Attributes
+}
+
+// SetAttributeKeys sets the value of AttributeKeys.
+func (s *UserUpdatedPayload) SetAttributeKeys(val []string) {
+	s.AttributeKeys = val
+}
+
+// SetAttributes sets the value of Attributes.
+func (s *UserUpdatedPayload) SetAttributes(val OptUserUpdatedPayloadAttributes) {
+	s.Attributes = val
+}
+
+type UserUpdatedPayloadAttributes map[string]jx.Raw
+
+func (s *UserUpdatedPayloadAttributes) init() UserUpdatedPayloadAttributes {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
 }
 
 // Merged schema.
