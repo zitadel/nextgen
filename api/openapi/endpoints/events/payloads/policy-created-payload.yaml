@@ -1,0 +1,7 @@
+title: PolicyCreatedPayload
+type: object
+description: |
+  Allowlisted fields for `policy.created`. Omits the `config` values.
+properties:
+  operation:
+    type: string

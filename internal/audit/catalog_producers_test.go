@@ -39,6 +39,7 @@ var livePathBProducers = map[domain.EventType]string{
 	domain.EventTypeFlowdefCreated:            "internal/service",
 	domain.EventTypeSchemaCreated:             "internal/service",
 	domain.EventTypeBrandingCreated:           "internal/service",
+	domain.EventTypePolicyCreated:             "internal/service",
 	domain.EventTypeEnvironmentCreated:        "internal/service",
 	domain.EventTypeReleaseCreated:            "internal/service",
 	domain.EventTypeDeploymentCreated:         "internal/service",

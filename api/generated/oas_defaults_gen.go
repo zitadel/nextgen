@@ -87,6 +87,18 @@ func (s *IdpConnectionProvisioning) setDefaults() {
 }
 
 // setDefaults set default value of fields.
+func (s *PolicyUserPasswordSaveConfig) setDefaults() {
+	{
+		val := int(15)
+		s.MinLength.SetTo(val)
+	}
+	{
+		val := int(0)
+		s.HistoryDepth.SetTo(val)
+	}
+}
+
+// setDefaults set default value of fields.
 func (s *QueryGrantsRequest) setDefaults() {
 	{
 		val := int(20)

@@ -1,0 +1,19 @@
+type: array
+description: Policy revisions, newest first.
+items:
+  type: object
+  required:
+    - id
+    - operation
+    - created_at
+  properties:
+    id:
+      type: string
+      description: The unique identifier of this policy revision.
+    operation:
+      type: string
+      description: The catalogued operation the revision guards.
+    created_at:
+      type: string
+      format: date-time
+      description: When this revision was published.

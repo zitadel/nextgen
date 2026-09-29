@@ -49,6 +49,7 @@ same TX (shared `request_id`).
 | **Team** | `name` | — |
 | **Flow definition** | `name`, `status`, `user_schema`, `purposes`, `audience` | Full `steps` graph |
 | **Branding** | `layout`, `logo_url`, `font_url`, `hero_url` | `liquid_template` |
+| **Policy** | `operation` | `config` values |
 | **Schema** | `kind`, `object_type` | Schema document body |
 | **User** | `schema_id`; `attribute_keys[]`; `attributes` map **only** for `x-audit` fields | Non-`x-audit` values; passwords / factors |
 | **Token** | `scopes[]` | Token string / JWE |
@@ -124,6 +125,7 @@ tracked below.
 | Flow definition create | `flowdef.created` | `admin` | `flow_definition` | `name`, `status`, `user_schema`, `purposes`, `audience` |
 | JSON schema create | `schema.created` | `admin` | `json_schema` | `kind`, `object_type` |
 | Branding create | `branding.created` | `admin` | `branding` | `layout`, `logo_url`, `font_url`, `hero_url` |
+| Policy revision create | `policy.created` | `admin` | `policy` | `operation` |
 | Project create seed `CreateEnvironment` (one per default environment) | `environment.created` | `admin` | `environment` | `name` |
 | ReleaseService create | `release.created` | `admin` | `release` | `content_hash`, `message`, `git_sha`, `git_dirty`, `pointers` |
 | DeploymentService create (deploy, promote and rollback alike; ids not names, so the audit trail survives environment renames and hard deletes — ADR 061) | `deployment.created` | `admin` | `deployment` | `environment_id`, `release_id`, `reason`, `message`, `source_environment_id` |

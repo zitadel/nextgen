@@ -114,6 +114,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	CreateIdpOperation: []string{
 		"idp.write",
 	},
+	CreatePolicyOperation: []string{
+		"policy.write",
+	},
 	CreateReleaseOperation: []string{
 		"release.write",
 	},
@@ -177,6 +180,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	GetIdpRevisionByIdOperation: []string{
 		"idp.read",
 	},
+	GetPolicyByIdOperation: []string{
+		"policy.read",
+	},
 	GetProjectOperation: []string{
 		"project.write",
 	},
@@ -224,6 +230,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	ListIdpRevisionsOperation: []string{
 		"idp.read",
+	},
+	ListPoliciesOperation: []string{
+		"policy.read",
 	},
 	ListReleasesOperation: []string{
 		"release.read",

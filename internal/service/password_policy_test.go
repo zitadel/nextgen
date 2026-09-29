@@ -21,12 +21,21 @@ type verifierFunc func(encoded, target string) error
 
 func (f verifierFunc) VerifyHash(encoded, target string) error { return f(encoded, target) }
 
+// staticPolicyResolver adapts the in-memory resolver to [service.PolicyResolver];
+// the statements are irrelevant to it.
+type staticPolicyResolver struct{ *policy.StaticResolver }
+
+func (r staticPolicyResolver) ResolveWith(ctx context.Context, _ service.AllStatements, projectID, operation string) (*policy.Instance, error) {
+	return r.Resolve(ctx, projectID, operation)
+}
+
 func newPasswordPolicy(t *testing.T, instances ...*policy.Instance) *service.PasswordPolicy {
 	t.Helper()
 	engine, err := policy.New()
 	require.NoError(t, err)
-	resolver := policy.NewStaticResolver()
-	resolver.Add("proj_1", instances...)
+	static := policy.NewStaticResolver()
+	static.Add("proj_1", instances...)
+	resolver := staticPolicyResolver{static}
 	verifier := verifierFunc(func(encoded, target string) error {
 		if encoded == "hash:"+target {
 			return nil

@@ -8,11 +8,11 @@ import (
 	"strings"
 )
 
-const _ReleasePointerKindName = "schemaflow_definitionbranding"
+const _ReleasePointerKindName = "schemaflow_definitionbrandingpolicy"
 
-var _ReleasePointerKindIndex = [...]uint8{0, 6, 21, 29}
+var _ReleasePointerKindIndex = [...]uint8{0, 6, 21, 29, 35}
 
-const _ReleasePointerKindLowerName = "schemaflow_definitionbranding"
+const _ReleasePointerKindLowerName = "schemaflow_definitionbrandingpolicy"
 
 func (i ReleasePointerKind) String() string {
 	if i >= ReleasePointerKind(len(_ReleasePointerKindIndex)-1) {
@@ -28,9 +28,10 @@ func _ReleasePointerKindNoOp() {
 	_ = x[ReleasePointerKindSchema-(0)]
 	_ = x[ReleasePointerKindFlowDefinition-(1)]
 	_ = x[ReleasePointerKindBranding-(2)]
+	_ = x[ReleasePointerKindPolicy-(3)]
 }
 
-var _ReleasePointerKindValues = []ReleasePointerKind{ReleasePointerKindSchema, ReleasePointerKindFlowDefinition, ReleasePointerKindBranding}
+var _ReleasePointerKindValues = []ReleasePointerKind{ReleasePointerKindSchema, ReleasePointerKindFlowDefinition, ReleasePointerKindBranding, ReleasePointerKindPolicy}
 
 var _ReleasePointerKindNameToValueMap = map[string]ReleasePointerKind{
 	_ReleasePointerKindName[0:6]:        ReleasePointerKindSchema,
@@ -39,12 +40,15 @@ var _ReleasePointerKindNameToValueMap = map[string]ReleasePointerKind{
 	_ReleasePointerKindLowerName[6:21]:  ReleasePointerKindFlowDefinition,
 	_ReleasePointerKindName[21:29]:      ReleasePointerKindBranding,
 	_ReleasePointerKindLowerName[21:29]: ReleasePointerKindBranding,
+	_ReleasePointerKindName[29:35]:      ReleasePointerKindPolicy,
+	_ReleasePointerKindLowerName[29:35]: ReleasePointerKindPolicy,
 }
 
 var _ReleasePointerKindNames = []string{
 	_ReleasePointerKindName[0:6],
 	_ReleasePointerKindName[6:21],
 	_ReleasePointerKindName[21:29],
+	_ReleasePointerKindName[29:35],
 }
 
 // ReleasePointerKindString retrieves an enum value from the enum constants string name.

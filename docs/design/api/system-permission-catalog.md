@@ -126,6 +126,8 @@ the target catalog for the planned paths in
 |---|---|---|
 | `branding.read` | `GET /branding`, `GET /branding/{id}` | Read/list immutable branding revisions. |
 | `branding.write` | `POST /branding` | Publish a new immutable revision; no separate create/delete permission. |
+| `policy.read` | `GET /policies`, `GET /policies/{id}` | Read/list immutable policy revisions (ADR 066). |
+| `policy.write` | `POST /policies` | Publish a new immutable policy revision; no separate create/delete permission. |
 | `domain.read` | Read/list `/projects/{id}/domains` | Domain context known to Zitadel; does not imply DNS/TLS infrastructure management. |
 | `domain.write` | Add/update a domain | Create + manage. |
 | `domain.delete` | Remove a domain | |
@@ -387,6 +389,7 @@ Full control over a project and its project-scoped resources.
 ```
 project.create, project.read, project.write, project.delete,
 branding.read, branding.write,
+policy.read, policy.write,
 domain.read, domain.write, domain.delete,
 feature.read, feature.write,
 allowed_origin.read, allowed_origin.write, allowed_origin.delete,
@@ -420,6 +423,7 @@ Read-only access to all project resources.
 ```
 project.read,
 branding.read,
+policy.read,
 domain.read,
 feature.read,
 allowed_origin.read,

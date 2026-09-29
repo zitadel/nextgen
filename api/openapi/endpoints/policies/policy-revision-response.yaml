@@ -1,0 +1,18 @@
+type: object
+description: |
+  A stored policy revision. `policy` echoes the canonical stored document so
+  the CLI sync engine can reconcile local files with the server.
+required:
+  - id
+  - created_at
+  - policy
+properties:
+  id:
+    type: string
+    description: The unique identifier of this policy revision.
+  created_at:
+    type: string
+    format: date-time
+    description: When this revision was published.
+  policy:
+    $ref: ../../components/flows/policy.yaml

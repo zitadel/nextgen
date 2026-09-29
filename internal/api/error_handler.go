@@ -117,6 +117,8 @@ func errorResponse(err error) *api.ErrorDetailsStatusCode {
 		return schemaErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixBranding.ErrorCodePrefix("")):
 		return brandingErrorResponse(e)
+	case strings.HasPrefix(e.Code, domain.PrefixPolicy.ErrorCodePrefix("")):
+		return policyErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixEnvironment.ErrorCodePrefix("")):
 		return environmentErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixRelease.ErrorCodePrefix("")):
