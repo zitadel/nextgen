@@ -75,9 +75,14 @@ Projects and environments topology:
 
 ## Conclusion
 
-Data isolation at the project boundary, one `live` plus ephemeral previews
-per project, and an API and CLI that can maintain different projects on
-different servers together cover every combination an app needs. A preview
+The decision gives three properties:
+
+- data is isolated at the project boundary,
+- every project has one `live` environment plus ephemeral previews,
+- the API and CLI can maintain different projects on different servers and
+  deploy configuration to each.
+
+Together they cover every combination an app needs. A preview
 that shares data with production is a preview environment on the production
 project. A staging with isolated data is a separate project, on the same
 server or another, with its own `live` and its own previews. In
