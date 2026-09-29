@@ -44,7 +44,7 @@ A logo is pixels and is never recoloured, so each side carries its own `logo_url
 
 Asset URLs are HTTPS. `logo_url`, `hero_url`, and the per-side `logo_url` may use canonical loopback HTTP (`localhost`, dotted-decimal `127.0.0.0/8`, or `[::1]`) for local development; the component keeps those URLs only while its embedding document also runs on loopback HTTP. `typography.font_url` is HTTPS-only.
 
-Shape validation cannot tell a live asset from a dead one, and a well-formed URL that serves nothing renders as a 0×0 `<img>`. Two layers cover that, neither of them a gate: `zitadel plan` / `apply` probe each URL and warn (`apps/cli/src/lib/sync/asset-probe.ts`), and the component hides an asset whose load fails, restoring either the split designs' decorative placeholder or a shipped design's authored no-asset content (`packages/components/src/orchestrator/asset-fallback.ts`). Templates cannot do the latter themselves: DOMPurify strips inline `onerror` along with every other event handler, so the listener is orchestrator-side. The CLI probe only contacts public HTTPS destinations and validates every redirect; loopback, private, and internal targets stay inconclusive so repo config cannot make the planning host scan its own network.
+Shape validation cannot tell a live asset from a dead one, and a well-formed URL that serves nothing renders as a 0×0 `<img>`. Two layers cover that, neither of them a gate: `zitadel plan` / `apply` probe the top-level `logo_url` and `hero_url` and warn (`apps/cli/src/lib/sync/asset-probe.ts`; the per-side marks and `typography.font_url` are not probed), and the component hides an asset whose load fails, restoring either the split designs' decorative placeholder or a shipped design's authored no-asset content (`packages/components/src/orchestrator/asset-fallback.ts`). Templates cannot do the latter themselves: DOMPurify strips inline `onerror` along with every other event handler, so the listener is orchestrator-side. The CLI probe only contacts public HTTPS destinations and validates every redirect; loopback, private, and internal targets stay inconclusive so repo config cannot make the planning host scan its own network.
 
 `typography.font_url` loads in page mode only. The component must inject a font stylesheet at document level (a shadow-scoped `@font-face` never registers faces), and Zitadel does not inject a stylesheet into a document it does not own. An embedded widget applies `font_family` and leaves loading to the embedding page. See [ADR 025](../../adrs/025-default-brand-font-loading.md).
 
@@ -54,24 +54,29 @@ The object carries no CSS field. The [override ladder](override-ladder.md) cover
 
 ## Shape invariants enforced by the component
 
-The server validates a revision on publish. The component checks again at paint time (`packages/components/src/orchestrator/branding-validator.ts`), because a payload can also arrive as a property from the embedding page:
+The server validates a revision on publish. The component checks the branding projection again each time a flow response arrives (`packages/components/src/orchestrator/branding-validator.ts`):
 
 1. Every URL is HTTPS, except the logo and hero assets under the loopback rule above. The exception is dropped on non-loopback documents.
 2. `layout` is one of the contract's values; anything else falls back to `centered`.
-3. `liquid_template`, when present, passes the structural validator ([`validator.md`](validator.md)). The security pipeline ([`../flowengine/template-security.md`](../flowengine/template-security.md)) runs on save server-side and is not repeated at paint time.
 
-A failing field is dropped and reported as a dev-build console warning, and the widget renders with the maintained default in its place. A broken branding object degrades; it does not brick the widget.
+A failing field is dropped and reported as a console warning, and the widget renders with the maintained default in its place. A broken branding object degrades; it does not brick the widget.
 
-## Runtime validation
+## Where each check runs
 
-Every branding payload the component receives passes through:
+| Check | Runs in |
+| --- | --- |
+| Field types, colour and font grammar, template lexical gate ([`../flowengine/template-security.md`](../flowengine/template-security.md)) | The server, on publish |
+| Structural template validation ([`validator.md`](validator.md)) | The CLI, on `zitadel plan` / `apply` |
+| URL and `layout` checks, as above | The component, per flow response |
+| Output sanitising (DOMPurify) | The component, per render |
 
-1. **Shape validation**: URLs and enums, as above. Every paint, cheap.
-2. **Template validation**: if `liquid_template` is set, a structural AST pass against the flow ([`validator.md`](validator.md)). Once per load, cached.
-3. **Runtime safety net**: `{% mandatory_gates %}` appends missing required UI so a bad template still yields a submittable step.
-4. **Asset degradation**: an `<img>` that fails to load is hidden and, in the split designs, replaced by the decorative brand-pane placeholder. Armed per commit; a failure is warned about once on the console.
+The component does not validate a template's structure. It parses and renders `liquid_template`, and a template that throws falls back to the bundled default. Three things keep a poor template usable at paint time:
 
-Stages 1 and 2 run in the component. Stage 3 runs as part of Liquid rendering.
+1. **Render fallback**: a parse or render error renders the bundled default template for the step.
+2. **Runtime safety net**: `{% mandatory_gates %}` appends missing required UI so the step stays submittable.
+3. **Asset degradation**: an `<img>` that fails to load is hidden and, in the split designs, replaced by the decorative brand-pane placeholder. Armed per commit; a failure is warned about once on the console.
+
+A revision published straight through the API skips the CLI's structural pass, so these three are what it relies on.
 
 ## Contrast
 

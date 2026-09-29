@@ -29,7 +29,7 @@ Shape and typography are shared across theme sides and land on one block. Each s
 
 ## What each branding key sets
 
-Branding keys are the stable, tenant-facing vocabulary. The variable names on the right are internal and can move without a revision changing.
+Both columns are stable contracts with different consumers. Branding keys are what a revision stores. The variable names are what host pages and tenant CSS set directly ([override ladder](override-ladder.md)), and the design-tokens snapshot test locks them, so a rename is a breaking change to host overrides even when no revision changes. The mapping between the two is the part that can move.
 
 ### Palette (per theme side)
 
