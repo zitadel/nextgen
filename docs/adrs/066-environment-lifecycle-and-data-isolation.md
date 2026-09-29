@@ -80,13 +80,12 @@ per project, and an API and CLI that can maintain different projects on
 different servers together cover every combination an app needs. A preview
 that shares data with production is a preview environment on the production
 project. A staging with isolated data is a separate project — on the same
-server or another — with its own `live` and its own previews. An app's own
-development, staging and production deployments each bind to a different
-project through `zitadel.json`, one server-and-project pair per app
-environment, so development may run against a local instance while production
-runs against the cloud; the server itself knows no environment kinds and
-never sees the app's mapping. The exact CLI commands to manage these projects
-and environments are out of scope for this ADR.
+server or another — with its own `live` and its own previews. In
+`zitadel.json` the app maps each of its environments — development, staging,
+production — to a server and a project, so development may run against a
+local instance while production runs against the cloud; the server itself
+knows no environment kinds and never sees the mapping. The exact CLI commands
+to manage these projects and environments are out of scope for this ADR.
 
 ## Consequences
 
