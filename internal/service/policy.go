@@ -17,9 +17,19 @@ type CreatePolicyInput struct {
 	Instance  *policy.Instance
 }
 
+// PolicyResolver is what a gate resolves the governing instance through.
+// Resolve reads through the pool; ResolveWith reads through statements the
+// caller already holds. A gate running inside a write transaction must use
+// the latter: SQLite serves one connection, so a pool read from inside the
+// transaction waits on the transaction itself until the busy timeout.
+type PolicyResolver interface {
+	policy.Resolver
+	ResolveWith(ctx context.Context, stmts AllStatements, projectID, operation string) (*policy.Instance, error)
+}
+
 // PolicyService publishes and resolves immutable policy revisions (ADR 066).
 // Revisions are create-only; evaluation resolves the newest revision per
-// operation, which makes the service the [policy.Resolver] the gates read
+// operation, which makes the service the [PolicyResolver] the gates read
 // from.
 type PolicyService struct {
 	v2Pool *DB
@@ -30,7 +40,7 @@ func NewPolicyService(v2Pool *DB, engine *policy.Engine) *PolicyService {
 	return &PolicyService{v2Pool: v2Pool, engine: engine}
 }
 
-var _ policy.Resolver = (*PolicyService)(nil)
+var _ PolicyResolver = (*PolicyService)(nil)
 
 // Engine exposes the compiled catalog for callers that need constraints or
 // warnings next to the stored revisions.
@@ -96,11 +106,17 @@ func (s *PolicyService) List(ctx context.Context, projectID string) ([]*domain.P
 	return result.Items, nil
 }
 
-// Resolve implements [policy.Resolver]: the newest stored revision for the
-// operation; nil when the project has authored nothing, so the caller falls
-// back to the template defaults.
+// Resolve implements [policy.Resolver] through the pool: the newest stored
+// revision for the operation; nil when the project has authored nothing, so
+// the caller falls back to the template defaults.
 func (s *PolicyService) Resolve(ctx context.Context, projectID, operation string) (*policy.Instance, error) {
-	result, err := s.v2Pool.Statements().ListPolicies(
+	return s.ResolveWith(ctx, s.v2Pool.Statements(), projectID, operation)
+}
+
+// ResolveWith is [PolicyService.Resolve] over the statements the caller
+// holds, for a gate that is already inside a transaction.
+func (s *PolicyService) ResolveWith(ctx context.Context, stmts AllStatements, projectID, operation string) (*policy.Instance, error) {
+	result, err := stmts.ListPolicies(
 		WithAuthzListUnrestricted(ctx),
 		policystore.ListOperationOptions(projectID, operation, 1),
 	)

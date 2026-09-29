@@ -19,14 +19,14 @@ const PasswordSaveOperation = "user.password.save"
 // one.
 type PasswordPolicy struct {
 	engine   *policy.Engine
-	resolver policy.Resolver
+	resolver PolicyResolver
 	verifier crypto.HashVerifier
 }
 
 // NewPasswordPolicy wires the engine, the instance resolver and the hash
 // verifier used for the history check. A nil resolver means every project
 // runs on the template defaults.
-func NewPasswordPolicy(engine *policy.Engine, resolver policy.Resolver, verifier crypto.HashVerifier) *PasswordPolicy {
+func NewPasswordPolicy(engine *policy.Engine, resolver PolicyResolver, verifier crypto.HashVerifier) *PasswordPolicy {
 	return &PasswordPolicy{engine: engine, resolver: resolver, verifier: verifier}
 }
 
@@ -62,7 +62,7 @@ func (p *PasswordPolicy) FieldValidation(ctx context.Context, projectID string) 
 // operation may proceed.
 func (p *PasswordPolicy) Check(ctx context.Context, stmts AllStatements, projectID, userID, candidate string) error {
 	candidate = domain.NormalizePassword(candidate)
-	inst, err := policy.Effective(ctx, p.engine, p.resolver, projectID, PasswordSaveOperation)
+	inst, err := p.effectiveWith(ctx, stmts, projectID)
 	if err != nil {
 		return domain.ErrInternal(err).WithMessage("failed to resolve password policy")
 	}
@@ -78,6 +78,23 @@ func (p *PasswordPolicy) Check(ctx context.Context, stmts AllStatements, project
 		return nil
 	}
 	return domain.ErrUserPasswordPolicyViolation(decision.Violations)
+}
+
+// effectiveWith resolves the project's instance through the statements the
+// gate holds, since Check runs inside the password save's transaction, and
+// falls back to the template defaults when nothing is authored.
+func (p *PasswordPolicy) effectiveWith(ctx context.Context, stmts AllStatements, projectID string) (*policy.Instance, error) {
+	if p.resolver == nil {
+		return p.engine.DefaultInstance(PasswordSaveOperation)
+	}
+	inst, err := p.resolver.ResolveWith(ctx, stmts, projectID, PasswordSaveOperation)
+	if err != nil {
+		return nil, err
+	}
+	if inst == nil {
+		return p.engine.DefaultInstance(PasswordSaveOperation)
+	}
+	return inst, nil
 }
 
 // buildContext derives the `user.password.save` context from the normalized
