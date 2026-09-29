@@ -118,7 +118,13 @@ func sessionCookieIn(t *testing.T, project *domain.Project, userID string) *http
 		if status == http.StatusOK && cookie != nil {
 			return cookie
 		}
-		if !strings.Contains(raw, domain.ErrSessionInvalidHandoffToken().Code) || i == signInAttempts-1 {
+		if !strings.Contains(raw, domain.ErrSessionInvalidHandoffToken().Code) {
+			break
+		}
+		// A rejected exchange returns before it deletes the attempt, so the
+		// helper does: a flake must not leave rows in the shared project.
+		require.NoError(t, stmts.Statements().DeleteAuthAttemptByID(t.Context(), project.ID, attempt.ID))
+		if i == signInAttempts-1 {
 			break
 		}
 		t.Logf("handoff expired before the exchange (slow database?), signing in again: %s", raw)
