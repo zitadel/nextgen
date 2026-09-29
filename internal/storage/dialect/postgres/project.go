@@ -117,28 +117,28 @@ func (ps projectStatements) SetProjectPasswordHashPolicy(ctx context.Context, pr
 
 // ListProjects implements [service.ProjectStatements].
 func (ps projectStatements) ListProjects(ctx context.Context, filter *database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {
-	var compiler statementCompiler
-	if err := compileRead(&compiler, projectQuery, filter, projectSchema); err != nil {
+	projects, nextCursor, err := pagination.Page(filter.Pagination, projectSchema, func(limit uint32) ([]*domain.Project, error) {
+		filter := filter.WithLimit(limit)
+		var compiler statementCompiler
+		if err := compileRead(&compiler, projectQuery, filter, projectSchema); err != nil {
+			return nil, err
+		}
+
+		rows, err := ps.client.Query(ctx, compiler.String(), compiler.args...)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+
+		projects, err := pgx.CollectRows(rows, ps.scanProject)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+
+		return projects, nil
+	})
+	if err != nil {
 		return nil, err
 	}
-
-	rows, err := ps.client.Query(ctx, compiler.String(), compiler.args...)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-
-	projects, err := pgx.CollectRows(rows, ps.scanProject)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-
-	projects, nextCursor := pagination.Paginate(
-		filter.Pagination.OrderBy,
-		projects,
-		projectSchema,
-		filter.Pagination.Limit,
-	)
-
 	return &database.ListResult[*domain.Project]{
 		Items:      projects,
 		NextCursor: nextCursor,

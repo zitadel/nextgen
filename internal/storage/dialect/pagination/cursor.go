@@ -3,6 +3,7 @@ package pagination
 import (
 	"encoding/base64"
 	"encoding/json"
+	"math"
 	"slices"
 
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -28,38 +29,34 @@ func New[F ~uint8](orderBy database.OrderBy[F], values []any) *Cursor[F] {
 	}
 }
 
-// Paginate splits an over-fetched result into the page to return and the token
-// for the next page. Callers fetch limit+1 rows: the extra row is a look-ahead
-// probe. When it is present there is a further page, so Paginate drops it,
-// returns the first limit rows, and emits a token built from the last returned
-// row. When it is absent this is the final page, so the items are returned
-// unchanged with no token — including when the total is an exact multiple of
-// the limit, which a page-full heuristic wrongly tokenized (#849).
-//
-// With limit 0 the request is unbounded, so the items are returned unchanged
-// with no token. With a positive limit but an OrderBy with no columns there is
-// no keyset to resume, so an over-fetched result is still trimmed to limit (a
-// bounded read must not leak the probe row) but no token is emitted.
-func Paginate[F ~uint8, T any](
-	orderBy database.OrderBy[F],
-	items []*T,
+// Page runs one keyset page: run fetches the requested limit plus a look-ahead
+// probe row, and Page trims the probe and returns the rows to serve with the
+// next-page token. Fetch and trim are a single operation, so they cannot drift.
+// A token is emitted only when the probe proved a further page exists, so an
+// exact-multiple final page reports none (#849). limit 0 is unbounded; an empty
+// OrderBy still trims but emits no token.
+func Page[F ~uint8, T any](
+	p database.Page[F],
 	schema database.Schema[F, T],
-	limit uint32,
-) ([]*T, []byte) {
-	// Compare widths in uint64: len(items) can be limit+1 up to math.MaxUint32+1,
-	// which narrowing to uint32 would wrap to 0 and skip trimming the probe row.
-	if limit == 0 || uint64(len(items)) <= uint64(limit) {
-		return items, nil
+	run func(limit uint32) ([]*T, error),
+) ([]*T, []byte, error) {
+	fetch := p.Limit
+	if fetch != 0 && fetch != math.MaxUint32 {
+		fetch++
 	}
-	// The probe row came back, so trim to the requested page regardless of
-	// whether it can be tokenized. A bounded read with no OrderBy still capped
-	// its result at limit and must not leak the extra row.
-	page := items[:limit]
-	if len(orderBy.Columns) == 0 {
-		return page, nil
+	items, err := run(fetch)
+	if err != nil {
+		return nil, nil, err
 	}
-	token := New(orderBy, schema.ValuesFrom(page[len(page)-1], orderBy.Columns)).Marshal()
-	return page, token
+	if p.Limit == 0 || uint64(len(items)) <= uint64(p.Limit) {
+		return items, nil, nil
+	}
+	page := items[:p.Limit]
+	if len(p.OrderBy.Columns) == 0 {
+		return page, nil, nil
+	}
+	token := New(p.OrderBy, schema.ValuesFrom(page[len(page)-1], p.OrderBy.Columns)).Marshal()
+	return page, token, nil
 }
 
 func CursorFromToken[F ~uint8](token []byte) (*Cursor[F], error) {

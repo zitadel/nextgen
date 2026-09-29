@@ -40,7 +40,7 @@ func TestCompileReadKeysetCursorAsc(t *testing.T) {
 	require.Len(t, args, 3)
 	assert.Equal(t, createdAt.UnixNano(), args[0])
 	assert.Equal(t, "proj_1", args[1])
-	assert.Equal(t, int64(6), args[2]) // compileLimit over-fetches by one (#849)
+	assert.Equal(t, int64(5), args[2])
 }
 
 func TestCompileReadCursorDesc(t *testing.T) {
@@ -131,7 +131,7 @@ func TestCompileReadCursorWithBaseFilter(t *testing.T) {
 	assert.Equal(t, "proj_1", args[0])
 	assert.Equal(t, createdAt.UnixNano(), args[1])
 	assert.Equal(t, "proj_1", args[2])
-	assert.Equal(t, int64(6), args[3]) // compileLimit over-fetches by one (#849)
+	assert.Equal(t, int64(5), args[3])
 }
 
 func TestCompileReadInvalidCursorToken(t *testing.T) {

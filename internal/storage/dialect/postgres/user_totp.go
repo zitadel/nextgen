@@ -59,28 +59,28 @@ func (us userTOTPStatements) GetUserTOTP(ctx context.Context, filter database.Fi
 
 // ListUserTOTPs implements [service.UserTOTPStatements].
 func (us userTOTPStatements) ListUserTOTPs(ctx context.Context, filter *database.ListOptions[domain.UserTOTPField]) (*database.ListResult[*domain.UserTOTP], error) {
-	var compiler statementCompiler
-	if err := compileRead(&compiler, userTOTPQuery, filter, usertotp.Schema); err != nil {
+	items, nextCursor, err := pagination.Page(filter.Pagination, usertotp.Schema, func(limit uint32) ([]*domain.UserTOTP, error) {
+		filter := filter.WithLimit(limit)
+		var compiler statementCompiler
+		if err := compileRead(&compiler, userTOTPQuery, filter, usertotp.Schema); err != nil {
+			return nil, err
+		}
+
+		rows, err := us.client.Query(ctx, compiler.String(), compiler.args...)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+
+		items, err := pgx.CollectRows(rows, us.scanUserTOTP)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+
+		return items, nil
+	})
+	if err != nil {
 		return nil, err
 	}
-
-	rows, err := us.client.Query(ctx, compiler.String(), compiler.args...)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-
-	items, err := pgx.CollectRows(rows, us.scanUserTOTP)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-
-	items, nextCursor := pagination.Paginate(
-		filter.Pagination.OrderBy,
-		items,
-		usertotp.Schema,
-		filter.Pagination.Limit,
-	)
-
 	return &database.ListResult[*domain.UserTOTP]{
 		Items:      items,
 		NextCursor: nextCursor,

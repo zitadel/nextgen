@@ -186,29 +186,29 @@ func (s idpConnectionStatements) ListIDPConnectionRevisions(ctx context.Context,
 }
 
 func (s idpConnectionStatements) list(ctx context.Context, opts *database.ListOptions[domain.IDPConnectionField], conjuncts ...string) (*database.ListResult[*domain.IDPConnection], error) {
-	var compiler statementCompiler
-	// compileList gets the alias `c`, not the table name: authz guards the
-	// connection row, on the revision list too.
-	if err := compileList(ctx, &compiler, idpConnectionQuery, opts, idpconnection.Schema, "c", "id", conjuncts...); err != nil {
+	items, nextCursor, err := pagination.Page(opts.Pagination, idpconnection.Schema, func(limit uint32) ([]*domain.IDPConnection, error) {
+		opts := opts.WithLimit(limit)
+		var compiler statementCompiler
+		// compileList gets the alias `c`, not the table name: authz guards the
+		// connection row, on the revision list too.
+		if err := compileList(ctx, &compiler, idpConnectionQuery, opts, idpconnection.Schema, "c", "id", conjuncts...); err != nil {
+			return nil, err
+		}
+
+		var items []*domain.IDPConnection
+		if err := s.db.Query(ctx, compiler.statement(), func(iter *spanner.RowIterator) error {
+			var err error
+			items, err = collectRows(iter, scanIDPConnection)
+			return err
+		}); err != nil {
+			return nil, err
+		}
+
+		return items, nil
+	})
+	if err != nil {
 		return nil, err
 	}
-
-	var items []*domain.IDPConnection
-	if err := s.db.Query(ctx, compiler.statement(), func(iter *spanner.RowIterator) error {
-		var err error
-		items, err = collectRows(iter, scanIDPConnection)
-		return err
-	}); err != nil {
-		return nil, err
-	}
-
-	items, nextCursor := pagination.Paginate(
-		opts.Pagination.OrderBy,
-		items,
-		idpconnection.Schema,
-		opts.Pagination.Limit,
-	)
-
 	return &database.ListResult[*domain.IDPConnection]{
 		Items:      items,
 		NextCursor: nextCursor,

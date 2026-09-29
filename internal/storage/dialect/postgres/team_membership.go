@@ -67,28 +67,28 @@ func (s teamMembershipStatements) GetTeamMembership(ctx context.Context, project
 
 // ListTeamMemberships implements [service.TeamMembershipStatements].
 func (s teamMembershipStatements) ListTeamMemberships(ctx context.Context, filter *database.ListOptions[domain.TeamMembershipField]) (*database.ListResult[*domain.TeamMembership], error) {
-	var compiler statementCompiler
-	if err := compileRead(&compiler, teamMembershipQuery, filter, teammembership.Schema); err != nil {
+	memberships, nextCursor, err := pagination.Page(filter.Pagination, teammembership.Schema, func(limit uint32) ([]*domain.TeamMembership, error) {
+		filter := filter.WithLimit(limit)
+		var compiler statementCompiler
+		if err := compileRead(&compiler, teamMembershipQuery, filter, teammembership.Schema); err != nil {
+			return nil, err
+		}
+
+		rows, err := s.client.Query(ctx, compiler.String(), compiler.args...)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+
+		memberships, err := pgx.CollectRows(rows, s.scanTeamMembership)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+
+		return memberships, nil
+	})
+	if err != nil {
 		return nil, err
 	}
-
-	rows, err := s.client.Query(ctx, compiler.String(), compiler.args...)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-
-	memberships, err := pgx.CollectRows(rows, s.scanTeamMembership)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-
-	memberships, nextCursor := pagination.Paginate(
-		filter.Pagination.OrderBy,
-		memberships,
-		teammembership.Schema,
-		filter.Pagination.Limit,
-	)
-
 	return &database.ListResult[*domain.TeamMembership]{
 		Items:      memberships,
 		NextCursor: nextCursor,
@@ -97,28 +97,28 @@ func (s teamMembershipStatements) ListTeamMemberships(ctx context.Context, filte
 
 // ListUserTeams implements [service.TeamMembershipStatements].
 func (s teamMembershipStatements) ListUserTeams(ctx context.Context, filter *database.ListOptions[domain.UserTeamField]) (*database.ListResult[*domain.UserTeam], error) {
-	var compiler statementCompiler
-	if err := compileRead(&compiler, userTeamQuery, filter, userteam.Schema); err != nil {
+	teams, nextCursor, err := pagination.Page(filter.Pagination, userteam.Schema, func(limit uint32) ([]*domain.UserTeam, error) {
+		filter := filter.WithLimit(limit)
+		var compiler statementCompiler
+		if err := compileRead(&compiler, userTeamQuery, filter, userteam.Schema); err != nil {
+			return nil, err
+		}
+
+		rows, err := s.client.Query(ctx, compiler.String(), compiler.args...)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+
+		teams, err := pgx.CollectRows(rows, s.scanUserTeam)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+
+		return teams, nil
+	})
+	if err != nil {
 		return nil, err
 	}
-
-	rows, err := s.client.Query(ctx, compiler.String(), compiler.args...)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-
-	teams, err := pgx.CollectRows(rows, s.scanUserTeam)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-
-	teams, nextCursor := pagination.Paginate(
-		filter.Pagination.OrderBy,
-		teams,
-		userteam.Schema,
-		filter.Pagination.Limit,
-	)
-
 	return &database.ListResult[*domain.UserTeam]{
 		Items:      teams,
 		NextCursor: nextCursor,

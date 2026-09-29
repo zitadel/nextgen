@@ -74,19 +74,19 @@ func (ss sessionStatements) ListSessions(ctx context.Context, filter *database.L
 	if filter.Pagination.OrderBy.Columns == nil {
 		filter.Pagination.OrderBy.Columns = []database.Column[domain.SessionField]{database.Col(domain.SessionFieldID)}
 	}
-	sessions, err := ss.querySessions(ctx, filter)
+	sessions, nextCursor, err := pagination.Page(filter.Pagination, sessionSchema, func(limit uint32) ([]*domain.Session, error) {
+		sessions, err := ss.querySessions(ctx, filter.WithLimit(limit))
+		if err != nil {
+			return nil, err
+		}
+		if sessions == nil {
+			sessions = []*domain.Session{}
+		}
+		return sessions, nil
+	})
 	if err != nil {
 		return nil, err
 	}
-	if sessions == nil {
-		sessions = []*domain.Session{}
-	}
-	sessions, nextCursor := pagination.Paginate(
-		filter.Pagination.OrderBy,
-		sessions,
-		sessionSchema,
-		filter.Pagination.Limit,
-	)
 	return &database.ListResult[*domain.Session]{Items: sessions, NextCursor: nextCursor}, nil
 }
 

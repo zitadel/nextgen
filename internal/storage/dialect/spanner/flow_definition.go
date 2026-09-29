@@ -106,35 +106,35 @@ func scanFlowDefinitionTimestamps(entity *domain.FlowDefinition) func(*spanner.R
 // ListFlowDefinitions implements [service.FlowDefinitionStatements].
 func (f flowDefinitionStatements) ListFlowDefinitions(ctx context.Context, filter *database.ListOptions[domain.FlowDefinitionField], queryOpts service.FlowDefinitionQueryOptions) (*database.ListResult[*domain.FlowDefinition], error) {
 	opts := flowdefinition.EnsureListOptions(filter)
+	defs, nextCursor, err := pagination.Page(opts.Pagination, flowdefinition.Schema, func(limit uint32) ([]*domain.FlowDefinition, error) {
+		opts := opts.WithLimit(limit)
 
-	var conjuncts []string
-	if queryOpts.LatestRevisionPerName {
-		conjuncts = append(conjuncts, latestRevisionPerName)
-	}
+		var conjuncts []string
+		if queryOpts.LatestRevisionPerName {
+			conjuncts = append(conjuncts, latestRevisionPerName)
+		}
 
-	var compiler statementCompiler
-	err := compileList(ctx, &compiler, flowDefinitionQuery, opts, flowdefinition.Schema, "flow_definitions", "id", conjuncts...)
-	if err != nil {
-		return nil, err
-	}
+		var compiler statementCompiler
+		err := compileList(ctx, &compiler, flowDefinitionQuery, opts, flowdefinition.Schema, "flow_definitions", "id", conjuncts...)
+		if err != nil {
+			return nil, err
+		}
 
-	var defs []*domain.FlowDefinition
-	err = f.db.Query(ctx, compiler.statement(), func(iter *spanner.RowIterator) error {
-		var err error
-		defs, err = collectRows(iter, f.scanFlowDefinition)
-		return err
+		var defs []*domain.FlowDefinition
+		err = f.db.Query(ctx, compiler.statement(), func(iter *spanner.RowIterator) error {
+			var err error
+			defs, err = collectRows(iter, f.scanFlowDefinition)
+			return err
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		return defs, nil
 	})
 	if err != nil {
 		return nil, err
 	}
-
-	defs, nextCursor := pagination.Paginate(
-		opts.Pagination.OrderBy,
-		defs,
-		flowdefinition.Schema,
-		opts.Pagination.Limit,
-	)
-
 	return &database.ListResult[*domain.FlowDefinition]{
 		Items:      defs,
 		NextCursor: nextCursor,

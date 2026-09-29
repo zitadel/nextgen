@@ -65,28 +65,28 @@ func (s userRecoveryCodesStatements) GetUserRecoveryCodes(ctx context.Context, f
 
 // ListUserRecoveryCodes implements [service.UserRecoveryCodesStatements].
 func (s userRecoveryCodesStatements) ListUserRecoveryCodes(ctx context.Context, filter *database.ListOptions[domain.UserRecoveryCodesField]) (*database.ListResult[*domain.UserRecoveryCodes], error) {
-	var compiler statementCompiler
-	if err := compileRead(&compiler, userRecoveryCodesQuery, filter, userrecoverycodes.Schema); err != nil {
-		return nil, err
-	}
+	items, nextCursor, err := pagination.Page(filter.Pagination, userrecoverycodes.Schema, func(limit uint32) ([]*domain.UserRecoveryCodes, error) {
+		filter := filter.WithLimit(limit)
+		var compiler statementCompiler
+		if err := compileRead(&compiler, userRecoveryCodesQuery, filter, userrecoverycodes.Schema); err != nil {
+			return nil, err
+		}
 
-	var items []*domain.UserRecoveryCodes
-	err := s.db.Query(ctx, compiler.statement(), func(iter *spanner.RowIterator) error {
-		var err error
-		items, err = collectRows(iter, s.scanUserRecoveryCodes)
-		return err
+		var items []*domain.UserRecoveryCodes
+		err := s.db.Query(ctx, compiler.statement(), func(iter *spanner.RowIterator) error {
+			var err error
+			items, err = collectRows(iter, s.scanUserRecoveryCodes)
+			return err
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		return items, nil
 	})
 	if err != nil {
 		return nil, err
 	}
-
-	items, nextCursor := pagination.Paginate(
-		filter.Pagination.OrderBy,
-		items,
-		userrecoverycodes.Schema,
-		filter.Pagination.Limit,
-	)
-
 	return &database.ListResult[*domain.UserRecoveryCodes]{
 		Items:      items,
 		NextCursor: nextCursor,

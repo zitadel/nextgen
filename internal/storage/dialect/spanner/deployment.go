@@ -173,27 +173,27 @@ func (ds deploymentStatements) GetDeploymentsByIDs(ctx context.Context, projectI
 
 // ListDeployments implements [service.DeploymentStatements].
 func (ds deploymentStatements) ListDeployments(ctx context.Context, filter *database.ListOptions[domain.DeploymentField]) (*database.ListResult[*domain.Deployment], error) {
-	var compiler statementCompiler
-	if err := compileList(ctx, &compiler, deploymentQuery, filter, deployment.Schema, deploymentTable, "id"); err != nil {
+	items, nextCursor, err := pagination.Page(filter.Pagination, deployment.Schema, func(limit uint32) ([]*domain.Deployment, error) {
+		filter := filter.WithLimit(limit)
+		var compiler statementCompiler
+		if err := compileList(ctx, &compiler, deploymentQuery, filter, deployment.Schema, deploymentTable, "id"); err != nil {
+			return nil, err
+		}
+
+		var items []*domain.Deployment
+		if err := ds.db.Query(ctx, compiler.statement(), func(iter *spanner.RowIterator) error {
+			var err error
+			items, err = collectRows(iter, scanDeployment)
+			return err
+		}); err != nil {
+			return nil, err
+		}
+
+		return items, nil
+	})
+	if err != nil {
 		return nil, err
 	}
-
-	var items []*domain.Deployment
-	if err := ds.db.Query(ctx, compiler.statement(), func(iter *spanner.RowIterator) error {
-		var err error
-		items, err = collectRows(iter, scanDeployment)
-		return err
-	}); err != nil {
-		return nil, err
-	}
-
-	items, nextCursor := pagination.Paginate(
-		filter.Pagination.OrderBy,
-		items,
-		deployment.Schema,
-		filter.Pagination.Limit,
-	)
-
 	return &database.ListResult[*domain.Deployment]{Items: items, NextCursor: nextCursor}, nil
 }
 

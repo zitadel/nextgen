@@ -81,28 +81,28 @@ func (ps userPasskeyStatements) GetUserPasskey(ctx context.Context, filter datab
 
 // ListUserPasskeys implements [service.UserPasskeyStatements].
 func (ps userPasskeyStatements) ListUserPasskeys(ctx context.Context, filter *database.ListOptions[domain.UserPasskeyField]) (*database.ListResult[*domain.UserPasskey], error) {
-	var compiler statementCompiler
-	if err := compileRead(&compiler, userPasskeyQuery, filter, userpasskey.Schema); err != nil {
+	passkeys, nextCursor, err := pagination.Page(filter.Pagination, userpasskey.Schema, func(limit uint32) ([]*domain.UserPasskey, error) {
+		filter := filter.WithLimit(limit)
+		var compiler statementCompiler
+		if err := compileRead(&compiler, userPasskeyQuery, filter, userpasskey.Schema); err != nil {
+			return nil, err
+		}
+
+		rows, err := ps.client.Query(ctx, compiler.String(), compiler.args...)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+
+		passkeys, err := pgx.CollectRows(rows, ps.scanUserPasskey)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+
+		return passkeys, nil
+	})
+	if err != nil {
 		return nil, err
 	}
-
-	rows, err := ps.client.Query(ctx, compiler.String(), compiler.args...)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-
-	passkeys, err := pgx.CollectRows(rows, ps.scanUserPasskey)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-
-	passkeys, nextCursor := pagination.Paginate(
-		filter.Pagination.OrderBy,
-		passkeys,
-		userpasskey.Schema,
-		filter.Pagination.Limit,
-	)
-
 	return &database.ListResult[*domain.UserPasskey]{
 		Items:      passkeys,
 		NextCursor: nextCursor,

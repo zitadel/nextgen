@@ -65,25 +65,26 @@ func (es environmentStatements) GetEnvironmentByName(ctx context.Context, projec
 
 // ListEnvironments implements [service.EnvironmentStatements].
 func (es environmentStatements) ListEnvironments(ctx context.Context, filter *database.ListOptions[domain.EnvironmentField]) (*database.ListResult[*domain.Environment], error) {
-	var compiler statementCompiler
-	if err := compileList(ctx, &compiler, environmentQuery, filter, environment.Schema, "environments", "id"); err != nil {
+	items, nextCursor, err := pagination.Page(filter.Pagination, environment.Schema, func(limit uint32) ([]*domain.Environment, error) {
+		filter := filter.WithLimit(limit)
+		var compiler statementCompiler
+		if err := compileList(ctx, &compiler, environmentQuery, filter, environment.Schema, "environments", "id"); err != nil {
+			return nil, err
+		}
+		rows, err := es.client.Query(ctx, compiler.String(), compiler.args...)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+		defer rows.Close()
+		items, err := collectRows(rows, scanEnvironment)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+		return items, nil
+	})
+	if err != nil {
 		return nil, err
 	}
-	rows, err := es.client.Query(ctx, compiler.String(), compiler.args...)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-	defer rows.Close()
-	items, err := collectRows(rows, scanEnvironment)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-	items, nextCursor := pagination.Paginate(
-		filter.Pagination.OrderBy,
-		items,
-		environment.Schema,
-		filter.Pagination.Limit,
-	)
 	return &database.ListResult[*domain.Environment]{Items: items, NextCursor: nextCursor}, nil
 }
 

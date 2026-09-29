@@ -137,27 +137,27 @@ func (rs releaseStatements) GetReleasesByIDs(ctx context.Context, projectID stri
 
 // ListReleases implements [service.ReleaseStatements].
 func (rs releaseStatements) ListReleases(ctx context.Context, filter *database.ListOptions[domain.ReleaseField]) (*database.ListResult[*domain.Release], error) {
-	var compiler statementCompiler
-	if err := compileList(ctx, &compiler, releaseQuery, filter, release.Schema, "releases", "id"); err != nil {
+	items, nextCursor, err := pagination.Page(filter.Pagination, release.Schema, func(limit uint32) ([]*domain.Release, error) {
+		filter := filter.WithLimit(limit)
+		var compiler statementCompiler
+		if err := compileList(ctx, &compiler, releaseQuery, filter, release.Schema, "releases", "id"); err != nil {
+			return nil, err
+		}
+
+		var items []*domain.Release
+		if err := rs.db.Query(ctx, compiler.statement(), func(iter *spanner.RowIterator) error {
+			var err error
+			items, err = collectRows(iter, rs.scanRelease)
+			return err
+		}); err != nil {
+			return nil, err
+		}
+
+		return items, nil
+	})
+	if err != nil {
 		return nil, err
 	}
-
-	var items []*domain.Release
-	if err := rs.db.Query(ctx, compiler.statement(), func(iter *spanner.RowIterator) error {
-		var err error
-		items, err = collectRows(iter, rs.scanRelease)
-		return err
-	}); err != nil {
-		return nil, err
-	}
-
-	items, nextCursor := pagination.Paginate(
-		filter.Pagination.OrderBy,
-		items,
-		release.Schema,
-		filter.Pagination.Limit,
-	)
-
 	return &database.ListResult[*domain.Release]{Items: items, NextCursor: nextCursor}, nil
 }
 

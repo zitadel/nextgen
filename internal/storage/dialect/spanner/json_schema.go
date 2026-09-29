@@ -105,33 +105,33 @@ func (js jsonSchemaStatements) GetJSONSchemaByID(ctx context.Context, projectID,
 
 // ListJSONSchemas implements [service.JSONSchemaStatements].
 func (js jsonSchemaStatements) ListJSONSchemas(ctx context.Context, filter *database.ListOptions[domain.JSONSchemaField], opts service.JSONSchemaQueryOptions) (*database.ListResult[*domain.JSONSchema], error) {
-	var conjuncts []string
-	if opts.LatestRevisionPerObjectType {
-		conjuncts = append(conjuncts, latestRevisionPerObjectType)
-	}
+	schemas, nextCursor, err := pagination.Page(filter.Pagination, jsonSchemaSchema, func(limit uint32) ([]*domain.JSONSchema, error) {
+		filter := filter.WithLimit(limit)
+		var conjuncts []string
+		if opts.LatestRevisionPerObjectType {
+			conjuncts = append(conjuncts, latestRevisionPerObjectType)
+		}
 
-	var compiler statementCompiler
-	if err := compileList(ctx, &compiler, jsonSchemaQuery, filter, jsonSchemaSchema, "json_schemas", "url", conjuncts...); err != nil {
-		return nil, err
-	}
+		var compiler statementCompiler
+		if err := compileList(ctx, &compiler, jsonSchemaQuery, filter, jsonSchemaSchema, "json_schemas", "url", conjuncts...); err != nil {
+			return nil, err
+		}
 
-	var schemas []*domain.JSONSchema
-	err := js.db.Query(ctx, compiler.statement(), func(iter *spanner.RowIterator) error {
-		var err error
-		schemas, err = collectRows(iter, js.scanJSONSchema)
-		return err
+		var schemas []*domain.JSONSchema
+		err := js.db.Query(ctx, compiler.statement(), func(iter *spanner.RowIterator) error {
+			var err error
+			schemas, err = collectRows(iter, js.scanJSONSchema)
+			return err
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		return schemas, nil
 	})
 	if err != nil {
 		return nil, err
 	}
-
-	schemas, nextCursor := pagination.Paginate(
-		filter.Pagination.OrderBy,
-		schemas,
-		jsonSchemaSchema,
-		filter.Pagination.Limit,
-	)
-
 	return &database.ListResult[*domain.JSONSchema]{
 		Items:      schemas,
 		NextCursor: nextCursor,

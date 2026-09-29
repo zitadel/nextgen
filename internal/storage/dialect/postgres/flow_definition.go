@@ -106,34 +106,34 @@ func (f flowDefinitionStatements) GetFlowDefinitionByID(ctx context.Context, pro
 // ListFlowDefinitions implements [service.FlowDefinitionStatements].
 func (f flowDefinitionStatements) ListFlowDefinitions(ctx context.Context, filter *database.ListOptions[domain.FlowDefinitionField], queryOpts service.FlowDefinitionQueryOptions) (*database.ListResult[*domain.FlowDefinition], error) {
 	opts := flowdefinition.EnsureListOptions(filter)
+	defs, nextCursor, err := pagination.Page(opts.Pagination, flowdefinition.Schema, func(limit uint32) ([]*domain.FlowDefinition, error) {
+		opts := opts.WithLimit(limit)
 
-	var conjuncts []string
-	if queryOpts.LatestRevisionPerName {
-		conjuncts = append(conjuncts, latestRevisionPerName)
-	}
+		var conjuncts []string
+		if queryOpts.LatestRevisionPerName {
+			conjuncts = append(conjuncts, latestRevisionPerName)
+		}
 
-	var compiler statementCompiler
-	err := compileList(ctx, &compiler, flowDefinitionQuery, opts, flowdefinition.Schema, "zitadel_nextgen.flow_definitions", "id", conjuncts...)
+		var compiler statementCompiler
+		err := compileList(ctx, &compiler, flowDefinitionQuery, opts, flowdefinition.Schema, "zitadel_nextgen.flow_definitions", "id", conjuncts...)
+		if err != nil {
+			return nil, err
+		}
+
+		rows, err := f.client.Query(ctx, compiler.String(), compiler.args...)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+		defs, err := pgx.CollectRows(rows, f.scanFlowDefinition)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+
+		return defs, nil
+	})
 	if err != nil {
 		return nil, err
 	}
-
-	rows, err := f.client.Query(ctx, compiler.String(), compiler.args...)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-	defs, err := pgx.CollectRows(rows, f.scanFlowDefinition)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-
-	defs, nextCursor := pagination.Paginate(
-		opts.Pagination.OrderBy,
-		defs,
-		flowdefinition.Schema,
-		opts.Pagination.Limit,
-	)
-
 	return &database.ListResult[*domain.FlowDefinition]{
 		Items:      defs,
 		NextCursor: nextCursor,

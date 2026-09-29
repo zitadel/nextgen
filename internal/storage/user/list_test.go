@@ -2,7 +2,6 @@ package user
 
 import (
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -34,33 +33,4 @@ func TestGroupByProject_ClearsAttributesAndIndexes(t *testing.T) {
 	assert.Nil(t, groups[0].ByID["u1"].Attributes)
 	assert.Equal(t, "p2", groups[1].ProjectID)
 	assert.Equal(t, []string{"u3"}, groups[1].IDs)
-}
-
-func TestPaginate_TrimsProbeAndTokenizes(t *testing.T) {
-	now := time.Now().UTC()
-	users := []*domain.User{
-		{ID: "u1", Metadata: domain.UserMetadata{CreatedAt: now}},
-		{ID: "u2", Metadata: domain.UserMetadata{CreatedAt: now.Add(time.Second)}},
-		{ID: "u3", Metadata: domain.UserMetadata{CreatedAt: now.Add(2 * time.Second)}},
-	}
-	page := database.Page[domain.UserField]{
-		Limit: 2,
-		OrderBy: database.OrderBy[domain.UserField]{
-			Columns: []database.Column[domain.UserField]{
-				database.Col(domain.UserFieldCreatedAt),
-				database.Col(domain.UserFieldID),
-			},
-			Direction: database.OrderAsc,
-		},
-	}
-	// Over-fetched (limit+1): the probe row is dropped and a token is emitted.
-	got, token := Paginate(users, page)
-	assert.Equal(t, []string{"u1", "u2"}, []string{got[0].ID, got[1].ID})
-	assert.Len(t, got, 2)
-	assert.NotEmpty(t, token)
-
-	// Exactly limit rows, no probe: final page, no token (#849).
-	got, token = Paginate(users[:2], page)
-	assert.Len(t, got, 2)
-	assert.Empty(t, token)
 }

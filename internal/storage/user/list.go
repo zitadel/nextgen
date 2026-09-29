@@ -51,12 +51,6 @@ func ApplyCursor(filter database.Filter[domain.UserField], page database.Page[do
 	return database.And(filter, database.CompareLess(terms...)), nil
 }
 
-// Paginate trims the look-ahead probe row from an over-fetched user page and
-// returns the page to serve plus the next-page token. See [pagination.Paginate].
-func Paginate(users []*domain.User, page database.Page[domain.UserField]) ([]*domain.User, []byte) {
-	return pagination.Paginate(page.OrderBy, users, Schema, page.Limit)
-}
-
 // ProjectGroup is one project's users prepared for attribute hydration.
 type ProjectGroup struct {
 	ProjectID string

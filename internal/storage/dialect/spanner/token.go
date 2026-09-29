@@ -111,28 +111,28 @@ func (ts tokenStatements) DeleteTokensBySessionID(ctx context.Context, projectID
 
 // ListTokens implements [service.TokenStatements].
 func (ts tokenStatements) ListTokens(ctx context.Context, filter *database.ListOptions[domain.TokenField]) (*database.ListResult[*domain.Token], error) {
-	var compiler statementCompiler
-	if err := compileRead(&compiler, tokenQuery, filter, tokenSchema); err != nil {
-		return nil, err
-	}
+	tokens, nextCursor, err := pagination.Page(filter.Pagination, tokenSchema, func(limit uint32) ([]*domain.Token, error) {
+		filter := filter.WithLimit(limit)
+		var compiler statementCompiler
+		if err := compileRead(&compiler, tokenQuery, filter, tokenSchema); err != nil {
+			return nil, err
+		}
 
-	var tokens []*domain.Token
-	err := ts.db.Query(ctx, compiler.statement(), func(iter *spanner.RowIterator) error {
-		var err error
-		tokens, err = collectRows(iter, ts.scanToken)
-		return err
+		var tokens []*domain.Token
+		err := ts.db.Query(ctx, compiler.statement(), func(iter *spanner.RowIterator) error {
+			var err error
+			tokens, err = collectRows(iter, ts.scanToken)
+			return err
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		return tokens, nil
 	})
 	if err != nil {
 		return nil, err
 	}
-
-	tokens, nextCursor := pagination.Paginate(
-		filter.Pagination.OrderBy,
-		tokens,
-		tokenSchema,
-		filter.Pagination.Limit,
-	)
-
 	return &database.ListResult[*domain.Token]{
 		Items:      tokens,
 		NextCursor: nextCursor,

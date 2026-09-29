@@ -143,20 +143,26 @@ func (e eventStatements) GetEventByID(ctx context.Context, projectID, id string)
 
 // ListEvents implements [service.EventStatements].
 func (e eventStatements) ListEvents(ctx context.Context, filter *database.ListOptions[domain.EventField]) (*database.ListResult[*domain.Event], error) {
-	var compiler statementCompiler
-	if err := compileRead(&compiler, eventQuery, filter, events.Schema); err != nil {
+	items, nextCursor, err := pagination.Page(filter.Pagination, events.Schema, func(limit uint32) ([]*domain.Event, error) {
+		filter := filter.WithLimit(limit)
+		var compiler statementCompiler
+		if err := compileRead(&compiler, eventQuery, filter, events.Schema); err != nil {
+			return nil, err
+		}
+		rows, err := e.client.Query(ctx, compiler.String(), compiler.args...)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+		defer rows.Close()
+		items, err := collectRows(rows, scanEvent)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+		return items, nil
+	})
+	if err != nil {
 		return nil, err
 	}
-	rows, err := e.client.Query(ctx, compiler.String(), compiler.args...)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-	defer rows.Close()
-	items, err := collectRows(rows, scanEvent)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-	items, nextCursor := pagination.Paginate(filter.Pagination.OrderBy, items, events.Schema, filter.Pagination.Limit)
 	return &database.ListResult[*domain.Event]{
 		Items:      items,
 		NextCursor: nextCursor,
