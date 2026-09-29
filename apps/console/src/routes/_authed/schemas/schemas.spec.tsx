@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { scopedPath } from "@/lib/project-scope.fixture";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
@@ -93,12 +94,12 @@ function serveBusiness() {
   );
 }
 
-async function renderAt(path: string) {
+async function renderAt(path: string, project?: string) {
   const [{ RouterProvider, createMemoryHistory }, { createAppRouter }] = await Promise.all([
     import("@tanstack/react-router"),
     import("../../../router"),
   ]);
-  const router = createAppRouter({ history: createMemoryHistory({ initialEntries: [path] }) });
+  const router = createAppRouter({ history: createMemoryHistory({ initialEntries: [scopedPath(path, project)] }) });
   render(<RouterProvider router={router} />);
   return router;
 }
@@ -164,7 +165,7 @@ describe("user schemas list", () => {
     await renderAt("/schemas");
 
     const link = await screen.findByRole("link", { name: "Business" });
-    expect(link).toHaveAttribute("href", "/schemas/sch_business");
+    expect(link).toHaveAttribute("href", scopedPath("/schemas/sch_business"));
     expect(link.className).toContain("after:inset-0");
   });
 
@@ -332,6 +333,22 @@ describe("user schema detail", () => {
     expect(path.getByText("address")).toHaveAttribute("aria-current", "true");
     await userEvent.click(path.getByRole("button", { name: "Schema" }));
     expect(await table().findByRole("cell", { name: "email" })).toBeInTheDocument();
+  });
+
+  it("reads the schema in the selected project", async () => {
+    // Schema ids are unique per project only (the seeded default carries the
+    // same `$id` everywhere), so the id alone could resolve in the caller's own.
+    const projects: (string | null)[] = [];
+    server.use(
+      http.get(`${SCHEMAS_URL}/sch_business`, ({ request }) => {
+        projects.push(new URL(request.url).searchParams.get("project_id"));
+        return HttpResponse.json(envelope("sch_business", BUSINESS));
+      }),
+    );
+    await renderAt("/schemas/sch_business", "proj_other");
+
+    expect(await screen.findByRole("heading", { name: "Business" })).toBeInTheDocument();
+    expect(projects).toEqual(["proj_other"]);
   });
 
   it("elides the middle of a deep path, keeping the last two levels", async () => {
