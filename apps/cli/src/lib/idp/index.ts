@@ -25,6 +25,15 @@ export {
   readConnectionFiles,
 } from "./connections";
 
+export {
+  applySsoToFlow,
+  applySsoToSchema,
+  ssoEditRefusal,
+  type SsoEditTarget,
+  type SsoResult,
+  type SsoSkipped,
+} from "./documents";
+
 export { callbackUriFor } from "./callback";
 
 export { askConnectionEndpoints } from "./endpoints";

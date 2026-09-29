@@ -23,16 +23,17 @@ import {
   type SetupPreset,
   type SetupUseCase,
 } from "@zitadel/config/defaults";
-import {
-  applySsoToFlow,
-  applySsoToSchema,
-  type ConnectionEndpoints,
-  idpProvider,
-} from "@zitadel/config/idp";
+import { type ConnectionEndpoints, idpProvider } from "@zitadel/config/idp";
 import { normalizeFlowBody, normalizeSchemaBody } from "@zitadel/config/normalize";
 
 import { FLOWS_DIR } from "./flows";
-import { authMethods, CONNECTION_SCHEMA_REF, IDPS_DIR } from "./idp";
+import {
+  applySsoToFlow,
+  applySsoToSchema,
+  authMethods,
+  CONNECTION_SCHEMA_REF,
+  IDPS_DIR,
+} from "./idp";
 import { stableStringify } from "./json";
 import { normalizePublicCliProse } from "./public-cli";
 import { hashForState, writeBackResource } from "./sync";

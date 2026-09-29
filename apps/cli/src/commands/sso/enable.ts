@@ -5,16 +5,7 @@ import { Flags } from "@oclif/core";
 import { password, text } from "@clack/prompts";
 import { consola } from "consola";
 
-import {
-  applySsoToFlow,
-  applySsoToSchema,
-  credentialVariables,
-  idpProvider,
-  IDP_PROVIDERS,
-  ssoEditRefusal,
-  type SsoEditTarget,
-  type SsoSkipped,
-} from "@zitadel/config/idp";
+import { credentialVariables, idpProvider, IDP_PROVIDERS } from "@zitadel/config/idp";
 
 import { createZitadelClient } from "../../lib/api-client";
 import { isDevelopmentBuild } from "../../lib/build-channel";
@@ -22,6 +13,8 @@ import { ZitadelError } from "../../lib/errors";
 import { bailOnCancel } from "../../lib/prompt-cancel";
 import { stableStringify } from "../../lib/json";
 import {
+  applySsoToFlow,
+  applySsoToSchema,
   askConnectionEndpoints,
   callbackUriFor,
   CONNECTION_SCHEMA_REF,
@@ -36,6 +29,9 @@ import {
   readFlowFiles,
   readSchemaFiles,
   reportClientIdOutcome,
+  ssoEditRefusal,
+  type SsoEditTarget,
+  type SsoSkipped,
   reportSecretOutcome,
   selectSchema,
   storeClientSecret,

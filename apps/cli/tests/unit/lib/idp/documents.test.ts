@@ -4,10 +4,14 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import { getDefaultHumanUserSchema, getDefaultLoginFlow } from "../defaults.js";
-import { applySsoToFlow, applySsoToSchema, ssoEditRefusal } from "./sso.js";
+import { getDefaultHumanUserSchema, getDefaultLoginFlow } from "@zitadel/config/defaults";
+import {
+  applySsoToFlow,
+  applySsoToSchema,
+  ssoEditRefusal,
+} from "../../../../src/lib/idp";
 
-const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "../../../..");
+const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "../../../../../..");
 
 /** The design's worked example: the shipped flow with Google added. */
 const reference = JSON.parse(
