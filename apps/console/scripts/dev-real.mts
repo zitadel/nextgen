@@ -10,23 +10,15 @@
  * `console:dev` with the dev proxy pointed at that instance:
  *
  *   CONSOLE_BACKEND_URL     -> the booted instance
- *   CONSOLE_PROJECT_SECRET  -> the operator credential the proxy injects, which
- *                              is what authorizes `queryUsers` (`user.read`);
- *                              the browser-plane publishable key deliberately
- *                              cannot list users (`internal/api/user.go`)
- *   CONSOLE_PROJECT_SECRET_PROJECT_ID
- *                           -> the project that secret belongs to, so the proxy
- *                              injects it only for calls scoped to that project;
- *                              differs from the pin below in claim mode
- *   VITE_CONSOLE_PROJECT_ID -> pins the client to the bootstrapped project, so
- *                              it agrees with the secret above
+ *   VITE_CONSOLE_PROJECT_ID -> pins the client to the bootstrapped project
  *
- * All three come from the boot-captured instance handle — the testkit's boot
- * contract is the sanctioned credential source (root ADR 053 §9):
- * the kit captures the secret from `POST /projects` provisioning output, so
- * nothing here is a developer-remembered variable and there is no server-side
- * test door to lean on. `--seed-only` prints the same three variables for a
- * separately-started dev server.
+ * The browser authenticates with the dev user's session cookie alone, as the
+ * embedded console does (#1300); the dev user is granted admin on the seeded
+ * project below, which is what lets it see and manage that project. The
+ * project secret, captured from `POST /projects` by the testkit's boot
+ * contract (root ADR 053 §9), is used only here, server-side, to seed and to
+ * write that grant — it never reaches the proxy or the browser. `--seed-only`
+ * prints the variables for a separately-started dev server.
  *
  * The instance is ephemeral: each run gets a fresh database and re-seeds, so
  * the users list looks identical every time (good for design work) at the cost
@@ -38,7 +30,7 @@
  * pointing a separately-running console (or curl) at a fresh instance.
  */
 import { spawn } from "node:child_process";
-import { access } from "node:fs/promises";
+import { access, mkdir, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -178,16 +170,33 @@ try {
   await shutdown(1);
 }
 
+/**
+ * The seeded accounts, for `scripts/dev-real-add-project.mts`: it grants one
+ * of them on another project and needs its id. Nothing else can hand that
+ * over — the dev proxy holds no credential (#1300) and the project secret
+ * stays in this process. Ids and emails only; overwritten on every run.
+ */
+const DEV_REAL_USERS_FILE = join(appDir, ".dev-real", "users.json");
+await mkdir(dirname(DEV_REAL_USERS_FILE), { recursive: true });
+await writeFile(
+  DEV_REAL_USERS_FILE,
+  JSON.stringify(
+    seeded.map(({ id, email }) => ({ id, email })),
+    null,
+    2,
+  ),
+);
+
 const { baseUrl, projectId, projectSecret } = zitadel.handle;
 
 /**
  * Makes the dev account an admin of the seeded project.
  *
- * The project pill and the Projects screen list what the signed-in person can
- * act on (`GET /users/me/projects`), and a seeded user holds no grant — so
- * without this the default loop shows "No projects" next to a project full of
- * users. Skipped in claim mode, where claiming is what is meant to produce the
- * access. Best-effort: a failure costs the row, not the instance.
+ * The console authenticates with the dev user's session cookie alone, so this
+ * grant is what every screen reads through: without it the dev user sees "No
+ * projects" and every list answers 404. Skipped in claim mode, where claiming
+ * is what is meant to produce the access. Best-effort: a failure is reported,
+ * not fatal.
  */
 async function grantDevUserAdmin(userId: string): Promise<boolean> {
   try {
@@ -207,7 +216,7 @@ async function grantDevUserAdmin(userId: string): Promise<boolean> {
 const devUser = seeded[0];
 if (!claimMode && devUser && !(await grantDevUserAdmin(devUser.id))) {
   console.warn(
-    "[console-dev-real] could not grant the dev user admin on the project; the project pill and Projects screen will read empty.",
+    "[console-dev-real] could not grant the dev user admin on the project; the console will show no project and its lists will answer 404.",
   );
 }
 
@@ -275,18 +284,15 @@ console.log(
 );
 
 if (seedOnly) {
-  // Hand the boot-captured credentials to the separately-started dev server —
-  // the whole point of the boot contract is that nobody has to remember or
-  // reconstruct these (the secret exists nowhere else: the server returns it
-  // exactly once, at provisioning).
+  // Hand the instance's address and project to the separately-started dev
+  // server. No credential: the dev user signs in and its session cookie does
+  // the rest.
   console.log(
     [
       "[console-dev-real] --seed-only: instance stays up, Ctrl-C to stop.",
       "  point a console dev server at it:",
       "",
       `    CONSOLE_BACKEND_URL=${baseUrl} \\`,
-      `    CONSOLE_PROJECT_SECRET=${projectSecret} \\`,
-      `    CONSOLE_PROJECT_SECRET_PROJECT_ID=${projectId} \\`,
       `    VITE_CONSOLE_PROJECT_ID=${consoleProjectId} \\`,
       "    corepack pnpm --filter @zitadel/console dev",
       "",
@@ -310,8 +316,6 @@ if (seedOnly) {
     env: {
       ...process.env,
       CONSOLE_BACKEND_URL: baseUrl,
-      CONSOLE_PROJECT_SECRET: projectSecret,
-      CONSOLE_PROJECT_SECRET_PROJECT_ID: projectId,
       VITE_CONSOLE_PROJECT_ID: consoleProjectId,
     },
   });
