@@ -187,7 +187,7 @@ func TestCreateIdp(t *testing.T) {
 }
 
 // TestCreateIdpRejectsInvalidDocuments sends documents the idp-connection.json
-// schema forbids. Nothing of them may be stored.
+// schema forbids. None of them may be stored.
 func TestCreateIdpRejectsInvalidDocuments(t *testing.T) {
 	t.Parallel()
 	f := newIdpFixture(t)
