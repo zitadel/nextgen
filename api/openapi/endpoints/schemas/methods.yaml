@@ -117,6 +117,7 @@ get:
   security:
     - oauth2:
         - schema.read
+    - nextgenSession: []
   responses:
     '200':
       description: A list of schemas was retrieved successfully.

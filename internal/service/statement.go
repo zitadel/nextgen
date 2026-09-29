@@ -32,6 +32,7 @@ type AllStatements interface {
 	EnvironmentStatements
 	ReleaseStatements
 	IDPConnectionStatements
+	DeploymentStatements
 	TeamStatements
 	TeamMembershipStatements
 	TokenStatements
@@ -156,6 +157,10 @@ type ReleaseStatements interface {
 	// assembling a release resolves an identical pinned set to the release that
 	// already holds it rather than writing a second one.
 	GetReleaseByContentHash(ctx context.Context, projectID, contentHash string) (*domain.Release, error)
+	// GetReleasesByIDs reads the named releases in one round trip, for
+	// hydrating an expanded deployment list (ADR 059). Unknown ids are simply
+	// absent from the result, not an error.
+	GetReleasesByIDs(ctx context.Context, projectID string, ids []string) ([]*domain.Release, error)
 	ListReleases(ctx context.Context, filter *database.ListOptions[domain.ReleaseField]) (*database.ListResult[*domain.Release], error)
 }
 
@@ -183,7 +188,9 @@ type IDPConnectionStatements interface {
 	GetIDPConnection(ctx context.Context, filter database.Filter[domain.IDPConnectionField]) (*domain.IDPConnection, error)
 	// GetIDPConnectionRevision returns the connection at the given revision,
 	// even when a newer one exists. Revision ids are unique per project. An
-	// unknown revision returns *database.NoRowFoundError.
+	// unknown revision returns *database.NoRowFoundError. It serves both the
+	// auth attempt reading its pinned revision and the public
+	// `GET /idps/revisions/{revision_id}` read (#1252).
 	GetIDPConnectionRevision(ctx context.Context, projectID, revisionID string) (*domain.IDPConnection, error)
 	ListIDPConnections(ctx context.Context, filter *database.ListOptions[domain.IDPConnectionField]) (*database.ListResult[*domain.IDPConnection], error)
 	// ListIDPConnectionRevisions pages one connection's revisions newest first.
@@ -191,6 +198,33 @@ type IDPConnectionStatements interface {
 	// the cursor. An unknown connection returns an empty page, so a handler
 	// needs GetIDPConnection to tell that from a connection with no revisions.
 	ListIDPConnectionRevisions(ctx context.Context, projectID, connectionID string, page database.Page[domain.IDPConnectionField]) (*database.ListResult[*domain.IDPConnection], error)
+}
+
+// TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
+// type DeploymentPool interface {
+// 	Statementer[DeploymentStatements]
+// 	Transactioner[DeploymentStatements]
+// }
+
+type DeploymentStatements interface {
+	Statements
+	// CreateDeployment inserts the deployment and points the environment's
+	// current_deployment_id at it, atomically. A non-nil
+	// expectedCurrentDeploymentID makes the swap conditional: when the
+	// environment's current deployment is not exactly that one, nothing is
+	// written and domain.ErrDeploymentConflict reports what actually runs.
+	// An environment that does not exist is a NoRowFoundError.
+	//
+	// Idempotent on the running release: when the environment's current
+	// deployment already points at entity's release, nothing is written,
+	// entity is overwritten with that existing record, and created is false.
+	CreateDeployment(ctx context.Context, entity *domain.Deployment, expectedCurrentDeploymentID *string) (created bool, err error)
+	GetDeploymentByID(ctx context.Context, projectID, id string) (*domain.Deployment, error)
+	// GetDeploymentsByIDs reads the named deployments in one round trip, for
+	// hydrating current_deployment on environment reads. Unknown ids are
+	// simply absent from the result, not an error.
+	GetDeploymentsByIDs(ctx context.Context, projectID string, ids []string) ([]*domain.Deployment, error)
+	ListDeployments(ctx context.Context, filter *database.ListOptions[domain.DeploymentField]) (*database.ListResult[*domain.Deployment], error)
 }
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
@@ -290,6 +324,27 @@ type AuthAttemptStatements interface {
 	SetAuthAttemptFactor(ctx context.Context, projectID, authAttemptID string, factor domain.AuthFactor) (checkID string, err error)
 	AuthAttemptChallengeSucceeded(ctx context.Context, projectID, authAttemptID string, factor domain.AuthFactor, challengeID string) error
 	AuthAttemptChallengeFailed(ctx context.Context, projectID, authAttemptID string, challenge domain.AuthChallenge) error
+	// IssueSSOState upserts the attempt's single sso_callback row. It mints the check
+	// id when check.ID is empty and re-mints it on a re-issue, so a stale id cannot
+	// match, and writes lookup_hash = check.StateHash, last_challenged_at = now and
+	// challenge_payload = check.Pending. It clears factor_payload, last_verified_at and
+	// the failure state, so a re-issue never exposes an earlier result. The minted id
+	// is written back onto check.
+	IssueSSOState(ctx context.Context, projectID, authAttemptID string, check *domain.SSOCallbackCheck) error
+	// ConsumeSSOState atomically consumes the pending row whose lookup_hash is stateHash
+	// and returns its check id, AuthAttemptID and Pending. The presented cookie value must
+	// match the record's binding nonce; on a mismatch or an empty value the record is left
+	// pending and ErrSSOStateInvalid is returned, so a caller who knows the state but not
+	// the cookie cannot burn it. Unknown, consumed and expired states return the same
+	// sentinel. An expired attempt is burned and rejected; no expiry check is left to the
+	// caller.
+	ConsumeSSOState(ctx context.Context, projectID, stateHash, bindingNonce string) (*domain.SSOCallbackCheck, error)
+	// SetSSOCallbackResult stores the callback result on the consumed row whose
+	// lookup_hash is stateHash. Returns ErrSSOStateInvalid when no such consumed row
+	// exists, including when a new state was issued since the consume (the hash no
+	// longer matches). The write is once only: a second write on the same consumed
+	// row returns ErrSSOStateInvalid. Never sets last_verified_at.
+	SetSSOCallbackResult(ctx context.Context, projectID, stateHash string, result *domain.SSOCallbackResult) error
 }
 
 // UserQueryOptions carries EAV match/hydrate options for GetUser / ListUsers.

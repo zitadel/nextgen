@@ -42,6 +42,11 @@ CREATE INDEX idx_resource_scope_index_project
 CREATE INDEX idx_resource_scope_index_kind_project
     ON zitadel_nextgen.resource_scope_index (resource_kind, project_id);
 
+-- By-id lookup across projects (GetResourceScope): a Console session resolves
+-- a path id without knowing its project (#1300).
+CREATE INDEX idx_resource_scope_index_resource
+    ON zitadel_nextgen.resource_scope_index (resource_id);
+
 CREATE TABLE zitadel_nextgen.authz_catalogs (
     id           TEXT COLLATE "C" NOT NULL CHECK (id <> ''),
     catalog_kind TEXT COLLATE "C" NOT NULL
@@ -340,6 +345,7 @@ DROP TABLE IF EXISTS zitadel_nextgen.authz_relation_closure;
 DROP TABLE IF EXISTS zitadel_nextgen.authz_relations;
 DROP INDEX IF EXISTS zitadel_nextgen.authz_catalogs_one_active;
 DROP TABLE IF EXISTS zitadel_nextgen.authz_catalogs;
+DROP INDEX IF EXISTS zitadel_nextgen.idx_resource_scope_index_resource;
 DROP INDEX IF EXISTS zitadel_nextgen.idx_resource_scope_index_kind_project;
 DROP INDEX IF EXISTS zitadel_nextgen.idx_resource_scope_index_project;
 DROP TABLE IF EXISTS zitadel_nextgen.resource_scope_index;

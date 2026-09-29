@@ -27,6 +27,7 @@ export interface DesignTokenOverrides {
   motion: MotionTokens;
   focus: FocusTokens;
   breakpoint: BreakpointTokens;
+  container: ContainerTokens;
 }
 
 /**
@@ -90,6 +91,17 @@ export interface BreakpointTokens {
   "4xl": string;
 }
 
+/**
+ * Container roles whose width is not a step on Figma's `container/*` scale.
+ * Roles that are a step (`auth-card`, `page`) are mapped in `scripts/build.ts`,
+ * which rejects an entry here that names one of those roles or restates a
+ * width the scale has. Keys are kebab-case role names.
+ */
+export interface ContainerTokens {
+  /** Column the console's settings screens render in. */
+  settings: string;
+}
+
 export const overrides: DesignTokenOverrides = {
   colorRole: {
     // The frames give links no colour of their own — they take the surrounding
@@ -137,5 +149,10 @@ export const overrides: DesignTokenOverrides = {
     "2xl": "96rem",
     "3xl": "120rem",
     "4xl": "160rem",
+  },
+  container: {
+    // 704px. The settings frames draw this column and the scale has no step
+    // for it (`2xl` is 672, `3xl` is 768).
+    settings: "44rem",
   },
 };

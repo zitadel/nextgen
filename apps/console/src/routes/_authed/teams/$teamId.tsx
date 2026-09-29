@@ -28,6 +28,7 @@ const PLATE = "flex size-9 items-center justify-center rounded-md bg-muted text-
  *
  */
 export const Route = createFileRoute("/_authed/teams/$teamId")({
+  staticData: { scope: "project" },
   loader: ({ params }) => api.getTeam(params.teamId),
   component: TeamDetail,
 });

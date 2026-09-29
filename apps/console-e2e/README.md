@@ -7,8 +7,9 @@ you need proven.
 | Lane           | Serves the console | Backend                | Proves                            |
 | -------------- | ------------------ | ---------------------- | --------------------------------- |
 | `e2e`          | `vite preview`     | none                   | the SPA mounts under `/ui/console/` |
-| `e2e-real`     | Vite dev server    | real, via secret proxy | resource screens against real data |
+| `e2e-real`     | Vite dev server    | real, via dev proxy    | resource screens against real data |
 | `e2e-embedded` | the Go binary      | real, same origin      | the production request path        |
+| `e2e-platform` | the Go binary      | real, platform project | a platform operator on the cookie   |
 
 ## Embedded shell smoke
 
@@ -36,19 +37,22 @@ moon run console-e2e:e2e-real
 ```
 
 Boots one ephemeral Zitadel instance through `@zitadel/testing`, starts the
-console Vite dev server with its server-side project-secret proxy, and exercises
-real project and user API data. Playwright workers share the instance and seed a
+console Vite dev server with its API proxy, and exercises real project and user
+API data. The proxy adds no credential: `signIn` in `src-real/support.ts`
+grants each test's user admin through the API, and the console authorizes with
+that user's session cookie (#1300). Playwright workers share the instance and seed a
 fresh user per test.
 
 The dev proxy is also this lane's blind spot: it rewrites `/api/*` onto the API
 root, so the console's API base is correct here by construction. That is what
 `e2e-embedded` is for.
 
-This lane boots the binary with both `/ui/*` surfaces off, and the mux mounts
-`/console/runtime.json` only alongside one of them — so its instance serves no
-runtime document, and the lane sets `VITE_CONSOLE_RUNTIME_FALLBACK` for the same
-reason a backend-less preview does (see [`moon.yml`](moon.yml)). The project id
-reaches the console through `VITE_CONSOLE_PROJECT_ID` as before.
+This lane boots the binary with its embedded console off (Vite serves the
+console here) but its hosted-login surface on: the mux mounts
+`/console/runtime.json` only alongside a UI surface, and that document carries
+the publishable key the login widget needs for the sign-in exchange (see
+[`moon.yml`](moon.yml)). The proxy forwards it like any other request. The
+project id reaches the console through `VITE_CONSOLE_PROJECT_ID` as before.
 
 ## Embedded-surface coverage
 
@@ -71,9 +75,10 @@ deployment state cannot produce. The stubbed retry falls through to the real
 server, so recovery is asserted against a genuine document rather than a
 fixture.
 
-Keep feature coverage out of it. Management screens need `user.read`, which
-only the project secret carries — that is `e2e-real`'s job. This lane asserts
-that the surfaces reach the API at all.
+Keep feature coverage out of it — that is `e2e-real`'s job. This lane asserts
+that the surfaces reach the API at all. Management screens work here too: they
+authorize with the signed-in user's session cookie and grants (#1300), so a
+test that needs one grants its user access through the API first.
 
 ## Handling the handshake
 
