@@ -179,6 +179,10 @@ jobs:
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
         env:
           JOURNEY_MATRIX: ${{ steps.ci-mode.outputs.journey_matrix }}
+          # Drop the default :3000 app-port preference so every lane's app port
+          # comes from the dynamic journey port block — otherwise concurrent
+          # Next lanes all race for 3000. Honored by run-local.mjs.
+          JOURNEY_APP_PORT_DYNAMIC: "1"
         run: |
           set -uo pipefail
           version="$(node -p "require('./apps/server/package.json').version")"
@@ -192,41 +196,32 @@ jobs:
           names=()
           start=$(date +%s)
 
-          # First run collided: fresh-app and passkey are both single-framework
-          # Next lanes, and run-local.mjs prefers the hard-coded default app
-          # port 3000 for single-framework frameworks-suite runs, so the two
-          # servers fought over :3000 (one got ERR_CONNECTION_REFUSED). Give
-          # each single-framework lane a distinct JOURNEY_APP_PORT. The multi-
-          # framework lanes (preexisting = next+nuxt) and testkit must stay on
-          # the dynamic allocator — run-local.mjs refuses a fixed app port for
-          # a matrix (assertMatrixPortsAreDynamic) — so pass '-' to leave it
-          # unset there. The zitadel port is always allocator-assigned.
+          # All app ports come from the dynamic allocator (JOURNEY_APP_PORT_DYNAMIC
+          # above), so no lane can be pinned — a fixed app port would also trip
+          # assertMatrixPortsAreDynamic on the multi-framework lanes (fresh-app's
+          # full SDK matrix under a force-full run, preexisting's next+nuxt).
           launch() {
-            local name="$1"; local appport="$2"; shift 2
-            local prefix=(env -u CI -u GITHUB_ACTIONS)
-            if [ "$appport" != "-" ]; then
-              prefix=(env -u CI -u GITHUB_ACTIONS "JOURNEY_APP_PORT=${appport}")
-            fi
-            ( "${prefix[@]}" moon run "$@" ) \
+            local name="$1"; shift
+            ( env -u CI -u GITHUB_ACTIONS moon run "$@" ) \
               > "${RUNNER_TEMP}/journey-${name}.log" 2>&1 &
             pids+=("$!")
             names+=("$name")
-            echo "launched journey '${name}' appPort=${appport} (pid $!)"
+            echo "launched journey '${name}' (pid $!)"
           }
 
-          launch fresh-app 3000 cli-journey-e2e:e2e-local -- \
+          launch fresh-app cli-journey-e2e:e2e-local -- \
             --runtime binary --concurrency 5 "${matrix_args[@]}" \
             --work-dir "${RUNNER_TEMP}/ci-journey" --tarballs-dir "$tarballs"
 
-          launch passkey 3001 cli-journey-e2e:e2e-local -- \
+          launch passkey cli-journey-e2e:e2e-local -- \
             --runtime binary --framework next --preset passkey-first \
             --work-dir "${RUNNER_TEMP}/ci-journey-passkey-first" --tarballs-dir "$tarballs"
 
-          launch preexisting - cli-journey-e2e:e2e-local -- \
+          launch preexisting cli-journey-e2e:e2e-local -- \
             --runtime binary --preexisting-app \
             --work-dir "${RUNNER_TEMP}/ci-journey-preexisting" --tarballs-dir "$tarballs"
 
-          launch testkit - cli-journey-e2e:e2e-testkit -- \
+          launch testkit cli-journey-e2e:e2e-testkit -- \
             --work-dir "${RUNNER_TEMP}/ci-journey-testkit" --tarballs-dir "$tarballs"
 
           rc=0

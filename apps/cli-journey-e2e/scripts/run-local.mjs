@@ -173,9 +173,15 @@ async function createFrameworkContext(framework) {
   // check, which refuses a port that already answers — and 3000 is the most
   // commonly squatted developer port (an IPv6-wildcard listener also slips
   // past canListen's IPv4 probe). Prefer a fresh ephemeral port there.
+  // The default 3000 preference is a local-dev convenience. Under parallel CI
+  // lanes every Next app would prefer 3000 and race across processes, so
+  // JOURNEY_APP_PORT_DYNAMIC drops the preference and forces pure allocator
+  // assignment from the journey port block for every framework.
+  const preferDefaultAppPort =
+    options.suite !== "testkit" && !process.env.JOURNEY_APP_PORT_DYNAMIC;
   const appPort = await resolveFrameworkPort(
     "JOURNEY_APP_PORT",
-    options.suite === "testkit" ? undefined : 3000,
+    preferDefaultAppPort ? 3000 : undefined,
   );
   const zitadelPort = await resolveFrameworkPort("JOURNEY_ZITADEL_PORT");
   const appUrl = `http://localhost:${appPort}`;
