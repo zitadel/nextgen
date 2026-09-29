@@ -242,6 +242,38 @@ async function mirrorSecret(
 }
 
 /**
+ * Say whether the project received a credential, and how to retry when it did
+ * not. Shared by both credentials, because the project is the destination that
+ * decides whether sign-in works and the wording should not drift between them.
+ *
+ * `noValue` separates the two ways a publish can be deferred: nothing was
+ * supplied, or there was no project to publish to. They read the same to the
+ * code and call for different things from the developer.
+ */
+function reportPublished(
+  name: string,
+  state: PublishState,
+  republish: string,
+  noValue: boolean,
+): void {
+  switch (state) {
+    case "stored":
+      consola.success(`Published ${name} to the project`);
+      break;
+    case "deferred":
+      consola.warn(
+        noValue
+          ? `${name} has no value yet. Publish it with: ${republish}`
+          : `${name} was not published to the project. Publish it with: ${republish}`,
+      );
+      break;
+    case "failed":
+      consola.warn(`${name} could not be published. Sign-in fails until it is: ${republish}`);
+      break;
+  }
+}
+
+/**
  * Tell the developer what became of the secret, loudest where it matters.
  *
  * The project is the destination that makes sign-in work, so anything short of
@@ -251,27 +283,13 @@ async function mirrorSecret(
  */
 export function reportSecretOutcome(outcome: SecretOutcome, cliVersion: string): void {
   const { name } = outcome;
-  const republish = publicCliCommand(`variables set ${name} --secret`, cliVersion);
-  switch (outcome.published) {
-    case "stored":
-      consola.success(`Published ${name} to the project`);
-      break;
-    case "deferred":
-      // No value and no project reach the same place by different routes, and
-      // the developer's next move differs, so they are worded apart. Only a
-      // run with nothing to publish leaves the mirror deferred as well.
-      consola.warn(
-        outcome.mirrored === "deferred"
-          ? `${name} has no value yet. Publish it with: ${republish}`
-          : `${name} was not published to the project. Publish it with: ${republish}`,
-      );
-      break;
-    case "failed":
-      consola.warn(
-        `${name} could not be published. Sign-in fails until it is: ${republish}`,
-      );
-      break;
-  }
+  // Only a run with nothing to publish leaves the mirror deferred as well.
+  reportPublished(
+    name,
+    outcome.published,
+    publicCliCommand(`variables set ${name} --secret`, cliVersion),
+    outcome.mirrored === "deferred",
+  );
   switch (outcome.mirrored) {
     case "stored":
       consola.info(`Kept a copy in ${ENV_LOCAL}`);
@@ -292,23 +310,13 @@ export function reportSecretOutcome(outcome: SecretOutcome, cliVersion: string):
  *
  * Shorter than the secret's report because there is less to say: the id is
  * public, so there is no local copy and no warning about where it may be
- * written — only whether the project received it.
+ * written — only whether the project received it. A missing one is never "no
+ * value yet": the command refuses without a client id.
  */
 export function reportClientIdOutcome(
   name: string,
   state: PublishState,
   cliVersion: string,
 ): void {
-  const republish = publicCliCommand(`variables set ${name}`, cliVersion);
-  switch (state) {
-    case "stored":
-      consola.success(`Published ${name} to the project`);
-      break;
-    case "deferred":
-      consola.warn(`${name} was not published to the project. Publish it with: ${republish}`);
-      break;
-    case "failed":
-      consola.warn(`${name} could not be published. Sign-in fails until it is: ${republish}`);
-      break;
-  }
+  reportPublished(name, state, publicCliCommand(`variables set ${name}`, cliVersion), false);
 }

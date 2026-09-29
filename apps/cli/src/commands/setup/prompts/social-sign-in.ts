@@ -49,7 +49,7 @@ export class SocialSignInPrompt implements SetupPrompt {
     const endpoints = answers.sso?.endpoints ?? (await askConnectionEndpoints({
         provider,
         developmentBuild: ctx.developmentBuild === true,
-        bail,
+        command: "Setup",
       }));
     this.announce(entry, answers.devPort, endpoints?.issuer);
 

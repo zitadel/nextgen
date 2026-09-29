@@ -119,6 +119,19 @@ function variableReference(name: string): string {
   return `\${{ ${name} }}`;
 }
 
+/**
+ * Whether a stored value is a `${{ NAME }}` reference rather than a credential.
+ *
+ * The one place that knows the syntax is {@link variableReference}, which
+ * writes it; this is its counterpart, so a caller deciding what a connection
+ * actually holds does not have to recognise the shape itself. Mirrors the
+ * engine's own placeholder grammar (`internal/domain/variable_replace.go`):
+ * a whole-value placeholder naming one variable, with optional inner spacing.
+ */
+export function isVariableReference(value: string): boolean {
+  return /^\$\{\{ *\w+ *\}\}$/.test(value.trim());
+}
+
 /** The reference written to a connection's `client_secret`. */
 export function clientSecretReference(slug: string): string {
   return variableReference(clientSecretVariableName(slug));

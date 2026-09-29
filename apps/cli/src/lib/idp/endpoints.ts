@@ -1,6 +1,12 @@
 import { text } from "@clack/prompts";
 
-import { catalogIssuer, derivedEndpoints, type ConnectionEndpoints } from "@zitadel/config/idp-catalog";
+import {
+  catalogIssuer,
+  derivedEndpoints,
+  type ConnectionEndpoints,
+} from "@zitadel/config/idp-catalog";
+
+import { bailOnCancel } from "../prompt-cancel";
 
 /**
  * Ask where a provider lives, on a development build only.
@@ -20,15 +26,15 @@ import { catalogIssuer, derivedEndpoints, type ConnectionEndpoints } from "@zita
 export async function askConnectionEndpoints(options: {
   readonly provider: string;
   readonly developmentBuild: boolean;
-  /** Turns a clack cancellation into whatever the caller raises. */
-  readonly bail: <T>(value: T | symbol) => asserts value is T;
+  /** The command being cancelled, for the wording a Ctrl-C produces. */
+  readonly command: string;
 }): Promise<ConnectionEndpoints | undefined> {
-  const { provider, developmentBuild, bail } = options;
+  const { provider, developmentBuild, command } = options;
   if (!developmentBuild) {
     return undefined;
   }
   const vendor = catalogIssuer(provider);
-  const issuer = await askUrl("Issuer", vendor, bail);
+  const issuer = await askUrl("Issuer", vendor, command);
   if (issuer === vendor) {
     // Nothing is being stood in for, so the endpoints are the vendor's and
     // come from its discovery document. Asking would offer two defaults that
@@ -45,18 +51,14 @@ export async function askConnectionEndpoints(options: {
     authorizationEndpoint: await askUrl(
       "Authorization endpoint",
       derived.authorizationEndpoint,
-      bail,
+      command,
     ),
-    tokenEndpoint: await askUrl("Token endpoint", derived.tokenEndpoint, bail),
+    tokenEndpoint: await askUrl("Token endpoint", derived.tokenEndpoint, command),
   };
 }
 
 /** One URL question, pre-filled with the answer that needs no thought. */
-async function askUrl(
-  message: string,
-  initialValue: string,
-  bail: <T>(value: T | symbol) => asserts value is T,
-): Promise<string> {
+async function askUrl(message: string, initialValue: string, command: string): Promise<string> {
   const answer = await text({
     message,
     initialValue,
@@ -69,6 +71,6 @@ async function askUrl(
       }
     },
   });
-  bail(answer);
+  bailOnCancel(answer, command);
   return String(answer).trim();
 }

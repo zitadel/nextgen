@@ -2,7 +2,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import { Flags } from "@oclif/core";
-import { cancel, isCancel, password, text } from "@clack/prompts";
+import { password, text } from "@clack/prompts";
 import { consola } from "consola";
 
 import {
@@ -16,6 +16,7 @@ import {
 import { applySsoToFlow, applySsoToSchema, type SsoSkipped } from "@zitadel/config/sso";
 
 import { createZitadelClient } from "../../lib/api-client";
+import { bailOnCancel } from "../../lib/prompt-cancel";
 import { isDevelopmentBuild } from "../../lib/build-channel";
 import { ZitadelError } from "../../lib/errors";
 import { stableStringify } from "../../lib/json";
@@ -49,16 +50,6 @@ import {
 import { readState } from "../../lib/sync/state";
 import { readStdin } from "../../lib/variables";
 
-/**
- * Turns a clack cancellation (Ctrl-C) into the command's own refusal, so a
- * half-answered question never reaches the connection document.
- */
-function bailOnCancel<T>(value: T | symbol): asserts value is T {
-  if (isCancel(value)) {
-    cancel("Enable cancelled.");
-    throw new ZitadelError("E_VALIDATION", "Enable cancelled by user");
-  }
-}
 
 /**
  * The `sso enable` command — add a provider to a Project's sign-in methods.
@@ -194,7 +185,7 @@ export default class SsoEnable extends BaseCommand {
       const endpoints = await askConnectionEndpoints({
         provider,
         developmentBuild: isDevelopmentBuild() && !nonInteractive,
-        bail: bailOnCancel,
+        command: "Enable",
       });
       const clientId =
         flags["client-id"] ?? (await this.askClientId(entry.display_name, nonInteractive));
@@ -396,10 +387,7 @@ export default class SsoEnable extends BaseCommand {
       // Vendors format these differently, so only emptiness can be checked.
       validate: (value) => ((value ?? "").trim() === "" ? "Enter the client id." : undefined),
     });
-    if (isCancel(answer)) {
-      cancel("Enable cancelled.");
-      throw new ZitadelError("E_VALIDATION", "Enable cancelled by user");
-    }
+    bailOnCancel(answer, "Enable");
     return String(answer).trim();
   }
 
@@ -454,10 +442,7 @@ export default class SsoEnable extends BaseCommand {
       // Vendors format these differently, so only emptiness can be checked.
       validate: (value) => ((value ?? "").trim() === "" ? "Enter the client secret." : undefined),
     });
-    if (isCancel(answer)) {
-      cancel("Enable cancelled.");
-      throw new ZitadelError("E_VALIDATION", "Enable cancelled by user");
-    }
+    bailOnCancel(answer, "Enable");
     return String(answer).trim();
   }
 }

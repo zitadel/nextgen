@@ -1,7 +1,11 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { idpCatalogEntry, type IdpCatalogEntry } from "@zitadel/config/idp-catalog";
+import {
+  idpCatalogEntry,
+  isVariableReference,
+  type IdpCatalogEntry,
+} from "@zitadel/config/idp-catalog";
 
 import { ZitadelError } from "../errors";
 import { isObject } from "../json";
@@ -148,7 +152,7 @@ export function planConnection(options: {
     // A hand-written connection may still hold a literal, and that one is
     // worth refusing: rerunning with a different id would otherwise reuse a
     // file configured for another client.
-    const literal = existing !== undefined && !existing.trim().startsWith("${{");
+    const literal = existing !== undefined && !isVariableReference(existing);
     if (options.clientId !== undefined && literal && existing !== options.clientId) {
       throw new ZitadelError(
         "E_VALIDATION",
