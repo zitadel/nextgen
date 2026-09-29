@@ -1,5 +1,5 @@
 // `Building2` returns with the parked organisation switcher below.
-import { Link, type LinkProps } from "@tanstack/react-router";
+import { Link, type LinkProps, useMatches } from "@tanstack/react-router";
 import { Boxes, ChevronsUpDown, type LucideIcon, Search } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 
@@ -9,11 +9,21 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 import { api } from "../../api/zitadel";
+import {
+  listMyProjectsCached,
+  useProjectScope,
+  useSelectProjectTarget,
+  withoutTrailingSlash,
+} from "../../lib/project-scope";
 
 /**
  * Org / project pills — Figma `Sidebar / PopoverContextSwitcher`
  * (`j3qqriDab6WQfrlgLujf4Y`). Desktop: 196px `bg-card` pills side-by-side.
  * Mobile (`Dashboard xs`): full-width stacked rows. Built on shadcn `Popover`.
+ *
+ * The project popover's footer links to the Projects overview (`All projects`),
+ * the same screen as the sidebar's first entry, for someone already in the
+ * switcher looking for a project it does not list.
  *
  * There is deliberately no create action in the footer. One used to render here,
  * but because this component backs both switchers it said "Create team" inside
@@ -29,25 +39,28 @@ import { api } from "../../api/zitadel";
  */
 const NO_PROJECTS = "No projects";
 
+/** What the project pill says while projects exist but none is selected. */
+const NO_SELECTION = "Select a project";
+
 interface SwitcherOption {
   id: string;
   label: string;
   plan?: string;
   /**
-   * Where following the row goes. Navigation, not selection: the pill keeps
-   * showing what it showed. Without one the row is a plain label.
+   * Where following the row goes — for a project, the same screen re-scoped
+   * to it (`?project=`). Without one the row is a plain label.
    */
   link?: Pick<LinkProps, "to" | "params" | "search">;
 }
 
 export function ContextSwitcher() {
   const projects = useProjects();
-  // Display only (#1237): there is no selected-project state, so the pill shows
-  // the first project the person can act on and the dropdown lists the rest as
-  // labels. It does not prefer `getConsoleProjectId()`: that is the project the
-  // console signs into — the platform project on a platform deployment — which
-  // is never the one anybody means here. Real switching is #814's territory.
-  const current = projects?.[0];
+  // The pill shows the selected project (`?project=`, `src/lib/project-scope.ts`),
+  // never `getConsoleProjectId()`: that is the project the console signs into —
+  // the platform project on a platform deployment — which is not what anybody
+  // means here unless it was selected.
+  const selected = useProjectScope();
+  const current = useSelectedOption(selected, projects);
 
   return (
     <div className="flex w-full min-w-0 flex-col gap-2 md:w-auto md:flex-row md:items-center">
@@ -87,8 +100,9 @@ export function ContextSwitcher() {
         label={current?.label}
         currentId={current?.id}
         options={projects}
-        emptyLabel={NO_PROJECTS}
+        emptyLabel={projects?.length === 0 ? NO_PROJECTS : NO_SELECTION}
         ariaLabel="Switch project"
+        footer={{ label: "All projects", link: { to: "/projects" } }}
       />
     </div>
   );
@@ -106,26 +120,26 @@ export function ContextSwitcher() {
  * One page is enough: the pill shows the first project and the dropdown is a
  * reference list, not the directory — the Projects screen pages the full set.
  *
+ * The read is the one the `_authed` guard makes when it picks a default
+ * selection (`listMyProjectsCached`), so a landing asks once for both.
+ *
  * Loaded here rather than in the `_authed` loader so the shell paints
  * immediately and a failure degrades to an empty switcher instead of blocking
  * every screen behind it — the chrome is not worth a boundary.
  */
 function useProjects(): SwitcherOption[] | undefined {
-  const [projects, setProjects] = useState<SwitcherOption[] | undefined>(undefined);
+  const [projects, setProjects] = useState<{ id: string; label: string }[] | undefined>(
+    undefined,
+  );
+  const scopeTo = useScopeTarget();
 
   useEffect(() => {
     let cancelled = false;
-    void api
-      .listMyProjects()
+    void listMyProjectsCached()
       .then((result) => {
         if (cancelled) return;
         setProjects(
-          result.projects.map((project) => ({
-            id: project.id,
-            label: project.name,
-            // The same target as a row on the Projects screen.
-            link: { to: "/projects/$projectId", params: { projectId: project.id } },
-          })),
+          result.projects.map((project) => ({ id: project.id, label: project.name })),
         );
       })
       .catch(() => {
@@ -136,7 +150,65 @@ function useProjects(): SwitcherOption[] | undefined {
     };
   }, []);
 
-  return projects;
+  return projects?.map((project) => ({ ...project, link: scopeTo(project.id) }));
+}
+
+/**
+ * Where selecting a project goes. A project-scoped list stays where it is and
+ * re-reads under the new project, keeping its own filters (Teams' tab and
+ * search). Anything else — a detail page, whose resource belongs to the
+ * previous project, or an unscoped screen such as Projects — goes where a
+ * Projects row would (`useSelectProjectTarget`): the screen `?next=` names, or
+ * the console's landing for that project.
+ */
+function useScopeTarget(): (projectId: string) => NonNullable<SwitcherOption["link"]> {
+  const leaf = useMatches({ select: (matches) => matches[matches.length - 1] });
+  const selectTarget = useSelectProjectTarget();
+  const stays = leaf?.staticData.scope === "project" && leaf.staticData.nav !== undefined;
+  return (projectId) =>
+    stays && leaf
+      ? {
+          to: withoutTrailingSlash(leaf.fullPath),
+          search: (prev: Record<string, unknown>) => ({ ...prev, project: projectId }),
+        }
+      : selectTarget(projectId);
+}
+
+/**
+ * The option the pill shows. A selected project missing from the list — the
+ * sign-in project the console falls back to, which its operator may hold no
+ * grant on (`resolveDefaultProjectScope`) — is named by `GET /projects/{id}`,
+ * and by its id until that read answers or if it is refused.
+ */
+function useSelectedOption(
+  selected: string | undefined,
+  projects: SwitcherOption[] | undefined,
+): SwitcherOption | undefined {
+  const listed = selected ? projects?.find((project) => project.id === selected) : undefined;
+  const missing = selected !== undefined && projects !== undefined && listed === undefined;
+  // Names read so far, by project id.
+  const [names, setNames] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!missing || !selected) return;
+    let cancelled = false;
+    void api
+      .getProject(selected)
+      .then((project) => {
+        if (!cancelled) setNames((known) => ({ ...known, [selected]: project.name }));
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setNames(({ [selected]: _refused, ...known }) => known);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [missing, selected]);
+
+  if (listed) return listed;
+  if (!missing) return undefined;
+  return { id: selected, label: names[selected] ?? selected };
 }
 
 function Switcher({
@@ -148,6 +220,7 @@ function Switcher({
   options,
   emptyLabel,
   ariaLabel,
+  footer,
 }: {
   icon: LucideIcon;
   /** `undefined` while loading, and when there are no options to name. */
@@ -161,6 +234,8 @@ function Switcher({
   /** Shown in place of a label once the options have loaded and there are none. */
   emptyLabel: string;
   ariaLabel: string;
+  /** A link beneath the options — for projects, the overview of all of them. */
+  footer?: { label: string; link: Pick<LinkProps, "to" | "search"> };
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -236,16 +311,10 @@ function Switcher({
               {empty ? emptyLabel : "No results"}
             </li>
           ) : (
-            // Links, not buttons: nothing here selects anything yet. The rows
-            // used to be buttons whose click only closed the popover, which
-            // looked like a switch and was not one. A link says what it does —
-            // it opens the project — and leaves the pill as it was.
-            //
-            // Interim: the row becomes a context setter that re-scopes the
-            // sidenav and its views to the chosen project instead of opening
-            // its detail. That needs selected-project state and management
-            // endpoints that authorize the session against the target project;
-            // until they do, a granted project's detail answers 401/403.
+            // Links, not buttons: selecting a project is a navigation, since
+            // the selection lives in the URL (`?project=`). The sidenav and its
+            // screens re-scope to it; screens whose endpoints cannot yet
+            // authorize the session on another project say so on their own.
             rows.map((option) => {
               const content = (
                 <>
@@ -287,6 +356,20 @@ function Switcher({
             })
           )}
         </ul>
+
+        {footer && (
+          <div className="border-border mt-1 border-t pt-1">
+            <Link
+              {...footer.link}
+              onClick={() => setOpen(false)}
+              // No icon, but indented like one: `pl-10` is a row's `px-3` plus its
+              // 16px icon and `gap-3`, so the label lines up with the names above.
+              className="flex w-full items-center rounded-sm py-2.5 pr-3 pl-10 text-left text-sm text-foreground outline-none hover:bg-accent focus-visible:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            >
+              {footer.label}
+            </Link>
+          </div>
+        )}
       </PopoverContent>
     </Popover>
   );

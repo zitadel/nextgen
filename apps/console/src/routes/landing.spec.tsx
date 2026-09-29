@@ -1,5 +1,6 @@
 import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
 import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
@@ -30,6 +31,16 @@ async function renderAt(path: string) {
   return router;
 }
 
+function project(id: string, name: string) {
+  return {
+    id,
+    name,
+    status: "active",
+    created_at: "2026-01-01T00:00:00Z",
+    updated_at: "2026-01-01T00:00:00Z",
+  };
+}
+
 /**
  * `/` has no screen of its own and lands on the first one behind it; `/settings`
  * is a view with nothing built in it yet and says so.
@@ -39,14 +50,105 @@ async function renderAt(path: string) {
  * console" all arrive, and `/settings` is where the account dropdown goes.
  */
 describe("landing routes", () => {
-  it("lands on Teams from the console root", async () => {
+  // `/` lands on Teams, a project-scoped screen, so with no `?project=` the
+  // `_authed` guard picks one (`resolveDefaultProjectScope`).
+  it("lands on Teams in the only project the person can act on", async () => {
+    const teamQueries: string[] = [];
     server.use(
-      http.post("http://localhost/api/teams/query", () => HttpResponse.json({ teams: [] })),
+      http.get("http://localhost/api/users/me/projects", () =>
+        HttpResponse.json({ projects: [project("proj_1", "Acme")] }),
+      ),
+      http.post("http://localhost/api/teams/query", ({ request }) => {
+        teamQueries.push(new URL(request.url).searchParams.get("project_id") ?? "");
+        return HttpResponse.json({ teams: [] });
+      }),
     );
     const router = await renderAt("/");
 
     await waitFor(() => expect(router.state.location.pathname).toBe("/teams"));
+    expect(router.state.location.search).toMatchObject({ project: "proj_1" });
     expect(await screen.findByRole("heading", { name: "Teams" })).toBeInTheDocument();
+    expect(teamQueries).toEqual(["proj_1"]);
+  });
+
+  it("lands on Projects when there are several to choose from", async () => {
+    server.use(
+      http.get("http://localhost/api/users/me/projects", () =>
+        HttpResponse.json({ projects: [project("proj_1", "Acme"), project("proj_2", "Globex")] }),
+      ),
+    );
+    const router = await renderAt("/");
+
+    await waitFor(() => expect(router.state.location.pathname).toBe("/projects"));
+    expect(router.state.location.search).not.toHaveProperty("project");
+  });
+
+  it("keeps a scoped deep link's target while the person picks a project", async () => {
+    // A link shared before the selection was part of the URL: several projects
+    // to choose from, so the guard asks, and choosing one ends on the link.
+    server.use(
+      http.get("http://localhost/api/users/me/projects", () =>
+        HttpResponse.json({ projects: [project("proj_1", "Acme"), project("proj_2", "Globex")] }),
+      ),
+    );
+    const router = await renderAt("/users/usr_1");
+
+    await waitFor(() => expect(router.state.location.pathname).toBe("/projects"));
+    expect(router.state.location.search).toMatchObject({ next: "/users/usr_1" });
+
+    await userEvent.click(await screen.findByRole("link", { name: "Globex" }));
+    await waitFor(() => expect(router.state.location.pathname).toBe("/users/usr_1"));
+    expect(router.state.location.search).toEqual({ project: "proj_2" });
+  });
+
+  it("selects the only project on an unscoped screen too", async () => {
+    // `/projects` opened directly agrees with `/`: one project, so it is selected.
+    server.use(
+      http.get("http://localhost/api/users/me/projects", () =>
+        HttpResponse.json({ projects: [project("proj_1", "Acme")] }),
+      ),
+    );
+    const router = await renderAt("/projects");
+
+    await waitFor(() => expect(router.state.location.search).toMatchObject({ project: "proj_1" }));
+    expect(router.state.location.pathname).toBe("/projects");
+  });
+
+  it("asks for the person's projects once for the guard and the switcher", async () => {
+    // The Projects screen pages the list itself (`limit`); the guard and the
+    // switcher share one unpaged read.
+    let unpaged = 0;
+    server.use(
+      http.get("http://localhost/api/users/me/projects", ({ request }) => {
+        if (!new URL(request.url).searchParams.has("limit")) unpaged += 1;
+        return HttpResponse.json({ projects: [project("proj_1", "Acme"), project("proj_2", "Globex")] });
+      }),
+    );
+    const router = await renderAt("/");
+
+    await waitFor(() => expect(router.state.location.pathname).toBe("/projects"));
+    const pill = await screen.findByRole("button", { name: "Switch project" });
+    await waitFor(() => expect(pill).toHaveTextContent("Select a project"));
+    expect(unpaged).toBe(1);
+  });
+
+  it("takes the pinned dev project without asking", async () => {
+    vi.stubEnv("VITE_CONSOLE_PROJECT_ID", "proj_pinned");
+    // One other project on offer: without the pin it would be the landing.
+    server.use(
+      http.get("http://localhost/api/users/me/projects", () =>
+        HttpResponse.json({ projects: [project("proj_1", "Acme")] }),
+      ),
+      http.post("http://localhost/api/teams/query", () => HttpResponse.json({ teams: [] })),
+    );
+    try {
+      const router = await renderAt("/");
+
+      await waitFor(() => expect(router.state.location.pathname).toBe("/teams"));
+      expect(router.state.location.search).toMatchObject({ project: "proj_pinned" });
+    } finally {
+      vi.stubEnv("VITE_CONSOLE_PROJECT_ID", "");
+    }
   });
 
   it("shows the empty settings view from settings", async () => {

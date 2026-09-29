@@ -30,14 +30,21 @@ test("shows the bootstrapped project in the list and detail views", async ({
   await page.goto("/projects");
   await expect(page.getByRole("heading", { name: "Projects", exact: true })).toBeVisible();
 
-  // The directory lists name and creation date. The id identifies the project on
-  // its detail screen, which the row opens — it is no longer on the list, where
-  // the screen used to be a key/value view of the one scoped project.
+  // The directory lists name and creation date. A row opens the project —
+  // selects it and lands on its first screen — and the project's own page, where
+  // the id is, is `Project settings` in the sidebar that selection fills.
   const projectLink = page.getByRole("table").getByRole("link").first();
   await expect(projectLink).toBeVisible();
   await projectLink.click();
 
-  await expect(page).toHaveURL(new RegExp(`/projects/${zitadel.handle.projectId}$`));
+  await expect(page).toHaveURL(
+    new RegExp(`/teams\\?.*project=${zitadel.handle.projectId}`),
+  );
+  await page
+    .getByRole("navigation", { name: "Primary" })
+    .getByRole("link", { name: "Project settings" })
+    .click();
+  await expect(page).toHaveURL(new RegExp(`/project\\?project=${zitadel.handle.projectId}$`));
   await expect(page.getByText(zitadel.handle.projectId, { exact: true })).toBeVisible();
   await expectNoErrorBoundary(page);
 });
@@ -53,7 +60,8 @@ test("shows a seeded user in the list and detail views", async ({ page, seed }) 
   await expect(userLink).toBeVisible();
   await userLink.click();
 
-  await expect(page).toHaveURL(new RegExp(`/users/${user.id}$`));
+  // The selected project rides along on every link (`?project=`).
+  await expect(page).toHaveURL(new RegExp(`/users/${user.id}\\?project=`));
   await expect(page.getByRole("heading", { name: user.email, exact: true })).toBeVisible();
   await expect(page.getByText(user.id, { exact: true })).toBeVisible();
   await expectNoErrorBoundary(page);
