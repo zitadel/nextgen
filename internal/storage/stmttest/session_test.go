@@ -298,21 +298,37 @@ func TestSessionStatements_List_RejectsOrderByFilterOnlyField(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID, _ := ensureUserTestProject(t, d.stmts)
 
-		_, err := d.stmts.ListSessions(t.Context(), &database.ListOptions[domain.SessionField]{
-			Filter: database.Equal(database.Col(domain.SessionFieldProjectID), projectID),
-			Pagination: database.Page[domain.SessionField]{
-				Limit: 10,
-				OrderBy: database.OrderBy[domain.SessionField]{
-					Columns: []database.Column[domain.SessionField]{
-						database.Col(domain.SessionFieldHasVerifiedFactors),
+		list := func(cursor []byte) error {
+			_, err := d.stmts.ListSessions(t.Context(), &database.ListOptions[domain.SessionField]{
+				Filter: database.Equal(database.Col(domain.SessionFieldProjectID), projectID),
+				Pagination: database.Page[domain.SessionField]{
+					Limit:  10,
+					Cursor: cursor,
+					OrderBy: database.OrderBy[domain.SessionField]{
+						Columns: []database.Column[domain.SessionField]{
+							database.Col(domain.SessionFieldHasVerifiedFactors),
+						},
 					},
 				},
-			},
-		})
-		var de database.Error
-		require.ErrorAs(t, err, &de)
-		assert.Equal(t, database.ErrFieldNotOrderable(nil).Code, de.Code, "typed not-orderable code")
-		assert.Equal(t, domain.SessionFieldHasVerifiedFactors, de.Details, "details identify the offending field")
+			})
+			return err
+		}
+
+		// The check must run before the cursor is decoded, so a request for a
+		// filter-only order field is refused with the same typed error whether
+		// or not it carries a cursor — a malformed cursor never shadows it with
+		// db.invalid_cursor (guards the ordering of the check in cursorFilter).
+		for name, cursor := range map[string][]byte{
+			"no cursor":        nil,
+			"malformed cursor": []byte("not-a-real-cursor"),
+		} {
+			t.Run(name, func(t *testing.T) {
+				var de database.Error
+				require.ErrorAs(t, list(cursor), &de)
+				assert.Equal(t, database.ErrFieldNotOrderable(nil).Code, de.Code, "typed not-orderable code")
+				assert.Equal(t, domain.SessionFieldHasVerifiedFactors, de.Details, "details identify the offending field")
+			})
+		}
 	})
 }
 
