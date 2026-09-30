@@ -34,6 +34,14 @@ async function main(): Promise<void> {
   if (!rootElement || rootElement.innerHTML) return;
   const root = ReactDOM.createRoot(rootElement);
 
+  // Dev-only auth design sandbox (`src/dev/auth-lab/`): the approved Figma
+  // login states as React screens, outside the router and the runtime.
+  if (import.meta.env.DEV && window.location.pathname === "/auth-lab") {
+    const { renderAuthLab } = await import("./dev/auth-lab");
+    renderAuthLab(root);
+    return;
+  }
+
   // Discover deployment runtime metadata (mode + project ids) before any
   // route guard or loader runs (Console ADR 0004 §3). An unreachable or
   // erroring endpoint is an error, not a mode: it renders the retryable
