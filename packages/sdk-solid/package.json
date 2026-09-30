@@ -45,6 +45,7 @@
     "@eslint/markdown": "catalog:",
     "@solidjs/testing-library": "^0.8.10",
     "@testing-library/jest-dom": "^6.0.0",
+    "@vitest/coverage-v8": "catalog:sdk",
     "eslint": "catalog:",
     "eslint-config-prettier": "catalog:",
     "eslint-import-resolver-typescript": "catalog:",

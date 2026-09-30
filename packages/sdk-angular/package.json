@@ -57,6 +57,7 @@
     "@eslint/json": "catalog:",
     "@eslint/markdown": "catalog:",
     "@testing-library/angular": "^19.4.1",
+    "@vitest/coverage-v8": "catalog:sdk",
     "eslint": "catalog:",
     "eslint-config-prettier": "catalog:",
     "eslint-import-resolver-typescript": "catalog:",

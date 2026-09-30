@@ -111,6 +111,7 @@
     "@types/node": "catalog:",
     "@types/semver": "catalog:",
     "@types/wrap-ansi": "^3.0.0",
+    "@vitest/coverage-v8": "catalog:sdk",
     "@zitadel/api-mock": "workspace:*",
     "@zitadel/sdk-next": "workspace:*",
     "msw": "catalog:",

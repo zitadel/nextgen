@@ -48,6 +48,7 @@
     "@eslint/markdown": "catalog:",
     "@sveltejs/vite-plugin-svelte": "^6.2.0",
     "@testing-library/svelte": "^5.3.1",
+    "@vitest/coverage-v8": "catalog:sdk",
     "eslint": "catalog:",
     "eslint-config-prettier": "catalog:",
     "eslint-import-resolver-typescript": "catalog:",

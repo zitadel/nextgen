@@ -53,6 +53,7 @@
     "@eslint/json": "catalog:",
     "@eslint/markdown": "catalog:",
     "@nuxt/eslint-plugin": "^0.7.0",
+    "@vitest/coverage-v8": "catalog:sdk",
     "eslint": "catalog:",
     "eslint-config-prettier": "catalog:",
     "eslint-import-resolver-typescript": "catalog:",

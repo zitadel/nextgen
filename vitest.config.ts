@@ -16,6 +16,8 @@ export default defineConfig({
     name: "@zitadel/workspace",
     environment: "node",
     include: ["scripts/**/*.test.mjs", "scripts/**/*.test.ts"],
+    // Root tests exercise scripts/, not src/ (there is none at the repo root).
+    coverage: { ...baseTest.coverage, include: ["scripts/**/*.{mjs,ts}"] },
     // Several of these shell out to slow tools (redocly, tsc program audits)
     // that run well past Vitest's 5s default; node:test had no timeout.
     testTimeout: 120_000,

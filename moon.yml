@@ -79,14 +79,16 @@ tasks:
       runInCI: true
 
   check-typecheck:
-    # `test -f` guards against a silent pass: Vitest treats a positional filter
+    # assert-file guards against a silent pass: Vitest treats a positional filter
     # that matches nothing as success (passWithNoTests), so a renamed/moved test
     # file would stop running unnoticed. node:test used to error on a missing
-    # file; this restores that fail-loud behavior.
-    script: "test -f scripts/check-typecheck-programs.test.mjs && corepack pnpm exec vitest run scripts/check-typecheck-programs.test.mjs && node scripts/check-typecheck-programs.mjs"
+    # file; this restores that fail-loud behavior, cross-platform (POSIX `test`
+    # is unavailable on Windows shells).
+    script: "node scripts/assert-file.mjs scripts/check-typecheck-programs.test.mjs && corepack pnpm exec vitest run scripts/check-typecheck-programs.test.mjs && node scripts/check-typecheck-programs.mjs"
     inputs:
       - "scripts/check-typecheck-programs.mjs"
       - "scripts/check-typecheck-programs.test.mjs"
+      - "scripts/assert-file.mjs"
       - "apps/*/moon.yml"
       - "packages/*/moon.yml"
       - "apps/*/package.json"
@@ -104,13 +106,15 @@ tasks:
   # nothing loudly — the spec just stops being checked. These fixtures fail
   # instead.
   check-openapi-rules:
-    # `test -f` guards against a silent pass: Vitest treats a positional filter
+    # assert-file guards against a silent pass: Vitest treats a positional filter
     # that matches nothing as success (passWithNoTests), so a renamed/moved test
     # file would stop running unnoticed. node:test used to error on a missing
-    # file; this restores that fail-loud behavior.
-    script: "test -f scripts/openapi-casing-rules.test.mjs && corepack pnpm exec vitest run scripts/openapi-casing-rules.test.mjs"
+    # file; this restores that fail-loud behavior, cross-platform (POSIX `test`
+    # is unavailable on Windows shells).
+    script: "node scripts/assert-file.mjs scripts/openapi-casing-rules.test.mjs && corepack pnpm exec vitest run scripts/openapi-casing-rules.test.mjs"
     inputs:
       - "scripts/openapi-casing-rules.test.mjs"
+      - "scripts/assert-file.mjs"
       - "scripts/testdata/openapi-casing/**"
       - "/redocly.yaml"
       # The test reads the pinned redocly version from this file.
