@@ -5,12 +5,16 @@ content:
     schema:
       oneOf:
         - $ref: '../../../../components/schemas/errors/auth-unauthorized.yaml'
+        - $ref: '../../../../components/schemas/errors/idp-not_found.yaml'
+        - $ref: '../../../../components/schemas/errors/idp-permission_denied.yaml'
         - $ref: '../../../../components/schemas/errors/internal.yaml'
         - $ref: '../../../../components/schemas/errors/req-invalid.yaml'
       discriminator:
         propertyName: code
         mapping:
           auth.unauthorized: '../../../../components/schemas/errors/auth-unauthorized.yaml'
+          idp.not_found: '../../../../components/schemas/errors/idp-not_found.yaml'
+          idp.permission_denied: '../../../../components/schemas/errors/idp-permission_denied.yaml'
           internal: '../../../../components/schemas/errors/internal.yaml'
           req.invalid: '../../../../components/schemas/errors/req-invalid.yaml'
     examples:
@@ -19,6 +23,16 @@ content:
         value:
           code: auth.unauthorized
           message: 'The request lacks valid authentication credentials.'
+      idp.not_found:
+        summary: idp.not_found
+        value:
+          code: idp.not_found
+          message: 'identity provider connection: not found'
+      idp.permission_denied:
+        summary: idp.permission_denied
+        value:
+          code: idp.permission_denied
+          message: 'identity provider connection: the caller''s project role does not allow this operation'
       internal:
         summary: internal
         value:
