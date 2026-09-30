@@ -426,12 +426,14 @@ export default class Setup extends BaseCommand {
       files_written_count: allFilesWritten.length,
     });
 
-    // After the connection exists, not before: the name belongs in
-    // `.env.example` only once something references it. The value goes to the
-    // project's variables, which is where the engine resolves the connection's
-    // `${{ NAME }}` from — against Zitadel Cloud as much as against a local
-    // server. A refusal is reported rather than failing setup: everything else
-    // is already provisioned, and `variables set` publishes it later.
+    // After the connection exists, not before: a credential published under a
+    // name nothing references yet is an orphan in the project's variables, and
+    // a setup that fails in between would leave one behind. Neither credential
+    // reaches the filesystem — both go to the project's variables, which is
+    // where the engine resolves the connection's `${{ NAME }}` from, against
+    // Zitadel Cloud as much as against a local server. A refusal is reported
+    // rather than failing setup: everything else is already provisioned, and
+    // `variables set` publishes it later.
     let ssoSecret: SecretOutcome | undefined;
     let ssoClientId: PublishState | undefined;
     if (answers.sso && !dryRun) {
