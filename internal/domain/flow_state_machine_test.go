@@ -2,6 +2,7 @@ package domain_test
 
 import (
 	"encoding/json"
+	"errors"
 	"testing"
 	"time"
 
@@ -64,6 +65,7 @@ type flowTestWorld struct {
 	authAttemptService *domainmock.MockFlowAuthAttemptService
 	schemaResolver     *domainmock.MockSchemaResolver
 	createUser         *domainmock.MockFlowOnSuccessHandler
+	ssoProviders       *domainmock.MockFlowSSOProviderResolver
 	sm                 *domain.FlowStateMachineRuntime
 }
 
@@ -81,6 +83,7 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 	schemaStore := domainmock.NewMockJSONSchemaStore(mock)
 	authAttemptService := domainmock.NewMockFlowAuthAttemptService(mock)
 	createUser := domainmock.NewMockFlowOnSuccessHandler(mock)
+	ssoProviders := domainmock.NewMockFlowSSOProviderResolver(mock)
 
 	resolver := domain.NewSchemaFieldResolver()
 
@@ -92,6 +95,7 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 		resolver,
 		createUser,
 		authAttemptService,
+		ssoProviders,
 		now,
 	)
 
@@ -101,6 +105,7 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 		schemaResolver:     schemaResolver,
 		authAttemptService: authAttemptService,
 		createUser:         createUser,
+		ssoProviders:       ssoProviders,
 		sm:                 sm,
 	}
 }
@@ -653,6 +658,104 @@ func TestFlowStateMachine_Process_SSOSubmissionUnsupported(t *testing.T) {
 		SSOProvider: &domain.FlowSSOProviderRef{ID: "google"},
 	})
 	require.ErrorIs(t, err, domain.ErrFlowUnsupported())
+}
+
+// ssoStepDefinition offers two providers on the signup step, routed to
+// done on callback as the validator requires of a step with sso_providers.
+func ssoStepDefinition() *domain.FlowDefinition {
+	def := signupDefinition()
+	def.Steps[0].SSOProviders = []string{"google", "github"}
+	def.Steps[0].Transitions["callback"] = domain.FlowStepTransition{Target: "done"}
+	return def
+}
+
+func TestFlowStateMachine_Start_RendersSSOProvidersInStepOrder(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+	def := ssoStepDefinition()
+
+	w.schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil)
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
+	google := domain.FlowSSOProvider{ID: "google", Name: "Google", Template: "google"}
+	github := domain.FlowSSOProvider{ID: "github", Name: "GitHub", Template: "github"}
+	w.ssoProviders.EXPECT().
+		Resolve(gomock.Any(), testProjectID, "credentials", []string{"google", "github"}).
+		Return([]domain.FlowSSOProvider{google, github}, nil)
+
+	result, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeRegister,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, result.Step)
+	assert.Equal(t, []domain.FlowSSOProvider{google, github}, result.Step.SSOProviders)
+	assert.True(t, containsFieldName(result.Step.Fields, "email"), "the step's inputs render alongside the providers")
+}
+
+// Providers are resolved on every render, not once per flow, so an edit to
+// a connection's display name shows on the next page load. A validation
+// error is the cheapest second render to prove it on.
+func TestFlowStateMachine_Process_ReRenderResolvesSSOProvidersAgain(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+	def := ssoStepDefinition()
+
+	w.schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+		AnyTimes()
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
+	gomock.InOrder(
+		w.ssoProviders.EXPECT().
+			Resolve(gomock.Any(), testProjectID, "credentials", []string{"google", "github"}).
+			Return([]domain.FlowSSOProvider{{ID: "google", Name: "Google", Template: "google"}}, nil),
+		w.ssoProviders.EXPECT().
+			Resolve(gomock.Any(), testProjectID, "credentials", []string{"google", "github"}).
+			Return([]domain.FlowSSOProvider{{ID: "google", Name: "Google Workspace", Template: "google"}}, nil),
+	)
+
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeRegister,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	result, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{"x-auth-methods#password": "correct-horse-battery-staple"},
+	})
+	require.NoError(t, err)
+	require.Equal(t, "credentials", result.Step.Name)
+	require.NotNil(t, result.Step.Error)
+	assert.Equal(t, []domain.FlowSSOProvider{{ID: "google", Name: "Google Workspace", Template: "google"}}, result.Step.SSOProviders)
+}
+
+func TestFlowStateMachine_Start_SSOProviderResolverErrorFailsRender(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+	def := ssoStepDefinition()
+
+	w.schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil)
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
+	w.ssoProviders.EXPECT().
+		Resolve(gomock.Any(), testProjectID, "credentials", []string{"google", "github"}).
+		Return(nil, errors.New("connection store unavailable"))
+
+	_, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeRegister,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.ErrorContains(t, err, "connection store unavailable")
 }
 
 // passkeyLoginDefinition builds a single-step passkey login: an
