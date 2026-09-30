@@ -150,6 +150,19 @@ var releaseAccess = resourceAccess{
 	denied:    domain.ErrReleasePermissionDenied,
 }
 
+// idpAccess guards the project's identity provider connections (#1003). Every
+// route carries a project_id. The two connection-id reads (get and the
+// revision list) resolve the path id through RSI in that project, so a grant
+// on one connection reaches it. Create, query and the single revision read
+// stay project-scoped: revisions have no RSI row. On the query the kind
+// narrows a partial-access list.
+var idpAccess = resourceAccess{
+	kind:      domain.ResourceKindIDPConnection,
+	readMiss:  domain.ErrIDPConnectionNotFound,
+	writeMiss: domain.ErrIDPConnectionNotFound,
+	denied:    domain.ErrIDPConnectionPermissionDenied,
+}
+
 // deploymentAccess gates the record of what runs where (ADR 035, #532).
 // Same shape as releaseAccess: create and get are project-scoped — both carry
 // a project_id and the get filters its lookup by it — so no route resolves a
