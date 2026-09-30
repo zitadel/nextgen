@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { test } from "node:test";
+import { test } from "vitest";
 
 import {
   computeMode,
@@ -55,7 +55,7 @@ const COMPONENTS_CLASS = [
   "cli-journey-e2e:e2e", "cli-journey-e2e:e2e-local", "cli-journey-e2e:e2e-testkit",
   "cli:build", "cli:build-release", "cli:lint", "cli:readme", "cli:test", "cli:typecheck",
   "components:build", "components:build-release", "components:lint", "components:test",
-  "components:test-browser", "components:typecheck",
+  "components:typecheck",
   "console-e2e:e2e", "console-e2e:e2e-real",
   "console:build", "console:build-release", "console:lint", "console:preview",
   "console:test", "console:typecheck",
@@ -86,9 +86,6 @@ const COMPONENTS_CLASS = [
   "storybook:build", "storybook:lint", "storybook:test", "storybook:typecheck",
   "testing:test-integration",
 ];
-// Synthetic slice, NOT a class capture: isolates the `:test-browser`-alone
-// trigger for the browsers gate, which no real class produces in isolation.
-const TEST_BROWSER_SLICE = ["components:test-browser", "components:lint"];
 
 function allTrue(gates) {
   return Object.values(gates).every(Boolean);
@@ -239,16 +236,6 @@ test("embedded-lane affectedness alone trips the console gate", () => {
   assert.equal(gates.suites_console, true);
   assert.equal(gates.browsers, true);
   assert.equal(gates.go_tests, false);
-});
-
-test(":test-browser affectedness alone keeps the browser install without journeys", () => {
-  const { gates } = resolveGates({
-    mode: "full",
-    files: ["packages/components/src/atoms/zl-alert.spec.ts"],
-    targets: TEST_BROWSER_SLICE,
-  });
-  assert.equal(gates.browsers, true);
-  assert.deepEqual(journeys(gates), [false, false, false, false]);
 });
 
 test("unclaimed files force a full run with the full matrix", () => {

@@ -55,6 +55,6 @@ tasks:
       mutex: "public-dist"
 
   test:
-    command: "corepack pnpm exec vitest run --passWithNoTests"
+    command: "corepack pnpm run test:all"
     deps:
       - "generate"

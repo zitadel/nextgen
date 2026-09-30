@@ -49,6 +49,6 @@ tasks:
       runInCI: false
 
   test:
-    command: "corepack pnpm run test"
+    command: "corepack pnpm run test:all"
     deps:
       - "build"
