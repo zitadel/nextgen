@@ -164,7 +164,7 @@ export function validateLoginTemplate(template: string): TemplateValidationIssue
       severity: "error",
       rule: "mandatory-gates",
       message:
-        "Template must contain a trailing {% mandatory_gates %} tag — the runtime safety net that appends required fields, gates, and the submit action a template forgot to render.",
+        "Template must contain a trailing {% mandatory_gates %} tag — the runtime safety net that appends any required field and the primary action a template left out.",
     });
   }
 

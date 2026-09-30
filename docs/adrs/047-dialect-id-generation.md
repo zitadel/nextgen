@@ -57,6 +57,7 @@ the dialect generator is the only mint path, not that create always overwrites.
 | flow definition | `flowdef` |
 | IdP connection | `idp` |
 | IdP connection revision | `idprev` |
+| IdP identity link (`idp_identity_links`, storage-only) | `idplink` |
 | flow handle (in-memory) | `flow` |
 | JSON schema (when server-assigned) | `sch` |
 | encryption key | `enc_key` |
