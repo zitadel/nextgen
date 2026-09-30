@@ -280,6 +280,14 @@ authorized API data loaded after sign-in.
 it does not choose a different Console login project and does not grant access.
 `VITE_CONSOLE_PROJECT_ID` remains a development-only override.
 
+> **Amendment (2026-09-30, #1300):** `VITE_CONSOLE_PROJECT_ID` is removed.
+> Development takes the sign-in project from `runtime.json` like production:
+> `console:dev-real` and the real e2e lane serve the document from their
+> instance (the seeded project, or `proj_platform` with bootstrap in claim
+> mode), and the api-mock serves one naming `proj_dev_mock`. The pin had also
+> preferred a default selection among the operator's projects; the default is
+> now their only project, or none.
+
 ### 4. The embedded Console uses a first-party session credential
 
 The Console performs same-origin API calls with its HttpOnly

@@ -3,6 +3,7 @@ import { _resetConfigForTesting } from "@zitadel/api/config";
 import "@testing-library/jest-dom/vitest";
 
 import { clearSessionCaches } from "./lib/session-cache";
+import { _resetRuntimeForTesting } from "./runtime/runtime";
 
 // configureZitadel is write-once on globalThis so duplicate module copies
 // share one slot. That slot also survives Vitest's per-file isolate, and
@@ -75,11 +76,13 @@ if (typeof Element !== "undefined") {
   Element.prototype.scrollIntoView ??= () => undefined;
 }
 
-// Hermetic env: Vitest (via Vite) loads `.env.local`, so without these stubs a
-// developer's local VITE_CONSOLE_PROJECT_ID would leak into test requests, and
-// a local VITE_CONSOLE_RUNTIME_FALLBACK would turn runtime-discovery failures
-// back into the standalone fallback (Console ADR 0004 §3) — both make outcomes
-// depend on gitignored local files. Specs that need a value stub their own
-// (vi.stubEnv wins over these defaults).
-vi.stubEnv("VITE_CONSOLE_PROJECT_ID", "");
+// Hermetic env: Vitest (via Vite) loads `.env.local`, so without this stub a
+// local VITE_CONSOLE_RUNTIME_FALLBACK would turn runtime-discovery failures
+// back into the standalone fallback (Console ADR 0004 §3), making outcomes
+// depend on a gitignored local file. Specs that need a value stub their own
+// (vi.stubEnv wins over this default).
 vi.stubEnv("VITE_CONSOLE_RUNTIME_FALLBACK", "");
+
+// Every spec starts with no runtime document, so no sign-in project. One that
+// needs a project sets it with `_setRuntimeForTesting`, as the server would.
+beforeEach(_resetRuntimeForTesting);

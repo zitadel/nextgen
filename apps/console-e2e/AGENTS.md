@@ -28,11 +28,11 @@ secret-handling caveat live in [`README.md`](README.md).
 
 Console screens act on the selected project (`?project=`, see
 [`apps/console/AGENTS.md`](../console/AGENTS.md)). The guard only ever selects
-a project the signed-in person holds a grant on: the `VITE_CONSOLE_PROJECT_ID`
-pin when it is one of theirs, else their only project, else none. `e2e-real`
-grants each signed-in user its project (`signIn` in `src-real/support.ts`), so
-the pin selects it there; a user with no grant lands on Projects with nothing
-selected. A spec that navigates by URL either lets the guard fill it in or
+a project the signed-in person holds a grant on: their only project, else
+none. `e2e-real` grants each signed-in user the harness project (`signIn` in
+`src-real/support.ts`), so it is selected there; a user with no grant lands on
+Projects with nothing selected. The project the console signs into comes from
+the instance's `/console/runtime.json` in every lane; no lane pins it. A spec that navigates by URL either lets the guard fill it in or
 names it, and asserts it survives navigation where that is the point.
 
 All four tasks carry `runInCI: false` — that only keeps them out of moon's

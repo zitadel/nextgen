@@ -166,21 +166,17 @@ the same way — through the grant, not a secret.
 
 ```sh
 PORT=8080 moon run api-mock:start          # terminal 1
-VITE_CONSOLE_PROJECT_ID=proj_dev_mock \
-  VITE_CONSOLE_RUNTIME_FALLBACK=1 \
-  moon run console:dev                     # terminal 2
+moon run console:dev                       # terminal 2
 ```
 
 Fast and offline, and the full sign-in loop works (the mock serves
 `/sessions/exchange` and `/sessions/me`), with the same split
 `identifier` → `password` flow the real server emits. Use it only for chrome that
 needs no real data: it has **no user store**, so list screens cannot be
-meaningful and nothing about authorization can be proven there. It also serves no
-`/console/runtime.json`, which is why the two variables above are both required:
-`VITE_CONSOLE_RUNTIME_FALLBACK` opts this loop into the standalone fallback
-(without it the console stops on the connectivity screen, correctly — the
-document really is missing), and the project id then has to come from
-`VITE_CONSOLE_PROJECT_ID`.
+meaningful and nothing about authorization can be proven there. It serves its
+own `/console/runtime.json`, naming `proj_dev_mock` as the project the console
+signs into, so the loop needs no variables: the dev proxy's default backend is
+the mock's port.
 
 ### Embedded build
 
@@ -198,8 +194,7 @@ embed base path.
 | `CONSOLE_BACKEND_URL` | Node (dev proxy) | Upstream API origin (defaults in `vite.config.mts`) |
 | `CONSOLE_DEV_PROXY_LOG` | Node (dev proxy) | Set to `1` to print each proxied request — for a screen that answers 401/403/404 when it is not obvious what the server was asked |
 | `VITE_CONSOLE_API_BASE` | Client | Same-origin API base the SDK calls (default `/api`) |
-| `VITE_CONSOLE_PROJECT_ID` | Client | Dev override for the project id; when unset it is discovered from `/console/runtime.json` (Console ADR 0004) |
-| `VITE_CONSOLE_RUNTIME_FALLBACK` | Client (build/dev time) | Opt-in for runs with no `/console/runtime.json` (`vite preview`, api-mock): failed discovery resolves to `standalone` instead of the connectivity error. Never set it for the embedded build |
+| `VITE_CONSOLE_RUNTIME_FALLBACK` | Client (build/dev time) | Opt-in for runs with no `/console/runtime.json` (`vite preview`): failed discovery resolves to `standalone` instead of the connectivity error. Never set it for the embedded build |
 
 ## Commands
 

@@ -10,7 +10,11 @@
  * `console:dev` with the dev proxy pointed at that instance:
  *
  *   CONSOLE_BACKEND_URL     -> the booted instance
- *   VITE_CONSOLE_PROJECT_ID -> pins the client to the bootstrapped project
+ *
+ * The console takes the project it signs into from the instance's
+ * `/console/runtime.json`, as it does in production: the seeded project here,
+ * the platform project in claim mode (`NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT`
+ * below decides which). Nothing pins it on the client.
  *
  * The browser authenticates with the dev user's session cookie alone, as the
  * embedded console does (#1300); the dev user is granted admin on the seeded
@@ -48,8 +52,8 @@ const seedOnly = process.argv.includes("--seed-only");
  * Claim mode boots the deployment's *platform* project and points the console
  * at it, which is what `claim/complete` authenticates against — without it the
  * claim page can render but never finish, because the console's session belongs
- * to the seeded project instead. Opt-in, not the default: pinning the console
- * to `proj_platform` is exactly the standalone-semantics change the demo and
+ * to the seeded project instead. Opt-in, not the default: making
+ * `proj_platform` the deployment's default project is exactly the standalone-semantics change the demo and
  * embedded suites must not see (see `cli-journey-e2e/scripts/run-local.mjs`).
  */
 const claimMode = process.argv.includes("--claim");
@@ -221,10 +225,10 @@ if (!claimMode && devUser && !(await grantDevUserAdmin(devUser.id))) {
 }
 
 // Claim mode signs in against the platform project, because that is the only
-// session `claim/complete` accepts. The seeded users stay in the project being
-// claimed — they are its app's users, not the human doing the claiming, who
-// registers through the claim page itself.
-const consoleProjectId = claimMode ? PLATFORM_PROJECT_ID : projectId;
+// session `claim/complete` accepts; bootstrapping it makes it the project
+// `runtime.json` names. The seeded users stay in the project being claimed —
+// they are its app's users, not the human doing the claiming, who registers
+// through the claim page itself.
 
 /**
  * A claim link for the seeded project, so claim mode lands on something
@@ -284,16 +288,16 @@ console.log(
 );
 
 if (seedOnly) {
-  // Hand the instance's address and project to the separately-started dev
-  // server. No credential: the dev user signs in and its session cookie does
-  // the rest.
+  // Hand the instance's address to the separately-started dev server. No
+  // credential and no project: the console reads the project from the
+  // instance's runtime document, and the dev user's session cookie does the
+  // rest.
   console.log(
     [
       "[console-dev-real] --seed-only: instance stays up, Ctrl-C to stop.",
       "  point a console dev server at it:",
       "",
       `    CONSOLE_BACKEND_URL=${baseUrl} \\`,
-      `    VITE_CONSOLE_PROJECT_ID=${consoleProjectId} \\`,
       "    corepack pnpm --filter @zitadel/console dev",
       "",
     ].join("\n"),
@@ -316,7 +320,6 @@ if (seedOnly) {
     env: {
       ...process.env,
       CONSOLE_BACKEND_URL: baseUrl,
-      VITE_CONSOLE_PROJECT_ID: consoleProjectId,
     },
   });
   vite.on("exit", (code) => void shutdown(code ?? 0));
