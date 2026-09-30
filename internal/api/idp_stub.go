@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"net/http"
 	"sort"
 	"sync"
 	"time"
@@ -155,6 +156,22 @@ func (h *Handler) CreateIdp(ctx context.Context, req *api.CreateIdpRequest, para
 	}
 	response := api.CreateIdpOK(record.response())
 	return &response, nil
+}
+
+// idpConnectionErrorResponse maps the connection errors onto the statuses the
+// spec documents. Without it the shared handler's default branch turns an
+// unknown prefix into a 500, so a missing id answered 500 where the spec says
+// 404 idp.not_found. It lives beside the stub so it moves with it when the real
+// service lands (#1003).
+func idpConnectionErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
+	switch err.Code {
+	case domain.ErrIDPConnectionNotFound().Code:
+		return errorResponseWithStatusCode(http.StatusNotFound, err)
+	case domain.ErrIDPConnectionFieldImmutable(nil).Code:
+		return errorResponseWithStatusCode(http.StatusBadRequest, err)
+	default:
+		return internalErrorResponse(err)
+	}
 }
 
 // GetIdpById returns the newest revision of one connection. Stub.

@@ -267,26 +267,32 @@ describe("scaffolded flow (schemas/default-login.scaffold.json)", () => {
   };
   const flowMeta = loadJson(metaSchemaDir, "flow-definition.json");
 
-  it("fails against the shipped meta-schema only on the documented on_success delta", () => {
-    // The on_success enum gains create_user_with_sso once #1037 adds the value
-    // and its engine handler together; the editor schema mirrors the API until
-    // then. sso_providers is already a slug list, so it no longer differs.
+  it("validates against the shipped meta-schema", () => {
+    // This used to allow one delta: the on_success enum lacked
+    // create_user_with_sso until #1037 added the value and its engine handler
+    // together. It has landed, so the scaffold must now validate outright —
+    // tolerating an error class here would let a real one through unseen.
     const validate = new Ajv2020({ strict: false, validateFormats: false, allErrors: true }).compile(
       flowMeta,
     );
-    validate(flow);
-    for (const err of validate.errors ?? []) {
-      const onSuccess = err.keyword === "enum" && err.instancePath.endsWith("/on_success");
-      expect(onSuccess, `${err.instancePath} ${err.keyword}`).toBe(true);
-    }
+
+    const valid = validate(flow);
+
+    expect(
+      (validate.errors ?? []).map((err) => `${err.instancePath} ${err.keyword}`),
+    ).toEqual([]);
+    expect(valid).toBe(true);
   });
 
-  it("validates once the on_success delta lands in the meta-schema", () => {
-    const patched = structuredClone(flowMeta) as {
-      $defs: { FlowDefinitionStep: { properties: { on_success: { enum: string[] } } } };
-    };
-    patched.$defs.FlowDefinitionStep.properties.on_success.enum.push("create_user_with_sso");
-    expect(ajv().compile(patched)(flow)).toBe(true);
+  it("uses the on_success value the meta-schema ships, not one it has to be taught", () => {
+    const enumValues = (
+      flowMeta as { $defs: { FlowDefinitionStep: { properties: { on_success: { enum: string[] } } } } }
+    ).$defs.FlowDefinitionStep.properties.on_success.enum;
+
+    expect(enumValues).toContain("create_user_with_sso");
+    // Unique, because the previous form of this test pushed the value in a
+    // second time and an enum with a repeat is not a valid JSON Schema.
+    expect(new Set(enumValues).size).toBe(enumValues.length);
   });
 
   it("every step carrying sso_providers routes all three outcomes", () => {
