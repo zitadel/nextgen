@@ -20,13 +20,13 @@
  *                                       --SUBMIT(recover)--> recover --SUBMIT--> identifier
  *                                       --SUBMIT(register)--> register
  *                                       --SUBMIT(passkey)--> passkey-login
- *                                       --SUBMIT(sso_provider_id)--> sso-redirect
+ *                                       --SUBMIT(sso)-----> sso-redirect
  *                            password   --SUBMIT(submit)--> done
  *                                       --SUBMIT(back)----> identifier
  *                                       --SUBMIT(passkey)--> passkey-login
  *      \--START(register)--> register --SUBMIT--> register-password --SUBMIT--> done
  *                                     --SUBMIT(sign_in)--> identifier
- *                                     --SUBMIT(sso_provider_id)--> sso-redirect
+ *                                     --SUBMIT(sso)-----> sso-redirect
  *
  *   passkey-upsell / passkey-setup -- legacy upsell pair; the default flow no
  *               longer routes through them (passkey registration is offered
@@ -37,7 +37,7 @@
  *   passkey-login --SUBMIT--> done
  *   passkey-login --SUBMIT(cancel)--> identifier
  *   sso-redirect --SUBMIT--> done
- *   sso-conflict --SUBMIT(sso_provider_id)--> sso-redirect
+ *   sso-conflict --SUBMIT(sso)-----> sso-redirect
  *   anything --RESET--> .idle  (root on: uses child-relative target syntax)
  */
 import type { CreateFlowBodyPurpose } from "@zitadel/api/generated/model";
@@ -125,12 +125,21 @@ const captureFields = assign<
  * transition first, ahead of that step's own actions — otherwise a click
  * falls through to the step's default and the mock reports a journey that
  * could not happen.
+ *
+ * Both halves are required, because both are the contract
+ * (`docs/design/idp/3-social-login-flow.md`): `{action: "sso",
+ * sso_provider_id}`. A `submit` that happens to carry a provider id is a
+ * malformed request the engine would treat as an ordinary submit, so routing
+ * it here would let a caller pass against the mock and fail against the
+ * engine.
  */
 type SubmitEvent = Extract<FlowMachineEvent, { type: "SUBMIT" }>;
 
 const chooseProvider = {
   guard: ({ event }: { event: SubmitEvent }) =>
-    typeof event.sso_provider_id === "string" && event.sso_provider_id.length > 0,
+    event.action === "sso" &&
+    typeof event.sso_provider_id === "string" &&
+    event.sso_provider_id.length > 0,
   target: "sso-redirect",
   actions: [
     captureFields,

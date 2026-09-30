@@ -149,16 +149,33 @@ describe("setupMockHandlers", () => {
     expect(done.handoff_token).toBeTruthy();
   });
 
-  test("redirects to SSO when sso_provider_id is set", async () => {
+  test("redirects to SSO on the reserved action", async () => {
     const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
     const submit = await submitFlowStep(start.id, {
       session_token: start.session_token,
-      action: "submit",
+      action: "sso",
       fields: {},
       sso_provider_id: "google",
     });
     expect(submit.step.name).toBe("sso-redirect");
     expect(submit.step.redirect_url).toBeTruthy();
+  });
+
+  /**
+   * A provider id on an ordinary submit is a malformed request, not a choice
+   * of provider. The engine reserves `action: "sso"` for that, so the mock
+   * must not accept the looser shape and hand back a pass the engine would
+   * not give.
+   */
+  test("ignores a provider id on an ordinary submit", async () => {
+    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    const submit = await submitFlowStep(start.id, {
+      session_token: start.session_token,
+      action: "submit",
+      fields: { email: "ada@example.test" },
+      sso_provider_id: "google",
+    });
+    expect(submit.step.name).toBe("password");
   });
 
   /**
@@ -371,7 +388,7 @@ describe("setupMockHandlers — the provider round trip", () => {
     const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
     const redirect = await submitFlowStep(start.id, {
       session_token: start.session_token,
-      action: "submit",
+      action: "sso",
       fields: {},
       sso_provider_id: "google",
     });
