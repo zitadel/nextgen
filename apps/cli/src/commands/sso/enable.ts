@@ -159,6 +159,7 @@ export default class SsoEnable extends BaseCommand {
         status: "skipped",
         reason: "dry-run",
         data: this.payload({
+          projectId: secretFile.project_id,
           provider,
           schema: schema.name,
           plan,
@@ -287,6 +288,7 @@ export default class SsoEnable extends BaseCommand {
       status: "ok",
       data: {
         ...this.payload({
+          projectId: secretFile.project_id,
           provider,
           schema: schema.name,
           plan,
@@ -411,6 +413,12 @@ export default class SsoEnable extends BaseCommand {
 
   /** The machine-readable payload. Never the secret, only whether it is held. */
   private payload(input: {
+    /**
+     * The Project the run addresses. `--json` suppresses the console line that
+     * otherwise carries it, and a result that names only the schema does not
+     * say which Project was changed.
+     */
+    projectId: string;
     provider: string;
     schema: string;
     plan: { action: string; slug: string; path?: string; file?: { path: string } };
@@ -426,6 +434,7 @@ export default class SsoEnable extends BaseCommand {
     skipped?: SsoSkipped[];
   }): Record<string, unknown> {
     return {
+      project_id: input.projectId,
       provider: input.provider,
       schema: input.schema,
       connection: {

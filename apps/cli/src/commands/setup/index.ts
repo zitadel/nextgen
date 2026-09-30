@@ -833,9 +833,11 @@ type SetupRetryOptions = {
   nonInteractive?: boolean;
   /**
    * The social provider and its client id. The secret is deliberately absent:
-   * a retry re-reads it from stdin (or leaves it to be set in `.env.local`),
-   * because putting a credential in suggested command text is exactly what
-   * piping the secret exists to avoid.
+   * a retry asks for it again, or takes it on stdin, because putting a
+   * credential in suggested command text is exactly what piping the secret
+   * exists to avoid. It never reaches the filesystem either way — the value
+   * goes to the project's variables, which is where the engine resolves the
+   * connection's `${{ NAME }}` from.
    */
   sso?: { provider: string; clientId: string };
 };
