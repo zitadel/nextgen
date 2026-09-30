@@ -7,11 +7,11 @@
  *    loopback HTTP while the component itself renders on a loopback HTTP
  *    origin.
  * 2. `layout` is in the documented enum.
- * 3. `liquid_template` shape checks happen elsewhere (security pipeline runs
- *    server-side; structural validator is deferred until the full atom set
- *    lands).
+ * 3. `liquid_template` is not checked here. The server and the CLI check it on
+ *    publish; the component renders it and falls back to the bundled default
+ *    when it throws.
  *
- * Failures are non-fatal: we collect issues, log a dev-build warning, and
+ * Failures are non-fatal: we collect issues, log a console warning, and
  * return a sanitised payload with the offending fields stripped (set to
  * `undefined`) so the orchestrator falls back to the bundled defaults.
  */

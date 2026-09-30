@@ -23,9 +23,9 @@ func ErrBrandingPermissionDenied() Error {
 	return newError(PrefixBranding.ErrorCodePrefix("permission_denied"), "branding: requires an operator-grade token bound to the project (project.write or a branding.* scope)", nil, nil)
 }
 
-// Branding layout presets understood by the bundled login template. The wire
-// enum is defined in api/openapi/components/flows/branding.yaml; richer
-// designs are delivered as Liquid templates, not new enum values (ADR 040).
+// Branding layout presets a revision may declare. The wire enum is defined in
+// api/openapi/components/flows/branding.yaml; designs are delivered as Liquid
+// templates, not new enum values (ADR 040).
 const (
 	BrandingLayoutCentered = "centered"
 	BrandingLayoutSplit    = "split"

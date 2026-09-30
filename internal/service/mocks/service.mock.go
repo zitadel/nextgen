@@ -744,6 +744,44 @@ func (c *MockAllStatementsCreateIDPConnectionCall) DoAndReturn(f func(context.Co
 	return c
 }
 
+// CreateIDPIdentityLink mocks base method.
+func (m *MockAllStatements) CreateIDPIdentityLink(ctx context.Context, link *domain.IDPIdentityLink) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateIDPIdentityLink", ctx, link)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CreateIDPIdentityLink indicates an expected call of CreateIDPIdentityLink.
+func (mr *MockAllStatementsMockRecorder) CreateIDPIdentityLink(ctx, link any) *MockAllStatementsCreateIDPIdentityLinkCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateIDPIdentityLink", reflect.TypeOf((*MockAllStatements)(nil).CreateIDPIdentityLink), ctx, link)
+	return &MockAllStatementsCreateIDPIdentityLinkCall{Call: call}
+}
+
+// MockAllStatementsCreateIDPIdentityLinkCall wrap *gomock.Call
+type MockAllStatementsCreateIDPIdentityLinkCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsCreateIDPIdentityLinkCall) Return(arg0 error) *MockAllStatementsCreateIDPIdentityLinkCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsCreateIDPIdentityLinkCall) Do(f func(context.Context, *domain.IDPIdentityLink) error) *MockAllStatementsCreateIDPIdentityLinkCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsCreateIDPIdentityLinkCall) DoAndReturn(f func(context.Context, *domain.IDPIdentityLink) error) *MockAllStatementsCreateIDPIdentityLinkCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // CreateJSONSchema mocks base method.
 func (m *MockAllStatements) CreateJSONSchema(ctx context.Context, entity *domain.JSONSchema) error {
 	m.ctrl.T.Helper()
@@ -2739,6 +2777,45 @@ func (c *MockAllStatementsGetIDPConnectionRevisionCall) Do(f func(context.Contex
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAllStatementsGetIDPConnectionRevisionCall) DoAndReturn(f func(context.Context, string, string) (*domain.IDPConnection, error)) *MockAllStatementsGetIDPConnectionRevisionCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// GetIDPIdentityLink mocks base method.
+func (m *MockAllStatements) GetIDPIdentityLink(ctx context.Context, filter database.Filter[domain.IDPIdentityLinkField]) (*domain.IDPIdentityLink, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetIDPIdentityLink", ctx, filter)
+	ret0, _ := ret[0].(*domain.IDPIdentityLink)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetIDPIdentityLink indicates an expected call of GetIDPIdentityLink.
+func (mr *MockAllStatementsMockRecorder) GetIDPIdentityLink(ctx, filter any) *MockAllStatementsGetIDPIdentityLinkCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetIDPIdentityLink", reflect.TypeOf((*MockAllStatements)(nil).GetIDPIdentityLink), ctx, filter)
+	return &MockAllStatementsGetIDPIdentityLinkCall{Call: call}
+}
+
+// MockAllStatementsGetIDPIdentityLinkCall wrap *gomock.Call
+type MockAllStatementsGetIDPIdentityLinkCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsGetIDPIdentityLinkCall) Return(arg0 *domain.IDPIdentityLink, arg1 error) *MockAllStatementsGetIDPIdentityLinkCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsGetIDPIdentityLinkCall) Do(f func(context.Context, database.Filter[domain.IDPIdentityLinkField]) (*domain.IDPIdentityLink, error)) *MockAllStatementsGetIDPIdentityLinkCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsGetIDPIdentityLinkCall) DoAndReturn(f func(context.Context, database.Filter[domain.IDPIdentityLinkField]) (*domain.IDPIdentityLink, error)) *MockAllStatementsGetIDPIdentityLinkCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

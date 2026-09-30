@@ -1,8 +1,8 @@
 /**
  * Builds the public token surfaces of `@zitadel/design-tokens` from:
  *   - `src/generated/figma.tokens.json` — resolved shadcn colours + container scale
- *   - `src/overrides.ts` — fonts, motion, focus, breakpoints, and the roles
- *     shadcn has no name for
+ *   - `src/overrides.ts` — fonts, motion, focus, breakpoints, container roles
+ *     that sit off Figma's scale, and the roles shadcn has no name for
  *
  * Emits four files into `src/generated/`:
  *
@@ -270,10 +270,17 @@ function build(): BuildResult {
     push(cssVarName("breakpoint", name), value, ["breakpoint", name]);
   }
 
-  // ---- container max-widths: Zitadel semantic roles mapped onto Figma's `container/*` scale ----
-  // Figma owns the pixel values; build owns which scale step each role uses.
-  push(cssVarName("container", "auth-card"), pxToRem(containerStep("sm")), ["container", "authCard"]);
-  push(cssVarName("container", "page"), pxToRem(containerStep("7xl")), ["container", "page"]);
+  // ---- container max-widths: Zitadel semantic roles ----
+  // A role that is a step on Figma's `container/*` scale takes its value from
+  // there (`CONTAINER_STEP_ROLES`). A role whose width is not on the scale
+  // takes it from `overrides.container`.
+  for (const [role, step] of Object.entries(CONTAINER_STEP_ROLES)) {
+    push(cssVarName("container", role), pxToRem(containerStep(step)), ["container", toCamel(role)]);
+  }
+  for (const [role, value] of Object.entries(overrides.container)) {
+    assertOffScaleContainerRole(role, value);
+    push(cssVarName("container", role), value, ["container", toCamel(role)]);
+  }
 
   // ---- themed groups (syntax, gradient): themed like the shadcn colours, but
   // namespaced by group so they stay clear of both `--zl-color-*` and the flat
@@ -305,6 +312,32 @@ function setDeep(target: Record<string, unknown>, path: string[], value: string)
     cursor = cursor[key] as Record<string, unknown>;
   }
   cursor[path[path.length - 1] ?? ""] = value;
+}
+
+/** Container roles that are a step on Figma's scale, keyed by kebab-case role name. */
+const CONTAINER_STEP_ROLES: Record<string, string> = {
+  "auth-card": "sm",
+  page: "7xl",
+};
+
+/**
+ * An override may neither redefine a role the scale already provides nor
+ * restate a width the scale has a step for: both would leave two sources for
+ * one value, with nothing to say which is current.
+ */
+function assertOffScaleContainerRole(role: string, value: string): void {
+  if (Object.hasOwn(CONTAINER_STEP_ROLES, role)) {
+    throw new Error(
+      `overrides.container.${role} redefines a role CONTAINER_STEP_ROLES maps onto Figma's container scale. Remove one.`,
+    );
+  }
+  const step = Object.entries(shadcn.container ?? {}).find(([, px]) => pxToRem(px) === value);
+  if (step) {
+    throw new Error(
+      `overrides.container.${role} is ${value}, which is container.${step[0]} on Figma's scale. ` +
+        `Map the role to that step in CONTAINER_STEP_ROLES and delete the override.`,
+    );
+  }
 }
 
 /** Read a step from Figma's container scale, failing loud if the designer dropped it. */
