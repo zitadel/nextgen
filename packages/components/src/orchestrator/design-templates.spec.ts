@@ -170,11 +170,14 @@ describe("branding design catalog", () => {
       expect(html).toContain("acme-sso");
     });
 
-    it("passes the localised label format and divider through", () => {
+    // The design draws no rule above the providers -- they sit directly under
+    // the primary action -- so the shipped templates pass no divider. The atom
+    // keeps the option for a tenant template that wants one.
+    it("passes the localised label format through, and no divider", () => {
       const html = render(withProviders);
 
       expect(html).toContain('label-format="Continue with {name}"');
-      expect(html).toContain('divider-label="or"');
+      expect(html).not.toContain("divider-label");
     });
 
     it("keeps the register row's copy for the register step's own sign_in", () => {

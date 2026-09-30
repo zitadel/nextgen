@@ -5,7 +5,6 @@ import { html } from "lit";
 import "@zitadel/components/atoms";
 
 const GOOGLE: SsoProvider = { id: "idp_01GOOGLE", name: "Google", template: "google" };
-const GITHUB: SsoProvider = { id: "idp_01GITHUB", name: "GitHub", template: "github" };
 const PRIVATE: SsoProvider = { id: "idp_01ACME", name: "Acme SSO", template: "oidc-generic" };
 
 interface SsoArgs {
@@ -26,14 +25,18 @@ interface SsoArgs {
  *
  * Choosing one emits `zl-sso-select`; the orchestrator turns that into the
  * reserved `sso` action and follows the redirect the server answers with. In
- * isolation there is nothing to redirect to, so a chosen button stays in its
- * loading state — that is the real behaviour, not a stuck story.
+ * isolation there is nothing listening, so a chosen button simply emits and
+ * nothing follows — the atom has no loading state of its own, only `disabled`,
+ * which the orchestrator sets while the step submits.
  */
 const meta: Meta<SsoArgs> = {
   title: "Atoms/SSO providers",
   tags: ["autodocs"],
   args: {
-    providers: [GOOGLE],
+    // Both shapes at once, so the fallback is visible without editing the
+    // control: Google ships a mark, a tenant's own OIDC connection has none
+    // and gets a labelled button rather than a wrong logo.
+    providers: [GOOGLE, PRIVATE],
     labelFormat: "Continue with {name}",
     dividerLabel: "or",
     disabled: false,
@@ -61,27 +64,3 @@ const render = ({ providers, labelFormat, dividerLabel, disabled }: SsoArgs) => 
 `;
 
 export const Default: Story = { render };
-
-/** Several providers, as a project that enabled more than one shows them. */
-export const Multiple: Story = {
-  args: { providers: [GOOGLE, GITHUB, PRIVATE] },
-  render,
-};
-
-/** A connection whose template has no mark — labelled, not mislabelled. */
-export const WithoutBrandMark: Story = {
-  args: { providers: [PRIVATE] },
-  render,
-};
-
-/** No rule above the buttons, for a step where they stand alone. */
-export const WithoutDivider: Story = {
-  args: { dividerLabel: "" },
-  render,
-};
-
-/** Every button held while the step submits something else. */
-export const Disabled: Story = {
-  args: { providers: [GOOGLE, GITHUB], disabled: true },
-  render,
-};

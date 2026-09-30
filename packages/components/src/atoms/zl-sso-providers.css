@@ -7,7 +7,9 @@
 .zr-sso {
   display: flex;
   flex-direction: column;
-  gap: var(--zl-spacing-2);
+  /* The same 12px the design puts between the primary action and the first
+     provider, so a divider-less group keeps one rhythm throughout. */
+  gap: var(--zl-spacing-3);
 }
 
 /* A labelled rule ("or"), drawn with the label sitting in the gap so it needs
@@ -33,7 +35,29 @@
 .zr-sso__list {
   display: flex;
   flex-direction: column;
-  gap: var(--zl-spacing-2);
+  /* The design stacks the providers on the same 12px rhythm that separates
+     them from the primary action, so the group reads as one block. */
+  gap: var(--zl-spacing-3);
+}
+
+/* A vendor's mark comes with rules about what may sit behind it: Google
+   permits only its light, dark and neutral themes, so this button cannot be
+   repainted from the tenant's palette the way every other surface is. These
+   roles are deliberately absent from `PALETTE_MAP` (`branding-to-tokens.ts`),
+   which is what keeps branding out of them; their defaults are the design's
+   outline button, so the shipped page matches Figma with no tenant input.
+   Hover and pressed mix toward the button's own foreground rather than
+   `--zl-accent`, which branding does paint. */
+.zr-sso__list zl-button::part(root) {
+  background: var(--zl-provider);
+  border-color: var(--zl-provider-border);
+  color: var(--zl-provider-foreground);
+}
+.zr-sso__list zl-button::part(root):hover:not(:disabled) {
+  background: color-mix(in srgb, var(--zl-provider) 95%, var(--zl-provider-foreground));
+}
+.zr-sso__list zl-button::part(root):active:not(:disabled) {
+  background: color-mix(in srgb, var(--zl-provider) 90%, var(--zl-provider-foreground));
 }
 
 /* The mark holds its size when the label beside it wraps. Its colours are its

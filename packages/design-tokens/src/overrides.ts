@@ -37,6 +37,24 @@ export interface DesignTokenOverrides {
 export interface ColorRoleTokens {
   link: { dark: string; light: string };
   warning: { dark: string; light: string };
+  /**
+   * The identity-provider button's surface, border and label.
+   *
+   * Separate roles rather than the neutral ones because a vendor's mark comes
+   * with rules about what may sit behind it: Google permits only its light,
+   * dark and neutral themes, so the button cannot be repainted from a tenant's
+   * palette the way every other surface is. `PALETTE_MAP` deliberately never
+   * names these (`branding-to-tokens.ts`), which is what keeps branding out;
+   * a host page that has cleared the vendor rules itself can still set them in
+   * its own CSS.
+   *
+   * The values are the design's outline button, so the shipped login page
+   * matches Figma with no tenant input at all.
+   */
+  provider: { dark: string; light: string };
+  // Kebab-cased because the build emits each key verbatim as `--zl-<key>`.
+  "provider-border": { dark: string; light: string };
+  "provider-foreground": { dark: string; light: string };
 }
 
 export interface FontTokens {
@@ -114,6 +132,18 @@ export const overrides: DesignTokenOverrides = {
     // weight as `--zl-destructive` in each mode. Raised with design — see the
     // open questions on the rebuild.
     warning: { dark: "#fbbf24", light: "#d97706" },
+    // shadcn's outline button: the page surface in light mode, and its
+    // `input` fill at 30% in dark, which is what the Figma frame draws.
+    // Literal rather than a reference to `input` / `foreground`: a typed token
+    // value must resolve on its own, which the snapshot spec enforces. Dark is
+    // the page's own faint fill, light the page surface.
+    provider: { dark: "#ffffff0b", light: "#FFFFFF" },
+    // Google's own neutral border for the light theme, so the mark sits in a
+    // frame its guidelines allow rather than one merely close to it.
+    "provider-border": { dark: "#ffffff26", light: "#747775" },
+    // Light is Google's own near-black, not the page's, so the label reads as
+    // part of their button.
+    "provider-foreground": { dark: "#fafafa", light: "#1F1F1F" },
   },
   font: {
     family: {

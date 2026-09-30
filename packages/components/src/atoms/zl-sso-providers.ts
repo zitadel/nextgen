@@ -115,7 +115,7 @@ export class ZlSsoProviders extends LitElement {
       <zl-button
         part="provider"
         exportparts="root: provider-button"
-        hierarchy="secondary"
+        hierarchy="outline"
         size="medium"
         type="button"
         block
@@ -127,7 +127,7 @@ export class ZlSsoProviders extends LitElement {
       >
         ${mark
           ? html`<span slot="leading" class="zr-sso__mark"
-              ><zl-icon name=${mark} size="24" decorative></zl-icon
+              ><zl-icon name=${mark} size="16" decorative></zl-icon
             ></span>`
           : nothing}
         <span class="zr-sso__label">${this.labelFor(provider)}</span>

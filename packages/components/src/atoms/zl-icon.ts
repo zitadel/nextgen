@@ -42,11 +42,15 @@ import { surfaceStyles } from "../styles/index.js";
  *
  * Brand marks (`brand-*`) are the exception to "everything comes from
  * Lucide": Lucide carries no vendor logos, and a provider's mark is fixed
- * artwork whose colours are part of the brand, so it cannot be recoloured to
- * `currentColor`. They are inlined in {@link BRAND_GLYPHS} with their own
- * viewBox and self-coloured paths, and the wrapper drops the stroke styling
- * the Lucide set needs. Adding one — GitHub, Microsoft — is an entry there
- * plus a name in the union, nothing else.
+ * artwork, so it is inlined in {@link BRAND_GLYPHS} with its own viewBox and
+ * the wrapper drops the stroke styling the Lucide set needs. Adding one —
+ * GitHub, Microsoft — is an entry there plus a name in the union.
+ *
+ * Not every vendor's mark is multi-coloured, and the wrapper already covers
+ * both. The `<svg>` carries `fill="currentColor"`, so a monochrome mark —
+ * GitHub, Apple — is added with no `fill` on its paths and follows the label
+ * colour; a multi-coloured one — Google, Microsoft — states a fill per path
+ * and overrides it. Neither needs a flag on the entry.
  *
  * Accessibility: glyphs with an entry in {@link DEFAULT_LABELS} expose an
  * `aria-label` so they're meaningful when used standalone. When the icon
@@ -82,8 +86,10 @@ export class ZlIcon extends LitElement {
       "zr-icon--spin": this.spin,
     });
     const brand = BRAND_GLYPHS[this.name as BrandIconName];
-    // A brand mark paints itself: its own viewBox, its own fills, and no
-    // stroke — the Lucide styling would repaint it in the text colour.
+    // A brand mark paints itself: its own viewBox and no stroke, since the
+    // Lucide styling would repaint it in the text colour. `fill` stays
+    // `currentColor` so a monochrome mark follows the label; a multi-coloured
+    // one states a fill per path and overrides it.
     return html`
       <span class=${classes}>
         <svg

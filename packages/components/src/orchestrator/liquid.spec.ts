@@ -773,17 +773,20 @@ describe("provider error renders in the alert", () => {
         uri: "https://provider.example/e?x=1&y=2",
       },
     ]);
-    expect(out).toContain('class="zl-alert-detail"');
+    // Slots on `<zl-alert>`, not markup the templates style themselves: the
+    // atom owns the spacing and the muted colour, so a tenant template gets
+    // both without copying them.
+    expect(out).toContain('slot="detail"');
     expect(out).toContain("Cancelled at O&#39;Reilly.");
-    expect(out).toContain('class="zl-alert-link"');
+    expect(out).toContain('slot="link"');
     // The href is attribute-escaped, not raw browser-blue markup.
     expect(out).toContain("https://provider.example/e?x=1&amp;y=2");
   });
 
   it("renders neither row when the error carries no detail or uri", () => {
     const out = render([{ text_key: "error.invalid_credentials" }]);
-    expect(out).not.toContain("zl-alert-detail");
-    expect(out).not.toContain("zl-alert-link");
+    expect(out).not.toContain('slot="detail"');
+    expect(out).not.toContain('slot="link"');
   });
 });
 
