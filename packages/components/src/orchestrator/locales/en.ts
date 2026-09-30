@@ -179,7 +179,7 @@ export const en: Record<string, string> = {
   // Step: sso-conflict (that email already has an account here)
   // ═══════════════════════════════════════════════════════════════════════════
   "sso-conflict.title": "You already have an account",
-  "sso-conflict.description": "Sign in the way you usually do, and we'll connect the two",
+  "sso-conflict.description": "Sign in the way you usually do to continue",
   "sso-conflict.field.password": "Password",
   "sso-conflict.action.submit": "Sign in",
   "sso-conflict.action.passkey": "Use a passkey",

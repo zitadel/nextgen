@@ -19,11 +19,13 @@ export type MockSsoProvider = CreateFlow201StepSsoProvidersItem;
 // `sso_provider_id` and what the flow definition references.
 
 /**
- * Steps the engine attaches providers to: the ones a sign-in can start from.
- * `password` is reached only after an identifier, so it never carries them —
- * the same rule the CLI's generator applies when writing the flow file.
+ * Steps the engine attaches providers to, which is what the CLI's generator
+ * writes into the flow file: the two a sign-in can start from, plus the
+ * conflict step, where the buttons are how the user proves the account is
+ * theirs. `password` and `passkey-login` are reached only after an identifier,
+ * so they never carry them.
  */
-const PROVIDER_STEPS = new Set(["identifier", "register", "passkey-login"]);
+const PROVIDER_STEPS = new Set(["identifier", "register", "sso-conflict"]);
 
 let overlay: readonly MockSsoProvider[] = [];
 

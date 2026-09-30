@@ -167,7 +167,7 @@ export const de: Locale = {
   "register-sso.field.email": "E-Mail",
   "register-sso.action.submit": "Konto erstellen",
   "sso-conflict.title": "Sie haben bereits ein Konto",
-  "sso-conflict.description": "Melden Sie sich wie gewohnt an, dann verbinden wir beide",
+  "sso-conflict.description": "Melden Sie sich wie gewohnt an, um fortzufahren",
   "sso-conflict.field.password": "Passwort",
   "sso-conflict.action.submit": "Anmelden",
   "sso-conflict.action.passkey": "Passkey verwenden",

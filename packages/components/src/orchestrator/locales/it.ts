@@ -165,7 +165,7 @@ export const it: Locale = {
   "register-sso.field.email": "Email",
   "register-sso.action.submit": "Crea account",
   "sso-conflict.title": "Hai già un account",
-  "sso-conflict.description": "Accedi come fai di solito e li collegheremo",
+  "sso-conflict.description": "Accedi come fai di solito per continuare",
   "sso-conflict.field.password": "Password",
   "sso-conflict.action.submit": "Accedi",
   "sso-conflict.action.passkey": "Usa una passkey",
