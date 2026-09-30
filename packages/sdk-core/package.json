@@ -20,6 +20,7 @@
     "build": "tsc -p tsconfig.lib.json",
     "typecheck": "tsc --build tsconfig.json",
     "test": "vitest run",
+    "test:all": "pnpm run test",
     "lint": "eslint ."
   },
   "exports": {

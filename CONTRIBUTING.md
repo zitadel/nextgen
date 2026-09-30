@@ -262,9 +262,10 @@ dependencies, then picks one of two modes via `scripts/ci-mode.mjs`:
 **Full mode** (normal PRs) runs, in order:
 
 - `moon run server:check-generate` — Go generated-file drift check.
-- Playwright Chromium install for the e2e suites and journeys (the browser
-  `:test-browser` lanes are `runInCI: false` and install their own Chromium via a
-  moon dep when run locally).
+- Playwright Chromium install for the `:test` graph, the e2e suites and the
+  journeys. The `components`/`api-mock` browser projects run in CI as part of
+  their `:test` task (via `test:all`), each pulling in Chromium through a moon
+  `install-browsers` dep.
 - `moon ci :lint :typecheck :build :test :check-adrs`.
 - `moon run server:test`, then `moon run server:test-postgres`,
   `moon run server:test-spanner` (Spanner emulator testcontainer), and

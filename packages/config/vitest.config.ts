@@ -7,7 +7,9 @@ export default defineConfig({
     ...baseTest,
     name: "@zitadel/config",
     environment: "node",
-    // meta-schemas are copied by the shared root global setup (inherited from
-    // baseTest); the moon `sync-schemas` dep still covers the build/typecheck graph.
+    // meta-schemas are synced before Vitest runs, not by a global setup: the
+    // `pretest` lifecycle hook (`pnpm run sync-schemas`) covers a direct
+    // `pnpm test` / `pnpm test:all`, and the moon `sync-schemas` dep
+    // (mutex: generated-sources) covers the moon graph.
   },
 });

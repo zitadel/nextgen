@@ -37,6 +37,7 @@
     "dev": "tsup src/index.ts src/server.ts --format esm --dts --watch",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:all": "pnpm run test",
     "lint": "eslint ."
   },
   "dependencies": {

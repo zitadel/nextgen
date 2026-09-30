@@ -30,11 +30,12 @@ const sourceDir = join(packageRoot, "../..", "api/openapi/endpoints/schemas");
 const targetDir = join(packageRoot, "meta-schemas");
 
 /**
- * Perform the copy. Exported so the Vitest global setup can call it directly —
- * running `vitest` alone must not depend on a separate script being chained
- * first — while `build`/`typecheck`/`sync-schemas` still invoke this file's CLI.
+ * Perform the copy. There is no Vitest global setup: this runs ahead of build,
+ * typecheck and test through the package's `pre*` lifecycle hooks (which invoke
+ * this file's CLI below) and through the moon `sync-schemas` task, which holds
+ * the `generated-sources` mutex so it never reads a half-generated source tree.
  */
-export function syncMetaSchemas() {
+function syncMetaSchemas() {
   const files = readdirSync(sourceDir).filter((name) => name.endsWith(".json")).sort();
   if (files.length === 0) {
     throw new Error(`no meta-schemas found in ${sourceDir}`);

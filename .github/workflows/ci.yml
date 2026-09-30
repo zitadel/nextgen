@@ -83,17 +83,19 @@ jobs:
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' }}
         run: moon run server:check-generate-pruned
 
-      # Chromium for the e2e suites and journeys (the browser `:test` lanes are
-      # runInCI:false — opt-in local checks — so they never run here).
+      # Chromium for the whole `moon ci :test` graph. The components/api-mock
+      # browser projects now run as part of their `:test` task (via `test:all`),
+      # so a full run always needs Chromium — not only browser-affected PRs.
+      # The e2e suites and journeys reuse the same cached download.
       - name: Cache Playwright browsers
-        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.browsers == 'true' }}
+        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install Playwright Chromium
-        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.browsers == 'true' }}
+        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
         run: corepack pnpm --filter @zitadel/components exec playwright install chromium
 
       - name: Run Moon build and test graph

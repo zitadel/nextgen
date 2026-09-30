@@ -168,9 +168,12 @@ trade-offs, browser quirks, or constraints the code itself can't convey.
 
 Two Vitest projects, one config (`vitest.config.ts`):
 
-- `unit` — `jsdom`. Default; what `pnpm test` runs.
-- `browser` — Chromium via `@vitest/browser-playwright`. Run with
+- `unit` — `jsdom`. The fast local lane; what `pnpm test` runs.
+- `browser` — Chromium via `@vitest/browser-playwright`. Run alone with
   `pnpm test:browser`. Tests in `*.browser.spec.ts` only.
+
+Both run together in CI via `pnpm test:all` (what `moon run components:test`
+invokes), producing one aggregated junit.xml.
 
 Always cover form-associated behaviour, focus delegation, and Enter-to-submit
 in the browser project. Anything markup-only (aria attributes, classes, slot
@@ -183,10 +186,11 @@ resolves the whole workspace from source (`resolve.conditions:
 ["@zitadel/source"]`). On a cold run Vite pre-bundles a large graph (`lit`, the
 generated `@zitadel/api` client, `dompurify`, `liquidjs`) **before the first
 test**: that warm-up is 60–120s+ and variable, while the tests themselves run in
-~1s. With a warm `node_modules/.vite` cache the same run finishes in seconds. It
-is intentionally `runInCI: false` in `moon.yml` — a heavy, opt-in local check,
-not part of the default loop (`moon ci :lint :typecheck :build :test` runs only
-the jsdom `unit` project).
+~1s. With a warm `node_modules/.vite` cache the same run finishes in seconds. CI
+pays this cold start deliberately: `moon ci :... :test` runs `test:all` (both
+projects), and the `components:test` task pulls in Chromium via an
+`install-browsers` moon dep. Locally, `pnpm test` stays on the fast jsdom
+`unit` project.
 
 What actually makes it look stuck, and how to avoid it:
 
@@ -204,7 +208,7 @@ What actually makes it look stuck, and how to avoid it:
 - **Run it directly and patiently**, expecting a slow first run then fast reruns:
 
   ```sh
-  corepack pnpm --filter @zitadel/components test:browser   # or: moon run components:test-browser
+  corepack pnpm --filter @zitadel/components test:browser
   ```
 
 - For a single file: `corepack pnpm --filter @zitadel/components exec vitest run --project browser <name>`.

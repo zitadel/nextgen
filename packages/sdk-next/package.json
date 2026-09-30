@@ -57,6 +57,7 @@
     "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && tsc -p tsconfig.build.json && node -e \"require('node:fs').copyFileSync('src/jsx.d.ts', 'dist/jsx.d.ts')\"",
     "typecheck": "tsc --build tsconfig.json",
     "test": "vitest run",
+    "test:all": "pnpm run test",
     "lint": "eslint ."
   },
   "dependencies": {

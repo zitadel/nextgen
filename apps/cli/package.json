@@ -80,6 +80,7 @@
     "typecheck": "tsc --build tsconfig.app.json",
     "pretest": "pnpm run build",
     "test": "vitest run",
+    "test:all": "pnpm run test",
     "readme": "oclif readme",
     "prepack": "tsdown && oclif manifest",
     "postpack": "rm -f oclif.manifest.json"

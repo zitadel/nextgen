@@ -7,13 +7,14 @@ import { baseTest, sourceConditions } from "../../vitest.shared.mjs";
  * Two projects in one config, selected per lane (no separate config files):
  *
  * - `unit` (node): the canonical contract test for the mock handlers against
- *   `msw/node`'s `setupServer`. The default `test` = `vitest run --project unit`,
- *   and the CI gate.
+ *   `msw/node`'s `setupServer`. The fast local `test` = `vitest run --project
+ *   unit`.
  * - `browser` (real Chromium via Playwright): smoke-tests `setupMock(worker)`
- *   against `msw/browser`. The opt-in `test:browser` = `vitest run --project
- *   browser` (`runInCI: false`).
+ *   against `msw/browser`. Local-only selector `test:browser` = `vitest run
+ *   --project browser`.
  *
- * `test:all` = `vitest run` runs both in one process.
+ * The CI gate is `test:all` = `vitest run`, which runs both projects in one
+ * process and emits one aggregated junit.xml.
  */
 export default defineConfig({
   resolve: { conditions: sourceConditions },

@@ -25,28 +25,24 @@ tasks:
       - "api:build"
       - "config:build"
 
-  # Chromium for the opt-in browser lane (self-contained, like storybook).
+  # Chromium for the browser project. Self-contained (like storybook): the
+  # `test` task depends on it so `moon ci :test` provisions it in CI.
   install-browsers:
     command: "corepack pnpm exec playwright install chromium"
     options:
       cache: false
 
-  # Default, fast lane: the node `unit` project only (the CI gate).
+  # Full lane (the CI gate): `test:all` runs the node `unit` project and the
+  # real-Chromium `browser` smoke test in one Vitest process, so both land in
+  # one aggregated junit.xml. moon invokes `test:all` uniformly across every
+  # package. The fast unit-only lane is `pnpm test` for local iteration;
+  # `pnpm test:browser` runs the browser project alone.
   test:
-    command: "corepack pnpm run test"
-    deps:
-      - "api:build"
-      - "config:build"
-
-  # Heavy, opt-in browser smoke test (real Chromium). runInCI:false by design.
-  test-browser:
-    command: "corepack pnpm run test:browser"
+    command: "corepack pnpm run test:all"
     deps:
       - "install-browsers"
       - "api:build"
       - "config:build"
-    options:
-      runInCI: false
 
   start:
     command: "corepack pnpm run start"
