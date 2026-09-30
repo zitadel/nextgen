@@ -40,9 +40,17 @@ import {
   recoverStep,
   registerPasswordStep,
   registerStep,
+  registerSsoStep,
+  ssoConflictStep,
   ssoRedirectStep,
 } from "./fixtures/login.js";
-import { startFlowActor, type FlowActor, type FlowStepName } from "./flow-machine.js";
+import {
+  startFlowActor,
+  type FlowActor,
+  type FlowStepName,
+  type SsoOutcome,
+} from "./flow-machine.js";
+import { SsoIdentityStore } from "./lib/sso-identities.js";
 import { AuthnStore, type PasskeyProof } from "./lib/authn/index.js";
 
 export type CapturedRequest =
@@ -83,11 +91,37 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
   let actor: FlowActor = startFlowActor();
   let captured: CapturedRequest[] = [];
   const authn = new AuthnStore();
+  // Which emails this mock has already seen arrive through a provider. The
+  // engine keys links on the provider's subject; see SsoIdentityStore for why
+  // the mock keys on email.
+  const ssoIdentities = new SsoIdentityStore();
+
+  /**
+   * Which branch the provider's return takes.
+   *
+   * A link this provider has seen signs the user straight in. An email that
+   * already has an account here, but no link, is the collision: the account
+   * exists and the provider must not silently mint a second one. Anything else
+   * is a new external identity.
+   */
+  function resolveSsoOutcome(slug: string | null, email: string | undefined): SsoOutcome {
+    if (!slug || !email) {
+      return "identity_unknown";
+    }
+    if (ssoIdentities.isLinked(slug, email)) {
+      return "callback";
+    }
+    return authn.hasAccount(email) ? "user_already_exists" : "identity_unknown";
+  }
 
   function reset(): void {
     actor = startFlowActor();
     captured = [];
     authn.clear();
+    // Links too: a caller asking for a clean mock must not inherit an email
+    // that a previous test signed up through a provider, which would turn the
+    // next first-time sign-in into a straight sign-in.
+    ssoIdentities.clear();
   }
 
   function registerCredential(userHandle: string, credentialId: string): void {
@@ -133,6 +167,10 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
         return withBranding(passkeyLoginStep(input));
       case "sso-redirect":
         return withBranding(ssoRedirectStep(input));
+      case "register-sso":
+        return withBranding(registerSsoStep(input));
+      case "sso-conflict":
+        return withBranding(ssoConflictStep(input));
       case "done":
         return withBranding(await doneStep(input));
       default:
@@ -235,12 +273,29 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
         return { ...base, step: { ...step, error: passkeyLoginErrorKey } };
       }
 
-      const baseFields = (body.fields ?? {}) as Record<string, string>;
+      const submitted = loginCred ? { ...fields, email: loginCred.userHandle } : fields;
+      const provider = snapshot.context.ssoProviderId;
+      // Leaving the provider, nothing has resolved yet. Coming back from it,
+      // the identity decides where the flow goes — the lookup the engine does
+      // before it picks a branch.
+      const ssoOutcome =
+        before === "sso-redirect"
+          ? resolveSsoOutcome(provider, submitted.email ?? snapshot.context.capturedFields.email)
+          : null;
+      // Registering through a provider is what creates the link, so it is
+      // recorded when the step that mints the account submits.
+      if (before === "register-sso" && body.action !== "sign_in") {
+        const linkEmail = submitted.email ?? snapshot.context.capturedFields.email;
+        if (provider && linkEmail) {
+          ssoIdentities.link(provider, linkEmail);
+        }
+      }
       actor.send({
         type: "SUBMIT",
         action: body.action,
-        fields: loginCred ? { ...baseFields, email: loginCred.userHandle } : baseFields,
+        fields: submitted,
         sso_provider_id: body.sso_provider_id ?? null,
+        sso_outcome: ssoOutcome,
       });
       return currentResponse();
     }),
