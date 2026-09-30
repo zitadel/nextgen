@@ -8,14 +8,16 @@ import { liquidRaw } from "./vite-liquid-plugin.js";
 const sharedPlugins = () => [liquidRaw()];
 
 /**
- * One config, two projects, run together by a single `vitest run` (the `test`
- * task) — one aggregated junit, no per-lane scripts or CLI flags:
+ * Two projects in one config, selected per lane (no separate config files):
  *
- * - `unit` (jsdom): the bulk of the suite. Skips the form-associated custom
- *   element checks that jsdom 29 only partially implements.
- * - `browser` (real Chromium via Playwright): the `*.browser.spec.ts` files —
- *   form participation, Enter-to-submit, focus management. Needs a Playwright
- *   Chromium install.
+ * - `unit` (jsdom): the bulk of the suite; the default `test` = `vitest run
+ *   --project unit`, and the CI gate. Skips the form-associated custom-element
+ *   checks that jsdom 29 only partially implements.
+ * - `browser` (real Chromium via Playwright): `*.browser.spec.ts` — form
+ *   participation, Enter-to-submit, focus management. The opt-in `test:browser`
+ *   = `vitest run --project browser` (heavy cold start, `runInCI: false`).
+ *
+ * `test:all` = `vitest run` runs both in one process.
  */
 export default defineConfig({
   plugins: sharedPlugins(),

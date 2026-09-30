@@ -4,13 +4,16 @@ import { defineConfig } from "vitest/config";
 import { baseTest, sourceConditions } from "../../vitest.shared.mjs";
 
 /**
- * One config, two projects, run together by a single `vitest run` (the `test`
- * task) — one aggregated junit, no per-lane scripts or CLI flags:
+ * Two projects in one config, selected per lane (no separate config files):
  *
- * - `unit` (node): the canonical contract test for the mock handlers, against
- *   `msw/node`'s `setupServer`.
- * - `browser` (real Chromium via Playwright): smoke-tests the `setupMock(worker)`
- *   entry against `msw/browser`. Needs a Playwright Chromium install.
+ * - `unit` (node): the canonical contract test for the mock handlers against
+ *   `msw/node`'s `setupServer`. The default `test` = `vitest run --project unit`,
+ *   and the CI gate.
+ * - `browser` (real Chromium via Playwright): smoke-tests `setupMock(worker)`
+ *   against `msw/browser`. The opt-in `test:browser` = `vitest run --project
+ *   browser` (`runInCI: false`).
+ *
+ * `test:all` = `vitest run` runs both in one process.
  */
 export default defineConfig({
   resolve: { conditions: sourceConditions },

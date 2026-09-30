@@ -82,8 +82,11 @@
   },
   "scripts": {
     "sync-schemas": "node scripts/sync-meta-schemas.mjs",
-    "build": "node scripts/sync-meta-schemas.mjs && tsdown",
-    "typecheck": "node scripts/sync-meta-schemas.mjs && tsc --build tsconfig.json",
+    "prebuild": "pnpm run sync-schemas",
+    "build": "tsdown",
+    "pretypecheck": "pnpm run sync-schemas",
+    "typecheck": "tsc --build tsconfig.json",
+    "pretest": "pnpm run sync-schemas",
     "test": "vitest run",
     "lint": "oxlint ."
   },

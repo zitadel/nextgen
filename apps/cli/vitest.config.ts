@@ -8,10 +8,8 @@ export default defineConfig({
     name: "@zitadel/cli",
     environment: "node",
     include: ["tests/**/*.test.ts"],
-    // Build the oclif dist the integration suite drives before any test runs,
-    // so `vitest run` is self-contained (package-local setup, no cross-package
-    // coupling). This also keeps the built CLI fresh rather than depending on a
-    // possibly-stale cached build.
-    globalSetup: ["tests/helpers/global-setup.ts"],
+    // The oclif dist the integration suite drives is built by the `pretest`
+    // hook (`pnpm run build`), so a direct `pnpm test` and a moon run are both
+    // self-contained with a fresh build. Same lifecycle-hook pattern as config.
   },
 });
