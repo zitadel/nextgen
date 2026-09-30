@@ -11,6 +11,7 @@ import { annotateAssetWarnings } from "./asset-probe.js";
 import { validatePlannedFlows } from "./flow-validation.js";
 import type { PlanResourceChange } from "./plan-renderer.js";
 import { readState, removeFromState, updateState } from "./state.js";
+import { FatalFetchError } from "./types.js";
 import type { FlowRepin, ResourceEntry, ResourceSyncer, SyncAction } from "./types.js";
 
 /**
@@ -109,6 +110,9 @@ export async function buildSyncPlan(
         try {
           oldContent = await syncer.fetch(entry.id);
         } catch (err) {
+          if (err instanceof FatalFetchError) {
+            throw err.reason;
+          }
           consola.debug(`fetch ${syncer.kind} ${entry.id} failed:`, err);
         }
       }
@@ -519,6 +523,10 @@ async function fetchOldIfAsked(
   try {
     return await syncer.fetch(id);
   } catch (err) {
+    // A syncer that refused on purpose is not a fetch that merely failed.
+    if (err instanceof FatalFetchError) {
+      throw err.reason;
+    }
     consola.debug(`fetch ${syncer.kind} ${id} failed:`, err);
     return null;
   }

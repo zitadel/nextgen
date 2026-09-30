@@ -15,6 +15,8 @@ import {
   writeBackResource,
 } from "../../../../src/lib/sync/loop";
 import { makeSyncers } from "../../../../src/lib/sync/syncers";
+import { FatalFetchError } from "../../../../src/lib/sync/types";
+import { ZitadelError } from "../../../../src/lib/errors";
 import type { ResourceSyncer } from "../../../../src/lib/sync/syncers";
 
 const client = createZitadelClient({ baseUrl: "http://test.local" });
@@ -257,6 +259,30 @@ describe("buildSyncPlan", () => {
       if (actions[0].kind === "delete") {
         expect(actions[0].oldContent).toEqual(fetchedContent);
       }
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("propagates a fatal fetch refusal instead of planning without a diff", async () => {
+    // The swallow above is right for a network error and wrong for a syncer
+    // that refused on purpose -- degrading that to "no diff" would hide the
+    // reason it refused.
+    const cwd = makeCwd();
+    try {
+      await writeState(cwd, {
+        framework: "next",
+        resources: { ".zitadel/schemas/old.json": { id: "old-id", hash: "abc" } },
+      });
+      await mkdir(join(cwd, ".zitadel/schemas"), { recursive: true });
+
+      const refusal = new ZitadelError("E_VALIDATION", "the response held a secret");
+      const fetchFn = vi.fn().mockRejectedValue(new FatalFetchError(refusal));
+      const syncer = makeSyncer({ fetch: fetchFn });
+
+      await expect(buildSyncPlan(cwd, [syncer], true)).rejects.toThrow(
+        /the response held a secret/,
+      );
     } finally {
       await rm(cwd, { recursive: true, force: true });
     }

@@ -32,6 +32,7 @@ import { IDPS_DIR } from "../idp";
 import { SCHEMAS_DIR } from "../user-schema";
 import { ZitadelError } from "../errors";
 import { isObject } from "../json";
+import { FatalFetchError } from "./types.js";
 import type { ResourceSyncer } from "./types.js";
 
 /** Runtime environment lookup used to resolve `${VAR}` / `*_env` references. */
@@ -88,12 +89,17 @@ function refuseResolvedSecret(definition: object, id: string): void {
     }
     const stored = block.client_secret;
     if (typeof stored === "string" && !isVariableReference(stored)) {
-      throw new ZitadelError("E_VALIDATION", `${id} came back holding a client_secret value`, {
-        hint:
-          "A stored connection must keep the ${{ NAME }} reference. Report this: the read " +
-          "endpoint is resolving secrets, and a plan would print one.",
-        details: { id, block: key },
-      });
+      // Fatal rather than a fetch that failed: the planner swallows an
+      // ordinary failure and plans without a diff, which would turn a server
+      // resolving secrets into a silently missing before/after.
+      throw new FatalFetchError(
+        new ZitadelError("E_VALIDATION", `${id} came back holding a client_secret value`, {
+          hint:
+            "A stored connection must keep the ${{ NAME }} reference. Report this: the read " +
+            "endpoint is resolving secrets, and a plan would print one.",
+          details: { id, block: key },
+        }),
+      );
     }
   }
 }

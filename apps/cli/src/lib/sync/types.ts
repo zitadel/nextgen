@@ -85,6 +85,27 @@ export type ZitadelState = {
  * and base URL come from `@zitadel/api/runtime/{auth,base-url}` module-globals
  * the command layer sets at boot.
  */
+/**
+ * A fetch failure the planner must not degrade into "no diff".
+ *
+ * Fetching old content is best effort: a resource the server cannot hand back
+ * just plans without a before/after, which is right for a timeout, a 404, or an
+ * endpoint that does not exist yet. It is wrong for a refusal that exists to
+ * protect the developer — a syncer that stopped because the response would have
+ * put a credential in the preview must stop the plan, not quietly lose the
+ * diff and leave the server's behaviour unreported.
+ *
+ * Wrapping rather than flagging: the planner cannot otherwise tell this apart
+ * from the ordinary failures it is right to swallow, and a `ZitadelError` alone
+ * does not say which it is.
+ */
+export class FatalFetchError extends Error {
+  constructor(readonly reason: Error) {
+    super(reason.message);
+    this.name = "FatalFetchError";
+  }
+}
+
 export interface ResourceSyncer {
   readonly kind: string;
   readonly directory: string;

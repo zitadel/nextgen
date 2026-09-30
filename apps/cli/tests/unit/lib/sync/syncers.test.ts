@@ -9,6 +9,7 @@ import { FLOWS_DIR } from "../../../../src/lib/flows";
 import { IDPS_DIR } from "../../../../src/lib/idp";
 import { SCHEMAS_DIR } from "../../../../src/lib/user-schema";
 import { makeSyncers } from "../../../../src/lib/sync/syncers";
+import { FatalFetchError } from "../../../../src/lib/sync/types";
 import { ZitadelError } from "../../../../src/lib/errors";
 
 /**
@@ -653,7 +654,25 @@ describe("IdpConnectionSyncer", () => {
     );
     const [, idp] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
 
-    await expect(idp.fetch?.("idp_1")).rejects.toMatchObject({ code: "E_VALIDATION" });
+    await expect(idp.fetch?.("idp_1")).rejects.toMatchObject({
+      reason: { code: "E_VALIDATION" },
+    });
+  });
+
+  it("raises a resolved secret as fatal, so the planner cannot swallow it", async () => {
+    // fetchOldIfAsked degrades an ordinary fetch failure to "no diff". That
+    // is right for a timeout and wrong here: it would turn a server that
+    // resolves secrets into a silently missing before/after.
+    const resolved = {
+      ...connection,
+      oidc: { ...connection.oidc, client_secret: "GOCSPX-a-real-secret" },
+    };
+    server.use(
+      http.get(`${BASE}/idps/idp_1`, () => HttpResponse.json({ id: "idp_1", definition: resolved })),
+    );
+    const [, idp] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
+
+    await expect(idp.fetch?.("idp_1")).rejects.toBeInstanceOf(FatalFetchError);
   });
 
   it("create posts the document under the project and keeps the returned id", async () => {
