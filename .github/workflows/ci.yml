@@ -164,64 +164,23 @@ jobs:
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.snapshot == 'true' }}
         run: env -u CI -u GITHUB_ACTIONS moon run release:snapshot -- --skip-container
 
-      # journey_matrix=single collapses the framework matrix to Next when no
-      # SDK, CLI, or journey surface moved — the flow widget is
+      # The journey runner parallelizes the four CI variants (fresh-app matrix,
+      # passkey preset, pre-existing app, testkit) internally through its own
+      # concurrency pool, so a single process shares one port pool and one work
+      # dir instead of four orchestrated CI steps racing for ports.
+      # journey_matrix=single collapses the fresh-app framework matrix to Next
+      # when no SDK, CLI, or journey surface moved — the flow widget is
       # framework-independent, so a server-only change proves as much on one
       # framework as on the full matrix (apps/cli-journey-e2e/scripts/frameworks.mjs).
-      - name: Run binary fresh-app journey
-        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.journey_fresh_app == 'true' }}
-        env:
-          JOURNEY_MATRIX: ${{ steps.ci-mode.outputs.journey_matrix }}
+      - name: Run journey e2e lanes
+        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.snapshot == 'true' }}
         run: |
           version="$(node -p "require('./apps/server/package.json').version")"
-          matrix_args=()
-          if [ "$JOURNEY_MATRIX" = "single" ]; then
-            matrix_args=(--framework next)
-          fi
           env -u CI -u GITHUB_ACTIONS moon run cli-journey-e2e:e2e-local -- \
+            --ci \
+            --matrix "${{ steps.ci-mode.outputs.journey_matrix }}" \
             --runtime binary \
-            --concurrency 5 \
-            "${matrix_args[@]}" \
             --work-dir "${RUNNER_TEMP}/ci-journey" \
-            --tarballs-dir "dist/release/${version}/npm"
-
-      # One framework is enough here: the preset decides the scaffolded
-      # flow shape, not the SDK — the matrix above already covers SDKs.
-      - name: Run passkey-first preset journey
-        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.journey_passkey == 'true' }}
-        run: |
-          version="$(node -p "require('./apps/server/package.json').version")"
-          env -u CI -u GITHUB_ACTIONS moon run cli-journey-e2e:e2e-local -- \
-            --runtime binary \
-            --framework next \
-            --preset passkey-first \
-            --work-dir "${RUNNER_TEMP}/ci-journey-passkey-first" \
-            --tarballs-dir "dist/release/${version}/npm"
-
-      # The ADR 044 widget posture end to end: seed minimal pre-existing Next
-      # and Nuxt apps, run setup against them, and drive the auth loop through
-      # the emitted variant="widget" pages inside the host apps' own shells.
-      # Fresh scaffolds keep covering the page posture in the matrix above.
-      - name: Run pre-existing-app journey
-        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.journey_preexisting == 'true' }}
-        run: |
-          version="$(node -p "require('./apps/server/package.json').version")"
-          env -u CI -u GITHUB_ACTIONS moon run cli-journey-e2e:e2e-local -- \
-            --runtime binary \
-            --preexisting-app \
-            --work-dir "${RUNNER_TEMP}/ci-journey-preexisting" \
-            --tarballs-dir "dist/release/${version}/npm"
-
-      # Customer-configuration proof for @zitadel/testing: a fresh app
-      # installs the kit from the journey registry and runs its withZitadel()
-      # suite against the published binary — embedded UIs, no repo env
-      # overrides (unlike the in-repo e2e-real lanes below).
-      - name: Run test-kit consumer journey
-        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.journey_testkit == 'true' }}
-        run: |
-          version="$(node -p "require('./apps/server/package.json').version")"
-          env -u CI -u GITHUB_ACTIONS moon run cli-journey-e2e:e2e-testkit -- \
-            --work-dir "${RUNNER_TEMP}/ci-journey-testkit" \
             --tarballs-dir "dist/release/${version}/npm"
 
       # Gates the test-kit's central promise: boot a real seeded instance,
@@ -281,11 +240,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: journey-diagnostics
-          path: |
-            ${{ runner.temp }}/ci-journey/diagnostics
-            ${{ runner.temp }}/ci-journey-passkey-first/diagnostics
-            ${{ runner.temp }}/ci-journey-preexisting/diagnostics
-            ${{ runner.temp }}/ci-journey-testkit/diagnostics
+          path: ${{ runner.temp }}/ci-journey/diagnostics
           if-no-files-found: ignore
           retention-days: 7
 

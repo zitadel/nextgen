@@ -37,7 +37,9 @@ test("is reached from the sidebar, nested under the flows it brands", async ({
 }) => {
   await signIn(page, zitadel.handle, await seed.user());
 
-  await page.goto("/projects");
+  // The sidebar lists a project's screens once one is selected; `/` selects
+  // this lane's pinned project and lands on its first screen.
+  await page.goto("/");
 
   // Branding is a sub-row of Login flows, as the design nests it: it is how
   // those flows render rather than a destination of its own.
@@ -51,7 +53,7 @@ test("is reached from the sidebar, nested under the flows it brands", async ({
   await expect(branding).toBeVisible();
   await branding.click();
 
-  await expect(page).toHaveURL(/\/branding$/);
+  await expect(page).toHaveURL(/\/branding\?project=/);
 
   // The selector lists the project's own flows, so it comes from the instance
   // rather than a fixed set. A real instance is what proves the label is the

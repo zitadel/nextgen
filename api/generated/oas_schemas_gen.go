@@ -5955,14 +5955,15 @@ type Branding struct {
 	// editor validates and autocompletes it. The CLI strips it before upload;
 	// the platform ignores it.
 	Schema OptString `json:"$schema"`
-	// Degrade preset (`centered` or `split`) the bundled default template
-	// branches on, and the fallback when a custom template fails validation.
+	// Layout preset the revision declares, `centered` or `split`. It is
+	// validated on publish and handed to the template as `branding.layout`.
+	// The bundled default template does not read it, so changing it alone
+	// changes nothing on screen, and it is not an appearance control.
 	// Not a design catalog: the ejectable designs (`centered`, `minimal`)
-	// ship as templates and map onto one of
-	// these two values; switch designs with
+	// ship as templates and both carry `centered`; switch designs with
 	// `zitadel branding eject --design <name>` instead of editing this field.
-	// Ejected templates may ignore it. Selects a template rather than restyling
-	// the widget, so it is not an appearance control.
+	// `split` is carried by revisions published from the earlier split
+	// designs.
 	Layout OptBrandingLayout `json:"layout"`
 	// The LiquidJS template for rendering this step. The orchestrator renders
 	// it into its Shadow DOM with the capability dictionaries as context.
@@ -5971,7 +5972,8 @@ type Branding struct {
 	// `theme.dark.logo_url` is set. Prefer the per-side marks — one file
 	// cannot serve both surfaces.
 	LogoURL OptURI `json:"logo_url"`
-	// Hero/background image URL, used by the split layout.
+	// Hero image URL, for templates that reference `branding.hero_url`. The
+	// bundled default template does not use it.
 	HeroURL    OptURI                `json:"hero_url"`
 	Theme      OptBrandingTheme      `json:"theme"`
 	Typography OptBrandingTypography `json:"typography"`
@@ -6554,14 +6556,15 @@ func (s *BrandingCreatedPayload) SetHeroURL(val OptString) {
 	s.HeroURL = val
 }
 
-// Degrade preset (`centered` or `split`) the bundled default template
-// branches on, and the fallback when a custom template fails validation.
+// Layout preset the revision declares, `centered` or `split`. It is
+// validated on publish and handed to the template as `branding.layout`.
+// The bundled default template does not read it, so changing it alone
+// changes nothing on screen, and it is not an appearance control.
 // Not a design catalog: the ejectable designs (`centered`, `minimal`)
-// ship as templates and map onto one of
-// these two values; switch designs with
+// ship as templates and both carry `centered`; switch designs with
 // `zitadel branding eject --design <name>` instead of editing this field.
-// Ejected templates may ignore it. Selects a template rather than restyling
-// the widget, so it is not an appearance control.
+// `split` is carried by revisions published from the earlier split
+// designs.
 type BrandingLayout string
 
 const (
@@ -7035,8 +7038,10 @@ func NewIntBrandingShapeRadius(v int) BrandingShapeRadius {
 // Publishing one side makes it the only theme that resolves, even under `auto`
 // or an operating-system preference for the other. Publishing both lets `auto`
 // follow the operating system, each side using its own logo and palette.
-// The element-level `theme` property overrides `mode`, but cannot select a
-// side the project never published.
+// The element-level `theme` property overrides `mode`. When one side is
+// published it cannot select the other. Publishing neither side leaves
+// `mode`, the `theme` property and the operating system to pick one, painted
+// with the maintained defaults.
 // Ref: #
 type BrandingTheme struct {
 	// Which published side may run. `auto` follows the operating system.
@@ -7125,8 +7130,10 @@ func (s *BrandingThemeMode) UnmarshalText(data []byte) error {
 }
 
 // One complete theme side. Light and dark are independent surfaces — neither
-// inherits from the other, and a side that is absent is never used, whatever
-// `mode` or the operating system asks for.
+// inherits from the other. When a revision publishes one side, the absent
+// side is never used, whatever `mode` or the operating system asks for. When
+// it publishes neither, either side can resolve and paints the maintained
+// defaults.
 // Ref: #
 type BrandingThemeSide struct {
 	// The mark for this surface. A logo is never recoloured, so each side
@@ -7171,9 +7178,10 @@ type BrandingTypography struct {
 	// example. Must be https; unlike the logo and hero assets there is no
 	// loopback carve-out. Rejected without `font_family`, which would name
 	// nothing to paint with.
-	// Stored but not applied to an embedded widget: the embedding page loads
-	// the face, and Zitadel does not inject a stylesheet into a document it
-	// does not own.
+	// Loaded only when the login component runs as `variant="page"`, the
+	// full-page login. In the default `variant="widget"` it is stored but not
+	// loaded: the component injects no stylesheet, and the embedding page
+	// loads the face.
 	FontURL OptURI `json:"font_url"`
 	// Multiplier on the base text sizes, `1` when omitted.
 	Scale OptFloat64 `json:"scale"`
