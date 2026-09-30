@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -20,7 +21,10 @@ import (
 )
 
 const (
-	flowCookieName          = "_zflow"
+	flowCookieName = "_zflow"
+	// ssoSubmitAction is the reserved action that starts an external sign-in
+	// (`flow-submit-request.yaml`).
+	ssoSubmitAction         = "sso"
 	flowCookieMaxAgeSeconds = 600
 )
 
@@ -123,6 +127,48 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 	}
 	if id, ok := req.SSOProviderID.Get(); ok {
 		submitReq.SSOProviderID = &id
+		// Stub: the engine cannot start an external sign-in yet, so the
+		// authorize redirect is answered here instead (see idp_sso_stub.go).
+		// Delete this branch with that file.
+		if req.Action == ssoSubmitAction {
+			origin := ""
+			if o, ok := params.Origin.Get(); ok {
+				origin = o.String()
+			} else if h, ok := requestOriginFromContext(ctx); ok {
+				origin = h
+			}
+			// The origin decides the redirect_uri handed to the provider and
+			// where the callback sends the browser afterwards, and it comes
+			// from a client header. Unchecked it is an open redirect and a way
+			// to have the provider deliver the authorization code elsewhere.
+			//
+			// Fails closed, unlike the passkey check below: that one degrades
+			// to a bad ceremony when a project registered no origins, this one
+			// would degrade to code exfiltration. A project with no registered
+			// origin cannot start an external sign-in at all.
+			project, err := h.projectService.Get(ctx, state.ProjectID)
+			if err != nil {
+				return nil, domain.ErrInternal(err)
+			}
+			if origin == "" || len(project.PreviewOrigins) == 0 {
+				return nil, domain.ErrRequestInvalid().WithMessage(
+					"external sign-in needs the app's origin registered with the project")
+			}
+			if err := validateOriginAgainstProject(origin, project); err != nil {
+				return nil, domain.ErrRequestInvalid().WithMessage(err.Error())
+			}
+			step, bindingCookie, err := h.ssoAuthorizeStep(ctx, state, id, origin)
+			if err != nil {
+				return nil, normalizeFlowError(err)
+			}
+			// The binding cookie takes the response's one cookie slot: the
+			// flow state is unchanged by this leg and is held server-side
+			// until the callback, so there is nothing to re-seal here.
+			return &api.SubmitFlowStepOK{
+				SetCookie: api.NewOptString(bindingCookie),
+				Response:  h.buildFlowResponse(ctx, domain.FlowStepResult{State: state, Step: step}, false),
+			}, nil
+		}
 	}
 	if cr, ok := req.ChallengeResponse.Get(); ok {
 		var proof []byte
@@ -209,12 +255,59 @@ func (h *Handler) GetFlowStep(ctx context.Context, params api.GetFlowStepParams)
 	if err != nil {
 		return nil, err
 	}
+	if pending := state.PendingHandoff; pending != nil {
+		// The flow finished while the browser was at the identity provider,
+		// so this GET is the response that completion never got: the token
+		// could not ride a redirect, and it waited in the sealed cookie.
+		//
+		// This read does not clear the cookie -- a GET has no Set-Cookie in
+		// the contract -- so a repeat of this request hands out the same
+		// token again. That is safe because the token itself is single use
+		// (see AuthAttemptService.Handoff): the second exchange is refused.
+		// Re-minting per GET is what would not be safe, and is why the
+		// completion is stored rather than recomputed.
+		if result.Step != nil {
+			kind := pending.Complete
+			result.Step.Complete = &kind
+		}
+		result.HandoffToken = pending.Token
+		result.HandoffTokenExpiresAt = pending.ExpiresAt
+		resp := h.buildFlowResponse(ctx, result, true)
+		return &resp, nil
+	}
+	if pendingErr := state.PendingError; pendingErr != nil && result.Step != nil {
+		// The provider returned an error while the browser was away. Surface
+		// it on the step the user lands back on, encoded so the login screen
+		// can show the code, description and a link. Not cleared here for the
+		// same reason as the handoff: a GET has no Set-Cookie, and it is
+		// harmless to re-render the same error on a repeat request.
+		encoded := encodeSSOError(pendingErr)
+		result.Step.Error = &encoded
+	}
 	if result.Step != nil && result.Step.Complete != nil {
 		return mapFlowGetError(domain.ErrFlowCompleted())
 	}
 
 	resp := h.buildFlowResponse(ctx, result, false)
 	return &resp, nil
+}
+
+// encodeSSOError packs a provider error into the step's single error string.
+//
+// step.error is one string, and this carries three fields plus a URL, so it
+// is JSON base64'd behind an `sso_error:` tag rather than squeezed into the
+// `error.<key>` catalog convention. The login orchestrator recognises the tag
+// and renders the parts; anything else still reads it as an opaque message.
+func encodeSSOError(e *domain.FlowSSOError) string {
+	payload, err := json.Marshal(map[string]string{
+		"code":        e.Code,
+		"description": e.Description,
+		"uri":         e.URI,
+	})
+	if err != nil {
+		return "error.sso_failed"
+	}
+	return "sso_error:" + base64.StdEncoding.EncodeToString(payload)
 }
 
 func (h *Handler) openState(ctx context.Context, raw string) (*domain.FlowState, error) {
@@ -300,6 +393,9 @@ func (h *Handler) buildFlowResponse(ctx context.Context, result domain.FlowStepR
 			resp.RedirectURI = api.NewOptURI(u)
 		}
 	}
+	// Stub: give each slug the connection's display name and template so the
+	// login can label and brand its buttons (#1031 does this in the engine).
+	resp.Step.SSOProviders = h.resolveSsoProviders(result.State.ProjectID, result.Step)
 	if terminal && result.HandoffToken != "" {
 		resp.HandoffToken = api.NewOptString(result.HandoffToken)
 		resp.HandoffTokenExpiresAt = api.NewOptDateTime(result.HandoffTokenExpiresAt)

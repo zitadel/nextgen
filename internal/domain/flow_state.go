@@ -85,41 +85,54 @@ type FlowState struct {
 	// the OIDC redirect boundary.
 	AuthAttemptID string
 
+	// PendingHandoff carries a completion that was reached while the
+	// browser was somewhere else, so the next GET can deliver it.
+	//
+	// A flow normally completes on a submit, and the handoff token rides
+	// that response. The identity-provider callback has no response to ride:
+	// it answers a redirect, and a bearer token must not travel in a URL.
+	// Following [FlowPendingChallenge], the completion is sealed into the
+	// cookie instead and re-emitted once, rather than re-minted -- a GET that
+	// minted a fresh token on every call would be a replay surface.
+	PendingHandoff *FlowPendingHandoff
+
+	// PendingError carries a provider error (an OAuth2 authorization error
+	// response, RFC 6749 §4.1.2.1) reached while the browser was at the
+	// provider, so the next GET can surface it on the step the user lands
+	// back on. Single use, like PendingHandoff.
+	PendingError *FlowSSOError
+
 	// VerifiedIdentity records that a trusted provider callback resolved an
 	// external identity in this flow. Server-set (only the SSO callback
 	// writes it) and durable on FlowState -- unlike CollectedData it must
 	// survive a pivot. create_user_with_sso refuses to run without it, so a
-	// flow that routes a plain submit into that mutation cannot mint a user
-	// with no proof of identity.
+	// submit-only flow cannot mint a user with no proof of identity.
 	VerifiedIdentity *FlowVerifiedIdentity
 }
 
-// FlowVerifiedIdentity is what a provider callback asserted about the user:
-// which provider, the provider's stable subject id, and the identifier it
-// vouched for.
-//
-// Email is the claim the account is created from. Carrying it here is what
-// makes the guard mean something: without it the handler would build the user
-// out of CollectedData, which a later submit can overwrite -- so a real
-// callback for one address could mint an account for another.
-//
-// This overlaps on one fact with the sso_callback record (#1073), which also
-// stores what the provider asserted. The overlap is deliberate: that record is
-// the OAuth ceremony's state (binding nonce, OIDC nonce, PKCE verifier, return
-// target) and answers "did this redirect really come from us"; this answers a
-// different question at a different layer -- "may this step mint a user" -- and
-// is read by the engine when the step completes, not by the callback. Keep them
-// in step: whatever the callback records there, it records here.
-type FlowVerifiedIdentity struct {
-	Provider string // "google", "github", "saml", ...
-	Subject  string
-	Email    string
+// FlowSSOError is the provider's authorization error, carried back to the
+// step the flow resumes on. Code is required; the other two are optional in
+// the spec and may be empty.
+type FlowSSOError struct {
+	Code        string
+	Description string
+	URI         string
 }
 
-// Valid reports whether a provider verification was recorded. Safe to call on
-// a nil receiver, so callers can write `state.VerifiedIdentity.Valid()`.
-func (vi *FlowVerifiedIdentity) Valid() bool {
-	return vi != nil && vi.Provider != "" && vi.Subject != "" && vi.Email != ""
+// FlowPendingHandoff is a completion waiting to be delivered. Single use:
+// the handler clears it as it emits it, so the same token cannot be handed
+// to two readers of the same cookie.
+type FlowPendingHandoff struct {
+	// Token is the handoff the caller exchanges for a session.
+	Token string
+
+	// ExpiresAt bounds the exchange window, as it does on the submit path.
+	ExpiresAt time.Time
+
+	// Complete is the terminal step's completion kind, captured when the
+	// flow terminated so the delivering render reports the same thing the
+	// submit path would have.
+	Complete FlowStepComplete
 }
 
 // FlowPendingChallenge records the server-issued challenge the next
@@ -188,6 +201,22 @@ type FlowProgress struct {
 	// progress entry, keyed by schema property name. A child flow's
 	// CollectedData is discarded when its progress is popped.
 	CollectedData CollectedFlowData
+}
+
+type FlowVerifiedIdentity struct {
+	Provider string // "google", "github", "saml", ...
+	Subject  string
+	// Email is the identifier the provider vouched for. The account is created
+	// from it, so it belongs to the proof: CollectedData can be overwritten by
+	// a later submit, and creating from that would let a real callback for one
+	// address mint an account for another.
+	Email string
+}
+
+// Valid reports whether a provider verification was recorded.
+// Safe to call on a nil receiver.
+func (vi *FlowVerifiedIdentity) Valid() bool {
+	return vi != nil && vi.Provider != "" && vi.Subject != "" && vi.Email != ""
 }
 
 // FlowBackEntry holds an entry to be pushed into BackStack.

@@ -21,6 +21,7 @@ content:
         - $ref: '../../../components/schemas/errors/flow-invalid_action.yaml'
         - $ref: '../../../components/schemas/errors/flow-not_found.yaml'
         - $ref: '../../../components/schemas/errors/flow-unsupported.yaml'
+        - $ref: '../../../components/schemas/errors/idp-not_found.yaml'
         - $ref: '../../../components/schemas/errors/internal.yaml'
         - $ref: '../../../components/schemas/errors/tkn-invalid.yaml'
         - $ref: '../../../components/schemas/errors/not_implemented.yaml'
@@ -50,6 +51,7 @@ content:
           flow.invalid_action: '../../../components/schemas/errors/flow-invalid_action.yaml'
           flow.not_found: '../../../components/schemas/errors/flow-not_found.yaml'
           flow.unsupported: '../../../components/schemas/errors/flow-unsupported.yaml'
+          idp.not_found: '../../../components/schemas/errors/idp-not_found.yaml'
           internal: '../../../components/schemas/errors/internal.yaml'
           tkn.invalid: '../../../components/schemas/errors/tkn-invalid.yaml'
           not_implemented: '../../../components/schemas/errors/not_implemented.yaml'
@@ -145,6 +147,11 @@ content:
         value:
           code: flow.unsupported
           message: 'flow feature is not supported'
+      idp.not_found:
+        summary: idp.not_found
+        value:
+          code: idp.not_found
+          message: 'identity provider connection: not found'
       internal:
         summary: internal
         value:

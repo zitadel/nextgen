@@ -644,6 +644,19 @@ func (r *FlowStateMachineRuntime) processSubmit(pc *processCtx, resolved FlowRes
 		}
 		return r.routeOutcome(pc, resolved, result.Outcome, result.Irreversible)
 	}
+	if result.Outcome != "" {
+		// The mutation resolved to a flow outcome; route its declared
+		// transition instead of the submitted action. Bind the colliding
+		// account first for user_already_exists (as ResumeWithOutcome does),
+		// so the conflict step can verify against the existing user rather
+		// than landing with no user pinned on the attempt.
+		if result.Outcome == FlowImplicitOutcomeUserAlreadyExists {
+			if err := r.bindCollidingUser(pc, resolved); err != nil {
+				return FlowStepResult{}, err
+			}
+		}
+		return r.routeOutcome(pc, resolved, result.Outcome, result.Irreversible)
+	}
 	return r.routeOutcome(pc, resolved, pc.in.Action, result.Irreversible)
 }
 
@@ -1436,15 +1449,32 @@ func (r *FlowStateMachineRuntime) buildStep(state *FlowState, step *FlowDefiniti
 		})
 	}
 	return &FlowStep{
-		Name:         step.Name,
-		Texts:        FlowStepTexts{TitleKey: step.Name + ".title", DescriptionKey: step.Name + ".description"},
-		Error:        errorKey,
-		Complete:     complete,
-		RedirectURL:  redirectURL,
-		Fields:       resolved.Fields,
-		Actions:      actions,
-		SSOProviders: nil,
+		Name:        step.Name,
+		Texts:       FlowStepTexts{TitleKey: step.Name + ".title", DescriptionKey: step.Name + ".description"},
+		Error:       errorKey,
+		Complete:    complete,
+		RedirectURL: redirectURL,
+		Fields:      resolved.Fields,
+		Actions:     actions,
+		// Carried as slugs. Resolving each to the connection's display name
+		// and template is the identity layer's, so the API fills those in
+		// (see internal/api/idp_sso_stub.go) until #1031 lands.
+		SSOProviders: ssoProvidersFromSlugs(step.SSOProviders),
 	}
+}
+
+// ssoProvidersFromSlugs carries a step's authored connection slugs into the
+// rendered step. Only the slug is known here: the flow definition references
+// connections by slug and the engine does not read the identity layer.
+func ssoProvidersFromSlugs(slugs []string) []FlowSSOProvider {
+	if len(slugs) == 0 {
+		return nil
+	}
+	providers := make([]FlowSSOProvider, 0, len(slugs))
+	for _, slug := range slugs {
+		providers = append(providers, FlowSSOProvider{ID: slug})
+	}
+	return providers
 }
 
 // collectsStepFields reports whether a submission commits the step's
@@ -1638,6 +1668,13 @@ func (r *FlowStateMachineRuntime) ResumeWithOutcome(
 // A miss is not an error: the account may have been deleted between the
 // resolution and this call, and the conflict step will simply fail to verify.
 func (r *FlowStateMachineRuntime) bindCollidingUser(pc *processCtx, resolved FlowResolvedFields) error {
+	// Entering the conflict boundary discards the external identity's proof:
+	// the flow is no longer creating a user from it, so it must not linger in
+	// the sealed state. #1280 also clears it on every routeOutcome path; this
+	// one is kept because clearing early can only withhold authorisation,
+	// never grant it.
+	pc.state.VerifiedIdentity = nil
+
 	// The external identity's proof is discarded by routeOutcome when it routes
 	// user_already_exists, which every conflict path goes through -- so it is
 	// not cleared here as well.

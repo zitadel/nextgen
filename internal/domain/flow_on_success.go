@@ -43,7 +43,7 @@ type FlowOnSuccessInput struct {
 }
 
 // FlowOnSuccessResult is what a handler returns. StepError keeps the
-// user on the current step.
+// user on the current step; Outcome routes the step's declared transition.
 type FlowOnSuccessResult struct {
 	// StepError re-renders the current step with this error key; Outcome
 	// instead routes the step's declared transition. At most one is set,

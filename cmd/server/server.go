@@ -369,31 +369,35 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	}
 	defer shipper.Close()
 
+	apiHandler := api.NewHandler(
+		flowService,
+		authAttemptSvc,
+		sessionService,
+		projectService,
+		userService,
+		schemaService,
+		flowDefinitionSvc,
+		teamService,
+		brandingService,
+		environmentService,
+		releaseService,
+		deploymentService,
+		eventService,
+		tokenService,
+		keyService,
+		claimService,
+		grantService,
+		variableService,
+		serviceDBPool,
+		// Resolved, not the raw pin: in bootstrap mode project_id is empty
+		// and an empty handler pin rejects every claim/complete session.
+		cfg.Platform.ResolvedProjectID(),
+	).WithPersonalTeamEnsurer(personalTeams).WithEgressClient(egressClient).
+		WithSsoUserCreater(createUserWithSSOHandler).
+		WithFlowStateMachine(stateMachine)
+
 	oasServer, err := oasapi.NewServer(
-		api.NewHandler(
-			flowService,
-			authAttemptSvc,
-			sessionService,
-			projectService,
-			userService,
-			schemaService,
-			flowDefinitionSvc,
-			teamService,
-			brandingService,
-			environmentService,
-			releaseService,
-			deploymentService,
-			eventService,
-			tokenService,
-			keyService,
-			claimService,
-			grantService,
-			variableService,
-			serviceDBPool,
-			// Resolved, not the raw pin: in bootstrap mode project_id is empty
-			// and an empty handler pin rejects every claim/complete session.
-			cfg.Platform.ResolvedProjectID(),
-		).WithPersonalTeamEnsurer(personalTeams),
+		apiHandler,
 		api.NewSecurityHandler(tokenService),
 		oasapi.WithMiddleware(
 			middleware.AddOperationIdToContext(),
@@ -406,7 +410,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		return fmt.Errorf("failed to build api server: %w", err)
 	}
 
-	mux, err := buildHTTPMux(cfg.Server, idgen.NewULID(), oasServer,
+	mux, err := buildHTTPMux(cfg.Server, idgen.NewULID(), oasServer, apiHandler.IdpCallbackHandler(),
 		standaloneRuntimeResolver(projectService, tokenService, keyService, cfg.Platform.ResolvedProjectID()),
 		requestEventBuf)
 	if err != nil {
@@ -690,8 +694,35 @@ func mustBindEnv(v *viper.Viper, key string) {
 
 // ----------------------------- HTTP --------------------------------------
 
-func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiHandler http.Handler, runtime runtimeResolver, requestEvents *audit.RequestBuffer) (*http.ServeMux, error) {
+// idpCallback is the identity provider's return leg. Passed in rather than
+// reached through the API handler so a test can mount the rest of the surface
+// without one; nil skips the route.
+//
+// Stub: the OpenAPI does not model this endpoint because the real engine owns
+// it (#1032), so it is removed with `internal/api/idp_sso_stub.go`.
+func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiHandler http.Handler, idpCallback http.Handler, runtime runtimeResolver, requestEvents *audit.RequestBuffer) (*http.ServeMux, error) {
 	mux := http.NewServeMux()
+
+	// Registered as an exact path, so it wins over the catch-all API mount
+	// below — but through the same middleware, because the handler sets the
+	// flow cookie and `cookieSecureFromContext` reads the request host that
+	// `WithRequestHostMiddleware` puts in the context. Without it the two legs
+	// of one sign-in disagree about the same cookie's Secure flag.
+	if idpCallback != nil {
+		mux.Handle(api.IdpCallbackRoute,
+			middleware.Chain(idpCallback,
+				func(next http.Handler) http.Handler {
+					return middleware.WithRequestContextMiddleware(reqIdGen, next)
+				},
+				middleware.WithLogging,
+				api.WithRequestHostMiddleware,
+				middleware.WithUserAgentMiddleware,
+				func(next http.Handler) http.Handler {
+					return audit.WithRequestEventMiddleware(requestEvents, next)
+				},
+			),
+		)
+	}
 
 	if cfg.LoginEnabled {
 		if err := login.ValidateDist(); err != nil {
