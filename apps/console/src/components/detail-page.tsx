@@ -22,8 +22,9 @@ import { cn } from "@/lib/utils";
  * | Body          | 24px under the header row                               |
  *
  * The schema and login-flow screens are a different composition — the whole
- * screen is one panel (`DETAIL_PANEL_PAGE`) — and keep it; they share the
- * header card through {@link MetaCard}.
+ * screen is one panel (`DETAIL_PANEL_PAGE`) — and keep it. Both share the icon
+ * tile ({@link ICON_PLATE}); the login-flow screen also shares the header card
+ * ({@link MetaCard}), while the schema screen shows no id.
  */
 
 /** Page wrapper: the list shell's gutter, 22px under the navbar. */

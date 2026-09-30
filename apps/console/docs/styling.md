@@ -163,8 +163,9 @@ Detail screens come in two compositions, and each has one shell:
 - **Configuration panel** (User schemas, Login flows): the whole screen is one
   panel card inside `DETAIL_PANEL_PAGE` (`src/components/layout.tsx`).
 
-Both share the icon tile (`ICON_PLATE`) and the header card (`MetaCard`, holding
-`MetaValue`s split by `MetaRule`).
+Both share the icon tile (`ICON_PLATE`). The header card (`MetaCard`, holding
+`MetaValue`s split by `MetaRule`) is on every resource detail and on Login flows;
+User schemas carries none, because its lockup names the schema without its id.
 
 | Region        | Value                                                 |
 | ------------- | ----------------------------------------------------- |

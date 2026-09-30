@@ -17,10 +17,14 @@
  *   CONSOLE_DEV_ORIGIN    console dev server, default http://localhost:5174
  *   CONSOLE_DEV_EMAIL     sign-in, default dev@zitadel.local
  *   CONSOLE_DEV_PASSWORD  sign-in, default Console-dev-1
- *   SCREENSHOT_DIR        output, default test-output/screenshots
+ *   SCREENSHOT_DIR        output, default test-output/screenshots. Only this
+ *                         script's own files in it (`*.png` shots named
+ *                         `<screen>.<theme>.<viewport>.png`, and `index.html`)
+ *                         are replaced; anything else there is left alone.
  */
 
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import { type Browser, type Page, chromium } from "@playwright/test";
@@ -198,16 +202,27 @@ ${rows}
 `;
 }
 
-await rm(outDir, { recursive: true, force: true });
-await mkdir(outDir, { recursive: true });
+/** A shot this script wrote on an earlier run: `<slug>.<theme>.<viewport>.png`. */
+const OWN_SHOT = new RegExp(
+  `^[a-z0-9-]+\\.(${THEMES.join("|")})\\.(${VIEWPORTS.map((v) => v.name).join("|")})\\.png$`,
+);
 
+await mkdir(outDir, { recursive: true });
+// A screen that no longer exists would otherwise leave its old shots behind.
+for (const file of await readdir(outDir)) {
+  if (OWN_SHOT.test(file)) await rm(join(outDir, file));
+}
+
+// The signed-in session is a live cookie: kept out of the output directory, in
+// a private temp directory removed however the run ends.
+const sessionDir = await mkdtemp(join(tmpdir(), "console-screenshots-"));
 const browser = await chromium.launch();
 try {
   const signInContext = await browser.newContext();
   const page = await signInContext.newPage();
   console.log(`signing in to ${origin} as ${user.email}`);
   const project = await signIn(page);
-  const storage = join(outDir, ".session.json");
+  const storage = join(sessionDir, "session.json");
   await signInContext.storageState({ path: storage });
 
   console.log(`resolving screens in ${project}`);
@@ -216,10 +231,10 @@ try {
 
   console.log(`capturing ${urls.size} screens × ${THEMES.length * VIEWPORTS.length} variants`);
   await capture(browser, urls, storage);
-  await rm(storage);
 
   await writeFile(join(outDir, "index.html"), contactSheet(urls));
   console.log(`\n  open ${join(outDir, "index.html")}\n`);
 } finally {
   await browser.close();
+  await rm(sessionDir, { recursive: true, force: true });
 }
