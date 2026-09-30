@@ -286,7 +286,11 @@ func (us userStatements) ListUsers(ctx context.Context, filter *database.ListOpt
 			return nil, wrapError(err)
 		}
 		defer rows.Close()
-		return collectRows(rows, scanUserHeader)
+		headers, err := collectRows(rows, scanUserHeader)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+		return headers, nil
 	})
 	if err != nil {
 		return nil, err

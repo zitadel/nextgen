@@ -169,7 +169,11 @@ func (s authzAssignmentStatements) ListManagedGrants(ctx context.Context, projec
 			return nil, wrapError(err)
 		}
 		defer rows.Close()
-		return collectRows(rows, scanAuthzAssignment)
+		assignments, err := collectRows(rows, scanAuthzAssignment)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+		return assignments, nil
 	})
 	if err != nil {
 		return nil, err
@@ -266,7 +270,11 @@ func (s authzAssignmentStatements) ListAuthorizedProjects(ctx context.Context, h
 			return nil, wrapError(err)
 		}
 		defer rows.Close()
-		return collectRows(rows, scanProject)
+		projects, err := collectRows(rows, scanProject)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+		return projects, nil
 	})
 	if err != nil {
 		return nil, err

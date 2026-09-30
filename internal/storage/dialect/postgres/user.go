@@ -422,7 +422,11 @@ func (us userStatements) ListUsers(ctx context.Context, filter *database.ListOpt
 		if err != nil {
 			return nil, wrapError(err)
 		}
-		return pgx.CollectRows(rows, scanUserHeader)
+		headers, err := pgx.CollectRows(rows, scanUserHeader)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+		return headers, nil
 	})
 	if err != nil {
 		return nil, err

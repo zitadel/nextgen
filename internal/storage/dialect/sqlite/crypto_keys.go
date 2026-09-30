@@ -74,11 +74,11 @@ func (s cryptoKeyStatements) GetEncryptionKey(ctx context.Context, filter databa
 
 // ListEncryptionKeys implements [service.CryptoKeyStatements].
 func (s cryptoKeyStatements) ListEncryptionKeys(ctx context.Context, opts *database.ListOptions[domain.EncryptionKeyField]) (*database.ListResult[*domain.EncryptionKey], error) {
+	if opts == nil {
+		opts = &database.ListOptions[domain.EncryptionKeyField]{}
+	}
 	keys, nextCursor, err := pagination.Page(opts.Pagination, encryptionKeySchema, func(limit uint32) ([]*domain.EncryptionKey, error) {
 		opts := opts.WithLimit(limit)
-		if opts == nil {
-			opts = &database.ListOptions[domain.EncryptionKeyField]{}
-		}
 		var compiler statementCompiler
 		if err := compileRead(&compiler, encryptionKeyQuery, opts, encryptionKeySchema); err != nil {
 			return nil, err

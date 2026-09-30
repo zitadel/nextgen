@@ -163,7 +163,11 @@ func (s authzAssignmentStatements) ListManagedGrants(ctx context.Context, projec
 		if err != nil {
 			return nil, wrapError(err)
 		}
-		return pgx.CollectRows(rows, scanAuthzAssignment)
+		assignments, err := pgx.CollectRows(rows, scanAuthzAssignment)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+		return assignments, nil
 	})
 	if err != nil {
 		return nil, err
@@ -246,7 +250,11 @@ func (s authzAssignmentStatements) ListAuthorizedProjects(ctx context.Context, h
 		if err != nil {
 			return nil, wrapError(err)
 		}
-		return pgx.CollectRows(rows, newProjectStatements(s.client).scanProject)
+		projects, err := pgx.CollectRows(rows, newProjectStatements(s.client).scanProject)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+		return projects, nil
 	})
 	if err != nil {
 		return nil, err
