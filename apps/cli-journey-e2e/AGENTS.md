@@ -23,14 +23,15 @@ ADR 044) — both shapes run the same CLI path and browser journeys.
 - CI may pass prebuilt release snapshot tarballs to the journey runner with
   `--tarballs-dir`; that path must skip rebuilding and still verify/publish the
   provided tarballs through Verdaccio.
-- CI runs the journey as **four separately gated variants** (#744):
-  `journey_fresh_app`, `journey_passkey`, `journey_preexisting`, and
-  `journey_testkit` steps in `.github/workflows/ci.yml`, with the framework
-  set collapsed per-PR via `JOURNEY_MATRIX` (computed by `scripts/ci-mode.mjs`
-  from the affected surface and `scripts/frameworks.mjs`). A variant that a
-  docs-only or narrow PR cannot affect is skipped, not silently passed —
-  keep new lanes wired into that gating rather than adding unconditional
-  steps.
+- CI runs all journey variants (fresh-app matrix, passkey preset,
+  pre-existing app, testkit) concurrently in a single `--ci` invocation of the
+  runner (one step in `.github/workflows/ci.yml`), which parallelizes them
+  through its own concurrency pool so one process shares one port allocator.
+  The step is gated on `snapshot` (i.e. any journey surface is affected,
+  computed by `scripts/ci-mode.mjs`), and the fresh-app framework set is
+  collapsed per-PR via `--matrix single|full` (the `journey_matrix` output,
+  using `scripts/frameworks.mjs`). New variants belong in the runner's `--ci`
+  set, not as new workflow steps.
 - CI must install Zitadel packages from current workflow tarballs through the
   temporary Verdaccio registry, not from public npm.
 - CI must run `npx @zitadel/cli@alpha doctor --runtime binary`,
