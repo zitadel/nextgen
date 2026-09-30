@@ -184,6 +184,11 @@ type IDPConnectionStatements interface {
 	// one connection created in the same instant have no newest, so the second
 	// returns *database.UniqueError.
 	ReviseIDPConnection(ctx context.Context, entity *domain.IDPConnection) error
+	// LockIDPConnection takes the connection row's write lock for the rest of
+	// the transaction, so concurrent revisions of one connection serialize. It
+	// must be called inside a transaction. An unknown id returns
+	// *database.NoRowFoundError.
+	LockIDPConnection(ctx context.Context, projectID, id string) error
 	// GetIDPConnection returns the connection matching filter at its newest
 	// revision. No match returns *database.NoRowFoundError.
 	GetIDPConnection(ctx context.Context, filter database.Filter[domain.IDPConnectionField]) (*domain.IDPConnection, error)
