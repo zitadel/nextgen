@@ -353,6 +353,42 @@ describe("materializeSetupResources with a social provider", () => {
     expect(state.resources[`${IDPS_DIR}/google.json`]).toMatchObject({ id: "idp_01KWHE" });
   });
 
+  it("refuses to write back a connection the server returned with a secret value", async () => {
+    // The write-back commits the canonical body to `.zitadel/idps/`, so a
+    // resolved secret must stop here rather than reach a committed file.
+    const client = recordingClient();
+    const leaking = {
+      ...client,
+      createIdp: () =>
+        Promise.resolve({
+          id: "idp_1",
+          revision_id: "idprev_1",
+          slug: "google",
+          definition: {
+            slug: "google",
+            protocol: "oidc",
+            oidc: { issuer: "https://accounts.google.com", client_secret: "GOCSPX-real" },
+          },
+        }),
+    } as unknown as typeof client;
+
+    await expect(
+      materializeSetupResources({
+        cwd,
+        cliVersion: TEST_CLI_VERSION,
+        client: leaking,
+        projectId: "project_123",
+        force: false,
+        sso: google,
+      }),
+    ).rejects.toMatchObject({ code: "E_VALIDATION" });
+
+    const written = existsSync(join(cwd, IDPS_DIR, "google.json"))
+      ? await readFile(join(cwd, IDPS_DIR, "google.json"), "utf8")
+      : "";
+    expect(written).not.toContain("GOCSPX-real");
+  });
+
   it("leaves no connection file behind when the create fails", async () => {
     // Setup does not remove a connection file it wrote, so writing before the
     // create would leave one behind on any failure and the retry would refuse

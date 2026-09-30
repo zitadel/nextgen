@@ -151,6 +151,33 @@ export type StoredVariables = {
 };
 
 /**
+ * Stop when a connection document hands back a credential value.
+ *
+ * `client_secret` is always a `${{ NAME }}` reference — the syncer refuses to
+ * upload anything else — so a value here is the server having resolved the
+ * reference. Every path that reaches this has somewhere worse to put it than a
+ * log: a plan preview prints it, and a canonical write-back commits it to
+ * `.zitadel/idps/`, which is the one place the secret must never reach.
+ */
+export function refuseResolvedSecret(definition: object, id: string): void {
+  for (const key of ["oidc", "oauth2"] as const) {
+    const block = (definition as Record<string, unknown>)[key];
+    if (!isObject(block)) {
+      continue;
+    }
+    const stored = block.client_secret;
+    if (typeof stored === "string" && !isVariableReference(stored)) {
+      throw new ZitadelError("E_VALIDATION", `${id} came back holding a client_secret value`, {
+        hint:
+          "A stored connection must keep the ${{ NAME }} reference. Report this: the endpoint " +
+          "is resolving secrets, and the value would be written to disk.",
+        details: { id, block: key },
+      });
+    }
+  }
+}
+
+/**
  * Stop when two connections' credentials would land in the same variable.
  *
  * Two ways that happens. A slug may hold `-` and `_`

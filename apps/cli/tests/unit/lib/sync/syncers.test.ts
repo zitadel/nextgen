@@ -675,6 +675,39 @@ describe("IdpConnectionSyncer", () => {
     await expect(idp.fetch?.("idp_1")).rejects.toBeInstanceOf(FatalFetchError);
   });
 
+  it("refuses a create response holding a secret value, before it is written to disk", async () => {
+    // The canonical body from a mutation is written back into
+    // `.zitadel/idps/`, which is committed. This is the last point before the
+    // credential would land in a file.
+    const resolved = {
+      ...connection,
+      oidc: { ...connection.oidc, client_secret: "GOCSPX-a-real-secret" },
+    };
+    server.use(
+      http.post(`${BASE}/idps`, () =>
+        HttpResponse.json({ id: "idp_1", revision_id: "idprev_1", definition: resolved }, { status: 201 }),
+      ),
+    );
+    const [, idp] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
+
+    await expect(idp.create(connection)).rejects.toMatchObject({ code: "E_VALIDATION" });
+  });
+
+  it("refuses an update response holding a secret value", async () => {
+    const resolved = {
+      ...connection,
+      oidc: { ...connection.oidc, client_secret: "GOCSPX-a-real-secret" },
+    };
+    server.use(
+      http.post(`${BASE}/idps`, () =>
+        HttpResponse.json({ id: "idp_1", revision_id: "idprev_2", definition: resolved }),
+      ),
+    );
+    const [, idp] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
+
+    await expect(idp.update("idp_1", connection)).rejects.toMatchObject({ code: "E_VALIDATION" });
+  });
+
   it("create posts the document under the project and keeps the returned id", async () => {
     let body: unknown;
     server.use(

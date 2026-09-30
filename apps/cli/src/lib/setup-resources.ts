@@ -33,6 +33,7 @@ import {
   authMethods,
   CONNECTION_SCHEMA_REF,
   IDPS_DIR,
+  refuseResolvedSecret,
 } from "./idp";
 import { stableStringify } from "./json";
 import { normalizePublicCliProse } from "./public-cli";
@@ -137,12 +138,12 @@ export async function materializeSetupResources(opts: {
     if (await writeResourceFile(opts.cwd, connectionPath, connection, false, CONNECTION_EXISTS)) {
       filesWritten.push(join(opts.cwd, connectionPath));
     }
-    const written = await writeBackResource(
-      opts.cwd,
-      connectionPath,
-      {},
-      (created.definition ?? connection) as object,
-    );
+    // The same guard the syncer applies: this write puts the canonical body
+    // into a file the developer commits, so a resolved secret must stop here
+    // rather than land on disk.
+    const canonical = (created.definition ?? connection) as object;
+    refuseResolvedSecret(canonical, requiredString(created.id, "created connection id"));
+    const written = await writeBackResource(opts.cwd, connectionPath, {}, canonical);
     await updateState(opts.cwd, connectionPath, {
       id: requiredString(created.id, "created identity provider connection id"),
       hash: written.hash,

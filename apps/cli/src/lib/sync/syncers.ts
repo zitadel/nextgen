@@ -28,10 +28,9 @@ import {
   toLocalBrandingBody,
 } from "../branding";
 import { FLOWS_DIR, flowEnvRefs } from "../flows";
-import { IDPS_DIR } from "../idp";
+import { IDPS_DIR, refuseResolvedSecret } from "../idp";
 import { SCHEMAS_DIR } from "../user-schema";
 import { ZitadelError } from "../errors";
-import { isObject } from "../json";
 import { FatalFetchError } from "./types.js";
 import type { ResourceSyncer } from "./types.js";
 
@@ -73,35 +72,18 @@ export function makeSyncers(opts: {
  * schemas and flows, and runs in the sync engine before any platform call.
  */
 /**
- * Stop when a stored connection hands back a credential value.
+ * A mutation response, checked before it is treated as the canonical body.
  *
- * `client_secret` is always written as a `${{ NAME }}` reference — the syncer's
- * own `validate` refuses to upload anything else — so a value here is the
- * server having resolved the reference on read. Rendering it would print the
- * secret into a plan, which area 4 forbids, and a plan is the one command a
- * developer runs expecting it to be safe to paste.
+ * Both write paths return the stored document and the sync loop writes it back
+ * to the file on disk, so this is the last point before a resolved secret would
+ * be committed.
  */
-function refuseResolvedSecret(definition: object, id: string): void {
-  for (const key of ["oidc", "oauth2"] as const) {
-    const block = (definition as Record<string, unknown>)[key];
-    if (!isObject(block)) {
-      continue;
-    }
-    const stored = block.client_secret;
-    if (typeof stored === "string" && !isVariableReference(stored)) {
-      // Fatal rather than a fetch that failed: the planner swallows an
-      // ordinary failure and plans without a diff, which would turn a server
-      // resolving secrets into a silently missing before/after.
-      throw new FatalFetchError(
-        new ZitadelError("E_VALIDATION", `${id} came back holding a client_secret value`, {
-          hint:
-            "A stored connection must keep the ${{ NAME }} reference. Report this: the read " +
-            "endpoint is resolving secrets, and a plan would print one.",
-          details: { id, block: key },
-        }),
-      );
-    }
+function canonicalDefinition(definition: object | undefined, id: unknown): object | undefined {
+  if (definition === undefined) {
+    return undefined;
   }
+  refuseResolvedSecret(definition, typeof id === "string" ? id : "the connection");
+  return definition;
 }
 
 /** The value a Zod issue path points at, or `undefined` when it is absent. */
@@ -198,7 +180,10 @@ class IdpConnectionSyncer implements ResourceSyncer {
       { idp: data as CreateIdpBodyIdp },
       { project_id: this.projectId },
     );
-    return { id: result.id, canonical: result.definition };
+    // Guarded before it becomes canonical: `writeBackResource` commits the
+    // canonical body to `.zitadel/idps/`, so a resolved secret here would be
+    // written to a file the developer commits.
+    return { id: result.id, canonical: canonicalDefinition(result.definition, result.id) };
   }
 
   /**
@@ -211,7 +196,7 @@ class IdpConnectionSyncer implements ResourceSyncer {
       { idp: data as CreateIdpBodyIdp },
       { project_id: this.projectId },
     );
-    return { canonical: result.definition };
+    return { canonical: canonicalDefinition(result.definition, result.id) };
   }
 
   /**
@@ -223,7 +208,14 @@ class IdpConnectionSyncer implements ResourceSyncer {
   async fetch(id: string): Promise<object> {
     const body = await this.client.getIdpById(id, { project_id: this.projectId });
     const definition = (body.definition ?? {}) as object;
-    refuseResolvedSecret(definition, id);
+    try {
+      refuseResolvedSecret(definition, id);
+    } catch (err) {
+      // Fatal rather than a fetch that failed: the planner swallows an ordinary
+      // failure and plans without a diff, which would turn a server resolving
+      // secrets into a silently missing before/after.
+      throw new FatalFetchError(err as Error);
+    }
     return definition;
   }
 

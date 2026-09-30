@@ -23,6 +23,7 @@ export {
   credentialVariablesOf,
   type StoredVariables,
   planConnection,
+  refuseResolvedSecret,
   readConnectionFiles,
 } from "./connections";
 
