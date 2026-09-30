@@ -2,54 +2,35 @@
 
 > **Status:** Proposed
 > **Date:** 2026-09-30
-> **Context:** Settings are the overridable subtree of the server configuration,
-> layered across deployment, project, team and user schema, stored as field rows
-> carried by a release.
+> **Context:** Where a setting lives, which scope configures it, and how it is
+> stored, validated and read.
 >
-> **Scope:** settings only. Policies are deferred
-> ([below](#deferred-the-policy-layer)), so
-> [#383](https://github.com/zitadel/nextgen/issues/383) is only partly answered.
+> **Scope:** settings only. Policies need their own ADR, so
+> [#383](https://github.com/zitadel/nextgen/issues/383) is only partly answered and
+> [#898](https://github.com/zitadel/nextgen/issues/898) stays blocked on it.
+> Inheritance between scopes is deferred by
+> [#899](https://github.com/zitadel/nextgen/issues/899); this ADR only avoids
+> blocking it.
 >
-> **Needs product sign-off:** layered override is the mechanism here from day one,
-> while [#899](https://github.com/zitadel/nextgen/issues/899) specifies one
-> explicit owner and defers inheritance. See
-> [Why layering now](#why-layering-now).
->
-> **Builds on** the meta-schema pipeline (`scripts/generate-meta-schemas.ts`),
-> [ADR 035](035-configuration-environments.md) (releases, environments,
-> deployments), [ADR 062](062-per-environment-variables-and-secrets.md)
-> (per-environment values are variables, attached to the environment),
-> [ADR 048](048-wide-events-internal-audit-primitive.md) (audit),
-> [ADR 024](024-user-team-lifecycle-ownership.md) (users and credentials are
-> project-scoped).
->
-> **Deviates from** [ADR 063](063-resource-revisions-fixed-id-and-revision-id.md):
-> a setting mints no `id` and no `revision_id` of its own, because the release
-> carries its content and supplies its version (§9). It still *references* one, the
-> `revision_id` of the schema whose layer defines it (§2).
+> **Builds on** [ADR 035](035-configuration-environments.md) (releases and
+> deployments),
+> [ADR 063](063-resource-revisions-fixed-id-and-revision-id.md) (revisions),
+> [ADR 062](062-per-environment-variables-and-secrets.md) (variables),
+> [ADR 008](008-users-eav-store.md) (key-value storage),
+> [ADR 048](048-wide-events-internal-audit-primitive.md) (audit).
 
 ## TL;DR
 
-- Settings **are** the overridable subtree of `cmd/server/config.go` (`session`,
-  `password_hasher`; the rest is deployment-only), so there is no key namespace to
-  invent. A setting is a path in that tree.
-- The shape is generated from the OpenAPI YAML by the existing meta-schema
-  pipeline, reaching the Go validator, the API and the developer's editor from one
-  source.
-- Four layers: deployment, project, team, user schema. Each holds a **sparse**
-  document, and an unset field falls through.
-- `x-layers` declares per field which layers may set it, **ordered, last wins**,
-  so precedence where layers do not contain each other is a per-field product
-  decision.
-- Only the deployment layer carries bounds beside values. Out of bounds is
-  rejected, never clamped.
-- **Settings are release content.** One table of field rows keyed by
-  `release_id`, so promotion, rollback and `git_sha` attribution come from
-  ADR 035 for free, and changing a setting requires a release.
-- Per-environment variation is a variable reference inside a setting value, since
-  variables are what attach to an environment.
-- Fail-closed: missing falls through, invalid or out of bounds refuses the
-  operation.
+- Every scope holds a settings document: deployment, project, team, user-schema,
+  over built-in defaults.
+- Each scope's schema defines what that scope can configure, so whether a setting is
+  configurable there is a product decision.
+- An unconfigured setting falls back to the deployment configuration, then the
+  built-in default.
+- One key-value table, a row per property path, immutable and discriminated by a
+  `revisionID` that a release pins.
+- A value may be a variable reference, which is how a setting varies per environment,
+  at the cost of validating only at deployment.
 
 ## Context
 
@@ -87,10 +68,11 @@ The application has multiple scopes in which settings can be configured:
 Each of these layers should be able to configure parts of the application. This
 will be done using a JSON/YAML document.
 
-E.g.: the deployment holds a `config.yaml` which defines the instrumentation, 
-events, the database,... A project will contain a JSON-document which defines 
+E.g.: the deployment holds a `config.yaml` which defines the instrumentation,
+events, the database,... A project will contain a JSON-document which defines
 the password-hashing policy for that project. But a user-schema defines which
-authentication methods are allowed.
+authentication methods are allowed. Each layer describes its own settings-schema
+defining what values can be configured.
 
 ### 2. Storage
 
@@ -100,22 +82,46 @@ the path to the property and value is the value of the property. Lists are
 stored as a whole. Next to lists, JSON scalar values are the only supported
 types since objects will be broken into separate rows.
 
-This storage method will require the scope on which the setting is applicable
+An object whose keys are data rather than schema is stored whole like a list, because
+`password_hasher.hasher.params` is valid only as a set for one algorithm.
+
+This storage method will require the scope on which the setting is applicable 
 (`projectID`, `teamID`, `userSchemaID`). All these entries need to be immutable
-to work with revisioning system described in ADR063. This will make writes 
-expensive since all data in a document will need to be duplicated when one 
+to work with revisioning system described in ADR063. This will make writes
+expensive since all data in a document will need to be duplicated when one
 property changes. This is done because we want to optimise for reads rather
 than writes and later on when configuration overriding lands, this will help
 with resolving settings.
 
-### 3. Variables
+### 3. Revisions
 
-To make configuration flexible over environments, a variable can be used to 
+To enable revisions a `revisionID` is added to JSON document. However, because
+each property lives in a separate record in the database, each record will need
+the `revisionID` as a discriminator.
+
+### 4. Variables
+
+To make configuration flexible over environments, a variable can be used to
 describe the value of a setting. This does not come without cost though: since
 variables cannot be evaluated without an environment, validation cannot be done
 until a deployment happens (which links a release and an environment).
 
-### 3. One accessor, in the service layer
+A missing variable fails that deployment. ADR 062 leaves an unresolved reference
+literal, which is fine for a string an IdP rejects and wrong for a duration.
+
+### 5. Validation and reads
+
+A value outside the bound its deployment field declares is refused, not clamped, as
+the password hasher already does with a method outside its limits.
+
+An unconfigured setting is not a failure: the value comes from the deployment
+configuration or the built-in default. An invalid value or an unresolved reference
+refuses the operation instead, and never falls back to one.
+
+A read reports the scope the value came from, which #899 requires and which is where
+"inherited" would go later.
+
+### 6. One accessor, in the service layer
 
 Not in API handlers, because the flow engine drives `auth_attempts` through the
 internal Go service layer rather than over HTTP, so a handler-level read is
@@ -123,7 +129,14 @@ invisible to the hosted login. Not in storage, which lacks request context. The
 service layer is the chokepoint the hosted login, direct clients, administration
 and self-service all pass through.
 
-### 4. What is not a setting
+### 7. Audit
+
+A release emits one ADR 048 wide event per property whose value differs from the
+release the environment runs, carrying the path, the scope and both values. The
+release and deployment already record `created_by`, `message` and `git_sha`. A
+variable reference is recorded unresolved, so a secret never lands in an event.
+
+### 8. What is not a setting
 
 | Not a setting                 | Where it stays              | Why                                                                           |
 |-------------------------------|-----------------------------|-------------------------------------------------------------------------------|
@@ -131,77 +144,53 @@ and self-service all pass through.
 | Authorization rules           | ADR 032 / 033 / 034         | "May this principal act" is a different question with a rule language already |
 | User state                    | User data, outside releases | #899 draws this line                                                          |
 | Branding, templates, copy     | ADR 040 / 045 / 057         | Documents, not fields in a config tree                                        |
-| A user's own attributes       | The schema and the user     | The schema is a layer (§2), but what it describes is user data                |
-| A requirement on an operation | Nowhere yet                 | That is a policy, deferred below                                              |
+| A user's own attributes       | The schema and the user     | A schema configures settings (§1), but what it describes is user data         |
+| A requirement on an operation | Nowhere yet                 | That is a policy, out of scope                                                |
 
 ## Alternatives considered
 
-**Settings stored in the `variables` table under a reserved `zitadel.` namespace,
-sharing that store, its API and its substitution machinery.** Explored at length and
-rejected on one point: a setting defined by a user schema is part of that schema's
-content, so it is versioned by the schema revision (§2). Variables have no revisions
-by design, and giving them any would break the reason they exist, which is that a
-per-environment value cannot travel inside a release unchanged (ADR 062). Adding
-revisions to only the reserved rows is this table behind a discriminator. What
-survives from that exploration: values may be arrays and objects (§9), and a
-setting's value may be a variable reference, which is how a setting varies per
-environment.
+**Settings in the `variables` table under a reserved `zitadel.` namespace.**
+Rejected: settings are revisioned (§3) and variables are not, by design, because a
+per-environment value cannot travel inside a release unchanged. What survived the
+exploration: list and object values (§2), and variable references (§4).
 
-**A separate registry of setting keys declared in Go.** Rejected (§1): the
-overridable config subtree is already the key set, and the meta-schema generator
-already reaches the server, the API and the editor.
-
-**One opaque document per release, as idp connections and branding store.**
-Rejected (§9) on the read path: settings are read one path at a time across
-layers, and "which projects override this path" stops being portable SQL.
-
-**Storing schema-scoped settings inside the schema document, as `x-auth-methods`
-does.** Rejected (§2) while the schema layer is accepted: user records pin a schema
-`revision_id` (ADR 063 §5) and a flow definition names its own schema pointer, so a
-value stored there is read at different revisions on different paths.
+**One opaque document per scope, as idp connections and branding store.** Rejected
+(§2): settings are read one property at a time, and "which projects override this
+path" stops being portable SQL.
 
 **Another column on `projects`, as `password_hash_policy` is.** Rejected: no
-revisions, no release, no non-project layer, a migration per setting. It is the
-status quo.
+revisions, no release, no scope but the project, a migration per setting.
 
 ## Non-goals
 
-Policies and their composition; restrictive inheritance; the per-field
-specifications, each needing its annotations plus `x-on-promotion`; the concrete
-HTTP shape of `effective-configuration`; release approval mechanics (out of scope in
-ADR 035); retention of superseded releases.
+Policies; inheritance between scopes; the per-setting specifications, each of which
+states its scopes, its default and what a promoted change does to existing state; the
+HTTP shape of the effective-configuration read; release approval mechanics; retention
+of superseded revisions.
 
 ## Consequences
 
-**`password_hash_policy` stops being a column** and becomes a project-layer field
-bounded by `HashConfig.Limits`, carried by a release. The current endpoint keeps
-working until then; the migration is a tracked follow-up and removes the last
-runtime-mutable configuration from outside the release boundary. Its
-`x-on-promotion` is documented behaviour already: stored passwords keep verifying
-under the method they were written with.
+**`password_hash_policy` stops being a column** and becomes a project-scoped setting
+bounded by `HashConfig.Limits`. The migration is a follow-up, and it removes the last
+runtime-mutable configuration from outside the release boundary.
 
-**`session.default_ttl` becomes overridable** below the deployment, bounded by
-`max_ttl`. It is also the first field whose `x-layers` order is a real product
-decision. A behaviour change for self-hosters, needing its own issue.
+**`session.default_ttl` becomes configurable** below the deployment, bounded by
+`max_ttl`. A behaviour change for self-hosters, needing its own issue.
 
-**No setting changes without a release.** Operators who expect to adjust a lifetime
-in a console field will instead cut a release. That is deliberate: it is what makes
-a setting change promotable, reversible and attributable. A value that genuinely has
-to move without one is a variable reference, resolved per environment.
+**Writes are expensive by design,** which is §2's trade for cheap reads.
 
-**The overridable subtree becomes a contract.** Splitting `Config` and generating
-its overridable half makes a change there an API change, not a local struct edit.
+**No setting changes without a release,** which is what makes a change promotable and
+attributable. A value that must move per environment is a variable reference.
 
 ## Open questions
 
-- **Precedence between user schema and team,** where no containment orders them.
-  `x-layers` makes it a per-field declaration, so the decision is a product one and
-  the first case is `session.default_ttl`.
-- **Whether `x-on-promotion` can refuse a deployment** that would invalidate
-  existing state, or only warn. Belongs with ADR 035's deployment validation.
-- **Whether the deployment layer is readable through the API,** so an administrator
-  can see the bounds their choices sit inside.
-- **Which team instance applies** when the operation targets one. ADR 060 keys
-  sessions on `users.lifecycle_owner_team_id` rather than roster membership, for
-  the cardinality reason that applies here too; that contract still has to be
-  written down.
+- Which scopes each setting allows. First cases are `session.default_ttl` and the
+  password hasher.
+- Whether `x-auth-methods` folds into the user-schema settings document.
+- Whether a deployment may refuse a change that invalidates existing users,
+  credentials or sessions, or only warn (ADR 035's deployment validation).
+- Whether the deployment configuration is readable through the API, so an
+  administrator sees the bounds.
+- Which team instance applies when an operation targets one. ADR 060 keys sessions on
+  `users.lifecycle_owner_team_id` rather than roster membership, for the cardinality
+  reason that applies here too.
