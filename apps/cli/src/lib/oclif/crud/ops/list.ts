@@ -1,6 +1,8 @@
 import { spinner } from "@clack/prompts";
 import { Flags } from "@oclif/core";
 
+import { nonBlankString } from "../../flags";
+
 import { publicCliCommand } from "../../../public-cli";
 import type { CommandResult, GlobalOptions } from "../../types";
 import { collectPages } from "../paging";
@@ -36,7 +38,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
         min: 1,
         max: 100,
       }),
-      "page-token": Flags.string({
+      "page-token": nonBlankString({
         description: "Continue from a previous page's next_page_token.",
       }),
       all: Flags.boolean({
@@ -46,7 +48,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
       }),
     };
     const presentation = {
-      fields: Flags.string({
+      fields: nonBlankString({
         description:
           "Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the resource's own columns; `--json` is unaffected.",
       }),
@@ -63,7 +65,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
     const specific = {
       ...(filters.length > 0
         ? {
-            filter: Flags.string({
+            filter: nonBlankString({
               multiple: true,
               description: `Filter as field=operation:value (operation defaults to equals). Fields: ${filters
                 .map(
@@ -76,7 +78,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
         : {}),
       ...(sorts.length > 0
         ? {
-            sort: Flags.string({
+            sort: nonBlankString({
               description: `Sort as field:direction (asc|desc). Fields: ${sorts.join(", ")}.`,
             }),
           }

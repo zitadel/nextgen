@@ -1,4 +1,4 @@
-import { Flags } from "@oclif/core";
+import { nonBlankString } from "../../flags";
 
 import { ZitadelError } from "../../../errors";
 import { isObject } from "../../../json";
@@ -23,13 +23,13 @@ import {
 
 /** `--data` / `--file`: the whole body at once, for anything the field flags cannot express. */
 const rawBodyFlags = {
-  data: Flags.string({
+  data: nonBlankString({
     // No `-d`: the CLI conventions reserve that short form for `--debug`.
     description: "Whole body as a JSON object, instead of the field flags.",
     exclusive: ["file"],
     helpGroup: "RAW BODY",
   }),
-  file: Flags.string({
+  file: nonBlankString({
     description: "Read the body from a JSON file; `-` reads stdin.",
     exclusive: ["data"],
     helpGroup: "RAW BODY",

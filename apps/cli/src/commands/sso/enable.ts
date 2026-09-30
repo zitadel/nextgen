@@ -41,7 +41,12 @@ import {
   type SecretOutcome,
   type SecretPublisher,
 } from "../../lib/idp";
-import { BaseCommand, CommandGroups, type JsonEnvelope } from "../../lib/oclif";
+import {
+  BaseCommand,
+  CommandGroups,
+  type JsonEnvelope,
+  nonBlankString,
+} from "../../lib/oclif";
 import {
   readDevelopmentIssuer,
   readZitadelConfig,
@@ -79,10 +84,10 @@ export default class SsoEnable extends BaseCommand {
       options: [...IDP_PROVIDERS],
       description: "Identity provider to enable.",
     }),
-    schema: Flags.string({
+    schema: nonBlankString({
       description: "User schema to change. Required when the Project has more than one.",
     }),
-    "client-id": Flags.string({
+    "client-id": nonBlankString({
       description: "Client id of the application registered with the provider.",
     }),
   };
@@ -117,10 +122,8 @@ export default class SsoEnable extends BaseCommand {
 
     const schema = selectSchema(await readSchemaFiles(cwd), flags.schema);
     const connections = await readConnectionFiles(cwd);
-    // Normalised once, here: `--client-id ""` (an unset shell variable, most
-    // often) is not a client id, and taking it as one would bypass the prompt
-    // on create and overwrite the project's variable with nothing on reuse.
-    const clientIdFlag = suppliedClientId(flags["client-id"]);
+    // `nonBlankString` has already refused a blank one and trimmed the rest.
+    const clientIdFlag = flags["client-id"];
     const plan = planConnection({ provider, files: connections, clientId: clientIdFlag });
 
     const reusing = plan.action === "reuse";
@@ -502,25 +505,6 @@ function flowUsesSchema(
   // No `$id` to go on: a Project scaffolded but never applied names the
   // schema by the URL setup wrote, whose last segment is the file name.
   return used.endsWith(`/${schema.name}.json`);
-}
-
-/**
- * The client id `--client-id` supplied, or `undefined` when the flag was not
- * given. A flag given but blank is refused rather than ignored: the developer
- * asked for a specific id, and silently falling back to a prompt or to the
- * stored value would hide that they passed nothing.
- */
-function suppliedClientId(flag: string | undefined): string | undefined {
-  if (flag === undefined) {
-    return undefined;
-  }
-  const value = flag.trim();
-  if (value === "") {
-    throw new ZitadelError("E_VALIDATION", "--client-id was given an empty value", {
-      hint: "Pass the client id of the application registered with the provider, or omit the flag.",
-    });
-  }
-  return value;
 }
 
 /** Stop on a document whose region the SSO editors would overwrite. */

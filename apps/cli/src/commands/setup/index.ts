@@ -39,7 +39,12 @@ import {
   type SecretPublisher,
 } from "../../lib/idp";
 import { brandingGuidanceAction } from "../../lib/journey-guidance";
-import { BaseCommand, CommandGroups, type JsonEnvelope } from "../../lib/oclif";
+import {
+  BaseCommand,
+  CommandGroups,
+  type JsonEnvelope,
+  nonBlankString,
+} from "../../lib/oclif";
 import { serverKind } from "../../lib/oclif/server-kind";
 import { readLocalAdmin } from "../../lib/local-server/admin-credential";
 import { claimProjectAsAdmin } from "../../lib/local-server/claim-as-admin";
@@ -160,13 +165,13 @@ export default class Setup extends BaseCommand {
     // Removed in #1039 — setup no longer applies a login template. Kept
     // hidden so scripts and agents still passing it get a targeted error
     // pointing at `branding eject` instead of oclif's unknown-flag error.
-    design: Flags.string({ hidden: true }),
+    design: nonBlankString({ hidden: true }),
     sso: Flags.string({
       description:
         "Social sign-in provider to enable while scaffolding, e.g. google. Skips the wizard's provider question; needs --sso-client-id, and the OAuth application must already be registered with the provider. Pipe the client secret in on stdin; never pass it as a flag.",
       options: [...IDP_PROVIDERS],
     }),
-    "sso-client-id": Flags.string({
+    "sso-client-id": nonBlankString({
       description: "Client id of the OAuth application registered with the --sso provider.",
     }),
   };
