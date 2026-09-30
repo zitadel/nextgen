@@ -6,10 +6,12 @@ import { parseLocalJourneyArgs } from "./run-options.mjs";
 
 test("local journey defaults to the full framework matrix", () => {
   assert.deepEqual(parseLocalJourneyArgs([]), {
+    ci: false,
     concurrency: 5,
     frameworkIds: ["next", "nuxt", "react", "vue", "angular", "solid", "svelte", "qwik"],
     image: "",
     keep: false,
+    matrix: "full",
     preexistingApp: false,
     preset: "",
     runtime: "binary",
@@ -35,10 +37,12 @@ test("local journey can select one framework and tune concurrency", () => {
       "/tmp/journey",
     ]),
     {
+      ci: false,
       concurrency: 2,
       frameworkIds: ["vue"],
       image: "nextgen:test",
       keep: true,
+      matrix: "full",
       preexistingApp: false,
       preset: "",
       runtime: "docker",
@@ -53,10 +57,12 @@ test("local journey can scaffold with a sign-in preset", () => {
   assert.deepEqual(
     parseLocalJourneyArgs(["--framework", "next", "--preset", "passkey-first"]),
     {
+      ci: false,
       concurrency: 5,
       frameworkIds: ["next"],
       image: "",
       keep: false,
+      matrix: "full",
       preexistingApp: false,
       preset: "passkey-first",
       runtime: "binary",
@@ -70,10 +76,12 @@ test("local journey can scaffold with a sign-in preset", () => {
 
 test("the testkit suite pins the next framework and rejects an explicit one", () => {
   assert.deepEqual(parseLocalJourneyArgs(["--suite", "testkit"]), {
+    ci: false,
     concurrency: 5,
     frameworkIds: ["next"],
     image: "",
     keep: false,
+    matrix: "full",
     preexistingApp: false,
     preset: "",
     runtime: "binary",
@@ -90,10 +98,12 @@ test("the testkit suite pins the next framework and rejects an explicit one", ()
 
 test("local journey can request the binary runtime explicitly", () => {
   assert.deepEqual(parseLocalJourneyArgs(["--runtime", "binary", "--framework", "next"]), {
+    ci: false,
     concurrency: 5,
     frameworkIds: ["next"],
     image: "",
     keep: false,
+    matrix: "full",
     preexistingApp: false,
     preset: "",
     runtime: "binary",
@@ -120,6 +130,45 @@ test("the pre-existing-app lane defaults to the route-based matrix", () => {
   assert.throws(
     () => parseLocalJourneyArgs(["--suite", "testkit", "--preexisting-app"]),
     /testkit suite always scaffolds fresh/,
+  );
+});
+
+test("--ci runs the full CI journey set in one process", () => {
+  const parsed = parseLocalJourneyArgs(["--ci"]);
+  assert.equal(parsed.ci, true);
+  assert.equal(parsed.matrix, "full");
+});
+
+test("--matrix validates its scope", () => {
+  assert.equal(parseLocalJourneyArgs(["--ci", "--matrix", "single"]).matrix, "single");
+  assert.equal(parseLocalJourneyArgs(["--ci", "--matrix", "full"]).matrix, "full");
+  assert.throws(() => parseLocalJourneyArgs(["--matrix", "half"]), /single or full/);
+  assert.throws(() => parseLocalJourneyArgs(["--matrix"]), /requires a value/);
+});
+
+test("--matrix without --ci is rejected rather than silently ignored", () => {
+  assert.throws(
+    () => parseLocalJourneyArgs(["--matrix", "single"]),
+    /--matrix only applies with --ci/,
+  );
+});
+
+test("--ci rejects the flags that pick a single variant's shape", () => {
+  assert.throws(
+    () => parseLocalJourneyArgs(["--ci", "--framework", "next"]),
+    /--ci runs the full CI journey set/,
+  );
+  assert.throws(
+    () => parseLocalJourneyArgs(["--ci", "--suite", "testkit"]),
+    /--ci runs the full CI journey set/,
+  );
+  assert.throws(
+    () => parseLocalJourneyArgs(["--ci", "--preset", "passkey-first"]),
+    /--ci runs the full CI journey set/,
+  );
+  assert.throws(
+    () => parseLocalJourneyArgs(["--ci", "--preexisting-app"]),
+    /--ci runs the full CI journey set/,
   );
 });
 
