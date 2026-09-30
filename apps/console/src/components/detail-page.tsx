@@ -9,17 +9,9 @@ import { cn } from "@/lib/utils";
  * Project settings) — the detail counterpart of `resource-list.tsx`.
  *
  * The three screens had each measured "the detail frame" and landed on three
- * versions of it: the page top at 36, 22 and 18px, the title with and without
- * its icon tile, the header card at two paddings and two alignments, and the
- * body 23, 24 or 32px below. One shell now draws all of them:
- *
- * | Region        | Value                                                  |
- * | ------------- | ------------------------------------------------------ |
- * | Page gutter   | 16px, 22px from the navbar — as the list shell         |
- * | Header gutter | 24px — the page gutter plus 8px                         |
- * | Title lockup  | 36px icon tile, 12px to a 24/24 display-face title      |
- * | Header card   | 20px inset, 12px block, values centred on the rule      |
- * | Body          | 24px under the header row                               |
+ * versions of it. One shell now draws all of them; its measurements live in
+ * one place, "Resource detail layout" in `docs/styling.md`, which a change to
+ * a value here updates too.
  *
  * The schema and login-flow screens are a different composition — the whole
  * screen is one panel (`DETAIL_PANEL_PAGE`) — and keep it. Both share the icon

@@ -27,7 +27,9 @@ import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { type Browser, type Page, chromium } from "@playwright/test";
+import { type Browser, type Page, chromium, errors } from "@playwright/test";
+
+import { completeLogin } from "../src-real/login";
 
 const origin = process.env.CONSOLE_DEV_ORIGIN ?? "http://localhost:5174";
 const user = {
@@ -70,19 +72,27 @@ const SCREENS: Screen[] = [
   { name: "Settings", path: "/settings" },
 ];
 
-/** The dev-real sign-in: default-login's identifier step, then its password step. */
+/**
+ * Signs in (the e2e suites' own login, `src-real/login.ts`) and returns the
+ * project the console selected, which every screen is captured in.
+ */
 async function signIn(page: Page): Promise<string> {
-  await page.goto(`${origin}/login`);
-  await page.getByLabel("Email").fill(user.email);
-  await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await page.getByLabel("Password").fill(user.password);
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await page.waitForURL((url) => !url.pathname.endsWith("/login"));
-  // The sign-in ends in a full-document navigation; the shell's nav rendering
-  // is what says it has landed (see src-real/support.ts).
-  await page.getByRole("navigation", { name: "Primary" }).waitFor();
-  // The `_authed` layout retains the selected project in the query.
-  await page.waitForURL((url) => url.searchParams.has("project"));
+  await completeLogin(page, user, `${origin}/login`);
+  // The `_authed` layout selects the person's only project and keeps it in the
+  // query. With none or several it selects nothing and waits on Projects, so
+  // this would otherwise run into the default timeout with no explanation.
+  try {
+    await page.waitForURL((url) => url.searchParams.has("project"), { timeout: 10_000 });
+  } catch (error) {
+    if (!(error instanceof errors.TimeoutError)) throw error;
+    throw new Error(
+      `signed in as ${user.email}, but the console selected no project (it is on ` +
+        `${new URL(page.url()).pathname}). It selects one only when the account holds ` +
+        "exactly one project: sign in as dev-real's seeded user, not in claim mode, " +
+        "or set CONSOLE_DEV_EMAIL to an account with a single grant.",
+      { cause: error },
+    );
+  }
   const project = new URL(page.url()).searchParams.get("project");
   if (!project) throw new Error("signed in, but no project was selected");
   return project;
@@ -111,11 +121,16 @@ async function resolveUrls(page: Page, project: string): Promise<Map<Screen, str
     }
     await page.goto(list);
     await settle(page);
+    // Only a timeout means an empty list; a crashed page or a lost context is
+    // a failure of the run and is reported as one.
     const href = await page
       .locator(`main a[href^="${screen.firstRow}"]`)
       .first()
       .getAttribute("href", { timeout: 5_000 })
-      .catch(() => null);
+      .catch((error: unknown) => {
+        if (error instanceof errors.TimeoutError) return null;
+        throw error;
+      });
     if (!href) {
       console.warn(`  skipped ${screen.name}: its list has no rows`);
       continue;
@@ -208,16 +223,21 @@ const OWN_SHOT = new RegExp(
 );
 
 await mkdir(outDir, { recursive: true });
-// A screen that no longer exists would otherwise leave its old shots behind.
+// A screen that no longer exists would otherwise leave its old shots behind,
+// and the contact sheet goes with them: it is rewritten only once every shot
+// is taken, so an aborted run must not leave the previous one pointing at
+// images just removed.
 for (const file of await readdir(outDir)) {
-  if (OWN_SHOT.test(file)) await rm(join(outDir, file));
+  if (OWN_SHOT.test(file) || file === "index.html") await rm(join(outDir, file));
 }
 
-// The signed-in session is a live cookie: kept out of the output directory, in
-// a private temp directory removed however the run ends.
-const sessionDir = await mkdtemp(join(tmpdir(), "console-screenshots-"));
 const browser = await chromium.launch();
+// The signed-in session is a live cookie: kept out of the output directory, in
+// a private temp directory made once the browser is up and removed however the
+// run ends.
+let sessionDir: string | undefined;
 try {
+  sessionDir = await mkdtemp(join(tmpdir(), "console-screenshots-"));
   const signInContext = await browser.newContext();
   const page = await signInContext.newPage();
   console.log(`signing in to ${origin} as ${user.email}`);
@@ -236,5 +256,5 @@ try {
   console.log(`\n  open ${join(outDir, "index.html")}\n`);
 } finally {
   await browser.close();
-  await rm(sessionDir, { recursive: true, force: true });
+  if (sessionDir) await rm(sessionDir, { recursive: true, force: true });
 }
