@@ -727,10 +727,10 @@ func TestCallback(t *testing.T) {
 			},
 		},
 		{
-			name: "the strategy cannot replace the subject",
+			name: "the strategy cannot replace the subject, mapped or not",
 			conn: func(p *provider) Connection {
 				conn := p.connection(ClientSecretBasic, true, true)
-				conn.ClaimMapping = mapping
+				conn.ClaimMapping = map[string]string{"email": "email", "givenName": "given_name", "externalId": "sub"}
 				return conn
 			},
 			req: CallbackRequest{Code: "the-code", Nonce: "the-nonce", RedirectURI: redirectURI, RevisionID: "idprev_1", PKCEVerifier: "the-verifier", ClientSecret: "the-secret",
@@ -739,7 +739,7 @@ func TestCallback(t *testing.T) {
 				}},
 			want: ExternalIdentity{
 				Subject:    "user-1",
-				Claims:     map[string]any{"email": "ada@example.test", "givenName": "Ada"},
+				Claims:     map[string]any{"email": "ada@example.test", "givenName": "Ada", "externalId": "user-1"},
 				Verified:   map[string]bool{},
 				RevisionID: "idprev_1",
 			},

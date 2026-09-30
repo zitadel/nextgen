@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"maps"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -138,8 +137,15 @@ func (c *OIDCClient) Callback(ctx context.Context, req CallbackRequest) (Externa
 		if err != nil {
 			return ExternalIdentity{}, domain.ErrIDPSupplementaryFetchFailed(err)
 		}
-		// The strategy is the authority for the claims it emits.
-		maps.Copy(claims, strategy.Claims)
+		// The strategy is the authority for the claims it emits, except the
+		// subject: the identity keys on the verified value, so a property
+		// mapped to the subject claim must carry that same value.
+		for claim, value := range strategy.Claims {
+			if claim == c.conn.SubjectClaim {
+				continue
+			}
+			claims[claim] = value
+		}
 	}
 	return ExternalIdentity{
 		Subject:    subject,
