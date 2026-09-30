@@ -298,8 +298,17 @@ export const flowMachine = createMachine({
           },
           {
             // `callback`: a subject already linked to an account, so the round
-            // trip is the whole sign-in.
+            // trip is the whole sign-in. Guarded, so only this outcome reaches
+            // it.
+            guard: ({ event }) => event.sso_outcome === "callback",
             target: "done",
+            actions: [captureFields, rotateToken],
+          },
+          {
+            // No outcome at all. Failing closed: the worst reading of "we
+            // could not tell who came back" is to sign someone in, so an
+            // unresolved return registers instead.
+            target: "register-sso",
             actions: [captureFields, rotateToken],
           },
         ],

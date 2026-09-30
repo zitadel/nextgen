@@ -51,9 +51,17 @@ describe("the provider round trip", () => {
 
   it("treats an unresolved return as a new identity rather than a sign-in", () => {
     // Failing closed: the worst reading of "we could not tell" is to sign
-    // someone in, so an absent outcome must not reach `done`.
+    // someone in, so an absent outcome must not reach `done`. The outcome is
+    // omitted here on purpose -- supplying one would test the wrong thing.
     const actor = atProvider();
-    actor.send({ type: "SUBMIT", action: "callback", fields: {}, sso_outcome: "identity_unknown" });
+    actor.send({ type: "SUBMIT", action: "callback", fields: {} });
+
+    expect(actor.getSnapshot().value).toBe("register-sso");
+  });
+
+  it("treats an explicitly null outcome the same way", () => {
+    const actor = atProvider();
+    actor.send({ type: "SUBMIT", action: "callback", fields: {}, sso_outcome: null });
 
     expect(actor.getSnapshot().value).toBe("register-sso");
   });

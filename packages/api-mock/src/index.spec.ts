@@ -419,6 +419,21 @@ describe("setupMockHandlers — the provider round trip", () => {
     expect(returning.step.name).toBe("done");
   });
 
+  test("the mock's password-account fixture reaches sso-conflict too", async () => {
+    // `exists@example.com` is how the mock represents an email that already
+    // has a password account. Reading only enrolled credentials missed it, so
+    // the collision branch was unreachable for the fixture most callers use.
+    const { id, sessionToken } = await toProvider();
+
+    const back = await submitFlowStep(id, {
+      session_token: sessionToken,
+      action: "callback",
+      fields: { email: "exists@example.com" },
+    });
+
+    expect(back.step.name).toBe("sso-conflict");
+  });
+
   test("an email that already has a passkey account reaches sso-conflict", async () => {
     // The account exists, so the provider must not mint a second one for it.
     mock.registerCredential("held@example.test", "cred-held");

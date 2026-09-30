@@ -111,7 +111,7 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
     if (ssoIdentities.isLinked(slug, email)) {
       return "callback";
     }
-    return authn.getByUser(email).length > 0 ? "user_already_exists" : "identity_unknown";
+    return authn.hasAccount(email) ? "user_already_exists" : "identity_unknown";
   }
 
   function reset(): void {
