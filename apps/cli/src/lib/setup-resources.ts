@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { access, mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import { consola } from "consola";
@@ -105,12 +105,24 @@ export async function materializeSetupResources(opts: {
     : undefined;
   const slug = typeof connection?.slug === "string" ? connection.slug : undefined;
   if (connection && slug) {
-    await mkdir(join(opts.cwd, IDPS_DIR), { recursive: true });
     const connectionPath = `${IDPS_DIR}/${slug}.json`;
-    // Deliberately not `opts.force`: see {@link CONNECTION_EXISTS}.
-    if (await writeResourceFile(opts.cwd, connectionPath, connection, false, CONNECTION_EXISTS)) {
-      filesWritten.push(join(opts.cwd, connectionPath));
+    // Refused before anything is created, for two reasons: the file is the
+    // developer's (see {@link CONNECTION_EXISTS}), and finding out after the
+    // create would leave the project holding a connection no local file
+    // tracks.
+    if (await exists(join(opts.cwd, connectionPath))) {
+      throw new ZitadelError("E_CONFLICT", `${connectionPath} already exists`, {
+        hint: CONNECTION_EXISTS.hint,
+        nextCommands: CONNECTION_EXISTS.nextCommands,
+      });
     }
+
+    // The create comes before the file. Setup does not remove a connection
+    // file it wrote -- that rule is what keeps a developer's own file safe --
+    // so writing first would leave one behind on any failure here and the
+    // retry would then refuse on it, with nothing able to clear it but the
+    // developer. Creating first means a failure leaves nothing to clear.
+    //
     // `client_secret` travels as its `${{ NAME }}` reference: the platform
     // resolves it from the environment's variables, so no credential is sent
     // here and none is written to the file.
@@ -118,6 +130,13 @@ export async function materializeSetupResources(opts: {
       { idp: connection as CreateIdpBodyIdp },
       { project_id: opts.projectId },
     );
+
+    await mkdir(join(opts.cwd, IDPS_DIR), { recursive: true });
+    // Still `wx` rather than `opts.force`: the check above is the early
+    // refusal, this is the one that cannot be raced.
+    if (await writeResourceFile(opts.cwd, connectionPath, connection, false, CONNECTION_EXISTS)) {
+      filesWritten.push(join(opts.cwd, connectionPath));
+    }
     const written = await writeBackResource(
       opts.cwd,
       connectionPath,
@@ -275,6 +294,16 @@ const CONNECTION_EXISTS: { hint: string; nextCommands: string[] } = {
     "provider afterwards to reuse it.",
   nextCommands: ["zitadel sso enable --provider google"],
 };
+
+/** Whether a path is there, without caring why it is not. */
+async function exists(path: string): Promise<boolean> {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 async function writeResourceFile(
   cwd: string,

@@ -353,6 +353,59 @@ describe("materializeSetupResources with a social provider", () => {
     expect(state.resources[`${IDPS_DIR}/google.json`]).toMatchObject({ id: "idp_01KWHE" });
   });
 
+  it("leaves no connection file behind when the create fails", async () => {
+    // Setup does not remove a connection file it wrote, so writing before the
+    // create would leave one behind on any failure and the retry would refuse
+    // on it -- with nothing able to clear it but the developer.
+    const client = recordingClient();
+    const failing = {
+      ...client,
+      createIdp: () => Promise.reject(new Error("not implemented")),
+    } as unknown as typeof client;
+
+    await expect(
+      materializeSetupResources({
+        cwd,
+        cliVersion: TEST_CLI_VERSION,
+        client: failing,
+        projectId: "project_123",
+        force: false,
+        sso: google,
+      }),
+    ).rejects.toThrow();
+
+    expect(existsSync(join(cwd, IDPS_DIR, "google.json"))).toBe(false);
+  });
+
+  it("refuses an existing connection before creating anything", async () => {
+    // Finding out after the create would leave the project holding a
+    // connection that no local file tracks.
+    let created = false;
+    const client = recordingClient();
+    const watching = {
+      ...client,
+      createIdp: (...args: unknown[]) => {
+        created = true;
+        return (client.createIdp as (...a: unknown[]) => unknown)(...args);
+      },
+    } as unknown as typeof client;
+    await mkdir(join(cwd, IDPS_DIR), { recursive: true });
+    await writeFile(join(cwd, IDPS_DIR, "google.json"), JSON.stringify({ slug: "google" }));
+
+    await expect(
+      materializeSetupResources({
+        cwd,
+        cliVersion: TEST_CLI_VERSION,
+        client: watching,
+        projectId: "project_123",
+        force: false,
+        sso: google,
+      }),
+    ).rejects.toMatchObject({ code: "E_CONFLICT" });
+
+    expect(created).toBe(false);
+  });
+
   it("refuses to replace an existing connection, even with --force", async () => {
     // --force is for setup's own scaffolding. A connection may hold a client
     // id someone registered with the vendor and a slug the schemas and flows
