@@ -149,6 +149,50 @@ describe("planConnection", () => {
     );
   });
 
+  it("reads what a hand-edited connection references, not what its slug implies", () => {
+    // An okta connection pointing at GOOGLE_CLIENT_SECRET collides with
+    // Google however its slug reads; deriving OKTA_CLIENT_SECRET from the
+    // slug would miss it and let the google publish overwrite a variable
+    // both connections consume.
+    const okta = file(
+      "okta.json",
+      googleBody({
+        slug: "okta",
+        template: "oidc-generic",
+        oidc: {
+          issuer: "https://acme.okta.com",
+          client_id: "${{ OKTA_CLIENT_ID }}",
+          client_secret: "${{ GOOGLE_CLIENT_SECRET }}",
+          scopes: ["openid"],
+        },
+      }),
+    );
+
+    expect(() => planConnection({ provider: "google", files: [okta] })).toThrow(
+      /both use GOOGLE_CLIENT_SECRET/,
+    );
+  });
+
+  it("refuses a connection pointing both credentials at one variable", () => {
+    // The second publish would replace the first, leaving the connection
+    // holding a client id where it looks for a secret.
+    const both = file(
+      "google.json",
+      googleBody({
+        oidc: {
+          issuer: "https://accounts.google.com",
+          client_id: "${{ GOOGLE_CLIENT_SECRET }}",
+          client_secret: "${{ GOOGLE_CLIENT_SECRET }}",
+          scopes: ["openid"],
+        },
+      }),
+    );
+
+    expect(() => planConnection({ provider: "google", files: [both] })).toThrow(
+      /both credentials at GOOGLE_CLIENT_SECRET/,
+    );
+  });
+
   it("does not mistake a connection for colliding with itself", () => {
     const only = file("google.json", googleBody({ slug: "google" }));
 

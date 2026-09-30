@@ -135,40 +135,59 @@ export function credentialVariablesOf(
 }
 
 /**
- * Stop when another connection's credentials would land in the same variables.
+ * Stop when two connections' credentials would land in the same variable.
  *
- * A slug may hold `-` and `_` (`^[a-z0-9][a-z0-9_-]*$`), and the variable name
- * replaces every non-alphanumeric with `_`, so `google-work` and `google_work`
- * both read `GOOGLE_WORK_CLIENT_SECRET`. Two connections sharing one variable
- * means whichever was published last wins and the other signs in with the
- * wrong application's credentials — a failure that surfaces at the provider,
- * not here. The derivation stays legible on purpose; the ambiguity is refused
- * instead, as this command refuses every other one.
+ * Two ways that happens. A slug may hold `-` and `_`
+ * (`^[a-z0-9][a-z0-9_-]*$`) and the variable name replaces every
+ * non-alphanumeric with `_`, so `google-work` and `google_work` both read
+ * `GOOGLE_WORK_CLIENT_SECRET`. And a connection is editable, so one may simply
+ * point at a name another already uses, or point both of its own credentials
+ * at one name. Either way a publish overwrites what the other credential put
+ * there, and the loser signs in with the wrong application — a failure that
+ * surfaces at the provider, not here.
  *
+ * What an existing file *references* is what counts, not what its slug would
+ * derive: an `okta` connection referencing `GOOGLE_CLIENT_SECRET` collides
+ * with Google however its slug reads.
+ *
+ * The derivation stays legible on purpose — these names get typed into
+ * `variables set` by hand — so the ambiguity is refused rather than encoded
+ * around.
+ *
+ * @param ours - The variables this run will publish to.
  * @param except - The connection being reused, which is not its own collision.
  */
 function refuseCollidingVariables(
+  ours: CredentialVariables,
   slug: string,
   files: readonly ConnectionFile[],
   except?: ConnectionFile,
 ): void {
-  const ours = credentialVariables(slug);
-  for (const file of files) {
-    if (file === except || typeof file.body.slug !== "string" || file.body.slug === slug) {
-      continue;
-    }
-    const theirs = credentialVariables(file.body.slug);
-    if (theirs.clientId !== ours.clientId && theirs.clientSecret !== ours.clientSecret) {
-      continue;
-    }
+  if (ours.clientId === ours.clientSecret) {
     throw new ZitadelError(
       "E_CONFLICT",
-      `Slugs ${JSON.stringify(file.body.slug)} and ${JSON.stringify(slug)} both use ${ours.clientSecret}`,
+      `This connection points both credentials at ${ours.clientId}`,
       {
-        hint: "Rename one of the connections' slugs so each has credentials of its own.",
-        details: { file: file.path, slug, other_slug: file.body.slug, variable: ours.clientSecret },
+        hint: "Give client_id and client_secret separate ${{ NAME }} references, then run the command again.",
+        details: { slug, variable: ours.clientId },
       },
     );
+  }
+  for (const file of files) {
+    if (file === except || typeof file.body.slug !== "string") {
+      continue;
+    }
+    const theirs = credentialVariablesOf(file, file.body.slug);
+    const shared = [ours.clientId, ours.clientSecret].find(
+      (name) => name === theirs.clientId || name === theirs.clientSecret,
+    );
+    if (shared === undefined) {
+      continue;
+    }
+    throw new ZitadelError("E_CONFLICT", `${file.path} and ${slug} both use ${shared}`, {
+      hint: "Point one of them at a variable of its own, then run the command again.",
+      details: { file: file.path, slug, other_slug: file.body.slug, variable: shared },
+    });
   }
 }
 
@@ -227,7 +246,7 @@ export function planConnection(options: {
       );
     }
     const matchSlug = typeof match.body.slug === "string" ? match.body.slug : slug;
-    refuseCollidingVariables(matchSlug, options.files, match);
+    refuseCollidingVariables(credentialVariablesOf(match, matchSlug), matchSlug, options.files, match);
     return { action: "reuse", file: match, slug: matchSlug };
   }
 
@@ -242,6 +261,6 @@ export function planConnection(options: {
       details: { file: path },
     });
   }
-  refuseCollidingVariables(slug, options.files);
+  refuseCollidingVariables(credentialVariables(slug), slug, options.files);
   return { action: "create", name, path, slug };
 }
