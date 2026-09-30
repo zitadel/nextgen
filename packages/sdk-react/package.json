@@ -29,6 +29,7 @@
     "build": "vite build",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
+    "test:all": "pnpm run test",
     "lint": "eslint ."
   },
   "dependencies": {
@@ -47,6 +48,7 @@
     "@eslint/markdown": "catalog:",
     "@testing-library/react": "catalog:",
     "@types/react": "catalog:",
+    "@vitest/coverage-v8": "catalog:sdk",
     "eslint": "catalog:",
     "eslint-config-prettier": "catalog:",
     "eslint-import-resolver-typescript": "catalog:",

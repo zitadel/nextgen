@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { test } from "node:test";
+import { test } from "vitest";
 import { fileURLToPath } from "node:url";
 
 import { prepareApp } from "./prepare-app.mjs";

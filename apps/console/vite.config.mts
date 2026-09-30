@@ -7,6 +7,8 @@ import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig, loadEnv, type ProxyOptions } from "vite";
 
+import { baseTest } from "../../vitest.shared.mjs";
+
 const consoleBase = "/ui/console/";
 const consoleOutDir = "../../internal/staticui/console/dist";
 const defaultApiBase = "/api";
@@ -36,7 +38,7 @@ export default defineConfig(({ command, mode, isPreview }) => ({
       ignored: ["**/.git/**", "**/node_modules/**", "**/dist/**"],
     },
   },
-  cacheDir: "../../node_modules/.vite/apps/console",
+  cacheDir: ".vitest",
   // Resolve workspace `@zitadel/*` packages straight from `.ts`
   // source for hot dev iteration. Production builds pick up pre-built
   // `dist/*.mjs` via the default `import` condition instead.
@@ -66,19 +68,15 @@ export default defineConfig(({ command, mode, isPreview }) => ({
     },
   },
   test: {
+    ...baseTest,
     name: "@zitadel/console",
-    watch: false,
-    passWithNoTests: true,
-    globals: true,
     environment: "jsdom",
     setupFiles: ["./src/test-setup.ts"],
-    include: ["src/**/*.spec.{ts,tsx}"],
-    reporters: ["default"],
-    coverage: {
-      reportsDirectory: "./test-output/vitest/coverage",
-      provider: "v8" as const,
-      include: ["src/**/*.{ts,tsx}"],
-    },
+    // The per-test runner budget must exceed the RTL asyncUtilTimeout (5s, set
+    // in test-setup.ts); otherwise a slow query hits Vitest's default 5s
+    // testTimeout before its own wait window elapses, cutting the findBy short
+    // and hiding Testing Library's diagnostic. Give it 4x headroom.
+    testTimeout: 20_000,
   },
 }));
 
