@@ -70,7 +70,8 @@ type ExternalIdentity struct {
 
 // SupplementaryFetch is the supplementary_fetch strategy slot: a provider
 // specific call after claims extraction whose result overwrites same-named
-// claims and vouches for the ones it verifies.
+// claims and vouches for the ones it verifies. The subject claim is the
+// exception: the verified token keeps it.
 type SupplementaryFetch func(ctx context.Context, in StrategyInput) (StrategyResult, error)
 
 // StrategyInput is what a strategy runs with.
