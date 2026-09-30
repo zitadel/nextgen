@@ -58,7 +58,7 @@ tasks:
   # affected-gate and release-body logic never become test files nothing
   # executes.
   test:
-    script: "node --test scripts/ci-mode.test.mjs scripts/release-github.test.mjs && corepack pnpm exec tsx --test scripts/generate-meta-schemas.test.ts"
+    command: "corepack pnpm run test:all"
     inputs:
       - "scripts/ci-mode.mjs"
       - "scripts/ci-mode.test.mjs"
@@ -69,21 +69,39 @@ tasks:
       - "scripts/release-github.mjs"
       - "scripts/release-github.test.mjs"
       - "scripts/release-manifest.mjs"
+      # The task delegates to the package `test` script and its file-existence
+      # guard, so both are behavioral inputs.
+      - "package.json"
+      - "scripts/assert-file.mjs"
+      # Shared Vitest config these tests run under (root project is not covered
+      # by the TypeScript implicitInputs).
+      - "vitest.config.ts"
+      - "vitest.shared.mjs"
+      - "vitest.shared.d.mts"
     options:
       cache: true
       runInCI: true
 
   check-typecheck:
-    script: "node --test scripts/check-typecheck-programs.test.mjs && node scripts/check-typecheck-programs.mjs"
+    # assert-file guards against a silent pass: Vitest treats a positional filter
+    # that matches nothing as success (passWithNoTests), so a renamed/moved test
+    # file would stop running unnoticed. node:test used to error on a missing
+    # file; this restores that fail-loud behavior, cross-platform (POSIX `test`
+    # is unavailable on Windows shells).
+    script: "node scripts/assert-file.mjs scripts/check-typecheck-programs.test.mjs && corepack pnpm exec vitest run scripts/check-typecheck-programs.test.mjs && node scripts/check-typecheck-programs.mjs"
     inputs:
       - "scripts/check-typecheck-programs.mjs"
       - "scripts/check-typecheck-programs.test.mjs"
+      - "scripts/assert-file.mjs"
       - "apps/*/moon.yml"
       - "packages/*/moon.yml"
       - "apps/*/package.json"
       - "packages/*/package.json"
       - "apps/*/tsconfig*.json"
       - "packages/*/tsconfig*.json"
+      - "vitest.config.ts"
+      - "vitest.shared.mjs"
+      - "vitest.shared.d.mts"
     options:
       cache: true
       runInCI: true
@@ -92,13 +110,22 @@ tasks:
   # nothing loudly — the spec just stops being checked. These fixtures fail
   # instead.
   check-openapi-rules:
-    command: "node --test scripts/openapi-casing-rules.test.mjs"
+    # assert-file guards against a silent pass: Vitest treats a positional filter
+    # that matches nothing as success (passWithNoTests), so a renamed/moved test
+    # file would stop running unnoticed. node:test used to error on a missing
+    # file; this restores that fail-loud behavior, cross-platform (POSIX `test`
+    # is unavailable on Windows shells).
+    script: "node scripts/assert-file.mjs scripts/openapi-casing-rules.test.mjs && corepack pnpm exec vitest run scripts/openapi-casing-rules.test.mjs"
     inputs:
       - "scripts/openapi-casing-rules.test.mjs"
+      - "scripts/assert-file.mjs"
       - "scripts/testdata/openapi-casing/**"
       - "/redocly.yaml"
       # The test reads the pinned redocly version from this file.
       - "apps/server/moon.yml"
+      - "vitest.config.ts"
+      - "vitest.shared.mjs"
+      - "vitest.shared.d.mts"
     options:
       cache: true
       runInCI: true

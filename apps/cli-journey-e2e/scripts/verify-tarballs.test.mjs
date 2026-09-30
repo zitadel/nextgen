@@ -1,11 +1,11 @@
-/* oxlint-disable playwright/expect-expect -- node:test file asserting via node:assert */
+/* oxlint-disable playwright/expect-expect -- Vitest file asserting via node:assert */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { after, before, test } from "node:test";
+import { afterAll, beforeAll, test } from "vitest";
 
 import { PUBLIC_PACKAGE_DIRS } from "../../../scripts/release-manifest.mjs";
 
@@ -22,7 +22,7 @@ let releaseSetDir;
 let extraPackageDir;
 let missingPackageDir;
 
-before(async () => {
+beforeAll(async () => {
   fixtureRoot = await mkdtemp(join(tmpdir(), "verify-tarballs-test-"));
   releaseSetDir = join(fixtureRoot, "release-set");
   extraPackageDir = join(fixtureRoot, "extra-package");
@@ -38,7 +38,7 @@ before(async () => {
   await rm(join(missingPackageDir, "zitadel-testing-1.0.0.tgz"));
 });
 
-after(async () => {
+afterAll(async () => {
   await rm(fixtureRoot, { recursive: true, force: true });
 });
 

@@ -1,5 +1,25 @@
 # @zitadel/api
 
+## 1.0.0-alpha.24
+
+### Minor Changes
+
+- [#1215](https://github.com/zitadel/nextgen/pull/1215) [`91b1eb6`](https://github.com/zitadel/nextgen/commit/91b1eb653fc00633cf64e9d93c9edf73e3687933) Thanks [@vitorbari](https://github.com/vitorbari)! - Releases can now be deployed to environments over the API.
+
+  `POST /deployments` makes a release live on an environment, atomically: when the call returns, the environment runs the named release and an immutable record of the act exists; on any failure nothing changes. Deploying, promoting and rolling back are all this call — `reason` says which, defaulting to `deploy`, and a promotion records the environment it came from. The record keeps ids and timestamp top-level; the why-and-who (`reason`, a free-form `message`, `source_environment_id`, `deployed_by`, `deployed_by_type`) rides in a `metadata` object, every field optional. Idempotent on the running release: deploying what the environment already runs changes nothing and answers `200` with the deployment that made it live, so a re-run of `zitadel deploy` on unchanged content is a no-op end to end. An optional `expected_current_deployment_id` guards against racing another deploy: a mismatch answers `409` carrying the actual current deployment and release.
+
+  `GET /deployments` lists the log newest first — filtered to one environment, the first row is its current deployment — and `expand: ["release"]` embeds the release each deployment made live (requires `release.read`). `GET /deployments/{deployment_id}` reads one record. Environment reads now carry `current_deployment` alongside the identity, `null` until something is deployed.
+
+  Every deployment is recorded in the audit stream as `deployment.created`, by ids rather than names, so the trail survives environment renames and deletes.
+
+- [#1303](https://github.com/zitadel/nextgen/pull/1303) [`e61c854`](https://github.com/zitadel/nextgen/commit/e61c8545f06ce9ebe25e7f2e0d344cb6f8efb0d0) Thanks [@livio-a](https://github.com/livio-a)! - `POST /users/query` takes an optional `project_id`, so a Console session can list the users of the project it selected rather than only those of the project it signed in to. Without it, the credential's own project is listed, as before. In the generated client, `queryUsers` gains a `params` argument before the fetch options: move options passed second to the third argument.
+
+- [#1305](https://github.com/zitadel/nextgen/pull/1305) [`f2e81dd`](https://github.com/zitadel/nextgen/commit/f2e81dd84af7e47c06c084365dea983ee59a305b) Thanks [@livio-a](https://github.com/livio-a)! - A Console session can open users, teams, schemas, login flows, and branding by id in any project it holds a grant on, not only in the project it signed in to. `GET /schemas/{id}` takes an optional `project_id`, because schema ids are unique per project only; without it an id that exists in several projects resolves in the caller's own project. Project secrets still resolve ids in their own project only.
+
+### Patch Changes
+
+- [#1288](https://github.com/zitadel/nextgen/pull/1288) [`4bea70a`](https://github.com/zitadel/nextgen/commit/4bea70a7244b44e62476e6dd2dc6b8e4a7bd1a45) Thanks [@mridang](https://github.com/mridang)! - Encode path parameters in the generated API client, so any id the API accepts can be fetched. Schema ids are the case that hit today: a schema's id is its `$id`, usually a URL such as `https://nextgen.com/api/schemas/default-human-user.json`. Sent raw, the `//` collapsed on a redirect and the request 404'd, so `zitadel schemas get <id>` failed for every URL id and the console's user list silently dropped its schema columns. `zitadel schemas get` also stops guessing what an id looks like: it used to read anything without `sch_` or `://` as an object type, which sent ids like `urn:example:human` down the wrong path. It now asks the server, and falls back to the object-type lookup only on a 404. Setup reconciliation and `apply`/`plan` schema fetches used to encode the id themselves to work around the same bug; that is gone, so the client encodes exactly once rather than sending `%25` for every delimiter.
+
 ## 1.0.0-alpha.23
 
 ### Major Changes

@@ -1,18 +1,16 @@
 import { defineConfig } from "vitest/config";
 
+import { baseTest } from "../../vitest.shared.mjs";
+
 export default defineConfig({
+  cacheDir: ".vitest",
   test: {
+    ...baseTest,
     name: "@zitadel/cli",
-    watch: false,
-    globals: true,
     environment: "node",
     include: ["tests/**/*.test.ts"],
-    globalSetup: ["tests/helpers/global-setup.ts"],
-    reporters: ["default"],
-    coverage: {
-      reportsDirectory: "./test-output/vitest/coverage",
-      provider: "v8",
-      include: ["src/**/*.ts"],
-    },
+    // The oclif dist the integration suite drives is built by the `pretest`
+    // hook (`pnpm run build`), so a direct `pnpm test` and a moon run are both
+    // self-contained with a fresh build. Same lifecycle-hook pattern as config.
   },
 });
