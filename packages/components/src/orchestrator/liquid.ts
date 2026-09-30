@@ -300,14 +300,24 @@ export function parseSsoError(raw: string): FlowError[] | null {
   const tag = "sso_error:";
   if (!raw.startsWith(tag)) return null;
   try {
-    const decoded = JSON.parse(atob(raw.slice(tag.length))) as {
+    // `atob` yields one character per byte, so a UTF-8 description would come
+    // back as mojibake read directly. The server marshals JSON as UTF-8 before
+    // base64, and the point of carrying the provider's own words is that they
+    // arrive intact -- which for most providers means non-ASCII.
+    const bytes = Uint8Array.from(atob(raw.slice(tag.length)), (char) => char.charCodeAt(0));
+    const decoded = JSON.parse(new TextDecoder().decode(bytes)) as {
       code?: string;
       description?: string;
       uri?: string;
     };
+    // RFC 6749 §4.1.2.1: `access_denied` is the person saying no. Everything
+    // else -- `server_error`, `temporarily_unavailable`, a misconfigured
+    // client -- is the provider failing, and telling someone they cancelled
+    // when they did not sends them looking for a mistake they never made.
+    const cancelled = decoded.code === "access_denied";
     return [
       {
-        text_key: "error.sso_cancelled",
+        text_key: cancelled ? "error.sso_cancelled" : "error.sso_failed",
         code: decoded.code,
         detail: decoded.description || undefined,
         uri: decoded.uri || undefined,

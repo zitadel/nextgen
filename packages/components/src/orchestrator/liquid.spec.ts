@@ -705,6 +705,43 @@ describe("parseSsoError", () => {
     expect(errors?.[0]?.uri).toBeUndefined();
   });
 
+  it("keeps a non-ascii description intact, as the server encoded it", () => {
+    // The server marshals JSON as UTF-8 before base64. Reading that back with
+    // `atob` alone gives one character per byte, so the provider's own words
+    // arrive as mojibake -- which is most providers, in most languages.
+    const utf8Tag = (obj: Record<string, string>) =>
+      "sso_error:" +
+      btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(obj))));
+
+    const errors = parseSsoError(
+      utf8Tag({ code: "access_denied", description: "Anmeldung abgebrochen — über Google" }),
+    );
+
+    expect(errors?.[0]?.detail).toBe("Anmeldung abgebrochen — über Google");
+  });
+
+  it("only calls it cancelled when the provider says access_denied", () => {
+    // Telling someone they cancelled a sign-in they did not cancel sends them
+    // looking for a mistake they never made; a provider outage is not a
+    // decision the user took.
+    expect(parseSsoError(tag({ code: "access_denied" }))?.[0]?.text_key).toBe(
+      "error.sso_cancelled",
+    );
+    for (const code of ["server_error", "temporarily_unavailable", "invalid_client"]) {
+      expect(parseSsoError(tag({ code }))?.[0]?.text_key, code).toBe("error.sso_failed");
+    }
+  });
+
+  it("keeps the provider's own code on a failure, so support can act on it", () => {
+    const errors = parseSsoError(tag({ code: "server_error", description: "Upstream is down" }));
+
+    expect(errors?.[0]).toMatchObject({
+      text_key: "error.sso_failed",
+      code: "server_error",
+      detail: "Upstream is down",
+    });
+  });
+
   it("degrades a corrupt payload to a generic failure rather than leaking it", () => {
     expect(parseSsoError("sso_error:not-valid-base64!!")).toEqual([{ text_key: "error.sso_failed" }]);
   });

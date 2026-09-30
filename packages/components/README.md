@@ -272,9 +272,18 @@ renders the bundled `default.liquid`. Tracked as a follow-up.
 | `resumeFlowId` / `resume-flow-id` | `string` | Resume an existing flow handle instead of starting fresh |
 
 Events: `zitadel-flow-input`, `zitadel-flow-step`, `zitadel-flow-complete`,
-`zitadel-flow-error`. `zitadel-flow-step` fires for every applied step
-including the first, so a host app can drive its own chrome (progress,
-headings, analytics) from mount onwards rather than from the first submit.
+`zitadel-flow-error`, `zitadel-flow-redirect`. `zitadel-flow-step` fires for
+every applied step including the first, so a host app can drive its own chrome
+(progress, headings, analytics) from mount onwards rather than from the first
+submit.
+
+`zitadel-flow-redirect` fires when a step hands the browser to an identity
+provider, carrying the URL to send it to. The widget does not navigate on its
+own: the host app owns its history, and a router-driven app usually wants to
+navigate its own way. Not handling it means the provider hand-off never
+happens, so sign-in with a provider stops at the button. The framework
+wrappers surface it as `onFlowRedirect`, except Vue, which emits
+`flowRedirect`, and Qwik, which takes `onFlowRedirect$`.
 The orchestrator exposes `::part(form)` for tenant-side CSS hooks. Adopts
 design tokens and `branding.font_url` into its shadow root on each update.
 
