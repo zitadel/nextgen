@@ -28,9 +28,10 @@ export const baseTest = {
   // here so no project can silently regress to serial execution). Files within
   // a project run concurrently; moon runs the projects concurrently on top.
   fileParallelism: true,
-  // Every project passes with no tests; suites that must have tests assert that
-  // themselves. Removes the per-script `--passWithNoTests` flags.
-  passWithNoTests: true,
+  // Fail loud when a suite's include matches nothing (a broken glob or all tests
+  // removed), restoring the pre-migration behavior. A genuinely test-less lane
+  // (login-ui) overrides this to `true` in its own config.
+  passWithNoTests: false,
   // Console output plus a machine-readable result report at a uniform path.
   // The path lives in `outputFile` (Vitest's canonical location) rather than the
   // reporter tuple, so a lane that runs concurrently in the same package cwd

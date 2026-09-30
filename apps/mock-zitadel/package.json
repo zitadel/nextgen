@@ -18,7 +18,7 @@
     "dev": "tsx scripts/local-server.ts",
     "build": "tsdown",
     "test": "vitest run",
-    "test:watch": "vitest",
+    "test:watch": "vitest --watch",
     "typecheck": "corepack pnpm --filter @zitadel/api run generate && tsc --noEmit",
     "lint": "eslint ."
   },

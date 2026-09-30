@@ -21,6 +21,9 @@ export default defineConfig(({ command, mode, isPreview }) => {
       name: "@zitadel/login-ui",
       environment: "node",
       include: ["src/**/*.spec.ts"],
+      // No unit tests yet (the login flow is covered in @zitadel/components and
+      // the e2e journeys), so this lane is intentionally allowed to be empty.
+      passWithNoTests: true,
     },
     plugins: [keepGoEmbedPlaceholder(loginOutDir)],
     build: {
