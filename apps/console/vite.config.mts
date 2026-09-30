@@ -73,10 +73,6 @@ export default defineConfig(({ command, mode, isPreview }) => ({
     environment: "jsdom",
     setupFiles: ["./src/test-setup.ts"],
     include: ["src/**/*.spec.{ts,tsx}"],
-    coverage: {
-      ...baseTest.coverage,
-      include: ["src/**/*.{ts,tsx}"],
-    },
   },
 }));
 

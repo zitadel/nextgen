@@ -58,7 +58,7 @@
   "scripts": {
     "build": "tsdown",
     "test": "vitest run --project unit",
-    "test:browser": "vitest run --project browser",
+    "test:browser": "vitest run --project browser --outputFile.junit=./test-output/vitest/junit.browser.xml",
     "test:all": "vitest run"
   },
   "dependencies": {

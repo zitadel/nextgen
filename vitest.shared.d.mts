@@ -10,7 +10,8 @@ export interface BaseTest {
   globals: true;
   fileParallelism: true;
   passWithNoTests: true;
-  reporters: ["default", ["junit", { outputFile: string }]];
+  reporters: ["default", "junit"];
+  outputFile: { junit: string };
   coverage: {
     provider: "v8";
     reportsDirectory: string;

@@ -32,11 +32,18 @@ export const baseTest = {
   // themselves. Removes the per-script `--passWithNoTests` flags.
   passWithNoTests: true,
   // Console output plus a machine-readable result report at a uniform path.
-  reporters: ["default", ["junit", { outputFile: "./test-output/vitest/junit.xml" }]],
+  // The path lives in `outputFile` (Vitest's canonical location) rather than the
+  // reporter tuple, so a lane that runs concurrently in the same package cwd
+  // (e.g. `test:browser`) can override just this via `--outputFile.junit=…`.
+  reporters: ["default", "junit"],
+  outputFile: { junit: "./test-output/vitest/junit.xml" },
   coverage: {
     provider: "v8",
     reportsDirectory: "./test-output/vitest/coverage",
-    include: ["src/**/*.ts"],
+    // Every source extension in use across the workspace (.ts/.tsx/.svelte),
+    // plus .vue defensively for the Vue SDK. Keep in sync with a
+    // `find */src -type f` extension sweep when adding a new framework.
+    include: ["src/**/*.{ts,tsx,vue,svelte}"],
   },
 };
 
