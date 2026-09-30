@@ -83,13 +83,10 @@ jobs:
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' }}
         run: moon run server:check-generate-pruned
 
-      # Cached unconditionally (on full runs) so the per-package `install-browsers`
-      # moon tasks that back the browser `:test` lanes (components/api-mock/
-      # storybook) hit the cache instead of downloading Chromium. The gated
-      # install below still provisions Chromium for the e2e suites and journeys,
-      # which run in their own steps and have no such moon dep.
+      # Chromium for the e2e suites and journeys (the browser `:test` lanes are
+      # runInCI:false — opt-in local checks — so they never run here).
       - name: Cache Playwright browsers
-        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
+        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.browsers == 'true' }}
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright

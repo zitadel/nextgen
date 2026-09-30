@@ -58,17 +58,17 @@ tasks:
       # the later release step instead of the normal build/test graph.
       runInCI: false
 
-  # `vitest run` runs both projects (unit + browser) from one config, so the
-  # Playwright Chromium install is a dep here (self-contained, like storybook).
+  # Chromium for the opt-in browser lane (self-contained, like storybook).
   install-browsers:
     command: "corepack pnpm exec playwright install chromium"
     options:
       cache: false
 
+  # Default, fast lane: the jsdom `unit` project only (the CI gate). No browser,
+  # so no Chromium needed.
   test:
     command: "corepack pnpm run test"
     deps:
-      - "install-browsers"
       - "api:build"
       - "api-mock:build"
       - "config:build"
@@ -76,3 +76,13 @@ tasks:
       # standalone-artifact.spec.ts reads dist/standalone.mjs — the unit suite
       # guards the built artifact, so the dev build must run first.
       - "build"
+
+  # Heavy, opt-in browser lane (real Chromium, 60-120s cold start). runInCI:false
+  # by design — a local check, not part of the default `moon ci :test` loop.
+  test-browser:
+    command: "corepack pnpm run test:browser"
+    deps:
+      - "install-browsers"
+      - "build"
+    options:
+      runInCI: false
