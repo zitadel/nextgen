@@ -625,6 +625,37 @@ describe("IdpConnectionSyncer", () => {
     }
   });
 
+  it("fetch returns the stored definition, so an update plans with a diff", async () => {
+    let url: string | undefined;
+    server.use(
+      http.get(`${BASE}/idps/idp_1`, ({ request }) => {
+        url = request.url;
+        return HttpResponse.json({ id: "idp_1", revision_id: "idprev_1", definition: connection });
+      }),
+    );
+    const [, idp] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
+
+    expect(await idp.fetch?.("idp_1")).toEqual(connection);
+    // Unlike the flat-by-id reads above, this endpoint takes the project.
+    expect(url).toContain("project_id=proj-1");
+  });
+
+  it("fetch refuses a stored connection that hands back a secret value", async () => {
+    // The syncer will not upload a literal secret, so one coming back means
+    // the read endpoint resolved the reference. Rendering it would print the
+    // credential into a plan.
+    const resolved = {
+      ...connection,
+      oidc: { ...connection.oidc, client_secret: "GOCSPX-a-real-secret" },
+    };
+    server.use(
+      http.get(`${BASE}/idps/idp_1`, () => HttpResponse.json({ id: "idp_1", definition: resolved })),
+    );
+    const [, idp] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
+
+    await expect(idp.fetch?.("idp_1")).rejects.toMatchObject({ code: "E_VALIDATION" });
+  });
+
   it("create posts the document under the project and keeps the returned id", async () => {
     let body: unknown;
     server.use(

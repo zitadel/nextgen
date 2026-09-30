@@ -465,7 +465,10 @@ never presented as proof that sign-in works.
   reported as the ordinary schema error it is.
 * **Secret-free previews:** previews display only the reference
   (`${{ GOOGLE_CLIENT_SECRET }}`), never a value.
-  Update previews show a field diff once a read endpoint exists.
+  Update previews show a field diff: the syncer reads the stored connection
+  through `GET /idps/{id}`, and refuses a body whose `client_secret` comes
+  back as a value rather than a reference, so a resolved secret stops the
+  plan instead of being printed into it.
 * **Delete:** a local file delete schedules a platform delete; what the server
   does with it is the open deletion question (area 1, Open Points).
 * **CRUD dependency:** create and update depend on the IdP CRUD API.

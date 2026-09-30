@@ -31,6 +31,7 @@ import { FLOWS_DIR, flowEnvRefs } from "../flows";
 import { IDPS_DIR } from "../idp";
 import { SCHEMAS_DIR } from "../user-schema";
 import { ZitadelError } from "../errors";
+import { isObject } from "../json";
 import type { ResourceSyncer } from "./types.js";
 
 /** Runtime environment lookup used to resolve `${VAR}` / `*_env` references. */
@@ -70,6 +71,33 @@ export function makeSyncers(opts: {
  * the missing names. Shared by every syncer so the check is identical for
  * schemas and flows, and runs in the sync engine before any platform call.
  */
+/**
+ * Stop when a stored connection hands back a credential value.
+ *
+ * `client_secret` is always written as a `${{ NAME }}` reference — the syncer's
+ * own `validate` refuses to upload anything else — so a value here is the
+ * server having resolved the reference on read. Rendering it would print the
+ * secret into a plan, which area 4 forbids, and a plan is the one command a
+ * developer runs expecting it to be safe to paste.
+ */
+function refuseResolvedSecret(definition: object, id: string): void {
+  for (const key of ["oidc", "oauth2"] as const) {
+    const block = (definition as Record<string, unknown>)[key];
+    if (!isObject(block)) {
+      continue;
+    }
+    const stored = block.client_secret;
+    if (typeof stored === "string" && !isVariableReference(stored)) {
+      throw new ZitadelError("E_VALIDATION", `${id} came back holding a client_secret value`, {
+        hint:
+          "A stored connection must keep the ${{ NAME }} reference. Report this: the read " +
+          "endpoint is resolving secrets, and a plan would print one.",
+        details: { id, block: key },
+      });
+    }
+  }
+}
+
 /** The value a Zod issue path points at, or `undefined` when it is absent. */
 function valueAt(data: object, path: ReadonlyArray<PropertyKey>): unknown {
   let current: unknown = data;
@@ -101,14 +129,12 @@ function assertEnvRefs(data: object, env: EnvLookup): void {
  * linked to a connection is undesigned, so a removed file is reported and no
  * deletion is sent.
  *
- * No `fetch`, deliberately, so an update plans without a field-level diff.
- * `fetch` is optional and the planner degrades to no old content, which is what
- * area 4 specifies: "update previews show a field diff once a read endpoint
- * exists". `GET /idps/{id}` is declared but unimplemented, and what a real
- * implementation returns for `client_secret` is not settled — the same area
- * requires previews to show only the `${{ NAME }}` reference and never a value,
- * so binding this to the read endpoint before one exists risks putting a
- * credential into a plan. It arrives with the connection service (#1003).
+ * `fetch` reads the stored connection so an update plans with a field-level
+ * diff, as every other resource does. It refuses a body whose `client_secret`
+ * is a value rather than a `${{ NAME }}` reference: previews must never print
+ * a credential (area 4), and the CLI's own `validate` makes a literal secret
+ * unuploadable, so one coming back from a read means the server resolved it
+ * and the plan must stop rather than render it.
  */
 class IdpConnectionSyncer implements ResourceSyncer {
   readonly kind = "idp";
@@ -180,6 +206,19 @@ class IdpConnectionSyncer implements ResourceSyncer {
       { project_id: this.projectId },
     );
     return { canonical: result.definition };
+  }
+
+  /**
+   * The stored connection, for the plan's before/after.
+   *
+   * Comparison-only: the result is rendered, never written back or uploaded,
+   * so it is returned as the server states it apart from the secret guard.
+   */
+  async fetch(id: string): Promise<object> {
+    const body = await this.client.getIdpById(id, { project_id: this.projectId });
+    const definition = (body.definition ?? {}) as object;
+    refuseResolvedSecret(definition, id);
+    return definition;
   }
 
   async delete(_id: string): Promise<void> {
