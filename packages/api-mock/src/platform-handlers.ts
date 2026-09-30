@@ -59,7 +59,19 @@ import {
   ListFlowDefinitionsQueryParams,
   ListFlowDefinitionsResponse,
   ListSchemasQueryParams,
+  CreateIdpBody,
+  CreateIdpQueryParams,
+  CreateIdpResponse,
+  GetIdpByIdParams,
+  GetIdpByIdQueryParams,
+  GetIdpByIdResponse,
+  GetVariablesQueryParams,
+  GetVariablesResponse,
+  QueryIdpsQueryParams,
+  QueryIdpsResponse,
   QueryUsersBody,
+  UpdateVariablesBody,
+  UpdateVariablesQueryParams,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import { validateFlowDefinition } from "@zitadel/config/validate";
 import {
@@ -219,10 +231,40 @@ type ClaimRecord = {
   dashboardUrl: string;
 };
 
+/**
+ * One identity provider connection, as the CLI's syncer publishes it.
+ *
+ * Keyed by `id`; `slug` is what dedupes a write. The server files each edit as
+ * a revision beneath one connection id, so a second `POST /idps` carrying a
+ * slug that already exists revises it rather than creating a second row —
+ * which is what keeps the CLI's `plan`/`apply` idempotent.
+ */
+type IdpConnectionRecord = {
+  id: string;
+  revisionId: string;
+  projectId: string;
+  slug: string;
+  createdAt: string;
+  updatedAt: string;
+  seq: number;
+  body: Record<string, unknown>;
+};
+
+/**
+ * One variable at the project level, which is the only owner the API addresses
+ * today. `secret` decides what a read may say: a secret reports that a value is
+ * held and withholds it (ADR 062 §7), so the stored value is only ever resolved
+ * into a connection, never returned.
+ */
+type VariableRecord = { value: string | number | boolean; secret: boolean };
+
 type Store = {
   projects: Map<string, ProjectRecord>;
   schemas: Map<string, SchemaRecord>;
   flowDefinitions: Map<string, FlowDefinitionRecord>;
+  idps: Map<string, IdpConnectionRecord>;
+  /** Project id -> variable name -> value. */
+  variables: Map<string, Map<string, VariableRecord>>;
   claimChallenges: Map<string, ClaimChallengeRecord>;
   claims: Map<string, ClaimRecord>;
   // Publication order. `nowIso()` is millisecond-resolution and ids are
@@ -237,6 +279,8 @@ function makeStore(): Store {
     projects: new Map(),
     schemas: new Map(),
     flowDefinitions: new Map(),
+    idps: new Map(),
+    variables: new Map(),
     claimChallenges: new Map(),
     claims: new Map(),
     lastSeq: 0,
@@ -327,6 +371,18 @@ function schemaKind(body: GetSchemaById200Schema): string | undefined {
  * `created_at DESC, id DESC`, the order the server lists in. `seq` stands in
  * for the id tiebreak.
  */
+/** One connection, in the wire shape every idp endpoint answers with. */
+function idpResponse(record: IdpConnectionRecord): Record<string, unknown> {
+  return {
+    id: record.id,
+    revision_id: record.revisionId,
+    slug: record.slug,
+    definition: record.body,
+    created_at: record.createdAt,
+    updated_at: record.updatedAt,
+  };
+}
+
 function compareNewestFirst(
   a: { createdAt: string; seq: number },
   b: { createdAt: string; seq: number },
@@ -406,11 +462,20 @@ export type PlatformStoreSnapshot = {
   projects: number;
   schemas: number;
   flowDefinitions: number;
+  idps: number;
   claimChallenges: number;
   claims: number;
   projectIds: string[];
   schemaIds: string[];
   flowDefinitionIds: string[];
+  /** Connection slugs, which is what schemas and flows reference. */
+  idpSlugs: string[];
+  /**
+   * Variable names entered at the project, secrets included. Names only: a
+   * secret's value is not readable over the API, and a snapshot that returned
+   * it would be a way around that.
+   */
+  variableNames: string[];
   /**
    * Ids of the live challenges. A caller that drove `claim/init` over HTTP
    * (a CLI under test, say) never sees the response body, so this is the only
@@ -425,11 +490,14 @@ export function snapshotPlatformStore(): PlatformStoreSnapshot {
     projects: store.projects.size,
     schemas: store.schemas.size,
     flowDefinitions: store.flowDefinitions.size,
+    idps: store.idps.size,
     claimChallenges: store.claimChallenges.size,
     claims: store.claims.size,
     projectIds: [...store.projects.keys()],
     schemaIds: [...store.schemas.keys()],
     flowDefinitionIds: [...store.flowDefinitions.keys()],
+    idpSlugs: [...store.idps.values()].map((record) => record.slug),
+    variableNames: [...store.variables.values()].flatMap((owned) => [...owned.keys()]),
     claimChallengeIds: [...store.claimChallenges.keys()],
   };
 }
@@ -1031,6 +1099,152 @@ export function setupPlatformHandlers() {
         return out.response;
       }
       return HttpResponse.json(out.data);
+    }),
+
+    // --- identity provider connections -----------------------------------
+    // The CLI's connection syncer publishes `.zitadel/idps/*.json` here. The
+    // Go service does not exist yet (#1003), so without these the SSO journey
+    // cannot be exercised end to end at all.
+
+    http.post("*/idps", async ({ request }) => {
+      const query = parse(CreateIdpQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const raw = await readJson(request);
+      if (raw === null) {
+        return HttpResponse.json(INVALID_JSON, { status: 400 });
+      }
+      const body = parse(CreateIdpBody, raw, "invalid_request");
+      if (!body.ok) {
+        return body.response;
+      }
+
+      const definition = body.data.idp as unknown as Record<string, unknown>;
+      const slug = definition.slug as string;
+      const now = nowIso();
+      // A slug that already exists is revised under its own id, so everything
+      // referencing the slug — the user schema, every flow step — keeps
+      // pointing at the same connection.
+      const existing = [...store.idps.values()].find(
+        (record) => record.projectId === query.data.project_id && record.slug === slug,
+      );
+      const record: IdpConnectionRecord = existing
+        ? { ...existing, revisionId: `idprev_${shortId()}`, updatedAt: now, seq: ++store.lastSeq, body: definition }
+        : {
+            id: `idp_${shortId()}`,
+            revisionId: `idprev_${shortId()}`,
+            projectId: query.data.project_id,
+            slug,
+            createdAt: now,
+            updatedAt: now,
+            seq: ++store.lastSeq,
+            body: definition,
+          };
+      store.idps.set(record.id, record);
+
+      const responseBody = idpResponse(record);
+      const out = parse(CreateIdpResponse, responseBody, "mock_response_invalid");
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data, { status: existing ? 200 : 201 });
+    }),
+
+    http.post("*/idps/query", ({ request }) => {
+      const query = parse(QueryIdpsQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const records = [...store.idps.values()]
+        .filter((record) => record.projectId === query.data.project_id)
+        .sort((a, b) => a.seq - b.seq);
+      const responseBody = { idps: records.map(idpResponse), next_page_token: null };
+      const out = parse(QueryIdpsResponse, responseBody, "mock_response_invalid");
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data);
+    }),
+
+    http.get("*/idps/:id", ({ params, request }) => {
+      const path = parse(GetIdpByIdParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+      const query = parse(GetIdpByIdQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const record = store.idps.get(path.data.id);
+      if (!record || record.projectId !== query.data.project_id) {
+        return HttpResponse.json(
+          errorBody("idp.not_found", "identity provider connection: not found"),
+          { status: 404 },
+        );
+      }
+      const out = parse(GetIdpByIdResponse, idpResponse(record), "mock_response_invalid");
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data);
+    }),
+
+    // --- variables ---------------------------------------------------------
+    // Where a connection's `${{ NAME }}` references resolve from. The CLI
+    // publishes the client id and secret here, so without them a scaffolded
+    // provider has no credentials and sign-in fails at the token endpoint.
+
+    http.get("*/variables", ({ request }) => {
+      const query = parse(GetVariablesQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const owned = store.variables.get(query.data.project_id) ?? new Map();
+      // A secret says that a value is held and withholds it (ADR 062 §7):
+      // returning the plaintext would defeat the encryption it stands for.
+      const responseBody = Object.fromEntries(
+        [...owned.entries()].map(([name, held]) => [
+          name,
+          held.secret ? { secret: true } : held.value,
+        ]),
+      );
+      const out = parse(GetVariablesResponse, responseBody, "mock_response_invalid");
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data);
+    }),
+
+    http.patch("*/variables", async ({ request }) => {
+      const query = parse(UpdateVariablesQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const raw = await readJson(request);
+      if (raw === null) {
+        return HttpResponse.json(INVALID_JSON, { status: 400 });
+      }
+      const body = parse(UpdateVariablesBody, raw, "invalid_request");
+      if (!body.ok) {
+        return body.response;
+      }
+
+      const owned = store.variables.get(query.data.project_id) ?? new Map<string, VariableRecord>();
+      // RFC 7386: a name present is written, `null` removes it, and a name
+      // absent is left alone.
+      for (const [name, value] of Object.entries(body.data as Record<string, unknown>)) {
+        if (value === null) {
+          owned.delete(name);
+        } else if (typeof value === "object") {
+          const input = value as { value: string | number | boolean; secret: boolean };
+          owned.set(name, { value: input.value, secret: input.secret });
+        } else {
+          owned.set(name, { value: value as string | number | boolean, secret: false });
+        }
+      }
+      store.variables.set(query.data.project_id, owned);
+      return new HttpResponse(null, { status: 204 });
     }),
   ];
 }
