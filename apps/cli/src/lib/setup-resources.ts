@@ -264,6 +264,31 @@ async function writeReadmeFile(
   }
 }
 
+/**
+ * The files a failed `setup` should remove, so a rerun starts fresh.
+ *
+ * `zitadel.json` and `.zitadel/secret` are always setup's own: the
+ * already-initialized guard refuses to run when either is present. A
+ * connection is only setup's when this run wrote it — one that was already on
+ * disk belongs to the developer, and is the likeliest reason the run failed,
+ * since {@link materializeSetupResources} refuses to replace one with or
+ * without `--force`. Removing that would destroy the file setup just declined
+ * to overwrite, which is worse than the overwrite it was protecting against.
+ */
+export function setupRollbackFiles(options: {
+  /** Project-relative connection path, or `undefined` when no provider was chosen. */
+  readonly connectionPath?: string;
+  /** Whether that connection was on disk before this run started. */
+  readonly connectionExisted: boolean;
+}): string[] {
+  const { connectionPath, connectionExisted } = options;
+  return [
+    "zitadel.json",
+    ".zitadel/secret",
+    ...(connectionPath !== undefined && !connectionExisted ? [connectionPath] : []),
+  ];
+}
+
 /** What to do about a connection file setup refuses to replace. */
 const CONNECTION_EXISTS_HINT =
   "A connection file is yours to keep, so setup will not replace it -- not even with --force. " +
