@@ -9,7 +9,8 @@ import { configureZitadel, getApi } from "@zitadel/api/config";
  *
  * - **Dev** — Vite serves the console on :5174 and the API lives on :8080,
  *   so requests target `/api`, which the dev-server proxy strips and
- *   forwards, injecting the project secret server-side (`vite.config.mts`).
+ *   forwards without adding a credential (`vite.config.mts`, #1300): the
+ *   `__nextgen_session` cookie rides along, as in production.
  * - **Production** — the built console is embedded in the Go binary, which
  *   serves the ogen API at the origin root (`buildHTTPMux`). The base is
  *   therefore `""`: requests go straight to `/flow`, `/sessions/me`, … on
@@ -25,9 +26,10 @@ import { configureZitadel, getApi } from "@zitadel/api/config";
  * already does (`apps/login-ui/src/main.ts`). `VITE_CONSOLE_API_BASE`
  * remains the escape hatch for a deployment that mounts the API elsewhere.
  *
- * `projectId` is non-secret public runtime metadata (it scopes list/detail
- * calls that require a `project_id` query param) and is read from a public
- * `VITE_`-prefixed env var.
+ * No project id is configured here. The project the console signs into is
+ * learnt at boot from `/console/runtime.json` (Console ADR 0004 §3), in
+ * development as in production, and read through `getConsoleProjectId()`;
+ * management calls name the selected project (`src/lib/project-scope.ts`).
  */
 /**
  * The same-origin API base every console request targets (Console ADR 0002).

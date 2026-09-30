@@ -53,7 +53,7 @@ import {
   expireClaimWindow,
   snapshotPlatformStore,
 } from "./platform-handlers.js";
-import { PLATFORM_PROJECT_ID, startMockServer } from "./server.js";
+import { MOCK_CONSOLE_PROJECT_ID, PLATFORM_PROJECT_ID, startMockServer } from "./server.js";
 
 const PORT = 4456;
 const BASE = `http://localhost:${PORT}`;
@@ -230,6 +230,18 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(res.status).toBe(404);
     const body = (await res.json()) as Record<string, unknown>;
     expect(body.code).toBe("session_not_found");
+  });
+
+  test("GET /console/runtime.json names the project the console signs into", async () => {
+    // Not in the OpenAPI spec: the Go server serves it from its root mux
+    // (Console ADR 0004 §3). The console's mock dev loop boots on it, so the
+    // path and both fields are the contract.
+    const res = await fetch(`${BASE}/console/runtime.json`);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      mode: "standalone",
+      console_project_id: MOCK_CONSOLE_PROJECT_ID,
+    });
   });
 
   test("POST /projects returns the spec-defined project shape", async () => {
