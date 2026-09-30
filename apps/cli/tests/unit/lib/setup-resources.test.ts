@@ -12,10 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { normalizeFlowBody, normalizeSchemaBody } from "@zitadel/config/normalize";
 
-import {
-  materializeSetupResources,
-  setupRollbackFiles,
-} from "../../../src/lib/setup-resources";
+import { materializeSetupResources } from "../../../src/lib/setup-resources";
 import { IDPS_DIR } from "../../../src/lib/idp";
 import { FLOWS_DIR } from "../../../src/lib/flows";
 import { SCHEMAS_DIR } from "../../../src/lib/user-schema";
@@ -354,24 +351,6 @@ describe("materializeSetupResources with a social provider", () => {
       await readFile(join(cwd, ".zitadel/state.json"), "utf8"),
     ) as ZitadelState;
     expect(state.resources[`${IDPS_DIR}/google.json`]).toMatchObject({ id: "idp_01KWHE" });
-  });
-
-  it("rolls back only the connection this run created", () => {
-    // The cleanup after a failed setup must not delete a connection that was
-    // already on disk: that file is the developer's, and is the likeliest
-    // reason the run failed, since the materializer refuses to replace one.
-    expect(
-      setupRollbackFiles({ connectionPath: `${IDPS_DIR}/google.json`, connectionExisted: true }),
-    ).toEqual(["zitadel.json", ".zitadel/secret"]);
-
-    expect(
-      setupRollbackFiles({ connectionPath: `${IDPS_DIR}/google.json`, connectionExisted: false }),
-    ).toEqual(["zitadel.json", ".zitadel/secret", `${IDPS_DIR}/google.json`]);
-
-    expect(setupRollbackFiles({ connectionExisted: false })).toEqual([
-      "zitadel.json",
-      ".zitadel/secret",
-    ]);
   });
 
   it("refuses to replace an existing connection, even with --force", async () => {

@@ -1,4 +1,4 @@
-import { access, rm } from "node:fs/promises";
+import { rm } from "node:fs/promises";
 import { basename, join } from "node:path";
 
 import { intro, outro } from "@clack/prompts";
@@ -28,7 +28,6 @@ import {
 } from "../../lib/claim-state";
 import { toZitadelError, ZitadelError } from "../../lib/errors";
 import {
-  IDPS_DIR,
   publishClientId,
   type PublishState,
   reportClientIdOutcome,
@@ -70,7 +69,6 @@ import { writeScaffoldManifest } from "../../lib/scaffold-manifest";
 import { readStdin } from "../../lib/variables";
 import {
   materializeSetupResources,
-  setupRollbackFiles,
   type MaterializeSetupResourcesResult,
 } from "../../lib/setup-resources";
 import { installDependenciesForSetup } from "./install";
@@ -369,15 +367,6 @@ export default class Setup extends BaseCommand {
     for (const file of result.filesSkipped) {
       consola.info(`Left ${relativeDisplay(cwd, file)} unchanged (already matches target)`);
     }
-    // Noted before anything is written, so the cleanup below can tell a
-    // connection this run created from one that was already on disk. A
-    // pre-existing connection is the developer's, and is the likeliest reason
-    // the run fails at all -- `materializeSetupResources` refuses to replace
-    // one, with or without --force.
-    const connectionPath =
-      answers.sso === undefined ? undefined : `${IDPS_DIR}/${answers.sso.provider}.json`;
-    const connectionExisted = connectionPath !== undefined && (await exists(join(cwd, connectionPath)));
-
     let resourceResult: MaterializeSetupResourcesResult;
     try {
       resourceResult = dryRun
@@ -403,20 +392,21 @@ export default class Setup extends BaseCommand {
       // forever with no default schema or login flow anywhere. The
       // half-provisioned project has no usable resources, so its credentials
       // are not worth keeping.
-      for (const file of setupRollbackFiles({ connectionPath, connectionExisted })) {
-        await rm(join(cwd, file), { force: true });
-      }
+      // Only these two, and never a connection file: those are tenant-owned,
+      // and setup neither writes over nor removes one.
+      await rm(join(cwd, "zitadel.json"), { force: true });
+      await rm(join(cwd, ".zitadel/secret"), { force: true });
       const cause = toZitadelError(error);
-      const preserved = connectionPath !== undefined && connectionExisted;
       throw new ZitadelError(cause.code, `Default resource setup failed: ${cause.message}`, {
-        hint: preserved
-          ? `The project was created but its resources did not finish, and ${connectionPath} was ` +
-            "left as you wrote it. Move it aside to scaffold a new one, or keep it and run " +
-            "`zitadel sso enable` after setup to reuse it."
-          : "The project was created but its default schema/flow upload did not finish. " +
+        // The cause knows its own remedy when it has one -- a file setup
+        // declined to touch is fixed by deciding what to do with that file,
+        // not by rerunning with --force.
+        hint:
+          cause.hint ??
+          "The project was created but its default schema/flow upload did not finish. " +
             "Re-run `zitadel setup` to start over (add --force to overwrite partially " +
             "written .zitadel files).",
-        nextCommands: preserved ? [] : ["zitadel setup --force"],
+        nextCommands: cause.nextCommands ?? ["zitadel setup --force"],
         details: cause.details,
       });
     }
@@ -689,16 +679,6 @@ export default class Setup extends BaseCommand {
         ],
       },
     });
-  }
-}
-
-/** Whether a path is there, without caring why it is not. */
-async function exists(path: string): Promise<boolean> {
-  try {
-    await access(path);
-    return true;
-  } catch {
-    return false;
   }
 }
 

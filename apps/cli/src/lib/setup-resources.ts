@@ -107,13 +107,8 @@ export async function materializeSetupResources(opts: {
   if (connection && slug) {
     await mkdir(join(opts.cwd, IDPS_DIR), { recursive: true });
     const connectionPath = `${IDPS_DIR}/${slug}.json`;
-    // Deliberately not `opts.force`. The other scaffolded files are setup's
-    // own output, so replacing them is what --force is for; a connection may
-    // hold a client id someone registered and a slug the schemas and flows
-    // already name, and the IdP contract makes these files tenant-owned.
-    // `sso enable` reuses one instead of rewriting it, and setup must not be
-    // the one command that silently does otherwise.
-    if (await writeResourceFile(opts.cwd, connectionPath, connection, false, CONNECTION_EXISTS_HINT)) {
+    // Deliberately not `opts.force`: see {@link CONNECTION_EXISTS}.
+    if (await writeResourceFile(opts.cwd, connectionPath, connection, false, CONNECTION_EXISTS)) {
       filesWritten.push(join(opts.cwd, connectionPath));
     }
     // `client_secret` travels as its `${{ NAME }}` reference: the platform
@@ -265,41 +260,28 @@ async function writeReadmeFile(
 }
 
 /**
- * The files a failed `setup` should remove, so a rerun starts fresh.
+ * What to do about a connection file setup will not touch.
  *
- * `zitadel.json` and `.zitadel/secret` are always setup's own: the
- * already-initialized guard refuses to run when either is present. A
- * connection is only setup's when this run wrote it — one that was already on
- * disk belongs to the developer, and is the likeliest reason the run failed,
- * since {@link materializeSetupResources} refuses to replace one with or
- * without `--force`. Removing that would destroy the file setup just declined
- * to overwrite, which is worse than the overwrite it was protecting against.
+ * Setup neither replaces nor removes one, with or without `--force`: a
+ * connection may hold a client id someone registered with the vendor and a slug
+ * the schemas and flows already name, and the IdP contract makes these files
+ * tenant-owned. So the one rule is that setup does not write there, and the
+ * developer decides what happens to the file.
  */
-export function setupRollbackFiles(options: {
-  /** Project-relative connection path, or `undefined` when no provider was chosen. */
-  readonly connectionPath?: string;
-  /** Whether that connection was on disk before this run started. */
-  readonly connectionExisted: boolean;
-}): string[] {
-  const { connectionPath, connectionExisted } = options;
-  return [
-    "zitadel.json",
-    ".zitadel/secret",
-    ...(connectionPath !== undefined && !connectionExisted ? [connectionPath] : []),
-  ];
-}
-
-/** What to do about a connection file setup refuses to replace. */
-const CONNECTION_EXISTS_HINT =
-  "A connection file is yours to keep, so setup will not replace it -- not even with --force. " +
-  "Remove it to scaffold a new one, or run `zitadel sso enable` afterwards to reuse it.";
+const CONNECTION_EXISTS: { hint: string; nextCommands: string[] } = {
+  hint:
+    "A connection file is yours to keep, so setup never replaces or removes one. " +
+    "Remove it and run setup again to scaffold a fresh one, or keep it and enable the " +
+    "provider afterwards to reuse it.",
+  nextCommands: ["zitadel sso enable --provider google"],
+};
 
 async function writeResourceFile(
   cwd: string,
   relPath: string,
   body: object,
   force: boolean,
-  existsHint?: string,
+  onExists?: { hint: string; nextCommands?: string[] },
 ): Promise<boolean> {
   const contents = `${stableStringify(body)}\n`;
   try {
@@ -309,8 +291,9 @@ async function writeResourceFile(
     if (isErrno(error, "EEXIST")) {
       throw new ZitadelError("E_CONFLICT", `${relPath} already exists`, {
         hint:
-          existsHint ??
+          onExists?.hint ??
           "Move the file aside or rerun setup with --force if you want setup to replace it.",
+        nextCommands: onExists?.nextCommands,
       });
     }
     throw error;
