@@ -404,8 +404,10 @@ export default class Setup extends BaseCommand {
         hint:
           cause.hint ??
           "The project was created but its default schema/flow upload did not finish. " +
-            "Re-run `zitadel setup` to start over (add --force to overwrite partially " +
-            "written .zitadel files).",
+            "Re-run `zitadel setup` to start over; --force overwrites the files setup " +
+            "scaffolds. It does not cover a connection under .zitadel/idps/ -- those are " +
+            "yours, so setup never replaces or removes one; delete it to scaffold a fresh " +
+            "one, or keep it and enable the provider after setup to reuse it.",
         nextCommands: cause.nextCommands ?? ["zitadel setup --force"],
         details: cause.details,
       });
