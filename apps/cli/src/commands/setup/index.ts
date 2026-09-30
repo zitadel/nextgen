@@ -865,7 +865,13 @@ function setupRetryFlags(opts: SetupRetryOptions): string {
   if (opts.sso) {
     parts.push(`--sso ${opts.sso.provider} --sso-client-id ${opts.sso.clientId}`);
   }
-  if (opts.nonInteractive) {
+  // `--non-interactive` is dropped when a provider is being configured: that
+  // combination reads the client secret from stdin, and a command handed over
+  // as text has no stdin to read. Offering it would advertise a retry that
+  // fails the moment it is run. Interactively the rerun asks for the secret,
+  // which is the one way a plain command can obtain it -- putting it in the
+  // command text is never an option.
+  if (opts.nonInteractive && !opts.sso) {
     parts.push("--non-interactive");
   }
   parts.push("--server local");
@@ -978,6 +984,10 @@ function localSetupHint(error: unknown, retry: SetupRetryOptions, cliVersion: st
     hint:
       `${normalized.hint ? `${normalized.hint} ` : ""}` +
       "Start local Zitadel first, then rerun setup. " +
+      (retry.sso
+        ? "The rerun asks for the client secret, because a command cannot carry one. " +
+          "To script it instead, pipe the secret in and add --non-interactive. "
+        : "") +
       "After setup succeeds, follow its next_commands to start the app and verify registration, logout, and login in the browser.",
     nextCommands: [
       publicCliCommand("start", cliVersion),
