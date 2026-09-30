@@ -11,8 +11,10 @@ secret-handling caveat live in [`README.md`](README.md).
 - `moon run console-e2e:e2e-real` — **real-instance resource coverage**: one
   ephemeral real instance via `@zitadel/testing`
   ([`packages/testing/AGENTS.md`](../../packages/testing/AGENTS.md)), console
-  served by the Vite dev server with the server-side project-secret proxy,
-  Playwright workers share the instance and seed a fresh user per test.
+  served by the Vite dev server through its (credential-free) API proxy; each
+  test's user is granted access through the API and signs in with its
+  session cookie (`src-real/support.ts`). Playwright workers share the
+  instance and seed a fresh user per test.
 - `moon run console-e2e:e2e-embedded` — **embedded production-path coverage**:
   the built Go binary serves the console, hosted login, and API from one
   origin, with no Vite proxy. This is the only lane that proves the API base
@@ -20,7 +22,18 @@ secret-handling caveat live in [`README.md`](README.md).
 - `moon run console-e2e:e2e-platform` — **platform-project coverage**: the
   same binary with the platform project bootstrapped (the server default). An
   operator signs up through the console, is granted the harness project by
-  email, and uses the screens on the session cookie alone.
+  email, and uses the screens on the session cookie alone. The console selects
+  that project on its own (the operator's only grant, as `?project=`), so the
+  screens run in a project other than the one the console signs into.
+
+Console screens act on the selected project (`?project=`, see
+[`apps/console/AGENTS.md`](../console/AGENTS.md)). The guard only ever selects
+a project the signed-in person holds a grant on: the `VITE_CONSOLE_PROJECT_ID`
+pin when it is one of theirs, else their only project, else none. `e2e-real`
+grants each signed-in user its project (`signIn` in `src-real/support.ts`), so
+the pin selects it there; a user with no grant lands on Projects with nothing
+selected. A spec that navigates by URL either lets the guard fill it in or
+names it, and asserts it survives navigation where that is the point.
 
 All four tasks carry `runInCI: false` — that only keeps them out of moon's
 automatic selection. The `full-pr` job explicitly runs `e2e-real`,

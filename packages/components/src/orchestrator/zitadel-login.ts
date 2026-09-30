@@ -553,10 +553,8 @@ export class ZitadelLogin extends ZitadelSurface {
 
   /**
    * "Secured with Zitadel" attribution chrome injected into every
-   * template's page-shell footer slot. Controlled by
-   * `branding.attribution.show_zitadel` — defaults to `true` for
-   * community / OSS deployments. Licensed tenants can suppress the badge
-   * entirely or swap it for a `custom_link` value.
+   * template's page-shell footer slot. Reads `branding.attribution`, which
+   * the wire contract does not carry, so the mark always renders.
    */
   private renderAttributionHtml(placement: "footer" | "inline" = "footer"): string {
     const attribution = this.branding?.attribution;

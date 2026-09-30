@@ -1,9 +1,8 @@
 /**
  * Aggregate registry of every shipped `<zl-*>` atom's manifest.
  *
- * The structural validator (`docs/design/branding/validator.md`) rejects any
- * `<zl-*>` tag not registered here. Editor tooling drives autocomplete from
- * this same registry. Adding a new atom = exporting it from `./atoms/` and
+ * The sanitiser allows only the tags and attributes registered here, and the
+ * orchestrator derives its `exportparts` forwarding from the same registry. Adding a new atom = exporting it from `./atoms/` and
  * adding its manifest to {@link manifestRegistry}.
  */
 import {

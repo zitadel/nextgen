@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { scopedPath } from "@/lib/project-scope.fixture";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
@@ -47,7 +48,7 @@ async function openDialog() {
     import("../router"),
   ]);
   const router = createAppRouter({
-    history: createMemoryHistory({ initialEntries: ["/users"] }),
+    history: createMemoryHistory({ initialEntries: [scopedPath("/users")] }),
   });
   render(<RouterProvider router={router} />);
   await userEvent.click(await screen.findByRole("button", { name: "Actions for Maya Patel" }));
@@ -67,7 +68,7 @@ describe("delete user dialog", () => {
     ]);
     render(
       <RouterProvider
-        router={createAppRouter({ history: createMemoryHistory({ initialEntries: ["/users"] }) })}
+        router={createAppRouter({ history: createMemoryHistory({ initialEntries: [scopedPath("/users")] }) })}
       />,
     );
     await userEvent.click(await screen.findByRole("button", { name: "Actions for Maya Patel" }));
