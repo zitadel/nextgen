@@ -34,7 +34,7 @@ func (r *FlowSSOProviderResolver) Resolve(ctx context.Context, projectID, stepNa
 			continue
 		}
 		if err != nil {
-			return nil, err
+			return nil, domain.ErrInternal(err).WithMessage("failed to read identity provider connection")
 		}
 		doc, err := domain.ParseIDPConnectionDocument(connection.Document)
 		if err != nil {

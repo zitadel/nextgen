@@ -37,10 +37,10 @@ func TestFlowSSOProviderResolver_Resolve_LookupErrorStopsResolution(t *testing.T
 	t.Parallel()
 	ctrl := gomock.NewController(t)
 	connections := servicemocks.NewMockIDPConnectionService(ctrl)
-	connections.EXPECT().GetBySlug(gomock.Any(), "proj-1", "google").
-		Return(nil, errors.New("connection store unavailable"))
+	cause := errors.New("connection store unavailable")
+	connections.EXPECT().GetBySlug(gomock.Any(), "proj-1", "google").Return(nil, cause)
 
 	_, err := service.NewFlowSSOProviderResolver(connections).
 		Resolve(t.Context(), "proj-1", "identifier", []string{"google", "github"})
-	require.ErrorContains(t, err, "connection store unavailable")
+	require.ErrorIs(t, err, domain.ErrInternal(cause))
 }
