@@ -107,7 +107,13 @@ export async function materializeSetupResources(opts: {
   if (connection && slug) {
     await mkdir(join(opts.cwd, IDPS_DIR), { recursive: true });
     const connectionPath = `${IDPS_DIR}/${slug}.json`;
-    if (await writeResourceFile(opts.cwd, connectionPath, connection, opts.force)) {
+    // Deliberately not `opts.force`. The other scaffolded files are setup's
+    // own output, so replacing them is what --force is for; a connection may
+    // hold a client id someone registered and a slug the schemas and flows
+    // already name, and the IdP contract makes these files tenant-owned.
+    // `sso enable` reuses one instead of rewriting it, and setup must not be
+    // the one command that silently does otherwise.
+    if (await writeResourceFile(opts.cwd, connectionPath, connection, false, CONNECTION_EXISTS_HINT)) {
       filesWritten.push(join(opts.cwd, connectionPath));
     }
     // `client_secret` travels as its `${{ NAME }}` reference: the platform
@@ -258,11 +264,17 @@ async function writeReadmeFile(
   }
 }
 
+/** What to do about a connection file setup refuses to replace. */
+const CONNECTION_EXISTS_HINT =
+  "A connection file is yours to keep, so setup will not replace it -- not even with --force. " +
+  "Remove it to scaffold a new one, or run `zitadel sso enable` afterwards to reuse it.";
+
 async function writeResourceFile(
   cwd: string,
   relPath: string,
   body: object,
   force: boolean,
+  existsHint?: string,
 ): Promise<boolean> {
   const contents = `${stableStringify(body)}\n`;
   try {
@@ -271,7 +283,9 @@ async function writeResourceFile(
   } catch (error) {
     if (isErrno(error, "EEXIST")) {
       throw new ZitadelError("E_CONFLICT", `${relPath} already exists`, {
-        hint: "Move the file aside or rerun setup with --force if you want setup to replace it.",
+        hint:
+          existsHint ??
+          "Move the file aside or rerun setup with --force if you want setup to replace it.",
       });
     }
     throw error;

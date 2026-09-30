@@ -353,6 +353,30 @@ describe("materializeSetupResources with a social provider", () => {
     expect(state.resources[`${IDPS_DIR}/google.json`]).toMatchObject({ id: "idp_01KWHE" });
   });
 
+  it("refuses to replace an existing connection, even with --force", async () => {
+    // --force is for setup's own scaffolding. A connection may hold a client
+    // id someone registered with the vendor and a slug the schemas and flows
+    // already name, and the IdP contract makes these files tenant-owned.
+    const client = recordingClient();
+    const existing = `${IDPS_DIR}/google.json`;
+    await mkdir(join(cwd, IDPS_DIR), { recursive: true });
+    await writeFile(join(cwd, existing), JSON.stringify({ slug: "google", mine: true }));
+
+    await expect(
+      materializeSetupResources({
+        cwd,
+        cliVersion: TEST_CLI_VERSION,
+        client,
+        projectId: "project_123",
+        force: true,
+        sso: google,
+      }),
+    ).rejects.toMatchObject({ code: "E_CONFLICT" });
+
+    const kept = JSON.parse(await readFile(join(cwd, existing), "utf8")) as { mine?: boolean };
+    expect(kept.mine).toBe(true);
+  });
+
   it("creates the connection before the flow that names it", async () => {
     const client = recordingClient();
 
