@@ -54,7 +54,7 @@
     "@eslint/json": "catalog:",
     "@eslint/markdown": "catalog:",
     "@nuxt/eslint-plugin": "^0.7.0",
-    "@vitest/coverage-v8": "catalog:sdk",
+    "@vitest/coverage-v8": "catalog:",
     "eslint": "catalog:",
     "eslint-config-prettier": "catalog:",
     "eslint-import-resolver-typescript": "catalog:",
@@ -67,6 +67,6 @@
     "tsup": "catalog:",
     "typescript": "^5.7.3",
     "typescript-eslint": "catalog:",
-    "vitest": "catalog:sdk"
+    "vitest": "catalog:"
   }
 }

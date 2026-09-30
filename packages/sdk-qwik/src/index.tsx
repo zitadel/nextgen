@@ -13,7 +13,7 @@ import type {
 } from "@zitadel/sdk-core/types";
 
 import "@zitadel/components";
-import { component$, useSignal, useVisibleTask$, type QRL, type Signal } from "@builder.io/qwik";
+import { component$, useSignal, useVisibleTask$, type QRL, type Signal } from "@qwik.dev/core";
 import {
   configureZitadel,
   getApi,
@@ -31,28 +31,26 @@ export * from "./types";
 export { businessLocales } from "@zitadel/components";
 
 /**
- * Passes the project config as a spread because `@zitadel/components`' Qwik JSX
- * types omit these property-only members. Qwik binds object and string values to
- * custom elements as DOM properties, so the handle (or the discrete project id /
- * proxy path) reaches the element intact. The widget uses whichever is present.
+ * Assigns a widget config value as a DOM *property*, skipping `undefined` so the
+ * element keeps its own accessor default (e.g. the session card's "Signed in
+ * as" heading).
+ *
+ * Qwik 2 binds custom-element JSX props as *attributes* only — its client
+ * renderer has no property-setting path for elements — and the widgets expose
+ * their config as property-only members (`project`/`locales` are
+ * `@property({ attribute: false })`) or as camelCase properties backed by
+ * kebab-case attributes (`projectId` ↔ `project-id`). Neither survives Qwik's
+ * lower-cased attribute binding, so all configuration is applied imperatively on
+ * the element instead (see the `ref` callbacks below).
  */
-function projectProp(
-  project: ZitadelProject | undefined,
-  projectId: string | undefined,
-  proxyPath: string | undefined,
-): Record<string, unknown> {
-  return { project, projectId, proxyPath };
-}
-
-/**
- * Login-only copy overrides, spread for the same reason as {@link projectProp}:
- * `locales`/`lang` are property-only members the custom-element JSX types omit.
- */
-function localeProps(
-  locales: Record<string, Partial<Record<string, string>>> | undefined,
-  lang: string | undefined,
-): Record<string, unknown> {
-  return { locales, lang };
+function setProp<E extends Element, K extends keyof E>(
+  el: E,
+  key: K,
+  value: E[K] | undefined,
+): void {
+  if (value !== undefined) {
+    el[key] = value;
+  }
 }
 
 function eventDetail<T>(event: Event): T {
@@ -90,11 +88,13 @@ export type ZitadelLoginProps = ZitadelLoginConfig &
 
 /**
  * Qwik component wrapping the `<zitadel-login>` web component. Binds the
- * {@link ZitadelProject} handle as a DOM property (or the discrete project id /
- * proxy path) and forwards the widget's `zitadel-*` events as optional
- * callbacks. `useVisibleTask$` (eager `document-ready`, so listeners attach on
- * load rather than on first visibility) wires the native listeners; Qwik's
- * declarative `useOn` does not catch these programmatic custom events.
+ * {@link ZitadelProject} handle (or the discrete project id / proxy path) and
+ * the surface config as DOM properties in the `ref` callback — synchronously at
+ * mount, before the widget's first render, which Qwik's JSX cannot do for a
+ * custom element (see {@link setProp}). `useVisibleTask$` (eager `document-ready`,
+ * so it runs on load rather than on first visibility) then wires the native
+ * listeners that forward the widget's `zitadel-*` events; Qwik's declarative
+ * `useOn` does not catch these programmatic custom events.
  */
 export const ZitadelLogin = component$<ZitadelLoginProps>((props) => {
   const host = useSignal<ZitadelLoginElement>();
@@ -129,15 +129,18 @@ export const ZitadelLogin = component$<ZitadelLoginProps>((props) => {
         if (props.ref) {
           props.ref.value = el;
         }
+        setProp(el, "project", props.project);
+        setProp(el, "projectId", props.projectId);
+        setProp(el, "proxyPath", props.proxyPath);
+        setProp(el, "purpose", props.purpose ?? "login");
+        setProp(el, "flowName", props.flowName);
+        setProp(el, "postSignInUrl", props.postSignInUrl);
+        setProp(el, "variant", props.variant);
+        setProp(el, "theme", props.theme);
+        setProp(el, "suppressHeader", props.suppressHeader);
+        setProp(el, "locales", props.locales);
+        setProp(el, "lang", props.lang);
       }}
-      {...projectProp(props.project, props.projectId, props.proxyPath)}
-      {...localeProps(props.locales, props.lang)}
-      purpose={props.purpose ?? "login"}
-      flow-name={props.flowName}
-      post-sign-in-url={props.postSignInUrl}
-      variant={props.variant}
-      theme={props.theme}
-      suppressHeader={props.suppressHeader}
     />
   );
 });
@@ -161,9 +164,9 @@ export type ZitadelLogoutProps = ZitadelLogoutConfig &
 
 /**
  * Qwik component wrapping the `<zitadel-logout>` web component. Binds the
- * {@link ZitadelProject} handle as a DOM property (or the discrete project id /
- * proxy path) and forwards the widget's `zitadel-signout` event as an optional
- * callback.
+ * {@link ZitadelProject} handle (or the discrete project id / proxy path) and
+ * surface config as DOM properties in the `ref` callback (see {@link setProp})
+ * and forwards the widget's `zitadel-signout` event as an optional callback.
  */
 export const ZitadelLogout = component$<ZitadelLogoutProps>((props) => {
   const host = useSignal<ZitadelLogoutElement>();
@@ -189,10 +192,12 @@ export const ZitadelLogout = component$<ZitadelLogoutProps>((props) => {
         if (props.ref) {
           props.ref.value = el;
         }
+        setProp(el, "project", props.project);
+        setProp(el, "projectId", props.projectId);
+        setProp(el, "proxyPath", props.proxyPath);
+        setProp(el, "postSignOutUrl", props.postSignOutUrl);
+        setProp(el, "theme", props.theme);
       }}
-      {...projectProp(props.project, props.projectId, props.proxyPath)}
-      post-sign-out-url={props.postSignOutUrl}
-      theme={props.theme}
     />
   );
 });
@@ -215,9 +220,10 @@ export type ZitadelSessionProps = ZitadelSessionConfig &
 
 /**
  * Qwik component wrapping the `<zitadel-session>` web component — the
- * post-sign-in "signed in as" card. Binds the {@link ZitadelProject} handle as
- * a DOM property (or the discrete project id / proxy path) and forwards the
- * widget's `zitadel-signout` event as an optional callback.
+ * post-sign-in "signed in as" card. Binds the {@link ZitadelProject} handle (or
+ * the discrete project id / proxy path) and surface config as DOM properties in
+ * the `ref` callback (see {@link setProp}) and forwards the widget's
+ * `zitadel-signout` event as an optional callback.
  */
 export const ZitadelSession = component$<ZitadelSessionProps>((props) => {
   const host = useSignal<ZitadelSessionElement>();
@@ -243,14 +249,16 @@ export const ZitadelSession = component$<ZitadelSessionProps>((props) => {
         if (props.ref) {
           props.ref.value = el;
         }
+        setProp(el, "project", props.project);
+        setProp(el, "projectId", props.projectId);
+        setProp(el, "proxyPath", props.proxyPath);
+        setProp(el, "postSignOutUrl", props.postSignOutUrl);
+        setProp(el, "heading", props.heading);
+        setProp(el, "logoutLabel", props.logoutLabel);
+        setProp(el, "variant", props.variant);
+        setProp(el, "theme", props.theme);
+        setProp(el, "suppressHeader", props.suppressHeader);
       }}
-      {...projectProp(props.project, props.projectId, props.proxyPath)}
-      post-sign-out-url={props.postSignOutUrl}
-      heading={props.heading}
-      logout-label={props.logoutLabel}
-      variant={props.variant}
-      theme={props.theme}
-      suppressHeader={props.suppressHeader}
     />
   );
 });
