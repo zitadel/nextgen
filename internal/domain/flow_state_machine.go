@@ -1373,8 +1373,34 @@ func (r *FlowStateMachineRuntime) buildStep(state *FlowState, step *FlowDefiniti
 		RedirectURL:  redirectURL,
 		Fields:       resolved.Fields,
 		Actions:      actions,
-		SSOProviders: nil,
+		SSOProviders: ssoProvidersFromSlugs(step.SSOProviders),
 	}
+}
+
+// ssoProvidersFromSlugs carries a step's connection slugs onto the rendered
+// step, as ids alone.
+//
+// The engine has no view of the identity layer, so it cannot supply the
+// display name or the brand template: those belong to the connection, and the
+// API resolves them before the step reaches the client (resolveSSOProviders in
+// internal/api). Emitting the ids here is what makes that resolution possible
+// at all -- a step rendered without them offers the client nothing to draw,
+// whatever connections the project holds.
+func ssoProvidersFromSlugs(slugs []string) []FlowSSOProvider {
+	if len(slugs) == 0 {
+		return nil
+	}
+	providers := make([]FlowSSOProvider, 0, len(slugs))
+	for _, slug := range slugs {
+		if slug == "" {
+			continue
+		}
+		providers = append(providers, FlowSSOProvider{ID: slug})
+	}
+	if len(providers) == 0 {
+		return nil
+	}
+	return providers
 }
 
 // collectsStepFields reports whether a submission commits the step's

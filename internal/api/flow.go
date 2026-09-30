@@ -289,6 +289,9 @@ func flowSetCookie(ctx context.Context, value string, clear bool) string {
 // resolved per response (latest revision for the project, ADR 040) so a
 // published template change reaches in-flight flows on their next step.
 func (h *Handler) buildFlowResponse(ctx context.Context, result domain.FlowStepResult, terminal bool) api.FlowResponse {
+	// Before the step is converted: the engine emits connection slugs, and the
+	// buttons need the name and template the connection owns.
+	h.resolveSSOProviders(ctx, result.State.ProjectID, result.Step)
 	resp := api.FlowResponse{
 		ID:        result.State.ID,
 		SessionID: result.State.SessionID,
@@ -312,11 +315,12 @@ func toFlowStep(step *domain.FlowStep) api.FlowStep {
 		return api.FlowStep{}
 	}
 	out := api.FlowStep{
-		Name:    step.Name,
-		Texts:   api.NewOptStepTexts(toStepTexts(step.Texts)),
-		Fields:  toFlowStepFields(step.Fields),
-		Actions: toFlowStepActions(step.Actions),
-		Gates:   api.FlowStepGates{},
+		Name:         step.Name,
+		Texts:        api.NewOptStepTexts(toStepTexts(step.Texts)),
+		Fields:       toFlowStepFields(step.Fields),
+		Actions:      toFlowStepActions(step.Actions),
+		SSOProviders: toFlowStepSSOProviders(step.SSOProviders),
+		Gates:        api.FlowStepGates{},
 	}
 	if step.Error != nil {
 		out.Error = api.NewOptNilString(*step.Error)
@@ -331,6 +335,23 @@ func toFlowStep(step *domain.FlowStep) api.FlowStep {
 	}
 	if step.Challenge != nil {
 		out.Challenge = api.NewOptFlowStepChallenge(toFlowStepChallenge(*step.Challenge))
+	}
+	return out
+}
+
+// toFlowStepSSOProviders maps the resolved providers onto the wire. Order is
+// the flow definition's, which is the order the project chose to offer them in.
+func toFlowStepSSOProviders(providers []domain.FlowSSOProvider) []api.SSOProvider {
+	if len(providers) == 0 {
+		return nil
+	}
+	out := make([]api.SSOProvider, 0, len(providers))
+	for _, provider := range providers {
+		out = append(out, api.SSOProvider{
+			ID:       provider.ID,
+			Name:     provider.Name,
+			Template: provider.Template,
+		})
 	}
 	return out
 }
