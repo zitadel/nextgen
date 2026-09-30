@@ -46,6 +46,7 @@ Configuration commands
   releases list:         List releases
   schemas get:           Get one schema by id
   schemas list:          List schemas
+  sso enable:            Enable an identity provider for a user schema
   variables delete:      Delete one variable from the project
   variables get:         Get one variable from the project
   variables list:        List the variables entered on the project

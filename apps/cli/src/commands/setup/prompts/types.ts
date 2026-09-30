@@ -1,4 +1,5 @@
 import type { SetupPreset, SetupUseCase } from "@zitadel/config/defaults";
+import type { ConnectionEndpoints } from "@zitadel/config/idp";
 
 import type { FrameworkFacts } from "../../../lib/orca";
 
@@ -12,6 +13,31 @@ import type { FrameworkFacts } from "../../../lib/orca";
  * prompt can decide whether to ask (skip when its flag is already a valid
  * value, otherwise prompt and write).
  */
+/**
+ * A social provider chosen during setup, with the credentials of the OAuth
+ * application the developer registered for it.
+ *
+ * Both credentials are required. Choosing a provider and then withholding one
+ * scaffolds a sign-in button that cannot work: the connection document stores
+ * `${{ NAME }}` references, and the engine resolves them from the project's
+ * variables, so a missing value fails at the provider with `invalid_client`
+ * long after setup reported success. Declining the provider is the answer for
+ * "not now" — `sso enable` adds it once the OAuth application exists.
+ *
+ * Neither value is ever written to a `.zitadel/` file.
+ */
+export type SsoAnswer = {
+  readonly provider: string;
+  readonly clientId: string;
+  readonly secret: string;
+  /**
+   * Where the connection points, when not at the vendor. Asked for only on a
+   * development build, whose one job is standing the provider up locally —
+   * see {@link import("./social-sign-in").SocialSignInPrompt}.
+   */
+  readonly endpoints?: ConnectionEndpoints;
+};
+
 export type SetupAnswers = {
   server: string;
   devPort: number;
@@ -19,6 +45,13 @@ export type SetupAnswers = {
   preset: SetupPreset;
   /** Use case (schema field set); see `SETUP_USE_CASES` in @zitadel/config. */
   useCase: SetupUseCase;
+  /**
+   * Social provider to enable while scaffolding, or `undefined` for email
+   * sign-in only. Chosen by {@link import("./social-sign-in").SocialSignInPrompt};
+   * `sso enable` adds one to an existing Project later, so this is
+   * never the only way in.
+   */
+  sso?: SsoAnswer;
 };
 
 /** Read-only facts a prompt may need. */
@@ -57,6 +90,24 @@ export type PromptContext = {
    * authoritative and {@link import("./use-case").UseCasePrompt} skips itself.
    */
   readonly useCaseFromFlag?: boolean;
+  /**
+   * Whether `--sso` was passed explicitly. When set, the flag answers the
+   * provider question and {@link import("./social-sign-in").SocialSignInPrompt}
+   * does not ask it.
+   *
+   * The credential questions are a separate matter: the prompt still asks for
+   * a client id or secret the invocation did not supply, because a connection
+   * missing either is one that cannot work. Only a `--non-interactive` run has
+   * nobody to ask, and that one is refused rather than left incomplete.
+   */
+  readonly ssoFromFlag?: boolean;
+  /**
+   * Whether this CLI was built from source rather than released. Only a
+   * development build asks where a provider's endpoints are — see
+   * {@link import("./social-sign-in").SocialSignInPrompt}. Passed in rather
+   * than read from the bundle so a test can drive both answers.
+   */
+  readonly developmentBuild?: boolean;
 };
 
 /**

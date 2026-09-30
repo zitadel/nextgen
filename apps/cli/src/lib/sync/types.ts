@@ -85,6 +85,27 @@ export type ZitadelState = {
  * and base URL come from `@zitadel/api/runtime/{auth,base-url}` module-globals
  * the command layer sets at boot.
  */
+/**
+ * A fetch failure the planner must not degrade into "no diff".
+ *
+ * Fetching old content is best effort: a resource the server cannot hand back
+ * just plans without a before/after, which is right for a timeout, a 404, or an
+ * endpoint that does not exist yet. It is wrong for a refusal that exists to
+ * protect the developer — a syncer that stopped because the response would have
+ * put a credential in the preview must stop the plan, not quietly lose the
+ * diff and leave the server's behaviour unreported.
+ *
+ * Wrapping rather than flagging: the planner cannot otherwise tell this apart
+ * from the ordinary failures it is right to swallow, and a `ZitadelError` alone
+ * does not say which it is.
+ */
+export class FatalFetchError extends Error {
+  constructor(readonly reason: Error) {
+    super(reason.message);
+    this.name = "FatalFetchError";
+  }
+}
+
 export interface ResourceSyncer {
   readonly kind: string;
   readonly directory: string;
@@ -114,7 +135,17 @@ export interface ResourceSyncer {
    */
   create(data: object): Promise<{ id: string; canonical?: object }>;
   /** Replace the resource. `canonical` as in {@link create}. */
-  update(id: string, data: object): Promise<{ canonical?: object }>;
+  /**
+   * Apply the local body to the tracked resource.
+   *
+   * `id` in the result is the resource the write actually landed on, for a
+   * syncer whose write is addressed by something in the document rather than by
+   * the tracked id — a connection is addressed by its `slug`, so editing that
+   * slug names a different connection and the server answers with a different
+   * id. Reporting it keeps state describing what the server did rather than
+   * what the caller assumed. Omit it when the write cannot change identity.
+   */
+  update(id: string, data: object): Promise<{ id?: string; canonical?: object }>;
   delete(id: string): Promise<void>;
   fetch?(id: string): Promise<object>;
   /**
