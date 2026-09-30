@@ -331,6 +331,68 @@ describe("the terminal the generated routes point at", () => {
   });
 });
 
+describe("a hand-edited owned step", () => {
+  /** The shipped flow, with its conflict step edited by hand. */
+  const flowWithEditedConflict = () => ({
+    name: "custom",
+    status: "active",
+    user_schema: "https://example.test/u.json",
+    purposes: { login: "identifier" },
+    steps: [
+      { name: "identifier", fields: ["email"], transitions: { submit: { target: "done" } } },
+      {
+        name: "sso-conflict",
+        // Hand-edited: the passkey action the generator writes is gone.
+        fields: ["x-auth-methods#password"],
+        actions: [{ name: "submit", kind: "submit", primary: true, text_key: "x" }],
+        sso_providers: ["github"],
+        transitions: { submit: { target: "done" } },
+      },
+      { name: "done", complete: "show" },
+    ],
+  });
+
+  it("is reported and left exactly as it was, provider list included", () => {
+    // Adding the provider and then reporting the step as untouched was the
+    // report contradicting itself: it says the step was left alone.
+    const { document, skipped } = applySsoToFlow(flowWithEditedConflict(), "google", {
+      password: true,
+      passkey: true,
+    });
+    const conflict = (document as { steps: { name: string; sso_providers?: unknown[] }[] }).steps.find(
+      (step) => step.name === "sso-conflict",
+    );
+
+    expect(skipped.map((entry) => entry.region)).toContain("steps.sso-conflict");
+    expect(conflict?.sso_providers).toEqual(["github"]);
+  });
+
+  it("still gains the provider when the step is the generator's own output", () => {
+    // The merge exists for this case: a step holding only an earlier provider
+    // must not read as hand-edited.
+    const { document, skipped } = applySsoToFlow(
+      {
+        name: "custom",
+        status: "active",
+        user_schema: "https://example.test/u.json",
+        purposes: { login: "identifier" },
+        steps: [
+          { name: "identifier", fields: ["email"], transitions: { submit: { target: "done" } } },
+          { name: "done", complete: "show" },
+        ],
+      },
+      "google",
+      { password: true, passkey: true },
+    );
+    const conflict = (document as { steps: { name: string; sso_providers?: unknown[] }[] }).steps.find(
+      (step) => step.name === "sso-conflict",
+    );
+
+    expect(skipped).toEqual([]);
+    expect(conflict?.sso_providers).toEqual(["google"]);
+  });
+});
+
 describe("refusing a document the editors would overwrite", () => {
   it("accepts the shipped flow and schema", () => {
     expect(ssoEditRefusal(getDefaultLoginFlow(), "flow")).toBeUndefined();

@@ -459,14 +459,18 @@ export function applySsoToFlow(
     // generator would report its own output as hand-edited and leave the
     // screen offering only the provider that was enabled first. `register-sso`
     // declares none, so it is compared as written.
-    const expected = step.sso_providers === undefined
-      ? step
-      : { ...step, sso_providers: mergedProviders(existing, slug) };
-    if (step.sso_providers !== undefined && addProvider(existing, slug)) {
-      changed = true;
-    }
-    if (!matches(existing, expected)) {
+    const merged = step.sso_providers === undefined ? undefined : mergedProviders(existing, slug);
+    const expected = merged === undefined ? step : { ...step, sso_providers: merged };
+    // Compared as if the list were already merged, but without merging it. The
+    // list is the generator's to extend; the rest of the step is not. Adding
+    // the provider first and comparing afterwards reported a hand-edited step
+    // as left alone while having already changed it -- the one thing the
+    // report promises it did not do.
+    const candidate = merged === undefined ? existing : { ...existing, sso_providers: merged };
+    if (!matches(candidate, expected)) {
       skipped.push({ region: `steps.${name}`, reason: "hand-edited" });
+    } else if (merged !== undefined && addProvider(existing, slug)) {
+      changed = true;
     }
   }
   document.steps = list;
