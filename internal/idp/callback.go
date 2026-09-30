@@ -228,8 +228,9 @@ func (c *OIDCClient) verifyIDToken(ctx context.Context, token *oauth2.Token, non
 	if !ok || raw == "" {
 		return nil, domain.ErrIDPIDTokenInvalid(rp.ErrMissingIDToken)
 	}
-	// A copy of the connection's verifier, so the nonce is per attempt
-	// while the key set and its JWKS cache are shared.
+	// A copy of the client's verifier, so the nonce is per attempt while
+	// the key set is the one the client was built with. The client lives
+	// for one attempt, so nothing is cached across attempts.
 	verifier := c.IDTokenVerifier()
 	verifier.Nonce = func(context.Context) string { return nonce }
 	verifier.Offset = iatTolerance
