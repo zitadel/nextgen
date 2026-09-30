@@ -74,7 +74,11 @@ tasks:
       runInCI: true
 
   check-typecheck:
-    script: "corepack pnpm exec vitest run scripts/check-typecheck-programs.test.mjs && node scripts/check-typecheck-programs.mjs"
+    # `test -f` guards against a silent pass: Vitest treats a positional filter
+    # that matches nothing as success (passWithNoTests), so a renamed/moved test
+    # file would stop running unnoticed. node:test used to error on a missing
+    # file; this restores that fail-loud behavior.
+    script: "test -f scripts/check-typecheck-programs.test.mjs && corepack pnpm exec vitest run scripts/check-typecheck-programs.test.mjs && node scripts/check-typecheck-programs.mjs"
     inputs:
       - "scripts/check-typecheck-programs.mjs"
       - "scripts/check-typecheck-programs.test.mjs"
@@ -92,7 +96,11 @@ tasks:
   # nothing loudly — the spec just stops being checked. These fixtures fail
   # instead.
   check-openapi-rules:
-    command: "corepack pnpm exec vitest run scripts/openapi-casing-rules.test.mjs"
+    # `test -f` guards against a silent pass: Vitest treats a positional filter
+    # that matches nothing as success (passWithNoTests), so a renamed/moved test
+    # file would stop running unnoticed. node:test used to error on a missing
+    # file; this restores that fail-loud behavior.
+    script: "test -f scripts/openapi-casing-rules.test.mjs && corepack pnpm exec vitest run scripts/openapi-casing-rules.test.mjs"
     inputs:
       - "scripts/openapi-casing-rules.test.mjs"
       - "scripts/testdata/openapi-casing/**"

@@ -20,6 +20,7 @@ export default defineConfig(({ command, mode, isPreview }) => {
       ...baseTest,
       name: "@zitadel/login-ui",
       environment: "node",
+      include: ["src/**/*.spec.ts"],
     },
     plugins: [keepGoEmbedPlaceholder(loginOutDir)],
     build: {

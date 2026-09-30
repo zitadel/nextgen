@@ -1,6 +1,6 @@
 /**
  * Regression tests for the vacuous-typecheck classifier, run by the
- * `workspace:check-typecheck` task before the audit itself (node:test, no
+ * `workspace:check-typecheck` task before the audit itself (Vitest, no
  * dependencies). The classifier must judge every `&&` segment on its own —
  * a whole-command `--build` short-circuit once let a plain solution-style
  * segment hide behind a build segment.
