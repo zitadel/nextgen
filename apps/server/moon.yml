@@ -206,6 +206,10 @@ tasks:
       - "-timeout"
       - "10m"
       - "./..."
+    deps:
+      # Order UI builds before go test so //go:embed all:dist has files.
+      - "console:build"
+      - "login-ui:build"
     inputs:
       - "@group(serverInputs)"
     options:
@@ -258,6 +262,10 @@ tasks:
       - "-p"
       - "1"
       - "./..."
+    deps:
+      # Order UI builds before go test so //go:embed all:dist has files.
+      - "console:build"
+      - "login-ui:build"
     inputs:
       - "@group(serverInputs)"
       # Belt-and-braces, not the thing protecting this lane: with cache: false
@@ -295,6 +303,10 @@ tasks:
       - "-timeout"
       - "5m"
       - "./..."
+    deps:
+      # Order UI builds before go test so //go:embed all:dist has files.
+      - "console:build"
+      - "login-ui:build"
     inputs:
       - "@group(serverInputs)"
     options:

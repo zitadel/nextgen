@@ -223,7 +223,7 @@ const heroBrokenLogoStep: CreateFlow201 = {
 
 /** The shipped minimal design: fields straight on the page, no card. The
  * wire `layout` enum is `centered | split` (ADR 040) — richer designs ride
- * in `liquid_template` and declare the layout they degrade to. */
+ * in `liquid_template`, and the shipped ones carry `centered`. */
 const minimalStep: CreateFlow201 = {
   ...identifierStep,
   branding: {

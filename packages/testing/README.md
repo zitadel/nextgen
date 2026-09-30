@@ -275,9 +275,11 @@ direct database writes, which would bypass the provisioner and break seed
 ops for `connectZitadel` targets.
 
 The in-repo dev loop follows the same contract: `moon run console:dev-real`
-boots, seeds, and threads `handle.projectSecret` into the console dev proxy's
-`CONSOLE_PROJECT_SECRET` itself; `--seed-only` prints the same variables for
-a separately-started dev server. Nothing to remember or export.
+boots, seeds, and uses `handle.projectSecret` itself to grant the dev user
+access, then signs the console in with that user's session cookie — the
+secret never reaches the dev proxy or the browser (#1300). `--seed-only`
+prints the variables for a separately-started dev server. Nothing to remember
+or export.
 
 ## Parallelism model
 
