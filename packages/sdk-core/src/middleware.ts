@@ -61,23 +61,78 @@ export function matchesRoutes(pathname: string, routes: readonly string[]): bool
 // ─── Response header filtering ───────────────────────────────────────────────
 
 /**
- * Filters upstream response headers for proxying: strips hop-by-hop headers,
- * `set-cookie` (handled separately via `getSetCookie()`), and `location`
- * (prevents leaking internal upstream URLs).
+ * An upstream `Location`, pointed back at this app.
+ *
+ * Only the path, query and fragment survive; whatever origin the upstream
+ * named is discarded and the result is re-based onto the request's own URL.
+ * That keeps both properties the blanket strip was protecting -- an internal
+ * hostname can never reach the browser, and the redirect can only ever land on
+ * this app -- without needing to know what this app's public origin is.
+ *
+ * Comparing origins instead would have required that knowledge, and there is
+ * no reliable source for it: `X-Forwarded-Host` is attacker-settable on a
+ * direct request, and the request's own host is wrong behind a proxy that
+ * terminates TLS or rewrites it. Discarding the origin sidesteps the question
+ * -- a redirect to another origin becomes the same path on this one rather
+ * than being dropped, so a deployment behind such a proxy works instead of
+ * landing on a blank page.
+ *
+ * Nothing legitimate on this path points off-origin anyway: an outbound
+ * redirect to a provider travels as `step.redirect_url` in a JSON body and the
+ * widget performs it, never as a proxied header.
+ *
+ * A relative reference resolves against the path it came from (RFC 3986 §5),
+ * so `next?flow=x` answered to `/__nextgen/idp/callback` means
+ * `/__nextgen/idp/next?flow=x`. An unparseable value is the one case with
+ * nothing to forward.
+ */
+function ontoThisApp(location: string, selfUrl: string | undefined): string | undefined {
+  if (selfUrl === undefined || selfUrl === "") {
+    return undefined;
+  }
+  try {
+    const base = new URL(selfUrl);
+    const target = new URL(location, base);
+    return new URL(`${target.pathname}${target.search}${target.hash}`, base).toString();
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Filters upstream response headers for proxying: strips hop-by-hop headers
+ * and `set-cookie` (handled separately via `getSetCookie()`), and reduces
+ * `location` to a redirect that can only land on this app.
+ *
+ * `location` was stripped outright until the identity-provider callback
+ * needed it: the provider returns the browser to `/__nextgen/idp/callback`,
+ * and the engine answers `302` back to the page the sign-in started on. That
+ * is a top-level navigation with no JavaScript in the loop, so a dropped
+ * `Location` leaves the browser on an empty page. Outbound redirects to a
+ * provider do not travel this way -- they arrive as `step.redirect_url` in a
+ * JSON body and the widget navigates -- so nothing legitimate points off-origin.
  *
  * @param upstream - The upstream response headers.
+ * @param selfUrl - The app's own request URL, which is both the origin a
+ *   redirect must land on and the base a relative one resolves against.
+ *   Omitting it keeps the old behaviour of dropping every redirect.
  * @returns A new `Headers` object with filtered headers.
  */
-export function filterResponseHeaders(upstream: Headers): Headers {
+export function filterResponseHeaders(upstream: Headers, selfUrl?: string): Headers {
   const filtered = new Headers();
   upstream.forEach((value, key) => {
-    if (
-      !HOP_BY_HOP.has(key.toLowerCase()) &&
-      key.toLowerCase() !== "set-cookie" &&
-      key.toLowerCase() !== "location"
-    ) {
-      filtered.set(key, value);
+    const name = key.toLowerCase();
+    if (HOP_BY_HOP.has(name) || name === "set-cookie") {
+      return;
     }
+    if (name === "location") {
+      const onThisApp = ontoThisApp(value, selfUrl);
+      if (onThisApp !== undefined) {
+        filtered.set("location", onThisApp);
+      }
+      return;
+    }
+    filtered.set(key, value);
   });
   return filtered;
 }

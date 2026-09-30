@@ -2,6 +2,7 @@ import type { GetMySession200 } from "@zitadel/api/generated/model";
 import { setApiCsrfToken } from "@zitadel/api/runtime/auth";
 
 import { api } from "../api/zitadel";
+import { clearSessionCaches } from "../lib/session-cache";
 
 /**
  * Console session helpers (Console ADR 0003).
@@ -31,10 +32,14 @@ const withCredentials: RequestInit = { credentials: "include" };
 let cachedSession: { at: number; session: ConsoleSession } | null = null;
 const SESSION_CACHE_MS = 15_000;
 
-/** Drops the cached session (called on sign-out). */
+/**
+ * Drops the cached session (called on sign-out), and with it every read cached
+ * for that person (`lib/session-cache.ts`).
+ */
 export function invalidateSessionCache(): void {
   cachedSession = null;
   setApiCsrfToken(undefined);
+  clearSessionCaches();
 }
 
 /**
