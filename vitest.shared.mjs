@@ -8,8 +8,9 @@
  *   });
  *
  * It is a plain object (not `defineConfig`/`mergeConfig`) on purpose: the SDK
- * family resolves Vitest 3 (the `sdk` pnpm catalog, pinned there because Qwik 1
- * peers `vite >=5 <8`) while everything else resolves Vitest 4. A plain object
+ * family — and `apps/cli`, which shares the `sdk` pnpm catalog — resolves
+ * Vitest 3 (pinned there because Qwik 1 peers `vite >=5 <8`) while everything
+ * else resolves Vitest 4. A plain object
  * of the fields common to both majors is consumed cleanly by either. It ships
  * as `.mjs` + a hand-written `.d.mts` so it resolves under both `bundler` and
  * `nodenext` TypeScript projects (including composite ones) without being pulled
