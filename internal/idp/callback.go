@@ -92,8 +92,8 @@ type StrategyResult struct {
 }
 
 // Callback completes the ceremony for one attempt: exchanges the code,
-// verifies the id_token, extracts claims, runs the strategy, evaluates
-// verification, and coerces the subject. The provider's tokens are dropped
+// verifies the id_token, extracts claims, coerces the subject, runs the
+// strategy, and evaluates verification. The provider's tokens are dropped
 // when it returns.
 func (c *OIDCClient) Callback(ctx context.Context, req CallbackRequest) (ExternalIdentity, error) {
 	if req.Code == "" {
@@ -120,6 +120,13 @@ func (c *OIDCClient) Callback(ctx context.Context, req CallbackRequest) (Externa
 	if err != nil {
 		return ExternalIdentity{}, err
 	}
+	// The subject is read before the strategy runs, so it comes from the
+	// verified id_token or the userinfo checked against it. A strategy
+	// emitting the subject claim changes the claim, never the identity.
+	subject, err := coerceSubject(c.conn.SubjectClaim, claims)
+	if err != nil {
+		return ExternalIdentity{}, err
+	}
 	var strategy StrategyResult
 	if req.SupplementaryFetch != nil {
 		strategy, err = req.SupplementaryFetch(ctx, StrategyInput{
@@ -133,10 +140,6 @@ func (c *OIDCClient) Callback(ctx context.Context, req CallbackRequest) (Externa
 		}
 		// The strategy is the authority for the claims it emits.
 		maps.Copy(claims, strategy.Claims)
-	}
-	subject, err := coerceSubject(c.conn.SubjectClaim, claims)
-	if err != nil {
-		return ExternalIdentity{}, err
 	}
 	return ExternalIdentity{
 		Subject:    subject,

@@ -727,6 +727,24 @@ func TestCallback(t *testing.T) {
 			},
 		},
 		{
+			name: "the strategy cannot replace the subject",
+			conn: func(p *provider) Connection {
+				conn := p.connection(ClientSecretBasic, true, true)
+				conn.ClaimMapping = mapping
+				return conn
+			},
+			req: CallbackRequest{Code: "the-code", Nonce: "the-nonce", RedirectURI: redirectURI, RevisionID: "idprev_1", PKCEVerifier: "the-verifier", ClientSecret: "the-secret",
+				SupplementaryFetch: func(context.Context, StrategyInput) (StrategyResult, error) {
+					return StrategyResult{Claims: map[string]any{"sub": "user-2"}}, nil
+				}},
+			want: ExternalIdentity{
+				Subject:    "user-1",
+				Claims:     map[string]any{"email": "ada@example.test", "givenName": "Ada"},
+				Verified:   map[string]bool{},
+				RevisionID: "idprev_1",
+			},
+		},
+		{
 			name: "a claim entry reads a verification claim the strategy emits",
 			conn: func(p *provider) Connection {
 				conn := p.connection(ClientSecretBasic, true, true)
