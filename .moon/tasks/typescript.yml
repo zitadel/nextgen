@@ -31,7 +31,3 @@ implicitInputs:
   # (and unselected by `moon ci`), running stale config.
   - "/vitest.shared.mjs"
   - "/vitest.shared.d.mts"
-  # Sets enable-pre-post-scripts, which is what makes the pre* lifecycle hooks
-  # (cli build, config sync-schemas) run ahead of test/build/typecheck. Toggling
-  # it changes what those tasks actually do, so it must invalidate their caches.
-  - "/.npmrc"
