@@ -16,9 +16,6 @@ export default defineConfig({
     name: "@zitadel/workspace",
     environment: "node",
     include: ["scripts/**/*.test.mjs", "scripts/**/*.test.ts"],
-    // This config already sits at the repo root, so the shared global setup is
-    // local (baseTest's ../../ path is for the 2-deep project configs).
-    globalSetup: ["./vitest.global-setup.mjs"],
     // Root tests exercise scripts/, not src/ (there is none at the repo root).
     coverage: { ...baseTest.coverage, include: ["scripts/**/*.{mjs,ts}"] },
     // Several of these shell out to slow tools (redocly, tsc program audits)

@@ -58,18 +58,21 @@ tasks:
       # the later release step instead of the normal build/test graph.
       runInCI: false
 
+  # `vitest run` runs both projects (unit + browser) from one config, so the
+  # Playwright Chromium install is a dep here (self-contained, like storybook).
+  install-browsers:
+    command: "corepack pnpm exec playwright install chromium"
+    options:
+      cache: false
+
   test:
     command: "corepack pnpm run test"
     deps:
+      - "install-browsers"
       - "api:build"
       - "api-mock:build"
       - "config:build"
       - "design-tokens:build"
       # standalone-artifact.spec.ts reads dist/standalone.mjs — the unit suite
       # guards the built artifact, so the dev build must run first.
-      - "build"
-
-  test-browser:
-    command: "corepack pnpm run test:browser"
-    deps:
       - "build"

@@ -8,7 +8,10 @@ export default defineConfig({
     name: "@zitadel/cli",
     environment: "node",
     include: ["tests/**/*.test.ts"],
-    // The oclif dist the integration suite drives is built by the moon `build`
-    // dep of cli:test; the shared root global setup is inherited from baseTest.
+    // Build the oclif dist the integration suite drives before any test runs,
+    // so `vitest run` is self-contained (package-local setup, no cross-package
+    // coupling). This also keeps the built CLI fresh rather than depending on a
+    // possibly-stale cached build.
+    globalSetup: ["tests/helpers/global-setup.ts"],
   },
 });

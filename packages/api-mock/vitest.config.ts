@@ -1,25 +1,47 @@
+import { playwright } from "@vitest/browser-playwright";
 import { defineConfig } from "vitest/config";
 
 import { baseTest, sourceConditions } from "../../vitest.shared.mjs";
 
 /**
- * Unit lane (node) — the default `vitest run` and the CI gate. The canonical
- * contract test for the mock handlers, running against `msw/node`'s
- * `setupServer`.
+ * One config, two projects, run together by a single `vitest run` (the `test`
+ * task) — one aggregated junit, no per-lane scripts or CLI flags:
  *
- * The browser lane lives in `vitest.browser.config.ts` (run via `test:browser`,
- * not in CI): it smoke-tests the `setupMock(worker)` entry point against
- * `msw/browser` in real Chromium and needs a Playwright install. Its config
- * owns the project selection and its own junit output, so the script needs no
- * CLI flags.
+ * - `unit` (node): the canonical contract test for the mock handlers, against
+ *   `msw/node`'s `setupServer`.
+ * - `browser` (real Chromium via Playwright): smoke-tests the `setupMock(worker)`
+ *   entry against `msw/browser`. Needs a Playwright Chromium install.
  */
 export default defineConfig({
   resolve: { conditions: sourceConditions },
   test: {
     ...baseTest,
     name: "@zitadel/api-mock",
-    environment: "node",
-    include: ["src/**/*.spec.ts"],
-    exclude: ["src/**/*.browser.spec.ts"],
+    projects: [
+      {
+        resolve: { conditions: sourceConditions },
+        test: {
+          name: "unit",
+          globals: true,
+          environment: "node",
+          include: ["src/**/*.spec.ts"],
+          exclude: ["src/**/*.browser.spec.ts"],
+        },
+      },
+      {
+        resolve: { conditions: sourceConditions },
+        test: {
+          name: "browser",
+          globals: true,
+          include: ["src/**/*.browser.spec.ts"],
+          browser: {
+            enabled: true,
+            provider: playwright(),
+            headless: true,
+            instances: [{ browser: "chromium" }],
+          },
+        },
+      },
+    ],
   },
 });
