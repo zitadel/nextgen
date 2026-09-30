@@ -26,3 +26,8 @@ implicitInputs:
   # Resolved upward from each linted file by prettier; enforced in the sdk-*
   # eslint lint tasks via eslint-plugin-prettier.
   - "/.prettierrc.json"
+  # Spread into every project's vitest config's `test` block. Without these a
+  # change to the shared base would leave every project's test task cache-hit
+  # (and unselected by `moon ci`), running stale config.
+  - "/vitest.shared.mjs"
+  - "/vitest.shared.d.mts"
