@@ -1,4 +1,4 @@
-import { act, configure, render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
@@ -32,21 +32,11 @@ const REVISION_URL = "http://localhost/api/branding/brnd_1";
 
 const server = setupServer();
 
-// The first async render in each case waits on a real router load, an MSW fetch
-// and the login widget's connect effects; on a cold or loaded CI runner that can
-// exceed RTL's default 1s findBy window and flake this suite. Give the async
-// queries more headroom, restored afterwards so no other suite is affected.
-const DEFAULT_ASYNC_TIMEOUT = 1000;
-
-beforeAll(() => {
-  server.listen({ onUnhandledRequest: "bypass" });
-  configure({ asyncUtilTimeout: 5000 });
-});
+beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
 afterEach(() => server.resetHandlers());
 afterAll(() => {
   server.close();
   vi.unstubAllEnvs();
-  configure({ asyncUtilTimeout: DEFAULT_ASYNC_TIMEOUT });
 });
 
 const PUBLISHED = {
