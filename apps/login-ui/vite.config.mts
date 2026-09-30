@@ -20,9 +20,10 @@ export default defineConfig(({ command, mode, isPreview }) => {
       ...baseTest,
       name: "@zitadel/login-ui",
       environment: "node",
-      include: ["src/**/*.spec.ts"],
-      // No unit tests yet (the login flow is covered in @zitadel/components and
-      // the e2e journeys), so this lane is intentionally allowed to be empty.
+      // Inherit the shared base's include (both .test/.spec suffixes) so a
+      // future test here is discovered. No unit tests yet (the login flow is
+      // covered in @zitadel/components and the e2e journeys), so this lane is
+      // intentionally allowed to be empty.
       passWithNoTests: true,
     },
     plugins: [keepGoEmbedPlaceholder(loginOutDir)],
