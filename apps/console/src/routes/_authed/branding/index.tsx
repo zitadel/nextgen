@@ -20,18 +20,19 @@ import type { BrandingRevision } from "@/lib/branding-palette";
 import { flowDisplayName } from "@/lib/flow-definition";
 
 import { api } from "../../../api/zitadel";
-import { getConsoleProjectId } from "../../../runtime/runtime";
+import { projectScopeDeps, requireProjectScope } from "../../../lib/project-scope";
 
 export const Route = createFileRoute("/_authed/branding/")({
   // Nested under Login flows, as in the design: branding is how those flows
   // render, not a resource of its own. Sub-rows carry no icon.
-  staticData: { nav: { label: "Branding", order: 1, parent: "/flow-definitions" } },
-  loader: async () => {
+  staticData: { scope: "project", nav: { label: "Branding", order: 1, parent: "/flow-definitions" } },
+  loaderDeps: projectScopeDeps,
+  loader: async ({ deps }) => {
     // Newest first, so the head of the list is what visitors see today. The
     // list carries ids only, so the configuration itself is a second call. A
     // project that has never published branding has no revision, and the
     // panel then shows the maintained defaults.
-    const projectId = getConsoleProjectId();
+    const projectId = requireProjectScope(deps.project);
     const [revisions, flows] = await Promise.all([
       api.listBranding({ project_id: projectId }),
       // One row per flow rather than per revision (#1246), as the Login
@@ -86,6 +87,7 @@ function BrandingScreen() {
   const { revision, flows } = Route.useLoaderData();
   // What the operator last picked; `activeJourney` below is what renders.
   const [journey, setJourney] = useState<PreviewJourney>("register");
+  // What the operator last picked; `activeFlowName` below is what renders.
   const [flowName, setFlowName] = useState(flows[0]?.name ?? "");
   const [theme, setTheme] = useState<PreviewTheme>("revision");
   const [narrow, setNarrow] = useState(false);
@@ -94,7 +96,12 @@ function BrandingScreen() {
   // it does not carry answers `flowdef.purpose_mismatch` instead of rendering.
   // A flow the list did not describe is treated as serving everything, so a
   // missing `purposes` narrows nothing.
-  const selected = flows.find((flow) => flow.name === flowName);
+  //
+  // Switching projects keeps this screen mounted and reloads `flows`, so a pick
+  // from the previous project can name a flow this one does not have. It falls
+  // back to the first flow, derived like `activeJourney` below.
+  const selected = flows.find((flow) => flow.name === flowName) ?? flows[0];
+  const activeFlowName = selected?.name ?? "";
   const journeys = selected?.purposes.length
     ? JOURNEYS.filter((entry) => selected.purposes.includes(entry.id))
     : JOURNEYS;
@@ -119,7 +126,7 @@ function BrandingScreen() {
       <div className="mt-3 flex flex-col gap-2 lg:flex-row lg:items-center lg:gap-[10px] lg:px-2">
         {flows.length > 0 && (
           <div className="flex items-center justify-between gap-[10px]">
-            <Select value={flowName} onValueChange={setFlowName}>
+            <Select value={activeFlowName} onValueChange={setFlowName}>
               <SelectTrigger aria-label="Previewed flow" className={GHOST_TRIGGER}>
                 <Workflow />
                 <SelectValue />
@@ -191,7 +198,7 @@ function BrandingScreen() {
           {/* The widget is content-sized, so the preview constrains the width
               rather than the element: that is what an embedding page does. */}
           <div className={narrow ? "w-[24rem]" : "w-full max-w-[32rem]"}>
-            <LoginPreview journey={activeJourney} flowName={flowName} theme={theme} />
+            <LoginPreview journey={activeJourney} flowName={activeFlowName} theme={theme} />
           </div>
         </Card>
 

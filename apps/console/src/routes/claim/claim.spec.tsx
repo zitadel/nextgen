@@ -6,6 +6,7 @@ import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { makeTestSession } from "../../auth/session.fixture";
+import { listMyProjectsCached } from "../../lib/project-scope";
 import { createAppRouter } from "../../router";
 import { resetClaimAttemptsForTests } from "./index";
 
@@ -144,6 +145,38 @@ describe("claim page", () => {
     // CLI picks the claim up on its own without being told to.
     expect(screen.getByRole("link", { name: "Open the console" })).toBeInTheDocument();
     expect(screen.queryByText(/terminal/i)).not.toBeInTheDocument();
+  });
+
+  it("opens the console on the project just claimed, not a list read before it", async () => {
+    // Before the claim the developer holds no project; afterwards, the claimed
+    // one. The console pins the platform project (claim mode), which they
+    // cannot manage, so the claimed project must be what gets selected.
+    fetchSession.mockResolvedValue(makeTestSession());
+    let claimed = false;
+    server.use(
+      http.get("*/api/users/me/projects", () =>
+        HttpResponse.json({
+          projects: claimed ? [{ id: PROJECT_ID, name: "Claimed" }] : [],
+        }),
+      ),
+      http.post("*/api/teams/query", () => HttpResponse.json({ teams: [] })),
+    );
+    stubComplete(() => {
+      claimed = true;
+      return HttpResponse.json({
+        project_id: PROJECT_ID,
+        team_id: "team_personal",
+        claimed_at: "2026-08-24T10:00:00Z",
+      });
+    });
+    // A list read before the claim, as the console's guard would have cached it.
+    expect((await listMyProjectsCached()).projects).toEqual([]);
+
+    const { router } = await renderAt(CLAIM_PATH);
+    await userEvent.click(await screen.findByRole("link", { name: "Open the console" }));
+
+    await waitFor(() => expect(router.state.location.pathname).toBe("/teams"));
+    expect(router.state.location.search).toMatchObject({ project: PROJECT_ID });
   });
 
   // The gap the in-component ref cannot cover: a fresh mount gets a fresh ref.

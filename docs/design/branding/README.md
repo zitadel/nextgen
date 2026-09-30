@@ -6,25 +6,28 @@ Notes for how the login UI is themed and laid out relative to the step payload.
 
 **Contract (source of truth):** [`../flowengine/flow-engine-nodes.md`](../flowengine/flow-engine-nodes.md), the shipped Branding spec under [`api/openapi/endpoints/branding/`](../../../api/openapi/endpoints/branding/), [`../flowengine/template-security.md`](../flowengine/template-security.md).
 
-**This folder:** optional extensions and working notes (extra branding fields, `--zl-*` tokens, Liquid layout checks). Details live in the files linked below.
+**This folder:** notes on how the component applies that contract (the branding object, `--zl-*` tokens, Liquid layout checks). Details live in the files linked below.
 
 ```mermaid
 graph LR
     S[Step JSON] --> L[Liquid]
     B[Branding] --> L
-    L --> X["Markup + :host vars"]
+    L --> X[Markup]
+    B --> O[Orchestrator]
+    O --> V["--zl-* on the shadow root"]
     X --> A[zl-* atoms]
+    V --> A
 ```
 
 ## Responsibility split
 
-1. **Step JSON** (`fields`, `actions`, `gates`, `messages`, `errors`, `identity`): capability data, stable keys, labels via `text_key`. No UI chrome in this layer.
+1. **Step JSON** (`fields`, `actions`, `gates`, `sso_providers`, `challenge`, `error`): capability data, stable keys, labels via `text_key`. No UI chrome in this layer.
 
 2. **`branding.liquid_template`:** which `<zl-*>` elements appear and in what order. Pure structure — no `<style>` blocks or `:host` rules.
 
 3. **Orchestrator:** reads the `Branding` object and generates `--zl-*` CSS tokens via `adoptedStyleSheets`. Templates never touch theming ([`tokens.md`](tokens.md)).
 
-4. **`Branding` object:** layout preset, URLs, optional theme fields ([`schema.md`](schema.md)). Input to the orchestrator's token generation.
+4. **`Branding` object:** asset URLs and the `theme`, `typography` and `shape` blocks ([`schema.md`](schema.md)). Input to the orchestrator's token generation.
 
 5. **`<zl-*>` atoms:** UI implementation; read CSS variables; overrides in [`override-ladder.md`](override-ladder.md).
 
@@ -38,7 +41,7 @@ Built-ins and tokens shipped first; hand-written Liquid is live via the CLI ejec
 
 ## Open points
 
-Dark mode; i18n source; powered-by line. Settled elsewhere: template attachment + grouping ([ADR 040](../../adrs/040-tenant-login-templates-editable-config.md)), extra designs via the catalog ([`templates.md`](templates.md)), untrusted CSS rejected ([`schema.md`](schema.md)).
+i18n source; powered-by line. Settled elsewhere: template attachment + grouping ([ADR 040](../../adrs/040-tenant-login-templates-editable-config.md)), extra designs via the catalog ([`templates.md`](templates.md)), untrusted CSS rejected ([`schema.md`](schema.md)).
 
 ## Files
 
