@@ -186,7 +186,7 @@ resolves the whole workspace from source (`resolve.conditions:
 ["@zitadel/source"]`). On a cold run Vite pre-bundles a large graph (`lit`, the
 generated `@zitadel/api` client, `dompurify`, `liquidjs`) **before the first
 test**: that warm-up is 60–120s+ and variable, while the tests themselves run in
-~1s. With a warm `node_modules/.vite` cache the same run finishes in seconds. CI
+~1s. With a warm `.vitest` cache the same run finishes in seconds. CI
 pays this cold start deliberately: `moon ci :... :test` runs `test:all` (both
 projects), and the `components:test` task pulls in Chromium via an
 `install-browsers` moon dep. Locally, `pnpm test` stays on the fast jsdom
