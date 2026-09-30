@@ -336,6 +336,9 @@ func evaluateVerified(conn Connection, claims map[string]any, strategy StrategyR
 		}
 		switch source.Kind {
 		case VerifyByTrust:
+			// Trust covers the value as it stands, including one the
+			// strategy replaced: the strategy is the authority for the
+			// claims it emits.
 			verified[property] = true
 		case VerifyByClaim:
 			// The boolean true or the string "true"; anything else,
