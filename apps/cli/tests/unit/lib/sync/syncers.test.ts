@@ -596,6 +596,35 @@ describe("IdpConnectionSyncer", () => {
     }
   });
 
+  it("does not call a missing client_secret a leaked one", () => {
+    // The field is absent, so telling someone to replace its value with a
+    // reference sends them looking for something that is not there.
+    const [, idp] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
+    const { client_secret: _omitted, ...oidc } = connection.oidc;
+    const missing = { ...connection, oidc };
+
+    try {
+      idp.validate(missing);
+      expect.unreachable("should have thrown");
+    } catch (error) {
+      expect((error as ZitadelError).code).toBe("E_VALIDATION");
+      expect((error as ZitadelError).message).not.toContain("must reference a variable");
+      expect((error as ZitadelError).message).toContain("not a valid identity provider connection");
+    }
+  });
+
+  it("does not call a wrongly-typed client_secret a leaked one", () => {
+    const [, idp] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
+    const wrongType = { ...connection, oidc: { ...connection.oidc, client_secret: 42 } };
+
+    try {
+      idp.validate(wrongType);
+      expect.unreachable("should have thrown");
+    } catch (error) {
+      expect((error as ZitadelError).message).not.toContain("must reference a variable");
+    }
+  });
+
   it("create posts the document under the project and keeps the returned id", async () => {
     let body: unknown;
     server.use(

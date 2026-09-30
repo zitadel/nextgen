@@ -64,11 +64,40 @@ const REGISTER_SSO = "register-sso";
 const SSO_CONFLICT = "sso-conflict";
 
 /** Outcomes the engine fires after a provider returns, and where they go. */
-const PROVIDER_OUTCOMES: Record<string, string> = {
-  callback: "done",
-  identity_unknown: REGISTER_SSO,
-  user_already_exists: SSO_CONFLICT,
-};
+function providerOutcomes(terminal: string): Record<string, string> {
+  return {
+    callback: terminal,
+    identity_unknown: REGISTER_SSO,
+    user_already_exists: SSO_CONFLICT,
+  };
+}
+
+/**
+ * The step a completed sign-in ends at.
+ *
+ * Derived, not assumed to be called `done`. Step names are not fixed by the
+ * contract — `purposes` names entry points, not terminals — and what marks a
+ * terminal is the `complete` property, which both shipped flows carry. A flow
+ * whose terminal is called something else was valid before this edit, and
+ * writing `done` into the generated routes would point them at a step that
+ * does not exist: `validateFlowDefinition` rejects that on the next `plan`
+ * ("transition ... targets unknown step"), so enabling a provider would break
+ * a flow that worked.
+ *
+ * `undefined` when the flow has no single terminal to route to, which the
+ * caller refuses rather than guesses at.
+ */
+function terminalStep(flow: Json): string | undefined {
+  const complete = steps(flow).filter(
+    (step) => step.complete !== undefined && typeof step.name === "string",
+  );
+  if (complete.length === 1) {
+    return complete[0]?.name as string;
+  }
+  // A flow that marks no terminal, or several: fall back to the scaffolded
+  // name if it is there, so an older hand-written flow still works.
+  return stepNamed(flow, "done") === undefined ? undefined : "done";
+}
 
 type Json = Record<string, unknown>;
 type Step = Json & { name?: unknown };
@@ -134,6 +163,11 @@ function flowRefusal(flow: Json): string | undefined {
       const name = typeof step.name === "string" ? step.name : String(index);
       return `steps.${name}.transitions is not an object`;
     }
+  }
+  // Last, because it is about where the generated routes point rather than
+  // whether the document can be read at all.
+  if (terminalStep(flow) === undefined) {
+    return "no step marks where a completed sign-in ends";
   }
   return undefined;
 }
@@ -231,14 +265,14 @@ function registrationFields(flow: Json): string[] {
  * step that can only collect the identifier is a dead end for every property
  * beyond it.
  */
-function registerSsoStep(fields: string[]): Step {
+function registerSsoStep(fields: string[], terminal: string): Step {
   return {
     name: REGISTER_SSO,
     fields,
     actions: [{ name: "submit", kind: "submit", primary: true, text_key: `${REGISTER_SSO}.action.submit` }],
     on_success: "create_user_with_sso",
     transitions: {
-      submit: { target: "done" },
+      submit: { target: terminal },
       user_already_exists: { target: SSO_CONFLICT },
     },
   };
@@ -253,6 +287,7 @@ function ssoConflictStep(
   slug: string,
   methods: { password: boolean; passkey: boolean },
   loginStep: string | undefined,
+  terminal: string,
 ): Step {
   const actions: Json[] = [];
   const fields: string[] = [];
@@ -274,12 +309,12 @@ function ssoConflictStep(
 
   const transitions: Json = {};
   if (methods.password) {
-    transitions.submit = { target: "done" };
+    transitions.submit = { target: terminal };
   }
   if (methods.passkey) {
-    transitions.passkey = { target: "done" };
+    transitions.passkey = { target: terminal };
   }
-  transitions.callback = { target: "done" };
+  transitions.callback = { target: terminal };
   transitions.user_already_exists = { target: SSO_CONFLICT };
   if (loginStep !== undefined) {
     transitions.sign_in = { target: loginStep, purpose: "login" };
@@ -355,6 +390,9 @@ export function applySsoToFlow(
   const document = clone(flow) as Json;
   const skipped: SsoSkipped[] = [];
   let changed = false;
+  // `ssoEditRefusal` has already refused a flow with no terminal to route to,
+  // so the caller never reaches here without one.
+  const terminal = terminalStep(document) ?? "done";
 
   for (const name of providerSteps(document)) {
     const step = stepNamed(document, name);
@@ -365,7 +403,7 @@ export function applySsoToFlow(
       changed = true;
     }
     const transitions = isObject(step.transitions) ? { ...step.transitions } : {};
-    for (const [outcome, target] of Object.entries(PROVIDER_OUTCOMES)) {
+    for (const [outcome, target] of Object.entries(providerOutcomes(terminal))) {
       const current = transitions[outcome];
       // `user_already_exists` already points at the password step on a
       // register flow. Retargeting it is the point: the same outcome now also
@@ -394,11 +432,11 @@ export function applySsoToFlow(
   }
 
   const list = steps(document);
-  const terminalIndex = list.findIndex((step) => step.name === "done");
+  const terminalIndex = list.findIndex((step) => step.name === terminal);
   const insertAt = terminalIndex === -1 ? list.length : terminalIndex;
   const wanted: Step[] = [
-    registerSsoStep(registrationFields(document)),
-    ssoConflictStep(slug, enabled, loginEntry(document)),
+    registerSsoStep(registrationFields(document), terminal),
+    ssoConflictStep(slug, enabled, loginEntry(document), terminal),
   ];
   let offset = 0;
   for (const step of wanted) {

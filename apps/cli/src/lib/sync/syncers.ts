@@ -10,6 +10,7 @@ import { consola } from "consola";
 
 import type { ZitadelClient } from "@zitadel/api/client";
 import { DEFAULT_FLOW_SCHEMA_URI } from "@zitadel/config/defaults";
+import { isVariableReference } from "@zitadel/config/idp";
 import { normalizeFlowBody, normalizeSchemaBody } from "@zitadel/config/normalize";
 import {
   brandingConfigSchema,
@@ -69,6 +70,18 @@ export function makeSyncers(opts: {
  * the missing names. Shared by every syncer so the check is identical for
  * schemas and flows, and runs in the sync engine before any platform call.
  */
+/** The value a Zod issue path points at, or `undefined` when it is absent. */
+function valueAt(data: object, path: ReadonlyArray<PropertyKey>): unknown {
+  let current: unknown = data;
+  for (const key of path) {
+    if (typeof current !== "object" || current === null) {
+      return undefined;
+    }
+    current = (current as Record<PropertyKey, unknown>)[key];
+  }
+  return current;
+}
+
 function assertEnvRefs(data: object, env: EnvLookup): void {
   const missing = flowEnvRefs(data).filter((name) => !env[name]);
   if (missing.length > 0) {
@@ -110,9 +123,17 @@ class IdpConnectionSyncer implements ResourceSyncer {
     if (result.success) {
       return;
     }
-    const literalSecret = result.error.issues.some(
-      (issue) => issue.path.length > 1 && issue.path[issue.path.length - 1] === "client_secret",
-    );
+    // Only a stored value that is not a reference is the mistake this names.
+    // A missing or wrongly-typed `client_secret` fails at the same path, and
+    // telling someone to replace a value with a reference when the field is
+    // not there sends them looking for something that does not exist.
+    const literalSecret = result.error.issues.some((issue) => {
+      if (issue.path.length <= 1 || issue.path[issue.path.length - 1] !== "client_secret") {
+        return false;
+      }
+      const stored = valueAt(data, issue.path);
+      return typeof stored === "string" && !isVariableReference(stored);
+    });
     throw new ZitadelError(
       "E_VALIDATION",
       literalSecret

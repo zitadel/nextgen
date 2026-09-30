@@ -276,6 +276,61 @@ describe("register-sso collects what registration collects", () => {
   });
 });
 
+describe("the terminal the generated routes point at", () => {
+  /** A flow shaped like the shipped one, but ending somewhere else. */
+  const flowEndingAt = (terminal: string) => ({
+    name: "custom",
+    status: "active",
+    user_schema: "https://example.test/u.json",
+    purposes: { login: "identifier" },
+    steps: [
+      { name: "identifier", fields: ["email"], transitions: { submit: { target: terminal } } },
+      { name: terminal, complete: "show" },
+    ],
+  });
+
+  it("routes to the flow's own terminal, not a hard-coded `done`", () => {
+    // A flow calling its terminal `complete` was valid before this edit.
+    // Writing `done` would point every generated route at a step that does
+    // not exist, and `validateFlowDefinition` rejects that on the next plan.
+    const { document } = applySsoToFlow(flowEndingAt("complete"), "google", {
+      password: true,
+      passkey: false,
+    });
+    const steps = (document as { steps: { name: string; transitions?: Record<string, { target: string }> }[] }).steps;
+    const targets = steps.flatMap((step) => Object.values(step.transitions ?? {}).map((t) => t.target));
+
+    expect(targets).toContain("complete");
+    expect(targets).not.toContain("done");
+  });
+
+  it("points every generated transition at a step the flow actually has", () => {
+    const { document } = applySsoToFlow(flowEndingAt("finished"), "google", {
+      password: false,
+      passkey: true,
+    });
+    const steps = (document as { steps: { name: string; transitions?: Record<string, { target: string }> }[] }).steps;
+    const names = new Set(steps.map((step) => step.name));
+
+    for (const step of steps) {
+      for (const [outcome, transition] of Object.entries(step.transitions ?? {})) {
+        expect(names, `${step.name}.${outcome} targets a missing step`).toContain(transition.target);
+      }
+    }
+  });
+
+  it("still uses `done` when that is what the flow calls its terminal", () => {
+    const { document } = applySsoToFlow(flowEndingAt("done"), "google", {
+      password: true,
+      passkey: false,
+    });
+    const steps = (document as { steps: { name: string; transitions?: Record<string, { target: string }> }[] }).steps;
+    const targets = steps.flatMap((step) => Object.values(step.transitions ?? {}).map((t) => t.target));
+
+    expect(targets).toContain("done");
+  });
+});
+
 describe("refusing a document the editors would overwrite", () => {
   it("accepts the shipped flow and schema", () => {
     expect(ssoEditRefusal(getDefaultLoginFlow(), "flow")).toBeUndefined();
@@ -284,9 +339,17 @@ describe("refusing a document the editors would overwrite", () => {
 
   it("accepts a document that has simply not got there yet", () => {
     // An absent region is written, which is the whole point of the editors.
-    expect(ssoEditRefusal({}, "flow")).toBeUndefined();
     expect(ssoEditRefusal({}, "schema")).toBeUndefined();
-    expect(ssoEditRefusal({ steps: [] }, "flow")).toBeUndefined();
+    expect(ssoEditRefusal({ steps: [{ name: "done", complete: "show" }] }, "flow")).toBeUndefined();
+  });
+
+  it("refuses a flow with nowhere for a completed sign-in to end", () => {
+    // The generated routes need a terminal to point at; inventing `done`
+    // would write transitions the validator rejects on the next plan.
+    expect(ssoEditRefusal({}, "flow")).toBe("no step marks where a completed sign-in ends");
+    expect(ssoEditRefusal({ steps: [] }, "flow")).toBe(
+      "no step marks where a completed sign-in ends",
+    );
   });
 
   it("refuses a flow whose steps are not a list", () => {
