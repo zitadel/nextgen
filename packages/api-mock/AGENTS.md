@@ -147,7 +147,8 @@ Two Vitest projects, mirroring `packages/components`:
 
 `pnpm test:all` runs both projects, and is what CI runs (the `api-mock:test`
 moon task invokes it with an `install-browsers` dep). When fixing a regression in step
-routing, add a case to the unit spec first — that is what CI gates on.
+routing, add a case to the unit spec first — it is the canonical contract for the
+handlers.
 
 ## Don't
 
