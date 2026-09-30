@@ -1,35 +1,34 @@
 import { playwright } from "@vitest/browser-playwright";
 import { defineConfig } from "vitest/config";
 
+import { baseTest, sourceConditions } from "../../vitest.shared.mjs";
+
 /**
- * Two projects, mirroring `packages/components/vitest.config.ts`:
+ * Two projects in one config, selected per lane (no separate config files):
  *
- * - `unit` — runs in node mode against `msw/node`'s `setupServer`. The
- *   canonical contract test for the mock handlers; runs in CI as the
- *   default `pnpm test` target. Picks up `*.spec.ts` (excluding the
- *   browser variant).
- * - `browser` — runs in real Chromium via Playwright against
- *   `msw/browser`'s `setupWorker`. Smoke-tests the `setupMock(worker)`
- *   browser entry point that the dev playground uses. Picks up
- *   `*.browser.spec.ts`. Requires a Playwright browser install
- *   (`pnpm exec playwright install`); not run in CI.
+ * - `unit` (node): the canonical contract test for the mock handlers against
+ *   `msw/node`'s `setupServer`. The fast local `test` = `vitest run --project
+ *   unit`.
+ * - `browser` (real Chromium via Playwright): smoke-tests `setupMock(worker)`
+ *   against `msw/browser`. Local-only selector `test:browser` = `vitest run
+ *   --project browser`.
  *
- * `pnpm test` runs the unit project. `pnpm test:browser` runs the
- * browser project. `pnpm test:all` runs both.
+ * The CI gate is `test:all` = `vitest run`, which runs both projects in one
+ * process and emits one aggregated junit.xml.
  */
 export default defineConfig({
-  resolve: { conditions: ["@zitadel/source"] },
+  cacheDir: ".vitest",
+  resolve: { conditions: sourceConditions },
   test: {
+    ...baseTest,
     name: "@zitadel/api-mock",
-    watch: false,
-    passWithNoTests: true,
-    coverage: {
-      reportsDirectory: "./test-output/vitest/coverage",
-      provider: "v8",
-      include: ["src/**/*.ts"],
-    },
     projects: [
       {
+        // Each project is its own Vite instance, so it needs its own cacheDir;
+        // a distinct subdir under the shared .vitest keeps the two deps caches
+        // from colliding.
+        cacheDir: ".vitest/unit",
+        resolve: { conditions: sourceConditions },
         test: {
           name: "unit",
           globals: true,
@@ -39,6 +38,8 @@ export default defineConfig({
         },
       },
       {
+        cacheDir: ".vitest/browser",
+        resolve: { conditions: sourceConditions },
         test: {
           name: "browser",
           globals: true,

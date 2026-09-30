@@ -138,17 +138,17 @@ Two Vitest projects, mirroring `packages/components`:
 
 - `unit` — node mode against `msw/node`'s `setupServer`. Picks up
   `*.spec.ts`. The end-to-end walk in `src/index.spec.ts` is the
-  canonical contract test for the handlers and is what CI runs as
-  `pnpm test`.
+  canonical contract test for the handlers, run locally by `pnpm test`.
 - `browser` — real Chromium via Playwright against `msw/browser`'s
   `setupWorker`. Picks up `*.browser.spec.ts`. `index.browser.spec.ts`
-  smoke-tests the `setupMock(worker)` browser entry point. Runs locally
-  via `pnpm test:browser` and requires a
-  Playwright browser install (`pnpm exec playwright install`); skipped
-  in CI to keep the runner image lean.
+  smoke-tests the `setupMock(worker)` browser entry point. Run alone
+  via `pnpm test:browser`; it needs a Playwright browser install
+  (`pnpm exec playwright install`).
 
-`pnpm test:all` runs both projects. When fixing a regression in step
-routing, add a case to the unit spec first — that is what CI gates on.
+`pnpm test:all` runs both projects, and is what CI runs (the `api-mock:test`
+moon task invokes it with an `install-browsers` dep). When fixing a regression in step
+routing, add a case to the unit spec first — it is the canonical contract for the
+handlers.
 
 ## Don't
 

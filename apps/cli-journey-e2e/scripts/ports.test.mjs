@@ -1,7 +1,7 @@
 /* oxlint-disable playwright/expect-expect */
 import assert from "node:assert/strict";
 import net from "node:net";
-import { test } from "node:test";
+import { test } from "vitest";
 
 import {
   JOURNEY_PORT_BLOCK_SIZE,
