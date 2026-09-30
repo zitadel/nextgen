@@ -5,8 +5,9 @@ import { apiBase } from "../api/zitadel";
 import { getConsoleProjectId, getPublishableKey } from "../runtime/runtime";
 
 /**
- * The per-element `ZitadelProject` handle a console screen hands to a
- * `<zitadel-login>` it mounts itself (sign-in, the branding preview).
+ * The per-element `ZitadelProject` handle the sign-in screen hands to the
+ * `<zitadel-login>` it mounts. The branding preview does not use it: that one
+ * runs in the selected project (`lib/project-scope.ts`), not the sign-in one.
  *
  * Built from the runtime-discovered project id (Console ADR 0004 §3), not
  * from the app-wide `configureZitadel()` handle: that one carries only the

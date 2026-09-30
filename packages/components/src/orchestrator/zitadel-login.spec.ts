@@ -2024,3 +2024,162 @@ describe("<zitadel-login> against the typed Flow API", () => {
     expect(submittedFields).not.toHaveProperty("maritalStatus");
   });
 });
+
+describe("<zitadel-login preview-state>", () => {
+  let host: HTMLDivElement;
+
+  beforeAll(() => {
+    host = document.createElement("div");
+    document.body.appendChild(host);
+  });
+
+  afterEach(() => {
+    host.innerHTML = "";
+  });
+
+  async function mountPreview(state: ZitadelLogin["previewState"]): Promise<ZitadelLogin> {
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.purpose = "login";
+    element.project = testProject;
+    element.previewState = state;
+    host.appendChild(element);
+    await waitFor(() => element.shadowRoot?.querySelector("zl-card"));
+    return element;
+  }
+
+  /** The operations the mock saw. */
+  function requests(): string[] {
+    return mock.getCaptured().map((entry) => entry.kind);
+  }
+
+  it("starts the real flow and shows its first step in the default state", async () => {
+    const element = await mountPreview("default");
+
+    expect(element.shadowRoot?.querySelector('zl-field[name="email"]')).not.toBeNull();
+    expect(element.shadowRoot?.querySelector("zl-alert")).toBeNull();
+    expect(requests()).toEqual(["createFlow"]);
+  });
+
+  it("flags every required field in the validation_error state", async () => {
+    const element = await mountPreview("validation_error");
+
+    const field = await waitFor(() => {
+      const candidate = element.shadowRoot?.querySelector('zl-field[name="email"][invalid]');
+      return candidate?.getAttribute("error") ? candidate : null;
+    });
+    // The server's own key, localised the way a real rejection is.
+    expect(field.getAttribute("error")).toBe("Please enter an email address");
+    expect(element.shadowRoot?.textContent).not.toContain("error.email_required");
+  });
+
+  it("shows the server-failure banner in the submission_error state", async () => {
+    const element = await mountPreview("submission_error");
+
+    const alert = await waitFor(() =>
+      element.shadowRoot?.querySelector<ZlAlert>("zl-alert[data-zl-step-error]"),
+    );
+    expect(alert.getAttribute("heading")).toBe("We couldn't complete your sign in.");
+    expect(alert.textContent).toContain("Please try again in a few minutes");
+    expect(element.shadowRoot?.querySelector("zl-field[invalid]")).toBeNull();
+  });
+
+  it("holds the busy treatment in the loading state", async () => {
+    const element = await mountPreview("loading");
+
+    await waitFor(() => (element.getAttribute("aria-busy") === "true" ? element : null));
+    expect(element.shadowRoot?.querySelector("form")?.getAttribute("aria-busy")).toBe("true");
+    // Still the served step underneath, not a loader slot.
+    expect(element.shadowRoot?.querySelector('zl-field[name="email"]')).not.toBeNull();
+  });
+
+  it("paints the terminal screen in the success state without completing anything", async () => {
+    const completeEvents: Event[] = [];
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.addEventListener("zitadel-flow-complete", (event) => completeEvents.push(event));
+    element.purpose = "login";
+    element.project = testProject;
+    element.previewState = "success";
+    element.postSignInUrl = "/admin";
+    host.appendChild(element);
+
+    await waitFor(() => (element.shadowRoot?.textContent?.includes("signed in") ? element : null));
+    expect(element.shadowRoot?.querySelector("zl-field")).toBeNull();
+    // Nothing was typed, so the greeting shows the identifier's placeholder
+    // rather than ending mid-sentence.
+    expect(element.shadowRoot?.textContent).toContain("You're signed in as you@example.com");
+    expect(completeEvents).toHaveLength(0);
+    // No handoff exchange: the only request is the start.
+    expect(requests()).toEqual(["createFlow"]);
+  });
+
+  it("submits nothing: Enter, actions and back are dropped", async () => {
+    const element = await mountPreview("default");
+    type(element, "email", "alice@acme.com");
+
+    submit(element);
+    submit(element, "register");
+    element.shadowRoot
+      ?.querySelector("form")
+      ?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    // Give any submit that slipped through time to reach the network.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(requests()).toEqual(["createFlow"]);
+    expect(element.shadowRoot?.querySelector('zl-field[name="email"]')).not.toBeNull();
+    // Enter did not run the client-side required gate either: the state the
+    // preview was asked for is what stays on screen.
+    expect(element.shadowRoot?.querySelector("zl-field[invalid]")).toBeNull();
+  });
+
+  it("switches state in place, without starting another flow", async () => {
+    const element = await mountPreview("default");
+
+    element.previewState = "validation_error";
+    await waitFor(() => element.shadowRoot?.querySelector('zl-field[name="email"][invalid]'));
+
+    element.previewState = "default";
+    await waitFor(() =>
+      element.shadowRoot?.querySelector('zl-field[name="email"]:not([invalid])'),
+    );
+    expect(element.shadowRoot?.querySelector("zl-alert")).toBeNull();
+    expect(requests()).toEqual(["createFlow"]);
+  });
+});
+
+describe("<zitadel-login preview-state> repaint", () => {
+  let host: HTMLDivElement;
+
+  beforeAll(() => {
+    host = document.createElement("div");
+    document.body.appendChild(host);
+  });
+
+  afterEach(() => {
+    host.innerHTML = "";
+  });
+
+  it("keeps typed input and leaves focus alone when the state changes", async () => {
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.purpose = "login";
+    element.project = testProject;
+    element.previewState = "default";
+    host.appendChild(element);
+    await waitFor(() => element.shadowRoot?.querySelector('zl-field[name="email"]'));
+    type(element, "email", "alice@acme.com");
+    // Focus sits with the operator's control outside the element.
+    const control = document.createElement("button");
+    document.body.appendChild(control);
+    control.focus();
+
+    element.previewState = "submission_error";
+    await waitFor(() => element.shadowRoot?.querySelector("zl-alert[data-zl-step-error]"));
+    await element.updateComplete;
+
+    const field = element.shadowRoot?.querySelector<HTMLElement & { formValue: string }>(
+      'zl-field[name="email"]',
+    );
+    expect(field?.formValue).toBe("alice@acme.com");
+    expect(document.activeElement).toBe(control);
+    control.remove();
+  });
+});

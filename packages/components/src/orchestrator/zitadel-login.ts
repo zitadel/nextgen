@@ -166,6 +166,29 @@ export class ZitadelLogin extends ZitadelSurface {
   @property({ type: String, attribute: "resume-flow-id" }) accessor resumeFlowId = "";
 
   /**
+   * Preview mode, for an operator surface such as the console's branding
+   * screen. Set, the element starts the flow as usual so the step it paints
+   * is the one the project serves, then shows it in the named state and
+   * submits nothing: form submits, actions, back and passkey ceremonies are
+   * dropped, and no completion is acted on. Fields stay editable so focus
+   * and filled styling can be seen. Changing the value re-applies the state
+   * to the step already loaded; it does not start another flow.
+   *
+   * - `default`: the step as a visitor first sees it.
+   * - `validation_error`: every required field flagged, as an empty submit
+   *   would be.
+   * - `submission_error`: the form-level banner a failed submit shows.
+   * - `loading`: the busy treatment of a submit in flight.
+   * - `success`: the flow's terminal screen.
+   *
+   * Only the purpose's entry step can be previewed: a later step exists
+   * only once the server has walked the flow to it.
+   */
+  @property({ type: String, attribute: "preview-state" }) accessor previewState:
+    | LoginPreviewState
+    | "" = "";
+
+  /**
    * BCP 47 language tag (e.g. `"de"`, `"en-US"`). The widget resolves this
    * to a built-in locale dictionary. Falls back to auto-detection from
    * `document.documentElement.lang` or `navigator.language` when empty.
@@ -201,6 +224,19 @@ export class ZitadelLogin extends ZitadelSurface {
   @state() private accessor startupError: string | null = null;
 
   @state() private accessor formValues: Record<string, string> = {};
+
+  /**
+   * The step the server served, kept while previewing so every preview state
+   * derives from the same response rather than from the last one shown.
+   */
+  private previewBase: CreateFlow201 | null = null;
+
+  /**
+   * Set while the next commit repaints a preview state, so `updated` treats
+   * it like a theme flip (restore typed values, leave focus alone) rather
+   * than a step swap that moves focus into the form. Non-reactive.
+   */
+  private previewRepaint = false;
 
   private engine: Liquid | null = null;
 
@@ -344,6 +380,14 @@ export class ZitadelLogin extends ZitadelSurface {
     if (!this.engine || changed.has("locales") || changed.has("lang")) {
       this.engine = createLiquidEngine({ locale: this.resolveLocale() });
     }
+    if (changed.has("previewState") && this.response) {
+      // A flow already on screen becomes the base when preview is switched on
+      // after mount; leaving preview restores it as it was served and lets
+      // the flow run for real from there.
+      this.previewBase ??= this.response;
+      this.applyPreviewState();
+      if (!this.previewState) this.previewBase = null;
+    }
     this.applySurfaceTheme(this.branding);
     this.setAttribute("aria-busy", this.loading ? "true" : "false");
   }
@@ -379,6 +423,13 @@ export class ZitadelLogin extends ZitadelSurface {
     this.lastRenderedTheme = this.themeController.theme;
 
     const props = changed as Map<string, unknown>;
+    if (props.has("response") && this.previewRepaint) {
+      // A preview state is not a step the visitor reached: keep focus where
+      // the operator has it (the state selector) and put typed values back.
+      this.previewRepaint = false;
+      void this.restoreValuesAfterRender();
+      return;
+    }
     if (props.has("response")) {
       // `changed` holds the OLD value: nullish (`null` initializer, or
       // undefined when the property never changed before) means this commit
@@ -581,6 +632,31 @@ export class ZitadelLogin extends ZitadelSurface {
     } finally {
       this.loading = false;
     }
+    // After `loading` has settled: the `loading` preview holds it back up.
+    if (this.previewState && this.response) {
+      this.previewBase = this.response;
+      this.applyPreviewState();
+    }
+  }
+
+  /**
+   * Derive the shown step from {@link previewBase} for {@link previewState}.
+   * Sets `response` directly, as a passkey error does, rather than through
+   * `applyResponse`: nothing here is a new server step, so history and
+   * completion must not react to it.
+   */
+  private applyPreviewState(): void {
+    const base = this.previewBase;
+    if (!base) return;
+    const state = this.previewState;
+    this.stepErrorDismissed = false;
+    this.loading = state === "loading";
+    const next = previewResponse(base, state);
+    // Same object for `default` right after the start: no repaint to flag,
+    // and the initial paint keeps its own focus rule.
+    if (next === this.response) return;
+    this.previewRepaint = true;
+    this.response = next;
   }
 
   /**
@@ -677,7 +753,9 @@ export class ZitadelLogin extends ZitadelSurface {
       }
     }
 
-    void this.maybeCompleteFlow(wire);
+    // A preview never completes: no handoff is exchanged and no host is told
+    // the visitor signed in.
+    if (!this.previewState) void this.maybeCompleteFlow(wire);
   }
 
   /**
@@ -772,7 +850,7 @@ export class ZitadelLogin extends ZitadelSurface {
       // reconnect `<zl-passkey>` and start a second WebAuthn ceremony.
       challenge: this.loading ? null : (step.challenge ?? null),
       messages: [],
-      identity: this.deriveIdentity(),
+      identity: this.deriveIdentity() ?? this.previewIdentity(),
       errors,
       branding: this.brandingForTemplate(),
       loading: this.loading,
@@ -822,6 +900,17 @@ export class ZitadelLogin extends ZitadelSurface {
     };
   }
 
+  /**
+   * Who the `success` preview greets when nothing has been typed: the email
+   * placeholder the identifier field shows, so the terminal screen reads as
+   * it does for a visitor rather than trailing off after "signed in as".
+   */
+  private previewIdentity(): FlowIdentity | null {
+    if (this.previewState !== "success") return null;
+    const email = this.resolveLocale()["identifier.field.email.placeholder"];
+    return email ? { email_address: email, display_name: email } : null;
+  }
+
   /** All rendered input atoms exposing the `formValue` contract. */
   private fieldAtoms(): FieldAtom[] {
     const root = this.shadowRoot;
@@ -852,17 +941,9 @@ export class ZitadelLogin extends ZitadelSurface {
       const name = atom.getAttribute("name");
       if (name) values.set(name, atom.formValue);
     }
-    const missing: string[] = [];
-    for (const field of this.response?.step.fields ?? []) {
-      // A checkbox always submits a real boolean (`false` when unticked), so it
-      // is never "missing"; a must-accept boolean is enforced by the schema
-      // (`const: true`), not this gate.
-      if (field.type === "checkbox") continue;
-      if (field.required && (values.get(field.name) ?? "") === "") {
-        missing.push(field.name);
-      }
-    }
-    return missing;
+    return this.response
+      ? requiredFieldNames(this.response.step).filter((name) => (values.get(name) ?? "") === "")
+      : [];
   }
 
   /**
@@ -1033,7 +1114,9 @@ export class ZitadelLogin extends ZitadelSurface {
     // Always intercept: we own the submit cycle. Without this the page would
     // navigate to whatever `action` URL the form has (none) and lose state.
     event.preventDefault();
-    if (this.loading) return;
+    // Before the required-field gate: a preview shows the state it was asked
+    // for, not the one Enter would produce.
+    if (this.loading || this.previewState) return;
     // This is the sole submit path for the primary action (submit-type
     // <zl-button> and Enter both drive `form.requestSubmit()`; the button no
     // longer emits a parallel `zl-submit`). Enforce the step's required fields
@@ -1152,7 +1235,9 @@ export class ZitadelLogin extends ZitadelSurface {
     action: string | null,
     challengeResponse?: SubmitFlowStepBodyChallengeResponse,
   ): Promise<void> {
-    if (!this.response || this.loading) return;
+    // Every other entry point (actions, back, passkey proofs) lands here, so
+    // this one check keeps a preview from ever writing to the flow.
+    if (!this.response || this.loading || this.previewState) return;
     const { id, session_token } = this.response;
     this.loading = true;
     try {
@@ -1252,6 +1337,58 @@ export class ZitadelLogin extends ZitadelSurface {
  */
 function isAllowedSelectValue(field: CreateFlow201StepFieldsItem, value: string): boolean {
   return field.validation?.enum?.includes(value) ?? false;
+}
+
+/** The states {@link ZitadelLogin.previewState} can show a step in. */
+export type LoginPreviewState =
+  | "default"
+  | "validation_error"
+  | "submission_error"
+  | "loading"
+  | "success";
+
+/** The response {@link ZitadelLogin.previewState} shows for the served one. */
+function previewResponse(base: CreateFlow201, state: LoginPreviewState | ""): CreateFlow201 {
+  if (state === "" || state === "default" || state === "loading") return base;
+  if (state === "success") {
+    // The terminal step carries no fields or actions, so the only thing a
+    // client-side stand-in could get wrong is its name; `done` is the one the
+    // default flow declares, and its texts follow the server's
+    // `<step>.title` / `<step>.description` convention.
+    return {
+      ...base,
+      step: {
+        name: "done",
+        texts: { title_key: "done.title", description_key: "done.description" },
+        complete: "show",
+        fields: [],
+        actions: [],
+        gates: {},
+      },
+    };
+  }
+  // The server's own dialect for both, so the template routes them exactly as
+  // it does for a visitor: `error.<field>_required` per required field (what
+  // an empty submit produces), or the catalog key the element shows for a
+  // submit the server could not complete.
+  const error =
+    state === "validation_error"
+      ? requiredFieldNames(base.step)
+          .map((name) => `error.${name}_required`)
+          .join("; ")
+      : "error.sign_in_server";
+  return { ...base, step: { ...base.step, error } };
+}
+
+/**
+ * Names of the step's `required` fields. A checkbox always submits a real
+ * boolean (`false` when unticked), so it is never required in this sense; a
+ * must-accept boolean is enforced by the schema (`const: true`), not here.
+ */
+function requiredFieldNames(step: CreateFlow201Step): string[] {
+  return (step.fields ?? [])
+    .filter((field) => field.type !== "checkbox" && field.required)
+    .map((field) => field.name);
 }
 
 /**

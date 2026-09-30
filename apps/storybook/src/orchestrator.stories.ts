@@ -35,6 +35,7 @@ interface OrchestratorArgs {
   purpose: "login" | "register";
   branding: BrandingPresetId;
   theme: "" | "light" | "dark" | "auto";
+  previewState: "" | "default" | "validation_error" | "submission_error" | "loading" | "success";
 }
 
 const mock = setupMockHandlers();
@@ -47,7 +48,7 @@ const meta: Meta<OrchestratorArgs> = {
     layout: "fullscreen",
     msw: { handlers: mock.handlers },
   },
-  args: { purpose: "login", branding: "centered", theme: "" },
+  args: { purpose: "login", branding: "centered", theme: "", previewState: "" },
   argTypes: {
     purpose: {
       control: "inline-radio",
@@ -65,14 +66,25 @@ const meta: Meta<OrchestratorArgs> = {
       description:
         "The embedding page's own preference. Empty defers to the revision's mode; a side the revision does not publish cannot be selected.",
     },
+    previewState: {
+      control: "select",
+      options: ["", "default", "validation_error", "submission_error", "loading", "success"],
+      description:
+        "Preview mode: show the served step in a state and submit nothing. Empty runs the flow for real.",
+    },
   },
   beforeEach: ({ args }) => {
     mock.reset();
     clearBranding();
     applyBranding(brandingPresets[args.branding]);
   },
-  render: ({ purpose, theme }) =>
-    html`<zitadel-login variant="page" .purpose=${purpose} theme=${theme}></zitadel-login>`,
+  render: ({ purpose, theme, previewState }) =>
+    html`<zitadel-login
+      variant="page"
+      .purpose=${purpose}
+      theme=${theme}
+      preview-state=${previewState}
+    ></zitadel-login>`,
 };
 
 export default meta;
@@ -111,3 +123,10 @@ export const SignUp: Story = { args: { purpose: "register" } };
 
 /** Same flow, split-layout tenant branding. */
 export const SplitBranding: Story = { args: { branding: "split" } };
+
+/**
+ * Preview mode, as the console's branding screen uses it: the served step
+ * with every required field flagged, and nothing submits. Switch
+ * `previewState` for the other states.
+ */
+export const PreviewValidationErrors: Story = { args: { previewState: "validation_error" } };

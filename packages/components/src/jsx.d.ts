@@ -36,6 +36,7 @@ declare module "react" {
         url?: string;
         "post-sign-in-url"?: string;
         "resume-flow-id"?: string;
+        "preview-state"?: ZitadelLogin["previewState"];
         lang?: string;
         locales?: ZitadelLogin["locales"];
       };

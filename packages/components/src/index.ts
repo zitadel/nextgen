@@ -56,6 +56,7 @@ export { baseHostStyles, focusVisibleStyles, t } from "./styles/index.js";
 
 export {
   ZitadelLogin,
+  type LoginPreviewState,
   ZitadelLogout,
   ZitadelSession,
   applyBrandingTokens,

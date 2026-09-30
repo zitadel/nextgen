@@ -17,8 +17,16 @@ vi.mock("@/auth/session", async (importOriginal) => {
 // connect and needs a browser to paint. Neither is what this spec is about:
 // the widget's own behaviour is covered in `@zitadel/components`.
 vi.mock("@/components/branding/login-preview", () => ({
-  LoginPreview: ({ journey, flowName }: { journey: string; flowName: string }) => (
-    <div data-testid="preview" data-flow={flowName}>
+  LoginPreview: ({
+    journey,
+    flowName,
+    state,
+  }: {
+    journey: string;
+    flowName: string;
+    state: string;
+  }) => (
+    <div data-testid="preview" data-flow={flowName} data-state={state}>
       {journey}
     </div>
   ),
@@ -221,12 +229,34 @@ describe("branding screen", () => {
     expect(screen.getByTestId("preview")).toHaveAttribute("data-flow", "default-login");
   });
 
+  it("switches the previewed state", async () => {
+    serveRevision();
+    await renderAt("/branding");
+
+    expect(await screen.findByTestId("preview")).toHaveAttribute("data-state", "default");
+    await userEvent.click(screen.getByLabelText("Previewed state"));
+    const menu = await screen.findByRole("listbox");
+    expect(
+      within(menu)
+        .getAllByRole("option")
+        .map((option) => option.textContent),
+    ).toEqual([
+      "State: Default",
+      "State: Validation errors",
+      "State: Submission error",
+      "State: Loading",
+      "State: Success",
+    ]);
+    await userEvent.click(within(menu).getByText("State: Validation errors"));
+    expect(screen.getByTestId("preview")).toHaveAttribute("data-state", "validation_error");
+  });
+
   it("offers only the journeys it can actually render", async () => {
     serveRevision();
     await renderAt("/branding");
 
-    // Passkey needs a step the flow reaches after an identifier, which waits on
-    // the state selector.
+    // Passkey needs a step the flow reaches after an identifier, which the
+    // preview cannot ask for.
     expect(await screen.findByRole("tab", { name: "Sign up" })).toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Passkey" })).not.toBeInTheDocument();
   });

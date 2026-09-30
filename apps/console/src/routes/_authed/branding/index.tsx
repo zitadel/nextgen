@@ -2,7 +2,11 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Monitor, Smartphone, Sun, Workflow } from "lucide-react";
 import { useState } from "react";
 
-import { LoginPreview, type PreviewJourney } from "@/components/branding/login-preview";
+import {
+  LoginPreview,
+  type PreviewJourney,
+  type PreviewState,
+} from "@/components/branding/login-preview";
 import { SettingsPanel } from "@/components/branding/settings-panel";
 import { RESOURCE_HEADER, RESOURCE_PAGE } from "@/components/resource-list";
 import { Button } from "@/components/ui/button";
@@ -62,12 +66,24 @@ export const Route = createFileRoute("/_authed/branding/")({
 /** A flow the preview can run, and the purposes it serves. */
 type PreviewFlow = { name: string; label: string; purposes: string[] };
 
-// Passkey is absent until the state selector lands: it needs a step the flow
-// only reaches after an identifier, and a tab that renders the sign-in step
-// under another name claims a journey it does not preview.
+// Passkey is absent: it needs a step the flow only reaches after an
+// identifier, which the preview cannot ask for (the element shows the entry
+// step in a chosen state; a later step exists only once the server has walked
+// the flow to it), and a tab that renders the sign-in step under another name
+// claims a journey it does not preview.
 const JOURNEYS: { id: PreviewJourney; label: string }[] = [
   { id: "register", label: "Sign up" },
   { id: "login", label: "Sign in" },
+];
+
+// The states of the design's selector, in its order. All of them are the
+// element's own rendering of the step the project serves; none writes to it.
+const STATES: { id: PreviewState; label: string }[] = [
+  { id: "default", label: "Default" },
+  { id: "validation_error", label: "Validation errors" },
+  { id: "submission_error", label: "Submission error" },
+  { id: "loading", label: "Loading" },
+  { id: "success", label: "Success" },
 ];
 
 // The flow selector is drawn as a ghost button, not a bordered select: no
@@ -90,6 +106,7 @@ function BrandingScreen() {
   // What the operator last picked; `activeFlowName` below is what renders.
   const [flowName, setFlowName] = useState(flows[0]?.name ?? "");
   const [theme, setTheme] = useState<PreviewTheme>("revision");
+  const [state, setState] = useState<PreviewState>("default");
   const [narrow, setNarrow] = useState(false);
 
   // Only the journeys the chosen flow actually serves: asking it for a purpose
@@ -147,7 +164,7 @@ function BrandingScreen() {
             <Separator orientation="vertical" className="hidden h-5! lg:block" />
           </div>
         )}
-        <div className="flex items-center justify-between gap-[10px] lg:flex-1">
+        <div className="flex items-center gap-[10px] lg:flex-1">
           <Tabs
             value={activeJourney}
             onValueChange={(value) => setJourney(value as PreviewJourney)}
@@ -160,8 +177,25 @@ function BrandingScreen() {
               ))}
             </TabsList>
           </Tabs>
+          {/* After the tabs, as the design orders the row: flow, screen, state.
+              No icon on this one; the flow selector alone carries its glyph. */}
+          <div className="flex items-center gap-[10px]">
+            <Separator orientation="vertical" className="hidden h-5! lg:block" />
+            <Select value={state} onValueChange={(value) => setState(value as PreviewState)}>
+              <SelectTrigger aria-label="Previewed state" className={GHOST_TRIGGER}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent position="popper" sideOffset={4}>
+                {STATES.map((entry) => (
+                  <SelectItem key={entry.id} value={entry.id}>
+                    State: {entry.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-          <div className="flex items-center gap-2 lg:ml-auto">
+          <div className="ml-auto flex items-center gap-2">
             <Button
               variant="outline"
               size="icon"
@@ -198,7 +232,12 @@ function BrandingScreen() {
           {/* The widget is content-sized, so the preview constrains the width
               rather than the element: that is what an embedding page does. */}
           <div className={narrow ? "w-[24rem]" : "w-full max-w-[32rem]"}>
-            <LoginPreview journey={activeJourney} flowName={activeFlowName} theme={theme} />
+            <LoginPreview
+              journey={activeJourney}
+              flowName={activeFlowName}
+              theme={theme}
+              state={state}
+            />
           </div>
         </Card>
 

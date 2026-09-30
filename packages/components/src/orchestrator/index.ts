@@ -8,7 +8,7 @@ import "./zitadel-login.js";
 import "./zitadel-logout.js";
 import "./zitadel-session.js";
 
-export { ZitadelLogin } from "./zitadel-login.js";
+export { ZitadelLogin, type LoginPreviewState } from "./zitadel-login.js";
 export { ZitadelLogout } from "./zitadel-logout.js";
 export { ZitadelSession } from "./zitadel-session.js";
 export {

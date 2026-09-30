@@ -87,3 +87,46 @@ test("shows the branding in use without a control to change it", async ({
 
   await expectNoErrorBoundary(page);
 });
+
+test("shows the served step in each state without submitting it", async ({
+  page,
+  zitadel,
+  seed,
+}) => {
+  await signIn(page, zitadel.handle, await seed.user());
+
+  await page.goto("/branding");
+  const preview = page.locator("zitadel-login");
+  const email = preview.getByRole("textbox", { name: "Email" });
+  await expect(email).toBeVisible();
+
+  // The state applies to the step the instance served: the error that appears
+  // is the one its required field would carry after an empty submit.
+  await page.getByLabel("Previewed state").click();
+  await page.getByRole("option", { name: "State: Validation errors" }).click();
+  await expect(preview.getByText("Please enter an email address")).toBeVisible();
+
+  await page.getByLabel("Previewed state").click();
+  await page.getByRole("option", { name: "State: Submission error" }).click();
+  await expect(preview.getByText("We couldn't complete your sign in.")).toBeVisible();
+
+  await page.getByLabel("Previewed state").click();
+  await page.getByRole("option", { name: "State: Loading" }).click();
+  await expect(preview).toHaveAttribute("aria-busy", "true");
+
+  await page.getByLabel("Previewed state").click();
+  await page.getByRole("option", { name: "State: Success" }).click();
+  await expect(preview.getByText("You're signed in as")).toBeVisible();
+  await expect(email).toHaveCount(0);
+
+  // Back to the served step, and a submit from the preview goes nowhere:
+  // the same step stays on screen with what was typed.
+  await page.getByLabel("Previewed state").click();
+  await page.getByRole("option", { name: "State: Default" }).click();
+  await email.fill("preview@example.com");
+  await email.press("Enter");
+  await expect(email).toHaveValue("preview@example.com");
+  await expect(preview.getByRole("textbox", { name: "Password" })).toHaveCount(0);
+
+  await expectNoErrorBoundary(page);
+});
