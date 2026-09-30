@@ -1,5 +1,87 @@
 # @zitadel/server
 
+## 1.0.0-alpha.24
+
+### Minor Changes
+
+- [#1319](https://github.com/zitadel/nextgen/pull/1319) [`5bac207`](https://github.com/zitadel/nextgen/commit/5bac20773092ea9a9d807c13bd423c70ecea56e6) Thanks [@IAM-marco](https://github.com/IAM-marco)! - Add the identity provider connection endpoints: `POST /idps` creates a
+  connection for a new slug (201) or appends a revision to the existing one
+  (200), with the document validated against `idp-connection.json` before it
+  is stored and the identity fields (`protocol`, `subject_claim`, OIDC
+  `issuer`, OAuth2 `token_endpoint` and `userinfo_endpoint`) fixed for the
+  life of the connection. `GET /idps/{id}`, `POST /idps/query` (filter and
+  sort by `slug` and `created_at`), `GET /idps/{id}/revisions` and
+  `GET /idps/revisions/{revision_id}` read them. Writes emit `idp.created`
+  and `idp.updated` audit events.
+
+- [#1299](https://github.com/zitadel/nextgen/pull/1299) [`d05fa4c`](https://github.com/zitadel/nextgen/commit/d05fa4cc2ae9063b84e1967c3e4e91e0145c6400) Thanks [@peintnermax](https://github.com/peintnermax)! - Choose the project you are working on in the console's project switcher. Teams, users, user schemas, login flows, branding and the project's own settings all follow the selected project, and the selection is part of the URL, so it survives a refresh and a shared link. With a single project the console selects it for you; with several, it opens the Projects overview so you can pick one.
+
+  The sidebar lists Projects first, then the selected project's screens; the switcher's "All projects" link opens Projects too. A project's name and admins are under "Project settings" in the sidebar. Links to `/projects/{id}` still work: they open that project's settings with it selected.
+
+- [#1319](https://github.com/zitadel/nextgen/pull/1319) [`5bac207`](https://github.com/zitadel/nextgen/commit/5bac20773092ea9a9d807c13bd423c70ecea56e6) Thanks [@IAM-marco](https://github.com/IAM-marco)! - Request decode errors keep the normalized `req.invalid` message and now
+  carry `details.fields`: the dotted paths of the fields the request
+  validation rejected, names only, never values or decoder text. For map
+  fields the last path element is the client's own key.
+
+- [#1215](https://github.com/zitadel/nextgen/pull/1215) [`91b1eb6`](https://github.com/zitadel/nextgen/commit/91b1eb653fc00633cf64e9d93c9edf73e3687933) Thanks [@vitorbari](https://github.com/vitorbari)! - Releases can now be deployed to environments over the API.
+
+  `POST /deployments` makes a release live on an environment, atomically: when the call returns, the environment runs the named release and an immutable record of the act exists; on any failure nothing changes. Deploying, promoting and rolling back are all this call — `reason` says which, defaulting to `deploy`, and a promotion records the environment it came from. The record keeps ids and timestamp top-level; the why-and-who (`reason`, a free-form `message`, `source_environment_id`, `deployed_by`, `deployed_by_type`) rides in a `metadata` object, every field optional. Idempotent on the running release: deploying what the environment already runs changes nothing and answers `200` with the deployment that made it live, so a re-run of `zitadel deploy` on unchanged content is a no-op end to end. An optional `expected_current_deployment_id` guards against racing another deploy: a mismatch answers `409` carrying the actual current deployment and release.
+
+  `GET /deployments` lists the log newest first — filtered to one environment, the first row is its current deployment — and `expand: ["release"]` embeds the release each deployment made live (requires `release.read`). `GET /deployments/{deployment_id}` reads one record. Environment reads now carry `current_deployment` alongside the identity, `null` until something is deployed.
+
+  Every deployment is recorded in the audit stream as `deployment.created`, by ids rather than names, so the trail survives environment renames and deletes.
+
+- [#1324](https://github.com/zitadel/nextgen/pull/1324) [`331b826`](https://github.com/zitadel/nextgen/commit/331b826ebe1f3354817edc2685a63ecbd63d4a56) Thanks [@mridang](https://github.com/mridang)! - A successful `PATCH /users/{user_id}` or `PATCH /users/me` now emits a `user.updated` wide event in the same transaction as the write, carrying the touched attribute keys (and `x-audit` values, same rule as `user.created`). The event is served as a typed member of the `GET /events` union.
+
+- [#1176](https://github.com/zitadel/nextgen/pull/1176) [`db15426`](https://github.com/zitadel/nextgen/commit/db154268d9610833e15860b7358a626c8b2315d0) Thanks [@wim07101993](https://github.com/wim07101993)! - Let a project choose the method its passwords are hashed with (ADR 029 §Hashing). `PATCH /projects/{project_id}` takes a `password_hash` of an algorithm and its cost parameters, and `null` hands the project back to the server default. Verification is unchanged and deployment-wide, so stored passwords keep working across a change; only the next password written moves. A method is accepted only if the deployment can verify it and its cost sits inside the configured limits, which now cover scrypt, pbkdf2 and sha2 as well as bcrypt and argon2.
+
+- [#1303](https://github.com/zitadel/nextgen/pull/1303) [`e61c854`](https://github.com/zitadel/nextgen/commit/e61c8545f06ce9ebe25e7f2e0d344cb6f8efb0d0) Thanks [@livio-a](https://github.com/livio-a)! - `POST /users/query` takes an optional `project_id`, so a Console session can list the users of the project it selected rather than only those of the project it signed in to. Without it, the credential's own project is listed, as before. In the generated client, `queryUsers` gains a `params` argument before the fetch options: move options passed second to the third argument.
+
+- [#1302](https://github.com/zitadel/nextgen/pull/1302) [`a0e642d`](https://github.com/zitadel/nextgen/commit/a0e642d6675f13724e9ee33aacc068ae61d2ff9b) Thanks [@livio-a](https://github.com/livio-a)! - User create, get, and delete, team create and update, and the schema, login flow, and branding reads accept a Console session cookie as the signed-in user, so the embedded Console's management screens load without a project secret.
+
+- [#1305](https://github.com/zitadel/nextgen/pull/1305) [`f2e81dd`](https://github.com/zitadel/nextgen/commit/f2e81dd84af7e47c06c084365dea983ee59a305b) Thanks [@livio-a](https://github.com/livio-a)! - A Console session can open users, teams, schemas, login flows, and branding by id in any project it holds a grant on, not only in the project it signed in to. `GET /schemas/{id}` takes an optional `project_id`, because schema ids are unique per project only; without it an id that exists in several projects resolves in the caller's own project. Project secrets still resolve ids in their own project only.
+
+- [#1306](https://github.com/zitadel/nextgen/pull/1306) [`ed64c1d`](https://github.com/zitadel/nextgen/commit/ed64c1d4d66b53501516a1456e364fc99022f07f) Thanks [@livio-a](https://github.com/livio-a)! - A Console session can expand a user's teams and lifecycle owner team, and filter users by team, on `POST /users/query`. It used to be refused because a session carries no scopes; it is now allowed once the session may list the project's users, so the Console's Team column shows for signed-in operators.
+
+### Patch Changes
+
+- [#1332](https://github.com/zitadel/nextgen/pull/1332) [`6524178`](https://github.com/zitadel/nextgen/commit/6524178cc74251da3d454451fdef45063fabce86) Thanks [@bastionstack](https://github.com/bastionstack)! - The `README.md` that `zitadel branding eject` writes into `.zitadel/branding/` now describes `branding.json` as it behaves: `layout` is not read by the shipped login template, fonts are set with `typography.font_family` and `typography.font_url`, `zitadel plan` probes `logo_url` and `hero_url`, `{% mandatory_gates %}` restores missing required fields and the primary action, and the "Secured with Zitadel" mark is always shown and can be placed with an anchor in the template. The `layout`, `hero_url`, `typography.font_url` and `theme` descriptions in the API reference and editor schema say the same, as does the `zitadel plan` error for a missing `{% mandatory_gates %}` tag.
+
+- [#1334](https://github.com/zitadel/nextgen/pull/1334) [`565427b`](https://github.com/zitadel/nextgen/commit/565427b39ba7ab8d1006778944d1e20aef99e93c) Thanks [@peintnermax](https://github.com/peintnermax)! - The console no longer selects a project you cannot manage. When you open it without a project selected, it picks your only project, or asks you to choose on the Projects screen. It no longer falls back to the project the console signs into, which on a deployment with a platform project is the platform project: after a claim, the console used to land there and answer "unauthorized" on Project settings.
+
+- [#1307](https://github.com/zitadel/nextgen/pull/1307) [`2056c37`](https://github.com/zitadel/nextgen/commit/2056c37515fbad31b5100e0f84d7b94cfc68f191) Thanks [@livio-a](https://github.com/livio-a)! - The Console's "Console API not authorized" screen no longer tells operators to check a development proxy secret. Every management call the Console makes is authorized by the signed-in person's session and their grants on the project, the same in development as in the embedded build.
+
+- [#1288](https://github.com/zitadel/nextgen/pull/1288) [`4bea70a`](https://github.com/zitadel/nextgen/commit/4bea70a7244b44e62476e6dd2dc6b8e4a7bd1a45) Thanks [@mridang](https://github.com/mridang)! - Encode path parameters in the generated API client, so any id the API accepts can be fetched. Schema ids are the case that hit today: a schema's id is its `$id`, usually a URL such as `https://nextgen.com/api/schemas/default-human-user.json`. Sent raw, the `//` collapsed on a redirect and the request 404'd, so `zitadel schemas get <id>` failed for every URL id and the console's user list silently dropped its schema columns. `zitadel schemas get` also stops guessing what an id looks like: it used to read anything without `sch_` or `://` as an object type, which sent ids like `urn:example:human` down the wrong path. It now asks the server, and falls back to the object-type lookup only on a 404. Setup reconciliation and `apply`/`plan` schema fetches used to encode the id themselves to work around the same bug; that is gone, so the client encodes exactly once rather than sending `%25` for every delimiter.
+
+- [#1325](https://github.com/zitadel/nextgen/pull/1325) [`5226076`](https://github.com/zitadel/nextgen/commit/5226076ce7bbb117d84c9ab15028eb1aa3dedbd6) Thanks [@mridang](https://github.com/mridang)! - Fix descending keyset pagination on `GET /events`: newest-first listings (`order=desc`) failed on the second page with a cursor/order mismatch, because the page cursor did not carry its sort direction. Paging through an `order=desc` result now works across every page.
+
+- [#1297](https://github.com/zitadel/nextgen/pull/1297) [`7165d73`](https://github.com/zitadel/nextgen/commit/7165d73f8d13f8f4aac94858ee5e918b5700c773) Thanks [@peintnermax](https://github.com/peintnermax)! - Setup no longer applies a login template, and the template catalog keeps
+  only widget structure.
+  - `zitadel setup` drops the "How should the login look?" question and the
+    `--design` flag; passing `--design` now fails with `E_VALIDATION` and a
+    hint pointing at app-side theming and `branding eject`. It embeds the
+    maintained login component (a starting page for a new app, a drop-in for an
+    existing one), writes nothing under `.zitadel/branding/`, and publishes no
+    branding revision. The JSON envelope
+    drops `data.design`, the summary drops the "Login design" row, and the next
+    actions point at theming the component from your app, with
+    `branding eject` as the opt-in for owning its template.
+  - `zitadel branding eject --design` now offers `centered` (the default card)
+    and `minimal` (the same form without card chrome). `split`, `split-right`
+    and `hero` are removed: they were page layout around the same card, which
+    belongs in your application, and asking for one fails with `E_VALIDATION`
+    and a hint saying so. `BRANDING_DESIGNS` in `@zitadel/config`
+    shrinks accordingly.
+  - Revisions already published from `split`, `split-right` or `hero` keep
+    rendering; the login still ships their chrome. The API reference for
+    `Branding.layout` no longer lists the retired designs.
+
+- [#1351](https://github.com/zitadel/nextgen/pull/1351) [`d89916b`](https://github.com/zitadel/nextgen/commit/d89916b05a9e020963d105de614be440c44f99d1) Thanks [@grvijayan](https://github.com/grvijayan)! - The single-use state that links a social login back to its login attempt now keeps the OIDC nonce as issued instead of as a hash, so the callback can hand it to the id_token check. Nothing changes for users until social login ships.
+
+- [#1301](https://github.com/zitadel/nextgen/pull/1301) [`2aafc3a`](https://github.com/zitadel/nextgen/commit/2aafc3ab9cb0e0498d4993689f52308b3448fbcf) Thanks [@IAM-marco](https://github.com/IAM-marco)! - Prepare the server for social login: it can now issue and consume the single-use state that links a sign-in with an external identity provider back to the right login attempt. Nothing changes for users until social login ships.
+
+- [#1321](https://github.com/zitadel/nextgen/pull/1321) [`2a625ba`](https://github.com/zitadel/nextgen/commit/2a625ba79b1dab543892c4a5f3a48aa9d3b2d219) Thanks [@IAM-marco](https://github.com/IAM-marco)! - The server can now remember which user an account at an external identity provider belongs to, so a returning sign-in through that provider finds the same user instead of a stranger.
+
 ## 1.0.0-alpha.23
 
 ### Major Changes
