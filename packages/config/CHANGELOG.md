@@ -1,5 +1,37 @@
 # @zitadel/config
 
+## 1.0.0-alpha.24
+
+### Minor Changes
+
+- [#1297](https://github.com/zitadel/nextgen/pull/1297) [`7165d73`](https://github.com/zitadel/nextgen/commit/7165d73f8d13f8f4aac94858ee5e918b5700c773) Thanks [@peintnermax](https://github.com/peintnermax)! - Setup no longer applies a login template, and the template catalog keeps
+  only widget structure.
+  - `zitadel setup` drops the "How should the login look?" question and the
+    `--design` flag; passing `--design` now fails with `E_VALIDATION` and a
+    hint pointing at app-side theming and `branding eject`. It embeds the
+    maintained login component (a starting page for a new app, a drop-in for an
+    existing one), writes nothing under `.zitadel/branding/`, and publishes no
+    branding revision. The JSON envelope
+    drops `data.design`, the summary drops the "Login design" row, and the next
+    actions point at theming the component from your app, with
+    `branding eject` as the opt-in for owning its template.
+  - `zitadel branding eject --design` now offers `centered` (the default card)
+    and `minimal` (the same form without card chrome). `split`, `split-right`
+    and `hero` are removed: they were page layout around the same card, which
+    belongs in your application, and asking for one fails with `E_VALIDATION`
+    and a hint saying so. `BRANDING_DESIGNS` in `@zitadel/config`
+    shrinks accordingly.
+  - Revisions already published from `split`, `split-right` or `hero` keep
+    rendering; the login still ships their chrome. The API reference for
+    `Branding.layout` no longer lists the retired designs.
+
+### Patch Changes
+
+- [#1332](https://github.com/zitadel/nextgen/pull/1332) [`6524178`](https://github.com/zitadel/nextgen/commit/6524178cc74251da3d454451fdef45063fabce86) Thanks [@bastionstack](https://github.com/bastionstack)! - The `README.md` that `zitadel branding eject` writes into `.zitadel/branding/` now describes `branding.json` as it behaves: `layout` is not read by the shipped login template, fonts are set with `typography.font_family` and `typography.font_url`, `zitadel plan` probes `logo_url` and `hero_url`, `{% mandatory_gates %}` restores missing required fields and the primary action, and the "Secured with Zitadel" mark is always shown and can be placed with an anchor in the template. The `layout`, `hero_url`, `typography.font_url` and `theme` descriptions in the API reference and editor schema say the same, as does the `zitadel plan` error for a missing `{% mandatory_gates %}` tag.
+
+- Updated dependencies [[`91b1eb6`](https://github.com/zitadel/nextgen/commit/91b1eb653fc00633cf64e9d93c9edf73e3687933), [`4bea70a`](https://github.com/zitadel/nextgen/commit/4bea70a7244b44e62476e6dd2dc6b8e4a7bd1a45), [`e61c854`](https://github.com/zitadel/nextgen/commit/e61c8545f06ce9ebe25e7f2e0d344cb6f8efb0d0), [`f2e81dd`](https://github.com/zitadel/nextgen/commit/f2e81dd84af7e47c06c084365dea983ee59a305b)]:
+  - @zitadel/api@1.0.0-alpha.24
+
 ## 1.0.0-alpha.23
 
 ### Minor Changes

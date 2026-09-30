@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { test } from "node:test";
+import { test } from "vitest";
 import { fileURLToPath } from "node:url";
 
 // The wire-casing rules are configuration, not code. Nothing else in the repo

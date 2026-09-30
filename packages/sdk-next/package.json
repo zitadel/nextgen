@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/sdk-next",
-  "version": "1.0.0-alpha.23",
+  "version": "1.0.0-alpha.24",
   "description": "Next.js helpers and mock auth UI for Zitadel",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-next#readme",
   "bugs": {
@@ -56,7 +56,8 @@
   "scripts": {
     "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && tsc -p tsconfig.build.json && node -e \"require('node:fs').copyFileSync('src/jsx.d.ts', 'dist/jsx.d.ts')\"",
     "typecheck": "tsc --build tsconfig.json",
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run",
+    "test:all": "pnpm run test",
     "lint": "eslint ."
   },
   "dependencies": {
@@ -77,6 +78,7 @@
     "@testing-library/react": "catalog:",
     "@testing-library/user-event": "catalog:",
     "@types/react": "catalog:",
+    "@vitest/coverage-v8": "catalog:sdk",
     "eslint": "catalog:",
     "eslint-config-prettier": "catalog:",
     "eslint-import-resolver-typescript": "catalog:",
@@ -92,6 +94,6 @@
     "prettier": "catalog:",
     "typescript": "^5.7.3",
     "typescript-eslint": "catalog:",
-    "vitest": "^3.0.0"
+    "vitest": "catalog:sdk"
   }
 }
