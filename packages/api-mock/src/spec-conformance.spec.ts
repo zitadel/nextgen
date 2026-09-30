@@ -1090,7 +1090,11 @@ describe("api-mock idp connections and variables", () => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ GOOGLE_CLIENT_ID: { value: "824.apps.googleusercontent.com", secret: false } }),
     });
-    expect(patch.status).toBe(204);
+    // 200 with the addressed owner read back, not 204.
+    expect(patch.status).toBe(200);
+    expect(((await patch.json()) as Record<string, unknown>).GOOGLE_CLIENT_ID).toBe(
+      "824.apps.googleusercontent.com",
+    );
 
     const res = await fetch(`${BASE}/variables?project_id=${projectId}`);
     const body = (await res.json()) as Record<string, unknown>;
@@ -1147,5 +1151,152 @@ describe("api-mock idp connections and variables", () => {
     const body = (await (await fetch(`${BASE}/variables?project_id=${other}`)).json()) as object;
 
     expect(body).toEqual({});
+  });
+});
+
+/** The contract details the first pass of these endpoints got wrong. */
+describe("api-mock idp and variable contract details", () => {
+  const base = {
+    slug: "google",
+    protocol: "oidc",
+    template: "google",
+    display_name: "Google",
+    subject_claim: "sub",
+    provisioning: { creation: "auto" },
+    oidc: {
+      issuer: "https://accounts.google.com",
+      scopes: ["openid"],
+      client_id: "${{ GOOGLE_CLIENT_ID }}",
+      client_secret: "${{ GOOGLE_CLIENT_SECRET }}",
+    },
+  };
+
+  async function newProject(name: string): Promise<string> {
+    const res = await fetch(`${BASE}/projects`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    return ((await res.json()) as { id: string }).id;
+  }
+
+  const putIdp = (projectId: string, idp: object) =>
+    fetch(`${BASE}/idps?project_id=${projectId}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ idp }),
+    });
+
+  const queryIdps = (projectId: string, body: object) =>
+    fetch(`${BASE}/idps/query?project_id=${projectId}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+  test("refuses a revision that changes the connection's identity", async () => {
+    // protocol, subject_claim and the authority decide which provider account a
+    // stored subject belongs to, so changing one repoints existing identities
+    // rather than reconfiguring them.
+    const projectId = await newProject("idp-immutable");
+    await putIdp(projectId, base);
+
+    const repointed = await putIdp(projectId, {
+      ...base,
+      oidc: { ...base.oidc, issuer: "https://login.microsoftonline.com/common/v2.0" },
+    });
+
+    expect(repointed.status).toBe(400);
+    expect(((await repointed.json()) as { code: string }).code).toBe("idp.field_immutable");
+  });
+
+  test("accepts a revision that changes something mutable", async () => {
+    const projectId = await newProject("idp-mutable");
+    await putIdp(projectId, base);
+
+    const revised = await putIdp(projectId, {
+      ...base,
+      oidc: { ...base.oidc, scopes: ["openid", "profile"] },
+    });
+
+    expect(revised.status).toBe(200);
+  });
+
+  test("applies a slug filter instead of returning every connection", async () => {
+    const projectId = await newProject("idp-filter");
+    await putIdp(projectId, base);
+    await putIdp(projectId, { ...base, slug: "acme", template: "oidc-generic" });
+
+    const res = await queryIdps(projectId, {
+      filter: [{ field: "slug", operation: "equals", value: "acme" }],
+    });
+
+    const body = (await res.json()) as { idps: { slug: string }[] };
+    expect(body.idps.map((i) => i.slug)).toEqual(["acme"]);
+  });
+
+  test("honours limit and sort direction", async () => {
+    const projectId = await newProject("idp-sort");
+    await putIdp(projectId, base);
+    await putIdp(projectId, { ...base, slug: "acme", template: "oidc-generic" });
+
+    const res = await queryIdps(projectId, {
+      limit: 1,
+      sorting: { field: "slug", direction: "desc" },
+    });
+
+    const body = (await res.json()) as { idps: { slug: string }[] };
+    expect(body.idps.map((i) => i.slug)).toEqual(["google"]);
+  });
+
+  test("rejects a malformed query body rather than ignoring it", async () => {
+    const projectId = await newProject("idp-badquery");
+
+    const res = await queryIdps(projectId, { limit: "lots" });
+
+    expect(res.status).toBe(400);
+  });
+
+  test("keeps an environment's variables separate from the project's", async () => {
+    // The project level does not see into its environments and an environment
+    // does not inherit the project's: they are distinct owners.
+    const projectId = await newProject("vars-owners");
+    const write = (query: string, payload: object) =>
+      fetch(`${BASE}/variables?${query}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    await write(`project_id=${projectId}`, { SHARED: { value: "project", secret: false } });
+    await write(`project_id=${projectId}&environment_name=production`, {
+      SHARED: { value: "prod", secret: false },
+    });
+
+    const atProject = (await (
+      await fetch(`${BASE}/variables?project_id=${projectId}`)
+    ).json()) as Record<string, unknown>;
+    const atEnv = (await (
+      await fetch(`${BASE}/variables?project_id=${projectId}&environment_name=production`)
+    ).json()) as Record<string, unknown>;
+
+    expect(atProject.SHARED).toBe("project");
+    expect(atEnv.SHARED).toBe("prod");
+  });
+
+  test("reads back what the write did not touch", async () => {
+    const projectId = await newProject("vars-readback");
+    const url = `${BASE}/variables?project_id=${projectId}`;
+    const write = (payload: object) =>
+      fetch(url, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    await write({ FIRST: { value: "a", secret: false } });
+
+    const second = await write({ SECOND: { value: "b", secret: false } });
+
+    const body = (await second.json()) as Record<string, unknown>;
+    expect(body).toEqual({ FIRST: "a", SECOND: "b" });
   });
 });

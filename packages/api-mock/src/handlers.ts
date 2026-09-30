@@ -40,6 +40,8 @@ import {
   recoverStep,
   registerPasswordStep,
   registerStep,
+  registerSsoStep,
+  ssoConflictStep,
   ssoRedirectStep,
 } from "./fixtures/login.js";
 import {
@@ -116,6 +118,10 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
     actor = startFlowActor();
     captured = [];
     authn.clear();
+    // Links too: a caller asking for a clean mock must not inherit an email
+    // that a previous test signed up through a provider, which would turn the
+    // next first-time sign-in into a straight sign-in.
+    ssoIdentities.clear();
   }
 
   function registerCredential(userHandle: string, credentialId: string): void {
@@ -161,6 +167,10 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
         return withBranding(passkeyLoginStep(input));
       case "sso-redirect":
         return withBranding(ssoRedirectStep(input));
+      case "register-sso":
+        return withBranding(registerSsoStep(input));
+      case "sso-conflict":
+        return withBranding(ssoConflictStep(input));
       case "done":
         return withBranding(await doneStep(input));
       default:

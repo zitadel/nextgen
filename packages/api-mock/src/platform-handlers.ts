@@ -67,10 +67,12 @@ import {
   GetIdpByIdResponse,
   GetVariablesQueryParams,
   GetVariablesResponse,
+  QueryIdpsBody,
   QueryIdpsQueryParams,
   QueryIdpsResponse,
   QueryUsersBody,
   UpdateVariablesBody,
+  UpdateVariablesResponse,
   UpdateVariablesQueryParams,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import { validateFlowDefinition } from "@zitadel/config/validate";
@@ -80,6 +82,10 @@ import {
 } from "@zitadel/config/defaults";
 import { http, HttpResponse } from "msw";
 import type { z } from "zod";
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
 
 function shortId(): string {
   return randomUUID().replaceAll("-", "").slice(0, 12);
@@ -263,7 +269,12 @@ type Store = {
   schemas: Map<string, SchemaRecord>;
   flowDefinitions: Map<string, FlowDefinitionRecord>;
   idps: Map<string, IdpConnectionRecord>;
-  /** Project id -> variable name -> value. */
+  /**
+   * Owner key -> variable name -> value. The project level and each
+   * environment are separate owners: the project does not see into its
+   * environments and an environment does not inherit the project's, so they
+   * cannot share a bucket. See {@link variableOwner}.
+   */
   variables: Map<string, Map<string, VariableRecord>>;
   claimChallenges: Map<string, ClaimChallengeRecord>;
   claims: Map<string, ClaimRecord>;
@@ -371,6 +382,94 @@ function schemaKind(body: GetSchemaById200Schema): string | undefined {
  * `created_at DESC, id DESC`, the order the server lists in. `seq` stands in
  * for the id tiebreak.
  */
+/**
+ * Whether a connection passes every filter the query carries. Filters are
+ * combined with AND, as the contract states.
+ *
+ * `slug` and `created_at` are the only filterable fields, and the mock supports
+ * the operations the CLI sends. An operation it does not know is reported
+ * rather than silently ignored: a filter that does not narrow looks like data
+ * that is not there.
+ */
+function matchesIdpFilters(
+  record: IdpConnectionRecord,
+  filters: readonly { field: string; operation: string; value?: unknown }[] | undefined,
+): boolean {
+  for (const filter of filters ?? []) {
+    const actual = filter.field === "slug" ? record.slug : record.createdAt;
+    const expected = String(filter.value ?? "");
+    const ok =
+      filter.operation === "equals"
+        ? actual === expected
+        : filter.operation === "contains"
+          ? actual.includes(expected)
+          : filter.operation === "greater_than"
+            ? actual > expected
+            : filter.operation === "less_than"
+              ? actual < expected
+              : undefined;
+    if (ok === undefined) {
+      throw new Error(`api-mock: unsupported idp filter operation ${filter.operation}`);
+    }
+    if (!ok) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Which identity field a revision would change, or `undefined` when none would.
+ *
+ * `protocol`, `subject_claim` and the field naming the authority decide which
+ * provider account a stored subject belongs to, so changing one repoints
+ * existing identities rather than reconfiguring them. The server refuses that
+ * for the life of the connection, and a mock that accepted it would let the CLI
+ * pass a test the real service fails.
+ */
+function immutableFieldClash(before: Record<string, unknown>, after: Record<string, unknown>): string | undefined {
+  for (const field of ["protocol", "subject_claim"] as const) {
+    if (before[field] !== undefined && before[field] !== after[field]) {
+      return field;
+    }
+  }
+  // The authority is the issuer for OIDC, and the token endpoint with the
+  // userinfo endpoint for OAuth 2.0.
+  for (const [block, fields] of [
+    ["oidc", ["issuer"]],
+    ["oauth2", ["token_endpoint", "userinfo_endpoint"]],
+  ] as const) {
+    const was = before[block];
+    const now = after[block];
+    if (!isObject(was) || !isObject(now)) {
+      continue;
+    }
+    for (const field of fields) {
+      if (was[field] !== undefined && was[field] !== now[field]) {
+        return `${block}.${field}`;
+      }
+    }
+  }
+  return undefined;
+}
+
+/**
+ * The owner a variables request addresses. An absent environment is the project
+ * level, which is a different owner from any environment under it.
+ */
+function variableOwner(projectId: string, environmentName?: string): string {
+  return environmentName === undefined ? `project:${projectId}` : `env:${projectId}/${environmentName}`;
+}
+
+/** What a read of one owner says: a value, or that a secret is held. */
+function variablesResponse(owned: Map<string, VariableRecord>): Record<string, unknown> {
+  // A secret says that a value is held and withholds it (ADR 062 §7):
+  // returning the plaintext would defeat the encryption it stands for.
+  return Object.fromEntries(
+    [...owned.entries()].map(([name, held]) => [name, held.secret ? { secret: true } : held.value]),
+  );
+}
+
 /** One connection, in the wire shape every idp endpoint answers with. */
 function idpResponse(record: IdpConnectionRecord): Record<string, unknown> {
   return {
@@ -1129,6 +1228,18 @@ export function setupPlatformHandlers() {
       const existing = [...store.idps.values()].find(
         (record) => record.projectId === query.data.project_id && record.slug === slug,
       );
+      if (existing) {
+        const clash = immutableFieldClash(existing.body, definition);
+        if (clash) {
+          return HttpResponse.json(
+            errorBody(
+              "idp.field_immutable",
+              "identity provider connection: the field is fixed for the life of the connection",
+            ),
+            { status: 400 },
+          );
+        }
+      }
       const record: IdpConnectionRecord = existing
         ? { ...existing, revisionId: `idprev_${shortId()}`, updatedAt: now, seq: ++store.lastSeq, body: definition }
         : {
@@ -1151,14 +1262,32 @@ export function setupPlatformHandlers() {
       return HttpResponse.json(out.data, { status: existing ? 200 : 201 });
     }),
 
-    http.post("*/idps/query", ({ request }) => {
+    http.post("*/idps/query", async ({ request }) => {
       const query = parse(QueryIdpsQueryParams, queryRecord(request), "invalid_query");
       if (!query.ok) {
         return query.response;
       }
+      // The body carries filters, sorting and paging. Accepting it unread
+      // would let a CLI slug filter appear to work while returning every
+      // connection in the project.
+      const raw = (await readJson(request)) ?? {};
+      const body = parse(QueryIdpsBody, raw, "invalid_request");
+      if (!body.ok) {
+        return body.response;
+      }
+
+      const ascending = body.data.sorting?.direction !== "desc";
+      const field = body.data.sorting?.field ?? "created_at";
       const records = [...store.idps.values()]
         .filter((record) => record.projectId === query.data.project_id)
-        .sort((a, b) => a.seq - b.seq);
+        .filter((record) => matchesIdpFilters(record, body.data.filter))
+        .sort((a, b) => {
+          const order =
+            field === "slug" ? a.slug.localeCompare(b.slug) : a.seq - b.seq;
+          // `seq` stands in for created_at; ids break ties either way.
+          return ascending ? order : -order;
+        })
+        .slice(0, body.data.limit ?? undefined);
       const responseBody = { idps: records.map(idpResponse), next_page_token: null };
       const out = parse(QueryIdpsResponse, responseBody, "mock_response_invalid");
       if (!out.ok) {
@@ -1200,16 +1329,9 @@ export function setupPlatformHandlers() {
       if (!query.ok) {
         return query.response;
       }
-      const owned = store.variables.get(query.data.project_id) ?? new Map();
-      // A secret says that a value is held and withholds it (ADR 062 §7):
-      // returning the plaintext would defeat the encryption it stands for.
-      const responseBody = Object.fromEntries(
-        [...owned.entries()].map(([name, held]) => [
-          name,
-          held.secret ? { secret: true } : held.value,
-        ]),
-      );
-      const out = parse(GetVariablesResponse, responseBody, "mock_response_invalid");
+      const owner = variableOwner(query.data.project_id, query.data.environment_name);
+      const owned = store.variables.get(owner) ?? new Map<string, VariableRecord>();
+      const out = parse(GetVariablesResponse, variablesResponse(owned), "mock_response_invalid");
       if (!out.ok) {
         return out.response;
       }
@@ -1230,7 +1352,8 @@ export function setupPlatformHandlers() {
         return body.response;
       }
 
-      const owned = store.variables.get(query.data.project_id) ?? new Map<string, VariableRecord>();
+      const owner = variableOwner(query.data.project_id, query.data.environment_name);
+      const owned = store.variables.get(owner) ?? new Map<string, VariableRecord>();
       // RFC 7386: a name present is written, `null` removes it, and a name
       // absent is left alone.
       for (const [name, value] of Object.entries(body.data as Record<string, unknown>)) {
@@ -1243,8 +1366,14 @@ export function setupPlatformHandlers() {
           owned.set(name, { value: value as string | number | boolean, secret: false });
         }
       }
-      store.variables.set(query.data.project_id, owned);
-      return new HttpResponse(null, { status: 204 });
+      store.variables.set(owner, owned);
+      // 200 with the addressed owner read back, so the response also carries
+      // what that owner held and this write did not touch.
+      const out = parse(UpdateVariablesResponse, variablesResponse(owned), "mock_response_invalid");
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data);
     }),
   ];
 }
