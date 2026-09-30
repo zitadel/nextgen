@@ -5,14 +5,12 @@ content:
     schema:
       oneOf:
         - $ref: '../../components/schemas/errors/auth-unauthorized.yaml'
-        - $ref: '../../components/schemas/errors/idp-not_found.yaml'
         - $ref: '../../components/schemas/errors/internal.yaml'
         - $ref: '../../components/schemas/errors/req-invalid.yaml'
       discriminator:
         propertyName: code
         mapping:
           auth.unauthorized: '../../components/schemas/errors/auth-unauthorized.yaml'
-          idp.not_found: '../../components/schemas/errors/idp-not_found.yaml'
           internal: '../../components/schemas/errors/internal.yaml'
           req.invalid: '../../components/schemas/errors/req-invalid.yaml'
     examples:
@@ -21,11 +19,6 @@ content:
         value:
           code: auth.unauthorized
           message: 'The request lacks valid authentication credentials.'
-      idp.not_found:
-        summary: idp.not_found
-        value:
-          code: idp.not_found
-          message: 'identity provider connection: not found'
       internal:
         summary: internal
         value:

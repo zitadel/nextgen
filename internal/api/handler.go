@@ -40,10 +40,6 @@ type Handler struct {
 	// personalTeams is optional (see WithPersonalTeamEnsurer); nil skips the
 	// exchange-time ensure.
 	personalTeams service.PersonalTeamEnsurer
-
-	// idpStub holds identity provider connections until the real service
-	// lands (#1003). See internal/api/idp_stub.go.
-	idpStub *idpStubStore
 }
 
 func NewHandler(
@@ -88,7 +84,6 @@ func NewHandler(
 		grantService:          grantService,
 		variableService:       variableService,
 		pool:                  pool,
-		idpStub:               newIdpStubStore(),
 		platformProjectID:     platformProjectID,
 	}
 }
