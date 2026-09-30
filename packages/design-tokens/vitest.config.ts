@@ -13,6 +13,5 @@ export default defineConfig({
     ...baseTest,
     name: "@zitadel/design-tokens",
     environment: "node",
-    include: ["src/**/*.spec.ts"],
   },
 });

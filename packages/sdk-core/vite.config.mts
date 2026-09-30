@@ -23,6 +23,5 @@ export default defineConfig({
     ...baseTest,
     name: "@zitadel/sdk-core",
     environment: "node",
-    include: ["src/**/*.spec.ts"],
   },
 });

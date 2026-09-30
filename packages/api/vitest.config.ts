@@ -7,6 +7,5 @@ export default defineConfig({
     ...baseTest,
     name: "@zitadel/api",
     environment: "node",
-    include: ["src/**/*.spec.ts"],
   },
 });

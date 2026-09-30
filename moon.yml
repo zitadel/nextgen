@@ -69,6 +69,10 @@ tasks:
       - "scripts/release-github.mjs"
       - "scripts/release-github.test.mjs"
       - "scripts/release-manifest.mjs"
+      # The task delegates to the package `test` script and its file-existence
+      # guard, so both are behavioral inputs.
+      - "package.json"
+      - "scripts/assert-file.mjs"
       # Shared Vitest config these tests run under (root project is not covered
       # by the TypeScript implicitInputs).
       - "vitest.config.ts"

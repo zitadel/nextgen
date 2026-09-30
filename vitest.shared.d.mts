@@ -10,6 +10,7 @@ export interface BaseTest {
   globals: true;
   fileParallelism: true;
   passWithNoTests: boolean;
+  include: string[];
   reporters: ["default", "junit"];
   outputFile: { junit: string };
   coverage: {

@@ -12,7 +12,6 @@ export default defineConfig({
     ...baseTest,
     name: "@zitadel/mock-zitadel",
     environment: "node",
-    include: ["src/**/*.test.ts"],
     coverage: { ...baseTest.coverage, exclude: ["src/**/*.test.ts"] },
   },
 });

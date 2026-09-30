@@ -72,7 +72,6 @@ export default defineConfig(({ command, mode, isPreview }) => ({
     name: "@zitadel/console",
     environment: "jsdom",
     setupFiles: ["./src/test-setup.ts"],
-    include: ["src/**/*.spec.{ts,tsx}"],
   },
 }));
 

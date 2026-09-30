@@ -32,6 +32,11 @@ export const baseTest = {
   // removed), restoring the pre-migration behavior. A genuinely test-less lane
   // (login-ui) overrides this to `true` in its own config.
   passWithNoTests: false,
+  // Discover both suffixes under src/, so a package can't silently drop a whole
+  // suite by matching only one of *.spec / *.test. Packages whose tests live
+  // outside src/ (cli → tests/, workspace/cli-journey-e2e → scripts/) or that
+  // split into sub-projects override `include` in their own config.
+  include: ["src/**/*.{test,spec}.{ts,tsx}"],
   // Console output plus a machine-readable result report at a uniform path.
   // The path lives in `outputFile` (Vitest's canonical location) rather than the
   // reporter tuple, so a lane that runs concurrently in the same package cwd

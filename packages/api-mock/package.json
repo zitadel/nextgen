@@ -32,9 +32,9 @@
   "scripts": {
     "start": "tsx bin/start.ts",
     "dev": "tsx watch bin/start.ts",
-    "test": "vitest run --project unit",
-    "test:browser": "vitest run --project browser --outputFile.junit=./test-output/vitest/junit.browser.xml",
-    "test:all": "vitest run"
+    "test": "vitest run",
+    "test:browser": "vitest run --config vitest.browser.config.ts",
+    "test:all": "vitest run && vitest run --config vitest.browser.config.ts"
   },
   "dependencies": {
     "@mswjs/http-middleware": "catalog:",

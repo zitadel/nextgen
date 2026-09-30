@@ -1,58 +1,25 @@
-import { playwright } from "@vitest/browser-playwright";
 import { defineConfig } from "vitest/config";
 
 import { baseTest, sourceConditions } from "../../vitest.shared.mjs";
 import { liquidRaw } from "./vite-liquid-plugin.js";
 
-/** Shared plugins for all vitest projects. */
-const sharedPlugins = () => [liquidRaw()];
-
 /**
- * Two test projects:
+ * Unit lane (jsdom) — the default `vitest run`. Fast feedback for the bulk of
+ * the suite; skips the form-associated custom-element checks because jsdom 29
+ * only ships a partial implementation.
  *
- * - `unit` — runs in jsdom. Fast feedback for the bulk of the suite. Skips
- *   the form-associated custom-element checks because jsdom 29 only ships a
- *   partial implementation.
- * - `browser` — runs in real Chromium via Playwright. Owns the
- *   `*.browser.spec.ts` files: form participation, Enter-to-submit, focus
- *   management, and other behaviours that require a real platform.
- *
- * `pnpm test` runs the unit project (the default in CI / pre-commit).
- * `pnpm test:browser` runs the browser project. `pnpm test:all` runs both.
+ * The browser lane lives in `vitest.browser.config.ts` (run via `test:browser`)
+ * so it stays out of the default run: it needs a real Chromium and writes its
+ * own junit file, both of which belong in that config rather than a CLI flag.
  */
 export default defineConfig({
-  plugins: sharedPlugins(),
+  plugins: [liquidRaw()],
   resolve: { conditions: sourceConditions },
   test: {
     ...baseTest,
     name: "@zitadel/components",
-    projects: [
-      {
-        plugins: sharedPlugins(),
-        resolve: { conditions: sourceConditions },
-        test: {
-          name: "unit",
-          globals: true,
-          environment: "jsdom",
-          include: ["src/**/*.spec.ts"],
-          exclude: ["src/**/*.browser.spec.ts"],
-        },
-      },
-      {
-        plugins: sharedPlugins(),
-        resolve: { conditions: sourceConditions },
-        test: {
-          name: "browser",
-          globals: true,
-          include: ["src/**/*.browser.spec.ts"],
-          browser: {
-            enabled: true,
-            provider: playwright(),
-            headless: true,
-            instances: [{ browser: "chromium" }],
-          },
-        },
-      },
-    ],
+    environment: "jsdom",
+    include: ["src/**/*.spec.ts"],
+    exclude: ["src/**/*.browser.spec.ts"],
   },
 });
