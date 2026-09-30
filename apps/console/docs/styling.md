@@ -153,6 +153,34 @@ glance; and the design's Lucide glyphs are drawn at **stroke 1.5**, where
 `lucide-react` defaults to 2 — a glyph at the default weight reads heavier than
 the design even though its box measures correctly.
 
+## Resource detail layout — one shell for every detail screen
+
+Detail screens come in two compositions, and each has one shell:
+
+- **Resource detail** (Users, Teams, Project settings): a title row over body
+  cards. Compose `DetailPage` + `DetailHeader` from
+  `src/components/detail-page.tsx`, then put the body under `DETAIL_BODY`.
+- **Configuration panel** (User schemas, Login flows): the whole screen is one
+  panel card inside `DETAIL_PANEL_PAGE` (`src/components/layout.tsx`).
+
+Both share the icon tile (`ICON_PLATE`) and the header card (`MetaCard`, holding
+`MetaValue`s split by `MetaRule`).
+
+| Region        | Value                                                 |
+| ------------- | ----------------------------------------------------- |
+| Page gutter   | 16px, 22px from the navbar — as the list shell        |
+| Header gutter | 24px — the page gutter plus 8px                        |
+| Title lockup  | 36px icon tile, 12px to a 24/24 display-face title     |
+| Header card   | 20px inset, 12px block, values centred on the rule     |
+| Body          | 24px under the header row                              |
+
+The title's icon is the glyph the resource's sidebar entry carries, at stroke
+1.5. Tabs are the body's first element when a resource has more than one
+section (Users: Overview / Authentication); a single-section resource renders
+its cards directly. A new resource's detail screen composes this shell rather
+than measuring its own frame: the three screens that did landed on three
+different page tops (36, 22 and 18px) and three body offsets.
+
 ## Traps that have already cost time
 
 - **A registry default is not our design system.** `components/ui/*` arrives from
