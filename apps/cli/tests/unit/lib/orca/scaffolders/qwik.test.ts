@@ -29,6 +29,7 @@ const TEMPLATE_FILES: Record<string, string> = {
   }),
   "vite.config.ts": `import { qwikVite } from '@builder.io/qwik/optimizer'\nimport { defineConfig } from 'vite'\n`,
   "src/main.tsx": `import '@builder.io/qwik/qwikloader.js'\nimport { render } from '@builder.io/qwik'\n`,
+  "tsconfig.app.json": `{ "compilerOptions": { "jsx": "react-jsx", "jsxImportSource": "@builder.io/qwik" } }\n`,
 };
 
 function fileFor(path: string): string | undefined {
@@ -90,11 +91,15 @@ describe("QwikScaffolder", () => {
 
     const viteConfig = writtenFor("vite.config.ts");
     const mainTsx = writtenFor("src/main.tsx");
+    const tsconfigApp = writtenFor("tsconfig.app.json");
     expect(viteConfig).toContain("@qwik.dev/core/optimizer");
     expect(viteConfig).not.toContain("@builder.io/qwik");
     expect(mainTsx).toContain("@qwik.dev/core/qwikloader.js");
     expect(mainTsx).toContain("from '@qwik.dev/core'");
     expect(mainTsx).not.toContain("@builder.io/qwik");
+    // jsxImportSource must move too, or `tsc -b && vite build` breaks.
+    expect(tsconfigApp).toContain('"jsxImportSource": "@qwik.dev/core"');
+    expect(tsconfigApp).not.toContain("@builder.io/qwik");
   });
 
   it("only supports qwik", () => {

@@ -33,11 +33,12 @@ export class QwikScaffolder extends AbstractCLIScaffolder {
 
   /**
    * Repoints the generated app from Qwik 1 to Qwik 2: swaps the `@builder.io/qwik`
-   * dependency for `@qwik.dev/core` in `package.json` and rewrites the Qwik
-   * imports create-vite emits in `vite.config.ts` and `src/main.tsx`. Edits
-   * `package.json` directly rather than via `npm pkg`, which cannot address keys
-   * containing dots (`@builder.io/qwik`, `@qwik.dev/core`). No-ops cleanly if a
-   * future template already ships Qwik 2.
+   * dependency for `@qwik.dev/core` in `package.json` and rewrites the `@builder.io/qwik`
+   * references create-vite emits in `vite.config.ts` (`/optimizer`), `src/main.tsx`
+   * (the runtime and `/qwikloader.js`), and `tsconfig.app.json` (`jsxImportSource`,
+   * which `tsc -b && vite build` needs). Edits `package.json` directly rather than
+   * via `npm pkg`, which cannot address keys containing dots (`@builder.io/qwik`,
+   * `@qwik.dev/core`). No-ops cleanly if a future template already ships Qwik 2.
    */
   private async migrateToQwik2(cwd: string): Promise<void> {
     const pkgPath = join(cwd, "package.json");
@@ -50,14 +51,15 @@ export class QwikScaffolder extends AbstractCLIScaffolder {
     }
     pkg.dependencies = { ...pkg.dependencies, "@qwik.dev/core": QWIK2_VERSION };
     await writeFile(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`);
-    await this.rewriteQwikImports(join(cwd, "vite.config.ts"));
-    await this.rewriteQwikImports(join(cwd, "src/main.tsx"));
+    for (const file of ["vite.config.ts", "src/main.tsx", "tsconfig.app.json"]) {
+      await this.repointQwikRefs(join(cwd, file));
+    }
   }
 
-  /** Rewrites `@builder.io/qwik…` import specifiers to `@qwik.dev/core…` in one
-   * generated file (covers the bare package, `/optimizer`, and `/qwikloader.js`).
-   * Skips a file that is absent or already migrated. */
-  private async rewriteQwikImports(file: string): Promise<void> {
+  /** Rewrites every `@builder.io/qwik…` reference (import specifier or
+   * `jsxImportSource`) to `@qwik.dev/core…` in one generated file. Skips a file
+   * that is absent or already migrated. */
+  private async repointQwikRefs(file: string): Promise<void> {
     const source = await readFile(file, "utf8").catch(() => null);
     if (source === null || !source.includes("@builder.io/qwik")) {
       return;
