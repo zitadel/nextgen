@@ -80,7 +80,9 @@ const NON_SHIPPING_ROOT_FILES = new Set([
   "redocly.yaml",
   "tsconfig.base.json",
   "tsconfig.json",
-  "vitest.workspace.ts",
+  "vitest.config.ts",
+  "vitest.shared.mjs",
+  "vitest.shared.d.mts",
 ]);
 
 export function parseSemanticConfig(source) {

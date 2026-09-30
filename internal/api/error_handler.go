@@ -11,6 +11,7 @@ import (
 	"github.com/go-faster/errors"
 	"github.com/go-faster/jx"
 	"github.com/ogen-go/ogen/ogenerrors"
+	"github.com/ogen-go/ogen/validate"
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
 )
@@ -121,6 +122,8 @@ func errorResponse(err error) *api.ErrorDetailsStatusCode {
 		return environmentErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixRelease.ErrorCodePrefix("")):
 		return releaseErrorResponse(e)
+	case strings.HasPrefix(e.Code, domain.PrefixIDPConnection.ErrorCodePrefix("")):
+		return idpErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixDeployment.ErrorCodePrefix("")):
 		return deploymentErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixEvent.ErrorCodePrefix("")):
@@ -184,8 +187,13 @@ func OgenErrorHandler(_ context.Context, w http.ResponseWriter, _ *http.Request,
 	case isDecodeError(err):
 		status = http.StatusBadRequest
 		// Use the stable domain message — do not echo ogen/framework
-		// decode text into the client envelope (ADR 030).
-		details = domainErrorDetails(domain.ErrRequestInvalid())
+		// decode text into the client envelope (ADR 030). The field paths
+		// ogen's validation rejected do go into details.
+		invalid := domain.ErrRequestInvalid()
+		if fields := validationFieldPaths(err); len(fields) > 0 {
+			invalid = invalid.WithDetails(map[string][]string{"fields": fields})
+		}
+		details = domainErrorDetails(invalid)
 
 	default:
 		resp := errorResponse(err)
@@ -223,6 +231,38 @@ func securityErrorDetails(err error) api.ErrorDetails {
 		unauthorized = unauthorized.WithMessage(sessionUnauthorizedMessage)
 	}
 	return domainErrorDetails(unauthorized)
+}
+
+// validationFieldPaths returns the dotted paths of the fields ogen's request
+// validation rejected, or nil when decoding failed for another reason, such as
+// malformed JSON. Only the names are returned: a leaf error can quote the
+// rejected value. For map-typed fields (for example claim_mapping,
+// verified_claims, static_authorize_parameters) the generated validator names
+// an entry by the client's own key, so a path like idp.claim_mapping.<key>
+// echoes client input as a name, never a value or decoder text, which ADR 030
+// allows.
+func validationFieldPaths(err error) []string {
+	var verr *validate.Error
+	if !errors.As(err, &verr) {
+		return nil
+	}
+	return appendFieldPaths(nil, "", verr)
+}
+
+func appendFieldPaths(paths []string, prefix string, verr *validate.Error) []string {
+	for _, field := range verr.Fields {
+		path := field.Name
+		if prefix != "" {
+			path = prefix + "." + field.Name
+		}
+		var nested *validate.Error
+		if errors.As(field.Error, &nested) {
+			paths = appendFieldPaths(paths, path, nested)
+			continue
+		}
+		paths = append(paths, path)
+	}
+	return paths
 }
 
 func isDecodeError(err error) bool {

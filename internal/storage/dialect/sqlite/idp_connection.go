@@ -20,6 +20,12 @@ const (
 	createIDPConnectionRevisionStmt = `INSERT INTO idp_connection_revisions ` +
 		`(project_id, id, connection_id, document, created_at) VALUES (?, ?, ?, ?, ?)`
 
+	// No FOR UPDATE: the dialect begins every transaction with
+	// _txlock=immediate (BEGIN IMMEDIATE) on a single connection, so the
+	// database write lock is already held from BEGIN and a second revise waits
+	// for the first to commit. The select only reports an unknown connection.
+	lockIDPConnectionStmt = `SELECT id FROM idp_connections WHERE project_id = ? AND id = ?`
+
 	// One row per revision, carrying its connection's identity. The last column
 	// is the revision's created_at, which reads serve as UpdatedAt.
 	idpConnectionQuery = `SELECT c.project_id, c.id, c.slug, r.id, r.document, c.created_at, r.created_at
@@ -88,6 +94,8 @@ func (s idpConnectionStatements) ReviseIDPConnection(ctx context.Context, entity
 	}
 	// One insert, so no transaction. The connection row is not read here, so
 	// CreatedAt stays as the caller had it.
+	// Stamped at the insert, inside a transaction BEGIN IMMEDIATE already
+	// serialized, so revision order follows transaction order.
 	now := nowUnixNano()
 	if _, err := s.client.Exec(ctx, createIDPConnectionRevisionStmt,
 		entity.ProjectID,
@@ -101,6 +109,12 @@ func (s idpConnectionStatements) ReviseIDPConnection(ctx context.Context, entity
 	entity.RevisionID = revisionID
 	entity.UpdatedAt = timeFromUnixNano(now)
 	return nil
+}
+
+// LockIDPConnection implements [service.IDPConnectionStatements].
+func (s idpConnectionStatements) LockIDPConnection(ctx context.Context, projectID, id string) error {
+	var locked string
+	return wrapError(s.client.QueryRow(ctx, lockIDPConnectionStmt, projectID, id).Scan(&locked))
 }
 
 // GetIDPConnection implements [service.IDPConnectionStatements].

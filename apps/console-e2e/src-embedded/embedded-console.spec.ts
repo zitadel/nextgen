@@ -103,40 +103,6 @@ test("manages the project with the session cookie alone", async ({ page, seed, z
   await expect(page.getByRole("link", { name, exact: true })).toBeVisible();
 });
 
-test("manages the project with the session cookie alone", async ({ page, seed, zitadel }) => {
-  // #1300: nothing on this lane holds the project secret — the binary serves
-  // the console and the API at one origin and no proxy adds a credential — so
-  // a granted operator's session cookie is what authorizes a management read
-  // and a management write. The grant is written from the test process.
-  const operator = await seed.user();
-  await grantProjectAdmin(zitadel.handle, operator.id);
-  const colleague = await seed.user();
-
-  await page.goto("/ui/console/");
-  await page.getByLabel("Email").fill(operator.email);
-  await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await page.getByLabel("Password").fill(operator.password);
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await page.waitForURL((url) => !url.pathname.endsWith("/login"));
-  await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();
-
-  await page.goto("/ui/console/users");
-  await expect(page.getByRole("link", { name: colleague.email, exact: true })).toBeVisible();
-
-  const name = `Embedded ${Date.now().toString(36)}`;
-  await page.goto("/ui/console/teams?status=active");
-  await page.getByRole("button", { name: "Add", exact: true }).click();
-  const drawer = page.getByRole("dialog", { name: "Add team" });
-  await drawer.getByLabel("Team name").fill(name);
-  const created = page.waitForResponse(
-    (response) =>
-      new URL(response.url()).pathname === "/teams" && response.request().method() === "POST",
-  );
-  await drawer.getByRole("button", { name: "Add team", exact: true }).click();
-  expect((await created).status()).toBe(201);
-  await expect(page.getByRole("link", { name, exact: true })).toBeVisible();
-});
-
 test("shows each user's team on the Users screen with the session cookie", async ({
   page,
   zitadel,
