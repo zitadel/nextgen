@@ -4,7 +4,6 @@ package integration_test
 
 import (
 	"bytes"
-	"crypto/sha256"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -68,21 +67,20 @@ func exchangeForSessionCookie(t *testing.T, projectID, projectSecret, handoffTok
 // test; TestClaimHappyPath drives the real flow engine instead.
 func platformSessionCookie(t *testing.T, userID string) *http.Cookie {
 	t.Helper()
+	return sessionCookieIn(t, harness.EnsurePlatformProject(t), userID)
+}
 
-	platform := harness.EnsurePlatformProject(t)
-	attempt := &domain.AuthAttempt{
-		ProjectID:      platform.ID,
-		RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypeUser},
-		Checks:         []domain.AuthCheck{&domain.AuthFactorUser{UserID: userID}},
-	}
-	stmts := harness.EnsureServiceDB(t)
-	require.NoError(t, stmts.Statements().CreateAuthAttempt(t.Context(), attempt))
-	plainToken := "handoff_claim_" + helpers.RandString(8)
-	sum := sha256.Sum256([]byte(plainToken))
-	attempt.HandoffToken = &domain.HandoffToken{TokenHash: sum[:]}
-	require.NoError(t, stmts.Statements().HandoffAuthAttempt(t.Context(), attempt))
+// sessionCookieIn signs the user into project through the harness's
+// CreateActiveSession and returns the session's cookie.
+func sessionCookieIn(t *testing.T, project *domain.Project, userID string) *http.Cookie {
+	t.Helper()
 
-	return exchangeForSessionCookie(t, platform.ID, harness.ProjectSecret(t, platform), plainToken)
+	session := harness.CreateActiveSession(t, project.ID, userID)
+	crypter, err := harness.EnsureKeyService(t).GetProjectCrypter(t.Context(), project.ID, domain.EncryptionKeyPurposeToken)
+	require.NoError(t, err)
+	token, err := session.Token(crypter)
+	require.NoError(t, err)
+	return &http.Cookie{Name: "__nextgen_session", Value: token}
 }
 
 // TestClaimHappyPath is the ticket's end-to-end leg: init → pending status →
