@@ -381,7 +381,7 @@ describe("sso enable secret handling", () => {
     });
     // Rendered as a command an agent can run, like every other result's.
     expect(json.data.next_commands).toEqual(
-      expect.arrayContaining([expect.stringContaining("variables set GOOGLE_CLIENT_SECRET --secret")]),
+      expect.arrayContaining([expect.stringContaining("variables set GOOGLE_CLIENT_SECRET --project-level --secret")]),
     );
     expect(json.data.next_commands.every((command) => command.startsWith("npx "))).toBe(true);
   });

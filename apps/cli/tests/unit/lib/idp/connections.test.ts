@@ -136,4 +136,25 @@ describe("planConnection", () => {
   it("rejects a provider the catalog does not know", () => {
     expect(() => planConnection({ provider: "okta", files: [] })).toThrow(/unknown identity provider/);
   });
+
+  it("refuses two slugs whose credentials would land in one variable", () => {
+    // A slug may hold `-` or `_`, and both become `_` in a variable name, so
+    // `google-work` and `google_work` share GOOGLE_WORK_CLIENT_SECRET. The
+    // second connection would then sign in with the first's application.
+    const existing = file("google-work.json", googleBody({ slug: "google-work" }));
+    const reused = file("google_work.json", googleBody({ slug: "google_work" }));
+
+    expect(() => planConnection({ provider: "google", files: [existing, reused] })).toThrow(
+      /both use GOOGLE_WORK_CLIENT_SECRET|More than one Google connection/,
+    );
+  });
+
+  it("does not mistake a connection for colliding with itself", () => {
+    const only = file("google.json", googleBody({ slug: "google" }));
+
+    expect(planConnection({ provider: "google", files: [only] })).toMatchObject({
+      action: "reuse",
+      slug: "google",
+    });
+  });
 });

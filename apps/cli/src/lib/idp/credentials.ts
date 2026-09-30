@@ -110,7 +110,15 @@ async function publishSecret(
  * that list is the only place the recovery step appears.
  */
 export function republishCommand(name: string, secret: boolean, cliVersion: string): string {
-  return publicCliCommand(`variables set ${name}${secret ? " --secret" : ""}`, cliVersion);
+  // `--project-level` is not optional: every `variables` command refuses with
+  // "Name the owner" without an owner, so a command missing it would fail
+  // before it reached the API and repair nothing. The project level is also
+  // the right owner — the engine resolves a connection's `${{ NAME }}` from
+  // the project's own variables.
+  return publicCliCommand(
+    `variables set ${name} --project-level${secret ? " --secret" : ""}`,
+    cliVersion,
+  );
 }
 
 /** A credential, and whether the project ended up holding it. */
