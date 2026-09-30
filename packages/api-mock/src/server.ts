@@ -54,13 +54,6 @@ const SESSION_TTL_SECONDS = 3600;
 export const PLATFORM_PROJECT_ID = "platform";
 
 /**
- * The project the mock's `/console/runtime.json` names as the one the console
- * signs into. The mock accepts any project id on the session routes, so this is
- * only a label; it is the console's to use, and nothing else here reads it.
- */
-export const MOCK_CONSOLE_PROJECT_ID = "proj_dev_mock";
-
-/**
  * Tracks handoff tokens (by `jti`) we've already consumed so a replay
  * surfaces as 410 Gone. Per the spec a handoff is single-use — a real
  * backend rejects the second exchange.
@@ -314,10 +307,13 @@ export function createMockApp(options: { issuer: string }): express.Express {
   // GET /console/runtime.json — the console's pre-session runtime document
   // (Console ADR 0004 §3), served by the Go server's root mux. Without it the
   // console stops on its connectivity screen, or, with
-  // VITE_CONSOLE_RUNTIME_FALLBACK, has no project to sign in to. No
-  // `publishable_key`: the mock's session exchange asks for no bearer.
+  // VITE_CONSOLE_RUNTIME_FALLBACK, has no project to sign in to. It names the
+  // platform project, as a deployment that bootstraps one does: the console's
+  // session then belongs to it, which is the only session `claim/complete`
+  // below accepts. No `publishable_key`: the mock's session exchange asks for
+  // no bearer.
   app.get("/console/runtime.json", (_req: express.Request, res: express.Response) => {
-    res.json({ mode: "standalone", console_project_id: MOCK_CONSOLE_PROJECT_ID });
+    res.json({ mode: "standalone", console_project_id: PLATFORM_PROJECT_ID });
   });
 
   // GET /sessions/me — validate opaque session cookie and return session data.

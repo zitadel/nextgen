@@ -14,8 +14,8 @@ import {
  * Console runtime discovery (Console ADR 0004 §3): the document is fetched
  * once, an unreachable or erroring endpoint is reported as a failure rather
  * than guessed to be `standalone`, `VITE_CONSOLE_RUNTIME_FALLBACK` is the
- * backend-less opt-in back to that fallback, and the dev env override wins
- * over the discovered project id.
+ * backend-less opt-in back to that fallback, and the discovered project id is
+ * the only source of the project the console signs into.
  */
 const fetchMock = vi.fn();
 

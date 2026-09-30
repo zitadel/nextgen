@@ -53,8 +53,9 @@ const seedOnly = process.argv.includes("--seed-only");
  * at it, which is what `claim/complete` authenticates against — without it the
  * claim page can render but never finish, because the console's session belongs
  * to the seeded project instead. Opt-in, not the default: making
- * `proj_platform` the deployment's default project is exactly the standalone-semantics change the demo and
- * embedded suites must not see (see `cli-journey-e2e/scripts/run-local.mjs`).
+ * `proj_platform` the deployment's default project is exactly the
+ * standalone-semantics change the demo and embedded suites must not see (see
+ * `cli-journey-e2e/scripts/run-local.mjs`).
  */
 const claimMode = process.argv.includes("--claim");
 

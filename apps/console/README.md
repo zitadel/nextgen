@@ -174,9 +174,10 @@ Fast and offline, and the full sign-in loop works (the mock serves
 `identifier` → `password` flow the real server emits. Use it only for chrome that
 needs no real data: it has **no user store**, so list screens cannot be
 meaningful and nothing about authorization can be proven there. It serves its
-own `/console/runtime.json`, naming `proj_dev_mock` as the project the console
-signs into, so the loop needs no variables: the dev proxy's default backend is
-the mock's port.
+own `/console/runtime.json`, naming the mock's platform project as the one the
+console signs into (so the claim page can complete, as in `console:dev-claim`),
+and the loop needs no variables: the dev proxy's default backend is the mock's
+port.
 
 ### Embedded build
 

@@ -32,8 +32,9 @@ a project the signed-in person holds a grant on: their only project, else
 none. `e2e-real` grants each signed-in user the harness project (`signIn` in
 `src-real/support.ts`), so it is selected there; a user with no grant lands on
 Projects with nothing selected. The project the console signs into comes from
-the instance's `/console/runtime.json` in every lane; no lane pins it. A spec that navigates by URL either lets the guard fill it in or
-names it, and asserts it survives navigation where that is the point.
+the instance's `/console/runtime.json` in every lane; no lane pins it. A spec
+that navigates by URL either lets the guard fill it in or names it, and asserts
+it survives navigation where that is the point.
 
 All four tasks carry `runInCI: false` — that only keeps them out of moon's
 automatic selection. The `full-pr` job explicitly runs `e2e-real`,
