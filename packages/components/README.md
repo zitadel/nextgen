@@ -402,8 +402,7 @@ moon run storybook:dev
 
 # --- Package checks ---
 
-moon run components:test
-moon run components:test-browser
+moon run components:test          # unit + browser projects (test:all)
 moon run components:typecheck
 moon run components:build
 ```
