@@ -108,15 +108,18 @@ export const ZitadelLogin = component$<ZitadelLoginProps>((props) => {
       const onStep = (event: Event): void => void props.onFlowStep$?.(eventDetail(event));
       const onInput = (event: Event): void => void props.onFlowInput$?.(eventDetail(event));
       const onComplete = (event: Event): void => void props.onFlowComplete$?.(eventDetail(event));
+      const onRedirect = (event: Event): void => void props.onFlowRedirect$?.(eventDetail(event));
       const onError = (event: Event): void => void props.onFlowError$?.(eventDetail(event));
       el.addEventListener("zitadel-flow-step", onStep);
       el.addEventListener("zitadel-flow-input", onInput);
       el.addEventListener("zitadel-flow-complete", onComplete);
+      el.addEventListener("zitadel-flow-redirect", onRedirect);
       el.addEventListener("zitadel-flow-error", onError);
       cleanup(() => {
         el.removeEventListener("zitadel-flow-step", onStep);
         el.removeEventListener("zitadel-flow-input", onInput);
         el.removeEventListener("zitadel-flow-complete", onComplete);
+        el.removeEventListener("zitadel-flow-redirect", onRedirect);
         el.removeEventListener("zitadel-flow-error", onError);
       });
     },

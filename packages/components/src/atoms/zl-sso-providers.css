@@ -1,0 +1,57 @@
+/* Styles for `<zl-sso-providers>` — the divider first, then the button list. */
+
+:host {
+  display: block;
+}
+
+.zr-sso {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zl-spacing-2);
+}
+
+/* A labelled rule ("or"), drawn with the label sitting in the gap so it needs
+   no background to punch through the line. */
+.zr-sso__divider {
+  display: flex;
+  align-items: center;
+  gap: var(--zl-spacing-3);
+  margin-block: var(--zl-spacing-1);
+  color: var(--zl-muted-foreground);
+  font-family: var(--zl-font-family-sans);
+  font-size: var(--zl-text-sm-size);
+  line-height: var(--zl-text-sm-leading);
+}
+.zr-sso__divider::before,
+.zr-sso__divider::after {
+  content: "";
+  flex: 1 1 auto;
+  height: 1px;
+  background: var(--zl-border);
+}
+
+.zr-sso__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zl-spacing-2);
+}
+
+/* The mark holds its size when the label beside it wraps. Its colours are its
+   own — every path in the glyph carries an explicit fill — so nothing here
+   needs to stop it inheriting the button's text colour. */
+.zr-sso__mark {
+  flex: 0 0 auto;
+  display: inline-flex;
+}
+
+/* Vendor names are tenant-authored and can be long. The button is a fixed
+   height and inherits `white-space: nowrap`, so an unconstrained "Contoso
+   Corporation Enterprise Single Sign-On" runs past the card and gives the
+   page a horizontal scrollbar. `min-width: 0` is what lets a flex item
+   shrink below its content width at all. */
+.zr-sso__label {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

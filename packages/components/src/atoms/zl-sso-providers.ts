@@ -1,0 +1,223 @@
+import { LitElement, html, nothing } from "lit";
+import { customElement, property } from "lit/decorators.js";
+
+import ssoStyles from "./zl-sso-providers.css?inline";
+
+import { emit } from "../internal/emit.js";
+import type { AtomManifest } from "../manifest.js";
+import { baseHostStyles, surfaceStyles } from "../styles/index.js";
+
+import { SHIPPED_BRAND_ICON_NAMES, type BrandIconName } from "./zl-icon.js";
+import "./zl-button.js";
+import "./zl-icon.js";
+
+/** One entry of the step's `sso_providers`, as the engine renders it. */
+export type SsoProvider = {
+  /** The connection's slug, sent back as `sso_provider_id`. */
+  readonly id: string;
+  /** Vendor name to show, already localised by the server. */
+  readonly name: string;
+  /** Catalog template (`google`, `github`, …) — picks the mark. */
+  readonly template?: string;
+};
+
+/** What a provider button reports when it is chosen. */
+export type ZlSsoSelectDetail = {
+  readonly providerId: string;
+  readonly template: string | undefined;
+  readonly name: string;
+};
+
+/** Placeholder the label format substitutes the vendor name into. */
+const NAME_PLACEHOLDER = "{name}";
+
+/**
+ * Atom: `<zl-sso-providers>` — one button per identity provider the step
+ * offers.
+ *
+ * Driven entirely by data. The step carries `sso_providers`, each entry a
+ * `{id, name, template}` the engine resolved from the connection, and this
+ * atom renders one button each in the order given. Nothing here knows which
+ * vendors exist: Google ships today and GitHub, Microsoft and the rest arrive
+ * as catalog entries plus a mark in `<zl-icon>`, with no change to this file.
+ *
+ * A template with no mark of its own still gets a working button, labelled
+ * with the vendor's name and no glyph. That is deliberate — a placeholder
+ * glyph would be a wrong logo, and a tenant's private OIDC connection is
+ * exactly the case that will never have artwork here.
+ *
+ * Choosing one emits `zl-sso-select`; the orchestrator submits
+ * `{action: "sso", sso_provider_id}` and follows the redirect the server
+ * answers with. The atom does not navigate: the flow owns that, as it owns
+ * every other transition.
+ *
+ * It holds no in-flight state of its own. Submitting re-renders the step —
+ * the orchestrator injects the rendered string with `unsafeHTML`, so this
+ * element is replaced, not updated — and the template passes `disabled` while
+ * the step is submitting. Any "pending" flag kept here would be thrown away
+ * on that same frame, so the disabled attribute is the whole mechanism.
+ */
+@customElement("zl-sso-providers")
+export class ZlSsoProviders extends LitElement {
+  static override styles = [baseHostStyles, ...surfaceStyles(ssoStyles)];
+
+  /**
+   * The providers to offer. Accepts a JSON string so a Liquid template can
+   * pass the step's array straight through (`providers='{{ sso_providers |
+   * json }}'`), exactly as `<zl-select>` takes its options.
+   */
+  @property({ converter: { fromAttribute: parseProviders } })
+  accessor providers: readonly SsoProvider[] = [];
+
+  /**
+   * Button label, with `{name}` standing in for the vendor. Passed in
+   * already localised; the fallback is English so a template that forgets it
+   * still renders a sentence rather than a key.
+   */
+  @property({ attribute: "label-format" }) accessor labelFormat = `Continue with ${NAME_PLACEHOLDER}`;
+
+  /** Text for the rule above the buttons. Omitted renders no rule. */
+  @property({ attribute: "divider-label" }) accessor dividerLabel: string | undefined = undefined;
+
+  /**
+   * Disables every button. The template sets this while the step is
+   * submitting, which is also what stops a second click starting a second
+   * authorization request.
+   */
+  @property({ type: Boolean, reflect: true }) accessor disabled = false;
+
+  override render() {
+    const providers = this.providers.filter(isRenderable);
+    if (providers.length === 0) {
+      return nothing;
+    }
+    // `<zl-button>` announces every click as `zl-submit`, which the
+    // orchestrator reads as "submit this step". A provider button is not that
+    // — it carries its own action and its own payload — so the inner event is
+    // caught at the boundary and `zl-sso-select` is emitted in its place.
+    return html`
+      <div class="zr-sso" part="root" @zl-submit=${stopInnerSubmit}>
+        ${this.dividerLabel
+          ? html`<div class="zr-sso__divider" part="divider" role="separator" aria-label=${this.dividerLabel}>
+              <span aria-hidden="true">${this.dividerLabel}</span>
+            </div>`
+          : nothing}
+        <div class="zr-sso__list" part="list">
+          ${providers.map((provider) => this.renderProvider(provider))}
+        </div>
+      </div>
+    `;
+  }
+
+  private renderProvider(provider: SsoProvider) {
+    const mark = brandIconFor(provider.template);
+    return html`
+      <zl-button
+        part="provider"
+        exportparts="root: provider-button"
+        hierarchy="secondary"
+        size="medium"
+        type="button"
+        block
+        data-provider=${provider.id}
+        data-template=${provider.template ?? nothing}
+        data-testid=${`zitadel-sso-provider-${provider.id}`}
+        ?disabled=${this.disabled}
+        @click=${() => this.choose(provider)}
+      >
+        ${mark
+          ? html`<span slot="leading" class="zr-sso__mark"
+              ><zl-icon name=${mark} size="24" decorative></zl-icon
+            ></span>`
+          : nothing}
+        <span class="zr-sso__label">${this.labelFor(provider)}</span>
+      </zl-button>
+    `;
+  }
+
+  /**
+   * The vendor's name in the caller's sentence; `{name}` may repeat.
+   *
+   * Rendered into the button's default slot rather than passed as its
+   * `label`: slotted content stays in this atom's shadow tree, which is the
+   * only way its stylesheet can keep a long vendor name from pushing the
+   * button past the card. `<zl-button>` exposes no part for its own text.
+   */
+  private labelFor(provider: SsoProvider): string {
+    return this.labelFormat.split(NAME_PLACEHOLDER).join(provider.name);
+  }
+
+  private choose(provider: SsoProvider): void {
+    if (this.disabled) {
+      return;
+    }
+    emit<ZlSsoSelectDetail>(this, "zl-sso-select", {
+      providerId: provider.id,
+      template: provider.template,
+      name: provider.name,
+    });
+  }
+
+}
+
+/**
+ * Keep `<zl-button>`'s own submit announcement inside this atom, so the step
+ * is not submitted a second time with the wrong action.
+ */
+function stopInnerSubmit(event: Event): void {
+  event.stopPropagation();
+}
+
+/**
+ * Parse the `providers` attribute. Malformed JSON renders nothing rather than
+ * throwing: the attribute is server data reaching a template, and a broken
+ * payload must not take the whole sign-in screen down with it.
+ */
+function parseProviders(value: string | null): readonly SsoProvider[] {
+  if (!value) {
+    return [];
+  }
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return Array.isArray(parsed) ? (parsed as SsoProvider[]).filter(isRenderable) : [];
+  } catch {
+    return [];
+  }
+}
+
+/** An entry with no id cannot be submitted, and one with no name has nothing to show. */
+function isRenderable(provider: SsoProvider | null | undefined): provider is SsoProvider {
+  return (
+    provider !== undefined &&
+    provider !== null &&
+    typeof provider.id === "string" &&
+    provider.id !== "" &&
+    typeof provider.name === "string" &&
+    provider.name !== ""
+  );
+}
+
+/** The mark for a template, or `undefined` when none has been drawn yet. */
+function brandIconFor(template: string | undefined): BrandIconName | undefined {
+  if (template === undefined) {
+    return undefined;
+  }
+  const name = `brand-${template}`;
+  return (SHIPPED_BRAND_ICON_NAMES as readonly string[]).includes(name)
+    ? (name as BrandIconName)
+    : undefined;
+}
+
+export const zlSsoProvidersManifest: AtomManifest = {
+  tag: "zl-sso-providers",
+  attrs: ["providers", "label-format", "divider-label", "disabled", "data-testid"],
+  parts: ["root", "divider", "list", "provider", "provider-button"],
+  slots: [],
+  events: ["zl-sso-select"],
+} as const;
+
+declare global {
+  interface HTMLElementTagNameMap {
+    "zl-sso-providers": ZlSsoProviders;
+  }
+}

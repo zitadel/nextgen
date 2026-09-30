@@ -99,7 +99,7 @@ export const en: Record<string, string> = {
   // ═══════════════════════════════════════════════════════════════════════════
   // Step: done (terminal — signed-in confirmation)
   // ═══════════════════════════════════════════════════════════════════════════
-  "done.title": "You're signed in as",
+  "done.title": "You're signed in",
   "done.description": "",
 
   // --- Step-name aliases used by the default login flow ---
@@ -133,7 +133,7 @@ export const en: Record<string, string> = {
   "register.action.sign_in.lead": "Already have an account? ",
   "register.action.sign_in.link": "Sign in",
 
-  "complete.title": "You're signed in as",
+  "complete.title": "You're signed in",
   "signed-in.continue": "Continue",
   "signed-in.logout": "Sign out",
 
@@ -162,6 +162,28 @@ export const en: Record<string, string> = {
 
   // --- SSO ---
   "sso.redirect.title": "Redirecting to your provider…",
+  // `{name}` is replaced with the provider's own name by <zl-sso-providers>,
+  // so one key covers every vendor the project enables.
+  "sso.continue_with": "Continue with {name}",
+  "sso.divider": "or",
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Step: register-sso (the provider returned someone new — collect the rest)
+  // ═══════════════════════════════════════════════════════════════════════════
+  "register-sso.title": "Finish creating your account",
+  "register-sso.description": "We need a little more to set you up",
+  "register-sso.field.email": "Email",
+  "register-sso.action.submit": "Create account",
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Step: sso-conflict (that email already has an account here)
+  // ═══════════════════════════════════════════════════════════════════════════
+  "sso-conflict.title": "You already have an account",
+  "sso-conflict.description": "Sign in the way you usually do, and we'll connect the two",
+  "sso-conflict.field.password": "Password",
+  "sso-conflict.action.submit": "Sign in",
+  "sso-conflict.action.passkey": "Use a passkey",
+  "sso-conflict.action.sign_in": "Back to sign in",
 
   // --- Passkey ceremony ---
   "passkey.pending.status": "Waiting for your passkey…",
@@ -202,6 +224,11 @@ export const en: Record<string, string> = {
   // --- Sign-in form-level alert ---
   "error.sign_in_server.title": "We couldn't complete your sign in.",
   "error.sign_in_server.body": "Please try again in a few minutes",
+  "error.sso_cancelled.title": "Sign-in cancelled",
+  "error.sso_cancelled.body": "You cancelled signing in with the provider, or it declined the request. You can try again or use another method.",
+  "error.sso_failed.title": "Sign-in failed",
+  "error.sso_failed.body": "The provider could not complete the sign-in. Please try again.",
+  "error.more_info": "More information",
 };
 
 export type Locale = Record<string, string>;

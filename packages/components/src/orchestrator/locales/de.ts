@@ -96,7 +96,7 @@ export const de: Locale = {
   // ═══════════════════════════════════════════════════════════════════════════
   // Step: done (Terminal — Anmeldebestätigung)
   // ═══════════════════════════════════════════════════════════════════════════
-  "done.title": "Du bist angemeldet als",
+  "done.title": "Du bist angemeldet",
   "done.description": "",
 
   // --- Step-Name-Aliase für den Standard-Login-Flow ---
@@ -131,7 +131,7 @@ export const de: Locale = {
   "register.action.sign_in.lead": "Bereits ein Konto? ",
   "register.action.sign_in.link": "Anmelden",
 
-  "complete.title": "Du bist angemeldet als",
+  "complete.title": "Du bist angemeldet",
   "signed-in.continue": "Weiter",
   "signed-in.logout": "Abmelden",
 
@@ -160,6 +160,18 @@ export const de: Locale = {
   "action.back": "Zurück",
 
   // --- SSO ---
+  "sso.continue_with": "Weiter mit {name}",
+  "sso.divider": "oder",
+  "register-sso.title": "Konto fertig einrichten",
+  "register-sso.description": "Wir brauchen noch ein paar Angaben",
+  "register-sso.field.email": "E-Mail",
+  "register-sso.action.submit": "Konto erstellen",
+  "sso-conflict.title": "Sie haben bereits ein Konto",
+  "sso-conflict.description": "Melden Sie sich wie gewohnt an, dann verbinden wir beide",
+  "sso-conflict.field.password": "Passwort",
+  "sso-conflict.action.submit": "Anmelden",
+  "sso-conflict.action.passkey": "Passkey verwenden",
+  "sso-conflict.action.sign_in": "Zurück zur Anmeldung",
   "sso.redirect.title": "Weiterleitung zum Anbieter…",
 
   // --- Passkey-Vorgang ---
@@ -199,4 +211,9 @@ export const de: Locale = {
   // --- Formular-Alerts ---
   "error.sign_in_server.title": "Anmeldung konnte nicht abgeschlossen werden.",
   "error.sign_in_server.body": "Bitte versuche es in einigen Minuten erneut",
+  "error.sso_cancelled.title": "Anmeldung abgebrochen",
+  "error.sso_cancelled.body": "Du hast die Anmeldung beim Anbieter abgebrochen, oder er hat die Anfrage abgelehnt. Versuche es erneut oder nutze eine andere Methode.",
+  "error.sso_failed.title": "Anmeldung fehlgeschlagen",
+  "error.sso_failed.body": "Der Anbieter konnte die Anmeldung nicht abschließen. Bitte versuche es erneut.",
+  "error.more_info": "Weitere Informationen",
 };

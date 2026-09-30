@@ -36,6 +36,16 @@ export interface ZitadelFlowCompleteDetail {
   readonly handoff_token_expires_at?: string;
 }
 
+/**
+ * Payload of the `zitadel-flow-redirect` event — the widget is handing the
+ * browser to an identity provider. Distinct from `zitadel-flow-complete`:
+ * nobody is signed in yet, and the flow resumes when the provider returns.
+ */
+export interface ZitadelFlowRedirectDetail {
+  readonly redirect_url: string;
+  readonly step: CreateFlow201Step;
+}
+
 /** Payload of the `zitadel-flow-error` event. */
 export interface ZitadelFlowErrorDetail {
   readonly message: string;
@@ -64,6 +74,7 @@ export interface ZitadelLoginEventMap {
   "zitadel-flow-step": ZitadelFlowStepDetail;
   "zitadel-flow-input": ZitadelFlowInputDetail;
   "zitadel-flow-complete": ZitadelFlowCompleteDetail;
+  "zitadel-flow-redirect": ZitadelFlowRedirectDetail;
   "zitadel-flow-error": ZitadelFlowErrorDetail;
 }
 
@@ -91,6 +102,7 @@ export const ZITADEL_LOGIN_EVENT_HANDLERS = {
   "zitadel-flow-step": "onFlowStep",
   "zitadel-flow-input": "onFlowInput",
   "zitadel-flow-complete": "onFlowComplete",
+  "zitadel-flow-redirect": "onFlowRedirect",
   "zitadel-flow-error": "onFlowError",
 } as const satisfies Record<keyof ZitadelLoginEventMap, `on${string}`>;
 

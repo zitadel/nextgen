@@ -30,6 +30,7 @@ import type {
 import type { RequestHandler } from "msw";
 
 import { withBranding } from "./branding.js";
+import { withSsoProviders } from "./sso-providers.js";
 import {
   doneStep,
   identifierStep,
@@ -105,7 +106,16 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
    * registered credentials in `authn`, then selects and renders the matching
    * step fixture. Called after every state transition and on `GET /flow/{id}`.
    */
+  /**
+   * The current step as a wire response, with the module-level overlays
+   * applied: branding on every response, identity providers on the steps that
+   * can start a sign-in. Both are off unless a caller opted in.
+   */
   async function currentResponse(): Promise<CreateFlow201> {
+    return withSsoProviders(await renderCurrentStep());
+  }
+
+  async function renderCurrentStep(): Promise<CreateFlow201> {
     const snapshot = actor.getSnapshot();
     const userHandle = snapshot.context.capturedFields["email"] ?? "";
     const input = {
