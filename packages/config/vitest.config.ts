@@ -7,8 +7,7 @@ export default defineConfig({
     ...baseTest,
     name: "@zitadel/config",
     environment: "node",
-    // Copy the server's meta-schemas into `meta-schemas/` before the suite, so
-    // `vitest run` needs no `sync-meta-schemas` step chained ahead of it.
-    globalSetup: ["./vitest.global-setup.mjs"],
+    // meta-schemas are copied by the shared root global setup (inherited from
+    // baseTest); the moon `sync-schemas` dep still covers the build/typecheck graph.
   },
 });

@@ -37,6 +37,10 @@ export const baseTest = {
   // outside src/ (cli → tests/, workspace/cli-journey-e2e → scripts/) or that
   // split into sub-projects override `include` in their own config.
   include: ["src/**/*.{test,spec}.{ts,tsx}"],
+  // One shared global setup for the whole workspace, from a consistent location
+  // (repo root). Resolved relative to each project config, which all sit two
+  // levels deep under apps/* or packages/*.
+  globalSetup: ["../../vitest.global-setup.mjs"],
   // Console output plus a machine-readable result report at a uniform path.
   // The path lives in `outputFile` (Vitest's canonical location) rather than the
   // reporter tuple, so a lane that runs concurrently in the same package cwd

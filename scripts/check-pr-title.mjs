@@ -81,6 +81,7 @@ const NON_SHIPPING_ROOT_FILES = new Set([
   "tsconfig.base.json",
   "tsconfig.json",
   "vitest.config.ts",
+  "vitest.global-setup.mjs",
   "vitest.shared.mjs",
   "vitest.shared.d.mts",
 ]);
