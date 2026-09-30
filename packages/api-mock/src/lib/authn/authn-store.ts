@@ -163,6 +163,21 @@ export class AuthnStore {
    * authn.registrationError("exists@example.com") // → "error.email_exists"
    * authn.registrationError("new@example.com")     // → null
    */
+  /**
+   * Whether this email already has an account here.
+   *
+   * Two signals, because the mock represents an account two ways: an enrolled
+   * WebAuthn credential, and the `email_exists` registration fixture that
+   * stands in for a password account. Reading only the credentials misses the
+   * password one, which is the fixture most callers reach for.
+   */
+  hasAccount(email: string): boolean {
+    return (
+      this.getByUser(email).length > 0 ||
+      REGISTRATION_ERRORS.get(email.toLowerCase()) === "error.email_exists"
+    );
+  }
+
   registrationError(email: string): string | null {
     return REGISTRATION_ERRORS.get(email.toLowerCase()) ?? null;
   }
