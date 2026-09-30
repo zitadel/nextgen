@@ -5042,6 +5042,44 @@ func (c *MockAllStatementsLoadCatalogMutationsCall) DoAndReturn(f func(context.C
 	return c
 }
 
+// LockIDPConnection mocks base method.
+func (m *MockAllStatements) LockIDPConnection(ctx context.Context, projectID, id string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "LockIDPConnection", ctx, projectID, id)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// LockIDPConnection indicates an expected call of LockIDPConnection.
+func (mr *MockAllStatementsMockRecorder) LockIDPConnection(ctx, projectID, id any) *MockAllStatementsLockIDPConnectionCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LockIDPConnection", reflect.TypeOf((*MockAllStatements)(nil).LockIDPConnection), ctx, projectID, id)
+	return &MockAllStatementsLockIDPConnectionCall{Call: call}
+}
+
+// MockAllStatementsLockIDPConnectionCall wrap *gomock.Call
+type MockAllStatementsLockIDPConnectionCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsLockIDPConnectionCall) Return(arg0 error) *MockAllStatementsLockIDPConnectionCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsLockIDPConnectionCall) Do(f func(context.Context, string, string) error) *MockAllStatementsLockIDPConnectionCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsLockIDPConnectionCall) DoAndReturn(f func(context.Context, string, string) error) *MockAllStatementsLockIDPConnectionCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // MarkChallengeCompleted mocks base method.
 func (m *MockAllStatements) MarkChallengeCompleted(ctx context.Context, projectID, id string) error {
 	m.ctrl.T.Helper()
