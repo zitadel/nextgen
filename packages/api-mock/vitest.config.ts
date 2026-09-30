@@ -17,12 +17,17 @@ import { baseTest, sourceConditions } from "../../vitest.shared.mjs";
  * process and emits one aggregated junit.xml.
  */
 export default defineConfig({
+  cacheDir: ".vitest",
   resolve: { conditions: sourceConditions },
   test: {
     ...baseTest,
     name: "@zitadel/api-mock",
     projects: [
       {
+        // Each project is its own Vite instance, so it needs its own cacheDir;
+        // a distinct subdir under the shared .vitest keeps the two deps caches
+        // from colliding.
+        cacheDir: ".vitest/unit",
         resolve: { conditions: sourceConditions },
         test: {
           name: "unit",
@@ -33,6 +38,7 @@ export default defineConfig({
         },
       },
       {
+        cacheDir: ".vitest/browser",
         resolve: { conditions: sourceConditions },
         test: {
           name: "browser",

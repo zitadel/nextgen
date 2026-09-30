@@ -17,6 +17,7 @@ import { baseTest } from "../../vitest.shared.mjs";
  * that single expected mount-time rejection is ignored.
  */
 export default defineConfig({
+  cacheDir: ".vitest",
   resolve: {
     conditions: ["browser"],
   },

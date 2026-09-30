@@ -38,7 +38,7 @@ export default defineConfig(({ command, mode, isPreview }) => ({
       ignored: ["**/.git/**", "**/node_modules/**", "**/dist/**"],
     },
   },
-  cacheDir: "../../node_modules/.vite/apps/console",
+  cacheDir: ".vitest",
   // Resolve workspace `@zitadel/*` packages straight from `.ts`
   // source for hot dev iteration. Production builds pick up pre-built
   // `dist/*.mjs` via the default `import` condition instead.

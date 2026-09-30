@@ -6,7 +6,7 @@ import { baseTest } from "../../vitest.shared.mjs";
 
 export default defineConfig({
   root: import.meta.dirname,
-  cacheDir: "../../node_modules/.vite/packages/sdk-core",
+  cacheDir: ".vitest",
   build: {
     emptyOutDir: false,
     lib: {

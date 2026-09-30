@@ -4,6 +4,7 @@ import { configDefaults, defineConfig } from "vitest/config";
 import { baseTest } from "../../vitest.shared.mjs";
 
 export default defineConfig({
+  cacheDir: ".vitest",
   plugins: [svelte()],
   resolve: {
     // Use Svelte's browser build so client-side `mount()` works under jsdom.

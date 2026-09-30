@@ -39,6 +39,8 @@ tasks:
   # `pnpm test:browser` runs the browser project alone.
   test:
     command: "corepack pnpm run test:all"
+    outputs:
+      - ".vitest/**/*"
     deps:
       - "install-browsers"
       - "api:build"

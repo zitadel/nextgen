@@ -21,6 +21,7 @@ const sharedPlugins = () => [liquidRaw()];
  * process and emits one aggregated junit.xml.
  */
 export default defineConfig({
+  cacheDir: ".vitest",
   plugins: sharedPlugins(),
   resolve: { conditions: sourceConditions },
   test: {
@@ -28,6 +29,10 @@ export default defineConfig({
     name: "@zitadel/components",
     projects: [
       {
+        // Each project is its own Vite instance, so it needs its own cacheDir;
+        // a distinct subdir under the shared .vitest keeps the two deps caches
+        // from colliding.
+        cacheDir: ".vitest/unit",
         plugins: sharedPlugins(),
         resolve: { conditions: sourceConditions },
         test: {
@@ -39,6 +44,7 @@ export default defineConfig({
         },
       },
       {
+        cacheDir: ".vitest/browser",
         plugins: sharedPlugins(),
         resolve: { conditions: sourceConditions },
         test: {

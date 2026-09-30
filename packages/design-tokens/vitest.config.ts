@@ -8,6 +8,7 @@ import { baseTest, sourceConditions } from "../../vitest.shared.mjs";
  * token fails CI instead of silently breaking atoms.
  */
 export default defineConfig({
+  cacheDir: ".vitest",
   resolve: { conditions: sourceConditions },
   test: {
     ...baseTest,

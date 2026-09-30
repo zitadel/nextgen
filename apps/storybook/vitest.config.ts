@@ -27,6 +27,11 @@ export default defineConfig({
     projects: [
       {
         extends: true,
+        // NOTE: unlike the other packages we do NOT pin cacheDir to `.vitest`
+        // here — the Storybook Vitest addon (`storybookTest`) manages its own
+        // Vite instance and keeps its cache under `node_modules/.vite`
+        // regardless of this setting, so `storybook:test` has no `.vitest`
+        // output in moon.yml.
         plugins: [
           storybookTest({
             configDir: join(dir, ".storybook"),

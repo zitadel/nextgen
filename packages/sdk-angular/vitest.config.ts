@@ -9,6 +9,7 @@ import { baseTest } from "../../vitest.shared.mjs";
 // so the spec files are part of its TypeScript program. `src/test-setup.ts`
 // boots the Angular testing environment.
 export default defineConfig({
+  cacheDir: ".vitest",
   plugins: [
     angular({
       tsconfig: fileURLToPath(new URL("./tsconfig.spec.json", import.meta.url)),

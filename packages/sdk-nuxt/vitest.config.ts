@@ -4,6 +4,7 @@ import { defineConfig } from "vitest/config";
 import { baseTest } from "../../vitest.shared.mjs";
 
 export default defineConfig({
+  cacheDir: ".vitest",
   resolve: {
     alias: {
       // Stub Nuxt's `#imports` virtual module so vitest can resolve sources

@@ -65,6 +65,8 @@ tasks:
 
   test:
     command: "corepack pnpm run test:all"
+    outputs:
+      - ".vitest/**/*"
     deps:
       - "build"
       - "sync-schemas"

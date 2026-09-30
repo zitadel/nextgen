@@ -11,6 +11,7 @@ import { baseTest } from "./vitest.shared.mjs";
  * to their one file (then run their audit script), so they share one config.
  */
 export default defineConfig({
+  cacheDir: ".vitest",
   test: {
     ...baseTest,
     name: "@zitadel/workspace",

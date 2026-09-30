@@ -14,7 +14,7 @@ export default defineConfig(({ command, mode, isPreview }) => {
     root: import.meta.dirname,
     base: command === "build" || isPreview ? uiBase : "/",
     server: command === "serve" && !isPreview ? devServerConfig(mode) : baseServerConfig(),
-    cacheDir: "../../node_modules/.vite/apps/login-ui",
+    cacheDir: ".vitest",
     resolve: { conditions: ["@zitadel/source"] },
     test: {
       ...baseTest,

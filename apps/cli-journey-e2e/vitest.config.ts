@@ -9,6 +9,7 @@ import { baseTest } from "../../vitest.shared.mjs";
  * separate runner (`e2e*` tasks) and are not selected here.
  */
 export default defineConfig({
+  cacheDir: ".vitest",
   test: {
     ...baseTest,
     name: "@zitadel/cli-journey-e2e",

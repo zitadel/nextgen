@@ -59,6 +59,8 @@ tasks:
   # executes.
   test:
     command: "corepack pnpm run test:all"
+    outputs:
+      - ".vitest/**/*"
     inputs:
       - "scripts/ci-mode.mjs"
       - "scripts/ci-mode.test.mjs"

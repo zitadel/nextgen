@@ -38,3 +38,5 @@ tasks:
 
   test:
     command: "corepack pnpm run test:all"
+    outputs:
+      - ".vitest/**/*"
