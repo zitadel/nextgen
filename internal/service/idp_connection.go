@@ -42,6 +42,7 @@ type ListIDPConnectionsOutput struct {
 type IDPConnectionService interface {
 	CreateOrRevise(ctx context.Context, projectID string, document []byte) (*CreateIDPConnectionOutput, error)
 	Get(ctx context.Context, projectID, id string) (*domain.IDPConnection, error)
+	GetBySlug(ctx context.Context, projectID, slug string) (*domain.IDPConnection, error)
 	GetRevision(ctx context.Context, projectID, revisionID string) (*domain.IDPConnection, error)
 	List(ctx context.Context, input ListIDPConnectionsInput) (*ListIDPConnectionsOutput, error)
 	ListRevisions(ctx context.Context, input ListIDPConnectionRevisionsInput) (*ListIDPConnectionsOutput, error)
@@ -212,6 +213,10 @@ func emitIDPConnectionEvent(ctx context.Context, tx Statementer[AllStatements], 
 
 func (s *idpConnectionService) Get(ctx context.Context, projectID, id string) (*domain.IDPConnection, error) {
 	return s.get(ctx, projectID, domain.IDPConnectionFieldID, id)
+}
+
+func (s *idpConnectionService) GetBySlug(ctx context.Context, projectID, slug string) (*domain.IDPConnection, error) {
+	return s.get(ctx, projectID, domain.IDPConnectionFieldSlug, slug)
 }
 
 func (s *idpConnectionService) get(ctx context.Context, projectID string, field domain.IDPConnectionField, value string) (*domain.IDPConnection, error) {
