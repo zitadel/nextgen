@@ -24,6 +24,7 @@ import {
 import type {
   CreateFlow201,
   CreateFlowBody,
+  CreateFlowBodyPurpose,
   ExchangeHandoffBody,
   SubmitFlowStepBody,
 } from "@zitadel/api/generated/model";
@@ -73,6 +74,28 @@ export type MockHandle = {
    * behaviour without needing a full registration ceremony first.
    */
   registerCredential: (userHandle: string, credentialId: string) => void;
+  /**
+   * Put the flow where an identity provider's callback leaves it, and return
+   * the handle to resume it with.
+   *
+   * The browser's half of the round trip cannot happen in-process: choosing a
+   * provider navigates the whole page to the authorization endpoint, and it is
+   * the provider's return to the callback that advances the flow. This stands
+   * in for that leg, sending the same `sso` and `callback` submissions the HTTP
+   * handler does and resolving the branch by the same rule, so a caller that
+   * cannot leave the page — a Storybook story, a component test — can still
+   * reach `register-sso` and `sso-conflict`.
+   *
+   * Which one it lands on follows from the email, exactly as it does over the
+   * wire: an address this provider has already signed up signs straight in, an
+   * address that has an account here but no link is the collision, and anything
+   * else is a new identity.
+   */
+  returnFromProvider: (input: {
+    provider: string;
+    email: string;
+    purpose?: CreateFlowBodyPurpose;
+  }) => string;
 };
 
 const FLOW_ID = "flow_mock";
@@ -127,6 +150,33 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
 
   function registerCredential(userHandle: string, credentialId: string): void {
     authn.register(userHandle, credentialId);
+  }
+
+  function returnFromProvider(input: {
+    provider: string;
+    email: string;
+    purpose?: CreateFlowBodyPurpose;
+  }): string {
+    actor = startFlowActor();
+    actor.send({ type: "START", purpose: input.purpose ?? "login" });
+    actor.send({
+      type: "SUBMIT",
+      action: "sso",
+      fields: {},
+      sso_provider_id: input.provider,
+    });
+    // Registering through a provider is what creates the link, and the HTTP
+    // path records it on the `register-sso` submit rather than here — so a
+    // caller walking this twice with the same email gets a new identity both
+    // times, which is what not having finished the registration means.
+    actor.send({
+      type: "SUBMIT",
+      action: "callback",
+      fields: { email: input.email },
+      sso_provider_id: input.provider,
+      sso_outcome: resolveSsoOutcome(input.provider, input.email),
+    });
+    return FLOW_ID;
   }
 
   function getCaptured(): readonly CapturedRequest[] {
@@ -322,5 +372,5 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
     }),
   ];
 
-  return { handlers, reset, getCaptured, registerCredential };
+  return { handlers, reset, getCaptured, registerCredential, returnFromProvider };
 }

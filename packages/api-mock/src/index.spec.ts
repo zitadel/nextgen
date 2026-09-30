@@ -474,3 +474,40 @@ describe("setupMockHandlers — the provider round trip", () => {
     expect(back.step.name).toBe("register-sso");
   });
 });
+
+/**
+ * `returnFromProvider` stands in for the leg of the round trip a page cannot
+ * make in-process, so what matters is that it lands where the wire does. Each
+ * case here is the in-process twin of a round trip above.
+ */
+describe("returnFromProvider", () => {
+  test("leaves a first-time identity on register-sso, ready to resume", async () => {
+    const id = mock.returnFromProvider({ provider: "google", email: "ada@example.test" });
+
+    const resumed = await getFlowStep(id);
+    expect(resumed.step.name).toBe("register-sso");
+    expect(resumed.step.fields?.map((f) => f.name)).toEqual(["given_name", "family_name"]);
+  });
+
+  test("leaves an email that already has an account on the conflict step", async () => {
+    const id = mock.returnFromProvider({ provider: "google", email: "exists@example.com" });
+
+    const resumed = await getFlowStep(id);
+    expect(resumed.step.name).toBe("sso-conflict");
+  });
+
+  test("resolves the branch the same way the wire does", async () => {
+    // Register through the provider in-process, then come back the same way:
+    // the link now exists, so this is a sign-in rather than a registration.
+    const first = mock.returnFromProvider({ provider: "google", email: "grace@example.test" });
+    const collect = await getFlowStep(first);
+    await submitFlowStep(first, {
+      session_token: collect.session_token,
+      action: "submit",
+      fields: { given_name: "Grace", family_name: "Hopper" },
+    });
+
+    const second = mock.returnFromProvider({ provider: "google", email: "grace@example.test" });
+    expect((await getFlowStep(second)).step.name).toBe("done");
+  });
+});

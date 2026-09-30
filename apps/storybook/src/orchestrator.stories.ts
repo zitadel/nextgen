@@ -149,3 +149,94 @@ export const WithSsoProviders: Story = { args: { sso: true } };
 
 /** The same buttons on the sign-up step, which can also start a sign-in. */
 export const SignUpWithSsoProviders: Story = { args: { sso: true, purpose: "register" } };
+
+/**
+ * Wait for the orchestrator to render a field and fill it, then press the
+ * primary action. The atoms live in a shadow root, so the story reaches
+ * through it rather than querying the document.
+ */
+async function fill(canvasElement: HTMLElement, name: string, value: string): Promise<void> {
+  const login = canvasElement.querySelector("zitadel-login");
+  const field = await waitFor(() => login?.shadowRoot?.querySelector(`zl-field[name="${name}"]`));
+  const input = await waitFor(() => (field as HTMLElement).shadowRoot?.querySelector("input"));
+  const el = input as HTMLInputElement;
+  el.value = value;
+  el.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+  el.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+}
+
+async function submit(canvasElement: HTMLElement): Promise<void> {
+  const login = canvasElement.querySelector("zitadel-login");
+  const form = await waitFor(() => login?.shadowRoot?.querySelector("form"));
+  (form as HTMLFormElement).requestSubmit();
+}
+
+async function waitFor<T>(probe: () => T | null | undefined, timeout = 4000): Promise<T> {
+  const start = Date.now();
+  for (;;) {
+    const value = probe();
+    if (value) return value;
+    if (Date.now() - start > timeout) throw new Error("waitFor timed out");
+    await new Promise((resolve) => setTimeout(resolve, 24));
+  }
+}
+
+/**
+ * The second step of an ordinary sign-in, where the credential is asked for.
+ * The identifier collects the email on its own, so this step is only ever
+ * reached by submitting one — the story does that rather than faking a step,
+ * which keeps the mock's flow the same one a visitor drives.
+ */
+export const PasswordStep: Story = {
+  play: async ({ canvasElement }) => {
+    await fill(canvasElement, "email", "ada@example.com");
+    await submit(canvasElement);
+    await waitFor(() =>
+      canvasElement
+        .querySelector("zitadel-login")
+        ?.shadowRoot?.querySelector('zl-field[name="password"]'),
+    );
+  },
+};
+
+/**
+ * Coming back from the provider as a new identity: the step collects what the
+ * provider did not supply, which is the name the schema wants and Google's
+ * claim does not always carry.
+ *
+ * The browser's trip to the provider cannot happen inside a story — choosing a
+ * button navigates the whole page to the authorization endpoint — so the mock
+ * is put where the callback leaves it (`returnFromProvider`) and the
+ * orchestrator resumes that flow, which is exactly what the real callback page
+ * does with `?flow=<id>`.
+ */
+export const RegisterAfterProvider: Story = {
+  args: { sso: true },
+  render: ({ purpose, theme }) => {
+    const flowId = mock.returnFromProvider({ provider: "google", email: "ada@example.com" });
+    return html`<zitadel-login
+      variant="page"
+      .purpose=${purpose}
+      theme=${theme}
+      resume-flow-id=${flowId}
+    ></zitadel-login>`;
+  },
+};
+
+/**
+ * The same return, for an email that already has an account here. The provider
+ * must not mint a second one, so the step asks the user to prove the account is
+ * theirs with a method the schema enables.
+ */
+export const ConflictAfterProvider: Story = {
+  args: { sso: true },
+  render: ({ purpose, theme }) => {
+    const flowId = mock.returnFromProvider({ provider: "google", email: "exists@example.com" });
+    return html`<zitadel-login
+      variant="page"
+      .purpose=${purpose}
+      theme=${theme}
+      resume-flow-id=${flowId}
+    ></zitadel-login>`;
+  },
+};
