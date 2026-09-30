@@ -1,6 +1,8 @@
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { configDefaults, defineConfig } from "vitest/config";
 
+import { baseTest } from "../../vitest.shared.mjs";
+
 export default defineConfig({
   plugins: [svelte()],
   resolve: {
@@ -8,8 +10,9 @@ export default defineConfig({
     conditions: ["browser"],
   },
   test: {
+    ...baseTest,
+    name: "@zitadel/sdk-svelte",
     environment: "jsdom",
-    globals: true,
     setupFiles: ["src/test-setup.ts"],
     // Never run the svelte-package build output (a staged copy of the spec).
     exclude: [...configDefaults.exclude, ".svelte-kit/**"],

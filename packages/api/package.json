@@ -70,7 +70,8 @@
   },
   "scripts": {
     "generate": "orval --config orval.config.ts --clean",
-    "build": "tsdown"
+    "build": "tsdown",
+    "test": "vitest run"
   },
   "devDependencies": {
     "@faker-js/faker": "catalog:",

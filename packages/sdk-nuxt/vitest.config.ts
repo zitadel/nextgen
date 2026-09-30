@@ -1,6 +1,8 @@
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 
+import { baseTest } from "../../vitest.shared.mjs";
+
 export default defineConfig({
   resolve: {
     alias: {
@@ -11,6 +13,8 @@ export default defineConfig({
     },
   },
   test: {
-    globals: true,
+    ...baseTest,
+    name: "@zitadel/sdk-nuxt",
+    environment: "node",
   },
 });

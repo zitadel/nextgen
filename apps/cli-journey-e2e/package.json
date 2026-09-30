@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "test": "node --test scripts/*.test.mjs",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "prepare-app": "node scripts/prepare-app.mjs",
     "publish-tarballs": "node scripts/publish-tarballs.mjs",

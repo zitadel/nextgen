@@ -29,27 +29,40 @@ const packageRoot = fileURLToPath(new URL("..", import.meta.url));
 const sourceDir = join(packageRoot, "../..", "api/openapi/endpoints/schemas");
 const targetDir = join(packageRoot, "meta-schemas");
 
-const files = readdirSync(sourceDir).filter((name) => name.endsWith(".json")).sort();
-if (files.length === 0) {
-  throw new Error(`no meta-schemas found in ${sourceDir}`);
+/**
+ * Perform the copy. Exported so the Vitest global setup can call it directly —
+ * running `vitest` alone must not depend on a separate script being chained
+ * first — while `build`/`typecheck`/`sync-schemas` still invoke this file's CLI.
+ */
+export function syncMetaSchemas() {
+  const files = readdirSync(sourceDir).filter((name) => name.endsWith(".json")).sort();
+  if (files.length === 0) {
+    throw new Error(`no meta-schemas found in ${sourceDir}`);
+  }
+
+  mkdirSync(targetDir, { recursive: true });
+
+  for (const name of files) {
+    const body = readFileSync(join(sourceDir, name));
+    const target = join(targetDir, name);
+    if (existsSync(target) && readFileSync(target).equals(body)) {
+      continue;
+    }
+    const tmp = join(targetDir, `.${name}.${process.pid}.tmp`);
+    writeFileSync(tmp, body);
+    renameSync(tmp, target);
+  }
+
+  const wanted = new Set(files);
+  for (const name of readdirSync(targetDir)) {
+    if (name.endsWith(".json") && !wanted.has(name)) {
+      rmSync(join(targetDir, name), { force: true });
+    }
+  }
 }
 
-mkdirSync(targetDir, { recursive: true });
-
-for (const name of files) {
-  const body = readFileSync(join(sourceDir, name));
-  const target = join(targetDir, name);
-  if (existsSync(target) && readFileSync(target).equals(body)) {
-    continue;
-  }
-  const tmp = join(targetDir, `.${name}.${process.pid}.tmp`);
-  writeFileSync(tmp, body);
-  renameSync(tmp, target);
-}
-
-const wanted = new Set(files);
-for (const name of readdirSync(targetDir)) {
-  if (name.endsWith(".json") && !wanted.has(name)) {
-    rmSync(join(targetDir, name), { force: true });
-  }
+// Direct invocation: `node scripts/sync-meta-schemas.mjs` (npm `sync-schemas`
+// script and the moon `sync-schemas` task).
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  syncMetaSchemas();
 }

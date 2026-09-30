@@ -84,7 +84,7 @@
     "sync-schemas": "node scripts/sync-meta-schemas.mjs",
     "build": "node scripts/sync-meta-schemas.mjs && tsdown",
     "typecheck": "node scripts/sync-meta-schemas.mjs && tsc --build tsconfig.json",
-    "test": "node scripts/sync-meta-schemas.mjs && vitest run --passWithNoTests",
+    "test": "vitest run",
     "lint": "oxlint ."
   },
   "dependencies": {

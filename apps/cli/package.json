@@ -116,6 +116,6 @@
     "msw": "catalog:",
     "oclif": "catalog:",
     "tsdown": "^0.21.10",
-    "vitest": "^3.0.0"
+    "vitest": "catalog:sdk"
   }
 }

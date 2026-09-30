@@ -2,6 +2,8 @@ import { resolve } from "node:path";
 
 import { defineConfig } from "vite";
 
+import { baseTest } from "../../vitest.shared.mjs";
+
 export default defineConfig({
   root: import.meta.dirname,
   cacheDir: "../../node_modules/.vite/packages/sdk-core",
@@ -18,16 +20,9 @@ export default defineConfig({
     },
   },
   test: {
+    ...baseTest,
     name: "@zitadel/sdk-core",
-    watch: false,
-    globals: true,
     environment: "node",
     include: ["src/**/*.spec.ts"],
-    reporters: ["default"],
-    coverage: {
-      reportsDirectory: "./test-output/vitest/coverage",
-      provider: "v8",
-      include: ["src/**/*.ts"],
-    },
   },
 });

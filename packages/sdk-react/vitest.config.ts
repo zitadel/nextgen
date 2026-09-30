@@ -1,5 +1,7 @@
 import { defineConfig } from "vitest/config";
 
+import { baseTest } from "../../vitest.shared.mjs";
+
 /**
  * `resolve.conditions: ['browser']` makes Vitest resolve the *browser* build of
  * `@lit/react`. Default Node resolution picks `@lit/react`'s SSR build, whose
@@ -19,8 +21,9 @@ export default defineConfig({
     conditions: ["browser"],
   },
   test: {
+    ...baseTest,
+    name: "@zitadel/sdk-react",
     environment: "jsdom",
-    globals: true,
     setupFiles: ["src/test-setup.ts"],
     dangerouslyIgnoreUnhandledErrors: true,
   },

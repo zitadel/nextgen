@@ -8,6 +8,7 @@ import react from "@vitejs/plugin-react";
 import { defineConfig, loadEnv, type ProxyOptions } from "vite";
 
 import { targetsOtherProject } from "./src/lib/dev-proxy";
+import { baseTest } from "../../vitest.shared.mjs";
 
 const consoleBase = "/ui/console/";
 const consoleOutDir = "../../internal/staticui/console/dist";
@@ -73,17 +74,13 @@ export default defineConfig(({ command, mode, isPreview }) => ({
     },
   },
   test: {
+    ...baseTest,
     name: "@zitadel/console",
-    watch: false,
-    passWithNoTests: true,
-    globals: true,
     environment: "jsdom",
     setupFiles: ["./src/test-setup.ts"],
     include: ["src/**/*.spec.{ts,tsx}"],
-    reporters: ["default"],
     coverage: {
-      reportsDirectory: "./test-output/vitest/coverage",
-      provider: "v8" as const,
+      ...baseTest.coverage,
       include: ["src/**/*.{ts,tsx}"],
     },
   },

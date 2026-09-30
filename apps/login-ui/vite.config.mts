@@ -2,6 +2,8 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { defineConfig, loadEnv } from "vite";
 
+import { baseTest } from "../../vitest.shared.mjs";
+
 const uiBase = "/ui/login/";
 const loginOutDir = "../../internal/staticui/login/dist";
 const defaultDevProxyPath = "/__nextgen";
@@ -14,6 +16,11 @@ export default defineConfig(({ command, mode, isPreview }) => {
     server: command === "serve" && !isPreview ? devServerConfig(mode) : baseServerConfig(),
     cacheDir: "../../node_modules/.vite/apps/login-ui",
     resolve: { conditions: ["@zitadel/source"] },
+    test: {
+      ...baseTest,
+      name: "@zitadel/login-ui",
+      environment: "node",
+    },
     plugins: [keepGoEmbedPlaceholder(loginOutDir)],
     build: {
       outDir: loginOutDir,

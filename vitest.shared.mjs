@@ -1,0 +1,48 @@
+/**
+ * Shared Vitest `test` defaults, spread into every project's own config:
+ *
+ *   import { defineConfig } from "vitest/config";
+ *   import { baseTest } from "../../vitest.shared.mjs";
+ *   export default defineConfig({
+ *     test: { ...baseTest, name: "@zitadel/x", environment: "node" },
+ *   });
+ *
+ * It is a plain object (not `defineConfig`/`mergeConfig`) on purpose: the SDK
+ * family resolves Vitest 3 (the `sdk` pnpm catalog, pinned there because Qwik 1
+ * peers `vite >=5 <8`) while everything else resolves Vitest 4. A plain object
+ * of the fields common to both majors is consumed cleanly by either. It ships
+ * as `.mjs` + a hand-written `.d.mts` so it resolves under both `bundler` and
+ * `nodenext` TypeScript projects (including composite ones) without being pulled
+ * into each project's compiled file list.
+ *
+ * Only genuinely shared fields live here. Per-project axes — `environment`,
+ * `plugins`, `resolve.conditions`, `include`, `setupFiles`/`globalSetup`, the
+ * unit+browser `projects` split — stay in each project's config.
+ *
+ * @type {import("./vitest.shared.d.mts").BaseTest}
+ */
+export const baseTest = {
+  watch: false,
+  globals: true,
+  // Run test files in parallel via the worker pool (Vitest's default, pinned
+  // here so no project can silently regress to serial execution). Files within
+  // a project run concurrently; moon runs the projects concurrently on top.
+  fileParallelism: true,
+  // Every project passes with no tests; suites that must have tests assert that
+  // themselves. Removes the per-script `--passWithNoTests` flags.
+  passWithNoTests: true,
+  // Console output plus a machine-readable result report at a uniform path.
+  reporters: ["default", ["junit", { outputFile: "./test-output/vitest/junit.xml" }]],
+  coverage: {
+    provider: "v8",
+    reportsDirectory: "./test-output/vitest/coverage",
+    include: ["src/**/*.ts"],
+  },
+};
+
+/**
+ * Resolve sibling `@zitadel/*` workspace packages to their TypeScript source
+ * (matching the repo tsconfig's custom condition), so tests exercise shipped
+ * code. Spread into `resolve.conditions` for workspace-source consumers.
+ */
+export const sourceConditions = ["@zitadel/source"];

@@ -1,6 +1,7 @@
 import { playwright } from "@vitest/browser-playwright";
 import { defineConfig } from "vitest/config";
 
+import { baseTest, sourceConditions } from "../../vitest.shared.mjs";
 import { liquidRaw } from "./vite-liquid-plugin.js";
 
 /** Shared plugins for all vitest projects. */
@@ -21,19 +22,14 @@ const sharedPlugins = () => [liquidRaw()];
  */
 export default defineConfig({
   plugins: sharedPlugins(),
-  resolve: { conditions: ["@zitadel/source"] },
+  resolve: { conditions: sourceConditions },
   test: {
+    ...baseTest,
     name: "@zitadel/components",
-    watch: false,
-    coverage: {
-      reportsDirectory: "./test-output/vitest/coverage",
-      provider: "v8",
-      include: ["src/**/*.ts"],
-    },
     projects: [
       {
         plugins: sharedPlugins(),
-        resolve: { conditions: ["@zitadel/source"] },
+        resolve: { conditions: sourceConditions },
         test: {
           name: "unit",
           globals: true,
@@ -44,7 +40,7 @@ export default defineConfig({
       },
       {
         plugins: sharedPlugins(),
-        resolve: { conditions: ["@zitadel/source"] },
+        resolve: { conditions: sourceConditions },
         test: {
           name: "browser",
           globals: true,

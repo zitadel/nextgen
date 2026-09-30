@@ -1,6 +1,8 @@
 import { qwikVite } from "@builder.io/qwik/optimizer";
 import { defineConfig } from "vitest/config";
 
+import { baseTest } from "../../vitest.shared.mjs";
+
 export default defineConfig({
   plugins: [qwikVite()],
   resolve: {
@@ -8,8 +10,9 @@ export default defineConfig({
     conditions: ["browser"],
   },
   test: {
+    ...baseTest,
+    name: "@zitadel/sdk-qwik",
     environment: "jsdom",
-    globals: true,
     setupFiles: ["src/test-setup.ts"],
   },
 });

@@ -1,6 +1,8 @@
 import { playwright } from "@vitest/browser-playwright";
 import { defineConfig } from "vitest/config";
 
+import { baseTest, sourceConditions } from "../../vitest.shared.mjs";
+
 /**
  * Two projects, mirroring `packages/components/vitest.config.ts`:
  *
@@ -18,16 +20,10 @@ import { defineConfig } from "vitest/config";
  * browser project. `pnpm test:all` runs both.
  */
 export default defineConfig({
-  resolve: { conditions: ["@zitadel/source"] },
+  resolve: { conditions: sourceConditions },
   test: {
+    ...baseTest,
     name: "@zitadel/api-mock",
-    watch: false,
-    passWithNoTests: true,
-    coverage: {
-      reportsDirectory: "./test-output/vitest/coverage",
-      provider: "v8",
-      include: ["src/**/*.ts"],
-    },
     projects: [
       {
         test: {

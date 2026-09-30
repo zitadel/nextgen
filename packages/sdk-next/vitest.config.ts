@@ -1,6 +1,8 @@
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 
+import { baseTest } from "../../vitest.shared.mjs";
+
 export default defineConfig({
   resolve: {
     alias: {
@@ -13,7 +15,8 @@ export default defineConfig({
     },
   },
   test: {
+    ...baseTest,
+    name: "@zitadel/sdk-next",
     environment: "jsdom",
-    globals: true,
   },
 });

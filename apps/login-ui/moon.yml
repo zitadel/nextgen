@@ -19,6 +19,12 @@ tasks:
       - "components:build"
       - "design-tokens:build"
 
+  test:
+    command: "corepack pnpm run test"
+    deps:
+      - "components:build"
+      - "design-tokens:build"
+
   build:
     command: "corepack pnpm run build"
     deps:
