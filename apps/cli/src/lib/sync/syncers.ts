@@ -100,6 +100,15 @@ function assertEnvRefs(data: object, env: EnvLookup): void {
  * Deletion is not supported yet (#1013): what should happen to users already
  * linked to a connection is undesigned, so a removed file is reported and no
  * deletion is sent.
+ *
+ * No `fetch`, deliberately, so an update plans without a field-level diff.
+ * `fetch` is optional and the planner degrades to no old content, which is what
+ * area 4 specifies: "update previews show a field diff once a read endpoint
+ * exists". `GET /idps/{id}` is declared but unimplemented, and what a real
+ * implementation returns for `client_secret` is not settled — the same area
+ * requires previews to show only the `${{ NAME }}` reference and never a value,
+ * so binding this to the read endpoint before one exists risks putting a
+ * credential into a plan. It arrives with the connection service (#1003).
  */
 class IdpConnectionSyncer implements ResourceSyncer {
   readonly kind = "idp";
