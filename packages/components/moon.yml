@@ -73,8 +73,6 @@ tasks:
   # has a 60-120s Chromium cold start, which this lane pays in CI by design.
   test:
     command: "corepack pnpm run test:all"
-    outputs:
-      - ".vitest/**/*"
     deps:
       - "install-browsers"
       - "api:build"

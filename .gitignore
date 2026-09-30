@@ -75,7 +75,7 @@ vite.config.*.timestamp*
 vitest.config.*.timestamp*
 test-output
 
-## vitest cache (per-package cacheDir, moon-cached as a task output)
+## vitest cache (per-package Vite/Vitest cacheDir)
 .vitest/
 
 ## moon

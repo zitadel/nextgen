@@ -18,8 +18,6 @@ tasks:
 
   test:
     command: "corepack pnpm run test:all"
-    outputs:
-      - ".vitest/**/*"
 
   e2e:
     command: "corepack pnpm run e2e"

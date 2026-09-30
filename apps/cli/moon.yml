@@ -66,8 +66,6 @@ tasks:
 
   test:
     command: "corepack pnpm run test:all"
-    outputs:
-      - ".vitest/**/*"
     deps:
       - "build"
       - "api-mock:build"
