@@ -15,6 +15,7 @@ import {
   completeProjectClaim,
   fetchClaimWindow,
 } from "../../lib/claim";
+import { clearSessionCaches } from "../../lib/session-cache";
 import { getConsoleProjectId, getPublishableKey } from "../../runtime/runtime";
 import { useTheme } from "../../theme";
 
@@ -338,7 +339,13 @@ function CompleteClaim({
   const run = useCallback(
     (retrying: boolean) => {
       setOutcome(null);
-      void spendClaim(projectId, challengeId, retrying).then(setOutcome);
+      void spendClaim(projectId, challengeId, retrying).then((result) => {
+        // The claim just granted a project. A projects list read before it
+        // (`lib/session-cache.ts`) would pick the default without it, so
+        // "Open the console" asks again.
+        if (result.kind === "claimed") clearSessionCaches();
+        setOutcome(result);
+      });
     },
     [projectId, challengeId],
   );
