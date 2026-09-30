@@ -358,3 +358,119 @@ describe("setupMockHandlers", () => {
     });
   });
 });
+
+/**
+ * The provider round trip over HTTP, not just through the machine.
+ *
+ * The first cut of these states had no render case, so both fell through to
+ * `identifierStep` and the endpoint answered the wrong step while the machine
+ * was in the right one. Walking them through the handler is what catches that.
+ */
+describe("setupMockHandlers — the provider round trip", () => {
+  async function toProvider(): Promise<{ id: string; sessionToken: string }> {
+    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    const redirect = await submitFlowStep(start.id, {
+      session_token: start.session_token,
+      action: "submit",
+      fields: {},
+      sso_provider_id: "google",
+    });
+    expect(redirect.step.name).toBe("sso-redirect");
+    expect(redirect.step.redirect_url).toBeTruthy();
+    return { id: start.id, sessionToken: redirect.session_token as string };
+  }
+
+  test("a first-time identity lands on register-sso, not the identifier", async () => {
+    const { id, sessionToken } = await toProvider();
+
+    const back = await submitFlowStep(id, {
+      session_token: sessionToken,
+      action: "callback",
+      fields: { email: "ada@example.test" },
+    });
+
+    expect(back.step.name).toBe("register-sso");
+    expect(back.step.fields?.map((f) => f.name)).toEqual(["given_name", "family_name"]);
+    expect(back.step.actions?.some((a) => a.name === "submit")).toBe(true);
+  });
+
+  test("registering through the provider signs in, and the next visit goes straight through", async () => {
+    const first = await toProvider();
+    const collect = await submitFlowStep(first.id, {
+      session_token: first.sessionToken,
+      action: "callback",
+      fields: { email: "grace@example.test" },
+    });
+    const created = await submitFlowStep(first.id, {
+      session_token: collect.session_token,
+      action: "submit",
+      fields: { given_name: "Grace", family_name: "Hopper" },
+    });
+    expect(created.step.name).toBe("done");
+
+    // Same email, same provider: the link exists now, so this is a sign-in.
+    const second = await toProvider();
+    const returning = await submitFlowStep(second.id, {
+      session_token: second.sessionToken,
+      action: "callback",
+      fields: { email: "grace@example.test" },
+    });
+
+    expect(returning.step.name).toBe("done");
+  });
+
+  test("the mock's password-account fixture reaches sso-conflict too", async () => {
+    // `exists@example.com` is how the mock represents an email that already
+    // has a password account. Reading only enrolled credentials missed it, so
+    // the collision branch was unreachable for the fixture most callers use.
+    const { id, sessionToken } = await toProvider();
+
+    const back = await submitFlowStep(id, {
+      session_token: sessionToken,
+      action: "callback",
+      fields: { email: "exists@example.com" },
+    });
+
+    expect(back.step.name).toBe("sso-conflict");
+  });
+
+  test("an email that already has a passkey account reaches sso-conflict", async () => {
+    // The account exists, so the provider must not mint a second one for it.
+    mock.registerCredential("held@example.test", "cred-held");
+    const { id, sessionToken } = await toProvider();
+
+    const back = await submitFlowStep(id, {
+      session_token: sessionToken,
+      action: "callback",
+      fields: { email: "held@example.test" },
+    });
+
+    expect(back.step.name).toBe("sso-conflict");
+    expect(back.step.actions?.some((a) => a.kind === "passkey")).toBe(true);
+    expect(back.step.actions?.some((a) => a.name === "sign_in")).toBe(true);
+  });
+
+  test("reset forgets the links, so a clean mock sees a first-time identity", async () => {
+    const first = await toProvider();
+    const collect = await submitFlowStep(first.id, {
+      session_token: first.sessionToken,
+      action: "callback",
+      fields: { email: "reset@example.test" },
+    });
+    await submitFlowStep(first.id, {
+      session_token: collect.session_token,
+      action: "submit",
+      fields: { given_name: "A", family_name: "B" },
+    });
+
+    mock.reset();
+
+    const after = await toProvider();
+    const back = await submitFlowStep(after.id, {
+      session_token: after.sessionToken,
+      action: "callback",
+      fields: { email: "reset@example.test" },
+    });
+    expect(back.step.name).toBe("register-sso");
+  });
+});

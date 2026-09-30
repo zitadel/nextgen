@@ -136,6 +136,13 @@ endpoint.
 > created. Sessions list now speaks `POST /sessions/query` (the `GET /sessions`
 > list endpoint was replaced by #757).
 
+> **Amendment (2026-09-28, #1299):** screens now act on a **selected project**
+> carried as `?project=<id>` on the `_authed` layout, which validates it and
+> retains it on every navigation (`src/lib/project-scope.ts`). `projects/index.tsx`
+> is the Projects overview, where a project is selected; the project's own page
+> moved to the scoped `project/index.tsx` (Project settings), and
+> `projects/$projectId.tsx` only redirects there with that project selected.
+
 ### 5. Data loading: route loaders, with three required boundaries
 
 Data for a route is fetched in its **`loader`**, using the typed API client
@@ -177,6 +184,15 @@ The sidebar component builds its grouped link list by reading `staticData.nav`
 off the route tree, so adding a resource route automatically adds its nav
 entry. Routes without `nav` metadata (e.g. `$userId` detail) do not appear in
 the sidebar.
+
+> **Amendment (2026-09-28, #1299):** a route that acts on the selected project
+> also declares `staticData.scope: "project"`. The sidebar lists such a route
+> only while a project is selected. The `_authed` guard gives any route opened
+> without a selection the default one; with none to give (several projects), a
+> scoped route goes to Projects with the requested location in `?next=`, and
+> choosing a project returns there. The Projects overview is the one unscoped entry, listed
+> first and alone until a project is selected; the selected project's screens
+> follow it.
 
 ## Consequences
 

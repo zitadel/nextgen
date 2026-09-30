@@ -56,6 +56,7 @@ describe("design-tokens public surface", () => {
         "breakpoint.xs",
         "container.authCard",
         "container.page",
+        "container.settings",
         "focus.offset",
         "focus.width",
         "font.family.heading",

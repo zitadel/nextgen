@@ -84,7 +84,7 @@ describe("branding designs", () => {
     }
   });
 
-  it("designs map to a degrade layout and reference the sibling template file", () => {
+  it("designs carry a layout and reference the sibling template file", () => {
     for (const design of BRANDING_DESIGNS) {
       const { branding } = getDefaultBrandingConfig(design);
       expect(["centered", "split"]).toContain(branding.layout);

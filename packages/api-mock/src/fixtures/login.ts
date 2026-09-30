@@ -391,6 +391,52 @@ export function ssoRedirectStep(input: StepFixtureInput & { redirectUrl?: string
 }
 
 /**
+ * A new external identity, collecting what the provider did not supply.
+ *
+ * The provider returns an email, so the field this asks for is the name the
+ * schema wants and Google's claim does not always carry. Its submit is the
+ * flow's `create_user_with_sso`; `sign_in` goes back rather than registering.
+ */
+export function registerSsoStep(input: StepFixtureInput): CreateFlow201 {
+  return wrap(input, {
+    name: "register-sso",
+    texts: { title_key: "register-sso.title", description_key: "register-sso.description" },
+    fields: [
+      { name: "given_name", type: "text", text_key: "register.field.givenName", required: true },
+      { name: "family_name", type: "text", text_key: "register.field.familyName", required: true },
+    ],
+    actions: [
+      { name: "submit", kind: "submit", text_key: "register-sso.action.submit", primary: true },
+      { name: "sign_in", kind: "navigate", text_key: "register.action.sign_in.link" },
+    ],
+    gates: {},
+  });
+}
+
+/**
+ * The provider's email already has an account here.
+ *
+ * It offers the methods that prove the user owns that account rather than
+ * minting a second one for the same email. The password field and the passkey
+ * action are both present in the mock: the real step offers only what the
+ * schema enables, which is the tenant's schema to decide and not something the
+ * fixture can know.
+ */
+export function ssoConflictStep(input: StepFixtureInput): CreateFlow201 {
+  return wrap(input, {
+    name: "sso-conflict",
+    texts: { title_key: "sso-conflict.title", description_key: "sso-conflict.description" },
+    fields: [{ name: "password", type: "password", text_key: "password.field.password", required: true }],
+    actions: [
+      { name: "submit", kind: "submit", text_key: "sso-conflict.action.submit", primary: true },
+      { name: "passkey", kind: "passkey", text_key: "sso-conflict.action.passkey" },
+      { name: "sign_in", kind: "navigate", text_key: "sso-conflict.action.sign_in" },
+    ],
+    gates: {},
+  });
+}
+
+/**
  * Signed-in confirmation step — includes a short-lived handoff token the
  * client exchanges for a session cookie via `POST /sessions/exchange`.
  *

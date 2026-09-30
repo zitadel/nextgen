@@ -784,8 +784,8 @@ describe("createNextgenMiddleware (H3)", () => {
     });
   });
 
-  describe("proxy: Location header stripping (S-1)", () => {
-    it("strips location header from upstream response to prevent internal URL leakage", async () => {
+  describe("proxy: Location header rewriting (S-1)", () => {
+    it("keeps the path but never the internal host of an upstream redirect", async () => {
       const upstreamHeaders = new Headers();
       upstreamHeaders.set("content-type", "application/json");
       upstreamHeaders.set("location", "http://internal-auth.corp:4000/callback");
@@ -800,7 +800,12 @@ describe("createNextgenMiddleware (H3)", () => {
       const handler = toWebHandler(app);
       const res = await handler(new Request("http://localhost:3000/__nextgen/v1/flow"));
 
-      expect(res.headers.get("location")).toBeNull();
+      // The redirect survives, pointed back at this app: the identity-provider
+      // callback answers `302` and a top-level navigation has no JavaScript to
+      // recover a dropped one. Only the path is taken, so the upstream's own
+      // host never reaches the browser.
+      expect(res.headers.get("location")).toBe("http://localhost/callback");
+      expect(res.headers.get("location")).not.toContain("internal-auth.corp");
       expect(res.headers.get("content-type")).toBe("application/json");
     });
   });

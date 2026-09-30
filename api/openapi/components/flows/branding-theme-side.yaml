@@ -2,8 +2,10 @@ type: object
 additionalProperties: false
 description: |
   One complete theme side. Light and dark are independent surfaces — neither
-  inherits from the other, and a side that is absent is never used, whatever
-  `mode` or the operating system asks for.
+  inherits from the other. When a revision publishes one side, the absent
+  side is never used, whatever `mode` or the operating system asks for. When
+  it publishes neither, either side can resolve and paints the maintained
+  defaults.
 properties:
   logo_url:
     type: string
