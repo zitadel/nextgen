@@ -30,6 +30,7 @@ import {
   readFlowFiles,
   readSchemaFiles,
   reportClientIdOutcome,
+  type StoredVariables,
   republishCommands,
   ssoEditRefusal,
   type SsoEditTarget,
@@ -130,9 +131,18 @@ export default class SsoEnable extends BaseCommand {
     // A reused connection may name its own variables — it is an editable file
     // — so the credentials go where it actually looks rather than where this
     // command would have put them.
-    const names = reusing
+    // A reused connection may name its own variables — it is an editable file
+    // — so the credentials go where it actually looks rather than where this
+    // command would have put them. A name is `undefined` when the file holds
+    // that credential as a literal: there is no variable to publish to, and
+    // publishing to a derived name would report success for a value the
+    // connection never reads.
+    // What a newly written connection will reference: this command writes both
+    // as `${{ NAME }}`, so on the create path the names are certain.
+    const scaffolded = credentialVariables(plan.slug);
+    const names: StoredVariables = reusing
       ? credentialVariablesOf(plan.file, plan.slug)
-      : credentialVariables(plan.slug);
+      : scaffolded;
     const variable = names.clientSecret;
     const idVariable = names.clientId;
 
@@ -180,15 +190,29 @@ export default class SsoEnable extends BaseCommand {
       // not start asking for credentials the project already has.
       const publish = this.publisher(secretFile);
       if (clientIdFlag !== undefined) {
-        clientIdState = await publishClientId({
-          name: idVariable,
-          value: clientIdFlag,
-          publish,
-        });
+        if (idVariable === undefined) {
+          consola.warn(
+            `${plan.file.path} holds its client id directly, so nothing was published. ` +
+              "Edit the file to change it.",
+          );
+        } else {
+          clientIdState = await publishClientId({
+            name: idVariable,
+            value: clientIdFlag,
+            publish,
+          });
+        }
       }
       const piped = nonInteractive ? await this.pipedSecret() : undefined;
       if (piped !== undefined) {
-        secret = await storeClientSecret({ name: variable, value: piped, publish });
+        if (variable === undefined) {
+          consola.warn(
+            `${plan.file.path} holds its client secret directly, so nothing was published. ` +
+              "Replace it with a ${{ NAME }} reference so the secret is not committed.",
+          );
+        } else {
+          secret = await storeClientSecret({ name: variable, value: piped, publish });
+        }
       }
     } else {
       consola.info(`${entry.displayName} needs an OAuth application.`);
@@ -204,7 +228,7 @@ export default class SsoEnable extends BaseCommand {
       });
       const clientId =
         clientIdFlag ?? (await this.askClientId(entry.displayName, nonInteractive));
-      const secretValue = await this.askClientSecret(variable, nonInteractive);
+      const secretValue = await this.askClientSecret(scaffolded.clientSecret, nonInteractive);
 
       const publish = this.publisher(secretFile);
       const connection = entry.connection({
@@ -226,8 +250,16 @@ export default class SsoEnable extends BaseCommand {
       await writeFile(target, `${stableStringify(connection)}\n`, { flag: "wx" });
       // The id first: it is the half the developer can read back afterwards,
       // and a connection missing either credential fails the same way.
-      clientIdState = await publishClientId({ name: idVariable, value: clientId, publish });
-      secret = await storeClientSecret({ name: variable, value: secretValue, publish });
+      clientIdState = await publishClientId({
+        name: scaffolded.clientId,
+        value: clientId,
+        publish,
+      });
+      secret = await storeClientSecret({
+        name: scaffolded.clientSecret,
+        value: secretValue,
+        publish,
+      });
       consola.success(`Wrote ${plan.path}`);
     }
 
@@ -242,7 +274,7 @@ export default class SsoEnable extends BaseCommand {
     if (edits.written.length === 0 && edits.skipped.length === 0) {
       consola.info(`${schema.name} and its login flow already offer ${entry.displayName}`);
     }
-    if (clientIdState) {
+    if (clientIdState !== undefined && idVariable !== undefined) {
       reportClientIdOutcome(idVariable, clientIdState, this.meta.cliVersion);
     }
     if (secret) {
@@ -385,8 +417,11 @@ export default class SsoEnable extends BaseCommand {
     callbackUri: string;
     secret: SecretOutcome | undefined;
     clientId: PublishState | undefined;
-    /** The variable the connection names, which need not be the slug's. */
-    idVariable: string;
+    /**
+     * The variable the connection names, which need not be the slug's, and is
+     * `undefined` when the connection holds its client id as a literal.
+     */
+    idVariable: string | undefined;
     changed?: string[];
     skipped?: SsoSkipped[];
   }): Record<string, unknown> {
@@ -402,7 +437,7 @@ export default class SsoEnable extends BaseCommand {
       changed: input.changed ?? [],
       untouched: (input.skipped ?? []).map((s) => s.region),
       client_id:
-        input.clientId === undefined
+        input.clientId === undefined || input.idVariable === undefined
           ? null
           : { variable: input.idVariable, published: input.clientId },
       secret:

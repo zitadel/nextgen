@@ -369,6 +369,22 @@ describe("refusing a document the editors would overwrite", () => {
     );
   });
 
+  it("refuses a step whose sso_providers is not a list", () => {
+    // addProvider reads a non-list as empty and writes the generated list over
+    // it, so `sso_providers: "github"` would silently become ["google"].
+    expect(
+      ssoEditRefusal(
+        {
+          steps: [
+            { name: "identifier", sso_providers: "github" },
+            { name: "done", complete: "show" },
+          ],
+        },
+        "flow",
+      ),
+    ).toBe("steps.identifier.sso_providers is not a list");
+  });
+
   it("refuses a schema whose auth-method regions are not the shape it edits", () => {
     expect(ssoEditRefusal({ "x-auth-methods": "password" }, "schema")).toBe(
       "x-auth-methods is not an object",

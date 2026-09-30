@@ -3,7 +3,6 @@ import { join } from "node:path";
 
 import {
   credentialVariables,
-  type CredentialVariables,
   idpProvider,
   isVariableReference,
   referencedVariable,
@@ -119,20 +118,37 @@ function credentialOf(file: ConnectionFile, field: "client_id" | "client_secret"
  * slug-derived name would store the credential where the connection never
  * looks and report it as stored.
  */
-export function credentialVariablesOf(
-  file: ConnectionFile,
-  slug: string,
-): CredentialVariables {
-  const named = (field: "client_id" | "client_secret", fallback: string): string => {
-    const stored = credentialOf(file, field);
-    return (stored === undefined ? undefined : referencedVariable(stored)) ?? fallback;
-  };
+export function credentialVariablesOf(file: ConnectionFile, slug: string): StoredVariables {
   const scaffolded = credentialVariables(slug);
+  const named = (field: "client_id" | "client_secret", fallback: string): string | undefined => {
+    const stored = credentialOf(file, field);
+    if (stored === undefined) {
+      // The field is absent, so the scaffolded name is where this command
+      // would have pointed it and where it will point it now.
+      return fallback;
+    }
+    // A literal is the value itself. There is no variable behind it, and
+    // naming one would publish where the connection never looks.
+    return referencedVariable(stored);
+  };
   return {
     clientId: named("client_id", scaffolded.clientId),
     clientSecret: named("client_secret", scaffolded.clientSecret),
   };
 }
+
+/**
+ * The variables a connection on disk actually uses.
+ *
+ * `undefined` for a credential the file holds as a literal: an editable
+ * connection may carry a real client id rather than a reference, and that value
+ * is not read from anywhere, so there is nothing to publish to and nothing for
+ * another connection to collide with.
+ */
+export type StoredVariables = {
+  readonly clientId: string | undefined;
+  readonly clientSecret: string | undefined;
+};
 
 /**
  * Stop when two connections' credentials would land in the same variable.
@@ -158,12 +174,12 @@ export function credentialVariablesOf(
  * @param except - The connection being reused, which is not its own collision.
  */
 function refuseCollidingVariables(
-  ours: CredentialVariables,
+  ours: StoredVariables,
   slug: string,
   files: readonly ConnectionFile[],
   except?: ConnectionFile,
 ): void {
-  if (ours.clientId === ours.clientSecret) {
+  if (ours.clientId !== undefined && ours.clientId === ours.clientSecret) {
     throw new ZitadelError(
       "E_CONFLICT",
       `This connection points both credentials at ${ours.clientId}`,
@@ -178,8 +194,9 @@ function refuseCollidingVariables(
       continue;
     }
     const theirs = credentialVariablesOf(file, file.body.slug);
+    // A literal on either side names no variable, so it cannot collide.
     const shared = [ours.clientId, ours.clientSecret].find(
-      (name) => name === theirs.clientId || name === theirs.clientSecret,
+      (name) => name !== undefined && (name === theirs.clientId || name === theirs.clientSecret),
     );
     if (shared === undefined) {
       continue;
@@ -245,7 +262,17 @@ export function planConnection(options: {
         },
       );
     }
-    const matchSlug = typeof match.body.slug === "string" ? match.body.slug : slug;
+    // A file can match on template or issuer while carrying no slug of its
+    // own. Inventing the provider's would point the schema and every flow at
+    // an identity the connection does not declare, and the server rejects the
+    // connection on the next apply for want of it.
+    const matchSlug = match.body.slug;
+    if (typeof matchSlug !== "string" || matchSlug === "") {
+      throw new ZitadelError("E_VALIDATION", `${match.path} is a ${entry.displayName} connection with no slug`, {
+        hint: "Add a slug to the connection file -- the schemas and flows reference it by that name.",
+        details: { file: match.path },
+      });
+    }
     refuseCollidingVariables(credentialVariablesOf(match, matchSlug), matchSlug, options.files, match);
     return { action: "reuse", file: match, slug: matchSlug };
   }

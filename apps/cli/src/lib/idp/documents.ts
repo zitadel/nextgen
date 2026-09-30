@@ -159,9 +159,15 @@ function flowRefusal(flow: Json): string | undefined {
     if (!isObject(step)) {
       return `steps[${index}] is not a step`;
     }
+    const name = typeof step.name === "string" ? step.name : String(index);
     if (step.transitions !== undefined && !isObject(step.transitions)) {
-      const name = typeof step.name === "string" ? step.name : String(index);
       return `steps.${name}.transitions is not an object`;
+    }
+    // Owned like transitions are: `addProvider` reads a non-list as empty and
+    // writes the generated list over it, so `sso_providers: "github"` would
+    // become `["google"]` with nothing said about the provider it replaced.
+    if (step.sso_providers !== undefined && !Array.isArray(step.sso_providers)) {
+      return `steps.${name}.sso_providers is not a list`;
     }
   }
   // Last, because it is about where the generated routes point rather than

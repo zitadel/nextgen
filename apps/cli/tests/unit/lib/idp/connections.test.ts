@@ -8,6 +8,7 @@ import { ZitadelError } from "../../../../src/lib/errors";
 import {
   type ConnectionFile,
   IDPS_DIR,
+  credentialVariablesOf,
   planConnection,
   readConnectionFiles,
 } from "../../../../src/lib/idp";
@@ -191,6 +192,68 @@ describe("planConnection", () => {
     expect(() => planConnection({ provider: "google", files: [both] })).toThrow(
       /both credentials at GOOGLE_CLIENT_SECRET/,
     );
+  });
+
+  it("refuses a matched connection that declares no slug", () => {
+    // It matches on template, so it is the Google connection; but the schema
+    // and flows reference a provider by slug, and inventing one would point
+    // them at an identity the file does not declare.
+    const { slug: _dropped, ...body } = googleBody();
+    const noSlug = file("google.json", body as Record<string, unknown>);
+
+    expect(() => planConnection({ provider: "google", files: [noSlug] })).toThrow(/no slug/);
+  });
+
+  it("does not claim a variable for a literal client id", () => {
+    // A literal is the value itself. Publishing to a derived name would store
+    // it where the connection never looks and report it as stored, and the
+    // collision guard would reserve a name this file does not use.
+    const literal = file(
+      "google.json",
+      googleBody({
+        oidc: {
+          issuer: "https://accounts.google.com",
+          client_id: "824.apps.googleusercontent.com",
+          client_secret: "${{ GOOGLE_CLIENT_SECRET }}",
+          scopes: ["openid"],
+        },
+      }),
+    );
+
+    expect(credentialVariablesOf(literal, "google")).toEqual({
+      clientId: undefined,
+      clientSecret: "GOOGLE_CLIENT_SECRET",
+    });
+  });
+
+  it("lets another connection use the name a literal-backed one does not", () => {
+    // google holds its id literally, so GOOGLE_CLIENT_ID is unclaimed and a
+    // second connection referencing it is not a collision.
+    const literal = file(
+      "google.json",
+      googleBody({
+        oidc: {
+          issuer: "https://accounts.google.com",
+          client_id: "824.apps.googleusercontent.com",
+          client_secret: "${{ SOMETHING_ELSE }}",
+          scopes: ["openid"],
+        },
+      }),
+    );
+
+    expect(planConnection({ provider: "google", files: [literal] })).toMatchObject({
+      action: "reuse",
+    });
+  });
+
+  it("still names the scaffolded variable when the field is absent", () => {
+    const { oidc: _oidc, ...rest } = googleBody();
+    const bare = file("google.json", { ...rest, oidc: { issuer: "https://accounts.google.com" } });
+
+    expect(credentialVariablesOf(bare, "google")).toEqual({
+      clientId: "GOOGLE_CLIENT_ID",
+      clientSecret: "GOOGLE_CLIENT_SECRET",
+    });
   });
 
   it("does not mistake a connection for colliding with itself", () => {

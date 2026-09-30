@@ -21,6 +21,7 @@ export {
   type ConnectionFile,
   type ConnectionPlan,
   credentialVariablesOf,
+  type StoredVariables,
   planConnection,
   readConnectionFiles,
 } from "./connections";
