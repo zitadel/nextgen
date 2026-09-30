@@ -1,5 +1,11 @@
 import type { Meta, StoryObj } from "@storybook/web-components-vite";
-import { applyBranding, clearBranding, setupMockHandlers } from "@zitadel/api-mock";
+import {
+  applyBranding,
+  applySsoProviders,
+  clearBranding,
+  clearSsoProviders,
+  setupMockHandlers,
+} from "@zitadel/api-mock";
 import { html } from "lit";
 import { initialize, mswLoader } from "msw-storybook-addon";
 import "@zitadel/components";
@@ -19,6 +25,9 @@ initialize({ onUnhandledRequest: "bypass" });
  *   own step; Sign up -> email, given name, family name, date of birth), so the
  *   rendered fields change without a separate component.
  * - `branding` swaps the tenant payload the mock overlays on every response.
+ * - `sso` offers identity providers on the steps that can start a sign-in,
+ *   which is what the flow looks like after `zitadel sso enable`. The shipped
+ *   flow has none, so it is off by default.
  *
  * Interactive fixture emails (typed live in the rendered form):
  * - `wrong@example.com` -> inline "Wrong email or password." on the password
@@ -35,9 +44,20 @@ interface OrchestratorArgs {
   purpose: "login" | "register";
   branding: BrandingPresetId;
   theme: "" | "light" | "dark" | "auto";
+  sso: boolean;
 }
 
 const mock = setupMockHandlers();
+
+/**
+ * What `zitadel sso enable google` leaves in the flow, plus a tenant's own OIDC
+ * connection — the second one has no brand mark, which is what every provider
+ * looks like before its artwork lands.
+ */
+const SSO_PROVIDERS = [
+  { id: "google", name: "Google", template: "google" },
+  { id: "acme", name: "Acme SSO", template: "oidc-generic" },
+];
 
 const meta: Meta<OrchestratorArgs> = {
   title: "Orchestrator/Login",
@@ -47,7 +67,7 @@ const meta: Meta<OrchestratorArgs> = {
     layout: "fullscreen",
     msw: { handlers: mock.handlers },
   },
-  args: { purpose: "login", branding: "centered", theme: "" },
+  args: { purpose: "login", branding: "centered", theme: "", sso: false },
   argTypes: {
     purpose: {
       control: "inline-radio",
@@ -65,11 +85,18 @@ const meta: Meta<OrchestratorArgs> = {
       description:
         "The embedding page's own preference. Empty defers to the revision's mode; a side the revision does not publish cannot be selected.",
     },
+    sso: {
+      control: "boolean",
+      description:
+        "Offer identity providers on the steps a sign-in can start from, as a project that ran `zitadel sso enable` has.",
+    },
   },
   beforeEach: ({ args }) => {
     mock.reset();
     clearBranding();
     applyBranding(brandingPresets[args.branding]);
+    clearSsoProviders();
+    if (args.sso) applySsoProviders(SSO_PROVIDERS);
   },
   render: ({ purpose, theme }) =>
     html`<zitadel-login variant="page" .purpose=${purpose} theme=${theme}></zitadel-login>`,
@@ -111,3 +138,14 @@ export const SignUp: Story = { args: { purpose: "register" } };
 
 /** Same flow, split-layout tenant branding. */
 export const SplitBranding: Story = { args: { branding: "split" } };
+
+/**
+ * The identifier step once a project has enabled providers: the buttons sit
+ * under the email field, on the tenant's own surface rather than the bare
+ * atom canvas. Choosing one asks the server for a redirect, which the mock
+ * answers with an `sso-redirect` step.
+ */
+export const WithSsoProviders: Story = { args: { sso: true } };
+
+/** The same buttons on the sign-up step, which can also start a sign-in. */
+export const SignUpWithSsoProviders: Story = { args: { sso: true, purpose: "register" } };
