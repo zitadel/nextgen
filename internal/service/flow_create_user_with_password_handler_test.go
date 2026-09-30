@@ -20,6 +20,7 @@ const passwordHandlerTestSchema = `{
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
 	"$id": "https://example.test/schema.json",
 	"type": "object",
+	"x-identifier": "email",
 	"properties": {
 		"email": {"type": "string", "format": "email", "x-unique": "project"}
 	}

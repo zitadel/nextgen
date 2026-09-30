@@ -275,6 +275,21 @@ describe("steps", () => {
 
 // ── phase 4: graph / cycles / flip table ─────────────────────────────────────
 
+describe("reserved outcome names", () => {
+  it.each(["identity_unknown", "callback", "user_already_exists", "user_not_found"])(
+    "rejects %s as an action name",
+    (reserved) => {
+      const def = flow();
+      const identifier = step(def, "identifier");
+      identifier.actions.push({ name: reserved, kind: "navigate" });
+      identifier.transitions[reserved] = { target: "done" };
+      expect(messages(validateFlowDefinition(def))).toContain(
+        `step "identifier": action name "${reserved}" is reserved for an engine outcome and cannot be declared as an action`,
+      );
+    },
+  );
+});
+
 describe("graph / cycles / flip-table", () => {
   it("rejects a local transition to an unknown step", () => {
     const def = flow();
@@ -398,6 +413,228 @@ describe("graph / cycles / flip-table", () => {
     delete step(def, "register").transitions.user_already_exists;
     expect(messages(validateFlowDefinition(def))).toContain(
       'step "register": entry step for purpose "register" must wire "user_already_exists" transition because "login" is also a purpose: without it, someone who already has an account gets stuck at registration instead of being routed to sign-in',
+    );
+  });
+});
+
+describe("sso/create-only-via-callback", () => {
+  const rule = "sso/create-only-via-callback";
+
+  function ssoIssues(def: TestFlow): FlowValidationIssue[] {
+    return validateFlowDefinition(def).filter((i) => i.rule === rule);
+  }
+
+  // Mirrors TestValidateSsoCreationReachability in flow_definition_validator.go:
+  // create_user_with_sso mints a user with no credential, so the step running it
+  // must never be a purpose entry and must only be reached from identity_unknown.
+
+  it("rejects create_user_with_sso as a purpose entry step", () => {
+    const def = flow();
+    def.purposes = { register: "signup" };
+    def.steps = [
+      {
+        name: "signup",
+        fields: ["email"],
+        on_success: "create_user_with_sso",
+        actions: [{ name: "submit", kind: "submit" }],
+        transitions: { submit: { target: "done" } },
+      },
+      { name: "done", complete: "show" },
+    ];
+    expect(messages(ssoIssues(def))).toContain(
+      'step "signup" runs create_user_with_sso but is a purpose entry step; it must only be reached from an identity-provider callback',
+    );
+  });
+
+  it("rejects create_user_with_sso reached via a plain submit", () => {
+    const def = flow();
+    def.purposes = { register: "identifier" };
+    def.steps = [
+      {
+        name: "identifier",
+        fields: ["email"],
+        actions: [{ name: "submit", kind: "submit" }],
+        transitions: { submit: { target: "make" } },
+      },
+      {
+        name: "make",
+        fields: ["email"],
+        on_success: "create_user_with_sso",
+        actions: [{ name: "submit", kind: "submit" }],
+        transitions: { submit: { target: "done" } },
+      },
+      { name: "done", complete: "show" },
+    ];
+    expect(messages(ssoIssues(def))).toContain(
+      'step "make" runs create_user_with_sso but is reachable via "submit"; it must only be reached from the "identity_unknown" outcome',
+    );
+  });
+
+  it("accepts create_user_with_sso reached only via identity_unknown", () => {
+    const def = flow();
+    def.purposes = { login: "identifier" };
+    def.steps = [
+      {
+        name: "identifier",
+        fields: ["email"],
+        actions: [{ name: "submit", kind: "submit" }],
+        transitions: {
+          submit: { target: "done" },
+          identity_unknown: { target: "register-sso" },
+        },
+      },
+      {
+        name: "register-sso",
+        fields: ["email"],
+        on_success: "create_user_with_sso",
+        actions: [{ name: "submit", kind: "submit" }],
+        transitions: {
+          submit: { target: "done" },
+          user_already_exists: { target: "conflict" },
+        },
+      },
+      {
+        name: "conflict",
+        // Proves ownership of the account the collision pinned.
+        fields: ["x-auth-methods#password"],
+        actions: [{ name: "submit", kind: "submit" }],
+        transitions: { submit: { target: "done" } },
+      },
+      { name: "done", complete: "show" },
+    ];
+    expect(ssoIssues(def)).toEqual([]);
+  });
+
+  it("rejects a collision transition that re-purposes", () => {
+    const def = flow();
+    def.purposes = { login: "identifier" };
+    def.steps = [
+      {
+        name: "identifier",
+        fields: ["email"],
+        sso_providers: ["google"],
+        actions: [{ name: "submit", kind: "submit" }],
+        transitions: {
+          submit: { target: "done" },
+          callback: { target: "done" },
+          identity_unknown: { target: "register-sso" },
+        },
+      },
+      {
+        name: "register-sso",
+        fields: ["email"],
+        on_success: "create_user_with_sso",
+        actions: [{ name: "submit", kind: "submit" }],
+        transitions: {
+          submit: { target: "done" },
+          // A re-purpose drops the pinned account.
+          user_already_exists: { target: "conflict", purpose: "login" },
+        },
+      },
+      {
+        name: "conflict",
+        fields: ["x-auth-methods#password"],
+        actions: [{ name: "submit", kind: "submit" }],
+        transitions: { submit: { target: "done" } },
+      },
+      { name: "done", complete: "show" },
+    ];
+    expect(messages(ssoIssues(def))).toContain(
+      'step "register-sso" routes "user_already_exists" through a re-purpose or another flow; it must be a plain transition within this flow so the colliding account stays pinned for verification',
+    );
+  });
+
+  it("rejects a collision target that verifies no credential", () => {
+    const def = flow();
+    def.purposes = { login: "identifier" };
+    def.steps = [
+      {
+        name: "identifier",
+        fields: ["email"],
+        actions: [{ name: "submit", kind: "submit" }],
+        transitions: {
+          submit: { target: "done" },
+          identity_unknown: { target: "register-sso" },
+        },
+      },
+      {
+        name: "register-sso",
+        fields: ["email"],
+        on_success: "create_user_with_sso",
+        actions: [{ name: "submit", kind: "submit" }],
+        transitions: {
+          submit: { target: "done" },
+          user_already_exists: { target: "conflict" },
+        },
+      },
+      {
+        // Non-terminal, but asks for nothing that proves ownership.
+        name: "conflict",
+        fields: ["email"],
+        actions: [{ name: "submit", kind: "submit" }],
+        transitions: { submit: { target: "done" } },
+      },
+      { name: "done", complete: "show" },
+    ];
+    expect(messages(ssoIssues(def))).toContain(
+      'step "register-sso" routes "user_already_exists" to "conflict", which verifies no credential; the colliding account must prove ownership with a password or passkey',
+    );
+  });
+
+  it("rejects create_user_with_sso whose user_already_exists routes to a terminal step", () => {
+    const def = flow();
+    def.purposes = { login: "identifier" };
+    def.steps = [
+      {
+        name: "identifier",
+        fields: ["email"],
+        actions: [{ name: "submit", kind: "submit" }],
+        transitions: {
+          submit: { target: "done" },
+          identity_unknown: { target: "register-sso" },
+        },
+      },
+      {
+        name: "register-sso",
+        fields: ["email"],
+        on_success: "create_user_with_sso",
+        actions: [{ name: "submit", kind: "submit" }],
+        transitions: {
+          submit: { target: "done" },
+          user_already_exists: { target: "done" },
+        },
+      },
+      { name: "done", complete: "show" },
+    ];
+    expect(messages(ssoIssues(def))).toContain(
+      'step "register-sso" routes "user_already_exists" to "done", which is terminal or missing; a colliding identity must reach a verification step, not a completion',
+    );
+  });
+
+  it("rejects a create_user_with_sso step with no user_already_exists transition", () => {
+    const def = flow();
+    def.purposes = { login: "identifier" };
+    def.steps = [
+      {
+        name: "identifier",
+        fields: ["email"],
+        actions: [{ name: "submit", kind: "submit" }],
+        transitions: {
+          submit: { target: "done" },
+          identity_unknown: { target: "register-sso" },
+        },
+      },
+      {
+        name: "register-sso",
+        fields: ["email"],
+        on_success: "create_user_with_sso",
+        actions: [{ name: "submit", kind: "submit" }],
+        transitions: { submit: { target: "done" } },
+      },
+      { name: "done", complete: "show" },
+    ];
+    expect(messages(ssoIssues(def))).toContain(
+      'step "register-sso" runs create_user_with_sso but declares no "user_already_exists" transition; a colliding identity would have nowhere to route',
     );
   });
 });
@@ -847,6 +1084,9 @@ describe("drift audit (Go validator)", () => {
       "isEscapeNode",
       "reachableSteps",
       "someStepEstablishesKind",
+      // Mirrored inline by stepVerifiesCredential in validate.ts, inside the
+      // sso/create-only-via-callback rule rather than as its own rule.
+      "stepVerifiesCredential",
     ];
     expect(goFuncs).toEqual([...ported, ...helpers].sort());
   });
@@ -919,7 +1159,11 @@ describe("drift audit (Go validator)", () => {
     // Mirrors ON_SUCCESS_MANIFESTS in validate.ts (keys and kinds): an
     // on_success gaining a manifest in Go without a port here skips its
     // collected-upstream check at plan time.
-    expect(cases).toEqual(["create_user"]);
+    expect(cases).toEqual(["create_user", "create_user_with_sso"]);
+    // create_user collects identifier + password. create_user_with_sso collects
+    // only the identifier: the provider is the proof, but the verified address
+    // still needs a field to be written to.
     expect(body).toContain("FlowFieldChallengeIdentifier, FlowFieldChallengePassword");
+    expect(body).toContain("[]FlowFieldChallenge{FlowFieldChallengeIdentifier}");
   });
 });

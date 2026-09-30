@@ -55,6 +55,7 @@ export const FLOW_VALIDATION_RULES = {
   "schema/fields-resolve": { goRef: "resolveAllStepFields" },
   "schema/passkey-actions": { goRef: "validatePasskeyActionsEnabled" },
   "schema/on-success-manifest": { goRef: "validateOnSuccessManifests" },
+  "sso/create-only-via-callback": { goRef: "validateSsoCreationReachability" },
   "warn/password-without-identifier": { goRef: null },
 } as const;
 
@@ -83,7 +84,7 @@ export const FLOW_PURPOSES = [
  * identifier outcomes only. `identity_unknown` comes only from SSO
  * resolution and is left out here; requiring it on every combined entry
  * step would reject the shipped default flow. A rule on steps carrying
- * sso_providers is future work (#1044).
+ * sso_providers is future work (#1014).
  */
 export const PURPOSE_FLIP_TARGETS: Readonly<Record<string, Readonly<Record<string, string>>>> = {
   login: { user_not_found: "register" },
@@ -110,6 +111,9 @@ const AUTH_METHOD_PREFIX = "x-auth-methods#";
 /** Mirrors `ManifestForOnSuccess` in flow_on_success.go. */
 const ON_SUCCESS_MANIFESTS: Readonly<Record<string, readonly FieldChallenge[]>> = {
   create_user: ["identifier", "password"],
+  // The provider is the proof, so no password -- but an identifier field must
+  // resolve: it is where the verified address is written.
+  create_user_with_sso: ["identifier"],
 };
 
 type FieldChallenge = "identifier" | "password";
@@ -166,6 +170,7 @@ export function validateFlowDefinition(flow: object, schema?: object): FlowValid
       issues.push(...validateCycles(def));
     }
     issues.push(...validateFlipTableCoverage(def));
+    issues.push(...validateSsoCreationOnlyViaCallback(def));
   }
 
   // Schema-dependent phases: only meaningful over structurally sound
@@ -331,6 +336,19 @@ function validateStep(step: FlowStep): FlowValidationIssue[] {
         error(
           "steps",
           `step ${q(name)}: action name ${q(action.name)} is reserved for engine-injected back navigation`,
+          name,
+        ),
+      );
+    }
+    // An action sharing a reserved outcome's name makes a transition key
+    // ambiguous: the graph could not say whether the edge came from the engine
+    // or from a client invoking the action, which would defeat the
+    // callback-only reachability rules that read those keys.
+    if ((RESERVED_OUTCOMES as readonly string[]).includes(action.name)) {
+      issues.push(
+        error(
+          "steps",
+          `step ${q(name)}: action name ${q(action.name)} is reserved for an engine outcome and cannot be declared as an action`,
           name,
         ),
       );
@@ -559,6 +577,106 @@ function validateCycles(def: FlowDef): FlowValidationIssue[] {
           step.name,
         ),
       );
+    }
+  }
+  return issues;
+}
+
+// validateSsoCreationOnlyViaCallback mirrors validateSsoCreationReachability in
+// flow_definition_validator.go: create_user_with_sso mints a user with no
+// credential, so it must never be a purpose entry and only the identity_unknown
+// outcome may target it. Catches at plan time what the runtime handler refuses.
+/**
+ * Mirrors `stepVerifiesCredential` in flow_definition_validator.go: *every* way
+ * out of the step must prove who the user is. A collected password makes submit
+ * itself the proof; a passkey only holds when no plain submit sits beside it as
+ * an unverified way onward.
+ */
+function stepVerifiesCredential(step: FlowStep): boolean {
+  if (step.fields.includes("x-auth-methods#password")) return true;
+  if (step.actions.some((a) => a.kind === "submit")) return false;
+  return step.actions.some((a) => a.kind === "passkey");
+}
+
+function validateSsoCreationOnlyViaCallback(def: FlowDef): FlowValidationIssue[] {
+  const issues: FlowValidationIssue[] = [];
+  const entrySteps = new Set(def.purposes.values());
+  const incoming = new Map<string, string[]>();
+  for (const s of def.steps) {
+    for (const [key, t] of s.transitions) {
+      if (t.action === null) {
+        const keys = incoming.get(t.target) ?? [];
+        keys.push(key);
+        incoming.set(t.target, keys);
+      }
+    }
+  }
+  for (const step of def.steps) {
+    if (step.onSuccess !== "create_user_with_sso") continue;
+    if (entrySteps.has(step.name)) {
+      issues.push(
+        error(
+          "sso/create-only-via-callback",
+          `step ${q(step.name)} runs create_user_with_sso but is a purpose entry step; it must only be reached from an identity-provider callback`,
+          step.name,
+        ),
+      );
+    }
+    for (const key of incoming.get(step.name) ?? []) {
+      if (key !== "identity_unknown") {
+        issues.push(
+          error(
+            "sso/create-only-via-callback",
+            `step ${q(step.name)} runs create_user_with_sso but is reachable via ${q(key)}; it must only be reached from the "identity_unknown" outcome`,
+            step.name,
+          ),
+        );
+      }
+    }
+    // The mutation resolves to user_already_exists on a colliding identity, so
+    // the step must route that outcome or the collision dead-ends.
+    const conflict = step.transitions.get("user_already_exists");
+    if (!conflict) {
+      issues.push(
+        error(
+          "sso/create-only-via-callback",
+          `step ${q(step.name)} runs create_user_with_sso but declares no "user_already_exists" transition; a colliding identity would have nowhere to route`,
+          step.name,
+        ),
+      );
+    } else if (conflict.action !== null || conflict.purpose !== null) {
+      // It has to be a plain current-flow transition. A re-purpose discards the
+      // very account the collision just pinned, and a cross-flow transition is
+      // refused at runtime -- either way nobody is left to verify against.
+      issues.push(
+        error(
+          "sso/create-only-via-callback",
+          `step ${q(step.name)} routes "user_already_exists" through a re-purpose or another flow; it must be a plain transition within this flow so the colliding account stays pinned for verification`,
+          step.name,
+        ),
+      );
+    } else {
+      // The collision pins the existing account, so the target must actually
+      // prove ownership. Non-terminal is not enough: a step that collects no
+      // credential still reaches a completion and hands off that account.
+      const target = def.steps.find((s) => s.name === conflict.target);
+      if (!target || target.terminal) {
+        issues.push(
+          error(
+            "sso/create-only-via-callback",
+            `step ${q(step.name)} routes "user_already_exists" to ${q(conflict.target)}, which is terminal or missing; a colliding identity must reach a verification step, not a completion`,
+            step.name,
+          ),
+        );
+      } else if (!stepVerifiesCredential(target)) {
+        issues.push(
+          error(
+            "sso/create-only-via-callback",
+            `step ${q(step.name)} routes "user_already_exists" to ${q(conflict.target)}, which verifies no credential; the colliding account must prove ownership with a password or passkey`,
+            step.name,
+          ),
+        );
+      }
     }
   }
   return issues;

@@ -21,6 +21,12 @@ func ManifestForOnSuccess(o FlowOnSuccess) []FlowFieldChallenge {
 	switch o {
 	case FlowOnSuccessCreateUser:
 		return []FlowFieldChallenge{FlowFieldChallengeIdentifier, FlowFieldChallengePassword}
+	case FlowOnSuccessCreateUserWithSso:
+		// The provider is the proof, so no password is collected -- but an
+		// identifier field must still be resolved: it is where the verified
+		// address is written. Without this the handler would refuse at runtime
+		// on a definition validation had accepted.
+		return []FlowFieldChallenge{FlowFieldChallengeIdentifier}
 	}
 	return nil
 }
@@ -39,7 +45,16 @@ type FlowOnSuccessInput struct {
 // FlowOnSuccessResult is what a handler returns. StepError keeps the
 // user on the current step.
 type FlowOnSuccessResult struct {
+	// StepError re-renders the current step with this error key; Outcome
+	// instead routes the step's declared transition. At most one is set,
+	// mirroring flowDispatchResult in the state machine.
 	StepError *string
+	// Outcome routes the named transition when the mutation resolves to a
+	// flow outcome rather than a plain success -- e.g. a create that loses
+	// the unique-constraint race resolves to user_already_exists, which the
+	// SSO flow routes to its conflict step. Empty means "route the submitted
+	// action", the normal success path.
+	Outcome string
 	// UserID is set when a handler creates a new user. The state machine
 	// only records it in flow state — a handler returning a UserID MUST
 	// have persisted the user's verified factors on the auth attempt

@@ -67,6 +67,9 @@ func ValidateFlowDefinition(userSchema *jsonschema.Schema, flowDefinition FlowDe
 	if err := validateOnSuccessManifests(flowDefinition, resolvedByStep); err != nil {
 		return nil, err
 	}
+	if err := validateSsoCreationReachability(flowDefinition, resolvedByStep); err != nil {
+		return nil, err
+	}
 
 	return pivotingTargets, nil
 }
@@ -263,6 +266,17 @@ func validateSteps(steps []FlowDefinitionStep) error {
 			if a.Name == flowBackActionName {
 				return ErrFlowDefinitionInvalid(fmt.Sprintf(
 					"step %q: action name %q is reserved for engine-injected back navigation", step.Name, a.Name), nil)
+			}
+			// An action sharing a reserved outcome's name makes a transition key
+			// ambiguous: the graph could not say whether the edge came from the
+			// engine (a provider callback, an identifier lookup) or from a
+			// client invoking the action. The engine refuses to accept one as a
+			// submitted action, so declaring it would only ever be dead -- and
+			// it would defeat the callback-only reachability rules that read
+			// these keys.
+			if _, reserved := reservedOutcomes[a.Name]; reserved {
+				return ErrFlowDefinitionInvalid(fmt.Sprintf(
+					"step %q: action name %q is reserved for an engine outcome and cannot be declared as an action", step.Name, a.Name), nil)
 			}
 			actionNames[a.Name] = struct{}{}
 		}
@@ -545,6 +559,79 @@ var flipOutcomeImpacts = map[string]string{
 	FlowImplicitOutcomeUserAlreadyExists: "someone who already has an account gets stuck at registration instead of being routed to sign-in",
 }
 
+// validateSsoCreationReachability enforces that create_user_with_sso can only
+// be reached from a provider callback, never from ordinary navigation.
+//
+// The mutation mints a user with no credential, so its safety depends entirely
+// on being unreachable except via SSO identity resolution. The runtime handler
+// already refuses without a verified identity on the flow state; this is the
+// static belt: a definition that could route a plain submit (or a purpose
+// entry) into it is rejected at author time rather than only failing at run
+// time. A create_user_with_sso step must therefore (a) not be a purpose entry,
+// and (b) be targeted only by the `identity_unknown` outcome.
+func validateSsoCreationReachability(def FlowDefinition, resolvedByStep map[string]FlowResolvedFields) error {
+	// outcome keys pointing at each step, within this flow.
+	incoming := make(map[string][]string, len(def.Steps))
+	for _, s := range def.Steps {
+		for key, t := range s.Transitions {
+			if t.IsCurrentFlow() {
+				incoming[t.Target] = append(incoming[t.Target], key)
+			}
+		}
+	}
+	entryStep := make(map[string]struct{}, len(def.Purposes))
+	for _, name := range def.Purposes {
+		entryStep[name] = struct{}{}
+	}
+
+	for i := range def.Steps {
+		step := &def.Steps[i]
+		if step.OnSuccess == nil || *step.OnSuccess != FlowOnSuccessCreateUserWithSso {
+			continue
+		}
+		if _, isEntry := entryStep[step.Name]; isEntry {
+			return ErrFlowDefinitionInvalid(fmt.Sprintf(
+				"step %q runs create_user_with_sso but is a purpose entry step; it must only be reached from an identity-provider callback", step.Name), nil)
+		}
+		for _, key := range incoming[step.Name] {
+			if key != FlowImplicitOutcomeIdentityUnknown {
+				return ErrFlowDefinitionInvalid(fmt.Sprintf(
+					"step %q runs create_user_with_sso but is reachable via %q; it must only be reached from the %q outcome", step.Name, key, FlowImplicitOutcomeIdentityUnknown), nil)
+			}
+		}
+		// The mutation resolves to user_already_exists when the provider's
+		// identity collides with an existing account, so the step must route
+		// that outcome (to a conflict step) or the collision dead-ends.
+		conflict, ok := step.Transitions[FlowImplicitOutcomeUserAlreadyExists]
+		if !ok {
+			return ErrFlowDefinitionInvalid(fmt.Sprintf(
+				"step %q runs create_user_with_sso but declares no %q transition; a colliding identity would have nowhere to route", step.Name, FlowImplicitOutcomeUserAlreadyExists), nil)
+		}
+		// It has to be a plain current-flow transition. A re-purpose runs
+		// dropResolvedUser, which discards the very account the collision just
+		// pinned, and a cross-flow transition is refused at runtime -- either
+		// way the conflict step is reached with nobody to verify against.
+		if conflict.Action != nil || conflict.Purpose != nil {
+			return ErrFlowDefinitionInvalid(fmt.Sprintf(
+				"step %q routes %q through a re-purpose or another flow; it must be a plain transition within this flow so the colliding account stays pinned for verification", step.Name, FlowImplicitOutcomeUserAlreadyExists), nil)
+		}
+		// The collision pins the *existing* account, so the target must actually
+		// prove ownership. Being non-terminal is not enough: required-checks are
+		// not enforced yet, so a step that collects nothing would still reach a
+		// completion and hand off a session bound to that account.
+		target, found := def.FindStep(conflict.Target)
+		if !found || target.Complete != nil {
+			return ErrFlowDefinitionInvalid(fmt.Sprintf(
+				"step %q routes %q to %q, which is terminal or missing; a colliding identity must reach a verification step, not a completion", step.Name, FlowImplicitOutcomeUserAlreadyExists, conflict.Target), nil)
+		}
+		if !stepVerifiesCredential(target, resolvedByStep) {
+			return ErrFlowDefinitionInvalid(fmt.Sprintf(
+				"step %q routes %q to %q, which verifies no credential; the colliding account must prove ownership with a password or passkey", step.Name, FlowImplicitOutcomeUserAlreadyExists, conflict.Target), nil)
+		}
+	}
+	return nil
+}
+
 // validateOnSuccessManifests verifies that every kind in each step's
 // on_success manifest is collected on the step itself or upstream.
 func validateOnSuccessManifests(def FlowDefinition, resolvedByStep map[string]FlowResolvedFields) error {
@@ -600,6 +687,35 @@ func reachableSteps(start string, reverse map[string][]string) map[string]struct
 
 // someStepEstablishesKind reports whether any candidate step collects
 // a field whose resolver-derived challenge matches kind.
+// stepVerifiesCredential reports whether *every* way out of the step proves who
+// the user is. Presence of a credential is not enough: a step offering a passkey
+// beside a plain submit lets the caller take the submit and reach a completion
+// with the colliding account already pinned.
+//
+// A collected password makes submit itself the proof (the dispatch verifies it).
+// A passkey is action-shaped, so it only holds when no plain submit sits beside
+// it as an unverified way onward.
+func stepVerifiesCredential(step *FlowDefinitionStep, resolvedByStep map[string]FlowResolvedFields) bool {
+	if resolved, ok := resolvedByStep[step.Name]; ok {
+		for _, f := range resolved.Fields {
+			if f.Challenge == FlowFieldChallengePassword {
+				return true
+			}
+		}
+	}
+	hasPasskey := false
+	for _, action := range step.Actions {
+		switch action.Kind {
+		case FlowActionKindPasskey:
+			hasPasskey = true
+		case FlowActionKindSubmit:
+			// Submits nothing that proves anything: an unverified way onward.
+			return false
+		}
+	}
+	return hasPasskey
+}
+
 func someStepEstablishesKind(candidates map[string]struct{}, resolvedByStep map[string]FlowResolvedFields, kind FlowFieldChallenge) bool {
 	for name := range candidates {
 		resolved, ok := resolvedByStep[name]

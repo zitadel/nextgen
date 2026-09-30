@@ -267,26 +267,17 @@ describe("scaffolded flow (schemas/default-login.scaffold.json)", () => {
   };
   const flowMeta = loadJson(metaSchemaDir, "flow-definition.json");
 
-  it("fails against the shipped meta-schema only on the documented on_success delta", () => {
-    // The on_success enum gains create_user_with_sso once #1037 adds the value
-    // and its engine handler together; the editor schema mirrors the API until
-    // then. sso_providers is already a slug list, so it no longer differs.
+  it("validates against the shipped meta-schema", () => {
+    // Both deltas have landed: on_success gained create_user_with_sso and
+    // sso_providers is a slug list. The scaffold must now validate outright,
+    // with no patching -- so a value dropped from the generated enum (the
+    // editor-schema regression this guards against) is caught here.
     const validate = new Ajv2020({ strict: false, validateFormats: false, allErrors: true }).compile(
       flowMeta,
     );
-    expect(validate(flow)).toBe(false);
-    for (const err of validate.errors ?? []) {
-      const onSuccess = err.keyword === "enum" && err.instancePath.endsWith("/on_success");
-      expect(onSuccess, `${err.instancePath} ${err.keyword}`).toBe(true);
-    }
-  });
-
-  it("validates once the on_success delta lands in the meta-schema", () => {
-    const patched = structuredClone(flowMeta) as {
-      $defs: { FlowDefinitionStep: { properties: { on_success: { enum: string[] } } } };
-    };
-    patched.$defs.FlowDefinitionStep.properties.on_success.enum.push("create_user_with_sso");
-    expect(ajv().compile(patched)(flow)).toBe(true);
+    const ok = validate(flow);
+    expect(validate.errors ?? [], JSON.stringify(validate.errors)).toEqual([]);
+    expect(ok).toBe(true);
   });
 
   it("every step carrying sso_providers routes all three outcomes", () => {

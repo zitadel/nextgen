@@ -76,9 +76,16 @@ func factorPayloadToAPI(factor domain.AuthFactor) api.OptCompletedFactorPayload 
 }
 
 func requiredFactorsToAPI(checks []domain.AuthCheckType) []api.FactorMethod {
-	factors := make([]api.FactorMethod, len(checks))
-	for i, check := range checks {
-		factors[i] = checkTypeToAPI(check)
+	factors := make([]api.FactorMethod, 0, len(checks))
+	for _, check := range checks {
+		// Check types with no wire method (the sso_callback record, #1073) are
+		// skipped: emitting an empty method would fail FactorMethod validation
+		// and sink the whole response.
+		method := checkTypeToAPI(check)
+		if method == "" {
+			continue
+		}
+		factors = append(factors, method)
 	}
 	return factors
 }

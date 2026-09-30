@@ -18,6 +18,15 @@ func (h *Harness) EnsureCreateUserHandler(t *testing.T) *service.FlowCreateUserW
 	)
 }
 
+func (h *Harness) EnsureCreateUserWithSsoHandler(t *testing.T) *service.FlowCreateUserWithSsoHandler {
+	t.Helper()
+	return service.NewFlowCreateUserWithSsoHandler(
+		h.EnsureUserService(t),
+		h.EnsureSchemaStore(t),
+		h.EnsureServiceDB(t),
+	)
+}
+
 func (h *Harness) EnsureFlowService(t *testing.T) service.FlowService {
 	t.Helper()
 	h.flowService.mutex.Lock()
@@ -45,6 +54,7 @@ func (h *Harness) EnsureFlowStateMachine(t *testing.T) *domain.FlowStateMachineR
 			h.EnsureSchemaStore(t),
 			fields,
 			h.EnsureCreateUserHandler(t),
+			h.EnsureCreateUserWithSsoHandler(t),
 			authAdapter,
 			time.Now,
 		)

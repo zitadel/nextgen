@@ -34181,6 +34181,8 @@ func (s *FlowDefinitionStepOnSuccess) Decode(d *jx.Decoder) error {
 	switch FlowDefinitionStepOnSuccess(v) {
 	case FlowDefinitionStepOnSuccessCreateUser:
 		*s = FlowDefinitionStepOnSuccessCreateUser
+	case FlowDefinitionStepOnSuccessCreateUserWithSSO:
+		*s = FlowDefinitionStepOnSuccessCreateUserWithSSO
 	default:
 		*s = FlowDefinitionStepOnSuccess(v)
 	}

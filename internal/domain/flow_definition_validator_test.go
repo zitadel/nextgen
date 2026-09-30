@@ -1893,3 +1893,313 @@ func TestValidator_TransitionPurposeWrongTargetRejected(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, errorDetails(t, err), `must target that purpose's entry step "register"`)
 }
+
+// The create_user_with_sso mutation mints a user with no credential, so the
+// validator must reject any flow that could reach it without a provider
+// callback (raised in review by @vitorbari). A valid flow reaches it only via
+// the identity_unknown outcome.
+func TestValidateSsoCreationReachability(t *testing.T) {
+	// create_user_with_sso's manifest requires a designated identifier (it is
+	// where the verified address is written) and the conflict step verifies a
+	// password, so the fixture needs a schema carrying both.
+	var schema jsonschema.Schema
+	require.NoError(t, json.Unmarshal(userSchemaIDAndPassword, &schema))
+
+	ssoCreate := domain.FlowOnSuccessCreateUserWithSso
+	show := domain.FlowStepCompleteShow
+
+	base := func(steps []domain.FlowDefinitionStep, purposes map[domain.FlowDefinitionPurpose]string) domain.FlowDefinition {
+		return domain.FlowDefinition{
+			ProjectID:     "project1",
+			Name:          "login",
+			SchemaVersion: "1.0.0",
+			UserSchema:    "https://tenant.com/schemas/my-user.json",
+			Purposes:      purposes,
+			Audience:      domain.FlowDefinitionAudience{AppIDs: []string{"app1"}, TeamIDs: []string{"team1"}},
+			Steps:         steps,
+		}
+	}
+
+	t.Run("rejects create_user_with_sso as a purpose entry", func(t *testing.T) {
+		def := base(
+			[]domain.FlowDefinitionStep{
+				{
+					Name:        "signup",
+					Fields:      []domain.Field{"email"},
+					OnSuccess:   &ssoCreate,
+					Actions:     []domain.FlowStepAction{{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true}},
+					Transitions: map[string]domain.FlowStepTransition{"submit": {Target: "done"}},
+				},
+				{Name: "done", Complete: &show},
+			},
+			map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeRegister: "signup"},
+		)
+		_, err := domain.ValidateFlowDefinition(&schema, def)
+		require.Error(t, err, "a plain-submit entry step running create_user_with_sso must be rejected")
+	})
+
+	t.Run("rejects create_user_with_sso reached via a plain submit", func(t *testing.T) {
+		def := base(
+			[]domain.FlowDefinitionStep{
+				{
+					Name:        "identifier",
+					Fields:      []domain.Field{"email"},
+					Actions:     []domain.FlowStepAction{{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true}},
+					Transitions: map[string]domain.FlowStepTransition{"submit": {Target: "make"}},
+				},
+				{
+					Name:        "make",
+					Fields:      []domain.Field{"email"},
+					OnSuccess:   &ssoCreate,
+					Actions:     []domain.FlowStepAction{{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true}},
+					Transitions: map[string]domain.FlowStepTransition{"submit": {Target: "done"}},
+				},
+				{Name: "done", Complete: &show},
+			},
+			map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeRegister: "identifier"},
+		)
+		_, err := domain.ValidateFlowDefinition(&schema, def)
+		require.Error(t, err, "a create_user_with_sso step reached via submit must be rejected")
+	})
+
+	t.Run("accepts create_user_with_sso reached only via identity_unknown", func(t *testing.T) {
+		def := base(
+			[]domain.FlowDefinitionStep{
+				{
+					Name:   "identifier",
+					Fields: []domain.Field{"email"},
+					// identity_unknown only fires from callback resolution, so
+					// the step has to actually offer a provider to reach it.
+					SSOProviders: []string{"google"},
+					Actions: []domain.FlowStepAction{
+						{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+					},
+					Transitions: map[string]domain.FlowStepTransition{
+						"submit":           {Target: "done"},
+						"callback":         {Target: "done"},
+						"identity_unknown": {Target: "register-sso"},
+					},
+				},
+				{
+					Name:      "register-sso",
+					Fields:    []domain.Field{"email"},
+					OnSuccess: &ssoCreate,
+					Actions:   []domain.FlowStepAction{{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true}},
+					Transitions: map[string]domain.FlowStepTransition{
+						"submit":              {Target: "done"},
+						"user_already_exists": {Target: "conflict"},
+					},
+				},
+				{
+					Name: "conflict",
+					// Proves ownership of the account the collision pinned.
+					Fields:      []domain.Field{"x-auth-methods#password"},
+					Actions:     []domain.FlowStepAction{{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true}},
+					Transitions: map[string]domain.FlowStepTransition{"submit": {Target: "done"}},
+				},
+				{Name: "done", Complete: &show},
+			},
+			map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "identifier"},
+		)
+		_, err := domain.ValidateFlowDefinition(&schema, def)
+		require.NoError(t, err, "reaching create_user_with_sso only via identity_unknown must be allowed")
+	})
+
+	t.Run("rejects create_user_with_sso without a user_already_exists transition", func(t *testing.T) {
+		def := base(
+			[]domain.FlowDefinitionStep{
+				{
+					Name:   "identifier",
+					Fields: []domain.Field{"email"},
+					// identity_unknown only fires from callback resolution, so
+					// the step has to actually offer a provider to reach it.
+					SSOProviders: []string{"google"},
+					Actions: []domain.FlowStepAction{
+						{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+					},
+					Transitions: map[string]domain.FlowStepTransition{
+						"submit":           {Target: "done"},
+						"callback":         {Target: "done"},
+						"identity_unknown": {Target: "register-sso"},
+					},
+				},
+				{
+					Name:        "register-sso",
+					Fields:      []domain.Field{"email"},
+					OnSuccess:   &ssoCreate,
+					Actions:     []domain.FlowStepAction{{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true}},
+					Transitions: map[string]domain.FlowStepTransition{"submit": {Target: "done"}},
+				},
+				{Name: "done", Complete: &show},
+			},
+			map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "identifier"},
+		)
+		_, err := domain.ValidateFlowDefinition(&schema, def)
+		require.Error(t, err, "a create_user_with_sso step with nowhere to route a collision must be rejected")
+	})
+
+	t.Run("rejects create_user_with_sso whose user_already_exists routes to a terminal step", func(t *testing.T) {
+		def := base(
+			[]domain.FlowDefinitionStep{
+				{
+					Name:   "identifier",
+					Fields: []domain.Field{"email"},
+					// identity_unknown only fires from callback resolution, so
+					// the step has to actually offer a provider to reach it.
+					SSOProviders: []string{"google"},
+					Actions: []domain.FlowStepAction{
+						{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+					},
+					Transitions: map[string]domain.FlowStepTransition{
+						"submit":           {Target: "done"},
+						"callback":         {Target: "done"},
+						"identity_unknown": {Target: "register-sso"},
+					},
+				},
+				{
+					Name:      "register-sso",
+					Fields:    []domain.Field{"email"},
+					OnSuccess: &ssoCreate,
+					Actions:   []domain.FlowStepAction{{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true}},
+					// Routes the collision straight to a completion: the existing
+					// account would be handed off without proving ownership.
+					Transitions: map[string]domain.FlowStepTransition{
+						"submit":              {Target: "done"},
+						"user_already_exists": {Target: "done"},
+					},
+				},
+				{Name: "done", Complete: &show},
+			},
+			map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "identifier"},
+		)
+		_, err := domain.ValidateFlowDefinition(&schema, def)
+		require.Error(t, err, "routing a collision to a terminal step must be rejected (account takeover)")
+	})
+
+	t.Run("rejects a collision transition that re-purposes", func(t *testing.T) {
+		login := domain.FlowDefinitionPurposeLogin
+		def := base(
+			[]domain.FlowDefinitionStep{
+				{
+					Name:         "identifier",
+					Fields:       []domain.Field{"email"},
+					SSOProviders: []string{"google"},
+					Actions: []domain.FlowStepAction{
+						{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+					},
+					Transitions: map[string]domain.FlowStepTransition{
+						"submit":           {Target: "done"},
+						"callback":         {Target: "done"},
+						"identity_unknown": {Target: "register-sso"},
+					},
+				},
+				{
+					Name:      "register-sso",
+					Fields:    []domain.Field{"email"},
+					OnSuccess: &ssoCreate,
+					Actions:   []domain.FlowStepAction{{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true}},
+					Transitions: map[string]domain.FlowStepTransition{
+						"submit": {Target: "done"},
+						// A re-purpose drops the pinned account, so the conflict
+						// step would have nobody to verify.
+						"user_already_exists": {Target: "conflict", Purpose: &login},
+					},
+				},
+				{
+					Name:        "conflict",
+					Fields:      []domain.Field{"x-auth-methods#password"},
+					Actions:     []domain.FlowStepAction{{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true}},
+					Transitions: map[string]domain.FlowStepTransition{"submit": {Target: "done"}},
+				},
+				{Name: "done", Complete: &show},
+			},
+			map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "identifier"},
+		)
+		_, err := domain.ValidateFlowDefinition(&schema, def)
+		require.Error(t, err, "a collision routed through a re-purpose must be rejected")
+	})
+
+	t.Run("rejects a collision target that verifies no credential", func(t *testing.T) {
+		def := base(
+			[]domain.FlowDefinitionStep{
+				{
+					Name:   "identifier",
+					Fields: []domain.Field{"email"},
+					// identity_unknown only fires from callback resolution, so
+					// the step has to actually offer a provider to reach it.
+					SSOProviders: []string{"google"},
+					Actions: []domain.FlowStepAction{
+						{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+					},
+					Transitions: map[string]domain.FlowStepTransition{
+						"submit":           {Target: "done"},
+						"callback":         {Target: "done"},
+						"identity_unknown": {Target: "register-sso"},
+					},
+				},
+				{
+					Name:      "register-sso",
+					Fields:    []domain.Field{"email"},
+					OnSuccess: &ssoCreate,
+					Actions:   []domain.FlowStepAction{{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true}},
+					Transitions: map[string]domain.FlowStepTransition{
+						"submit":              {Target: "done"},
+						"user_already_exists": {Target: "conflict"},
+					},
+				},
+				{
+					// Non-terminal, but asks for nothing that proves ownership:
+					// the pinned account would be handed off unverified.
+					Name:        "conflict",
+					Fields:      []domain.Field{"email"},
+					Actions:     []domain.FlowStepAction{{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true}},
+					Transitions: map[string]domain.FlowStepTransition{"submit": {Target: "done"}},
+				},
+				{Name: "done", Complete: &show},
+			},
+			map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "identifier"},
+		)
+		_, err := domain.ValidateFlowDefinition(&schema, def)
+		require.Error(t, err, "a collision target that verifies no credential must be rejected")
+	})
+}
+
+// An action named for a reserved outcome would make transition keys ambiguous:
+// the graph could not distinguish an engine-produced edge (a provider callback,
+// an identifier lookup) from a client invoking that action, which is what the
+// callback-only reachability rules read.
+func TestValidateSteps_RejectsReservedOutcomeAsActionName(t *testing.T) {
+	var schema jsonschema.Schema
+	require.NoError(t, json.Unmarshal(userSchemaIDAndPassword, &schema))
+	show := domain.FlowStepCompleteShow
+
+	for _, name := range []string{"identity_unknown", "callback", "user_already_exists", "user_not_found"} {
+		t.Run(name, func(t *testing.T) {
+			def := domain.FlowDefinition{
+				ProjectID:     "project1",
+				Name:          "login",
+				SchemaVersion: "1.0.0",
+				UserSchema:    "https://tenant.com/schemas/idpw-user.json",
+				Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "identifier"},
+				Audience:      domain.FlowDefinitionAudience{AppIDs: []string{"app1"}, TeamIDs: []string{"team1"}},
+				Steps: []domain.FlowDefinitionStep{
+					{
+						Name:   "identifier",
+						Fields: []domain.Field{"email"},
+						Actions: []domain.FlowStepAction{
+							{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+							{Name: name, Kind: domain.FlowActionKindNavigate},
+						},
+						Transitions: map[string]domain.FlowStepTransition{
+							"submit": {Target: "done"},
+							name:     {Target: "done"},
+						},
+					},
+					{Name: "done", Complete: &show},
+				},
+			}
+			_, err := domain.ValidateFlowDefinition(&schema, def)
+			require.Error(t, err, "an action named after a reserved outcome must be rejected")
+		})
+	}
+}
