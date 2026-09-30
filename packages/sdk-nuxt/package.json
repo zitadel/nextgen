@@ -36,7 +36,8 @@
     "build": "tsup src/index.ts src/server.ts src/runtime/types.ts src/runtime/server/middleware.ts src/runtime/server/handler.ts --format esm --dts --clean --external '#imports' && tsup src/runtime/plugin.ts src/runtime/composables/useAuth.ts src/module.ts --format esm --no-clean --external @nuxt/kit --external '#imports'",
     "dev": "tsup src/index.ts src/server.ts --format esm --dts --watch",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run",
+    "test:all": "pnpm run test",
     "lint": "eslint ."
   },
   "dependencies": {
@@ -53,6 +54,7 @@
     "@eslint/json": "catalog:",
     "@eslint/markdown": "catalog:",
     "@nuxt/eslint-plugin": "^0.7.0",
+    "@vitest/coverage-v8": "catalog:sdk",
     "eslint": "catalog:",
     "eslint-config-prettier": "catalog:",
     "eslint-import-resolver-typescript": "catalog:",
@@ -65,6 +67,6 @@
     "tsup": "catalog:",
     "typescript": "^5.7.3",
     "typescript-eslint": "catalog:",
-    "vitest": "^3.0.0"
+    "vitest": "catalog:sdk"
   }
 }
