@@ -10511,6 +10511,7 @@ func (*CreateIdpCreated) createIdpRes() {}
 type CreateIdpErrorResponse struct {
 	Type             CreateIdpErrorResponseType // switch on this field
 	AuthUnauthorized AuthUnauthorized
+	IdpNotFound      IdpNotFound
 	Internal         Internal
 	ReqInvalid       ReqInvalid
 }
@@ -10521,6 +10522,7 @@ type CreateIdpErrorResponseType string
 // Possible values for CreateIdpErrorResponseType.
 const (
 	AuthUnauthorizedCreateIdpErrorResponse CreateIdpErrorResponseType = "auth.unauthorized"
+	IdpNotFoundCreateIdpErrorResponse      CreateIdpErrorResponseType = "idp.not_found"
 	InternalCreateIdpErrorResponse         CreateIdpErrorResponseType = "internal"
 	ReqInvalidCreateIdpErrorResponse       CreateIdpErrorResponseType = "req.invalid"
 )
@@ -10528,6 +10530,11 @@ const (
 // IsAuthUnauthorized reports whether CreateIdpErrorResponse is AuthUnauthorized.
 func (s CreateIdpErrorResponse) IsAuthUnauthorized() bool {
 	return s.Type == AuthUnauthorizedCreateIdpErrorResponse
+}
+
+// IsIdpNotFound reports whether CreateIdpErrorResponse is IdpNotFound.
+func (s CreateIdpErrorResponse) IsIdpNotFound() bool {
+	return s.Type == IdpNotFoundCreateIdpErrorResponse
 }
 
 // IsInternal reports whether CreateIdpErrorResponse is Internal.
@@ -10556,6 +10563,27 @@ func (s CreateIdpErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bo
 func NewAuthUnauthorizedCreateIdpErrorResponse(v AuthUnauthorized) CreateIdpErrorResponse {
 	var s CreateIdpErrorResponse
 	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetIdpNotFound sets CreateIdpErrorResponse to IdpNotFound.
+func (s *CreateIdpErrorResponse) SetIdpNotFound(v IdpNotFound) {
+	s.Type = IdpNotFoundCreateIdpErrorResponse
+	s.IdpNotFound = v
+}
+
+// GetIdpNotFound returns IdpNotFound and true boolean if CreateIdpErrorResponse is IdpNotFound.
+func (s CreateIdpErrorResponse) GetIdpNotFound() (v IdpNotFound, ok bool) {
+	if !s.IsIdpNotFound() {
+		return v, false
+	}
+	return s.IdpNotFound, true
+}
+
+// NewIdpNotFoundCreateIdpErrorResponse returns new CreateIdpErrorResponse from IdpNotFound.
+func NewIdpNotFoundCreateIdpErrorResponse(v IdpNotFound) CreateIdpErrorResponse {
+	var s CreateIdpErrorResponse
+	s.SetIdpNotFound(v)
 	return s
 }
 
@@ -23738,6 +23766,7 @@ func (*GetHealthOK) getHealthRes() {}
 type GetIdpByIdErrorResponse struct {
 	Type             GetIdpByIdErrorResponseType // switch on this field
 	AuthUnauthorized AuthUnauthorized
+	IdpNotFound      IdpNotFound
 	Internal         Internal
 	ReqInvalid       ReqInvalid
 }
@@ -23748,6 +23777,7 @@ type GetIdpByIdErrorResponseType string
 // Possible values for GetIdpByIdErrorResponseType.
 const (
 	AuthUnauthorizedGetIdpByIdErrorResponse GetIdpByIdErrorResponseType = "auth.unauthorized"
+	IdpNotFoundGetIdpByIdErrorResponse      GetIdpByIdErrorResponseType = "idp.not_found"
 	InternalGetIdpByIdErrorResponse         GetIdpByIdErrorResponseType = "internal"
 	ReqInvalidGetIdpByIdErrorResponse       GetIdpByIdErrorResponseType = "req.invalid"
 )
@@ -23755,6 +23785,11 @@ const (
 // IsAuthUnauthorized reports whether GetIdpByIdErrorResponse is AuthUnauthorized.
 func (s GetIdpByIdErrorResponse) IsAuthUnauthorized() bool {
 	return s.Type == AuthUnauthorizedGetIdpByIdErrorResponse
+}
+
+// IsIdpNotFound reports whether GetIdpByIdErrorResponse is IdpNotFound.
+func (s GetIdpByIdErrorResponse) IsIdpNotFound() bool {
+	return s.Type == IdpNotFoundGetIdpByIdErrorResponse
 }
 
 // IsInternal reports whether GetIdpByIdErrorResponse is Internal.
@@ -23783,6 +23818,27 @@ func (s GetIdpByIdErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok b
 func NewAuthUnauthorizedGetIdpByIdErrorResponse(v AuthUnauthorized) GetIdpByIdErrorResponse {
 	var s GetIdpByIdErrorResponse
 	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetIdpNotFound sets GetIdpByIdErrorResponse to IdpNotFound.
+func (s *GetIdpByIdErrorResponse) SetIdpNotFound(v IdpNotFound) {
+	s.Type = IdpNotFoundGetIdpByIdErrorResponse
+	s.IdpNotFound = v
+}
+
+// GetIdpNotFound returns IdpNotFound and true boolean if GetIdpByIdErrorResponse is IdpNotFound.
+func (s GetIdpByIdErrorResponse) GetIdpNotFound() (v IdpNotFound, ok bool) {
+	if !s.IsIdpNotFound() {
+		return v, false
+	}
+	return s.IdpNotFound, true
+}
+
+// NewIdpNotFoundGetIdpByIdErrorResponse returns new GetIdpByIdErrorResponse from IdpNotFound.
+func NewIdpNotFoundGetIdpByIdErrorResponse(v IdpNotFound) GetIdpByIdErrorResponse {
+	var s GetIdpByIdErrorResponse
+	s.SetIdpNotFound(v)
 	return s
 }
 
@@ -27510,6 +27566,59 @@ func (s *IdpFilterField) UnmarshalText(data []byte) error {
 	default:
 		return errors.Errorf("invalid value: %q", data)
 	}
+}
+
+// Merged schema.
+// Ref: #
+type IdpNotFound struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptIdpNotFoundDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *IdpNotFound) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *IdpNotFound) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *IdpNotFound) GetDetails() OptIdpNotFoundDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *IdpNotFound) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *IdpNotFound) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *IdpNotFound) SetDetails(val OptIdpNotFoundDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type IdpNotFoundDetails map[string]jx.Raw
+
+func (s *IdpNotFoundDetails) init() IdpNotFoundDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
 }
 
 // The protocol used by the identity provider.
@@ -36068,6 +36177,52 @@ func (o OptIdpConnectionVerifiedClaims) Or(d IdpConnectionVerifiedClaims) IdpCon
 	return d
 }
 
+// NewOptIdpNotFoundDetails returns new OptIdpNotFoundDetails with value set to v.
+func NewOptIdpNotFoundDetails(v IdpNotFoundDetails) OptIdpNotFoundDetails {
+	return OptIdpNotFoundDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptIdpNotFoundDetails is optional IdpNotFoundDetails.
+type OptIdpNotFoundDetails struct {
+	Value IdpNotFoundDetails
+	Set   bool
+}
+
+// IsSet returns true if OptIdpNotFoundDetails was set.
+func (o OptIdpNotFoundDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptIdpNotFoundDetails) Reset() {
+	var v IdpNotFoundDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptIdpNotFoundDetails) SetTo(v IdpNotFoundDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptIdpNotFoundDetails) Get() (v IdpNotFoundDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptIdpNotFoundDetails) Or(d IdpNotFoundDetails) IdpNotFoundDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptInt returns new OptInt with value set to v.
 func NewOptInt(v int) OptInt {
 	return OptInt{
@@ -43508,6 +43663,144 @@ func (o OptUserUpdatedPayloadAttributes) Or(d UserUpdatedPayloadAttributes) User
 	return d
 }
 
+// NewOptVarDecryptionFailedDetails returns new OptVarDecryptionFailedDetails with value set to v.
+func NewOptVarDecryptionFailedDetails(v VarDecryptionFailedDetails) OptVarDecryptionFailedDetails {
+	return OptVarDecryptionFailedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptVarDecryptionFailedDetails is optional VarDecryptionFailedDetails.
+type OptVarDecryptionFailedDetails struct {
+	Value VarDecryptionFailedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptVarDecryptionFailedDetails was set.
+func (o OptVarDecryptionFailedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptVarDecryptionFailedDetails) Reset() {
+	var v VarDecryptionFailedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptVarDecryptionFailedDetails) SetTo(v VarDecryptionFailedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptVarDecryptionFailedDetails) Get() (v VarDecryptionFailedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptVarDecryptionFailedDetails) Or(d VarDecryptionFailedDetails) VarDecryptionFailedDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptVarDocumentTooDeepDetails returns new OptVarDocumentTooDeepDetails with value set to v.
+func NewOptVarDocumentTooDeepDetails(v VarDocumentTooDeepDetails) OptVarDocumentTooDeepDetails {
+	return OptVarDocumentTooDeepDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptVarDocumentTooDeepDetails is optional VarDocumentTooDeepDetails.
+type OptVarDocumentTooDeepDetails struct {
+	Value VarDocumentTooDeepDetails
+	Set   bool
+}
+
+// IsSet returns true if OptVarDocumentTooDeepDetails was set.
+func (o OptVarDocumentTooDeepDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptVarDocumentTooDeepDetails) Reset() {
+	var v VarDocumentTooDeepDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptVarDocumentTooDeepDetails) SetTo(v VarDocumentTooDeepDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptVarDocumentTooDeepDetails) Get() (v VarDocumentTooDeepDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptVarDocumentTooDeepDetails) Or(d VarDocumentTooDeepDetails) VarDocumentTooDeepDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptVarExpansionTooLargeDetails returns new OptVarExpansionTooLargeDetails with value set to v.
+func NewOptVarExpansionTooLargeDetails(v VarExpansionTooLargeDetails) OptVarExpansionTooLargeDetails {
+	return OptVarExpansionTooLargeDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptVarExpansionTooLargeDetails is optional VarExpansionTooLargeDetails.
+type OptVarExpansionTooLargeDetails struct {
+	Value VarExpansionTooLargeDetails
+	Set   bool
+}
+
+// IsSet returns true if OptVarExpansionTooLargeDetails was set.
+func (o OptVarExpansionTooLargeDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptVarExpansionTooLargeDetails) Reset() {
+	var v VarExpansionTooLargeDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptVarExpansionTooLargeDetails) SetTo(v VarExpansionTooLargeDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptVarExpansionTooLargeDetails) Get() (v VarExpansionTooLargeDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptVarExpansionTooLargeDetails) Or(d VarExpansionTooLargeDetails) VarExpansionTooLargeDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptVarInvalidNameDetails returns new OptVarInvalidNameDetails with value set to v.
 func NewOptVarInvalidNameDetails(v VarInvalidNameDetails) OptVarInvalidNameDetails {
 	return OptVarInvalidNameDetails{
@@ -43732,6 +44025,52 @@ func (o OptVarPermissionDeniedDetails) Get() (v VarPermissionDeniedDetails, ok b
 
 // Or returns value if set, or given parameter if does not.
 func (o OptVarPermissionDeniedDetails) Or(d VarPermissionDeniedDetails) VarPermissionDeniedDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptVarSecretNotWholeValueDetails returns new OptVarSecretNotWholeValueDetails with value set to v.
+func NewOptVarSecretNotWholeValueDetails(v VarSecretNotWholeValueDetails) OptVarSecretNotWholeValueDetails {
+	return OptVarSecretNotWholeValueDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptVarSecretNotWholeValueDetails is optional VarSecretNotWholeValueDetails.
+type OptVarSecretNotWholeValueDetails struct {
+	Value VarSecretNotWholeValueDetails
+	Set   bool
+}
+
+// IsSet returns true if OptVarSecretNotWholeValueDetails was set.
+func (o OptVarSecretNotWholeValueDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptVarSecretNotWholeValueDetails) Reset() {
+	var v VarSecretNotWholeValueDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptVarSecretNotWholeValueDetails) SetTo(v VarSecretNotWholeValueDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptVarSecretNotWholeValueDetails) Get() (v VarSecretNotWholeValueDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptVarSecretNotWholeValueDetails) Or(d VarSecretNotWholeValueDetails) VarSecretNotWholeValueDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -47827,6 +48166,7 @@ func (*QueryIdpsBadRequest) queryIdpsRes() {}
 type QueryIdpsErrorResponse struct {
 	Type             QueryIdpsErrorResponseType // switch on this field
 	AuthUnauthorized AuthUnauthorized
+	IdpNotFound      IdpNotFound
 	Internal         Internal
 	ReqInvalid       ReqInvalid
 }
@@ -47837,6 +48177,7 @@ type QueryIdpsErrorResponseType string
 // Possible values for QueryIdpsErrorResponseType.
 const (
 	AuthUnauthorizedQueryIdpsErrorResponse QueryIdpsErrorResponseType = "auth.unauthorized"
+	IdpNotFoundQueryIdpsErrorResponse      QueryIdpsErrorResponseType = "idp.not_found"
 	InternalQueryIdpsErrorResponse         QueryIdpsErrorResponseType = "internal"
 	ReqInvalidQueryIdpsErrorResponse       QueryIdpsErrorResponseType = "req.invalid"
 )
@@ -47844,6 +48185,11 @@ const (
 // IsAuthUnauthorized reports whether QueryIdpsErrorResponse is AuthUnauthorized.
 func (s QueryIdpsErrorResponse) IsAuthUnauthorized() bool {
 	return s.Type == AuthUnauthorizedQueryIdpsErrorResponse
+}
+
+// IsIdpNotFound reports whether QueryIdpsErrorResponse is IdpNotFound.
+func (s QueryIdpsErrorResponse) IsIdpNotFound() bool {
+	return s.Type == IdpNotFoundQueryIdpsErrorResponse
 }
 
 // IsInternal reports whether QueryIdpsErrorResponse is Internal.
@@ -47872,6 +48218,27 @@ func (s QueryIdpsErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bo
 func NewAuthUnauthorizedQueryIdpsErrorResponse(v AuthUnauthorized) QueryIdpsErrorResponse {
 	var s QueryIdpsErrorResponse
 	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetIdpNotFound sets QueryIdpsErrorResponse to IdpNotFound.
+func (s *QueryIdpsErrorResponse) SetIdpNotFound(v IdpNotFound) {
+	s.Type = IdpNotFoundQueryIdpsErrorResponse
+	s.IdpNotFound = v
+}
+
+// GetIdpNotFound returns IdpNotFound and true boolean if QueryIdpsErrorResponse is IdpNotFound.
+func (s QueryIdpsErrorResponse) GetIdpNotFound() (v IdpNotFound, ok bool) {
+	if !s.IsIdpNotFound() {
+		return v, false
+	}
+	return s.IdpNotFound, true
+}
+
+// NewIdpNotFoundQueryIdpsErrorResponse returns new QueryIdpsErrorResponse from IdpNotFound.
+func NewIdpNotFoundQueryIdpsErrorResponse(v IdpNotFound) QueryIdpsErrorResponse {
+	var s QueryIdpsErrorResponse
+	s.SetIdpNotFound(v)
 	return s
 }
 
@@ -55295,34 +55662,38 @@ func (*SubmitFlowStepBadRequest) submitFlowStepRes() {}
 
 // SubmitFlowStepErrorResponse represents sum type.
 type SubmitFlowStepErrorResponse struct {
-	Type                SubmitFlowStepErrorResponseType // switch on this field
-	AttAlreadyHandedOff AttAlreadyHandedOff
-	AttInvalidRequest   AttInvalidRequest
-	AttInvalidState     AttInvalidState
-	AttNotCompleted     AttNotCompleted
-	AttNotFound         AttNotFound
-	AttProofRejected    AttProofRejected
-	AttStaleChallenge   AttStaleChallenge
-	EncKeyDecryptFailed EncKeyDecryptFailed
-	EncKeyEncryptFailed EncKeyEncryptFailed
-	EncKeyNotFound      EncKeyNotFound
-	EvtInvalid          EvtInvalid
-	FlowCookieExpired   FlowCookieExpired
-	FlowCookieInvalid   FlowCookieInvalid
-	FlowIntegrity       FlowIntegrity
-	FlowInvalidAction   FlowInvalidAction
-	FlowNotFound        FlowNotFound
-	FlowUnsupported     FlowUnsupported
-	IdpNotFound         IdpNotFound
-	Internal            Internal
-	TknInvalid          TknInvalid
-	NotImplemented      NotImplemented
-	ReqInvalid          ReqInvalid
-	EncKeyUnknownAlg    EncKeyUnknownAlg
-	Unavailable         Unavailable
-	UserAlreadyExists   UserAlreadyExists
-	UserInvalid         UserInvalid
-	UserNotFound        UserNotFound
+	Type                   SubmitFlowStepErrorResponseType // switch on this field
+	AttAlreadyHandedOff    AttAlreadyHandedOff
+	AttInvalidRequest      AttInvalidRequest
+	AttInvalidState        AttInvalidState
+	AttNotCompleted        AttNotCompleted
+	AttNotFound            AttNotFound
+	AttProofRejected       AttProofRejected
+	AttStaleChallenge      AttStaleChallenge
+	EncKeyDecryptFailed    EncKeyDecryptFailed
+	EncKeyEncryptFailed    EncKeyEncryptFailed
+	EncKeyNotFound         EncKeyNotFound
+	EvtInvalid             EvtInvalid
+	VarDecryptionFailed    VarDecryptionFailed
+	FlowCookieExpired      FlowCookieExpired
+	FlowCookieInvalid      FlowCookieInvalid
+	FlowIntegrity          FlowIntegrity
+	FlowInvalidAction      FlowInvalidAction
+	FlowNotFound           FlowNotFound
+	FlowUnsupported        FlowUnsupported
+	IdpNotFound            IdpNotFound
+	Internal               Internal
+	TknInvalid             TknInvalid
+	NotImplemented         NotImplemented
+	ReqInvalid             ReqInvalid
+	VarSecretNotWholeValue VarSecretNotWholeValue
+	EncKeyUnknownAlg       EncKeyUnknownAlg
+	Unavailable            Unavailable
+	UserAlreadyExists      UserAlreadyExists
+	UserInvalid            UserInvalid
+	UserNotFound           UserNotFound
+	VarDocumentTooDeep     VarDocumentTooDeep
+	VarExpansionTooLarge   VarExpansionTooLarge
 }
 
 // SubmitFlowStepErrorResponseType is oneOf type of SubmitFlowStepErrorResponse.
@@ -55330,33 +55701,37 @@ type SubmitFlowStepErrorResponseType string
 
 // Possible values for SubmitFlowStepErrorResponseType.
 const (
-	AttAlreadyHandedOffSubmitFlowStepErrorResponse SubmitFlowStepErrorResponseType = "att.already_handed_off"
-	AttInvalidRequestSubmitFlowStepErrorResponse   SubmitFlowStepErrorResponseType = "att.invalid_request"
-	AttInvalidStateSubmitFlowStepErrorResponse     SubmitFlowStepErrorResponseType = "att.invalid_state"
-	AttNotCompletedSubmitFlowStepErrorResponse     SubmitFlowStepErrorResponseType = "att.not_completed"
-	AttNotFoundSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "att.not_found"
-	AttProofRejectedSubmitFlowStepErrorResponse    SubmitFlowStepErrorResponseType = "att.proof_rejected"
-	AttStaleChallengeSubmitFlowStepErrorResponse   SubmitFlowStepErrorResponseType = "att.stale_challenge"
-	EncKeyDecryptFailedSubmitFlowStepErrorResponse SubmitFlowStepErrorResponseType = "enc_key.decrypt_failed"
-	EncKeyEncryptFailedSubmitFlowStepErrorResponse SubmitFlowStepErrorResponseType = "enc_key.encrypt_failed"
-	EncKeyNotFoundSubmitFlowStepErrorResponse      SubmitFlowStepErrorResponseType = "enc_key.not_found"
-	EvtInvalidSubmitFlowStepErrorResponse          SubmitFlowStepErrorResponseType = "evt.invalid"
-	FlowCookieExpiredSubmitFlowStepErrorResponse   SubmitFlowStepErrorResponseType = "flow.cookie_expired"
-	FlowCookieInvalidSubmitFlowStepErrorResponse   SubmitFlowStepErrorResponseType = "flow.cookie_invalid"
-	FlowIntegritySubmitFlowStepErrorResponse       SubmitFlowStepErrorResponseType = "flow.integrity"
-	FlowInvalidActionSubmitFlowStepErrorResponse   SubmitFlowStepErrorResponseType = "flow.invalid_action"
-	FlowNotFoundSubmitFlowStepErrorResponse        SubmitFlowStepErrorResponseType = "flow.not_found"
-	FlowUnsupportedSubmitFlowStepErrorResponse     SubmitFlowStepErrorResponseType = "flow.unsupported"
-	IdpNotFoundSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "idp.not_found"
-	InternalSubmitFlowStepErrorResponse            SubmitFlowStepErrorResponseType = "internal"
-	TknInvalidSubmitFlowStepErrorResponse          SubmitFlowStepErrorResponseType = "tkn.invalid"
-	NotImplementedSubmitFlowStepErrorResponse      SubmitFlowStepErrorResponseType = "not_implemented"
-	ReqInvalidSubmitFlowStepErrorResponse          SubmitFlowStepErrorResponseType = "req.invalid"
-	EncKeyUnknownAlgSubmitFlowStepErrorResponse    SubmitFlowStepErrorResponseType = "enc_key.unknown_alg"
-	UnavailableSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "unavailable"
-	UserAlreadyExistsSubmitFlowStepErrorResponse   SubmitFlowStepErrorResponseType = "user.already_exists"
-	UserInvalidSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "user.invalid"
-	UserNotFoundSubmitFlowStepErrorResponse        SubmitFlowStepErrorResponseType = "user.not_found"
+	AttAlreadyHandedOffSubmitFlowStepErrorResponse    SubmitFlowStepErrorResponseType = "att.already_handed_off"
+	AttInvalidRequestSubmitFlowStepErrorResponse      SubmitFlowStepErrorResponseType = "att.invalid_request"
+	AttInvalidStateSubmitFlowStepErrorResponse        SubmitFlowStepErrorResponseType = "att.invalid_state"
+	AttNotCompletedSubmitFlowStepErrorResponse        SubmitFlowStepErrorResponseType = "att.not_completed"
+	AttNotFoundSubmitFlowStepErrorResponse            SubmitFlowStepErrorResponseType = "att.not_found"
+	AttProofRejectedSubmitFlowStepErrorResponse       SubmitFlowStepErrorResponseType = "att.proof_rejected"
+	AttStaleChallengeSubmitFlowStepErrorResponse      SubmitFlowStepErrorResponseType = "att.stale_challenge"
+	EncKeyDecryptFailedSubmitFlowStepErrorResponse    SubmitFlowStepErrorResponseType = "enc_key.decrypt_failed"
+	EncKeyEncryptFailedSubmitFlowStepErrorResponse    SubmitFlowStepErrorResponseType = "enc_key.encrypt_failed"
+	EncKeyNotFoundSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "enc_key.not_found"
+	EvtInvalidSubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "evt.invalid"
+	VarDecryptionFailedSubmitFlowStepErrorResponse    SubmitFlowStepErrorResponseType = "var.decryption_failed"
+	FlowCookieExpiredSubmitFlowStepErrorResponse      SubmitFlowStepErrorResponseType = "flow.cookie_expired"
+	FlowCookieInvalidSubmitFlowStepErrorResponse      SubmitFlowStepErrorResponseType = "flow.cookie_invalid"
+	FlowIntegritySubmitFlowStepErrorResponse          SubmitFlowStepErrorResponseType = "flow.integrity"
+	FlowInvalidActionSubmitFlowStepErrorResponse      SubmitFlowStepErrorResponseType = "flow.invalid_action"
+	FlowNotFoundSubmitFlowStepErrorResponse           SubmitFlowStepErrorResponseType = "flow.not_found"
+	FlowUnsupportedSubmitFlowStepErrorResponse        SubmitFlowStepErrorResponseType = "flow.unsupported"
+	IdpNotFoundSubmitFlowStepErrorResponse            SubmitFlowStepErrorResponseType = "idp.not_found"
+	InternalSubmitFlowStepErrorResponse               SubmitFlowStepErrorResponseType = "internal"
+	TknInvalidSubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "tkn.invalid"
+	NotImplementedSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "not_implemented"
+	ReqInvalidSubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "req.invalid"
+	VarSecretNotWholeValueSubmitFlowStepErrorResponse SubmitFlowStepErrorResponseType = "var.secret_not_whole_value"
+	EncKeyUnknownAlgSubmitFlowStepErrorResponse       SubmitFlowStepErrorResponseType = "enc_key.unknown_alg"
+	UnavailableSubmitFlowStepErrorResponse            SubmitFlowStepErrorResponseType = "unavailable"
+	UserAlreadyExistsSubmitFlowStepErrorResponse      SubmitFlowStepErrorResponseType = "user.already_exists"
+	UserInvalidSubmitFlowStepErrorResponse            SubmitFlowStepErrorResponseType = "user.invalid"
+	UserNotFoundSubmitFlowStepErrorResponse           SubmitFlowStepErrorResponseType = "user.not_found"
+	VarDocumentTooDeepSubmitFlowStepErrorResponse     SubmitFlowStepErrorResponseType = "var.document_too_deep"
+	VarExpansionTooLargeSubmitFlowStepErrorResponse   SubmitFlowStepErrorResponseType = "var.expansion_too_large"
 )
 
 // IsAttAlreadyHandedOff reports whether SubmitFlowStepErrorResponse is AttAlreadyHandedOff.
@@ -55414,6 +55789,11 @@ func (s SubmitFlowStepErrorResponse) IsEvtInvalid() bool {
 	return s.Type == EvtInvalidSubmitFlowStepErrorResponse
 }
 
+// IsVarDecryptionFailed reports whether SubmitFlowStepErrorResponse is VarDecryptionFailed.
+func (s SubmitFlowStepErrorResponse) IsVarDecryptionFailed() bool {
+	return s.Type == VarDecryptionFailedSubmitFlowStepErrorResponse
+}
+
 // IsFlowCookieExpired reports whether SubmitFlowStepErrorResponse is FlowCookieExpired.
 func (s SubmitFlowStepErrorResponse) IsFlowCookieExpired() bool {
 	return s.Type == FlowCookieExpiredSubmitFlowStepErrorResponse
@@ -55469,6 +55849,11 @@ func (s SubmitFlowStepErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidSubmitFlowStepErrorResponse
 }
 
+// IsVarSecretNotWholeValue reports whether SubmitFlowStepErrorResponse is VarSecretNotWholeValue.
+func (s SubmitFlowStepErrorResponse) IsVarSecretNotWholeValue() bool {
+	return s.Type == VarSecretNotWholeValueSubmitFlowStepErrorResponse
+}
+
 // IsEncKeyUnknownAlg reports whether SubmitFlowStepErrorResponse is EncKeyUnknownAlg.
 func (s SubmitFlowStepErrorResponse) IsEncKeyUnknownAlg() bool {
 	return s.Type == EncKeyUnknownAlgSubmitFlowStepErrorResponse
@@ -55492,6 +55877,16 @@ func (s SubmitFlowStepErrorResponse) IsUserInvalid() bool {
 // IsUserNotFound reports whether SubmitFlowStepErrorResponse is UserNotFound.
 func (s SubmitFlowStepErrorResponse) IsUserNotFound() bool {
 	return s.Type == UserNotFoundSubmitFlowStepErrorResponse
+}
+
+// IsVarDocumentTooDeep reports whether SubmitFlowStepErrorResponse is VarDocumentTooDeep.
+func (s SubmitFlowStepErrorResponse) IsVarDocumentTooDeep() bool {
+	return s.Type == VarDocumentTooDeepSubmitFlowStepErrorResponse
+}
+
+// IsVarExpansionTooLarge reports whether SubmitFlowStepErrorResponse is VarExpansionTooLarge.
+func (s SubmitFlowStepErrorResponse) IsVarExpansionTooLarge() bool {
+	return s.Type == VarExpansionTooLargeSubmitFlowStepErrorResponse
 }
 
 // SetAttAlreadyHandedOff sets SubmitFlowStepErrorResponse to AttAlreadyHandedOff.
@@ -55722,6 +56117,27 @@ func (s SubmitFlowStepErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
 func NewEvtInvalidSubmitFlowStepErrorResponse(v EvtInvalid) SubmitFlowStepErrorResponse {
 	var s SubmitFlowStepErrorResponse
 	s.SetEvtInvalid(v)
+	return s
+}
+
+// SetVarDecryptionFailed sets SubmitFlowStepErrorResponse to VarDecryptionFailed.
+func (s *SubmitFlowStepErrorResponse) SetVarDecryptionFailed(v VarDecryptionFailed) {
+	s.Type = VarDecryptionFailedSubmitFlowStepErrorResponse
+	s.VarDecryptionFailed = v
+}
+
+// GetVarDecryptionFailed returns VarDecryptionFailed and true boolean if SubmitFlowStepErrorResponse is VarDecryptionFailed.
+func (s SubmitFlowStepErrorResponse) GetVarDecryptionFailed() (v VarDecryptionFailed, ok bool) {
+	if !s.IsVarDecryptionFailed() {
+		return v, false
+	}
+	return s.VarDecryptionFailed, true
+}
+
+// NewVarDecryptionFailedSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from VarDecryptionFailed.
+func NewVarDecryptionFailedSubmitFlowStepErrorResponse(v VarDecryptionFailed) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetVarDecryptionFailed(v)
 	return s
 }
 
@@ -55956,6 +56372,27 @@ func NewReqInvalidSubmitFlowStepErrorResponse(v ReqInvalid) SubmitFlowStepErrorR
 	return s
 }
 
+// SetVarSecretNotWholeValue sets SubmitFlowStepErrorResponse to VarSecretNotWholeValue.
+func (s *SubmitFlowStepErrorResponse) SetVarSecretNotWholeValue(v VarSecretNotWholeValue) {
+	s.Type = VarSecretNotWholeValueSubmitFlowStepErrorResponse
+	s.VarSecretNotWholeValue = v
+}
+
+// GetVarSecretNotWholeValue returns VarSecretNotWholeValue and true boolean if SubmitFlowStepErrorResponse is VarSecretNotWholeValue.
+func (s SubmitFlowStepErrorResponse) GetVarSecretNotWholeValue() (v VarSecretNotWholeValue, ok bool) {
+	if !s.IsVarSecretNotWholeValue() {
+		return v, false
+	}
+	return s.VarSecretNotWholeValue, true
+}
+
+// NewVarSecretNotWholeValueSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from VarSecretNotWholeValue.
+func NewVarSecretNotWholeValueSubmitFlowStepErrorResponse(v VarSecretNotWholeValue) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetVarSecretNotWholeValue(v)
+	return s
+}
+
 // SetEncKeyUnknownAlg sets SubmitFlowStepErrorResponse to EncKeyUnknownAlg.
 func (s *SubmitFlowStepErrorResponse) SetEncKeyUnknownAlg(v EncKeyUnknownAlg) {
 	s.Type = EncKeyUnknownAlgSubmitFlowStepErrorResponse
@@ -56058,6 +56495,48 @@ func (s SubmitFlowStepErrorResponse) GetUserNotFound() (v UserNotFound, ok bool)
 func NewUserNotFoundSubmitFlowStepErrorResponse(v UserNotFound) SubmitFlowStepErrorResponse {
 	var s SubmitFlowStepErrorResponse
 	s.SetUserNotFound(v)
+	return s
+}
+
+// SetVarDocumentTooDeep sets SubmitFlowStepErrorResponse to VarDocumentTooDeep.
+func (s *SubmitFlowStepErrorResponse) SetVarDocumentTooDeep(v VarDocumentTooDeep) {
+	s.Type = VarDocumentTooDeepSubmitFlowStepErrorResponse
+	s.VarDocumentTooDeep = v
+}
+
+// GetVarDocumentTooDeep returns VarDocumentTooDeep and true boolean if SubmitFlowStepErrorResponse is VarDocumentTooDeep.
+func (s SubmitFlowStepErrorResponse) GetVarDocumentTooDeep() (v VarDocumentTooDeep, ok bool) {
+	if !s.IsVarDocumentTooDeep() {
+		return v, false
+	}
+	return s.VarDocumentTooDeep, true
+}
+
+// NewVarDocumentTooDeepSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from VarDocumentTooDeep.
+func NewVarDocumentTooDeepSubmitFlowStepErrorResponse(v VarDocumentTooDeep) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetVarDocumentTooDeep(v)
+	return s
+}
+
+// SetVarExpansionTooLarge sets SubmitFlowStepErrorResponse to VarExpansionTooLarge.
+func (s *SubmitFlowStepErrorResponse) SetVarExpansionTooLarge(v VarExpansionTooLarge) {
+	s.Type = VarExpansionTooLargeSubmitFlowStepErrorResponse
+	s.VarExpansionTooLarge = v
+}
+
+// GetVarExpansionTooLarge returns VarExpansionTooLarge and true boolean if SubmitFlowStepErrorResponse is VarExpansionTooLarge.
+func (s SubmitFlowStepErrorResponse) GetVarExpansionTooLarge() (v VarExpansionTooLarge, ok bool) {
+	if !s.IsVarExpansionTooLarge() {
+		return v, false
+	}
+	return s.VarExpansionTooLarge, true
+}
+
+// NewVarExpansionTooLargeSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from VarExpansionTooLarge.
+func NewVarExpansionTooLargeSubmitFlowStepErrorResponse(v VarExpansionTooLarge) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetVarExpansionTooLarge(v)
 	return s
 }
 
@@ -61522,6 +62001,165 @@ func (s *UserUpdatedPayloadAttributes) init() UserUpdatedPayloadAttributes {
 
 // Merged schema.
 // Ref: #
+type VarDecryptionFailed struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptVarDecryptionFailedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *VarDecryptionFailed) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *VarDecryptionFailed) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *VarDecryptionFailed) GetDetails() OptVarDecryptionFailedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *VarDecryptionFailed) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *VarDecryptionFailed) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *VarDecryptionFailed) SetDetails(val OptVarDecryptionFailedDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type VarDecryptionFailedDetails map[string]jx.Raw
+
+func (s *VarDecryptionFailedDetails) init() VarDecryptionFailedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type VarDocumentTooDeep struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptVarDocumentTooDeepDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *VarDocumentTooDeep) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *VarDocumentTooDeep) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *VarDocumentTooDeep) GetDetails() OptVarDocumentTooDeepDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *VarDocumentTooDeep) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *VarDocumentTooDeep) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *VarDocumentTooDeep) SetDetails(val OptVarDocumentTooDeepDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type VarDocumentTooDeepDetails map[string]jx.Raw
+
+func (s *VarDocumentTooDeepDetails) init() VarDocumentTooDeepDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type VarExpansionTooLarge struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptVarExpansionTooLargeDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *VarExpansionTooLarge) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *VarExpansionTooLarge) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *VarExpansionTooLarge) GetDetails() OptVarExpansionTooLargeDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *VarExpansionTooLarge) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *VarExpansionTooLarge) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *VarExpansionTooLarge) SetDetails(val OptVarExpansionTooLargeDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type VarExpansionTooLargeDetails map[string]jx.Raw
+
+func (s *VarExpansionTooLargeDetails) init() VarExpansionTooLargeDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
 type VarInvalidName struct {
 	// Merged property.
 	Code string `json:"code"`
@@ -61777,6 +62415,59 @@ func (s *VarPermissionDenied) SetDetails(val OptVarPermissionDeniedDetails) {
 type VarPermissionDeniedDetails map[string]jx.Raw
 
 func (s *VarPermissionDeniedDetails) init() VarPermissionDeniedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type VarSecretNotWholeValue struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptVarSecretNotWholeValueDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *VarSecretNotWholeValue) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *VarSecretNotWholeValue) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *VarSecretNotWholeValue) GetDetails() OptVarSecretNotWholeValueDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *VarSecretNotWholeValue) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *VarSecretNotWholeValue) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *VarSecretNotWholeValue) SetDetails(val OptVarSecretNotWholeValueDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type VarSecretNotWholeValueDetails map[string]jx.Raw
+
+func (s *VarSecretNotWholeValueDetails) init() VarSecretNotWholeValueDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}
