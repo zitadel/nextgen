@@ -135,7 +135,17 @@ export interface ResourceSyncer {
    */
   create(data: object): Promise<{ id: string; canonical?: object }>;
   /** Replace the resource. `canonical` as in {@link create}. */
-  update(id: string, data: object): Promise<{ canonical?: object }>;
+  /**
+   * Apply the local body to the tracked resource.
+   *
+   * `id` in the result is the resource the write actually landed on, for a
+   * syncer whose write is addressed by something in the document rather than by
+   * the tracked id — a connection is addressed by its `slug`, so editing that
+   * slug names a different connection and the server answers with a different
+   * id. Reporting it keeps state describing what the server did rather than
+   * what the caller assumed. Omit it when the write cannot change identity.
+   */
+  update(id: string, data: object): Promise<{ id?: string; canonical?: object }>;
   delete(id: string): Promise<void>;
   fetch?(id: string): Promise<object>;
   /**

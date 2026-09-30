@@ -1,4 +1,4 @@
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -342,6 +342,57 @@ describe("buildSyncPlan validation (real syncers)", () => {
 });
 
 describe("runSyncLoop", () => {
+  it("records the id the write reported, not the one it was given", async () => {
+    // A connection is addressed by the slug inside the document, so editing
+    // that slug names a different connection and the server creates one. State
+    // has to follow it: left pointing at the old id, the next plan reads the
+    // connection the file no longer describes.
+    const cwd = makeCwd();
+    try {
+      await writeState(cwd, {
+        framework: "next",
+        resources: { ".zitadel/schemas/user.json": { id: "idp_AAA", hash: "stale" } },
+      });
+      await writeResource(cwd, ".zitadel/schemas", "user.json", { kind: "user-schema" });
+
+      const syncer = makeSyncer({
+        mutable: true,
+        update: vi.fn().mockResolvedValue({ id: "idp_BBB" }),
+      });
+      await runSyncLoop(cwd, [syncer]);
+
+      const state = JSON.parse(await readFile(join(cwd, ".zitadel/state.json"), "utf8")) as {
+        resources: Record<string, { id?: string }>;
+      };
+      expect(state.resources[".zitadel/schemas/user.json"]?.id).toBe("idp_BBB");
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps the tracked id when the write reports none", async () => {
+    // A write that cannot change identity says nothing, and state must not be
+    // blanked by that silence.
+    const cwd = makeCwd();
+    try {
+      await writeState(cwd, {
+        framework: "next",
+        resources: { ".zitadel/schemas/user.json": { id: "sch_AAA", hash: "stale" } },
+      });
+      await writeResource(cwd, ".zitadel/schemas", "user.json", { kind: "user-schema" });
+
+      const syncer = makeSyncer({ mutable: true, update: vi.fn().mockResolvedValue({}) });
+      await runSyncLoop(cwd, [syncer]);
+
+      const state = JSON.parse(await readFile(join(cwd, ".zitadel/state.json"), "utf8")) as {
+        resources: Record<string, { id?: string }>;
+      };
+      expect(state.resources[".zitadel/schemas/user.json"]?.id).toBe("sch_AAA");
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
   it("creates resource when no id in state", async () => {
     const cwd = makeCwd();
     try {

@@ -739,7 +739,30 @@ describe("IdpConnectionSyncer", () => {
     );
     const [, idp] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
 
-    expect(await idp.update("idp_1", connection)).toEqual({ canonical: connection });
+    // The id is reported, not the one it was handed: the slug decides which
+    // connection the write landed on, so state follows the answer.
+    expect(await idp.update("idp_1", connection)).toEqual({
+      id: "idp_1",
+      canonical: connection,
+    });
+  });
+
+  it("reports the new connection when an edited slug lands on a different one", async () => {
+    // The server has no such slug, so it creates a connection and answers with
+    // its id. Returning the id the caller passed would leave state describing
+    // the connection the file no longer names.
+    const renamed = { ...connection, slug: "google-work" };
+    server.use(
+      http.post(`${BASE}/idps`, () =>
+        HttpResponse.json(
+          { id: "idp_2", revision_id: "idprev_1", slug: "google-work", definition: renamed },
+          { status: 201 },
+        ),
+      ),
+    );
+    const [, idp] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
+
+    expect(await idp.update("idp_1", renamed)).toMatchObject({ id: "idp_2" });
   });
 
   it("refuses to delete, because what happens to linked users is undesigned", async () => {

@@ -381,13 +381,19 @@ export async function runSyncLoop(
           newId && action.repin
             ? await adoptRepin(action.path, action.content, action.repin, newId)
             : action.content;
-        const { canonical } = await action.syncer.update(action.id, content);
+        const { id: landedOn, canonical } = await action.syncer.update(action.id, content);
         const fallbackHash = newId ? hashForState(action.syncer, content) : action.hash;
+        // The id the write reported, not the one it was given: a write
+        // addressed by document content can land on a different resource than
+        // the tracked one, and state has to follow it or the next plan reads
+        // the resource the file no longer describes.
+        const trackedId = landedOn ?? action.id;
         await updateState(cwd, action.path, {
+          id: trackedId,
           hash: await writeBack(action, canonical, fallbackHash),
         });
         consola.info(`Updated the ${action.syncer.kind} on Zitadel from ${action.path}`);
-        applied.push({ kind: action.syncer.kind, action: "update", file: action.path, id: action.id });
+        applied.push({ kind: action.syncer.kind, action: "update", file: action.path, id: trackedId });
         break;
       }
       case "delete": {

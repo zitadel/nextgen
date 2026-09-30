@@ -191,12 +191,19 @@ class IdpConnectionSyncer implements ResourceSyncer {
    * connection, keeping its id. The id is passed for the sync loop's benefit
    * and deliberately unused — the slug inside the document addresses the row.
    */
-  async update(_id: string, data: object): Promise<{ canonical?: object }> {
+  async update(_id: string, data: object): Promise<{ id?: string; canonical?: object }> {
     const result = await this.client.createIdp(
       { idp: data as CreateIdpBodyIdp },
       { project_id: this.projectId },
     );
-    return { canonical: canonicalDefinition(result.definition, result.id) };
+    // The id comes back because the slug decides which connection the write
+    // landed on: editing it names a different connection, and the server
+    // creates one. Returning the id keeps state pointing at that connection
+    // rather than the one the slug used to name.
+    return {
+      id: typeof result.id === "string" ? result.id : undefined,
+      canonical: canonicalDefinition(result.definition, result.id),
+    };
   }
 
   /**
