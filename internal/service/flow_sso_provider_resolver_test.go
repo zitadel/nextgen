@@ -17,12 +17,12 @@ func TestFlowSSOProviderResolver_Resolve_DropsUnknownSlugsKeepsOrder(t *testing.
 	t.Parallel()
 	ctrl := gomock.NewController(t)
 	connections := servicemocks.NewMockIDPConnectionService(ctrl)
-	connections.EXPECT().GetBySlug(gomock.Any(), "proj-1", "google").
-		Return(&domain.IDPConnection{Slug: "google", Document: []byte(`{"display_name":"Google","template":"google"}`)}, nil)
-	connections.EXPECT().GetBySlug(gomock.Any(), "proj-1", "gone").
-		Return(nil, domain.ErrIDPConnectionNotFound())
-	connections.EXPECT().GetBySlug(gomock.Any(), "proj-1", "github").
-		Return(&domain.IDPConnection{Slug: "github", Document: []byte(`{"display_name":"GitHub"}`)}, nil)
+	// Storage order is unspecified, so the mock answers out of step order.
+	connections.EXPECT().GetBySlugs(gomock.Any(), "proj-1", []string{"google", "gone", "github"}).
+		Return([]*domain.IDPConnection{
+			{Slug: "github", Document: []byte(`{"display_name":"GitHub"}`)},
+			{Slug: "google", Document: []byte(`{"display_name":"Google","template":"google"}`)},
+		}, nil)
 
 	got, err := service.NewFlowSSOProviderResolver(connections).
 		Resolve(t.Context(), "proj-1", "identifier", []string{"google", "gone", "github"})
@@ -38,7 +38,7 @@ func TestFlowSSOProviderResolver_Resolve_LookupErrorStopsResolution(t *testing.T
 	ctrl := gomock.NewController(t)
 	connections := servicemocks.NewMockIDPConnectionService(ctrl)
 	cause := errors.New("connection store unavailable")
-	connections.EXPECT().GetBySlug(gomock.Any(), "proj-1", "google").Return(nil, cause)
+	connections.EXPECT().GetBySlugs(gomock.Any(), "proj-1", []string{"google", "github"}).Return(nil, cause)
 
 	_, err := service.NewFlowSSOProviderResolver(connections).
 		Resolve(t.Context(), "proj-1", "identifier", []string{"google", "github"})

@@ -74,6 +74,10 @@ func compileList[F ~uint8, T any](ctx context.Context, c *statementCompiler, stm
 // the page, or nil when the page starts from the beginning. Statements that
 // assemble their own WHERE call it directly; compileList calls it for the rest.
 func cursorFilter[F ~uint8, T any](page database.Page[F], schema database.Schema[F, T]) (database.Filter[F], error) {
+	// Before cursor decode, so the first page and cursor pages fail alike (#850).
+	if err := schema.EnsureOrderable(page.OrderBy); err != nil {
+		return nil, err
+	}
 	if len(page.Cursor) == 0 {
 		return nil, nil
 	}
