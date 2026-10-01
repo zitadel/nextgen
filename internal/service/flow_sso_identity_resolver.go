@@ -172,17 +172,13 @@ func bindSSOIdentity(ctx context.Context, stmts AllStatements, in domain.FlowSSO
 	// the transaction and no read after it can run.
 	if !alreadyBound {
 		// The check above is a plain read: a concurrent identifier submission
-		// can still bind a user after it. The add refuses to overwrite one.
+		// can still bind a user after it. The add refuses to overwrite one, and
+		// a refusal means exactly that race, so the flow restarts. No read
+		// follows the refusal: on Spanner it poisons the transaction.
 		userFactor := &domain.AuthFactorUser{UserID: in.UserID}
 		checkID, err := stmts.AddAuthAttemptFactor(ctx, in.ProjectID, in.AttemptID, userFactor)
 		if _, taken := errors.AsType[*database.UniqueError](err); taken {
-			current, err := stmts.GetAuthAttemptByID(ctx, in.ProjectID, in.AttemptID)
-			if err != nil {
-				return fmt.Errorf("bind sso identity: re-read attempt: %w", err)
-			}
-			if bound, ok := domain.CheckAs[*domain.AuthFactorUser](current, domain.AuthCheckTypeUser); !ok || bound.UserID != in.UserID {
-				return domain.ErrFlowRestartRequired()
-			}
+			return domain.ErrFlowRestartRequired()
 		} else if err != nil {
 			return fmt.Errorf("bind sso identity: %w", err)
 		} else if err := emitDirectAuthFactor(ctx, stmts, attempt, userFactor, checkID); err != nil {

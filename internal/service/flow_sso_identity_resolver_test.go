@@ -302,51 +302,26 @@ func TestFlowSSOIdentityResolver_BindLinked_RefusesDifferentBoundUser(t *testing
 	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
 }
 
-// A concurrent identifier submission bound another user between the read and
-// the write: the add is refused and the re-read shows the competing user.
-func TestFlowSSOIdentityResolver_BindLinked_ConcurrentBindRestarts(t *testing.T) {
-	t.Parallel()
-	f := newSSOResolverFixture(t)
-	f.inTransaction(t)
-	gomock.InOrder(
-		f.stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), ssoProjectID, ssoAttemptID).Return(parkedAttempt(parkedResult()), nil),
-		f.stmts.EXPECT().AddAuthAttemptFactor(gomock.Any(), ssoProjectID, ssoAttemptID, gomock.Any()).
-			Return("", database.NewUniqueError("checks", "", nil)),
-		f.stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), ssoProjectID, ssoAttemptID).
-			Return(parkedAttempt(parkedResult(), &domain.AuthFactorUser{UserID: "user-a"}), nil),
-	)
-	f.stmts.EXPECT().SetAuthAttemptFactor(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
-	// Deleted first, then rolled back with the transaction.
-	f.stmts.EXPECT().DeleteSSOCallback(gomock.Any(), ssoProjectID, ssoAttemptID, "ch-1").Return(nil)
-
-	err := f.resolver.BindLinked(t.Context(), domain.FlowSSOBindInput{
-		ProjectID: ssoProjectID, AttemptID: ssoAttemptID, CheckID: "ch-1", UserID: "user-b", ConnectionID: "idp-1", LinkID: "idplink-1",
-	})
-	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
-}
-
-// The competing writer bound the same user: the bind carries on with the sso
-// factor and emits no second event for the user factor it did not write.
-func TestFlowSSOIdentityResolver_BindLinked_ConcurrentSameUserProceeds(t *testing.T) {
+// A refused add can only mean a concurrent bind since the read: the same-user
+// case is settled by the read before it. The flow restarts with no re-read,
+// which a refused write would make impossible on Spanner.
+func TestFlowSSOIdentityResolver_BindLinked_ConcurrentBindRestartsWithoutReread(t *testing.T) {
 	t.Parallel()
 	f := newSSOResolverFixture(t)
 	f.inTransaction(t)
 	gomock.InOrder(
 		f.stmts.EXPECT().DeleteSSOCallback(gomock.Any(), ssoProjectID, ssoAttemptID, "ch-1").Return(nil),
-		f.stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), ssoProjectID, ssoAttemptID).Return(parkedAttempt(parkedResult()), nil),
+		f.stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), ssoProjectID, ssoAttemptID).Return(parkedAttempt(parkedResult()), nil).Times(1),
 		f.stmts.EXPECT().AddAuthAttemptFactor(gomock.Any(), ssoProjectID, ssoAttemptID, gomock.Any()).
 			Return("", database.NewUniqueError("checks", "", nil)),
-		f.stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), ssoProjectID, ssoAttemptID).
-			Return(parkedAttempt(parkedResult(), &domain.AuthFactorUser{UserID: "user-1"}), nil),
 	)
-	f.stmts.EXPECT().SetAuthAttemptFactor(gomock.Any(), ssoProjectID, ssoAttemptID,
-		&domain.AuthFactorSSO{ConnectionID: "idp-1", LinkID: "idplink-1", AttemptID: ssoAttemptID}).Return("ch-sso", nil)
-	f.stmts.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil).Times(1)
+	f.stmts.EXPECT().SetAuthAttemptFactor(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+	f.stmts.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Times(0)
 
 	err := f.resolver.BindLinked(t.Context(), domain.FlowSSOBindInput{
-		ProjectID: ssoProjectID, AttemptID: ssoAttemptID, CheckID: "ch-1", UserID: "user-1", ConnectionID: "idp-1", LinkID: "idplink-1",
+		ProjectID: ssoProjectID, AttemptID: ssoAttemptID, CheckID: "ch-1", UserID: "user-b", ConnectionID: "idp-1", LinkID: "idplink-1",
 	})
-	require.NoError(t, err)
+	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
 }
 
 // The pinned revision (or its connection) was deleted while the user was at
