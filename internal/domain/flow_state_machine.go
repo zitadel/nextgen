@@ -516,9 +516,11 @@ func ssoSchemaClaims(schema *jsonschema.Schema, claims map[string]any) map[strin
 // collision check probes (probe), both sorted so the probe order is stable.
 // Team scope is not probed, because the probe only asks the project-scoped
 // registry; a team-scoped collision is still refused at creation and falls
-// back to collection. The annotation is read directly, so a claim whose
-// property no flow step could render (a type union) is no error; a claim the
-// schema does not know, or an object or array claim, is skipped.
+// back to collection. An object or array property is unique like any other
+// (the registry stores it), so it is in unique, but it is not probed: the
+// lookup takes a single value. The annotation is read directly, so a claim
+// whose property no flow step could render (a type union) is no error; a
+// claim the schema does not know is skipped.
 func ssoUniqueClaims(schema *jsonschema.Schema, claims map[string]any) (probe, unique []string) {
 	root := newSchemaReader(schema)
 	for name := range claims {
@@ -526,15 +528,13 @@ func ssoUniqueClaims(schema *jsonschema.Schema, claims map[string]any) (probe, u
 		if !ok {
 			continue
 		}
-		if t, _ := prop.JSONType(); t == "object" || t == "array" {
+		scope := deriveUnique(prop)
+		if scope == AttributeUniquenessUnspecified {
 			continue
 		}
-		switch deriveUnique(prop) {
-		case AttributeUniquenessProject:
+		unique = append(unique, name)
+		if t, _ := prop.JSONType(); scope == AttributeUniquenessProject && t != "object" && t != "array" {
 			probe = append(probe, name)
-			unique = append(unique, name)
-		case AttributeUniquenessTeam:
-			unique = append(unique, name)
 		}
 	}
 	slices.Sort(probe)

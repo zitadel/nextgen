@@ -5038,3 +5038,33 @@ func TestFlowStateMachine_Render_SSONestedComposedRequiredFallsBackToCollection(
 		})
 	}
 }
+
+// An array can carry x-unique and is stored in the uniqueness registry, so a
+// required unique array must arrive verified like any other unique property.
+// It is not probed: the collision lookup takes a single string value.
+func TestFlowStateMachine_Render_SSOUnverifiedRequiredUniqueArrayFallsBackToCollection(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoRenderWorldWithSchema(t, `{
+		"$schema": "https://json-schema.org/draft/2020-12/schema",
+		"type": "object",
+		"x-auth-methods": { "password": { "enabled": true } },
+		"x-identifier": "email",
+		"required": ["email", "aliases"],
+		"properties": {
+			"email":    { "type": "string", "format": "email", "x-unique": "project" },
+			"username": { "type": "string" },
+			"aliases":  { "type": "array", "items": { "type": "string" }, "x-unique": "project" }
+		}
+	}`)
+	def = withSSOOutcomeSteps(def)
+	w.expectParked(unlinkedParked(
+		map[string]any{"email": "alice@example.com", "aliases": []any{"ali"}},
+		map[string]bool{"email": true, "aliases": false},
+	), nil)
+	w.expectOwner("email", "alice@example.com", "")
+	w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Times(0)
+
+	result, err := w.sm.Render(t.Context(), def, state)
+	require.NoError(t, err)
+	assert.Equal(t, "sso-register", result.Step.Name)
+}
