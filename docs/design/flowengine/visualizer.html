@@ -1402,6 +1402,12 @@ function setupRightTabs() {
 
 // ── Mermaid Diagram ───────────────────────────────────────────────
 
+// `callback` is the key main still accepts until #1371 lands; remove it after.
+function ssoReturnKey(step) {
+  const t = step.transitions || {};
+  return 'sso_authenticated' in t ? 'sso_authenticated' : ('callback' in t ? 'callback' : null);
+}
+
 let mermaidCounter = 0;
 
 async function renderDiagram() {
@@ -1430,8 +1436,8 @@ async function renderDiagram() {
     }
 
     if (step.on_success) label += `<br/>on_success: ${step.on_success}`;
-    // Detect sso_authenticated-only steps (SSO redirect, etc.)
-    const isCallbackStep = step.transitions && 'sso_authenticated' in step.transitions &&
+    // Detect SSO-return-only steps (SSO redirect, etc.)
+    const isCallbackStep = ssoReturnKey(step) !== null &&
       (!step.fields || (Array.isArray(step.fields) ? step.fields.length === 0 : Object.keys(step.fields).length === 0)) &&
       (!step.actions || Object.keys(step.actions).length === 0);
 
@@ -1474,7 +1480,7 @@ async function renderDiagram() {
 
   for (const step of steps) {
     const id = 'n_' + step.name;
-    const isCallback = step.transitions && 'sso_authenticated' in step.transitions &&
+    const isCallback = ssoReturnKey(step) !== null &&
       (!step.fields || (Array.isArray(step.fields) ? step.fields.length === 0 : Object.keys(step.fields).length === 0)) &&
       (!step.actions || Object.keys(step.actions).length === 0);
     if (step.complete) {
@@ -1837,8 +1843,8 @@ async function renderSim() {
     return;
   }
 
-  // Detect redirect steps: no fields, no actions, has an sso_authenticated transition
-  const hasCallback = step.transitions && 'sso_authenticated' in step.transitions;
+  // Detect redirect steps: no fields, no actions, has an SSO return transition
+  const hasCallback = ssoReturnKey(step) !== null;
   const hasNoFields = !step.fields || (Array.isArray(step.fields) ? step.fields.length === 0 : Object.keys(step.fields).length === 0);
   const hasNoActions = !step.actions || Object.keys(step.actions).length === 0;
   if (hasCallback && hasNoFields && hasNoActions) {
@@ -1848,7 +1854,7 @@ async function renderSim() {
       <div class="sim-body">
         <p style="color: var(--muted); text-align: center; padding: 40px 0;">Redirecting to external provider\u2026</p>
         <div class="sim-actions">
-          <button class="sim-btn primary" onclick="simAction('sso_authenticated')">Simulate SSO return</button>
+          <button class="sim-btn primary" onclick="simAction('${ssoReturnKey(step)}')">Simulate SSO return</button>
         </div>
       </div>
       <div class="sim-footer">

@@ -7,6 +7,11 @@ A flow definition is a directed graph of steps stored as an API resource and
 executed by the [flow engine](architecture.md). This document describes the
 shape and the rules the engine enforces on top of the JSON schema.
 
+The SSO outcome keys below (`sso_authenticated`, `sso_user_not_found`,
+`sso_user_already_exists`) are the names the engine adopts in #1371. Until that
+PR merges, the shipped schema and validator still accept `callback` and
+`identity_unknown`.
+
 Validation runs in two layers:
 
 1. **Schema**: `api/openapi/components/flows/flow-definition.yaml` states required fields, types, enums, and string patterns, plus the step and transition shapes JSON Schema can express: a terminal step carries nothing else, a non-terminal step does something, `sso_providers` needs `transitions.sso_authenticated`, and a transition never sets both `purpose` and `action`. The generated editor meta-schema enforces all of it; the API's generated request validation ignores the shape rules, which the engine rules below enforce again.
