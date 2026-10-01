@@ -368,9 +368,9 @@ of scope parameters such as `team_ids`), release-time validation, and
 most-specific-wins resolution; policies adopt it as-is when it lands, the
 `audience` field joining the envelope next to `kind` and `operation`. The
 model needs no change to take it: the engine evaluates one resolved instance,
-the resolver is the only piece that grows a request hint, and the [not-weaker
-than-the-project-default check](#policy-hierarchy) waits for the explicit
-default that draft introduces.
+and the resolver is the only piece that grows a request hint. That a scoped
+instance must not weaken the project's policy is an open question decided
+with that draft ([Policy hierarchy](#policy-hierarchy)).
 
 ### Hooks and actions
 
