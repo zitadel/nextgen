@@ -14388,6 +14388,10 @@ func (s *Server) handleSetUserPasswordRequest(args [1]string, argsEscaped bool, 
 // carries the browser-binding cookie the callback checks instead:
 // `__Host-_zsso` with `Secure` on https origins, `_zsso` without on an
 // http development origin, always `HttpOnly`, `Path=/`, `SameSite=Lax`.
+// A connection whose `client_id` is a `${{ NAME }}` reference has it filled
+// from the project's variables. A provider the engine cannot start a
+// sign-in with, including a reference with no variable behind it,
+// re-renders the step with `error.sso_unavailable`.
 //
 // POST /flow/{id}/submit
 func (s *Server) handleSubmitFlowStepRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {

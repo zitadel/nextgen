@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -19,13 +20,14 @@ type FlowSSORedirectIssuer struct {
 	connections IDPConnectionService
 	attempts    AuthAttemptService
 	keys        KeyService
+	variables   VariableService
 	// httpClient is the hardened egress client; discovery fetches a
 	// tenant-authored URL (ADR 061).
 	httpClient *http.Client
 }
 
-func NewFlowSSORedirectIssuer(connections IDPConnectionService, attempts AuthAttemptService, keys KeyService, httpClient *http.Client) *FlowSSORedirectIssuer {
-	return &FlowSSORedirectIssuer{connections: connections, attempts: attempts, keys: keys, httpClient: httpClient}
+func NewFlowSSORedirectIssuer(connections IDPConnectionService, attempts AuthAttemptService, keys KeyService, variables VariableService, httpClient *http.Client) *FlowSSORedirectIssuer {
+	return &FlowSSORedirectIssuer{connections: connections, attempts: attempts, keys: keys, variables: variables, httpClient: httpClient}
 }
 
 var _ domain.FlowSSORedirectIssuer = (*FlowSSORedirectIssuer)(nil)
@@ -45,6 +47,25 @@ func (i *FlowSSORedirectIssuer) Issue(ctx context.Context, in domain.FlowIssueSS
 	conn, parseErr := idp.ParseConnection(connection.RevisionID, connection.Document)
 	if parseErr != nil {
 		return domain.FlowSSORedirectOutput{}, i.unavailable(ctx, in, parseErr)
+	}
+	// A `${{ NAME }}` client_id is filled at the point of use (ADR 062); the
+	// value is a project variable until environments exist. A variable marked
+	// secret is refused rather than decrypted: the value goes into a URL the
+	// browser sees. The client secret is not read here: the authorize
+	// request does not use it.
+	if name, ok := domain.VariableReferenceName(conn.OIDC.ClientID); ok {
+		variables, varErr := i.variables.GetVariables(ctx, domain.VariableOwner{ProjectID: in.ProjectID}, name)
+		if varErr != nil {
+			return domain.FlowSSORedirectOutput{}, varErr
+		}
+		clientID := ""
+		if len(variables) == 1 && !variables[0].IsSecret {
+			clientID, _ = variables[0].Value.(string)
+		}
+		if clientID == "" {
+			return domain.FlowSSORedirectOutput{}, i.unavailable(ctx, in, fmt.Errorf("client_id variable %q is missing, a secret, or not a string", name))
+		}
+		conn.OIDC.ClientID = clientID
 	}
 	client, clientErr := idp.NewOIDCClient(ctx, conn, in.RedirectURI, i.httpClient)
 	if clientErr != nil {

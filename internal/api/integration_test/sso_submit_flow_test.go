@@ -30,8 +30,16 @@ func TestFlowSSOSubmitRedirectsToProvider(t *testing.T) {
 	oidcConn.TokenEndpoint = api.NewOptString("https://accounts.example.test/token")
 	oidcConn.UserinfoEndpoint = api.NewOptString("https://accounts.example.test/userinfo")
 	oidcConn.JwksURI = api.NewOptString("https://accounts.example.test/keys")
+	// The document carries a reference; the engine fills it from the
+	// project's variables when it builds the authorize URL.
+	oidcConn.ClientID = "${{ GOOGLE_CLIENT_ID }}"
 	connection.Oidc = api.NewOptIdpConnectionOidc(oidcConn)
 	created := f.create(t, connection)
+	varsResp, err := f.client.UpdateVariables(t.Context(), api.UpdateVariablesRequest{
+		"GOOGLE_CLIENT_ID": api.NewVariableScalarVariableInput(api.NewStringVariableScalar("google-client")),
+	}, api.UpdateVariablesParams{ProjectID: f.projectID()})
+	require.NoError(t, err)
+	require.IsType(t, &api.Variables{}, varsResp, helpers.MustMarshal(t, varsResp))
 
 	defResp, err := f.client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      f.projectID(),

@@ -1252,7 +1252,11 @@ export class ZitadelLogin extends ZitadelSurface {
         action: action ?? "submit",
         fields,
         ...(challengeResponse ? { challenge_response: challengeResponse } : {}),
-        ...(ssoProviderId ? { sso_provider_id: ssoProviderId } : {}),
+        // The page the callback brings the browser back to; the engine
+        // refuses a target on another origin.
+        ...(ssoProviderId
+          ? { sso_provider_id: ssoProviderId, return_target: window.location.href }
+          : {}),
       };
       const { api } = resolveApi(this.project, this.projectAttrs, "<zitadel-login>");
       const wire = await apiSubmitStep(api, id, body);

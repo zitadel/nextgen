@@ -139,6 +139,7 @@ describe("<zitadel-login> with identity providers", () => {
     expect(submits).toHaveLength(1);
     expect(submits[0]?.body.action).toBe("sso");
     expect(submits[0]?.body.sso_provider_id).toBe(GOOGLE.id);
+    expect(submits[0]?.body.return_target).toBe(window.location.href);
   });
 
   it("hands the browser to the provider's authorize URL", async () => {

@@ -15,6 +15,7 @@ phases:
 ```
 submit { action: "sso", sso_provider_id: "google", return_target: "<page hosting the orchestrator>" }
   engine: reject if provider absent from the step's sso_providers
+  engine: fill a ${{ NAME }} client_id from the project's variables
   engine: mint state record, build authorize URL (PKCE), emit sso-redirect step
 browser → provider → user authenticates
 provider → GET {issuer}/__nextgen/idp/callback?code=…&state=…
