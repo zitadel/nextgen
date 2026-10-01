@@ -137,9 +137,10 @@ function BrandingScreen() {
         <h1 className="font-serif text-2xl leading-6 tracking-tight text-foreground">Branding</h1>
       </div>
 
-      {/* Two rows on a phone, one on a desktop: the design pairs the selectors
-          on the first row and the tabs with the environment buttons on the
-          second, each edge-aligned. The separators only exist inline. */}
+      {/* Three rows on a phone, one on a desktop: the flow selector, then the
+          tabs with the environment buttons edge-aligned, then the state
+          selector, which is too wide to share the tabs' row at that width.
+          The separators only exist inline. */}
       <div className="mt-3 flex flex-col gap-2 lg:flex-row lg:items-center lg:gap-[10px] lg:px-2">
         {flows.length > 0 && (
           <div className="flex items-center justify-between gap-[10px]">
@@ -164,7 +165,7 @@ function BrandingScreen() {
             <Separator orientation="vertical" className="hidden h-5! lg:block" />
           </div>
         )}
-        <div className="flex items-center gap-[10px] lg:flex-1">
+        <div className="flex flex-wrap items-center gap-x-[10px] gap-y-2 lg:flex-1">
           <Tabs
             value={activeJourney}
             onValueChange={(value) => setJourney(value as PreviewJourney)}
@@ -179,7 +180,7 @@ function BrandingScreen() {
           </Tabs>
           {/* After the tabs, as the design orders the row: flow, screen, state.
               No icon on this one; the flow selector alone carries its glyph. */}
-          <div className="flex items-center gap-[10px]">
+          <div className="order-last flex basis-full items-center gap-[10px] sm:order-none sm:basis-auto">
             <Separator orientation="vertical" className="hidden h-5! lg:block" />
             <Select value={state} onValueChange={(value) => setState(value as PreviewState)}>
               <SelectTrigger aria-label="Previewed state" className={GHOST_TRIGGER}>
