@@ -10,8 +10,9 @@ npx @zitadel/cli@alpha start
 ```
 
 Run it where you run `setup` and `console`. Both look for the local admin in
-the current directory only, so a `start` in another directory leaves `setup`
-unable to attach the project to the admin, and the console shows no projects.
+the current directory only. After a `start` in another directory, `setup`
+cannot attach the project to the admin, `console` in the app directory fails
+(see below), and a sign-in from the directory `start` ran in shows no projects.
 
 By default, `start` boots the runtime with the platform project and creates a
 local admin, `admin@zitadel.localhost`, so you exist on your own server without
