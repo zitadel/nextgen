@@ -12,6 +12,8 @@
  * rewriting it would discard deliberate work.
  */
 
+import { ZitadelError } from "../errors";
+
 /**
  * Steps a flow starts at, by purpose, plus the steps that collect an
  * identifier. The provider button belongs on all of them: a developer landing
@@ -407,6 +409,19 @@ function migrateLegacyOutcomes(document: Json): boolean {
     for (const [old, next] of LEGACY_OUTCOMES) {
       if (!(old in transitions) || actionNames.has(old)) {
         continue;
+      }
+      if (actionNames.has(next)) {
+        // The new key is this step's own action route: migrating would hand it
+        // to the generated SSO target, a change to hand-authored routing.
+        const name = typeof step.name === "string" ? step.name : "?";
+        throw new ZitadelError(
+          "E_VALIDATION",
+          `steps.${name}: action "${next}" uses the name the SSO outcome "${old}" is renamed to`,
+          {
+            hint: `Rename the action "${next}" on step "${name}" (and its transition), then run sso enable again.`,
+            details: { step: name, action: next, legacyOutcome: old },
+          },
+        );
       }
       if (!(next in transitions)) {
         transitions[next] = transitions[old];
