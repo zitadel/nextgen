@@ -30,13 +30,12 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 import type { NavGroup } from "../../nav";
 import { type ThemePreference, useTheme } from "../../theme";
 import { ContextSwitcher } from "./ContextSwitcher";
 import { ZitadelLogo } from "./icons";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-
 import { useNavItems } from "./use-nav-items";
 
 /**
@@ -327,16 +326,13 @@ function PortalNav() {
  * The identity block: 32px avatar, name, email. It is drawn twice — as the
  * footer trigger and again as the dropdown's header — so it lives in one place.
  *
- * The gradient is the design's `Gradient/Red` style rather than a token: it is
- * a placeholder portrait, and no avatar image source exists on the session yet.
+ * The gradient is the design's `Gradient/Red`, a placeholder portrait: no
+ * avatar image source exists on the session yet.
  */
 function UserIdentity({ primary, secondary }: { primary: string; secondary?: string }) {
   return (
     <>
-      <span
-        aria-hidden
-        className="size-8 shrink-0 rounded-full bg-[linear-gradient(232deg,#f25543_17%,#0f0f11_75%)]"
-      />
+      <span aria-hidden className="size-8 shrink-0 rounded-full bg-(image:--zl-gradient-red)" />
       <span className="flex min-w-0 flex-1 flex-col gap-0.5 leading-none">
         <span className="truncate text-sm leading-none font-semibold">{primary}</span>
         {secondary && <span className="truncate text-xs leading-none">{secondary}</span>}
@@ -406,7 +402,9 @@ function ContextBar() {
     <div className="sticky top-0 z-10 flex items-start justify-between gap-4 bg-background px-2 py-3 md:items-center md:px-4">
       <div className="flex min-w-0 flex-1 flex-col gap-2 md:flex-row md:items-center">
         {/* Desktop only — mobile keeps the persistent Sidebar 07. icon rail. */}
-        {state === "expanded" && <SidebarTrigger className="hidden text-foreground md:inline-flex" />}
+        {state === "expanded" && (
+          <SidebarTrigger className="hidden text-foreground md:inline-flex" />
+        )}
         <ContextSwitcher />
       </div>
       <ThemeToggle />
