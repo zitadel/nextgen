@@ -114,6 +114,7 @@ func TestFlowSSOSubmitRedirectsToProvider(t *testing.T) {
 	require.NotEmpty(t, record.AuthAttemptID)
 	require.Equal(t, "google", record.Pending.ProviderSlug)
 	require.Equal(t, created.RevisionID, record.Pending.ConnectionRevisionID)
+	require.Equal(t, "https://login.example.test/__nextgen/idp/callback", record.Pending.RedirectURI)
 	require.Equal(t, returnTarget.String(), record.Pending.ReturnTarget)
 	require.Equal(t, query.Get("nonce"), record.Pending.OIDCNonce)
 

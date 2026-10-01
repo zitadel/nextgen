@@ -159,6 +159,7 @@ type IssueSSOStateInput struct {
 	AttemptID            string
 	ProviderSlug         string
 	ConnectionRevisionID string
+	RedirectURI          string
 	ReturnTarget         string
 	PKCEEncrypter        crypto.Encrypter
 }
@@ -406,7 +407,7 @@ func (s *authAttemptService) IssueSSOState(ctx context.Context, input IssueSSOSt
 	if err := attempt.PrepareChallenge(domain.AuthCheckTypeSSOCallback); err != nil {
 		return nil, err
 	}
-	state, err := domain.NewSSOState(input.ProviderSlug, input.ConnectionRevisionID, input.ReturnTarget, input.PKCEEncrypter)
+	state, err := domain.NewSSOState(input.ProviderSlug, input.ConnectionRevisionID, input.RedirectURI, input.ReturnTarget, input.PKCEEncrypter)
 	if err != nil {
 		return nil, err
 	}

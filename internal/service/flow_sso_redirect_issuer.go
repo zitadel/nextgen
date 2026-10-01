@@ -84,6 +84,7 @@ func (i *FlowSSORedirectIssuer) Issue(ctx context.Context, in domain.FlowIssueSS
 		AttemptID:            in.AttemptID,
 		ProviderSlug:         in.ProviderSlug,
 		ConnectionRevisionID: connection.RevisionID,
+		RedirectURI:          in.RedirectURI,
 		ReturnTarget:         in.ReturnTarget,
 		PKCEEncrypter:        encrypter,
 	})

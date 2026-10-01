@@ -82,6 +82,7 @@ func TestFlowSSORedirectIssuer_Issue(t *testing.T) {
 			AttemptID:            "attempt-1",
 			ProviderSlug:         "google",
 			ConnectionRevisionID: "idprev_1",
+			RedirectURI:          ssoIssueInput.RedirectURI,
 			ReturnTarget:         ssoIssueInput.ReturnTarget,
 			PKCEEncrypter:        crypter,
 		}, attempts.issueSSOStateIn)
