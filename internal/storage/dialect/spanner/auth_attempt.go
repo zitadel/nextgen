@@ -43,7 +43,7 @@ const (
 		` THEN RETURN id`
 	// The check id is part of the primary key, so AddAuthAttemptFactor cannot
 	// give a pending row a new id in place: it deletes the row and inserts.
-	deletePendingAuthAttemptCheckStmt = `DELETE FROM checks WHERE project_id = @p1 AND auth_attempt_id = @p2 AND type = @p3 AND factor_payload IS NULL`
+	deletePendingAuthAttemptCheckStmt = `DELETE FROM checks WHERE project_id = @p1 AND auth_attempt_id = @p2 AND type = @p3 AND last_verified_at IS NULL`
 	authAttemptChallengeSucceededStmt = `UPDATE checks SET last_verified_at = @p1, factor_payload = @p2, challenge_payload = NULL, last_challenged_at = NULL, failure_count = 0` +
 		` WHERE project_id = @p3 AND auth_attempt_id = @p4 AND type = @p5 AND id = @p6`
 	// Spanner DML cannot update a primary-key column, and a re-issue mints a

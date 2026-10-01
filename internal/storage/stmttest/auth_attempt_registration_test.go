@@ -261,6 +261,25 @@ func TestAuthAttemptStatements_AddAuthAttemptFactorRefusesSecond(t *testing.T) {
 			assert.False(t, stillChallenged)
 		})
 
+		// A verified factor without a payload (password) is still verified.
+		t.Run("refuses_a_payload_less_verified_factor", func(t *testing.T) {
+			projectID := ensureProject(t, d.stmts)
+			attempt := createBareAttempt(t, d.stmts, projectID)
+			stored := &domain.AuthFactorPassword{}
+			_, err := d.stmts.SetAuthAttemptFactor(t.Context(), projectID, attempt.ID, stored)
+			require.NoError(t, err)
+
+			_, err = d.stmts.AddAuthAttemptFactor(t.Context(), projectID, attempt.ID, &domain.AuthFactorPassword{})
+			var unique *database.UniqueError
+			require.ErrorAs(t, err, &unique)
+
+			got, err := d.stmts.GetAuthAttemptByID(t.Context(), projectID, attempt.ID)
+			require.NoError(t, err)
+			factor, ok := domain.CheckAs[*domain.AuthFactorPassword](got, domain.AuthCheckTypePassword)
+			require.True(t, ok)
+			assert.True(t, factor.GetLastVerifiedAt().Equal(stored.GetLastVerifiedAt()), "the stored factor is untouched")
+		})
+
 		t.Run("invalidates_an_earlier_challenge", func(t *testing.T) {
 			projectID := ensureProject(t, d.stmts)
 			attempt := createBareAttempt(t, d.stmts, projectID)

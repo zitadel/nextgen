@@ -49,7 +49,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`
 		` VALUES (?, ?, ?, ?, ?, ?, 0) ON CONFLICT (project_id, auth_attempt_id, type)` +
 		` DO UPDATE SET id = EXCLUDED.id, last_verified_at = EXCLUDED.last_verified_at, factor_payload = EXCLUDED.factor_payload,` +
 		` challenge_payload = NULL, last_challenged_at = NULL, failure_count = 0, last_failed_at = NULL` +
-		` WHERE checks.factor_payload IS NULL` +
+		` WHERE checks.last_verified_at IS NULL` +
 		` RETURNING id`
 
 	authAttemptChallengeSucceededStmt = `UPDATE checks SET last_verified_at = ?, factor_payload = ?, challenge_payload = NULL, last_challenged_at = NULL, failure_count = 0` +
