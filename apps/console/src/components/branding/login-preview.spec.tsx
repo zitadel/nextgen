@@ -19,6 +19,7 @@ type Mounted = HTMLElement & {
   purpose?: string;
   flowName?: string;
   previewState?: string;
+  previewSuccessStep?: string;
   theme?: string;
 };
 
@@ -58,5 +59,19 @@ describe("LoginPreview", () => {
     // Same element: a state change must not restart the flow.
     expect(mounted(container)).toBe(before);
     expect(before.previewState).toBe("loading");
+  });
+
+  it("names the flow's terminal step for the success state", () => {
+    const { container } = render(
+      <LoginPreview
+        journey="login"
+        flowName="onboarding"
+        theme="revision"
+        state="success"
+        successStep="welcome"
+      />,
+    );
+
+    expect(mounted(container).previewSuccessStep).toBe("welcome");
   });
 });

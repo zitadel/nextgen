@@ -20,6 +20,8 @@ type Props = {
   theme: "light" | "dark" | "revision";
   /** The state the element shows the step in. */
   state: PreviewState;
+  /** The flow's terminal step, which the success state paints; the element's default when unset. */
+  successStep?: string;
 };
 
 /**
@@ -46,7 +48,7 @@ type Props = {
  * connect — so a journey change has to build a new one rather than mutate the
  * old.
  */
-export function LoginPreview({ journey, flowName, theme, state }: Props) {
+export function LoginPreview({ journey, flowName, theme, state, successStep = "" }: Props) {
   const host = useRef<HTMLDivElement | null>(null);
   const element = useRef<ZitadelLogin | null>(null);
 
@@ -68,14 +70,16 @@ export function LoginPreview({ journey, flowName, theme, state }: Props) {
     login.project = project;
     login.theme = elementTheme(theme);
     login.previewState = state;
+    login.previewSuccessStep = successStep;
     container.replaceChildren(login);
     element.current = login;
     return () => {
       login.remove();
       element.current = null;
     };
-    // `theme` and `state` are seeded here but deliberately not remount keys: a
-    // switch repaints the element below rather than restarting its flow.
+    // `theme`, `state` and `successStep` are seeded here but deliberately not
+    // remount keys: a switch repaints the element below rather than restarting
+    // its flow.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [journey, flowName, project]);
 
@@ -90,7 +94,8 @@ export function LoginPreview({ journey, flowName, theme, state }: Props) {
   useEffect(() => {
     if (!element.current) return;
     element.current.previewState = state;
-  }, [state]);
+    element.current.previewSuccessStep = successStep;
+  }, [state, successStep]);
 
   return <div ref={host} />;
 }

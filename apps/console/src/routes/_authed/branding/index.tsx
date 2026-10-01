@@ -54,6 +54,7 @@ export const Route = createFileRoute("/_authed/branding/")({
       name: entry.flow_definition.name,
       label: flowDisplayName(entry.flow_definition),
       purposes: Object.keys(entry.flow_definition.purposes ?? {}),
+      successStep: successStepName(entry.flow_definition.steps),
     }));
     const latest = revisions[0];
     if (!latest) return { revision: {} as BrandingRevision, flows: previewFlows };
@@ -63,8 +64,17 @@ export const Route = createFileRoute("/_authed/branding/")({
   component: BrandingScreen,
 });
 
-/** A flow the preview can run, and the purposes it serves. */
-type PreviewFlow = { name: string; label: string; purposes: string[] };
+/** A flow the preview can run, the purposes it serves, and its terminal screen. */
+type PreviewFlow = { name: string; label: string; purposes: string[]; successStep?: string };
+
+/**
+ * The step a flow ends on a screen with: its one `complete: "show"` step. A
+ * flow that declares none, or several, leaves the choice to the element.
+ */
+function successStepName(steps: { name: string; complete?: string }[] = []): string | undefined {
+  const shown = steps.filter((step) => step.complete === "show");
+  return shown.length === 1 ? shown[0]?.name : undefined;
+}
 
 // Passkey is absent: it needs a step the flow only reaches after an
 // identifier, which the preview cannot ask for (the element shows the entry
@@ -78,13 +88,14 @@ const JOURNEYS: { id: PreviewJourney; label: string }[] = [
 
 // The states of the design's selector, in its order. All of them are the
 // element's own rendering of the step the project serves; none writes to it.
-const STATES: { id: PreviewState; label: string }[] = [
-  { id: "default", label: "Default" },
-  { id: "validation_error", label: "Validation errors" },
-  { id: "submission_error", label: "Submission error" },
-  { id: "loading", label: "Loading" },
-  { id: "success", label: "Success" },
-];
+// Keyed by state, so one the element gains has to be labelled here to compile.
+const STATE_LABELS: Record<PreviewState, string> = {
+  default: "Default",
+  validation_error: "Validation errors",
+  submission_error: "Submission error",
+  loading: "Loading",
+  success: "Success",
+};
 
 // The flow selector is drawn as a ghost button, not a bordered select: no
 // border or shadow, and its icons take the foreground colour rather than the
@@ -187,9 +198,9 @@ function BrandingScreen() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent position="popper" sideOffset={4}>
-                {STATES.map((entry) => (
-                  <SelectItem key={entry.id} value={entry.id}>
-                    State: {entry.label}
+                {Object.entries(STATE_LABELS).map(([id, label]) => (
+                  <SelectItem key={id} value={id}>
+                    State: {label}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -238,6 +249,7 @@ function BrandingScreen() {
               flowName={activeFlowName}
               theme={theme}
               state={state}
+              successStep={selected?.successStep}
             />
           </div>
         </Card>

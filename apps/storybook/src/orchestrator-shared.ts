@@ -8,7 +8,7 @@ import {
 } from "@zitadel/api-mock";
 import { html } from "lit";
 import { mswLoader } from "msw-storybook-addon";
-import "@zitadel/components";
+import { LOGIN_PREVIEW_STATES, type LoginPreviewState } from "@zitadel/components";
 import { brandingPresets, type BrandingPresetId } from "./branding-presets.js";
 
 /**
@@ -41,7 +41,7 @@ export interface OrchestratorArgs {
   branding: BrandingPresetId;
   theme: "" | "light" | "dark" | "auto";
   sso: boolean;
-  previewState: "" | "default" | "validation_error" | "submission_error" | "loading" | "success";
+  previewState: "" | LoginPreviewState;
 }
 
 export const mock = setupMockHandlers();
@@ -98,7 +98,7 @@ export const orchestratorBase = {
     },
     previewState: {
       control: "select",
-      options: ["", "default", "validation_error", "submission_error", "loading", "success"],
+      options: ["", ...LOGIN_PREVIEW_STATES],
       description:
         "Preview mode: show the served step in a state and submit nothing. Empty runs the flow for real.",
     },

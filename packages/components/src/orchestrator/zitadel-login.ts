@@ -217,9 +217,9 @@ export class ZitadelLogin extends ZitadelSurface {
    *   would be.
    * - `submission_error`: the form-level banner a failed submit shows.
    * - `loading`: the busy treatment of a submit in flight.
-   * - `success`: the terminal screen, with the default flow's `done` texts.
-   *   A flow definition's own terminal step is not known until the server
-   *   walks the flow to it.
+   * - `success`: the terminal screen. It is the step named by
+   *   {@link previewSuccessStep}, since the flow's own terminal step is not
+   *   known until the server walks the flow to it.
    *
    * Only the purpose's entry step can be previewed: a later step exists
    * only once the server has walked the flow to it.
@@ -227,6 +227,13 @@ export class ZitadelLogin extends ZitadelSurface {
   @property({ type: String, attribute: "preview-state" }) accessor previewState:
     | LoginPreviewState
     | "" = "";
+
+  /**
+   * The terminal step the `success` preview paints, for a flow definition that
+   * names it differently from the default flow's `done`. Its texts follow the
+   * server's `<step>.title` / `<step>.description` convention.
+   */
+  @property({ type: String, attribute: "preview-success-step" }) accessor previewSuccessStep = "";
 
   /**
    * The preview state in effect: {@link previewState} when it names a known
@@ -440,7 +447,9 @@ export class ZitadelLogin extends ZitadelSurface {
           `(${LOGIN_PREVIEW_STATES.join(", ")}); running the flow for real.`,
       );
     }
-    if (changed.has("previewState") && this.response) {
+    const previewChanged =
+      changed.has("previewState") || (changed.has("previewSuccessStep") && this.preview !== "");
+    if (previewChanged && this.response) {
       // A flow already on screen becomes the base when preview is switched on
       // after mount; leaving preview restores it as it was served and lets
       // the flow run for real from there.
@@ -484,11 +493,14 @@ export class ZitadelLogin extends ZitadelSurface {
 
     const props = changed as Map<string, unknown>;
     if (props.has("response") && this.previewRepaint) {
+      this.previewRepaint = false;
       // A preview state is not a step the visitor reached: keep focus where
       // the operator has it (the state selector) and put typed values back.
-      this.previewRepaint = false;
-      void this.restoreValuesAfterRender();
-      return;
+      // Not on the first paint, which focuses as any mount does.
+      if (props.get("response") != null) {
+        void this.restoreValuesAfterRender();
+        return;
+      }
     }
     if (props.has("response")) {
       // `changed` holds the OLD value: nullish (`null` initializer, or
@@ -694,10 +706,7 @@ export class ZitadelLogin extends ZitadelSurface {
       this.loading = false;
     }
     // After `loading` has settled: the `loading` preview holds it back up.
-    if (this.preview && this.response) {
-      this.previewBase = this.response;
-      this.applyPreviewState();
-    }
+    if (this.preview) this.applyPreviewState();
   }
 
   /**
@@ -712,7 +721,7 @@ export class ZitadelLogin extends ZitadelSurface {
     const state = this.preview;
     this.stepErrorDismissed = false;
     this.loading = state === "loading";
-    const next = previewResponse(base, state);
+    const next = previewResponse(base, state, this.previewSuccessStep || "done");
     // Same object for `default` right after the start: no repaint to flag,
     // and the initial paint keeps its own focus rule.
     if (next === this.response) return;
@@ -771,8 +780,11 @@ export class ZitadelLogin extends ZitadelSurface {
 
     // A preview never leaves the step it shows: it takes no history entry,
     // makes no trip to a provider, exchanges no handoff and tells no host the
-    // visitor signed in.
-    if (preview) return;
+    // visitor signed in. The served step becomes what its states derive from.
+    if (preview) {
+      this.previewBase = wire;
+      return;
+    }
 
     // History API (ADR 022): keep exactly one same-document entry — the
     // sentinel — on the stack while the current step supports
@@ -1361,6 +1373,9 @@ export class ZitadelLogin extends ZitadelSurface {
     } finally {
       this.loading = false;
     }
+    // Preview switched on while this submit was in flight: show the step it
+    // landed on in the chosen state.
+    if (this.preview) this.applyPreviewState();
   }
 
   /**
@@ -1439,8 +1454,8 @@ function isAllowedSelectValue(field: CreateFlow201StepFieldsItem, value: string)
   return field.validation?.enum?.includes(value) ?? false;
 }
 
-/** The states {@link ZitadelLogin.previewState} can show a step in. */
-const LOGIN_PREVIEW_STATES = [
+/** Every state {@link ZitadelLogin.previewState} can show a step in, in order. */
+export const LOGIN_PREVIEW_STATES = [
   "default",
   "validation_error",
   "submission_error",
@@ -1450,18 +1465,24 @@ const LOGIN_PREVIEW_STATES = [
 export type LoginPreviewState = (typeof LOGIN_PREVIEW_STATES)[number];
 
 /** The response {@link ZitadelLogin.previewState} shows for the served one. */
-function previewResponse(base: CreateFlow201, state: LoginPreviewState | ""): CreateFlow201 {
+function previewResponse(
+  base: CreateFlow201,
+  state: LoginPreviewState | "",
+  successStep: string,
+): CreateFlow201 {
   if (state === "" || state === "default" || state === "loading") return base;
   if (state === "success") {
-    // The terminal step carries no fields or actions, so the only thing a
-    // client-side stand-in could get wrong is its name; `done` is the one the
-    // default flow declares, and its texts follow the server's
+    // The terminal step carries no fields or actions, so its name is all a
+    // client-side stand-in needs: the texts follow the server's
     // `<step>.title` / `<step>.description` convention.
     return {
       ...base,
       step: {
-        name: "done",
-        texts: { title_key: "done.title", description_key: "done.description" },
+        name: successStep,
+        texts: {
+          title_key: `${successStep}.title`,
+          description_key: `${successStep}.description`,
+        },
         complete: "show",
         fields: [],
         actions: [],

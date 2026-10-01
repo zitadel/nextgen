@@ -2106,6 +2106,7 @@ describe("<zitadel-login preview-state>", () => {
       element.shadowRoot?.textContent?.includes("You're signed in") ? element : null,
     );
     expect(element.shadowRoot?.querySelector("zl-field")).toBeNull();
+    expect(element.shadowRoot?.querySelector("zl-card.zl-card--terminal")).not.toBeNull();
     expect(completeEvents).toHaveLength(0);
     // No handoff exchange: the only request is the start.
     expect(requests()).toEqual(["createFlow"]);
@@ -2128,6 +2129,72 @@ describe("<zitadel-login preview-state>", () => {
     // Enter did not run the client-side required gate either: the state the
     // preview was asked for is what stays on screen.
     expect(element.shadowRoot?.querySelector("zl-field[invalid]")).toBeNull();
+  });
+
+  it("follows a submit that lands after preview is switched on", async () => {
+    let release: (() => void) | undefined;
+    server.use(
+      http.post(
+        "*/flow/*/submit",
+        () =>
+          new Promise((resolve) => {
+            release = () =>
+              resolve(
+                HttpResponse.json({
+                  id: "flow-1",
+                  session_id: "sess-1",
+                  session_token: "token-1",
+                  step: {
+                    name: "password",
+                    texts: { title_key: "password.title" },
+                    fields: [
+                      {
+                        name: "password",
+                        type: "password",
+                        text_key: "password.field.password",
+                        required: true,
+                      },
+                    ],
+                    actions: [
+                      { name: "submit", kind: "submit", text_key: "submit.continue", primary: true },
+                    ],
+                    gates: {},
+                  },
+                  branding: {},
+                }),
+              );
+          }),
+      ),
+    );
+    const element = await mountPreview("");
+    type(element, "email", "alice@acme.com");
+    submit(element);
+    await waitFor(() => release);
+
+    element.previewState = "default";
+    await element.updateComplete;
+    release?.();
+    await waitFor(() => element.shadowRoot?.querySelector('zl-field[name="password"]'));
+
+    // The step the server moved to is what the states derive from now.
+    element.previewState = "validation_error";
+    await waitFor(() => element.shadowRoot?.querySelector('zl-field[name="password"][invalid]'));
+    expect(element.shadowRoot?.querySelector('zl-field[name="email"]')).toBeNull();
+  });
+
+  it("paints the named terminal step in the success state", async () => {
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.purpose = "login";
+    element.project = testProject;
+    element.previewState = "success";
+    element.previewSuccessStep = "welcome";
+    element.locales = { en: { "welcome.title": "Welcome aboard" } };
+    host.appendChild(element);
+
+    await waitFor(() =>
+      element.shadowRoot?.textContent?.includes("Welcome aboard") ? element : null,
+    );
+    expect(element.shadowRoot?.textContent).not.toContain("You're signed in");
   });
 
   it("starts no passkey ceremony for a served step that carries a challenge", async () => {

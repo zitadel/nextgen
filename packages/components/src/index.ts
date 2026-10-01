@@ -61,6 +61,7 @@ export { tokens, cssVars, type Tokens, type CssVars } from "./tokens/index.js";
 export { baseHostStyles, focusVisibleStyles, t } from "./styles/index.js";
 
 export {
+  LOGIN_PREVIEW_STATES,
   ZitadelLogin,
   type LoginPreviewState,
   ZitadelLogout,
