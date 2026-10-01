@@ -5,6 +5,7 @@ import (
 	"context"
 	"log/slog"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -113,6 +114,58 @@ func TestFlowSSOIdentityResolver_LoadParked_NoResultReturnsNil(t *testing.T) {
 			assert.Nil(t, got)
 		})
 	}
+}
+
+func boundFactors() []domain.AuthCheck {
+	return []domain.AuthCheck{
+		&domain.AuthFactorUser{UserID: "user-1"},
+		&domain.AuthFactorSSO{ConnectionID: "idp-1", LinkID: "idplink-1"},
+	}
+}
+
+// A previous request bound the attempt and deleted the parked row, then lost
+// its handoff: the bound user is reported so the handoff can be retried.
+func TestFlowSSOIdentityResolver_LoadParked_BoundAttemptReportsUser(t *testing.T) {
+	t.Parallel()
+	f := newSSOResolverFixture(t)
+	f.stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), ssoProjectID, ssoAttemptID).
+		Return(&domain.AuthAttempt{ProjectID: ssoProjectID, ID: ssoAttemptID, Checks: boundFactors()}, nil)
+	f.connections.EXPECT().GetRevision(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+	f.stmts.EXPECT().GetIDPIdentityLink(gomock.Any(), gomock.Any()).Times(0)
+
+	got, err := f.resolver.LoadParked(t.Context(), loadInput())
+	require.NoError(t, err)
+	assert.Equal(t, &domain.FlowSSOParkedIdentity{BoundUserID: "user-1"}, got)
+}
+
+func TestFlowSSOIdentityResolver_LoadParked_BoundAttemptWithParkedResultPrefersResult(t *testing.T) {
+	t.Parallel()
+	f := newSSOResolverFixture(t)
+	f.stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), ssoProjectID, ssoAttemptID).
+		Return(parkedAttempt(parkedResult(), boundFactors()...), nil)
+	f.connections.EXPECT().GetRevision(gomock.Any(), ssoProjectID, ssoRevisionID).
+		Return(&domain.IDPConnection{ProjectID: ssoProjectID, ID: "idp-1", RevisionID: ssoRevisionID, Document: []byte(ssoConnectionDocument)}, nil)
+	f.stmts.EXPECT().GetIDPIdentityLink(gomock.Any(), gomock.Any()).Return(nil, database.NewNoRowFoundError(nil))
+
+	got, err := f.resolver.LoadParked(t.Context(), loadInput())
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	assert.Equal(t, "ch-1", got.CheckID)
+	assert.Empty(t, got.BoundUserID)
+}
+
+// After a successful handoff there is nothing to retry: a second load with an
+// older cookie renders the step instead of failing on a second handoff.
+func TestFlowSSOIdentityResolver_LoadParked_HandedOffBoundAttemptIsNil(t *testing.T) {
+	t.Parallel()
+	f := newSSOResolverFixture(t)
+	handedOff := time.Now()
+	f.stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), ssoProjectID, ssoAttemptID).
+		Return(&domain.AuthAttempt{ProjectID: ssoProjectID, ID: ssoAttemptID, Checks: boundFactors(), HandedOffAt: &handedOff}, nil)
+
+	got, err := f.resolver.LoadParked(t.Context(), loadInput())
+	require.NoError(t, err)
+	assert.Nil(t, got)
 }
 
 func TestFlowSSOIdentityResolver_LoadParked_LinkFound(t *testing.T) {

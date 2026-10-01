@@ -4401,6 +4401,38 @@ func TestFlowStateMachine_Render_SSOBindOnForeignUserRestarts(t *testing.T) {
 	assert.Equal(t, "credentials", state.CurrentStep)
 }
 
+// An earlier request bound the attempt but lost its handoff: the success
+// outcome is raised again, so the handoff is minted on this render.
+func TestFlowStateMachine_Render_SSOBoundAttemptRetriesHandoff(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoRenderWorld(t)
+	w.expectParked(&domain.FlowSSOParkedIdentity{BoundUserID: "u1"}, nil)
+	w.ssoIdentities.EXPECT().BindLinked(gomock.Any(), gomock.Any()).Times(0)
+	w.authAttemptService.EXPECT().
+		Handoff(gomock.Any(), domain.FlowHandoffInput{ProjectID: testProjectID, AttemptID: "att-1"}).
+		Return(domain.FlowHandoffOutput{Token: "handoff-1", ExpiresAt: time.Unix(1700000060, 0).UTC()}, nil).
+		Times(1)
+
+	result, err := w.sm.Render(t.Context(), def, state)
+	require.NoError(t, err)
+	assert.Equal(t, "done", result.Step.Name)
+	assert.Equal(t, "handoff-1", result.HandoffToken)
+	assert.Equal(t, "u1", result.State.CollectedData.UserID)
+}
+
+func TestFlowStateMachine_Render_SSOBoundAttemptWithRecordedUserRendersStep(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoRenderWorld(t)
+	state.CollectedData.UserID = "u1"
+	w.expectParked(&domain.FlowSSOParkedIdentity{BoundUserID: "u1"}, nil)
+	w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).Times(0)
+
+	result, err := w.sm.Render(t.Context(), def, state)
+	require.NoError(t, err)
+	assert.Equal(t, "credentials", result.Step.Name)
+	assert.Empty(t, result.HandoffToken)
+}
+
 // A concurrent request settled the parked row, or a new ceremony replaced it:
 // the winner already answered, so this render shows the step with no outcome.
 func TestFlowStateMachine_Render_SSOStaleParkedRowRendersStep(t *testing.T) {
