@@ -163,25 +163,31 @@ func bindSSOIdentity(ctx context.Context, stmts AllStatements, in domain.FlowSSO
 	if attempt.IsExpired() || attempt.IsHandedOff() {
 		return domain.ErrFlowRestartRequired()
 	}
-	if bound, ok := domain.CheckAs[*domain.AuthFactorUser](attempt, domain.AuthCheckTypeUser); ok && bound.UserID != in.UserID {
+	bound, alreadyBound := domain.CheckAs[*domain.AuthFactorUser](attempt, domain.AuthCheckTypeUser)
+	if alreadyBound && bound.UserID != in.UserID {
 		return domain.ErrFlowRestartRequired()
 	}
-	// The check above is a plain read: a concurrent identifier submission
-	// can still bind a user after it. The add refuses to overwrite one.
-	userFactor := &domain.AuthFactorUser{UserID: in.UserID}
-	checkID, err := stmts.AddAuthAttemptFactor(ctx, in.ProjectID, in.AttemptID, userFactor)
-	if _, taken := errors.AsType[*database.UniqueError](err); taken {
-		current, err := stmts.GetAuthAttemptByID(ctx, in.ProjectID, in.AttemptID)
-		if err != nil {
-			return fmt.Errorf("bind sso identity: re-read attempt: %w", err)
+	// The same user is bound already (a retry after a lost cookie): nothing to
+	// add. Skipping the add matters on Spanner, where a refused add poisons
+	// the transaction and no read after it can run.
+	if !alreadyBound {
+		// The check above is a plain read: a concurrent identifier submission
+		// can still bind a user after it. The add refuses to overwrite one.
+		userFactor := &domain.AuthFactorUser{UserID: in.UserID}
+		checkID, err := stmts.AddAuthAttemptFactor(ctx, in.ProjectID, in.AttemptID, userFactor)
+		if _, taken := errors.AsType[*database.UniqueError](err); taken {
+			current, err := stmts.GetAuthAttemptByID(ctx, in.ProjectID, in.AttemptID)
+			if err != nil {
+				return fmt.Errorf("bind sso identity: re-read attempt: %w", err)
+			}
+			if bound, ok := domain.CheckAs[*domain.AuthFactorUser](current, domain.AuthCheckTypeUser); !ok || bound.UserID != in.UserID {
+				return domain.ErrFlowRestartRequired()
+			}
+		} else if err != nil {
+			return fmt.Errorf("bind sso identity: %w", err)
+		} else if err := emitDirectAuthFactor(ctx, stmts, attempt, userFactor, checkID); err != nil {
+			return fmt.Errorf("bind sso identity: %w", err)
 		}
-		if bound, ok := domain.CheckAs[*domain.AuthFactorUser](current, domain.AuthCheckTypeUser); !ok || bound.UserID != in.UserID {
-			return domain.ErrFlowRestartRequired()
-		}
-	} else if err != nil {
-		return fmt.Errorf("bind sso identity: %w", err)
-	} else if err := emitDirectAuthFactor(ctx, stmts, attempt, userFactor, checkID); err != nil {
-		return fmt.Errorf("bind sso identity: %w", err)
 	}
 	// A collision has no link: like a typed identifier it proves nothing about
 	// the account, so it records the user factor alone.

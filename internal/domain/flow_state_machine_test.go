@@ -3,6 +3,7 @@ package domain_test
 import (
 	"encoding/json"
 	"errors"
+	"maps"
 	"testing"
 	"time"
 
@@ -4958,4 +4959,82 @@ func TestFlowStateMachine_Render_SSOCollisionRetryAfterLostCookieRaisesAgain(t *
 	require.NoError(t, err)
 	assert.Equal(t, "sso-conflict", retry.Step.Name)
 	assert.Equal(t, "user-9", retry.State.CollectedData.UserID)
+}
+
+// A connection can map a superset of properties for several schemas; each
+// schema consumes only the properties it defines, so the rest is not stored.
+func TestFlowStateMachine_Render_SSOUnknownClaimIsNotPersisted(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoRenderWorld(t)
+	claims, verified := completeClaims()
+	withNickname := maps.Clone(claims)
+	withNickname["nickname"] = "ali"
+	w.expectParked(unlinkedParked(withNickname, verified), nil)
+	w.ssoIdentities.EXPECT().FindUniqueOwner(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return("", nil).Times(2)
+	w.ssoIdentities.EXPECT().
+		CreateLinked(gomock.Any(), gomock.Cond(func(in domain.FlowSSOCreateInput) bool {
+			_, stored := in.Attributes["nickname"]
+			return !stored && assert.ObjectsAreEqual(claims, in.Attributes)
+		})).
+		Return("user-new", nil)
+	w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).
+		Return(domain.FlowHandoffOutput{Token: "handoff-1", ExpiresAt: time.Unix(1700000060, 0).UTC()}, nil)
+
+	result, err := w.sm.Render(t.Context(), def, state)
+	require.NoError(t, err)
+	assert.Equal(t, "done", result.Step.Name)
+}
+
+// Composition below the root counts too: a required object whose own
+// subschema makes a unique leaf required is not evaluated either, and a $ref
+// can point anywhere. Both fall back to collection.
+func TestFlowStateMachine_Render_SSONestedComposedRequiredFallsBackToCollection(t *testing.T) {
+	t.Parallel()
+	for name, schema := range map[string]string{
+		"nested allOf": `{
+			"$schema": "https://json-schema.org/draft/2020-12/schema",
+			"type": "object",
+			"x-auth-methods": { "password": { "enabled": true } },
+			"x-identifier": "email",
+			"required": ["email", "address"],
+			"properties": {
+				"email":    { "type": "string", "format": "email", "x-unique": "project" },
+				"username": { "type": "string" },
+				"address":  {
+					"type": "object",
+					"properties": { "email": { "type": "string", "x-unique": "project" } },
+					"allOf": [ { "required": ["email"] } ]
+				}
+			}
+		}`,
+		"ref": `{
+			"$schema": "https://json-schema.org/draft/2020-12/schema",
+			"type": "object",
+			"x-auth-methods": { "password": { "enabled": true } },
+			"x-identifier": "email",
+			"required": ["email", "address"],
+			"$defs": { "address": { "type": "object", "properties": { "email": { "type": "string" } } } },
+			"properties": {
+				"email":    { "type": "string", "format": "email", "x-unique": "project" },
+				"username": { "type": "string" },
+				"address":  { "$ref": "#/$defs/address" }
+			}
+		}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			w, def, state := ssoRenderWorldWithSchema(t, schema)
+			def = withSSOOutcomeSteps(def)
+			w.expectParked(unlinkedParked(
+				map[string]any{"email": "alice@example.com", "address": map[string]any{"email": "home@example.com"}},
+				map[string]bool{"email": true},
+			), nil)
+			w.expectOwner("email", "alice@example.com", "")
+			w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Times(0)
+
+			result, err := w.sm.Render(t.Context(), def, state)
+			require.NoError(t, err)
+			assert.Equal(t, "sso-register", result.Step.Name)
+		})
+	}
 }

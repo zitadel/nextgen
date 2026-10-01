@@ -447,7 +447,10 @@ func (r *FlowStateMachineRuntime) provisionSSOIdentity(ctx context.Context, stat
 	if err != nil {
 		return "", fmt.Errorf("flow state machine: load user schema for sso identity: %w", err)
 	}
-	probeClaims, uniqueClaims := ssoUniqueClaims(schema, parked.Claims)
+	// A connection can map a superset of properties for several schemas; this
+	// schema consumes only the top-level properties it defines.
+	claims := ssoSchemaClaims(schema, parked.Claims)
+	probeClaims, uniqueClaims := ssoUniqueClaims(schema, claims)
 	if bound, err := r.bindSSOCollision(ctx, state, parked, probeClaims); err != nil || bound {
 		return FlowImplicitOutcomeUserAlreadyExists, err
 	}
@@ -456,12 +459,12 @@ func (r *FlowStateMachineRuntime) provisionSSOIdentity(ctx context.Context, stat
 	if state.CollectedData.UserID != "" {
 		return "", ErrFlowRestartRequired()
 	}
-	if !ssoClaimsComplete(schema, parked, uniqueClaims) {
+	if !ssoClaimsComplete(schema, parked, claims, uniqueClaims) {
 		return FlowImplicitOutcomeSSOUserNotFound, nil
 	}
 
 	attributes := map[string]any{}
-	for name, value := range parked.Claims {
+	for name, value := range claims {
 		if err := maputil.SetNested(attributes, AttributeKey(name).Nodes(), value); err != nil {
 			return "", fmt.Errorf("flow state machine: sso claim %q: %w", name, err)
 		}
@@ -493,6 +496,19 @@ func (r *FlowStateMachineRuntime) provisionSSOIdentity(ctx context.Context, stat
 	}
 	recordResolvedUser(state, userID)
 	return FlowImplicitOutcomeSSOAuthenticated, nil
+}
+
+// ssoSchemaClaims keeps the claims whose name is a top-level property of the
+// schema and drops the rest.
+func ssoSchemaClaims(schema *jsonschema.Schema, claims map[string]any) map[string]any {
+	root := newSchemaReader(schema)
+	out := make(map[string]any, len(claims))
+	for name, value := range claims {
+		if _, ok := root.Property(name); ok {
+			out[name] = value
+		}
+	}
+	return out
 }
 
 // ssoUniqueClaims returns the claim names whose top-level schema property
@@ -566,33 +582,30 @@ func (r *FlowStateMachineRuntime) bindSSOCollision(ctx context.Context, state *F
 	return false, nil
 }
 
-// ssoComposedKeywords can make a property required outside the top-level
-// `required` keyword.
-var ssoComposedKeywords = []string{"allOf", "anyOf", "oneOf", "if", "then", "else", "dependentRequired", "dependentSchemas"}
-
 // ssoClaimsComplete reports whether the claims can create a user unattended:
 // every required property has a claim, and every required unique one arrived
 // verified, so an unverified address cannot claim an account. Claims are
 // top-level, so a required nested object never completes.
-func ssoClaimsComplete(schema *jsonschema.Schema, parked *FlowSSOParkedIdentity, uniqueClaims []string) bool {
+func ssoClaimsComplete(schema *jsonschema.Schema, parked *FlowSSOParkedIdentity, claims map[string]any, uniqueClaims []string) bool {
 	// RequiredPaths reads `required` and `properties` only. Requiredness a
-	// composition adds is not evaluated, so such a schema never creates a user
-	// unattended: the verified-unique rule must not be bypassable.
-	for _, keyword := range ssoComposedKeywords {
-		if _, ok := schema.LookupKeyword(keyword); ok {
-			return false
-		}
+	// composition or a reference adds, at any depth, is not evaluated, so such
+	// a schema never creates a user unattended: the verified-unique rule must
+	// not be bypassable.
+	if newSchemaReader(schema).ComposesRequiredness() {
+		return false
 	}
-	materialized := make(map[string]struct{}, len(parked.Claims))
 	for name := range parked.Claims {
 		// Nested mapped keys are unsupported (mapping is top-level only), so they fall back to collection.
 		if strings.Contains(name, ".") {
 			return false
 		}
+	}
+	materialized := make(map[string]struct{}, len(claims))
+	for name := range claims {
 		materialized[name] = struct{}{}
 	}
 	for path := range newSchemaReader(schema).RequiredPaths(materialized) {
-		if parked.Claims[path] == nil {
+		if claims[path] == nil {
 			return false
 		}
 		if slices.Contains(uniqueClaims, path) && !parked.Verified[path] {
