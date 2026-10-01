@@ -433,7 +433,12 @@ docker --image <ref>` remains the explicit image override for debugging.
   `${{ NAME }}` reference. The client secret is
   never a flag — it is prompted for, or read from stdin on a non-interactive
   run, as `variables set` does — and only its `${{ NAME }}` reference reaches
-  the connection file. A step edited by hand is left alone and reported. `setup`
+  the connection file. A step edited by hand is left alone and reported. On a
+  flow an earlier CLI wrote, the transition keys `callback` and
+  `identity_unknown` become `sso_authenticated` and `sso_user_not_found`, except
+  where the key is also an action on that step. If a step the command edits has
+  an action named like an outcome it writes there, the command stops with
+  `E_VALIDATION` naming the step and the action, and changes no file. `setup`
   asks the same question during onboarding (`--sso`, `--sso-client-id`, secret
   on stdin). `plan`/`apply` then publish the connection; **deleting** one is not
   supported yet (#1013), so a removed file fails `apply` with
