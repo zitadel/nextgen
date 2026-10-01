@@ -166,6 +166,55 @@ func TestFlowStateMachine_TwoStepLogin_PasswordStepPairsTheIdentifier(t *testing
 	assert.False(t, containsFieldName(result.Step.Fields, "email"))
 }
 
+// A reload on the password step is the case the client cannot cover: the
+// widget keeps collected values in memory only, so a fresh document has no
+// identifier to pair, while GET /flow/{id} re-renders from the flow state.
+func TestFlowStateMachine_RenderAfterReload_StillPairsTheIdentifier(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+
+	const email = "alice@example.com"
+
+	w.schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+		AnyTimes()
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("att_01TEST", nil)
+	w.authAttemptService.EXPECT().
+		SubmitIdentifier(gomock.Any(), gomock.Any()).
+		Return("user_alice", nil).
+		Times(1)
+
+	def := twoStepLoginDefinition()
+
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	advanced, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{"email": email},
+	})
+	require.NoError(t, err)
+	require.Equal(t, "password", advanced.Step.Name)
+
+	// Re-render the same state, as a page reload does.
+	reloaded, err := w.sm.Render(t.Context(), def, advanced.State)
+	require.NoError(t, err)
+	require.NotNil(t, reloaded.Step)
+	require.Equal(t, "password", reloaded.Step.Name)
+
+	require.NotNil(t, reloaded.Step.Identifier)
+	assert.Equal(t, "email", reloaded.Step.Identifier.Name)
+	assert.Equal(t, email, reloaded.Step.Identifier.Value)
+	require.Len(t, reloaded.Step.Fields, 1)
+	assert.Equal(t, domain.AutocompleteCurrentPassword, reloaded.Step.Fields[0].Autocomplete)
+}
+
 func TestFlowStateMachine_MultiStepRegister_PasswordStepIsANewPassword(t *testing.T) {
 	t.Parallel()
 	w := newFlowTestWorld(t)
