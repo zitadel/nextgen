@@ -382,6 +382,38 @@ function sortKeys(value: unknown): unknown {
   return value;
 }
 
+/** Outcome keys the previous CLI wrote, and the names the engine now raises. */
+const LEGACY_OUTCOMES: ReadonlyArray<readonly [string, string]> = [
+  ["callback", "sso_authenticated"],
+  ["identity_unknown", "sso_user_not_found"],
+];
+
+/**
+ * Rename the previous outcome keys on every step, in place. The validator
+ * rejects the old keys, so leaving them would make `sso enable` write an
+ * invalid flow. Where a step already has the new key, that one wins.
+ */
+function migrateLegacyOutcomes(document: Json): boolean {
+  let changed = false;
+  for (const step of steps(document)) {
+    if (!isObject(step.transitions)) {
+      continue;
+    }
+    const transitions = step.transitions;
+    for (const [old, next] of LEGACY_OUTCOMES) {
+      if (!(old in transitions)) {
+        continue;
+      }
+      if (!(next in transitions)) {
+        transitions[next] = transitions[old];
+      }
+      delete transitions[old];
+      changed = true;
+    }
+  }
+  return changed;
+}
+
 /**
  * Add the provider to a login flow.
  *
@@ -399,6 +431,10 @@ export function applySsoToFlow(
   // `ssoEditRefusal` has already refused a flow with no terminal to route to,
   // so the caller never reaches here without one.
   const terminal = terminalStep(document) ?? "done";
+  // First, so a step the previous CLI wrote matches today's template below.
+  if (migrateLegacyOutcomes(document)) {
+    changed = true;
+  }
 
   for (const name of providerSteps(document)) {
     const step = stepNamed(document, name);
