@@ -118,6 +118,10 @@ function BrandingScreen() {
   const [flowName, setFlowName] = useState(flows[0]?.name ?? "");
   const [theme, setTheme] = useState<PreviewTheme>("revision");
   const [state, setState] = useState<PreviewState>("default");
+  // The states that show the served step differently from `default`, and the
+  // preview they were reported for. A step with no required field has nothing
+  // to flag, so "Validation errors" is not offered for it.
+  const [served, setServed] = useState<{ preview: string; states: PreviewState[] } | null>(null);
   const [narrow, setNarrow] = useState(false);
 
   // Only the journeys the chosen flow actually serves: asking it for a purpose
@@ -139,6 +143,12 @@ function BrandingScreen() {
   const activeJourney = journeys.some((entry) => entry.id === journey)
     ? journey
     : (journeys[0]?.id ?? journey);
+  // Until the step of the flow on screen has arrived, every state is offered.
+  const preview = `${activeFlowName}:${activeJourney}`;
+  const states = served?.preview === preview ? served.states : null;
+  // Derived like `activeJourney`: a pick this step cannot show previews the
+  // default, and comes back when a step that can show it is served.
+  const activeState = states && !states.includes(state) ? "default" : state;
   // Unset, a widget follows the visitor: the panel shows `auto` for it too.
   const revisionMode = revision.theme?.mode ?? "auto";
 
@@ -193,13 +203,20 @@ function BrandingScreen() {
               No icon on this one; the flow selector alone carries its glyph. */}
           <div className="order-last flex basis-full items-center gap-[10px] sm:order-none sm:basis-auto">
             <Separator orientation="vertical" className="hidden h-5! lg:block" />
-            <Select value={state} onValueChange={(value) => setState(value as PreviewState)}>
+            <Select
+              value={activeState}
+              onValueChange={(value) => setState(value as PreviewState)}
+            >
               <SelectTrigger aria-label="Previewed state" className={GHOST_TRIGGER}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent position="popper" sideOffset={4}>
                 {Object.entries(STATE_LABELS).map(([id, label]) => (
-                  <SelectItem key={id} value={id}>
+                  <SelectItem
+                    key={id}
+                    value={id}
+                    disabled={states !== null && !states.includes(id as PreviewState)}
+                  >
                     State: {label}
                   </SelectItem>
                 ))}
@@ -248,8 +265,9 @@ function BrandingScreen() {
               journey={activeJourney}
               flowName={activeFlowName}
               theme={theme}
-              state={state}
+              state={activeState}
               successStep={selected?.successStep}
+              onStates={(next) => setServed({ preview, states: next })}
             />
           </div>
         </Card>

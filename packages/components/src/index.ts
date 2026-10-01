@@ -63,6 +63,7 @@ export { baseHostStyles, focusVisibleStyles, t } from "./styles/index.js";
 export {
   LOGIN_PREVIEW_STATES,
   ZitadelLogin,
+  loginPreviewStatesFor,
   type LoginPreviewState,
   ZitadelLogout,
   ZitadelSession,

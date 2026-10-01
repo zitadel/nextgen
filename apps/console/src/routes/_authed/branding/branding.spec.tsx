@@ -21,13 +21,22 @@ vi.mock("@/components/branding/login-preview", () => ({
     journey,
     flowName,
     state,
+    onStates,
   }: {
     journey: string;
     flowName: string;
     state: string;
+    onStates?: (states: string[]) => void;
   }) => (
     <div data-testid="preview" data-flow={flowName} data-state={state}>
       {journey}
+      {/* Stands in for the served step arriving with no required field. */}
+      <button
+        type="button"
+        onClick={() => onStates?.(["default", "submission_error", "loading", "success"])}
+      >
+        serve a step with nothing to flag
+      </button>
     </div>
   ),
 }));
@@ -249,6 +258,28 @@ describe("branding screen", () => {
     ]);
     await userEvent.click(within(menu).getByText("State: Validation errors"));
     expect(screen.getByTestId("preview")).toHaveAttribute("data-state", "validation_error");
+  });
+
+  it("does not offer validation errors for a step with nothing to flag", async () => {
+    serveRevision();
+    await renderAt("/branding");
+
+    await userEvent.click(await screen.findByLabelText("Previewed state"));
+    await userEvent.click(
+      within(await screen.findByRole("listbox")).getByText("State: Validation errors"),
+    );
+    expect(screen.getByTestId("preview")).toHaveAttribute("data-state", "validation_error");
+
+    await userEvent.click(screen.getByRole("button", { name: "serve a step with nothing to flag" }));
+
+    // The pick falls back to the default, and the option cannot be chosen.
+    expect(screen.getByTestId("preview")).toHaveAttribute("data-state", "default");
+    await userEvent.click(screen.getByLabelText("Previewed state"));
+    expect(
+      within(await screen.findByRole("listbox")).getByRole("option", {
+        name: "State: Validation errors",
+      }),
+    ).toHaveAttribute("aria-disabled", "true");
   });
 
   it("offers only the journeys it can actually render", async () => {

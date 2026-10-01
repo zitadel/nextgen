@@ -24,7 +24,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 
 import "./zitadel-login.js";
 import type { ZlAlert } from "../atoms/zl-alert.js";
-import type { ZitadelLogin } from "./zitadel-login.js";
+import { loginPreviewStatesFor, type ZitadelLogin } from "./zitadel-login.js";
 
 const API_BASE = "https://flow.test.invalid";
 
@@ -2241,6 +2241,23 @@ describe("<zitadel-login preview-state>", () => {
   });
 
   it("takes no history entry for a served step that can go back", async () => {
+    serveBackCapableStep();
+    const pushState = vi.spyOn(history, "pushState");
+    try {
+      await mountPreview("default");
+
+      // No sentinel: the browser's back gesture stays the host page's own.
+      const sentinels = pushState.mock.calls.filter(
+        ([state]) => (state as { zl?: boolean } | null)?.zl === true,
+      );
+      expect(sentinels).toHaveLength(0);
+    } finally {
+      pushState.mockRestore();
+    }
+  });
+
+  /** A served step the browser's back gesture can leave. */
+  function serveBackCapableStep(): void {
     server.use(
       http.post("*/flow", () =>
         HttpResponse.json(
@@ -2261,18 +2278,79 @@ describe("<zitadel-login preview-state>", () => {
         ),
       ),
     );
-    const pushState = vi.spyOn(history, "pushState");
-    try {
-      await mountPreview("default");
+  }
 
-      // No sentinel: the browser's back gesture stays the host page's own.
-      const sentinels = pushState.mock.calls.filter(
-        ([state]) => (state as { zl?: boolean } | null)?.zl === true,
-      );
-      expect(sentinels).toHaveLength(0);
+  function sentinelPushes(pushState: { mock: { calls: unknown[][] } }): number {
+    return pushState.mock.calls.filter(([state]) => (state as { zl?: boolean } | null)?.zl === true)
+      .length;
+  }
+
+  it("gives the history entry back when preview is switched on mid-flow", async () => {
+    serveBackCapableStep();
+    const pushState = vi.spyOn(history, "pushState");
+    const back = vi.spyOn(history, "back");
+    try {
+      const element = await mountPreview("");
+      expect(sentinelPushes(pushState)).toBe(1);
+
+      element.previewState = "default";
+      await element.updateComplete;
+
+      // The entry is retired, so a back press leaves the page as it would
+      // without the element rather than being caught and dropped.
+      expect(back).toHaveBeenCalledTimes(1);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(sentinelPushes(pushState)).toBe(1);
     } finally {
       pushState.mockRestore();
+      back.mockRestore();
     }
+  });
+
+  it("takes the history entry when preview is switched off on a step that can go back", async () => {
+    serveBackCapableStep();
+    const pushState = vi.spyOn(history, "pushState");
+    try {
+      const element = await mountPreview("default");
+      expect(sentinelPushes(pushState)).toBe(0);
+
+      element.previewState = "";
+      await element.updateComplete;
+
+      expect(sentinelPushes(pushState)).toBe(1);
+    } finally {
+      pushState.mockRestore();
+      history.back();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+  });
+
+  it("offers validation_error only for a step with a required field to flag", () => {
+    type Step = Parameters<typeof loginPreviewStatesFor>[0];
+    const step = (fields: Step["fields"]): Step => ({
+      name: "identifier",
+      texts: {},
+      fields,
+      actions: [],
+      gates: {},
+    });
+
+    expect(
+      loginPreviewStatesFor(
+        step([{ name: "email", type: "email", text_key: "identifier.field.email", required: true }]),
+      ),
+    ).toContain("validation_error");
+    // An optional field, a must-accept checkbox, or no fields at all: an empty
+    // submit flags nothing, so the state would look like `default`.
+    expect(
+      loginPreviewStatesFor(
+        step([
+          { name: "nickname", type: "text", text_key: "profile.field.nickname" },
+          { name: "terms", type: "checkbox", text_key: "profile.field.terms", required: true },
+        ]),
+      ),
+    ).toEqual(["default", "submission_error", "loading", "success"]);
+    expect(loginPreviewStatesFor(step([]))).not.toContain("validation_error");
   });
 
   it("runs the flow for real when the value is not a known state", async () => {

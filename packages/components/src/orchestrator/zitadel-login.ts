@@ -456,6 +456,9 @@ export class ZitadelLogin extends ZitadelSurface {
       this.previewBase ??= this.response;
       this.applyPreviewState();
       if (!this.preview) this.previewBase = null;
+      // A preview holds no history entry; a flow resumed from one takes the
+      // entry its step calls for.
+      this.syncBackSentinel(this.preview ? null : this.response.step);
     }
     this.applySurfaceTheme(this.branding);
     this.setAttribute("aria-busy", this.loading ? "true" : "false");
@@ -786,55 +789,63 @@ export class ZitadelLogin extends ZitadelSurface {
       return;
     }
 
-    // History API (ADR 022): keep exactly one same-document entry — the
-    // sentinel — on the stack while the current step supports
-    // back-navigation, so the browser's back gesture fires `popstate`
-    // (handled in `onPopState`) instead of leaving the page. Arming only
-    // on the unarmed → armed transition means consecutive back-capable
-    // steps (and re-renders of the same step, e.g. after a failed submit)
-    // never grow the stack. Steps without a `kind: "back"` action retire
-    // the sentinel — the next back press then navigates the host page
-    // (leaves the flow), which is correct.
-    if (typeof window !== "undefined") {
-      const hasBack = Boolean(wire.step.actions?.some((a) => a.kind === "back"));
-      if (hasBack && !this.armed) {
-        // Spread the host's state: vue-router (Nuxt) keeps `position` /
-        // `back` / `forward` here and reads them on popstate. Replacing it
-        // wholesale leaves the sentinel opaque to the host router.
-        history.pushState({ ...history.state, zl: true }, "");
-        this.armed = true;
-      } else if (!hasBack && this.armed) {
-        this.armed = false;
-        // Only traverse while we still own the current entry. If the host
-        // pushed its own entry after we armed, `history.back()` would pop
-        // *that* one and trigger a host back-navigation the user never
-        // asked for. Leaving a stale sentinel behind is the lesser evil —
-        // same tradeoff as disconnect; the popstate handler skips stale
-        // sentinels in one extra hop from either direction.
-        if ((history.state as { zl?: boolean } | null)?.zl === true) {
-          if (this.completing) {
-            // A terminal step that navigates away: retire the sentinel in
-            // place instead of traversing. `history.back()` fires `popstate`
-            // in the host, and a host router that reloads on popstate would
-            // re-read the session `maybeCompleteFlow` is about to establish
-            // and act on it in a document that is already being replaced —
-            // the console claim page spent its single-use challenge that way,
-            // once here and once in the document it navigated to. The
-            // retired entry stays on the stack under the destination (a
-            // same-URL destination, like the claim page, replaces it); a back
-            // press from there lands on the host page signed in, which is the
-            // same stale-sentinel tradeoff as above, one hop at most.
-            history.replaceState({ ...history.state, zl: false }, "");
-          } else {
-            this.ignoreNextPop = true;
-            history.back();
-          }
-        }
-      }
-    }
+    this.syncBackSentinel(wire.step);
 
     if (this.maybeRedirectToProvider(wire)) return;
     void this.maybeCompleteFlow(wire);
+  }
+
+  /**
+   * History API (ADR 022): keep exactly one same-document entry — the
+   * sentinel — on the stack while the current step supports
+   * back-navigation, so the browser's back gesture fires `popstate`
+   * (handled in `onPopState`) instead of leaving the page. Arming only
+   * on the unarmed → armed transition means consecutive back-capable
+   * steps (and re-renders of the same step, e.g. after a failed submit)
+   * never grow the stack. Steps without a `kind: "back"` action retire
+   * the sentinel — the next back press then navigates the host page
+   * (leaves the flow), which is correct.
+   *
+   * `null` is a step with nothing to go back from: a preview, which takes no
+   * entry and gives back one the flow took before it was switched on.
+   */
+  private syncBackSentinel(step: CreateFlow201Step | null): void {
+    if (typeof window === "undefined") return;
+    const hasBack = Boolean(step?.actions?.some((a) => a.kind === "back"));
+    if (hasBack && !this.armed) {
+      // Spread the host's state: vue-router (Nuxt) keeps `position` /
+      // `back` / `forward` here and reads them on popstate. Replacing it
+      // wholesale leaves the sentinel opaque to the host router.
+      history.pushState({ ...history.state, zl: true }, "");
+      this.armed = true;
+    } else if (!hasBack && this.armed) {
+      this.armed = false;
+      // Only traverse while we still own the current entry. If the host
+      // pushed its own entry after we armed, `history.back()` would pop
+      // *that* one and trigger a host back-navigation the user never
+      // asked for. Leaving a stale sentinel behind is the lesser evil —
+      // same tradeoff as disconnect; the popstate handler skips stale
+      // sentinels in one extra hop from either direction.
+      if ((history.state as { zl?: boolean } | null)?.zl === true) {
+        if (this.completing) {
+          // A terminal step that navigates away: retire the sentinel in
+          // place instead of traversing. `history.back()` fires `popstate`
+          // in the host, and a host router that reloads on popstate would
+          // re-read the session `maybeCompleteFlow` is about to establish
+          // and act on it in a document that is already being replaced —
+          // the console claim page spent its single-use challenge that way,
+          // once here and once in the document it navigated to. The
+          // retired entry stays on the stack under the destination (a
+          // same-URL destination, like the claim page, replaces it); a back
+          // press from there lands on the host page signed in, which is the
+          // same stale-sentinel tradeoff as above, one hop at most.
+          history.replaceState({ ...history.state, zl: false }, "");
+        } else {
+          this.ignoreNextPop = true;
+          history.back();
+        }
+      }
+    }
   }
 
   /**
@@ -1463,6 +1474,16 @@ export const LOGIN_PREVIEW_STATES = [
   "success",
 ] as const;
 export type LoginPreviewState = (typeof LOGIN_PREVIEW_STATES)[number];
+
+/**
+ * The states that show `step` differently from `default`, for a surface that
+ * offers them. `validation_error` needs a required field to flag; a step
+ * without one renders it as `default`.
+ */
+export function loginPreviewStatesFor(step: CreateFlow201Step): LoginPreviewState[] {
+  const flaggable = requiredFieldNames(step).length > 0;
+  return LOGIN_PREVIEW_STATES.filter((state) => state !== "validation_error" || flaggable);
+}
 
 /** The response {@link ZitadelLogin.previewState} shows for the served one. */
 function previewResponse(
