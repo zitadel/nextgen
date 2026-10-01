@@ -40,16 +40,17 @@ export interface ColorRoleTokens {
   /**
    * The identity-provider button's surface, border and label.
    *
-   * Separate roles rather than the neutral ones because a vendor's mark comes
-   * with rules about what may sit behind it: Google permits only its light,
-   * dark and neutral themes, so the button cannot be repainted from a tenant's
-   * palette the way every other surface is. `PALETTE_MAP` deliberately never
+   * Separate roles rather than the neutral ones so every provider button
+   * keeps one neutral look whatever the tenant's palette: a vendor's mark on a
+   * brand-coloured fill (the Google "G" on pink) reads as broken, and a stack
+   * of providers should look like one group. `PALETTE_MAP` deliberately never
    * names these (`branding-to-tokens.ts`), which is what keeps branding out;
-   * a host page that has cleared the vendor rules itself can still set them in
-   * its own CSS.
+   * a host page can still set them in its own CSS.
    *
    * The values are the design's outline button, so the shipped login page
-   * matches Figma with no tenant input at all.
+   * matches Figma with no tenant input at all. They are not Google's exact
+   * button themes — like Auth0 and Clerk, one neutral style serves every
+   * provider — and moving to those is a change of values here, nothing else.
    */
   provider: { dark: string; light: string };
   // Kebab-cased because the build emits each key verbatim as `--zl-<key>`.
@@ -132,18 +133,15 @@ export const overrides: DesignTokenOverrides = {
     // weight as `--zl-destructive` in each mode. Raised with design — see the
     // open questions on the rebuild.
     warning: { dark: "#fbbf24", light: "#d97706" },
-    // shadcn's outline button: the page surface in light mode, and its
-    // `input` fill at 30% in dark, which is what the Figma frame draws.
-    // Literal rather than a reference to `input` / `foreground`: a typed token
-    // value must resolve on its own, which the snapshot spec enforces. Dark is
-    // the page's own faint fill, light the page surface.
-    provider: { dark: "#ffffff0b", light: "#FFFFFF" },
-    // Google's own neutral border for the light theme, so the mark sits in a
-    // frame its guidelines allow rather than one merely close to it.
-    "provider-border": { dark: "#ffffff26", light: "#747775" },
-    // Light is Google's own near-black, not the page's, so the label reads as
-    // part of their button.
-    "provider-foreground": { dark: "#fafafa", light: "#1F1F1F" },
+    // shadcn's outline button as the Figma frame draws it: the page surface
+    // inside the `input` border, label in the page foreground; in dark, the
+    // fill is `input` at 30%. Literal rather than a reference to `background`
+    // / `input` / `foreground`: a typed token value must resolve on its own,
+    // which the snapshot spec enforces — and a reference would let a tenant's
+    // palette back in through those roles.
+    provider: { dark: "#ffffff0b", light: "#fafafa" },
+    "provider-border": { dark: "#ffffff26", light: "#e5e5e5" },
+    "provider-foreground": { dark: "#fafafa", light: "#0a0a0a" },
   },
   font: {
     family: {

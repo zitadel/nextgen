@@ -40,10 +40,10 @@
   gap: var(--zl-spacing-3);
 }
 
-/* A vendor's mark comes with rules about what may sit behind it: Google
-   permits only its light, dark and neutral themes, so this button cannot be
-   repainted from the tenant's palette the way every other surface is. These
-   roles are deliberately absent from `PALETTE_MAP` (`branding-to-tokens.ts`),
+/* Every provider shares one neutral look, whatever the tenant's palette: a
+   vendor's mark on a brand-coloured fill reads as broken, so this button is
+   not repainted the way every other surface is. These roles are deliberately
+   absent from `PALETTE_MAP` (`branding-to-tokens.ts`),
    which is what keeps branding out of them; their defaults are the design's
    outline button, so the shipped page matches Figma with no tenant input.
    Hover and pressed mix toward the button's own foreground rather than

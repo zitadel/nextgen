@@ -38,7 +38,8 @@ const meta: Meta<SsoArgs> = {
     // and gets a labelled button rather than a wrong logo.
     providers: [GOOGLE, PRIVATE],
     labelFormat: "Continue with {name}",
-    dividerLabel: "or",
+    // Off, as the shipped templates render it; type a label to see the rule.
+    dividerLabel: "",
     disabled: false,
   },
   argTypes: {
