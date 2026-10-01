@@ -15,6 +15,9 @@
 :host([hierarchy="secondary"]) {
   color: var(--zl-secondary-foreground);
 }
+:host([hierarchy="outline"]) {
+  color: var(--zl-foreground);
+}
 :host([hierarchy="text"]) {
   color: var(--zl-foreground);
 }
@@ -84,6 +87,14 @@
   background: var(--zl-secondary);
   color: var(--zl-secondary-foreground);
 }
+/* shadcn's outline variant: the page surface inside a visible border, with
+   the small shadow that lifts it off the card. */
+.zr-btn--outline {
+  background: var(--zl-background);
+  color: var(--zl-foreground);
+  border-color: var(--zl-input);
+  box-shadow: var(--zl-shadow-xs);
+}
 .zr-btn--text {
   background: transparent;
   color: var(--zl-foreground);
@@ -101,6 +112,10 @@
 .zr-btn--secondary:hover:not(:disabled),
 .zr-btn--secondary[data-state="hovered"]:not(:disabled) {
   background: color-mix(in srgb, var(--zl-secondary) 80%, var(--zl-foreground));
+}
+.zr-btn--outline:hover:not(:disabled),
+.zr-btn--outline[data-state="hovered"]:not(:disabled) {
+  background: color-mix(in srgb, var(--zl-background) 95%, var(--zl-foreground));
 }
 .zr-btn--text:hover:not(:disabled),
 .zr-btn--text[data-state="hovered"]:not(:disabled) {

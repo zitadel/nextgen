@@ -103,6 +103,9 @@
   --color-zl-success: var(--zl-success);
   --color-zl-link: var(--zl-link);
   --color-zl-warning: var(--zl-warning);
+  --color-zl-provider: var(--zl-provider);
+  --color-zl-provider-border: var(--zl-provider-border);
+  --color-zl-provider-foreground: var(--zl-provider-foreground);
   --color-zl-gradient-purple-start: var(--zl-gradient-purple-start);
   --color-zl-gradient-red-start: var(--zl-gradient-red-start);
   --color-zl-gradient-neutral-start: var(--zl-gradient-neutral-start);
