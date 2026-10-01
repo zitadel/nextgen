@@ -353,6 +353,40 @@ describe("applySsoToFlow", () => {
     expect(flow).toEqual(before);
   });
 
+  it("checks every generated outcome on a provider step that also has a fixed name", () => {
+    // The login entry here is named `register-password`, so it is both a
+    // provider step and the step the shared outcome is retargeted on.
+    const flow = {
+      name: "custom",
+      purposes: { login: "register-password" },
+      steps: [
+        {
+          name: "register-password",
+          fields: ["email"],
+          actions: [
+            { name: "submit", kind: "submit" },
+            { name: "sso_authenticated", kind: "submit" },
+          ],
+          transitions: { submit: { target: "done" }, sso_authenticated: { target: "done" } },
+        },
+        { name: "done", complete: "show" },
+      ],
+    };
+    const before = structuredClone(flow);
+
+    let caught: unknown;
+    try {
+      applySsoToFlow(flow, "google", bothMethods);
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(ZitadelError);
+    expect((caught as ZitadelError).code).toBe("E_VALIDATION");
+    expect((caught as ZitadelError).message).toContain("register-password");
+    expect(flow).toEqual(before);
+  });
+
   it("keeps the new key when a step carries both the old and the new one", () => {
     const legacy = previousCliFlow();
     const identifier = legacy.steps.find((s) => s.name === "identifier")!;

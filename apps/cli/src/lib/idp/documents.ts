@@ -427,17 +427,23 @@ function migrateLegacyOutcomes(document: Json): boolean {
  */
 function refuseOutcomeActionCollision(document: Json): void {
   const outcomes = ["sso_authenticated", "sso_user_not_found", "user_already_exists"];
-  const written = new Map<string, string[]>([
+  const entries: Array<[string, string[]]> = [
     ...providerSteps(document).map((name) => [name, outcomes] as [string, string[]]),
     [SSO_CONFLICT, outcomes],
     [REGISTER_SSO, ["user_already_exists"]],
     ["register-password", ["user_already_exists"]],
-  ]);
+  ];
+  // A step can be listed twice (a provider step named `register-password`), so
+  // its keys are the union of every entry, never just the last one.
+  const written = new Map<string, Set<string>>();
+  for (const [name, keys] of entries) {
+    written.set(name, new Set([...(written.get(name) ?? []), ...keys]));
+  }
   for (const [name, keys] of written) {
     const step = stepNamed(document, name);
     const actions = step !== undefined && Array.isArray(step.actions) ? step.actions : [];
     for (const action of actions) {
-      if (isObject(action) && typeof action.name === "string" && keys.includes(action.name)) {
+      if (isObject(action) && typeof action.name === "string" && keys.has(action.name)) {
         throw new ZitadelError(
           "E_VALIDATION",
           `steps.${name}: action "${action.name}" uses a name sso enable writes as an outcome on this step`,
