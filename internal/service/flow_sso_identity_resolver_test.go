@@ -682,7 +682,7 @@ func TestFlowSSOIdentityResolver_BindCollision_WritesUserFactorOnlyAndKeepsRow(t
 	f.inTransaction(t)
 	var written []domain.AuthFactor
 	gomock.InOrder(
-		f.stmts.EXPECT().TouchSSOCallback(gomock.Any(), ssoProjectID, ssoAttemptID, "ch-1").Return(nil),
+		f.stmts.EXPECT().MarkSSOCallbackCollision(gomock.Any(), ssoProjectID, ssoAttemptID, "ch-1", "user-9").Return(nil),
 		f.stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), ssoProjectID, ssoAttemptID).Return(parkedAttempt(parkedResult()), nil),
 		f.stmts.EXPECT().AddAuthAttemptFactor(gomock.Any(), ssoProjectID, ssoAttemptID, gomock.Any()).
 			DoAndReturn(func(_ context.Context, _, _ string, factor domain.AuthFactor) (string, error) {
@@ -702,7 +702,7 @@ func TestFlowSSOIdentityResolver_BindCollision_StaleRowAbortsBeforeWrites(t *tes
 	t.Parallel()
 	f := newSSOResolverFixture(t)
 	f.inTransaction(t)
-	f.stmts.EXPECT().TouchSSOCallback(gomock.Any(), ssoProjectID, ssoAttemptID, "ch-1").Return(domain.ErrSSOStateInvalid())
+	f.stmts.EXPECT().MarkSSOCallbackCollision(gomock.Any(), ssoProjectID, ssoAttemptID, "ch-1", "user-9").Return(domain.ErrSSOStateInvalid())
 	f.stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 	f.stmts.EXPECT().AddAuthAttemptFactor(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 
@@ -714,7 +714,7 @@ func TestFlowSSOIdentityResolver_BindCollision_RefusesDifferentBoundUser(t *test
 	t.Parallel()
 	f := newSSOResolverFixture(t)
 	f.inTransaction(t)
-	f.stmts.EXPECT().TouchSSOCallback(gomock.Any(), ssoProjectID, ssoAttemptID, "ch-1").Return(nil)
+	f.stmts.EXPECT().MarkSSOCallbackCollision(gomock.Any(), ssoProjectID, ssoAttemptID, "ch-1", "user-9").Return(nil)
 	f.stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), ssoProjectID, ssoAttemptID).
 		Return(parkedAttempt(parkedResult(), &domain.AuthFactorUser{UserID: "user-a"}), nil)
 	f.stmts.EXPECT().AddAuthAttemptFactor(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
@@ -739,7 +739,7 @@ func TestFlowSSOIdentityResolver_BindCollision_SameUserAlreadyBoundSkipsAdd(t *t
 	t.Parallel()
 	f := newSSOResolverFixture(t)
 	f.inTransaction(t)
-	f.stmts.EXPECT().TouchSSOCallback(gomock.Any(), ssoProjectID, ssoAttemptID, "ch-1").Return(nil)
+	f.stmts.EXPECT().MarkSSOCallbackCollision(gomock.Any(), ssoProjectID, ssoAttemptID, "ch-1", "user-9").Return(nil)
 	f.stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), ssoProjectID, ssoAttemptID).
 		Return(parkedAttempt(parkedResult(), &domain.AuthFactorUser{UserID: "user-9"}), nil)
 	f.stmts.EXPECT().AddAuthAttemptFactor(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
@@ -748,15 +748,16 @@ func TestFlowSSOIdentityResolver_BindCollision_SameUserAlreadyBoundSkipsAdd(t *t
 	require.NoError(t, f.resolver.BindCollision(t.Context(), collisionInput("user-9")))
 }
 
-// A user factor next to a still-parked row this flow already resolved comes
-// from a collision bind (the linked and created paths delete the row). It is
-// reported, so a flow whose cookie lost that bind can catch up, and nothing
-// else is read.
-func TestFlowSSOIdentityResolver_LoadParked_ResolvedRowWithUserFactorReportsCollisionUser(t *testing.T) {
+// A collision bind marks the parked row with the user it bound. On the
+// resolved-row shortcut that marker is reported, so a flow whose cookie lost
+// the bind can catch up, and nothing else is read.
+func TestFlowSSOIdentityResolver_LoadParked_ResolvedRowWithCollisionMarkerReportsCollisionUser(t *testing.T) {
 	t.Parallel()
 	f := newSSOResolverFixture(t)
+	marked := parkedResult()
+	marked.CollisionUserID = "u-b"
 	f.stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), ssoProjectID, ssoAttemptID).
-		Return(parkedAttempt(parkedResult(), &domain.AuthFactorUser{UserID: "u-b"}), nil)
+		Return(parkedAttempt(marked, &domain.AuthFactorUser{UserID: "u-b"}), nil)
 	f.connections.EXPECT().GetRevision(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 	f.stmts.EXPECT().GetIDPIdentityLink(gomock.Any(), gomock.Any()).Times(0)
 
@@ -767,10 +768,13 @@ func TestFlowSSOIdentityResolver_LoadParked_ResolvedRowWithUserFactorReportsColl
 	assert.Equal(t, &domain.FlowSSOParkedIdentity{CollisionUserID: "u-b", AttemptUserID: "u-b"}, got)
 }
 
-func TestFlowSSOIdentityResolver_LoadParked_ResolvedRowWithoutUserFactorIsNil(t *testing.T) {
+// A user factor without the marker (an identifier a concurrent request
+// submitted after collection, say) is not a collision: nothing is reported.
+func TestFlowSSOIdentityResolver_LoadParked_ResolvedRowWithUnrelatedUserFactorIsNotACollision(t *testing.T) {
 	t.Parallel()
 	f := newSSOResolverFixture(t)
-	f.stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), ssoProjectID, ssoAttemptID).Return(parkedAttempt(parkedResult()), nil)
+	f.stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), ssoProjectID, ssoAttemptID).
+		Return(parkedAttempt(parkedResult(), &domain.AuthFactorUser{UserID: "u-x"}), nil)
 	f.connections.EXPECT().GetRevision(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 
 	in := loadInput()

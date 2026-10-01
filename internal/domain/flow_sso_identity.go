@@ -61,11 +61,10 @@ type FlowSSOParkedIdentity struct {
 	// can be retried. Every other field is then empty.
 	BoundUserID string
 	// CollisionUserID is set when the row this flow already resolved is still
-	// parked and the attempt carries a user factor but no sso factor. Only a
-	// collision leaves that: the linked and created paths delete the row, and
-	// the engine never collects on an attempt that carries a user (see
-	// AttemptUserID). The cookie that recorded the bind may have been lost, so
-	// the engine catches the state up. Only AttemptUserID is set besides it.
+	// parked and carries the collision marker
+	// ([SSOCallbackResult.CollisionUserID]) a collision bind wrote with the
+	// user factor. The cookie that recorded the bind may have been lost, so the
+	// engine catches the state up. Only AttemptUserID is set besides it.
 	CollisionUserID string
 	// AttemptUserID is the user of the user factor the attempt carries when it
 	// is read, whatever wrote it: a signed-in session copies its user in, a

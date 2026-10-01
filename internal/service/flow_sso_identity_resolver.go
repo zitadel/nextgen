@@ -46,15 +46,12 @@ func (r *FlowSSOIdentityResolver) LoadParked(ctx context.Context, in domain.Flow
 	}
 	// An already resolved row (sso_user_not_found leaves it parked) needs
 	// none of the reads below.
-	if ok && check.Result != nil && check.ID == in.ResolvedCheckID && attemptUserID != "" {
-		// The linked and created paths delete the row, and the engine never
-		// collects or creates on an attempt that already carries a user, so a
-		// user factor without an sso factor next to a resolved row was bound by
-		// a collision. Report it, so a flow whose cookie lost that bind can
-		// catch up.
-		if _, sso := domain.CheckAs[*domain.AuthFactorSSO](attempt, domain.AuthCheckTypeSSO); !sso {
-			return &domain.FlowSSOParkedIdentity{CollisionUserID: attemptUserID, AttemptUserID: attemptUserID}, nil
-		}
+	if ok && check.Result != nil && check.ID == in.ResolvedCheckID && check.Result.CollisionUserID != "" {
+		// A collision bind marked the row with the user it bound, in the same
+		// transaction as the user factor. Report it, so a flow whose cookie
+		// lost that bind can catch up. Only the marker counts: a user factor
+		// alone can come from an unrelated identifier submission.
+		return &domain.FlowSSOParkedIdentity{CollisionUserID: check.Result.CollisionUserID, AttemptUserID: attemptUserID}, nil
 	}
 	if !ok || check.Result == nil || check.ID == in.ResolvedCheckID {
 		if bound := boundThroughSSO(attempt); bound != nil {
@@ -160,16 +157,19 @@ func (r *FlowSSOIdentityResolver) BindLinked(ctx context.Context, in domain.Flow
 
 // bindSSOIdentity records the user factor, plus the sso factor when a link is
 // given, on the attempt. A link settles the parked row, so it is deleted; a
-// collision keeps it, so a retry after a lost cookie raises the outcome
-// again. It runs inside the caller's transaction and returns
-// ErrSSOStateInvalid unwrapped when the row was settled or replaced.
+// collision keeps it, marked with the bound user, so a retry after a lost
+// cookie raises the outcome again. It runs inside the caller's transaction
+// and returns ErrSSOStateInvalid unwrapped when the row was settled or
+// replaced.
 func bindSSOIdentity(ctx context.Context, stmts AllStatements, in domain.FlowSSOBindInput) error {
 	// The exact parked row goes first: a settled or replaced one aborts before any write.
-	guard := stmts.DeleteSSOCallback
+	var err error
 	if in.LinkID == "" {
-		guard = stmts.TouchSSOCallback
+		err = stmts.MarkSSOCallbackCollision(ctx, in.ProjectID, in.AttemptID, in.CheckID, in.UserID)
+	} else {
+		err = stmts.DeleteSSOCallback(ctx, in.ProjectID, in.AttemptID, in.CheckID)
 	}
-	if err := guard(ctx, in.ProjectID, in.AttemptID, in.CheckID); err != nil {
+	if err != nil {
 		return err
 	}
 	attempt, err := stmts.GetAuthAttemptByID(ctx, in.ProjectID, in.AttemptID)

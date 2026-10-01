@@ -430,10 +430,10 @@ func TestAuthAttemptStatements_DeleteSSOCallback(t *testing.T) {
 	})
 }
 
-// TestAuthAttemptStatements_TouchSSOCallback covers the stale-row guard a
-// collision bind takes without settling the row: the exact row is matched and
-// left unchanged, any other id is refused.
-func TestAuthAttemptStatements_TouchSSOCallback(t *testing.T) {
+// TestAuthAttemptStatements_MarkSSOCallbackCollision covers the marker a
+// collision bind writes without settling the row: the exact row keeps its
+// result and gains the collision user, any other id is refused.
+func TestAuthAttemptStatements_MarkSSOCallbackCollision(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID := ensureProject(t, d.stmts)
 		attempt := createBareAttempt(t, d.stmts, projectID)
@@ -448,18 +448,20 @@ func TestAuthAttemptStatements_TouchSSOCallback(t *testing.T) {
 		}
 		require.NoError(t, d.stmts.SetSSOCallbackResult(t.Context(), projectID, sso.Check.StateHash, result))
 
-		require.ErrorIs(t, d.stmts.TouchSSOCallback(t.Context(), projectID, attempt.ID, "ch_other"), domain.ErrSSOStateInvalid())
-		require.NoError(t, d.stmts.TouchSSOCallback(t.Context(), projectID, attempt.ID, sso.Check.ID))
+		require.ErrorIs(t, d.stmts.MarkSSOCallbackCollision(t.Context(), projectID, attempt.ID, "ch_other", "user_9"), domain.ErrSSOStateInvalid())
+		require.NoError(t, d.stmts.MarkSSOCallbackCollision(t.Context(), projectID, attempt.ID, sso.Check.ID, "user_9"))
 
 		got, err := d.stmts.GetAuthAttemptByID(t.Context(), projectID, attempt.ID)
 		require.NoError(t, err)
 		parked, ok := got.SSOCallback()
-		require.True(t, ok, "the touch keeps the parked row")
+		require.True(t, ok, "the mark keeps the parked row")
 		assert.Equal(t, sso.Check.ID, parked.ID)
-		assert.Equal(t, result, parked.Result, "the touch changes nothing")
+		marked := *result
+		marked.CollisionUserID = "user_9"
+		assert.Equal(t, &marked, parked.Result, "the rest of the result is unchanged")
 
 		require.NoError(t, d.stmts.DeleteSSOCallback(t.Context(), projectID, attempt.ID, sso.Check.ID))
-		require.ErrorIs(t, d.stmts.TouchSSOCallback(t.Context(), projectID, attempt.ID, sso.Check.ID), domain.ErrSSOStateInvalid(),
+		require.ErrorIs(t, d.stmts.MarkSSOCallbackCollision(t.Context(), projectID, attempt.ID, sso.Check.ID, "user_9"), domain.ErrSSOStateInvalid(),
 			"a settled row is refused")
 	})
 }

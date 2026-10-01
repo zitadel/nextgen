@@ -100,8 +100,10 @@ const setSSOCallbackResultStmt = `UPDATE zitadel_nextgen.checks SET factor_paylo
 
 const deleteSSOCallbackStmt = `DELETE FROM zitadel_nextgen.checks WHERE project_id = $1 AND auth_attempt_id = $2 AND type = $3 AND id = $4`
 
-// touchSSOCallbackStmt writes nothing new; it only matches (and locks) the row.
-const touchSSOCallbackStmt = `UPDATE zitadel_nextgen.checks SET failure_count = failure_count WHERE project_id = $1 AND auth_attempt_id = $2 AND type = $3 AND id = $4`
+// markSSOCallbackCollisionStmt sets collision_user_id in the parked result and
+// leaves the rest of it as it is.
+const markSSOCallbackCollisionStmt = `UPDATE zitadel_nextgen.checks SET factor_payload = jsonb_set(factor_payload, '{collision_user_id}', to_jsonb($5::TEXT))` +
+	` WHERE project_id = $1 AND auth_attempt_id = $2 AND type = $3 AND id = $4`
 
 const authAttemptChallengeFailedStmt = `UPDATE zitadel_nextgen.checks` +
 	` SET last_failed_at = NOW(), failure_count = failure_count + 1` +
@@ -550,10 +552,10 @@ func (as authAttemptStatements) DeleteSSOCallback(ctx context.Context, projectID
 	return nil
 }
 
-func (as authAttemptStatements) TouchSSOCallback(ctx context.Context, projectID, authAttemptID, checkID string) error {
-	tag, err := as.client.Exec(ctx, touchSSOCallbackStmt, projectID, authAttemptID, domain.AuthCheckTypeSSOCallback, checkID)
+func (as authAttemptStatements) MarkSSOCallbackCollision(ctx context.Context, projectID, authAttemptID, checkID, userID string) error {
+	tag, err := as.client.Exec(ctx, markSSOCallbackCollisionStmt, projectID, authAttemptID, domain.AuthCheckTypeSSOCallback, checkID, userID)
 	if err != nil {
-		return fmt.Errorf("failed to touch sso callback: %w", wrapError(err))
+		return fmt.Errorf("failed to mark sso callback collision: %w", wrapError(err))
 	}
 	if tag.RowsAffected() == 0 {
 		return domain.ErrSSOStateInvalid()
