@@ -315,7 +315,7 @@ type IDPConnectionPayload struct {
 
 // IDPConnectionPayloadSnapshot is the allowlisted create snapshot for idp.created.
 func IDPConnectionPayloadSnapshot(connection *IDPConnection) (IDPConnectionPayload, error) {
-	doc, err := parseIDPConnectionDocument(connection.Document)
+	doc, err := ParseIDPConnectionDocument(connection.Document)
 	if err != nil {
 		return IDPConnectionPayload{}, err
 	}
@@ -335,11 +335,11 @@ func IDPConnectionPayloadSnapshot(connection *IDPConnection) (IDPConnectionPaylo
 // plus display_name and template when they differ from previous. Slug and
 // protocol are fixed for the life of the connection, so they never change.
 func IDPConnectionPayloadDelta(previous, next *IDPConnection) (IDPConnectionPayload, error) {
-	before, err := parseIDPConnectionDocument(previous.Document)
+	before, err := ParseIDPConnectionDocument(previous.Document)
 	if err != nil {
 		return IDPConnectionPayload{}, err
 	}
-	after, err := parseIDPConnectionDocument(next.Document)
+	after, err := ParseIDPConnectionDocument(next.Document)
 	if err != nil {
 		return IDPConnectionPayload{}, err
 	}

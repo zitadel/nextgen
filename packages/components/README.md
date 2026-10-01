@@ -273,9 +273,21 @@ renders the bundled `default.liquid`. Tracked as a follow-up.
 | `previewState` / `preview-state` | `'default' \| 'validation_error' \| 'submission_error' \| 'loading' \| 'success'` | Preview mode for operator surfaces such as the console's branding screen. The flow still starts, so the step is the one the project serves; the element then shows it in this state and submits nothing. Only the purpose's entry step can be previewed |
 
 Events: `zitadel-flow-input`, `zitadel-flow-step`, `zitadel-flow-complete`,
-`zitadel-flow-error`. `zitadel-flow-step` fires for every applied step
-including the first, so a host app can drive its own chrome (progress,
-headings, analytics) from mount onwards rather than from the first submit.
+`zitadel-flow-error`, `zitadel-flow-redirect`. `zitadel-flow-step` fires for
+every applied step including the first, so a host app can drive its own chrome
+(progress, headings, analytics) from mount onwards rather than from the first
+submit.
+
+`zitadel-flow-redirect` fires when a step hands the browser to an identity
+provider, carrying the URL to send it to. The widget then navigates there
+itself, with `window.location.assign`: the provider's authorization endpoint
+is a full-page destination on another origin, so there is nothing a router
+could do with it. The event is a notification, not a hook — it is not
+cancelable, and a host listener cannot substitute its own navigation. Use it
+to record the hand-off (analytics, a spinner, saving scroll state) before the
+page goes away. The framework wrappers surface it as `onFlowRedirect`, except
+Vue and Angular, which emit `flowRedirect`, and Qwik, which takes
+`onFlowRedirect$`.
 The orchestrator exposes `::part(form)` for tenant-side CSS hooks. Adopts
 design tokens and `branding.font_url` into its shadow root on each update.
 

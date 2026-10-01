@@ -20,6 +20,9 @@ export {
   ZlPageShell,
   ZlPill,
   ZlSelect,
+  ZlSsoProviders,
+  SHIPPED_BRAND_ICON_NAMES,
+  type BrandIconName,
   type IconName,
   type IconSize,
   type IconTone,
@@ -27,6 +30,8 @@ export {
   type ZlFieldType,
   type ZlSelectOption,
   type ZlSelectChangeDetail,
+  type SsoProvider,
+  type ZlSsoSelectDetail,
   zlAlertManifest,
   zlButtonManifest,
   zlCardManifest,
@@ -36,6 +41,7 @@ export {
   zlPageShellManifest,
   zlPillManifest,
   zlSelectManifest,
+  zlSsoProvidersManifest,
 } from "./atoms/index.js";
 
 export { manifestRegistry, findManifest, listKnownTags, type AtomManifest } from "./manifests.js";

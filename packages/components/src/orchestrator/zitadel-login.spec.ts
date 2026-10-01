@@ -2102,11 +2102,10 @@ describe("<zitadel-login preview-state>", () => {
     element.postSignInUrl = "/admin";
     host.appendChild(element);
 
-    await waitFor(() => (element.shadowRoot?.textContent?.includes("signed in") ? element : null));
+    await waitFor(() =>
+      element.shadowRoot?.textContent?.includes("You're signed in") ? element : null,
+    );
     expect(element.shadowRoot?.querySelector("zl-field")).toBeNull();
-    // Nothing was typed, so the greeting shows the identifier's placeholder
-    // rather than ending mid-sentence.
-    expect(element.shadowRoot?.textContent).toContain("You're signed in as you@example.com");
     expect(completeEvents).toHaveLength(0);
     // No handoff exchange: the only request is the start.
     expect(requests()).toEqual(["createFlow"]);

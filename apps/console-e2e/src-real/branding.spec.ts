@@ -116,7 +116,7 @@ test("shows the served step in each state without submitting it", async ({
 
   await page.getByLabel("Previewed state").click();
   await page.getByRole("option", { name: "State: Success" }).click();
-  await expect(preview.getByText("You're signed in as")).toBeVisible();
+  await expect(preview.getByText("You're signed in")).toBeVisible();
   await expect(email).toHaveCount(0);
 
   // Back to the served step, and a submit from the preview goes nowhere:

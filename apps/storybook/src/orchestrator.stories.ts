@@ -1,46 +1,27 @@
-import type { Meta, StoryObj } from "@storybook/web-components-vite";
-import { applyBranding, clearBranding, setupMockHandlers } from "@zitadel/api-mock";
+import type { StoryObj } from "@storybook/web-components-vite";
 import { html } from "lit";
-import { initialize, mswLoader } from "msw-storybook-addon";
-import "@zitadel/components";
-import { brandingPresets, type BrandingPresetId } from "./branding-presets.js";
 
-// MSW lives only on the orchestrator (the atoms make no requests), so the
-// worker starts lazily here rather than globally in preview.ts.
-initialize({ onUnhandledRequest: "bypass" });
+import { mswLoader } from "msw-storybook-addon";
 
-/**
- * The `<zitadel-login>` orchestrator renders whatever the Flow API returns for
- * the current step. Here that API is mocked by `@zitadel/api-mock` (an xstate
- * flow machine + orval-typed fixtures), wired through `msw-storybook-addon`.
- *
- * One component, knobs for the rest:
- * - `purpose` switches the flow (Sign in -> email, then the credential on its
- *   own step; Sign up -> email, given name, family name, date of birth), so the
- *   rendered fields change without a separate component.
- * - `branding` swaps the tenant payload the mock overlays on every response.
- *
- * Interactive fixture emails (typed live in the rendered form):
- * - `wrong@example.com` -> inline "Wrong email or password." on the password
- *   step (credential failures surface there, not on the identifier)
- * - `server@example.com` -> form alert on the password step
- * - `exists@example.com` -> inline "account already exists" on Sign up
- * - any other email -> happy path to signed-in
- *
- * Excluded from the Storybook test run (`no-test`): the orchestrator drives
- * real network + the MSW worker; its behaviour is covered by the
- * `@zitadel/components` orchestrator specs.
- */
-interface OrchestratorArgs {
-  purpose: "login" | "register";
-  branding: BrandingPresetId;
-  theme: "" | "light" | "dark" | "auto";
-  previewState: "" | "default" | "validation_error" | "submission_error" | "loading" | "success";
-}
+import {
+  fill,
+  mock,
+  orchestratorArgTypes,
+  orchestratorBeforeEach,
+  orchestratorDefaultArgs,
+  orchestratorRender,
+  submit,
+  waitFor,
+  type OrchestratorArgs,
+} from "./orchestrator-shared.js";
 
-const mock = setupMockHandlers();
-
-const meta: Meta<OrchestratorArgs> = {
+// Written out rather than spread from the shared base: Storybook reads a CSF
+// default export statically, so a spread of an imported object silently loses
+// everything but `title` -- no `msw` handlers and, worse, no `beforeEach`, so
+// the branding overlay never ran and the `branding` knob did nothing on a cold
+// load. It only looked like it worked when another group had already set the
+// overlay as module state. The values still come from one place.
+export default {
   title: "Orchestrator/Login",
   tags: ["no-test"],
   loaders: [mswLoader],
@@ -48,47 +29,13 @@ const meta: Meta<OrchestratorArgs> = {
     layout: "fullscreen",
     msw: { handlers: mock.handlers },
   },
-  args: { purpose: "login", branding: "centered", theme: "", previewState: "" },
-  argTypes: {
-    purpose: {
-      control: "inline-radio",
-      options: ["login", "register"],
-      description: "Flow purpose — which step (and fields) the mock returns.",
-    },
-    branding: {
-      control: "select",
-      options: Object.keys(brandingPresets),
-      description: "Tenant branding the mock overlays on every response.",
-    },
-    theme: {
-      control: "inline-radio",
-      options: ["", "light", "dark", "auto"],
-      description:
-        "The embedding page's own preference. Empty defers to the revision's mode; a side the revision does not publish cannot be selected.",
-    },
-    previewState: {
-      control: "select",
-      options: ["", "default", "validation_error", "submission_error", "loading", "success"],
-      description:
-        "Preview mode: show the served step in a state and submit nothing. Empty runs the flow for real.",
-    },
-  },
-  beforeEach: ({ args }) => {
-    mock.reset();
-    clearBranding();
-    applyBranding(brandingPresets[args.branding]);
-  },
-  render: ({ purpose, theme, previewState }) =>
-    html`<zitadel-login
-      variant="page"
-      .purpose=${purpose}
-      theme=${theme}
-      preview-state=${previewState}
-    ></zitadel-login>`,
+  args: orchestratorDefaultArgs,
+  argTypes: orchestratorArgTypes,
+  beforeEach: orchestratorBeforeEach,
+  render: orchestratorRender,
 };
-
-export default meta;
 type Story = StoryObj<OrchestratorArgs>;
+
 
 /**
  * Sign-in, first step: the identifier collects the email only. Submitting
@@ -130,3 +77,21 @@ export const SplitBranding: Story = { args: { branding: "split" } };
  * `previewState` for the other states.
  */
 export const PreviewValidationErrors: Story = { args: { previewState: "validation_error" } };
+
+/**
+ * The second step of an ordinary sign-in, where the credential is asked for.
+ * The identifier collects the email on its own, so this step is only ever
+ * reached by submitting one — the story does that rather than faking a step,
+ * which keeps the mock's flow the same one a visitor drives.
+ */
+export const PasswordStep: Story = {
+  play: async ({ canvasElement }) => {
+    await fill(canvasElement, "email", "ada@example.com");
+    await submit(canvasElement);
+    await waitFor(() =>
+      canvasElement
+        .querySelector("zitadel-login")
+        ?.shadowRoot?.querySelector('zl-field[name="password"]'),
+    );
+  },
+};
