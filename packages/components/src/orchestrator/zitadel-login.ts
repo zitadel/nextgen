@@ -229,6 +229,16 @@ export class ZitadelLogin extends ZitadelSurface {
     | "" = "";
 
   /**
+   * The preview state in effect: {@link previewState} when it names a known
+   * state, otherwise none, so a mistyped attribute leaves a working login
+   * rather than one that silently submits nothing.
+   */
+  private get preview(): LoginPreviewState | "" {
+    const state = this.previewState;
+    return (LOGIN_PREVIEW_STATES as readonly string[]).includes(state) ? state : "";
+  }
+
+  /**
    * BCP 47 language tag (e.g. `"de"`, `"en-US"`). The widget resolves this
    * to a built-in locale dictionary. Falls back to auto-detection from
    * `document.documentElement.lang` or `navigator.language` when empty.
@@ -424,13 +434,19 @@ export class ZitadelLogin extends ZitadelSurface {
     if (!this.engine || changed.has("locales") || changed.has("lang")) {
       this.engine = createLiquidEngine({ locale: this.resolveLocale() });
     }
+    if (changed.has("previewState") && this.previewState && !this.preview) {
+      console.warn(
+        `[zitadel-login] preview-state="${this.previewState}" is not a preview state ` +
+          `(${LOGIN_PREVIEW_STATES.join(", ")}); running the flow for real.`,
+      );
+    }
     if (changed.has("previewState") && this.response) {
       // A flow already on screen becomes the base when preview is switched on
       // after mount; leaving preview restores it as it was served and lets
       // the flow run for real from there.
       this.previewBase ??= this.response;
       this.applyPreviewState();
-      if (!this.previewState) this.previewBase = null;
+      if (!this.preview) this.previewBase = null;
     }
     this.applySurfaceTheme(this.branding);
     this.setAttribute("aria-busy", this.loading ? "true" : "false");
@@ -678,7 +694,7 @@ export class ZitadelLogin extends ZitadelSurface {
       this.loading = false;
     }
     // After `loading` has settled: the `loading` preview holds it back up.
-    if (this.previewState && this.response) {
+    if (this.preview && this.response) {
       this.previewBase = this.response;
       this.applyPreviewState();
     }
@@ -693,7 +709,7 @@ export class ZitadelLogin extends ZitadelSurface {
   private applyPreviewState(): void {
     const base = this.previewBase;
     if (!base) return;
-    const state = this.previewState;
+    const state = this.preview;
     this.stepErrorDismissed = false;
     this.loading = state === "loading";
     const next = previewResponse(base, state);
@@ -735,9 +751,11 @@ export class ZitadelLogin extends ZitadelSurface {
   private applyResponse(wire: CreateFlow201): void {
     // A fresh response carries fresh (or no) errors — un-dismiss.
     this.stepErrorDismissed = false;
+    const preview = this.preview !== "";
     // Decided before the step is assigned: `maybeCompleteFlow` navigates a
-    // turn later, and by then the terminal screen has already painted.
-    this.completing = navigatesOnComplete(wire, this.postSignInUrl);
+    // turn later, and by then the terminal screen has already painted. A
+    // preview navigates nowhere, so it never holds the loader for it.
+    this.completing = !preview && navigatesOnComplete(wire, this.postSignInUrl);
     this.response = wire;
     const { branding, issues } = validateBranding(wire.branding, {
       renderingOrigin: this.ownerDocument.location.origin,
@@ -750,6 +768,11 @@ export class ZitadelLogin extends ZitadelSurface {
     // Defaults seed every declared field; existing entries (typed input,
     // carry-over from prior steps) win on conflict.
     this.formValues = { ...collectInitialValues(wire.step), ...this.formValues };
+
+    // A preview never leaves the step it shows: it takes no history entry,
+    // makes no trip to a provider, exchanges no handoff and tells no host the
+    // visitor signed in.
+    if (preview) return;
 
     // History API (ADR 022): keep exactly one same-document entry — the
     // sentinel — on the stack while the current step supports
@@ -798,9 +821,6 @@ export class ZitadelLogin extends ZitadelSurface {
       }
     }
 
-    // A preview never leaves the step it shows: no trip to a provider, no
-    // handoff is exchanged and no host is told the visitor signed in.
-    if (this.previewState) return;
     if (this.maybeRedirectToProvider(wire)) return;
     void this.maybeCompleteFlow(wire);
   }
@@ -922,7 +942,7 @@ export class ZitadelLogin extends ZitadelSurface {
       // step before the server returns. Re-rendering the same challenge would
       // reconnect `<zl-passkey>` and start a second WebAuthn ceremony. A
       // preview renders none at all: the atom starts its ceremony on connect.
-      challenge: this.loading || this.previewState ? null : (step.challenge ?? null),
+      challenge: this.loading || this.preview ? null : (step.challenge ?? null),
       messages: [],
       identity: this.deriveIdentity(),
       errors,
@@ -1194,7 +1214,7 @@ export class ZitadelLogin extends ZitadelSurface {
     event.preventDefault();
     // Before the required-field gate: a preview shows the state it was asked
     // for, not the one Enter would produce.
-    if (this.loading || this.previewState) return;
+    if (this.loading || this.preview) return;
     // This is the sole submit path for the primary action (submit-type
     // <zl-button> and Enter both drive `form.requestSubmit()`; the button no
     // longer emits a parallel `zl-submit`). Enforce the step's required fields
@@ -1316,7 +1336,7 @@ export class ZitadelLogin extends ZitadelSurface {
   ): Promise<void> {
     // Every other entry point (actions, back, passkey proofs) lands here, so
     // this one check keeps a preview from ever writing to the flow.
-    if (!this.response || this.loading || this.previewState) return;
+    if (!this.response || this.loading || this.preview) return;
     const { id, session_token } = this.response;
     this.loading = true;
     try {
@@ -1420,12 +1440,14 @@ function isAllowedSelectValue(field: CreateFlow201StepFieldsItem, value: string)
 }
 
 /** The states {@link ZitadelLogin.previewState} can show a step in. */
-export type LoginPreviewState =
-  | "default"
-  | "validation_error"
-  | "submission_error"
-  | "loading"
-  | "success";
+const LOGIN_PREVIEW_STATES = [
+  "default",
+  "validation_error",
+  "submission_error",
+  "loading",
+  "success",
+] as const;
+export type LoginPreviewState = (typeof LOGIN_PREVIEW_STATES)[number];
 
 /** The response {@link ZitadelLogin.previewState} shows for the served one. */
 function previewResponse(base: CreateFlow201, state: LoginPreviewState | ""): CreateFlow201 {
@@ -1447,10 +1469,10 @@ function previewResponse(base: CreateFlow201, state: LoginPreviewState | ""): Cr
       },
     };
   }
-  // The server's own dialect for both, so the template routes them exactly as
-  // it does for a visitor: `error.<field>_required` per required field (what
-  // an empty submit produces), or the catalog key the element shows for a
-  // submit the server could not complete.
+  // Step errors in the dialect the template already routes:
+  // `error.<field>_required` per required field (what the server answers an
+  // empty submit with), or the catalog's form-level failure, which paints the
+  // banner.
   const error =
     state === "validation_error"
       ? requiredFieldNames(base.step)

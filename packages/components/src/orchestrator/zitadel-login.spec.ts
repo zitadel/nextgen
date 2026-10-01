@@ -2173,6 +2173,59 @@ describe("<zitadel-login preview-state>", () => {
     expect(attempts).toHaveLength(0);
   });
 
+  it("takes no history entry for a served step that can go back", async () => {
+    server.use(
+      http.post("*/flow", () =>
+        HttpResponse.json(
+          {
+            id: "flow-1",
+            session_id: "sess-1",
+            session_token: "token-1",
+            step: {
+              name: "password",
+              texts: { title_key: "password.title" },
+              fields: [],
+              actions: [{ name: "back", kind: "back", text_key: "action.back" }],
+              gates: {},
+            },
+            branding: {},
+          },
+          { status: 201 },
+        ),
+      ),
+    );
+    const pushState = vi.spyOn(history, "pushState");
+    try {
+      await mountPreview("default");
+
+      // No sentinel: the browser's back gesture stays the host page's own.
+      const sentinels = pushState.mock.calls.filter(
+        ([state]) => (state as { zl?: boolean } | null)?.zl === true,
+      );
+      expect(sentinels).toHaveLength(0);
+    } finally {
+      pushState.mockRestore();
+    }
+  });
+
+  it("runs the flow for real when the value is not a known state", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const element = await mountPreview("validation-error" as ZitadelLogin["previewState"]);
+
+      expect(element.shadowRoot?.querySelector("zl-alert")).toBeNull();
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('preview-state="validation-error"'),
+      );
+
+      type(element, "email", "alice@acme.com");
+      submit(element);
+      await waitFor(() => (requests().includes("submitFlowStep") ? true : null));
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   it("switches state in place, without starting another flow", async () => {
     const element = await mountPreview("default");
 
