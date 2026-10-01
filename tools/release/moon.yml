@@ -58,6 +58,12 @@ tasks:
   # reproducible — matching the rest of the release chain.
   build-server:
     command: "node scripts/release.mjs build-server"
+    # The server binary embeds the console and login UI via `//go:embed all:dist`
+    # (internal/staticui/{console,login}/embed.go), so those UIs must be rebuilt
+    # before the go compile — otherwise a stale or missing dist gets baked in.
+    deps:
+      - "console:build-release"
+      - "login-ui:build-release"
     outputs:
       - "/dist/release/*/build/**/*"
     options:
