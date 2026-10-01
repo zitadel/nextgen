@@ -287,6 +287,7 @@ func (s *flowService) Submit(ctx context.Context, req SubmitFlowRequest) (domain
 		Step:                  result.Step,
 		HandoffToken:          result.HandoffToken,
 		HandoffTokenExpiresAt: result.HandoffTokenExpiresAt,
+		SSOBindingNonce:       result.SSOBindingNonce,
 	}, nil
 }
 

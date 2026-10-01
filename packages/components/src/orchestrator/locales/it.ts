@@ -185,6 +185,8 @@ export const it: Locale = {
   "error.passkey_invalid": "Non è stato possibile verificare questa passkey. Riprova.",
   "error.passkey_registration_invalid":
     "Non è stato possibile verificare la nuova passkey. Riprova a registrarla.",
+  "error.sso_unavailable":
+    "Questo provider di accesso non è disponibile al momento. Prova un altro metodo di accesso.",
 
   // --- Errori campo / modulo ---
   "error.email_required": "Inserisci un indirizzo e-mail",

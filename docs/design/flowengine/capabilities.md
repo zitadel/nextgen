@@ -66,7 +66,6 @@ to be a fast answer to "can I build flow X right now?"
 These contracts exist on the wire and in the state machine but reject at runtime:
 
 - **Cross-flow transitions.** `transitions.target` with `action: "pivot"` or `action: "switch"` is rejected. `PivotStack` is defined on `FlowState` but never pushed.
-- **SSO submissions.** Submitting an action with an `sso_provider_id` is rejected.
 - **Gate proofs.** Submitting a `gate_proofs` map is rejected.
 
 `ErrFlowUnsupported` maps to HTTP 400 with `code: "flow.unsupported"`.

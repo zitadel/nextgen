@@ -13,7 +13,7 @@ The end-to-end OAuth2/OIDC redirect ceremony progresses through three main
 phases:
 
 ```
-submit { action: "sso", sso_provider_id: "google" }
+submit { action: "sso", sso_provider_id: "google", return_target: "<page hosting the orchestrator>" }
   engine: reject if provider absent from the step's sso_providers
   engine: mint state record, build authorize URL (PKCE), emit sso-redirect step
 browser → provider → user authenticates
@@ -63,7 +63,7 @@ The `state` record serves as the server-side, single-use anchor for the attempt:
 | **PKCE Verifier** | Present when the connection enables PKCE (`pkce_enabled`, the default); the challenge is always `S256` when sent. A connection may set `pkce_enabled: false` only for a provider whose token endpoint rejects the parameters ([area 1](1-resource-model.md#the-connection-schema)); binding then rests on `state` and, for OIDC, `nonce`. |
 | **OIDC `nonce`** | Echoed in the `id_token` to bind the issued token strictly to this authorize request. |
 | **Expiry** | Sets a bounded time window for the external leg, inheriting the attempt's overall TTL. |
-| **Return Target** | The browser destination after callback processing, captured at submission time and validated against the environment's declared issuer origin. Never read from callback input: an attacker-supplied target is an open redirect. |
+| **Return Target** | The browser destination after callback processing: the page hosting the orchestrator, sent as `return_target` on the submission, where the flow resumes with `GET /flow/{id}`. Its origin must equal the request origin, which stands in for the environment's declared issuer origin until environments exist. Never read from callback input: an attacker-supplied target is an open redirect. |
 
 > **Security Note:** A guessable or reusable `state` parameter introduces
 > classic OAuth CSRF and code-injection vulnerabilities.
@@ -497,7 +497,7 @@ and recovery route without exposing internal technical details to the end user.
 | **Callback Route:** Register route under the server HTTP surface; the scaffolded proxy matcher is already prefix-wide (`/__nextgen/:path*`), so no patcher work remains. | Server |
 | **Localization Keys:** Export conflict-step copy (the account-exists explanation plus its submit, passkey, and sign-in actions), error copy, and provider button labels as `text_key` entries. | Login UI / Locale Work |
 | **UI & Branding Assets:** Add conditional SSO blocks to all five branding `login.liquid` templates and `default.liquid`; add provider glyphs to `zl-icon`. | Branding Defaults / Components |
-| **`<zl-sso-providers>` and `sso-redirect`:** An atom rendering one button per provider (`name` and `template` on the rendered step, filled by the engine from the connection; `template` is the brand hint) that submits `{action: "sso", sso_provider_id}`, and orchestrator navigation when a step carries `redirect_url`. | Components / Orchestrator |
+| **`<zl-sso-providers>` and `sso-redirect`:** An atom rendering one button per provider (`name` and `template` on the rendered step, filled by the engine from the connection; `template` is the brand hint) that submits `{action: "sso", sso_provider_id, return_target}`, and orchestrator navigation when a step carries `redirect_url`. | Components / Orchestrator |
 | **Failure-Details Channel:** Details are written to the server log; tenant-side misconfigurations are hidden from the end user. The log never carries authorization codes, tokens, or secret values; claim values follow `x-audit`'s deny-by-default; access logs redact `code` and `state` from the callback query. | Engine; the login UI shows the generic error |
 
 ## Open Points
@@ -547,10 +547,12 @@ and recovery route without exposing internal technical details to the end user.
   single value per host, so a second tab's ceremony overwrites the first tab's
   nonce and fails it at callback; per-attempt cookie names versus accepting the
   overwrite must be settled together with the state rule.
-* **`sso-redirect` Step Shape:** Confirming whether `{name, redirect_url}`
-  (sketched in example 4) serves as the official wire contract or if the
-  redirect URL should be folded directly into the submission response payload.
-  The return leg is settled in [The `state` Record](#the-state-record): the
+* **`sso-redirect` Step Shape:** Settled. The submission returns a
+  non-terminal step `{name: "sso-redirect", texts.title_key, redirect_url}`
+  with no fields or actions (example 4 in
+  [`flow-engine.md`](../flowengine/flow-engine.md#example-4-sso-login-google)),
+  and the flow state stays on the step the provider was picked from. The
+  return leg is settled in [The `state` Record](#the-state-record): the
   record carries the return target and the callback route consumes it, never
   reading a destination from callback input.
 

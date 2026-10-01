@@ -528,19 +528,26 @@ User clicks "Continue with Google":
 
 ```http
 POST /flow/flow_2/submit
-{ "action": "sso", "sso_provider_id": "google" }
+{ "action": "sso", "sso_provider_id": "google", "return_target": "https://login.example.com/login?flow=flow_2" }
 ```
 ```json
 ← 200  (engine-emitted redirect step — not authored in the definition)
+Set-Cookie: __Host-_zsso=<binding nonce>; Path=/; Max-Age=900; HttpOnly; Secure; SameSite=Lax
 {
   "id": "flow_2",
   "session_id": "sess_2",
   "step": {
     "name": "sso-redirect",
-    "redirect_url": "https://accounts.google.com/o/oauth2/auth?client_id=...&state=sess_2_google"
+    "texts": { "title_key": "sso.redirect.title" },
+    "redirect_url": "https://accounts.google.com/o/oauth2/auth?client_id=...&redirect_uri=https%3A%2F%2Flogin.example.com%2F__nextgen%2Fidp%2Fcallback&state=<state>&nonce=<nonce>&code_challenge=...&code_challenge_method=S256"
   }
 }
 ```
+
+The flow state does not change on this response, so `_zflow` is not
+rotated; the one `Set-Cookie` carries the browser-binding nonce the callback
+checks. `return_target` is the page hosting the orchestrator, where the flow
+resumes after the callback; its origin must equal the request origin.
 
 In the planned ceremony, the frontend navigates to `redirect_url` and the IdP
 callback returns control to the same step:
