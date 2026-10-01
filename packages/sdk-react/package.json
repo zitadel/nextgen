@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/sdk-react",
-  "version": "1.0.0-alpha.23",
+  "version": "1.0.0-alpha.24",
   "description": "React components for the Zitadel auth UI (client-side SPA).",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-react#readme",
   "bugs": {
@@ -48,7 +48,7 @@
     "@eslint/markdown": "catalog:",
     "@testing-library/react": "catalog:",
     "@types/react": "catalog:",
-    "@vitest/coverage-v8": "catalog:sdk",
+    "@vitest/coverage-v8": "catalog:",
     "eslint": "catalog:",
     "eslint-config-prettier": "catalog:",
     "eslint-import-resolver-typescript": "catalog:",
@@ -65,8 +65,8 @@
     "react-dom": "catalog:",
     "typescript": "catalog:",
     "typescript-eslint": "catalog:",
-    "vite": "catalog:sdk",
+    "vite": "catalog:",
     "vite-plugin-dts": "catalog:",
-    "vitest": "catalog:sdk"
+    "vitest": "catalog:"
   }
 }

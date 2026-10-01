@@ -76,7 +76,7 @@ const FRAMEWORK_FIXTURES = [
       await mkdir(join(cwd, "src"), { recursive: true });
       await writeFile(
         join(cwd, "package.json"),
-        JSON.stringify({ name: "demo", dependencies: { react: "^19.0.0", vite: "^7.0.0" } }),
+        JSON.stringify({ name: "demo", dependencies: { react: "^19.0.0", vite: "^8.0.0" } }),
       );
       await writeFile(join(cwd, "vite.config.ts"), "export default {}\n");
       return cwd;
@@ -91,7 +91,7 @@ const FRAMEWORK_FIXTURES = [
       await mkdir(join(cwd, "src"), { recursive: true });
       await writeFile(
         join(cwd, "package.json"),
-        JSON.stringify({ name: "demo", dependencies: { vue: "^3.0.0", vite: "^7.0.0" } }),
+        JSON.stringify({ name: "demo", dependencies: { vue: "^3.0.0", vite: "^8.0.0" } }),
       );
       await writeFile(join(cwd, "vite.config.ts"), "export default {}\n");
       return cwd;

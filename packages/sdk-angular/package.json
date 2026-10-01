@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/sdk-angular",
-  "version": "1.0.0-alpha.23",
+  "version": "1.0.0-alpha.24",
   "description": "Angular components for the Zitadel auth UI (client-side SPA).",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-angular#readme",
   "bugs": {
@@ -58,7 +58,7 @@
     "@eslint/json": "catalog:",
     "@eslint/markdown": "catalog:",
     "@testing-library/angular": "^19.4.1",
-    "@vitest/coverage-v8": "catalog:sdk",
+    "@vitest/coverage-v8": "catalog:",
     "eslint": "catalog:",
     "eslint-config-prettier": "catalog:",
     "eslint-import-resolver-typescript": "catalog:",
@@ -69,8 +69,8 @@
     "prettier": "catalog:",
     "typescript": "catalog:",
     "typescript-eslint": "catalog:",
-    "vite": "catalog:sdk",
-    "vitest": "catalog:sdk",
+    "vite": "catalog:",
+    "vitest": "catalog:",
     "zone.js": "~0.16.0"
   }
 }

@@ -1,6 +1,4 @@
-import { cancel, isCancel } from "@clack/prompts";
-
-import { ZitadelError } from "../../../lib/errors";
+import { bailOnCancel } from "../../../lib/prompt-cancel";
 
 /**
  * Converts a clack cancellation (Ctrl-C) into a thrown `E_VALIDATION` rather
@@ -8,8 +6,5 @@ import { ZitadelError } from "../../../lib/errors";
  * this so the wizard never proceeds with a sentinel or missing value.
  */
 export function bail<T>(value: T | symbol): asserts value is T {
-  if (isCancel(value)) {
-    cancel("Setup cancelled.");
-    throw new ZitadelError("E_VALIDATION", "Setup cancelled by user");
-  }
+  bailOnCancel(value, "Setup");
 }

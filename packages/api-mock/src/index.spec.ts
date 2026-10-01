@@ -149,16 +149,33 @@ describe("setupMockHandlers", () => {
     expect(done.handoff_token).toBeTruthy();
   });
 
-  test("redirects to SSO when sso_provider_id is set", async () => {
+  test("redirects to SSO on the reserved action", async () => {
     const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
     const submit = await submitFlowStep(start.id, {
       session_token: start.session_token,
-      action: "submit",
+      action: "sso",
       fields: {},
       sso_provider_id: "google",
     });
     expect(submit.step.name).toBe("sso-redirect");
     expect(submit.step.redirect_url).toBeTruthy();
+  });
+
+  /**
+   * A provider id on an ordinary submit is a malformed request, not a choice
+   * of provider. The engine reserves `action: "sso"` for that, so the mock
+   * must not accept the looser shape and hand back a pass the engine would
+   * not give.
+   */
+  test("ignores a provider id on an ordinary submit", async () => {
+    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    const submit = await submitFlowStep(start.id, {
+      session_token: start.session_token,
+      action: "submit",
+      fields: { email: "ada@example.test" },
+      sso_provider_id: "google",
+    });
+    expect(submit.step.name).toBe("password");
   });
 
   /**
@@ -371,7 +388,7 @@ describe("setupMockHandlers — the provider round trip", () => {
     const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
     const redirect = await submitFlowStep(start.id, {
       session_token: start.session_token,
-      action: "submit",
+      action: "sso",
       fields: {},
       sso_provider_id: "google",
     });
@@ -472,5 +489,42 @@ describe("setupMockHandlers — the provider round trip", () => {
       fields: { email: "reset@example.test" },
     });
     expect(back.step.name).toBe("register-sso");
+  });
+});
+
+/**
+ * `returnFromProvider` stands in for the leg of the round trip a page cannot
+ * make in-process, so what matters is that it lands where the wire does. Each
+ * case here is the in-process twin of a round trip above.
+ */
+describe("returnFromProvider", () => {
+  test("leaves a first-time identity on register-sso, ready to resume", async () => {
+    const id = mock.returnFromProvider({ provider: "google", email: "ada@example.test" });
+
+    const resumed = await getFlowStep(id);
+    expect(resumed.step.name).toBe("register-sso");
+    expect(resumed.step.fields?.map((f) => f.name)).toEqual(["given_name", "family_name"]);
+  });
+
+  test("leaves an email that already has an account on the conflict step", async () => {
+    const id = mock.returnFromProvider({ provider: "google", email: "exists@example.com" });
+
+    const resumed = await getFlowStep(id);
+    expect(resumed.step.name).toBe("sso-conflict");
+  });
+
+  test("resolves the branch the same way the wire does", async () => {
+    // Register through the provider in-process, then come back the same way:
+    // the link now exists, so this is a sign-in rather than a registration.
+    const first = mock.returnFromProvider({ provider: "google", email: "grace@example.test" });
+    const collect = await getFlowStep(first);
+    await submitFlowStep(first, {
+      session_token: collect.session_token,
+      action: "submit",
+      fields: { given_name: "Grace", family_name: "Hopper" },
+    });
+
+    const second = mock.returnFromProvider({ provider: "google", email: "grace@example.test" });
+    expect((await getFlowStep(second)).step.name).toBe("done");
   });
 });

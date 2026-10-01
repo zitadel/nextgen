@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/sdk-core",
-  "version": "1.0.0-alpha.23",
+  "version": "1.0.0-alpha.24",
   "description": "Core types and shared utilities for Zitadel SDKs",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-core#readme",
   "bugs": {
@@ -55,7 +55,7 @@
     "@eslint/js": "catalog:",
     "@eslint/json": "catalog:",
     "@eslint/markdown": "catalog:",
-    "@vitest/coverage-v8": "catalog:sdk",
+    "@vitest/coverage-v8": "catalog:",
     "eslint": "catalog:",
     "eslint-config-prettier": "catalog:",
     "eslint-import-resolver-typescript": "catalog:",
@@ -65,7 +65,7 @@
     "prettier": "catalog:",
     "typescript": "catalog:",
     "typescript-eslint": "catalog:",
-    "vite": "catalog:sdk",
-    "vitest": "catalog:sdk"
+    "vite": "catalog:",
+    "vitest": "catalog:"
   }
 }

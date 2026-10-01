@@ -135,6 +135,40 @@ describe("setup command pre-flight", () => {
     ]);
   });
 
+  it("offers an sso retry that can actually be run", async () => {
+    // The retry goes into next_commands, which an agent runs verbatim. With
+    // --sso and --non-interactive the CLI reads the secret from stdin, and a
+    // command handed over as text has none -- so advertising that combination
+    // is advertising a command that fails on sight.
+    const cwd = await makeTempDir();
+    await writeFile(join(cwd, "package.json"), JSON.stringify({ dependencies: { next: "^15" } }));
+    await writeRuntimeMetadata(cwd, runtimeFor(cwd, "http://localhost:9"));
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--framework",
+      "next",
+      "--server",
+      "local",
+      "--sso",
+      "google",
+      "--sso-client-id",
+      "1234-abc.apps.googleusercontent.com",
+      "--non-interactive",
+      "--json",
+    ]);
+
+    const json = parseJson(res.stdout) as { code: string; hint?: string; next_commands?: string[] };
+    expect(json.code).toBe("E_LOCAL_SERVER_NOT_RUNNING");
+    const retry = (json.next_commands ?? []).find((c) => c.includes("setup "));
+    expect(retry).toContain("--sso google");
+    expect(retry).not.toContain("--non-interactive");
+    // And it says why, so the scripted path is still reachable.
+    expect(json.hint).toContain("asks for the client secret");
+  });
+
   it("explains non-empty dirs whose framework can't be inferred or scaffolded", async () => {
     const cwd = await makeTempDir();
     // A non-empty dir that isn't a known framework — Orca's detector fails
@@ -368,6 +402,65 @@ describe("setup --design removal (#1039)", () => {
     expect(json.next_commands.join("\n")).toContain("branding eject");
     expect(capture.requests).toEqual([]);
     expect(existsSync(join(cwd, ".zitadel"))).toBe(false);
+  });
+});
+
+describe("setup --sso flags", () => {
+  it("refuses a provider with no client id before touching the directory", async () => {
+    const cwd = await makeTempDir();
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--non-interactive",
+      "--json",
+      "--sso",
+      "google",
+    ]);
+
+    expect(res.exitCode).not.toBe(0);
+    const json = parseJson(res.stdout) as { status: string; code: string; message?: string };
+    expect(json.status).toBe("error");
+    expect(json.code).toBe("E_VALIDATION");
+    expect(json.message).toContain("--sso-client-id");
+  });
+
+  it("refuses a client id with no provider", async () => {
+    const cwd = await makeTempDir();
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--non-interactive",
+      "--json",
+      "--sso-client-id",
+      "1234-abc.apps.googleusercontent.com",
+    ]);
+
+    expect(res.exitCode).not.toBe(0);
+    const json = parseJson(res.stdout) as { status: string; code: string };
+    expect(json.status).toBe("error");
+    expect(json.code).toBe("E_VALIDATION");
+  });
+
+  it("rejects a provider the catalog does not know", async () => {
+    const cwd = await makeTempDir();
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--non-interactive",
+      "--json",
+      "--sso",
+      "myspace",
+      "--sso-client-id",
+      "abc",
+    ]);
+
+    expect(res.exitCode).not.toBe(0);
   });
 });
 

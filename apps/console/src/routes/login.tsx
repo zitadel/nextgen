@@ -14,8 +14,8 @@ import { useTheme } from "../theme";
  *
  * Renders the embedded `<zitadel-login>` widget via `@zitadel/sdk-react`,
  * passing a per-element `project` **handle** built from the runtime-discovered
- * project id (Console ADR 0004 §3: env override in dev, runtime document
- * otherwise). The handle — not discrete `projectId`/`proxyPath` props — is
+ * project id (Console ADR 0004 §3: the runtime document, in development as in
+ * production). The handle — not discrete `projectId`/`proxyPath` props — is
  * required here: the widget's config precedence is element `project`
  * property → global `configureZitadel()` → declarative attributes
  * (`resolve-api.ts`), and the console's app-wide `configureZitadel()` call

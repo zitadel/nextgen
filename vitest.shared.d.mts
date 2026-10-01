@@ -1,9 +1,9 @@
 /**
  * Types for `vitest.shared.mjs`. Hand-written (not derived from `vitest/config`)
- * so the declaration is version-neutral: the SDK family typechecks against
- * Vitest 3 and everything else against Vitest 4, and both must accept `baseTest`
- * when it is spread into their own `test` config. Literal types (`false`,
- * `"v8"`, the reporter tuple) keep it assignable to either major's `test` type.
+ * so the declaration stays version-neutral: every project typechecks against
+ * Vitest 4 today, and `baseTest` must accept being spread into their own `test`
+ * config without coupling this base to a specific Vitest version's type. Literal
+ * types (`false`, `"v8"`, the reporter tuple) keep it assignable to `test`.
  */
 export interface BaseTest {
   watch: false;
