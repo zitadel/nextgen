@@ -41,6 +41,9 @@ const (
 	insertAuthAttemptFactorStmt = `INSERT INTO checks (project_id, auth_attempt_id, type, id, last_verified_at, factor_payload, failure_count)` +
 		` VALUES (@p1, @p2, @p3, @p4, @p5, @p6, 0)` +
 		` THEN RETURN id`
+	// The check id is part of the primary key, so AddAuthAttemptFactor cannot
+	// give a pending row a new id in place: it deletes the row and inserts.
+	deletePendingAuthAttemptCheckStmt = `DELETE FROM checks WHERE project_id = @p1 AND auth_attempt_id = @p2 AND type = @p3 AND factor_payload IS NULL`
 	authAttemptChallengeSucceededStmt = `UPDATE checks SET last_verified_at = @p1, factor_payload = @p2, challenge_payload = NULL, last_challenged_at = NULL, failure_count = 0` +
 		` WHERE project_id = @p3 AND auth_attempt_id = @p4 AND type = @p5 AND id = @p6`
 	// Spanner DML cannot update a primary-key column, and a re-issue mints a
@@ -393,6 +396,40 @@ func (as authAttemptStatements) SetAuthAttemptFactor(ctx context.Context, projec
 	}
 	factor.SetLastVerifiedAt(now)
 	return returnedID, nil
+}
+
+// AddAuthAttemptFactor implements [service.AuthAttemptStatements]. The insert
+// hits the unique (project_id, auth_attempt_id, type) index when a verified
+// factor is still stored, which surfaces as a [database.UniqueError].
+func (as authAttemptStatements) AddAuthAttemptFactor(ctx context.Context, projectID, authAttemptID string, factor domain.AuthFactor) (string, error) {
+	now := time.Now().UTC()
+	payloadStr, err := authattempt.MarshalPayloadString(factor.Payload())
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal factor payload: %w", err)
+	}
+	checkID := ""
+	if err := ensureManagedID(&checkID, domain.PrefixChallenge); err != nil {
+		return "", err
+	}
+	err = withTransaction(ctx, as.db, func(ctx context.Context, tx queryExecutor) error {
+		deletePending := buildStatement(deletePendingAuthAttemptCheckStmt, projectID, authAttemptID, int64(factor.Type())).statement()
+		if _, err := tx.Update(ctx, deletePending); err != nil {
+			return err
+		}
+		insert := buildStatement(insertAuthAttemptFactorStmt,
+			projectID, authAttemptID, int64(factor.Type()), checkID, now, encodeSpannerJSONPtr(payloadStr)).statement()
+		return tx.Write(ctx, insert, func(iter *spanner.RowIterator) error {
+			_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
+				return struct{}{}, row.Columns(&checkID)
+			})
+			return err
+		})
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to add factor: %w", err)
+	}
+	factor.SetLastVerifiedAt(now)
+	return checkID, nil
 }
 
 // AuthAttemptChallengeSucceeded implements [service.AuthAttemptStatements].

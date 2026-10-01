@@ -342,6 +342,12 @@ type AuthAttemptStatements interface {
 	// An existing check row of the same type is overwritten and its challenge
 	// state cleared. Returns the check row's id for audit emits.
 	SetAuthAttemptFactor(ctx context.Context, projectID, authAttemptID string, factor domain.AuthFactor) (checkID string, err error)
+	// AddAuthAttemptFactor writes a verified factor like SetAuthAttemptFactor, but
+	// returns a [*database.UniqueError] when a verified factor of that type is
+	// already stored, and gives the row a new check id. It exists so the SSO bind
+	// cannot overwrite a competing user factor, and so a challenge issued before
+	// the bind can no longer succeed.
+	AddAuthAttemptFactor(ctx context.Context, projectID, authAttemptID string, factor domain.AuthFactor) (checkID string, err error)
 	AuthAttemptChallengeSucceeded(ctx context.Context, projectID, authAttemptID string, factor domain.AuthFactor, challengeID string) error
 	AuthAttemptChallengeFailed(ctx context.Context, projectID, authAttemptID string, challenge domain.AuthChallenge) error
 	// IssueSSOState upserts the attempt's single sso_callback row. It mints the check

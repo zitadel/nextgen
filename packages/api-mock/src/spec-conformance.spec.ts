@@ -232,6 +232,19 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(body.code).toBe("session_not_found");
   });
 
+  test("GET /console/runtime.json names the project the console signs into", async () => {
+    // Not in the OpenAPI spec: the Go server serves it from its root mux
+    // (Console ADR 0004 §3). The console's mock dev loop boots on it, so the
+    // path and both fields are the contract. The platform project, so a
+    // console session can complete a claim (see the claim lifecycle below).
+    const res = await fetch(`${BASE}/console/runtime.json`);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      mode: "standalone",
+      console_project_id: PLATFORM_PROJECT_ID,
+    });
+  });
+
   test("POST /projects returns the spec-defined project shape", async () => {
     const res = await fetch(`${BASE}/projects`, {
       method: "POST",

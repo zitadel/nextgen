@@ -114,18 +114,29 @@ func bindSSOIdentity(ctx context.Context, stmts AllStatements, in domain.FlowSSO
 	if err != nil {
 		return fmt.Errorf("bind sso identity: read attempt: %w", err)
 	}
-	// SetAuthAttemptFactor overwrites, so a bound attempt is checked here.
 	if bound, ok := domain.CheckAs[*domain.AuthFactorUser](attempt, domain.AuthCheckTypeUser); ok && bound.UserID != in.UserID {
 		return domain.ErrFlowRestartRequired()
 	}
-	factors := []domain.AuthFactor{
-		&domain.AuthFactorUser{UserID: in.UserID},
-		&domain.AuthFactorSSO{ConnectionID: in.ConnectionID, LinkID: in.LinkID},
-	}
-	for _, factor := range factors {
-		if _, err := recordDirectAuthFactor(ctx, stmts, attempt, factor); err != nil {
-			return fmt.Errorf("bind sso identity: %w", err)
+	// The check above is a plain read: a concurrent identifier submission
+	// can still bind a user after it. The add refuses to overwrite one.
+	userFactor := &domain.AuthFactorUser{UserID: in.UserID}
+	checkID, err := stmts.AddAuthAttemptFactor(ctx, in.ProjectID, in.AttemptID, userFactor)
+	if _, taken := errors.AsType[*database.UniqueError](err); taken {
+		current, err := stmts.GetAuthAttemptByID(ctx, in.ProjectID, in.AttemptID)
+		if err != nil {
+			return fmt.Errorf("bind sso identity: re-read attempt: %w", err)
 		}
+		if bound, ok := domain.CheckAs[*domain.AuthFactorUser](current, domain.AuthCheckTypeUser); !ok || bound.UserID != in.UserID {
+			return domain.ErrFlowRestartRequired()
+		}
+	} else if err != nil {
+		return fmt.Errorf("bind sso identity: %w", err)
+	} else if err := emitDirectAuthFactor(ctx, stmts, attempt, userFactor, checkID); err != nil {
+		return fmt.Errorf("bind sso identity: %w", err)
+	}
+	ssoFactor := &domain.AuthFactorSSO{ConnectionID: in.ConnectionID, LinkID: in.LinkID}
+	if _, err := recordDirectAuthFactor(ctx, stmts, attempt, ssoFactor); err != nil {
+		return fmt.Errorf("bind sso identity: %w", err)
 	}
 	return stmts.DeleteSSOCallback(ctx, in.ProjectID, in.AttemptID)
 }
