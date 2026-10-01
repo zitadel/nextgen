@@ -51,9 +51,9 @@ const (
 	// attempt's row and inserts the new one inside withTransaction.
 	deleteSSOStateStmt    = `DELETE FROM checks WHERE project_id = @p1 AND auth_attempt_id = @p2 AND type = @p3`
 	deleteSSOCallbackStmt = `DELETE FROM checks WHERE project_id = @p1 AND auth_attempt_id = @p2 AND type = @p3 AND id = @p4`
-	// markSSOCallbackCollisionStmt sets collision_user_id in the parked result
-	// and leaves the rest of it as it is.
-	markSSOCallbackCollisionStmt = `UPDATE checks SET factor_payload = JSON_SET(factor_payload, '$.collision_user_id', @p5)` +
+	// markSSOCallbackCollisionStmt replaces the parked result with the
+	// collision marker alone.
+	markSSOCallbackCollisionStmt = `UPDATE checks SET factor_payload = @p5` +
 		` WHERE project_id = @p1 AND auth_attempt_id = @p2 AND type = @p3 AND id = @p4`
 	insertSSOStateStmt = `INSERT INTO checks (project_id, auth_attempt_id, type, id, last_challenged_at, challenge_payload, lookup_hash, failure_count)` +
 		` VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, 0)`
@@ -620,8 +620,13 @@ func (as authAttemptStatements) DeleteSSOCallback(ctx context.Context, projectID
 }
 
 func (as authAttemptStatements) MarkSSOCallbackCollision(ctx context.Context, projectID, authAttemptID, checkID, userID string) error {
+	// The marker replaces the result: the provider's subject and claims go.
+	payload, err := authattempt.MarshalPayloadString(&domain.SSOCallbackResult{CollisionUserID: userID})
+	if err != nil {
+		return fmt.Errorf("failed to marshal sso collision marker: %w", err)
+	}
 	stmt := buildStatement(markSSOCallbackCollisionStmt,
-		projectID, authAttemptID, int64(domain.AuthCheckTypeSSOCallback), checkID, userID).statement()
+		projectID, authAttemptID, int64(domain.AuthCheckTypeSSOCallback), checkID, encodeSpannerJSONPtr(payload)).statement()
 	n, err := as.db.Update(ctx, stmt)
 	if err != nil {
 		return fmt.Errorf("failed to mark sso callback collision: %w", err)

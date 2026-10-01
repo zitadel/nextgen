@@ -576,9 +576,9 @@ func ssoUniqueClaims(schema *jsonschema.Schema, claims map[string]any) (probe, u
 // bindSSOCollision looks up each project-unique claim, verified or not, until
 // one names an existing user, then binds that user by id. Like a typed
 // identifier it only binds the user: no link, no sso factor. The bind checks
-// the exact parked row first and keeps it, so a row another request replaced
-// binds nothing (ErrSSOStateInvalid) and a retry after a lost cookie binds
-// the same owner again.
+// the exact parked row first and replaces it by a marker of that user, so a
+// row another request replaced binds nothing (ErrSSOStateInvalid) and a
+// retry after a lost cookie catches up from the marker.
 func (r *FlowStateMachineRuntime) bindSSOCollision(ctx context.Context, state *FlowState, parked *FlowSSOParkedIdentity, probeClaims []string) (bool, error) {
 	for _, name := range probeClaims {
 		value, _ := parked.Claims[name].(string)

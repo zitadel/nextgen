@@ -381,13 +381,13 @@ type AuthAttemptStatements interface {
 	// parked result it read. It returns ErrSSOStateInvalid when no row matched:
 	// a concurrent request settled it, or a new ceremony replaced it.
 	DeleteSSOCallback(ctx context.Context, projectID, authAttemptID, checkID string) error
-	// MarkSSOCallbackCollision records userID as the parked result's
-	// collision_user_id on the attempt's sso_callback row with the given check
-	// id, and changes nothing else; the write holds the row until the
-	// transaction ends. A collision bind takes it in place of the delete, so
-	// the row stays for a retry and a later render can tell the collision from
-	// an unrelated user factor. It returns ErrSSOStateInvalid when no row
-	// matched.
+	// MarkSSOCallbackCollision replaces the parked result on the attempt's
+	// sso_callback row with the given check id by the collision marker alone
+	// (collision_user_id = userID): the provider's subject and claims are gone.
+	// The write holds the row until the transaction ends.
+	// A collision bind takes it in place of the delete, so the row stays for a
+	// retry and a later render can tell the collision from an unrelated user
+	// factor. It returns ErrSSOStateInvalid when no row matched.
 	MarkSSOCallbackCollision(ctx context.Context, projectID, authAttemptID, checkID, userID string) error
 }
 

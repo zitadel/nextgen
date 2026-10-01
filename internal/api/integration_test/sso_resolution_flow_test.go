@@ -401,7 +401,8 @@ func TestSSOResolutionCollisionBindsAndKeepsParked(t *testing.T) {
 	row, parked := attempt.SSOCallback()
 	require.True(t, parked, "the parked row stays, so a lost cookie can be recovered")
 	require.NotNil(t, row.Result)
-	assert.Equal(t, ownerID, row.Result.CollisionUserID, "the row is marked with the user the collision bound")
+	assert.Equal(t, &domain.SSOCallbackResult{CollisionUserID: ownerID}, row.Result,
+		"the row holds only the marker: the provider's subject and claims are gone")
 	_, err := f.linkFor(t, "sub-new")
 	require.ErrorAs(t, err, new(*database.NoRowFoundError), "a collision links nothing")
 	owner, err := f.userByEmail(t, email)
@@ -409,7 +410,7 @@ func TestSSOResolutionCollisionBindsAndKeepsParked(t *testing.T) {
 	assert.Equal(t, ownerID, owner.ID, "no second user was created")
 
 	// The client lost the sealed cookie and retries with the one it had
-	// before: the same owner is bound and the same outcome raised again.
+	// before: the marker catches the state up and the same outcome is raised.
 	retry := f.getStep(t, flow)
 	require.IsType(t, &api.FlowResponseHeaders{}, retry, helpers.MustMarshal(t, retry))
 	assert.Equal(t, domain.FlowImplicitOutcomeUserAlreadyExists, retry.(*api.FlowResponseHeaders).Response.Step.Error.Value)

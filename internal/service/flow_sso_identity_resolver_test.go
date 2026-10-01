@@ -800,3 +800,19 @@ func TestFlowSSOIdentityResolver_LoadParked_ReportsAttemptUser(t *testing.T) {
 	require.NotNil(t, got)
 	assert.Equal(t, "u-s", got.AttemptUserID)
 }
+
+// After a collision the row holds only the marker, so the cookie that lost the
+// race (no resolved id recorded) still finds it, with no revision read: the
+// marker carries no revision to read.
+func TestFlowSSOIdentityResolver_LoadParked_CollisionMarkerReportedWithoutResolvedID(t *testing.T) {
+	t.Parallel()
+	f := newSSOResolverFixture(t)
+	f.stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), ssoProjectID, ssoAttemptID).
+		Return(parkedAttempt(&domain.SSOCallbackResult{CollisionUserID: "u-b"}, &domain.AuthFactorUser{UserID: "u-b"}), nil)
+	f.connections.EXPECT().GetRevision(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+	f.stmts.EXPECT().GetIDPIdentityLink(gomock.Any(), gomock.Any()).Times(0)
+
+	got, err := f.resolver.LoadParked(t.Context(), loadInput())
+	require.NoError(t, err)
+	assert.Equal(t, &domain.FlowSSOParkedIdentity{CollisionUserID: "u-b", AttemptUserID: "u-b"}, got)
+}

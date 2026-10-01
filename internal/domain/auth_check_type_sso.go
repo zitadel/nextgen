@@ -100,8 +100,10 @@ type SSOCallbackResult struct {
 	// is keyed like Claims, the same as idp.ExternalIdentity.Verified.
 	Verified map[string]bool `json:"verified,omitempty"`
 	// CollisionUserID is written by a collision bind in the same transaction as
-	// the user factor. It is the only signal a later render reconciles a lost
-	// collision cookie from.
+	// the user factor, and replaces the whole result: after a collision the row
+	// holds only this marker, and the provider's subject and claims are gone.
+	// It is the only signal a later render reconciles a lost collision cookie
+	// from.
 	CollisionUserID string `json:"collision_user_id,omitempty"`
 }
 

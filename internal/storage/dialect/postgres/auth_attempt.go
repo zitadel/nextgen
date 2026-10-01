@@ -100,9 +100,9 @@ const setSSOCallbackResultStmt = `UPDATE zitadel_nextgen.checks SET factor_paylo
 
 const deleteSSOCallbackStmt = `DELETE FROM zitadel_nextgen.checks WHERE project_id = $1 AND auth_attempt_id = $2 AND type = $3 AND id = $4`
 
-// markSSOCallbackCollisionStmt sets collision_user_id in the parked result and
-// leaves the rest of it as it is.
-const markSSOCallbackCollisionStmt = `UPDATE zitadel_nextgen.checks SET factor_payload = jsonb_set(factor_payload, '{collision_user_id}', to_jsonb($5::TEXT))` +
+// markSSOCallbackCollisionStmt replaces the parked result with the collision
+// marker alone.
+const markSSOCallbackCollisionStmt = `UPDATE zitadel_nextgen.checks SET factor_payload = $5::JSONB` +
 	` WHERE project_id = $1 AND auth_attempt_id = $2 AND type = $3 AND id = $4`
 
 const authAttemptChallengeFailedStmt = `UPDATE zitadel_nextgen.checks` +
@@ -553,7 +553,12 @@ func (as authAttemptStatements) DeleteSSOCallback(ctx context.Context, projectID
 }
 
 func (as authAttemptStatements) MarkSSOCallbackCollision(ctx context.Context, projectID, authAttemptID, checkID, userID string) error {
-	tag, err := as.client.Exec(ctx, markSSOCallbackCollisionStmt, projectID, authAttemptID, domain.AuthCheckTypeSSOCallback, checkID, userID)
+	// The marker replaces the result: the provider's subject and claims go.
+	payload, err := authattempt.MarshalPayloadJSON(&domain.SSOCallbackResult{CollisionUserID: userID})
+	if err != nil {
+		return fmt.Errorf("failed to marshal sso collision marker: %w", err)
+	}
+	tag, err := as.client.Exec(ctx, markSSOCallbackCollisionStmt, projectID, authAttemptID, domain.AuthCheckTypeSSOCallback, checkID, payload)
 	if err != nil {
 		return fmt.Errorf("failed to mark sso callback collision: %w", wrapError(err))
 	}

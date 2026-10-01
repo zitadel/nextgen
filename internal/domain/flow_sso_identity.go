@@ -19,10 +19,10 @@ type FlowSSOIdentityService interface {
 	BindLinked(ctx context.Context, in FlowSSOBindInput) error
 	// BindCollision binds the user FindUniqueOwner found, by id, in one
 	// transaction: a user factor only, no link and no sso factor. The parked
-	// row is kept, so a retry after a lost cookie raises the outcome again. It
-	// returns ErrSSOStateInvalid when the row is gone and
-	// ErrFlowRestartRequired when the attempt carries another user or is
-	// expired or handed off.
+	// row keeps only a marker of that user, so a retry after a lost cookie
+	// raises the outcome again. It returns ErrSSOStateInvalid when the row is
+	// gone and ErrFlowRestartRequired when the attempt carries another user or
+	// is expired or handed off.
 	BindCollision(ctx context.Context, in FlowSSOBindInput) error
 	// FindUniqueOwner returns the user owning value in the unique attribute,
 	// or "" with a nil error when nobody does. It only reads: unlike an
@@ -60,11 +60,11 @@ type FlowSSOParkedIdentity struct {
 	// through SSO; the engine re-raises the success outcome so a lost handoff
 	// can be retried. Every other field is then empty.
 	BoundUserID string
-	// CollisionUserID is set when the row this flow already resolved is still
-	// parked and carries the collision marker
-	// ([SSOCallbackResult.CollisionUserID]) a collision bind wrote with the
-	// user factor. The cookie that recorded the bind may have been lost, so the
-	// engine catches the state up. Only AttemptUserID is set besides it.
+	// CollisionUserID is set when the parked row holds the collision marker
+	// ([SSOCallbackResult.CollisionUserID]) a collision bind wrote with the user
+	// factor, whatever the cookie recorded. The cookie that recorded the bind
+	// may have been lost, so the engine catches the state up. Only
+	// AttemptUserID is set besides it.
 	CollisionUserID string
 	// AttemptUserID is the user of the user factor the attempt carries when it
 	// is read, whatever wrote it: a signed-in session copies its user in, a

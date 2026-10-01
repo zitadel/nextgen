@@ -431,8 +431,8 @@ func TestAuthAttemptStatements_DeleteSSOCallback(t *testing.T) {
 }
 
 // TestAuthAttemptStatements_MarkSSOCallbackCollision covers the marker a
-// collision bind writes without settling the row: the exact row keeps its
-// result and gains the collision user, any other id is refused.
+// collision bind writes without settling the row: the exact row keeps only
+// the collision user, the provider data goes, and any other id is refused.
 func TestAuthAttemptStatements_MarkSSOCallbackCollision(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID := ensureProject(t, d.stmts)
@@ -456,9 +456,9 @@ func TestAuthAttemptStatements_MarkSSOCallbackCollision(t *testing.T) {
 		parked, ok := got.SSOCallback()
 		require.True(t, ok, "the mark keeps the parked row")
 		assert.Equal(t, sso.Check.ID, parked.ID)
-		marked := *result
-		marked.CollisionUserID = "user_9"
-		assert.Equal(t, &marked, parked.Result, "the rest of the result is unchanged")
+		// The provider's subject, claims and verification data are gone: the row
+		// holds only the marker a retry reconciles from.
+		assert.Equal(t, &domain.SSOCallbackResult{CollisionUserID: "user_9"}, parked.Result)
 
 		require.NoError(t, d.stmts.DeleteSSOCallback(t.Context(), projectID, attempt.ID, sso.Check.ID))
 		require.ErrorIs(t, d.stmts.MarkSSOCallbackCollision(t.Context(), projectID, attempt.ID, sso.Check.ID, "user_9"), domain.ErrSSOStateInvalid(),
