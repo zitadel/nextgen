@@ -16,7 +16,7 @@ It requires three distinct artifacts to align perfectly:
 | :--- | :--- | :--- |
 | **User schema** | `x-auth-methods: {password, passkey, magic_link, sso, otp}` | The `sso` slot exists. Currently, every entry is strictly `{enabled}` only, with `additionalProperties: false`. |
 | **IdP connection** | The external provider configuration itself. | Outlined in area 1 (no server contract exists yet). |
-| **Flow step** | `sso_providers: ["google"]`, a list of connection slugs. The engine fills the rendered step's `name` and `template` from the connection ([Rendering from the connection](#rendering-from-the-connection)). | The meta-schema, the flow definition API and stored revisions take the slug list; every render resolves each slug through the connection service and emits `{id, name, template}`. The engine still rejects any SSO submission (`ErrFlowUnsupported`, `internal/domain/flow_state_machine.go`). *Constraint:* Any step carrying these **must** define a `transitions.sso_authenticated` (enforced by the validator). |
+| **Flow step** | `sso_providers: ["google"]`, a list of connection slugs. The engine fills the rendered step's `name` and `template` from the connection ([Rendering from the connection](#rendering-from-the-connection)). | The meta-schema, the flow definition API and stored revisions take the slug list; every render resolves each slug through the connection service and emits `{id, name, template}`. The engine still rejects any SSO submission (`ErrFlowUnsupported`, `internal/domain/flow_state_machine.go`). *Constraint:* Any step carrying these **must** define a `transitions.sso_authenticated` (enforced by the validator; on main before #1371 merges the enforced key is still `callback`). |
 
 Each authentication method surfaces differently within a flow, meaning there is
 no uniform rendering mechanism across the board:
@@ -228,7 +228,7 @@ it (emitting an error like
 | **Flow enables SSO** | **Mirrors existing logic:** If a step has `sso_providers`, the schema's `sso.enabled` must be `true`. |
 | **Provider ID validity** | **New:** Every `sso_providers[]` entry must exist in the pinned schema's `sso.providers` list. |
 | **Cross-resource resolution** | **New:** Every name in `sso.providers` must resolve to a valid connection file under `.zitadel/idps/`. |
-| **Callback transition** | **Already enforced:** A step utilizing `sso_providers` must define a `transitions.sso_authenticated`. |
+| **Callback transition** | **Already enforced** (as `transitions.callback` until #1371 renames it): A step utilizing `sso_providers` must define a `transitions.sso_authenticated`. |
 | **Full outcome routing** | **New:** A step with `sso_providers` must properly route `sso_user_not_found` and `user_already_exists`. The engine fires three possible outcomes, and routing only `sso_authenticated` dead-ends the other two. |
 | **Empty `claim_mapping` intersection** | **New (Warning):** If an offered provider's `claim_mapping` shares zero properties with the pinned schema, the collection fields are not prefilled, and every sign-up stops at the collection step for manual input. |
 | **Empty `verified_claims` intersection** | **New (Warning):** If a provider's `verified_claims` keys share no properties with the pinned schema, every property arrives unverified. Where a required property carries a non-empty `x-unique` scope, the auto-creation gate never passes and sign-up stops at the collection step. |
