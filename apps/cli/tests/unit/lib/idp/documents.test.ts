@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import { getDefaultHumanUserSchema, getDefaultLoginFlow } from "@zitadel/config/defaults";
+import { ZitadelError } from "../../../../src/lib/errors";
 import {
   applySsoToFlow,
   applySsoToSchema,
@@ -289,6 +290,44 @@ describe("applySsoToFlow", () => {
     expect(stepNamed(second.document, "sso-conflict").fields).toEqual(["email"]);
     expect(oldKeysIn(second.document)).toEqual([]);
     expect(targetsOf(second.document, "sso-conflict").sso_authenticated).toBe("done");
+  });
+
+  it("keeps an action transition named like a legacy outcome", () => {
+    // `callback` was a valid action name before the rename; its transition is
+    // the action's, not the old SSO outcome, and must stay with it.
+    const legacy = previousCliFlow();
+    const register = legacy.steps.find((s) => s.name === "register")!;
+    register.actions = [...((register.actions as unknown[]) ?? []), { name: "callback", kind: "submit" }];
+    const ownTarget = (register.transitions as Record<string, unknown>).callback;
+
+    const { document } = applySsoToFlow(legacy, "google", bothMethods);
+
+    expect((stepNamed(document, "register").transitions as Record<string, unknown>).callback).toEqual(ownTarget);
+    expect(targetsOf(document, "identifier").callback).toBeUndefined();
+    expect(targetsOf(document, "identifier").sso_authenticated).toBe("done");
+  });
+
+  it("refuses to migrate when an action already uses the new outcome name", () => {
+    // `sso_authenticated` was a free action name before this release. Renaming
+    // the legacy `callback` onto it would hand the action's route to the
+    // generated SSO target without saying so.
+    const legacy = previousCliFlow();
+    const identifier = legacy.steps.find((s) => s.name === "identifier")!;
+    identifier.actions = [...((identifier.actions as unknown[]) ?? []), { name: "sso_authenticated", kind: "submit" }];
+    const before = structuredClone(legacy);
+
+    let caught: unknown;
+    try {
+      applySsoToFlow(legacy, "github", bothMethods);
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(ZitadelError);
+    expect((caught as ZitadelError).code).toBe("E_VALIDATION");
+    expect((caught as ZitadelError).message).toContain("identifier");
+    expect((caught as ZitadelError).message).toContain("sso_authenticated");
+    expect(legacy).toEqual(before);
   });
 
   it("keeps the new key when a step carries both the old and the new one", () => {

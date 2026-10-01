@@ -12,6 +12,8 @@
  * rewriting it would discard deliberate work.
  */
 
+import { ZitadelError } from "../errors";
+
 /**
  * Steps a flow starts at, by purpose, plus the steps that collect an
  * identifier. The provider button belongs on all of them: a developer landing
@@ -391,7 +393,9 @@ const LEGACY_OUTCOMES: ReadonlyArray<readonly [string, string]> = [
 /**
  * Rename the previous outcome keys on every step, in place. The validator
  * rejects the old keys, so leaving them would make `sso enable` write an
- * invalid flow. Where a step already has the new key, that one wins.
+ * invalid flow. Where a step already has the new key, that one wins. A key
+ * that is also one of the step's action names is the action's transition and
+ * stays.
  */
 function migrateLegacyOutcomes(document: Json): boolean {
   let changed = false;
@@ -400,9 +404,24 @@ function migrateLegacyOutcomes(document: Json): boolean {
       continue;
     }
     const transitions = step.transitions;
+    const actions = Array.isArray(step.actions) ? step.actions : [];
+    const actionNames = new Set(actions.map((action) => (isObject(action) ? action.name : undefined)));
     for (const [old, next] of LEGACY_OUTCOMES) {
-      if (!(old in transitions)) {
+      if (!(old in transitions) || actionNames.has(old)) {
         continue;
+      }
+      if (actionNames.has(next)) {
+        // The new key is this step's own action route: migrating would hand it
+        // to the generated SSO target, a change to hand-authored routing.
+        const name = typeof step.name === "string" ? step.name : "?";
+        throw new ZitadelError(
+          "E_VALIDATION",
+          `steps.${name}: action "${next}" uses the name the SSO outcome "${old}" is renamed to`,
+          {
+            hint: `Rename the action "${next}" on step "${name}" (and its transition), then run sso enable again.`,
+            details: { step: name, action: next, legacyOutcome: old },
+          },
+        );
       }
       if (!(next in transitions)) {
         transitions[next] = transitions[old];
