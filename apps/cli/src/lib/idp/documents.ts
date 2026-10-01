@@ -391,7 +391,9 @@ const LEGACY_OUTCOMES: ReadonlyArray<readonly [string, string]> = [
 /**
  * Rename the previous outcome keys on every step, in place. The validator
  * rejects the old keys, so leaving them would make `sso enable` write an
- * invalid flow. Where a step already has the new key, that one wins.
+ * invalid flow. Where a step already has the new key, that one wins. A key
+ * that is also one of the step's action names is the action's transition and
+ * stays.
  */
 function migrateLegacyOutcomes(document: Json): boolean {
   let changed = false;
@@ -400,8 +402,10 @@ function migrateLegacyOutcomes(document: Json): boolean {
       continue;
     }
     const transitions = step.transitions;
+    const actions = Array.isArray(step.actions) ? step.actions : [];
+    const actionNames = new Set(actions.map((action) => (isObject(action) ? action.name : undefined)));
     for (const [old, next] of LEGACY_OUTCOMES) {
-      if (!(old in transitions)) {
+      if (!(old in transitions) || actionNames.has(old)) {
         continue;
       }
       if (!(next in transitions)) {

@@ -291,6 +291,21 @@ describe("applySsoToFlow", () => {
     expect(targetsOf(second.document, "sso-conflict").sso_authenticated).toBe("done");
   });
 
+  it("keeps an action transition named like a legacy outcome", () => {
+    // `callback` was a valid action name before the rename; its transition is
+    // the action's, not the old SSO outcome, and must stay with it.
+    const legacy = previousCliFlow();
+    const register = legacy.steps.find((s) => s.name === "register")!;
+    register.actions = [...((register.actions as unknown[]) ?? []), { name: "callback", kind: "submit" }];
+    const ownTarget = (register.transitions as Record<string, unknown>).callback;
+
+    const { document } = applySsoToFlow(legacy, "google", bothMethods);
+
+    expect((stepNamed(document, "register").transitions as Record<string, unknown>).callback).toEqual(ownTarget);
+    expect(targetsOf(document, "identifier").callback).toBeUndefined();
+    expect(targetsOf(document, "identifier").sso_authenticated).toBe("done");
+  });
+
   it("keeps the new key when a step carries both the old and the new one", () => {
     const legacy = previousCliFlow();
     const identifier = legacy.steps.find((s) => s.name === "identifier")!;
