@@ -122,6 +122,15 @@ function flowIdFromLocation(): string {
   }
 }
 
+/** The `code` of a Flow API error envelope, or "" for anything else. */
+function apiErrorCode(error: unknown): string {
+  if (!(error instanceof ApiError)) return "";
+  const { body } = error;
+  return typeof body === "object" && body !== null && "code" in body
+    ? String((body as { code: unknown }).code)
+    : "";
+}
+
 @customElement("zitadel-login")
 export class ZitadelLogin extends ZitadelSurface {
   static override shadowRootOptions: ShadowRootInit = {
@@ -588,6 +597,14 @@ export class ZitadelLogin extends ZitadelSurface {
     return { projectId: this.projectId, proxyPath: this.proxyPath, url: this.url };
   }
 
+  /**
+   * Set while a fresh flow replaces one the server refused to continue
+   * (`flow.restart_required`). It bypasses the resume handle, puts the notice
+   * on the new first step, and refuses a second restart until a step renders,
+   * so a server that keeps refusing cannot loop the widget.
+   */
+  private restarting = false;
+
   private async startFlow(): Promise<void> {
     this.loading = true;
     this.startupError = null;
@@ -597,7 +614,7 @@ export class ZitadelLogin extends ZitadelSurface {
       // unhandled promise rejection from `firstUpdated`'s microtask.
       const { project: cfg, api } = resolveApi(this.project, this.projectAttrs, "<zitadel-login>");
       let wire: CreateFlow201;
-      const resumeId = this.resumeFlowId || flowIdFromLocation();
+      const resumeId = this.restarting ? "" : this.resumeFlowId || flowIdFromLocation();
       if (resumeId) {
         wire = await getCurrentStep(api, resumeId);
       } else {
@@ -613,6 +630,9 @@ export class ZitadelLogin extends ZitadelSurface {
           ...(this.flowName ? { flow_definition_name: this.flowName } : {}),
         });
       }
+      if (this.restarting) {
+        wire = { ...wire, step: { ...wire.step, error: "error.flow_restart_required" } };
+      }
       this.applyResponse(wire);
       // Symmetric with `submit()`: every applied step announces itself, the
       // first one included. A host app driving its own chrome from the step
@@ -620,10 +640,25 @@ export class ZitadelLogin extends ZitadelSurface {
       // after the visitor's first submit.
       emit(this, "zitadel-flow-step", { step: wire.step });
     } catch (error) {
+      if (await this.restartIfRequired(error)) return;
       this.handleTransportError(this.describeFlowSelectionError(error));
     } finally {
       this.loading = false;
     }
+  }
+
+  /**
+   * Start a fresh flow when the server says this one cannot continue (a
+   * parked identity whose connection or schema no longer fits). Returns
+   * whether it did; a second refusal before any step rendered is reported as
+   * an ordinary error instead.
+   */
+  private async restartIfRequired(error: unknown): Promise<boolean> {
+    if (this.restarting || apiErrorCode(error) !== "flow.restart_required") return false;
+    this.restarting = true;
+    this.resumeFlowId = "";
+    await this.startFlow();
+    return true;
   }
 
   /**
@@ -633,11 +668,8 @@ export class ZitadelLogin extends ZitadelSurface {
    * every other error passes through untouched.
    */
   private describeFlowSelectionError(error: unknown): unknown {
-    if (!this.flowName || !(error instanceof ApiError)) return error;
-    const code =
-      typeof error.body === "object" && error.body !== null && "code" in error.body
-        ? String((error.body as { code: unknown }).code)
-        : "";
+    if (!this.flowName) return error;
+    const code = apiErrorCode(error);
     if (code === "flowdef.not_found") {
       return new Error(
         `<zitadel-login> flow-name="${this.flowName}" does not match any active flow ` +
@@ -655,6 +687,7 @@ export class ZitadelLogin extends ZitadelSurface {
   }
 
   private applyResponse(wire: CreateFlow201): void {
+    this.restarting = false;
     // A fresh response carries fresh (or no) errors — un-dismiss.
     this.stepErrorDismissed = false;
     // Decided before the step is assigned: `maybeCompleteFlow` navigates a
@@ -1259,6 +1292,7 @@ export class ZitadelLogin extends ZitadelSurface {
       this.applyResponse(wire);
       emit(this, "zitadel-flow-step", { step: wire.step });
     } catch (error) {
+      if (await this.restartIfRequired(error)) return;
       this.handleTransportError(error);
     } finally {
       this.loading = false;

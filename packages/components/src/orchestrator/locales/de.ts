@@ -191,6 +191,8 @@ export const de: Locale = {
     "Dieser Passkey konnte nicht bestätigt werden. Bitte versuche es erneut.",
   "error.sso_creation_disabled":
     "Für diese Anmeldung gibt es kein Konto, und mit diesem Anbieter können keine neuen Konten erstellt werden.",
+  "error.flow_restart_required":
+    "Ihre Anmeldung konnte nicht fortgesetzt werden. Bitte beginnen Sie erneut.",
   "error.passkey_registration_invalid":
     "Der neue Passkey konnte nicht bestätigt werden. Bitte registriere ihn erneut.",
 

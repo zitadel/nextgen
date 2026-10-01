@@ -6,6 +6,7 @@ import {
   type MockHandle,
 } from "@zitadel/api-mock";
 import { configureZitadel, _resetConfigForTesting } from "@zitadel/api/config";
+import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -262,6 +263,61 @@ describe("<zitadel-login> with identity providers", () => {
 
     expect(seen).toContain("GET /flow/flow_mock");
     expect(seen).not.toContain("POST /flow");
+  });
+
+  describe("when the server answers flow.restart_required", () => {
+    const restartRequired = () =>
+      HttpResponse.json(
+        { code: "flow.restart_required", message: "the flow must be restarted" },
+        { status: 409 },
+      );
+
+    async function resumeStale(): Promise<{ element: ZitadelLogin; seen: string[] }> {
+      const seen: string[] = [];
+      const record = ({ request }: { request: Request }) => {
+        seen.push(`${request.method} ${new URL(request.url).pathname}`);
+      };
+      server.events.on("request:start", record);
+      const original = window.location.href;
+      window.history.replaceState({}, "", "/login?flow=flow_stale");
+      const element = document.createElement("zitadel-login") as ZitadelLogin;
+      try {
+        element.purpose = "login";
+        element.project = testProject;
+        host.appendChild(element);
+        await waitFor(() => element.shadowRoot?.querySelector("zl-field, zl-alert"));
+        await element.updateComplete;
+      } finally {
+        window.history.replaceState({}, "", original);
+        server.events.removeListener("request:start", record);
+      }
+      return { element, seen };
+    }
+
+    it("starts a fresh flow and tells the user why", async () => {
+      server.use(http.get("*/flow/:id", restartRequired, { once: true }));
+
+      const { element, seen } = await resumeStale();
+      await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
+
+      expect(seen.filter((r) => r === "POST /flow")).toHaveLength(1);
+      expect(element.shadowRoot?.textContent).toContain(
+        "Your sign-in could not be continued. Please start again.",
+      );
+    });
+
+    it("restarts only once when the fresh flow is refused too", async () => {
+      server.use(
+        http.get("*/flow/:id", restartRequired),
+        http.post("*/flow", restartRequired),
+      );
+
+      const { element, seen } = await resumeStale();
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      expect(seen.filter((r) => r === "POST /flow")).toHaveLength(1);
+      expect(element.shadowRoot?.querySelector("zl-alert")).not.toBeNull();
+    });
   });
 
   it("offers no providers when the project has enabled none", async () => {
