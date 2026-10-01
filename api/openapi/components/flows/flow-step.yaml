@@ -14,10 +14,12 @@ example:
     - name: email
       type: email
       text_key: login.field.email
+      autocomplete: email
       required: true
     - name: password
       type: password
       text_key: login.field.password
+      autocomplete: current-password
       required: true
   actions:
     - name: submit
@@ -88,6 +90,39 @@ properties:
     items:
       $ref: field.yaml
     default: []
+  identifier:
+    type: object
+    required: [name, value, autocomplete]
+    description: |
+      The user's identifier as collected on an earlier step, so a form
+      that carries a password can carry the identifier beside it. A
+      password manager stores the two as one credential and needs both
+      in the same form; the template renders this as a hidden input.
+
+      Present only when the step collects a password and does not
+      itself collect the identifier. A step that collects the
+      identifier carries it in `fields` instead.
+
+      Render-only. The step's `fields` are the whole submission, and
+      submitting this name fails as an unknown field.
+    properties:
+      name:
+        type: string
+        description: |
+          The user-schema property the identifier was collected into.
+          Use it as the input's `name`.
+        example: email
+      value:
+        type: string
+        description: The identifier the user supplied.
+        example: alice@acme.com
+      autocomplete:
+        type: string
+        description: |
+          Value for the input's HTML `autocomplete` attribute, rendered
+          verbatim. `username` is the token that pairs an identifier
+          with a password in the same form.
+        example: username
   actions:
     type: array
     description: |
