@@ -272,35 +272,39 @@ describe("<zitadel-login> with identity providers", () => {
         { status: 409 },
       );
 
-    async function resumeStale(): Promise<{ element: ZitadelLogin; seen: string[] }> {
+    async function resumeStale(): Promise<{ element: ZitadelLogin; seen: string[]; url: string }> {
       const seen: string[] = [];
       const record = ({ request }: { request: Request }) => {
         seen.push(`${request.method} ${new URL(request.url).pathname}`);
       };
       server.events.on("request:start", record);
       const original = window.location.href;
-      window.history.replaceState({}, "", "/login?flow=flow_stale");
+      window.history.replaceState({}, "", "/login?keep=1&flow=flow_stale#top");
       const element = document.createElement("zitadel-login") as ZitadelLogin;
+      let url = "";
       try {
         element.purpose = "login";
         element.project = testProject;
         host.appendChild(element);
         await waitFor(() => element.shadowRoot?.querySelector("zl-field, zl-alert"));
         await element.updateComplete;
+        url = window.location.search + window.location.hash;
       } finally {
         window.history.replaceState({}, "", original);
         server.events.removeListener("request:start", record);
       }
-      return { element, seen };
+      return { element, seen, url };
     }
 
     it("starts a fresh flow and tells the user why", async () => {
       server.use(http.get("*/flow/:id", restartRequired, { once: true }));
 
-      const { element, seen } = await resumeStale();
+      const { element, seen, url } = await resumeStale();
       await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
 
       expect(seen.filter((r) => r === "POST /flow")).toHaveLength(1);
+      // A reload must not resume the refused flow again.
+      expect(url).toBe("?keep=1#top");
       expect(element.shadowRoot?.textContent).toContain(
         "Your sign-in could not be continued. Please start again.",
       );
