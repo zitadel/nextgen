@@ -68,6 +68,11 @@ tasks:
       - "/dist/release/*/build/**/*"
     options:
       cache: false
+      # Release package builds rewrite shared dist output, so the whole chain
+      # must stay serial (see build-public-packages). Keep this task's UI-build
+      # deps serial too, and reach them only through this task so they never run
+      # in parallel with the build-public-packages subtree.
+      runDepsInParallel: false
       runFromWorkspaceRoot: true
       runInCI: false
 
@@ -76,10 +81,10 @@ tasks:
     env:
       RELEASE_SERVER_PREBUILT: "1"
     deps:
-      - "release:build-server"
       - "release:build-public-packages"
       - "console:build-release"
       - "login-ui:build-release"
+      - "release:build-server"
     outputs:
       - "/dist/release/**/*"
     options:
@@ -92,12 +97,15 @@ tasks:
     command: "node scripts/release.mjs snapshot"
     env:
       RELEASE_SERVER_PREBUILT: "1"
+    # The release builds rewrite shared dist output and must stay fully serial
+    # (runDepsInParallel: false). build-server runs last so the go compile sees
+    # the freshly built console/login dist it embeds.
     deps:
       - "server:test"
-      - "release:build-server"
       - "release:build-public-packages"
       - "console:build-release"
       - "login-ui:build-release"
+      - "release:build-server"
     outputs:
       - "/dist/release/**/*"
     options:
