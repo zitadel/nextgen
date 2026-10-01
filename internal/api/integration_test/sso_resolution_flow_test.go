@@ -17,6 +17,9 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
+// Every test creates a project, a connection and users; the Spanner emulator
+// starves when that setup runs in parallel, so these tests run sequentially.
+
 // The callback route is not built yet, so these tests park the provider's
 // result on the attempt through the same statements the callback will use,
 // then drive the resolution through GET /flow/{id}.
@@ -158,7 +161,6 @@ func requireAuthenticated(t *testing.T, resp api.GetFlowStepRes) *api.FlowRespon
 }
 
 func TestGetFlowStepRotatesCookie(t *testing.T) {
-	t.Parallel()
 	f := newSSOResolutionFixture(t, helpers.OIDCConnection("google"))
 	flow := f.startFlow(t, "")
 
@@ -173,7 +175,6 @@ func TestGetFlowStepRotatesCookie(t *testing.T) {
 // A flow that was complete before the request still answers 410: only a
 // render that itself completes the flow returns the terminal step.
 func TestGetFlowStep_AlreadyCompleted_Still410(t *testing.T) {
-	t.Parallel()
 	f := newSSOResolutionFixture(t, helpers.OIDCConnection("google"))
 	flow := f.startFlow(t, "")
 	state := openFlowState(t, f.project.ID, flow.zflow)
@@ -185,7 +186,6 @@ func TestGetFlowStep_AlreadyCompleted_Still410(t *testing.T) {
 }
 
 func TestSSOResolutionExistingLinkRoutesAuthenticated(t *testing.T) {
-	t.Parallel()
 	f := newSSOResolutionFixture(t, helpers.OIDCConnection("google"))
 	userID := f.createUser(t, defaultSchemaURL())
 	f.link(t, f.connection.ID, "sub-1", userID)
@@ -213,7 +213,6 @@ func TestSSOResolutionExistingLinkRoutesAuthenticated(t *testing.T) {
 }
 
 func TestSSOResolutionLaterRevisionResolvesSameLink(t *testing.T) {
-	t.Parallel()
 	f := newSSOResolutionFixture(t, helpers.OIDCConnection("google"))
 	userID := f.createUser(t, defaultSchemaURL())
 	f.link(t, f.connection.ID, "sub-1", userID)
@@ -228,7 +227,6 @@ func TestSSOResolutionLaterRevisionResolvesSameLink(t *testing.T) {
 }
 
 func TestSSOResolutionOtherConnectionSameSubjectDoesNotMatch(t *testing.T) {
-	t.Parallel()
 	f := newSSOResolutionFixture(t, helpers.OIDCConnection("google"))
 	other := f.create(t, helpers.OIDCConnection("corp"))
 	f.link(t, f.connection.ID, "sub-1", f.createUser(t, defaultSchemaURL()))
@@ -248,7 +246,6 @@ func TestSSOResolutionOtherConnectionSameSubjectDoesNotMatch(t *testing.T) {
 }
 
 func TestSSOResolutionStoresNoProviderToken(t *testing.T) {
-	t.Parallel()
 	f := newSSOResolutionFixture(t, helpers.OIDCConnection("google"))
 	userID := f.createUser(t, defaultSchemaURL())
 	link := f.link(t, f.connection.ID, "sub-1", userID)
@@ -269,7 +266,6 @@ func TestSSOResolutionStoresNoProviderToken(t *testing.T) {
 }
 
 func TestSSOResolutionOtherSchemaReturns409(t *testing.T) {
-	t.Parallel()
 	f := newSSOResolutionFixture(t, helpers.OIDCConnection("google"))
 	staffSchemaURL := harness.CreateUserSchema(t, f.project, `{
 		"title": "SSOStaffUser",
@@ -297,7 +293,6 @@ func TestSSOResolutionOtherSchemaReturns409(t *testing.T) {
 }
 
 func TestSSOResolutionCreationDisabledRerendersWithError(t *testing.T) {
-	t.Parallel()
 	connection := helpers.OIDCConnection("google")
 	connection.Provisioning = api.NewOptIdpConnectionProvisioning(api.IdpConnectionProvisioning{
 		Creation: api.NewOptIdpConnectionProvisioningCreation(api.IdpConnectionProvisioningCreationDisabled),
@@ -324,7 +319,6 @@ func TestSSOResolutionCreationDisabledRerendersWithError(t *testing.T) {
 }
 
 func TestSSOResolutionOnBoundAttemptRebindsNothing(t *testing.T) {
-	t.Parallel()
 	f := newSSOResolutionFixture(t, helpers.OIDCConnection("google"))
 	userA := f.createUser(t, defaultSchemaURL())
 	userB := f.createUser(t, defaultSchemaURL())
@@ -384,7 +378,6 @@ func (f *ssoResolutionFixture) requireCollected(t *testing.T, flow ssoFlow, resp
 }
 
 func TestSSOResolutionCollisionBindsAndDeletesParked(t *testing.T) {
-	t.Parallel()
 	f := newSSOResolutionFixture(t, helpers.OIDCConnection("google"))
 	email := helpers.RandString(8) + "@example.com"
 	ownerID := "user_" + helpers.RandString(8)
@@ -415,7 +408,6 @@ func TestSSOResolutionCollisionBindsAndDeletesParked(t *testing.T) {
 }
 
 func TestSSOResolutionAutoCreateCreatesUserAndLinkAtomically(t *testing.T) {
-	t.Parallel()
 	f := newSSOResolutionFixture(t, helpers.OIDCConnection("google"))
 	email := helpers.RandString(8) + "@example.com"
 	flow := f.startFlow(t, "")
@@ -446,7 +438,6 @@ func TestSSOResolutionAutoCreateCreatesUserAndLinkAtomically(t *testing.T) {
 // create directly to land in that window: the user insert succeeds, the link
 // trips the pair index, and the whole transaction rolls back.
 func TestSSOResolutionAutoCreateRollsBackOnLinkFailure(t *testing.T) {
-	t.Parallel()
 	f := newSSOResolutionFixture(t, helpers.OIDCConnection("google"))
 	f.link(t, f.connection.ID, "sub-taken", f.createUser(t, defaultSchemaURL()))
 	flow := f.startFlow(t, "")
@@ -476,7 +467,6 @@ func TestSSOResolutionAutoCreateRollsBackOnLinkFailure(t *testing.T) {
 }
 
 func TestSSOResolutionMissingRequiredRoutesSSOUserNotFound(t *testing.T) {
-	t.Parallel()
 	f := newSSOResolutionFixture(t, helpers.OIDCConnection("google"))
 	flow := f.startFlow(t, "")
 	parkSSOResult(t, f.project.ID, flow.attemptID, f.connection.RevisionID, "sub-new", map[string]any{}, nil)
@@ -493,7 +483,6 @@ func TestSSOResolutionMissingRequiredRoutesSSOUserNotFound(t *testing.T) {
 }
 
 func TestSSOResolutionUnverifiedUniqueRoutesSSOUserNotFound(t *testing.T) {
-	t.Parallel()
 	f := newSSOResolutionFixture(t, helpers.OIDCConnection("google"))
 	email := helpers.RandString(8) + "@example.com"
 	flow := f.startFlow(t, "")
