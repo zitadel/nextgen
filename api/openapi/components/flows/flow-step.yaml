@@ -94,32 +94,55 @@ properties:
     type: object
     required: [name, value, autocomplete]
     description: |
-      The user's identifier as collected on an earlier step, so a form
-      that carries a password can carry the identifier beside it. A
-      password manager stores the two as one credential and needs both
-      in the same form; the template renders this as a hidden input.
+      The user's identifier, collected on an earlier step, for this
+      step's form to carry alongside the password. Present only when the
+      step collects a password and does not itself collect the
+      identifier — a step that collects the identifier carries it in
+      `fields` instead, and needs nothing here.
 
-      Present only when the step collects a password and does not
-      itself collect the identifier. A step that collects the
-      identifier carries it in `fields` instead.
+      A password manager saves an identifier and a password as one
+      credential, and reads both from the same form. A step that
+      collects only the password leaves it nothing to pair with, so the
+      engine hands the identifier back here.
 
-      Render-only. The step's `fields` are the whole submission, and
-      submitting this name fails as an unknown field.
+      **What the client does with it.** Put one more control in the same
+      form element as the password input, carrying `name`, `value` and
+      `autocomplete` as given. It must be:
+
+      - *hidden* — the user already supplied this value on the previous
+        step and is not being asked for it again;
+      - *not editable* — the engine has already resolved the user from
+        this value, so a changed one would not change who is signing in;
+      - *left out of the submission* — see below.
+
+      Any control a password manager can read works; the fields are
+      named for an HTML input because that is the shape managers expect.
+
+      **Do not submit it.** The step's `fields` are the whole
+      submission. This name is not among them, so sending it back fails
+      the step with an `error.<name>_unknown_field` violation. Clients
+      that build their submission from `fields` (rather than from
+      whatever the form contains) get this for free.
+
+      It is also not display text: do not render it as a greeting or a
+      label. `texts.description_key` is the place for that.
     properties:
       name:
         type: string
         description: |
           The user-schema property the identifier was collected into.
-          Use it as the input's `name`.
+          Use it as the control's `name`.
         example: email
       value:
         type: string
-        description: The identifier the user supplied.
+        description: |
+          The identifier the user supplied. Use it as the control's
+          `value`, verbatim.
         example: alice@acme.com
       autocomplete:
         type: string
         description: |
-          Value for the input's HTML `autocomplete` attribute, rendered
+          Value for the control's HTML `autocomplete` attribute, used
           verbatim. `username` is the token that pairs an identifier
           with a password in the same form.
         example: username

@@ -17423,15 +17423,20 @@ type Field struct {
 	Type FieldType `json:"type"`
 	// Localization key for the field label.
 	TextKey string `json:"text_key"`
-	// Value for the input's HTML `autocomplete` attribute, so password
-	// managers and browser autofill recognise the field. A
-	// space-separated token list, rendered verbatim into the attribute.
+	// Value for the HTML `autocomplete` attribute of the input rendered
+	// for this field, so password managers and browser autofill
+	// recognise it. A space-separated token list; put it on the
+	// attribute verbatim and do not reinterpret it.
 	// The engine emits `username` on the field carrying the user's
 	// identifier, or `email` when that field's `type` is `email`. On a
 	// password field it emits `current-password` where the submitted
 	// value is verified against the stored credential, and
-	// `new-password` where the value is saved as the user's password.
-	// Omitted when no token applies.
+	// `new-password` where the value is saved as the user's password —
+	// so a manager offers to fill on sign-in and to generate on
+	// registration. Omitted when no token applies, in which case render
+	// no attribute rather than an empty one.
+	// Autofill only: it says nothing about validation, and the input's
+	// `type` still comes from `type`.
 	Autocomplete OptString `json:"autocomplete"`
 	// The field MUST be present and non-empty on submit. Mirrors the
 	// schema's top-level `required` array.
@@ -19891,15 +19896,32 @@ type FlowStep struct {
 	// template iterates this array; for keyed lookup it builds a name-indexed
 	// map locally.
 	Fields []Field `json:"fields"`
-	// The user's identifier as collected on an earlier step, so a form
-	// that carries a password can carry the identifier beside it. A
-	// password manager stores the two as one credential and needs both
-	// in the same form; the template renders this as a hidden input.
-	// Present only when the step collects a password and does not
-	// itself collect the identifier. A step that collects the
-	// identifier carries it in `fields` instead.
-	// Render-only. The step's `fields` are the whole submission, and
-	// submitting this name fails as an unknown field.
+	// The user's identifier, collected on an earlier step, for this
+	// step's form to carry alongside the password. Present only when the
+	// step collects a password and does not itself collect the
+	// identifier — a step that collects the identifier carries it in
+	// `fields` instead, and needs nothing here.
+	// A password manager saves an identifier and a password as one
+	// credential, and reads both from the same form. A step that
+	// collects only the password leaves it nothing to pair with, so the
+	// engine hands the identifier back here.
+	// **What the client does with it.** Put one more control in the same
+	// form element as the password input, carrying `name`, `value` and
+	// `autocomplete` as given. It must be:
+	// - *hidden* — the user already supplied this value on the previous
+	// step and is not being asked for it again;
+	// - *not editable* — the engine has already resolved the user from
+	// this value, so a changed one would not change who is signing in;
+	// - *left out of the submission* — see below.
+	// Any control a password manager can read works; the fields are
+	// named for an HTML input because that is the shape managers expect.
+	// **Do not submit it.** The step's `fields` are the whole
+	// submission. This name is not among them, so sending it back fails
+	// the step with an `error.<name>_unknown_field` violation. Clients
+	// that build their submission from `fields` (rather than from
+	// whatever the form contains) get this for free.
+	// It is also not display text: do not render it as a greeting or a
+	// label. `texts.description_key` is the place for that.
 	Identifier OptFlowStepIdentifier `json:"identifier"`
 	// Ordered list of available user actions. The LiquidJS template iterates
 	// this array and builds a name-indexed map locally for keyed lookup.
@@ -20325,22 +20347,40 @@ func (s *FlowStepGates) init() FlowStepGates {
 	return m
 }
 
-// The user's identifier as collected on an earlier step, so a form
-// that carries a password can carry the identifier beside it. A
-// password manager stores the two as one credential and needs both
-// in the same form; the template renders this as a hidden input.
-// Present only when the step collects a password and does not
-// itself collect the identifier. A step that collects the
-// identifier carries it in `fields` instead.
-// Render-only. The step's `fields` are the whole submission, and
-// submitting this name fails as an unknown field.
+// The user's identifier, collected on an earlier step, for this
+// step's form to carry alongside the password. Present only when the
+// step collects a password and does not itself collect the
+// identifier — a step that collects the identifier carries it in
+// `fields` instead, and needs nothing here.
+// A password manager saves an identifier and a password as one
+// credential, and reads both from the same form. A step that
+// collects only the password leaves it nothing to pair with, so the
+// engine hands the identifier back here.
+// **What the client does with it.** Put one more control in the same
+// form element as the password input, carrying `name`, `value` and
+// `autocomplete` as given. It must be:
+// - *hidden* — the user already supplied this value on the previous
+// step and is not being asked for it again;
+// - *not editable* — the engine has already resolved the user from
+// this value, so a changed one would not change who is signing in;
+// - *left out of the submission* — see below.
+// Any control a password manager can read works; the fields are
+// named for an HTML input because that is the shape managers expect.
+// **Do not submit it.** The step's `fields` are the whole
+// submission. This name is not among them, so sending it back fails
+// the step with an `error.<name>_unknown_field` violation. Clients
+// that build their submission from `fields` (rather than from
+// whatever the form contains) get this for free.
+// It is also not display text: do not render it as a greeting or a
+// label. `texts.description_key` is the place for that.
 type FlowStepIdentifier struct {
 	// The user-schema property the identifier was collected into.
-	// Use it as the input's `name`.
+	// Use it as the control's `name`.
 	Name string `json:"name"`
-	// The identifier the user supplied.
+	// The identifier the user supplied. Use it as the control's
+	// `value`, verbatim.
 	Value string `json:"value"`
-	// Value for the input's HTML `autocomplete` attribute, rendered
+	// Value for the control's HTML `autocomplete` attribute, used
 	// verbatim. `username` is the token that pairs an identifier
 	// with a password in the same form.
 	Autocomplete string `json:"autocomplete"`
