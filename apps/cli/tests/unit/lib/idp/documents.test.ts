@@ -330,6 +330,29 @@ describe("applySsoToFlow", () => {
     expect(legacy).toEqual(before);
   });
 
+  it("refuses when an action collides with a generated outcome, legacy keys or not", () => {
+    // A pre-rename flow could name an action `sso_authenticated`; the provider
+    // loop would overwrite its route with the generated SSO target.
+    const flow = structuredClone(shippedFlow()) as { steps: Array<Record<string, unknown>> };
+    const identifier = flow.steps.find((s) => s.name === "identifier")!;
+    identifier.actions = [...((identifier.actions as unknown[]) ?? []), { name: "sso_authenticated", kind: "submit" }];
+    identifier.transitions = { ...(identifier.transitions as object), sso_authenticated: { target: "register" } };
+    const before = structuredClone(flow);
+
+    let caught: unknown;
+    try {
+      applySsoToFlow(flow, "google", bothMethods);
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(ZitadelError);
+    expect((caught as ZitadelError).code).toBe("E_VALIDATION");
+    expect((caught as ZitadelError).message).toContain("identifier");
+    expect((caught as ZitadelError).message).toContain("sso_authenticated");
+    expect(flow).toEqual(before);
+  });
+
   it("keeps the new key when a step carries both the old and the new one", () => {
     const legacy = previousCliFlow();
     const identifier = legacy.steps.find((s) => s.name === "identifier")!;
