@@ -108,6 +108,13 @@ type testServer struct {
 
 func newTestServer(t *testing.T) *testServer {
 	t.Helper()
+	return newTestServerSealing(t, nil)
+}
+
+// newTestServerSealing lets a test make sealing a new cookie fail with
+// sealErr while opening the presented one still works.
+func newTestServerSealing(t *testing.T, sealErr error) *testServer {
+	t.Helper()
 
 	crypter := op.NewAES256GCMCrypto(fixedKey, "")
 
@@ -115,7 +122,11 @@ func newTestServer(t *testing.T) *testServer {
 	tokenService := mocks.NewMockTokenService(mock)
 	keyService := mocks.NewMockKeyService(mock)
 	keyService.EXPECT().GetCrypter(gomock.Any(), gomock.Any(), gomock.Any()).Return(crypter, nil).AnyTimes()
-	keyService.EXPECT().GetProjectCrypter(gomock.Any(), gomock.Any(), gomock.Any()).Return(crypter, nil).AnyTimes()
+	if sealErr != nil {
+		keyService.EXPECT().GetProjectCrypter(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, sealErr).AnyTimes()
+	} else {
+		keyService.EXPECT().GetProjectCrypter(gomock.Any(), gomock.Any(), gomock.Any()).Return(crypter, nil).AnyTimes()
+	}
 
 	fake := &fakeFlowSvc{}
 	// The release service is a mock rather than nil so a test that reaches a
@@ -393,6 +404,37 @@ func TestGetFlowStep_RotatesCookie(t *testing.T) {
 // not the 410 a flow completed before this request gets.
 func TestGetFlowStep_ResolvedHandoffReturns200WithTerminalCookie(t *testing.T) {
 	ts := newTestServer(t)
+	state := &domain.FlowState{ID: "flow_1", ProjectID: "proj_1", IssuedAt: time.Now()}
+	cookieVal := ts.sealCookie(t, state)
+
+	complete := domain.FlowStepCompleteShow
+	ts.fake.getResult = domain.FlowStepResult{
+		State:                 state,
+		Step:                  &domain.FlowStep{Name: "done", Complete: &complete},
+		HandoffToken:          "ht_abc",
+		HandoffTokenExpiresAt: time.Now().Add(time.Minute),
+	}
+
+	resp, body := doRequest(t, http.MethodGet, ts.srv.URL+"/flow/flow_1", nil, cookieVal)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", resp.StatusCode, body)
+	}
+	if got := resp.Header.Get("Set-Cookie"); !strings.Contains(got, "Max-Age=0") {
+		t.Errorf("expected the terminal cookie, got %q", got)
+	}
+	var fr gen.FlowResponse
+	if err := json.Unmarshal(body, &fr); err != nil {
+		t.Fatalf("unmarshal: %v (body=%s)", err, body)
+	}
+	if got, ok := fr.HandoffToken.Get(); !ok || got != "ht_abc" {
+		t.Errorf("handoff_token = %v (set=%t), want ht_abc", got, ok)
+	}
+}
+
+// The handoff is already committed and single use, and the terminal cookie
+// only clears: a failing seal must not cost the client its handoff token.
+func TestGetFlowStep_ResolvedHandoffSurvivesSealFailure(t *testing.T) {
+	ts := newTestServerSealing(t, domain.ErrInternal(errors.New("key service down")))
 	state := &domain.FlowState{ID: "flow_1", ProjectID: "proj_1", IssuedAt: time.Now()}
 	cookieVal := ts.sealCookie(t, state)
 

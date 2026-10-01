@@ -217,14 +217,20 @@ func (h *Handler) GetFlowStep(ctx context.Context, params api.GetFlowStepParams)
 		return mapFlowGetError(domain.ErrFlowCompleted())
 	}
 
-	// The render may have changed the state (resolution, IssuedAt), so it is
-	// re-sealed on every 200, the same as submit.
-	cookieValue, err := h.sealState(ctx, result.State)
-	if err != nil {
-		return nil, err
+	// A terminal render only clears the cookie, so nothing is sealed: the
+	// handoff it carries is already committed and must reach the client.
+	// Otherwise the render may have changed the state (resolution, IssuedAt),
+	// so it is re-sealed, the same as submit.
+	setCookie := flowSetCookie(ctx, "", true)
+	if !terminal {
+		cookieValue, err := h.sealState(ctx, result.State)
+		if err != nil {
+			return nil, err
+		}
+		setCookie = flowSetCookie(ctx, cookieValue, false)
 	}
 	return &api.FlowResponseHeaders{
-		SetCookie: api.NewOptString(flowSetCookie(ctx, cookieValue, terminal)),
+		SetCookie: api.NewOptString(setCookie),
 		Response:  h.buildFlowResponse(ctx, result, terminal),
 	}, nil
 }

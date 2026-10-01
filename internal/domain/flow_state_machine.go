@@ -349,6 +349,22 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 	if err != nil {
 		return FlowStepResult{}, false, fmt.Errorf("flow state machine: load parked sso identity: %w", err)
 	}
+	// An earlier request bound the attempt but its handoff failed, and the
+	// parked row is gone: raise the success outcome again, which mints the
+	// handoff. A state that already carries a user has nothing to retry.
+	if parked != nil && parked.BoundUserID != "" {
+		if state.CollectedData.UserID != "" {
+			return FlowStepResult{}, false, nil
+		}
+		pc := &processCtx{ctx: ctx, def: def, state: state, currentStep: currentStep}
+		resolvedFields, err := r.resolveInputs(pc)
+		if err != nil {
+			return FlowStepResult{}, false, err
+		}
+		recordResolvedUser(state, parked.BoundUserID)
+		result, err := r.routeOutcome(pc, resolvedFields, FlowImplicitOutcomeSSOAuthenticated, false)
+		return result, true, err
+	}
 	if parked == nil || parked.CheckID == state.SSOResolvedCheckID {
 		return FlowStepResult{}, false, nil
 	}

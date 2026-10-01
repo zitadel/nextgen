@@ -42,7 +42,7 @@ func (r *FlowSSOIdentityResolver) LoadParked(ctx context.Context, in domain.Flow
 	// An already resolved row (sso_user_not_found leaves it parked) needs
 	// none of the reads below.
 	if !ok || check.Result == nil || check.ID == in.ResolvedCheckID {
-		return nil, nil
+		return boundThroughSSO(attempt), nil
 	}
 	result := check.Result
 
@@ -104,6 +104,23 @@ func (r *FlowSSOIdentityResolver) LoadParked(ctx context.Context, in domain.Flow
 	}
 	parked.Link = &domain.FlowSSOLinkedUser{LinkID: link.ID, UserID: link.UserID}
 	return parked, nil
+}
+
+// boundThroughSSO reports the user an earlier BindLinked recorded, while the
+// attempt still waits for its handoff. The sso factor is the marker: only a
+// bind writes it, together with the user factor.
+func boundThroughSSO(attempt *domain.AuthAttempt) *domain.FlowSSOParkedIdentity {
+	if attempt.HandedOffAt != nil {
+		return nil
+	}
+	if _, ok := domain.CheckAs[*domain.AuthFactorSSO](attempt, domain.AuthCheckTypeSSO); !ok {
+		return nil
+	}
+	user, ok := domain.CheckAs[*domain.AuthFactorUser](attempt, domain.AuthCheckTypeUser)
+	if !ok {
+		return nil
+	}
+	return &domain.FlowSSOParkedIdentity{BoundUserID: user.UserID}
 }
 
 func (r *FlowSSOIdentityResolver) BindLinked(ctx context.Context, in domain.FlowSSOBindInput) error {

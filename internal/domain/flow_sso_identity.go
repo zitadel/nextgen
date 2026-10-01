@@ -7,7 +7,8 @@ import "context"
 // connection revision (internal/idp imports domain), so the implementation
 // does the parsing and hands back a [FlowSSOParkedIdentity].
 type FlowSSOIdentityService interface {
-	// LoadParked returns nil, nil when the attempt has no parked result. It
+	// LoadParked returns nil, nil when the attempt has no parked result, unless
+	// an earlier bind left it waiting for its handoff (see BoundUserID). It
 	// returns ErrFlowRestartRequired when the provider's subject is linked to
 	// a user under another schema than the flow's.
 	LoadParked(ctx context.Context, in FlowSSOLoadInput) (*FlowSSOParkedIdentity, error)
@@ -51,6 +52,10 @@ type FlowSSOParkedIdentity struct {
 	CreationDisabled bool
 	// Link is nil when the subject has no identity link on the connection.
 	Link *FlowSSOLinkedUser
+	// BoundUserID is set when a previous request already bound the attempt
+	// through SSO; the engine re-raises the success outcome so a lost handoff
+	// can be retried. Every other field is then empty.
+	BoundUserID string
 }
 
 type FlowSSOLinkedUser struct{ LinkID, UserID string }
