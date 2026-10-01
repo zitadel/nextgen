@@ -410,19 +410,6 @@ function migrateLegacyOutcomes(document: Json): boolean {
       if (!(old in transitions) || actionNames.has(old)) {
         continue;
       }
-      if (actionNames.has(next)) {
-        // The new key is this step's own action route: migrating would hand it
-        // to the generated SSO target, a change to hand-authored routing.
-        const name = typeof step.name === "string" ? step.name : "?";
-        throw new ZitadelError(
-          "E_VALIDATION",
-          `steps.${name}: action "${next}" uses the name the SSO outcome "${old}" is renamed to`,
-          {
-            hint: `Rename the action "${next}" on step "${name}" (and its transition), then run sso enable again.`,
-            details: { step: name, action: next, legacyOutcome: old },
-          },
-        );
-      }
       if (!(next in transitions)) {
         transitions[next] = transitions[old];
       }
@@ -431,6 +418,43 @@ function migrateLegacyOutcomes(document: Json): boolean {
     }
   }
   return changed;
+}
+
+/**
+ * Refuse a flow where a step this command writes declares an action named like
+ * an outcome key the generator writes on that step. Those names were free
+ * before the rename; the generated route would silently replace the action's.
+ */
+function refuseOutcomeActionCollision(document: Json): void {
+  const outcomes = ["sso_authenticated", "sso_user_not_found", "user_already_exists"];
+  const entries: Array<[string, string[]]> = [
+    ...providerSteps(document).map((name) => [name, outcomes] as [string, string[]]),
+    [SSO_CONFLICT, outcomes],
+    [REGISTER_SSO, ["user_already_exists"]],
+    ["register-password", ["user_already_exists"]],
+  ];
+  // A step can be listed twice (a provider step named `register-password`), so
+  // its keys are the union of every entry, never just the last one.
+  const written = new Map<string, Set<string>>();
+  for (const [name, keys] of entries) {
+    written.set(name, new Set([...(written.get(name) ?? []), ...keys]));
+  }
+  for (const [name, keys] of written) {
+    const step = stepNamed(document, name);
+    const actions = step !== undefined && Array.isArray(step.actions) ? step.actions : [];
+    for (const action of actions) {
+      if (isObject(action) && typeof action.name === "string" && keys.has(action.name)) {
+        throw new ZitadelError(
+          "E_VALIDATION",
+          `steps.${name}: action "${action.name}" uses a name sso enable writes as an outcome on this step`,
+          {
+            hint: `Rename the action "${action.name}" on step "${name}" (and its transition), then run sso enable again.`,
+            details: { step: name, action: action.name },
+          },
+        );
+      }
+    }
+  }
 }
 
 /**
@@ -445,6 +469,8 @@ export function applySsoToFlow(
   enabled: { password: boolean; passkey: boolean },
 ): SsoResult<object> {
   const document = clone(flow) as Json;
+  // Before any rewrite, so a refused flow is never half edited.
+  refuseOutcomeActionCollision(document);
   const skipped: SsoSkipped[] = [];
   let changed = false;
   // `ssoEditRefusal` has already refused a flow with no terminal to route to,

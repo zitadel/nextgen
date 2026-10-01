@@ -350,7 +350,8 @@ type AuthAttemptStatements interface {
 	// returns a [*database.UniqueError] when a verified factor of that type is
 	// already stored, and gives the row a new check id. It exists so the SSO bind
 	// cannot overwrite a competing user factor, and so a challenge issued before
-	// the bind can no longer succeed.
+	// the bind can no longer succeed. After a refusal the caller must not use the
+	// transaction again: on Spanner the refused insert has already ended it.
 	AddAuthAttemptFactor(ctx context.Context, projectID, authAttemptID string, factor domain.AuthFactor) (checkID string, err error)
 	AuthAttemptChallengeSucceeded(ctx context.Context, projectID, authAttemptID string, factor domain.AuthFactor, challengeID string) error
 	AuthAttemptChallengeFailed(ctx context.Context, projectID, authAttemptID string, challenge domain.AuthChallenge) error
