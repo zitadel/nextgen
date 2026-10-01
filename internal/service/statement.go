@@ -390,6 +390,10 @@ type UserQueryOptions struct {
 	// equal value in a non-unique property of another user (for example a
 	// notification address) cannot make the lookup ambiguous.
 	UniqueAttributesOnly bool
+	// UniqueTeamID, with UniqueAttributesOnly, restricts the registry match
+	// to rows of one team scope; "" means project-scoped rows only. Nil
+	// matches rows of every scope.
+	UniqueTeamID *string
 	// MembershipTeamID, when set, requires an active team membership.
 	MembershipTeamID *string
 	// IncludeTeams hydrates each user's team memberships (ADR 059). The list is loaded

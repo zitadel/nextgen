@@ -534,6 +534,9 @@ func TestFlowSSOIdentityResolver_FindUniqueOwner(t *testing.T) {
 				GetUser(gomock.Any(), gomock.Any(), service.UserQueryOptions{
 					Attributes:           []domain.Attribute{{Key: "email", Value: "alice@example.com"}},
 					UniqueAttributesOnly: true,
+					// Project-scoped rows only: a team-scoped row for the
+					// same value would not collide with the new user.
+					UniqueTeamID: new(""),
 				}).
 				Return(tc.user, tc.err)
 

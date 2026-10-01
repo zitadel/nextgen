@@ -240,13 +240,19 @@ func (a *ssoLinkAction) Apply(ctx context.Context, stmts AllStatements) error {
 
 var _ UserAction = (*ssoLinkAction)(nil)
 
-// FindUniqueOwner looks the value up the way an identifier submission does,
-// without recording anything on the attempt.
+// FindUniqueOwner looks the value up in the project-scoped rows of the
+// unique-attributes registry, without recording anything on the attempt. A
+// team-scoped row for the same value would not collide with the new user, so
+// it does not count.
 func (r *FlowSSOIdentityResolver) FindUniqueOwner(ctx context.Context, projectID, attribute, value string) (string, error) {
-	user, err := UserStatementsLookup{Pool: r.db}.GetByAttributes(ctx, projectID, []domain.Attribute{{
-		Key:   domain.AttributeKey(attribute),
-		Value: value,
-	}})
+	user, err := r.db.Statements().GetUser(ctx,
+		database.Equal(database.Col(domain.UserFieldProjectID), projectID),
+		UserQueryOptions{
+			Attributes:           []domain.Attribute{{Key: domain.AttributeKey(attribute), Value: value}},
+			UniqueAttributesOnly: true,
+			UniqueTeamID:         new(""),
+		},
+	)
 	if _, missing := errors.AsType[*database.NoRowFoundError](err); missing {
 		return "", nil
 	}
