@@ -4240,6 +4240,24 @@ func TestFlowStateMachine_Process_PurposeToggleDoesNotGrowState(t *testing.T) {
 	assert.Equal(t, "attempt-1", state.AuthAttemptID)
 }
 
+// ssoSchemaContent is the schema behind [ssoRenderWorld]: email and username
+// are project-unique, so the collision check probes them; badge is
+// team-unique, which the probe skips.
+const ssoSchemaContent string = `{
+		"$schema": "https://json-schema.org/draft/2020-12/schema",
+		"type": "object",
+		"x-auth-methods": { "password": { "enabled": true }, "passkey": { "enabled": true } },
+		"x-identifier": "email",
+		"required": ["email", "username", "given_name", "family_name", "badge"],
+		"properties": {
+			"email":       { "type": "string", "format": "email", "maxLength": 320, "x-unique": "project" },
+			"username":    { "type": "string", "minLength": 3, "maxLength": 64, "x-unique": "project" },
+			"given_name":  { "type": "string", "minLength": 1, "maxLength": 200 },
+			"family_name": { "type": "string", "minLength": 1, "maxLength": 200 },
+			"badge":       { "type": "string", "x-unique": "team" }
+		}
+	}`
+
 // ssoRenderWorld is a test world sitting on the sso step of
 // [ssoStepDefinition], with the schema and the provider list resolving on
 // every render.
@@ -4248,7 +4266,7 @@ func ssoRenderWorld(t *testing.T) (*flowTestWorld, *domain.FlowDefinition, *doma
 	w := newFlowTestWorld(t)
 	w.schemaResolver.EXPECT().
 		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
-		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+		Return(mustUnmarshal[jsonschema.Schema](t, ssoSchemaContent), nil).
 		AnyTimes()
 	w.ssoProviders.EXPECT().
 		Resolve(gomock.Any(), testProjectID, "credentials", gomock.Any()).
@@ -4385,17 +4403,19 @@ func unlinkedParked(claims map[string]any, verified map[string]bool) *domain.Flo
 	return &domain.FlowSSOParkedIdentity{CheckID: "ch-1", ConnectionID: "idp-1", Subject: "sub-1", Claims: claims, Verified: verified}
 }
 
-// completeClaims carries every required property of defaultSchemaContent, the
-// two x-unique ones verified.
+// completeClaims carries every required property of ssoSchemaContent, the
+// x-unique ones verified.
 func completeClaims() (map[string]any, map[string]bool) {
 	return map[string]any{
 			"email":       "alice@example.com",
 			"username":    "alice",
 			"given_name":  "Alice",
 			"family_name": "Liddell",
+			"badge":       "b-7",
 		}, map[string]bool{
 			"email":    true,
 			"username": true,
+			"badge":    true,
 		}
 }
 
@@ -4589,19 +4609,48 @@ func TestFlowStateMachine_Render_SSOMissingRequiredRoutesUserNotFound(t *testing
 // someone's address, so it is collected instead of trusted.
 func TestFlowStateMachine_Render_SSOUnverifiedRequiredUniqueRoutesUserNotFound(t *testing.T) {
 	t.Parallel()
+	// The rule holds for every scope, including a team scope the collision
+	// check does not probe.
+	for _, unverified := range []string{"email", "badge"} {
+		t.Run(unverified, func(t *testing.T) {
+			t.Parallel()
+			w, def, state := ssoRenderWorld(t)
+			def = withSSOOutcomeSteps(def)
+			claims, verified := completeClaims()
+			verified[unverified] = false
+			w.expectParked(unlinkedParked(claims, verified), nil)
+			w.expectIdentifier("email", "alice@example.com", "", domain.ErrAuthAttemptProofRejected(nil))
+			w.expectIdentifier("username", "alice", "", domain.ErrAuthAttemptProofRejected(nil))
+			w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Times(0)
+			w.ssoIdentities.EXPECT().DeleteParked(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+
+			result, err := w.sm.Render(t.Context(), def, state)
+			require.NoError(t, err)
+			assert.Equal(t, "sso-register", result.Step.Name)
+		})
+	}
+}
+
+// The identifier lookup is not scoped to a team, so probing a team-unique
+// claim could bind a user of another team. The claim is not probed; a real
+// collision in the new user's scope is refused by the create instead.
+func TestFlowStateMachine_Render_SSOTeamScopedUniqueClaimIsNotProbed(t *testing.T) {
+	t.Parallel()
 	w, def, state := ssoRenderWorld(t)
 	def = withSSOOutcomeSteps(def)
 	claims, verified := completeClaims()
-	verified["email"] = false
 	w.expectParked(unlinkedParked(claims, verified), nil)
-	w.expectIdentifier("email", "alice@example.com", "", domain.ErrAuthAttemptProofRejected(nil))
-	w.expectIdentifier("username", "alice", "", domain.ErrAuthAttemptProofRejected(nil))
-	w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Times(0)
+	w.authAttemptService.EXPECT().
+		SubmitIdentifier(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitIdentifierInput) bool { return in.AttributeName != "badge" })).
+		Return("", domain.ErrAuthAttemptProofRejected(nil)).
+		Times(4)
+	w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Return("", domain.ErrUserAlreadyExists())
 	w.ssoIdentities.EXPECT().DeleteParked(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 
 	result, err := w.sm.Render(t.Context(), def, state)
 	require.NoError(t, err)
 	assert.Equal(t, "sso-register", result.Step.Name)
+	assert.Empty(t, result.State.CollectedData.UserID, "no user of another team is bound")
 }
 
 // A step that does not route the outcome re-renders with the outcome as its

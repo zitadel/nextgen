@@ -404,11 +404,11 @@ func (r *FlowStateMachineRuntime) provisionSSOIdentity(ctx context.Context, stat
 	if err != nil {
 		return "", fmt.Errorf("flow state machine: load user schema for sso identity: %w", err)
 	}
-	uniqueClaims, err := r.ssoUniqueClaims(schema, state.CurrentStep, parked.Claims)
+	probeClaims, uniqueClaims, err := r.ssoUniqueClaims(schema, state.CurrentStep, parked.Claims)
 	if err != nil {
 		return "", err
 	}
-	if bound, err := r.bindSSOCollision(ctx, state, parked, uniqueClaims); err != nil || bound {
+	if bound, err := r.bindSSOCollision(ctx, state, parked, probeClaims); err != nil || bound {
 		return FlowImplicitOutcomeSSOUserAlreadyExists, err
 	}
 	if !ssoClaimsComplete(schema, parked, uniqueClaims) {
@@ -432,7 +432,7 @@ func (r *FlowStateMachineRuntime) provisionSSOIdentity(ctx context.Context, stat
 	if errors.Is(err, ErrUserAlreadyExists()) {
 		// Lost a race since the probe: whoever took the attribute is bound,
 		// and a race lost on the subject alone falls back to collection.
-		if bound, err := r.bindSSOCollision(ctx, state, parked, uniqueClaims); err != nil || bound {
+		if bound, err := r.bindSSOCollision(ctx, state, parked, probeClaims); err != nil || bound {
 			return FlowImplicitOutcomeSSOUserAlreadyExists, err
 		}
 		return FlowImplicitOutcomeSSOUserNotFound, nil
@@ -450,31 +450,38 @@ func (r *FlowStateMachineRuntime) provisionSSOIdentity(ctx context.Context, stat
 }
 
 // ssoUniqueClaims returns the claim names whose schema property carries an
-// x-unique scope, sorted so the probe order is stable. A claim the schema
-// does not know, or an object claim, is skipped.
-func (r *FlowStateMachineRuntime) ssoUniqueClaims(schema *jsonschema.Schema, stepName string, claims map[string]any) ([]string, error) {
-	var names []string
+// x-unique scope (unique), and the project-scoped subset the collision check
+// probes (probe), both sorted so the probe order is stable. Team scope is not
+// probed: the identifier lookup has no team filter yet (see resolveIdentifier
+// in internal/service/auth_attempt.go), so it could bind a user of another
+// team. A claim the schema does not know, or an object claim, is skipped.
+func (r *FlowStateMachineRuntime) ssoUniqueClaims(schema *jsonschema.Schema, stepName string, claims map[string]any) (probe, unique []string, err error) {
 	for name := range claims {
 		resolved, err := r.fields.Resolve(schema, stepName, []Field{Field(name)})
 		if errors.Is(err, ErrFlowFieldUnknown) || errors.Is(err, ErrFlowFieldNotScalar) {
 			continue
 		}
 		if err != nil {
-			return nil, fmt.Errorf("flow state machine: resolve sso claim %q: %w", name, err)
+			return nil, nil, fmt.Errorf("flow state machine: resolve sso claim %q: %w", name, err)
 		}
-		if resolved.Fields[0].Unique != AttributeUniquenessUnspecified {
-			names = append(names, name)
+		switch resolved.Fields[0].Unique {
+		case AttributeUniquenessProject:
+			probe = append(probe, name)
+			unique = append(unique, name)
+		case AttributeUniquenessTeam:
+			unique = append(unique, name)
 		}
 	}
-	slices.Sort(names)
-	return names, nil
+	slices.Sort(probe)
+	slices.Sort(unique)
+	return probe, unique, nil
 }
 
-// bindSSOCollision probes each unique claim, verified or not, until one names
-// an existing user, then binds that user and deletes the parked row. Like a
-// typed identifier it only binds the user: no link, no sso factor.
-func (r *FlowStateMachineRuntime) bindSSOCollision(ctx context.Context, state *FlowState, parked *FlowSSOParkedIdentity, uniqueClaims []string) (bool, error) {
-	for _, name := range uniqueClaims {
+// bindSSOCollision probes each project-unique claim, verified or not, until
+// one names an existing user, then binds that user and deletes the parked
+// row. Like a typed identifier it only binds the user: no link, no sso factor.
+func (r *FlowStateMachineRuntime) bindSSOCollision(ctx context.Context, state *FlowState, parked *FlowSSOParkedIdentity, probeClaims []string) (bool, error) {
+	for _, name := range probeClaims {
 		value, _ := parked.Claims[name].(string)
 		if value == "" {
 			continue
