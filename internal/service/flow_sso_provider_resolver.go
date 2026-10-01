@@ -26,10 +26,7 @@ func (r *FlowSSOProviderResolver) Resolve(ctx context.Context, projectID, stepNa
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to read identity provider connections")
 	}
-	bySlug := make(map[string]*domain.IDPConnection, len(connections))
-	for _, connection := range connections {
-		bySlug[connection.Slug] = connection
-	}
+	bySlug := indexByID(connections, func(c *domain.IDPConnection) string { return c.Slug })
 	providers := make([]domain.FlowSSOProvider, 0, len(slugs))
 	for _, slug := range slugs {
 		connection, ok := bySlug[slug]

@@ -221,20 +221,16 @@ func (s *idpConnectionService) Get(ctx context.Context, projectID, id string) (*
 // GetBySlugs reads the whole slug set in one statement. The flow render calls
 // it outside any management request, so the list runs unrestricted, like the
 // flow definition lookup on the same path. A zero limit compiles to no LIMIT,
-// and the step schema caps sso_providers, so one page holds every match.
+// so one page holds every match.
 func (s *idpConnectionService) GetBySlugs(ctx context.Context, projectID string, slugs []string) ([]*domain.IDPConnection, error) {
 	// An empty OR compiles to nothing and leaves a dangling AND in the WHERE.
 	if len(slugs) == 0 {
 		return nil, nil
 	}
-	bySlug := make([]database.Filter[domain.IDPConnectionField], 0, len(slugs))
-	for _, slug := range slugs {
-		bySlug = append(bySlug, database.Equal(database.Col(domain.IDPConnectionFieldSlug), slug))
-	}
 	result, err := s.v2Pool.Statements().ListIDPConnections(WithAuthzListUnrestricted(ctx), &database.ListOptions[domain.IDPConnectionField]{
 		Filter: database.And(
 			database.Equal(database.Col(domain.IDPConnectionFieldProjectID), projectID),
-			database.Or(bySlug...),
+			database.Or(equalIDFilters(domain.IDPConnectionFieldSlug, slugs)...),
 		),
 	})
 	if err != nil {
