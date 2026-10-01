@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { CircleUserRound } from "lucide-react";
 import { useId } from "react";
 
-import { DetailPage } from "@/components/detail-page";
+import { DETAIL_TITLE, DetailPage } from "@/components/detail-page";
 import { SettingsColumn } from "@/components/layout";
 import { SettingsCard } from "@/components/settings-card";
 import { Field, FieldContent, FieldLabel } from "@/components/ui/field";
@@ -40,7 +40,8 @@ const ROW = "@md/field-group:items-center!";
 function ProfileScreen() {
   const { user } = Route.useLoaderData();
   // The schema's `email` attribute only: the designated identifier can be a
-  // username (ADR 058), so it does not stand in for a missing email.
+  // username (ADR 058), so it does not stand in for a missing email. A schema
+  // without one says so in the field rather than leaving it blank.
   const email = field(userAttributes(user as Record<string, unknown>), "email") ?? "";
   const id = useId();
 
@@ -49,14 +50,21 @@ function ProfileScreen() {
       <SettingsColumn>
         {/* No header gutter: the settings frame aligns the title with the card,
             where a resource detail insets its title lockup by 8px. */}
-        <h1 className="text-foreground font-serif text-2xl leading-6 tracking-tight">Profile</h1>
+        <h1 className={DETAIL_TITLE}>Profile</h1>
         <SettingsCard>
           <Field orientation="responsive" className={ROW}>
             <FieldLabel htmlFor={id} className={LABEL_HALF}>
               Email address
             </FieldLabel>
             <FieldContent>
-              <Input id={id} type="email" value={email} disabled readOnly />
+              <Input
+                id={id}
+                type="email"
+                value={email}
+                placeholder="No email address"
+                disabled
+                readOnly
+              />
             </FieldContent>
           </Field>
         </SettingsCard>

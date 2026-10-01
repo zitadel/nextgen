@@ -69,7 +69,7 @@ describe("settings profile", () => {
     expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
   });
 
-  it("leaves the field empty when the identifier is not an email", async () => {
+  it("says there is no email when the identifier is not one", async () => {
     server.use(
       http.get(ME_URL, () =>
         HttpResponse.json(
@@ -83,7 +83,9 @@ describe("settings profile", () => {
     );
     await renderAt("/settings/profile");
 
-    expect(await screen.findByLabelText("Email address")).toHaveValue("");
+    const email = await screen.findByLabelText("Email address");
+    expect(email).toHaveValue("");
+    expect(email).toHaveAttribute("placeholder", "No email address");
   });
 
   it("lists Profile under ACCOUNT, and no WORKSPACE heading", async () => {
