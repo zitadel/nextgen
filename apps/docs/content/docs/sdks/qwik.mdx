@@ -10,6 +10,10 @@ import { Tab, Tabs } from "fumadocs-ui/components/tabs";
 
 The Qwik SDK is the SPA wrapper for the shared Zitadel login and logout widgets.
 
+<Callout title="Requires Qwik 2" type="info">
+  `@zitadel/sdk-qwik` peers `@qwik.dev/core` (`^2.0.0-beta.45`), so your app must be on Qwik 2. A Qwik 1 (`@builder.io/qwik`) app is not supported — migrate it to `@qwik.dev/core` first.
+</Callout>
+
 <Callout title="SPA proxy requirement" type="warn">
   Vite-based Qwik SPAs do not have server middleware by default. The CLI configures a Vite dev proxy; production deployments need an equivalent same-origin proxy for `/__nextgen/*`. See [SDK proxy](/docs/concepts/sdk-proxy).
 </Callout>
@@ -52,7 +56,7 @@ The Qwik SDK is the SPA wrapper for the shared Zitadel login and logout widgets.
     Configure Zitadel once, then render login and logout widgets:
 
     ```tsx
-    import { component$ } from "@builder.io/qwik";
+    import { component$ } from "@qwik.dev/core";
     import { ZitadelLogin, ZitadelLogout, configureZitadel } from "@zitadel/sdk-qwik";
 
     const project = configureZitadel({

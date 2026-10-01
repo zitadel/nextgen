@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { scopedPath } from "@/lib/project-scope.fixture";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
@@ -13,7 +14,6 @@ vi.mock("@/auth/session", async (importOriginal) => {
 });
 
 vi.stubEnv("VITE_CONSOLE_API_BASE", "http://localhost/api");
-vi.stubEnv("VITE_CONSOLE_PROJECT_ID", "proj_console");
 
 const USERS_URL = "http://localhost/api/users";
 const USERS_QUERY_URL = `${USERS_URL}/query`;
@@ -72,13 +72,13 @@ function stub({
   );
 }
 
-async function renderDetail() {
+async function renderDetail(project?: string) {
   const [{ RouterProvider, createMemoryHistory }, { createAppRouter }] = await Promise.all([
     import("@tanstack/react-router"),
     import("../../../router"),
   ]);
   const router = createAppRouter({
-    history: createMemoryHistory({ initialEntries: [`/users/${USER_ID}`] }),
+    history: createMemoryHistory({ initialEntries: [scopedPath(`/users/${USER_ID}`, project)] }),
   });
   render(<RouterProvider router={router} />);
   return router;
@@ -94,6 +94,23 @@ describe("user detail", () => {
     expect(screen.getByText("Business")).toBeInTheDocument();
     expect(screen.getByLabelText("Company name")).toHaveValue("Acme");
     expect(screen.getByLabelText("Email")).toHaveValue("maya@acme.com");
+  });
+
+  it("reads the user's schema in the selected project", async () => {
+    // Schema ids are unique per project only, and the server resolves an
+    // ambiguous one in the caller's own project unless `project_id` names it.
+    stub();
+    const projects: (string | null)[] = [];
+    server.use(
+      http.get(`${SCHEMAS_URL}/sch_business`, ({ request }) => {
+        projects.push(new URL(request.url).searchParams.get("project_id"));
+        return HttpResponse.json({ id: "sch_business", schema: BUSINESS });
+      }),
+    );
+    await renderDetail("proj_other");
+
+    expect(await screen.findByLabelText("Company name")).toHaveValue("Acme");
+    expect(projects).toEqual(["proj_other"]);
   });
 
   it("renders numeric and boolean attributes rather than leaving them blank", async () => {

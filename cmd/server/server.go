@@ -283,6 +283,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	environmentService := service.NewEnvironmentService(serviceDBPool)
 	variableService := service.NewVariableService(serviceDBPool, keyService)
 	releaseService := service.NewReleaseService(serviceDBPool)
+	idpConnectionService := service.NewIDPConnectionService(serviceDBPool, schemaValidator)
 	deploymentService := service.NewDeploymentService(serviceDBPool)
 	eventService := service.NewEventService(serviceDBPool)
 	projectHashers := service.NewProjectHasherResolver(serviceDBPool, hasherFactory)
@@ -320,6 +321,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		fields,
 		createUserHandler,
 		flowAuth,
+		service.NewFlowSSOProviderResolver(idpConnectionService),
 		time.Now,
 	)
 
@@ -376,6 +378,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 			brandingService,
 			environmentService,
 			releaseService,
+			idpConnectionService,
 			deploymentService,
 			eventService,
 			tokenService,

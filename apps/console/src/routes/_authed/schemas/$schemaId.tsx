@@ -3,6 +3,7 @@ import { Users } from "lucide-react";
 import { Fragment } from "react";
 
 import { DocumentViewer } from "@/components/document-viewer";
+import { ICON_PLATE } from "@/components/detail-page";
 import { DETAIL_PANEL_PAGE } from "@/components/layout";
 import { SchemaFieldsPanel } from "@/components/schema-fields-panel";
 import { Badge } from "@/components/ui/badge";
@@ -12,10 +13,18 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { type UserSchema, schemaAuthMethods, schemaDisplayName } from "@/lib/schema";
 
 import { api } from "../../../api/zitadel";
+import { projectScopeDeps, requireProjectScope } from "../../../lib/project-scope";
 
 export const Route = createFileRoute("/_authed/schemas/$schemaId")({
-  loader: ({ params }) =>
-    api.getSchemaById(params.schemaId).then((body) => body.schema as UserSchema),
+  staticData: { scope: "project" },
+  loaderDeps: projectScopeDeps,
+  // Schema ids are unique per project only (the seeded default carries the same
+  // `$id` everywhere), and an ambiguous id resolves in the caller's own project
+  // unless `project_id` names the selected one.
+  loader: ({ params, deps }) =>
+    api
+      .getSchemaById(params.schemaId, { project_id: requireProjectScope(deps.project) })
+      .then((body) => body.schema as UserSchema),
   component: SchemaDetail,
 });
 
@@ -32,11 +41,8 @@ function SchemaDetail() {
             The schema's id is not repeated here — the list row carries it, and
             the design's lockup has only the two lines. */}
         <div className="flex items-center gap-3">
-          <span
-            aria-hidden
-            className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted"
-          >
-            <Users className="size-4 text-foreground" />
+          <span aria-hidden className={ICON_PLATE}>
+            <Users className="size-4" />
           </span>
           <div className="flex min-w-0 flex-col gap-0.5">
             <span className={OVERLINE}>User schema</span>

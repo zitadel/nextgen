@@ -24,12 +24,14 @@ import {
 import type {
   CreateFlow201,
   CreateFlowBody,
+  CreateFlowBodyPurpose,
   ExchangeHandoffBody,
   SubmitFlowStepBody,
 } from "@zitadel/api/generated/model";
 import type { RequestHandler } from "msw";
 
 import { withBranding } from "./branding.js";
+import { withSsoProviders } from "./sso-providers.js";
 import {
   doneStep,
   identifierStep,
@@ -40,9 +42,17 @@ import {
   recoverStep,
   registerPasswordStep,
   registerStep,
+  registerSsoStep,
+  ssoConflictStep,
   ssoRedirectStep,
 } from "./fixtures/login.js";
-import { startFlowActor, type FlowActor, type FlowStepName } from "./flow-machine.js";
+import {
+  startFlowActor,
+  type FlowActor,
+  type FlowStepName,
+  type SsoOutcome,
+} from "./flow-machine.js";
+import { SsoIdentityStore } from "./lib/sso-identities.js";
 import { AuthnStore, type PasskeyProof } from "./lib/authn/index.js";
 
 export type CapturedRequest =
@@ -64,6 +74,28 @@ export type MockHandle = {
    * behaviour without needing a full registration ceremony first.
    */
   registerCredential: (userHandle: string, credentialId: string) => void;
+  /**
+   * Put the flow where an identity provider's callback leaves it, and return
+   * the handle to resume it with.
+   *
+   * The browser's half of the round trip cannot happen in-process: choosing a
+   * provider navigates the whole page to the authorization endpoint, and it is
+   * the provider's return to the callback that advances the flow. This stands
+   * in for that leg, sending the same `sso` and `callback` submissions the HTTP
+   * handler does and resolving the branch by the same rule, so a caller that
+   * cannot leave the page — a Storybook story, a component test — can still
+   * reach `register-sso` and `sso-conflict`.
+   *
+   * Which one it lands on follows from the email, exactly as it does over the
+   * wire: an address this provider has already signed up signs straight in, an
+   * address that has an account here but no link is the collision, and anything
+   * else is a new identity.
+   */
+  returnFromProvider: (input: {
+    provider: string;
+    email: string;
+    purpose?: CreateFlowBodyPurpose;
+  }) => string;
 };
 
 const FLOW_ID = "flow_mock";
@@ -83,15 +115,68 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
   let actor: FlowActor = startFlowActor();
   let captured: CapturedRequest[] = [];
   const authn = new AuthnStore();
+  // Which emails this mock has already seen arrive through a provider. The
+  // engine keys links on the provider's subject; see SsoIdentityStore for why
+  // the mock keys on email.
+  const ssoIdentities = new SsoIdentityStore();
+
+  /**
+   * Which branch the provider's return takes.
+   *
+   * A link this provider has seen signs the user straight in. An email that
+   * already has an account here, but no link, is the collision: the account
+   * exists and the provider must not silently mint a second one. Anything else
+   * is a new external identity.
+   */
+  function resolveSsoOutcome(slug: string | null, email: string | undefined): SsoOutcome {
+    if (!slug || !email) {
+      return "identity_unknown";
+    }
+    if (ssoIdentities.isLinked(slug, email)) {
+      return "callback";
+    }
+    return authn.hasAccount(email) ? "user_already_exists" : "identity_unknown";
+  }
 
   function reset(): void {
     actor = startFlowActor();
     captured = [];
     authn.clear();
+    // Links too: a caller asking for a clean mock must not inherit an email
+    // that a previous test signed up through a provider, which would turn the
+    // next first-time sign-in into a straight sign-in.
+    ssoIdentities.clear();
   }
 
   function registerCredential(userHandle: string, credentialId: string): void {
     authn.register(userHandle, credentialId);
+  }
+
+  function returnFromProvider(input: {
+    provider: string;
+    email: string;
+    purpose?: CreateFlowBodyPurpose;
+  }): string {
+    actor = startFlowActor();
+    actor.send({ type: "START", purpose: input.purpose ?? "login" });
+    actor.send({
+      type: "SUBMIT",
+      action: "sso",
+      fields: {},
+      sso_provider_id: input.provider,
+    });
+    // Registering through a provider is what creates the link, and the HTTP
+    // path records it on the `register-sso` submit rather than here — so a
+    // caller walking this twice with the same email gets a new identity both
+    // times, which is what not having finished the registration means.
+    actor.send({
+      type: "SUBMIT",
+      action: "callback",
+      fields: { email: input.email },
+      sso_provider_id: input.provider,
+      sso_outcome: resolveSsoOutcome(input.provider, input.email),
+    });
+    return FLOW_ID;
   }
 
   function getCaptured(): readonly CapturedRequest[] {
@@ -105,7 +190,16 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
    * registered credentials in `authn`, then selects and renders the matching
    * step fixture. Called after every state transition and on `GET /flow/{id}`.
    */
+  /**
+   * The current step as a wire response, with the module-level overlays
+   * applied: branding on every response, identity providers on the steps that
+   * can start a sign-in. Both are off unless a caller opted in.
+   */
   async function currentResponse(): Promise<CreateFlow201> {
+    return withSsoProviders(await renderCurrentStep());
+  }
+
+  async function renderCurrentStep(): Promise<CreateFlow201> {
     const snapshot = actor.getSnapshot();
     const userHandle = snapshot.context.capturedFields["email"] ?? "";
     const input = {
@@ -133,6 +227,10 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
         return withBranding(passkeyLoginStep(input));
       case "sso-redirect":
         return withBranding(ssoRedirectStep(input));
+      case "register-sso":
+        return withBranding(registerSsoStep(input));
+      case "sso-conflict":
+        return withBranding(ssoConflictStep(input));
       case "done":
         return withBranding(await doneStep(input));
       default:
@@ -235,12 +333,29 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
         return { ...base, step: { ...step, error: passkeyLoginErrorKey } };
       }
 
-      const baseFields = (body.fields ?? {}) as Record<string, string>;
+      const submitted = loginCred ? { ...fields, email: loginCred.userHandle } : fields;
+      const provider = snapshot.context.ssoProviderId;
+      // Leaving the provider, nothing has resolved yet. Coming back from it,
+      // the identity decides where the flow goes — the lookup the engine does
+      // before it picks a branch.
+      const ssoOutcome =
+        before === "sso-redirect"
+          ? resolveSsoOutcome(provider, submitted.email ?? snapshot.context.capturedFields.email)
+          : null;
+      // Registering through a provider is what creates the link, so it is
+      // recorded when the step that mints the account submits.
+      if (before === "register-sso" && body.action !== "sign_in") {
+        const linkEmail = submitted.email ?? snapshot.context.capturedFields.email;
+        if (provider && linkEmail) {
+          ssoIdentities.link(provider, linkEmail);
+        }
+      }
       actor.send({
         type: "SUBMIT",
         action: body.action,
-        fields: loginCred ? { ...baseFields, email: loginCred.userHandle } : baseFields,
+        fields: submitted,
         sso_provider_id: body.sso_provider_id ?? null,
+        sso_outcome: ssoOutcome,
       });
       return currentResponse();
     }),
@@ -257,5 +372,5 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
     }),
   ];
 
-  return { handlers, reset, getCaptured, registerCredential };
+  return { handlers, reset, getCaptured, registerCredential, returnFromProvider };
 }

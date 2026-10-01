@@ -20,12 +20,13 @@
  *                                       --SUBMIT(recover)--> recover --SUBMIT--> identifier
  *                                       --SUBMIT(register)--> register
  *                                       --SUBMIT(passkey)--> passkey-login
- *                                       --SUBMIT(sso_provider_id)--> sso-redirect
+ *                                       --SUBMIT(sso)-----> sso-redirect
  *                            password   --SUBMIT(submit)--> done
  *                                       --SUBMIT(back)----> identifier
  *                                       --SUBMIT(passkey)--> passkey-login
  *      \--START(register)--> register --SUBMIT--> register-password --SUBMIT--> done
  *                                     --SUBMIT(sign_in)--> identifier
+ *                                     --SUBMIT(sso)-----> sso-redirect
  *
  *   passkey-upsell / passkey-setup -- legacy upsell pair; the default flow no
  *               longer routes through them (passkey registration is offered
@@ -36,6 +37,7 @@
  *   passkey-login --SUBMIT--> done
  *   passkey-login --SUBMIT(cancel)--> identifier
  *   sso-redirect --SUBMIT--> done
+ *   sso-conflict --SUBMIT(sso)-----> sso-redirect
  *   anything --RESET--> .idle  (root on: uses child-relative target syntax)
  */
 import type { CreateFlowBodyPurpose } from "@zitadel/api/generated/model";
@@ -51,7 +53,21 @@ export type FlowStepName =
   | "passkey-setup"
   | "passkey-login"
   | "sso-redirect"
+  | "register-sso"
+  | "sso-conflict"
   | "done";
+
+/**
+ * What the provider's return resolved to, decided by the caller rather than
+ * here.
+ *
+ * The real engine works this out from the identity the provider returned: a
+ * subject already linked signs in, an unknown subject registers, and an email
+ * that already has an account collides. That is a lookup, not a state
+ * transition, so the machine takes the answer and routes on it — the same split
+ * the engine has.
+ */
+export type SsoOutcome = "callback" | "identity_unknown" | "user_already_exists";
 
 export type FlowMachineContext = {
   tokenSeq: number;
@@ -68,6 +84,7 @@ export type FlowMachineEvent =
       action: string;
       fields: Record<string, string>;
       sso_provider_id?: string | null;
+      sso_outcome?: SsoOutcome | null;
     }
   | { type: "RESET" };
 
@@ -99,6 +116,39 @@ const captureFields = assign<
 >({
   capturedFields: ({ context, event }) => ({ ...context.capturedFields, ...event.fields }),
 });
+
+/**
+ * Choosing a provider is the reserved `sso` action: it carries
+ * `sso_provider_id` and leaves for the provider's authorization endpoint,
+ * whatever step offered the button. Every state the engine attaches
+ * `sso_providers` to (`PROVIDER_STEPS` in `sso-providers.ts`) takes this
+ * transition first, ahead of that step's own actions — otherwise a click
+ * falls through to the step's default and the mock reports a journey that
+ * could not happen.
+ *
+ * Both halves are required, because both are the contract
+ * (`docs/design/idp/3-social-login-flow.md`): `{action: "sso",
+ * sso_provider_id}`. A `submit` that happens to carry a provider id is a
+ * malformed request the engine would treat as an ordinary submit, so routing
+ * it here would let a caller pass against the mock and fail against the
+ * engine.
+ */
+type SubmitEvent = Extract<FlowMachineEvent, { type: "SUBMIT" }>;
+
+const chooseProvider = {
+  guard: ({ event }: { event: SubmitEvent }) =>
+    event.action === "sso" &&
+    typeof event.sso_provider_id === "string" &&
+    event.sso_provider_id.length > 0,
+  target: "sso-redirect",
+  actions: [
+    captureFields,
+    assign<FlowMachineContext, SubmitEvent, undefined, FlowMachineEvent, never>({
+      ssoProviderId: ({ event }) => event.sso_provider_id ?? null,
+    }),
+    rotateToken,
+  ],
+} as const;
 
 const setPurpose = assign<
   FlowMachineContext,
@@ -143,16 +193,7 @@ export const flowMachine = createMachine({
     identifier: {
       on: {
         SUBMIT: [
-          {
-            guard: ({ event }) =>
-              typeof event.sso_provider_id === "string" && event.sso_provider_id.length > 0,
-            target: "sso-redirect",
-            actions: [
-              captureFields,
-              assign({ ssoProviderId: ({ event }) => event.sso_provider_id ?? null }),
-              rotateToken,
-            ],
-          },
+          chooseProvider,
           {
             guard: ({ event }) => event.action === "register",
             target: "register",
@@ -180,6 +221,7 @@ export const flowMachine = createMachine({
     register: {
       on: {
         SUBMIT: [
+          chooseProvider,
           {
             guard: ({ event }) => event.action === "sign_in",
             target: "identifier",
@@ -266,9 +308,74 @@ export const flowMachine = createMachine({
         ],
       },
     },
+    // Returning from the provider. The three branches are area 3's resolution
+    // branches, and the caller says which one applies.
     "sso-redirect": {
       on: {
-        SUBMIT: { target: "done", actions: [rotateToken] },
+        SUBMIT: [
+          {
+            guard: ({ event }) => event.sso_outcome === "identity_unknown",
+            target: "register-sso",
+            actions: [captureFields, rotateToken],
+          },
+          {
+            guard: ({ event }) => event.sso_outcome === "user_already_exists",
+            target: "sso-conflict",
+            actions: [captureFields, rotateToken],
+          },
+          {
+            // `callback`: a subject already linked to an account, so the round
+            // trip is the whole sign-in. Guarded, so only this outcome reaches
+            // it.
+            guard: ({ event }) => event.sso_outcome === "callback",
+            target: "done",
+            actions: [captureFields, rotateToken],
+          },
+          {
+            // No outcome at all. Failing closed: the worst reading of "we
+            // could not tell who came back" is to sign someone in, so an
+            // unresolved return registers instead.
+            target: "register-sso",
+            actions: [captureFields, rotateToken],
+          },
+        ],
+      },
+    },
+
+    // A new external identity. The step collects whatever the schema needs
+    // that the provider did not supply, and its submit is the flow's
+    // `create_user_with_sso`.
+    "register-sso": {
+      on: {
+        SUBMIT: [
+          {
+            guard: ({ event }) => event.action === "sign_in",
+            target: "identifier",
+            actions: [rotateToken],
+          },
+          { target: "done", actions: [captureFields, rotateToken] },
+        ],
+      },
+    },
+
+    // The provider's email already has an account, so the user proves they own
+    // it with a method this schema enables rather than getting a second one.
+    "sso-conflict": {
+      on: {
+        SUBMIT: [
+          chooseProvider,
+          {
+            guard: ({ event }) => event.action === "passkey",
+            target: "passkey-login",
+            actions: [captureFields, rotateToken],
+          },
+          {
+            guard: ({ event }) => event.action === "sign_in",
+            target: "identifier",
+            actions: [rotateToken],
+          },
+          { target: "done", actions: [captureFields, rotateToken] },
+        ],
       },
     },
     done: { type: "final" },

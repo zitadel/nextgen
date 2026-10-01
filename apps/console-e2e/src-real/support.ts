@@ -1,6 +1,8 @@
 import type { Page } from "@playwright/test";
 import { expect } from "@zitadel/testing/playwright";
 
+import { completeLogin } from "./login";
+
 /**
  * Shared helpers for the real-instance console suites.
  *
@@ -9,33 +11,23 @@ import { expect } from "@zitadel/testing/playwright";
  * mean the suites were signing in differently while looking identical.
  */
 
+/** The instance handle fields the helpers here need. */
+type ProjectHandle = { baseUrl: string; projectId: string; projectSecret: string };
+
 /**
- * Completes the console's login screen (Console ADR 0003) with a seeded
- * user: the default-login flow's identifier step ("Email" + "Continue"),
- * then the password step ("Password" + "Sign in"). The widget exchanges the
- * handoff for the `__nextgen_session` cookie and performs a full-document
- * navigation away from /login.
+ * Grants a seeded user admin on the instance's project, then signs in with it
+ * through the console's login screen (`completeLogin` in `login.ts`).
  */
 export async function signIn(
   page: Page,
-  user: { email: string; password: string },
+  handle: ProjectHandle,
+  user: { id: string; email: string; password: string },
 ): Promise<void> {
-  await page.goto("/login");
-  await page.getByLabel("Email").fill(user.email);
-  await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await page.getByLabel("Password").fill(user.password);
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await page.waitForURL((url) => !url.pathname.endsWith("/login"));
-
-  // The URL leaving /login is not the end of signing in. The widget's terminal
-  // step is a full-document navigation to postSignInUrl, and the `_authed`
-  // guard resolves the session again on the way into the layout. Returning at
-  // the URL change leaves those in flight, and they interrupt whatever the
-  // caller navigates to next ("Navigation to /x is interrupted by another
-  // navigation to /"). The shell's own navigation renders only once the guard
-  // has let the layout through, so waiting for it waits for the sign-in to
-  // have finished landing.
-  await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();
+  // The console authenticates with the session cookie alone (#1300): what a
+  // person sees is what their grants allow, so every signed-in test user is
+  // made an admin of the instance's project first.
+  await grantProjectAdmin(handle, user.id);
+  await completeLogin(page, user);
 }
 
 /**
@@ -49,10 +41,7 @@ export async function signIn(
  * Written with the boot-captured project secret from the test process, never
  * from the page: the browser must not see it (see the credential-leak spec).
  */
-export async function grantProjectAdmin(
-  handle: { baseUrl: string; projectId: string; projectSecret: string },
-  userId: string,
-): Promise<void> {
+export async function grantProjectAdmin(handle: ProjectHandle, userId: string): Promise<void> {
   const query = new URLSearchParams({ project_id: handle.projectId });
   const response = await fetch(`${handle.baseUrl}/grants?${query.toString()}`, {
     method: "POST",

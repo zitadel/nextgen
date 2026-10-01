@@ -304,6 +304,18 @@ export function createMockApp(options: { issuer: string }): express.Express {
     },
   );
 
+  // GET /console/runtime.json — the console's pre-session runtime document
+  // (Console ADR 0004 §3), served by the Go server's root mux. Without it the
+  // console stops on its connectivity screen, or, with
+  // VITE_CONSOLE_RUNTIME_FALLBACK, has no project to sign in to. It names the
+  // platform project, as a deployment that bootstraps one does: the console's
+  // session then belongs to it, which is the only session `claim/complete`
+  // below accepts. No `publishable_key`: the mock's session exchange asks for
+  // no bearer.
+  app.get("/console/runtime.json", (_req: express.Request, res: express.Response) => {
+    res.json({ mode: "standalone", console_project_id: PLATFORM_PROJECT_ID });
+  });
+
   // GET /sessions/me — validate opaque session cookie and return session data.
   // Mirrors the Go server's GetMySession handler.
   app.get("/sessions/me", (req: express.Request, res: express.Response) => {

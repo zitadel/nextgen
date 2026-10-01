@@ -66,8 +66,10 @@ scoped `AGENTS.md` owns the rules — read those rather than rediscovering them.
 6. **Story** (`src/<id>.stories.ts`): one `Default` story under an
    `Atoms/<Name>` title. States are knobs, not extra stories.
 7. **Verify.** Dev loop: `storybook dev -p 6006` (HMR from source). Gate:
-   `moon run components:test` (unit), `moon run storybook:typecheck`, and
-   `moon run storybook:test` (render + a11y + plays in Chromium).
+   `moon run components:test` (unit + browser projects), `moon run
+   storybook:typecheck`, and `moon run storybook:test` (render + a11y + plays in
+   Chromium). For just the fast unit lane while iterating, use
+   `pnpm --filter @zitadel/components test`.
 
 ## Local checks
 

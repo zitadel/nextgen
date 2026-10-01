@@ -1,19 +1,18 @@
 import { defineConfig } from "vitest/config";
 
+import { baseTest, sourceConditions } from "../../vitest.shared.mjs";
+
 export default defineConfig({
+  cacheDir: ".vitest",
   // Resolve sibling `@zitadel/*` workspace packages to their TypeScript
   // source, matching the `customConditions` the repo's tsconfig uses, so
   // tests exercise the same code that ships. Mirrors the convention in
   // `packages/api-mock`, `packages/components`, etc.
-  resolve: { conditions: ["@zitadel/source"] },
+  resolve: { conditions: sourceConditions },
   test: {
-    include: ["src/**/*.test.ts"],
+    ...baseTest,
+    name: "@zitadel/mock-zitadel",
     environment: "node",
-    reporters: ["default"],
-    coverage: {
-      provider: "v8",
-      include: ["src/**/*.ts"],
-      exclude: ["src/**/*.test.ts"],
-    },
+    coverage: { ...baseTest.coverage, exclude: ["src/**/*.test.ts"] },
   },
 });

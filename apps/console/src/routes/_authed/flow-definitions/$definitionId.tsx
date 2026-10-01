@@ -4,8 +4,9 @@ import { Link2, Workflow } from "lucide-react";
 import { DocumentViewer } from "@/components/document-viewer";
 import { DETAIL_PANEL_PAGE } from "@/components/layout";
 import { EYEBROW, MetaRule, MetaValue } from "@/components/detail-meta";
+import { ICON_PLATE, MetaCard } from "@/components/detail-page";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import {
   Table,
@@ -26,9 +27,12 @@ import {
 import { schemaDisplayName } from "@/lib/schema";
 
 import { api } from "../../../api/zitadel";
+import { projectScopeDeps, requireProjectScope } from "../../../lib/project-scope";
 
 export const Route = createFileRoute("/_authed/flow-definitions/$definitionId")({
-  loader: async ({ params }) => {
+  staticData: { scope: "project" },
+  loaderDeps: projectScopeDeps,
+  loader: async ({ params, deps }) => {
     const entry = await api.getFlowDefinition(params.definitionId);
     // Structurally the list's `flow_definition`; orval renames per operation.
     const definition: FlowDefinition = entry.flow_definition;
@@ -36,17 +40,27 @@ export const Route = createFileRoute("/_authed/flow-definitions/$definitionId")(
       definition,
       createdAt: entry.created_at,
       // No `expand` on this endpoint, so the badge costs a second call.
-      schemaName: await resolveSchemaName(definition.user_schema),
+      schemaName: await resolveSchemaName(
+        definition.user_schema,
+        requireProjectScope(deps.project),
+      ),
       schemaId: definition.user_schema,
     };
   },
   component: FlowDefinitionDetail,
 });
 
-async function resolveSchemaName(id: string | undefined): Promise<string | undefined> {
+/**
+ * Schema ids are unique per project only, so the lookup names the project the
+ * flow belongs to — otherwise an ambiguous id resolves in the caller's own.
+ */
+async function resolveSchemaName(
+  id: string | undefined,
+  projectId: string,
+): Promise<string | undefined> {
   if (!id) return undefined;
   try {
-    const body = await api.getSchemaById(id);
+    const body = await api.getSchemaById(id, { project_id: projectId });
     return schemaDisplayName(body.schema, id);
   } catch {
     return undefined;
@@ -66,11 +80,8 @@ function FlowDefinitionDetail() {
           {/* Stacks below `sm` so a long schema name cannot squeeze the title. */}
           <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
             <div className="flex min-w-0 items-center gap-3">
-              <span
-                aria-hidden
-                className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted"
-              >
-                <Workflow className="size-4 text-foreground" />
+              <span aria-hidden className={ICON_PLATE}>
+                <Workflow className="size-4" />
               </span>
               <h1 className="truncate font-serif text-lg leading-6 text-foreground">{name}</h1>
             </div>
@@ -85,13 +96,11 @@ function FlowDefinitionDetail() {
           </div>
 
           {/* The frame draws a third value, `EXPIRES AT`; nothing backs it. */}
-          <Card className="gap-0 rounded-md py-0 shadow-xs">
-            <CardContent className="flex flex-col px-5 py-3.5 sm:flex-row sm:flex-wrap sm:items-start">
-              <MetaValue label="Flow ID" value={definitionId} copyable />
-              <MetaRule />
-              <MetaValue label="Created" value={formatDate(createdAt)} />
-            </CardContent>
-          </Card>
+          <MetaCard>
+            <MetaValue label="Flow ID" value={definitionId} copyable />
+            <MetaRule />
+            <MetaValue label="Created" value={formatDate(createdAt)} />
+          </MetaCard>
         </div>
 
         <Separator />

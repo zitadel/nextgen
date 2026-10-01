@@ -5,6 +5,7 @@ import { storybookTest } from "@storybook/addon-vitest/vitest-plugin";
 import { playwright } from "@vitest/browser-playwright";
 import { defineConfig } from "vitest/config";
 
+import { baseTest } from "../../vitest.shared.mjs";
 import { optimizeDepsExclude, optimizeDepsInclude } from "./.storybook/optimize-deps.js";
 
 const dir = dirname(fileURLToPath(import.meta.url));
@@ -21,9 +22,16 @@ const dir = dirname(fileURLToPath(import.meta.url));
  */
 export default defineConfig({
   test: {
+    ...baseTest,
+    name: "@zitadel/storybook",
     projects: [
       {
         extends: true,
+        // NOTE: unlike the other packages we do NOT pin cacheDir to `.vitest`
+        // here — the Storybook Vitest addon (`storybookTest`) manages its own
+        // Vite instance and keeps its cache under `node_modules/.vite`
+        // regardless of this setting, so `storybook:test` has no `.vitest`
+        // output in moon.yml.
         plugins: [
           storybookTest({
             configDir: join(dir, ".storybook"),

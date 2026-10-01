@@ -35,6 +35,13 @@ roles — syntax highlighting colours and gradient stops. They live under
 `text-zl-syntax-key`. They are not part of the unprefixed shadcn contract in
 `css/shadcn.css`, so reach them by their `--zl-*` or `zl-`-prefixed names.
 
+Composed gradients (`--zl-gradient-red`) are `linear-gradient()` values built
+from those stops, at the angle and stop positions recorded in
+`src/overrides.ts`, and are the same in both modes. A gradient is an image
+rather than a colour, so it has no `bg-zl-*` alias: read it as
+`var(--zl-gradient-red)` (in Tailwind, `bg-(image:--zl-gradient-red)`) or
+`cssVars.gradient.red`.
+
 All are themed: dark values live on `:root` / `[data-theme="dark"]`, light
 overrides on `[data-theme="light"]`. The new shadcn names never collide with the
 legacy `--zl-color-*` namespace, so a file can reference either (or both) during

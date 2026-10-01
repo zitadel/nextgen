@@ -17,6 +17,11 @@ export function Page({ children }: { children: ReactNode }) {
   );
 }
 
+/** The fixed column every settings screen renders in, centred in the main area. */
+export function SettingsColumn({ children }: { children: ReactNode }) {
+  return <div className="mx-auto w-full max-w-(--zl-container-settings)">{children}</div>;
+}
+
 /**
  * 12-column content grid matching the Figma `layout/*` spec. Prefer
  * `--zl-layout-gutter` when the token pipeline emits it; fall back to 24px
@@ -48,6 +53,7 @@ export function ContentGrid({
  * in their narrow variant. Shared because the schema and login-flow screens are
  * the same composition and had drifted apart: the schema screen carried 36/32,
  * which matches neither frame. Resource detail screens (users, teams, projects)
- * are a different composition and keep their own measured insets.
+ * are a different composition: a title row over cards, drawn by `DetailPage`
+ * and `DetailHeader` in `detail-page.tsx`.
  */
 export const DETAIL_PANEL_PAGE = "px-4 py-6 sm:px-6";

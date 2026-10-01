@@ -149,8 +149,11 @@ moon ci :lint :typecheck :build :test
 The root doctor treats Moon and the local toolchain as required. Docker is
 needed for container builds, Docker fallback journeys, and container-backed
 integration tests; it is not required for the default npm-binary local runtime.
-Playwright browsers remain warning-only because they are needed only for opt-in
-e2e and journey workflows.
+Playwright browsers remain warning-only because CI provisions them where they
+are needed: the components/api-mock/storybook browser test lanes (now part of
+the default `moon ci … :test` gate) pull Chromium in through an
+`install-browsers` task dependency, and the standalone e2e and journey suites
+get it from the ci-mode-gated Chromium install step in the CI workflow.
 
 Use `moon run workspace:check -- --full` for slower CI-parity phases and
 `moon run <project>:<task>` to rerun one named task.

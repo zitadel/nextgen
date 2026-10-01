@@ -9,7 +9,7 @@ import prettierPlugin from "eslint-plugin-prettier";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist/**", "node_modules/**"] },
+  { ignores: ["dist/**", "node_modules/**", ".vitest/**"] },
   {
     ...eslint.configs.recommended,
     files: ["**/*.{ts,js,mjs,cjs}"],

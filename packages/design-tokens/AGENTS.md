@@ -98,6 +98,11 @@ Two colour systems ship at once so consumers migrate incrementally:
   shadcn colours but are deliberately kept out of `css/shadcn.css`: that file
   owns the *unprefixed* shadcn contract, and `syntax`/`gradient` are not shadcn
   role names. Reach them as `--zl-*` or `bg-zl-gradient-red-start`.
+- **Composed gradients** (`--zl-gradient-red`) are `linear-gradient()` values
+  built in `build.ts` from the exported gradient colours, at the angle and stop
+  positions recorded in `overrides.ts`. Figma keeps each gradient as a style,
+  which the sync cannot read; the override goes once it publishes the angle and
+  positions as variables.
 
 When migrating a consumer, replace legacy `--zl-color-*` references with the new
 `--zl-*` names (or `bg-zl-*` / `text-zl-*` Tailwind utilities) and verify light +
