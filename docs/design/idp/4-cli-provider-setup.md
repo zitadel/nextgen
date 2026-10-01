@@ -374,9 +374,9 @@ topology [dependency](2-auth-method-selection.md#dependencies).
 
 #### 2. The Three-Outcome Rule for SSO Steps
 Every step carrying `sso_providers` must explicitly handle three outcomes:
-`sso_authenticated`, `sso_user_not_found`, and `sso_user_already_exists`.
-All three are SSO-only routes; typed collisions keep their own
-`user_already_exists` ([decision 5](#5-retargeting-registration-collisions)).
+`sso_authenticated`, `sso_user_not_found`, and `user_already_exists`.
+The first two are SSO-only routes; `user_already_exists` is shared with typed
+collisions ([decision 5](#5-retargeting-registration-collisions)).
 *   **`sso_user_not_found` → `register-sso`** on every step, so an unknown
     user reaches the collection step after one ceremony whether they started
     on the sign-in or the register page
@@ -401,7 +401,7 @@ identity.
 *   **Action:** Executes `on_success: "create_user_with_sso"` upon submission to
     consume the identity.
 *   **Collision Routing:** If a modified field causes a collision upon
-    submission, `sso_user_already_exists` routes the user to `sso-conflict`.
+    submission, `user_already_exists` routes the user to `sso-conflict`.
 
 #### 4. The Unified Conflict Step (`sso-conflict`)
 This is a comprehensive recovery step presented under "account exists"
@@ -414,15 +414,15 @@ The engine binds the attempt to the colliding account.
     three-outcome rule:
     *   `sso_authenticated` routes to `done`: the user signed in with a
         provider already linked to that account.
-    *   `sso_user_already_exists` targets the step itself: clicking the
-        colliding provider again re-runs the ceremony and resolves
-        identically, so the step re-renders with the same options.
+    *   `user_already_exists` targets the step itself: clicking the colliding
+        provider again re-runs the ceremony and resolves identically, so the
+        step re-renders with the same options.
     *   `sso_user_not_found` routes to `register-sso`: reachable only if the
         provider returns a different, unknown subject (the user switched
         provider accounts mid-loop).
     *   A wrong password re-renders the step with an error and no transition
         ([`capabilities.md`](../flowengine/capabilities.md#steps--state-machine));
-        `sso_user_already_exists` comes from SSO resolution.
+        `user_already_exists` comes from identifier resolution.
 *   **Navigation Fallback:** Includes a secondary `sign_in` action targeting
     `identifier` (`{ "target": "identifier", "purpose": "login" }`) so the user
     can back out and use a different account.
@@ -486,7 +486,7 @@ never presented as proof that sign-in works.
 | :--- | :--- | :--- |
 | **Re-enterable Sub-Journey** | Callable behind the "Sign-in methods" interface with the reuse branch as default mode. | Sign-in methods journey (ticket work, [Post-Claim Re-entry](#post-claim-re-entry)) |
 | **Test Journey Handoff** | Provides execution target for exit copy; applying changes is never presented as working sign-in. | Test sign-in command (ticket work) |
-| **Validation Rule** | Enforces that steps with `on_success: create_user_with_sso` route `sso_user_already_exists`. | Validator Work (Area 2) |
+| **Validation Rule** | Enforces that steps with `on_success: create_user_with_sso` route `user_already_exists`. | Validator Work (Area 2) |
 | **Multi-Schema Reuse** | Multi-schema reuse logic is specified but unreachable in Epic 851's single-schema flow; activates with the post-claim schema picker. | Sign-in methods journey (ticket work, [Post-Claim Re-entry](#post-claim-re-entry)) |
 | **"Skip for now" Destination** | The setup sub-journey's skip path hands the dropped provider to the Sign-in methods journey; the final summary names it. | Sign-in methods journey (ticket work) |
 | **Locale Keys** | `register-sso.action.submit`, `sso-conflict.action.submit`, `sso-conflict.action.passkey`, `sso-conflict.action.sign_in`; step titles derive from step names. | Login UI / Locale Work |

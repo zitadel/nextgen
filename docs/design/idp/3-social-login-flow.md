@@ -211,8 +211,10 @@ returning users and new users to different locations, so resolution fires one
 of three outcomes.
 The third, `sso_user_not_found`, is new and fires only from SSO resolution,
 never from a typed identifier.
-The three keys carry an `sso_` prefix so a flow author and the engine can tell
-them apart from the same-named outcomes of typed identifier and register steps.
+The two SSO-only keys carry an `sso_` prefix so a flow author and the engine
+can tell them apart from the typed `user_not_found`, while
+`user_already_exists` stays shared because typed and passkey registration raise
+it too.
 `sso_authenticated` names the success branch because every resolution outcome
 follows the provider's return.
 
@@ -253,7 +255,7 @@ transitions route it:
 | :--- | :--- | :--- |
 | **Known subject** | `sso_authenticated` | **Targets `done` (Authenticated).** Identity is pinned to `(connection, subject)`, not to claims, so profile edits cannot fork accounts. A sign-in does not update the stored user from fresh claims; that refresh is `is_auto_update`, deferred with its guards ([area 1](1-resource-model.md#deferred-and-cut-fields)). |
 | **Unknown subject** | `sso_user_not_found` | **Targets the data collection step** ([New Users: Prefill and Confirm](#new-users-prefill-and-confirm); `register-sso` in area 4's scaffold). Under `creation: disabled`, `sso_user_not_found` is not raised; the unknown subject is an error on the originating step ([Failures and Recovery](#failures-and-recovery)). |
-| **Unknown subject with unique-property collision** | `sso_user_already_exists` | **Targets the conflict resolution step** ([Conflict Resolution Flow](#conflict-resolution-flow); `sso-conflict` in area 4's scaffold). The engine binds the attempt to the colliding account, and a correct password or passkey on that step signs that account in. |
+| **Unknown subject with unique-property collision** | `user_already_exists` | **Targets the conflict resolution step** ([Conflict Resolution Flow](#conflict-resolution-flow); `sso-conflict` in area 4's scaffold). The engine binds the attempt to the colliding account, and a correct password or passkey on that step signs that account in. |
 
 ### Creation Without Collection (`creation: auto`)
 
@@ -326,7 +328,7 @@ property in the schema.
   specification.
 - **Validation Rule:** Steps containing `sso_providers` **must** explicitly
   route all three outcomes (`sso_authenticated`, `sso_user_not_found`, and
-  `sso_user_already_exists`) to prevent flow dead-ends (validator rule in
+  `user_already_exists`) to prevent flow dead-ends (validator rule in
   [`2-auth-method-selection.md`](2-auth-method-selection.md); today only
   `transitions.sso_authenticated` is enforced).
 
@@ -404,7 +406,7 @@ Scoped by the epic: a safe recovery route, without introducing automatic linking
 or leaving the user at a dead end.
 
 ```
-sso_user_already_exists → authored step: "an account with this email already exists"
+user_already_exists → authored step: "an account with this email already exists"
   → action: sign in → transition with action: "switch" to the login flow
   → user authenticates with existing factors → continues to the app
 ```
@@ -432,8 +434,8 @@ sso_user_already_exists → authored step: "an account with this email already e
 
 ### Trigger Points
 
-The `sso_user_already_exists` outcome fires at **two distinct execution
-points**, and the flow must route both:
+The `user_already_exists` outcome fires at **two distinct execution points**,
+and the flow must route both:
 
 1. **Callback Resolution:** Triggered when provider-supplied values collide with
    an existing user record.
@@ -441,12 +443,12 @@ points**, and the flow must route both:
    into a conflicting value (matching standard registration submission
    semantics).
 
-Both the entry step and the collection step carry the
-`sso_user_already_exists` transition.
+Both the entry step and the collection step carry the `user_already_exists`
+transition.
 
-> **Enumeration Note:** The conflict step and the `sso_user_already_exists`
-> outcome behind it confirm to the person completing the ceremony that an
-> account with the colliding value exists.
+> **Enumeration Note:** The conflict step and the `user_already_exists` outcome
+> behind it confirm to the person completing the ceremony that an account with
+> the colliding value exists.
 > This is a recorded trade-off, not an oversight.
 > The shipped default flow already answers registration submissions with
 > `user_already_exists` (`packages/config/defaults/default-login.json:112`), so

@@ -229,12 +229,12 @@ it (emitting an error like
 | **Provider ID validity** | **New:** Every `sso_providers[]` entry must exist in the pinned schema's `sso.providers` list. |
 | **Cross-resource resolution** | **New:** Every name in `sso.providers` must resolve to a valid connection file under `.zitadel/idps/`. |
 | **Callback transition** | **Already enforced:** A step utilizing `sso_providers` must define a `transitions.sso_authenticated`. |
-| **Full outcome routing** | **New:** A step with `sso_providers` must properly route `sso_user_not_found` and `sso_user_already_exists`. The engine fires three possible outcomes, and routing only `sso_authenticated` dead-ends the other two. |
+| **Full outcome routing** | **New:** A step with `sso_providers` must properly route `sso_user_not_found` and `user_already_exists`. The engine fires three possible outcomes, and routing only `sso_authenticated` dead-ends the other two. |
 | **Empty `claim_mapping` intersection** | **New (Warning):** If an offered provider's `claim_mapping` shares zero properties with the pinned schema, the collection fields are not prefilled, and every sign-up stops at the collection step for manual input. |
 | **Empty `verified_claims` intersection** | **New (Warning):** If a provider's `verified_claims` keys share no properties with the pinned schema, every property arrives unverified. Where a required property carries a non-empty `x-unique` scope, the auto-creation gate never passes and sign-up stops at the collection step. |
 | **Wildcard `issuer_pattern` conflict** | **Warning:** An environment declaring a wildcard `issuer_pattern` cannot produce the exact redirect URIs providers require (environments are design-only until [#534](https://github.com/zitadel/nextgen/issues/534)). The validator returns a warning, never an error: a release is one artifact promoted through every environment, so a pattern environment must not block it. The engine leaves the provider buttons out at render ([area 3](3-social-login-flow.md#constraints--edge-cases)). |
 | **Dead capability** | **Warning:** A schema lists a provider that no flow offers. The Console shows it as a method of this user type, but no login page carries the button. |
-| **Collection-step conflict routing** | **New:** A step whose `on_success` is `create_user_with_sso` must route `sso_user_already_exists`. Area 3 fires that outcome at collection-step submission as well as at callback resolution, and requires the conflict transition attached to both steps. |
+| **Collection-step conflict routing** | **New:** A step whose `on_success` is `create_user_with_sso` must route `user_already_exists`. Area 3 fires that outcome at collection-step submission as well as at callback resolution, and requires the conflict transition attached to both steps. |
 
 ---
 

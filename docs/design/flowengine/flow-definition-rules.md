@@ -7,10 +7,9 @@ A flow definition is a directed graph of steps stored as an API resource and
 executed by the [flow engine](architecture.md). This document describes the
 shape and the rules the engine enforces on top of the JSON schema.
 
-The SSO outcome keys below (`sso_authenticated`, `sso_user_not_found`,
-`sso_user_already_exists`) are the names the engine adopts in #1371. Until that
-PR merges, the shipped schema and validator still accept `callback` and
-`identity_unknown`.
+The SSO outcome keys below (`sso_authenticated`, `sso_user_not_found`) are the
+names the engine adopts in #1371. Until that PR merges, the shipped schema and
+validator still accept `callback` and `identity_unknown`.
 
 Validation runs in two layers:
 
@@ -54,10 +53,10 @@ A transition key is one of:
 - **Action name** declared in the step's `actions` map.
 - **Engine-emitted outcome.** Reserved keys produced by the engine, not the
   client. Today: `user_not_found` and `user_already_exists` (from
-  identifier-shaped fields, depending on the active `CurrentPurpose`),
-  `sso_authenticated` (SSO resolution signed the user in), `sso_user_not_found`
-  (SSO resolution found no user), and `sso_user_already_exists` (SSO resolution
-  collided with an existing user). More may follow, see
+  identifier-shaped fields, depending on the active `CurrentPurpose`; SSO
+  resolution also raises `user_already_exists` on a collision),
+  `sso_authenticated` (SSO resolution signed the user in), and
+  `sso_user_not_found` (SSO resolution found no user). More may follow, see
   [ADR 017](../../adrs/017-flow-engine-auth-attempt-dispatch.md).
 
 Transition values:
