@@ -598,3 +598,4 @@ zl-page-shell:has(.zl-split--right) [slot="footer"].zl-attribution ::slotted(*) 
 :host([variant="page"]) .zl-minimal {
   padding: 52px 16px;
 }
+
