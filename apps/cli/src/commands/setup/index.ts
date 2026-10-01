@@ -842,7 +842,10 @@ async function ssoFromFlags(
     // after setup reports success. It is never a flag — that would put it in
     // shell history, a process listing and CI logs.
     throw new ZitadelError("E_VALIDATION", `--sso ${flags.sso} needs the client secret on stdin`, {
-      hint: `Pipe it in, e.g. \`printf '%s' "$GOOGLE_CLIENT_SECRET" | zitadel setup --sso ${flags.sso} --sso-client-id ${clientId} ...\`.`,
+      // The client id is the developer's own, already on their command line,
+      // so the example names the flag rather than echoing the value back into
+      // a line they may paste somewhere else.
+      hint: `Pipe it in, e.g. \`printf '%s' "$GOOGLE_CLIENT_SECRET" | zitadel setup --sso ${flags.sso} --sso-client-id <id> ...\`.`,
     });
   }
   return { provider: flags.sso, clientId, secret: piped };
@@ -901,7 +904,10 @@ function setupRetryFlags(opts: SetupRetryOptions): string {
   // could not be reselected.
   const [firstSso] = opts.sso ?? [];
   if (firstSso) {
-    parts.push(`--sso ${firstSso.provider} --sso-client-id ${firstSso.clientId}`);
+    // Provider only. `--sso-client-id` would interpolate a value the wizard
+    // accepted on emptiness alone into a command run verbatim, and nothing
+    // here escapes it for a shell. The rerun asks for the id.
+    parts.push(`--sso ${firstSso.provider}`);
   }
   // `--non-interactive` is dropped when a provider is being configured: that
   // combination reads the client secret from stdin, and a command handed over
@@ -985,12 +991,18 @@ function ssoRecovery(
     return { hint: "", commands: [] };
   }
   return {
-    hint: `The rerun configures ${chosen[0]?.provider ?? ""} only; add the rest with the sso enable commands below. `,
+    hint:
+      `The rerun configures ${chosen[0]?.provider ?? ""} only; add the rest with the sso enable ` +
+      "commands below, which ask for each client id. ",
+    // The client id is not interpolated into the command. These strings are
+    // run verbatim, especially by agents, and nothing escapes them for a
+    // shell: a value the wizard accepted -- it only refuses an empty one --
+    // could split into two arguments or carry a metacharacter that changes
+    // what the command does. `sso enable` asks for the id, exactly as it asks
+    // for the secret, which was never put in command text for the same
+    // reason.
     commands: remaining.map((provider) =>
-      publicCliCommand(
-        `sso enable --provider ${provider.provider} --client-id ${provider.clientId}`,
-        cliVersion,
-      ),
+      publicCliCommand(`sso enable --provider ${provider.provider}`, cliVersion),
     ),
   };
 }

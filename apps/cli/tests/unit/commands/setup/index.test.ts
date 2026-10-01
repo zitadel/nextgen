@@ -169,6 +169,44 @@ describe("setup command pre-flight", () => {
     expect(json.hint).toContain("asks for the client secret");
   });
 
+  // Suggested commands are run verbatim, especially by agents, and nothing
+  // escapes them for a shell. The wizard accepts any non-empty client id, so a
+  // value carrying a space or a metacharacter would split the command or
+  // change what it does. No id is interpolated into command text at all --
+  // the rerun asks for it, as it already does for the secret.
+  it("keeps the client id out of every suggested command", async () => {
+    const cwd = await makeTempDir();
+    await writeFile(join(cwd, "package.json"), JSON.stringify({ dependencies: { next: "^15" } }));
+    await writeRuntimeMetadata(cwd, runtimeFor(cwd, "http://localhost:9"));
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--framework",
+      "next",
+      "--server",
+      "local",
+      "--sso",
+      "google",
+      "--sso-client-id",
+      "id with spaces; echo pwned",
+      "--non-interactive",
+      "--json",
+    ]);
+
+    const json = parseJson(res.stdout) as { next_commands?: string[]; hint?: string };
+    for (const command of json.next_commands ?? []) {
+      expect(command).not.toContain("id with spaces");
+      expect(command).not.toContain("echo pwned");
+    }
+    expect(json.hint ?? "").not.toContain("echo pwned");
+    // The provider still reaches the retry; only the id is withheld.
+    const retry = (json.next_commands ?? []).find((c) => c.includes("setup "));
+    expect(retry).toContain("--sso google");
+    expect(retry).not.toContain("--sso-client-id");
+  });
+
   it("explains non-empty dirs whose framework can't be inferred or scaffolded", async () => {
     const cwd = await makeTempDir();
     // A non-empty dir that isn't a known framework — Orca's detector fails
