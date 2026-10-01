@@ -382,17 +382,10 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 
 	if parked.Link == nil {
 		// provisioning.creation is disabled: the identity has no account and
-		// will not get one.
-		// ErrSSOStateInvalid here and from BindLinked means a concurrent request
-		// settled the row or a new ceremony replaced it: the winner already
-		// answered, so this render shows the step with no outcome.
-		err := r.ssoIdentities.DeleteParked(ctx, state.ProjectID, state.AuthAttemptID, parked.CheckID)
-		if errors.Is(err, ErrSSOStateInvalid()) {
-			return FlowStepResult{}, false, nil
-		}
-		if err != nil {
-			return FlowStepResult{}, false, fmt.Errorf("flow state machine: delete parked sso identity: %w", err)
-		}
+		// will not get one. The row stays parked, so a failed render or seal
+		// re-runs this branch and shows the error again; the replay guard in
+		// the sealed cookie keeps later reloads from repeating it. The row
+		// expires with the attempt or is replaced by the next ceremony.
 		msg := FlowStepErrorSSOCreationDisabled
 		result, err := r.renderStepError(pc, resolvedFields, &msg)
 		return result, true, err
@@ -407,6 +400,8 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 		LinkID:       parked.Link.LinkID,
 	})
 	if errors.Is(err, ErrSSOStateInvalid()) {
+		// A concurrent request settled the row or a new ceremony replaced it:
+		// the winner already answered, so this render shows the step.
 		return FlowStepResult{}, false, nil
 	}
 	if err != nil {
