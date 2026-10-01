@@ -29,10 +29,10 @@ sso      → its own slot: sso_providers: [...] + transitions.callback
 
 ## Rendering from the Connection
 
-A step lists connection slugs. At render, the engine resolves each slug and
-emits `{id, name, template}` from the connection's `display_name` and
-`template`. The login UI payload (`GetFlowStep200StepSsoProvidersItem`) is
-unchanged.
+A step lists connection slugs, at most 20; the step schema enforces the
+bound. At render, the engine resolves each slug and emits
+`{id, name, template}` from the connection's `display_name` and `template`.
+The login UI payload (`GetFlowStep200StepSsoProvidersItem`) is unchanged.
 
 The connection is the only source for a provider's name and branding. The flow
 definition holds no copy that could go stale when the connection file is

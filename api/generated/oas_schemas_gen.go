@@ -19058,7 +19058,8 @@ type FlowDefinitionStep struct {
 	// order. Each names the `slug` of a connection under `.zitadel/idps/`; the
 	// connection carries the display name and template, so a rename there
 	// reaches every step without editing the flow. The rendered step the client
-	// receives carries the resolved `{id, name, template}` objects instead.
+	// receives carries the resolved `{id, name, template}` objects instead. A
+	// step offers at most 20 providers.
 	SSOProviders []string `json:"sso_providers"`
 	// Server-side mutation to execute when this step completes successfully.
 	// Runs after field validation passes, before the transition fires.
