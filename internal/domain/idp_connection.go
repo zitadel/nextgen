@@ -43,9 +43,9 @@ func ErrIDPConnectionRevisionConflict() Error {
 	return newError(PrefixIDPConnection.ErrorCodePrefix("revision_conflict"), "identity provider connection: another revision of the same connection was created at the same instant", nil, nil)
 }
 
-// idpConnectionDocument holds the few document fields the server reads. The
+// IDPConnectionDocument holds the few document fields the server reads. The
 // rest of the document belongs to the API contract and stays opaque here.
-type idpConnectionDocument struct {
+type IDPConnectionDocument struct {
 	Protocol     *string `json:"protocol"`
 	SubjectClaim *string `json:"subject_claim"`
 	Template     *string `json:"template"`
@@ -59,8 +59,8 @@ type idpConnectionDocument struct {
 	} `json:"oauth2"`
 }
 
-func parseIDPConnectionDocument(document []byte) (idpConnectionDocument, error) {
-	var doc idpConnectionDocument
+func ParseIDPConnectionDocument(document []byte) (IDPConnectionDocument, error) {
+	var doc IDPConnectionDocument
 	err := json.Unmarshal(document, &doc)
 	return doc, err
 }
@@ -74,11 +74,11 @@ func parseIDPConnectionDocument(document []byte) (idpConnectionDocument, error) 
 // endpoint fields are skipped: those of two protocols are not comparable.
 // The order is protocol, subject_claim, then endpoints.
 func IDPConnectionImmutableFieldsChanged(stored, next []byte) ([]string, error) {
-	before, err := parseIDPConnectionDocument(stored)
+	before, err := ParseIDPConnectionDocument(stored)
 	if err != nil {
 		return nil, err
 	}
-	after, err := parseIDPConnectionDocument(next)
+	after, err := ParseIDPConnectionDocument(next)
 	if err != nil {
 		return nil, err
 	}

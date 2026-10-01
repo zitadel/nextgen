@@ -46,6 +46,7 @@ func (h *Harness) EnsureFlowStateMachine(t *testing.T) *domain.FlowStateMachineR
 			fields,
 			h.EnsureCreateUserHandler(t),
 			authAdapter,
+			service.NewFlowSSOProviderResolver(h.EnsureIDPConnectionService(t)),
 			time.Now,
 		)
 	}
