@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/sdk-svelte",
-  "version": "1.0.0-alpha.23",
+  "version": "1.0.0-alpha.24",
   "description": "Svelte components for the Zitadel auth UI (client-side SPA).",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-svelte#readme",
   "bugs": {
@@ -32,6 +32,7 @@
     "build": "vite build",
     "typecheck": "svelte-check --tsconfig ./tsconfig.json",
     "test": "vitest run",
+    "test:all": "pnpm run test",
     "lint": "eslint ."
   },
   "dependencies": {
@@ -46,8 +47,9 @@
     "@eslint/js": "catalog:",
     "@eslint/json": "catalog:",
     "@eslint/markdown": "catalog:",
-    "@sveltejs/vite-plugin-svelte": "^6.2.0",
+    "@sveltejs/vite-plugin-svelte": "^7.3.1",
     "@testing-library/svelte": "^5.3.1",
+    "@vitest/coverage-v8": "catalog:",
     "eslint": "catalog:",
     "eslint-config-prettier": "catalog:",
     "eslint-import-resolver-typescript": "catalog:",
@@ -62,7 +64,7 @@
     "svelte2tsx": "^0.7.0",
     "typescript": "^5.7.3",
     "typescript-eslint": "catalog:",
-    "vite": "catalog:sdk",
-    "vitest": "catalog:sdk"
+    "vite": "catalog:",
+    "vitest": "catalog:"
   }
 }

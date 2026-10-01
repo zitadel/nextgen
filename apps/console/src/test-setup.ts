@@ -1,9 +1,16 @@
+import { configure } from "@testing-library/react";
 import { afterEach, beforeEach } from "vitest";
 import { _resetConfigForTesting } from "@zitadel/api/config";
 import "@testing-library/jest-dom/vitest";
 
 import { clearSessionCaches } from "./lib/session-cache";
 import { _resetRuntimeForTesting } from "./runtime/runtime";
+
+// Console screens render after a router load, an API fetch and component
+// effects. On a cold or loaded CI runner that first render can exceed RTL's
+// default 1s findBy/waitFor window, which flaked the suite. Give the async
+// queries more headroom for every console spec.
+configure({ asyncUtilTimeout: 5000 });
 
 // configureZitadel is write-once on globalThis so duplicate module copies
 // share one slot. That slot also survives Vitest's per-file isolate, and

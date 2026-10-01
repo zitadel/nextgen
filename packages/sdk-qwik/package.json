@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/sdk-qwik",
-  "version": "1.0.0-alpha.23",
+  "version": "1.0.0-alpha.24",
   "description": "Qwik components for the Zitadel auth UI (client-side SPA).",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-qwik#readme",
   "bugs": {
@@ -32,6 +32,7 @@
     "build": "vite build --mode lib",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:all": "pnpm run test",
     "lint": "eslint ."
   },
   "dependencies": {
@@ -40,26 +41,29 @@
     "@zitadel/sdk-core": "workspace:*"
   },
   "peerDependencies": {
-    "@builder.io/qwik": "^1.5.0"
+    "@qwik.dev/core": "^2.0.0-beta.45"
   },
   "devDependencies": {
-    "@builder.io/qwik": "^1.19.0",
     "@eslint/js": "catalog:",
     "@eslint/json": "catalog:",
     "@eslint/markdown": "catalog:",
+    "@qwik.dev/core": "^2.0.0-beta.45",
+    "@vitest/browser": "catalog:",
+    "@vitest/browser-playwright": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
     "eslint": "catalog:",
     "eslint-config-prettier": "catalog:",
     "eslint-import-resolver-typescript": "catalog:",
     "eslint-plugin-import": "catalog:",
     "eslint-plugin-perfectionist": "catalog:",
     "eslint-plugin-prettier": "catalog:",
-    "eslint-plugin-qwik": "^1.19.0",
-    "jsdom": "catalog:",
+    "eslint-plugin-qwik": "^2.0.0-beta.45",
+    "playwright": "catalog:",
     "prettier": "catalog:",
     "typescript": "catalog:",
     "typescript-eslint": "catalog:",
-    "vite": "catalog:sdk",
+    "vite": "catalog:",
     "vite-plugin-dts": "catalog:",
-    "vitest": "catalog:sdk"
+    "vitest": "catalog:"
   }
 }

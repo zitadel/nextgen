@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/testing",
-  "version": "1.0.0-alpha.23",
+  "version": "1.0.0-alpha.24",
   "description": "Test-kit for seeded ephemeral local Zitadel instances",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/testing#readme",
   "bugs": {
@@ -40,6 +40,7 @@
     "build": "tsdown",
     "typecheck": "tsc --build tsconfig.json",
     "test": "vitest run",
+    "test:all": "pnpm run test",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "lint": "oxlint ."
   },
