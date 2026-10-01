@@ -122,6 +122,18 @@ function flowIdFromLocation(): string {
   }
 }
 
+/**
+ * Drop the `flow` handle from the URL, keeping every other parameter and the
+ * hash, so a reload does not resume a flow the server refused to continue.
+ */
+function clearFlowIdFromLocation(): void {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has("flow")) return;
+  url.searchParams.delete("flow");
+  history.replaceState(history.state, "", url);
+}
+
 /** The `code` of a Flow API error envelope, or "" for anything else. */
 function apiErrorCode(error: unknown): string {
   if (!(error instanceof ApiError)) return "";
@@ -657,6 +669,7 @@ export class ZitadelLogin extends ZitadelSurface {
     if (this.restarting || apiErrorCode(error) !== "flow.restart_required") return false;
     this.restarting = true;
     this.resumeFlowId = "";
+    clearFlowIdFromLocation();
     await this.startFlow();
     return true;
   }
