@@ -322,7 +322,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		createUserHandler,
 		flowAuth,
 		service.NewFlowSSOProviderResolver(idpConnectionService),
-		nil, // the sso redirect issuer is wired with its service adapter
+		service.NewFlowSSORedirectIssuer(idpConnectionService, authAttemptSvc, keyService, egressClient),
 		time.Now,
 	)
 

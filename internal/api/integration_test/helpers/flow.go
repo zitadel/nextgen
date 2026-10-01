@@ -47,7 +47,7 @@ func (h *Harness) EnsureFlowStateMachine(t *testing.T) *domain.FlowStateMachineR
 			h.EnsureCreateUserHandler(t),
 			authAdapter,
 			service.NewFlowSSOProviderResolver(h.EnsureIDPConnectionService(t)),
-			nil, // the sso redirect issuer is wired with its service adapter
+			service.NewFlowSSORedirectIssuer(h.EnsureIDPConnectionService(t), h.EnsureAuthAttemptService(t), h.EnsureKeyService(t), h.EnsureHttpClient(t)),
 			time.Now,
 		)
 	}

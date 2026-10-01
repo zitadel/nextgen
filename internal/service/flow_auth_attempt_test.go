@@ -29,6 +29,9 @@ type fakeAuthAttempts struct {
 	handoffErr       error
 	getByIDProjectID string
 	getByIDAttemptID string
+	issueSSOStateIn  service.IssueSSOStateInput
+	issueSSOState    *domain.SSOState
+	issueSSOStateErr error
 }
 
 func (f *fakeAuthAttempts) Create(_ context.Context, in service.CreateAuthAttemptInput) (*domain.AuthAttempt, error) {
@@ -56,8 +59,9 @@ func (f *fakeAuthAttempts) Handoff(_ context.Context, in service.HandoffInput) (
 	return f.handoffAttempt, f.handoffErr
 }
 
-func (f *fakeAuthAttempts) IssueSSOState(context.Context, service.IssueSSOStateInput) (*domain.SSOState, error) {
-	return nil, errors.New("not used by the flow adapter")
+func (f *fakeAuthAttempts) IssueSSOState(_ context.Context, in service.IssueSSOStateInput) (*domain.SSOState, error) {
+	f.issueSSOStateIn = in
+	return f.issueSSOState, f.issueSSOStateErr
 }
 
 func (f *fakeAuthAttempts) BeginPasskeyEnrollment(context.Context, service.BeginPasskeyEnrollmentInput) (*service.BeginPasskeyEnrollmentOutput, error) {
