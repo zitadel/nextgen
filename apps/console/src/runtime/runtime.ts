@@ -22,8 +22,8 @@
  *    outage as "no project yet" and send an operator to run `zitadel setup`
  *    against a problem setup cannot fix.
  *
- * Builds that deliberately run without a runtime document — `vite preview`,
- * the api-mock dev loop — collapse state 3 into state 2 by opting in with
+ * Builds that deliberately run without a runtime document — `vite preview`
+ * with no backend — collapse state 3 into state 2 by opting in with
  * `VITE_CONSOLE_RUNTIME_FALLBACK`. That opt-in is the only path back to the
  * old silent fallback, and the embedded production build never sets it.
  */
@@ -117,16 +117,17 @@ export function getRuntime(): ConsoleRuntime {
 }
 
 /**
- * The project the console signs into: the `VITE_CONSOLE_PROJECT_ID` dev
- * override when set, otherwise the discovered `console_project_id` (ADR 0004
- * §3).
+ * The project the console signs into: the discovered `console_project_id`
+ * (ADR 0004 §3), in development as in production. There is no build-time
+ * override: `dev-real`, the real e2e lane and the api-mock all serve a runtime
+ * document naming the project, so the console always takes it from the server.
  *
  * Not the project being managed, and never selected as one: management calls
  * use the selected project (`src/lib/project-scope.ts`), chosen from the
  * person's own projects. This one is for sign-in and claim.
  */
 export function getConsoleProjectId(): string {
-  return import.meta.env.VITE_CONSOLE_PROJECT_ID || getRuntime().console_project_id || "";
+  return getRuntime().console_project_id || "";
 }
 
 /**
@@ -218,6 +219,16 @@ function parseRuntime(doc: unknown): ConsoleRuntime | undefined {
  */
 function absentOrString(value: unknown): value is string | undefined {
   return value === undefined || (typeof value === "string" && value !== "");
+}
+
+/**
+ * Test-only: settle discovery on `document`, as if the server had served it —
+ * how a spec names the project the console signs into.
+ */
+export function _setRuntimeForTesting(document: ConsoleRuntime): void {
+  runtime = document;
+  settled = { ok: true, runtime: document };
+  pending = undefined;
 }
 
 /** Test-only: drop the cached document so specs can exercise `initRuntime` again. */

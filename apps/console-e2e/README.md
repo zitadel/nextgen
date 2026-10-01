@@ -51,8 +51,9 @@ This lane boots the binary with its embedded console off (Vite serves the
 console here) but its hosted-login surface on: the mux mounts
 `/console/runtime.json` only alongside a UI surface, and that document carries
 the publishable key the login widget needs for the sign-in exchange (see
-[`moon.yml`](moon.yml)). The proxy forwards it like any other request. The
-project id reaches the console through `VITE_CONSOLE_PROJECT_ID` as before.
+[`moon.yml`](moon.yml)). The proxy forwards it like any other request, and the
+same document names the project the console signs into: the instance's
+first-created project, the harness one. Nothing pins it on the client.
 
 ## Embedded-surface coverage
 
