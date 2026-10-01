@@ -1,5 +1,53 @@
 # @zitadel/cli
 
+## 1.0.0-alpha.24
+
+### Minor Changes
+
+- [#1286](https://github.com/zitadel/nextgen/pull/1286) [`b633a22`](https://github.com/zitadel/nextgen/commit/b633a22c5d2ee8957255dff6b836caab36c676ce) Thanks [@mridang](https://github.com/mridang)! - **Breaking:** remove `--environment` (`-e`) from `plan`, `apply` and the resource commands (`users`, `teams`, `sessions`, `events`, `grants`, `idps`, `projects`, `schemas`, `environments`, `releases`, `flow-definitions`, `branding`). It accepted only `development`, `preview` or `production` — none of them a name the platform uses — and never reached the platform: its one effect was to read a server URL from `environments.<name>.server` in `zitadel.json`, a key nothing writes. Passing it now fails as an unknown flag; drop it from scripts. `--server`, `ZITADEL_API_BASE` and the top-level `server` in `zitadel.json` still choose the server, and `environments list` / `environments get` still read the platform's environments.
+
+  The CLI therefore has no per-environment flag at all until the platform's environments settle, which is also why the new `variables` commands address the project level only. Their own `--environment` / `--env` never shipped.
+
+- [#1297](https://github.com/zitadel/nextgen/pull/1297) [`7165d73`](https://github.com/zitadel/nextgen/commit/7165d73f8d13f8f4aac94858ee5e918b5700c773) Thanks [@peintnermax](https://github.com/peintnermax)! - Setup no longer applies a login template, and the template catalog keeps
+  only widget structure.
+  - `zitadel setup` drops the "How should the login look?" question and the
+    `--design` flag; passing `--design` now fails with `E_VALIDATION` and a
+    hint pointing at app-side theming and `branding eject`. It embeds the
+    maintained login component (a starting page for a new app, a drop-in for an
+    existing one), writes nothing under `.zitadel/branding/`, and publishes no
+    branding revision. The JSON envelope
+    drops `data.design`, the summary drops the "Login design" row, and the next
+    actions point at theming the component from your app, with
+    `branding eject` as the opt-in for owning its template.
+  - `zitadel branding eject --design` now offers `centered` (the default card)
+    and `minimal` (the same form without card chrome). `split`, `split-right`
+    and `hero` are removed: they were page layout around the same card, which
+    belongs in your application, and asking for one fails with `E_VALIDATION`
+    and a hint saying so. `BRANDING_DESIGNS` in `@zitadel/config`
+    shrinks accordingly.
+  - Revisions already published from `split`, `split-right` or `hero` keep
+    rendering; the login still ships their chrome. The API reference for
+    `Branding.layout` no longer lists the retired designs.
+
+### Patch Changes
+
+- [#1296](https://github.com/zitadel/nextgen/pull/1296) [`1a05521`](https://github.com/zitadel/nextgen/commit/1a0552186fe99b0af17a5dc4ffed02ddf2b4c222) Thanks [@IAM-marco](https://github.com/IAM-marco)! - The CLI documentation now explains the local admin `admin@zitadel.localhost`
+  that `zitadel start` creates by default, the one-time console sign-in link it
+  prints, the `zitadel console` command that prints a fresh link, and that on the
+  default local runtime `zitadel setup` attaches the project to that admin's
+  team, so `zitadel claim` reports it as already owned.
+
+- [#1288](https://github.com/zitadel/nextgen/pull/1288) [`4bea70a`](https://github.com/zitadel/nextgen/commit/4bea70a7244b44e62476e6dd2dc6b8e4a7bd1a45) Thanks [@mridang](https://github.com/mridang)! - Encode path parameters in the generated API client, so any id the API accepts can be fetched. Schema ids are the case that hit today: a schema's id is its `$id`, usually a URL such as `https://nextgen.com/api/schemas/default-human-user.json`. Sent raw, the `//` collapsed on a redirect and the request 404'd, so `zitadel schemas get <id>` failed for every URL id and the console's user list silently dropped its schema columns. `zitadel schemas get` also stops guessing what an id looks like: it used to read anything without `sch_` or `://` as an object type, which sent ids like `urn:example:human` down the wrong path. It now asks the server, and falls back to the object-type lookup only on a 404. Setup reconciliation and `apply`/`plan` schema fetches used to encode the id themselves to work around the same bug; that is gone, so the client encodes exactly once rather than sending `%25` for every delimiter.
+
+- [#1292](https://github.com/zitadel/nextgen/pull/1292) [`0a82bb1`](https://github.com/zitadel/nextgen/commit/0a82bb1e66f5d66b7d256389fb503939563b8eaa) Thanks [@mridang](https://github.com/mridang)! - Correct the `grants` command reference. The README still documented `--principal-type` and `--principal-id` on `grants create`, and `principal_type` / `principal_id` as filter fields on `grants list`, which the user and team locators replaced: `grants create` takes `--relation` as its only required field flag and names the principal through `--data` / `--file`, and `grants list` filters on `user_id` and `team_id`.
+
+  `grants create --help` also no longer suggests `grants create --relation viewer`. A grant needs exactly one of `user` or `team`, which are nested objects no flag can carry, so that run was never a complete body. Any write command whose body needs a nested object or an array now offers only its `--data` and `--file` examples.
+
+- Updated dependencies [[`5bac207`](https://github.com/zitadel/nextgen/commit/5bac20773092ea9a9d807c13bd423c70ecea56e6), [`6524178`](https://github.com/zitadel/nextgen/commit/6524178cc74251da3d454451fdef45063fabce86), [`565427b`](https://github.com/zitadel/nextgen/commit/565427b39ba7ab8d1006778944d1e20aef99e93c), [`2056c37`](https://github.com/zitadel/nextgen/commit/2056c37515fbad31b5100e0f84d7b94cfc68f191), [`d05fa4c`](https://github.com/zitadel/nextgen/commit/d05fa4cc2ae9063b84e1967c3e4e91e0145c6400), [`5bac207`](https://github.com/zitadel/nextgen/commit/5bac20773092ea9a9d807c13bd423c70ecea56e6), [`91b1eb6`](https://github.com/zitadel/nextgen/commit/91b1eb653fc00633cf64e9d93c9edf73e3687933), [`331b826`](https://github.com/zitadel/nextgen/commit/331b826ebe1f3354817edc2685a63ecbd63d4a56), [`4bea70a`](https://github.com/zitadel/nextgen/commit/4bea70a7244b44e62476e6dd2dc6b8e4a7bd1a45), [`5226076`](https://github.com/zitadel/nextgen/commit/5226076ce7bbb117d84c9ab15028eb1aa3dedbd6), [`db15426`](https://github.com/zitadel/nextgen/commit/db154268d9610833e15860b7358a626c8b2315d0), [`e61c854`](https://github.com/zitadel/nextgen/commit/e61c8545f06ce9ebe25e7f2e0d344cb6f8efb0d0), [`a0e642d`](https://github.com/zitadel/nextgen/commit/a0e642d6675f13724e9ee33aacc068ae61d2ff9b), [`f2e81dd`](https://github.com/zitadel/nextgen/commit/f2e81dd84af7e47c06c084365dea983ee59a305b), [`ed64c1d`](https://github.com/zitadel/nextgen/commit/ed64c1d4d66b53501516a1456e364fc99022f07f), [`7165d73`](https://github.com/zitadel/nextgen/commit/7165d73f8d13f8f4aac94858ee5e918b5700c773), [`d89916b`](https://github.com/zitadel/nextgen/commit/d89916b05a9e020963d105de614be440c44f99d1), [`2aafc3a`](https://github.com/zitadel/nextgen/commit/2aafc3ab9cb0e0498d4993689f52308b3448fbcf), [`2a625ba`](https://github.com/zitadel/nextgen/commit/2a625ba79b1dab543892c4a5f3a48aa9d3b2d219)]:
+  - @zitadel/server@1.0.0-alpha.24
+  - @zitadel/config@1.0.0-alpha.24
+  - @zitadel/api@1.0.0-alpha.24
+
 ## 1.0.0-alpha.23
 
 ### Minor Changes

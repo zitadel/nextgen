@@ -73,15 +73,13 @@ func TestAuthAttemptStatements_SSOState(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, sso.PKCEVerifier, verifier)
 
-			// Both nonces survive as hashes the callback can verify: the
-			// binding nonce against the browser's cookie, the OIDC nonce
-			// against the id_token claim.
+			// The binding nonce survives as a hash the callback verifies
+			// against the browser's cookie. The OIDC nonce survives as
+			// issued, because the callback hands it to the id_token verifier.
 			assert.Equal(t, domain.HashSecret(sso.BindingNonce), stored.Pending.BindingNonceHash)
 			assert.NotEqual(t, sso.BindingNonce, stored.Pending.BindingNonceHash)
 			assert.True(t, stored.Pending.MatchesBindingNonce(sso.BindingNonce))
-			assert.Equal(t, domain.HashSecret(sso.OIDCNonce), stored.Pending.OIDCNonceHash)
-			assert.NotEqual(t, sso.OIDCNonce, stored.Pending.OIDCNonceHash)
-			assert.True(t, stored.Pending.MatchesOIDCNonce(sso.OIDCNonce))
+			assert.Equal(t, sso.OIDCNonce, stored.Pending.OIDCNonce)
 		})
 
 		t.Run("consume_returns_payload_once", func(t *testing.T) {
@@ -101,10 +99,12 @@ func TestAuthAttemptStatements_SSOState(t *testing.T) {
 			assert.Equal(t, sso.Check.Pending, consumed.Pending)
 
 			// The consume hands the callback the verifier it needs for the
-			// code exchange, still only as ciphertext on the record.
+			// code exchange, still only as ciphertext on the record, and the
+			// OIDC nonce it needs for the id_token verifier.
 			verifier, err := consumed.Pending.DecryptPKCEVerifier(ssoTestCrypter{})
 			require.NoError(t, err)
 			assert.Equal(t, sso.PKCEVerifier, verifier)
+			assert.Equal(t, sso.OIDCNonce, consumed.Pending.OIDCNonce)
 
 			_, err = d.stmts.ConsumeSSOState(t.Context(), projectID, stateHash, sso.BindingNonce)
 			assert.ErrorIs(t, err, domain.ErrSSOStateInvalid())

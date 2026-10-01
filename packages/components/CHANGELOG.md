@@ -1,5 +1,14 @@
 # @zitadel/components
 
+## 1.0.0-alpha.24
+
+### Patch Changes
+
+- [#1331](https://github.com/zitadel/nextgen/pull/1331) [`8853408`](https://github.com/zitadel/nextgen/commit/88534088991a21027f7e7dd6bea1ff76fe43edf0) Thanks [@bastionstack](https://github.com/bastionstack)! - The design tokens bundled with the login components gain `--zl-container-settings`, the width of the console's settings column. Nothing in the login surface reads it.
+
+- Updated dependencies [[`6524178`](https://github.com/zitadel/nextgen/commit/6524178cc74251da3d454451fdef45063fabce86), [`7165d73`](https://github.com/zitadel/nextgen/commit/7165d73f8d13f8f4aac94858ee5e918b5700c773)]:
+  - @zitadel/config@1.0.0-alpha.24
+
 ## 1.0.0-alpha.23
 
 ### Major Changes
