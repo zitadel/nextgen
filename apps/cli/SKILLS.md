@@ -205,6 +205,9 @@ The groups below mirror the ones `zitadel --help` prints.
   humans can omit it and choose from the prompt. Supported floors: Next.js 15+
   and React 18+ — `setup` and `doctor` fail with `E_UNSUPPORTED_PROJECT_SHAPE`
   below them instead of degrading silently (an unparseable version passes).
+  Qwik requires Qwik 2 (`@qwik.dev/core`): the `@zitadel/sdk-qwik` widgets need
+  it, so a Qwik 1 (`@builder.io/qwik`) app is not detected as Qwik, and a fresh
+  `--framework qwik` scaffold is created on Qwik 2.
   Flags:
   `--framework next|react|vue|angular|nuxt|solid|svelte|qwik`, `--renderer
   react` (selects the Next.js auth-page renderer; accepted for any framework
