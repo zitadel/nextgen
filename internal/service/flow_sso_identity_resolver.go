@@ -126,25 +126,26 @@ func (r *FlowSSOIdentityResolver) BindLinked(ctx context.Context, in domain.Flow
 		if err != nil {
 			return fmt.Errorf("bind sso identity: read attempt: %w", err)
 		}
-		if bound, ok := domain.CheckAs[*domain.AuthFactorUser](attempt, domain.AuthCheckTypeUser); ok && bound.UserID != in.UserID {
+		bound, alreadyBound := domain.CheckAs[*domain.AuthFactorUser](attempt, domain.AuthCheckTypeUser)
+		if alreadyBound && bound.UserID != in.UserID {
 			return domain.ErrFlowRestartRequired()
 		}
-		// The check above is a plain read: a concurrent identifier submission
-		// can still bind a user after it. The add refuses to overwrite one.
-		userFactor := &domain.AuthFactorUser{UserID: in.UserID}
-		checkID, err := stmts.AddAuthAttemptFactor(ctx, in.ProjectID, in.AttemptID, userFactor)
-		if _, taken := errors.AsType[*database.UniqueError](err); taken {
-			current, err := stmts.GetAuthAttemptByID(ctx, in.ProjectID, in.AttemptID)
-			if err != nil {
-				return fmt.Errorf("bind sso identity: re-read attempt: %w", err)
-			}
-			if bound, ok := domain.CheckAs[*domain.AuthFactorUser](current, domain.AuthCheckTypeUser); !ok || bound.UserID != in.UserID {
+		if !alreadyBound {
+			// The check above is a plain read: a concurrent identifier
+			// submission can still bind a user after it, and the add refuses to
+			// overwrite one. The flow restarts without re-reading: on Spanner the
+			// refused insert has already ended the transaction.
+			userFactor := &domain.AuthFactorUser{UserID: in.UserID}
+			checkID, err := stmts.AddAuthAttemptFactor(ctx, in.ProjectID, in.AttemptID, userFactor)
+			if _, taken := errors.AsType[*database.UniqueError](err); taken {
 				return domain.ErrFlowRestartRequired()
 			}
-		} else if err != nil {
-			return fmt.Errorf("bind sso identity: %w", err)
-		} else if err := emitDirectAuthFactor(ctx, stmts, attempt, userFactor, checkID); err != nil {
-			return fmt.Errorf("bind sso identity: %w", err)
+			if err != nil {
+				return fmt.Errorf("bind sso identity: %w", err)
+			}
+			if err := emitDirectAuthFactor(ctx, stmts, attempt, userFactor, checkID); err != nil {
+				return fmt.Errorf("bind sso identity: %w", err)
+			}
 		}
 		ssoFactor := &domain.AuthFactorSSO{ConnectionID: in.ConnectionID, LinkID: in.LinkID, AttemptID: in.AttemptID}
 		if _, err := recordDirectAuthFactor(ctx, stmts, attempt, ssoFactor); err != nil {
