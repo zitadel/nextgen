@@ -47,8 +47,8 @@ type ssoResolverFixture struct {
 	connections *servicemocks.MockIDPConnectionService
 	schemaStore *domainmock.MockJSONSchemaStore
 	resolver    *service.FlowSSOIdentityResolver
-	// events are the event types expectCreateUser saw inserted.
-	events []domain.EventType
+	// events are the events expectCreateUser saw inserted.
+	events []*domain.Event
 }
 
 func newSSOResolverFixture(t *testing.T) *ssoResolverFixture {
@@ -396,7 +396,7 @@ func (f *ssoResolverFixture) expectCreateUser(createErr error) {
 		Return(&domain.JSONSchema{ProjectID: ssoProjectID, URL: ssoSchemaURL, Schema: []byte(ssoUserSchema)}, nil)
 	f.stmts.EXPECT().CreateUser(gomock.Any(), gomock.Any()).Return(createErr)
 	f.stmts.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, ev *domain.Event) error {
-		f.events = append(f.events, ev.EventType)
+		f.events = append(f.events, ev)
 		return nil
 	}).AnyTimes()
 }
@@ -529,7 +529,7 @@ func TestFlowSSOIdentityResolver_CreateLinked_LostRaceEmitsUserCreateFailed(t *t
 
 	_, err := f.resolver.CreateLinked(t.Context(), createInput())
 	require.ErrorIs(t, err, domain.ErrUserAlreadyExists())
-	assert.Contains(t, f.events, domain.EventTypeUserCreateFailed)
+	assert.NotNil(t, f.event(domain.EventTypeUserCreateFailed))
 }
 
 func TestFlowSSOIdentityResolver_FindUniqueOwner(t *testing.T) {
@@ -628,4 +628,43 @@ func TestFlowSSOIdentityResolver_LoadParked_DeadAttemptWithoutSSORowIsNil(t *tes
 	got, err := f.resolver.LoadParked(t.Context(), loadInput())
 	require.NoError(t, err)
 	assert.Nil(t, got)
+}
+
+// event returns the first inserted event of eventType, or nil.
+func (f *ssoResolverFixture) event(eventType domain.EventType) *domain.Event {
+	for _, ev := range f.events {
+		if ev.EventType == eventType {
+			return ev
+		}
+	}
+	return nil
+}
+
+// The link is a new mutation, audited in the same transaction. Its payload
+// holds ids only: the provider's subject and claims never reach the trail.
+func TestFlowSSOIdentityResolver_CreateLinked_EmitsIdentityLinkCreated(t *testing.T) {
+	t.Parallel()
+	f := newSSOResolverFixture(t)
+	f.inTransaction(t)
+	f.expectCreateUser(nil)
+	f.stmts.EXPECT().CreateIDPIdentityLink(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, link *domain.IDPIdentityLink) error {
+			link.ID = "idplink-new"
+			return nil
+		})
+	f.stmts.EXPECT().DeleteSSOCallback(gomock.Any(), ssoProjectID, ssoAttemptID, "ch-1").Return(nil)
+	f.stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), ssoProjectID, ssoAttemptID).Return(parkedAttempt(parkedResult()), nil)
+	f.stmts.EXPECT().AddAuthAttemptFactor(gomock.Any(), ssoProjectID, ssoAttemptID, gomock.Any()).Return("ch-user", nil)
+	f.stmts.EXPECT().SetAuthAttemptFactor(gomock.Any(), ssoProjectID, ssoAttemptID, gomock.Any()).Return("ch-sso", nil)
+
+	_, err := f.resolver.CreateLinked(t.Context(), createInput())
+	require.NoError(t, err)
+
+	ev := f.event(domain.EventTypeIDPIdentityLinkCreated)
+	require.NotNil(t, ev)
+	assert.Equal(t, domain.EventCategoryEntity, ev.Category)
+	assert.Equal(t, "idp_identity_link", *ev.EntityType)
+	assert.Equal(t, "idplink-new", *ev.EntityID)
+	assert.JSONEq(t, `{"connection_id":"idp-1","user_id":"user_new"}`, string(ev.Payload))
+	assert.NotContains(t, string(ev.Payload), "sub-1")
 }

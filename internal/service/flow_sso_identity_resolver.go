@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/idp"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -233,6 +234,16 @@ func (a *ssoLinkAction) Apply(ctx context.Context, stmts AllStatements) error {
 			return domain.ErrUserAlreadyExists().WithParent(err)
 		}
 		return fmt.Errorf("create sso user: link identity: %w", err)
+	}
+	if err := audit.Emit(ctx, stmts, audit.EmitSpec{
+		Type:       domain.EventTypeIDPIdentityLinkCreated,
+		Category:   domain.EventCategoryEntity,
+		ProjectID:  link.ProjectID,
+		EntityType: "idp_identity_link",
+		EntityID:   link.ID,
+		Payload:    domain.IDPIdentityLinkCreatedPayload{ConnectionID: link.ConnectionID, UserID: link.UserID},
+	}); err != nil {
+		return fmt.Errorf("create sso user: emit identity link created: %w", err)
 	}
 	bind := a.bind
 	bind.LinkID = link.ID
