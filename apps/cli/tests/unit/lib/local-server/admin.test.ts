@@ -138,6 +138,19 @@ describe("local admin", () => {
     expect(await readLocalAdmin(cwd)).toEqual(first.admin);
   });
 
+  // Publishing through a staging file must clean up after itself, or a project
+  // accumulates one stray file per start. This guards the new write path, not
+  // the race it fixes: the race is a window between two syscalls inside the old
+  // `wx` write, which the timing-based test below is the only coverage for.
+  it("leaves no staging file behind", async () => {
+    const cwd = await tempCwd();
+
+    await ensureLocalAdmin(cwd);
+
+    const entries = await readdir(join(cwd, ".zitadel", "local"));
+    expect(entries.filter((name) => name.endsWith(".tmp"))).toEqual([]);
+  });
+
   // Two starts in one directory must not each mint a password: the server would
   // import one hash while the CLI kept the other credential, and every console
   // handoff would fail.

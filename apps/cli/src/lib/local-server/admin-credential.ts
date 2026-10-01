@@ -1,5 +1,5 @@
 import { pbkdf2Sync, randomBytes } from "node:crypto";
-import { chmod, mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { chmod, link, mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { defaultHumanUserSchemaUrl } from "@zitadel/config";
@@ -149,16 +149,37 @@ async function createLocalAdmin(cwd: string): Promise<LocalAdmin> {
   return won ? candidate : ((await readLocalAdmin(cwd)) ?? candidate);
 }
 
-/** Writes owner-only, reporting `false` when another run got there first. */
+/**
+ * Writes owner-only, reporting `false` when another run got there first.
+ *
+ * The content is written to a staging file and published with `link`, rather
+ * than opened at `path` with `wx`. `wx` creates the file and writes it in two
+ * steps, so between them the credential exists on disk with no content: a
+ * concurrent `zitadel start` gets `EEXIST`, reads the empty file, and fails
+ * with "admin.json is malformed" -- telling the developer to delete their
+ * credential and reset the server over a race that resolved itself. `link` is
+ * atomic and still fails `EEXIST`, so the file never exists half-written and
+ * the loser still loses.
+ *
+ * The staging file is unique per call: two starts in one directory must not
+ * publish each other's bytes, and a crash between write and link leaves a
+ * stray file rather than a corrupt credential.
+ */
 async function writePrivateIfAbsent(path: string, content: string): Promise<boolean> {
+  const staging = `${path}.${randomBytes(6).toString("hex")}.tmp`;
   try {
-    await writeFile(path, content, { mode: 0o600, flag: "wx" });
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "EEXIST") return false;
-    throw error;
+    await writeFile(staging, content, { mode: 0o600 });
+    await chmod(staging, 0o600).catch(() => undefined);
+    try {
+      await link(staging, path);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "EEXIST") return false;
+      throw error;
+    }
+    return true;
+  } finally {
+    await unlink(staging).catch(() => undefined);
   }
-  await chmod(path, 0o600).catch(() => undefined);
-  return true;
 }
 
 function bootstrapUserDocument(admin: LocalAdmin, schemaUrl: string) {
