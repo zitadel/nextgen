@@ -894,8 +894,11 @@ function setupRetryFlags(opts: SetupRetryOptions): string {
     parts.push(`--dev-port ${opts.devPort}`);
   }
   // Only the first: `--sso` takes one provider, and a scripted rerun can pipe
-  // only one secret. A retry that names several would not be runnable, which
-  // is the whole point of this line. The rest are added with `sso enable`.
+  // only one secret. A retry naming several would not be runnable, which is
+  // the whole point of this line. The rest are not silently dropped -- the
+  // guidance that uses this emits an `sso enable` command for each, because
+  // `--sso` makes the rerun skip the multi-select, so a provider left out here
+  // could not be reselected.
   const [firstSso] = opts.sso ?? [];
   if (firstSso) {
     parts.push(`--sso ${firstSso.provider} --sso-client-id ${firstSso.clientId}`);
@@ -1014,19 +1017,33 @@ function localSetupHint(error: unknown, retry: SetupRetryOptions, cliVersion: st
   }
 
   const setupCommand = `setup ${setupRetryFlags(retry)}`;
+  // The rerun carries one provider; every other one chosen is restored with
+  // its own command rather than lost. `--sso` makes the rerun skip the
+  // multi-select, so without these the remaining providers would have no way
+  // back into the project.
+  const remainingProviders = (retry.sso ?? []).slice(1);
 
   return new ZitadelError(normalized.code, normalized.message, {
     hint:
       `${normalized.hint ? `${normalized.hint} ` : ""}` +
       "Start local Zitadel first, then rerun setup. " +
-      (retry.sso
+      (retry.sso && retry.sso.length > 0
         ? "The rerun asks for the client secret, because a command cannot carry one. " +
           "To script it instead, pipe the secret in and add --non-interactive. "
+        : "") +
+      (remainingProviders.length > 0
+        ? `The rerun configures ${retry.sso?.[0]?.provider ?? ""} only; add the rest with the sso enable commands below. `
         : "") +
       "After setup succeeds, follow its next_commands to start the app and verify registration, logout, and login in the browser.",
     nextCommands: [
       publicCliCommand("start", cliVersion),
       publicCliCommand(setupCommand, cliVersion),
+      ...remainingProviders.map((provider) =>
+        publicCliCommand(
+          `sso enable --provider ${provider.provider} --client-id ${provider.clientId}`,
+          cliVersion,
+        ),
+      ),
     ],
     details: normalized.details,
   });
