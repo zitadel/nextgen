@@ -149,6 +149,7 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 	} else if h, ok := requestOriginFromContext(ctx); ok {
 		originStr = h
 	}
+	originAllowed := false
 	if originStr != "" {
 		originURL, err := url.Parse(originStr)
 		if err == nil {
@@ -163,8 +164,29 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 				if err := validateOriginAgainstProject(originStr, project); err != nil {
 					return nil, domain.ErrRequestInvalid().WithMessage(err.Error())
 				}
+				originAllowed = true
 				submitReq.PasskeyRP = rp
 			}
+		}
+	}
+	// An external sign-in is bound to the request origin: the provider sends
+	// the browser back to its callback route, and the page the browser then
+	// returns to must be on it. A return target on any other origin would be
+	// an open redirect through the callback.
+	if req.Action == domain.FlowActionSSO || req.SSOProviderID.IsSet() {
+		if !originAllowed {
+			return nil, domain.ErrRequestInvalid().WithMessage("an sso submission needs a request origin")
+		}
+		returnTarget, ok := req.ReturnTarget.Get()
+		if !ok {
+			return nil, domain.ErrRequestInvalid().WithMessage("return_target is required for action sso")
+		}
+		if returnOrigin := returnTarget.Scheme + "://" + returnTarget.Host; !strings.EqualFold(returnOrigin, originStr) {
+			return nil, domain.ErrRequestInvalid().WithMessage(fmt.Sprintf("return_target origin %q is not the request origin %q", returnOrigin, originStr))
+		}
+		submitReq.SSOReturn = &domain.FlowSSOReturn{
+			RedirectURI:  originStr + idpCallbackPath,
+			ReturnTarget: returnTarget.String(),
 		}
 	}
 
@@ -173,13 +195,22 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 		return nil, normalizeFlowError(err)
 	}
 
+	terminal := result.Step != nil && result.Step.Complete != nil
+	flowResp := h.buildFlowResponse(ctx, result, terminal)
+
+	// The redirect step leaves the flow state as it is, so the response's one
+	// cookie slot carries the binding nonce instead of a re-sealed _zflow.
+	if result.SSOBindingNonce != "" {
+		return &api.SubmitFlowStepOK{
+			SetCookie: api.NewOptString(ssoBindingSetCookie(ctx, result.SSOBindingNonce)),
+			Response:  flowResp,
+		}, nil
+	}
+
 	cookieValue, err := h.sealState(ctx, result.State)
 	if err != nil {
 		return nil, err
 	}
-
-	terminal := result.Step != nil && result.Step.Complete != nil
-	flowResp := h.buildFlowResponse(ctx, result, terminal)
 
 	// Validation error: state machine keeps the user on the step with Error set.
 	if result.Step != nil && result.Step.Error != nil {

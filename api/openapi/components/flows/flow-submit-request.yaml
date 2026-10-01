@@ -52,3 +52,13 @@ properties:
       ID of the selected SSO provider (from `sso_providers[].id`).
       Required when `action` is "sso".
     example: google
+  return_target:
+    type: string
+    format: uri
+    description: |
+      The page hosting the orchestrator, where the flow resumes after an
+      external sign-in: the callback sends the browser here, and the page
+      loads `GET /flow/{id}` to render the next step. Required when `action`
+      is "sso". Its origin must equal the request origin; any other origin is
+      rejected and no sign-in is started.
+    example: https://login.example.com/login?flow=flow_2

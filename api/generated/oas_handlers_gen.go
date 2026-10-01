@@ -14380,6 +14380,14 @@ func (s *Server) handleSetUserPasswordRequest(args [1]string, argsEscaped bool, 
 // If a stacked flow (e.g., recovery pivoted from login) finishes, the server
 // auto-pops to the parent flow and returns the parent's next step — the
 // frontend never sees a `complete` for intermediate flows.
+// ## External sign-in
+// `{action: "sso", sso_provider_id, return_target}` on a step that offers
+// `sso_providers` returns the engine-emitted `sso-redirect` step, whose
+// `redirect_url` the frontend navigates to. The flow state does not
+// change, so this response does not rotate `_zflow`; its `Set-Cookie`
+// carries the browser-binding cookie the callback checks instead:
+// `__Host-_zsso` with `Secure` on https origins, `_zsso` without on an
+// http development origin, always `HttpOnly`, `Path=/`, `SameSite=Lax`.
 //
 // POST /flow/{id}/submit
 func (s *Server) handleSubmitFlowStepRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {

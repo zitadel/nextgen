@@ -37074,15 +37074,22 @@ func (s *FlowSubmitRequest) encodeFields(e *jx.Encoder) {
 			s.SSOProviderID.Encode(e)
 		}
 	}
+	{
+		if s.ReturnTarget.Set {
+			e.FieldStart("return_target")
+			s.ReturnTarget.Encode(e)
+		}
+	}
 }
 
-var jsonFieldsNameOfFlowSubmitRequest = [6]string{
+var jsonFieldsNameOfFlowSubmitRequest = [7]string{
 	0: "session_token",
 	1: "action",
 	2: "fields",
 	3: "gate_proofs",
 	4: "challenge_response",
 	5: "sso_provider_id",
+	6: "return_target",
 }
 
 // Decode decodes FlowSubmitRequest from json.
@@ -37155,6 +37162,16 @@ func (s *FlowSubmitRequest) Decode(d *jx.Decoder) error {
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"sso_provider_id\"")
+			}
+		case "return_target":
+			if err := func() error {
+				s.ReturnTarget.Reset()
+				if err := s.ReturnTarget.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"return_target\"")
 			}
 		default:
 			return errors.Errorf("unexpected field %q", k)
