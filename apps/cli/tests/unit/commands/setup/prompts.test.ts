@@ -6,6 +6,8 @@ vi.mock("@clack/prompts", () => ({
   confirm: vi.fn(),
   select: vi.fn(),
   text: vi.fn(),
+  password: vi.fn(),
+  note: vi.fn(),
   intro: vi.fn(),
   outro: vi.fn(),
   cancel: vi.fn(),
@@ -28,7 +30,9 @@ vi.mock("../../../../src/lib/local-server/runtime", async (importOriginal) => ({
   detectHealthyLocalServer: vi.fn(),
 }));
 
-import { confirm, isCancel, select, text } from "@clack/prompts";
+import { confirm, isCancel, note, password, select, text } from "@clack/prompts";
+import { IDP_PROVIDERS } from "@zitadel/config/idp";
+
 import { detectHealthyLocalServer } from "../../../../src/lib/local-server/runtime";
 
 import {
@@ -38,6 +42,7 @@ import {
   ServerPrompt,
   SignInPresetPrompt,
   SETUP_PROMPTS,
+  SocialSignInPrompt,
   UseCasePrompt,
   type PromptContext,
   type SetupAnswers,
@@ -288,14 +293,163 @@ describe("SignInPresetPrompt", () => {
 describe("SETUP_PROMPTS", () => {
   it("asks no login-design question (#1039)", () => {
     // Setup only gets authentication working; taking ownership of the login
-    // template is the opt-in `branding eject`, never a wizard step.
+    // template is the opt-in `branding eject`, never a wizard step. Social
+    // sign-in is not the same kind of question: it configures a way in, which
+    // is what setup is for, and it asks last because it is the only one whose
+    // answer comes from outside the terminal.
     expect(SETUP_PROMPTS.map((prompt) => prompt.constructor.name)).toEqual([
       "FrameworkConfirmPrompt",
       "ServerPrompt",
       "DevPortPrompt",
       "UseCasePrompt",
       "SignInPresetPrompt",
+      "SocialSignInPrompt",
     ]);
   });
 });
 
+describe("SocialSignInPrompt", () => {
+  it("leaves the answers alone when no provider is wanted", async () => {
+    vi.mocked(select).mockResolvedValueOnce("" as never);
+
+    const answers = await new SocialSignInPrompt().ask(baseAnswers(), ctx);
+
+    expect(answers.sso).toBeUndefined();
+    // Nothing is asked for once the developer has declined.
+    expect(text).not.toHaveBeenCalled();
+    expect(password).not.toHaveBeenCalled();
+  });
+
+  it("offers every catalog provider alongside the declining option", async () => {
+    vi.mocked(select).mockResolvedValueOnce("" as never);
+
+    await new SocialSignInPrompt().ask(baseAnswers(), ctx);
+
+    expect(selectOptionsFromFirstCall().map((option) => option.value)).toEqual([
+      "",
+      ...IDP_PROVIDERS,
+    ]);
+  });
+
+  it("captures the credentials and shows the redirect URI to register", async () => {
+    vi.mocked(select).mockResolvedValueOnce("google" as never);
+    vi.mocked(text).mockResolvedValueOnce("  1234-abc.apps.googleusercontent.com  " as never);
+    vi.mocked(password).mockResolvedValueOnce("  s3cret  " as never);
+
+    const answers = await new SocialSignInPrompt().ask(baseAnswers({ devPort: 4321 }), ctx);
+
+    expect(answers.sso).toEqual({
+      provider: "google",
+      clientId: "1234-abc.apps.googleusercontent.com",
+      secret: "s3cret",
+    });
+    // The URI has to be exact — the vendor matches it literally — and the
+    // port answered a moment earlier is what decides it.
+    expect(vi.mocked(note).mock.calls[0]?.[0]).toContain(
+      "http://localhost:4321/__nextgen/idp/callback",
+    );
+  });
+
+
+  it("asks where the provider lives on a development build", async () => {
+    // Someone working on the CLI runs it against a local stand-in constantly.
+    // Before this the connection had to be hand-edited afterwards.
+    vi.mocked(select).mockResolvedValueOnce("google" as never);
+    vi.mocked(text)
+      .mockResolvedValueOnce("http://localhost:9100" as never)
+      .mockResolvedValueOnce("client-id" as never);
+    vi.mocked(password).mockResolvedValueOnce("the-secret" as never);
+
+    const answers = await new SocialSignInPrompt().ask(baseAnswers(), {
+      ...ctx,
+      developmentBuild: true,
+    });
+
+    // Only the issuer: naming a subset of the endpoints the engine needs is
+    // rejected as `idp.endpoints_partial`, so discovery supplies them.
+    expect(answers.sso?.endpoints).toEqual({ issuer: "http://localhost:9100" });
+  });
+
+
+
+  it("never asks on a released build", async () => {
+    // The gate is the build stamp, not a flag: someone who installed the CLI
+    // is configuring the real vendor and must not meet this question.
+    vi.mocked(select).mockResolvedValueOnce("google" as never);
+    vi.mocked(text).mockResolvedValueOnce("client-id" as never);
+    vi.mocked(password).mockResolvedValueOnce("the-secret" as never);
+
+    const answers = await new SocialSignInPrompt().ask(baseAnswers(), {
+      ...ctx,
+      developmentBuild: false,
+    });
+
+    expect(answers.sso?.endpoints).toBeUndefined();
+    // Only the client id was asked for, so no URL question was rendered.
+    expect(vi.mocked(text)).toHaveBeenCalledTimes(1);
+  });
+
+  it("will not take an empty secret, because a provider without one cannot work", async () => {
+    // The prompt re-asks rather than accepting nothing: the connection
+    // references the secret as `${{ NAME }}` and the engine resolves it from
+    // the project's variables, so scaffolding without a value writes a
+    // sign-in button that fails at the provider with invalid_client. "Not
+    // now" is answered by declining the provider, not by skipping this.
+    vi.mocked(select).mockResolvedValueOnce("google" as never);
+    vi.mocked(text).mockResolvedValueOnce("client-id" as never);
+    vi.mocked(password).mockResolvedValueOnce("the-secret" as never);
+
+    await new SocialSignInPrompt().ask(baseAnswers(), ctx);
+
+    const { validate } = vi.mocked(password).mock.calls.at(-1)![0] as {
+      validate?: (value: string) => string | undefined;
+    };
+    expect(validate?.("")).toBeTruthy();
+    expect(validate?.("   ")).toBeTruthy();
+    expect(validate?.("a-secret")).toBeUndefined();
+  });
+
+  it("does not ask which provider when --sso named one", async () => {
+    vi.mocked(password).mockResolvedValueOnce("" as never);
+    const seeded = baseAnswers({ sso: { provider: "google", clientId: "from-the-flag" } });
+
+    const answers = await new SocialSignInPrompt().ask(seeded, { ...ctx, ssoFromFlag: true });
+
+    expect(select).not.toHaveBeenCalled();
+    expect(text).not.toHaveBeenCalled();
+    expect(answers.sso?.provider).toBe("google");
+    expect(answers.sso?.clientId).toBe("from-the-flag");
+  });
+
+  it("still asks for the secret a flagged run could not supply", async () => {
+    // The secret is never a flag, and only a scripted run pipes it in — so an
+    // interactive run with --sso arrives here without one.
+    vi.mocked(password).mockResolvedValueOnce("typed-after-the-flag" as never);
+    const seeded = baseAnswers({ sso: { provider: "google", clientId: "from-the-flag" } });
+
+    const answers = await new SocialSignInPrompt().ask(seeded, { ...ctx, ssoFromFlag: true });
+
+    expect(password).toHaveBeenCalledOnce();
+    expect(answers.sso?.secret).toBe("typed-after-the-flag");
+  });
+
+  it("keeps a secret that was already piped in rather than asking again", async () => {
+    const seeded = baseAnswers({
+      sso: { provider: "google", clientId: "from-the-flag", secret: "piped" },
+    });
+
+    const answers = await new SocialSignInPrompt().ask(seeded, { ...ctx, ssoFromFlag: true });
+
+    expect(password).not.toHaveBeenCalled();
+    expect(answers.sso?.secret).toBe("piped");
+  });
+
+  it("throws E_VALIDATION on Ctrl-C at the provider question", async () => {
+    vi.mocked(select).mockResolvedValueOnce(Symbol("cancel") as never);
+    vi.mocked(isCancel).mockReturnValueOnce(true);
+
+    await expect(new SocialSignInPrompt().ask(baseAnswers(), ctx)).rejects.toMatchObject({
+      code: "E_VALIDATION",
+    });
+  });
+});
