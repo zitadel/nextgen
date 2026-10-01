@@ -426,6 +426,11 @@ func (r *FlowStateMachineRuntime) provisionSSOIdentity(ctx context.Context, stat
 	if bound, err := r.bindSSOCollision(ctx, state, parked, probeClaims, &settled); err != nil || bound {
 		return FlowImplicitOutcomeUserAlreadyExists, err
 	}
+	// Neither linked to nor colliding with the user the flow carries: no new
+	// user can register on that attempt. The bind helper stays the backstop.
+	if state.CollectedData.UserID != "" {
+		return "", ErrFlowRestartRequired()
+	}
 	if settled || !ssoClaimsComplete(schema, parked, uniqueClaims) {
 		// settled: an owner vanished between the lookup and the bind, after
 		// the row was deleted. Collection then runs without the prefill.

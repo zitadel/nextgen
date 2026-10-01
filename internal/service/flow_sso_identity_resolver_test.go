@@ -511,3 +511,49 @@ func TestFlowSSOIdentityResolver_LoadParked_AlreadyResolvedSkipsReads(t *testing
 	require.NoError(t, err)
 	assert.Nil(t, got)
 }
+
+func expiredAttempt(a *domain.AuthAttempt) *domain.AuthAttempt {
+	ttl := time.Minute
+	a.CreatedAt = time.Now().Add(-time.Hour)
+	a.TimeToLive = &ttl
+	return a
+}
+
+// A dead attempt cannot settle a parked identity, whichever branch would run.
+func TestFlowSSOIdentityResolver_LoadParked_ExpiredAttemptWithParkedRowRestarts(t *testing.T) {
+	t.Parallel()
+	f := newSSOResolverFixture(t)
+	f.stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), ssoProjectID, ssoAttemptID).Return(expiredAttempt(parkedAttempt(parkedResult())), nil)
+	f.connections.EXPECT().GetRevision(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+
+	_, err := f.resolver.LoadParked(t.Context(), loadInput())
+	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
+}
+
+// The replay shortcut would hide a dead attempt on every later render, so the
+// state check runs before it.
+func TestFlowSSOIdentityResolver_LoadParked_HandedOffAttemptRestartsBeforeReplayShortcut(t *testing.T) {
+	t.Parallel()
+	f := newSSOResolverFixture(t)
+	handedOff := parkedAttempt(parkedResult())
+	handedOff.HandoffToken = &domain.HandoffToken{}
+	f.stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), ssoProjectID, ssoAttemptID).Return(handedOff, nil)
+
+	in := loadInput()
+	in.ResolvedCheckID = "ch-1"
+	_, err := f.resolver.LoadParked(t.Context(), in)
+	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
+}
+
+// Without an SSO row there is nothing to resolve, and a plain render of a
+// flow with a dead attempt keeps its behaviour.
+func TestFlowSSOIdentityResolver_LoadParked_DeadAttemptWithoutSSORowIsNil(t *testing.T) {
+	t.Parallel()
+	f := newSSOResolverFixture(t)
+	f.stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), ssoProjectID, ssoAttemptID).
+		Return(expiredAttempt(&domain.AuthAttempt{ProjectID: ssoProjectID, ID: ssoAttemptID}), nil)
+
+	got, err := f.resolver.LoadParked(t.Context(), loadInput())
+	require.NoError(t, err)
+	assert.Nil(t, got)
+}

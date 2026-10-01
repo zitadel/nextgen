@@ -4894,3 +4894,20 @@ func TestFlowStateMachine_Render_SSOCollisionOnAttemptBoundToSameUserBindsWithou
 	assert.Equal(t, "sso-conflict", result.Step.Name)
 	assert.Equal(t, "u-b", result.State.CollectedData.UserID)
 }
+
+// An identity that neither links to nor collides with the user the flow
+// already carries cannot register a new user on that attempt.
+func TestFlowStateMachine_Render_SSOUnlinkedIdentityOnBoundAttemptRestarts(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoRenderWorld(t)
+	def = withSSOOutcomeSteps(def)
+	state.CollectedData.UserID = "u-a"
+	w.expectParked(unlinkedParked(map[string]any{"email": "alice@example.com"}, nil), nil)
+	w.expectOwner("email", "alice@example.com", "")
+	w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Times(0)
+	w.ssoIdentities.EXPECT().DeleteParked(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+
+	_, err := w.sm.Render(t.Context(), def, state)
+	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
+	assert.Equal(t, "u-a", state.CollectedData.UserID)
+}
