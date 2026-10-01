@@ -383,6 +383,11 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 	// A collision bound a user, but the cookie that recorded it lost the race
 	// to one that recorded this row as collected: catch the state up.
 	if parked != nil && parked.CollisionUserID != "" {
+		// The marker counts only while the attempt still carries that user: a
+		// stale submission may have overwritten the user factor since.
+		if parked.AttemptUserID != parked.CollisionUserID {
+			return FlowStepResult{}, false, ErrFlowRestartRequired()
+		}
 		switch state.CollectedData.UserID {
 		case parked.CollisionUserID:
 			return FlowStepResult{}, false, nil

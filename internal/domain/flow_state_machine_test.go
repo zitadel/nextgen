@@ -5096,7 +5096,7 @@ func TestFlowStateMachine_Render_SSOCollisionReconcilesLostCookieRace(t *testing
 		LoadParked(gomock.Any(), domain.FlowSSOLoadInput{
 			ProjectID: testProjectID, AttemptID: "att-1", UserSchemaURL: defaultSchemaURL, ResolvedCheckID: "ch-1",
 		}).
-		Return(&domain.FlowSSOParkedIdentity{CollisionUserID: "u-b"}, nil)
+		Return(&domain.FlowSSOParkedIdentity{CollisionUserID: "u-b", AttemptUserID: "u-b"}, nil)
 
 	result, err := w.sm.Render(t.Context(), def, state)
 	require.NoError(t, err)
@@ -5110,7 +5110,7 @@ func TestFlowStateMachine_Render_SSOCollisionReconcileWithRecordedUserRendersSte
 	def = withSSOOutcomeSteps(def)
 	state.SSOResolvedCheckID = "ch-1"
 	state.CollectedData.UserID = "u-b"
-	w.ssoIdentities.EXPECT().LoadParked(gomock.Any(), gomock.Any()).Return(&domain.FlowSSOParkedIdentity{CollisionUserID: "u-b"}, nil)
+	w.ssoIdentities.EXPECT().LoadParked(gomock.Any(), gomock.Any()).Return(&domain.FlowSSOParkedIdentity{CollisionUserID: "u-b", AttemptUserID: "u-b"}, nil)
 
 	result, err := w.sm.Render(t.Context(), def, state)
 	require.NoError(t, err)
@@ -5123,7 +5123,7 @@ func TestFlowStateMachine_Render_SSOCollisionReconcileWithOtherUserRestarts(t *t
 	w, def, state := ssoRenderWorld(t)
 	state.SSOResolvedCheckID = "ch-1"
 	state.CollectedData.UserID = "u-a"
-	w.ssoIdentities.EXPECT().LoadParked(gomock.Any(), gomock.Any()).Return(&domain.FlowSSOParkedIdentity{CollisionUserID: "u-b"}, nil)
+	w.ssoIdentities.EXPECT().LoadParked(gomock.Any(), gomock.Any()).Return(&domain.FlowSSOParkedIdentity{CollisionUserID: "u-b", AttemptUserID: "u-b"}, nil)
 
 	_, err := w.sm.Render(t.Context(), def, state)
 	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
@@ -5163,4 +5163,18 @@ func TestFlowStateMachine_Render_SSOCollisionOnSessionBoundAttemptSameOwnerBinds
 	require.NoError(t, err)
 	assert.Equal(t, "sso-conflict", result.Step.Name)
 	assert.Equal(t, "u-s", result.State.CollectedData.UserID)
+}
+
+// The marker names u-a but the attempt now carries u-b (a stale submission
+// overwrote the user factor after the collision): the marker cannot be
+// trusted, and the flow starts over without recording anyone.
+func TestFlowStateMachine_Render_SSOCollisionMarkerWithDifferentAttemptUserRestarts(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoRenderWorld(t)
+	w.ssoIdentities.EXPECT().LoadParked(gomock.Any(), gomock.Any()).
+		Return(&domain.FlowSSOParkedIdentity{CollisionUserID: "u-a", AttemptUserID: "u-b"}, nil)
+
+	_, err := w.sm.Render(t.Context(), def, state)
+	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
+	assert.Empty(t, state.CollectedData.UserID)
 }
