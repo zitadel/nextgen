@@ -1,9 +1,10 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { Key, UserRoundCog } from "lucide-react";
+import { Key, User, UserRoundCog } from "lucide-react";
 import { useId } from "react";
 
 import { DeleteUserDialog } from "@/components/delete-user-dialog";
 import { EYEBROW, MetaRule, MetaValue } from "@/components/detail-meta";
+import { DETAIL_BODY, DetailHeader, DetailPage, ICON_PLATE } from "@/components/detail-page";
 import { StatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -67,13 +68,10 @@ export const Route = createFileRoute("/_authed/users/$userId")({
 
 // Long utility strings live as named constants so Tailwind's scanner sees the
 // full literal (it never sees a concatenated fragment).
-const PAGE = "px-4 pt-9 pb-8 sm:px-8";
-const HEADING = "text-foreground font-serif text-2xl leading-8 tracking-tight";
 const CARD = "gap-0 rounded-xl py-0";
 // The panel body is 24px in from the card edge and 20px down, with 16px between
 // the header, the divider and the content.
 const CARD_HEAD = "flex items-center gap-3 px-6 pt-5 pb-4";
-const PLATE = "flex size-9 items-center justify-center rounded-md bg-muted text-foreground";
 // 18px between fields on both axes — not a 4px-scale step, so it is written out.
 const GRID = "grid gap-[18px] px-6 pt-4 pb-5 sm:grid-cols-2";
 const ROW = "flex items-center justify-between gap-4 px-6 pt-4 pb-5";
@@ -94,20 +92,16 @@ function UserDetail() {
   const metadata = userMetadata(user);
 
   return (
-    <div className={PAGE}>
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="flex flex-col gap-1">
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className={HEADING}>{name}</h1>
-            {metadata.status && <StatusBadge status={metadata.status} />}
-          </div>
-          {secondary && <p className="text-muted-foreground text-sm">{secondary}</p>}
-        </div>
-        <Card className="gap-0 rounded-xl py-0">
-          {/* Stacked below `sm`, in a row above it — the mobile frame
-              keeps every item flush left and turns the column
-              rule into a tick on its own row between them. */}
-          <CardContent className="flex flex-col px-5 py-3.5 sm:flex-row sm:flex-wrap sm:items-start">
+    <DetailPage>
+      {/* `User`, the sidebar's glyph for Users, as each detail title carries its
+          section's. */}
+      <DetailHeader
+        icon={User}
+        title={name}
+        status={metadata.status && <StatusBadge status={metadata.status} />}
+        subtitle={secondary}
+        meta={
+          <>
             <MetaValue label="User ID" value={userId} copyable />
             {metadata.createdAt && (
               <>
@@ -115,11 +109,11 @@ function UserDetail() {
                 <MetaValue label="Created" value={formatDate(metadata.createdAt)} />
               </>
             )}
-          </CardContent>
-        </Card>
-      </div>
+          </>
+        }
+      />
 
-      <Tabs defaultValue="overview" className="mt-6 gap-6">
+      <Tabs defaultValue="overview" className={`${DETAIL_BODY} gap-6`}>
         <TabsList aria-label="User detail sections">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="authentication">Authentication</TabsTrigger>
@@ -128,7 +122,7 @@ function UserDetail() {
         <TabsContent value="overview" className="flex flex-col gap-4">
           <Card className={CARD}>
             <div className={CARD_HEAD}>
-              <span className={PLATE} aria-hidden>
+              <span className={ICON_PLATE} aria-hidden>
                 <UserRoundCog className="size-[18px]" />
               </span>
               <div className="flex flex-col">
@@ -187,7 +181,7 @@ function UserDetail() {
             <div className={CARD_HEAD}>
               {/* `Lucide Icon / Key` — the design names the glyph,
                   so it is read off the node rather than picked by meaning. */}
-              <span className={PLATE} aria-hidden>
+              <span className={ICON_PLATE} aria-hidden>
                 <Key className="size-[18px]" />
               </span>
               <div className="flex flex-col">
@@ -222,7 +216,7 @@ function UserDetail() {
           </Card>
         </TabsContent>
       </Tabs>
-    </div>
+    </DetailPage>
   );
 }
 

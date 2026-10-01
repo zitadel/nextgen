@@ -72,7 +72,10 @@ classification and token authority live there; the pair recipe lives in
 
 List/detail screens follow the shipped patterns under `src/routes/_authed/`
 (users, schemas, flow-definitions): loader-fetched data, status columns where
-the resource has lifecycle state, `$param` detail routes. The sessions screen
+the resource has lifecycle state, `$param` detail routes. A list screen composes
+`src/components/resource-list.tsx` and a detail screen
+`src/components/detail-page.tsx` rather than measuring its own frame — see
+"Resource list layout" and "Resource detail layout" in `docs/styling.md`. The sessions screen
 speaks `POST /sessions/query` (structured filters + cursor pagination); there
 is no `GET /sessions` list, and sessions have no `revoked` state — revocation
 deletes the session.
