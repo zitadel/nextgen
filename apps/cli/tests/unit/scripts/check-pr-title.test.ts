@@ -35,7 +35,7 @@ const config = {
 };
 
 describe("parseSemanticConfig", () => {
-  it("reads the flat type and scope lists and drops comments", () => {
+  it("reads the flat type and scope lists and drops comments", async () => {
     const source = [
       "# Always validate the PR title",
       "titleOnly: true",
@@ -50,7 +50,7 @@ describe("parseSemanticConfig", () => {
       "  - console",
     ].join("\n");
 
-    expect(parseSemanticConfigOf(source)).resolves.toEqual({
+    await expect(parseSemanticConfigOf(source)).resolves.toEqual({
       types: ["feat", "fix"],
       scopes: ["api", "console"],
     });
