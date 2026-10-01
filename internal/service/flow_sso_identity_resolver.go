@@ -100,6 +100,10 @@ func (r *FlowSSOIdentityResolver) LoadParked(ctx context.Context, in domain.Flow
 func (r *FlowSSOIdentityResolver) BindLinked(ctx context.Context, in domain.FlowSSOBindInput) error {
 	return r.db.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		stmts := tx.Statements()
+		// The exact parked row goes first: a settled or replaced one aborts before any write.
+		if err := stmts.DeleteSSOCallback(ctx, in.ProjectID, in.AttemptID, in.CheckID); err != nil {
+			return err
+		}
 		attempt, err := stmts.GetAuthAttemptByID(ctx, in.ProjectID, in.AttemptID)
 		if err != nil {
 			return fmt.Errorf("bind sso identity: read attempt: %w", err)
@@ -128,12 +132,12 @@ func (r *FlowSSOIdentityResolver) BindLinked(ctx context.Context, in domain.Flow
 		if _, err := recordDirectAuthFactor(ctx, stmts, attempt, ssoFactor); err != nil {
 			return fmt.Errorf("bind sso identity: %w", err)
 		}
-		return stmts.DeleteSSOCallback(ctx, in.ProjectID, in.AttemptID)
+		return nil
 	})
 }
 
-func (r *FlowSSOIdentityResolver) DeleteParked(ctx context.Context, projectID, attemptID string) error {
-	return r.db.Statements().DeleteSSOCallback(ctx, projectID, attemptID)
+func (r *FlowSSOIdentityResolver) DeleteParked(ctx context.Context, projectID, attemptID, checkID string) error {
+	return r.db.Statements().DeleteSSOCallback(ctx, projectID, attemptID, checkID)
 }
 
 func (r *FlowSSOIdentityResolver) CreateLinked(context.Context, domain.FlowSSOCreateInput) (string, error) {

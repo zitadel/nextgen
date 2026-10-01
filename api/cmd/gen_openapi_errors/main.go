@@ -890,6 +890,9 @@ var securityErrors = []string{
 // public code before the response is written.
 var operationExcludedErrors = map[string][]string{
 	"listMyProjects": {"domain.ErrSessionTokenInvalid"},
+	// The flow engine catches a stale parked SSO row with errors.Is and renders
+	// the step; the analysis cannot see that check prune the error.
+	"getFlowStep": {"domain.ErrSSOStateInvalid"},
 }
 
 // methodErrorsFromAnalysis adapts the inferred error sets to the shape the

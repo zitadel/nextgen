@@ -4297,6 +4297,7 @@ func TestFlowStateMachine_Render_SSOLinkedUserRoutesAuthenticated(t *testing.T) 
 		BindLinked(gomock.Any(), domain.FlowSSOBindInput{
 			ProjectID:    testProjectID,
 			AttemptID:    "att-1",
+			CheckID:      "ch-1",
 			UserID:       "user-1",
 			ConnectionID: "idp-1",
 			LinkID:       "idplink-1",
@@ -4357,7 +4358,7 @@ func TestFlowStateMachine_Render_SSOCreationDisabledRendersStepError(t *testing.
 	t.Parallel()
 	w, def, state := ssoRenderWorld(t)
 	w.expectParked(&domain.FlowSSOParkedIdentity{CheckID: "ch-1", ConnectionID: "idp-1", Subject: "sub-1", CreationDisabled: true}, nil)
-	w.ssoIdentities.EXPECT().DeleteParked(gomock.Any(), testProjectID, "att-1").Return(nil).Times(1)
+	w.ssoIdentities.EXPECT().DeleteParked(gomock.Any(), testProjectID, "att-1", "ch-1").Return(nil).Times(1)
 	w.ssoIdentities.EXPECT().BindLinked(gomock.Any(), gomock.Any()).Times(0)
 	w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).Times(0)
 
@@ -4378,7 +4379,7 @@ func TestFlowStateMachine_Render_SSOUnlinkedAutoLeavesParkedRow(t *testing.T) {
 	t.Parallel()
 	w, def, state := ssoRenderWorld(t)
 	w.expectParked(&domain.FlowSSOParkedIdentity{CheckID: "ch-1", ConnectionID: "idp-1", Subject: "sub-1"}, nil)
-	w.ssoIdentities.EXPECT().DeleteParked(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+	w.ssoIdentities.EXPECT().DeleteParked(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 
 	result, err := w.sm.Render(t.Context(), def, state)
 	require.NoError(t, err)
@@ -4398,6 +4399,35 @@ func TestFlowStateMachine_Render_SSOBindOnForeignUserRestarts(t *testing.T) {
 	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
 	assert.Empty(t, state.CollectedData.UserID, "nothing is recorded for the foreign user")
 	assert.Equal(t, "credentials", state.CurrentStep)
+}
+
+// A concurrent request settled the parked row, or a new ceremony replaced it:
+// the winner already answered, so this render shows the step with no outcome.
+func TestFlowStateMachine_Render_SSOStaleParkedRowRendersStep(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoRenderWorld(t)
+	w.expectParked(linkedParked(), nil)
+	w.ssoIdentities.EXPECT().BindLinked(gomock.Any(), gomock.Any()).Return(domain.ErrSSOStateInvalid())
+	w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).Times(0)
+
+	result, err := w.sm.Render(t.Context(), def, state)
+	require.NoError(t, err)
+	assert.Equal(t, "credentials", result.Step.Name)
+	assert.Nil(t, result.Step.Error)
+	assert.Empty(t, result.State.CollectedData.UserID)
+	assert.Empty(t, result.HandoffToken)
+}
+
+func TestFlowStateMachine_Render_SSOStaleParkedRowCreationDisabledRendersStep(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoRenderWorld(t)
+	w.expectParked(&domain.FlowSSOParkedIdentity{CheckID: "ch-1", ConnectionID: "idp-1", Subject: "sub-1", CreationDisabled: true}, nil)
+	w.ssoIdentities.EXPECT().DeleteParked(gomock.Any(), testProjectID, "att-1", "ch-1").Return(domain.ErrSSOStateInvalid())
+
+	result, err := w.sm.Render(t.Context(), def, state)
+	require.NoError(t, err)
+	assert.Equal(t, "credentials", result.Step.Name)
+	assert.Nil(t, result.Step.Error)
 }
 
 // A completed flow has handed its attempt off (and the session exchange may

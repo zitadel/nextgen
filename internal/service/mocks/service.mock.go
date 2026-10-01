@@ -1661,17 +1661,17 @@ func (c *MockAllStatementsDeleteResourceScopeCall) DoAndReturn(f func(context.Co
 }
 
 // DeleteSSOCallback mocks base method.
-func (m *MockAllStatements) DeleteSSOCallback(ctx context.Context, projectID, authAttemptID string) error {
+func (m *MockAllStatements) DeleteSSOCallback(ctx context.Context, projectID, authAttemptID, checkID string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteSSOCallback", ctx, projectID, authAttemptID)
+	ret := m.ctrl.Call(m, "DeleteSSOCallback", ctx, projectID, authAttemptID, checkID)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // DeleteSSOCallback indicates an expected call of DeleteSSOCallback.
-func (mr *MockAllStatementsMockRecorder) DeleteSSOCallback(ctx, projectID, authAttemptID any) *MockAllStatementsDeleteSSOCallbackCall {
+func (mr *MockAllStatementsMockRecorder) DeleteSSOCallback(ctx, projectID, authAttemptID, checkID any) *MockAllStatementsDeleteSSOCallbackCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteSSOCallback", reflect.TypeOf((*MockAllStatements)(nil).DeleteSSOCallback), ctx, projectID, authAttemptID)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteSSOCallback", reflect.TypeOf((*MockAllStatements)(nil).DeleteSSOCallback), ctx, projectID, authAttemptID, checkID)
 	return &MockAllStatementsDeleteSSOCallbackCall{Call: call}
 }
 
@@ -1687,13 +1687,13 @@ func (c *MockAllStatementsDeleteSSOCallbackCall) Return(arg0 error) *MockAllStat
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsDeleteSSOCallbackCall) Do(f func(context.Context, string, string) error) *MockAllStatementsDeleteSSOCallbackCall {
+func (c *MockAllStatementsDeleteSSOCallbackCall) Do(f func(context.Context, string, string, string) error) *MockAllStatementsDeleteSSOCallbackCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsDeleteSSOCallbackCall) DoAndReturn(f func(context.Context, string, string) error) *MockAllStatementsDeleteSSOCallbackCall {
+func (c *MockAllStatementsDeleteSSOCallbackCall) DoAndReturn(f func(context.Context, string, string, string) error) *MockAllStatementsDeleteSSOCallbackCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -8407,17 +8407,17 @@ func (c *MockAuthAttemptStatementsDeleteAuthAttemptByIDCall) DoAndReturn(f func(
 }
 
 // DeleteSSOCallback mocks base method.
-func (m *MockAuthAttemptStatements) DeleteSSOCallback(ctx context.Context, projectID, authAttemptID string) error {
+func (m *MockAuthAttemptStatements) DeleteSSOCallback(ctx context.Context, projectID, authAttemptID, checkID string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteSSOCallback", ctx, projectID, authAttemptID)
+	ret := m.ctrl.Call(m, "DeleteSSOCallback", ctx, projectID, authAttemptID, checkID)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // DeleteSSOCallback indicates an expected call of DeleteSSOCallback.
-func (mr *MockAuthAttemptStatementsMockRecorder) DeleteSSOCallback(ctx, projectID, authAttemptID any) *MockAuthAttemptStatementsDeleteSSOCallbackCall {
+func (mr *MockAuthAttemptStatementsMockRecorder) DeleteSSOCallback(ctx, projectID, authAttemptID, checkID any) *MockAuthAttemptStatementsDeleteSSOCallbackCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteSSOCallback", reflect.TypeOf((*MockAuthAttemptStatements)(nil).DeleteSSOCallback), ctx, projectID, authAttemptID)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteSSOCallback", reflect.TypeOf((*MockAuthAttemptStatements)(nil).DeleteSSOCallback), ctx, projectID, authAttemptID, checkID)
 	return &MockAuthAttemptStatementsDeleteSSOCallbackCall{Call: call}
 }
 
@@ -8433,13 +8433,13 @@ func (c *MockAuthAttemptStatementsDeleteSSOCallbackCall) Return(arg0 error) *Moc
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAuthAttemptStatementsDeleteSSOCallbackCall) Do(f func(context.Context, string, string) error) *MockAuthAttemptStatementsDeleteSSOCallbackCall {
+func (c *MockAuthAttemptStatementsDeleteSSOCallbackCall) Do(f func(context.Context, string, string, string) error) *MockAuthAttemptStatementsDeleteSSOCallbackCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAuthAttemptStatementsDeleteSSOCallbackCall) DoAndReturn(f func(context.Context, string, string) error) *MockAuthAttemptStatementsDeleteSSOCallbackCall {
+func (c *MockAuthAttemptStatementsDeleteSSOCallbackCall) DoAndReturn(f func(context.Context, string, string, string) error) *MockAuthAttemptStatementsDeleteSSOCallbackCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

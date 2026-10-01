@@ -367,7 +367,14 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 	if parked.Link == nil {
 		// provisioning.creation is disabled: the identity has no account and
 		// will not get one.
-		if err := r.ssoIdentities.DeleteParked(ctx, state.ProjectID, state.AuthAttemptID); err != nil {
+		// ErrSSOStateInvalid here and from BindLinked means a concurrent request
+		// settled the row or a new ceremony replaced it: the winner already
+		// answered, so this render shows the step with no outcome.
+		err := r.ssoIdentities.DeleteParked(ctx, state.ProjectID, state.AuthAttemptID, parked.CheckID)
+		if errors.Is(err, ErrSSOStateInvalid()) {
+			return FlowStepResult{}, false, nil
+		}
+		if err != nil {
 			return FlowStepResult{}, false, fmt.Errorf("flow state machine: delete parked sso identity: %w", err)
 		}
 		msg := FlowStepErrorSSOCreationDisabled
@@ -375,13 +382,18 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 		return result, true, err
 	}
 
-	if err := r.ssoIdentities.BindLinked(ctx, FlowSSOBindInput{
+	err = r.ssoIdentities.BindLinked(ctx, FlowSSOBindInput{
 		ProjectID:    state.ProjectID,
 		AttemptID:    state.AuthAttemptID,
+		CheckID:      parked.CheckID,
 		UserID:       parked.Link.UserID,
 		ConnectionID: parked.ConnectionID,
 		LinkID:       parked.Link.LinkID,
-	}); err != nil {
+	})
+	if errors.Is(err, ErrSSOStateInvalid()) {
+		return FlowStepResult{}, false, nil
+	}
+	if err != nil {
 		return FlowStepResult{}, false, fmt.Errorf("flow state machine: bind sso identity: %w", err)
 	}
 	recordResolvedUser(state, parked.Link.UserID)
