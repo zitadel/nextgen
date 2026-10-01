@@ -10,6 +10,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
+	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/dialect/authattempt"
 	v2session "github.com/zitadel/nextgen/internal/storage/session"
 )
@@ -40,6 +41,15 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`
 		` VALUES (?, ?, ?, ?, ?, ?, 0) ON CONFLICT (project_id, auth_attempt_id, type)` +
 		` DO UPDATE SET last_verified_at = EXCLUDED.last_verified_at, factor_payload = EXCLUDED.factor_payload,` +
 		` challenge_payload = NULL, last_challenged_at = NULL, failure_count = 0, last_failed_at = NULL` +
+		` RETURNING id`
+
+	// addAuthAttemptFactorStmt fills only a row without a verified factor; the
+	// new id makes a challenge issued before this write stale.
+	addAuthAttemptFactorStmt = `INSERT INTO checks (project_id, auth_attempt_id, id, type, last_verified_at, factor_payload, failure_count)` +
+		` VALUES (?, ?, ?, ?, ?, ?, 0) ON CONFLICT (project_id, auth_attempt_id, type)` +
+		` DO UPDATE SET id = EXCLUDED.id, last_verified_at = EXCLUDED.last_verified_at, factor_payload = EXCLUDED.factor_payload,` +
+		` challenge_payload = NULL, last_challenged_at = NULL, failure_count = 0, last_failed_at = NULL` +
+		` WHERE checks.factor_payload IS NULL` +
 		` RETURNING id`
 
 	authAttemptChallengeSucceededStmt = `UPDATE checks SET last_verified_at = ?, factor_payload = ?, challenge_payload = NULL, last_challenged_at = NULL, failure_count = 0` +
@@ -358,6 +368,19 @@ func (as authAttemptStatements) SetAuthAttemptChallenge(ctx context.Context, pro
 
 // SetAuthAttemptFactor implements [service.AuthAttemptStatements].
 func (as authAttemptStatements) SetAuthAttemptFactor(ctx context.Context, projectID, authAttemptID string, factor domain.AuthFactor) (string, error) {
+	return as.writeAuthAttemptFactor(ctx, setAuthAttemptFactorStmt, projectID, authAttemptID, factor)
+}
+
+// AddAuthAttemptFactor implements [service.AuthAttemptStatements].
+func (as authAttemptStatements) AddAuthAttemptFactor(ctx context.Context, projectID, authAttemptID string, factor domain.AuthFactor) (string, error) {
+	id, err := as.writeAuthAttemptFactor(ctx, addAuthAttemptFactorStmt, projectID, authAttemptID, factor)
+	if _, noRow := errors.AsType[*database.NoRowFoundError](err); noRow {
+		return "", database.NewUniqueError("checks", "", err)
+	}
+	return id, err
+}
+
+func (as authAttemptStatements) writeAuthAttemptFactor(ctx context.Context, stmt, projectID, authAttemptID string, factor domain.AuthFactor) (string, error) {
 	now := time.Now().UTC()
 	payloadStr, err := authattempt.MarshalPayloadString(factor.Payload())
 	if err != nil {
@@ -372,7 +395,7 @@ func (as authAttemptStatements) SetAuthAttemptFactor(ctx context.Context, projec
 		payloadArg = *payloadStr
 	}
 	var returnedID string
-	if err := as.client.QueryRow(ctx, setAuthAttemptFactorStmt,
+	if err := as.client.QueryRow(ctx, stmt,
 		projectID, authAttemptID, checkID, int64(factor.Type()), now.UnixNano(), payloadArg,
 	).Scan(&returnedID); err != nil {
 		return "", fmt.Errorf("failed to set factor: %w", wrapError(err))

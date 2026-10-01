@@ -246,6 +246,45 @@ func (c *MockAllStatementsActiveSystemCatalogIDCall) DoAndReturn(f func(context.
 	return c
 }
 
+// AddAuthAttemptFactor mocks base method.
+func (m *MockAllStatements) AddAuthAttemptFactor(ctx context.Context, projectID, authAttemptID string, factor domain.AuthFactor) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AddAuthAttemptFactor", ctx, projectID, authAttemptID, factor)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// AddAuthAttemptFactor indicates an expected call of AddAuthAttemptFactor.
+func (mr *MockAllStatementsMockRecorder) AddAuthAttemptFactor(ctx, projectID, authAttemptID, factor any) *MockAllStatementsAddAuthAttemptFactorCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddAuthAttemptFactor", reflect.TypeOf((*MockAllStatements)(nil).AddAuthAttemptFactor), ctx, projectID, authAttemptID, factor)
+	return &MockAllStatementsAddAuthAttemptFactorCall{Call: call}
+}
+
+// MockAllStatementsAddAuthAttemptFactorCall wrap *gomock.Call
+type MockAllStatementsAddAuthAttemptFactorCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsAddAuthAttemptFactorCall) Return(checkID string, err error) *MockAllStatementsAddAuthAttemptFactorCall {
+	c.Call = c.Call.Return(checkID, err)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsAddAuthAttemptFactorCall) Do(f func(context.Context, string, string, domain.AuthFactor) (string, error)) *MockAllStatementsAddAuthAttemptFactorCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsAddAuthAttemptFactorCall) DoAndReturn(f func(context.Context, string, string, domain.AuthFactor) (string, error)) *MockAllStatementsAddAuthAttemptFactorCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // AuthAttemptChallengeFailed mocks base method.
 func (m *MockAllStatements) AuthAttemptChallengeFailed(ctx context.Context, projectID, authAttemptID string, challenge domain.AuthChallenge) error {
 	m.ctrl.T.Helper()
@@ -8135,6 +8174,45 @@ func NewMockAuthAttemptStatements(ctrl *gomock.Controller) *MockAuthAttemptState
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockAuthAttemptStatements) EXPECT() *MockAuthAttemptStatementsMockRecorder {
 	return m.recorder
+}
+
+// AddAuthAttemptFactor mocks base method.
+func (m *MockAuthAttemptStatements) AddAuthAttemptFactor(ctx context.Context, projectID, authAttemptID string, factor domain.AuthFactor) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AddAuthAttemptFactor", ctx, projectID, authAttemptID, factor)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// AddAuthAttemptFactor indicates an expected call of AddAuthAttemptFactor.
+func (mr *MockAuthAttemptStatementsMockRecorder) AddAuthAttemptFactor(ctx, projectID, authAttemptID, factor any) *MockAuthAttemptStatementsAddAuthAttemptFactorCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddAuthAttemptFactor", reflect.TypeOf((*MockAuthAttemptStatements)(nil).AddAuthAttemptFactor), ctx, projectID, authAttemptID, factor)
+	return &MockAuthAttemptStatementsAddAuthAttemptFactorCall{Call: call}
+}
+
+// MockAuthAttemptStatementsAddAuthAttemptFactorCall wrap *gomock.Call
+type MockAuthAttemptStatementsAddAuthAttemptFactorCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAuthAttemptStatementsAddAuthAttemptFactorCall) Return(checkID string, err error) *MockAuthAttemptStatementsAddAuthAttemptFactorCall {
+	c.Call = c.Call.Return(checkID, err)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAuthAttemptStatementsAddAuthAttemptFactorCall) Do(f func(context.Context, string, string, domain.AuthFactor) (string, error)) *MockAuthAttemptStatementsAddAuthAttemptFactorCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAuthAttemptStatementsAddAuthAttemptFactorCall) DoAndReturn(f func(context.Context, string, string, domain.AuthFactor) (string, error)) *MockAuthAttemptStatementsAddAuthAttemptFactorCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
 }
 
 // AuthAttemptChallengeFailed mocks base method.
