@@ -69,15 +69,21 @@ describe("settings profile", () => {
     expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
   });
 
-  it("falls back to the identifier for a schema without an email attribute", async () => {
+  it("leaves the field empty when the identifier is not an email", async () => {
     server.use(
       http.get(ME_URL, () =>
-        HttpResponse.json(me({ identifier: "maya", attributes: { username: "maya" } })),
+        HttpResponse.json(
+          me({
+            identifier: "maya",
+            identifier_property: "username",
+            attributes: { username: "maya" },
+          }),
+        ),
       ),
     );
     await renderAt("/settings/profile");
 
-    expect(await screen.findByLabelText("Email address")).toHaveValue("maya");
+    expect(await screen.findByLabelText("Email address")).toHaveValue("");
   });
 
   it("lists Profile under ACCOUNT, and no WORKSPACE heading", async () => {

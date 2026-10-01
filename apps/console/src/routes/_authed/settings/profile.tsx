@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 
 import { api } from "../../../api/zitadel";
 import { field } from "../../../lib/record";
-import { userAttributes, userIdentifier } from "../../../lib/user";
+import { userAttributes } from "../../../lib/user";
 
 /**
  * Settings → Profile: the signed-in person's own account.
@@ -39,10 +39,9 @@ const ROW = "@md/field-group:items-center!";
 
 function ProfileScreen() {
   const { user } = Route.useLoaderData();
-  const record = user as Record<string, unknown>;
-  // The schema's `email` attribute, or the designated identifier for a schema
-  // that names it differently.
-  const email = field(userAttributes(record), "email") ?? userIdentifier(record) ?? "";
+  // The schema's `email` attribute only: the designated identifier can be a
+  // username (ADR 058), so it does not stand in for a missing email.
+  const email = field(userAttributes(user as Record<string, unknown>), "email") ?? "";
   const id = useId();
 
   return (
