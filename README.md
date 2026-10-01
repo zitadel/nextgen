@@ -63,10 +63,16 @@ Zitadel Cloud instance if you want the project to belong to your team there.
 ### Local
 
 ```sh
+mkdir my-app
+cd my-app
 npx @zitadel/cli@alpha start
 npx @zitadel/cli@alpha setup --server local
 npm run dev
 ```
+
+Run all of these in your app's directory. `start` keeps the local admin's
+credential in `.zitadel/local/` there, and `setup` and `console` look for it in
+the current directory only.
 
 `start` boots the local Zitadel runtime and creates a local admin,
 `admin@zitadel.localhost`. It ends by printing a sign-in link for the
@@ -75,7 +81,9 @@ management console. That link works once.
 `setup --server local` creates the project and, by default, attaches it to
 that admin's team, so the project is owned from the start and `zitadel claim`
 reports it as already owned. If that attempt fails, setup prints a warning and
-`zitadel claim` remains the way to attach it. If you turned the platform
+`zitadel claim` remains the way to attach it. If `start` ran in another
+directory, setup finds no local admin and skips this step without a warning:
+the project stays unowned and the console shows no projects. If you turned the platform
 bootstrap off, the server has no local admin and no claiming at all, so the
 project simply has no owning team.
 
