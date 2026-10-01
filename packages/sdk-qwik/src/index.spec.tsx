@@ -13,6 +13,14 @@ import {
 } from "@zitadel/sdk-core/types";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+  LoginHarness,
+  loginTheme,
+  LogoutHarness,
+  logoutTheme,
+  SessionHarness,
+  sessionHeading,
+} from "./__fixtures__/reactive-harness";
 import { businessLocales, ZitadelLogin, ZitadelLogout, ZitadelSession } from "./index";
 
 const project = { projectId: "proj-test", proxyPath: "/__nextgen" };
@@ -232,6 +240,56 @@ describe("ZitadelSession", () => {
     expect(el).not.toBeNull();
     expect(consumerRef.value).toBe(el);
     expect(consumerRef.value?.tagName.toLowerCase()).toBe("zitadel-session");
+  });
+});
+
+/**
+ * Polls until `predicate` holds or a deadline passes. Changing a prop re-renders
+ * the parent and re-runs the wrapper's tracked visible task on a later turn, so
+ * the updated DOM property is not observable synchronously.
+ */
+async function waitFor(predicate: () => boolean): Promise<void> {
+  const deadline = Date.now() + 1000;
+  while (!predicate()) {
+    if (Date.now() > deadline) {
+      throw new Error("condition not met within 1000ms");
+    }
+    await macrotask();
+  }
+}
+
+// Each wrapper has its own tracked `useVisibleTask$`, so a signal-backed parent
+// that changes a prop after mount proves the widget stays reactive (and that the
+// task actually re-subscribes) for login, logout, and session independently.
+describe("reactive config", () => {
+  it("re-applies <zitadel-login> config when a prop changes after mount", async () => {
+    loginTheme.value = "light";
+    const host = await renderWidget(<LoginHarness />);
+    const el = (): ZitadelLoginElement | null => host.querySelector("zitadel-login");
+    await waitFor(() => el()?.theme === "light");
+    loginTheme.value = "dark";
+    await waitFor(() => el()?.theme === "dark");
+    expect(el()!.theme).toBe("dark");
+  });
+
+  it("re-applies <zitadel-logout> config when a prop changes after mount", async () => {
+    logoutTheme.value = "light";
+    const host = await renderWidget(<LogoutHarness />);
+    const el = (): ZitadelLogoutElement | null => host.querySelector("zitadel-logout");
+    await waitFor(() => el()?.theme === "light");
+    logoutTheme.value = "dark";
+    await waitFor(() => el()?.theme === "dark");
+    expect(el()!.theme).toBe("dark");
+  });
+
+  it("re-applies <zitadel-session> config when a prop changes after mount", async () => {
+    sessionHeading.value = "Signed in";
+    const host = await renderWidget(<SessionHarness />);
+    const el = (): ZitadelSessionElement | null => host.querySelector("zitadel-session");
+    await waitFor(() => el()?.heading === "Signed in");
+    sessionHeading.value = "Welcome back";
+    await waitFor(() => el()?.heading === "Welcome back");
+    expect(el()!.heading).toBe("Welcome back");
   });
 });
 

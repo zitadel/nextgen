@@ -22,5 +22,9 @@ export default defineConfig({
       external: [/^@zitadel\//, /^@qwik\.dev\//],
     },
   },
-  plugins: [qwikVite(), dts({ include: ["src"], exclude: ["src/**/*.spec.*"] })],
+  plugins: [
+    qwikVite(),
+    // Exclude specs and the test-only harness fixtures from the shipped types.
+    dts({ include: ["src"], exclude: ["src/**/*.spec.*", "src/__fixtures__/**"] }),
+  ],
 });
