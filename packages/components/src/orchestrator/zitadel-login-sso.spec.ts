@@ -322,6 +322,47 @@ describe("<zitadel-login> with identity providers", () => {
       expect(seen.filter((r) => r === "POST /flow")).toHaveLength(1);
       expect(element.shadowRoot?.querySelector("zl-alert")).not.toBeNull();
     });
+
+    it("does not carry typed values into the replacement flow", async () => {
+      const element = await mountLogin();
+      await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
+      const submitted: Array<Record<string, unknown>> = [];
+      const record = async ({ request }: { request: Request }) => {
+        if (request.method === "POST" && new URL(request.url).pathname.endsWith("/submit")) {
+          const body = (await request.clone().json()) as { fields?: Record<string, unknown> };
+          submitted.push(body.fields ?? {});
+        }
+      };
+      server.events.on("request:start", record);
+      try {
+        // The typed value is refused together with its flow.
+        server.use(http.post("*/flow/:id/submit", restartRequired, { once: true }));
+        element.shadowRoot?.dispatchEvent(
+          new CustomEvent("zl-input", {
+            bubbles: true,
+            composed: true,
+            detail: { name: "email", value: "typed@example.test" },
+          }),
+        );
+        element.shadowRoot?.dispatchEvent(
+          new CustomEvent("zl-submit", { bubbles: true, composed: true, detail: { action: "submit" } }),
+        );
+        await waitFor(() =>
+          element.shadowRoot?.textContent?.includes("Your sign-in could not be continued") ? true : null,
+        );
+        await element.updateComplete;
+
+        element.shadowRoot?.dispatchEvent(
+          new CustomEvent("zl-submit", { bubbles: true, composed: true, detail: { action: "submit" } }),
+        );
+        await waitFor(() => (submitted.length >= 2 ? true : null));
+      } finally {
+        server.events.removeListener("request:start", record);
+      }
+
+      expect(submitted[0]?.email).toBe("typed@example.test");
+      expect(submitted[1]?.email).not.toBe("typed@example.test");
+    });
   });
 
   it("offers no providers when the project has enabled none", async () => {
