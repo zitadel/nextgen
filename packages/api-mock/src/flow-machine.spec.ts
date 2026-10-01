@@ -46,7 +46,7 @@ describe("the provider round trip", () => {
   it("stops at the conflict step when the email already has an account", () => {
     // Minting a second account for an email that already has one is the
     // outcome this branch exists to prevent.
-    expect(stepAfterReturn("sso_user_already_exists")).toBe("sso-conflict");
+    expect(stepAfterReturn("user_already_exists")).toBe("sso-conflict");
   });
 
   it("treats an unresolved return as a new identity rather than a sign-in", () => {
@@ -95,7 +95,7 @@ describe("sso-conflict", () => {
       type: "SUBMIT",
       action: "callback",
       fields: { email: "ada@example.test" },
-      sso_outcome: "sso_user_already_exists",
+      sso_outcome: "user_already_exists",
     });
     return actor;
   };
@@ -127,7 +127,7 @@ describe("sso-conflict", () => {
   it("rotates the session token on every hop, as the engine does", () => {
     const actor = atProvider();
     const atRedirect = actor.getSnapshot().context.sessionToken;
-    actor.send({ type: "SUBMIT", action: "callback", fields: {}, sso_outcome: "sso_user_already_exists" });
+    actor.send({ type: "SUBMIT", action: "callback", fields: {}, sso_outcome: "user_already_exists" });
 
     expect(actor.getSnapshot().context.sessionToken).not.toBe(atRedirect);
   });
@@ -155,7 +155,7 @@ describe("every step that offers providers acts on the press", () => {
       type: "SUBMIT",
       action: "callback",
       fields: { email: "ada@example.test" },
-      sso_outcome: "sso_user_already_exists",
+      sso_outcome: "user_already_exists",
     });
     actor.send({ type: "SUBMIT", action: "sso", fields: {}, sso_provider_id: "acme" });
 

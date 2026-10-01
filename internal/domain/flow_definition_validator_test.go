@@ -1056,7 +1056,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 					},
 				},
 			},
-			wantErr: domain.ErrFlowDefinitionInvalid(`step "start": transition key "magic_link" is not an action name or reserved outcome (user_not_found, user_already_exists, sso_user_not_found, sso_user_already_exists, sso_authenticated)`, nil),
+			wantErr: domain.ErrFlowDefinitionInvalid(`step "start": transition key "magic_link" is not an action name or reserved outcome (user_not_found, user_already_exists, sso_user_not_found, sso_authenticated)`, nil),
 		},
 		{
 			name: "invalid flow - duplicate step names",
@@ -1283,6 +1283,38 @@ func TestValidator_FlipTable_SoloLoginNoFlipRequired(t *testing.T) {
 	}
 	_, err := domain.ValidateFlowDefinition(schema, def)
 	require.NoError(t, err)
+}
+
+// The SSO collision shares user_already_exists with the typed one, so there is
+// no separate sso_ key to route.
+func TestValidator_SSOCollisionHasNoOwnOutcome(t *testing.T) {
+	schema := mustSchema(t, userSchemaIDAndPassword)
+	def := domain.FlowDefinition{
+		ProjectID:     "p",
+		Name:          "solo-login",
+		SchemaVersion: "1.0.0",
+		UserSchema:    "https://tenant.com/schemas/idpw-user.json",
+		Purposes: map[domain.FlowDefinitionPurpose]string{
+			domain.FlowDefinitionPurposeLogin: "credentials",
+		},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name:   "credentials",
+				Fields: []domain.Field{"email", "x-auth-methods#password"},
+				Actions: []domain.FlowStepAction{
+					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					"submit":                  {Target: "done"},
+					"sso_user_already_exists": {Target: "done"},
+				},
+			},
+			{Name: "done", Complete: gu.Ptr(domain.FlowStepCompleteShow)},
+		},
+	}
+	_, err := domain.ValidateFlowDefinition(schema, def)
+	require.Error(t, err)
+	assert.Contains(t, errorDetails(t, err), `transition key "sso_user_already_exists" is not an action name or reserved outcome`)
 }
 
 // ---- on_success manifest cross-check ----

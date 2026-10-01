@@ -110,20 +110,21 @@ describe("applySsoToFlow", () => {
 
     expect(targets.sso_authenticated).toBe("done");
     expect(targets.sso_user_not_found).toBe("register-sso");
-    expect(targets.sso_user_already_exists).toBe("sso-conflict");
+    expect(targets.user_already_exists).toBe("sso-conflict");
+    expect(targets.sso_user_already_exists).toBeUndefined();
     // Typing an unknown email still goes to registration, as before.
     expect(targets.user_not_found).toBe("register");
   });
 
-  it("retargets the typed collision on both registration steps", () => {
+  it("retargets the shared outcome on both registration steps", () => {
     // The colliding account may be SSO-only, so the password step would
     // dead-end it; the conflict step offers every way back in.
     const { document } = applySsoToFlow(shippedFlow(), "google", bothMethods);
     for (const name of ["register", "register-password"]) {
       expect(targetsOf(document, name).user_already_exists).toBe("sso-conflict");
     }
-    expect(targetsOf(document, "register").sso_user_already_exists).toBe("sso-conflict");
-    expect(targetsOf(document, "identifier").user_already_exists).toBeUndefined();
+    expect(targetsOf(document, "sso-conflict").user_already_exists).toBe("sso-conflict");
+    expect(targetsOf(document, "sso-conflict").sso_user_already_exists).toBeUndefined();
   });
 
   it("offers only the methods the schema enables on the conflict step", () => {

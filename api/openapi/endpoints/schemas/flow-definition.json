@@ -396,7 +396,7 @@
         },
         "transitions": {
           "type": "object",
-          "description": "Maps action/outcome names to their transition descriptor.\n\nKeys match action names from the `actions` array. Additional keys\ncome from implicit outcomes based on schema annotations\n(e.g. `user_not_found` from `x-unique` fields) and engine\nevents (e.g. `sso_authenticated`, `sso_user_not_found`, `sso_user_already_exists`).\n",
+          "description": "Maps action/outcome names to their transition descriptor.\n\nKeys match action names from the `actions` array. Additional keys\ncome from implicit outcomes based on schema annotations\n(e.g. `user_not_found` from `x-unique` fields) and engine\nevents (e.g. `sso_authenticated`, `sso_user_not_found`).\n",
           "additionalProperties": {
             "type": "object",
             "required": [

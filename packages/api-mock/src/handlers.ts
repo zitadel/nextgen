@@ -135,7 +135,7 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
     if (ssoIdentities.isLinked(slug, email)) {
       return "sso_authenticated";
     }
-    return authn.hasAccount(email) ? "sso_user_already_exists" : "sso_user_not_found";
+    return authn.hasAccount(email) ? "user_already_exists" : "sso_user_not_found";
   }
 
   function reset(): void {

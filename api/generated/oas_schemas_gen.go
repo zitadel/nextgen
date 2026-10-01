@@ -19077,7 +19077,7 @@ type FlowDefinitionStep struct {
 	// Keys match action names from the `actions` array. Additional keys
 	// come from implicit outcomes based on schema annotations
 	// (e.g. `user_not_found` from `x-unique` fields) and engine
-	// events (e.g. `sso_authenticated`, `sso_user_not_found`, `sso_user_already_exists`).
+	// events (e.g. `sso_authenticated`, `sso_user_not_found`).
 	Transitions OptFlowDefinitionStepTransitions `json:"transitions"`
 }
 
@@ -19273,7 +19273,7 @@ func (s *FlowDefinitionStepOnSuccess) UnmarshalText(data []byte) error {
 // Keys match action names from the `actions` array. Additional keys
 // come from implicit outcomes based on schema annotations
 // (e.g. `user_not_found` from `x-unique` fields) and engine
-// events (e.g. `sso_authenticated`, `sso_user_not_found`, `sso_user_already_exists`).
+// events (e.g. `sso_authenticated`, `sso_user_not_found`).
 type FlowDefinitionStepTransitions map[string]FlowDefinitionStepTransitionsItem
 
 func (s *FlowDefinitionStepTransitions) init() FlowDefinitionStepTransitions {

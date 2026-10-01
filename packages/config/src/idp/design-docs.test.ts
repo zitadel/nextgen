@@ -299,11 +299,10 @@ describe("scaffolded flow (schemas/default-login.scaffold.json)", () => {
     const ssoSteps = flow.steps.filter((s) => s.sso_providers);
     expect(ssoSteps.map((s) => s.name)).toEqual(["identifier", "register", "sso-conflict"]);
     for (const step of ssoSteps) {
-      for (const outcome of ["sso_authenticated", "sso_user_not_found", "sso_user_already_exists"]) {
+      for (const outcome of ["sso_authenticated", "sso_user_not_found", "user_already_exists"]) {
         expect(step.transitions?.[outcome], `${step.name} routes ${outcome}`).toBeDefined();
       }
       expect(step.transitions!["sso_user_not_found"]!.target).toBe("register-sso");
-      expect(step.transitions!["sso_user_already_exists"]!.target).toBe("sso-conflict");
     }
     // user_not_found stays the typed-email outcome with the shipped target.
     expect(ssoSteps[0]!.transitions!["user_not_found"]).toEqual({ target: "register" });
@@ -312,10 +311,7 @@ describe("scaffolded flow (schemas/default-login.scaffold.json)", () => {
 
   it("both firing points reach sso-conflict, whose sign-in re-purposes to login's entry; no pivot anywhere", () => {
     const byName = new Map(flow.steps.map((s) => [s.name, s]));
-    for (const name of ["identifier", "register"]) {
-      expect(byName.get(name)!.transitions!["sso_user_already_exists"]!.target).toBe("sso-conflict");
-    }
-    for (const name of ["register", "register-password", "register-sso"]) {
+    for (const name of ["identifier", "register", "register-password", "register-sso"]) {
       expect(byName.get(name)!.transitions!["user_already_exists"]!.target).toBe("sso-conflict");
     }
     expect(byName.get("register-sso")!.on_success).toBe("create_user_with_sso");
@@ -327,7 +323,7 @@ describe("scaffolded flow (schemas/default-login.scaffold.json)", () => {
     // action, and the provider buttons all sit on the conflict step itself.
     expect(byName.get("sso-conflict")!.fields).toEqual(["x-auth-methods#password"]);
     expect(byName.get("sso-conflict")!.actions?.map((a) => a.kind)).toEqual(["submit", "passkey", "navigate"]);
-    expect(byName.get("sso-conflict")!.transitions!["sso_user_already_exists"]!.target).toBe("sso-conflict");
+    expect(byName.get("sso-conflict")!.transitions!["user_already_exists"]!.target).toBe("sso-conflict");
     for (const step of flow.steps) {
       for (const t of Object.values(step.transitions ?? {})) {
         expect(t.action).not.toBe("pivot");
@@ -352,7 +348,7 @@ describe("scaffolded flow (schemas/default-login.scaffold.json)", () => {
     for (const step of stripped.steps) delete step.sso_providers;
     const byName = new Map(stripped.steps.map((s) => [s.name, s]));
     for (const name of ["identifier", "register"]) {
-      for (const outcome of ["sso_authenticated", "sso_user_not_found", "sso_user_already_exists"]) {
+      for (const outcome of ["sso_authenticated", "sso_user_not_found", "user_already_exists"]) {
         delete byName.get(name)!.transitions![outcome];
       }
     }

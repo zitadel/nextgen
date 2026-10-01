@@ -65,7 +65,6 @@ export const RESERVED_OUTCOMES = [
   "user_not_found",
   "user_already_exists",
   "sso_user_not_found",
-  "sso_user_already_exists",
   "sso_authenticated",
 ] as const;
 
@@ -375,7 +374,7 @@ function validateStep(step: FlowStep): FlowValidationIssue[] {
       issues.push(
         error(
           "steps",
-          `step ${q(name)}: transition key ${q(transitionKey)} is not an action name or reserved outcome (user_not_found, user_already_exists, sso_user_not_found, sso_user_already_exists, sso_authenticated)`,
+          `step ${q(name)}: transition key ${q(transitionKey)} is not an action name or reserved outcome (user_not_found, user_already_exists, sso_user_not_found, sso_authenticated)`,
           name,
         ),
       );
