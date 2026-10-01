@@ -2130,6 +2130,49 @@ describe("<zitadel-login preview-state>", () => {
     expect(element.shadowRoot?.querySelector("zl-field[invalid]")).toBeNull();
   });
 
+  it("starts no passkey ceremony for a served step that carries a challenge", async () => {
+    server.use(
+      http.post("*/flow", () =>
+        HttpResponse.json(
+          {
+            id: "flow-1",
+            session_id: "sess-1",
+            session_token: "token-1",
+            step: {
+              name: "passkey-login",
+              texts: { title_key: "passkey-login.title" },
+              fields: [],
+              actions: [],
+              gates: {},
+              challenge: {
+                method: "passkey",
+                challenge_id: "ch-1",
+                options: { challenge: "AAAA", rpId: "localhost" },
+              },
+            },
+            branding: {},
+          },
+          { status: 201 },
+        ),
+      ),
+    );
+
+    // `<zl-passkey>` starts its ceremony as soon as it connects; here that
+    // fails at once (no WebAuthn), which is what reports an attempt.
+    const attempts: Event[] = [];
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.addEventListener("zl-passkey-error", (event) => attempts.push(event));
+    element.purpose = "login";
+    element.project = testProject;
+    element.previewState = "default";
+    host.appendChild(element);
+    await waitFor(() => element.shadowRoot?.querySelector("zl-card"));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(element.shadowRoot?.querySelector("zl-passkey")).toBeNull();
+    expect(attempts).toHaveLength(0);
+  });
+
   it("switches state in place, without starting another flow", async () => {
     const element = await mountPreview("default");
 

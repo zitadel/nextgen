@@ -217,7 +217,9 @@ export class ZitadelLogin extends ZitadelSurface {
    *   would be.
    * - `submission_error`: the form-level banner a failed submit shows.
    * - `loading`: the busy treatment of a submit in flight.
-   * - `success`: the flow's terminal screen.
+   * - `success`: the terminal screen, with the default flow's `done` texts.
+   *   A flow definition's own terminal step is not known until the server
+   *   walks the flow to it.
    *
    * Only the purpose's entry step can be previewed: a later step exists
    * only once the server has walked the flow to it.
@@ -918,8 +920,9 @@ export class ZitadelLogin extends ZitadelSurface {
       sso_providers: step.sso_providers ?? [],
       // While submitting a passkey proof, `loading` re-renders the current
       // step before the server returns. Re-rendering the same challenge would
-      // reconnect `<zl-passkey>` and start a second WebAuthn ceremony.
-      challenge: this.loading ? null : (step.challenge ?? null),
+      // reconnect `<zl-passkey>` and start a second WebAuthn ceremony. A
+      // preview renders none at all: the atom starts its ceremony on connect.
+      challenge: this.loading || this.previewState ? null : (step.challenge ?? null),
       messages: [],
       identity: this.deriveIdentity(),
       errors,

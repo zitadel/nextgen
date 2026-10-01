@@ -72,13 +72,6 @@ export const SignUp: Story = { args: { purpose: "register" } };
 export const SplitBranding: Story = { args: { branding: "split" } };
 
 /**
- * Preview mode, as the console's branding screen uses it: the served step
- * with every required field flagged, and nothing submits. Switch
- * `previewState` for the other states.
- */
-export const PreviewValidationErrors: Story = { args: { previewState: "validation_error" } };
-
-/**
  * The second step of an ordinary sign-in, where the credential is asked for.
  * The identifier collects the email on its own, so this step is only ever
  * reached by submitting one — the story does that rather than faking a step,
