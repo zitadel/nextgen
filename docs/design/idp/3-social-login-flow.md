@@ -329,9 +329,8 @@ property in the schema.
 - **Validation Rule:** Steps containing `sso_providers` **must** explicitly
   route all three outcomes (`sso_authenticated`, `sso_user_not_found`, and
   `user_already_exists`) to prevent flow dead-ends (validator rule in
-  [`2-auth-method-selection.md`](2-auth-method-selection.md); today only the
-  success key is enforced, as `transitions.callback` on main until #1371
-  renames it to `sso_authenticated`).
+  [`2-auth-method-selection.md`](2-auth-method-selection.md); today only
+  `transitions.sso_authenticated` is enforced).
 
 ## New Users: Prefill and Confirm
 

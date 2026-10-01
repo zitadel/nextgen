@@ -449,8 +449,6 @@ an identifier. Login routes a missing user through `user_not_found` to
 > **Direction:** SSO is stubbed in today's engine (`ErrUnsupported` — see
 > [capabilities.md](capabilities.md)). The definition below validates against
 > the shipped schema; the runtime exchange shows the intended ceremony.
-> The example uses the `sso_authenticated` key from #1371; against the schema
-> on main before that PR merges, the key is still `callback`.
 
 **Flow Definition:**
 
