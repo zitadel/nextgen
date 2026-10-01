@@ -472,28 +472,16 @@ review has to.
 #383 asks only that the architecture not foreclose it, and
 [Ownership](#ownership) pins the resolution root to the Project.
 
-Scoped instances come with the audience-scoped configuration draft
-([#1264](https://github.com/zitadel/nextgen/pull/1264)): one explicit project
-default and one winning override per request, applied wholesale. What that
-draft does not give by itself is restrictive inheritance: a team override
-could be weaker than the project default. Policies close that when they adopt
-it: the template gains a per-setting strictness direction (`min_length`:
-higher is stricter; a blocklist: a superset is stricter; a fixed setting has
-none), and saving a scoped instance compares its effective config against the
-project's explicit default for the same operation, rejecting any setting that
-is weaker and naming both values. Saving a new default runs the same check the
-other way, against every scoped instance of the operation, so a default can
-only tighten when its overrides already comply. Without a default the
-comparison runs against the template defaults. The setting-level metadata is
-the only new piece; the resolution model is unchanged.
+Scoped instances (a team, an app) come with the audience-scoped
+configuration draft ([#1264](https://github.com/zitadel/nextgen/pull/1264)).
+Two questions stay open until then:
 
-The unresolved product question is tenant-authored configuration: a Team in a
-customer project is a runtime resource, so a Team-level override cannot be in
-the developer's release without the developer authoring a document per tenant.
-The shape worth preserving optionality for is the envelope model: the release
-declares which settings a tenant may strengthen and how far, and the tenant's
-choice is runtime state bounded by release content. Whether Zitadel wants that
-at all is a product decision that has not been made.
+- A scoped instance must not weaken the project's policy. How that is
+  checked, and against what, is decided together with #1264.
+- Tenant-authored configuration: a Team in a customer project is a runtime
+  resource, so a Team-level override cannot live in the developer's release
+  as it is. Whether Zitadel wants tenants to configure policies at all is a
+  product decision that has not been made.
 
 ## External references
 
