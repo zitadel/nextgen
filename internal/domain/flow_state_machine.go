@@ -205,12 +205,25 @@ type FlowAuthRequestRef struct {
 
 // FlowStateMachineRuntime is the production [FlowStateMachine].
 type FlowStateMachineRuntime struct {
-	schemas      SchemaResolver
-	schemaStore  JSONSchemaStore
-	fields       FlowFieldResolver
-	userCreater  FlowOnSuccessHandler
-	authAttempts FlowAuthAttemptService
-	now          func() time.Time
+	schemas           SchemaResolver
+	schemaStore       JSONSchemaStore
+	fields            FlowFieldResolver
+	userCreater       FlowOnSuccessHandler
+	authAttempts      FlowAuthAttemptService
+	passwordSaveRules FlowPasswordSaveRules
+	now               func() time.Time
+}
+
+// FlowPasswordSaveRules returns the validation a password field carries on a
+// step where the password is saved: the project's `user.password.save`
+// constraints (ADR 066). The state machine calls it with the flow's project.
+type FlowPasswordSaveRules func(ctx context.Context, projectID string) (*FlowFieldValidation, error)
+
+// WithPasswordSaveRules wires the project's password constraints into field
+// resolution. Without it a saved password keeps the built-in floor.
+func (r *FlowStateMachineRuntime) WithPasswordSaveRules(rules FlowPasswordSaveRules) *FlowStateMachineRuntime {
+	r.passwordSaveRules = rules
+	return r
 }
 
 // NewFlowStateMachine wires the runtime. The now hook is injectable so
@@ -389,7 +402,7 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, def *FlowDefiniti
 // resolveInputs resolves the step's fields and prefills any values the
 // user already supplied on earlier steps.
 func (r *FlowStateMachineRuntime) resolveInputs(pc *processCtx) (FlowResolvedFields, error) {
-	resolved, err := r.resolveStepFields(pc.ctx, pc.state, pc.currentStep)
+	resolved, err := r.resolveStepFields(pc.ctx, pc.def, pc.state, pc.currentStep)
 	if err != nil {
 		return FlowResolvedFields{}, err
 	}
@@ -772,13 +785,10 @@ func (r *FlowStateMachineRuntime) dispatchChallenges(pc *processCtx, resolved Fl
 				return flowDispatchResult{Outcome: FlowImplicitOutcomeUserAlreadyExists}, nil
 			}
 		case FlowFieldChallengePassword:
-			if state.CurrentPurpose != FlowDefinitionPurposeLogin {
-				continue
-			}
-			// Skip if any visited step runs an on_success — today the only
-			// one (create_user) establishes the password kind, and the
-			// validator enforces password-collected-upstream for it.
-			if anyVisitedStepOnSuccess(def, state, step) {
+			// A password is only verified on a login that no visited
+			// on_success (create_user) turns into a creation; the validator
+			// enforces password-collected-upstream for that case.
+			if !passwordVerifiedOnStep(def, state, step) {
 				continue
 			}
 			err := r.authAttempts.SubmitPassword(ctx, FlowSubmitPasswordInput{
@@ -1189,7 +1199,7 @@ func (r *FlowStateMachineRuntime) processBack(pc *processCtx) (FlowStepResult, e
 	// One resolution serves both the identifier check and the render below:
 	// it is the same step either way, and resolving twice would double the
 	// schema load and the chance of a transient failure on one back click.
-	resolved, err := r.resolveStepFields(pc.ctx, pc.state, prevStep)
+	resolved, err := r.resolveStepFields(pc.ctx, pc.def, pc.state, prevStep)
 	if err != nil {
 		return FlowStepResult{}, err
 	}
@@ -1268,7 +1278,7 @@ func (r *FlowStateMachineRuntime) renderStep(ctx context.Context, def *FlowDefin
 	if !ok {
 		return nil, fmt.Errorf("%w: render unknown step %q", ErrFlowIntegrity(), state.CurrentStep)
 	}
-	resolved, err := r.resolveStepFields(ctx, state, step)
+	resolved, err := r.resolveStepFields(ctx, def, state, step)
 	if err != nil {
 		return nil, err
 	}
@@ -1276,7 +1286,7 @@ func (r *FlowStateMachineRuntime) renderStep(ctx context.Context, def *FlowDefin
 	return r.buildStep(state, step, resolved, nil, nil, nil), nil
 }
 
-func (r *FlowStateMachineRuntime) resolveStepFields(ctx context.Context, state *FlowState, step *FlowDefinitionStep) (FlowResolvedFields, error) {
+func (r *FlowStateMachineRuntime) resolveStepFields(ctx context.Context, def *FlowDefinition, state *FlowState, step *FlowDefinitionStep) (FlowResolvedFields, error) {
 	if len(step.Fields) == 0 {
 		return FlowResolvedFields{}, nil
 	}
@@ -1288,7 +1298,58 @@ func (r *FlowStateMachineRuntime) resolveStepFields(ctx context.Context, state *
 	if err != nil {
 		return FlowResolvedFields{}, fmt.Errorf("flow state machine: resolve fields on step %q: %w", step.Name, err)
 	}
+	if passwordVerifiedOnStep(def, state, step) {
+		dropPasswordSaveRules(&resolved)
+		return resolved, nil
+	}
+	if err := r.applyPasswordSaveRules(ctx, state.ProjectID, &resolved); err != nil {
+		return FlowResolvedFields{}, fmt.Errorf("flow state machine: password constraints on step %q: %w", step.Name, err)
+	}
 	return resolved, nil
+}
+
+// applyPasswordSaveRules replaces the floor on a saved password field with
+// the project's `user.password.save` constraints, read once per resolution
+// and only when the step carries such a field.
+func (r *FlowStateMachineRuntime) applyPasswordSaveRules(ctx context.Context, projectID string, resolved *FlowResolvedFields) error {
+	if r.passwordSaveRules == nil {
+		return nil
+	}
+	var rules *FlowFieldValidation
+	for i := range resolved.Fields {
+		if resolved.Fields[i].Challenge != FlowFieldChallengePassword {
+			continue
+		}
+		if rules == nil {
+			var err error
+			if rules, err = r.passwordSaveRules(ctx, projectID); err != nil {
+				return err
+			}
+		}
+		resolved.Fields[i].Validation = rules
+	}
+	return nil
+}
+
+// passwordVerifiedOnStep reports whether a password submitted on step is
+// checked against the user's stored credential rather than collected for a
+// save: a login that no visited on_success (create_user) turns into a
+// creation. Dispatch and field resolution read the same answer, so the
+// step renders and validates what it will do with the value.
+func passwordVerifiedOnStep(def *FlowDefinition, state *FlowState, step *FlowDefinitionStep) bool {
+	return state.CurrentPurpose == FlowDefinitionPurposeLogin && !anyVisitedStepOnSuccess(def, state, step)
+}
+
+// dropPasswordSaveRules strips the `user.password.save` constraints from a
+// password field that is verified, not saved (ADR 066): the policy governs
+// new passwords, and a stored one predating a stricter policy must still
+// sign in. Verification is the only check that value gets.
+func dropPasswordSaveRules(resolved *FlowResolvedFields) {
+	for i := range resolved.Fields {
+		if resolved.Fields[i].Challenge == FlowFieldChallengePassword {
+			resolved.Fields[i].Validation = nil
+		}
+	}
 }
 
 // resolveVisitedFields resolves the union of fields collected by every

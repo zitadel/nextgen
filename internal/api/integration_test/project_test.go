@@ -551,7 +551,7 @@ func TestPatchProjectPasswordHash(t *testing.T) {
 func TestProjectPasswordHashPolicyGovernsHashing(t *testing.T) {
 	t.Parallel()
 
-	const password = "Passw0rd!-504"
+	const password = "Passw0rd!-504-long"
 
 	hashOf := func(t *testing.T, projectID, userID string) string {
 		t.Helper()

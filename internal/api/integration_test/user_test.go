@@ -343,7 +343,7 @@ func TestDeleteUser(t *testing.T) {
 			t.Parallel()
 
 			const email = "testdeleteuserwithsession@example.com"
-			const password = "pass123$"
+			const password = "pass123$pass123$"
 
 			userService := harness.EnsureUserService(t)
 
@@ -425,7 +425,7 @@ func TestSetUserPassword(t *testing.T) {
 
 			params, userEmail := createUser(t, "testsetuserpassword.initial@example.com")
 
-			const password = "fake-password"
+			const password = "fake-password-long!"
 			request := &api.SetUserPasswordRequest{
 				Password: password,
 			}
@@ -442,12 +442,31 @@ func TestSetUserPassword(t *testing.T) {
 			assert.NoError(t, err)
 		})
 
+		t.Run("password policy rejects a short password", func(t *testing.T) {
+			t.Parallel()
+
+			params, _ := createUser(t, "testsetuserpassword.policy@example.com")
+
+			resp, err := client.SetUserPassword(t.Context(), &api.SetUserPasswordRequest{
+				Password: "short",
+			}, params)
+			require.NoError(t, err)
+			bad, ok := resp.(*api.SetUserPasswordBadRequest)
+			require.True(t, ok, "got %T: %s", resp, helpers.MustMarshal(t, resp))
+			assert.Equal(t, api.ErrorCode("user.password_policy_violation"), bad.Code)
+			envelope, ok := bad.Details.Get()
+			require.True(t, ok, "policy denial carries the violated rules")
+			violations := string(envelope["details"]) // ADR 030: producer details sit under `details.details`
+			assert.Contains(t, violations, `"rule":"min_length"`)
+			assert.Contains(t, violations, `"min_length":15`)
+		})
+
 		t.Run("update password", func(t *testing.T) {
 			t.Parallel()
 
 			params, userEmail := createUser(t, "testsetuserpassword.update@example.com")
 
-			const originalPassword = "fake-password"
+			const originalPassword = "fake-password-long!"
 			request := &api.SetUserPasswordRequest{
 				Password: originalPassword,
 			}
@@ -456,7 +475,7 @@ func TestSetUserPassword(t *testing.T) {
 			assert.NoError(t, err)
 			assert.IsType(t, &api.SetUserPasswordNoContent{}, resp, helpers.MustMarshal(t, resp))
 
-			const newPassword = "new-password"
+			const newPassword = "new-password-long!"
 
 			request = &api.SetUserPasswordRequest{
 				Password: newPassword,
@@ -499,7 +518,7 @@ func TestSetUserPassword(t *testing.T) {
 			harness.SetProjectSecretOnApiClient(t, projClient, project)
 
 			request := &api.SetUserPasswordRequest{
-				Password: "fake-password",
+				Password: "fake-password-long!",
 			}
 			params := api.SetUserPasswordParams{
 				UserID: api.UserID("user_does-not-exist"),
@@ -693,7 +712,7 @@ func TestPatchMyUser(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		const password = "fake-password"
+		const password = "fake-password-long!"
 		require.NoError(t, userService.SetPassword(t.Context(), service.SetPasswordInput{
 			ProjectID: project.ID,
 			UserID:    user.ID,
@@ -878,7 +897,7 @@ func TestGetMyUser(t *testing.T) {
 		userID := user.ID
 		userEmail := user.StringAttribute("email")
 
-		const password = "fake-password"
+		const password = "fake-password-long!"
 		err = userService.SetPassword(t.Context(), service.SetPasswordInput{
 			ProjectID: project.ID,
 			UserID:    userID,
