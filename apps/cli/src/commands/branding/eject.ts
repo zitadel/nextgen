@@ -19,7 +19,12 @@ import { BRANDING_DIR } from "../../lib/branding";
 import { BRANDING_DESIGN_INFO, resolveBrandingDesign } from "../../lib/branding/designs";
 import { ZitadelError } from "../../lib/errors";
 import { stableStringify } from "../../lib/json";
-import { BaseCommand, CommandGroups, type JsonEnvelope } from "../../lib/oclif";
+import {
+  BaseCommand,
+  CommandGroups,
+  type JsonEnvelope,
+  nonBlankString,
+} from "../../lib/oclif";
 import { hasZitadelConfig } from "../../lib/project";
 import {
   normalizePublicCliJson,
@@ -48,7 +53,7 @@ export default class BrandingEject extends BaseCommand {
     // No oclif `options`: the retired designs (#1039) must reach
     // resolveBrandingDesign to get their targeted error instead of oclif's
     // generic "expected one of".
-    design: Flags.string({
+    design: nonBlankString({
       description: `Design to start from: ${BRANDING_DESIGNS.join(" or ")} (default: ${DEFAULT_BRANDING_DESIGN}).`,
     }),
   };

@@ -6,6 +6,7 @@
 export { BaseCommand } from "./base";
 export { OwnerCommand } from "./owner-command";
 export { CommandGroups, type CommandGroup } from "./groups";
+export { nonBlankArg, nonBlankString } from "./flags";
 export type {
   CommandResult,
   EnvelopeMeta,

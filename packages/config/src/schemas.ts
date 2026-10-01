@@ -1,6 +1,7 @@
 import {
   CreateBrandingBody,
   CreateFlowDefinitionBody,
+  CreateIdpBody,
   CreateSchemaBody,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import { z } from "zod";
@@ -15,6 +16,14 @@ import { isCanonicalLoopbackHttpUrl } from "./branding-url.js";
 export const schemaConfigSchema = CreateSchemaBody;
 export const flowConfigSchema = CreateFlowDefinitionBody.shape.flow_definition;
 export const createFlowDefinitionRequestSchema = CreateFlowDefinitionBody;
+
+/**
+ * One `.zitadel/idps/<slug>.json` body: the connection document `POST /idps`
+ * carries under `idp`. The generated Zod enforces the contract the meta-schema
+ * states, including that `client_secret` is a `${{ NAME }}` reference and
+ * never a literal.
+ */
+export const idpConnectionConfigSchema = CreateIdpBody.shape.idp;
 
 /** The wire shape of a branding revision (`POST /branding` request body). */
 export const brandingWireSchema = CreateBrandingBody;

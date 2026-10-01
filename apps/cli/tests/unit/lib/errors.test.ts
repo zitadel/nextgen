@@ -223,3 +223,46 @@ describe("toZitadelError", () => {
     expect(toZitadelError(server).code).toBe("E_NETWORK");
   });
 });
+
+/**
+ * Found against the real IdP controller: rejecting a changed issuer answers
+ * `idp.field_immutable`, whose message names no field. The envelope does, so
+ * the failure a person reads should too.
+ */
+describe("fields the platform blames", () => {
+  const immutable = (body: unknown) =>
+    toZitadelError(
+      new ApiError(400, "http://localhost:8140/idps?project_id=p", body, "Bad Request"),
+    );
+
+  it("names them, as the server nests them", () => {
+    const error = immutable({
+      code: "idp.field_immutable",
+      message: "identity provider connection: the field is fixed for the life of the connection",
+      details: { details: { fields: ["oidc.issuer"] } },
+    });
+
+    expect(error.hint).toContain("oidc.issuer");
+    expect(error.hint).toContain("this field");
+  });
+
+  it("reads them without the extra wrapper too", () => {
+    const error = immutable({ code: "idp.field_immutable", details: { fields: ["protocol"] } });
+
+    expect(error.hint).toContain("protocol");
+  });
+
+  it("says fields, plural, when there is more than one", () => {
+    const error = immutable({
+      code: "idp.field_immutable",
+      details: { details: { fields: ["protocol", "subject_claim"] } },
+    });
+
+    expect(error.hint).toContain("these fields");
+    expect(error.hint).toContain("protocol, subject_claim");
+  });
+
+  it("adds no hint when the envelope blames nothing", () => {
+    expect(immutable({ code: "req.invalid", message: "nope" }).hint).toBeUndefined();
+  });
+});
