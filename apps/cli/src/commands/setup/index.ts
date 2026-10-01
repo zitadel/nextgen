@@ -299,8 +299,16 @@ export default class Setup extends BaseCommand {
     this.recordTelemetry({
       preset: answers.preset,
       use_case: answers.useCase,
-      // The set, not one name: telemetry counts what a project enabled.
-      sso: answers.sso.length === 0 ? "none" : answers.sso.map((a) => a.provider).join(","),
+      // One slug, "none", or "multiple" -- never a joined set. A dimension's
+      // value space has to stay enumerable: comma-joining n providers makes it
+      // combinatorial, and the question telemetry answers here is whether a
+      // project enabled a provider at all, not which combination.
+      sso:
+        answers.sso.length === 0
+          ? "none"
+          : answers.sso.length === 1
+            ? (answers.sso[0]?.provider ?? "none")
+            : "multiple",
     });
 
     const issuer = issuerFromPort(answers.devPort);

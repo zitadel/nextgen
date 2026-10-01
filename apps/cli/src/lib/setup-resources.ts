@@ -101,7 +101,14 @@ export async function materializeSetupResources(opts: {
   // name its slug: a Project should never be published claiming a provider the
   // platform does not hold. Its claim mapping reads the template's properties,
   // which enabling the provider does not change.
-  const slugs: string[] = [];
+  // Every connection is built and every path checked before the first create.
+  // Checking inside the loop would refuse "before anything is created" only
+  // for the first provider: a conflict on the second would leave the first
+  // created on the platform, its file written and its state recorded, and
+  // setup does not remove a connection file it wrote -- so the retry would
+  // then refuse on that file too, with nothing but the developer able to
+  // clear it. One pass to build and refuse, a second to create.
+  const planned: Array<{ slug: string; connectionPath: string; connection: object }> = [];
   for (const chosen of opts.sso ?? []) {
     const connection = idpProvider(chosen.provider).connection({
       endpoints: chosen.endpoints,
@@ -110,7 +117,6 @@ export async function materializeSetupResources(opts: {
     });
     const slug = typeof connection.slug === "string" ? connection.slug : undefined;
     if (!slug) continue;
-    slugs.push(slug);
     const connectionPath = `${IDPS_DIR}/${slug}.json`;
     // Refused before anything is created, for two reasons: the file is the
     // developer's (see {@link CONNECTION_EXISTS}), and finding out after the
@@ -122,7 +128,11 @@ export async function materializeSetupResources(opts: {
         nextCommands: CONNECTION_EXISTS.nextCommands,
       });
     }
+    planned.push({ slug, connectionPath, connection });
+  }
 
+  const slugs: string[] = planned.map((entry) => entry.slug);
+  for (const { connectionPath, connection } of planned) {
     // The create comes before the file. Setup does not remove a connection
     // file it wrote -- that rule is what keeps a developer's own file safe --
     // so writing first would leave one behind on any failure here and the
