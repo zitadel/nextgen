@@ -43,9 +43,9 @@ func ErrIDPConnectionRevisionConflict() Error {
 	return newError(PrefixIDPConnection.ErrorCodePrefix("revision_conflict"), "identity provider connection: another revision of the same connection was created at the same instant", nil, nil)
 }
 
-// idpConnectionDocument holds the few document fields the server reads. The
+// IDPConnectionDocument holds the few document fields the server reads. The
 // rest of the document belongs to the API contract and stays opaque here.
-type idpConnectionDocument struct {
+type IDPConnectionDocument struct {
 	Protocol     *string `json:"protocol"`
 	SubjectClaim *string `json:"subject_claim"`
 	Template     *string `json:"template"`
@@ -59,8 +59,8 @@ type idpConnectionDocument struct {
 	} `json:"oauth2"`
 }
 
-func parseIDPConnectionDocument(document []byte) (idpConnectionDocument, error) {
-	var doc idpConnectionDocument
+func ParseIDPConnectionDocument(document []byte) (IDPConnectionDocument, error) {
+	var doc IDPConnectionDocument
 	err := json.Unmarshal(document, &doc)
 	return doc, err
 }
@@ -74,11 +74,11 @@ func parseIDPConnectionDocument(document []byte) (idpConnectionDocument, error) 
 // endpoint fields are skipped: those of two protocols are not comparable.
 // The order is protocol, subject_claim, then endpoints.
 func IDPConnectionImmutableFieldsChanged(stored, next []byte) ([]string, error) {
-	before, err := parseIDPConnectionDocument(stored)
+	before, err := ParseIDPConnectionDocument(stored)
 	if err != nil {
 		return nil, err
 	}
-	after, err := parseIDPConnectionDocument(next)
+	after, err := ParseIDPConnectionDocument(next)
 	if err != nil {
 		return nil, err
 	}
@@ -169,6 +169,44 @@ func ErrIDPEndpointsPartial(missing []string) Error {
 // accepts the protocol, but the engine does not serve it yet (#1066).
 func ErrIDPOAuth2Unsupported() Error {
 	return newError(PrefixIDPConnection.ErrorCodePrefix("oauth2_unsupported"), "identity provider connection: the oauth2 protocol is not supported yet", nil, nil)
+}
+
+// ErrIDPExchangeFailed reports that the code exchange yielded no token. One
+// code covers the whole step, as discovery_failed does: the token endpoint
+// answered with an error such as invalid_grant or with a non-conformant
+// body, or no answer arrived because the address was denied, the connection
+// failed, or an egress cap struck.
+func ErrIDPExchangeFailed(cause error) Error {
+	return newError(PrefixIDPConnection.ErrorCodePrefix("exchange_failed"), "identity provider connection: the code exchange failed", nil, cause)
+}
+
+// ErrIDPIDTokenInvalid reports an id_token the engine will not accept: absent
+// from the token response, signed with an algorithm outside the allowlist or
+// with a key the JWKS endpoint does not serve, or carrying an issuer,
+// audience, expiry, or nonce other than the attempt expects.
+func ErrIDPIDTokenInvalid(cause error) Error {
+	return newError(PrefixIDPConnection.ErrorCodePrefix("id_token_invalid"), "identity provider connection: the id_token is invalid", nil, cause)
+}
+
+// ErrIDPUserinfoFailed reports a userinfo response the engine cannot take
+// claims from: no answer, a non-2xx status, a body that is not a JSON
+// object, or a sub other than the id_token's.
+func ErrIDPUserinfoFailed(cause error) Error {
+	return newError(PrefixIDPConnection.ErrorCodePrefix("userinfo_failed"), "identity provider connection: the userinfo request failed", nil, cause)
+}
+
+// ErrIDPSupplementaryFetchFailed reports that the connection's
+// supplementary_fetch strategy could not complete: its request failed or
+// its response did not parse. An empty result is not a failure.
+func ErrIDPSupplementaryFetchFailed(cause error) Error {
+	return newError(PrefixIDPConnection.ErrorCodePrefix("supplementary_fetch_failed"), "identity provider connection: the supplementary fetch failed", nil, cause)
+}
+
+// ErrIDPSubjectInvalid reports a subject claim the engine cannot key an
+// identity on: absent, null, empty, or a boolean, object, or array. The
+// cause names the claim and the shape, never the value.
+func ErrIDPSubjectInvalid(cause error) Error {
+	return newError(PrefixIDPConnection.ErrorCodePrefix("subject_invalid"), "identity provider connection: the subject claim is absent or not a string or number", nil, cause)
 }
 
 // IDPConnection is one identity provider connection at one revision. The

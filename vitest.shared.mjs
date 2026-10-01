@@ -7,14 +7,13 @@
  *     test: { ...baseTest, name: "@zitadel/x", environment: "node" },
  *   });
  *
- * It is a plain object (not `defineConfig`/`mergeConfig`) on purpose: the SDK
- * family — and `apps/cli`, which shares the `sdk` pnpm catalog — resolves
- * Vitest 3 (pinned there because Qwik 1 peers `vite >=5 <8`) while everything
- * else resolves Vitest 4. A plain object
- * of the fields common to both majors is consumed cleanly by either. It ships
- * as `.mjs` + a hand-written `.d.mts` so it resolves under both `bundler` and
- * `nodenext` TypeScript projects (including composite ones) without being pulled
- * into each project's compiled file list.
+ * It is a plain object (not `defineConfig`/`mergeConfig`) on purpose: every
+ * project resolves Vitest 4 from the root catalog, but a plain object of the
+ * shared `test` fields stays trivially assignable and keeps this base decoupled
+ * from any one Vitest version's config type. It ships as `.mjs` + a hand-written
+ * `.d.mts` so it resolves under both `bundler` and `nodenext` TypeScript
+ * projects (including composite ones) without being pulled into each project's
+ * compiled file list.
  *
  * Only genuinely shared fields live here. Per-project axes — `environment`,
  * `plugins`, `resolve.conditions`, `include`, `setupFiles`/`globalSetup`, the

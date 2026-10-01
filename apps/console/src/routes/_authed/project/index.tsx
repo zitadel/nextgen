@@ -3,6 +3,7 @@ import { AlertCircle, Box, Loader2, SlidersHorizontal } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { EYEBROW, MetaRule, MetaValue } from "@/components/detail-meta";
+import { DETAIL_BODY, DetailHeader, DetailPage } from "@/components/detail-page";
 import { ProjectAdmins } from "@/components/project-admins";
 import { Alert, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -15,8 +16,6 @@ import { api } from "../../../api/zitadel";
 import { describeError } from "../../../lib/api-error";
 import { formatDate } from "../../../lib/date";
 import { projectScopeDeps, requireProjectScope } from "../../../lib/project-scope";
-
-const PLATE = "flex size-9 items-center justify-center rounded-md bg-muted text-foreground";
 
 /**
  * Project settings — the selected project's own page.
@@ -93,32 +92,20 @@ function ProjectDetail() {
   }
 
   return (
-    // The page header is inset 24px and the card 16px, and the header sits 18px
-    // below the navbar — the geometry the detail frame draws.
-    <div className="px-4 pt-[18px] pb-8">
-      {/* Wraps rather than overflows: the meta card's width is set by the id, so
-          when the title and the card no longer fit on one line the card drops
-          below instead of pushing off the page edge. */}
-      <div className="flex flex-col gap-4 px-2 lg:flex-row lg:flex-wrap lg:items-center lg:justify-between">
-        <div className="flex min-w-0 items-center gap-3">
-          <span className={PLATE}>
-            <Box className="size-4" strokeWidth={1.5} aria-hidden />
-          </span>
-          <h1 className="text-foreground font-serif text-2xl leading-6 tracking-tight">
-            {project.name}
-          </h1>
-        </div>
-        <Card className="max-w-full gap-0 overflow-x-auto rounded-xl py-0">
-          <CardContent className="flex flex-col px-5 py-3 sm:flex-row sm:flex-wrap sm:items-center">
+    <DetailPage>
+      <DetailHeader
+        icon={Box}
+        title={project.name}
+        meta={
+          <>
             <MetaValue label="Project ID" value={project.id} copyable />
             <MetaRule />
             <MetaValue label="Created" value={formatDate(project.created_at)} />
-          </CardContent>
-        </Card>
-      </div>
+          </>
+        }
+      />
 
-      {/* Card top sits 32px under the header row. */}
-      <Card className="mt-8 gap-0 rounded-xl py-0">
+      <Card className={`${DETAIL_BODY} gap-0 rounded-xl py-0`}>
         {/* `Card Content`: inset 24px, 20px top and bottom, with a 16px gap
             between the header, the rule and the grid. */}
         <CardContent className="flex flex-col gap-4 px-6 py-5">
@@ -165,6 +152,6 @@ function ProjectDetail() {
         grants={grants}
         onChanged={() => void router.invalidate()}
       />
-    </div>
+    </DetailPage>
   );
 }

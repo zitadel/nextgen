@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/sdk-next",
-  "version": "1.0.0-alpha.23",
+  "version": "1.0.0-alpha.24",
   "description": "Next.js helpers and mock auth UI for Zitadel",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-next#readme",
   "bugs": {
@@ -78,7 +78,7 @@
     "@testing-library/react": "catalog:",
     "@testing-library/user-event": "catalog:",
     "@types/react": "catalog:",
-    "@vitest/coverage-v8": "catalog:sdk",
+    "@vitest/coverage-v8": "catalog:",
     "eslint": "catalog:",
     "eslint-config-prettier": "catalog:",
     "eslint-import-resolver-typescript": "catalog:",
@@ -94,6 +94,6 @@
     "prettier": "catalog:",
     "typescript": "^5.7.3",
     "typescript-eslint": "catalog:",
-    "vitest": "catalog:sdk"
+    "vitest": "catalog:"
   }
 }

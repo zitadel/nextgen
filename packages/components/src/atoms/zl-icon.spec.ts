@@ -77,3 +77,36 @@ describe("<zl-icon>", () => {
     expect(el.getAttribute("size")).toBe("16");
   });
 });
+
+/**
+ * Raised in review: a monochrome vendor mark (GitHub, Apple) must follow the
+ * label colour, or it renders black on the dark provider button. The wrapper
+ * already covers it -- the `<svg>` carries `fill="currentColor"`, which a
+ * multi-coloured mark overrides per path and a monochrome one inherits -- so
+ * this pins that rather than adding a flag to each entry.
+ */
+describe("brand marks and colour", () => {
+  let brandHost: HTMLDivElement;
+
+  beforeEach(() => {
+    brandHost = document.createElement("div");
+    document.body.appendChild(brandHost);
+  });
+
+  afterEach(() => {
+    brandHost.remove();
+  });
+
+  it("leaves the svg on currentColor, so a mark with no per-path fill follows the label", async () => {
+    brandHost.innerHTML = `<zl-icon name="brand-google" size="16" decorative></zl-icon>`;
+    const el = brandHost.querySelector("zl-icon") as ZlIcon;
+    await el.updateComplete;
+    const svg = el.shadowRoot?.querySelector("svg");
+
+    expect(svg?.getAttribute("fill")).toBe("currentColor");
+    // Google's is the multi-coloured case: every path overrides it.
+    const paths = [...(svg?.querySelectorAll("path") ?? [])];
+    expect(paths.length).toBeGreaterThan(0);
+    expect(paths.every((path) => path.getAttribute("fill") !== null)).toBe(true);
+  });
+});

@@ -1,11 +1,10 @@
-// @vitest-environment jsdom
 import type {
   ZitadelLogin as ZitadelLoginElement,
   ZitadelLogout as ZitadelLogoutElement,
   ZitadelSession as ZitadelSessionElement,
 } from "@zitadel/components";
 
-import { $, render, type Signal } from "@builder.io/qwik";
+import { $, render, type Signal } from "@qwik.dev/core";
 import { businessLocales as componentsBusinessLocales } from "@zitadel/components";
 import {
   ZITADEL_LOGIN_EVENT_HANDLERS,
@@ -21,13 +20,30 @@ const project = { projectId: "proj-test", proxyPath: "/__nextgen" };
 const macrotask = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 
 /**
+ * Renders a widget into a fresh host attached to the document. Qwik 2's client
+ * `render` finds its container via a `[q:container]` attribute selector that a
+ * jsdom/domino selector engine cannot match — and the widgets wrap real Lit
+ * custom elements that only upgrade in a real DOM — so this suite runs in a
+ * browser (see vitest.config.ts) where `render`, element upgrade, and native
+ * events all behave as in production. Returns the mounted host.
+ */
+async function renderWidget(jsx: Parameters<typeof render>[1]): Promise<HTMLElement> {
+  const host = document.createElement("div");
+  document.body.appendChild(host);
+  await render(host, jsx);
+  return host;
+}
+
+/**
  * Qwik wires the widget's listeners in a `useVisibleTask$` that runs a turn
  * after `render` (eager `document-ready` strategy), so a single fixed delay
  * races the attachment. Instead, re-dispatch the event each turn until the
- * forwarded callback fires, polling up to a generous deadline. CustomEvents do
- * not replay, so dispatching only after the listener exists is essential —
- * re-dispatching makes that deterministic without guessing the timing. Returns
- * the detail the callback received (the listener forwards `event.detail`).
+ * forwarded callback receives this exact `detail`, polling up to a generous
+ * deadline. CustomEvents do not replay, so dispatching only after the listener
+ * exists is essential — re-dispatching makes that deterministic without guessing
+ * the timing. Matching by identity (not "something arrived") keeps the check
+ * robust when the live widget emits its own event of the same name — e.g. a
+ * `zitadel-flow-error` from the stubbed network — alongside our probe.
  */
 async function dispatchUntilForwarded(
   el: Element,
@@ -36,9 +52,9 @@ async function dispatchUntilForwarded(
   received: readonly Record<string, unknown>[],
 ): Promise<void> {
   const deadline = Date.now() + 1000;
-  while (received.length === 0) {
+  while (!received.includes(detail)) {
     el.dispatchEvent(new CustomEvent(eventName, { detail }));
-    if (received.length > 0) {
+    if (received.includes(detail)) {
       return;
     }
     if (Date.now() > deadline) {
@@ -57,18 +73,14 @@ beforeEach(() => {
 
 describe("ZitadelLogin", () => {
   it("binds the project handle as a property", async () => {
-    const host = document.createElement("div");
-    document.body.appendChild(host);
-    await render(host, <ZitadelLogin project={project} purpose="login" />);
+    const host = await renderWidget(<ZitadelLogin project={project} purpose="login" />);
     const el = host.querySelector<ZitadelLoginElement>("zitadel-login");
     expect(el).not.toBeNull();
     expect(el!.project).toBe(project);
   });
 
   it("binds discrete projectId/proxyPath", async () => {
-    const host = document.createElement("div");
-    document.body.appendChild(host);
-    await render(host, <ZitadelLogin projectId="proj-test" proxyPath="/__nextgen" />);
+    const host = await renderWidget(<ZitadelLogin projectId="proj-test" proxyPath="/__nextgen" />);
     const el = host.querySelector<ZitadelLoginElement>("zitadel-login");
     expect(el!.projectId).toBe("proj-test");
     expect(el!.proxyPath).toBe("/__nextgen");
@@ -76,9 +88,7 @@ describe("ZitadelLogin", () => {
 
   it("forwards locales and lang to the widget", async () => {
     const locales = { en: { "identifier.title": "Welcome back" } };
-    const host = document.createElement("div");
-    document.body.appendChild(host);
-    await render(host, <ZitadelLogin project={project} locales={locales} lang="de" />);
+    const host = await renderWidget(<ZitadelLogin project={project} locales={locales} lang="de" />);
     const el = host.querySelector<ZitadelLoginElement>("zitadel-login");
     expect(el!.locales).toEqual(locales);
     expect(el!.lang).toBe("de");
@@ -88,10 +98,7 @@ describe("ZitadelLogin", () => {
     "forwards %s to its callback",
     async (eventName, handlerProp) => {
       const received: Record<string, unknown>[] = [];
-      const host = document.createElement("div");
-      document.body.appendChild(host);
-      await render(
-        host,
+      const host = await renderWidget(
         <ZitadelLogin
           project={project}
           {...{
@@ -105,15 +112,13 @@ describe("ZitadelLogin", () => {
       expect(el).not.toBeNull();
       const detail = { probe: eventName };
       await dispatchUntilForwarded(el!, eventName, detail, received);
-      expect(received[received.length - 1]).toBe(detail);
+      expect(received).toContain(detail);
     },
   );
 
   it("populates a consumer ref with the underlying element", async () => {
     const consumerRef = { value: undefined } as Signal<ZitadelLoginElement | undefined>;
-    const host = document.createElement("div");
-    document.body.appendChild(host);
-    await render(host, <ZitadelLogin project={project} ref={consumerRef} />);
+    const host = await renderWidget(<ZitadelLogin project={project} ref={consumerRef} />);
     await macrotask();
     const el = host.querySelector<ZitadelLoginElement>("zitadel-login");
     expect(el).not.toBeNull();
@@ -124,18 +129,14 @@ describe("ZitadelLogin", () => {
 
 describe("ZitadelLogout", () => {
   it("binds the project handle as a property", async () => {
-    const host = document.createElement("div");
-    document.body.appendChild(host);
-    await render(host, <ZitadelLogout project={project} />);
+    const host = await renderWidget(<ZitadelLogout project={project} />);
     const el = host.querySelector<ZitadelLogoutElement>("zitadel-logout");
     expect(el).not.toBeNull();
     expect(el!.project).toBe(project);
   });
 
   it("binds discrete projectId/proxyPath", async () => {
-    const host = document.createElement("div");
-    document.body.appendChild(host);
-    await render(host, <ZitadelLogout projectId="proj-test" proxyPath="/__nextgen" />);
+    const host = await renderWidget(<ZitadelLogout projectId="proj-test" proxyPath="/__nextgen" />);
     const el = host.querySelector<ZitadelLogoutElement>("zitadel-logout");
     expect(el!.projectId).toBe("proj-test");
     expect(el!.proxyPath).toBe("/__nextgen");
@@ -145,10 +146,7 @@ describe("ZitadelLogout", () => {
     "forwards %s to its callback",
     async (eventName, handlerProp) => {
       const received: Record<string, unknown>[] = [];
-      const host = document.createElement("div");
-      document.body.appendChild(host);
-      await render(
-        host,
+      const host = await renderWidget(
         <ZitadelLogout
           project={project}
           {...{
@@ -162,15 +160,13 @@ describe("ZitadelLogout", () => {
       expect(el).not.toBeNull();
       const detail = { probe: eventName };
       await dispatchUntilForwarded(el!, eventName, detail, received);
-      expect(received[received.length - 1]).toBe(detail);
+      expect(received).toContain(detail);
     },
   );
 
   it("populates a consumer ref with the underlying element", async () => {
     const consumerRef = { value: undefined } as Signal<ZitadelLogoutElement | undefined>;
-    const host = document.createElement("div");
-    document.body.appendChild(host);
-    await render(host, <ZitadelLogout project={project} ref={consumerRef} />);
+    const host = await renderWidget(<ZitadelLogout project={project} ref={consumerRef} />);
     await macrotask();
     const el = host.querySelector<ZitadelLogoutElement>("zitadel-logout");
     expect(el).not.toBeNull();
@@ -181,28 +177,23 @@ describe("ZitadelLogout", () => {
 
 describe("ZitadelSession", () => {
   it("binds the project handle as a property", async () => {
-    const host = document.createElement("div");
-    document.body.appendChild(host);
-    await render(host, <ZitadelSession project={project} />);
+    const host = await renderWidget(<ZitadelSession project={project} />);
     const el = host.querySelector<ZitadelSessionElement>("zitadel-session");
     expect(el).not.toBeNull();
     expect(el!.project).toBe(project);
   });
 
   it("binds discrete projectId/proxyPath", async () => {
-    const host = document.createElement("div");
-    document.body.appendChild(host);
-    await render(host, <ZitadelSession projectId="proj-test" proxyPath="/__nextgen" />);
+    const host = await renderWidget(
+      <ZitadelSession projectId="proj-test" proxyPath="/__nextgen" />,
+    );
     const el = host.querySelector<ZitadelSessionElement>("zitadel-session");
     expect(el!.projectId).toBe("proj-test");
     expect(el!.proxyPath).toBe("/__nextgen");
   });
 
   it("forwards the surface variant/theme", async () => {
-    const host = document.createElement("div");
-    document.body.appendChild(host);
-    await render(
-      host,
+    const host = await renderWidget(
       <ZitadelSession project={project} variant="page" theme="light" suppressHeader={true} />,
     );
     const el = host.querySelector<ZitadelSessionElement>("zitadel-session");
@@ -215,10 +206,7 @@ describe("ZitadelSession", () => {
     "forwards %s to its callback",
     async (eventName, handlerProp) => {
       const received: Record<string, unknown>[] = [];
-      const host = document.createElement("div");
-      document.body.appendChild(host);
-      await render(
-        host,
+      const host = await renderWidget(
         <ZitadelSession
           project={project}
           {...{
@@ -232,15 +220,13 @@ describe("ZitadelSession", () => {
       expect(el).not.toBeNull();
       const detail = { probe: eventName };
       await dispatchUntilForwarded(el!, eventName, detail, received);
-      expect(received[received.length - 1]).toBe(detail);
+      expect(received).toContain(detail);
     },
   );
 
   it("populates a consumer ref with the underlying element", async () => {
     const consumerRef = { value: undefined } as Signal<ZitadelSessionElement | undefined>;
-    const host = document.createElement("div");
-    document.body.appendChild(host);
-    await render(host, <ZitadelSession project={project} ref={consumerRef} />);
+    const host = await renderWidget(<ZitadelSession project={project} ref={consumerRef} />);
     await macrotask();
     const el = host.querySelector<ZitadelSessionElement>("zitadel-session");
     expect(el).not.toBeNull();
