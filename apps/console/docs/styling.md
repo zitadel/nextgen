@@ -155,17 +155,24 @@ the design even though its box measures correctly.
 
 ## Resource detail layout — one shell for every detail screen
 
-Detail screens come in two compositions, and each has one shell:
+Detail screens come in three compositions, and each has one shell:
 
 - **Resource detail** (Users, Teams, Project settings): a title row over body
   cards. Compose `DetailPage` + `DetailHeader` from
   `src/components/detail-page.tsx`, then put the body under `DETAIL_BODY`.
 - **Configuration panel** (User schemas, Login flows): the whole screen is one
   panel card inside `DETAIL_PANEL_PAGE` (`src/components/layout.tsx`).
+- **Settings** (Profile): a bare title over one card of labelled rows, in a
+  centred column `--zl-container-settings` wide. Compose `DetailPage` +
+  `SettingsColumn` (`src/components/layout.tsx`), a `DETAIL_TITLE` heading with
+  no header gutter, then `SettingsCard` (`src/components/settings-card.tsx`)
+  holding `Field` rows: 24px inset, 20px block, 16px between rows. No icon tile
+  and no header card: a settings screen is not a resource with an id.
 
-Both share the icon tile (`ICON_PLATE`). The header card (`MetaCard`, holding
-`MetaValue`s split by `MetaRule`) is on every resource detail and on Login flows;
-User schemas carries none, because its lockup names the schema without its id.
+The first two share the icon tile (`ICON_PLATE`). The header card (`MetaCard`,
+holding `MetaValue`s split by `MetaRule`) is on every resource detail and on
+Login flows; User schemas carries none, because its lockup names the schema
+without its id.
 
 | Region        | Value                                                 |
 | ------------- | ----------------------------------------------------- |

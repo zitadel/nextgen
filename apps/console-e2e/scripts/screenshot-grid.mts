@@ -69,7 +69,7 @@ const SCREENS: Screen[] = [
   { name: "Branding", path: "/branding" },
   { name: "User schemas", path: "/schemas" },
   { name: "User schema detail", path: "/schemas", firstRow: "/schemas/" },
-  { name: "Settings", path: "/settings" },
+  { name: "Settings — Profile", path: "/settings" },
 ];
 
 /**

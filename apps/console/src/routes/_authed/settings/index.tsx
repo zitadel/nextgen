@@ -1,37 +1,18 @@
-import { createFileRoute } from "@tanstack/react-router";
-
-import { SettingsColumn } from "@/components/layout";
-import { RESOURCE_PAGE, RESOURCE_TABLE_WRAP } from "@/components/resource-list";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
 /**
- * Account settings — where the sidebar's account dropdown lands, and the route
+ * Account settings: where the sidebar's account dropdown lands, and the route
  * that puts the shell into its Settings view.
  *
  * It carries no `staticData.nav` entry on purpose: the design reaches settings
  * from the account dropdown, not from the primary sidebar list, so the route is
  * addressable without being advertised as a nav row (Console ADR 0001).
  *
- * There is no settings screen to land on yet. Admins moved to the project's
- * own page (#1238: a grant is project-level data, not an account setting), and
- * `ACCOUNT / Profile` needs a call that updates a user (#693) and is not built.
- * Until Profile lands this renders the view's empty state rather than
- * redirecting somewhere unrelated; redirect to Profile once it exists.
+ * Settings has no landing page of its own, so this forwards to its first
+ * screen.
  */
 export const Route = createFileRoute("/_authed/settings/")({
-  component: SettingsEmpty,
+  beforeLoad: ({ search }) => {
+    throw redirect({ to: "/settings/profile", search });
+  },
 });
-
-function SettingsEmpty() {
-  return (
-    <div className={`${RESOURCE_PAGE} pt-11`}>
-      <SettingsColumn>
-        <h1 className="text-foreground font-serif text-2xl leading-6 tracking-tight">Settings</h1>
-        <div
-          className={`${RESOURCE_TABLE_WRAP} text-muted-foreground mt-6 py-24 text-center text-xs`}
-        >
-          No settings yet.
-        </div>
-      </SettingsColumn>
-    </div>
-  );
-}

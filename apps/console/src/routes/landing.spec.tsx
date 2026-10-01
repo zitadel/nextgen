@@ -44,8 +44,8 @@ function project(id: string, name: string) {
 }
 
 /**
- * `/` has no screen of its own and lands on the first one behind it; `/settings`
- * is a view with nothing built in it yet and says so.
+ * Neither `/` nor `/settings` has a screen of its own; each lands on the first
+ * one behind it.
  *
  * Worth its own spec because these are the two paths nobody navigates to
  * deliberately: `/` is where sign-in, the logo and the claim flow's "Open the
@@ -191,18 +191,20 @@ describe("landing routes", () => {
     expect(router.state.location.search).not.toHaveProperty("project");
   });
 
-  it("shows the empty settings view from settings", async () => {
-    // Settings has no built screen yet: Admins moved to the project page
-    // (#1238) and Profile is not built, so the account dropdown's target is the
-    // view's own empty state rather than a redirect somewhere unrelated.
+  it("lands on Profile from settings", async () => {
+    // Settings has no landing page of its own; the account dropdown's target
+    // forwards to the first settings screen.
+    server.use(
+      http.get("http://localhost/api/users/me", () =>
+        HttpResponse.json({ id: "user_1", attributes: { email: "maya@example.com" } }),
+      ),
+    );
     const router = await renderAt("/settings");
 
-    await waitFor(() => expect(router.state.location.pathname).toBe("/settings"));
-    expect(await screen.findByRole("heading", { name: "Settings" })).toBeInTheDocument();
-    expect(screen.getByText("No settings yet.")).toBeInTheDocument();
-    // Asserted here, where the Settings nav is actually mounted: no route
-    // claims a Settings heading any more, so neither a WORKSPACE group over
-    // nothing nor an Admins row survives.
+    await waitFor(() => expect(router.state.location.pathname).toBe("/settings/profile"));
+    expect(await screen.findByRole("heading", { name: "Profile" })).toBeInTheDocument();
+    // No screen claims WORKSPACE, so the heading is absent and no Admins row
+    // survives from when that screen lived here.
     expect(screen.queryByRole("navigation", { name: "WORKSPACE" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Admins/ })).not.toBeInTheDocument();
   });
