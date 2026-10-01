@@ -518,11 +518,21 @@ func (r *FlowStateMachineRuntime) bindSSOCollision(ctx context.Context, state *F
 		if owner == "" {
 			continue
 		}
+		// PrepareUserChallenge's attempt-level refusal stays the atomic backstop; this makes the invariant explicit here.
+		bound := state.CollectedData.UserID
+		if bound != "" && bound != owner {
+			return false, ErrFlowRestartRequired()
+		}
 		if !*settled {
 			if err := r.ssoIdentities.DeleteParked(ctx, state.ProjectID, state.AuthAttemptID, parked.CheckID); err != nil {
 				return false, fmt.Errorf("flow state machine: delete parked sso identity: %w", err)
 			}
 			*settled = true
+		}
+		if bound == owner {
+			// The attempt already carries the owner; a second user challenge
+			// would be refused.
+			return true, nil
 		}
 		userID, err := r.authAttempts.SubmitIdentifier(ctx, FlowSubmitIdentifierInput{
 			ProjectID:     state.ProjectID,

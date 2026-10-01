@@ -4859,3 +4859,38 @@ func TestFlowStateMachine_Render_SSODottedClaimKeyFallsBackToCollection(t *testi
 	require.NoError(t, err)
 	assert.Equal(t, "sso-register", result.Step.Name)
 }
+
+// The attempt already carries another user: binding the owner would replace
+// it, so the flow starts over and nothing is written.
+func TestFlowStateMachine_Render_SSOCollisionOnAttemptBoundToOtherUserRestarts(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoRenderWorld(t)
+	def = withSSOOutcomeSteps(def)
+	state.CollectedData.UserID = "u-a"
+	w.expectParked(unlinkedParked(map[string]any{"email": "alice@example.com"}, nil), nil)
+	w.expectOwner("email", "alice@example.com", "u-b")
+	w.ssoIdentities.EXPECT().DeleteParked(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+	w.authAttemptService.EXPECT().SubmitIdentifier(gomock.Any(), gomock.Any()).Times(0)
+
+	_, err := w.sm.Render(t.Context(), def, state)
+	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
+	assert.Equal(t, "u-a", state.CollectedData.UserID)
+}
+
+// The attempt already carries the owner, so there is nothing to probe: the
+// row is settled and the collision outcome raised.
+func TestFlowStateMachine_Render_SSOCollisionOnAttemptBoundToSameUserBindsWithoutProbe(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoRenderWorld(t)
+	def = withSSOOutcomeSteps(def)
+	state.CollectedData.UserID = "u-b"
+	w.expectParked(unlinkedParked(map[string]any{"email": "alice@example.com"}, nil), nil)
+	w.expectOwner("email", "alice@example.com", "u-b")
+	w.ssoIdentities.EXPECT().DeleteParked(gomock.Any(), testProjectID, "att-1", "ch-1").Return(nil)
+	w.authAttemptService.EXPECT().SubmitIdentifier(gomock.Any(), gomock.Any()).Times(0)
+
+	result, err := w.sm.Render(t.Context(), def, state)
+	require.NoError(t, err)
+	assert.Equal(t, "sso-conflict", result.Step.Name)
+	assert.Equal(t, "u-b", result.State.CollectedData.UserID)
+}
