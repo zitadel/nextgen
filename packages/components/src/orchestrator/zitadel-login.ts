@@ -669,6 +669,9 @@ export class ZitadelLogin extends ZitadelSurface {
     if (this.restarting || apiErrorCode(error) !== "flow.restart_required") return false;
     this.restarting = true;
     this.resumeFlowId = "";
+    // Values typed into the refused flow (a password included) must not be
+    // merged into the fresh step and submitted on a new attempt.
+    this.formValues = {};
     clearFlowIdFromLocation();
     await this.startFlow();
     return true;
