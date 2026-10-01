@@ -4315,6 +4315,7 @@ func TestFlowStateMachine_Render_SSOLinkedUserRoutesAuthenticated(t *testing.T) 
 		BindLinked(gomock.Any(), domain.FlowSSOBindInput{
 			ProjectID:    testProjectID,
 			AttemptID:    "att-1",
+			CheckID:      "ch-1",
 			UserID:       "user-1",
 			ConnectionID: "idp-1",
 			LinkID:       "idplink-1",
@@ -4384,7 +4385,7 @@ func TestFlowStateMachine_Render_SSOCreationDisabledRendersStepError(t *testing.
 	t.Parallel()
 	w, def, state := ssoRenderWorld(t)
 	w.expectParked(&domain.FlowSSOParkedIdentity{CheckID: "ch-1", ConnectionID: "idp-1", Subject: "sub-1", CreationDisabled: true}, nil)
-	w.ssoIdentities.EXPECT().DeleteParked(gomock.Any(), testProjectID, "att-1").Return(nil).Times(1)
+	w.ssoIdentities.EXPECT().DeleteParked(gomock.Any(), testProjectID, "att-1", "ch-1").Return(nil).Times(1)
 	w.ssoIdentities.EXPECT().BindLinked(gomock.Any(), gomock.Any()).Times(0)
 	w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).Times(0)
 
@@ -4430,7 +4431,14 @@ func withSSOOutcomeSteps(def *domain.FlowDefinition) *domain.FlowDefinition {
 	return def
 }
 
-// expectIdentifier answers one collision probe.
+// expectOwner answers one read-only collision lookup; "" is no owner.
+func (w *flowTestWorld) expectOwner(attribute, value, userID string) *domainmock.MockFlowSSOIdentityServiceFindUniqueOwnerCall {
+	return w.ssoIdentities.EXPECT().
+		FindUniqueOwner(gomock.Any(), testProjectID, attribute, value).
+		Return(userID, nil)
+}
+
+// expectIdentifier answers the bind that follows a found owner.
 func (w *flowTestWorld) expectIdentifier(attribute, value, userID string, err error) *domainmock.MockFlowAuthAttemptServiceSubmitIdentifierCall {
 	return w.authAttemptService.EXPECT().
 		SubmitIdentifier(gomock.Any(), identifiedBy("att-1", attribute, value)).
@@ -4443,9 +4451,10 @@ func TestFlowStateMachine_Render_SSOCollisionRoutesUserAlreadyExists(t *testing.
 	def = withSSOOutcomeSteps(def)
 	w.expectParked(unlinkedParked(map[string]any{"email": "alice@example.com", "username": "alice"}, map[string]bool{"email": true}), nil)
 	gomock.InOrder(
-		w.expectIdentifier("email", "alice@example.com", "", domain.ErrAuthAttemptProofRejected(nil)),
+		w.expectOwner("email", "alice@example.com", ""),
+		w.expectOwner("username", "alice", "user-9"),
 		w.expectIdentifier("username", "alice", "user-9", nil),
-		w.ssoIdentities.EXPECT().DeleteParked(gomock.Any(), testProjectID, "att-1").Return(nil),
+		w.ssoIdentities.EXPECT().DeleteParked(gomock.Any(), testProjectID, "att-1", "ch-1").Return(nil),
 	)
 	w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Times(0)
 	w.ssoIdentities.EXPECT().BindLinked(gomock.Any(), gomock.Any()).Times(0)
@@ -4463,8 +4472,9 @@ func TestFlowStateMachine_Render_SSOUserAlreadyExistsFlipsRegisterToLogin(t *tes
 	def = withSSOOutcomeSteps(def)
 	require.Equal(t, domain.FlowDefinitionPurposeRegister, state.CurrentPurpose)
 	w.expectParked(unlinkedParked(map[string]any{"email": "alice@example.com"}, nil), nil)
+	w.expectOwner("email", "alice@example.com", "user-9")
 	w.expectIdentifier("email", "alice@example.com", "user-9", nil)
-	w.ssoIdentities.EXPECT().DeleteParked(gomock.Any(), testProjectID, "att-1").Return(nil)
+	w.ssoIdentities.EXPECT().DeleteParked(gomock.Any(), testProjectID, "att-1", "ch-1").Return(nil)
 
 	result, err := w.sm.Render(t.Context(), def, state)
 	require.NoError(t, err)
@@ -4484,8 +4494,9 @@ func TestFlowStateMachine_Render_SSOCollisionSubmitIdentifierInvalidRequestMapsT
 			t.Parallel()
 			w, def, state := ssoRenderWorld(t)
 			w.expectParked(unlinkedParked(map[string]any{"email": "alice@example.com"}, nil), nil)
+			w.expectOwner("email", "alice@example.com", "user-9")
 			w.expectIdentifier("email", "alice@example.com", "", probeErr)
-			w.ssoIdentities.EXPECT().DeleteParked(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+			w.ssoIdentities.EXPECT().DeleteParked(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 			w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Times(0)
 
 			_, err := w.sm.Render(t.Context(), def, state)
@@ -4503,10 +4514,9 @@ func TestFlowStateMachine_Render_SSOInvalidClaimRoutesUserNotFound(t *testing.T)
 	def = withSSOOutcomeSteps(def)
 	claims, verified := completeClaims()
 	w.expectParked(unlinkedParked(claims, verified), nil)
-	w.authAttemptService.EXPECT().SubmitIdentifier(gomock.Any(), gomock.Any()).
-		Return("", domain.ErrAuthAttemptProofRejected(nil)).Times(2)
+	w.ssoIdentities.EXPECT().FindUniqueOwner(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return("", nil).Times(2)
 	w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Return("", domain.ErrUserInvalid())
-	w.ssoIdentities.EXPECT().DeleteParked(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+	w.ssoIdentities.EXPECT().DeleteParked(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 
 	result, err := w.sm.Render(t.Context(), def, state)
 	require.NoError(t, err)
@@ -4520,12 +4530,13 @@ func TestFlowStateMachine_Render_SSOAutoCreateRoutesAuthenticated(t *testing.T) 
 	w, def, state := ssoRenderWorld(t)
 	claims, verified := completeClaims()
 	w.expectParked(unlinkedParked(claims, verified), nil)
-	w.expectIdentifier("email", "alice@example.com", "", domain.ErrAuthAttemptProofRejected(nil))
-	w.expectIdentifier("username", "alice", "", domain.ErrAuthAttemptProofRejected(nil))
+	w.expectOwner("email", "alice@example.com", "")
+	w.expectOwner("username", "alice", "")
 	w.ssoIdentities.EXPECT().
 		CreateLinked(gomock.Any(), domain.FlowSSOCreateInput{
 			ProjectID:     testProjectID,
 			AttemptID:     "att-1",
+			CheckID:       "ch-1",
 			UserSchemaURL: defaultSchemaURL,
 			ConnectionID:  "idp-1",
 			Subject:       "sub-1",
@@ -4552,11 +4563,12 @@ func TestFlowStateMachine_Render_SSOCreateUniqueRaceFallsThroughToCollision(t *t
 	claims, verified := completeClaims()
 	w.expectParked(unlinkedParked(claims, verified), nil)
 	gomock.InOrder(
-		w.expectIdentifier("email", "alice@example.com", "", domain.ErrAuthAttemptProofRejected(nil)),
-		w.expectIdentifier("username", "alice", "", domain.ErrAuthAttemptProofRejected(nil)),
+		w.expectOwner("email", "alice@example.com", ""),
+		w.expectOwner("username", "alice", ""),
 		w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Return("", domain.ErrUserAlreadyExists()),
+		w.expectOwner("email", "alice@example.com", "user-9"),
 		w.expectIdentifier("email", "alice@example.com", "user-9", nil),
-		w.ssoIdentities.EXPECT().DeleteParked(gomock.Any(), testProjectID, "att-1").Return(nil),
+		w.ssoIdentities.EXPECT().DeleteParked(gomock.Any(), testProjectID, "att-1", "ch-1").Return(nil),
 	)
 
 	result, err := w.sm.Render(t.Context(), def, state)
@@ -4573,10 +4585,9 @@ func TestFlowStateMachine_Render_SSOCreateUniqueRaceWithoutOwnerRoutesUserNotFou
 	def = withSSOOutcomeSteps(def)
 	claims, verified := completeClaims()
 	w.expectParked(unlinkedParked(claims, verified), nil)
-	w.authAttemptService.EXPECT().SubmitIdentifier(gomock.Any(), gomock.Any()).
-		Return("", domain.ErrAuthAttemptProofRejected(nil)).Times(4)
+	w.ssoIdentities.EXPECT().FindUniqueOwner(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return("", nil).Times(4)
 	w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Return("", domain.ErrUserAlreadyExists())
-	w.ssoIdentities.EXPECT().DeleteParked(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+	w.ssoIdentities.EXPECT().DeleteParked(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 
 	result, err := w.sm.Render(t.Context(), def, state)
 	require.NoError(t, err)
@@ -4592,8 +4603,8 @@ func TestFlowStateMachine_Render_SSOMissingRequiredRoutesUserNotFound(t *testing
 	def = withSSOOutcomeSteps(def)
 	state.CurrentPurpose = domain.FlowDefinitionPurposeLogin
 	w.expectParked(unlinkedParked(map[string]any{"email": "alice@example.com"}, map[string]bool{"email": true}), nil)
-	w.expectIdentifier("email", "alice@example.com", "", domain.ErrAuthAttemptProofRejected(nil))
-	w.ssoIdentities.EXPECT().DeleteParked(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+	w.expectOwner("email", "alice@example.com", "")
+	w.ssoIdentities.EXPECT().DeleteParked(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 	w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Times(0)
 	w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).Times(0)
 
@@ -4619,10 +4630,10 @@ func TestFlowStateMachine_Render_SSOUnverifiedRequiredUniqueRoutesUserNotFound(t
 			claims, verified := completeClaims()
 			verified[unverified] = false
 			w.expectParked(unlinkedParked(claims, verified), nil)
-			w.expectIdentifier("email", "alice@example.com", "", domain.ErrAuthAttemptProofRejected(nil))
-			w.expectIdentifier("username", "alice", "", domain.ErrAuthAttemptProofRejected(nil))
+			w.expectOwner("email", "alice@example.com", "")
+			w.expectOwner("username", "alice", "")
 			w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Times(0)
-			w.ssoIdentities.EXPECT().DeleteParked(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+			w.ssoIdentities.EXPECT().DeleteParked(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 
 			result, err := w.sm.Render(t.Context(), def, state)
 			require.NoError(t, err)
@@ -4640,12 +4651,12 @@ func TestFlowStateMachine_Render_SSOTeamScopedUniqueClaimIsNotProbed(t *testing.
 	def = withSSOOutcomeSteps(def)
 	claims, verified := completeClaims()
 	w.expectParked(unlinkedParked(claims, verified), nil)
-	w.authAttemptService.EXPECT().
-		SubmitIdentifier(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitIdentifierInput) bool { return in.AttributeName != "badge" })).
-		Return("", domain.ErrAuthAttemptProofRejected(nil)).
+	w.ssoIdentities.EXPECT().
+		FindUniqueOwner(gomock.Any(), testProjectID, gomock.Cond(func(attribute string) bool { return attribute != "badge" }), gomock.Any()).
+		Return("", nil).
 		Times(4)
 	w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Return("", domain.ErrUserAlreadyExists())
-	w.ssoIdentities.EXPECT().DeleteParked(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+	w.ssoIdentities.EXPECT().DeleteParked(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 
 	result, err := w.sm.Render(t.Context(), def, state)
 	require.NoError(t, err)
@@ -4659,7 +4670,7 @@ func TestFlowStateMachine_Render_SSOOutcomeUnwiredRendersOutcomeToken(t *testing
 	t.Parallel()
 	w, def, state := ssoRenderWorld(t)
 	w.expectParked(unlinkedParked(map[string]any{"email": "alice@example.com"}, nil), nil)
-	w.expectIdentifier("email", "alice@example.com", "", domain.ErrAuthAttemptProofRejected(nil))
+	w.expectOwner("email", "alice@example.com", "")
 
 	result, err := w.sm.Render(t.Context(), def, state)
 	require.NoError(t, err)
@@ -4680,6 +4691,88 @@ func TestFlowStateMachine_Render_SSOBindOnForeignUserRestarts(t *testing.T) {
 	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
 	assert.Empty(t, state.CollectedData.UserID, "nothing is recorded for the foreign user")
 	assert.Equal(t, "credentials", state.CurrentStep)
+}
+
+// A concurrent request settled the parked row, or a new ceremony replaced it:
+// the winner already answered, so this render shows the step with no outcome.
+func TestFlowStateMachine_Render_SSOStaleParkedRowRendersStep(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoRenderWorld(t)
+	w.expectParked(linkedParked(), nil)
+	w.ssoIdentities.EXPECT().BindLinked(gomock.Any(), gomock.Any()).Return(domain.ErrSSOStateInvalid())
+	w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).Times(0)
+
+	result, err := w.sm.Render(t.Context(), def, state)
+	require.NoError(t, err)
+	assert.Equal(t, "credentials", result.Step.Name)
+	assert.Nil(t, result.Step.Error)
+	assert.Empty(t, result.State.CollectedData.UserID)
+	assert.Empty(t, result.HandoffToken)
+}
+
+func TestFlowStateMachine_Render_SSOStaleParkedRowCreationDisabledRendersStep(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoRenderWorld(t)
+	w.expectParked(&domain.FlowSSOParkedIdentity{CheckID: "ch-1", ConnectionID: "idp-1", Subject: "sub-1", CreationDisabled: true}, nil)
+	w.ssoIdentities.EXPECT().DeleteParked(gomock.Any(), testProjectID, "att-1", "ch-1").Return(domain.ErrSSOStateInvalid())
+
+	result, err := w.sm.Render(t.Context(), def, state)
+	require.NoError(t, err)
+	assert.Equal(t, "credentials", result.Step.Name)
+	assert.Nil(t, result.Step.Error)
+}
+
+// Under creation auto the row can be settled elsewhere too, by the delete
+// after a collision bind or inside the create: the render shows the step
+// with no outcome and records no user.
+func TestFlowStateMachine_Render_SSOStaleParkedRowProvisioningRendersStep(t *testing.T) {
+	t.Parallel()
+	for name, wire := range map[string]func(w *flowTestWorld){
+		"collision": func(w *flowTestWorld) {
+			w.expectParked(unlinkedParked(map[string]any{"email": "alice@example.com"}, nil), nil)
+			w.expectOwner("email", "alice@example.com", "user-9")
+			w.expectIdentifier("email", "alice@example.com", "user-9", nil)
+			w.ssoIdentities.EXPECT().DeleteParked(gomock.Any(), testProjectID, "att-1", "ch-1").Return(domain.ErrSSOStateInvalid())
+		},
+		"create": func(w *flowTestWorld) {
+			claims, verified := completeClaims()
+			w.expectParked(unlinkedParked(claims, verified), nil)
+			w.ssoIdentities.EXPECT().FindUniqueOwner(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return("", nil).Times(2)
+			w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Return("", domain.ErrSSOStateInvalid())
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			w, def, state := ssoRenderWorld(t)
+			def = withSSOOutcomeSteps(def)
+			wire(w)
+			w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).Times(0)
+
+			result, err := w.sm.Render(t.Context(), def, state)
+			require.NoError(t, err)
+			assert.Equal(t, "credentials", result.Step.Name)
+			assert.Nil(t, result.Step.Error)
+			assert.Empty(t, result.State.CollectedData.UserID)
+		})
+	}
+}
+
+// A lookup miss is not a sign-in attempt: no identifier proof is submitted,
+// so the attempt records no failed check.
+func TestFlowStateMachine_Render_SSOCollisionProbeMissesRecordNoProof(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoRenderWorld(t)
+	def = withSSOOutcomeSteps(def)
+	claims, verified := completeClaims()
+	verified["email"] = false
+	w.expectParked(unlinkedParked(claims, verified), nil)
+	w.expectOwner("email", "alice@example.com", "")
+	w.expectOwner("username", "alice", "")
+	w.authAttemptService.EXPECT().SubmitIdentifier(gomock.Any(), gomock.Any()).Times(0)
+
+	result, err := w.sm.Render(t.Context(), def, state)
+	require.NoError(t, err)
+	assert.Equal(t, "sso-register", result.Step.Name)
 }
 
 // A completed flow has handed its attempt off (and the session exchange may

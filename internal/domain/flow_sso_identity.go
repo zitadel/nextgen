@@ -12,11 +12,17 @@ type FlowSSOIdentityService interface {
 	// a user under another schema than the flow's.
 	LoadParked(ctx context.Context, in FlowSSOLoadInput) (*FlowSSOParkedIdentity, error)
 	// BindLinked records the linked user and an sso factor on the attempt and
-	// deletes the parked row, in one transaction. It returns
-	// ErrFlowRestartRequired when the attempt already carries another user.
+	// deletes the parked row with in.CheckID, in one transaction. It returns
+	// ErrFlowRestartRequired when the attempt already carries another user, and
+	// ErrSSOStateInvalid, before writing anything, when that row is gone.
 	BindLinked(ctx context.Context, in FlowSSOBindInput) error
-	// DeleteParked removes the parked row. No row is not an error.
-	DeleteParked(ctx context.Context, projectID, attemptID string) error
+	// DeleteParked removes the parked row with checkID. It returns
+	// ErrSSOStateInvalid when that row is gone.
+	DeleteParked(ctx context.Context, projectID, attemptID, checkID string) error
+	// FindUniqueOwner returns the user owning value in the unique attribute,
+	// or "" with a nil error when nobody does. It only reads: unlike an
+	// identifier submission it records nothing on the attempt.
+	FindUniqueOwner(ctx context.Context, projectID, attribute, value string) (userID string, err error)
 	// CreateLinked creates the user, its identity link and the attempt
 	// factors in one transaction, and returns the new user's id.
 	CreateLinked(ctx context.Context, in FlowSSOCreateInput) (userID string, err error)
@@ -49,9 +55,12 @@ type FlowSSOParkedIdentity struct {
 
 type FlowSSOLinkedUser struct{ LinkID, UserID string }
 
-type FlowSSOBindInput struct{ ProjectID, AttemptID, UserID, ConnectionID, LinkID string }
+// FlowSSOBindInput settles the parked row CheckID, the one LoadParked read.
+type FlowSSOBindInput struct{ ProjectID, AttemptID, CheckID, UserID, ConnectionID, LinkID string }
 
+// FlowSSOCreateInput creates a user for the parked row CheckID, the one
+// LoadParked read.
 type FlowSSOCreateInput struct {
-	ProjectID, AttemptID, UserSchemaURL, ConnectionID, Subject string
-	Attributes                                                 map[string]any
+	ProjectID, AttemptID, CheckID, UserSchemaURL, ConnectionID, Subject string
+	Attributes                                                          map[string]any
 }

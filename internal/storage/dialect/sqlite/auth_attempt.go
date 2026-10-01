@@ -74,7 +74,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`
 		` WHERE project_id = ? AND lookup_hash = ? AND type = ? AND last_challenged_at IS NULL` +
 		` AND factor_payload IS NULL`
 
-	deleteSSOCallbackStmt = `DELETE FROM checks WHERE project_id = ? AND auth_attempt_id = ? AND type = ?`
+	deleteSSOCallbackStmt = `DELETE FROM checks WHERE project_id = ? AND auth_attempt_id = ? AND type = ? AND id = ?`
 
 	authAttemptChallengeFailedStmt = `UPDATE checks SET last_failed_at = ?, failure_count = failure_count + 1` +
 		` WHERE project_id = ? AND auth_attempt_id = ? AND type = ? AND id = ?` +
@@ -542,10 +542,14 @@ func (as authAttemptStatements) SetSSOCallbackResult(ctx context.Context, projec
 }
 
 // DeleteSSOCallback implements [service.AuthAttemptStatements].
-func (as authAttemptStatements) DeleteSSOCallback(ctx context.Context, projectID, authAttemptID string) error {
-	if _, err := execAffected(ctx, as.client, deleteSSOCallbackStmt,
-		projectID, authAttemptID, int64(domain.AuthCheckTypeSSOCallback)); err != nil {
+func (as authAttemptStatements) DeleteSSOCallback(ctx context.Context, projectID, authAttemptID, checkID string) error {
+	n, err := execAffected(ctx, as.client, deleteSSOCallbackStmt,
+		projectID, authAttemptID, int64(domain.AuthCheckTypeSSOCallback), checkID)
+	if err != nil {
 		return fmt.Errorf("failed to delete sso callback: %w", err)
+	}
+	if n == 0 {
+		return domain.ErrSSOStateInvalid()
 	}
 	return nil
 }

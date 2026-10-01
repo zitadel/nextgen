@@ -883,17 +883,17 @@ func (c *MockFlowSSOIdentityServiceCreateLinkedCall) DoAndReturn(f func(context.
 }
 
 // DeleteParked mocks base method.
-func (m *MockFlowSSOIdentityService) DeleteParked(ctx context.Context, projectID, attemptID string) error {
+func (m *MockFlowSSOIdentityService) DeleteParked(ctx context.Context, projectID, attemptID, checkID string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteParked", ctx, projectID, attemptID)
+	ret := m.ctrl.Call(m, "DeleteParked", ctx, projectID, attemptID, checkID)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // DeleteParked indicates an expected call of DeleteParked.
-func (mr *MockFlowSSOIdentityServiceMockRecorder) DeleteParked(ctx, projectID, attemptID any) *MockFlowSSOIdentityServiceDeleteParkedCall {
+func (mr *MockFlowSSOIdentityServiceMockRecorder) DeleteParked(ctx, projectID, attemptID, checkID any) *MockFlowSSOIdentityServiceDeleteParkedCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteParked", reflect.TypeOf((*MockFlowSSOIdentityService)(nil).DeleteParked), ctx, projectID, attemptID)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteParked", reflect.TypeOf((*MockFlowSSOIdentityService)(nil).DeleteParked), ctx, projectID, attemptID, checkID)
 	return &MockFlowSSOIdentityServiceDeleteParkedCall{Call: call}
 }
 
@@ -909,13 +909,52 @@ func (c *MockFlowSSOIdentityServiceDeleteParkedCall) Return(arg0 error) *MockFlo
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockFlowSSOIdentityServiceDeleteParkedCall) Do(f func(context.Context, string, string) error) *MockFlowSSOIdentityServiceDeleteParkedCall {
+func (c *MockFlowSSOIdentityServiceDeleteParkedCall) Do(f func(context.Context, string, string, string) error) *MockFlowSSOIdentityServiceDeleteParkedCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockFlowSSOIdentityServiceDeleteParkedCall) DoAndReturn(f func(context.Context, string, string) error) *MockFlowSSOIdentityServiceDeleteParkedCall {
+func (c *MockFlowSSOIdentityServiceDeleteParkedCall) DoAndReturn(f func(context.Context, string, string, string) error) *MockFlowSSOIdentityServiceDeleteParkedCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// FindUniqueOwner mocks base method.
+func (m *MockFlowSSOIdentityService) FindUniqueOwner(ctx context.Context, projectID, attribute, value string) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FindUniqueOwner", ctx, projectID, attribute, value)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// FindUniqueOwner indicates an expected call of FindUniqueOwner.
+func (mr *MockFlowSSOIdentityServiceMockRecorder) FindUniqueOwner(ctx, projectID, attribute, value any) *MockFlowSSOIdentityServiceFindUniqueOwnerCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindUniqueOwner", reflect.TypeOf((*MockFlowSSOIdentityService)(nil).FindUniqueOwner), ctx, projectID, attribute, value)
+	return &MockFlowSSOIdentityServiceFindUniqueOwnerCall{Call: call}
+}
+
+// MockFlowSSOIdentityServiceFindUniqueOwnerCall wrap *gomock.Call
+type MockFlowSSOIdentityServiceFindUniqueOwnerCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockFlowSSOIdentityServiceFindUniqueOwnerCall) Return(userID string, err error) *MockFlowSSOIdentityServiceFindUniqueOwnerCall {
+	c.Call = c.Call.Return(userID, err)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockFlowSSOIdentityServiceFindUniqueOwnerCall) Do(f func(context.Context, string, string, string) (string, error)) *MockFlowSSOIdentityServiceFindUniqueOwnerCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockFlowSSOIdentityServiceFindUniqueOwnerCall) DoAndReturn(f func(context.Context, string, string, string) (string, error)) *MockFlowSSOIdentityServiceFindUniqueOwnerCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

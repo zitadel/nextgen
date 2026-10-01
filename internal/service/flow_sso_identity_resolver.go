@@ -107,12 +107,23 @@ func (r *FlowSSOIdentityResolver) BindLinked(ctx context.Context, in domain.Flow
 	})
 }
 
-// bindSSOIdentity records the user and sso factors on the attempt and deletes
-// the parked row. It runs inside the caller's transaction.
+// bindSSOIdentity deletes the parked row and records the user and sso factors
+// on the attempt. It runs inside the caller's transaction and returns
+// ErrSSOStateInvalid unwrapped when the row was settled or replaced.
 func bindSSOIdentity(ctx context.Context, stmts AllStatements, in domain.FlowSSOBindInput) error {
+	// The exact parked row goes first: a settled or replaced one aborts before any write.
+	if err := stmts.DeleteSSOCallback(ctx, in.ProjectID, in.AttemptID, in.CheckID); err != nil {
+		return err
+	}
 	attempt, err := stmts.GetAuthAttemptByID(ctx, in.ProjectID, in.AttemptID)
 	if err != nil {
 		return fmt.Errorf("bind sso identity: read attempt: %w", err)
+	}
+	// Creation without a project-unique claim reaches here with no earlier
+	// attempt check, so a dead attempt is refused here and every write before
+	// it rolls back.
+	if attempt.IsExpired() || attempt.IsHandedOff() {
+		return domain.ErrFlowRestartRequired()
 	}
 	if bound, ok := domain.CheckAs[*domain.AuthFactorUser](attempt, domain.AuthCheckTypeUser); ok && bound.UserID != in.UserID {
 		return domain.ErrFlowRestartRequired()
@@ -138,11 +149,11 @@ func bindSSOIdentity(ctx context.Context, stmts AllStatements, in domain.FlowSSO
 	if _, err := recordDirectAuthFactor(ctx, stmts, attempt, ssoFactor); err != nil {
 		return fmt.Errorf("bind sso identity: %w", err)
 	}
-	return stmts.DeleteSSOCallback(ctx, in.ProjectID, in.AttemptID)
+	return nil
 }
 
-func (r *FlowSSOIdentityResolver) DeleteParked(ctx context.Context, projectID, attemptID string) error {
-	return r.db.Statements().DeleteSSOCallback(ctx, projectID, attemptID)
+func (r *FlowSSOIdentityResolver) DeleteParked(ctx context.Context, projectID, attemptID, checkID string) error {
+	return r.db.Statements().DeleteSSOCallback(ctx, projectID, attemptID, checkID)
 }
 
 // CreateLinked creates the user, links the subject to it and binds the
@@ -164,11 +175,14 @@ func (r *FlowSSOIdentityResolver) CreateLinked(ctx context.Context, in domain.Fl
 		bind: domain.FlowSSOBindInput{
 			ProjectID:    in.ProjectID,
 			AttemptID:    in.AttemptID,
+			CheckID:      in.CheckID,
 			UserID:       userID,
 			ConnectionID: in.ConnectionID,
 		},
 	}
 	if err := r.users.ApplyActions(ctx, createUser, linkAndBind); err != nil {
+		// Audited like a create through the user API.
+		emitUserCreateFailedBestEffort(ctx, r.db, createUser, err)
 		return "", err
 	}
 	return userID, nil
@@ -203,3 +217,19 @@ func (a *ssoLinkAction) Apply(ctx context.Context, stmts AllStatements) error {
 }
 
 var _ UserAction = (*ssoLinkAction)(nil)
+
+// FindUniqueOwner looks the value up the way an identifier submission does,
+// without recording anything on the attempt.
+func (r *FlowSSOIdentityResolver) FindUniqueOwner(ctx context.Context, projectID, attribute, value string) (string, error) {
+	user, err := UserStatementsLookup{Pool: r.db}.GetByAttributes(ctx, projectID, []domain.Attribute{{
+		Key:   domain.AttributeKey(attribute),
+		Value: value,
+	}})
+	if _, missing := errors.AsType[*database.NoRowFoundError](err); missing {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("find unique owner: %w", err)
+	}
+	return user.ID, nil
+}

@@ -187,7 +187,7 @@ func (s *userService) ApplyActions(ctx context.Context, actions ...UserAction) (
 	return nil
 }
 
-func (s *userService) emitUserCreateFailedBestEffort(ctx context.Context, action *CreateUserAction, applyErr error) {
+func emitUserCreateFailedBestEffort(ctx context.Context, pool StatementPool, action *CreateUserAction, applyErr error) {
 	var unique *database.UniqueError
 	if !errors.As(applyErr, &unique) {
 		return
@@ -195,7 +195,7 @@ func (s *userService) emitUserCreateFailedBestEffort(ctx context.Context, action
 	if action == nil || action.CreateUser == nil {
 		return
 	}
-	_ = audit.Emit(ctx, s.v2Pool.Statements(), audit.EmitSpec{
+	_ = audit.Emit(ctx, pool.Statements(), audit.EmitSpec{
 		Type:       domain.EventTypeUserCreateFailed,
 		Category:   domain.EventCategoryEntity,
 		ProjectID:  action.ProjectID,
@@ -207,7 +207,7 @@ func (s *userService) emitUserCreateFailedBestEffort(ctx context.Context, action
 func (s *userService) CreateUser(ctx context.Context, input CreateUserInput) (_ *domain.User, err error) {
 	action := NewCreateUserAction(input, s.schemaStore)
 	if err := s.ApplyActions(ctx, action); err != nil {
-		s.emitUserCreateFailedBestEffort(ctx, action, err)
+		emitUserCreateFailedBestEffort(ctx, s.v2Pool, action, err)
 		return nil, err
 	}
 

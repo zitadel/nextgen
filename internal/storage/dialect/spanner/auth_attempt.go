@@ -49,8 +49,9 @@ const (
 	// Spanner DML cannot update a primary-key column, and a re-issue mints a
 	// fresh check id so a stale one cannot match, so the issue deletes the
 	// attempt's row and inserts the new one inside withTransaction.
-	deleteSSOStateStmt = `DELETE FROM checks WHERE project_id = @p1 AND auth_attempt_id = @p2 AND type = @p3`
-	insertSSOStateStmt = `INSERT INTO checks (project_id, auth_attempt_id, type, id, last_challenged_at, challenge_payload, lookup_hash, failure_count)` +
+	deleteSSOStateStmt    = `DELETE FROM checks WHERE project_id = @p1 AND auth_attempt_id = @p2 AND type = @p3`
+	deleteSSOCallbackStmt = `DELETE FROM checks WHERE project_id = @p1 AND auth_attempt_id = @p2 AND type = @p3 AND id = @p4`
+	insertSSOStateStmt    = `INSERT INTO checks (project_id, auth_attempt_id, type, id, last_challenged_at, challenge_payload, lookup_hash, failure_count)` +
 		` VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, 0)`
 	selectPendingSSOStateStmt = `SELECT c.id, c.auth_attempt_id, c.challenge_payload, aa.created_at, aa.time_to_live` +
 		` FROM checks c` +
@@ -585,11 +586,15 @@ func (as authAttemptStatements) SetSSOCallbackResult(ctx context.Context, projec
 }
 
 // DeleteSSOCallback implements [service.AuthAttemptStatements].
-func (as authAttemptStatements) DeleteSSOCallback(ctx context.Context, projectID, authAttemptID string) error {
-	stmt := buildStatement(deleteSSOStateStmt,
-		projectID, authAttemptID, int64(domain.AuthCheckTypeSSOCallback)).statement()
-	if _, err := as.db.Update(ctx, stmt); err != nil {
+func (as authAttemptStatements) DeleteSSOCallback(ctx context.Context, projectID, authAttemptID, checkID string) error {
+	stmt := buildStatement(deleteSSOCallbackStmt,
+		projectID, authAttemptID, int64(domain.AuthCheckTypeSSOCallback), checkID).statement()
+	n, err := as.db.Update(ctx, stmt)
+	if err != nil {
 		return fmt.Errorf("failed to delete sso callback: %w", err)
+	}
+	if n == 0 {
+		return domain.ErrSSOStateInvalid()
 	}
 	return nil
 }

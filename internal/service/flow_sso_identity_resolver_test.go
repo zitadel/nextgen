@@ -3,8 +3,10 @@ package service_test
 import (
 	"bytes"
 	"context"
+	"errors"
 	"log/slog"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -45,6 +47,8 @@ type ssoResolverFixture struct {
 	connections *servicemocks.MockIDPConnectionService
 	schemaStore *domainmock.MockJSONSchemaStore
 	resolver    *service.FlowSSOIdentityResolver
+	// events are the event types expectCreateUser saw inserted.
+	events []domain.EventType
 }
 
 func newSSOResolverFixture(t *testing.T) *ssoResolverFixture {
@@ -173,7 +177,10 @@ func TestFlowSSOIdentityResolver_BindLinked_WritesBothFactorsAndDeletes(t *testi
 	t.Parallel()
 	f := newSSOResolverFixture(t)
 	f.inTransaction(t)
-	f.stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), ssoProjectID, ssoAttemptID).Return(parkedAttempt(parkedResult()), nil)
+	gomock.InOrder(
+		f.stmts.EXPECT().DeleteSSOCallback(gomock.Any(), ssoProjectID, ssoAttemptID, "ch-1").Return(nil),
+		f.stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), ssoProjectID, ssoAttemptID).Return(parkedAttempt(parkedResult()), nil),
+	)
 	var written []domain.AuthFactor
 	record := func(_ context.Context, _, _ string, factor domain.AuthFactor) (string, error) {
 		written = append(written, factor)
@@ -182,16 +189,32 @@ func TestFlowSSOIdentityResolver_BindLinked_WritesBothFactorsAndDeletes(t *testi
 	f.stmts.EXPECT().AddAuthAttemptFactor(gomock.Any(), ssoProjectID, ssoAttemptID, gomock.Any()).DoAndReturn(record)
 	f.stmts.EXPECT().SetAuthAttemptFactor(gomock.Any(), ssoProjectID, ssoAttemptID, gomock.Any()).DoAndReturn(record)
 	f.stmts.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil).Times(2)
-	f.stmts.EXPECT().DeleteSSOCallback(gomock.Any(), ssoProjectID, ssoAttemptID).Return(nil)
 
 	err := f.resolver.BindLinked(t.Context(), domain.FlowSSOBindInput{
-		ProjectID: ssoProjectID, AttemptID: ssoAttemptID, UserID: "user-1", ConnectionID: "idp-1", LinkID: "idplink-1",
+		ProjectID: ssoProjectID, AttemptID: ssoAttemptID, CheckID: "ch-1", UserID: "user-1", ConnectionID: "idp-1", LinkID: "idplink-1",
 	})
 	require.NoError(t, err)
 	assert.Equal(t, []domain.AuthFactor{
 		&domain.AuthFactorUser{UserID: "user-1"},
 		&domain.AuthFactorSSO{ConnectionID: "idp-1", LinkID: "idplink-1"},
 	}, written)
+}
+
+// The parked row was settled by a concurrent request or replaced by a new
+// ceremony: nothing is written and the error reaches the engine as is.
+func TestFlowSSOIdentityResolver_BindLinked_StaleRowAbortsBeforeWrites(t *testing.T) {
+	t.Parallel()
+	f := newSSOResolverFixture(t)
+	f.inTransaction(t)
+	f.stmts.EXPECT().DeleteSSOCallback(gomock.Any(), ssoProjectID, ssoAttemptID, "ch-1").Return(domain.ErrSSOStateInvalid())
+	f.stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+	f.stmts.EXPECT().AddAuthAttemptFactor(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+	f.stmts.EXPECT().SetAuthAttemptFactor(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+
+	err := f.resolver.BindLinked(t.Context(), domain.FlowSSOBindInput{
+		ProjectID: ssoProjectID, AttemptID: ssoAttemptID, CheckID: "ch-1", UserID: "user-1", ConnectionID: "idp-1", LinkID: "idplink-1",
+	})
+	require.ErrorIs(t, err, domain.ErrSSOStateInvalid())
 }
 
 func TestFlowSSOIdentityResolver_BindLinked_RefusesDifferentBoundUser(t *testing.T) {
@@ -201,10 +224,11 @@ func TestFlowSSOIdentityResolver_BindLinked_RefusesDifferentBoundUser(t *testing
 	f.stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), ssoProjectID, ssoAttemptID).
 		Return(parkedAttempt(parkedResult(), &domain.AuthFactorUser{UserID: "user-a"}), nil)
 	f.stmts.EXPECT().SetAuthAttemptFactor(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
-	f.stmts.EXPECT().DeleteSSOCallback(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+	// Deleted first, then rolled back with the transaction.
+	f.stmts.EXPECT().DeleteSSOCallback(gomock.Any(), ssoProjectID, ssoAttemptID, "ch-1").Return(nil)
 
 	err := f.resolver.BindLinked(t.Context(), domain.FlowSSOBindInput{
-		ProjectID: ssoProjectID, AttemptID: ssoAttemptID, UserID: "user-b", ConnectionID: "idp-1", LinkID: "idplink-1",
+		ProjectID: ssoProjectID, AttemptID: ssoAttemptID, CheckID: "ch-1", UserID: "user-b", ConnectionID: "idp-1", LinkID: "idplink-1",
 	})
 	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
 }
@@ -223,10 +247,11 @@ func TestFlowSSOIdentityResolver_BindLinked_ConcurrentBindRestarts(t *testing.T)
 			Return(parkedAttempt(parkedResult(), &domain.AuthFactorUser{UserID: "user-a"}), nil),
 	)
 	f.stmts.EXPECT().SetAuthAttemptFactor(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
-	f.stmts.EXPECT().DeleteSSOCallback(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+	// Deleted first, then rolled back with the transaction.
+	f.stmts.EXPECT().DeleteSSOCallback(gomock.Any(), ssoProjectID, ssoAttemptID, "ch-1").Return(nil)
 
 	err := f.resolver.BindLinked(t.Context(), domain.FlowSSOBindInput{
-		ProjectID: ssoProjectID, AttemptID: ssoAttemptID, UserID: "user-b", ConnectionID: "idp-1", LinkID: "idplink-1",
+		ProjectID: ssoProjectID, AttemptID: ssoAttemptID, CheckID: "ch-1", UserID: "user-b", ConnectionID: "idp-1", LinkID: "idplink-1",
 	})
 	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
 }
@@ -238,6 +263,7 @@ func TestFlowSSOIdentityResolver_BindLinked_ConcurrentSameUserProceeds(t *testin
 	f := newSSOResolverFixture(t)
 	f.inTransaction(t)
 	gomock.InOrder(
+		f.stmts.EXPECT().DeleteSSOCallback(gomock.Any(), ssoProjectID, ssoAttemptID, "ch-1").Return(nil),
 		f.stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), ssoProjectID, ssoAttemptID).Return(parkedAttempt(parkedResult()), nil),
 		f.stmts.EXPECT().AddAuthAttemptFactor(gomock.Any(), ssoProjectID, ssoAttemptID, gomock.Any()).
 			Return("", database.NewUniqueError("checks", "", nil)),
@@ -247,10 +273,9 @@ func TestFlowSSOIdentityResolver_BindLinked_ConcurrentSameUserProceeds(t *testin
 	f.stmts.EXPECT().SetAuthAttemptFactor(gomock.Any(), ssoProjectID, ssoAttemptID,
 		&domain.AuthFactorSSO{ConnectionID: "idp-1", LinkID: "idplink-1"}).Return("ch-sso", nil)
 	f.stmts.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil).Times(1)
-	f.stmts.EXPECT().DeleteSSOCallback(gomock.Any(), ssoProjectID, ssoAttemptID).Return(nil)
 
 	err := f.resolver.BindLinked(t.Context(), domain.FlowSSOBindInput{
-		ProjectID: ssoProjectID, AttemptID: ssoAttemptID, UserID: "user-1", ConnectionID: "idp-1", LinkID: "idplink-1",
+		ProjectID: ssoProjectID, AttemptID: ssoAttemptID, CheckID: "ch-1", UserID: "user-1", ConnectionID: "idp-1", LinkID: "idplink-1",
 	})
 	require.NoError(t, err)
 }
@@ -286,6 +311,7 @@ func createInput() domain.FlowSSOCreateInput {
 	return domain.FlowSSOCreateInput{
 		ProjectID:     ssoProjectID,
 		AttemptID:     ssoAttemptID,
+		CheckID:       "ch-1",
 		UserSchemaURL: ssoSchemaURL,
 		ConnectionID:  "idp-1",
 		Subject:       "sub-1",
@@ -300,7 +326,10 @@ func (f *ssoResolverFixture) expectCreateUser(createErr error) {
 	f.schemaStore.EXPECT().GetJSONSchemaByID(gomock.Any(), ssoProjectID, ssoSchemaURL).
 		Return(&domain.JSONSchema{ProjectID: ssoProjectID, URL: ssoSchemaURL, Schema: []byte(ssoUserSchema)}, nil)
 	f.stmts.EXPECT().CreateUser(gomock.Any(), gomock.Any()).Return(createErr)
-	f.stmts.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	f.stmts.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, ev *domain.Event) error {
+		f.events = append(f.events, ev.EventType)
+		return nil
+	}).AnyTimes()
 }
 
 func TestFlowSSOIdentityResolver_CreateLinked_AppliesActionsInOneTransaction(t *testing.T) {
@@ -321,12 +350,13 @@ func TestFlowSSOIdentityResolver_CreateLinked_AppliesActionsInOneTransaction(t *
 		written = append(written, factor)
 		return "ch-new", nil
 	}
-	// The user factor is added (refused when one is stored), the sso factor set.
+	// The exact parked row goes first, then the user factor is added (refused
+	// when one is stored) and the sso factor set.
 	gomock.InOrder(
+		f.stmts.EXPECT().DeleteSSOCallback(gomock.Any(), ssoProjectID, ssoAttemptID, "ch-1").Return(nil),
 		f.stmts.EXPECT().AddAuthAttemptFactor(gomock.Any(), ssoProjectID, ssoAttemptID, gomock.Any()).DoAndReturn(record),
 		f.stmts.EXPECT().SetAuthAttemptFactor(gomock.Any(), ssoProjectID, ssoAttemptID, gomock.Any()).DoAndReturn(record),
 	)
-	f.stmts.EXPECT().DeleteSSOCallback(gomock.Any(), ssoProjectID, ssoAttemptID).Return(nil)
 
 	userID, err := f.resolver.CreateLinked(t.Context(), createInput())
 	require.NoError(t, err)
@@ -357,7 +387,7 @@ func TestFlowSSOIdentityResolver_CreateLinked_UniqueErrorMapsToUserAlreadyExists
 			wire(f)
 			f.stmts.EXPECT().AddAuthAttemptFactor(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 			f.stmts.EXPECT().SetAuthAttemptFactor(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
-			f.stmts.EXPECT().DeleteSSOCallback(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+			f.stmts.EXPECT().DeleteSSOCallback(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 
 			_, err := f.resolver.CreateLinked(t.Context(), createInput())
 			require.ErrorIs(t, err, domain.ErrUserAlreadyExists())
@@ -371,6 +401,7 @@ func TestFlowSSOIdentityResolver_CreateLinked_RefusesBoundAttempt(t *testing.T) 
 	f.inTransaction(t)
 	f.expectCreateUser(nil)
 	f.stmts.EXPECT().CreateIDPIdentityLink(gomock.Any(), gomock.Any()).Return(nil)
+	f.stmts.EXPECT().DeleteSSOCallback(gomock.Any(), ssoProjectID, ssoAttemptID, "ch-1").Return(nil)
 	f.stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), ssoProjectID, ssoAttemptID).
 		Return(parkedAttempt(parkedResult(), &domain.AuthFactorUser{UserID: "user-a"}), nil)
 	f.stmts.EXPECT().AddAuthAttemptFactor(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
@@ -378,6 +409,91 @@ func TestFlowSSOIdentityResolver_CreateLinked_RefusesBoundAttempt(t *testing.T) 
 
 	_, err := f.resolver.CreateLinked(t.Context(), createInput())
 	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
+}
+
+// With no project-unique claim nothing probed the attempt before the create,
+// so the bind is the first place that sees an expired attempt. It refuses, and
+// the user and link roll back with it.
+func TestFlowSSOIdentityResolver_CreateLinked_RefusesExpiredAttempt(t *testing.T) {
+	t.Parallel()
+	f := newSSOResolverFixture(t)
+	f.inTransaction(t)
+	f.expectCreateUser(nil)
+	f.stmts.EXPECT().CreateIDPIdentityLink(gomock.Any(), gomock.Any()).Return(nil)
+	f.stmts.EXPECT().DeleteSSOCallback(gomock.Any(), ssoProjectID, ssoAttemptID, "ch-1").Return(nil)
+	ttl := time.Minute
+	expired := parkedAttempt(parkedResult())
+	expired.CreatedAt = time.Now().Add(-time.Hour)
+	expired.TimeToLive = &ttl
+	f.stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), ssoProjectID, ssoAttemptID).Return(expired, nil)
+	f.stmts.EXPECT().AddAuthAttemptFactor(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+	f.stmts.EXPECT().SetAuthAttemptFactor(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+
+	_, err := f.resolver.CreateLinked(t.Context(), createInput())
+	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
+}
+
+func TestFlowSSOIdentityResolver_BindLinked_RefusesHandedOffAttempt(t *testing.T) {
+	t.Parallel()
+	f := newSSOResolverFixture(t)
+	f.inTransaction(t)
+	f.stmts.EXPECT().DeleteSSOCallback(gomock.Any(), ssoProjectID, ssoAttemptID, "ch-1").Return(nil)
+	handedOff := parkedAttempt(parkedResult())
+	handedOff.HandoffToken = &domain.HandoffToken{}
+	f.stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), ssoProjectID, ssoAttemptID).Return(handedOff, nil)
+	f.stmts.EXPECT().AddAuthAttemptFactor(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+	f.stmts.EXPECT().SetAuthAttemptFactor(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+
+	err := f.resolver.BindLinked(t.Context(), domain.FlowSSOBindInput{
+		ProjectID: ssoProjectID, AttemptID: ssoAttemptID, CheckID: "ch-1", UserID: "user-1", ConnectionID: "idp-1", LinkID: "idplink-1",
+	})
+	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
+}
+
+// A lost attribute race is a failed user creation, audited like one created
+// through the user API.
+func TestFlowSSOIdentityResolver_CreateLinked_LostRaceEmitsUserCreateFailed(t *testing.T) {
+	t.Parallel()
+	f := newSSOResolverFixture(t)
+	f.inTransaction(t)
+	f.expectCreateUser(database.NewUniqueError("users", "uq_unique_attributes", nil))
+
+	_, err := f.resolver.CreateLinked(t.Context(), createInput())
+	require.ErrorIs(t, err, domain.ErrUserAlreadyExists())
+	assert.Contains(t, f.events, domain.EventTypeUserCreateFailed)
+}
+
+func TestFlowSSOIdentityResolver_FindUniqueOwner(t *testing.T) {
+	t.Parallel()
+	for name, tc := range map[string]struct {
+		user    *domain.User
+		err     error
+		want    string
+		wantErr bool
+	}{
+		"hit":   {user: &domain.User{ID: "user-9"}, want: "user-9"},
+		"miss":  {err: database.NewNoRowFoundError(nil)},
+		"error": {err: errors.New("boom"), wantErr: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			f := newSSOResolverFixture(t)
+			f.stmts.EXPECT().
+				GetUser(gomock.Any(), gomock.Any(), service.UserQueryOptions{
+					Attributes:           []domain.Attribute{{Key: "email", Value: "alice@example.com"}},
+					UniqueAttributesOnly: true,
+				}).
+				Return(tc.user, tc.err)
+
+			got, err := f.resolver.FindUniqueOwner(t.Context(), ssoProjectID, "email", "alice@example.com")
+			if tc.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, got)
+		})
+	}
 }
 
 // A parked row the engine already resolved (sso_user_not_found leaves it in

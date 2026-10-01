@@ -364,7 +364,14 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 
 	if parked.Link == nil && parked.CreationDisabled {
 		// The identity has no account and will not get one.
-		if err := r.ssoIdentities.DeleteParked(ctx, state.ProjectID, state.AuthAttemptID); err != nil {
+		// ErrSSOStateInvalid here and from the binds below means a concurrent
+		// request settled the row or a new ceremony replaced it: the winner
+		// already answered, so this render shows the step with no outcome.
+		err := r.ssoIdentities.DeleteParked(ctx, state.ProjectID, state.AuthAttemptID, parked.CheckID)
+		if errors.Is(err, ErrSSOStateInvalid()) {
+			return FlowStepResult{}, false, nil
+		}
+		if err != nil {
 			return FlowStepResult{}, false, fmt.Errorf("flow state machine: delete parked sso identity: %w", err)
 		}
 		msg := FlowStepErrorSSOCreationDisabled
@@ -373,6 +380,9 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 	}
 	if parked.Link == nil {
 		outcome, err := r.provisionSSOIdentity(ctx, state, parked)
+		if errors.Is(err, ErrSSOStateInvalid()) {
+			return FlowStepResult{}, false, nil
+		}
 		if err != nil {
 			return FlowStepResult{}, false, err
 		}
@@ -380,13 +390,18 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 		return result, true, err
 	}
 
-	if err := r.ssoIdentities.BindLinked(ctx, FlowSSOBindInput{
+	err = r.ssoIdentities.BindLinked(ctx, FlowSSOBindInput{
 		ProjectID:    state.ProjectID,
 		AttemptID:    state.AuthAttemptID,
+		CheckID:      parked.CheckID,
 		UserID:       parked.Link.UserID,
 		ConnectionID: parked.ConnectionID,
 		LinkID:       parked.Link.LinkID,
-	}); err != nil {
+	})
+	if errors.Is(err, ErrSSOStateInvalid()) {
+		return FlowStepResult{}, false, nil
+	}
+	if err != nil {
 		return FlowStepResult{}, false, fmt.Errorf("flow state machine: bind sso identity: %w", err)
 	}
 	recordResolvedUser(state, parked.Link.UserID)
@@ -424,6 +439,7 @@ func (r *FlowStateMachineRuntime) provisionSSOIdentity(ctx context.Context, stat
 	userID, err := r.ssoIdentities.CreateLinked(ctx, FlowSSOCreateInput{
 		ProjectID:     state.ProjectID,
 		AttemptID:     state.AuthAttemptID,
+		CheckID:       parked.CheckID,
 		UserSchemaURL: state.UserSchemaURL,
 		ConnectionID:  parked.ConnectionID,
 		Subject:       parked.Subject,
@@ -486,6 +502,16 @@ func (r *FlowStateMachineRuntime) bindSSOCollision(ctx context.Context, state *F
 		if value == "" {
 			continue
 		}
+		// A read-only lookup first: an identifier submission that misses
+		// records a failed check on the attempt, and a miss here is no
+		// sign-in attempt.
+		owner, err := r.ssoIdentities.FindUniqueOwner(ctx, state.ProjectID, name, value)
+		if err != nil {
+			return false, fmt.Errorf("flow state machine: look up sso claim %q: %w", name, err)
+		}
+		if owner == "" {
+			continue
+		}
 		userID, err := r.authAttempts.SubmitIdentifier(ctx, FlowSubmitIdentifierInput{
 			ProjectID:     state.ProjectID,
 			AttemptID:     state.AuthAttemptID,
@@ -503,10 +529,10 @@ func (r *FlowStateMachineRuntime) bindSSOCollision(ctx context.Context, state *F
 		if err != nil {
 			return false, fmt.Errorf("flow state machine: probe sso claim %q: %w", name, err)
 		}
-		recordResolvedUser(state, userID)
-		if err := r.ssoIdentities.DeleteParked(ctx, state.ProjectID, state.AuthAttemptID); err != nil {
+		if err := r.ssoIdentities.DeleteParked(ctx, state.ProjectID, state.AuthAttemptID, parked.CheckID); err != nil {
 			return false, fmt.Errorf("flow state machine: delete parked sso identity: %w", err)
 		}
+		recordResolvedUser(state, userID)
 		return true, nil
 	}
 	return false, nil
