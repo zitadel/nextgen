@@ -41,7 +41,7 @@ export { businessLocales } from "@zitadel/components";
  * `@property({ attribute: false })`) or as camelCase properties backed by
  * kebab-case attributes (`projectId` ↔ `project-id`). Neither survives Qwik's
  * lower-cased attribute binding, so all configuration is applied imperatively on
- * the element instead (see the `ref` callbacks below).
+ * the element — see the `bind*Config` binders.
  */
 function setProp<E extends Element, K extends keyof E>(
   el: E,
@@ -51,6 +51,43 @@ function setProp<E extends Element, K extends keyof E>(
   if (value !== undefined) {
     el[key] = value;
   }
+}
+
+/** Applies the `<zitadel-login>` surface config to the element as DOM properties. */
+function bindLoginConfig(el: ZitadelLoginElement, props: ZitadelLoginProps): void {
+  setProp(el, "project", props.project);
+  setProp(el, "projectId", props.projectId);
+  setProp(el, "proxyPath", props.proxyPath);
+  setProp(el, "purpose", props.purpose ?? "login");
+  setProp(el, "flowName", props.flowName);
+  setProp(el, "postSignInUrl", props.postSignInUrl);
+  setProp(el, "variant", props.variant);
+  setProp(el, "theme", props.theme);
+  setProp(el, "suppressHeader", props.suppressHeader);
+  setProp(el, "locales", props.locales);
+  setProp(el, "lang", props.lang);
+}
+
+/** Applies the `<zitadel-logout>` surface config to the element as DOM properties. */
+function bindLogoutConfig(el: ZitadelLogoutElement, props: ZitadelLogoutProps): void {
+  setProp(el, "project", props.project);
+  setProp(el, "projectId", props.projectId);
+  setProp(el, "proxyPath", props.proxyPath);
+  setProp(el, "postSignOutUrl", props.postSignOutUrl);
+  setProp(el, "theme", props.theme);
+}
+
+/** Applies the `<zitadel-session>` surface config to the element as DOM properties. */
+function bindSessionConfig(el: ZitadelSessionElement, props: ZitadelSessionProps): void {
+  setProp(el, "project", props.project);
+  setProp(el, "projectId", props.projectId);
+  setProp(el, "proxyPath", props.proxyPath);
+  setProp(el, "postSignOutUrl", props.postSignOutUrl);
+  setProp(el, "heading", props.heading);
+  setProp(el, "logoutLabel", props.logoutLabel);
+  setProp(el, "variant", props.variant);
+  setProp(el, "theme", props.theme);
+  setProp(el, "suppressHeader", props.suppressHeader);
 }
 
 function eventDetail<T>(event: Event): T {
@@ -89,12 +126,12 @@ export type ZitadelLoginProps = ZitadelLoginConfig &
 /**
  * Qwik component wrapping the `<zitadel-login>` web component. Binds the
  * {@link ZitadelProject} handle (or the discrete project id / proxy path) and
- * the surface config as DOM properties in the `ref` callback — synchronously at
- * mount, before the widget's first render, which Qwik's JSX cannot do for a
- * custom element (see {@link setProp}). `useVisibleTask$` (eager `document-ready`,
- * so it runs on load rather than on first visibility) then wires the native
- * listeners that forward the widget's `zitadel-*` events; Qwik's declarative
- * `useOn` does not catch these programmatic custom events.
+ * the surface config as DOM properties — Qwik's JSX cannot set these on a custom
+ * element (see {@link setProp}). The `ref` callback applies them synchronously at
+ * mount, before the widget's first render; the `useVisibleTask$` tracks the props
+ * and re-applies them when any changes (so the widget stays reactive), and wires
+ * the native listeners that forward the widget's `zitadel-*` events, which Qwik's
+ * declarative `useOn` does not catch.
  */
 export const ZitadelLogin = component$<ZitadelLoginProps>((props) => {
   const host = useSignal<ZitadelLoginElement>();
@@ -105,6 +142,9 @@ export const ZitadelLogin = component$<ZitadelLoginProps>((props) => {
       if (!el) {
         return;
       }
+      // Re-run whenever any prop changes, then re-apply the config reactively.
+      track(() => ({ ...props }));
+      bindLoginConfig(el, props);
       const onStep = (event: Event): void => void props.onFlowStep$?.(eventDetail(event));
       const onInput = (event: Event): void => void props.onFlowInput$?.(eventDetail(event));
       const onComplete = (event: Event): void => void props.onFlowComplete$?.(eventDetail(event));
@@ -129,17 +169,7 @@ export const ZitadelLogin = component$<ZitadelLoginProps>((props) => {
         if (props.ref) {
           props.ref.value = el;
         }
-        setProp(el, "project", props.project);
-        setProp(el, "projectId", props.projectId);
-        setProp(el, "proxyPath", props.proxyPath);
-        setProp(el, "purpose", props.purpose ?? "login");
-        setProp(el, "flowName", props.flowName);
-        setProp(el, "postSignInUrl", props.postSignInUrl);
-        setProp(el, "variant", props.variant);
-        setProp(el, "theme", props.theme);
-        setProp(el, "suppressHeader", props.suppressHeader);
-        setProp(el, "locales", props.locales);
-        setProp(el, "lang", props.lang);
+        bindLoginConfig(el, props);
       }}
     />
   );
@@ -165,8 +195,9 @@ export type ZitadelLogoutProps = ZitadelLogoutConfig &
 /**
  * Qwik component wrapping the `<zitadel-logout>` web component. Binds the
  * {@link ZitadelProject} handle (or the discrete project id / proxy path) and
- * surface config as DOM properties in the `ref` callback (see {@link setProp})
- * and forwards the widget's `zitadel-signout` event as an optional callback.
+ * surface config as DOM properties (see {@link setProp}) — applied at mount in
+ * the `ref` callback and re-applied reactively by the `useVisibleTask$` — and
+ * forwards the widget's `zitadel-signout` event as an optional callback.
  */
 export const ZitadelLogout = component$<ZitadelLogoutProps>((props) => {
   const host = useSignal<ZitadelLogoutElement>();
@@ -177,6 +208,8 @@ export const ZitadelLogout = component$<ZitadelLogoutProps>((props) => {
       if (!el) {
         return;
       }
+      track(() => ({ ...props }));
+      bindLogoutConfig(el, props);
       const onSignout = (event: Event): void => void props.onSignout$?.(eventDetail(event));
       el.addEventListener("zitadel-signout", onSignout);
       cleanup(() => {
@@ -192,11 +225,7 @@ export const ZitadelLogout = component$<ZitadelLogoutProps>((props) => {
         if (props.ref) {
           props.ref.value = el;
         }
-        setProp(el, "project", props.project);
-        setProp(el, "projectId", props.projectId);
-        setProp(el, "proxyPath", props.proxyPath);
-        setProp(el, "postSignOutUrl", props.postSignOutUrl);
-        setProp(el, "theme", props.theme);
+        bindLogoutConfig(el, props);
       }}
     />
   );
@@ -221,8 +250,9 @@ export type ZitadelSessionProps = ZitadelSessionConfig &
 /**
  * Qwik component wrapping the `<zitadel-session>` web component — the
  * post-sign-in "signed in as" card. Binds the {@link ZitadelProject} handle (or
- * the discrete project id / proxy path) and surface config as DOM properties in
- * the `ref` callback (see {@link setProp}) and forwards the widget's
+ * the discrete project id / proxy path) and surface config as DOM properties
+ * (see {@link setProp}) — applied at mount in the `ref` callback and re-applied
+ * reactively by the `useVisibleTask$` — and forwards the widget's
  * `zitadel-signout` event as an optional callback.
  */
 export const ZitadelSession = component$<ZitadelSessionProps>((props) => {
@@ -234,6 +264,8 @@ export const ZitadelSession = component$<ZitadelSessionProps>((props) => {
       if (!el) {
         return;
       }
+      track(() => ({ ...props }));
+      bindSessionConfig(el, props);
       const onSignout = (event: Event): void => void props.onSignout$?.(eventDetail(event));
       el.addEventListener("zitadel-signout", onSignout);
       cleanup(() => {
@@ -249,15 +281,7 @@ export const ZitadelSession = component$<ZitadelSessionProps>((props) => {
         if (props.ref) {
           props.ref.value = el;
         }
-        setProp(el, "project", props.project);
-        setProp(el, "projectId", props.projectId);
-        setProp(el, "proxyPath", props.proxyPath);
-        setProp(el, "postSignOutUrl", props.postSignOutUrl);
-        setProp(el, "heading", props.heading);
-        setProp(el, "logoutLabel", props.logoutLabel);
-        setProp(el, "variant", props.variant);
-        setProp(el, "theme", props.theme);
-        setProp(el, "suppressHeader", props.suppressHeader);
+        bindSessionConfig(el, props);
       }}
     />
   );
