@@ -72,3 +72,22 @@ func TestAuthAttemptStatements_Get(t *testing.T) {
 		})
 	})
 }
+
+func TestAuthAttemptStatements_SetSSOFactorRoundTrip(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureProject(t, d.stmts)
+		attempt := createBareAttempt(t, d.stmts, projectID)
+
+		_, err := d.stmts.SetAuthAttemptFactor(t.Context(), projectID, attempt.ID,
+			&domain.AuthFactorSSO{ConnectionID: "idp_1", LinkID: "idplink_1"})
+		require.NoError(t, err)
+
+		got, err := d.stmts.GetAuthAttemptByID(t.Context(), projectID, attempt.ID)
+		require.NoError(t, err)
+		factor, ok := domain.CheckAs[*domain.AuthFactorSSO](got, domain.AuthCheckTypeSSO)
+		require.True(t, ok)
+		assert.Equal(t, "idp_1", factor.ConnectionID)
+		assert.Equal(t, "idplink_1", factor.LinkID)
+		assert.False(t, factor.GetLastVerifiedAt().IsZero())
+	})
+}

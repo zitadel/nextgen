@@ -85,6 +85,8 @@ const setSSOCallbackResultStmt = `UPDATE zitadel_nextgen.checks SET factor_paylo
 	` WHERE project_id = $1 AND lookup_hash = $2 AND type = $3 AND last_challenged_at IS NULL` +
 	` AND factor_payload IS NULL`
 
+const deleteSSOCallbackStmt = `DELETE FROM zitadel_nextgen.checks WHERE project_id = $1 AND auth_attempt_id = $2 AND type = $3`
+
 const authAttemptChallengeFailedStmt = `UPDATE zitadel_nextgen.checks` +
 	` SET last_failed_at = NOW(), failure_count = failure_count + 1` +
 	` WHERE project_id = $1 AND auth_attempt_id = $2 AND type = $3 AND id = $4` +
@@ -487,6 +489,14 @@ func (as authAttemptStatements) SetSSOCallbackResult(ctx context.Context, projec
 	}
 	if tag.RowsAffected() == 0 {
 		return domain.ErrSSOStateInvalid()
+	}
+	return nil
+}
+
+// DeleteSSOCallback implements [service.AuthAttemptStatements].
+func (as authAttemptStatements) DeleteSSOCallback(ctx context.Context, projectID, authAttemptID string) error {
+	if _, err := as.client.Exec(ctx, deleteSSOCallbackStmt, projectID, authAttemptID, domain.AuthCheckTypeSSOCallback); err != nil {
+		return fmt.Errorf("failed to delete sso callback: %w", wrapError(err))
 	}
 	return nil
 }

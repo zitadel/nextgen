@@ -106,12 +106,12 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
    */
   function resolveSsoOutcome(slug: string | null, email: string | undefined): SsoOutcome {
     if (!slug || !email) {
-      return "identity_unknown";
+      return "sso_user_not_found";
     }
     if (ssoIdentities.isLinked(slug, email)) {
-      return "callback";
+      return "sso_authenticated";
     }
-    return authn.hasAccount(email) ? "user_already_exists" : "identity_unknown";
+    return authn.hasAccount(email) ? "sso_user_already_exists" : "sso_user_not_found";
   }
 
   function reset(): void {

@@ -158,13 +158,13 @@ describe("meta-schemas", () => {
     const cases: Array<[string, Record<string, unknown>, boolean]> = [
       ["sso_providers without transitions", { sso_providers: [provider] }, false],
       [
-        "sso_providers without a callback",
+        "sso_providers without an sso_authenticated transition",
         { sso_providers: [provider], transitions: { submit: { target: "extra" } } },
         false,
       ],
       [
-        "sso_providers with a callback",
-        { sso_providers: [provider], transitions: { callback: { target: "extra" } } },
+        "sso_providers with an sso_authenticated transition",
+        { sso_providers: [provider], transitions: { sso_authenticated: { target: "extra" } } },
         true,
       ],
       [
@@ -181,8 +181,8 @@ describe("meta-schemas", () => {
       ["non-terminal step with nothing", {}, false],
       ["non-terminal step with only empty lists", { fields: [], actions: [] }, false],
       [
-        "non-terminal step with only a callback",
-        { transitions: { callback: { target: "extra" } } },
+        "non-terminal step with only an sso_authenticated transition",
+        { transitions: { sso_authenticated: { target: "extra" } } },
         true,
       ],
       ["non-terminal step with fields", { fields: ["email"] }, true],

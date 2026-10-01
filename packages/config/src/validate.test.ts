@@ -236,16 +236,16 @@ describe("steps", () => {
     const def = flow();
     def.steps.push({ name: "idle", transitions: { user_not_found: { target: "done" } } });
     expect(messages(validateFlowDefinition(def))).toContain(
-      'step "idle" is non-terminal but has no fields, actions, sso_providers, gates, or transitions.callback',
+      'step "idle" is non-terminal but has no fields, actions, sso_providers, gates, or transitions.sso_authenticated',
     );
   });
 
-  it("rejects sso_providers without transitions.callback", () => {
+  it("rejects sso_providers without transitions.sso_authenticated", () => {
     const def = flow();
     const s = step(def, "identifier");
     s.sso_providers = ["idp"];
     expect(messages(validateFlowDefinition(def))).toContain(
-      'step "identifier": has sso_providers but is missing transitions.callback',
+      'step "identifier": has sso_providers but is missing transitions.sso_authenticated',
     );
   });
 
@@ -261,7 +261,7 @@ describe("steps", () => {
     const def = flow();
     step(def, "identifier").transitions.jump = { target: "done" };
     expect(messages(validateFlowDefinition(def))).toContain(
-      'step "identifier": transition key "jump" is not an action name or reserved outcome (user_not_found, user_already_exists, identity_unknown, callback)',
+      'step "identifier": transition key "jump" is not an action name or reserved outcome (user_not_found, user_already_exists, sso_user_not_found, sso_user_already_exists, sso_authenticated)',
     );
   });
 

@@ -298,7 +298,12 @@ func (s *flowService) GetStep(ctx context.Context, req GetFlowStepRequest) (doma
 	if err != nil {
 		return domain.FlowStepResult{}, err
 	}
-	return domain.FlowStepResult{State: result.State, Step: result.Step}, nil
+	return domain.FlowStepResult{
+		State:                 result.State,
+		Step:                  result.Step,
+		HandoffToken:          result.HandoffToken,
+		HandoffTokenExpiresAt: result.HandoffTokenExpiresAt,
+	}, nil
 }
 
 func flowServesPurpose(def *domain.FlowDefinition, purpose domain.FlowDefinitionPurpose) bool {

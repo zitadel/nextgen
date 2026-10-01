@@ -8038,7 +8038,8 @@ type CompletedFactor struct {
 	// Method-specific factor metadata. Structure depends on the `method` field.
 	// - `identifier`: includes user_id
 	// - `password`: no additional data
-	// - `passkey`: includes credential details and verification flags.
+	// - `passkey`: includes credential details and verification flags
+	// - `sso`: no additional data.
 	Payload OptCompletedFactorPayload `json:"payload"`
 }
 
@@ -8075,7 +8076,8 @@ func (s *CompletedFactor) SetPayload(val OptCompletedFactorPayload) {
 // Method-specific factor metadata. Structure depends on the `method` field.
 // - `identifier`: includes user_id
 // - `password`: no additional data
-// - `passkey`: includes credential details and verification flags.
+// - `passkey`: includes credential details and verification flags
+// - `sso`: no additional data.
 // CompletedFactorPayload represents sum type.
 type CompletedFactorPayload struct {
 	Type                    CompletedFactorPayloadType // switch on this field
@@ -17366,6 +17368,7 @@ const (
 	FactorMethodIdentifier FactorMethod = "identifier"
 	FactorMethodPassword   FactorMethod = "password"
 	FactorMethodPasskey    FactorMethod = "passkey"
+	FactorMethodSSO        FactorMethod = "sso"
 )
 
 // AllValues returns all FactorMethod values.
@@ -17374,6 +17377,7 @@ func (FactorMethod) AllValues() []FactorMethod {
 		FactorMethodIdentifier,
 		FactorMethodPassword,
 		FactorMethodPasskey,
+		FactorMethodSSO,
 	}
 }
 
@@ -17385,6 +17389,8 @@ func (s FactorMethod) MarshalText() ([]byte, error) {
 	case FactorMethodPassword:
 		return []byte(s), nil
 	case FactorMethodPasskey:
+		return []byte(s), nil
+	case FactorMethodSSO:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -17402,6 +17408,9 @@ func (s *FactorMethod) UnmarshalText(data []byte) error {
 		return nil
 	case FactorMethodPasskey:
 		*s = FactorMethodPasskey
+		return nil
+	case FactorMethodSSO:
+		*s = FactorMethodSSO
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
@@ -19068,7 +19077,7 @@ type FlowDefinitionStep struct {
 	// Keys match action names from the `actions` array. Additional keys
 	// come from implicit outcomes based on schema annotations
 	// (e.g. `user_not_found` from `x-unique` fields) and engine
-	// events (e.g. `sso`, `callback`).
+	// events (e.g. `sso_authenticated`, `sso_user_not_found`, `sso_user_already_exists`).
 	Transitions OptFlowDefinitionStepTransitions `json:"transitions"`
 }
 
@@ -19264,7 +19273,7 @@ func (s *FlowDefinitionStepOnSuccess) UnmarshalText(data []byte) error {
 // Keys match action names from the `actions` array. Additional keys
 // come from implicit outcomes based on schema annotations
 // (e.g. `user_not_found` from `x-unique` fields) and engine
-// events (e.g. `sso`, `callback`).
+// events (e.g. `sso_authenticated`, `sso_user_not_found`, `sso_user_already_exists`).
 type FlowDefinitionStepTransitions map[string]FlowDefinitionStepTransitionsItem
 
 func (s *FlowDefinitionStepTransitions) init() FlowDefinitionStepTransitions {
@@ -19810,8 +19819,6 @@ func (s *FlowResponse) SetHandoffTokenExpiresAt(val OptDateTime) {
 	s.HandoffTokenExpiresAt = val
 }
 
-func (*FlowResponse) getFlowStepRes() {}
-
 // FlowResponseHeaders wraps FlowResponse with response headers.
 type FlowResponseHeaders struct {
 	SetCookie OptString
@@ -19838,7 +19845,61 @@ func (s *FlowResponseHeaders) SetResponse(val FlowResponse) {
 	s.Response = val
 }
 
-func (*FlowResponseHeaders) createFlowRes() {}
+func (*FlowResponseHeaders) createFlowRes()  {}
+func (*FlowResponseHeaders) getFlowStepRes() {}
+
+// Merged schema.
+// Ref: #
+type FlowRestartRequired struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptFlowRestartRequiredDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *FlowRestartRequired) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *FlowRestartRequired) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *FlowRestartRequired) GetDetails() OptFlowRestartRequiredDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *FlowRestartRequired) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *FlowRestartRequired) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *FlowRestartRequired) SetDetails(val OptFlowRestartRequiredDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type FlowRestartRequiredDetails map[string]jx.Raw
+
+func (s *FlowRestartRequiredDetails) init() FlowRestartRequiredDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
 
 // A step contains ordered capability arrays: what to collect (fields),
 // what the user can do (actions), and what security gates must be satisfied (gates).
@@ -23306,20 +23367,40 @@ func (s *GetFlowDefinitionErrorResponseStatusCode) SetResponse(val GetFlowDefini
 
 func (*GetFlowDefinitionErrorResponseStatusCode) getFlowDefinitionRes() {}
 
+type GetFlowStepConflict ErrorDetails
+
+func (*GetFlowStepConflict) getFlowStepRes() {}
+
 // GetFlowStepErrorResponse represents sum type.
 type GetFlowStepErrorResponse struct {
-	Type                GetFlowStepErrorResponseType // switch on this field
-	EncKeyDecryptFailed EncKeyDecryptFailed
-	EncKeyNotFound      EncKeyNotFound
-	FlowCompleted       FlowCompleted
-	FlowCookieExpired   FlowCookieExpired
-	FlowCookieInvalid   FlowCookieInvalid
-	FlowIntegrity       FlowIntegrity
-	FlowNotFound        FlowNotFound
-	Internal            Internal
-	TknInvalid          TknInvalid
-	ReqInvalid          ReqInvalid
-	EncKeyUnknownAlg    EncKeyUnknownAlg
+	Type                    GetFlowStepErrorResponseType // switch on this field
+	AttAlreadyHandedOff     AttAlreadyHandedOff
+	AttInvalidRequest       AttInvalidRequest
+	AttInvalidState         AttInvalidState
+	AttNotCompleted         AttNotCompleted
+	AttNotFound             AttNotFound
+	EncKeyDecryptFailed     EncKeyDecryptFailed
+	EncKeyEncryptFailed     EncKeyEncryptFailed
+	EncKeyNotFound          EncKeyNotFound
+	EvtInvalid              EvtInvalid
+	FlowCompleted           FlowCompleted
+	FlowCookieExpired       FlowCookieExpired
+	FlowCookieInvalid       FlowCookieInvalid
+	FlowIntegrity           FlowIntegrity
+	FlowInvalidAction       FlowInvalidAction
+	FlowNotFound            FlowNotFound
+	FlowRestartRequired     FlowRestartRequired
+	FlowUnsupported         FlowUnsupported
+	IdpNotFound             IdpNotFound
+	IdpEndpointCleartext    IdpEndpointCleartext
+	IdpEndpointsPartial     IdpEndpointsPartial
+	IdpOAuth2Unsupported    IdpOAuth2Unsupported
+	IdpProtocolBlockMissing IdpProtocolBlockMissing
+	IdpScopesMissingOpenid  IdpScopesMissingOpenid
+	Internal                Internal
+	TknInvalid              TknInvalid
+	ReqInvalid              ReqInvalid
+	EncKeyUnknownAlg        EncKeyUnknownAlg
 }
 
 // GetFlowStepErrorResponseType is oneOf type of GetFlowStepErrorResponse.
@@ -23327,27 +23408,78 @@ type GetFlowStepErrorResponseType string
 
 // Possible values for GetFlowStepErrorResponseType.
 const (
-	EncKeyDecryptFailedGetFlowStepErrorResponse GetFlowStepErrorResponseType = "enc_key.decrypt_failed"
-	EncKeyNotFoundGetFlowStepErrorResponse      GetFlowStepErrorResponseType = "enc_key.not_found"
-	FlowCompletedGetFlowStepErrorResponse       GetFlowStepErrorResponseType = "flow.completed"
-	FlowCookieExpiredGetFlowStepErrorResponse   GetFlowStepErrorResponseType = "flow.cookie_expired"
-	FlowCookieInvalidGetFlowStepErrorResponse   GetFlowStepErrorResponseType = "flow.cookie_invalid"
-	FlowIntegrityGetFlowStepErrorResponse       GetFlowStepErrorResponseType = "flow.integrity"
-	FlowNotFoundGetFlowStepErrorResponse        GetFlowStepErrorResponseType = "flow.not_found"
-	InternalGetFlowStepErrorResponse            GetFlowStepErrorResponseType = "internal"
-	TknInvalidGetFlowStepErrorResponse          GetFlowStepErrorResponseType = "tkn.invalid"
-	ReqInvalidGetFlowStepErrorResponse          GetFlowStepErrorResponseType = "req.invalid"
-	EncKeyUnknownAlgGetFlowStepErrorResponse    GetFlowStepErrorResponseType = "enc_key.unknown_alg"
+	AttAlreadyHandedOffGetFlowStepErrorResponse     GetFlowStepErrorResponseType = "att.already_handed_off"
+	AttInvalidRequestGetFlowStepErrorResponse       GetFlowStepErrorResponseType = "att.invalid_request"
+	AttInvalidStateGetFlowStepErrorResponse         GetFlowStepErrorResponseType = "att.invalid_state"
+	AttNotCompletedGetFlowStepErrorResponse         GetFlowStepErrorResponseType = "att.not_completed"
+	AttNotFoundGetFlowStepErrorResponse             GetFlowStepErrorResponseType = "att.not_found"
+	EncKeyDecryptFailedGetFlowStepErrorResponse     GetFlowStepErrorResponseType = "enc_key.decrypt_failed"
+	EncKeyEncryptFailedGetFlowStepErrorResponse     GetFlowStepErrorResponseType = "enc_key.encrypt_failed"
+	EncKeyNotFoundGetFlowStepErrorResponse          GetFlowStepErrorResponseType = "enc_key.not_found"
+	EvtInvalidGetFlowStepErrorResponse              GetFlowStepErrorResponseType = "evt.invalid"
+	FlowCompletedGetFlowStepErrorResponse           GetFlowStepErrorResponseType = "flow.completed"
+	FlowCookieExpiredGetFlowStepErrorResponse       GetFlowStepErrorResponseType = "flow.cookie_expired"
+	FlowCookieInvalidGetFlowStepErrorResponse       GetFlowStepErrorResponseType = "flow.cookie_invalid"
+	FlowIntegrityGetFlowStepErrorResponse           GetFlowStepErrorResponseType = "flow.integrity"
+	FlowInvalidActionGetFlowStepErrorResponse       GetFlowStepErrorResponseType = "flow.invalid_action"
+	FlowNotFoundGetFlowStepErrorResponse            GetFlowStepErrorResponseType = "flow.not_found"
+	FlowRestartRequiredGetFlowStepErrorResponse     GetFlowStepErrorResponseType = "flow.restart_required"
+	FlowUnsupportedGetFlowStepErrorResponse         GetFlowStepErrorResponseType = "flow.unsupported"
+	IdpNotFoundGetFlowStepErrorResponse             GetFlowStepErrorResponseType = "idp.not_found"
+	IdpEndpointCleartextGetFlowStepErrorResponse    GetFlowStepErrorResponseType = "idp.endpoint_cleartext"
+	IdpEndpointsPartialGetFlowStepErrorResponse     GetFlowStepErrorResponseType = "idp.endpoints_partial"
+	IdpOAuth2UnsupportedGetFlowStepErrorResponse    GetFlowStepErrorResponseType = "idp.oauth2_unsupported"
+	IdpProtocolBlockMissingGetFlowStepErrorResponse GetFlowStepErrorResponseType = "idp.protocol_block_missing"
+	IdpScopesMissingOpenidGetFlowStepErrorResponse  GetFlowStepErrorResponseType = "idp.scopes_missing_openid"
+	InternalGetFlowStepErrorResponse                GetFlowStepErrorResponseType = "internal"
+	TknInvalidGetFlowStepErrorResponse              GetFlowStepErrorResponseType = "tkn.invalid"
+	ReqInvalidGetFlowStepErrorResponse              GetFlowStepErrorResponseType = "req.invalid"
+	EncKeyUnknownAlgGetFlowStepErrorResponse        GetFlowStepErrorResponseType = "enc_key.unknown_alg"
 )
+
+// IsAttAlreadyHandedOff reports whether GetFlowStepErrorResponse is AttAlreadyHandedOff.
+func (s GetFlowStepErrorResponse) IsAttAlreadyHandedOff() bool {
+	return s.Type == AttAlreadyHandedOffGetFlowStepErrorResponse
+}
+
+// IsAttInvalidRequest reports whether GetFlowStepErrorResponse is AttInvalidRequest.
+func (s GetFlowStepErrorResponse) IsAttInvalidRequest() bool {
+	return s.Type == AttInvalidRequestGetFlowStepErrorResponse
+}
+
+// IsAttInvalidState reports whether GetFlowStepErrorResponse is AttInvalidState.
+func (s GetFlowStepErrorResponse) IsAttInvalidState() bool {
+	return s.Type == AttInvalidStateGetFlowStepErrorResponse
+}
+
+// IsAttNotCompleted reports whether GetFlowStepErrorResponse is AttNotCompleted.
+func (s GetFlowStepErrorResponse) IsAttNotCompleted() bool {
+	return s.Type == AttNotCompletedGetFlowStepErrorResponse
+}
+
+// IsAttNotFound reports whether GetFlowStepErrorResponse is AttNotFound.
+func (s GetFlowStepErrorResponse) IsAttNotFound() bool {
+	return s.Type == AttNotFoundGetFlowStepErrorResponse
+}
 
 // IsEncKeyDecryptFailed reports whether GetFlowStepErrorResponse is EncKeyDecryptFailed.
 func (s GetFlowStepErrorResponse) IsEncKeyDecryptFailed() bool {
 	return s.Type == EncKeyDecryptFailedGetFlowStepErrorResponse
 }
 
+// IsEncKeyEncryptFailed reports whether GetFlowStepErrorResponse is EncKeyEncryptFailed.
+func (s GetFlowStepErrorResponse) IsEncKeyEncryptFailed() bool {
+	return s.Type == EncKeyEncryptFailedGetFlowStepErrorResponse
+}
+
 // IsEncKeyNotFound reports whether GetFlowStepErrorResponse is EncKeyNotFound.
 func (s GetFlowStepErrorResponse) IsEncKeyNotFound() bool {
 	return s.Type == EncKeyNotFoundGetFlowStepErrorResponse
+}
+
+// IsEvtInvalid reports whether GetFlowStepErrorResponse is EvtInvalid.
+func (s GetFlowStepErrorResponse) IsEvtInvalid() bool {
+	return s.Type == EvtInvalidGetFlowStepErrorResponse
 }
 
 // IsFlowCompleted reports whether GetFlowStepErrorResponse is FlowCompleted.
@@ -23370,9 +23502,54 @@ func (s GetFlowStepErrorResponse) IsFlowIntegrity() bool {
 	return s.Type == FlowIntegrityGetFlowStepErrorResponse
 }
 
+// IsFlowInvalidAction reports whether GetFlowStepErrorResponse is FlowInvalidAction.
+func (s GetFlowStepErrorResponse) IsFlowInvalidAction() bool {
+	return s.Type == FlowInvalidActionGetFlowStepErrorResponse
+}
+
 // IsFlowNotFound reports whether GetFlowStepErrorResponse is FlowNotFound.
 func (s GetFlowStepErrorResponse) IsFlowNotFound() bool {
 	return s.Type == FlowNotFoundGetFlowStepErrorResponse
+}
+
+// IsFlowRestartRequired reports whether GetFlowStepErrorResponse is FlowRestartRequired.
+func (s GetFlowStepErrorResponse) IsFlowRestartRequired() bool {
+	return s.Type == FlowRestartRequiredGetFlowStepErrorResponse
+}
+
+// IsFlowUnsupported reports whether GetFlowStepErrorResponse is FlowUnsupported.
+func (s GetFlowStepErrorResponse) IsFlowUnsupported() bool {
+	return s.Type == FlowUnsupportedGetFlowStepErrorResponse
+}
+
+// IsIdpNotFound reports whether GetFlowStepErrorResponse is IdpNotFound.
+func (s GetFlowStepErrorResponse) IsIdpNotFound() bool {
+	return s.Type == IdpNotFoundGetFlowStepErrorResponse
+}
+
+// IsIdpEndpointCleartext reports whether GetFlowStepErrorResponse is IdpEndpointCleartext.
+func (s GetFlowStepErrorResponse) IsIdpEndpointCleartext() bool {
+	return s.Type == IdpEndpointCleartextGetFlowStepErrorResponse
+}
+
+// IsIdpEndpointsPartial reports whether GetFlowStepErrorResponse is IdpEndpointsPartial.
+func (s GetFlowStepErrorResponse) IsIdpEndpointsPartial() bool {
+	return s.Type == IdpEndpointsPartialGetFlowStepErrorResponse
+}
+
+// IsIdpOAuth2Unsupported reports whether GetFlowStepErrorResponse is IdpOAuth2Unsupported.
+func (s GetFlowStepErrorResponse) IsIdpOAuth2Unsupported() bool {
+	return s.Type == IdpOAuth2UnsupportedGetFlowStepErrorResponse
+}
+
+// IsIdpProtocolBlockMissing reports whether GetFlowStepErrorResponse is IdpProtocolBlockMissing.
+func (s GetFlowStepErrorResponse) IsIdpProtocolBlockMissing() bool {
+	return s.Type == IdpProtocolBlockMissingGetFlowStepErrorResponse
+}
+
+// IsIdpScopesMissingOpenid reports whether GetFlowStepErrorResponse is IdpScopesMissingOpenid.
+func (s GetFlowStepErrorResponse) IsIdpScopesMissingOpenid() bool {
+	return s.Type == IdpScopesMissingOpenidGetFlowStepErrorResponse
 }
 
 // IsInternal reports whether GetFlowStepErrorResponse is Internal.
@@ -23393,6 +23570,111 @@ func (s GetFlowStepErrorResponse) IsReqInvalid() bool {
 // IsEncKeyUnknownAlg reports whether GetFlowStepErrorResponse is EncKeyUnknownAlg.
 func (s GetFlowStepErrorResponse) IsEncKeyUnknownAlg() bool {
 	return s.Type == EncKeyUnknownAlgGetFlowStepErrorResponse
+}
+
+// SetAttAlreadyHandedOff sets GetFlowStepErrorResponse to AttAlreadyHandedOff.
+func (s *GetFlowStepErrorResponse) SetAttAlreadyHandedOff(v AttAlreadyHandedOff) {
+	s.Type = AttAlreadyHandedOffGetFlowStepErrorResponse
+	s.AttAlreadyHandedOff = v
+}
+
+// GetAttAlreadyHandedOff returns AttAlreadyHandedOff and true boolean if GetFlowStepErrorResponse is AttAlreadyHandedOff.
+func (s GetFlowStepErrorResponse) GetAttAlreadyHandedOff() (v AttAlreadyHandedOff, ok bool) {
+	if !s.IsAttAlreadyHandedOff() {
+		return v, false
+	}
+	return s.AttAlreadyHandedOff, true
+}
+
+// NewAttAlreadyHandedOffGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from AttAlreadyHandedOff.
+func NewAttAlreadyHandedOffGetFlowStepErrorResponse(v AttAlreadyHandedOff) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetAttAlreadyHandedOff(v)
+	return s
+}
+
+// SetAttInvalidRequest sets GetFlowStepErrorResponse to AttInvalidRequest.
+func (s *GetFlowStepErrorResponse) SetAttInvalidRequest(v AttInvalidRequest) {
+	s.Type = AttInvalidRequestGetFlowStepErrorResponse
+	s.AttInvalidRequest = v
+}
+
+// GetAttInvalidRequest returns AttInvalidRequest and true boolean if GetFlowStepErrorResponse is AttInvalidRequest.
+func (s GetFlowStepErrorResponse) GetAttInvalidRequest() (v AttInvalidRequest, ok bool) {
+	if !s.IsAttInvalidRequest() {
+		return v, false
+	}
+	return s.AttInvalidRequest, true
+}
+
+// NewAttInvalidRequestGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from AttInvalidRequest.
+func NewAttInvalidRequestGetFlowStepErrorResponse(v AttInvalidRequest) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetAttInvalidRequest(v)
+	return s
+}
+
+// SetAttInvalidState sets GetFlowStepErrorResponse to AttInvalidState.
+func (s *GetFlowStepErrorResponse) SetAttInvalidState(v AttInvalidState) {
+	s.Type = AttInvalidStateGetFlowStepErrorResponse
+	s.AttInvalidState = v
+}
+
+// GetAttInvalidState returns AttInvalidState and true boolean if GetFlowStepErrorResponse is AttInvalidState.
+func (s GetFlowStepErrorResponse) GetAttInvalidState() (v AttInvalidState, ok bool) {
+	if !s.IsAttInvalidState() {
+		return v, false
+	}
+	return s.AttInvalidState, true
+}
+
+// NewAttInvalidStateGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from AttInvalidState.
+func NewAttInvalidStateGetFlowStepErrorResponse(v AttInvalidState) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetAttInvalidState(v)
+	return s
+}
+
+// SetAttNotCompleted sets GetFlowStepErrorResponse to AttNotCompleted.
+func (s *GetFlowStepErrorResponse) SetAttNotCompleted(v AttNotCompleted) {
+	s.Type = AttNotCompletedGetFlowStepErrorResponse
+	s.AttNotCompleted = v
+}
+
+// GetAttNotCompleted returns AttNotCompleted and true boolean if GetFlowStepErrorResponse is AttNotCompleted.
+func (s GetFlowStepErrorResponse) GetAttNotCompleted() (v AttNotCompleted, ok bool) {
+	if !s.IsAttNotCompleted() {
+		return v, false
+	}
+	return s.AttNotCompleted, true
+}
+
+// NewAttNotCompletedGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from AttNotCompleted.
+func NewAttNotCompletedGetFlowStepErrorResponse(v AttNotCompleted) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetAttNotCompleted(v)
+	return s
+}
+
+// SetAttNotFound sets GetFlowStepErrorResponse to AttNotFound.
+func (s *GetFlowStepErrorResponse) SetAttNotFound(v AttNotFound) {
+	s.Type = AttNotFoundGetFlowStepErrorResponse
+	s.AttNotFound = v
+}
+
+// GetAttNotFound returns AttNotFound and true boolean if GetFlowStepErrorResponse is AttNotFound.
+func (s GetFlowStepErrorResponse) GetAttNotFound() (v AttNotFound, ok bool) {
+	if !s.IsAttNotFound() {
+		return v, false
+	}
+	return s.AttNotFound, true
+}
+
+// NewAttNotFoundGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from AttNotFound.
+func NewAttNotFoundGetFlowStepErrorResponse(v AttNotFound) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetAttNotFound(v)
+	return s
 }
 
 // SetEncKeyDecryptFailed sets GetFlowStepErrorResponse to EncKeyDecryptFailed.
@@ -23416,6 +23698,27 @@ func NewEncKeyDecryptFailedGetFlowStepErrorResponse(v EncKeyDecryptFailed) GetFl
 	return s
 }
 
+// SetEncKeyEncryptFailed sets GetFlowStepErrorResponse to EncKeyEncryptFailed.
+func (s *GetFlowStepErrorResponse) SetEncKeyEncryptFailed(v EncKeyEncryptFailed) {
+	s.Type = EncKeyEncryptFailedGetFlowStepErrorResponse
+	s.EncKeyEncryptFailed = v
+}
+
+// GetEncKeyEncryptFailed returns EncKeyEncryptFailed and true boolean if GetFlowStepErrorResponse is EncKeyEncryptFailed.
+func (s GetFlowStepErrorResponse) GetEncKeyEncryptFailed() (v EncKeyEncryptFailed, ok bool) {
+	if !s.IsEncKeyEncryptFailed() {
+		return v, false
+	}
+	return s.EncKeyEncryptFailed, true
+}
+
+// NewEncKeyEncryptFailedGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from EncKeyEncryptFailed.
+func NewEncKeyEncryptFailedGetFlowStepErrorResponse(v EncKeyEncryptFailed) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetEncKeyEncryptFailed(v)
+	return s
+}
+
 // SetEncKeyNotFound sets GetFlowStepErrorResponse to EncKeyNotFound.
 func (s *GetFlowStepErrorResponse) SetEncKeyNotFound(v EncKeyNotFound) {
 	s.Type = EncKeyNotFoundGetFlowStepErrorResponse
@@ -23434,6 +23737,27 @@ func (s GetFlowStepErrorResponse) GetEncKeyNotFound() (v EncKeyNotFound, ok bool
 func NewEncKeyNotFoundGetFlowStepErrorResponse(v EncKeyNotFound) GetFlowStepErrorResponse {
 	var s GetFlowStepErrorResponse
 	s.SetEncKeyNotFound(v)
+	return s
+}
+
+// SetEvtInvalid sets GetFlowStepErrorResponse to EvtInvalid.
+func (s *GetFlowStepErrorResponse) SetEvtInvalid(v EvtInvalid) {
+	s.Type = EvtInvalidGetFlowStepErrorResponse
+	s.EvtInvalid = v
+}
+
+// GetEvtInvalid returns EvtInvalid and true boolean if GetFlowStepErrorResponse is EvtInvalid.
+func (s GetFlowStepErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
+	if !s.IsEvtInvalid() {
+		return v, false
+	}
+	return s.EvtInvalid, true
+}
+
+// NewEvtInvalidGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from EvtInvalid.
+func NewEvtInvalidGetFlowStepErrorResponse(v EvtInvalid) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetEvtInvalid(v)
 	return s
 }
 
@@ -23521,6 +23845,27 @@ func NewFlowIntegrityGetFlowStepErrorResponse(v FlowIntegrity) GetFlowStepErrorR
 	return s
 }
 
+// SetFlowInvalidAction sets GetFlowStepErrorResponse to FlowInvalidAction.
+func (s *GetFlowStepErrorResponse) SetFlowInvalidAction(v FlowInvalidAction) {
+	s.Type = FlowInvalidActionGetFlowStepErrorResponse
+	s.FlowInvalidAction = v
+}
+
+// GetFlowInvalidAction returns FlowInvalidAction and true boolean if GetFlowStepErrorResponse is FlowInvalidAction.
+func (s GetFlowStepErrorResponse) GetFlowInvalidAction() (v FlowInvalidAction, ok bool) {
+	if !s.IsFlowInvalidAction() {
+		return v, false
+	}
+	return s.FlowInvalidAction, true
+}
+
+// NewFlowInvalidActionGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from FlowInvalidAction.
+func NewFlowInvalidActionGetFlowStepErrorResponse(v FlowInvalidAction) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetFlowInvalidAction(v)
+	return s
+}
+
 // SetFlowNotFound sets GetFlowStepErrorResponse to FlowNotFound.
 func (s *GetFlowStepErrorResponse) SetFlowNotFound(v FlowNotFound) {
 	s.Type = FlowNotFoundGetFlowStepErrorResponse
@@ -23539,6 +23884,174 @@ func (s GetFlowStepErrorResponse) GetFlowNotFound() (v FlowNotFound, ok bool) {
 func NewFlowNotFoundGetFlowStepErrorResponse(v FlowNotFound) GetFlowStepErrorResponse {
 	var s GetFlowStepErrorResponse
 	s.SetFlowNotFound(v)
+	return s
+}
+
+// SetFlowRestartRequired sets GetFlowStepErrorResponse to FlowRestartRequired.
+func (s *GetFlowStepErrorResponse) SetFlowRestartRequired(v FlowRestartRequired) {
+	s.Type = FlowRestartRequiredGetFlowStepErrorResponse
+	s.FlowRestartRequired = v
+}
+
+// GetFlowRestartRequired returns FlowRestartRequired and true boolean if GetFlowStepErrorResponse is FlowRestartRequired.
+func (s GetFlowStepErrorResponse) GetFlowRestartRequired() (v FlowRestartRequired, ok bool) {
+	if !s.IsFlowRestartRequired() {
+		return v, false
+	}
+	return s.FlowRestartRequired, true
+}
+
+// NewFlowRestartRequiredGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from FlowRestartRequired.
+func NewFlowRestartRequiredGetFlowStepErrorResponse(v FlowRestartRequired) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetFlowRestartRequired(v)
+	return s
+}
+
+// SetFlowUnsupported sets GetFlowStepErrorResponse to FlowUnsupported.
+func (s *GetFlowStepErrorResponse) SetFlowUnsupported(v FlowUnsupported) {
+	s.Type = FlowUnsupportedGetFlowStepErrorResponse
+	s.FlowUnsupported = v
+}
+
+// GetFlowUnsupported returns FlowUnsupported and true boolean if GetFlowStepErrorResponse is FlowUnsupported.
+func (s GetFlowStepErrorResponse) GetFlowUnsupported() (v FlowUnsupported, ok bool) {
+	if !s.IsFlowUnsupported() {
+		return v, false
+	}
+	return s.FlowUnsupported, true
+}
+
+// NewFlowUnsupportedGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from FlowUnsupported.
+func NewFlowUnsupportedGetFlowStepErrorResponse(v FlowUnsupported) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetFlowUnsupported(v)
+	return s
+}
+
+// SetIdpNotFound sets GetFlowStepErrorResponse to IdpNotFound.
+func (s *GetFlowStepErrorResponse) SetIdpNotFound(v IdpNotFound) {
+	s.Type = IdpNotFoundGetFlowStepErrorResponse
+	s.IdpNotFound = v
+}
+
+// GetIdpNotFound returns IdpNotFound and true boolean if GetFlowStepErrorResponse is IdpNotFound.
+func (s GetFlowStepErrorResponse) GetIdpNotFound() (v IdpNotFound, ok bool) {
+	if !s.IsIdpNotFound() {
+		return v, false
+	}
+	return s.IdpNotFound, true
+}
+
+// NewIdpNotFoundGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from IdpNotFound.
+func NewIdpNotFoundGetFlowStepErrorResponse(v IdpNotFound) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetIdpNotFound(v)
+	return s
+}
+
+// SetIdpEndpointCleartext sets GetFlowStepErrorResponse to IdpEndpointCleartext.
+func (s *GetFlowStepErrorResponse) SetIdpEndpointCleartext(v IdpEndpointCleartext) {
+	s.Type = IdpEndpointCleartextGetFlowStepErrorResponse
+	s.IdpEndpointCleartext = v
+}
+
+// GetIdpEndpointCleartext returns IdpEndpointCleartext and true boolean if GetFlowStepErrorResponse is IdpEndpointCleartext.
+func (s GetFlowStepErrorResponse) GetIdpEndpointCleartext() (v IdpEndpointCleartext, ok bool) {
+	if !s.IsIdpEndpointCleartext() {
+		return v, false
+	}
+	return s.IdpEndpointCleartext, true
+}
+
+// NewIdpEndpointCleartextGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from IdpEndpointCleartext.
+func NewIdpEndpointCleartextGetFlowStepErrorResponse(v IdpEndpointCleartext) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetIdpEndpointCleartext(v)
+	return s
+}
+
+// SetIdpEndpointsPartial sets GetFlowStepErrorResponse to IdpEndpointsPartial.
+func (s *GetFlowStepErrorResponse) SetIdpEndpointsPartial(v IdpEndpointsPartial) {
+	s.Type = IdpEndpointsPartialGetFlowStepErrorResponse
+	s.IdpEndpointsPartial = v
+}
+
+// GetIdpEndpointsPartial returns IdpEndpointsPartial and true boolean if GetFlowStepErrorResponse is IdpEndpointsPartial.
+func (s GetFlowStepErrorResponse) GetIdpEndpointsPartial() (v IdpEndpointsPartial, ok bool) {
+	if !s.IsIdpEndpointsPartial() {
+		return v, false
+	}
+	return s.IdpEndpointsPartial, true
+}
+
+// NewIdpEndpointsPartialGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from IdpEndpointsPartial.
+func NewIdpEndpointsPartialGetFlowStepErrorResponse(v IdpEndpointsPartial) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetIdpEndpointsPartial(v)
+	return s
+}
+
+// SetIdpOAuth2Unsupported sets GetFlowStepErrorResponse to IdpOAuth2Unsupported.
+func (s *GetFlowStepErrorResponse) SetIdpOAuth2Unsupported(v IdpOAuth2Unsupported) {
+	s.Type = IdpOAuth2UnsupportedGetFlowStepErrorResponse
+	s.IdpOAuth2Unsupported = v
+}
+
+// GetIdpOAuth2Unsupported returns IdpOAuth2Unsupported and true boolean if GetFlowStepErrorResponse is IdpOAuth2Unsupported.
+func (s GetFlowStepErrorResponse) GetIdpOAuth2Unsupported() (v IdpOAuth2Unsupported, ok bool) {
+	if !s.IsIdpOAuth2Unsupported() {
+		return v, false
+	}
+	return s.IdpOAuth2Unsupported, true
+}
+
+// NewIdpOAuth2UnsupportedGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from IdpOAuth2Unsupported.
+func NewIdpOAuth2UnsupportedGetFlowStepErrorResponse(v IdpOAuth2Unsupported) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetIdpOAuth2Unsupported(v)
+	return s
+}
+
+// SetIdpProtocolBlockMissing sets GetFlowStepErrorResponse to IdpProtocolBlockMissing.
+func (s *GetFlowStepErrorResponse) SetIdpProtocolBlockMissing(v IdpProtocolBlockMissing) {
+	s.Type = IdpProtocolBlockMissingGetFlowStepErrorResponse
+	s.IdpProtocolBlockMissing = v
+}
+
+// GetIdpProtocolBlockMissing returns IdpProtocolBlockMissing and true boolean if GetFlowStepErrorResponse is IdpProtocolBlockMissing.
+func (s GetFlowStepErrorResponse) GetIdpProtocolBlockMissing() (v IdpProtocolBlockMissing, ok bool) {
+	if !s.IsIdpProtocolBlockMissing() {
+		return v, false
+	}
+	return s.IdpProtocolBlockMissing, true
+}
+
+// NewIdpProtocolBlockMissingGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from IdpProtocolBlockMissing.
+func NewIdpProtocolBlockMissingGetFlowStepErrorResponse(v IdpProtocolBlockMissing) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetIdpProtocolBlockMissing(v)
+	return s
+}
+
+// SetIdpScopesMissingOpenid sets GetFlowStepErrorResponse to IdpScopesMissingOpenid.
+func (s *GetFlowStepErrorResponse) SetIdpScopesMissingOpenid(v IdpScopesMissingOpenid) {
+	s.Type = IdpScopesMissingOpenidGetFlowStepErrorResponse
+	s.IdpScopesMissingOpenid = v
+}
+
+// GetIdpScopesMissingOpenid returns IdpScopesMissingOpenid and true boolean if GetFlowStepErrorResponse is IdpScopesMissingOpenid.
+func (s GetFlowStepErrorResponse) GetIdpScopesMissingOpenid() (v IdpScopesMissingOpenid, ok bool) {
+	if !s.IsIdpScopesMissingOpenid() {
+		return v, false
+	}
+	return s.IdpScopesMissingOpenid, true
+}
+
+// NewIdpScopesMissingOpenidGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from IdpScopesMissingOpenid.
+func NewIdpScopesMissingOpenidGetFlowStepErrorResponse(v IdpScopesMissingOpenid) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetIdpScopesMissingOpenid(v)
 	return s
 }
 
@@ -28213,6 +28726,112 @@ func (s *IdpCreatedEventDelegationType) UnmarshalText(data []byte) error {
 
 // Merged schema.
 // Ref: #
+type IdpEndpointCleartext struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptIdpEndpointCleartextDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *IdpEndpointCleartext) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *IdpEndpointCleartext) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *IdpEndpointCleartext) GetDetails() OptIdpEndpointCleartextDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *IdpEndpointCleartext) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *IdpEndpointCleartext) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *IdpEndpointCleartext) SetDetails(val OptIdpEndpointCleartextDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type IdpEndpointCleartextDetails map[string]jx.Raw
+
+func (s *IdpEndpointCleartextDetails) init() IdpEndpointCleartextDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type IdpEndpointsPartial struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptIdpEndpointsPartialDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *IdpEndpointsPartial) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *IdpEndpointsPartial) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *IdpEndpointsPartial) GetDetails() OptIdpEndpointsPartialDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *IdpEndpointsPartial) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *IdpEndpointsPartial) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *IdpEndpointsPartial) SetDetails(val OptIdpEndpointsPartialDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type IdpEndpointsPartialDetails map[string]jx.Raw
+
+func (s *IdpEndpointsPartialDetails) init() IdpEndpointsPartialDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
 type IdpFieldImmutable struct {
 	// Merged property.
 	Code string `json:"code"`
@@ -28355,6 +28974,59 @@ func (s *IdpNotFound) SetDetails(val OptIdpNotFoundDetails) {
 type IdpNotFoundDetails map[string]jx.Raw
 
 func (s *IdpNotFoundDetails) init() IdpNotFoundDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type IdpOAuth2Unsupported struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptIdpOAuth2UnsupportedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *IdpOAuth2Unsupported) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *IdpOAuth2Unsupported) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *IdpOAuth2Unsupported) GetDetails() OptIdpOAuth2UnsupportedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *IdpOAuth2Unsupported) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *IdpOAuth2Unsupported) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *IdpOAuth2Unsupported) SetDetails(val OptIdpOAuth2UnsupportedDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type IdpOAuth2UnsupportedDetails map[string]jx.Raw
+
+func (s *IdpOAuth2UnsupportedDetails) init() IdpOAuth2UnsupportedDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}
@@ -28525,6 +29197,59 @@ func (s *IdpProtocol) UnmarshalText(data []byte) error {
 	}
 }
 
+// Merged schema.
+// Ref: #
+type IdpProtocolBlockMissing struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptIdpProtocolBlockMissingDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *IdpProtocolBlockMissing) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *IdpProtocolBlockMissing) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *IdpProtocolBlockMissing) GetDetails() OptIdpProtocolBlockMissingDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *IdpProtocolBlockMissing) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *IdpProtocolBlockMissing) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *IdpProtocolBlockMissing) SetDetails(val OptIdpProtocolBlockMissingDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type IdpProtocolBlockMissingDetails map[string]jx.Raw
+
+func (s *IdpProtocolBlockMissingDetails) init() IdpProtocolBlockMissingDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
 // An identity provider connection.
 // Ref: #
 type IdpResponse struct {
@@ -28655,6 +29380,59 @@ func (s *IdpRevisionConflict) SetDetails(val OptIdpRevisionConflictDetails) {
 type IdpRevisionConflictDetails map[string]jx.Raw
 
 func (s *IdpRevisionConflictDetails) init() IdpRevisionConflictDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type IdpScopesMissingOpenid struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptIdpScopesMissingOpenidDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *IdpScopesMissingOpenid) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *IdpScopesMissingOpenid) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *IdpScopesMissingOpenid) GetDetails() OptIdpScopesMissingOpenidDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *IdpScopesMissingOpenid) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *IdpScopesMissingOpenid) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *IdpScopesMissingOpenid) SetDetails(val OptIdpScopesMissingOpenidDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type IdpScopesMissingOpenidDetails map[string]jx.Raw
+
+func (s *IdpScopesMissingOpenidDetails) init() IdpScopesMissingOpenidDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}
@@ -35706,6 +36484,52 @@ func (o OptFlowNotFoundDetails) Or(d FlowNotFoundDetails) FlowNotFoundDetails {
 	return d
 }
 
+// NewOptFlowRestartRequiredDetails returns new OptFlowRestartRequiredDetails with value set to v.
+func NewOptFlowRestartRequiredDetails(v FlowRestartRequiredDetails) OptFlowRestartRequiredDetails {
+	return OptFlowRestartRequiredDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFlowRestartRequiredDetails is optional FlowRestartRequiredDetails.
+type OptFlowRestartRequiredDetails struct {
+	Value FlowRestartRequiredDetails
+	Set   bool
+}
+
+// IsSet returns true if OptFlowRestartRequiredDetails was set.
+func (o OptFlowRestartRequiredDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFlowRestartRequiredDetails) Reset() {
+	var v FlowRestartRequiredDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFlowRestartRequiredDetails) SetTo(v FlowRestartRequiredDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFlowRestartRequiredDetails) Get() (v FlowRestartRequiredDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFlowRestartRequiredDetails) Or(d FlowRestartRequiredDetails) FlowRestartRequiredDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptFlowStepChallenge returns new OptFlowStepChallenge with value set to v.
 func NewOptFlowStepChallenge(v FlowStepChallenge) OptFlowStepChallenge {
 	return OptFlowStepChallenge{
@@ -37638,6 +38462,98 @@ func (o OptIdpCreatedEventDelegationType) Or(d IdpCreatedEventDelegationType) Id
 	return d
 }
 
+// NewOptIdpEndpointCleartextDetails returns new OptIdpEndpointCleartextDetails with value set to v.
+func NewOptIdpEndpointCleartextDetails(v IdpEndpointCleartextDetails) OptIdpEndpointCleartextDetails {
+	return OptIdpEndpointCleartextDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptIdpEndpointCleartextDetails is optional IdpEndpointCleartextDetails.
+type OptIdpEndpointCleartextDetails struct {
+	Value IdpEndpointCleartextDetails
+	Set   bool
+}
+
+// IsSet returns true if OptIdpEndpointCleartextDetails was set.
+func (o OptIdpEndpointCleartextDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptIdpEndpointCleartextDetails) Reset() {
+	var v IdpEndpointCleartextDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptIdpEndpointCleartextDetails) SetTo(v IdpEndpointCleartextDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptIdpEndpointCleartextDetails) Get() (v IdpEndpointCleartextDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptIdpEndpointCleartextDetails) Or(d IdpEndpointCleartextDetails) IdpEndpointCleartextDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptIdpEndpointsPartialDetails returns new OptIdpEndpointsPartialDetails with value set to v.
+func NewOptIdpEndpointsPartialDetails(v IdpEndpointsPartialDetails) OptIdpEndpointsPartialDetails {
+	return OptIdpEndpointsPartialDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptIdpEndpointsPartialDetails is optional IdpEndpointsPartialDetails.
+type OptIdpEndpointsPartialDetails struct {
+	Value IdpEndpointsPartialDetails
+	Set   bool
+}
+
+// IsSet returns true if OptIdpEndpointsPartialDetails was set.
+func (o OptIdpEndpointsPartialDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptIdpEndpointsPartialDetails) Reset() {
+	var v IdpEndpointsPartialDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptIdpEndpointsPartialDetails) SetTo(v IdpEndpointsPartialDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptIdpEndpointsPartialDetails) Get() (v IdpEndpointsPartialDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptIdpEndpointsPartialDetails) Or(d IdpEndpointsPartialDetails) IdpEndpointsPartialDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptIdpFieldImmutableDetails returns new OptIdpFieldImmutableDetails with value set to v.
 func NewOptIdpFieldImmutableDetails(v IdpFieldImmutableDetails) OptIdpFieldImmutableDetails {
 	return OptIdpFieldImmutableDetails{
@@ -37730,6 +38646,52 @@ func (o OptIdpNotFoundDetails) Or(d IdpNotFoundDetails) IdpNotFoundDetails {
 	return d
 }
 
+// NewOptIdpOAuth2UnsupportedDetails returns new OptIdpOAuth2UnsupportedDetails with value set to v.
+func NewOptIdpOAuth2UnsupportedDetails(v IdpOAuth2UnsupportedDetails) OptIdpOAuth2UnsupportedDetails {
+	return OptIdpOAuth2UnsupportedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptIdpOAuth2UnsupportedDetails is optional IdpOAuth2UnsupportedDetails.
+type OptIdpOAuth2UnsupportedDetails struct {
+	Value IdpOAuth2UnsupportedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptIdpOAuth2UnsupportedDetails was set.
+func (o OptIdpOAuth2UnsupportedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptIdpOAuth2UnsupportedDetails) Reset() {
+	var v IdpOAuth2UnsupportedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptIdpOAuth2UnsupportedDetails) SetTo(v IdpOAuth2UnsupportedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptIdpOAuth2UnsupportedDetails) Get() (v IdpOAuth2UnsupportedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptIdpOAuth2UnsupportedDetails) Or(d IdpOAuth2UnsupportedDetails) IdpOAuth2UnsupportedDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptIdpPermissionDeniedDetails returns new OptIdpPermissionDeniedDetails with value set to v.
 func NewOptIdpPermissionDeniedDetails(v IdpPermissionDeniedDetails) OptIdpPermissionDeniedDetails {
 	return OptIdpPermissionDeniedDetails{
@@ -37776,6 +38738,52 @@ func (o OptIdpPermissionDeniedDetails) Or(d IdpPermissionDeniedDetails) IdpPermi
 	return d
 }
 
+// NewOptIdpProtocolBlockMissingDetails returns new OptIdpProtocolBlockMissingDetails with value set to v.
+func NewOptIdpProtocolBlockMissingDetails(v IdpProtocolBlockMissingDetails) OptIdpProtocolBlockMissingDetails {
+	return OptIdpProtocolBlockMissingDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptIdpProtocolBlockMissingDetails is optional IdpProtocolBlockMissingDetails.
+type OptIdpProtocolBlockMissingDetails struct {
+	Value IdpProtocolBlockMissingDetails
+	Set   bool
+}
+
+// IsSet returns true if OptIdpProtocolBlockMissingDetails was set.
+func (o OptIdpProtocolBlockMissingDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptIdpProtocolBlockMissingDetails) Reset() {
+	var v IdpProtocolBlockMissingDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptIdpProtocolBlockMissingDetails) SetTo(v IdpProtocolBlockMissingDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptIdpProtocolBlockMissingDetails) Get() (v IdpProtocolBlockMissingDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptIdpProtocolBlockMissingDetails) Or(d IdpProtocolBlockMissingDetails) IdpProtocolBlockMissingDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptIdpRevisionConflictDetails returns new OptIdpRevisionConflictDetails with value set to v.
 func NewOptIdpRevisionConflictDetails(v IdpRevisionConflictDetails) OptIdpRevisionConflictDetails {
 	return OptIdpRevisionConflictDetails{
@@ -37816,6 +38824,52 @@ func (o OptIdpRevisionConflictDetails) Get() (v IdpRevisionConflictDetails, ok b
 
 // Or returns value if set, or given parameter if does not.
 func (o OptIdpRevisionConflictDetails) Or(d IdpRevisionConflictDetails) IdpRevisionConflictDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptIdpScopesMissingOpenidDetails returns new OptIdpScopesMissingOpenidDetails with value set to v.
+func NewOptIdpScopesMissingOpenidDetails(v IdpScopesMissingOpenidDetails) OptIdpScopesMissingOpenidDetails {
+	return OptIdpScopesMissingOpenidDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptIdpScopesMissingOpenidDetails is optional IdpScopesMissingOpenidDetails.
+type OptIdpScopesMissingOpenidDetails struct {
+	Value IdpScopesMissingOpenidDetails
+	Set   bool
+}
+
+// IsSet returns true if OptIdpScopesMissingOpenidDetails was set.
+func (o OptIdpScopesMissingOpenidDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptIdpScopesMissingOpenidDetails) Reset() {
+	var v IdpScopesMissingOpenidDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptIdpScopesMissingOpenidDetails) SetTo(v IdpScopesMissingOpenidDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptIdpScopesMissingOpenidDetails) Get() (v IdpScopesMissingOpenidDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptIdpScopesMissingOpenidDetails) Or(d IdpScopesMissingOpenidDetails) IdpScopesMissingOpenidDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}

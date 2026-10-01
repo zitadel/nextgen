@@ -365,6 +365,10 @@ type AuthAttemptStatements interface {
 	// longer matches). The write is once only: a second write on the same consumed
 	// row returns ErrSSOStateInvalid. Never sets last_verified_at.
 	SetSSOCallbackResult(ctx context.Context, projectID, stateHash string, result *domain.SSOCallbackResult) error
+	// DeleteSSOCallback removes the attempt's sso_callback row, pending or
+	// consumed. Identity resolution calls it once the parked result is used.
+	// An attempt without the row is not an error.
+	DeleteSSOCallback(ctx context.Context, projectID, authAttemptID string) error
 }
 
 // UserQueryOptions carries EAV match/hydrate options for GetUser / ListUsers.

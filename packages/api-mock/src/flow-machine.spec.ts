@@ -36,17 +36,17 @@ describe("the provider round trip", () => {
   });
 
   it("signs a linked identity straight in", () => {
-    expect(stepAfterReturn("callback")).toBe("done");
+    expect(stepAfterReturn("sso_authenticated")).toBe("done");
   });
 
   it("collects what the provider did not supply for a new identity", () => {
-    expect(stepAfterReturn("identity_unknown")).toBe("register-sso");
+    expect(stepAfterReturn("sso_user_not_found")).toBe("register-sso");
   });
 
   it("stops at the conflict step when the email already has an account", () => {
     // Minting a second account for an email that already has one is the
     // outcome this branch exists to prevent.
-    expect(stepAfterReturn("user_already_exists")).toBe("sso-conflict");
+    expect(stepAfterReturn("sso_user_already_exists")).toBe("sso-conflict");
   });
 
   it("treats an unresolved return as a new identity rather than a sign-in", () => {
@@ -70,7 +70,7 @@ describe("the provider round trip", () => {
 describe("register-sso", () => {
   it("creates the account on submit", () => {
     const actor = atProvider();
-    actor.send({ type: "SUBMIT", action: "callback", fields: {}, sso_outcome: "identity_unknown" });
+    actor.send({ type: "SUBMIT", action: "callback", fields: {}, sso_outcome: "sso_user_not_found" });
 
     actor.send({ type: "SUBMIT", action: "submit", fields: { givenName: "Ada" } });
 
@@ -80,7 +80,7 @@ describe("register-sso", () => {
 
   it("goes back to sign-in rather than registering when asked", () => {
     const actor = atProvider();
-    actor.send({ type: "SUBMIT", action: "callback", fields: {}, sso_outcome: "identity_unknown" });
+    actor.send({ type: "SUBMIT", action: "callback", fields: {}, sso_outcome: "sso_user_not_found" });
 
     actor.send({ type: "SUBMIT", action: "sign_in", fields: {} });
 
@@ -95,7 +95,7 @@ describe("sso-conflict", () => {
       type: "SUBMIT",
       action: "callback",
       fields: { email: "ada@example.test" },
-      sso_outcome: "user_already_exists",
+      sso_outcome: "sso_user_already_exists",
     });
     return actor;
   };
@@ -127,7 +127,7 @@ describe("sso-conflict", () => {
   it("rotates the session token on every hop, as the engine does", () => {
     const actor = atProvider();
     const atRedirect = actor.getSnapshot().context.sessionToken;
-    actor.send({ type: "SUBMIT", action: "callback", fields: {}, sso_outcome: "user_already_exists" });
+    actor.send({ type: "SUBMIT", action: "callback", fields: {}, sso_outcome: "sso_user_already_exists" });
 
     expect(actor.getSnapshot().context.sessionToken).not.toBe(atRedirect);
   });

@@ -12,11 +12,25 @@ get:
     - $ref: ../../../components/parameters/flow-cookie.yaml
   responses:
     '200':
-      description: Current step.
+      description: |
+        Current step. The flow cookie is re-sealed on every render. When the
+        render resolved a parked SSO identity into a completed sign-in, the
+        step is terminal and carries the handoff token.
+      headers:
+        Set-Cookie:
+          $ref: ../../../components/headers/set-cookie-flow.yaml
       content:
         application/json:
           schema:
             $ref: ../../../components/flows/flow-response.yaml
+    '409':
+      description: |
+        The flow must be restarted: the provider's identity belongs to a
+        user the flow cannot continue with.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
     '404':
       description: Flow not found.
       content:

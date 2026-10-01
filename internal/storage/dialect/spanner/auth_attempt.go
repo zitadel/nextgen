@@ -547,4 +547,14 @@ func (as authAttemptStatements) SetSSOCallbackResult(ctx context.Context, projec
 	return nil
 }
 
+// DeleteSSOCallback implements [service.AuthAttemptStatements].
+func (as authAttemptStatements) DeleteSSOCallback(ctx context.Context, projectID, authAttemptID string) error {
+	stmt := buildStatement(deleteSSOStateStmt,
+		projectID, authAttemptID, int64(domain.AuthCheckTypeSSOCallback)).statement()
+	if _, err := as.db.Update(ctx, stmt); err != nil {
+		return fmt.Errorf("failed to delete sso callback: %w", err)
+	}
+	return nil
+}
+
 var _ service.AuthAttemptStatements = (*authAttemptStatements)(nil)

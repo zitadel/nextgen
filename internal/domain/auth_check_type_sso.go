@@ -95,8 +95,9 @@ type SSOCallbackResult struct {
 	Subject              string         `json:"subject"`
 	ConnectionRevisionID string         `json:"connection_revision_id"`
 	Claims               map[string]any `json:"claims,omitempty"`
-	// Verified records, per mapped claim name, whether the provider asserted it
-	// as verified (for example email_verified).
+	// Verified records, per user-schema property, whether the provider asserted
+	// the property's mapped claim as verified (for example email_verified). It
+	// is keyed like Claims, the same as idp.ExternalIdentity.Verified.
 	Verified map[string]bool `json:"verified,omitempty"`
 }
 
@@ -156,6 +157,22 @@ func (c SSOCallbackCheck) LogValue() slog.Value {
 
 // Deliberately not an AuthFactor and not an AuthChallenge.
 var _ AuthCheck = (*SSOCallbackCheck)(nil)
+
+// AuthFactorSSO records that the attempt was authenticated through an identity
+// provider: which connection, and which identity link resolved the user. It
+// carries no subject, no claims and no provider token, so promoting it into a
+// session copies nothing the provider asserted.
+type AuthFactorSSO struct {
+	ConnectionID string `json:"connection_id"`
+	LinkID       string `json:"link_id"`
+	authFactor
+}
+
+func (a *AuthFactorSSO) Type() AuthCheckType { return AuthCheckTypeSSO }
+
+func (a *AuthFactorSSO) Payload() any { return a }
+
+var _ AuthFactor = (*AuthFactorSSO)(nil)
 
 // SSOState is what NewSSOState hands the submit step: the four plaintext
 // secrets it needs and the record to persist. The state becomes the record's

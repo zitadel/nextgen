@@ -66,9 +66,9 @@ const SSO_CONFLICT = "sso-conflict";
 /** Outcomes the engine fires after a provider returns, and where they go. */
 function providerOutcomes(terminal: string): Record<string, string> {
   return {
-    callback: terminal,
-    identity_unknown: REGISTER_SSO,
-    user_already_exists: SSO_CONFLICT,
+    sso_authenticated: terminal,
+    sso_user_not_found: REGISTER_SSO,
+    sso_user_already_exists: SSO_CONFLICT,
   };
 }
 
@@ -320,12 +320,12 @@ function ssoConflictStep(
   if (methods.passkey) {
     transitions.passkey = { target: terminal };
   }
-  transitions.callback = { target: terminal };
-  transitions.user_already_exists = { target: SSO_CONFLICT };
+  transitions.sso_authenticated = { target: terminal };
+  transitions.sso_user_already_exists = { target: SSO_CONFLICT };
   if (loginStep !== undefined) {
     transitions.sign_in = { target: loginStep, purpose: "login" };
   }
-  transitions.identity_unknown = { target: REGISTER_SSO };
+  transitions.sso_user_not_found = { target: REGISTER_SSO };
 
   return { name: SSO_CONFLICT, fields, actions, sso_providers: [slug], transitions };
 }
@@ -411,10 +411,6 @@ export function applySsoToFlow(
     const transitions = isObject(step.transitions) ? { ...step.transitions } : {};
     for (const [outcome, target] of Object.entries(providerOutcomes(terminal))) {
       const current = transitions[outcome];
-      // `user_already_exists` already points at the password step on a
-      // register flow. Retargeting it is the point: the same outcome now also
-      // fires for a provider return, and the conflict step offers everything
-      // the password step did.
       if (isObject(current) && current.target === target) {
         continue;
       }
@@ -424,15 +420,21 @@ export function applySsoToFlow(
     step.transitions = transitions;
   }
 
-  // The password registration step shares the outcome, so it has to route to
-  // the same place or a taken email dead-ends there.
-  const registerPassword = stepNamed(document, "register-password");
-  if (registerPassword !== undefined) {
-    const transitions = isObject(registerPassword.transitions) ? { ...registerPassword.transitions } : {};
+  // A typed email that already has an account (`user_already_exists`) points
+  // at the password step on a register flow. Once a provider exists, that
+  // account may be SSO-only and the password step would dead-end it, so both
+  // registration steps retarget the collision to the conflict step, which
+  // offers everything the password step did plus the provider.
+  for (const name of ["register", "register-password"]) {
+    const step = stepNamed(document, name);
+    if (step === undefined) {
+      continue;
+    }
+    const transitions = isObject(step.transitions) ? { ...step.transitions } : {};
     const current = transitions.user_already_exists;
     if (!isObject(current) || current.target !== SSO_CONFLICT) {
       transitions.user_already_exists = { target: SSO_CONFLICT };
-      registerPassword.transitions = transitions;
+      step.transitions = transitions;
       changed = true;
     }
   }

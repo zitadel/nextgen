@@ -371,3 +371,66 @@ func TestGetFlowStep_TerminalReturns410(t *testing.T) {
 		t.Fatalf("status = %d, want 410", resp.StatusCode)
 	}
 }
+
+func TestGetFlowStep_RotatesCookie(t *testing.T) {
+	ts := newTestServer(t)
+	state := &domain.FlowState{ID: "flow_1", ProjectID: "proj_1", IssuedAt: time.Now()}
+	cookieVal := ts.sealCookie(t, state)
+	ts.fake.getResult = domain.FlowStepResult{State: state, Step: &domain.FlowStep{Name: "identify"}}
+
+	resp, body := doRequest(t, http.MethodGet, ts.srv.URL+"/flow/flow_1", nil, cookieVal)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", resp.StatusCode, body)
+	}
+	got := resp.Header.Get("Set-Cookie")
+	if !strings.Contains(got, "_zflow=") || strings.Contains(got, "Max-Age=0") {
+		t.Errorf("expected a re-sealed _zflow cookie, got %q", got)
+	}
+}
+
+// A render that resolved a parked SSO identity into a sign-in lands on the
+// terminal step with a handoff token: that is a 200 with the terminal cookie,
+// not the 410 a flow completed before this request gets.
+func TestGetFlowStep_ResolvedHandoffReturns200WithTerminalCookie(t *testing.T) {
+	ts := newTestServer(t)
+	state := &domain.FlowState{ID: "flow_1", ProjectID: "proj_1", IssuedAt: time.Now()}
+	cookieVal := ts.sealCookie(t, state)
+
+	complete := domain.FlowStepCompleteShow
+	ts.fake.getResult = domain.FlowStepResult{
+		State:                 state,
+		Step:                  &domain.FlowStep{Name: "done", Complete: &complete},
+		HandoffToken:          "ht_abc",
+		HandoffTokenExpiresAt: time.Now().Add(time.Minute),
+	}
+
+	resp, body := doRequest(t, http.MethodGet, ts.srv.URL+"/flow/flow_1", nil, cookieVal)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", resp.StatusCode, body)
+	}
+	if got := resp.Header.Get("Set-Cookie"); !strings.Contains(got, "Max-Age=0") {
+		t.Errorf("expected the terminal cookie, got %q", got)
+	}
+	var fr gen.FlowResponse
+	if err := json.Unmarshal(body, &fr); err != nil {
+		t.Fatalf("unmarshal: %v (body=%s)", err, body)
+	}
+	if got, ok := fr.HandoffToken.Get(); !ok || got != "ht_abc" {
+		t.Errorf("handoff_token = %v (set=%t), want ht_abc", got, ok)
+	}
+}
+
+func TestGetFlowStep_RestartRequiredReturns409(t *testing.T) {
+	ts := newTestServer(t)
+	state := &domain.FlowState{ID: "flow_1", ProjectID: "proj_1", IssuedAt: time.Now()}
+	cookieVal := ts.sealCookie(t, state)
+	ts.fake.getErr = domain.ErrFlowRestartRequired()
+
+	resp, body := doRequest(t, http.MethodGet, ts.srv.URL+"/flow/flow_1", nil, cookieVal)
+	if resp.StatusCode != http.StatusConflict {
+		t.Fatalf("status = %d, want 409 (body = %s)", resp.StatusCode, body)
+	}
+	if !strings.Contains(string(body), "flow.restart_required") {
+		t.Errorf("expected the restart code, got %s", body)
+	}
+}

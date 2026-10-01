@@ -383,7 +383,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 							},
 							SSOProviders: []string{"google"},
 							Transitions: map[string]domain.FlowStepTransition{
-								"callback": {Target: "done"},
+								"sso_authenticated": {Target: "done"},
 							},
 						},
 						{
@@ -423,7 +423,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 					},
 				},
 			},
-			wantErr: domain.ErrFlowDefinitionInvalid(`step "identify": has sso_providers but is missing transitions.callback`, nil),
+			wantErr: domain.ErrFlowDefinitionInvalid(`step "identify": has sso_providers but is missing transitions.sso_authenticated`, nil),
 		},
 		{
 			name: "invalid with inescapable cycle",
@@ -579,7 +579,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 					},
 				},
 			},
-			wantErr: domain.ErrFlowDefinitionInvalid(`step "doing_nothing" is non-terminal but has no fields, actions, sso_providers, gates, or transitions.callback`, nil),
+			wantErr: domain.ErrFlowDefinitionInvalid(`step "doing_nothing" is non-terminal but has no fields, actions, sso_providers, gates, or transitions.sso_authenticated`, nil),
 		},
 		{
 			name: "invalid flow with missing entry point in steps",
@@ -1056,7 +1056,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 					},
 				},
 			},
-			wantErr: domain.ErrFlowDefinitionInvalid(`step "start": transition key "magic_link" is not an action name or reserved outcome (user_not_found, user_already_exists, identity_unknown, callback)`, nil),
+			wantErr: domain.ErrFlowDefinitionInvalid(`step "start": transition key "magic_link" is not an action name or reserved outcome (user_not_found, user_already_exists, sso_user_not_found, sso_user_already_exists, sso_authenticated)`, nil),
 		},
 		{
 			name: "invalid flow - duplicate step names",

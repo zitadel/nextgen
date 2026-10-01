@@ -66,6 +66,7 @@ type flowTestWorld struct {
 	schemaResolver     *domainmock.MockSchemaResolver
 	createUser         *domainmock.MockFlowOnSuccessHandler
 	ssoProviders       *domainmock.MockFlowSSOProviderResolver
+	ssoIdentities      *domainmock.MockFlowSSOIdentityService
 	sm                 *domain.FlowStateMachineRuntime
 }
 
@@ -84,6 +85,7 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 	authAttemptService := domainmock.NewMockFlowAuthAttemptService(mock)
 	createUser := domainmock.NewMockFlowOnSuccessHandler(mock)
 	ssoProviders := domainmock.NewMockFlowSSOProviderResolver(mock)
+	ssoIdentities := domainmock.NewMockFlowSSOIdentityService(mock)
 
 	resolver := domain.NewSchemaFieldResolver()
 
@@ -96,6 +98,7 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 		createUser,
 		authAttemptService,
 		ssoProviders,
+		ssoIdentities,
 		now,
 	)
 
@@ -106,6 +109,7 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 		authAttemptService: authAttemptService,
 		createUser:         createUser,
 		ssoProviders:       ssoProviders,
+		ssoIdentities:      ssoIdentities,
 		sm:                 sm,
 	}
 }
@@ -702,11 +706,11 @@ func TestFlowStateMachine_Process_SSOSubmissionUnsupported(t *testing.T) {
 }
 
 // ssoStepDefinition offers two providers on the signup step, routed to
-// done on callback as the validator requires of a step with sso_providers.
+// done on sso_authenticated as the validator requires of a step with sso_providers.
 func ssoStepDefinition() *domain.FlowDefinition {
 	def := signupDefinition()
 	def.Steps[0].SSOProviders = []string{"google", "github"}
-	def.Steps[0].Transitions["callback"] = domain.FlowStepTransition{Target: "done"}
+	def.Steps[0].Transitions["sso_authenticated"] = domain.FlowStepTransition{Target: "done"}
 	return def
 }
 
@@ -3350,6 +3354,7 @@ func TestFlowStepErrorContract(t *testing.T) {
 		domain.FlowStepErrorInvalidCredentials,
 		domain.FlowStepErrorPasskeyInvalid,
 		domain.FlowStepErrorPasskeyRegistrationInvalid,
+		domain.FlowStepErrorSSOCreationDisabled,
 	}
 	for _, key := range stepErrorConsts {
 		assert.True(t, domain.FlowStepErrorAllowed(key), "step-error const %q must honor the contract", key)
@@ -4233,4 +4238,179 @@ func TestFlowStateMachine_Process_PurposeToggleDoesNotGrowState(t *testing.T) {
 	assert.Empty(t, state.BackStack)
 	assert.Empty(t, state.History)
 	assert.Equal(t, "attempt-1", state.AuthAttemptID)
+}
+
+// ssoRenderWorld is a test world sitting on the sso step of
+// [ssoStepDefinition], with the schema and the provider list resolving on
+// every render.
+func ssoRenderWorld(t *testing.T) (*flowTestWorld, *domain.FlowDefinition, *domain.FlowState) {
+	t.Helper()
+	w := newFlowTestWorld(t)
+	w.schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+		AnyTimes()
+	w.ssoProviders.EXPECT().
+		Resolve(gomock.Any(), testProjectID, "credentials", gomock.Any()).
+		Return([]domain.FlowSSOProvider{{ID: "google", Name: "Google"}}, nil).
+		AnyTimes()
+	state := &domain.FlowState{
+		ID:            "flow-1",
+		ProjectID:     testProjectID,
+		UserSchemaURL: defaultSchemaURL,
+		FlowProgress: domain.FlowProgress{
+			DefinitionID:   "def-signup",
+			Purpose:        domain.FlowDefinitionPurposeRegister,
+			CurrentPurpose: domain.FlowDefinitionPurposeRegister,
+			CurrentStep:    "credentials",
+		},
+		AuthAttemptID: "att-1",
+	}
+	return w, ssoStepDefinition(), state
+}
+
+// expectParked makes LoadParked hand back parked for the world's attempt.
+func (w *flowTestWorld) expectParked(parked *domain.FlowSSOParkedIdentity, err error) {
+	w.ssoIdentities.EXPECT().
+		LoadParked(gomock.Any(), domain.FlowSSOLoadInput{
+			ProjectID:     testProjectID,
+			AttemptID:     "att-1",
+			UserSchemaURL: defaultSchemaURL,
+		}).
+		Return(parked, err)
+}
+
+func linkedParked() *domain.FlowSSOParkedIdentity {
+	return &domain.FlowSSOParkedIdentity{
+		CheckID:      "ch-1",
+		ConnectionID: "idp-1",
+		Subject:      "sub-1",
+		Link:         &domain.FlowSSOLinkedUser{LinkID: "idplink-1", UserID: "user-1"},
+	}
+}
+
+func TestFlowStateMachine_Render_SSOLinkedUserRoutesAuthenticated(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoRenderWorld(t)
+	w.expectParked(linkedParked(), nil)
+	w.ssoIdentities.EXPECT().
+		BindLinked(gomock.Any(), domain.FlowSSOBindInput{
+			ProjectID:    testProjectID,
+			AttemptID:    "att-1",
+			UserID:       "user-1",
+			ConnectionID: "idp-1",
+			LinkID:       "idplink-1",
+		}).
+		Return(nil).
+		Times(1)
+	w.authAttemptService.EXPECT().
+		Handoff(gomock.Any(), domain.FlowHandoffInput{ProjectID: testProjectID, AttemptID: "att-1"}).
+		Return(domain.FlowHandoffOutput{Token: "handoff-1", ExpiresAt: time.Unix(1700000060, 0).UTC()}, nil).
+		Times(1)
+
+	result, err := w.sm.Render(t.Context(), def, state)
+	require.NoError(t, err)
+	require.Equal(t, "done", result.Step.Name)
+	require.NotNil(t, result.Step.Complete)
+	assert.Equal(t, "handoff-1", result.HandoffToken)
+	assert.Equal(t, "user-1", result.State.CollectedData.UserID)
+	assert.Equal(t, "ch-1", result.State.SSOResolvedCheckID)
+}
+
+func TestFlowStateMachine_Render_SSOReplayGuardSkipsResolution(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoRenderWorld(t)
+	state.SSOResolvedCheckID = "ch-1"
+	w.expectParked(linkedParked(), nil)
+	w.ssoIdentities.EXPECT().BindLinked(gomock.Any(), gomock.Any()).Times(0)
+
+	result, err := w.sm.Render(t.Context(), def, state)
+	require.NoError(t, err)
+	assert.Equal(t, "credentials", result.Step.Name)
+	assert.Nil(t, result.Step.Error)
+	assert.Empty(t, result.State.CollectedData.UserID)
+	assert.Empty(t, result.HandoffToken)
+}
+
+func TestFlowStateMachine_Render_NoParkedIdentityRendersStep(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoRenderWorld(t)
+	w.expectParked(nil, nil)
+
+	result, err := w.sm.Render(t.Context(), def, state)
+	require.NoError(t, err)
+	assert.Equal(t, "credentials", result.Step.Name)
+	assert.Nil(t, result.Step.Error)
+	assert.Empty(t, result.State.SSOResolvedCheckID)
+}
+
+func TestFlowStateMachine_Render_SSORestartRequiredPropagates(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoRenderWorld(t)
+	w.expectParked(nil, domain.ErrFlowRestartRequired())
+
+	_, err := w.sm.Render(t.Context(), def, state)
+	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
+}
+
+func TestFlowStateMachine_Render_SSOCreationDisabledRendersStepError(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoRenderWorld(t)
+	w.expectParked(&domain.FlowSSOParkedIdentity{CheckID: "ch-1", ConnectionID: "idp-1", Subject: "sub-1", CreationDisabled: true}, nil)
+	w.ssoIdentities.EXPECT().DeleteParked(gomock.Any(), testProjectID, "att-1").Return(nil).Times(1)
+	w.ssoIdentities.EXPECT().BindLinked(gomock.Any(), gomock.Any()).Times(0)
+	w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).Times(0)
+
+	result, err := w.sm.Render(t.Context(), def, state)
+	require.NoError(t, err)
+	assert.Equal(t, "credentials", result.Step.Name)
+	require.NotNil(t, result.Step.Error)
+	assert.Equal(t, domain.FlowStepErrorSSOCreationDisabled, *result.Step.Error)
+	assert.True(t, containsFieldName(result.Step.Fields, "email"), "the step keeps its inputs")
+	assert.Empty(t, result.HandoffToken)
+	assert.Equal(t, "ch-1", result.State.SSOResolvedCheckID)
+}
+
+// Creation under `auto` is not resolved yet: the parked row stays for the
+// branch that will create or collide, and the guard is not recorded so that
+// branch still sees the row.
+func TestFlowStateMachine_Render_SSOUnlinkedAutoLeavesParkedRow(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoRenderWorld(t)
+	w.expectParked(&domain.FlowSSOParkedIdentity{CheckID: "ch-1", ConnectionID: "idp-1", Subject: "sub-1"}, nil)
+	w.ssoIdentities.EXPECT().DeleteParked(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+
+	result, err := w.sm.Render(t.Context(), def, state)
+	require.NoError(t, err)
+	assert.Equal(t, "credentials", result.Step.Name)
+	assert.Nil(t, result.Step.Error)
+	assert.Empty(t, result.State.SSOResolvedCheckID)
+}
+
+func TestFlowStateMachine_Render_SSOBindOnForeignUserRestarts(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoRenderWorld(t)
+	w.expectParked(linkedParked(), nil)
+	w.ssoIdentities.EXPECT().BindLinked(gomock.Any(), gomock.Any()).Return(domain.ErrFlowRestartRequired())
+	w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).Times(0)
+
+	_, err := w.sm.Render(t.Context(), def, state)
+	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
+	assert.Empty(t, state.CollectedData.UserID, "nothing is recorded for the foreign user")
+	assert.Equal(t, "credentials", state.CurrentStep)
+}
+
+// A completed flow has handed its attempt off (and the session exchange may
+// have deleted it), so a render on the terminal step reads nothing.
+func TestFlowStateMachine_Render_TerminalStepSkipsResolution(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoRenderWorld(t)
+	state.CurrentStep = "done"
+	w.ssoIdentities.EXPECT().LoadParked(gomock.Any(), gomock.Any()).Times(0)
+
+	result, err := w.sm.Render(t.Context(), def, state)
+	require.NoError(t, err)
+	assert.Equal(t, "done", result.Step.Name)
+	// Marked complete, so GET /flow/{id} can answer 410 for a finished flow.
+	assert.NotNil(t, result.Step.Complete)
 }

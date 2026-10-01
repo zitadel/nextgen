@@ -41,13 +41,13 @@
           "target": "register",
           "purpose": "register"
         },
-        "callback": {
+        "sso_authenticated": {
           "target": "done"
         },
-        "user_already_exists": {
+        "sso_user_already_exists": {
           "target": "sso-conflict"
         },
-        "identity_unknown": {
+        "sso_user_not_found": {
           "target": "register-sso"
         }
       }
@@ -97,17 +97,20 @@
         "submit": {
           "target": "register-password"
         },
+        "user_already_exists": {
+          "target": "sso-conflict"
+        },
         "sign_in": {
           "target": "identifier",
           "purpose": "login"
         },
-        "callback": {
+        "sso_authenticated": {
           "target": "done"
         },
-        "user_already_exists": {
+        "sso_user_already_exists": {
           "target": "sso-conflict"
         },
-        "identity_unknown": {
+        "sso_user_not_found": {
           "target": "register-sso"
         }
       }
@@ -193,17 +196,17 @@
         "passkey": {
           "target": "done"
         },
-        "callback": {
+        "sso_authenticated": {
           "target": "done"
         },
-        "user_already_exists": {
+        "sso_user_already_exists": {
           "target": "sso-conflict"
         },
         "sign_in": {
           "target": "identifier",
           "purpose": "login"
         },
-        "identity_unknown": {
+        "sso_user_not_found": {
           "target": "register-sso"
         }
       }

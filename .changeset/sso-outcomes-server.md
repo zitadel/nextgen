@@ -1,0 +1,5 @@
+---
+"@zitadel/server": minor
+---
+
+A flow now resolves the identity a sign-in provider returned. When the provider's account is already linked to a user, `GET /flow/{id}` signs that user in: the response carries the terminal step and the handoff token. When the connection sets `provisioning.creation` to `disabled` and the account has no user, the step is shown again with `error.sso_creation_disabled`. A provider account that belongs to a user the flow cannot continue with ends in `409` with `flow.restart_required`. `GET /flow/{id}` now renews the flow cookie on every response, as submit does, and sessions list a new `sso` factor method. The SSO transition outcomes are renamed: `callback` is now `sso_authenticated` (required on a step that offers `sso_providers`), `identity_unknown` is now `sso_user_not_found`, and the new `sso_user_already_exists` is raised when the provider's details belong to an existing account. Rename these keys in your flow definitions.

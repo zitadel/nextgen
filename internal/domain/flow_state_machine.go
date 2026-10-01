@@ -30,6 +30,9 @@ const (
 	// FlowStepErrorPasskeyRegistrationInvalid reports a rejected
 	// passkey registration attestation.
 	FlowStepErrorPasskeyRegistrationInvalid = "error.passkey_registration_invalid"
+	// FlowStepErrorSSOCreationDisabled reports a provider identity with no
+	// account on a connection whose provisioning.creation is disabled.
+	FlowStepErrorSSOCreationDisabled = "error.sso_creation_disabled"
 )
 
 // FlowStepErrorAllowed reports whether a step error value honors the
@@ -205,13 +208,14 @@ type FlowAuthRequestRef struct {
 
 // FlowStateMachineRuntime is the production [FlowStateMachine].
 type FlowStateMachineRuntime struct {
-	schemas      SchemaResolver
-	schemaStore  JSONSchemaStore
-	fields       FlowFieldResolver
-	userCreater  FlowOnSuccessHandler
-	authAttempts FlowAuthAttemptService
-	ssoProviders FlowSSOProviderResolver
-	now          func() time.Time
+	schemas       SchemaResolver
+	schemaStore   JSONSchemaStore
+	fields        FlowFieldResolver
+	userCreater   FlowOnSuccessHandler
+	authAttempts  FlowAuthAttemptService
+	ssoProviders  FlowSSOProviderResolver
+	ssoIdentities FlowSSOIdentityService
+	now           func() time.Time
 }
 
 // NewFlowStateMachine wires the runtime. The now hook is injectable so
@@ -223,19 +227,21 @@ func NewFlowStateMachine(
 	createUser FlowOnSuccessHandler,
 	authAttempts FlowAuthAttemptService,
 	ssoProviders FlowSSOProviderResolver,
+	ssoIdentities FlowSSOIdentityService,
 	now func() time.Time,
 ) *FlowStateMachineRuntime {
 	if now == nil {
 		now = time.Now
 	}
 	return &FlowStateMachineRuntime{
-		schemas:      schemas,
-		schemaStore:  schemaStore,
-		fields:       fields,
-		userCreater:  createUser,
-		authAttempts: authAttempts,
-		ssoProviders: ssoProviders,
-		now:          now,
+		schemas:       schemas,
+		schemaStore:   schemaStore,
+		fields:        fields,
+		userCreater:   createUser,
+		authAttempts:  authAttempts,
+		ssoProviders:  ssoProviders,
+		ssoIdentities: ssoIdentities,
+		now:           now,
 	}
 }
 
@@ -300,6 +306,9 @@ func (r *FlowStateMachineRuntime) Render(ctx context.Context, def *FlowDefinitio
 	if def == nil || state == nil {
 		return FlowStepResult{}, fmt.Errorf("%w: render without definition or state", ErrFlowIntegrity())
 	}
+	if result, resolved, err := r.resolveSSOIdentity(ctx, def, state); err != nil || resolved {
+		return result, err
+	}
 	step, err := r.renderStep(ctx, def, state)
 	if err != nil {
 		return FlowStepResult{}, err
@@ -308,6 +317,76 @@ func (r *FlowStateMachineRuntime) Render(ctx context.Context, def *FlowDefinitio
 	attachPendingChallenge(step, state.PendingChallenge)
 	state.IssuedAt = r.now()
 	return FlowStepResult{State: state, Step: step}, nil
+}
+
+// resolveSSOIdentity turns an external identity an SSO callback parked on the
+// attempt into an outcome on the current step. resolved reports that it
+// produced the result; otherwise Render goes on to render the step as usual.
+//
+// It runs on every render, so every GET /flow/{id} pays one attempt read even
+// without SSO. Filtering on steps that offer sso_providers would change what
+// back navigation sees, so the read stays until it measurably matters.
+//
+// The outcome is raised with an empty action, so an unwired transition
+// degrades to the step-error re-render, as a handler diversion does.
+func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *FlowDefinition, state *FlowState) (FlowStepResult, bool, error) {
+	currentStep, ok := def.FindStep(state.CurrentStep)
+	if !ok {
+		return FlowStepResult{}, false, fmt.Errorf("%w: current step %q missing from definition", ErrFlowIntegrity(), state.CurrentStep)
+	}
+	// A completed flow handed its attempt off; there is nothing to resolve.
+	if currentStep.Complete != nil {
+		return FlowStepResult{}, false, nil
+	}
+	parked, err := r.ssoIdentities.LoadParked(ctx, FlowSSOLoadInput{
+		ProjectID:     state.ProjectID,
+		AttemptID:     state.AuthAttemptID,
+		UserSchemaURL: state.UserSchemaURL,
+	})
+	if err != nil {
+		return FlowStepResult{}, false, fmt.Errorf("flow state machine: load parked sso identity: %w", err)
+	}
+	if parked == nil || parked.CheckID == state.SSOResolvedCheckID {
+		return FlowStepResult{}, false, nil
+	}
+	// Creation under `auto` (create or collide) is not resolved yet: the row
+	// stays parked, and no guard is recorded, so a later render can resolve it.
+	if parked.Link == nil && !parked.CreationDisabled {
+		return FlowStepResult{}, false, nil
+	}
+
+	pc := &processCtx{ctx: ctx, def: def, state: state, currentStep: currentStep}
+	resolvedFields, err := r.resolveInputs(pc)
+	if err != nil {
+		return FlowStepResult{}, false, err
+	}
+	// Recorded before the branch work, so a failed branch is not retried on
+	// every reload.
+	state.SSOResolvedCheckID = parked.CheckID
+
+	if parked.Link == nil {
+		// provisioning.creation is disabled: the identity has no account and
+		// will not get one.
+		if err := r.ssoIdentities.DeleteParked(ctx, state.ProjectID, state.AuthAttemptID); err != nil {
+			return FlowStepResult{}, false, fmt.Errorf("flow state machine: delete parked sso identity: %w", err)
+		}
+		msg := FlowStepErrorSSOCreationDisabled
+		result, err := r.renderStepError(pc, resolvedFields, &msg)
+		return result, true, err
+	}
+
+	if err := r.ssoIdentities.BindLinked(ctx, FlowSSOBindInput{
+		ProjectID:    state.ProjectID,
+		AttemptID:    state.AuthAttemptID,
+		UserID:       parked.Link.UserID,
+		ConnectionID: parked.ConnectionID,
+		LinkID:       parked.Link.LinkID,
+	}); err != nil {
+		return FlowStepResult{}, false, fmt.Errorf("flow state machine: bind sso identity: %w", err)
+	}
+	recordResolvedUser(state, parked.Link.UserID)
+	result, err := r.routeOutcome(pc, resolvedFields, FlowImplicitOutcomeSSOAuthenticated, false)
+	return result, true, err
 }
 
 // processCtx carries the per-submission context threaded through the
@@ -728,14 +807,16 @@ func identifierFieldsOnly(resolved FlowResolvedFields, values map[string]any) ma
 }
 
 // applyOutcomeFlip flips CurrentPurpose on resolution outcomes:
-// login + user_not_found → register; login + identity_unknown → register;
-// register + user_already_exists → login. Recovery never flips.
+// login + user_not_found → register; login + sso_user_not_found → register;
+// register + user_already_exists → login; register + sso_user_already_exists
+// → login. Recovery never flips.
 func applyOutcomeFlip(state *FlowState, outcome string) {
 	switch {
 	case state.CurrentPurpose == FlowDefinitionPurposeLogin &&
-		(outcome == FlowImplicitOutcomeUserNotFound || outcome == FlowImplicitOutcomeIdentityUnknown):
+		(outcome == FlowImplicitOutcomeUserNotFound || outcome == FlowImplicitOutcomeSSOUserNotFound):
 		state.CurrentPurpose = FlowDefinitionPurposeRegister
-	case state.CurrentPurpose == FlowDefinitionPurposeRegister && outcome == FlowImplicitOutcomeUserAlreadyExists:
+	case state.CurrentPurpose == FlowDefinitionPurposeRegister &&
+		(outcome == FlowImplicitOutcomeUserAlreadyExists || outcome == FlowImplicitOutcomeSSOUserAlreadyExists):
 		state.CurrentPurpose = FlowDefinitionPurposeLogin
 	}
 }
@@ -1303,7 +1384,9 @@ func (r *FlowStateMachineRuntime) renderStep(ctx context.Context, def *FlowDefin
 		return nil, err
 	}
 	prefillFromCollected(&resolved, state.CollectedData.UserData)
-	return r.buildStep(ctx, state, step, resolved, nil, nil, nil)
+	// A terminal step renders as complete, so a re-render of a finished flow
+	// says so (GET /flow/{id} answers 410 on it).
+	return r.buildStep(ctx, state, step, resolved, nil, step.Complete, nil)
 }
 
 func (r *FlowStateMachineRuntime) resolveStepFields(ctx context.Context, state *FlowState, step *FlowDefinitionStep) (FlowResolvedFields, error) {

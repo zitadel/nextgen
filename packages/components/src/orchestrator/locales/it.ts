@@ -171,6 +171,8 @@ export const it: Locale = {
   "error.passkey_unsupported": "Questo dispositivo non supporta le passkey",
   "error.passkey_failed": "Qualcosa è andato storto. Riprova.",
   "error.passkey_invalid": "Non è stato possibile verificare questa passkey. Riprova.",
+  "error.sso_creation_disabled":
+    "Non esiste un account per questo accesso e con questo provider non è possibile creare nuovi account.",
   "error.passkey_registration_invalid":
     "Non è stato possibile verificare la nuova passkey. Riprova a registrarla.",
 

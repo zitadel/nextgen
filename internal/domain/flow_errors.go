@@ -40,6 +40,14 @@ func ErrFlowUnsupported() Error {
 	return newError(PrefixFlow.ErrorCodePrefix("unsupported"), "flow feature is not supported", nil, nil)
 }
 
+// ErrFlowRestartRequired ends a flow that cannot continue with the identity it
+// resolved: the attempt is bound to another user, or the provider's user lives
+// under another schema. The message is fixed and the error never carries the
+// resolved values; callers log them instead.
+func ErrFlowRestartRequired() Error {
+	return newError(PrefixFlow.ErrorCodePrefix("restart_required"), "the flow must be restarted", nil, nil)
+}
+
 func ErrFlowIntegrity() Error {
 	return newError(PrefixFlow.ErrorCodePrefix("integrity"), "flow state integrity violation", nil, nil)
 }

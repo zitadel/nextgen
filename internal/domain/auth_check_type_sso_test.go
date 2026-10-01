@@ -262,3 +262,16 @@ func TestSSOCallbackCheck_IsNotFactorOrChallenge(t *testing.T) {
 	_, isChallenge := check.(domain.AuthChallenge)
 	assert.False(t, isChallenge)
 }
+
+func TestAuthFactorSSO_TypeClassPayload(t *testing.T) {
+	t.Parallel()
+	factor := &domain.AuthFactorSSO{ConnectionID: "idp_1", LinkID: "idplink_1"}
+
+	assert.Equal(t, "SSO", domain.AuthCheckTypeSSO.String())
+	assert.Equal(t, domain.AuthCheckTypeSSO, factor.Type())
+	// Its own class: a provider sign-in competes with no other factor.
+	assert.Equal(t, domain.AuthCheckTypeSSO, domain.AuthCheckTypeSSO.Class())
+	assert.Equal(t, factor, factor.Payload())
+
+	var _ domain.AuthFactor = factor
+}
