@@ -46,6 +46,9 @@ func (h *Harness) EnsureFlowStateMachine(t *testing.T) *domain.FlowStateMachineR
 			fields,
 			h.EnsureCreateUserHandler(t),
 			authAdapter,
+			// No authorizer: these exercise the flows a provider hand-off is
+			// not part of. A test that needs one injects its own.
+			nil,
 			time.Now,
 		)
 	}

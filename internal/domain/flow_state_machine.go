@@ -128,6 +128,11 @@ type FlowStep struct {
 	Fields       []FlowField
 	Actions      []FlowAction
 	SSOProviders []FlowSSOProvider
+	// SSOBindingNonce is set only on the step that starts a provider hand-off.
+	// The API puts it in a `__Host-` cookie and it never reaches the wire: the
+	// callback proves it is the same browser by presenting it, so a value the
+	// client could read from the response body would prove nothing.
+	SSOBindingNonce string
 	// Challenge is a pending authentication ceremony the client must
 	// satisfy before re-submitting (e.g. a passkey assertion). Nil unless
 	// the engine just issued one.
@@ -205,12 +210,13 @@ type FlowAuthRequestRef struct {
 
 // FlowStateMachineRuntime is the production [FlowStateMachine].
 type FlowStateMachineRuntime struct {
-	schemas      SchemaResolver
-	schemaStore  JSONSchemaStore
-	fields       FlowFieldResolver
-	userCreater  FlowOnSuccessHandler
-	authAttempts FlowAuthAttemptService
-	now          func() time.Time
+	schemas       SchemaResolver
+	schemaStore   JSONSchemaStore
+	fields        FlowFieldResolver
+	userCreater   FlowOnSuccessHandler
+	authAttempts  FlowAuthAttemptService
+	ssoAuthorizer FlowSSOAuthorizer
+	now           func() time.Time
 }
 
 // NewFlowStateMachine wires the runtime. The now hook is injectable so
@@ -221,18 +227,20 @@ func NewFlowStateMachine(
 	fields FlowFieldResolver,
 	createUser FlowOnSuccessHandler,
 	authAttempts FlowAuthAttemptService,
+	ssoAuthorizer FlowSSOAuthorizer,
 	now func() time.Time,
 ) *FlowStateMachineRuntime {
 	if now == nil {
 		now = time.Now
 	}
 	return &FlowStateMachineRuntime{
-		schemas:      schemas,
-		schemaStore:  schemaStore,
-		fields:       fields,
-		userCreater:  createUser,
-		authAttempts: authAttempts,
-		now:          now,
+		schemas:       schemas,
+		schemaStore:   schemaStore,
+		fields:        fields,
+		userCreater:   createUser,
+		authAttempts:  authAttempts,
+		ssoAuthorizer: ssoAuthorizer,
+		now:           now,
 	}
 }
 
@@ -323,9 +331,6 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, def *FlowDefiniti
 	if def == nil || state == nil {
 		return FlowStepResult{}, fmt.Errorf("%w: process without definition or state", ErrFlowIntegrity())
 	}
-	if in.SSOProvider != nil {
-		return FlowStepResult{}, fmt.Errorf("%w: sso submissions", ErrFlowUnsupported())
-	}
 	if len(in.GateProofs) > 0 {
 		return FlowStepResult{}, fmt.Errorf("%w: gate proofs", ErrFlowUnsupported())
 	}
@@ -333,6 +338,14 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, def *FlowDefiniti
 	currentStep, ok := def.FindStep(state.CurrentStep)
 	if !ok {
 		return FlowStepResult{}, fmt.Errorf("%w: current step %q missing from definition", ErrFlowIntegrity(), state.CurrentStep)
+	}
+
+	// Before the input pipeline: choosing a provider submits no fields and
+	// runs no gates. The step stays where it is -- the flow resumes here when
+	// the provider returns to the callback -- so this neither advances the
+	// state nor pushes onto the back stack.
+	if in.SSOProvider != nil {
+		return r.processSSO(ctx, state, currentStep, in)
 	}
 
 	pc := &processCtx{ctx: ctx, def: def, state: state, currentStep: currentStep, in: in}
@@ -1375,6 +1388,51 @@ func (r *FlowStateMachineRuntime) buildStep(state *FlowState, step *FlowDefiniti
 		Actions:      actions,
 		SSOProviders: nil,
 	}
+}
+
+// processSSO hands the browser to the provider the pressed button named.
+//
+// The step is not advanced. A provider hand-off is a full-page navigation to
+// another origin: the flow sits on the step that offered the button until the
+// callback returns, and the rendered step carries only the redirect. Treating
+// it as a transition would push a step onto the back stack that the user never
+// saw, and leave the flow somewhere the callback cannot resume.
+//
+// The slug is checked against the step's own `sso_providers` rather than
+// trusted. `sso_provider_id` arrives from the client, and a step that offers
+// Google must not start a hand-off to a connection it does not offer -- the
+// project may have enabled a provider for one schema and not another.
+func (r *FlowStateMachineRuntime) processSSO(ctx context.Context, state *FlowState, step *FlowDefinitionStep, in FlowSubmitInput) (FlowStepResult, error) {
+	if !slices.Contains(step.SSOProviders, in.SSOProvider.ID) {
+		return FlowStepResult{}, fmt.Errorf("%w: step %q does not offer provider %q", ErrFlowIntegrity(), step.Name, in.SSOProvider.ID)
+	}
+	if r.ssoAuthorizer == nil {
+		return FlowStepResult{}, fmt.Errorf("%w: sso authorizer not wired", ErrFlowIntegrity())
+	}
+
+	out, err := r.ssoAuthorizer.Authorize(ctx, FlowSSOAuthorizeInput{
+		ProjectID: state.ProjectID,
+		AttemptID: state.AuthAttemptID,
+		FlowID:    state.ID,
+		Slug:      in.SSOProvider.ID,
+		StepName:  step.Name,
+	})
+	if err != nil {
+		return FlowStepResult{}, fmt.Errorf("flow state machine: authorize sso provider %q on step %q: %w", in.SSOProvider.ID, step.Name, err)
+	}
+
+	// Not a completion: nobody is signed in yet, and `complete` is what tells
+	// the client the flow is over. The orchestrator distinguishes the two by
+	// `redirect_url` on a step that is not complete.
+	return FlowStepResult{
+		State: state,
+		Step: &FlowStep{
+			Name:            step.Name,
+			Texts:           FlowStepTexts{TitleKey: step.Name + ".title", DescriptionKey: step.Name + ".description"},
+			RedirectURL:     &out.RedirectURL,
+			SSOBindingNonce: out.BindingNonce,
+		},
+	}, nil
 }
 
 // collectsStepFields reports whether a submission commits the step's

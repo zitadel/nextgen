@@ -321,6 +321,12 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		fields,
 		createUserHandler,
 		flowAuth,
+		// No authorizer yet: the identity layer's half of the hand-off (mint
+		// the state, encrypt the PKCE verifier, record the pending callback
+		// through IssueSSOState, build the authorize URL) is the next piece.
+		// Until it is wired, pressing a provider button fails loudly as a flow
+		// integrity error rather than silently doing nothing.
+		nil,
 		time.Now,
 	)
 
