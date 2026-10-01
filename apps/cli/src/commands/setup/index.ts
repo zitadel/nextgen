@@ -272,7 +272,7 @@ export default class Setup extends BaseCommand {
       devPort: framework.devPort,
       preset: (flags.preset as SetupPreset | undefined) ?? DEFAULT_SETUP_PRESET,
       useCase: (flags["use-case"] as SetupUseCase | undefined) ?? DEFAULT_SETUP_USE_CASE,
-      sso: ssoFromCommandLine,
+      sso: ssoFromCommandLine === undefined ? [] : [ssoFromCommandLine],
     };
 
     if (!nonInteractive && !dryRun) {
@@ -299,7 +299,8 @@ export default class Setup extends BaseCommand {
     this.recordTelemetry({
       preset: answers.preset,
       use_case: answers.useCase,
-      sso: answers.sso?.provider ?? "none",
+      // The set, not one name: telemetry counts what a project enabled.
+      sso: answers.sso.length === 0 ? "none" : answers.sso.map((a) => a.provider).join(","),
     });
 
     const issuer = issuerFromPort(answers.devPort);
@@ -335,9 +336,10 @@ export default class Setup extends BaseCommand {
             preset: answers.preset,
             useCase: answers.useCase,
             devPort: answers.devPort,
-            sso: answers.sso
-              ? { provider: answers.sso.provider, clientId: answers.sso.clientId }
-              : undefined,
+            sso: answers.sso.map((answer) => ({
+              provider: answer.provider,
+              clientId: answer.clientId,
+            })),
           },
         );
     consola.success(`Created project ${project.id}`);
@@ -434,31 +436,37 @@ export default class Setup extends BaseCommand {
     // Zitadel Cloud as much as against a local server. A refusal is reported
     // rather than failing setup: everything else is already provisioned, and
     // `variables set` publishes it later.
-    let ssoSecret: SecretOutcome | undefined;
-    let ssoClientId: PublishState | undefined;
-    if (answers.sso && !dryRun) {
-      const idVariable = credentialVariables(answers.sso.provider).clientId;
-      const variable = credentialVariables(answers.sso.provider).clientSecret;
+    // One outcome per provider, keyed by slug: the summary reports each
+    // separately, because one provider's publish can land while another's does
+    // not, and telling the developer "the secret did not reach the project"
+    // without saying whose would leave them guessing.
+    const ssoOutcomes = new Map<string, { clientId: PublishState; secret: SecretOutcome }>();
+    if (answers.sso.length > 0 && !dryRun) {
       const publish = ssoCredentialPublisher(answers.server, project);
-      ssoClientId = await publishClientId({
-        name: idVariable,
-        value: answers.sso.clientId,
-        publish,
-      });
-      ssoSecret = await storeClientSecret({ name: variable, value: answers.sso.secret, publish });
-      if (answers.sso.endpoints?.issuer !== undefined) {
-        // Said out loud: a connection pointing somewhere other than the
-        // vendor is not what the developer will want in the end, and nothing
-        // else in the summary would show it.
-        consola.warn(
-          `${idpProvider(answers.sso.provider).displayName} points at ` +
-            `${answers.sso.endpoints.issuer}, not the provider`,
-        );
+      for (const answer of answers.sso) {
+        const idVariable = credentialVariables(answer.provider).clientId;
+        const variable = credentialVariables(answer.provider).clientSecret;
+        const clientId = await publishClientId({
+          name: idVariable,
+          value: answer.clientId,
+          publish,
+        });
+        const secret = await storeClientSecret({ name: variable, value: answer.secret, publish });
+        ssoOutcomes.set(answer.provider, { clientId, secret });
+        if (answer.endpoints?.issuer !== undefined) {
+          // Said out loud: a connection pointing somewhere other than the
+          // vendor is not what the developer will want in the end, and nothing
+          // else in the summary would show it.
+          consola.warn(
+            `${idpProvider(answer.provider).displayName} points at ` +
+              `${answer.endpoints.issuer}, not the provider`,
+          );
+        }
+        reportClientIdOutcome(idVariable, clientId, this.meta.cliVersion);
+        // The wizard refuses an empty secret, so a deferred publish here only
+        // ever means there was no project to publish to.
+        reportSecretOutcome(secret, this.meta.cliVersion, false);
       }
-      reportClientIdOutcome(idVariable, ssoClientId, this.meta.cliVersion);
-      // The wizard refuses an empty secret, so a deferred publish here only
-      // ever means there was no project to publish to.
-      reportSecretOutcome(ssoSecret, this.meta.cliVersion, false);
     }
 
     if (!dryRun) {
@@ -640,19 +648,26 @@ export default class Setup extends BaseCommand {
         // The provider enabled during scaffolding, or null. `secret` reports
         // where the value went, never the value itself — `published` is the
         // one that decides whether the provider button works.
-        sso: answers.sso
-          ? {
-              provider: answers.sso.provider,
-              client_id: answers.sso.clientId,
-              connection: `.zitadel/idps/${answers.sso.provider}.json`,
-              client_id_variable: ssoClientId
-                ? { variable: credentialVariables(answers.sso.provider).clientId, published: ssoClientId }
-                : null,
-              secret: ssoSecret
-                ? { variable: ssoSecret.name, published: ssoSecret.published }
-                : null,
-            }
-          : null,
+        // A list, one entry per provider enabled during scaffolding, empty
+        // when none was. An agent reading this needs to know which provider a
+        // deferred publish belongs to, so the outcomes stay per entry.
+        sso: answers.sso.map((answer) => {
+          const outcome = ssoOutcomes.get(answer.provider);
+          return {
+            provider: answer.provider,
+            client_id: answer.clientId,
+            connection: `.zitadel/idps/${answer.provider}.json`,
+            client_id_variable: outcome
+              ? {
+                  variable: credentialVariables(answer.provider).clientId,
+                  published: outcome.clientId,
+                }
+              : null,
+            secret: outcome
+              ? { variable: outcome.secret.name, published: outcome.secret.published }
+              : null,
+          };
+        }),
         // Branding guidance before the claim nudge: make it yours, then
         // claim to keep it (the same order the manifesto's journey walks).
         next_actions: [
@@ -665,17 +680,21 @@ export default class Setup extends BaseCommand {
         // nothing to act on. `sso enable` reports the same recovery step.
         next_commands: [
           ...republishCommands(
-            [
-              {
-                name:
-                  answers.sso === undefined
-                    ? undefined
-                    : credentialVariables(answers.sso.provider).clientId,
-                secret: false,
-                published: ssoClientId,
-              },
-              { name: ssoSecret?.name, secret: true, published: ssoSecret?.published },
-            ],
+            answers.sso.flatMap((answer) => {
+              const outcome = ssoOutcomes.get(answer.provider);
+              return [
+                {
+                  name: credentialVariables(answer.provider).clientId,
+                  secret: false,
+                  published: outcome?.clientId,
+                },
+                {
+                  name: outcome?.secret.name,
+                  secret: true,
+                  published: outcome?.secret.published,
+                },
+              ];
+            }),
             this.meta.cliVersion,
           ),
           ...installOutcome.nextCommands,
@@ -841,7 +860,7 @@ type SetupRetryOptions = {
    * goes to the project's variables, which is where the engine resolves the
    * connection's `${{ NAME }}` from.
    */
-  sso?: { provider: string; clientId: string };
+  sso?: readonly { provider: string; clientId: string }[];
 };
 
 /**
@@ -866,8 +885,12 @@ function setupRetryFlags(opts: SetupRetryOptions): string {
   if (opts.devPort !== undefined) {
     parts.push(`--dev-port ${opts.devPort}`);
   }
-  if (opts.sso) {
-    parts.push(`--sso ${opts.sso.provider} --sso-client-id ${opts.sso.clientId}`);
+  // Only the first: `--sso` takes one provider, and a scripted rerun can pipe
+  // only one secret. A retry that names several would not be runnable, which
+  // is the whole point of this line. The rest are added with `sso enable`.
+  const [firstSso] = opts.sso ?? [];
+  if (firstSso) {
+    parts.push(`--sso ${firstSso.provider} --sso-client-id ${firstSso.clientId}`);
   }
   // `--non-interactive` is dropped when a provider is being configured: that
   // combination reads the client secret from stdin, and a command handed over
@@ -875,7 +898,7 @@ function setupRetryFlags(opts: SetupRetryOptions): string {
   // fails the moment it is run. Interactively the rerun asks for the secret,
   // which is the one way a plain command can obtain it -- putting it in the
   // command text is never an option.
-  if (opts.nonInteractive && !opts.sso) {
+  if (opts.nonInteractive && firstSso === undefined) {
     parts.push("--non-interactive");
   }
   parts.push("--server local");
@@ -906,7 +929,7 @@ function retryOptionsFromFlags(flags: {
     nonInteractive: Boolean(flags["non-interactive"]),
     sso:
       flags.sso !== undefined && flags["sso-client-id"] !== undefined
-        ? { provider: flags.sso, clientId: flags["sso-client-id"] }
+        ? [{ provider: flags.sso, clientId: flags["sso-client-id"] }]
         : undefined,
   };
 }
@@ -1084,7 +1107,7 @@ function buildSummary(opts: {
   server: string;
   issuer: string;
   scaffoldedFramework: boolean;
-  sso?: SsoAnswer;
+  sso: readonly SsoAnswer[];
 }): Section[] {
   const {
     projectFacts,
@@ -1158,11 +1181,14 @@ function buildSummary(opts: {
     const hit = pickWrittenFile(writtenRel, suffix);
     if (hit) customizeRows.push({ label, value: stylePath(dir), secondary: "see its README.md" });
   }
-  if (sso) {
+  // One row per provider: each has its own connection file, and a developer
+  // scanning the summary for where to edit needs the path that belongs to the
+  // provider they are looking at.
+  for (const answer of sso) {
     customizeRows.push({
       label: "Social sign-in",
-      value: idpProvider(sso.provider).displayName,
-      secondary: stylePath(`.zitadel/idps/${sso.provider}.json`),
+      value: idpProvider(answer.provider).displayName,
+      secondary: stylePath(`.zitadel/idps/${answer.provider}.json`),
     });
   }
 

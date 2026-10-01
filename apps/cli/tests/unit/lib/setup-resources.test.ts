@@ -322,7 +322,8 @@ describe("materializeSetupResources with a social provider", () => {
     } as unknown as ZitadelClient;
   }
 
-  const google = { provider: "google", clientId: "1234-abc.apps.googleusercontent.com" };
+  // A list now: setup enables any number of providers in one run.
+  const google = [{ provider: "google", clientId: "1234-abc.apps.googleusercontent.com" }];
 
   it("writes the connection and records the id the platform assigned", async () => {
     const client = recordingClient();
