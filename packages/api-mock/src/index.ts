@@ -13,8 +13,10 @@
  *   `getCapturedRequests()` delegate to the most recently created handle from
  *   `setupMock`, which is safe when only one mock is active at a time.
  * - `startMockServer(port)` (from `./server.js`) — Express + MSW middleware
- *   for `apps/demo-next` and `apps/demo-nuxt`. Applies `defaultDevBranding`
- *   (Arimo `font_url`) on boot; see `default-dev-branding.ts`.
+ *   for `apps/demo-next` and `apps/demo-nuxt`, and the console's mock dev loop
+ *   (`apps/console/README.md`), which alone uses `/console/runtime.json`.
+ *   Applies `defaultDevBranding` (Arimo `font_url`) on boot; see
+ *   `default-dev-branding.ts`.
  *
  * Helpers:
  *
