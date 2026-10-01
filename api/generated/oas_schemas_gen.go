@@ -19822,8 +19822,14 @@ func (s *FlowResponse) SetHandoffTokenExpiresAt(val OptDateTime) {
 
 // FlowResponseHeaders wraps FlowResponse with response headers.
 type FlowResponseHeaders struct {
-	SetCookie OptString
-	Response  FlowResponse
+	CacheControl OptString
+	SetCookie    OptString
+	Response     FlowResponse
+}
+
+// GetCacheControl returns the value of CacheControl.
+func (s *FlowResponseHeaders) GetCacheControl() OptString {
+	return s.CacheControl
 }
 
 // GetSetCookie returns the value of SetCookie.
@@ -19834,6 +19840,11 @@ func (s *FlowResponseHeaders) GetSetCookie() OptString {
 // GetResponse returns the value of Response.
 func (s *FlowResponseHeaders) GetResponse() FlowResponse {
 	return s.Response
+}
+
+// SetCacheControl sets the value of CacheControl.
+func (s *FlowResponseHeaders) SetCacheControl(val OptString) {
+	s.CacheControl = val
 }
 
 // SetSetCookie sets the value of SetCookie.

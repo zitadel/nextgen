@@ -422,6 +422,10 @@ func TestGetFlowStep_ResolvedHandoffReturns200WithTerminalCookie(t *testing.T) {
 	if got := resp.Header.Get("Set-Cookie"); !strings.Contains(got, "Max-Age=0") {
 		t.Errorf("expected the terminal cookie, got %q", got)
 	}
+	// The handoff token is a single-use credential: never stored.
+	if got := resp.Header.Get("Cache-Control"); got != "private, no-store" {
+		t.Errorf("Cache-Control = %q, want private, no-store", got)
+	}
 	var fr gen.FlowResponse
 	if err := json.Unmarshal(body, &fr); err != nil {
 		t.Fatalf("unmarshal: %v (body=%s)", err, body)
