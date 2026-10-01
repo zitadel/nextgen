@@ -504,3 +504,20 @@ func TestSSOResolutionUnverifiedUniqueRoutesSSOUserNotFound(t *testing.T) {
 	_, err := f.userByEmail(t, email)
 	require.ErrorAs(t, err, new(*database.NoRowFoundError), "no user is created from an unverified email")
 }
+
+// A flow started on a signed-in session carries that session's user on its
+// attempt. An unlinked identity that does not collide with that user cannot
+// register a new one there, nor be collected: the flow starts over.
+func TestSSOResolutionUnlinkedIdentityOnSessionBoundAttemptRestarts(t *testing.T) {
+	f := newSSOResolutionFixture(t, helpers.OIDCConnection("google"))
+	userA := f.createUser(t, defaultSchemaURL())
+	session := harness.CreateActiveSession(t, f.project.ID, userA)
+	flow := f.startFlow(t, session.ID)
+	parkSSOResult(t, f.project.ID, flow.attemptID, f.connection.RevisionID, "sub-new", map[string]any{}, nil)
+
+	resp := f.getStep(t, flow)
+	require.IsType(t, &api.GetFlowStepConflict{}, resp, helpers.MustMarshal(t, resp))
+	assert.Equal(t, "flow.restart_required", string(resp.(*api.GetFlowStepConflict).Code))
+	_, err := f.linkFor(t, "sub-new")
+	require.ErrorAs(t, err, new(*database.NoRowFoundError), "nothing is linked")
+}

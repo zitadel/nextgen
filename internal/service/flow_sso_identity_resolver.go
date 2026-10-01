@@ -40,10 +40,28 @@ func (r *FlowSSOIdentityResolver) LoadParked(ctx context.Context, in domain.Flow
 	if ok && (attempt.IsExpired() || attempt.IsHandedOff()) {
 		return nil, domain.ErrFlowRestartRequired()
 	}
+	var attemptUserID string
+	if user, bound := domain.CheckAs[*domain.AuthFactorUser](attempt, domain.AuthCheckTypeUser); bound {
+		attemptUserID = user.UserID
+	}
 	// An already resolved row (sso_user_not_found leaves it parked) needs
 	// none of the reads below.
+	if ok && check.Result != nil && check.ID == in.ResolvedCheckID && attemptUserID != "" {
+		// The linked and created paths delete the row, and the engine never
+		// collects or creates on an attempt that already carries a user, so a
+		// user factor without an sso factor next to a resolved row was bound by
+		// a collision. Report it, so a flow whose cookie lost that bind can
+		// catch up.
+		if _, sso := domain.CheckAs[*domain.AuthFactorSSO](attempt, domain.AuthCheckTypeSSO); !sso {
+			return &domain.FlowSSOParkedIdentity{CollisionUserID: attemptUserID, AttemptUserID: attemptUserID}, nil
+		}
+	}
 	if !ok || check.Result == nil || check.ID == in.ResolvedCheckID {
-		return boundThroughSSO(attempt), nil
+		if bound := boundThroughSSO(attempt); bound != nil {
+			bound.AttemptUserID = attemptUserID
+			return bound, nil
+		}
+		return nil, nil
 	}
 	result := check.Result
 
@@ -72,6 +90,7 @@ func (r *FlowSSOIdentityResolver) LoadParked(ctx context.Context, in domain.Flow
 		Claims:           result.Claims,
 		Verified:         result.Verified,
 		CreationDisabled: parsed.CreationDisabled,
+		AttemptUserID:    attemptUserID,
 	}
 
 	link, err := stmts.GetIDPIdentityLink(ctx, database.And(

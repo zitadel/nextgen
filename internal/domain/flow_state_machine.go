@@ -380,6 +380,25 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 		}
 		return result, true, err
 	}
+	// A collision bound a user, but the cookie that recorded it lost the race
+	// to one that recorded this row as collected: catch the state up.
+	if parked != nil && parked.CollisionUserID != "" {
+		switch state.CollectedData.UserID {
+		case parked.CollisionUserID:
+			return FlowStepResult{}, false, nil
+		case "":
+		default:
+			return FlowStepResult{}, false, ErrFlowRestartRequired()
+		}
+		pc := &processCtx{ctx: ctx, def: def, state: state, currentStep: currentStep}
+		resolvedFields, err := r.resolveInputs(pc)
+		if err != nil {
+			return FlowStepResult{}, false, err
+		}
+		recordResolvedUser(state, parked.CollisionUserID)
+		result, err := r.routeOutcome(pc, resolvedFields, FlowImplicitOutcomeUserAlreadyExists, false)
+		return result, true, err
+	}
 	if parked == nil || parked.CheckID == state.SSOResolvedCheckID {
 		return FlowStepResult{}, false, nil
 	}
@@ -454,9 +473,11 @@ func (r *FlowStateMachineRuntime) provisionSSOIdentity(ctx context.Context, stat
 	if bound, err := r.bindSSOCollision(ctx, state, parked, probeClaims); err != nil || bound {
 		return FlowImplicitOutcomeUserAlreadyExists, err
 	}
-	// Neither linked to nor colliding with the user the flow carries: no new
-	// user can register on that attempt. The bind helper stays the backstop.
-	if state.CollectedData.UserID != "" {
+	// Neither linked to nor colliding with the user the flow or its attempt
+	// carries (a signed-in session included): no new user can register on
+	// that attempt, and it is not collected either. The bind helper stays the
+	// backstop.
+	if ssoBoundUser(state, parked) != "" {
 		return "", ErrFlowRestartRequired()
 	}
 	if !ssoClaimsComplete(schema, parked, claims, uniqueClaims) {
@@ -496,6 +517,16 @@ func (r *FlowStateMachineRuntime) provisionSSOIdentity(ctx context.Context, stat
 	}
 	recordResolvedUser(state, userID)
 	return FlowImplicitOutcomeSSOAuthenticated, nil
+}
+
+// ssoBoundUser is the user the flow already carries: the one its state
+// recorded, or else the one its attempt carries, which a flow started on a
+// signed-in session gets from that session without the state recording it.
+func ssoBoundUser(state *FlowState, parked *FlowSSOParkedIdentity) string {
+	if state.CollectedData.UserID != "" {
+		return state.CollectedData.UserID
+	}
+	return parked.AttemptUserID
 }
 
 // ssoSchemaClaims keeps the claims whose name is a top-level property of the
@@ -565,7 +596,7 @@ func (r *FlowStateMachineRuntime) bindSSOCollision(ctx context.Context, state *F
 		}
 		// The bind refuses another bound user too; this makes the invariant
 		// explicit in the engine.
-		if bound := state.CollectedData.UserID; bound != "" && bound != owner {
+		if bound := ssoBoundUser(state, parked); bound != "" && bound != owner {
 			return false, ErrFlowRestartRequired()
 		}
 		if err := r.ssoIdentities.BindCollision(ctx, FlowSSOBindInput{

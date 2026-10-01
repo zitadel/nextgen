@@ -531,7 +531,7 @@ func (x xAuthMethodsReader) IsEnabled(method string) bool {
 // requirednessKeywords can make a property required outside a `required`
 // list, or (a reference) hide what a subschema requires.
 var requirednessKeywords = map[string]bool{
-	"allOf": true, "anyOf": true, "oneOf": true,
+	"allOf": true, "anyOf": true, "oneOf": true, "not": true,
 	"if": true, "then": true, "else": true,
 	"dependentRequired": true, "dependentSchemas": true, "dependencies": true,
 	"$ref": true, "$dynamicRef": true,

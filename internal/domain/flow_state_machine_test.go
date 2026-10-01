@@ -5007,6 +5007,22 @@ func TestFlowStateMachine_Render_SSONestedComposedRequiredFallsBackToCollection(
 				}
 			}
 		}`,
+		"double not": `{
+			"$schema": "https://json-schema.org/draft/2020-12/schema",
+			"type": "object",
+			"x-auth-methods": { "password": { "enabled": true } },
+			"x-identifier": "email",
+			"required": ["email", "address"],
+			"properties": {
+				"email":    { "type": "string", "format": "email", "x-unique": "project" },
+				"username": { "type": "string" },
+				"address":  {
+					"type": "object",
+					"properties": { "email": { "type": "string", "x-unique": "project" } },
+					"not": { "not": { "required": ["email"] } }
+				}
+			}
+		}`,
 		"ref": `{
 			"$schema": "https://json-schema.org/draft/2020-12/schema",
 			"type": "object",
@@ -5067,4 +5083,84 @@ func TestFlowStateMachine_Render_SSOUnverifiedRequiredUniqueArrayFallsBackToColl
 	result, err := w.sm.Render(t.Context(), def, state)
 	require.NoError(t, err)
 	assert.Equal(t, "sso-register", result.Step.Name)
+}
+
+// A concurrent collision bound "u-b" while this flow's cookie recorded the
+// row as collected: the state catches up and the collision outcome is raised.
+func TestFlowStateMachine_Render_SSOCollisionReconcilesLostCookieRace(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoRenderWorld(t)
+	def = withSSOOutcomeSteps(def)
+	state.SSOResolvedCheckID = "ch-1"
+	w.ssoIdentities.EXPECT().
+		LoadParked(gomock.Any(), domain.FlowSSOLoadInput{
+			ProjectID: testProjectID, AttemptID: "att-1", UserSchemaURL: defaultSchemaURL, ResolvedCheckID: "ch-1",
+		}).
+		Return(&domain.FlowSSOParkedIdentity{CollisionUserID: "u-b"}, nil)
+
+	result, err := w.sm.Render(t.Context(), def, state)
+	require.NoError(t, err)
+	assert.Equal(t, "sso-conflict", result.Step.Name)
+	assert.Equal(t, "u-b", result.State.CollectedData.UserID)
+}
+
+func TestFlowStateMachine_Render_SSOCollisionReconcileWithRecordedUserRendersStep(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoRenderWorld(t)
+	def = withSSOOutcomeSteps(def)
+	state.SSOResolvedCheckID = "ch-1"
+	state.CollectedData.UserID = "u-b"
+	w.ssoIdentities.EXPECT().LoadParked(gomock.Any(), gomock.Any()).Return(&domain.FlowSSOParkedIdentity{CollisionUserID: "u-b"}, nil)
+
+	result, err := w.sm.Render(t.Context(), def, state)
+	require.NoError(t, err)
+	assert.Equal(t, "credentials", result.Step.Name)
+	assert.Nil(t, result.Step.Error)
+}
+
+func TestFlowStateMachine_Render_SSOCollisionReconcileWithOtherUserRestarts(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoRenderWorld(t)
+	state.SSOResolvedCheckID = "ch-1"
+	state.CollectedData.UserID = "u-a"
+	w.ssoIdentities.EXPECT().LoadParked(gomock.Any(), gomock.Any()).Return(&domain.FlowSSOParkedIdentity{CollisionUserID: "u-b"}, nil)
+
+	_, err := w.sm.Render(t.Context(), def, state)
+	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
+}
+
+// The attempt carries the user of a signed-in session the flow started on,
+// which the flow state does not record. An identity that does not collide
+// with that user cannot register a new one on this attempt.
+func TestFlowStateMachine_Render_SSOUnlinkedIdentityOnSessionBoundAttemptRestarts(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoRenderWorld(t)
+	def = withSSOOutcomeSteps(def)
+	parked := unlinkedParked(map[string]any{"email": "alice@example.com"}, nil)
+	parked.AttemptUserID = "u-s"
+	w.expectParked(parked, nil)
+	w.expectOwner("email", "alice@example.com", "")
+	w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Times(0)
+
+	_, err := w.sm.Render(t.Context(), def, state)
+	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
+	assert.Empty(t, state.CollectedData.UserID)
+}
+
+// The probe finds the very user the session-bound attempt carries: that is a
+// collision bound to that user, not a restart.
+func TestFlowStateMachine_Render_SSOCollisionOnSessionBoundAttemptSameOwnerBinds(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoRenderWorld(t)
+	def = withSSOOutcomeSteps(def)
+	parked := unlinkedParked(map[string]any{"email": "alice@example.com"}, nil)
+	parked.AttemptUserID = "u-s"
+	w.expectParked(parked, nil)
+	w.expectOwner("email", "alice@example.com", "u-s")
+	w.expectBindCollision("u-s", nil)
+
+	result, err := w.sm.Render(t.Context(), def, state)
+	require.NoError(t, err)
+	assert.Equal(t, "sso-conflict", result.Step.Name)
+	assert.Equal(t, "u-s", result.State.CollectedData.UserID)
 }
