@@ -17,10 +17,12 @@ import (
 type FlowSSOIdentityResolver struct {
 	db          StatementPool
 	connections IDPConnectionService
+	users       UserService
+	schemaStore domain.JSONSchemaStore
 }
 
-func NewFlowSSOIdentityResolver(db StatementPool, connections IDPConnectionService) *FlowSSOIdentityResolver {
-	return &FlowSSOIdentityResolver{db: db, connections: connections}
+func NewFlowSSOIdentityResolver(db StatementPool, connections IDPConnectionService, users UserService, schemaStore domain.JSONSchemaStore) *FlowSSOIdentityResolver {
+	return &FlowSSOIdentityResolver{db: db, connections: connections, users: users, schemaStore: schemaStore}
 }
 
 var _ domain.FlowSSOIdentityService = (*FlowSSOIdentityResolver)(nil)
@@ -32,7 +34,9 @@ func (r *FlowSSOIdentityResolver) LoadParked(ctx context.Context, in domain.Flow
 		return nil, fmt.Errorf("load parked sso identity: read attempt: %w", err)
 	}
 	check, ok := attempt.SSOCallback()
-	if !ok || check.Result == nil {
+	// An already resolved row (sso_user_not_found leaves it parked) needs
+	// none of the reads below.
+	if !ok || check.Result == nil || check.ID == in.ResolvedCheckID {
 		return nil, nil
 	}
 	result := check.Result
@@ -99,32 +103,92 @@ func (r *FlowSSOIdentityResolver) LoadParked(ctx context.Context, in domain.Flow
 
 func (r *FlowSSOIdentityResolver) BindLinked(ctx context.Context, in domain.FlowSSOBindInput) error {
 	return r.db.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		stmts := tx.Statements()
-		attempt, err := stmts.GetAuthAttemptByID(ctx, in.ProjectID, in.AttemptID)
-		if err != nil {
-			return fmt.Errorf("bind sso identity: read attempt: %w", err)
-		}
-		// SetAuthAttemptFactor overwrites, so a bound attempt is checked here.
-		if bound, ok := domain.CheckAs[*domain.AuthFactorUser](attempt, domain.AuthCheckTypeUser); ok && bound.UserID != in.UserID {
-			return domain.ErrFlowRestartRequired()
-		}
-		factors := []domain.AuthFactor{
-			&domain.AuthFactorUser{UserID: in.UserID},
-			&domain.AuthFactorSSO{ConnectionID: in.ConnectionID, LinkID: in.LinkID},
-		}
-		for _, factor := range factors {
-			if _, err := recordDirectAuthFactor(ctx, stmts, attempt, factor); err != nil {
-				return fmt.Errorf("bind sso identity: %w", err)
-			}
-		}
-		return stmts.DeleteSSOCallback(ctx, in.ProjectID, in.AttemptID)
+		return bindSSOIdentity(ctx, tx.Statements(), in)
 	})
+}
+
+// bindSSOIdentity records the user and sso factors on the attempt and deletes
+// the parked row. It runs inside the caller's transaction.
+func bindSSOIdentity(ctx context.Context, stmts AllStatements, in domain.FlowSSOBindInput) error {
+	attempt, err := stmts.GetAuthAttemptByID(ctx, in.ProjectID, in.AttemptID)
+	if err != nil {
+		return fmt.Errorf("bind sso identity: read attempt: %w", err)
+	}
+	// SetAuthAttemptFactor overwrites, so a bound attempt is checked here.
+	if bound, ok := domain.CheckAs[*domain.AuthFactorUser](attempt, domain.AuthCheckTypeUser); ok && bound.UserID != in.UserID {
+		return domain.ErrFlowRestartRequired()
+	}
+	factors := []domain.AuthFactor{
+		&domain.AuthFactorUser{UserID: in.UserID},
+		&domain.AuthFactorSSO{ConnectionID: in.ConnectionID, LinkID: in.LinkID},
+	}
+	for _, factor := range factors {
+		if _, err := recordDirectAuthFactor(ctx, stmts, attempt, factor); err != nil {
+			return fmt.Errorf("bind sso identity: %w", err)
+		}
+	}
+	return stmts.DeleteSSOCallback(ctx, in.ProjectID, in.AttemptID)
 }
 
 func (r *FlowSSOIdentityResolver) DeleteParked(ctx context.Context, projectID, attemptID string) error {
 	return r.db.Statements().DeleteSSOCallback(ctx, projectID, attemptID)
 }
 
-func (r *FlowSSOIdentityResolver) CreateLinked(context.Context, domain.FlowSSOCreateInput) (string, error) {
-	return "", fmt.Errorf("%w: sso auto creation", domain.ErrFlowUnsupported())
+// CreateLinked creates the user, links the subject to it and binds the
+// attempt, all in one transaction. A unique attribute or the subject already
+// taken returns ErrUserAlreadyExists.
+func (r *FlowSSOIdentityResolver) CreateLinked(ctx context.Context, in domain.FlowSSOCreateInput) (string, error) {
+	userID, err := r.db.Statements().NewManagedID(string(domain.PrefixUser))
+	if err != nil {
+		return "", fmt.Errorf("create sso user: mint user id: %w", err)
+	}
+	createUser := NewCreateUserAction(CreateUserInput{
+		ProjectID:  in.ProjectID,
+		SchemaURL:  in.UserSchemaURL,
+		Attributes: in.Attributes,
+		ID:         userID,
+	}, r.schemaStore)
+	linkAndBind := &ssoLinkAction{
+		subject: in.Subject,
+		bind: domain.FlowSSOBindInput{
+			ProjectID:    in.ProjectID,
+			AttemptID:    in.AttemptID,
+			UserID:       userID,
+			ConnectionID: in.ConnectionID,
+		},
+	}
+	if err := r.users.ApplyActions(ctx, createUser, linkAndBind); err != nil {
+		return "", err
+	}
+	return userID, nil
 }
+
+// ssoLinkAction links the subject to the user created in the same
+// transaction, then binds the attempt with the link id the insert minted.
+type ssoLinkAction struct {
+	subject string
+	bind    domain.FlowSSOBindInput
+}
+
+func (a *ssoLinkAction) Prepare(context.Context) error { return nil }
+
+func (a *ssoLinkAction) Apply(ctx context.Context, stmts AllStatements) error {
+	link := &domain.IDPIdentityLink{
+		ProjectID:    a.bind.ProjectID,
+		ConnectionID: a.bind.ConnectionID,
+		Subject:      a.subject,
+		UserID:       a.bind.UserID,
+	}
+	if err := stmts.CreateIDPIdentityLink(ctx, link); err != nil {
+		if _, ok := errors.AsType[*database.UniqueError](err); ok {
+			// Another sign-in linked the subject first.
+			return domain.ErrUserAlreadyExists().WithParent(err)
+		}
+		return fmt.Errorf("create sso user: link identity: %w", err)
+	}
+	bind := a.bind
+	bind.LinkID = link.ID
+	return bindSSOIdentity(ctx, stmts, bind)
+}
+
+var _ UserAction = (*ssoLinkAction)(nil)

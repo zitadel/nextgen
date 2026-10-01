@@ -9,6 +9,8 @@ content:
         - $ref: '../../../components/schemas/errors/att-invalid_state.yaml'
         - $ref: '../../../components/schemas/errors/att-not_completed.yaml'
         - $ref: '../../../components/schemas/errors/att-not_found.yaml'
+        - $ref: '../../../components/schemas/errors/att-proof_rejected.yaml'
+        - $ref: '../../../components/schemas/errors/att-stale_challenge.yaml'
         - $ref: '../../../components/schemas/errors/enc_key-decrypt_failed.yaml'
         - $ref: '../../../components/schemas/errors/enc_key-encrypt_failed.yaml'
         - $ref: '../../../components/schemas/errors/enc_key-not_found.yaml'
@@ -31,6 +33,9 @@ content:
         - $ref: '../../../components/schemas/errors/tkn-invalid.yaml'
         - $ref: '../../../components/schemas/errors/req-invalid.yaml'
         - $ref: '../../../components/schemas/errors/enc_key-unknown_alg.yaml'
+        - $ref: '../../../components/schemas/errors/user-already_exists.yaml'
+        - $ref: '../../../components/schemas/errors/user-invalid.yaml'
+        - $ref: '../../../components/schemas/errors/user-not_found.yaml'
       discriminator:
         propertyName: code
         mapping:
@@ -39,6 +44,8 @@ content:
           att.invalid_state: '../../../components/schemas/errors/att-invalid_state.yaml'
           att.not_completed: '../../../components/schemas/errors/att-not_completed.yaml'
           att.not_found: '../../../components/schemas/errors/att-not_found.yaml'
+          att.proof_rejected: '../../../components/schemas/errors/att-proof_rejected.yaml'
+          att.stale_challenge: '../../../components/schemas/errors/att-stale_challenge.yaml'
           enc_key.decrypt_failed: '../../../components/schemas/errors/enc_key-decrypt_failed.yaml'
           enc_key.encrypt_failed: '../../../components/schemas/errors/enc_key-encrypt_failed.yaml'
           enc_key.not_found: '../../../components/schemas/errors/enc_key-not_found.yaml'
@@ -61,6 +68,9 @@ content:
           tkn.invalid: '../../../components/schemas/errors/tkn-invalid.yaml'
           req.invalid: '../../../components/schemas/errors/req-invalid.yaml'
           enc_key.unknown_alg: '../../../components/schemas/errors/enc_key-unknown_alg.yaml'
+          user.already_exists: '../../../components/schemas/errors/user-already_exists.yaml'
+          user.invalid: '../../../components/schemas/errors/user-invalid.yaml'
+          user.not_found: '../../../components/schemas/errors/user-not_found.yaml'
     examples:
       att.already_handed_off:
         summary: att.already_handed_off
@@ -87,6 +97,16 @@ content:
         value:
           code: att.not_found
           message: 'The auth attempt was not found.'
+      att.proof_rejected:
+        summary: att.proof_rejected
+        value:
+          code: att.proof_rejected
+          message: 'The proof was rejected.'
+      att.stale_challenge:
+        summary: att.stale_challenge
+        value:
+          code: att.stale_challenge
+          message: 'The challenge is stale or was re-issued.'
       enc_key.decrypt_failed:
         summary: enc_key.decrypt_failed
         value:
@@ -197,3 +217,18 @@ content:
         value:
           code: enc_key.unknown_alg
           message: 'unsupported encryption algorithm'
+      user.already_exists:
+        summary: user.already_exists
+        value:
+          code: user.already_exists
+          message: 'a user already exists with the given unique attributes'
+      user.invalid:
+        summary: user.invalid
+        value:
+          code: user.invalid
+          message: 'user invalid'
+      user.not_found:
+        summary: user.not_found
+        value:
+          code: user.not_found
+          message: 'user not found'

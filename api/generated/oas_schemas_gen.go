@@ -23379,6 +23379,8 @@ type GetFlowStepErrorResponse struct {
 	AttInvalidState         AttInvalidState
 	AttNotCompleted         AttNotCompleted
 	AttNotFound             AttNotFound
+	AttProofRejected        AttProofRejected
+	AttStaleChallenge       AttStaleChallenge
 	EncKeyDecryptFailed     EncKeyDecryptFailed
 	EncKeyEncryptFailed     EncKeyEncryptFailed
 	EncKeyNotFound          EncKeyNotFound
@@ -23401,6 +23403,9 @@ type GetFlowStepErrorResponse struct {
 	TknInvalid              TknInvalid
 	ReqInvalid              ReqInvalid
 	EncKeyUnknownAlg        EncKeyUnknownAlg
+	UserAlreadyExists       UserAlreadyExists
+	UserInvalid             UserInvalid
+	UserNotFound            UserNotFound
 }
 
 // GetFlowStepErrorResponseType is oneOf type of GetFlowStepErrorResponse.
@@ -23413,6 +23418,8 @@ const (
 	AttInvalidStateGetFlowStepErrorResponse         GetFlowStepErrorResponseType = "att.invalid_state"
 	AttNotCompletedGetFlowStepErrorResponse         GetFlowStepErrorResponseType = "att.not_completed"
 	AttNotFoundGetFlowStepErrorResponse             GetFlowStepErrorResponseType = "att.not_found"
+	AttProofRejectedGetFlowStepErrorResponse        GetFlowStepErrorResponseType = "att.proof_rejected"
+	AttStaleChallengeGetFlowStepErrorResponse       GetFlowStepErrorResponseType = "att.stale_challenge"
 	EncKeyDecryptFailedGetFlowStepErrorResponse     GetFlowStepErrorResponseType = "enc_key.decrypt_failed"
 	EncKeyEncryptFailedGetFlowStepErrorResponse     GetFlowStepErrorResponseType = "enc_key.encrypt_failed"
 	EncKeyNotFoundGetFlowStepErrorResponse          GetFlowStepErrorResponseType = "enc_key.not_found"
@@ -23435,6 +23442,9 @@ const (
 	TknInvalidGetFlowStepErrorResponse              GetFlowStepErrorResponseType = "tkn.invalid"
 	ReqInvalidGetFlowStepErrorResponse              GetFlowStepErrorResponseType = "req.invalid"
 	EncKeyUnknownAlgGetFlowStepErrorResponse        GetFlowStepErrorResponseType = "enc_key.unknown_alg"
+	UserAlreadyExistsGetFlowStepErrorResponse       GetFlowStepErrorResponseType = "user.already_exists"
+	UserInvalidGetFlowStepErrorResponse             GetFlowStepErrorResponseType = "user.invalid"
+	UserNotFoundGetFlowStepErrorResponse            GetFlowStepErrorResponseType = "user.not_found"
 )
 
 // IsAttAlreadyHandedOff reports whether GetFlowStepErrorResponse is AttAlreadyHandedOff.
@@ -23460,6 +23470,16 @@ func (s GetFlowStepErrorResponse) IsAttNotCompleted() bool {
 // IsAttNotFound reports whether GetFlowStepErrorResponse is AttNotFound.
 func (s GetFlowStepErrorResponse) IsAttNotFound() bool {
 	return s.Type == AttNotFoundGetFlowStepErrorResponse
+}
+
+// IsAttProofRejected reports whether GetFlowStepErrorResponse is AttProofRejected.
+func (s GetFlowStepErrorResponse) IsAttProofRejected() bool {
+	return s.Type == AttProofRejectedGetFlowStepErrorResponse
+}
+
+// IsAttStaleChallenge reports whether GetFlowStepErrorResponse is AttStaleChallenge.
+func (s GetFlowStepErrorResponse) IsAttStaleChallenge() bool {
+	return s.Type == AttStaleChallengeGetFlowStepErrorResponse
 }
 
 // IsEncKeyDecryptFailed reports whether GetFlowStepErrorResponse is EncKeyDecryptFailed.
@@ -23572,6 +23592,21 @@ func (s GetFlowStepErrorResponse) IsEncKeyUnknownAlg() bool {
 	return s.Type == EncKeyUnknownAlgGetFlowStepErrorResponse
 }
 
+// IsUserAlreadyExists reports whether GetFlowStepErrorResponse is UserAlreadyExists.
+func (s GetFlowStepErrorResponse) IsUserAlreadyExists() bool {
+	return s.Type == UserAlreadyExistsGetFlowStepErrorResponse
+}
+
+// IsUserInvalid reports whether GetFlowStepErrorResponse is UserInvalid.
+func (s GetFlowStepErrorResponse) IsUserInvalid() bool {
+	return s.Type == UserInvalidGetFlowStepErrorResponse
+}
+
+// IsUserNotFound reports whether GetFlowStepErrorResponse is UserNotFound.
+func (s GetFlowStepErrorResponse) IsUserNotFound() bool {
+	return s.Type == UserNotFoundGetFlowStepErrorResponse
+}
+
 // SetAttAlreadyHandedOff sets GetFlowStepErrorResponse to AttAlreadyHandedOff.
 func (s *GetFlowStepErrorResponse) SetAttAlreadyHandedOff(v AttAlreadyHandedOff) {
 	s.Type = AttAlreadyHandedOffGetFlowStepErrorResponse
@@ -23674,6 +23709,48 @@ func (s GetFlowStepErrorResponse) GetAttNotFound() (v AttNotFound, ok bool) {
 func NewAttNotFoundGetFlowStepErrorResponse(v AttNotFound) GetFlowStepErrorResponse {
 	var s GetFlowStepErrorResponse
 	s.SetAttNotFound(v)
+	return s
+}
+
+// SetAttProofRejected sets GetFlowStepErrorResponse to AttProofRejected.
+func (s *GetFlowStepErrorResponse) SetAttProofRejected(v AttProofRejected) {
+	s.Type = AttProofRejectedGetFlowStepErrorResponse
+	s.AttProofRejected = v
+}
+
+// GetAttProofRejected returns AttProofRejected and true boolean if GetFlowStepErrorResponse is AttProofRejected.
+func (s GetFlowStepErrorResponse) GetAttProofRejected() (v AttProofRejected, ok bool) {
+	if !s.IsAttProofRejected() {
+		return v, false
+	}
+	return s.AttProofRejected, true
+}
+
+// NewAttProofRejectedGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from AttProofRejected.
+func NewAttProofRejectedGetFlowStepErrorResponse(v AttProofRejected) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetAttProofRejected(v)
+	return s
+}
+
+// SetAttStaleChallenge sets GetFlowStepErrorResponse to AttStaleChallenge.
+func (s *GetFlowStepErrorResponse) SetAttStaleChallenge(v AttStaleChallenge) {
+	s.Type = AttStaleChallengeGetFlowStepErrorResponse
+	s.AttStaleChallenge = v
+}
+
+// GetAttStaleChallenge returns AttStaleChallenge and true boolean if GetFlowStepErrorResponse is AttStaleChallenge.
+func (s GetFlowStepErrorResponse) GetAttStaleChallenge() (v AttStaleChallenge, ok bool) {
+	if !s.IsAttStaleChallenge() {
+		return v, false
+	}
+	return s.AttStaleChallenge, true
+}
+
+// NewAttStaleChallengeGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from AttStaleChallenge.
+func NewAttStaleChallengeGetFlowStepErrorResponse(v AttStaleChallenge) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetAttStaleChallenge(v)
 	return s
 }
 
@@ -24136,6 +24213,69 @@ func (s GetFlowStepErrorResponse) GetEncKeyUnknownAlg() (v EncKeyUnknownAlg, ok 
 func NewEncKeyUnknownAlgGetFlowStepErrorResponse(v EncKeyUnknownAlg) GetFlowStepErrorResponse {
 	var s GetFlowStepErrorResponse
 	s.SetEncKeyUnknownAlg(v)
+	return s
+}
+
+// SetUserAlreadyExists sets GetFlowStepErrorResponse to UserAlreadyExists.
+func (s *GetFlowStepErrorResponse) SetUserAlreadyExists(v UserAlreadyExists) {
+	s.Type = UserAlreadyExistsGetFlowStepErrorResponse
+	s.UserAlreadyExists = v
+}
+
+// GetUserAlreadyExists returns UserAlreadyExists and true boolean if GetFlowStepErrorResponse is UserAlreadyExists.
+func (s GetFlowStepErrorResponse) GetUserAlreadyExists() (v UserAlreadyExists, ok bool) {
+	if !s.IsUserAlreadyExists() {
+		return v, false
+	}
+	return s.UserAlreadyExists, true
+}
+
+// NewUserAlreadyExistsGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from UserAlreadyExists.
+func NewUserAlreadyExistsGetFlowStepErrorResponse(v UserAlreadyExists) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetUserAlreadyExists(v)
+	return s
+}
+
+// SetUserInvalid sets GetFlowStepErrorResponse to UserInvalid.
+func (s *GetFlowStepErrorResponse) SetUserInvalid(v UserInvalid) {
+	s.Type = UserInvalidGetFlowStepErrorResponse
+	s.UserInvalid = v
+}
+
+// GetUserInvalid returns UserInvalid and true boolean if GetFlowStepErrorResponse is UserInvalid.
+func (s GetFlowStepErrorResponse) GetUserInvalid() (v UserInvalid, ok bool) {
+	if !s.IsUserInvalid() {
+		return v, false
+	}
+	return s.UserInvalid, true
+}
+
+// NewUserInvalidGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from UserInvalid.
+func NewUserInvalidGetFlowStepErrorResponse(v UserInvalid) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetUserInvalid(v)
+	return s
+}
+
+// SetUserNotFound sets GetFlowStepErrorResponse to UserNotFound.
+func (s *GetFlowStepErrorResponse) SetUserNotFound(v UserNotFound) {
+	s.Type = UserNotFoundGetFlowStepErrorResponse
+	s.UserNotFound = v
+}
+
+// GetUserNotFound returns UserNotFound and true boolean if GetFlowStepErrorResponse is UserNotFound.
+func (s GetFlowStepErrorResponse) GetUserNotFound() (v UserNotFound, ok bool) {
+	if !s.IsUserNotFound() {
+		return v, false
+	}
+	return s.UserNotFound, true
+}
+
+// NewUserNotFoundGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from UserNotFound.
+func NewUserNotFoundGetFlowStepErrorResponse(v UserNotFound) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetUserNotFound(v)
 	return s
 }
 

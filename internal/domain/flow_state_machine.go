@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ianlancetaylor/jsonschema"
+
 	"github.com/zitadel/nextgen/internal/maputil"
 )
 
@@ -339,19 +341,15 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 		return FlowStepResult{}, false, nil
 	}
 	parked, err := r.ssoIdentities.LoadParked(ctx, FlowSSOLoadInput{
-		ProjectID:     state.ProjectID,
-		AttemptID:     state.AuthAttemptID,
-		UserSchemaURL: state.UserSchemaURL,
+		ProjectID:       state.ProjectID,
+		AttemptID:       state.AuthAttemptID,
+		UserSchemaURL:   state.UserSchemaURL,
+		ResolvedCheckID: state.SSOResolvedCheckID,
 	})
 	if err != nil {
 		return FlowStepResult{}, false, fmt.Errorf("flow state machine: load parked sso identity: %w", err)
 	}
 	if parked == nil || parked.CheckID == state.SSOResolvedCheckID {
-		return FlowStepResult{}, false, nil
-	}
-	// Creation under `auto` (create or collide) is not resolved yet: the row
-	// stays parked, and no guard is recorded, so a later render can resolve it.
-	if parked.Link == nil && !parked.CreationDisabled {
 		return FlowStepResult{}, false, nil
 	}
 
@@ -361,17 +359,24 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 		return FlowStepResult{}, false, err
 	}
 	// Recorded before the branch work, so a failed branch is not retried on
-	// every reload.
+	// every reload, and a row left parked for collection is not resolved twice.
 	state.SSOResolvedCheckID = parked.CheckID
 
-	if parked.Link == nil {
-		// provisioning.creation is disabled: the identity has no account and
-		// will not get one.
+	if parked.Link == nil && parked.CreationDisabled {
+		// The identity has no account and will not get one.
 		if err := r.ssoIdentities.DeleteParked(ctx, state.ProjectID, state.AuthAttemptID); err != nil {
 			return FlowStepResult{}, false, fmt.Errorf("flow state machine: delete parked sso identity: %w", err)
 		}
 		msg := FlowStepErrorSSOCreationDisabled
 		result, err := r.renderStepError(pc, resolvedFields, &msg)
+		return result, true, err
+	}
+	if parked.Link == nil {
+		outcome, err := r.provisionSSOIdentity(ctx, state, parked)
+		if err != nil {
+			return FlowStepResult{}, false, err
+		}
+		result, err := r.routeOutcome(pc, resolvedFields, outcome, false)
 		return result, true, err
 	}
 
@@ -387,6 +392,137 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 	recordResolvedUser(state, parked.Link.UserID)
 	result, err := r.routeOutcome(pc, resolvedFields, FlowImplicitOutcomeSSOAuthenticated, false)
 	return result, true, err
+}
+
+// provisionSSOIdentity settles an unlinked identity under `creation: auto`
+// and returns the outcome to raise. A user owning one of the unique claims is
+// bound (sso_user_already_exists); otherwise complete, trusted claims create
+// a linked user (sso_authenticated); anything else is collected
+// (sso_user_not_found), with the row left parked for the prefill.
+func (r *FlowStateMachineRuntime) provisionSSOIdentity(ctx context.Context, state *FlowState, parked *FlowSSOParkedIdentity) (string, error) {
+	schema, err := r.schemas.Resolve(ctx, r.schemaStore, state.ProjectID, state.UserSchemaURL, nil)
+	if err != nil {
+		return "", fmt.Errorf("flow state machine: load user schema for sso identity: %w", err)
+	}
+	uniqueClaims, err := r.ssoUniqueClaims(schema, state.CurrentStep, parked.Claims)
+	if err != nil {
+		return "", err
+	}
+	if bound, err := r.bindSSOCollision(ctx, state, parked, uniqueClaims); err != nil || bound {
+		return FlowImplicitOutcomeSSOUserAlreadyExists, err
+	}
+	if !ssoClaimsComplete(schema, parked, uniqueClaims) {
+		return FlowImplicitOutcomeSSOUserNotFound, nil
+	}
+
+	attributes := map[string]any{}
+	for name, value := range parked.Claims {
+		if err := maputil.SetNested(attributes, AttributeKey(name).Nodes(), value); err != nil {
+			return "", fmt.Errorf("flow state machine: sso claim %q: %w", name, err)
+		}
+	}
+	userID, err := r.ssoIdentities.CreateLinked(ctx, FlowSSOCreateInput{
+		ProjectID:     state.ProjectID,
+		AttemptID:     state.AuthAttemptID,
+		UserSchemaURL: state.UserSchemaURL,
+		ConnectionID:  parked.ConnectionID,
+		Subject:       parked.Subject,
+		Attributes:    attributes,
+	})
+	if errors.Is(err, ErrUserAlreadyExists()) {
+		// Lost a race since the probe: whoever took the attribute is bound,
+		// and a race lost on the subject alone falls back to collection.
+		if bound, err := r.bindSSOCollision(ctx, state, parked, uniqueClaims); err != nil || bound {
+			return FlowImplicitOutcomeSSOUserAlreadyExists, err
+		}
+		return FlowImplicitOutcomeSSOUserNotFound, nil
+	}
+	if errors.Is(err, ErrUserInvalid()) {
+		// A claim fails the schema (too long, bad format): collect it so the
+		// user can fix it.
+		return FlowImplicitOutcomeSSOUserNotFound, nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("flow state machine: create sso user: %w", err)
+	}
+	recordResolvedUser(state, userID)
+	return FlowImplicitOutcomeSSOAuthenticated, nil
+}
+
+// ssoUniqueClaims returns the claim names whose schema property carries an
+// x-unique scope, sorted so the probe order is stable. A claim the schema
+// does not know, or an object claim, is skipped.
+func (r *FlowStateMachineRuntime) ssoUniqueClaims(schema *jsonschema.Schema, stepName string, claims map[string]any) ([]string, error) {
+	var names []string
+	for name := range claims {
+		resolved, err := r.fields.Resolve(schema, stepName, []Field{Field(name)})
+		if errors.Is(err, ErrFlowFieldUnknown) || errors.Is(err, ErrFlowFieldNotScalar) {
+			continue
+		}
+		if err != nil {
+			return nil, fmt.Errorf("flow state machine: resolve sso claim %q: %w", name, err)
+		}
+		if resolved.Fields[0].Unique != AttributeUniquenessUnspecified {
+			names = append(names, name)
+		}
+	}
+	slices.Sort(names)
+	return names, nil
+}
+
+// bindSSOCollision probes each unique claim, verified or not, until one names
+// an existing user, then binds that user and deletes the parked row. Like a
+// typed identifier it only binds the user: no link, no sso factor.
+func (r *FlowStateMachineRuntime) bindSSOCollision(ctx context.Context, state *FlowState, parked *FlowSSOParkedIdentity, uniqueClaims []string) (bool, error) {
+	for _, name := range uniqueClaims {
+		value, _ := parked.Claims[name].(string)
+		if value == "" {
+			continue
+		}
+		userID, err := r.authAttempts.SubmitIdentifier(ctx, FlowSubmitIdentifierInput{
+			ProjectID:     state.ProjectID,
+			AttemptID:     state.AuthAttemptID,
+			AttributeName: name,
+			Value:         value,
+		})
+		if errors.Is(err, ErrAuthAttemptProofRejected(nil)) {
+			continue
+		}
+		if errors.Is(err, ErrAuthAttemptInvalidRequest()) || errors.Is(err, ErrAuthAttemptInvalidState()) {
+			// The attempt already carries another user, or it expired or was
+			// handed off.
+			return false, ErrFlowRestartRequired()
+		}
+		if err != nil {
+			return false, fmt.Errorf("flow state machine: probe sso claim %q: %w", name, err)
+		}
+		recordResolvedUser(state, userID)
+		if err := r.ssoIdentities.DeleteParked(ctx, state.ProjectID, state.AuthAttemptID); err != nil {
+			return false, fmt.Errorf("flow state machine: delete parked sso identity: %w", err)
+		}
+		return true, nil
+	}
+	return false, nil
+}
+
+// ssoClaimsComplete reports whether the claims can create a user unattended:
+// every required property has a claim, and every required unique one arrived
+// verified, so an unverified address cannot claim an account. Claims are
+// top-level, so a required nested object never completes.
+func ssoClaimsComplete(schema *jsonschema.Schema, parked *FlowSSOParkedIdentity, uniqueClaims []string) bool {
+	materialized := make(map[string]struct{}, len(parked.Claims))
+	for name := range parked.Claims {
+		materialized[name] = struct{}{}
+	}
+	for path := range newSchemaReader(schema).RequiredPaths(materialized) {
+		if parked.Claims[path] == nil {
+			return false
+		}
+		if slices.Contains(uniqueClaims, path) && !parked.Verified[path] {
+			return false
+		}
+	}
+	return true
 }
 
 // processCtx carries the per-submission context threaded through the

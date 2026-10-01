@@ -42583,6 +42583,38 @@ func (s GetFlowStepErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case AttProofRejectedGetFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("att.proof_rejected")
+		{
+			s := s.AttProofRejected
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case AttStaleChallengeGetFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("att.stale_challenge")
+		{
+			s := s.AttStaleChallenge
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case EncKeyDecryptFailedGetFlowStepErrorResponse:
 		e.FieldStart("code")
 		e.Str("enc_key.decrypt_failed")
@@ -42935,6 +42967,54 @@ func (s GetFlowStepErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case UserAlreadyExistsGetFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.already_exists")
+		{
+			s := s.UserAlreadyExists
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UserInvalidGetFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.invalid")
+		{
+			s := s.UserInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UserNotFoundGetFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.not_found")
+		{
+			s := s.UserNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	}
 }
 
@@ -42975,6 +43055,12 @@ func (s *GetFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 					found = true
 				case "att.not_found":
 					s.Type = AttNotFoundGetFlowStepErrorResponse
+					found = true
+				case "att.proof_rejected":
+					s.Type = AttProofRejectedGetFlowStepErrorResponse
+					found = true
+				case "att.stale_challenge":
+					s.Type = AttStaleChallengeGetFlowStepErrorResponse
 					found = true
 				case "enc_key.decrypt_failed":
 					s.Type = EncKeyDecryptFailedGetFlowStepErrorResponse
@@ -43042,6 +43128,15 @@ func (s *GetFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 				case "enc_key.unknown_alg":
 					s.Type = EncKeyUnknownAlgGetFlowStepErrorResponse
 					found = true
+				case "user.already_exists":
+					s.Type = UserAlreadyExistsGetFlowStepErrorResponse
+					found = true
+				case "user.invalid":
+					s.Type = UserInvalidGetFlowStepErrorResponse
+					found = true
+				case "user.not_found":
+					s.Type = UserNotFoundGetFlowStepErrorResponse
+					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
 				}
@@ -43074,6 +43169,14 @@ func (s *GetFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case AttNotFoundGetFlowStepErrorResponse:
 		if err := s.AttNotFound.Decode(d); err != nil {
+			return err
+		}
+	case AttProofRejectedGetFlowStepErrorResponse:
+		if err := s.AttProofRejected.Decode(d); err != nil {
+			return err
+		}
+	case AttStaleChallengeGetFlowStepErrorResponse:
+		if err := s.AttStaleChallenge.Decode(d); err != nil {
 			return err
 		}
 	case EncKeyDecryptFailedGetFlowStepErrorResponse:
@@ -43162,6 +43265,18 @@ func (s *GetFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case EncKeyUnknownAlgGetFlowStepErrorResponse:
 		if err := s.EncKeyUnknownAlg.Decode(d); err != nil {
+			return err
+		}
+	case UserAlreadyExistsGetFlowStepErrorResponse:
+		if err := s.UserAlreadyExists.Decode(d); err != nil {
+			return err
+		}
+	case UserInvalidGetFlowStepErrorResponse:
+		if err := s.UserInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UserNotFoundGetFlowStepErrorResponse:
+		if err := s.UserNotFound.Decode(d); err != nil {
 			return err
 		}
 	default:

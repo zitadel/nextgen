@@ -1,0 +1,5 @@
+---
+"@zitadel/server": minor
+---
+
+A sign-in provider account with no linked user can now get one automatically when the connection keeps `provisioning.creation` at `auto` (the default). The flow first checks whether one of the provider's unique details, such as the email, already belongs to a user. If it does, the flow binds that user and raises `sso_user_already_exists`, so the user signs in with a factor they already have; nothing is linked. If not, and the provider sent every required property of the user schema, with every required unique one verified, the flow creates the user and links the provider account in one step, then raises `sso_authenticated`. Otherwise the flow raises `sso_user_not_found` and keeps the provider's details, so a registration step can collect what is missing. Known limitation: claim mapping fills top-level properties only, so a user schema with a required nested object always falls back to `sso_user_not_found`.
