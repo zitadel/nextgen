@@ -17,19 +17,24 @@ const (
 	setUserPasswordStmt = `INSERT INTO user_passwords (
 	id, project_id, user_id, encoded_hash, change_required, verification_id
 ) VALUES (@p1, @p2, @p3, @p4, @p5, @p6)
-ON CONFLICT (project_id, user_id) DO UPDATE SET
-	encoded_hash = EXCLUDED.encoded_hash,
-	change_required = EXCLUDED.change_required,
-	verification_id = EXCLUDED.verification_id,
-	changed_at = CURRENT_TIMESTAMP(),
-	failed_attempts = 0,
-	last_successful_check = NULL,
-	updated_at = CURRENT_TIMESTAMP()
 THEN RETURN id`
 
-	userPasswordQuery = `SELECT id, project_id, user_id, encoded_hash, change_required,
-	changed_at, verification_id, last_successful_check, failed_attempts, created_at, updated_at
+	userPasswordColumns = `id, project_id, user_id, encoded_hash, change_required,
+	verification_id, last_successful_check, failed_attempts, created_at, updated_at`
+
+	userPasswordQuery = `SELECT ` + userPasswordColumns + `
 FROM user_passwords`
+
+	currentUserPassword = `NOT EXISTS (SELECT 1 FROM user_passwords AS newer` +
+		` WHERE newer.project_id = user_passwords.project_id` +
+		` AND newer.user_id = user_passwords.user_id` +
+		` AND newer.created_at > user_passwords.created_at)`
+
+	userPasswordHistoryQuery = `SELECT ` + userPasswordColumns + `
+FROM user_passwords
+WHERE project_id = @p1 AND user_id = @p2
+ORDER BY created_at DESC
+LIMIT @p3 OFFSET 1`
 )
 
 type userPasswordStatements struct{ statement }
@@ -90,7 +95,7 @@ func (ps userPasswordStatements) GetUserPassword(ctx context.Context, filter dat
 // ListUserPasswords implements [service.UserPasswordStatements].
 func (ps userPasswordStatements) ListUserPasswords(ctx context.Context, filter *database.ListOptions[domain.UserPasswordField]) (*database.ListResult[*domain.UserPassword], error) {
 	var compiler statementCompiler
-	if err := compileRead(&compiler, userPasswordQuery, filter, userpassword.Schema); err != nil {
+	if err := compileRead(&compiler, userPasswordQuery, filter, userpassword.Schema, currentUserPassword); err != nil {
 		return nil, err
 	}
 
@@ -115,6 +120,18 @@ func (ps userPasswordStatements) ListUserPasswords(ctx context.Context, filter *
 		Items:      passwords,
 		NextCursor: nextCursor,
 	}, nil
+}
+
+// GetUserPasswordHistory implements [service.UserPasswordStatements].
+func (ps userPasswordStatements) GetUserPasswordHistory(ctx context.Context, projectID, userID string) ([]*domain.UserPassword, error) {
+	var passwords []*domain.UserPassword
+	stmt := buildStatement(userPasswordHistoryQuery, projectID, userID, int64(domain.UserPasswordHistoryDepth)).statement()
+	err := ps.db.Query(ctx, stmt, func(iter *spanner.RowIterator) error {
+		var err error
+		passwords, err = collectRows(iter, ps.scanUserPassword)
+		return err
+	})
+	return passwords, wrapError(err)
 }
 
 // UpdateUserPassword implements [service.UserPasswordStatements].
@@ -143,8 +160,6 @@ func (ps userPasswordStatements) UpdateUserPassword(ctx context.Context, filter 
 			writeAssign("encoded_hash", u.EncodedHash)
 		case *domain.UserPasswordChangeRequiredUpdate:
 			writeAssign("change_required", u.ChangeRequired)
-		case *domain.UserPasswordChangedAtUpdate:
-			writeAssign("changed_at", u.ChangedAt)
 		case *domain.UserPasswordVerificationIDUpdate:
 			writeAssign("verification_id", u.VerificationID)
 		case *domain.UserPasswordLastSuccessfulCheckUpdate:
@@ -163,6 +178,8 @@ func (ps userPasswordStatements) UpdateUserPassword(ctx context.Context, filter 
 
 	c.WriteString(", updated_at = CURRENT_TIMESTAMP() WHERE ")
 	compileFilter(&c, filter, userpassword.Schema)
+	c.WriteString(" AND ")
+	c.WriteString(currentUserPassword)
 
 	n, err := ps.db.Update(ctx, c.statement())
 	if err != nil {
@@ -172,18 +189,6 @@ func (ps userPasswordStatements) UpdateUserPassword(ctx context.Context, filter 
 		return wrapError(spanner.ErrRowNotFound)
 	}
 	return nil
-}
-
-// DeleteUserPassword implements [service.UserPasswordStatements].
-func (ps userPasswordStatements) DeleteUserPassword(ctx context.Context, filter database.Filter[domain.UserPasswordField]) error {
-	if filter == nil {
-		return fmt.Errorf("UserPassword filter is required")
-	}
-	var c statementCompiler
-	c.WriteString("DELETE FROM user_passwords WHERE ")
-	compileFilter(&c, filter, userpassword.Schema)
-	_, err := ps.db.Update(ctx, c.statement())
-	return wrapError(err)
 }
 
 func (ps userPasswordStatements) scanUserPassword(row *spanner.Row) (*domain.UserPassword, error) {
@@ -199,7 +204,6 @@ func (ps userPasswordStatements) scanUserPassword(row *spanner.Row) (*domain.Use
 		&pw.UserID,
 		&pw.EncodedHash,
 		&pw.ChangeRequired,
-		&pw.ChangedAt,
 		&verificationID,
 		&lastSuccessfulCheck,
 		&failedAttempts,

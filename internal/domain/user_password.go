@@ -8,6 +8,8 @@ import (
 
 const PrefixUserPassword ResourcePrefix = "upw"
 
+const UserPasswordHistoryDepth = 4
+
 func ErrUserPasswordInvalid() Error {
 	return newError("user.password_invalid", "The password provided is invalid.", nil, nil)
 }
@@ -26,7 +28,6 @@ type UserPassword struct {
 	UserID              string
 	EncodedHash         string
 	ChangeRequired      bool
-	ChangedAt           time.Time
 	VerificationID      *string
 	LastSuccessfulCheck *time.Time
 	FailedAttempts      int16
@@ -43,8 +44,8 @@ func (u *UserPassword) Verify(password string, verifier crypto.HashVerifier) err
 }
 
 type SetUserPassword struct {
-	// ID is the password row id. Dialects mint on create and overwrite with the
-	// persisted id on upsert (RETURNING / equivalent) so emitters can set
+	// ID is the new password row's id, minted by the dialect when empty. Every
+	// set adds a row, so each password gets its own id, which emitters use as
 	// entity_id / factor_id.
 	ID             string
 	ProjectID      string
@@ -65,7 +66,6 @@ const (
 	UserPasswordFieldUserID
 	UserPasswordFieldEncodedHash
 	UserPasswordFieldChangeRequired
-	UserPasswordFieldChangedAt
 	UserPasswordFieldVerificationID
 	UserPasswordFieldLastSuccessfulCheck
 	UserPasswordFieldFailedAttempts

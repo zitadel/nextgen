@@ -18,12 +18,6 @@ type UserPasswordChangeRequiredUpdate struct {
 
 func (*UserPasswordChangeRequiredUpdate) userPasswordUpdate() {}
 
-type UserPasswordChangedAtUpdate struct {
-	ChangedAt time.Time
-}
-
-func (*UserPasswordChangedAtUpdate) userPasswordUpdate() {}
-
 type UserPasswordVerificationIDUpdate struct {
 	VerificationID string
 }

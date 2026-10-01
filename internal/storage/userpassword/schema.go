@@ -32,11 +32,6 @@ var Schema = database.NewSchema(map[domain.UserPasswordField]database.FieldBindi
 		Accessor: func(p *domain.UserPassword) any { return p.ChangeRequired },
 		Coerce:   database.CoerceBool,
 	},
-	domain.UserPasswordFieldChangedAt: {
-		SQLName:  "changed_at",
-		Accessor: func(p *domain.UserPassword) any { return p.ChangedAt },
-		Coerce:   database.CoerceTime,
-	},
 	domain.UserPasswordFieldVerificationID: {
 		SQLName:  "verification_id",
 		Accessor: func(p *domain.UserPassword) any { return database.NullableValue(p.VerificationID) },
