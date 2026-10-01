@@ -46,8 +46,12 @@ async function sourceSuggestedCommandIds(dir: string): Promise<Set<string>> {
       const id = commandIdFromArgs(match[2]);
       if (id) commands.add(id);
     }
-    for (const match of source.matchAll(/["`]zitadel\s+([a-z][\w:-]*)/g)) {
-      commands.add(match[1]);
+    // Through the same mapping as the publicCliCommand form above: a topic
+    // command is written "zitadel sso enable", and taking only the first word
+    // would test the topic `sso`, which is not a command id at all.
+    for (const match of source.matchAll(/["`]zitadel\s+([^"`]*)/g)) {
+      const id = commandIdFromArgs(match[1] ?? "");
+      if (id) commands.add(id);
     }
   }
   return commands;
