@@ -4420,6 +4420,22 @@ func TestFlowStateMachine_Render_SSOBoundAttemptRetriesHandoff(t *testing.T) {
 	assert.Equal(t, "u1", result.State.CollectedData.UserID)
 }
 
+// Two requests retried the same lost handoff and the other one won: this one
+// renders the step quietly, with no token and no error.
+func TestFlowStateMachine_Render_SSOBoundAttemptRetryLosesRace(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoRenderWorld(t)
+	w.expectParked(&domain.FlowSSOParkedIdentity{BoundUserID: "u1"}, nil)
+	w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).
+		Return(domain.FlowHandoffOutput{}, domain.ErrAuthAttemptAlreadyHandedOff())
+
+	result, err := w.sm.Render(t.Context(), def, state)
+	require.NoError(t, err)
+	assert.Equal(t, "credentials", result.Step.Name)
+	assert.Nil(t, result.Step.Complete)
+	assert.Empty(t, result.HandoffToken)
+}
+
 func TestFlowStateMachine_Render_SSOBoundAttemptWithRecordedUserRendersStep(t *testing.T) {
 	t.Parallel()
 	w, def, state := ssoRenderWorld(t)

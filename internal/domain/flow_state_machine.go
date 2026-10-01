@@ -2,6 +2,7 @@ package domain
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
@@ -358,8 +359,22 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 		if err != nil {
 			return FlowStepResult{}, false, err
 		}
+		// Snapshot in the cookie's own form: if a concurrent retry wins the
+		// handoff, this request renders the step exactly as the cookie had it.
+		before, err := json.Marshal(state)
+		if err != nil {
+			return FlowStepResult{}, false, fmt.Errorf("flow state machine: snapshot state: %w", err)
+		}
 		recordResolvedUser(state, parked.BoundUserID)
 		result, err := r.routeOutcome(pc, resolvedFields, FlowImplicitOutcomeSSOAuthenticated, false)
+		if errors.Is(err, ErrAuthAttemptAlreadyHandedOff()) {
+			var restored FlowState
+			if err := json.Unmarshal(before, &restored); err != nil {
+				return FlowStepResult{}, false, fmt.Errorf("flow state machine: restore state: %w", err)
+			}
+			*state = restored
+			return FlowStepResult{}, false, nil
+		}
 		return result, true, err
 	}
 	if parked == nil || parked.CheckID == state.SSOResolvedCheckID {

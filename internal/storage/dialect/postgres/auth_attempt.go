@@ -40,7 +40,7 @@ const createAuthAttemptStmt = `WITH inserted_attempt AS (` +
 
 const deleteAuthAttemptByIDStmt = `DELETE FROM zitadel_nextgen.auth_attempts WHERE project_id = $1 AND id = $2`
 
-const handoffAuthAttemptStmt = `UPDATE zitadel_nextgen.auth_attempts SET handoff_token = $3, handed_off_at = NOW() WHERE project_id = $1 AND id = $2 RETURNING handed_off_at`
+const handoffAuthAttemptStmt = `UPDATE zitadel_nextgen.auth_attempts SET handoff_token = $3, handed_off_at = NOW() WHERE project_id = $1 AND id = $2 AND handed_off_at IS NULL RETURNING handed_off_at`
 
 const setAuthAttemptChallengeStmt = `INSERT INTO zitadel_nextgen.checks` +
 	` (project_id, auth_attempt_id, type, id, last_challenged_at, challenge_payload)` +
@@ -333,11 +333,27 @@ func (as authAttemptStatements) HandoffAuthAttempt(ctx context.Context, attempt 
 	var handedOffAt time.Time
 	err := as.client.QueryRow(ctx, handoffAuthAttemptStmt,
 		attempt.ProjectID, attempt.ID, attempt.HandoffToken.TokenHash).Scan(&handedOffAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return as.handoffRefused(ctx, attempt, wrapError(err))
+	}
 	if err != nil {
 		return wrapError(err)
 	}
 	attempt.HandedOffAt = &handedOffAt
 	return nil
+}
+
+// handoffRefused explains a handoff that updated no row: the attempt is
+// missing (noRow is returned) or another request already handed it off.
+func (as authAttemptStatements) handoffRefused(ctx context.Context, attempt *domain.AuthAttempt, noRow error) error {
+	_, err := as.GetAuthAttemptByID(ctx, attempt.ProjectID, attempt.ID)
+	if errors.Is(err, domain.ErrAuthAttemptNotFound()) {
+		return noRow
+	}
+	if err != nil {
+		return err
+	}
+	return domain.ErrAuthAttemptAlreadyHandedOff()
 }
 
 // SetAuthAttemptChallenge implements [service.AuthAttemptStatements].

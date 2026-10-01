@@ -334,6 +334,10 @@ type AuthAttemptStatements interface {
 	GetAuthAttemptByID(ctx context.Context, projectID, authAttemptID string) (*domain.AuthAttempt, error)
 	GetAuthAttemptByHandoffToken(ctx context.Context, projectID string, handoffToken []byte) (*domain.AuthAttempt, error)
 	DeleteAuthAttemptByID(ctx context.Context, projectID, authAttemptID string) error
+	// HandoffAuthAttempt stores the handoff token only on an attempt that was not
+	// handed off yet, so two concurrent handoffs cannot both return a token. The
+	// loser gets ErrAuthAttemptAlreadyHandedOff; a missing attempt still gets a
+	// NoRowFoundError.
 	HandoffAuthAttempt(ctx context.Context, attempt *domain.AuthAttempt) error
 	SetAuthAttemptChallenge(ctx context.Context, projectID, authAttemptID string, challenge domain.AuthChallenge) error
 	// SetAuthAttemptFactor upserts a verified factor directly, without a

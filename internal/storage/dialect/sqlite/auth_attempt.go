@@ -30,7 +30,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`
 
 	deleteAuthAttemptByIDStmt = `DELETE FROM auth_attempts WHERE project_id = ? AND id = ?`
 
-	handoffAuthAttemptStmt = `UPDATE auth_attempts SET handoff_token = ?, handed_off_at = ? WHERE project_id = ? AND id = ? RETURNING handed_off_at`
+	handoffAuthAttemptStmt = `UPDATE auth_attempts SET handoff_token = ?, handed_off_at = ? WHERE project_id = ? AND id = ? AND handed_off_at IS NULL RETURNING handed_off_at`
 
 	setAuthAttemptChallengeStmt = `INSERT INTO checks (project_id, auth_attempt_id, id, type, last_challenged_at, challenge_payload, failure_count, last_failed_at)` +
 		` VALUES (?, ?, ?, ?, ?, ?, 0, NULL) ON CONFLICT (project_id, auth_attempt_id, type)` +
@@ -330,12 +330,28 @@ func (as authAttemptStatements) HandoffAuthAttempt(ctx context.Context, attempt 
 	err := as.client.QueryRow(ctx, handoffAuthAttemptStmt,
 		attempt.HandoffToken.TokenHash, now.UnixNano(), attempt.ProjectID, attempt.ID,
 	).Scan(&handedOffNano)
+	if errors.Is(err, sql.ErrNoRows) {
+		return as.handoffRefused(ctx, attempt, fmt.Errorf("failed to handoff auth attempt: %w", wrapError(err)))
+	}
 	if err != nil {
 		return fmt.Errorf("failed to handoff auth attempt: %w", wrapError(err))
 	}
 	handedOffAt := timeFromUnixNano(handedOffNano)
 	attempt.HandedOffAt = &handedOffAt
 	return nil
+}
+
+// handoffRefused explains a handoff that updated no row: the attempt is
+// missing (noRow is returned) or another request already handed it off.
+func (as authAttemptStatements) handoffRefused(ctx context.Context, attempt *domain.AuthAttempt, noRow error) error {
+	_, err := as.GetAuthAttemptByID(ctx, attempt.ProjectID, attempt.ID)
+	if errors.Is(err, domain.ErrAuthAttemptNotFound()) {
+		return noRow
+	}
+	if err != nil {
+		return err
+	}
+	return domain.ErrAuthAttemptAlreadyHandedOff()
 }
 
 // SetAuthAttemptChallenge implements [service.AuthAttemptStatements].
