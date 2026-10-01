@@ -966,6 +966,35 @@ function ssoCredentialPublisher(
   };
 }
 
+/**
+ * The providers a setup retry cannot carry, and how to restore them.
+ *
+ * `--sso` names one provider and makes the rerun skip the multi-select, so
+ * every other provider chosen would be lost unless it is restored explicitly.
+ * Both recovery paths need this -- the one before the wizard and the one for a
+ * failed project creation -- and the second was missed when this was written
+ * inline, which is exactly the kind of thing one copy prevents.
+ */
+function ssoRecovery(
+  retry: SetupRetryOptions,
+  cliVersion: string,
+): { hint: string; commands: string[] } {
+  const chosen = retry.sso ?? [];
+  const remaining = chosen.slice(1);
+  if (remaining.length === 0) {
+    return { hint: "", commands: [] };
+  }
+  return {
+    hint: `The rerun configures ${chosen[0]?.provider ?? ""} only; add the rest with the sso enable commands below. `,
+    commands: remaining.map((provider) =>
+      publicCliCommand(
+        `sso enable --provider ${provider.provider} --client-id ${provider.clientId}`,
+        cliVersion,
+      ),
+    ),
+  };
+}
+
 async function createProjectWithLocalHint(
   client: ReturnType<typeof createZitadelClient>,
   server: string,
@@ -988,14 +1017,16 @@ async function createProjectWithLocalHint(
   } catch (error) {
     const normalized = toZitadelError(error);
     const retryFlags = setupRetryFlags(retry);
+    const sso = ssoRecovery(retry, cliVersion);
     throw new ZitadelError(normalized.code, normalized.message, {
       hint:
         `${normalized.hint ? `${normalized.hint} ` : ""}` +
         "If you meant to use a local Zitadel server, start it first " +
-        `and retry setup with ${retryFlags}.`,
+        `and retry setup with ${retryFlags}. ${sso.hint}`.trimEnd(),
       nextCommands: [
         publicCliCommand("start", cliVersion),
         publicCliCommand(`setup ${retryFlags}`, cliVersion),
+        ...sso.commands,
       ],
       details: {
         server,
@@ -1017,11 +1048,7 @@ function localSetupHint(error: unknown, retry: SetupRetryOptions, cliVersion: st
   }
 
   const setupCommand = `setup ${setupRetryFlags(retry)}`;
-  // The rerun carries one provider; every other one chosen is restored with
-  // its own command rather than lost. `--sso` makes the rerun skip the
-  // multi-select, so without these the remaining providers would have no way
-  // back into the project.
-  const remainingProviders = (retry.sso ?? []).slice(1);
+  const sso = ssoRecovery(retry, cliVersion);
 
   return new ZitadelError(normalized.code, normalized.message, {
     hint:
@@ -1031,19 +1058,12 @@ function localSetupHint(error: unknown, retry: SetupRetryOptions, cliVersion: st
         ? "The rerun asks for the client secret, because a command cannot carry one. " +
           "To script it instead, pipe the secret in and add --non-interactive. "
         : "") +
-      (remainingProviders.length > 0
-        ? `The rerun configures ${retry.sso?.[0]?.provider ?? ""} only; add the rest with the sso enable commands below. `
-        : "") +
+      sso.hint +
       "After setup succeeds, follow its next_commands to start the app and verify registration, logout, and login in the browser.",
     nextCommands: [
       publicCliCommand("start", cliVersion),
       publicCliCommand(setupCommand, cliVersion),
-      ...remainingProviders.map((provider) =>
-        publicCliCommand(
-          `sso enable --provider ${provider.provider} --client-id ${provider.clientId}`,
-          cliVersion,
-        ),
-      ),
+      ...sso.commands,
     ],
     details: normalized.details,
   });
