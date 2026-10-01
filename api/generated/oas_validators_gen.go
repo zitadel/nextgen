@@ -4770,8 +4770,8 @@ func (s *FlowDefinitionStep) Validate() error {
 		if err := (validate.Array{
 			MinLength:    0,
 			MinLengthSet: false,
-			MaxLength:    0,
-			MaxLengthSet: false,
+			MaxLength:    20,
+			MaxLengthSet: true,
 		}).ValidateLength(len(s.SSOProviders)); err != nil {
 			return errors.Wrap(err, "array")
 		}
