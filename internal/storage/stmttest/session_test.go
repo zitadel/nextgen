@@ -314,10 +314,7 @@ func TestSessionStatements_List_RejectsOrderByFilterOnlyField(t *testing.T) {
 			return err
 		}
 
-		// The check must run before the cursor is decoded, so a request for a
-		// filter-only order field is refused with the same typed error whether
-		// or not it carries a cursor — a malformed cursor never shadows it with
-		// db.invalid_cursor (guards the ordering of the check in cursorFilter).
+		// Runs before cursor decode, so a bad cursor cannot hide the error behind db.invalid_cursor.
 		for name, cursor := range map[string][]byte{
 			"no cursor":        nil,
 			"malformed cursor": []byte("not-a-real-cursor"),

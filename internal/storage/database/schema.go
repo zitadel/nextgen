@@ -95,9 +95,7 @@ func (s Schema[F, T]) MustSQLName(field F) string {
 // EnsureOrderable reports whether every order-by column can back keyset
 // pagination. A column with no accessor names a value the cursor cannot read
 // (filter-only computed expressions, e.g. a correlated EXISTS), so ordering by
-// it would panic in ValuesFrom; it is refused with a typed error instead. This
-// enforces the sortable/filter-only split at the schema layer rather than by
-// per-dialect comment (#850).
+// it would panic in ValuesFrom; it is refused with a typed error instead (#850).
 func (s Schema[F, T]) EnsureOrderable(orderBy OrderBy[F]) error {
 	for _, col := range orderBy.Columns {
 		if s.binding(col.Field()).Accessor == nil {
