@@ -51,9 +51,26 @@ tasks:
       runFromWorkspaceRoot: true
       runInCI: false
 
+  # Cross-compiles the server binaries and stages them into the npm package bin
+  # dirs. Split out of pack/snapshot so moon runs it as its own graph node; those
+  # tasks then skip the inline build via RELEASE_SERVER_PREBUILT. Not cached: the
+  # binaries embed the git commit and build date (ldflags), so output is never
+  # reproducible — matching the rest of the release chain.
+  build-server:
+    command: "node scripts/release.mjs build-server"
+    outputs:
+      - "/dist/release/*/build/**/*"
+    options:
+      cache: false
+      runFromWorkspaceRoot: true
+      runInCI: false
+
   pack:
     command: "node scripts/release.mjs pack"
+    env:
+      RELEASE_SERVER_PREBUILT: "1"
     deps:
+      - "release:build-server"
       - "release:build-public-packages"
       - "console:build-release"
       - "login-ui:build-release"
@@ -67,8 +84,11 @@ tasks:
 
   snapshot:
     command: "node scripts/release.mjs snapshot"
+    env:
+      RELEASE_SERVER_PREBUILT: "1"
     deps:
       - "server:test"
+      - "release:build-server"
       - "release:build-public-packages"
       - "console:build-release"
       - "login-ui:build-release"

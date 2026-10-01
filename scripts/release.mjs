@@ -38,6 +38,8 @@ export async function main(args = forwardedArgs()) {
       return await commandSnapshot(options);
     case "pack":
       return await commandPack();
+    case "build-server":
+      return await commandBuildServer();
     case "publish":
       return await commandPublish(options);
     case "verify":
@@ -52,14 +54,32 @@ async function commandVersion() {
   console.log(`${release.name} ${release.version} (${release.tag})`);
 }
 
+// Download modules, cross-compile the server binaries, and stage them into the
+// npm package bin dirs. Factored out so the `release:build-server` moon task can
+// run it as a dependency ahead of pack/snapshot, which then skip it via
+// RELEASE_SERVER_PREBUILT. Still runs inline for a direct, unorchestrated call.
+async function buildAndStageServer({ outDir, version, gitInfo: info }) {
+  await run("go", ["mod", "download"], { cwd: repoRoot });
+  await buildServerBinaries({ repoRoot, outDir, version, gitInfo: info });
+  await stageServerNpmBinaries({ repoRoot, outDir, version });
+}
+
+async function commandBuildServer() {
+  const release = await readServerRelease(repoRoot);
+  const outDir = releaseDir(repoRoot, release.version);
+  const info = await gitInfo({ repoRoot });
+  await buildAndStageServer({ outDir, version: release.version, gitInfo: info });
+  console.log(`server binaries staged: ${outDir}`);
+}
+
 async function commandSnapshot(options) {
   const release = await readServerRelease(repoRoot);
   const outDir = releaseDir(repoRoot, release.version);
   const info = await gitInfo({ repoRoot });
 
-  await run("go", ["mod", "download"], { cwd: repoRoot });
-  await buildServerBinaries({ repoRoot, outDir, version: release.version, gitInfo: info });
-  await stageServerNpmBinaries({ repoRoot, outDir, version: release.version });
+  if (!process.env.RELEASE_SERVER_PREBUILT) {
+    await buildAndStageServer({ outDir, version: release.version, gitInfo: info });
+  }
   await createArchives({ repoRoot, outDir, version: release.version });
   await packPublicPackages({ repoRoot, outDir, version: release.version });
   await prepareDockerContext({ repoRoot, outDir, version: release.version });
@@ -83,10 +103,10 @@ async function commandSnapshot(options) {
 async function commandPack() {
   const release = await readServerRelease(repoRoot);
   const outDir = releaseDir(repoRoot, release.version);
-  const info = await gitInfo({ repoRoot });
-  await run("go", ["mod", "download"], { cwd: repoRoot });
-  await buildServerBinaries({ repoRoot, outDir, version: release.version, gitInfo: info });
-  await stageServerNpmBinaries({ repoRoot, outDir, version: release.version });
+  if (!process.env.RELEASE_SERVER_PREBUILT) {
+    const info = await gitInfo({ repoRoot });
+    await buildAndStageServer({ outDir, version: release.version, gitInfo: info });
+  }
   await packPublicPackages({ repoRoot, outDir, version: release.version });
   console.log(`npm tarballs ready: ${join(outDir, "npm")}`);
 }
@@ -237,7 +257,7 @@ function usage(error) {
     console.error(error);
     console.error("");
   }
-  console.log(`usage: node scripts/release.mjs <version|pack|snapshot|publish|verify> [options]
+  console.log(`usage: node scripts/release.mjs <version|pack|snapshot|build-server|publish|verify> [options]
 
 Options:
   --dry-run          Do not publish or mutate remote registries.
