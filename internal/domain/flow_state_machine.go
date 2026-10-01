@@ -411,9 +411,10 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 
 // provisionSSOIdentity settles an unlinked identity under `creation: auto`
 // and returns the outcome to raise. A user owning one of the unique claims is
-// bound (sso_user_already_exists); otherwise complete, trusted claims create
-// a linked user (sso_authenticated); anything else is collected
-// (sso_user_not_found), with the row left parked for the prefill.
+// bound (user_already_exists, as for a typed registration collision);
+// otherwise complete, trusted claims create a linked user
+// (sso_authenticated); anything else is collected (sso_user_not_found), with
+// the row left parked for the prefill.
 func (r *FlowStateMachineRuntime) provisionSSOIdentity(ctx context.Context, state *FlowState, parked *FlowSSOParkedIdentity) (string, error) {
 	schema, err := r.schemas.Resolve(ctx, r.schemaStore, state.ProjectID, state.UserSchemaURL, nil)
 	if err != nil {
@@ -423,7 +424,7 @@ func (r *FlowStateMachineRuntime) provisionSSOIdentity(ctx context.Context, stat
 	// settled reports that this request already deleted the parked row.
 	settled := false
 	if bound, err := r.bindSSOCollision(ctx, state, parked, probeClaims, &settled); err != nil || bound {
-		return FlowImplicitOutcomeSSOUserAlreadyExists, err
+		return FlowImplicitOutcomeUserAlreadyExists, err
 	}
 	if settled || !ssoClaimsComplete(schema, parked, uniqueClaims) {
 		// settled: an owner vanished between the lookup and the bind, after
@@ -450,7 +451,7 @@ func (r *FlowStateMachineRuntime) provisionSSOIdentity(ctx context.Context, stat
 		// Lost a race since the probe: whoever took the attribute is bound,
 		// and a race lost on the subject alone falls back to collection.
 		if bound, err := r.bindSSOCollision(ctx, state, parked, probeClaims, &settled); err != nil || bound {
-			return FlowImplicitOutcomeSSOUserAlreadyExists, err
+			return FlowImplicitOutcomeUserAlreadyExists, err
 		}
 		return FlowImplicitOutcomeSSOUserNotFound, nil
 	}

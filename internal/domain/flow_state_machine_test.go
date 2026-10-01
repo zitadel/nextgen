@@ -4423,7 +4423,7 @@ func completeClaims() (map[string]any, map[string]bool) {
 
 // withSSOOutcomeSteps routes the two creation outcomes to their own steps.
 func withSSOOutcomeSteps(def *domain.FlowDefinition) *domain.FlowDefinition {
-	def.Steps[0].Transitions[domain.FlowImplicitOutcomeSSOUserAlreadyExists] = domain.FlowStepTransition{Target: "sso-conflict"}
+	def.Steps[0].Transitions[domain.FlowImplicitOutcomeUserAlreadyExists] = domain.FlowStepTransition{Target: "sso-conflict"}
 	def.Steps[0].Transitions[domain.FlowImplicitOutcomeSSOUserNotFound] = domain.FlowStepTransition{Target: "sso-register"}
 	def.Steps = append(def.Steps,
 		domain.FlowDefinitionStep{Name: "sso-conflict", Fields: []domain.Field{"email"}},
@@ -4467,7 +4467,7 @@ func TestFlowStateMachine_Render_SSOCollisionRoutesUserAlreadyExists(t *testing.
 	assert.Equal(t, "ch-1", result.State.SSOResolvedCheckID)
 }
 
-func TestFlowStateMachine_Render_SSOUserAlreadyExistsFlipsRegisterToLogin(t *testing.T) {
+func TestFlowStateMachine_Render_SSOCollisionFlipsRegisterToLogin(t *testing.T) {
 	t.Parallel()
 	w, def, state := ssoRenderWorld(t)
 	def = withSSOOutcomeSteps(def)

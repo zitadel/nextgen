@@ -388,7 +388,7 @@ func TestSSOResolutionCollisionBindsAndDeletesParked(t *testing.T) {
 	require.IsType(t, &api.FlowResponseHeaders{}, resp, helpers.MustMarshal(t, resp))
 	got := resp.(*api.FlowResponseHeaders).Response
 	// This definition does not route the outcome, so it surfaces as the error.
-	assert.Equal(t, domain.FlowImplicitOutcomeSSOUserAlreadyExists, got.Step.Error.Value)
+	assert.Equal(t, domain.FlowImplicitOutcomeUserAlreadyExists, got.Step.Error.Value)
 	assert.False(t, got.HandoffToken.Set, "the owner still has to prove a factor")
 
 	attempt := f.attempt(t, flow)
