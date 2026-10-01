@@ -52,7 +52,7 @@ beforeEach(() => {
   mockReadFile.mockImplementation((path: Parameters<typeof readFile>[0]) => {
     const contents = fileFor(String(path));
     return contents === undefined
-      ? Promise.reject(new Error("ENOENT"))
+      ? Promise.reject(Object.assign(new Error("ENOENT"), { code: "ENOENT" }))
       : Promise.resolve(contents);
   });
 });

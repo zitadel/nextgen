@@ -58,10 +58,20 @@ export class QwikScaffolder extends AbstractCLIScaffolder {
 
   /** Rewrites every `@builder.io/qwik…` reference (import specifier or
    * `jsxImportSource`) to `@qwik.dev/core…` in one generated file. Skips a file
-   * that is absent or already migrated. */
+   * that is absent (a future template may not emit it) or already migrated, but
+   * rethrows any other read error (e.g. `EACCES`) rather than silently leaving a
+   * half-migrated app that reports success but cannot build. */
   private async repointQwikRefs(file: string): Promise<void> {
-    const source = await readFile(file, "utf8").catch(() => null);
-    if (source === null || !source.includes("@builder.io/qwik")) {
+    let source: string;
+    try {
+      source = await readFile(file, "utf8");
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        return;
+      }
+      throw error;
+    }
+    if (!source.includes("@builder.io/qwik")) {
       return;
     }
     await writeFile(file, source.replaceAll("@builder.io/qwik", "@qwik.dev/core"));
