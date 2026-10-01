@@ -44,7 +44,7 @@
         "sso_authenticated": {
           "target": "done"
         },
-        "sso_user_already_exists": {
+        "user_already_exists": {
           "target": "sso-conflict"
         },
         "sso_user_not_found": {
@@ -97,9 +97,6 @@
         "submit": {
           "target": "register-password"
         },
-        "user_already_exists": {
-          "target": "sso-conflict"
-        },
         "sign_in": {
           "target": "identifier",
           "purpose": "login"
@@ -107,7 +104,7 @@
         "sso_authenticated": {
           "target": "done"
         },
-        "sso_user_already_exists": {
+        "user_already_exists": {
           "target": "sso-conflict"
         },
         "sso_user_not_found": {
@@ -199,7 +196,7 @@
         "sso_authenticated": {
           "target": "done"
         },
-        "sso_user_already_exists": {
+        "user_already_exists": {
           "target": "sso-conflict"
         },
         "sign_in": {

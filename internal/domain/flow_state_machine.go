@@ -820,15 +820,13 @@ func identifierFieldsOnly(resolved FlowResolvedFields, values map[string]any) ma
 
 // applyOutcomeFlip flips CurrentPurpose on resolution outcomes:
 // login + user_not_found → register; login + sso_user_not_found → register;
-// register + user_already_exists → login; register + sso_user_already_exists
-// → login. Recovery never flips.
+// register + user_already_exists → login, typed or SSO. Recovery never flips.
 func applyOutcomeFlip(state *FlowState, outcome string) {
 	switch {
 	case state.CurrentPurpose == FlowDefinitionPurposeLogin &&
 		(outcome == FlowImplicitOutcomeUserNotFound || outcome == FlowImplicitOutcomeSSOUserNotFound):
 		state.CurrentPurpose = FlowDefinitionPurposeRegister
-	case state.CurrentPurpose == FlowDefinitionPurposeRegister &&
-		(outcome == FlowImplicitOutcomeUserAlreadyExists || outcome == FlowImplicitOutcomeSSOUserAlreadyExists):
+	case state.CurrentPurpose == FlowDefinitionPurposeRegister && outcome == FlowImplicitOutcomeUserAlreadyExists:
 		state.CurrentPurpose = FlowDefinitionPurposeLogin
 	}
 }

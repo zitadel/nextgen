@@ -67,7 +67,7 @@ export type FlowStepName =
  * transition, so the machine takes the answer and routes on it — the same split
  * the engine has.
  */
-export type SsoOutcome = "sso_authenticated" | "sso_user_not_found" | "sso_user_already_exists";
+export type SsoOutcome = "sso_authenticated" | "sso_user_not_found" | "user_already_exists";
 
 export type FlowMachineContext = {
   tokenSeq: number;
@@ -319,7 +319,7 @@ export const flowMachine = createMachine({
             actions: [captureFields, rotateToken],
           },
           {
-            guard: ({ event }) => event.sso_outcome === "sso_user_already_exists",
+            guard: ({ event }) => event.sso_outcome === "user_already_exists",
             target: "sso-conflict",
             actions: [captureFields, rotateToken],
           },

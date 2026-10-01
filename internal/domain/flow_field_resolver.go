@@ -248,11 +248,6 @@ const FlowImplicitOutcomeUserAlreadyExists = "user_already_exists"
 // route the two apart.
 const FlowImplicitOutcomeSSOUserNotFound = "sso_user_not_found"
 
-// FlowImplicitOutcomeSSOUserAlreadyExists drives the register → login flip
-// when SSO resolution finds an existing user owning one of the provider's
-// unique claims.
-const FlowImplicitOutcomeSSOUserAlreadyExists = "sso_user_already_exists"
-
 // FlowImplicitOutcomeSSOAuthenticated is raised when SSO resolution binds the
 // attempt to a user. A step offering sso_providers must route it.
 const FlowImplicitOutcomeSSOAuthenticated = "sso_authenticated"
