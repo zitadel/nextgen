@@ -377,7 +377,7 @@ func (f *ssoResolutionFixture) requireCollected(t *testing.T, flow ssoFlow, resp
 	return parked
 }
 
-func TestSSOResolutionCollisionBindsAndDeletesParked(t *testing.T) {
+func TestSSOResolutionCollisionBindsAndKeepsParked(t *testing.T) {
 	f := newSSOResolutionFixture(t, helpers.OIDCConnection("google"))
 	email := helpers.RandString(8) + "@example.com"
 	ownerID := "user_" + helpers.RandString(8)
@@ -399,12 +399,21 @@ func TestSSOResolutionCollisionBindsAndDeletesParked(t *testing.T) {
 	_, hasSSO := domain.CheckAs[*domain.AuthFactorSSO](attempt, domain.AuthCheckTypeSSO)
 	assert.False(t, hasSSO, "a collision proves nothing about the account")
 	_, parked := attempt.SSOCallback()
-	assert.False(t, parked, "the parked row is deleted")
+	assert.True(t, parked, "the parked row stays, so a lost cookie can be recovered")
 	_, err := f.linkFor(t, "sub-new")
 	require.ErrorAs(t, err, new(*database.NoRowFoundError), "a collision links nothing")
 	owner, err := f.userByEmail(t, email)
 	require.NoError(t, err)
 	assert.Equal(t, ownerID, owner.ID, "no second user was created")
+
+	// The client lost the sealed cookie and retries with the one it had
+	// before: the same owner is bound and the same outcome raised again.
+	retry := f.getStep(t, flow)
+	require.IsType(t, &api.FlowResponseHeaders{}, retry, helpers.MustMarshal(t, retry))
+	assert.Equal(t, domain.FlowImplicitOutcomeUserAlreadyExists, retry.(*api.FlowResponseHeaders).Response.Step.Error.Value)
+	userFactor, ok = domain.CheckAs[*domain.AuthFactorUser](f.attempt(t, flow), domain.AuthCheckTypeUser)
+	require.True(t, ok)
+	assert.Equal(t, ownerID, userFactor.UserID)
 }
 
 func TestSSOResolutionAutoCreateCreatesUserAndLinkAtomically(t *testing.T) {

@@ -17,9 +17,10 @@ type FlowSSOIdentityService interface {
 	// ErrFlowRestartRequired when the attempt already carries another user, and
 	// ErrSSOStateInvalid, before writing anything, when that row is gone.
 	BindLinked(ctx context.Context, in FlowSSOBindInput) error
-	// BindCollision binds the user FindUniqueOwner found, by id, and deletes
-	// the parked row, in one transaction: a user factor only, no link and no
-	// sso factor. It returns ErrSSOStateInvalid when the row is gone and
+	// BindCollision binds the user FindUniqueOwner found, by id, in one
+	// transaction: a user factor only, no link and no sso factor. The parked
+	// row is kept, so a retry after a lost cookie raises the outcome again. It
+	// returns ErrSSOStateInvalid when the row is gone and
 	// ErrFlowRestartRequired when the attempt carries another user or is
 	// expired or handed off.
 	BindCollision(ctx context.Context, in FlowSSOBindInput) error

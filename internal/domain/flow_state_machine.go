@@ -528,9 +528,10 @@ func ssoUniqueClaims(schema *jsonschema.Schema, claims map[string]any) (probe, u
 
 // bindSSOCollision looks up each project-unique claim, verified or not, until
 // one names an existing user, then binds that user by id. Like a typed
-// identifier it only binds the user: no link, no sso factor. The bind deletes
-// the exact parked row first, so a row another request replaced binds
-// nothing (ErrSSOStateInvalid).
+// identifier it only binds the user: no link, no sso factor. The bind checks
+// the exact parked row first and keeps it, so a row another request replaced
+// binds nothing (ErrSSOStateInvalid) and a retry after a lost cookie binds
+// the same owner again.
 func (r *FlowStateMachineRuntime) bindSSOCollision(ctx context.Context, state *FlowState, parked *FlowSSOParkedIdentity, probeClaims []string) (bool, error) {
 	for _, name := range probeClaims {
 		value, _ := parked.Claims[name].(string)
@@ -565,11 +566,23 @@ func (r *FlowStateMachineRuntime) bindSSOCollision(ctx context.Context, state *F
 	return false, nil
 }
 
+// ssoComposedKeywords can make a property required outside the top-level
+// `required` keyword.
+var ssoComposedKeywords = []string{"allOf", "anyOf", "oneOf", "if", "then", "else", "dependentRequired", "dependentSchemas"}
+
 // ssoClaimsComplete reports whether the claims can create a user unattended:
 // every required property has a claim, and every required unique one arrived
 // verified, so an unverified address cannot claim an account. Claims are
 // top-level, so a required nested object never completes.
 func ssoClaimsComplete(schema *jsonschema.Schema, parked *FlowSSOParkedIdentity, uniqueClaims []string) bool {
+	// RequiredPaths reads `required` and `properties` only. Requiredness a
+	// composition adds is not evaluated, so such a schema never creates a user
+	// unattended: the verified-unique rule must not be bypassable.
+	for _, keyword := range ssoComposedKeywords {
+		if _, ok := schema.LookupKeyword(keyword); ok {
+			return false
+		}
+	}
 	materialized := make(map[string]struct{}, len(parked.Claims))
 	for name := range parked.Claims {
 		// Nested mapped keys are unsupported (mapping is top-level only), so they fall back to collection.

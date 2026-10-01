@@ -380,6 +380,12 @@ type AuthAttemptStatements interface {
 	// parked result it read. It returns ErrSSOStateInvalid when no row matched:
 	// a concurrent request settled it, or a new ceremony replaced it.
 	DeleteSSOCallback(ctx context.Context, projectID, authAttemptID, checkID string) error
+	// TouchSSOCallback matches the attempt's sso_callback row with the given
+	// check id and changes nothing; on postgres and sqlite the write holds the
+	// row until the transaction ends. A collision bind takes it in place of
+	// the delete, so the row stays for a retry. It returns ErrSSOStateInvalid
+	// when no row matched.
+	TouchSSOCallback(ctx context.Context, projectID, authAttemptID, checkID string) error
 }
 
 // UserQueryOptions carries EAV match/hydrate options for GetUser / ListUsers.

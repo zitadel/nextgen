@@ -139,13 +139,18 @@ func (r *FlowSSOIdentityResolver) BindLinked(ctx context.Context, in domain.Flow
 	})
 }
 
-// bindSSOIdentity deletes the parked row and records the user factor, plus the
-// sso factor when a link is given, on the attempt. It runs inside the caller's
-// transaction and returns ErrSSOStateInvalid unwrapped when the row was
-// settled or replaced.
+// bindSSOIdentity records the user factor, plus the sso factor when a link is
+// given, on the attempt. A link settles the parked row, so it is deleted; a
+// collision keeps it, so a retry after a lost cookie raises the outcome
+// again. It runs inside the caller's transaction and returns
+// ErrSSOStateInvalid unwrapped when the row was settled or replaced.
 func bindSSOIdentity(ctx context.Context, stmts AllStatements, in domain.FlowSSOBindInput) error {
 	// The exact parked row goes first: a settled or replaced one aborts before any write.
-	if err := stmts.DeleteSSOCallback(ctx, in.ProjectID, in.AttemptID, in.CheckID); err != nil {
+	guard := stmts.DeleteSSOCallback
+	if in.LinkID == "" {
+		guard = stmts.TouchSSOCallback
+	}
+	if err := guard(ctx, in.ProjectID, in.AttemptID, in.CheckID); err != nil {
 		return err
 	}
 	attempt, err := stmts.GetAuthAttemptByID(ctx, in.ProjectID, in.AttemptID)

@@ -4264,10 +4264,16 @@ const ssoSchemaContent string = `{
 // every render.
 func ssoRenderWorld(t *testing.T) (*flowTestWorld, *domain.FlowDefinition, *domain.FlowState) {
 	t.Helper()
+	return ssoRenderWorldWithSchema(t, ssoSchemaContent)
+}
+
+// ssoRenderWorldWithSchema is [ssoRenderWorld] on another user schema.
+func ssoRenderWorldWithSchema(t *testing.T, schema string) (*flowTestWorld, *domain.FlowDefinition, *domain.FlowState) {
+	t.Helper()
 	w := newFlowTestWorld(t)
 	w.schemaResolver.EXPECT().
 		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
-		Return(mustUnmarshal[jsonschema.Schema](t, ssoSchemaContent), nil).
+		Return(mustUnmarshal[jsonschema.Schema](t, schema), nil).
 		AnyTimes()
 	w.ssoProviders.EXPECT().
 		Resolve(gomock.Any(), testProjectID, "credentials", gomock.Any()).
@@ -4902,4 +4908,54 @@ func TestFlowStateMachine_Render_SSOUnlinkedIdentityOnBoundAttemptRestarts(t *te
 	_, err := w.sm.Render(t.Context(), def, state)
 	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
 	assert.Equal(t, "u-a", state.CollectedData.UserID)
+}
+
+// Composed requiredness (allOf, if/then, dependentRequired, ...) is not
+// evaluated, so a schema that uses it cannot create a user unattended: an
+// unverified unique claim could otherwise become required unseen.
+func TestFlowStateMachine_Render_SSOComposedRequiredSchemaFallsBackToCollection(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoRenderWorldWithSchema(t, `{
+		"$schema": "https://json-schema.org/draft/2020-12/schema",
+		"type": "object",
+		"x-auth-methods": { "password": { "enabled": true } },
+		"x-identifier": "email",
+		"properties": {
+			"email":    { "type": "string", "format": "email", "x-unique": "project" },
+			"username": { "type": "string" }
+		},
+		"allOf": [ { "required": ["email"] } ]
+	}`)
+	def = withSSOOutcomeSteps(def)
+	w.expectParked(unlinkedParked(map[string]any{"email": "alice@example.com"}, map[string]bool{"email": false}), nil)
+	w.expectOwner("email", "alice@example.com", "")
+	w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Times(0)
+
+	result, err := w.sm.Render(t.Context(), def, state)
+	require.NoError(t, err)
+	assert.Equal(t, "sso-register", result.Step.Name)
+}
+
+// The collision keeps the parked row. When the sealed cookie from the first
+// render is lost, the client renders again with its earlier state (no user,
+// no guard): the same owner is bound again and the outcome raised again.
+func TestFlowStateMachine_Render_SSOCollisionRetryAfterLostCookieRaisesAgain(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoRenderWorld(t)
+	def = withSSOOutcomeSteps(def)
+	lost := *state
+	parked := unlinkedParked(map[string]any{"email": "alice@example.com"}, nil)
+	w.expectParked(parked, nil)
+	w.expectParked(parked, nil)
+	w.expectOwner("email", "alice@example.com", "user-9").Times(2)
+	w.expectBindCollision("user-9", nil).Times(2)
+
+	first, err := w.sm.Render(t.Context(), def, state)
+	require.NoError(t, err)
+	require.Equal(t, "sso-conflict", first.Step.Name)
+
+	retry, err := w.sm.Render(t.Context(), def, &lost)
+	require.NoError(t, err)
+	assert.Equal(t, "sso-conflict", retry.Step.Name)
+	assert.Equal(t, "user-9", retry.State.CollectedData.UserID)
 }

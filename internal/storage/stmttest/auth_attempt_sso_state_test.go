@@ -429,3 +429,37 @@ func TestAuthAttemptStatements_DeleteSSOCallback(t *testing.T) {
 		require.ErrorIs(t, d.stmts.DeleteSSOCallback(t.Context(), projectID, attempt.ID, sso.Check.ID), domain.ErrSSOStateInvalid())
 	})
 }
+
+// TestAuthAttemptStatements_TouchSSOCallback covers the stale-row guard a
+// collision bind takes without settling the row: the exact row is matched and
+// left unchanged, any other id is refused.
+func TestAuthAttemptStatements_TouchSSOCallback(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureProject(t, d.stmts)
+		attempt := createBareAttempt(t, d.stmts, projectID)
+		sso := issueSSOState(t, d.stmts, projectID, attempt.ID)
+		_, err := d.stmts.ConsumeSSOState(t.Context(), projectID, sso.Check.StateHash, sso.BindingNonce)
+		require.NoError(t, err)
+		result := &domain.SSOCallbackResult{
+			Subject:              "sub-1",
+			ConnectionRevisionID: "idprev_1",
+			Claims:               map[string]any{"email": "alice@example.com"},
+			Verified:             map[string]bool{"email": true},
+		}
+		require.NoError(t, d.stmts.SetSSOCallbackResult(t.Context(), projectID, sso.Check.StateHash, result))
+
+		require.ErrorIs(t, d.stmts.TouchSSOCallback(t.Context(), projectID, attempt.ID, "ch_other"), domain.ErrSSOStateInvalid())
+		require.NoError(t, d.stmts.TouchSSOCallback(t.Context(), projectID, attempt.ID, sso.Check.ID))
+
+		got, err := d.stmts.GetAuthAttemptByID(t.Context(), projectID, attempt.ID)
+		require.NoError(t, err)
+		parked, ok := got.SSOCallback()
+		require.True(t, ok, "the touch keeps the parked row")
+		assert.Equal(t, sso.Check.ID, parked.ID)
+		assert.Equal(t, result, parked.Result, "the touch changes nothing")
+
+		require.NoError(t, d.stmts.DeleteSSOCallback(t.Context(), projectID, attempt.ID, sso.Check.ID))
+		require.ErrorIs(t, d.stmts.TouchSSOCallback(t.Context(), projectID, attempt.ID, sso.Check.ID), domain.ErrSSOStateInvalid(),
+			"a settled row is refused")
+	})
+}

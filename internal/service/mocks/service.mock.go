@@ -5615,6 +5615,44 @@ func (c *MockAllStatementsSetVariableCall) DoAndReturn(f func(context.Context, *
 	return c
 }
 
+// TouchSSOCallback mocks base method.
+func (m *MockAllStatements) TouchSSOCallback(ctx context.Context, projectID, authAttemptID, checkID string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "TouchSSOCallback", ctx, projectID, authAttemptID, checkID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// TouchSSOCallback indicates an expected call of TouchSSOCallback.
+func (mr *MockAllStatementsMockRecorder) TouchSSOCallback(ctx, projectID, authAttemptID, checkID any) *MockAllStatementsTouchSSOCallbackCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TouchSSOCallback", reflect.TypeOf((*MockAllStatements)(nil).TouchSSOCallback), ctx, projectID, authAttemptID, checkID)
+	return &MockAllStatementsTouchSSOCallbackCall{Call: call}
+}
+
+// MockAllStatementsTouchSSOCallbackCall wrap *gomock.Call
+type MockAllStatementsTouchSSOCallbackCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsTouchSSOCallbackCall) Return(arg0 error) *MockAllStatementsTouchSSOCallbackCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsTouchSSOCallbackCall) Do(f func(context.Context, string, string, string) error) *MockAllStatementsTouchSSOCallbackCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsTouchSSOCallbackCall) DoAndReturn(f func(context.Context, string, string, string) error) *MockAllStatementsTouchSSOCallbackCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // UpdateKey mocks base method.
 func (m *MockAllStatements) UpdateKey(ctx context.Context, id, key string) error {
 	m.ctrl.T.Helper()
@@ -8745,6 +8783,44 @@ func (c *MockAuthAttemptStatementsSetSSOCallbackResultCall) Do(f func(context.Co
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAuthAttemptStatementsSetSSOCallbackResultCall) DoAndReturn(f func(context.Context, string, string, *domain.SSOCallbackResult) error) *MockAuthAttemptStatementsSetSSOCallbackResultCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// TouchSSOCallback mocks base method.
+func (m *MockAuthAttemptStatements) TouchSSOCallback(ctx context.Context, projectID, authAttemptID, checkID string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "TouchSSOCallback", ctx, projectID, authAttemptID, checkID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// TouchSSOCallback indicates an expected call of TouchSSOCallback.
+func (mr *MockAuthAttemptStatementsMockRecorder) TouchSSOCallback(ctx, projectID, authAttemptID, checkID any) *MockAuthAttemptStatementsTouchSSOCallbackCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TouchSSOCallback", reflect.TypeOf((*MockAuthAttemptStatements)(nil).TouchSSOCallback), ctx, projectID, authAttemptID, checkID)
+	return &MockAuthAttemptStatementsTouchSSOCallbackCall{Call: call}
+}
+
+// MockAuthAttemptStatementsTouchSSOCallbackCall wrap *gomock.Call
+type MockAuthAttemptStatementsTouchSSOCallbackCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAuthAttemptStatementsTouchSSOCallbackCall) Return(arg0 error) *MockAuthAttemptStatementsTouchSSOCallbackCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAuthAttemptStatementsTouchSSOCallbackCall) Do(f func(context.Context, string, string, string) error) *MockAuthAttemptStatementsTouchSSOCallbackCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAuthAttemptStatementsTouchSSOCallbackCall) DoAndReturn(f func(context.Context, string, string, string) error) *MockAuthAttemptStatementsTouchSSOCallbackCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
