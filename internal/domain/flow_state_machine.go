@@ -128,10 +128,33 @@ type FlowStep struct {
 	Fields       []FlowField
 	Actions      []FlowAction
 	SSOProviders []FlowSSOProvider
+	// Identifier carries the identifier collected on an earlier step so a
+	// form holding a password can hold the identifier beside it. Set only
+	// when the step collects a password and does not itself collect the
+	// identifier. Render-only: the step's Fields stay the whole
+	// submission.
+	Identifier *FlowStepIdentifier
 	// Challenge is a pending authentication ceremony the client must
 	// satisfy before re-submitting (e.g. a passkey assertion). Nil unless
 	// the engine just issued one.
 	Challenge *FlowStepChallenge
+}
+
+// FlowStepIdentifier mirrors the OpenAPI `flow-step.identifier`: the
+// identifier a password form renders beside the password input, as a
+// hidden control, so a password manager stores the two as one credential.
+type FlowStepIdentifier struct {
+	// Name is the user-schema property the identifier was collected
+	// into, used as the rendered input's name.
+	Name string
+
+	// Value is the identifier the user supplied on the earlier step.
+	Value string
+
+	// Autocomplete is the token the rendered input carries, always
+	// [AutocompleteUsername]: it is what pairs an identifier with a
+	// password in the same form.
+	Autocomplete string
 }
 
 // FlowStepChallenge mirrors the OpenAPI `flow-step.challenge`: a pending
@@ -1399,16 +1422,70 @@ func (r *FlowStateMachineRuntime) buildStep(ctx context.Context, state *FlowStat
 			TextKey: step.Name + ".action." + flowBackActionName,
 		})
 	}
+	fields := applyAutocomplete(resolved.Fields, state.CurrentPurpose)
 	return &FlowStep{
 		Name:         step.Name,
 		Texts:        FlowStepTexts{TitleKey: step.Name + ".title", DescriptionKey: step.Name + ".description"},
 		Error:        errorKey,
 		Complete:     complete,
 		RedirectURL:  redirectURL,
-		Fields:       resolved.Fields,
+		Fields:       fields,
 		Actions:      actions,
 		SSOProviders: providers,
+		Identifier:   pairedIdentifier(resolved, state.CollectedData.UserData),
 	}, nil
+}
+
+// applyAutocomplete stamps each field's autofill token for the purpose the
+// flow is running under. Rendering-only, so it runs here rather than in the
+// resolver: validation and challenge dispatch read the same resolved fields
+// and have no use for the token.
+func applyAutocomplete(fields []FlowField, purpose FlowDefinitionPurpose) []FlowField {
+	out := make([]FlowField, len(fields))
+	copy(out, fields)
+	for i := range out {
+		out[i].Autocomplete = AutocompleteForField(out[i], purpose)
+	}
+	return out
+}
+
+// pairedIdentifier returns the identifier a password form renders beside
+// the password input, or nil when the step needs none.
+//
+// A password manager stores an identifier and a password as one credential
+// and reads both from the same form. A step that collects the password on
+// its own — the second step of a two-step sign-in — leaves the manager
+// nothing to pair, so the engine hands the collected identifier back for
+// the form to carry as a hidden control.
+//
+// Nil when the step collects no password, when it collects the identifier
+// itself (the field already carries it), when the schema designates no
+// identifier, or when nothing has been collected for it yet.
+func pairedIdentifier(resolved FlowResolvedFields, collected map[string]any) *FlowStepIdentifier {
+	if resolved.IdentifierName == "" {
+		return nil
+	}
+	var holdsPassword bool
+	for _, f := range resolved.Fields {
+		switch f.Challenge {
+		case FlowFieldChallengeIdentifier:
+			return nil
+		case FlowFieldChallengePassword:
+			holdsPassword = true
+		}
+	}
+	if !holdsPassword {
+		return nil
+	}
+	value, ok := maputil.GetNested[string](collected, AttributeKey(resolved.IdentifierName).Nodes())
+	if !ok || value == "" {
+		return nil
+	}
+	return &FlowStepIdentifier{
+		Name:         resolved.IdentifierName,
+		Value:        value,
+		Autocomplete: AutocompleteUsername,
+	}
 }
 
 // resolveSSOProviders renders the step's connection slugs through the

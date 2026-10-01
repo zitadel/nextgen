@@ -44,6 +44,14 @@ type FlowResolvedFields struct {
 	// field contributes, keyed by field name. The state machine uses it
 	// to validate flow definitions and route schema-derived transitions.
 	ImplicitOutcomes map[string][]string
+
+	// IdentifierName is the user-schema property the schema designates
+	// as the identifier (the schema-root `x-identifier` path), whether
+	// or not this step collects it. A step that collects a password
+	// without collecting the identifier reads it to name the identifier
+	// the rendered form carries alongside the password. Empty when the
+	// schema designates nothing.
+	IdentifierName string
 }
 
 // FlowField is the resolved per-field metadata.
@@ -82,6 +90,13 @@ type FlowField struct {
 	// when absent. The user-creation path consults it to set the
 	// per-attribute uniqueness scope on storage.
 	Unique AttributeUniqueness
+
+	// Autocomplete is the value the client renders into the input's HTML
+	// `autocomplete` attribute, so password managers and browser autofill
+	// recognise the field. Derived from [FlowField.Challenge] and, for a
+	// password, the flow's purpose — see [AutocompleteForField]. Empty
+	// when no token applies.
+	Autocomplete string
 
 	// Challenge names the auth-attempt challenge the field maps to, or
 	// [FlowFieldChallengeNone] when the field carries neither an
@@ -122,6 +137,52 @@ const (
 	FlowFieldChallengeSSO        FlowFieldChallenge = "sso"
 	FlowFieldChallengeOTP        FlowFieldChallenge = "otp"
 )
+
+// Autocomplete tokens the engine puts on [FlowField.Autocomplete]. They
+// are the HTML autofill tokens password managers and browsers key on.
+const (
+	// AutocompleteUsername pairs an identifier with a password in the
+	// same form, so a manager stores the two as one credential.
+	AutocompleteUsername = "username"
+	// AutocompleteEmail is the identifier token for a field the schema
+	// types as an email address.
+	AutocompleteEmail = "email"
+	// AutocompleteCurrentPassword marks a password the engine verifies
+	// against the stored credential, so a manager offers to fill it.
+	AutocompleteCurrentPassword = "current-password"
+	// AutocompleteNewPassword marks a password the engine saves, so a
+	// manager offers to generate one instead of filling the old one.
+	AutocompleteNewPassword = "new-password"
+)
+
+// AutocompleteForField returns the autofill token for a resolved field
+// under the given purpose, or "" when none applies.
+//
+// The identifier field takes [AutocompleteEmail] when the schema types it
+// as an email address and [AutocompleteUsername] otherwise — the property
+// may be called anything, so the token comes from the `x-identifier`
+// designation rather than the field's name.
+//
+// A password field takes [AutocompleteCurrentPassword] under
+// [FlowDefinitionPurposeLogin] and [AutocompleteNewPassword] under any
+// other purpose, mirroring the condition dispatchChallenges applies to
+// decide whether to verify the submitted password: login verifies it,
+// every other purpose establishes a new one.
+func AutocompleteForField(f FlowField, purpose FlowDefinitionPurpose) string {
+	switch f.Challenge {
+	case FlowFieldChallengeIdentifier:
+		if f.Type == FlowFieldTypeEmail {
+			return AutocompleteEmail
+		}
+		return AutocompleteUsername
+	case FlowFieldChallengePassword:
+		if purpose == FlowDefinitionPurposeLogin {
+			return AutocompleteCurrentPassword
+		}
+		return AutocompleteNewPassword
+	}
+	return ""
+}
 
 // FlowFieldValidation carries the validation rules the resolver
 // surfaces to the client and enforces on submit. Each field maps to a

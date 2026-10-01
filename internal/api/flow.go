@@ -335,6 +335,13 @@ func toFlowStep(step *domain.FlowStep) api.FlowStep {
 	if step.Challenge != nil {
 		out.Challenge = api.NewOptFlowStepChallenge(toFlowStepChallenge(*step.Challenge))
 	}
+	if step.Identifier != nil {
+		out.Identifier = api.NewOptFlowStepIdentifier(api.FlowStepIdentifier{
+			Name:         step.Identifier.Name,
+			Value:        step.Identifier.Value,
+			Autocomplete: step.Identifier.Autocomplete,
+		})
+	}
 	return out
 }
 
@@ -423,6 +430,9 @@ func toFlowField(f domain.FlowField) api.Field {
 		Type:     api.FieldType(f.Type),
 		TextKey:  f.TextKey,
 		Required: api.NewOptBool(f.Required),
+	}
+	if f.Autocomplete != "" {
+		out.Autocomplete = api.NewOptString(f.Autocomplete)
 	}
 	if f.Value != nil {
 		out.Value = jx.Raw(jsonQuoted(*f.Value))
