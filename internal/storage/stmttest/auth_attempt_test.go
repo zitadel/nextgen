@@ -30,6 +30,25 @@ func TestAuthAttemptStatements_Handoff(t *testing.T) {
 	})
 }
 
+// Two requests that both saw the attempt not handed off must not both mint a
+// token: the later write would replace the token the earlier one returned.
+func TestAuthAttemptStatements_HandoffRefusesSecond(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureProject(t, d.stmts)
+		_, attempt := handoffCompletedAttempt(t, d.stmts, projectID, nil)
+		first := attempt.HandoffToken.TokenHash
+
+		second := sha256.Sum256([]byte("handoff_second"))
+		again := &domain.AuthAttempt{ProjectID: projectID, ID: attempt.ID, HandoffToken: &domain.HandoffToken{TokenHash: second[:]}}
+		require.ErrorIs(t, d.stmts.HandoffAuthAttempt(t.Context(), again), domain.ErrAuthAttemptAlreadyHandedOff())
+
+		got, err := d.stmts.GetAuthAttemptByID(t.Context(), projectID, attempt.ID)
+		require.NoError(t, err)
+		require.NotNil(t, got.HandoffToken)
+		assert.Equal(t, first, got.HandoffToken.TokenHash, "the first token stays")
+	})
+}
+
 func TestAuthAttemptStatements_Get(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		t.Run("by_id_returns_handed_off_attempt", func(t *testing.T) {

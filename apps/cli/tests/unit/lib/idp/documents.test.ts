@@ -232,6 +232,75 @@ describe("applySsoToFlow", () => {
     expect(after?.fields).toEqual(["email"]);
   });
 
+  /** The flow the previous CLI wrote: today's output under the old outcome keys. */
+  function previousCliFlow(): { steps: Array<Record<string, unknown>> } {
+    const current = applySsoToFlow(shippedFlow(), "google", bothMethods).document;
+    const legacy = structuredClone(current) as { steps: Array<Record<string, unknown>> };
+    for (const step of legacy.steps) {
+      const transitions = step.transitions as Record<string, unknown> | undefined;
+      if (transitions === undefined) continue;
+      for (const [next, old] of [
+        ["sso_authenticated", "callback"],
+        ["sso_user_not_found", "identity_unknown"],
+      ] as const) {
+        if (next in transitions) {
+          transitions[old] = transitions[next];
+          delete transitions[next];
+        }
+      }
+    }
+    return legacy;
+  }
+
+  function oldKeysIn(flow: object): string[] {
+    const found: string[] = [];
+    for (const step of (flow as { steps: Array<Record<string, unknown>> }).steps) {
+      for (const key of Object.keys((step.transitions as object | undefined) ?? {})) {
+        if (key === "callback" || key === "identity_unknown") found.push(`${String(step.name)}.${key}`);
+      }
+    }
+    return found;
+  }
+
+  it("migrates the transition keys of a flow written by the previous CLI", () => {
+    const legacy = previousCliFlow();
+    expect(oldKeysIn(legacy)).not.toEqual([]);
+
+    const second = applySsoToFlow(legacy, "github", bothMethods);
+
+    expect(oldKeysIn(second.document)).toEqual([]);
+    // After the rename the generated steps match the template again.
+    expect(second.skipped).toEqual([]);
+    for (const step of ["identifier", "register", "sso-conflict"]) {
+      expect(stepNamed(second.document, step).sso_providers, step).toEqual(["google", "github"]);
+      expect(targetsOf(second.document, step).sso_authenticated, step).toBe("done");
+      expect(targetsOf(second.document, step).sso_user_not_found, step).toBe("register-sso");
+    }
+  });
+
+  it("renames the keys of a hand-edited step and keeps its other edits", () => {
+    const legacy = previousCliFlow();
+    const conflict = legacy.steps.find((s) => s.name === "sso-conflict")!;
+    conflict.fields = ["email"];
+
+    const second = applySsoToFlow(legacy, "google", bothMethods);
+
+    expect(second.skipped).toEqual([{ region: "steps.sso-conflict", reason: "hand-edited" }]);
+    expect(stepNamed(second.document, "sso-conflict").fields).toEqual(["email"]);
+    expect(oldKeysIn(second.document)).toEqual([]);
+    expect(targetsOf(second.document, "sso-conflict").sso_authenticated).toBe("done");
+  });
+
+  it("keeps the new key when a step carries both the old and the new one", () => {
+    const legacy = previousCliFlow();
+    const identifier = legacy.steps.find((s) => s.name === "identifier")!;
+    (identifier.transitions as Record<string, unknown>).sso_authenticated = { target: "register" };
+
+    const { document } = applySsoToFlow(legacy, "google", bothMethods);
+
+    expect(targetsOf(document, "identifier").callback).toBeUndefined();
+  });
+
   it("adds the new steps before the terminal step", () => {
     const { document } = applySsoToFlow(shippedFlow(), "google", bothMethods);
     const names = ((document as { steps: Array<Record<string, unknown>> }).steps ?? []).map((s) => s.name);
