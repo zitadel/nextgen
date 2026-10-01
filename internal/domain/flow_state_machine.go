@@ -419,14 +419,15 @@ func (r *FlowStateMachineRuntime) provisionSSOIdentity(ctx context.Context, stat
 	if err != nil {
 		return "", fmt.Errorf("flow state machine: load user schema for sso identity: %w", err)
 	}
-	probeClaims, uniqueClaims, err := r.ssoUniqueClaims(schema, state.CurrentStep, parked.Claims)
-	if err != nil {
-		return "", err
-	}
-	if bound, err := r.bindSSOCollision(ctx, state, parked, probeClaims); err != nil || bound {
+	probeClaims, uniqueClaims := ssoUniqueClaims(schema, parked.Claims)
+	// settled reports that this request already deleted the parked row.
+	settled := false
+	if bound, err := r.bindSSOCollision(ctx, state, parked, probeClaims, &settled); err != nil || bound {
 		return FlowImplicitOutcomeSSOUserAlreadyExists, err
 	}
-	if !ssoClaimsComplete(schema, parked, uniqueClaims) {
+	if settled || !ssoClaimsComplete(schema, parked, uniqueClaims) {
+		// settled: an owner vanished between the lookup and the bind, after
+		// the row was deleted. Collection then runs without the prefill.
 		return FlowImplicitOutcomeSSOUserNotFound, nil
 	}
 
@@ -448,7 +449,7 @@ func (r *FlowStateMachineRuntime) provisionSSOIdentity(ctx context.Context, stat
 	if errors.Is(err, ErrUserAlreadyExists()) {
 		// Lost a race since the probe: whoever took the attribute is bound,
 		// and a race lost on the subject alone falls back to collection.
-		if bound, err := r.bindSSOCollision(ctx, state, parked, probeClaims); err != nil || bound {
+		if bound, err := r.bindSSOCollision(ctx, state, parked, probeClaims, &settled); err != nil || bound {
 			return FlowImplicitOutcomeSSOUserAlreadyExists, err
 		}
 		return FlowImplicitOutcomeSSOUserNotFound, nil
@@ -465,22 +466,25 @@ func (r *FlowStateMachineRuntime) provisionSSOIdentity(ctx context.Context, stat
 	return FlowImplicitOutcomeSSOAuthenticated, nil
 }
 
-// ssoUniqueClaims returns the claim names whose schema property carries an
-// x-unique scope (unique), and the project-scoped subset the collision check
-// probes (probe), both sorted so the probe order is stable. Team scope is not
-// probed: the identifier lookup has no team filter yet (see resolveIdentifier
-// in internal/service/auth_attempt.go), so it could bind a user of another
-// team. A claim the schema does not know, or an object claim, is skipped.
-func (r *FlowStateMachineRuntime) ssoUniqueClaims(schema *jsonschema.Schema, stepName string, claims map[string]any) (probe, unique []string, err error) {
+// ssoUniqueClaims returns the claim names whose top-level schema property
+// carries an x-unique scope (unique), and the project-scoped subset the
+// collision check probes (probe), both sorted so the probe order is stable.
+// Team scope is not probed: the identifier lookup has no team filter yet (see
+// resolveIdentifier in internal/service/auth_attempt.go), so it could bind a
+// user of another team. The annotation is read directly, so a claim whose
+// property no flow step could render (a type union) is no error; a claim the
+// schema does not know, or an object or array claim, is skipped.
+func ssoUniqueClaims(schema *jsonschema.Schema, claims map[string]any) (probe, unique []string) {
+	root := newSchemaReader(schema)
 	for name := range claims {
-		resolved, err := r.fields.Resolve(schema, stepName, []Field{Field(name)})
-		if errors.Is(err, ErrFlowFieldUnknown) || errors.Is(err, ErrFlowFieldNotScalar) {
+		prop, ok := root.Property(name)
+		if !ok {
 			continue
 		}
-		if err != nil {
-			return nil, nil, fmt.Errorf("flow state machine: resolve sso claim %q: %w", name, err)
+		if t, _ := prop.JSONType(); t == "object" || t == "array" {
+			continue
 		}
-		switch resolved.Fields[0].Unique {
+		switch deriveUnique(prop) {
 		case AttributeUniquenessProject:
 			probe = append(probe, name)
 			unique = append(unique, name)
@@ -490,13 +494,15 @@ func (r *FlowStateMachineRuntime) ssoUniqueClaims(schema *jsonschema.Schema, ste
 	}
 	slices.Sort(probe)
 	slices.Sort(unique)
-	return probe, unique, nil
+	return probe, unique
 }
 
 // bindSSOCollision probes each project-unique claim, verified or not, until
-// one names an existing user, then binds that user and deletes the parked
-// row. Like a typed identifier it only binds the user: no link, no sso factor.
-func (r *FlowStateMachineRuntime) bindSSOCollision(ctx context.Context, state *FlowState, parked *FlowSSOParkedIdentity, probeClaims []string) (bool, error) {
+// one names an existing user, then binds that user. Like a typed identifier
+// it only binds the user: no link, no sso factor. Deleting the parked row
+// settles it, so it runs before the bind and only once (settled): a row
+// another request replaced binds nothing.
+func (r *FlowStateMachineRuntime) bindSSOCollision(ctx context.Context, state *FlowState, parked *FlowSSOParkedIdentity, probeClaims []string, settled *bool) (bool, error) {
 	for _, name := range probeClaims {
 		value, _ := parked.Claims[name].(string)
 		if value == "" {
@@ -511,6 +517,12 @@ func (r *FlowStateMachineRuntime) bindSSOCollision(ctx context.Context, state *F
 		}
 		if owner == "" {
 			continue
+		}
+		if !*settled {
+			if err := r.ssoIdentities.DeleteParked(ctx, state.ProjectID, state.AuthAttemptID, parked.CheckID); err != nil {
+				return false, fmt.Errorf("flow state machine: delete parked sso identity: %w", err)
+			}
+			*settled = true
 		}
 		userID, err := r.authAttempts.SubmitIdentifier(ctx, FlowSubmitIdentifierInput{
 			ProjectID:     state.ProjectID,
@@ -528,9 +540,6 @@ func (r *FlowStateMachineRuntime) bindSSOCollision(ctx context.Context, state *F
 		}
 		if err != nil {
 			return false, fmt.Errorf("flow state machine: probe sso claim %q: %w", name, err)
-		}
-		if err := r.ssoIdentities.DeleteParked(ctx, state.ProjectID, state.AuthAttemptID, parked.CheckID); err != nil {
-			return false, fmt.Errorf("flow state machine: delete parked sso identity: %w", err)
 		}
 		recordResolvedUser(state, userID)
 		return true, nil
