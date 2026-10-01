@@ -9,8 +9,8 @@ shape and the rules the engine enforces on top of the JSON schema.
 
 Validation runs in two layers:
 
-1. **Schema** — `api/openapi/components/flows/flow-definition.yaml` states required fields, types, enums, and string patterns, plus the step and transition shapes JSON Schema can express: a terminal step carries nothing else, a non-terminal step does something, `sso_providers` needs `transitions.callback`, and a transition never sets both `purpose` and `action`. The generated editor meta-schema enforces all of it; the API's generated request validation ignores the shape rules, which the engine rules below enforce again.
-2. **Engine** — the rules below, applied at write time and (where deferred) at runtime.
+1. **Schema**: `api/openapi/components/flows/flow-definition.yaml` states required fields, types, enums, and string patterns, plus the step and transition shapes JSON Schema can express: a terminal step carries nothing else, a non-terminal step does something, `sso_providers` needs `transitions.sso_authenticated`, and a transition never sets both `purpose` and `action`. The generated editor meta-schema enforces all of it; the API's generated request validation ignores the shape rules, which the engine rules below enforce again.
+2. **Engine**: the rules below, applied at write time and (where deferred) at runtime.
 
 ## Definition shape
 
@@ -50,7 +50,9 @@ A transition key is one of:
 - **Engine-emitted outcome.** Reserved keys produced by the engine, not the
   client. Today: `user_not_found` and `user_already_exists` (from
   identifier-shaped fields, depending on the active `CurrentPurpose`),
-  `callback` (SSO callback). More may follow — see
+  `sso_authenticated` (SSO resolution signed the user in), `sso_user_not_found`
+  (SSO resolution found no user), and `sso_user_already_exists` (SSO resolution
+  collided with an existing user). More may follow, see
   [ADR 017](../../adrs/017-flow-engine-auth-attempt-dispatch.md).
 
 Transition values:
@@ -73,12 +75,12 @@ Transition values:
 
 ### Step
 
-- A non-terminal step does something: at least one of `fields`, `actions`, `sso_providers`, `gates`, `transitions.callback`.
+- A non-terminal step does something: at least one of `fields`, `actions`, `sso_providers`, `gates`, `transitions.sso_authenticated`.
 - A terminal step (`complete` set) has nothing else.
 - Every key in `actions` has a matching key in `transitions`.
 - Every key in `transitions` is either an action name declared in this step's `actions` or a reserved engine-emitted outcome.
 - **`back` is a reserved action name.** The engine injects a `back` action on rendered responses when there's a step to return to (non-empty back stack on a non-terminal step). Authors must not declare an action named `back`, regardless of `kind`.
-- When `sso_providers` is non-empty, `transitions.callback` is defined. The `sso` action itself is engine-handled and never appears in `transitions`.
+- When `sso_providers` is non-empty, `transitions.sso_authenticated` is defined. The `sso` action itself is engine-handled and never appears in `transitions`.
 - Every entry in `fields` resolves to a property in the referenced `user_schema`.
 - A step with an identifier-shaped field (schema property with non-empty `x-unique`) may declare a `user_not_found` transition; absence of the transition means the engine errors on lookup failure rather than routing. See [ADR 017](../../adrs/017-flow-engine-auth-attempt-dispatch.md) for the direction this is heading.
 

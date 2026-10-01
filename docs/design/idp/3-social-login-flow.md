@@ -206,12 +206,17 @@ Local development instances may relax the loopback rejection so
 
 ## Resolution Branches
 
-A single `transitions.callback` cannot route returning users and new users to
-different locations, so resolution fires one of three outcomes.
-Two are shipped; the third, `identity_unknown`, is new and fires only from
-SSO resolution, never from a typed identifier.
+A single success transition (`transitions.sso_authenticated`) cannot route
+returning users and new users to different locations, so resolution fires one
+of three outcomes.
+The third, `sso_user_not_found`, is new and fires only from SSO resolution,
+never from a typed identifier.
+The three keys carry an `sso_` prefix so a flow author and the engine can tell
+them apart from the same-named outcomes of typed identifier and register steps.
+`sso_authenticated` names the success branch because every resolution outcome
+follows the provider's return.
 
-**Why `identity_unknown` is needed:**
+**Why `sso_user_not_found` is needed:**
 *   **Why not `user_not_found`:** A shared entry step hosts both the typed
     email field and the SSO buttons, and a transition key allows one target.
     Reusing `user_not_found` for an unknown SSO subject would demand two
@@ -219,7 +224,7 @@ SSO resolution, never from a typed identifier.
     the collection step for SSO.
     The key would have to keep its typed-email target, sending the unknown SSO
     user to the register step to start the ceremony over.
-*   **The split:** `identity_unknown` routes the unknown SSO user straight to
+*   **The split:** `sso_user_not_found` routes the unknown SSO user straight to
     the data collection step, while `user_not_found` keeps its route for typed
     emails.
 *   **Engine behavior:** When it fires, the engine flips `CurrentPurpose` from
@@ -227,7 +232,7 @@ SSO resolution, never from a typed identifier.
     This departs from ADR 017's SSO note
     ([ADR 017](../../adrs/017-flow-engine-auth-attempt-dispatch.md#note-sso)),
     which expected ceremonies to reuse `user_not_found` and to add
-    `user_link_required` for linking; 851 adds `identity_unknown` for the
+    `user_link_required` for linking; 851 adds `sso_user_not_found` for the
     shared-step reason above, and `user_link_required` is not added, since
     linking is out of scope ([area 1](1-resource-model.md#linking-safety)).
     The ADR's deferred passkey outcome (`credential_unknown`) has the same
@@ -246,19 +251,19 @@ transitions route it:
 
 | Resolution State | Outcome Fired | Routing & Engine Behavior |
 | :--- | :--- | :--- |
-| **Known subject** | `callback` | **Targets `done` (Authenticated).** Identity is pinned to `(connection, subject)`, not to claims, so profile edits cannot fork accounts. A sign-in does not update the stored user from fresh claims; that refresh is `is_auto_update`, deferred with its guards ([area 1](1-resource-model.md#deferred-and-cut-fields)). |
-| **Unknown subject** | `identity_unknown` | **Targets the data collection step** ([New Users: Prefill and Confirm](#new-users-prefill-and-confirm); `register-sso` in area 4's scaffold). Under `creation: disabled`, `identity_unknown` is not raised; the unknown subject is an error on the originating step ([Failures and Recovery](#failures-and-recovery)). |
-| **Unknown subject with unique-property collision** | `user_already_exists` | **Targets the conflict resolution step** ([Conflict Resolution Flow](#conflict-resolution-flow); `sso-conflict` in area 4's scaffold). The engine binds the attempt to the colliding account, and a correct password or passkey on that step signs that account in. |
+| **Known subject** | `sso_authenticated` | **Targets `done` (Authenticated).** Identity is pinned to `(connection, subject)`, not to claims, so profile edits cannot fork accounts. A sign-in does not update the stored user from fresh claims; that refresh is `is_auto_update`, deferred with its guards ([area 1](1-resource-model.md#deferred-and-cut-fields)). |
+| **Unknown subject** | `sso_user_not_found` | **Targets the data collection step** ([New Users: Prefill and Confirm](#new-users-prefill-and-confirm); `register-sso` in area 4's scaffold). Under `creation: disabled`, `sso_user_not_found` is not raised; the unknown subject is an error on the originating step ([Failures and Recovery](#failures-and-recovery)). |
+| **Unknown subject with unique-property collision** | `sso_user_already_exists` | **Targets the conflict resolution step** ([Conflict Resolution Flow](#conflict-resolution-flow); `sso-conflict` in area 4's scaffold). The engine binds the attempt to the colliding account, and a correct password or passkey on that step signs that account in. |
 
 ### Creation Without Collection (`creation: auto`)
 
 Under `creation: auto` (the default), the engine **creates the account
-immediately without pausing for collection** and fires `callback` as a newly
-authenticated user, provided the mapped claims supply every required property in
-the schema.
+immediately without pausing for collection** and fires `sso_authenticated` as a
+newly authenticated user, provided the mapped claims supply every required
+property in the schema.
 
 * **Fallback Behavior:** If a required property is missing, execution degrades
-  to `identity_unknown` → data collection, prefilled with what did arrive.
+  to `sso_user_not_found` → data collection, prefilled with what did arrive.
   This is the epic's new-user journey: the user provides only what the provider
   did not return.
 * **Unverified Identifiers:** A required property with a non-empty `x-unique`
@@ -276,7 +281,7 @@ the schema.
     creates the account first, and the victim meets the conflict step at their
     own sign-up.
 * **Disabled:** under `creation: disabled` an unknown subject is an error on
-  the step the user started from; `identity_unknown` is not raised
+  the step the user started from; `sso_user_not_found` is not raised
   ([Failures and Recovery](#failures-and-recovery)).
   The provider signs in existing users only.
   The deferred `auto_only` errors on incomplete claims rather than
@@ -320,10 +325,10 @@ the schema.
   All account-linking semantics are deferred to the dedicated account-linking
   specification.
 - **Validation Rule:** Steps containing `sso_providers` **must** explicitly
-  route all three outcomes (`callback`, `identity_unknown`, and
-  `user_already_exists`) to prevent flow dead-ends (validator rule in
+  route all three outcomes (`sso_authenticated`, `sso_user_not_found`, and
+  `sso_user_already_exists`) to prevent flow dead-ends (validator rule in
   [`2-auth-method-selection.md`](2-auth-method-selection.md); today only
-  `transitions.callback` is enforced).
+  `transitions.sso_authenticated` is enforced).
 
 ## New Users: Prefill and Confirm
 
@@ -399,7 +404,7 @@ Scoped by the epic: a safe recovery route, without introducing automatic linking
 or leaving the user at a dead end.
 
 ```
-user_already_exists → authored step: "an account with this email already exists"
+sso_user_already_exists → authored step: "an account with this email already exists"
   → action: sign in → transition with action: "switch" to the login flow
   → user authenticates with existing factors → continues to the app
 ```
@@ -427,8 +432,8 @@ user_already_exists → authored step: "an account with this email already exist
 
 ### Trigger Points
 
-The `user_already_exists` outcome fires at **two distinct execution points**,
-and the flow must route both:
+The `sso_user_already_exists` outcome fires at **two distinct execution
+points**, and the flow must route both:
 
 1. **Callback Resolution:** Triggered when provider-supplied values collide with
    an existing user record.
@@ -436,12 +441,12 @@ and the flow must route both:
    into a conflicting value (matching standard registration submission
    semantics).
 
-Both the entry step and the collection step carry the `user_already_exists`
-transition.
+Both the entry step and the collection step carry the
+`sso_user_already_exists` transition.
 
-> **Enumeration Note:** The conflict step and the `user_already_exists` outcome
-> behind it confirm to the person completing the ceremony that an account with
-> the colliding value exists.
+> **Enumeration Note:** The conflict step and the `sso_user_already_exists`
+> outcome behind it confirm to the person completing the ceremony that an
+> account with the colliding value exists.
 > This is a recorded trade-off, not an oversight.
 > The shipped default flow already answers registration submissions with
 > `user_already_exists` (`packages/config/defaults/default-login.json:112`), so

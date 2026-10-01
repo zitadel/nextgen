@@ -16,7 +16,7 @@ It requires three distinct artifacts to align perfectly:
 | :--- | :--- | :--- |
 | **User schema** | `x-auth-methods: {password, passkey, magic_link, sso, otp}` | The `sso` slot exists. Currently, every entry is strictly `{enabled}` only, with `additionalProperties: false`. |
 | **IdP connection** | The external provider configuration itself. | Outlined in area 1 (no server contract exists yet). |
-| **Flow step** | `sso_providers: ["google"]`, a list of connection slugs. The engine fills the rendered step's `name` and `template` from the connection ([Rendering from the connection](#rendering-from-the-connection)). | The meta-schema, the flow definition API and stored revisions take the slug list; every render resolves each slug through the connection service and emits `{id, name, template}`. The engine still rejects any SSO submission (`ErrFlowUnsupported`, `internal/domain/flow_state_machine.go`). *Constraint:* Any step carrying these **must** define a `transitions.callback` (enforced by the validator). |
+| **Flow step** | `sso_providers: ["google"]`, a list of connection slugs. The engine fills the rendered step's `name` and `template` from the connection ([Rendering from the connection](#rendering-from-the-connection)). | The meta-schema, the flow definition API and stored revisions take the slug list; every render resolves each slug through the connection service and emits `{id, name, template}`. The engine still rejects any SSO submission (`ErrFlowUnsupported`, `internal/domain/flow_state_machine.go`). *Constraint:* Any step carrying these **must** define a `transitions.sso_authenticated` (enforced by the validator). |
 
 Each authentication method surfaces differently within a flow, meaning there is
 no uniform rendering mechanism across the board:
@@ -24,7 +24,7 @@ no uniform rendering mechanism across the board:
 ```text
 password → a field:      fields: ["x-auth-methods#password"]      // "only password is field-shaped today"
 passkey  → actions:      actions: ["passkey", "passkey_register"]
-sso      → its own slot: sso_providers: [...] + transitions.callback
+sso      → its own slot: sso_providers: [...] + transitions.sso_authenticated
 ```
 
 ## Rendering from the Connection
@@ -228,13 +228,13 @@ it (emitting an error like
 | **Flow enables SSO** | **Mirrors existing logic:** If a step has `sso_providers`, the schema's `sso.enabled` must be `true`. |
 | **Provider ID validity** | **New:** Every `sso_providers[]` entry must exist in the pinned schema's `sso.providers` list. |
 | **Cross-resource resolution** | **New:** Every name in `sso.providers` must resolve to a valid connection file under `.zitadel/idps/`. |
-| **Callback transition** | **Already enforced:** A step utilizing `sso_providers` must define a `transitions.callback`. |
-| **Full outcome routing** | **New:** A step with `sso_providers` must properly route `identity_unknown` and `user_already_exists`. The engine fires three possible outcomes, and routing only the callback dead-ends the other two. |
+| **Callback transition** | **Already enforced:** A step utilizing `sso_providers` must define a `transitions.sso_authenticated`. |
+| **Full outcome routing** | **New:** A step with `sso_providers` must properly route `sso_user_not_found` and `sso_user_already_exists`. The engine fires three possible outcomes, and routing only `sso_authenticated` dead-ends the other two. |
 | **Empty `claim_mapping` intersection** | **New (Warning):** If an offered provider's `claim_mapping` shares zero properties with the pinned schema, the collection fields are not prefilled, and every sign-up stops at the collection step for manual input. |
 | **Empty `verified_claims` intersection** | **New (Warning):** If a provider's `verified_claims` keys share no properties with the pinned schema, every property arrives unverified. Where a required property carries a non-empty `x-unique` scope, the auto-creation gate never passes and sign-up stops at the collection step. |
 | **Wildcard `issuer_pattern` conflict** | **Warning:** An environment declaring a wildcard `issuer_pattern` cannot produce the exact redirect URIs providers require (environments are design-only until [#534](https://github.com/zitadel/nextgen/issues/534)). The validator returns a warning, never an error: a release is one artifact promoted through every environment, so a pattern environment must not block it. The engine leaves the provider buttons out at render ([area 3](3-social-login-flow.md#constraints--edge-cases)). |
 | **Dead capability** | **Warning:** A schema lists a provider that no flow offers. The Console shows it as a method of this user type, but no login page carries the button. |
-| **Collection-step conflict routing** | **New:** A step whose `on_success` is `create_user_with_sso` must route `user_already_exists`. Area 3 fires that outcome at collection-step submission as well as at callback resolution, and requires the conflict transition attached to both steps. |
+| **Collection-step conflict routing** | **New:** A step whose `on_success` is `create_user_with_sso` must route `sso_user_already_exists`. Area 3 fires that outcome at collection-step submission as well as at callback resolution, and requires the conflict transition attached to both steps. |
 
 ---
 
