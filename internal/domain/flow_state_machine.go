@@ -554,6 +554,10 @@ func (r *FlowStateMachineRuntime) bindSSOCollision(ctx context.Context, state *F
 func ssoClaimsComplete(schema *jsonschema.Schema, parked *FlowSSOParkedIdentity, uniqueClaims []string) bool {
 	materialized := make(map[string]struct{}, len(parked.Claims))
 	for name := range parked.Claims {
+		// Nested mapped keys are unsupported (mapping is top-level only), so they fall back to collection.
+		if strings.Contains(name, ".") {
+			return false
+		}
 		materialized[name] = struct{}{}
 	}
 	for path := range newSchemaReader(schema).RequiredPaths(materialized) {

@@ -4840,3 +4840,22 @@ func TestFlowStateMachine_Render_TerminalStepSkipsResolution(t *testing.T) {
 	// Marked complete, so GET /flow/{id} can answer 410 for a finished flow.
 	assert.NotNil(t, result.Step.Complete)
 }
+
+// Claim mapping is top-level only, so a dotted claim key cannot be checked
+// against the schema's nested required or unique rules: it is collected
+// instead of created.
+func TestFlowStateMachine_Render_SSODottedClaimKeyFallsBackToCollection(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoRenderWorld(t)
+	def = withSSOOutcomeSteps(def)
+	claims, verified := completeClaims()
+	claims["address.email"] = "alice@home.example.com"
+	verified["address.email"] = true
+	w.expectParked(unlinkedParked(claims, verified), nil)
+	w.ssoIdentities.EXPECT().FindUniqueOwner(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return("", nil).Times(2)
+	w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Times(0)
+
+	result, err := w.sm.Render(t.Context(), def, state)
+	require.NoError(t, err)
+	assert.Equal(t, "sso-register", result.Step.Name)
+}
