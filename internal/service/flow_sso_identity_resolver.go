@@ -125,15 +125,24 @@ func boundThroughSSO(attempt *domain.AuthAttempt) *domain.FlowSSOParkedIdentity 
 	return &domain.FlowSSOParkedIdentity{BoundUserID: user.UserID}
 }
 
+// BindCollision binds the user an SSO claim collided with, by id, so the
+// lookup that found it is not repeated through an unscoped identifier.
+func (r *FlowSSOIdentityResolver) BindCollision(ctx context.Context, in domain.FlowSSOBindInput) error {
+	return r.db.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		return bindSSOIdentity(ctx, tx.Statements(), in)
+	})
+}
+
 func (r *FlowSSOIdentityResolver) BindLinked(ctx context.Context, in domain.FlowSSOBindInput) error {
 	return r.db.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		return bindSSOIdentity(ctx, tx.Statements(), in)
 	})
 }
 
-// bindSSOIdentity deletes the parked row and records the user and sso factors
-// on the attempt. It runs inside the caller's transaction and returns
-// ErrSSOStateInvalid unwrapped when the row was settled or replaced.
+// bindSSOIdentity deletes the parked row and records the user factor, plus the
+// sso factor when a link is given, on the attempt. It runs inside the caller's
+// transaction and returns ErrSSOStateInvalid unwrapped when the row was
+// settled or replaced.
 func bindSSOIdentity(ctx context.Context, stmts AllStatements, in domain.FlowSSOBindInput) error {
 	// The exact parked row goes first: a settled or replaced one aborts before any write.
 	if err := stmts.DeleteSSOCallback(ctx, in.ProjectID, in.AttemptID, in.CheckID); err != nil {
@@ -169,15 +178,16 @@ func bindSSOIdentity(ctx context.Context, stmts AllStatements, in domain.FlowSSO
 	} else if err := emitDirectAuthFactor(ctx, stmts, attempt, userFactor, checkID); err != nil {
 		return fmt.Errorf("bind sso identity: %w", err)
 	}
+	// A collision has no link: like a typed identifier it proves nothing about
+	// the account, so it records the user factor alone.
+	if in.LinkID == "" {
+		return nil
+	}
 	ssoFactor := &domain.AuthFactorSSO{ConnectionID: in.ConnectionID, LinkID: in.LinkID, AttemptID: in.AttemptID}
 	if _, err := recordDirectAuthFactor(ctx, stmts, attempt, ssoFactor); err != nil {
 		return fmt.Errorf("bind sso identity: %w", err)
 	}
 	return nil
-}
-
-func (r *FlowSSOIdentityResolver) DeleteParked(ctx context.Context, projectID, attemptID, checkID string) error {
-	return r.db.Statements().DeleteSSOCallback(ctx, projectID, attemptID, checkID)
 }
 
 // CreateLinked creates the user, links the subject to it and binds the

@@ -17,9 +17,12 @@ type FlowSSOIdentityService interface {
 	// ErrFlowRestartRequired when the attempt already carries another user, and
 	// ErrSSOStateInvalid, before writing anything, when that row is gone.
 	BindLinked(ctx context.Context, in FlowSSOBindInput) error
-	// DeleteParked removes the parked row with checkID. It returns
-	// ErrSSOStateInvalid when that row is gone.
-	DeleteParked(ctx context.Context, projectID, attemptID, checkID string) error
+	// BindCollision binds the user FindUniqueOwner found, by id, and deletes
+	// the parked row, in one transaction: a user factor only, no link and no
+	// sso factor. It returns ErrSSOStateInvalid when the row is gone and
+	// ErrFlowRestartRequired when the attempt carries another user or is
+	// expired or handed off.
+	BindCollision(ctx context.Context, in FlowSSOBindInput) error
 	// FindUniqueOwner returns the user owning value in the unique attribute,
 	// or "" with a nil error when nobody does. It only reads: unlike an
 	// identifier submission it records nothing on the attempt.

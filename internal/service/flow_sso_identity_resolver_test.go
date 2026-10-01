@@ -668,3 +668,56 @@ func TestFlowSSOIdentityResolver_CreateLinked_EmitsIdentityLinkCreated(t *testin
 	assert.JSONEq(t, `{"connection_id":"idp-1","user_id":"user_new"}`, string(ev.Payload))
 	assert.NotContains(t, string(ev.Payload), "sub-1")
 }
+
+func collisionInput(userID string) domain.FlowSSOBindInput {
+	return domain.FlowSSOBindInput{ProjectID: ssoProjectID, AttemptID: ssoAttemptID, CheckID: "ch-1", UserID: userID}
+}
+
+// A collision binds the found owner the way a typed identifier would: a user
+// factor alone, no link and no sso factor, with the parked row deleted first.
+func TestFlowSSOIdentityResolver_BindCollision_WritesUserFactorOnlyAndDeletes(t *testing.T) {
+	t.Parallel()
+	f := newSSOResolverFixture(t)
+	f.inTransaction(t)
+	var written []domain.AuthFactor
+	gomock.InOrder(
+		f.stmts.EXPECT().DeleteSSOCallback(gomock.Any(), ssoProjectID, ssoAttemptID, "ch-1").Return(nil),
+		f.stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), ssoProjectID, ssoAttemptID).Return(parkedAttempt(parkedResult()), nil),
+		f.stmts.EXPECT().AddAuthAttemptFactor(gomock.Any(), ssoProjectID, ssoAttemptID, gomock.Any()).
+			DoAndReturn(func(_ context.Context, _, _ string, factor domain.AuthFactor) (string, error) {
+				written = append(written, factor)
+				return "ch-user", nil
+			}),
+	)
+	f.stmts.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil)
+	f.stmts.EXPECT().SetAuthAttemptFactor(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+
+	require.NoError(t, f.resolver.BindCollision(t.Context(), collisionInput("user-9")))
+	assert.Equal(t, []domain.AuthFactor{&domain.AuthFactorUser{UserID: "user-9"}}, written)
+}
+
+func TestFlowSSOIdentityResolver_BindCollision_StaleRowAbortsBeforeWrites(t *testing.T) {
+	t.Parallel()
+	f := newSSOResolverFixture(t)
+	f.inTransaction(t)
+	f.stmts.EXPECT().DeleteSSOCallback(gomock.Any(), ssoProjectID, ssoAttemptID, "ch-1").Return(domain.ErrSSOStateInvalid())
+	f.stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+	f.stmts.EXPECT().AddAuthAttemptFactor(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+
+	err := f.resolver.BindCollision(t.Context(), collisionInput("user-9"))
+	require.ErrorIs(t, err, domain.ErrSSOStateInvalid())
+}
+
+func TestFlowSSOIdentityResolver_BindCollision_RefusesDifferentBoundUser(t *testing.T) {
+	t.Parallel()
+	f := newSSOResolverFixture(t)
+	f.inTransaction(t)
+	// Deleted first, then rolled back with the transaction.
+	f.stmts.EXPECT().DeleteSSOCallback(gomock.Any(), ssoProjectID, ssoAttemptID, "ch-1").Return(nil)
+	f.stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), ssoProjectID, ssoAttemptID).
+		Return(parkedAttempt(parkedResult(), &domain.AuthFactorUser{UserID: "user-a"}), nil)
+	f.stmts.EXPECT().AddAuthAttemptFactor(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+
+	err := f.resolver.BindCollision(t.Context(), collisionInput("user-9"))
+	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
+}
