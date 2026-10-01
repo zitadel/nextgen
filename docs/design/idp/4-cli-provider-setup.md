@@ -44,13 +44,15 @@ For each selected provider:
 │ Create the application at https://console.cloud.google.com/apis/credentials
 ◆ Open the Google console in your browser?  (Y/n)
 ◆ Client ID:  1234-abc.apps.googleusercontent.com
-◆ Client secret (goes to .env.local, Enter to defer):  ********
+◆ Client secret (published to the project as GOOGLE_CLIENT_SECRET):  ********
 ```
 
 1. **Announce:** What the provider requires, the exact callback URI per
    environment, and the console URL from the [catalog](#the-provider-catalog).
 2. **Offer the Browser:** Opens the console URL. As in the claim journey, this
-   is skipped when the run is non-interactive or `--no-open` is passed.
+   is skipped when the run is non-interactive. (No `--no-open` flag: one was
+   declared and read nowhere, and was removed rather than left as dead surface
+   in `--help`.)
    The prompt then waits while the developer creates the application at the
    provider.
 3. **Reuse or Create:** Decides whether to reuse an existing connection file or
@@ -158,9 +160,17 @@ preview       excluded: declared by issuer_pattern, not an exact issuer
 
 Following Area 1's principle that
 ["vendor knowledge is data"](1-resource-model.md#vendor-knowledge-is-data), the
-catalog is a table bundled in `packages/config`, so scaffolding works offline.
+catalog is bundled in `packages/config`, so scaffolding works offline.
 Epic 851 includes two entries: `google` and `github`.
 [`schemas/catalog.json`](schemas/catalog.json) is an example of the full table.
+
+The values below are the vendor knowledge; how a connection is composed from
+them is not. `packages/config/src/idp/` therefore holds one class per provider
+over a shared `IdpProvider` interface, rather than a JSON table the callers
+interpret: GitHub speaks OAuth2 rather than OIDC, emits no family name, and
+needs a second request to read an email at all, and a table would push each of
+those differences into a branch in shared code. Adding a provider is a class
+and a line in the registry.
 
 Not in the table:
 
@@ -201,18 +211,14 @@ the tenant can add rows or accept that the collection step asks for them.
 
 ## Credential Capture
 
-> **Pending reconciliation with [ADR 062](../../adrs/062-per-environment-variables-and-secrets.md).**
-> The reference half of this section is current: the connection file carries
-> `${{ NAME }}` references and never a value. The *storage* half below is not.
-> It writes captured values into `.env.local` and stubs names into
-> `.env.example`, and ADR 062 is explicit that variables are **not**
-> operating-system environment variables — they are project data, written
-> through `PATCH /variables` against the environment being configured and
-> resolved by the engine when it serves the connection. Moving the capture step
-> onto that API, and `plan`'s presence check off `process.env`, is
-> [#851](https://github.com/zitadel/nextgen/issues/851) execution work
-> (area 1, [Open Points](1-resource-model.md#open-points)). What the local
-> development runtime does in the meantime is unchanged.
+> **Reconciled with [ADR 062](../../adrs/062-per-environment-variables-and-secrets.md).**
+> Both halves of this section now describe one model. The connection file
+> carries `${{ NAME }}` references and never a value, and the values themselves
+> are project data: captured credentials are published through the variables
+> API against the project being configured, and the engine resolves them when
+> it serves the connection. Nothing is written to `.env.local` or
+> `.env.example`, and no credential reaches the filesystem at all — so the
+> gitignore gate the earlier design needed is gone rather than relaxed.
 
 Credentials are per environment; the connection is not.
 The connection file carries references.
@@ -247,30 +253,43 @@ resolving `${{ NAME }}` in the client id.
 
 ### Client Secret Rules
 
-- **Variable Naming:** Derived automatically from the provider slug (uppercase,
-  non-alphanumerics converted to `_`, suffix `_CLIENT_SECRET`, and prefixed with
-  `_` if starting with a digit).
-  Examples: `GOOGLE_CLIENT_SECRET` and `GITHUB_CLIENT_SECRET`.
-  Reused connections keep the variable name they already reference intact.
-- **File Actions:**
-  - Writes the `${{ NAME }}` reference into the connection file as
-    `client_secret`.
-  - Stubs the variable name into `.env.example` via `merge-env`.
-  - Writes the secret value into `.env.local`.
+- **Variable Naming:** Derived automatically from the connection's slug
+  (uppercase, non-alphanumerics converted to `_`, suffix `_CLIENT_ID` or
+  `_CLIENT_SECRET`, and prefixed with `_` if starting with a digit).
+  Examples: `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
+  Derived from the slug rather than the provider, so a second connection for
+  the same provider has credentials of its own; two slugs that would derive one
+  name are refused rather than sharing it.
+  A reused connection keeps the variable names it already references, whatever
+  they are — a hand-edited file may point at `ACME_SECRET`, and publishing to a
+  slug-derived name instead would store the value where nothing reads it.
+- **What is written where:**
+  - The connection file gets `${{ NAME }}` references for **both** credentials.
+    The secret because the file is committed and a revision is immutable, so a
+    literal could never be scrubbed; the id because each environment registers
+    its own application, and a literal would force one connection file per
+    environment.
+  - Both values are published to the project through the variables API — the
+    secret as a secret, the id as an ordinary variable, so it can be read back.
+  - Nothing else. No `.env.local`, no `.env.example`, no credential on disk.
 
 #### Safety & Security Gates
 
-* **Gitignore Safety Gate:** Secret values are written to `.env.local` only if
-  verified as untracked and gitignored via `git check-ignore` (new: `merge-env`
-  writes without the check today).
-  If verification fails, only the stub is written and manual setup instructions
-  are printed.
-* **CLI Safety:** Secret values are never exposed in process arguments (`argv`);
-  no `--client-secret` flag exists.
-  Deferred capture is the default non-interactive behavior.
-* **No-Clobber Behavior:** `merge-env` will not overwrite existing keys.
-  Re-running with a new secret prompts: *"already set in `.env.local`, edit it
-  there"*.
+* **Nothing on disk:** Neither credential is written to a file, so there is no
+  gitignore gate to pass and no local file to leak. ADR 062 §7 applies to the
+  secret from the moment it is published: it can be replaced but never read
+  back.
+* **CLI Safety:** Secret values are never exposed in process arguments (`argv`)
+  — no `--client-secret` flag exists, and none will. The secret is prompted for
+  on a TTY and read from stdin on a non-interactive run, as `variables set`
+  does, so it reaches neither shell history nor a process listing nor a CI log.
+* **Required, not deferrable:** Once a provider is chosen the secret is
+  mandatory. A connection scaffolded without one produces a sign-in button that
+  fails at the token endpoint with `invalid_client`, in a browser, long after
+  the command reported success.
+* **Rerun Behavior:** A rerun that supplies a credential republishes it, so a
+  changed client id takes effect instead of being silently ignored. A rerun
+  that supplies nothing publishes nothing and changes nothing.
 
 ## Missing Credentials
 
@@ -284,18 +303,23 @@ Missing credentials fall into two distinct execution states:
   to pass in `next_commands`.
   A scan match needs no client id and follows the reuse rule
   ([Create or Reuse](#create-or-reuse)).
-- **Environment Reference:** Passing a `${{ NAME }}` reference defers evaluation to
-  plan-time presence checks via `E_CREDENTIAL_MISSING`.
+- **Environment Reference:** A `${{ NAME }}` reference is what the connection
+  file always holds, so a client id is never compared against it; only a
+  literal id already in a hand-written connection can disagree with a supplied
+  one, and that disagreement stops the command.
 
 ### Missing Secret Value
-- **At setup, a missing value only warns.** If the secret is absent from
-  `process.env` and local environment files (`.env.local`, `.env`; new: `plan`
-  reads `process.env` only today, `apps/cli/src/lib/oclif/base.ts`), the
-  non-interactive output envelope includes a warning naming the variable with
-  remediation steps in `data.next_actions`.
-- **At plan/apply it errors.** `E_CREDENTIAL_MISSING`; the `hint` names the
-  variable and `.env.local` and says to re-run `plan`
-  ([Dependencies](#dependencies)).
+- **A publish that did not land is reported, with the command that fixes it.**
+  The result says whether the project received each credential (`stored`,
+  `deferred`, `failed`); anything other than `stored` names the
+  `variables set <NAME> --project-level` command that completes the job, in the
+  terminal warning and in `next_commands` — the latter matters because `--json`
+  prints no warnings at all.
+- **`plan`/`apply` do not check the value.** A connection's `${{ NAME }}` is
+  resolved by the engine when it serves the connection, not by the CLI, so an
+  unpublished variable is not a validation failure here. It surfaces at the
+  provider on first sign-in, which is why the publish is reported at capture
+  time rather than left to be discovered later.
 
 ## Create or Reuse
 
@@ -317,8 +341,8 @@ without duplicating connections across re-runs.
   A mismatch fails with `E_VALIDATION` naming both ids.
   Extends the connection's `claim_mapping` to the active schema, without
   touching existing secrets.
-  Re-checks credential presence so missing local values yield
-  `E_CREDENTIAL_MISSING` with a `.env.local` pointer.
+  Republishes a supplied credential, so a rerun with a changed client id takes
+  effect; a rerun supplying nothing publishes nothing.
 * **Multiple Hits:** Prompts interactive user selection; throws a
   non-interactive error listing matching candidates.
 * **No Hit (Create):** Scaffolds at catalog slug.
@@ -338,7 +362,6 @@ Selecting `google` on the default scaffold touches the following target files:
 | **`.zitadel/meta/idp-connection.json`** | Local copy of the meta-schema. |
 | **`.zitadel/schemas/default-human-user.json`** | Sets `x-auth-methods.sso: { "enabled": true, "providers": ["google"] }`. |
 | **`.zitadel/flows/default-login.json`** | The SSO routing delta below. |
-| **`.env.example`, `.env.local`** | Variable stub and local secret value. |
 | **`.zitadel/state.json`** | Connection state entry. |
 
 ### Flow Architecture Decisions
@@ -436,12 +459,16 @@ never presented as proof that sign-in works.
   is an update, never a new outer id.
   References are by slug, so nothing re-pins.
 * **Validation before upload:** the syncer runs the meta-schema and the
-  validator rules from areas 1 and 2, with the
-  [`E_CREDENTIAL_MISSING`](#missing-credentials) split for unresolved variable
-  references.
+  validator rules from areas 1 and 2. A `client_secret` holding a literal
+  rather than a reference is named as that specific mistake, since it is the
+  one that would publish a credential; a missing or wrongly-typed field is
+  reported as the ordinary schema error it is.
 * **Secret-free previews:** previews display only the reference
   (`${{ GOOGLE_CLIENT_SECRET }}`), never a value.
-  Update previews show a field diff once a read endpoint exists.
+  Update previews show a field diff: the syncer reads the stored connection
+  through `GET /idps/{id}`, and refuses a body whose `client_secret` comes
+  back as a value rather than a reference, so a resolved secret stops the
+  plan instead of being printed into it.
 * **Delete:** a local file delete schedules a platform delete; what the server
   does with it is the open deletion question (area 1, Open Points).
 * **CRUD dependency:** create and update depend on the IdP CRUD API.
@@ -460,8 +487,8 @@ never presented as proof that sign-in works.
 | **Multi-Schema Reuse** | Multi-schema reuse logic is specified but unreachable in Epic 851's single-schema flow; activates with the post-claim schema picker. | Sign-in methods journey (ticket work, [Post-Claim Re-entry](#post-claim-re-entry)) |
 | **"Skip for now" Destination** | The setup sub-journey's skip path hands the dropped provider to the Sign-in methods journey; the final summary names it. | Sign-in methods journey (ticket work) |
 | **Locale Keys** | `register-sso.action.submit`, `sso-conflict.action.submit`, `sso-conflict.action.passkey`, `sso-conflict.action.sign_in`; step titles derive from step names. | Login UI / Locale Work |
-| **Error Codes** | `E_CREDENTIAL_MISSING` (acquire a value locally, distinct from `E_VALIDATION`: edit the file) and `E_CANCELLED` (a cancellation signal distinct from `E_VALIDATION`, required by a menu loop that returns to its parent on cancel). | CLI error union |
-| **Dev-Runtime Secret Join** | At local-runtime spawn the CLI resolves the connection's declared env refs from `.env.local` and injects them into the engine process environment, so the engine's name-to-value join works at token exchange. Development only, downstream of everything diffed or printed. Production delivery stays with area 1's deferred secret-store spec. | CLI local runtime |
+| **Error Codes** | ~~`E_CREDENTIAL_MISSING` and `E_CANCELLED`~~ — **not adopted.** Neither was added. There is no local value to acquire (the engine resolves references from project variables, so `plan` has nothing to check), and cancellation exits the command rather than returning to a parent menu. Both cases are `E_VALIDATION` with a hint naming the next move. | — |
+| **Dev-Runtime Secret Join** | ~~Inject `.env.local` values into the engine process environment at local-runtime spawn.~~ **Not needed.** The engine resolves a connection's `${{ NAME }}` from the project's own variables when it serves the connection, so the join happens server-side for development and production alike and no value passes through the CLI's process environment. | — |
 | **`create_user_with_sso`** | Meta-schema enum value plus the engine handler from area 3. | Flow meta-schema / Engine |
 | **`identity_unknown`** | New reserved outcome, fired by ceremony resolution for an unknown subject; joins the reserved-key list and the flip table (`login` → `register`) at every enumeration site: `RESERVED_OUTCOMES` and `PURPOSE_FLIP_TARGETS` (`packages/config/src/validate.ts`), `reservedOutcomes` and `purposeFlipTargets` (`internal/domain/flow_definition_validator.go`), `applyOutcomeFlip` (`internal/domain/flow_state_machine.go`), the `transitions` description in `flow-definition.json`, the validator's three-outcome rule, and an amendment to ADR 017's SSO note ([area 3](3-social-login-flow.md#resolution-branches)). | Flow meta-schema / Engine / Validator / ADR 017 |
 
@@ -475,8 +502,10 @@ never presented as proof that sign-in works.
   unsupported by Google).
 * **`scaffoldedFrom` Provenance:** Pending Area 1's specification for recording
   provenance data on generated connection resources.
-* **Secret Rotation UX:** Defining explicit rotation workflows beyond existing
-  no-clobber behavior in `.env.local` (deferred to Area 1 secret-store spec).
+* **Secret Rotation UX:** Defining explicit rotation workflows. Replacing a
+  secret works today — `variables set <NAME> --project-level --secret`, which is
+  also what a failed publish reports — but rotating one without a sign-in
+  interruption is unspecified (deferred to Area 1's secret-store spec).
 
 ## Related
 

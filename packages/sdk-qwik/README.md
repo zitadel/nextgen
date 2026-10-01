@@ -9,7 +9,7 @@ TypeScript ≥ 5.0 — the published type definitions re-export with `export typ
 ## Usage
 
 ```tsx
-import { component$ } from '@builder.io/qwik';
+import { component$ } from '@qwik.dev/core';
 import { ZitadelLogin, configureZitadel } from '@zitadel/sdk-qwik';
 
 export default component$(() => {

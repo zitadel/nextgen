@@ -40,6 +40,9 @@
   --zl-success: #22c55e;
   --zl-link: currentColor;
   --zl-warning: #fbbf24;
+  --zl-provider: #ffffff0b;
+  --zl-provider-border: #ffffff26;
+  --zl-provider-foreground: #fafafa;
   --zl-spacing-0: 0rem;
   --zl-spacing-px: 0.0625rem;
   --zl-spacing-0-5: 0.125rem;
@@ -200,6 +203,9 @@
   --zl-sidebar-border: #e5e5e5;
   --zl-sidebar-ring: #a3a3a3;
   --zl-warning: #d97706;
+  --zl-provider: #fafafa;
+  --zl-provider-border: #e5e5e5;
+  --zl-provider-foreground: #0a0a0a;
   --zl-input-fill: #ffffff00;
   --zl-ring-outline: #a3a3a380;
   --zl-destructive-ring: #dc262633;
