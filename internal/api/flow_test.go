@@ -75,6 +75,9 @@ func (stubAuthAttempt) GetByID(context.Context, string, string) (*domain.AuthAtt
 func (stubAuthAttempt) IssueChallenge(context.Context, service.IssueChallengeInput) (*domain.AuthAttempt, error) {
 	return nil, errors.New("stub auth attempt")
 }
+func (stubAuthAttempt) IssueSSOState(context.Context, service.IssueSSOStateInput) (*domain.SSOState, error) {
+	return nil, errors.New("stub auth attempt")
+}
 func (stubAuthAttempt) VerifyProof(context.Context, service.VerifyProofInput) (*domain.AuthAttempt, error) {
 	return nil, errors.New("stub auth attempt")
 }

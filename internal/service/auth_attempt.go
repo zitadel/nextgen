@@ -43,6 +43,16 @@ type AuthAttemptService interface {
 	// errors: domain.ErrAuthAttemptNotFound, domain.ErrAuthAttemptInvalidRequest, domain.ErrAuthAttemptInvalidState, domain.ErrAuthAttemptAlreadyHandedOff, domain.ErrInternal
 	IssueChallenge(ctx context.Context, input IssueChallengeInput) (*domain.AuthAttempt, error)
 
+	// IssueSSOState mints the single-use state record an external sign-in
+	// runs on and returns the minted values: State, OIDCNonce and
+	// PKCEVerifier for the authorize request, BindingNonce for the browser's
+	// cookie. The record keeps the state and the binding nonce as hashes,
+	// the verifier as ciphertext and the OIDC nonce as issued. A record from
+	// an earlier submission on the same attempt is replaced.
+	//
+	// errors: domain.ErrAuthAttemptNotFound, domain.ErrAuthAttemptInvalidState, domain.ErrAuthAttemptAlreadyHandedOff, domain.ErrInternal
+	IssueSSOState(ctx context.Context, input IssueSSOStateInput) (*domain.SSOState, error)
+
 	// VerifyProof verifies the submitted proof against the challenge identified by ChallengeID.
 	//
 	// On success, it persists the verification and marks the attempt complete if all
@@ -138,6 +148,19 @@ type IssueChallengeInput struct {
 	AttemptID string
 	// Challenge is a discriminated union — use one of the Challenge* types below.
 	Challenge Challenge
+}
+
+// IssueSSOStateInput pins what the callback needs to finish an external
+// sign-in: the connection revision the authorize request is built from and
+// the page the browser returns to. PKCEEncrypter nil means the connection
+// runs without PKCE; otherwise it encrypts the verifier for storage.
+type IssueSSOStateInput struct {
+	ProjectID            string
+	AttemptID            string
+	ProviderSlug         string
+	ConnectionRevisionID string
+	ReturnTarget         string
+	PKCEEncrypter        crypto.Encrypter
 }
 
 type VerifyProofInput struct {
@@ -370,6 +393,27 @@ func (s *authAttemptService) IssueChallenge(ctx context.Context, input IssueChal
 	}
 
 	return attempt, nil
+}
+
+// IssueSSOState mints the state record on an existing attempt. The attempt
+// is guarded the way a challenge issue is: expired or handed off attempts
+// cannot start an external sign-in.
+func (s *authAttemptService) IssueSSOState(ctx context.Context, input IssueSSOStateInput) (*domain.SSOState, error) {
+	attempt, err := s.stmts.Statements().GetAuthAttemptByID(ctx, input.ProjectID, input.AttemptID)
+	if err != nil {
+		return nil, err
+	}
+	if err := attempt.PrepareChallenge(domain.AuthCheckTypeSSOCallback); err != nil {
+		return nil, err
+	}
+	state, err := domain.NewSSOState(input.ProviderSlug, input.ConnectionRevisionID, input.ReturnTarget, input.PKCEEncrypter)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.stmts.Statements().IssueSSOState(ctx, input.ProjectID, input.AttemptID, state.Check); err != nil {
+		return nil, err
+	}
+	return state, nil
 }
 
 // VerifyProof verifies the submitted proof against the challenge identified by ChallengeID.
