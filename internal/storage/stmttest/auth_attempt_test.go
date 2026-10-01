@@ -79,7 +79,7 @@ func TestAuthAttemptStatements_SetSSOFactorRoundTrip(t *testing.T) {
 		attempt := createBareAttempt(t, d.stmts, projectID)
 
 		_, err := d.stmts.SetAuthAttemptFactor(t.Context(), projectID, attempt.ID,
-			&domain.AuthFactorSSO{ConnectionID: "idp_1", LinkID: "idplink_1"})
+			&domain.AuthFactorSSO{ConnectionID: "idp_1", LinkID: "idplink_1", AttemptID: attempt.ID})
 		require.NoError(t, err)
 
 		got, err := d.stmts.GetAuthAttemptByID(t.Context(), projectID, attempt.ID)
@@ -88,6 +88,7 @@ func TestAuthAttemptStatements_SetSSOFactorRoundTrip(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, "idp_1", factor.ConnectionID)
 		assert.Equal(t, "idplink_1", factor.LinkID)
+		assert.Equal(t, attempt.ID, factor.AttemptID)
 		assert.False(t, factor.GetLastVerifiedAt().IsZero())
 	})
 }

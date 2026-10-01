@@ -85,8 +85,9 @@ func (h *Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest) (a
 
 	resp := h.buildFlowResponse(ctx, result, false)
 	return &api.FlowResponseHeaders{
-		SetCookie: api.NewOptString(flowSetCookie(ctx, cookieValue, false)),
-		Response:  resp,
+		SetCookie:    api.NewOptString(flowSetCookie(ctx, cookieValue, false)),
+		CacheControl: api.NewOptString(sessionStateCacheControl),
+		Response:     resp,
 	}, nil
 }
 
@@ -184,14 +185,16 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 	// Validation error: state machine keeps the user on the step with Error set.
 	if result.Step != nil && result.Step.Error != nil {
 		return &api.SubmitFlowStepBadRequest{
-			SetCookie: api.NewOptString(flowSetCookie(ctx, cookieValue, false)),
-			Response:  flowResp,
+			SetCookie:    api.NewOptString(flowSetCookie(ctx, cookieValue, false)),
+			CacheControl: api.NewOptString(sessionStateCacheControl),
+			Response:     flowResp,
 		}, nil
 	}
 
 	return &api.SubmitFlowStepOK{
-		SetCookie: api.NewOptString(flowSetCookie(ctx, cookieValue, terminal)),
-		Response:  flowResp,
+		SetCookie:    api.NewOptString(flowSetCookie(ctx, cookieValue, terminal)),
+		CacheControl: api.NewOptString(sessionStateCacheControl),
+		Response:     flowResp,
 	}, nil
 }
 
@@ -230,8 +233,9 @@ func (h *Handler) GetFlowStep(ctx context.Context, params api.GetFlowStepParams)
 		setCookie = flowSetCookie(ctx, cookieValue, false)
 	}
 	return &api.FlowResponseHeaders{
-		SetCookie: api.NewOptString(setCookie),
-		Response:  h.buildFlowResponse(ctx, result, terminal),
+		SetCookie:    api.NewOptString(setCookie),
+		CacheControl: api.NewOptString(sessionStateCacheControl),
+		Response:     h.buildFlowResponse(ctx, result, terminal),
 	}, nil
 }
 

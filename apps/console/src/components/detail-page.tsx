@@ -27,6 +27,9 @@ export function DetailPage({ children }: { children: ReactNode }) {
 /** The 24px gap between the header row and the first body element. */
 export const DETAIL_BODY = "mt-6";
 
+/** A detail screen's title: the 24/24 display face. */
+export const DETAIL_TITLE = "text-foreground font-serif text-2xl leading-6 tracking-tight";
+
 /** The icon tile a detail title leads with. */
 export const ICON_PLATE =
   "bg-muted text-foreground flex size-9 shrink-0 items-center justify-center rounded-md";
@@ -85,9 +88,7 @@ export function DetailHeader({
                 flex item's minimum width, so a title with no break point — a
                 user's email address — wraps on a phone instead of widening the
                 page past the viewport. */}
-            <h1 className="text-foreground font-serif text-2xl leading-6 tracking-tight wrap-anywhere">
-              {title}
-            </h1>
+            <h1 className={cn(DETAIL_TITLE, "wrap-anywhere")}>{title}</h1>
             {status}
           </div>
           {subtitle && <p className="text-muted-foreground text-sm">{subtitle}</p>}

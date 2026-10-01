@@ -165,6 +165,10 @@ var _ AuthCheck = (*SSOCallbackCheck)(nil)
 type AuthFactorSSO struct {
 	ConnectionID string `json:"connection_id"`
 	LinkID       string `json:"link_id"`
+	// AttemptID is the attempt that wrote the factor; a copy promoted through a
+	// session keeps the original id, so only this attempt's own bind counts as
+	// a retry marker.
+	AttemptID string `json:"attempt_id"`
 	authFactor
 }
 

@@ -264,8 +264,8 @@ func TestSSOResolutionStoresNoProviderToken(t *testing.T) {
 	require.True(t, ok)
 	payload, err := json.Marshal(ssoFactor.Payload())
 	require.NoError(t, err)
-	assert.JSONEq(t, `{"connection_id":"`+f.connection.ID+`","link_id":"`+link.ID+`"}`, string(payload),
-		"the sso factor holds the connection and link ids, nothing the provider asserted")
+	assert.JSONEq(t, `{"connection_id":"`+f.connection.ID+`","link_id":"`+link.ID+`","attempt_id":"`+flow.attemptID+`"}`, string(payload),
+		"the sso factor holds the connection, link and attempt ids, nothing the provider asserted")
 }
 
 func TestSSOResolutionOtherSchemaReturns409(t *testing.T) {
@@ -312,7 +312,15 @@ func TestSSOResolutionCreationDisabledRerendersWithError(t *testing.T) {
 	assert.Equal(t, "identifier", step.Name)
 	assert.Equal(t, domain.FlowStepErrorSSOCreationDisabled, step.Error.Value)
 	_, parked := f.attempt(t, flow).SSOCallback()
-	assert.False(t, parked, "the parked result is deleted")
+	assert.True(t, parked, "the parked result stays, so a lost response can show the error again")
+
+	// The rotated cookie carries the replay guard: the next load renders the
+	// step without the error.
+	flow.zflow = mustExtractZflow(t, resp.(*api.FlowResponseHeaders).SetCookie.Value)
+	again := f.getStep(t, flow)
+	require.IsType(t, &api.FlowResponseHeaders{}, again, helpers.MustMarshal(t, again))
+	assert.Equal(t, "identifier", again.(*api.FlowResponseHeaders).Response.Step.Name)
+	assert.False(t, again.(*api.FlowResponseHeaders).Response.Step.Error.Set)
 }
 
 func TestSSOResolutionOnBoundAttemptRebindsNothing(t *testing.T) {

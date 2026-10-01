@@ -865,7 +865,7 @@ const FLOWS = {
       },
       {
         name: "sso_redirect",
-        transitions: { callback: { target: "done" } }
+        transitions: { sso_authenticated: { target: "done" } }
       },
       { name: "done", complete: "redirect" }
     ]
@@ -924,7 +924,7 @@ const FLOWS = {
       },
       {
         name: "sso_redirect",
-        transitions: { callback: { target: "consent" } }
+        transitions: { sso_authenticated: { target: "consent" } }
       },
       {
         name: "signin",
@@ -1016,7 +1016,7 @@ const FLOWS = {
       },
       {
         name: "sso_link",
-        transitions: { callback: { target: "terms" } }
+        transitions: { sso_authenticated: { target: "terms" } }
       },
       {
         name: "terms",
@@ -1430,8 +1430,8 @@ async function renderDiagram() {
     }
 
     if (step.on_success) label += `<br/>on_success: ${step.on_success}`;
-    // Detect callback-only steps (SSO redirect, etc.)
-    const isCallbackStep = step.transitions && 'callback' in step.transitions &&
+    // Detect SSO-return-only steps (SSO redirect, etc.)
+    const isCallbackStep = step.transitions && 'sso_authenticated' in step.transitions &&
       (!step.fields || (Array.isArray(step.fields) ? step.fields.length === 0 : Object.keys(step.fields).length === 0)) &&
       (!step.actions || Object.keys(step.actions).length === 0);
 
@@ -1474,7 +1474,7 @@ async function renderDiagram() {
 
   for (const step of steps) {
     const id = 'n_' + step.name;
-    const isCallback = step.transitions && 'callback' in step.transitions &&
+    const isCallback = step.transitions && 'sso_authenticated' in step.transitions &&
       (!step.fields || (Array.isArray(step.fields) ? step.fields.length === 0 : Object.keys(step.fields).length === 0)) &&
       (!step.actions || Object.keys(step.actions).length === 0);
     if (step.complete) {
@@ -1837,8 +1837,8 @@ async function renderSim() {
     return;
   }
 
-  // Detect redirect/callback steps: no fields, no actions, has a callback transition
-  const hasCallback = step.transitions && 'callback' in step.transitions;
+  // Detect redirect steps: no fields, no actions, has an SSO return transition
+  const hasCallback = step.transitions && 'sso_authenticated' in step.transitions;
   const hasNoFields = !step.fields || (Array.isArray(step.fields) ? step.fields.length === 0 : Object.keys(step.fields).length === 0);
   const hasNoActions = !step.actions || Object.keys(step.actions).length === 0;
   if (hasCallback && hasNoFields && hasNoActions) {
@@ -1848,7 +1848,7 @@ async function renderSim() {
       <div class="sim-body">
         <p style="color: var(--muted); text-align: center; padding: 40px 0;">Redirecting to external provider\u2026</p>
         <div class="sim-actions">
-          <button class="sim-btn primary" onclick="simAction('callback')">Simulate callback</button>
+          <button class="sim-btn primary" onclick="simAction('sso_authenticated')">Simulate SSO return</button>
         </div>
       </div>
       <div class="sim-footer">

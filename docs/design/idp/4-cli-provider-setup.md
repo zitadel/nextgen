@@ -374,12 +374,12 @@ topology [dependency](2-auth-method-selection.md#dependencies).
 
 #### 2. The Three-Outcome Rule for SSO Steps
 Every step carrying `sso_providers` must explicitly handle three outcomes:
-`callback`, `identity_unknown`, and `user_already_exists`.
+`sso_authenticated`, `sso_user_not_found`, and `user_already_exists`.
 The first two are SSO-only routes; `user_already_exists` is shared with typed
 collisions ([decision 5](#5-retargeting-registration-collisions)).
-*   **`identity_unknown` → `register-sso`** on every step, so an unknown user
-    reaches the collection step after one ceremony whether they started on the
-    sign-in or the register page
+*   **`sso_user_not_found` → `register-sso`** on every step, so an unknown
+    user reaches the collection step after one ceremony whether they started
+    on the sign-in or the register page
     ([area 3](3-social-login-flow.md#resolution-branches)).
     The engine flips `CurrentPurpose` to `register` on the way.
 *   **`user_not_found` is untouched.**
@@ -412,12 +412,12 @@ and the SSO provider buttons.
 The engine binds the attempt to the colliding account.
 *   **SSO Outcomes:** Carrying `sso_providers` puts the step under the
     three-outcome rule:
-    *   `callback` routes to `done`: the user signed in with a provider already
-        linked to that account.
+    *   `sso_authenticated` routes to `done`: the user signed in with a
+        provider already linked to that account.
     *   `user_already_exists` targets the step itself: clicking the colliding
         provider again re-runs the ceremony and resolves identically, so the
         step re-renders with the same options.
-    *   `identity_unknown` routes to `register-sso`: reachable only if the
+    *   `sso_user_not_found` routes to `register-sso`: reachable only if the
         provider returns a different, unknown subject (the user switched
         provider accounts mid-loop).
     *   A wrong password re-renders the step with an error and no transition
@@ -490,7 +490,7 @@ never presented as proof that sign-in works.
 | **Error Codes** | ~~`E_CREDENTIAL_MISSING` and `E_CANCELLED`~~ — **not adopted.** Neither was added. There is no local value to acquire (the engine resolves references from project variables, so `plan` has nothing to check), and cancellation exits the command rather than returning to a parent menu. Both cases are `E_VALIDATION` with a hint naming the next move. | — |
 | **Dev-Runtime Secret Join** | ~~Inject `.env.local` values into the engine process environment at local-runtime spawn.~~ **Not needed.** The engine resolves a connection's `${{ NAME }}` from the project's own variables when it serves the connection, so the join happens server-side for development and production alike and no value passes through the CLI's process environment. | — |
 | **`create_user_with_sso`** | Meta-schema enum value plus the engine handler from area 3. | Flow meta-schema / Engine |
-| **`identity_unknown`** | New reserved outcome, fired by ceremony resolution for an unknown subject; joins the reserved-key list and the flip table (`login` → `register`) at every enumeration site: `RESERVED_OUTCOMES` and `PURPOSE_FLIP_TARGETS` (`packages/config/src/validate.ts`), `reservedOutcomes` and `purposeFlipTargets` (`internal/domain/flow_definition_validator.go`), `applyOutcomeFlip` (`internal/domain/flow_state_machine.go`), the `transitions` description in `flow-definition.json`, the validator's three-outcome rule, and an amendment to ADR 017's SSO note ([area 3](3-social-login-flow.md#resolution-branches)). | Flow meta-schema / Engine / Validator / ADR 017 |
+| **`sso_user_not_found`** | New reserved outcome, fired by ceremony resolution for an unknown subject; joins the reserved-key list and the flip table (`login` → `register`) at every enumeration site: `RESERVED_OUTCOMES` and `PURPOSE_FLIP_TARGETS` (`packages/config/src/validate.ts`), `reservedOutcomes` and `purposeFlipTargets` (`internal/domain/flow_definition_validator.go`), `applyOutcomeFlip` (`internal/domain/flow_state_machine.go`), the `transitions` description in `flow-definition.json`, the validator's three-outcome rule, and an amendment to ADR 017's SSO note ([area 3](3-social-login-flow.md#resolution-branches)). | Flow meta-schema / Engine / Validator / ADR 017 |
 
 ## Open Points
 
