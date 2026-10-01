@@ -13,7 +13,7 @@ import tseslint from "typescript-eslint";
 // `svelte-check`, the `check` script); ESLint also covers the `.ts`/`.js`
 // surface with the hardened rules shared across the SPA SDKs.
 export default tseslint.config(
-  { ignores: ["dist/**", "node_modules/**", ".svelte-kit/**"] },
+  { ignores: ["dist/**", "node_modules/**", ".svelte-kit/**", ".vitest/**"] },
   {
     ...eslint.configs.recommended,
     files: ["**/*.{ts,js,mjs,cjs}"],
