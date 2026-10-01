@@ -1,4 +1,4 @@
-import { Args } from "@oclif/core";
+import { nonBlankArg } from "../flags";
 
 import { ZitadelError } from "../../errors";
 import type { CommandResult } from "../types";
@@ -14,7 +14,7 @@ export const idName = <Ctx>(resource: ResourceDescriptor<Ctx>): string => resour
 export const idArg = <Ctx>(resource: ResourceDescriptor<Ctx>) => {
   const name = idName(resource);
   const description = resource.idDescription ?? `${resource.singular} ${name}`;
-  return { [name]: Args.string({ required: true, description }) };
+  return { [name]: nonBlankArg({ required: true, description }) };
 };
 
 /** The value the caller passed for that argument. */

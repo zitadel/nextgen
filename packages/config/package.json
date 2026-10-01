@@ -33,6 +33,11 @@
       "types": "./dist/defaults.d.mts",
       "import": "./dist/defaults.mjs"
     },
+    "./idp": {
+      "@zitadel/source": "./src/idp/index.ts",
+      "types": "./dist/idp/index.d.mts",
+      "import": "./dist/idp/index.mjs"
+    },
     "./schemas": {
       "@zitadel/source": "./src/schemas.ts",
       "types": "./dist/schemas.d.mts",

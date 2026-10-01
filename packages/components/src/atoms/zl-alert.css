@@ -91,3 +91,30 @@
   outline: var(--zl-focus-width) solid var(--zl-ring);
   outline-offset: var(--zl-focus-offset);
 }
+
+/* An error can carry more than one sentence: a provider's own words
+   (`error_description`) and a link to its explanation (`error_uri`). They are
+   slots rather than markup the templates repeat, so a tenant template gets
+   them for free and the spacing stays with the atom.
+   Muted rather than the message colour at reduced opacity: opacity stacks on
+   whatever the message already is, and on a heading that is itself muted the
+   detail would land at 85% of muted text and risk failing contrast. */
+::slotted([slot="detail"]) {
+  display: block;
+  margin-top: var(--zl-spacing-1);
+  color: var(--zl-muted-foreground);
+}
+::slotted([slot="link"]) {
+  display: inline-block;
+  margin-top: var(--zl-spacing-2);
+  color: var(--zl-link);
+  text-decoration: underline;
+  text-underline-offset: var(--zl-spacing-1);
+}
+::slotted([slot="link"]:hover) {
+  color: var(--zl-foreground);
+}
+::slotted([slot="link"]:focus-visible) {
+  outline: var(--zl-focus-width) solid var(--zl-ring);
+  outline-offset: var(--zl-focus-offset);
+}

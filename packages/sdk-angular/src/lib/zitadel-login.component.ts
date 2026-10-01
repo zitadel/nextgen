@@ -3,6 +3,7 @@ import type { ZitadelLogin as ZitadelLoginElement } from "@zitadel/components";
 import type {
   CreateFlowBodyPurpose,
   ZitadelFlowCompleteDetail,
+  ZitadelFlowRedirectDetail,
   ZitadelFlowErrorDetail,
   ZitadelFlowInputDetail,
   ZitadelFlowStepDetail,
@@ -63,6 +64,7 @@ import "@zitadel/components";
     (zitadel-flow-step)="onFlowStep($event)"
     (zitadel-flow-input)="onFlowInput($event)"
     (zitadel-flow-complete)="onFlowComplete($event)"
+    (zitadel-flow-redirect)="onFlowRedirect($event)"
     (zitadel-flow-error)="onFlowError($event)"
   ></zitadel-login>`,
 })
@@ -81,6 +83,8 @@ export class ZitadelLoginComponent {
   @Output() flowStep = new EventEmitter<ZitadelFlowStepDetail>();
   @Output() flowInput = new EventEmitter<ZitadelFlowInputDetail>();
   @Output() flowComplete = new EventEmitter<ZitadelFlowCompleteDetail>();
+
+  @Output() flowRedirect = new EventEmitter<ZitadelFlowRedirectDetail>();
   @Output() flowError = new EventEmitter<ZitadelFlowErrorDetail>();
 
   @ViewChild("el") private elementRef?: ElementRef<ZitadelLoginElement>;
@@ -100,6 +104,10 @@ export class ZitadelLoginComponent {
 
   onFlowComplete(event: Event): void {
     this.flowComplete.emit((event as CustomEvent<ZitadelFlowCompleteDetail>).detail);
+  }
+
+  onFlowRedirect(event: Event): void {
+    this.flowRedirect.emit((event as CustomEvent<ZitadelFlowRedirectDetail>).detail);
   }
 
   onFlowError(event: Event): void {

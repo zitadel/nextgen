@@ -16,7 +16,7 @@ It requires three distinct artifacts to align perfectly:
 | :--- | :--- | :--- |
 | **User schema** | `x-auth-methods: {password, passkey, magic_link, sso, otp}` | The `sso` slot exists. Currently, every entry is strictly `{enabled}` only, with `additionalProperties: false`. |
 | **IdP connection** | The external provider configuration itself. | Outlined in area 1 (no server contract exists yet). |
-| **Flow step** | `sso_providers: ["google"]`, a list of connection slugs. The engine fills the rendered step's `name` and `template` from the connection ([Rendering from the connection](#rendering-from-the-connection)). | The meta-schema, the flow definition API and stored revisions take the slug list; the engine rejects any SSO submission (`ErrFlowUnsupported`, `internal/domain/flow_state_machine.go`) and renders no providers until it can resolve a slug to its connection. *Constraint:* Any step carrying these **must** define a `transitions.callback` (enforced by the validator). |
+| **Flow step** | `sso_providers: ["google"]`, a list of connection slugs. The engine fills the rendered step's `name` and `template` from the connection ([Rendering from the connection](#rendering-from-the-connection)). | The meta-schema, the flow definition API and stored revisions take the slug list; every render resolves each slug through the connection service and emits `{id, name, template}`. The engine still rejects any SSO submission (`ErrFlowUnsupported`, `internal/domain/flow_state_machine.go`). *Constraint:* Any step carrying these **must** define a `transitions.callback` (enforced by the validator). |
 
 Each authentication method surfaces differently within a flow, meaning there is
 no uniform rendering mechanism across the board:
@@ -42,7 +42,13 @@ The definition contract (`sso_providers` in
 `api/openapi/components/flows/flow-definition-step.yaml`, and the meta-schema
 generated from it) is a slug list. Revisions stored with the earlier
 `[{id, name, template}]` shape still load, each object read as its `id`.
-Resolving slugs at render is the remaining engine work.
+
+The engine resolves the slugs on every render, inside the step builder, so a
+start, a submit and a step read all emit the same providers. Each slug is read
+at the connection's newest revision. A slug with no connection in the project
+is dropped from the rendered step and logged with the step name; the other
+slugs still render. A connection without `template` renders `template: ""`
+until the wire field becomes optional.
 
 ## Principle: Capability vs. Usage
 
@@ -260,7 +266,6 @@ it (emitting an error like
 | **Pair-level `claim_mapping` intersection:** warn when an offered provider's `claim_mapping` shares zero properties with the pinned schema (the [Validation Rules](#validation-rules) row). | `validate.ts` and the Go server mirror, at flow create and update |
 | **Pair-level `verified_claims` intersection:** warn when a provider's `verified_claims` keys share no properties with the pinned schema. | `validate.ts` and the Go server mirror, at flow create and update |
 | **Register-step topology:** whether registration shares the entry steps' `sso_providers` or carries its own step. Both shapes pass the validator and run, so the choice is scaffolding, not validation. | [`4-cli-provider-setup.md`](4-cli-provider-setup.md#flow-architecture-decisions) (settled: `sso_providers` on both shared entry steps and the conflict step) |
-| **Runtime example alignment:** `components/flows/sso-provider.yaml` shows an instance-suffixed `id: google-1`; the rendered `id` is the connection slug, and the runtime example must say so before the engine reads it. | Flow API docs |
 
 The two pairing rows live here because the flow definition is the only document
 that references both sides: its `user_schema` pins the schema revision and its
