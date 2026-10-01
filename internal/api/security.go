@@ -137,6 +137,7 @@ var userBoundSessionOperations = map[api.OperationName]bool{
 	// Console management screens (#1300 §1). CSRF for the writes is #1140.
 	api.CreateUserOperation:          true,
 	api.GetUserByIDOperation:         true,
+	api.ListUserPasskeysOperation:    true,
 	api.DeleteUserByIDOperation:      true,
 	api.CreateTeamOperation:          true,
 	api.UpdateTeamOperation:          true,

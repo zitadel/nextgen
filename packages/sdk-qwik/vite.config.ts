@@ -1,4 +1,4 @@
-import { qwikVite } from "@builder.io/qwik/optimizer";
+import { qwikVite } from "@qwik.dev/core/optimizer";
 import { defineConfig } from "vite";
 import dts from "vite-plugin-dts";
 
@@ -19,7 +19,7 @@ export default defineConfig({
       fileName: () => "index.qwik.mjs",
     },
     rollupOptions: {
-      external: [/^@zitadel\//, /^@builder\.io\//],
+      external: [/^@zitadel\//, /^@qwik\.dev\//],
     },
   },
   plugins: [qwikVite(), dts({ include: ["src"], exclude: ["src/**/*.spec.*"] })],

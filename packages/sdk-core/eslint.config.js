@@ -9,16 +9,16 @@ import prettierPlugin from "eslint-plugin-prettier";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist/**", "out-tsc/**", "test-output/**", "node_modules/**"] },
+  { ignores: ["dist/**", "out-tsc/**", "test-output/**", "node_modules/**", ".vitest/**"] },
   {
     ...eslint.configs.recommended,
-    files: ["**/*.{ts,js,mjs,cjs}"],
+    files: ["**/*.{ts,mts,js,mjs,cjs}"],
   },
   tseslint.configs.recommended,
   importPlugin.flatConfigs.recommended,
   importPlugin.flatConfigs.typescript,
   {
-    files: ["**/*.{ts,js,mjs,cjs}"],
+    files: ["**/*.{ts,mts,js,mjs,cjs}"],
     plugins: {
       perfectionist: perfectionistPlugin,
       prettier: prettierPlugin,
