@@ -17423,6 +17423,21 @@ type Field struct {
 	Type FieldType `json:"type"`
 	// Localization key for the field label.
 	TextKey string `json:"text_key"`
+	// Value for the HTML `autocomplete` attribute of the input rendered
+	// for this field, so password managers and browser autofill
+	// recognise it. A space-separated token list; put it on the
+	// attribute verbatim and do not reinterpret it.
+	// The engine emits `username` on the field carrying the user's
+	// identifier, or `email` when that field's `type` is `email`. On a
+	// password field it emits `current-password` where the submitted
+	// value is verified against the stored credential, and
+	// `new-password` where the value is saved as the user's password —
+	// so a manager offers to fill on sign-in and to generate on
+	// registration. Omitted when no token applies, in which case render
+	// no attribute rather than an empty one.
+	// Autofill only: it says nothing about validation, and the input's
+	// `type` still comes from `type`.
+	Autocomplete OptString `json:"autocomplete"`
 	// The field MUST be present and non-empty on submit. Mirrors the
 	// schema's top-level `required` array.
 	Required OptBool `json:"required"`
@@ -17453,6 +17468,11 @@ func (s *Field) GetTextKey() string {
 	return s.TextKey
 }
 
+// GetAutocomplete returns the value of Autocomplete.
+func (s *Field) GetAutocomplete() OptString {
+	return s.Autocomplete
+}
+
 // GetRequired returns the value of Required.
 func (s *Field) GetRequired() OptBool {
 	return s.Required
@@ -17481,6 +17501,11 @@ func (s *Field) SetType(val FieldType) {
 // SetTextKey sets the value of TextKey.
 func (s *Field) SetTextKey(val string) {
 	s.TextKey = val
+}
+
+// SetAutocomplete sets the value of Autocomplete.
+func (s *Field) SetAutocomplete(val OptString) {
+	s.Autocomplete = val
 }
 
 // SetRequired sets the value of Required.
@@ -19872,6 +19897,33 @@ type FlowStep struct {
 	// template iterates this array; for keyed lookup it builds a name-indexed
 	// map locally.
 	Fields []Field `json:"fields"`
+	// The user's identifier, collected on an earlier step, for this
+	// step's form to carry alongside the password. Present only when the
+	// step collects a password and does not itself collect the
+	// identifier — a step that collects the identifier carries it in
+	// `fields` instead, and needs nothing here.
+	// A password manager saves an identifier and a password as one
+	// credential, and reads both from the same form. A step that
+	// collects only the password leaves it nothing to pair with, so the
+	// engine hands the identifier back here.
+	// **What the client does with it.** Put one more control in the same
+	// form element as the password input, carrying `name`, `value` and
+	// `autocomplete` as given. It must be:
+	// - *hidden* — the user already supplied this value on the previous
+	// step and is not being asked for it again;
+	// - *not editable* — the engine has already resolved the user from
+	// this value, so a changed one would not change who is signing in;
+	// - *left out of the submission* — see below.
+	// Any control a password manager can read works; the fields are
+	// named for an HTML input because that is the shape managers expect.
+	// **Do not submit it.** The step's `fields` are the whole
+	// submission. This name is not among them, so sending it back fails
+	// the step with an `error.<name>_unknown_field` violation. Clients
+	// that build their submission from `fields` (rather than from
+	// whatever the form contains) get this for free.
+	// It is also not display text: do not render it as a greeting or a
+	// label. `texts.description_key` is the place for that.
+	Identifier OptFlowStepIdentifier `json:"identifier"`
 	// Ordered list of available user actions. The LiquidJS template iterates
 	// this array and builds a name-indexed map locally for keyed lookup.
 	Actions []FlowStepAction `json:"actions"`
@@ -19918,6 +19970,11 @@ func (s *FlowStep) GetRedirectURL() OptURI {
 // GetFields returns the value of Fields.
 func (s *FlowStep) GetFields() []Field {
 	return s.Fields
+}
+
+// GetIdentifier returns the value of Identifier.
+func (s *FlowStep) GetIdentifier() OptFlowStepIdentifier {
+	return s.Identifier
 }
 
 // GetActions returns the value of Actions.
@@ -19968,6 +20025,11 @@ func (s *FlowStep) SetRedirectURL(val OptURI) {
 // SetFields sets the value of Fields.
 func (s *FlowStep) SetFields(val []Field) {
 	s.Fields = val
+}
+
+// SetIdentifier sets the value of Identifier.
+func (s *FlowStep) SetIdentifier(val OptFlowStepIdentifier) {
+	s.Identifier = val
 }
 
 // SetActions sets the value of Actions.
@@ -20284,6 +20346,75 @@ func (s *FlowStepGates) init() FlowStepGates {
 		*s = m
 	}
 	return m
+}
+
+// The user's identifier, collected on an earlier step, for this
+// step's form to carry alongside the password. Present only when the
+// step collects a password and does not itself collect the
+// identifier — a step that collects the identifier carries it in
+// `fields` instead, and needs nothing here.
+// A password manager saves an identifier and a password as one
+// credential, and reads both from the same form. A step that
+// collects only the password leaves it nothing to pair with, so the
+// engine hands the identifier back here.
+// **What the client does with it.** Put one more control in the same
+// form element as the password input, carrying `name`, `value` and
+// `autocomplete` as given. It must be:
+// - *hidden* — the user already supplied this value on the previous
+// step and is not being asked for it again;
+// - *not editable* — the engine has already resolved the user from
+// this value, so a changed one would not change who is signing in;
+// - *left out of the submission* — see below.
+// Any control a password manager can read works; the fields are
+// named for an HTML input because that is the shape managers expect.
+// **Do not submit it.** The step's `fields` are the whole
+// submission. This name is not among them, so sending it back fails
+// the step with an `error.<name>_unknown_field` violation. Clients
+// that build their submission from `fields` (rather than from
+// whatever the form contains) get this for free.
+// It is also not display text: do not render it as a greeting or a
+// label. `texts.description_key` is the place for that.
+type FlowStepIdentifier struct {
+	// The user-schema property the identifier was collected into.
+	// Use it as the control's `name`.
+	Name string `json:"name"`
+	// The identifier the user supplied. Use it as the control's
+	// `value`, verbatim.
+	Value string `json:"value"`
+	// Value for the control's HTML `autocomplete` attribute, used
+	// verbatim. `username` is the token that pairs an identifier
+	// with a password in the same form.
+	Autocomplete string `json:"autocomplete"`
+}
+
+// GetName returns the value of Name.
+func (s *FlowStepIdentifier) GetName() string {
+	return s.Name
+}
+
+// GetValue returns the value of Value.
+func (s *FlowStepIdentifier) GetValue() string {
+	return s.Value
+}
+
+// GetAutocomplete returns the value of Autocomplete.
+func (s *FlowStepIdentifier) GetAutocomplete() string {
+	return s.Autocomplete
+}
+
+// SetName sets the value of Name.
+func (s *FlowStepIdentifier) SetName(val string) {
+	s.Name = val
+}
+
+// SetValue sets the value of Value.
+func (s *FlowStepIdentifier) SetValue(val string) {
+	s.Value = val
+}
+
+// SetAutocomplete sets the value of Autocomplete.
+func (s *FlowStepIdentifier) SetAutocomplete(val string) {
+	s.Autocomplete = val
 }
 
 // Ref: #
@@ -35885,6 +36016,52 @@ func (o OptFlowStepComplete) Get() (v FlowStepComplete, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptFlowStepComplete) Or(d FlowStepComplete) FlowStepComplete {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptFlowStepIdentifier returns new OptFlowStepIdentifier with value set to v.
+func NewOptFlowStepIdentifier(v FlowStepIdentifier) OptFlowStepIdentifier {
+	return OptFlowStepIdentifier{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFlowStepIdentifier is optional FlowStepIdentifier.
+type OptFlowStepIdentifier struct {
+	Value FlowStepIdentifier
+	Set   bool
+}
+
+// IsSet returns true if OptFlowStepIdentifier was set.
+func (o OptFlowStepIdentifier) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFlowStepIdentifier) Reset() {
+	var v FlowStepIdentifier
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFlowStepIdentifier) SetTo(v FlowStepIdentifier) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFlowStepIdentifier) Get() (v FlowStepIdentifier, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFlowStepIdentifier) Or(d FlowStepIdentifier) FlowStepIdentifier {
 	if v, ok := o.Get(); ok {
 		return v
 	}
