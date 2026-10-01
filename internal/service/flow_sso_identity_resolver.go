@@ -98,13 +98,14 @@ func (r *FlowSSOIdentityResolver) LoadParked(ctx context.Context, in domain.Flow
 }
 
 // boundThroughSSO reports the user an earlier BindLinked recorded, while the
-// attempt still waits for its handoff. The sso factor is the marker: only a
-// bind writes it, together with the user factor.
+// attempt still waits for its handoff. The sso factor this attempt wrote is the
+// marker: only a bind writes it, together with the user factor. A factor
+// copied in from a session carries the older attempt id and does not count.
 func boundThroughSSO(attempt *domain.AuthAttempt) *domain.FlowSSOParkedIdentity {
 	if attempt.HandedOffAt != nil {
 		return nil
 	}
-	if _, ok := domain.CheckAs[*domain.AuthFactorSSO](attempt, domain.AuthCheckTypeSSO); !ok {
+	if sso, ok := domain.CheckAs[*domain.AuthFactorSSO](attempt, domain.AuthCheckTypeSSO); !ok || sso.AttemptID != attempt.ID {
 		return nil
 	}
 	user, ok := domain.CheckAs[*domain.AuthFactorUser](attempt, domain.AuthCheckTypeUser)
@@ -145,7 +146,7 @@ func (r *FlowSSOIdentityResolver) BindLinked(ctx context.Context, in domain.Flow
 		} else if err := emitDirectAuthFactor(ctx, stmts, attempt, userFactor, checkID); err != nil {
 			return fmt.Errorf("bind sso identity: %w", err)
 		}
-		ssoFactor := &domain.AuthFactorSSO{ConnectionID: in.ConnectionID, LinkID: in.LinkID}
+		ssoFactor := &domain.AuthFactorSSO{ConnectionID: in.ConnectionID, LinkID: in.LinkID, AttemptID: in.AttemptID}
 		if _, err := recordDirectAuthFactor(ctx, stmts, attempt, ssoFactor); err != nil {
 			return fmt.Errorf("bind sso identity: %w", err)
 		}

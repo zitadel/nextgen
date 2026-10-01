@@ -119,7 +119,7 @@ func TestFlowSSOIdentityResolver_LoadParked_NoResultReturnsNil(t *testing.T) {
 func boundFactors() []domain.AuthCheck {
 	return []domain.AuthCheck{
 		&domain.AuthFactorUser{UserID: "user-1"},
-		&domain.AuthFactorSSO{ConnectionID: "idp-1", LinkID: "idplink-1"},
+		&domain.AuthFactorSSO{ConnectionID: "idp-1", LinkID: "idplink-1", AttemptID: ssoAttemptID},
 	}
 }
 
@@ -136,6 +136,23 @@ func TestFlowSSOIdentityResolver_LoadParked_BoundAttemptReportsUser(t *testing.T
 	got, err := f.resolver.LoadParked(t.Context(), loadInput())
 	require.NoError(t, err)
 	assert.Equal(t, &domain.FlowSSOParkedIdentity{BoundUserID: "user-1"}, got)
+}
+
+// A new attempt started from an SSO session inherits the session's factors,
+// including an sso factor another attempt wrote: that is no lost settlement.
+func TestFlowSSOIdentityResolver_LoadParked_SessionCopiedSSOFactorIsNotARetryMarker(t *testing.T) {
+	t.Parallel()
+	f := newSSOResolverFixture(t)
+	copied := []domain.AuthCheck{
+		&domain.AuthFactorUser{UserID: "user-1"},
+		&domain.AuthFactorSSO{ConnectionID: "idp-1", LinkID: "idplink-1", AttemptID: "att-earlier"},
+	}
+	f.stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), ssoProjectID, ssoAttemptID).
+		Return(&domain.AuthAttempt{ProjectID: ssoProjectID, ID: ssoAttemptID, Checks: copied}, nil)
+
+	got, err := f.resolver.LoadParked(t.Context(), loadInput())
+	require.NoError(t, err)
+	assert.Nil(t, got)
 }
 
 func TestFlowSSOIdentityResolver_LoadParked_BoundAttemptWithParkedResultPrefersResult(t *testing.T) {
@@ -240,7 +257,7 @@ func TestFlowSSOIdentityResolver_BindLinked_WritesBothFactorsAndDeletes(t *testi
 	require.NoError(t, err)
 	assert.Equal(t, []domain.AuthFactor{
 		&domain.AuthFactorUser{UserID: "user-1"},
-		&domain.AuthFactorSSO{ConnectionID: "idp-1", LinkID: "idplink-1"},
+		&domain.AuthFactorSSO{ConnectionID: "idp-1", LinkID: "idplink-1", AttemptID: ssoAttemptID},
 	}, written)
 }
 
@@ -315,7 +332,7 @@ func TestFlowSSOIdentityResolver_BindLinked_ConcurrentSameUserProceeds(t *testin
 			Return(parkedAttempt(parkedResult(), &domain.AuthFactorUser{UserID: "user-1"}), nil),
 	)
 	f.stmts.EXPECT().SetAuthAttemptFactor(gomock.Any(), ssoProjectID, ssoAttemptID,
-		&domain.AuthFactorSSO{ConnectionID: "idp-1", LinkID: "idplink-1"}).Return("ch-sso", nil)
+		&domain.AuthFactorSSO{ConnectionID: "idp-1", LinkID: "idplink-1", AttemptID: ssoAttemptID}).Return("ch-sso", nil)
 	f.stmts.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil).Times(1)
 
 	err := f.resolver.BindLinked(t.Context(), domain.FlowSSOBindInput{

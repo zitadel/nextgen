@@ -261,8 +261,8 @@ func TestSSOResolutionStoresNoProviderToken(t *testing.T) {
 	require.True(t, ok)
 	payload, err := json.Marshal(ssoFactor.Payload())
 	require.NoError(t, err)
-	assert.JSONEq(t, `{"connection_id":"`+f.connection.ID+`","link_id":"`+link.ID+`"}`, string(payload),
-		"the sso factor holds the connection and link ids, nothing the provider asserted")
+	assert.JSONEq(t, `{"connection_id":"`+f.connection.ID+`","link_id":"`+link.ID+`","attempt_id":"`+flow.attemptID+`"}`, string(payload),
+		"the sso factor holds the connection, link and attempt ids, nothing the provider asserted")
 }
 
 func TestSSOResolutionOtherSchemaReturns409(t *testing.T) {
