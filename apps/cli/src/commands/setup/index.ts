@@ -944,9 +944,15 @@ function retryOptionsFromFlags(flags: {
     renderer: flags.renderer,
     devPort: flags["dev-port"],
     nonInteractive: Boolean(flags["non-interactive"]),
+    // The provider survives on its own. A suggested retry carries `--sso`
+    // without `--sso-client-id` -- the id is never put in command text -- so
+    // requiring both here would drop the provider from the next suggestion if
+    // that retry failed again before the wizard ran, and the developer would
+    // be told to set up without the provider they asked for. An empty id
+    // means "ask for it", which is what the wizard does with it.
     sso:
-      flags.sso !== undefined && flags["sso-client-id"] !== undefined
-        ? [{ provider: flags.sso, clientId: flags["sso-client-id"] }]
+      flags.sso !== undefined
+        ? [{ provider: flags.sso, clientId: flags["sso-client-id"] ?? "" }]
         : undefined,
   };
 }
@@ -1067,8 +1073,8 @@ function localSetupHint(error: unknown, retry: SetupRetryOptions, cliVersion: st
       `${normalized.hint ? `${normalized.hint} ` : ""}` +
       "Start local Zitadel first, then rerun setup. " +
       (retry.sso && retry.sso.length > 0
-        ? "The rerun asks for the client secret, because a command cannot carry one. " +
-          "To script it instead, pipe the secret in and add --non-interactive. "
+        ? "The rerun asks for the client id and secret, because a command carries neither. " +
+          "To script it instead, add --sso-client-id and --non-interactive, and pipe the secret in. "
         : "") +
       sso.hint +
       "After setup succeeds, follow its next_commands to start the app and verify registration, logout, and login in the browser.",

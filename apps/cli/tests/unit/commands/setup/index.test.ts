@@ -165,8 +165,41 @@ describe("setup command pre-flight", () => {
     const retry = (json.next_commands ?? []).find((c) => c.includes("setup "));
     expect(retry).toContain("--sso google");
     expect(retry).not.toContain("--non-interactive");
-    // And it says why, so the scripted path is still reachable.
-    expect(json.hint).toContain("asks for the client secret");
+    // And it says why, so the scripted path is still reachable -- naming both
+    // credentials, since the retry carries neither.
+    expect(json.hint).toContain("asks for the client id and secret");
+    expect(json.hint).toContain("--sso-client-id");
+  });
+
+  // The suggested retry carries `--sso` without `--sso-client-id`, since the id
+  // is never put in command text. Following that retry and hitting the same
+  // failure again must not drop the provider from the next suggestion -- the
+  // developer would be told to set up without the provider they asked for.
+  it("keeps the provider in the retry when only --sso was given", async () => {
+    const cwd = await makeTempDir();
+    await writeFile(join(cwd, "package.json"), JSON.stringify({ dependencies: { next: "^15" } }));
+    await writeRuntimeMetadata(cwd, runtimeFor(cwd, "http://localhost:9"));
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--framework",
+      "next",
+      "--server",
+      "local",
+      "--sso",
+      "google",
+      "--json",
+    ]);
+
+    const json = parseJson(res.stdout) as { next_commands?: string[]; hint?: string };
+    const retry = (json.next_commands ?? []).find((c) => c.includes("setup "));
+    expect(retry).toContain("--sso google");
+    // And the scripted route names both flags, because a rerun with --sso and
+    // --non-interactive alone fails on the missing client id before stdin is
+    // ever read.
+    expect(json.hint).toContain("--sso-client-id");
   });
 
   // Suggested commands are run verbatim, especially by agents, and nothing
