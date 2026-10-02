@@ -15,24 +15,9 @@ Scope pointers first — this file's own body covers **telemetry only**:
   `src/lib/claim-state.ts`, `src/commands/doctor/checks/claim.ts`).
 - The journey e2e contract is
   [`apps/cli-journey-e2e/AGENTS.md`](../cli-journey-e2e/AGENTS.md).
-
-## Tests are a unit test or a spec, never something in between
-
-Every test under `tests/` is one of exactly two kinds, and the directory says
-which:
-
-- `tests/unit/**` — a unit test. It imports from `src/` (or reads a checked-in
-  file) and asserts on what it imported. Doubles are fine here.
-- `tests/integration/**` — a spec. It drives the built CLI through
-  `runCliForTest` against `@zitadel/api-mock`'s platform handlers, and asserts
-  only on observable outcomes: the JSON envelope, the exit code, the files the
-  project ends up holding, and what the platform received. No doubles of our
-  own modules, and never a real Zitadel.
-
-So a test that never invokes the CLI does not belong in `tests/integration`,
-even when it is slow or reads from disk, and a spec does not reach into `src/`
-to stub a collaborator. A test of a helper defined inside a test file is
-neither kind — assert the behaviour through the spec that uses it instead.
+- The test contract — the unit/spec split and one spec per command — is
+  [`tests/AGENTS.md`](tests/AGENTS.md). Read it before adding or moving any
+  test.
 
 # Analytics Tracking — Mixpanel
 
