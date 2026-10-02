@@ -66,6 +66,7 @@ type flowTestWorld struct {
 	schemaResolver     *domainmock.MockSchemaResolver
 	createUser         *domainmock.MockFlowOnSuccessHandler
 	ssoProviders       *domainmock.MockFlowSSOProviderResolver
+	ssoIdentities      *domainmock.MockFlowSSOIdentityService
 	ssoRedirects       *domainmock.MockFlowSSORedirectIssuer
 	sm                 *domain.FlowStateMachineRuntime
 }
@@ -85,6 +86,7 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 	authAttemptService := domainmock.NewMockFlowAuthAttemptService(mock)
 	createUser := domainmock.NewMockFlowOnSuccessHandler(mock)
 	ssoProviders := domainmock.NewMockFlowSSOProviderResolver(mock)
+	ssoIdentities := domainmock.NewMockFlowSSOIdentityService(mock)
 	ssoRedirects := domainmock.NewMockFlowSSORedirectIssuer(mock)
 
 	resolver := domain.NewSchemaFieldResolver()
@@ -98,6 +100,7 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 		createUser,
 		authAttemptService,
 		ssoProviders,
+		ssoIdentities,
 		ssoRedirects,
 		now,
 	)
@@ -109,6 +112,7 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 		authAttemptService: authAttemptService,
 		createUser:         createUser,
 		ssoProviders:       ssoProviders,
+		ssoIdentities:      ssoIdentities,
 		ssoRedirects:       ssoRedirects,
 		sm:                 sm,
 	}
@@ -875,11 +879,11 @@ func TestFlowStateMachine_Process_SSO_IssueErrors(t *testing.T) {
 }
 
 // ssoStepDefinition offers two providers on the signup step, routed to
-// done on callback as the validator requires of a step with sso_providers.
+// done on sso_authenticated as the validator requires of a step with sso_providers.
 func ssoStepDefinition() *domain.FlowDefinition {
 	def := signupDefinition()
 	def.Steps[0].SSOProviders = []string{"google", "github"}
-	def.Steps[0].Transitions["callback"] = domain.FlowStepTransition{Target: "done"}
+	def.Steps[0].Transitions["sso_authenticated"] = domain.FlowStepTransition{Target: "done"}
 	return def
 }
 
@@ -3523,6 +3527,7 @@ func TestFlowStepErrorContract(t *testing.T) {
 		domain.FlowStepErrorInvalidCredentials,
 		domain.FlowStepErrorPasskeyInvalid,
 		domain.FlowStepErrorPasskeyRegistrationInvalid,
+		domain.FlowStepErrorSSOCreationDisabled,
 		domain.FlowStepErrorSSOUnavailable,
 	}
 	for _, key := range stepErrorConsts {
@@ -4535,7 +4540,9 @@ func TestFlowStateMachine_RenderAfterReload_StillPairsTheIdentifier(t *testing.T
 	require.NoError(t, err)
 	require.Equal(t, "password", advanced.Step.Name)
 
-	// Re-render the same state, as a page reload does.
+	// Re-render the same state, as a page reload does. Every render reads
+	// the attempt for a parked SSO identity; there is none here.
+	w.ssoIdentities.EXPECT().LoadParked(gomock.Any(), gomock.Any()).Return(nil, nil)
 	reloaded, err := w.sm.Render(t.Context(), def, advanced.State)
 	require.NoError(t, err)
 	require.NotNil(t, reloaded.Step)
@@ -4621,4 +4628,294 @@ func TestFlowStateMachine_SingleCardLogin_NeedsNoPairingHint(t *testing.T) {
 	}
 	assert.Equal(t, domain.AutocompleteUsername, byName["email"])
 	assert.Equal(t, domain.AutocompleteCurrentPassword, byName["x-auth-methods#password"])
+}
+
+// ssoRenderWorld is a test world sitting on the sso step of
+// [ssoStepDefinition], with the schema and the provider list resolving on
+// every render.
+func ssoRenderWorld(t *testing.T) (*flowTestWorld, *domain.FlowDefinition, *domain.FlowState) {
+	t.Helper()
+	w := newFlowTestWorld(t)
+	w.schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+		AnyTimes()
+	w.ssoProviders.EXPECT().
+		Resolve(gomock.Any(), testProjectID, "credentials", gomock.Any()).
+		Return([]domain.FlowSSOProvider{{ID: "google", Name: "Google"}}, nil).
+		AnyTimes()
+	state := &domain.FlowState{
+		ID:            "flow-1",
+		ProjectID:     testProjectID,
+		UserSchemaURL: defaultSchemaURL,
+		FlowProgress: domain.FlowProgress{
+			DefinitionID:   "def-signup",
+			Purpose:        domain.FlowDefinitionPurposeRegister,
+			CurrentPurpose: domain.FlowDefinitionPurposeRegister,
+			CurrentStep:    "credentials",
+		},
+		AuthAttemptID: "att-1",
+	}
+	return w, ssoStepDefinition(), state
+}
+
+// expectParked makes LoadParked hand back parked for the world's attempt.
+func (w *flowTestWorld) expectParked(parked *domain.FlowSSOParkedIdentity, err error) {
+	w.ssoIdentities.EXPECT().
+		LoadParked(gomock.Any(), domain.FlowSSOLoadInput{
+			ProjectID:     testProjectID,
+			AttemptID:     "att-1",
+			UserSchemaURL: defaultSchemaURL,
+		}).
+		Return(parked, err)
+}
+
+func linkedParked() *domain.FlowSSOParkedIdentity {
+	return &domain.FlowSSOParkedIdentity{
+		CheckID:      "ch-1",
+		ConnectionID: "idp-1",
+		Subject:      "sub-1",
+		Link:         &domain.FlowSSOLinkedUser{LinkID: "idplink-1", UserID: "user-1"},
+	}
+}
+
+func TestFlowStateMachine_Render_SSOLinkedUserRoutesAuthenticated(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoRenderWorld(t)
+	w.expectParked(linkedParked(), nil)
+	w.ssoIdentities.EXPECT().
+		BindLinked(gomock.Any(), domain.FlowSSOBindInput{
+			ProjectID:    testProjectID,
+			AttemptID:    "att-1",
+			CheckID:      "ch-1",
+			UserID:       "user-1",
+			ConnectionID: "idp-1",
+			LinkID:       "idplink-1",
+		}).
+		Return(nil).
+		Times(1)
+	w.authAttemptService.EXPECT().
+		Handoff(gomock.Any(), domain.FlowHandoffInput{ProjectID: testProjectID, AttemptID: "att-1"}).
+		Return(domain.FlowHandoffOutput{Token: "handoff-1", ExpiresAt: time.Unix(1700000060, 0).UTC()}, nil).
+		Times(1)
+
+	result, err := w.sm.Render(t.Context(), def, state)
+	require.NoError(t, err)
+	require.Equal(t, "done", result.Step.Name)
+	require.NotNil(t, result.Step.Complete)
+	assert.Equal(t, "handoff-1", result.HandoffToken)
+	assert.Equal(t, "user-1", result.State.CollectedData.UserID)
+	assert.Equal(t, "ch-1", result.State.SSOResolvedCheckID)
+}
+
+func TestFlowStateMachine_Render_SSOReplayGuardSkipsResolution(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoRenderWorld(t)
+	state.SSOResolvedCheckID = "ch-1"
+	// The engine hands its guard to the service, which skips the resolved row.
+	w.ssoIdentities.EXPECT().
+		LoadParked(gomock.Any(), domain.FlowSSOLoadInput{
+			ProjectID:       testProjectID,
+			AttemptID:       "att-1",
+			UserSchemaURL:   defaultSchemaURL,
+			ResolvedCheckID: "ch-1",
+		}).
+		Return(nil, nil)
+	w.ssoIdentities.EXPECT().BindLinked(gomock.Any(), gomock.Any()).Times(0)
+
+	result, err := w.sm.Render(t.Context(), def, state)
+	require.NoError(t, err)
+	assert.Equal(t, "credentials", result.Step.Name)
+	assert.Nil(t, result.Step.Error)
+	assert.Empty(t, result.State.CollectedData.UserID)
+	assert.Empty(t, result.HandoffToken)
+}
+
+func TestFlowStateMachine_Render_NoParkedIdentityRendersStep(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoRenderWorld(t)
+	w.expectParked(nil, nil)
+
+	result, err := w.sm.Render(t.Context(), def, state)
+	require.NoError(t, err)
+	assert.Equal(t, "credentials", result.Step.Name)
+	assert.Nil(t, result.Step.Error)
+	assert.Empty(t, result.State.SSOResolvedCheckID)
+}
+
+func TestFlowStateMachine_Render_SSORestartRequiredPropagates(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoRenderWorld(t)
+	w.expectParked(nil, domain.ErrFlowRestartRequired())
+
+	_, err := w.sm.Render(t.Context(), def, state)
+	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
+}
+
+// The attempt read on every render also ends a flow whose attempt is dead,
+// on a step that offers no sso_providers too.
+func TestFlowStateMachine_Render_DeadAttemptRestartsStepWithoutSSO(t *testing.T) {
+	t.Parallel()
+	w, _, state := ssoRenderWorld(t)
+	w.expectParked(nil, domain.ErrFlowRestartRequired())
+
+	_, err := w.sm.Render(t.Context(), signupDefinition(), state)
+	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
+}
+
+func TestFlowStateMachine_Render_SSOCreationDisabledRendersStepError(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoRenderWorld(t)
+	w.expectParked(&domain.FlowSSOParkedIdentity{CheckID: "ch-1", ConnectionID: "idp-1", Subject: "sub-1", CreationDisabled: true}, nil)
+	w.ssoIdentities.EXPECT().BindLinked(gomock.Any(), gomock.Any()).Times(0)
+	w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).Times(0)
+
+	result, err := w.sm.Render(t.Context(), def, state)
+	require.NoError(t, err)
+	assert.Equal(t, "credentials", result.Step.Name)
+	require.NotNil(t, result.Step.Error)
+	assert.Equal(t, domain.FlowStepErrorSSOCreationDisabled, *result.Step.Error)
+	assert.True(t, containsFieldName(result.Step.Fields, "email"), "the step keeps its inputs")
+	assert.Empty(t, result.HandoffToken)
+	assert.Equal(t, "ch-1", result.State.SSOResolvedCheckID)
+}
+
+// Creation under `auto` is not resolved yet: the parked row stays for the
+// branch that will create or collide, and the guard is not recorded so that
+// branch still sees the row.
+func TestFlowStateMachine_Render_SSOUnlinkedAutoLeavesParkedRow(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoRenderWorld(t)
+	w.expectParked(&domain.FlowSSOParkedIdentity{CheckID: "ch-1", ConnectionID: "idp-1", Subject: "sub-1"}, nil)
+
+	result, err := w.sm.Render(t.Context(), def, state)
+	require.NoError(t, err)
+	assert.Equal(t, "credentials", result.Step.Name)
+	assert.Nil(t, result.Step.Error)
+	assert.Empty(t, result.State.SSOResolvedCheckID)
+}
+
+// A stored definition is validated only on write. When its sso_authenticated
+// transition cannot route, the attempt is not bound: the step shows the
+// unwired outcome, and the guard keeps a reload from repeating it.
+func TestFlowStateMachine_Render_SSOUnroutableTransitionDoesNotBind(t *testing.T) {
+	t.Parallel()
+	register := domain.FlowDefinitionPurposeRegister
+	action := domain.Switch
+	for name, transition := range map[string]*domain.FlowStepTransition{
+		"missing":      nil,
+		"with purpose": {Target: "done", Purpose: &register},
+		"with action":  {Target: "other-flow", Action: &action},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			w, def, state := ssoRenderWorld(t)
+			delete(def.Steps[0].Transitions, domain.FlowImplicitOutcomeSSOAuthenticated)
+			if transition != nil {
+				def.Steps[0].Transitions[domain.FlowImplicitOutcomeSSOAuthenticated] = *transition
+			}
+			w.expectParked(linkedParked(), nil)
+			w.ssoIdentities.EXPECT().BindLinked(gomock.Any(), gomock.Any()).Times(0)
+			w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).Times(0)
+
+			result, err := w.sm.Render(t.Context(), def, state)
+			require.NoError(t, err)
+			assert.Equal(t, "credentials", result.Step.Name)
+			require.NotNil(t, result.Step.Error)
+			assert.Equal(t, domain.FlowImplicitOutcomeSSOAuthenticated, *result.Step.Error)
+			assert.Empty(t, result.State.CollectedData.UserID)
+			assert.Equal(t, "ch-1", result.State.SSOResolvedCheckID)
+		})
+	}
+}
+
+func TestFlowStateMachine_Render_SSOBindOnForeignUserRestarts(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoRenderWorld(t)
+	w.expectParked(linkedParked(), nil)
+	w.ssoIdentities.EXPECT().BindLinked(gomock.Any(), gomock.Any()).Return(domain.ErrFlowRestartRequired())
+	w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).Times(0)
+
+	_, err := w.sm.Render(t.Context(), def, state)
+	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
+	assert.Empty(t, state.CollectedData.UserID, "nothing is recorded for the foreign user")
+	assert.Equal(t, "credentials", state.CurrentStep)
+}
+
+// An earlier request bound the attempt but lost its handoff: the success
+// outcome is raised again, so the handoff is minted on this render.
+func TestFlowStateMachine_Render_SSOBoundAttemptRetriesHandoff(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoRenderWorld(t)
+	w.expectParked(&domain.FlowSSOParkedIdentity{BoundUserID: "u1"}, nil)
+	w.ssoIdentities.EXPECT().BindLinked(gomock.Any(), gomock.Any()).Times(0)
+	w.authAttemptService.EXPECT().
+		Handoff(gomock.Any(), domain.FlowHandoffInput{ProjectID: testProjectID, AttemptID: "att-1"}).
+		Return(domain.FlowHandoffOutput{Token: "handoff-1", ExpiresAt: time.Unix(1700000060, 0).UTC()}, nil).
+		Times(1)
+
+	result, err := w.sm.Render(t.Context(), def, state)
+	require.NoError(t, err)
+	assert.Equal(t, "done", result.Step.Name)
+	assert.Equal(t, "handoff-1", result.HandoffToken)
+	assert.Equal(t, "u1", result.State.CollectedData.UserID)
+}
+
+// Two requests retried the same lost handoff and the other one won: the
+// attempt is handed off, so this one restarts, as every later render of this
+// cookie would.
+func TestFlowStateMachine_Render_SSOBoundAttemptRetryLosesRace(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoRenderWorld(t)
+	w.expectParked(&domain.FlowSSOParkedIdentity{BoundUserID: "u1"}, nil)
+	w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).
+		Return(domain.FlowHandoffOutput{}, domain.ErrAuthAttemptAlreadyHandedOff())
+
+	_, err := w.sm.Render(t.Context(), def, state)
+	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
+}
+
+func TestFlowStateMachine_Render_SSOBoundAttemptWithRecordedUserRendersStep(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoRenderWorld(t)
+	state.CollectedData.UserID = "u1"
+	w.expectParked(&domain.FlowSSOParkedIdentity{BoundUserID: "u1"}, nil)
+	w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).Times(0)
+
+	result, err := w.sm.Render(t.Context(), def, state)
+	require.NoError(t, err)
+	assert.Equal(t, "credentials", result.Step.Name)
+	assert.Empty(t, result.HandoffToken)
+}
+
+// A concurrent request settled the parked row, or a new ceremony replaced it:
+// the winner already answered, so this render shows the step with no outcome.
+func TestFlowStateMachine_Render_SSOStaleParkedRowRendersStep(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoRenderWorld(t)
+	w.expectParked(linkedParked(), nil)
+	w.ssoIdentities.EXPECT().BindLinked(gomock.Any(), gomock.Any()).Return(domain.ErrSSOStateInvalid())
+	w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).Times(0)
+
+	result, err := w.sm.Render(t.Context(), def, state)
+	require.NoError(t, err)
+	assert.Equal(t, "credentials", result.Step.Name)
+	assert.Nil(t, result.Step.Error)
+	assert.Empty(t, result.State.CollectedData.UserID)
+	assert.Empty(t, result.HandoffToken)
+}
+
+// A completed flow has handed its attempt off (and the session exchange may
+// have deleted it), so a render on the terminal step reads nothing.
+func TestFlowStateMachine_Render_TerminalStepSkipsResolution(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoRenderWorld(t)
+	state.CurrentStep = "done"
+	w.ssoIdentities.EXPECT().LoadParked(gomock.Any(), gomock.Any()).Times(0)
+
+	result, err := w.sm.Render(t.Context(), def, state)
+	require.NoError(t, err)
+	assert.Equal(t, "done", result.Step.Name)
+	// Marked complete, so GET /flow/{id} can answer 410 for a finished flow.
+	assert.NotNil(t, result.Step.Complete)
 }

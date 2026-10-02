@@ -71,6 +71,9 @@ func factorPayloadToAPI(factor domain.AuthFactor) api.OptCompletedFactorPayload 
 				AuthenticatorAttachment: api.OptPasskeyFactorPayloadAuthenticatorAttachment{},
 			},
 		})
+	case *domain.AuthFactorSSO:
+		// No payload: the connection and link ids stay server-side.
+		return api.OptCompletedFactorPayload{}
 	}
 	return api.OptCompletedFactorPayload{}
 }
@@ -93,6 +96,8 @@ func checkTypeToAPI(check domain.AuthCheckType) api.FactorMethod {
 		return api.FactorMethodPassword
 	case domain.AuthCheckTypePasskey:
 		return api.FactorMethodPasskey
+	case domain.AuthCheckTypeSSO:
+		return api.FactorMethodSSO
 	default:
 		return ""
 	}

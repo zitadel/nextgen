@@ -776,3 +776,25 @@ func TestFlowService_GetStep_CallsRender(t *testing.T) {
 	require.NotNil(t, res.Step)
 	assert.Equal(t, "identify", res.Step.Name)
 }
+
+func TestFlowService_GetStep_PropagatesHandoffToken(t *testing.T) {
+	def := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
+	repo := stubGetFlowDefinition(t, def)
+	state := &domain.FlowState{
+		ID:           "flow_1",
+		ProjectID:    def.ProjectID,
+		FlowProgress: domain.FlowProgress{DefinitionID: def.ID},
+	}
+	expiresAt := time.Date(2026, 5, 27, 12, 0, 0, 0, time.UTC)
+	sm := &fakeStateMachine{renderResult: domain.FlowStepResult{
+		State:                 state,
+		Step:                  &domain.FlowStep{Name: "done"},
+		HandoffToken:          "ht_abc",
+		HandoffTokenExpiresAt: expiresAt,
+	}}
+
+	res, err := service.NewFlowService(repo, sm).GetStep(t.Context(), service.GetFlowStepRequest{State: state})
+	require.NoError(t, err)
+	assert.Equal(t, "ht_abc", res.HandoffToken)
+	assert.True(t, res.HandoffTokenExpiresAt.Equal(expiresAt))
+}

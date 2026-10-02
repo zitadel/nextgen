@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
@@ -28,4 +29,16 @@ func TestChecksToAPI_SkipsSSOCallback(t *testing.T) {
 	assert.Empty(t, challenges)
 	assert.Equal(t, checkTypeToAPI(domain.AuthCheckTypePassword), factors[0].Method)
 	assert.Empty(t, checkTypeToAPI(domain.AuthCheckTypeSSOCallback))
+}
+
+// TestFactorToAPI_SSO pins that a promoted sso factor renders with its own
+// method and no payload: the connection and link ids stay server-side.
+func TestFactorToAPI_SSO(t *testing.T) {
+	t.Parallel()
+	factor := &domain.AuthFactorSSO{ConnectionID: "idp_1", LinkID: "idplink_1"}
+	factor.SetLastVerifiedAt(time.Now())
+
+	got := factorToAPI(factor)
+	assert.Equal(t, api.FactorMethodSSO, got.Method)
+	assert.False(t, got.Payload.Set)
 }

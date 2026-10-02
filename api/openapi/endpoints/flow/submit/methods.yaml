@@ -85,6 +85,8 @@ post:
       headers:
         Set-Cookie:
           $ref: ../../../components/headers/set-cookie-flow.yaml
+        Cache-Control:
+          $ref: ../../../components/headers/cache-control-private-no-store.yaml
       content:
         application/json:
           schema:
@@ -96,6 +98,8 @@ post:
       headers:
         Set-Cookie:
           $ref: ../../../components/headers/set-cookie-flow.yaml
+        Cache-Control:
+          $ref: ../../../components/headers/cache-control-private-no-store.yaml
       content:
         application/json:
           schema:
@@ -103,10 +107,11 @@ post:
     '409':
       description: |
         Conflict. Either the flow session moved on under another request
-        (`flow.session_conflict`), or the submission is an sso start on an
-        attempt that was already handed off (`att.already_handed_off`). Only
-        a client that kept the flow cookie past the terminal response reaches
-        the second case.
+        (`flow.session_conflict`), or the submission (an sso start included)
+        reached an attempt that was already handed off
+        (`att.already_handed_off`). Only a client that kept the flow cookie
+        past the terminal response, or a request racing the one that handed
+        the attempt off, reaches the second case.
       content:
         application/json:
           schema:

@@ -85,8 +85,9 @@ func (h *Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest) (a
 
 	resp := h.buildFlowResponse(ctx, result, false)
 	return &api.FlowResponseHeaders{
-		SetCookie: []string{flowSetCookie(ctx, cookieValue, false)},
-		Response:  resp,
+		SetCookie:    []string{flowSetCookie(ctx, cookieValue, false)},
+		CacheControl: api.NewOptString(sessionStateCacheControl),
+		Response:     resp,
 	}, nil
 }
 
@@ -225,8 +226,9 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 	// Validation error: state machine keeps the user on the step with Error set.
 	if result.Step != nil && result.Step.Error != nil {
 		return &api.SubmitFlowStepBadRequest{
-			SetCookie: []string{flowSetCookie(ctx, cookieValue, false)},
-			Response:  flowResp,
+			SetCookie:    []string{flowSetCookie(ctx, cookieValue, false)},
+			CacheControl: api.NewOptString(sessionStateCacheControl),
+			Response:     flowResp,
 		}, nil
 	}
 
@@ -238,8 +240,9 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 		cookies = append(cookies, ssoBindingSetCookie(ctx, result.SSOBindingNonce))
 	}
 	return &api.SubmitFlowStepOK{
-		SetCookie: cookies,
-		Response:  flowResp,
+		SetCookie:    cookies,
+		CacheControl: api.NewOptString(sessionStateCacheControl),
+		Response:     flowResp,
 	}, nil
 }
 
@@ -255,14 +258,33 @@ func (h *Handler) GetFlowStep(ctx context.Context, params api.GetFlowStepParams)
 
 	result, err := h.flowService.GetStep(ctx, service.GetFlowStepRequest{State: state})
 	if err != nil {
-		return nil, err
+		return mapFlowGetError(normalizeFlowError(err))
 	}
-	if result.Step != nil && result.Step.Complete != nil {
+	// A render can complete the flow (a parked SSO identity resolved into a
+	// sign-in), and then it carries the handoff token. Without one, the flow
+	// was already complete before this request.
+	terminal := result.Step != nil && result.Step.Complete != nil
+	if terminal && result.HandoffToken == "" {
 		return mapFlowGetError(domain.ErrFlowCompleted())
 	}
 
-	resp := h.buildFlowResponse(ctx, result, false)
-	return &resp, nil
+	// A terminal render only clears the cookie, so nothing is sealed: the
+	// handoff it carries is already committed and must reach the client.
+	// Otherwise the render may have changed the state (resolution, IssuedAt),
+	// so it is re-sealed, the same as submit.
+	setCookie := flowSetCookie(ctx, "", true)
+	if !terminal {
+		cookieValue, err := h.sealState(ctx, result.State)
+		if err != nil {
+			return nil, err
+		}
+		setCookie = flowSetCookie(ctx, cookieValue, false)
+	}
+	return &api.FlowResponseHeaders{
+		SetCookie:    []string{setCookie},
+		CacheControl: api.NewOptString(sessionStateCacheControl),
+		Response:     h.buildFlowResponse(ctx, result, terminal),
+	}, nil
 }
 
 func (h *Handler) openState(ctx context.Context, raw string) (*domain.FlowState, error) {
@@ -607,6 +629,7 @@ var (
 	codeFlowSessionConflict = domain.ErrFlowSessionConflict().Code
 	codeFlowUnsupported     = domain.ErrFlowUnsupported().Code
 	codeFlowInvalidPurpose  = domain.ErrFlowInvalidPurpose().Code
+	codeFlowRestartRequired = domain.ErrFlowRestartRequired().Code
 )
 
 func flowErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
@@ -617,7 +640,7 @@ func flowErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		return errorResponseWithStatusCode(http.StatusNotFound, err)
 	case codeFlowCompleted:
 		return errorResponseWithStatusCode(http.StatusGone, err)
-	case codeFlowSessionConflict:
+	case codeFlowSessionConflict, codeFlowRestartRequired:
 		return errorResponseWithStatusCode(http.StatusConflict, err)
 	case codeFlowInvalidAction, codeFlowUnsupported, codeFlowInvalidPurpose:
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
@@ -657,6 +680,7 @@ func normalizeFlowError(err error) error {
 		domain.ErrFlowSessionConflict(),
 		domain.ErrFlowUnsupported(),
 		domain.ErrFlowInvalidPurpose(),
+		domain.ErrFlowRestartRequired(),
 	} {
 		if errors.Is(err, sentinel) {
 			return sentinel
@@ -673,6 +697,9 @@ func mapFlowGetError(err error) (api.GetFlowStepRes, error) {
 	case errors.Is(err, domain.ErrFlowCompleted()):
 		gone := api.GetFlowStepGone(domainErrorDetails(domain.ErrFlowCompleted()))
 		return &gone, nil
+	case errors.Is(err, domain.ErrFlowRestartRequired()):
+		conflict := api.GetFlowStepConflict(domainErrorDetails(domain.ErrFlowRestartRequired()))
+		return &conflict, nil
 	}
 	return nil, err
 }
