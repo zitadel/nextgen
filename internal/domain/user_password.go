@@ -23,16 +23,11 @@ func HashPassword(password string, hasher crypto.Hasher) (string, error) {
 }
 
 type UserPassword struct {
-	ID                  string
-	ProjectID           string
-	UserID              string
-	EncodedHash         string
-	ChangeRequired      bool
-	VerificationID      *string
-	LastSuccessfulCheck *time.Time
-	FailedAttempts      int16
-	CreatedAt           time.Time
-	UpdatedAt           time.Time
+	ID          string
+	ProjectID   string
+	UserID      string
+	EncodedHash string
+	CreatedAt   time.Time
 }
 
 func (u *UserPassword) Verify(password string, verifier crypto.HashVerifier) error {
@@ -47,12 +42,10 @@ type SetUserPassword struct {
 	// ID is the new password row's id, minted by the dialect when empty. Every
 	// set adds a row, so each password gets its own id, which emitters use as
 	// entity_id / factor_id.
-	ID             string
-	ProjectID      string
-	UserID         string
-	EncodedHash    string
-	ChangeRequired bool
-	VerificationID *string
+	ID          string
+	ProjectID   string
+	UserID      string
+	EncodedHash string
 }
 
 // UserPasswordField enumerates the fields of UserPassword which can be used for
@@ -65,10 +58,5 @@ const (
 	UserPasswordFieldProjectID
 	UserPasswordFieldUserID
 	UserPasswordFieldEncodedHash
-	UserPasswordFieldChangeRequired
-	UserPasswordFieldVerificationID
-	UserPasswordFieldLastSuccessfulCheck
-	UserPasswordFieldFailedAttempts
 	UserPasswordFieldCreatedAt
-	UserPasswordFieldUpdatedAt
 )

@@ -89306,17 +89306,10 @@ func (s *SetUserPasswordRequest) encodeFields(e *jx.Encoder) {
 		e.FieldStart("password")
 		e.Str(s.Password)
 	}
-	{
-		if s.IsChangeRequired.Set {
-			e.FieldStart("is_change_required")
-			s.IsChangeRequired.Encode(e)
-		}
-	}
 }
 
-var jsonFieldsNameOfSetUserPasswordRequest = [2]string{
+var jsonFieldsNameOfSetUserPasswordRequest = [1]string{
 	0: "password",
-	1: "is_change_required",
 }
 
 // Decode decodes SetUserPasswordRequest from json.
@@ -89339,16 +89332,6 @@ func (s *SetUserPasswordRequest) Decode(d *jx.Decoder) error {
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"password\"")
-			}
-		case "is_change_required":
-			if err := func() error {
-				s.IsChangeRequired.Reset()
-				if err := s.IsChangeRequired.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"is_change_required\"")
 			}
 		default:
 			return d.Skip()

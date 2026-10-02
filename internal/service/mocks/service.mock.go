@@ -5734,49 +5734,6 @@ func (c *MockAllStatementsUpdateUserPasskeyCall) DoAndReturn(f func(context.Cont
 	return c
 }
 
-// UpdateUserPassword mocks base method.
-func (m *MockAllStatements) UpdateUserPassword(ctx context.Context, filter database.Filter[domain.UserPasswordField], updates ...domain.UserPasswordUpdate) error {
-	m.ctrl.T.Helper()
-	varargs := []any{ctx, filter}
-	for _, a := range updates {
-		varargs = append(varargs, a)
-	}
-	ret := m.ctrl.Call(m, "UpdateUserPassword", varargs...)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// UpdateUserPassword indicates an expected call of UpdateUserPassword.
-func (mr *MockAllStatementsMockRecorder) UpdateUserPassword(ctx, filter any, updates ...any) *MockAllStatementsUpdateUserPasswordCall {
-	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, filter}, updates...)
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateUserPassword", reflect.TypeOf((*MockAllStatements)(nil).UpdateUserPassword), varargs...)
-	return &MockAllStatementsUpdateUserPasswordCall{Call: call}
-}
-
-// MockAllStatementsUpdateUserPasswordCall wrap *gomock.Call
-type MockAllStatementsUpdateUserPasswordCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockAllStatementsUpdateUserPasswordCall) Return(arg0 error) *MockAllStatementsUpdateUserPasswordCall {
-	c.Call = c.Call.Return(arg0)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsUpdateUserPasswordCall) Do(f func(context.Context, database.Filter[domain.UserPasswordField], ...domain.UserPasswordUpdate) error) *MockAllStatementsUpdateUserPasswordCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsUpdateUserPasswordCall) DoAndReturn(f func(context.Context, database.Filter[domain.UserPasswordField], ...domain.UserPasswordUpdate) error) *MockAllStatementsUpdateUserPasswordCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
 // UpdateUserRecoveryCodes mocks base method.
 func (m *MockAllStatements) UpdateUserRecoveryCodes(ctx context.Context, filter database.Filter[domain.UserRecoveryCodesField], updates ...domain.UserRecoveryCodesUpdate) error {
 	m.ctrl.T.Helper()
@@ -9175,49 +9132,6 @@ func (c *MockUserPasswordStatementsSetUserPasswordCall) Do(f func(context.Contex
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockUserPasswordStatementsSetUserPasswordCall) DoAndReturn(f func(context.Context, *domain.SetUserPassword) error) *MockUserPasswordStatementsSetUserPasswordCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
-// UpdateUserPassword mocks base method.
-func (m *MockUserPasswordStatements) UpdateUserPassword(ctx context.Context, filter database.Filter[domain.UserPasswordField], updates ...domain.UserPasswordUpdate) error {
-	m.ctrl.T.Helper()
-	varargs := []any{ctx, filter}
-	for _, a := range updates {
-		varargs = append(varargs, a)
-	}
-	ret := m.ctrl.Call(m, "UpdateUserPassword", varargs...)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// UpdateUserPassword indicates an expected call of UpdateUserPassword.
-func (mr *MockUserPasswordStatementsMockRecorder) UpdateUserPassword(ctx, filter any, updates ...any) *MockUserPasswordStatementsUpdateUserPasswordCall {
-	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, filter}, updates...)
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateUserPassword", reflect.TypeOf((*MockUserPasswordStatements)(nil).UpdateUserPassword), varargs...)
-	return &MockUserPasswordStatementsUpdateUserPasswordCall{Call: call}
-}
-
-// MockUserPasswordStatementsUpdateUserPasswordCall wrap *gomock.Call
-type MockUserPasswordStatementsUpdateUserPasswordCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockUserPasswordStatementsUpdateUserPasswordCall) Return(arg0 error) *MockUserPasswordStatementsUpdateUserPasswordCall {
-	c.Call = c.Call.Return(arg0)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockUserPasswordStatementsUpdateUserPasswordCall) Do(f func(context.Context, database.Filter[domain.UserPasswordField], ...domain.UserPasswordUpdate) error) *MockUserPasswordStatementsUpdateUserPasswordCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockUserPasswordStatementsUpdateUserPasswordCall) DoAndReturn(f func(context.Context, database.Filter[domain.UserPasswordField], ...domain.UserPasswordUpdate) error) *MockUserPasswordStatementsUpdateUserPasswordCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

@@ -2,8 +2,6 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
-	"fmt"
 
 	"github.com/jackc/pgx/v5"
 
@@ -16,13 +14,12 @@ import (
 
 const (
 	setUserPasswordStmt = `INSERT INTO zitadel_nextgen.user_passwords (
-	id, project_id, user_id, encoded_hash, change_required, verification_id, created_at, updated_at
-) SELECT $1, $2, $3, $4, $5, $6, stamp.at, stamp.at
+	id, project_id, user_id, encoded_hash, created_at
+) SELECT $1, $2, $3, $4, stamp.at
 FROM (SELECT clock_timestamp() AS at) AS stamp
 RETURNING id`
 
-	userPasswordColumns = `id, project_id, user_id, encoded_hash, change_required,
-	verification_id, last_successful_check, failed_attempts, created_at, updated_at`
+	userPasswordColumns = `id, project_id, user_id, encoded_hash, created_at`
 
 	userPasswordQuery = `SELECT ` + userPasswordColumns + `
 FROM zitadel_nextgen.user_passwords`
@@ -59,8 +56,6 @@ func (ps userPasswordStatements) SetUserPassword(ctx context.Context, pw *domain
 		pw.ProjectID,
 		pw.UserID,
 		pw.EncodedHash,
-		pw.ChangeRequired,
-		pw.VerificationID,
 	).Scan(&pw.ID)
 	return wrapError(err)
 }
@@ -121,89 +116,16 @@ func (ps userPasswordStatements) GetUserPasswordHistory(ctx context.Context, pro
 	return passwords, wrapError(err)
 }
 
-// UpdateUserPassword implements [service.UserPasswordStatements].
-func (ps userPasswordStatements) UpdateUserPassword(ctx context.Context, filter database.Filter[domain.UserPasswordField], updates ...domain.UserPasswordUpdate) error {
-	if filter == nil {
-		return fmt.Errorf("UserPassword filter is required")
-	}
-	if len(updates) == 0 {
-		return database.ErrNoChanges
-	}
-
-	var c statementCompiler
-	c.WriteString("UPDATE zitadel_nextgen.user_passwords SET ")
-	sep := ""
-	writeAssign := func(col string, arg any) {
-		c.WriteString(sep)
-		sep = ", "
-		c.WriteString(col)
-		c.WriteString(" = ")
-		c.WriteArg(arg)
-	}
-
-	for _, update := range updates {
-		switch u := update.(type) {
-		case *domain.UserPasswordEncodedHashUpdate:
-			writeAssign("encoded_hash", u.EncodedHash)
-		case *domain.UserPasswordChangeRequiredUpdate:
-			writeAssign("change_required", u.ChangeRequired)
-		case *domain.UserPasswordVerificationIDUpdate:
-			writeAssign("verification_id", u.VerificationID)
-		case *domain.UserPasswordLastSuccessfulCheckUpdate:
-			writeAssign("last_successful_check", u.LastSuccessfulCheck)
-		case *domain.UserPasswordIncrementFailedAttemptsUpdate:
-			c.WriteString(sep)
-			sep = ", "
-			c.WriteString("failed_attempts = failed_attempts + ")
-			c.WriteArg(u.Delta)
-		case *domain.UserPasswordResetFailedAttemptsUpdate:
-			writeAssign("failed_attempts", int16(0))
-		default:
-			return fmt.Errorf("unknown UserPasswordUpdate %T", update)
-		}
-	}
-
-	c.WriteString(", updated_at = NOW() WHERE ")
-	compileFilter(&c, filter, userpassword.Schema)
-	c.WriteString(" AND ")
-	c.WriteString(currentUserPassword)
-
-	tag, err := ps.client.Exec(ctx, c.String(), c.args...)
-	if err != nil {
-		return wrapError(err)
-	}
-	if tag.RowsAffected() == 0 {
-		return wrapError(pgx.ErrNoRows)
-	}
-	return nil
-}
-
 func (ps userPasswordStatements) scanUserPassword(row pgx.CollectableRow) (*domain.UserPassword, error) {
 	pw := new(domain.UserPassword)
-	var (
-		verificationID      sql.NullString
-		lastSuccessfulCheck sql.NullTime
-	)
 	if err := row.Scan(
 		&pw.ID,
 		&pw.ProjectID,
 		&pw.UserID,
 		&pw.EncodedHash,
-		&pw.ChangeRequired,
-		&verificationID,
-		&lastSuccessfulCheck,
-		&pw.FailedAttempts,
 		&pw.CreatedAt,
-		&pw.UpdatedAt,
 	); err != nil {
 		return nil, err
-	}
-	if verificationID.Valid {
-		pw.VerificationID = &verificationID.String
-	}
-	if lastSuccessfulCheck.Valid {
-		ts := lastSuccessfulCheck.Time
-		pw.LastSuccessfulCheck = &ts
 	}
 	return pw, nil
 }

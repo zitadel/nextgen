@@ -37,13 +37,10 @@ func TestUserPasswordStatements_SetGet(t *testing.T) {
 
 		require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, userID, "pw@example.com", "PW User")))
 
-		vid := "verif-1"
 		require.NoError(t, d.stmts.SetUserPassword(t.Context(), &domain.SetUserPassword{
-			ProjectID:      projectID,
-			UserID:         userID,
-			EncodedHash:    "argon2id$v=19$m=65536,t=3,p=4$fake",
-			ChangeRequired: true,
-			VerificationID: &vid,
+			ProjectID:   projectID,
+			UserID:      userID,
+			EncodedHash: "argon2id$v=19$m=65536,t=3,p=4$fake",
 		}))
 
 		byUser := userPasswordByUser(projectID, userID)
@@ -54,9 +51,7 @@ func TestUserPasswordStatements_SetGet(t *testing.T) {
 		assert.Equal(t, projectID, got.ProjectID)
 		assert.Equal(t, userID, got.UserID)
 		assert.Equal(t, "argon2id$v=19$m=65536,t=3,p=4$fake", got.EncodedHash)
-		assert.True(t, got.ChangeRequired)
-		require.NotNil(t, got.VerificationID)
-		assert.Equal(t, vid, *got.VerificationID)
+		assert.WithinDuration(t, time.Now(), got.CreatedAt, 5*time.Second)
 
 		gotByID, err := d.stmts.GetUserPassword(t.Context(), userPasswordByID(got.ID))
 		require.NoError(t, err)
@@ -79,10 +74,9 @@ func TestUserPasswordStatements_SetAddsCurrentPassword(t *testing.T) {
 
 		byUser := userPasswordByUser(projectID, userID)
 		first := &domain.SetUserPassword{
-			ProjectID:      projectID,
-			UserID:         userID,
-			EncodedHash:    "argon2id$v=19$m=65536,t=3,p=4$initial",
-			ChangeRequired: true,
+			ProjectID:   projectID,
+			UserID:      userID,
+			EncodedHash: "argon2id$v=19$m=65536,t=3,p=4$initial",
 		}
 		require.NoError(t, d.stmts.SetUserPassword(t.Context(), first))
 		require.True(t, domain.PrefixUserPassword.Matches(first.ID))
@@ -90,17 +84,10 @@ func TestUserPasswordStatements_SetAddsCurrentPassword(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, first.ID, got.ID)
 
-		now := time.Now().UTC().Truncate(time.Millisecond)
-		require.NoError(t, d.stmts.UpdateUserPassword(t.Context(), byUser,
-			&domain.UserPasswordIncrementFailedAttemptsUpdate{Delta: 3},
-			&domain.UserPasswordLastSuccessfulCheckUpdate{LastSuccessfulCheck: now},
-		))
-
 		replacement := &domain.SetUserPassword{
-			ProjectID:      projectID,
-			UserID:         userID,
-			EncodedHash:    "argon2id$v=19$m=65536,t=3,p=4$updated",
-			ChangeRequired: false,
+			ProjectID:   projectID,
+			UserID:      userID,
+			EncodedHash: "argon2id$v=19$m=65536,t=3,p=4$updated",
 		}
 		require.NoError(t, d.stmts.SetUserPassword(t.Context(), replacement))
 		require.True(t, domain.PrefixUserPassword.Matches(replacement.ID))
@@ -110,25 +97,12 @@ func TestUserPasswordStatements_SetAddsCurrentPassword(t *testing.T) {
 		require.NoError(t, err, "a user filter still matches only the current password")
 		assert.Equal(t, replacement.ID, got2.ID)
 		assert.Equal(t, "argon2id$v=19$m=65536,t=3,p=4$updated", got2.EncodedHash)
-		assert.False(t, got2.ChangeRequired)
-		assert.Zero(t, got2.FailedAttempts)
-		assert.Nil(t, got2.LastSuccessfulCheck)
-		assert.WithinDuration(t, time.Now(), got2.CreatedAt, 5*time.Second)
 		assert.True(t, got2.CreatedAt.After(got.CreatedAt))
 
-		// Updates reach the current password only.
-		require.NoError(t, d.stmts.UpdateUserPassword(t.Context(), byUser,
-			&domain.UserPasswordIncrementFailedAttemptsUpdate{Delta: 1},
-		))
 		history, err := d.stmts.GetUserPasswordHistory(t.Context(), projectID, userID)
 		require.NoError(t, err)
 		require.Len(t, history, 1)
 		assert.Equal(t, first.ID, history[0].ID)
-		assert.Equal(t, int16(3), history[0].FailedAttempts)
-		err = d.stmts.UpdateUserPassword(t.Context(), userPasswordByID(first.ID),
-			&domain.UserPasswordIncrementFailedAttemptsUpdate{Delta: 1},
-		)
-		assert.ErrorIs(t, err, new(database.NoRowFoundError), "a previous password is not updatable")
 		_, err = d.stmts.GetUserPassword(t.Context(), userPasswordByID(first.ID))
 		assert.ErrorIs(t, err, new(database.NoRowFoundError), "a previous password is not readable as current")
 	})
@@ -145,56 +119,6 @@ func TestUserPasswordStatements_SetMissingUser(t *testing.T) {
 		})
 		require.Error(t, err)
 		assert.ErrorIs(t, err, new(database.ForeignKeyError))
-	})
-}
-
-func TestUserPasswordStatements_Update(t *testing.T) {
-	forEachDialect(t, func(t *testing.T, d dialect) {
-		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
-		userID := "user_pw_upd"
-
-		require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, userID, "pw-upd@example.com", "PW Update")))
-		require.NoError(t, d.stmts.SetUserPassword(t.Context(), &domain.SetUserPassword{
-			ProjectID:   projectID,
-			UserID:      userID,
-			EncodedHash: "argon2id$v=19$m=65536,t=3,p=4$initial",
-		}))
-
-		byUser := userPasswordByUser(projectID, userID)
-
-		err := d.stmts.UpdateUserPassword(t.Context(), byUser)
-		assert.ErrorIs(t, err, database.ErrNoChanges)
-
-		err = d.stmts.UpdateUserPassword(t.Context(), userPasswordByUser(projectID, "missing-user"),
-			&domain.UserPasswordIncrementFailedAttemptsUpdate{Delta: 1},
-		)
-		assert.ErrorIs(t, err, new(database.NoRowFoundError))
-
-		now := time.Now().UTC().Truncate(time.Millisecond)
-		require.NoError(t, d.stmts.UpdateUserPassword(t.Context(), byUser,
-			&domain.UserPasswordEncodedHashUpdate{EncodedHash: "argon2id$v=19$m=65536,t=3,p=4$rotated"},
-			&domain.UserPasswordChangeRequiredUpdate{ChangeRequired: true},
-			&domain.UserPasswordVerificationIDUpdate{VerificationID: "verif-upd"},
-			&domain.UserPasswordLastSuccessfulCheckUpdate{LastSuccessfulCheck: now},
-			&domain.UserPasswordResetFailedAttemptsUpdate{},
-		))
-
-		got, err := d.stmts.GetUserPassword(t.Context(), byUser)
-		require.NoError(t, err)
-		assert.Equal(t, "argon2id$v=19$m=65536,t=3,p=4$rotated", got.EncodedHash)
-		assert.True(t, got.ChangeRequired)
-		require.NotNil(t, got.VerificationID)
-		assert.Equal(t, "verif-upd", *got.VerificationID)
-		require.NotNil(t, got.LastSuccessfulCheck)
-		assert.WithinDuration(t, now, *got.LastSuccessfulCheck, time.Second)
-		assert.Zero(t, got.FailedAttempts)
-
-		require.NoError(t, d.stmts.UpdateUserPassword(t.Context(), byUser,
-			&domain.UserPasswordIncrementFailedAttemptsUpdate{Delta: 2},
-		))
-		got, err = d.stmts.GetUserPassword(t.Context(), byUser)
-		require.NoError(t, err)
-		assert.Equal(t, int16(2), got.FailedAttempts)
 	})
 }
 
