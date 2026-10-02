@@ -432,6 +432,46 @@ func TestSubmitFlowStep_SSO_ProviderIDAloneDoesNotSelectTheBranch(t *testing.T) 
 	require.Contains(t, string(body), "flow.invalid_action")
 }
 
+// A hash-routed page lives in its fragment; the callback must bring the
+// browser back to the route, not to a percent-encoded path.
+func TestSubmitFlowStep_SSO_KeepsTheReturnTargetFragment(t *testing.T) {
+	const origin = "https://login.example.com"
+	const target = origin + "/app#/sign-in?flow=flow_1"
+	ts := newTestServer(t)
+	state := &domain.FlowState{ID: "flow_1", ProjectID: "proj_1", SessionID: "sess_1", IssuedAt: time.Now()}
+	ts.projects.EXPECT().Get(gomock.Any(), "proj_1").Return(&domain.Project{PreviewOrigins: []string{origin}}, nil)
+	ts.fake.submitResult = domain.FlowStepResult{
+		State:           state,
+		Step:            &domain.FlowStep{Name: "sso-redirect", RedirectURL: new("https://accounts.example.test/authorize?state=s")},
+		SSOBindingNonce: "nonce-1",
+	}
+
+	resp, body := doRequestWithOrigin(t, http.MethodPost, ts.srv.URL+"/flow/flow_1/submit", map[string]any{
+		"action":          "sso",
+		"sso_provider_id": "google",
+		"return_target":   target,
+	}, ts.sealCookie(t, state), origin)
+	require.Equal(t, http.StatusOK, resp.StatusCode, string(body))
+	require.Equal(t, target, ts.fake.gotSubmitReq.SSOReturn.ReturnTarget)
+}
+
+// The length limit is the generated validation's: the request is refused
+// before the handler reads the project.
+func TestSubmitFlowStep_SSO_RejectsAnOverlongReturnTarget(t *testing.T) {
+	const origin = "https://login.example.com"
+	ts := newTestServer(t)
+	state := &domain.FlowState{ID: "flow_1", ProjectID: "proj_1", SessionID: "sess_1", IssuedAt: time.Now()}
+
+	resp, body := doRequestWithOrigin(t, http.MethodPost, ts.srv.URL+"/flow/flow_1/submit", map[string]any{
+		"action":          "sso",
+		"sso_provider_id": "google",
+		"return_target":   origin + "/login?pad=" + strings.Repeat("x", 2048),
+	}, ts.sealCookie(t, state), origin)
+	require.Equal(t, http.StatusBadRequest, resp.StatusCode, string(body))
+	require.Contains(t, string(body), "return_target")
+	require.Empty(t, ts.fake.gotSubmitReq.Action, "no sign-in is started")
+}
+
 func TestSubmitFlowStep_SSO_RejectsAnUnboundReturn(t *testing.T) {
 	const origin = "https://login.example.com"
 	tests := []struct {
@@ -460,6 +500,11 @@ func TestSubmitFlowStep_SSO_RejectsAnUnboundReturn(t *testing.T) {
 			name:   "return_target missing",
 			origin: origin,
 			body:   map[string]any{"action": "sso", "sso_provider_id": "google"},
+		},
+		{
+			name:   "return_target relative",
+			origin: origin,
+			body:   map[string]any{"action": "sso", "sso_provider_id": "google", "return_target": "/login?flow=flow_1"},
 		},
 		{
 			name: "no request origin",

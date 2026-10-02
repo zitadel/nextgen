@@ -66,7 +66,7 @@ func TestFlowSSOSubmitRedirectsToProvider(t *testing.T) {
 	submission := api.FlowSubmitRequest{
 		Action:        "sso",
 		SSOProviderID: api.NewOptString("google"),
-		ReturnTarget:  api.NewOptURI(returnTarget),
+		ReturnTarget:  api.NewOptString(returnTarget.String()),
 	}
 	body, err := submission.MarshalJSON()
 	require.NoError(t, err)

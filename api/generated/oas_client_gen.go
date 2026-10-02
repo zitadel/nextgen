@@ -11871,6 +11871,15 @@ func (c *Client) SubmitFlowStep(ctx context.Context, request *FlowSubmitRequest,
 }
 
 func (c *Client) sendSubmitFlowStep(ctx context.Context, request *FlowSubmitRequest, params SubmitFlowStepParams) (res SubmitFlowStepRes, err error) {
+	// Validate request before sending.
+	if err := func() error {
+		if err := request.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return res, errors.Wrap(err, "validate")
+	}
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("submitFlowStep"),
 		semconv.HTTPRequestMethodKey.String("POST"),

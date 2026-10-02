@@ -184,9 +184,16 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 		if !originAllowed {
 			return nil, domain.ErrRequestInvalid().WithMessage("an sso submission needs a request origin")
 		}
-		returnTarget, ok := req.ReturnTarget.Get()
+		rawTarget, ok := req.ReturnTarget.Get()
 		if !ok {
 			return nil, domain.ErrRequestInvalid().WithMessage("return_target is required for action sso")
+		}
+		// Parsed here, not by the generated decoder: a request-URI parse
+		// leaves a fragment in the path, and a hash-routed page needs it
+		// back as a fragment.
+		returnTarget, err := url.Parse(rawTarget)
+		if err != nil || returnTarget.Scheme == "" || returnTarget.Host == "" {
+			return nil, domain.ErrRequestInvalid().WithMessage(fmt.Sprintf("return_target %q is not an absolute URL", rawTarget))
 		}
 		// No page URL carries userinfo; it is only ever a way to dress a
 		// foreign host up as the origin.

@@ -20494,9 +20494,11 @@ type FlowSubmitRequest struct {
 	// external sign-in: the callback sends the browser here unchanged, and
 	// the page loads `GET /flow/{id}` to render the next step. The client
 	// puts the flow id in it; the orchestrator reads `?flow=<id>` on the
-	// reload. Required when `action` is "sso". Its origin must equal the
-	// request origin; any other origin is rejected and no sign-in is started.
-	ReturnTarget OptURI `json:"return_target"`
+	// reload. Required when `action` is "sso". An absolute URL; the server
+	// parses it and keeps a fragment, so a hash-routed page returns to its
+	// route. Its origin must equal the request origin; any other origin is
+	// rejected and no sign-in is started.
+	ReturnTarget OptString `json:"return_target"`
 }
 
 // GetSessionToken returns the value of SessionToken.
@@ -20530,7 +20532,7 @@ func (s *FlowSubmitRequest) GetSSOProviderID() OptString {
 }
 
 // GetReturnTarget returns the value of ReturnTarget.
-func (s *FlowSubmitRequest) GetReturnTarget() OptURI {
+func (s *FlowSubmitRequest) GetReturnTarget() OptString {
 	return s.ReturnTarget
 }
 
@@ -20565,7 +20567,7 @@ func (s *FlowSubmitRequest) SetSSOProviderID(val OptString) {
 }
 
 // SetReturnTarget sets the value of ReturnTarget.
-func (s *FlowSubmitRequest) SetReturnTarget(val OptURI) {
+func (s *FlowSubmitRequest) SetReturnTarget(val OptString) {
 	s.ReturnTarget = val
 }
 
