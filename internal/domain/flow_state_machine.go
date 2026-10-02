@@ -1411,14 +1411,14 @@ func (r *FlowStateMachineRuntime) buildStep(ctx context.Context, state *FlowStat
 			TextKey: step.Name + ".action." + flowBackActionName,
 		})
 	}
-	fields := applyAutocomplete(resolved.Fields, state.CurrentPurpose)
+	applyAutocomplete(resolved.Fields, state.CurrentPurpose)
 	return &FlowStep{
 		Name:         step.Name,
 		Texts:        FlowStepTexts{TitleKey: step.Name + ".title", DescriptionKey: step.Name + ".description"},
 		Error:        errorKey,
 		Complete:     complete,
 		RedirectURL:  redirectURL,
-		Fields:       fields,
+		Fields:       resolved.Fields,
 		Actions:      actions,
 		SSOProviders: providers,
 		Identifier:   pairedIdentifier(resolved, state.CollectedData.UserData),
@@ -1429,13 +1429,10 @@ func (r *FlowStateMachineRuntime) buildStep(ctx context.Context, state *FlowStat
 // known at resolve time — the definition validator resolves without one, and
 // applyOutcomeFlip can change it mid-flow — so the token belongs to a render
 // rather than to the resolved field set.
-func applyAutocomplete(fields []FlowField, purpose FlowDefinitionPurpose) []FlowField {
-	out := make([]FlowField, len(fields))
-	copy(out, fields)
-	for i := range out {
-		out[i].Autocomplete = AutocompleteForField(out[i], purpose)
+func applyAutocomplete(fields []FlowField, purpose FlowDefinitionPurpose) {
+	for i := range fields {
+		fields[i].Autocomplete = AutocompleteForField(fields[i], purpose)
 	}
-	return out
 }
 
 // pairedIdentifier returns the identifier a password form carries beside
