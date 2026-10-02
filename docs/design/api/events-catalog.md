@@ -138,7 +138,8 @@ tracked below.
 
 **Non-events:** pure reads; RSI upserts as create side-effects; crypto/catalog
 internals without a product mutate API; signal category deferred until ADR 019
-writers exist.
+writers exist; issuing a challenge or an sso state record (`IssueChallenge`,
+`IssueSSOState`), which mints the `check_id` the outcome event then carries.
 
 ## Retired
 

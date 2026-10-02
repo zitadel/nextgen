@@ -1,8 +1,6 @@
 package idp
 
 import (
-	"crypto/rand"
-	"encoding/base64"
 	"errors"
 	"slices"
 
@@ -13,8 +11,8 @@ import (
 )
 
 // AuthorizeRequest carries the per-attempt values the SSO submission
-// supplies: state from the state record, nonce and the PKCE verifier from
-// [NewNonce] and [NewPKCEVerifier].
+// supplies from the issued state record: state, the OIDC nonce and the
+// PKCE verifier.
 type AuthorizeRequest struct {
 	State string
 	Nonce string
@@ -93,25 +91,4 @@ func NewAuthorizeRedirect(c *OIDCClient, req AuthorizeRequest) (AuthorizeRedirec
 	}
 	redirect.URL = rp.AuthURL(req.State, c.party, opts...)
 	return redirect, nil
-}
-
-// NewNonce returns the nonce for one authorize request.
-func NewNonce() string {
-	return randomToken()
-}
-
-// NewPKCEVerifier returns the PKCE code verifier for one authorize request.
-func NewPKCEVerifier() string {
-	return randomToken()
-}
-
-// randomToken draws 256 bits from the CSPRNG. That is above the 128-bit
-// floor the ceremony sets for state, and its 43 unreserved characters are
-// the minimum RFC 7636 sets for a code verifier.
-func randomToken() string {
-	b := make([]byte, 32)
-	// crypto/rand.Read never returns an error; it terminates the program
-	// if the source fails.
-	_, _ = rand.Read(b)
-	return base64.RawURLEncoding.EncodeToString(b)
 }
