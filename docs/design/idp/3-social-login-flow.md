@@ -590,6 +590,6 @@ and recovery route without exposing internal technical details to the end user.
 - [`../flowengine/flow-engine-nodes.md`](../flowengine/flow-engine-nodes.md)
   (step response shape)
 - [`../flowengine/capabilities.md`](../flowengine/capabilities.md) (what is
-  stubbed)
-- `internal/domain/flow_state_machine.go` (the SSO stub), `flow_on_success.go`
+  implemented)
+- `internal/domain/flow_state_machine.go` (the sso branch), `flow_on_success.go`
   (the `on_success` handler interface `create_user_with_sso` joins)

@@ -9016,8 +9016,10 @@ type SubmitFlowStepParams struct {
 	Zflow string
 	// Standard browser `Origin` header. When a step issues a passkey
 	// challenge, the server derives the WebAuthn relying-party id and the
-	// allowed origin from this value. Browsers send it automatically on the
-	// fetch POST; no client action is required.
+	// allowed origin from this value. An sso submission is bound to it as
+	// well: `return_target` must be on this origin, and the callback route
+	// is built under it (see External sign-in above). Browsers send it
+	// automatically on the fetch POST; no client action is required.
 	Origin OptURI `json:",omitempty,omitzero"`
 }
 

@@ -446,9 +446,10 @@ an identifier. Login routes a missing user through `user_not_found` to
 
 ### Example 4: SSO Login (Google)
 
-> **Direction:** SSO is stubbed in today's engine (`ErrUnsupported` — see
-> [capabilities.md](capabilities.md)). The definition below validates against
-> the shipped schema; the runtime exchange shows the intended ceremony.
+> **Direction:** the submission and the `sso-redirect` step are implemented
+> (#1030, see [capabilities.md](capabilities.md)); the callback route that
+> finishes the sign-in is #1032. The definition below validates against the
+> shipped schema; the runtime exchange shows both legs.
 > The example uses the `sso_authenticated` key from #1371; against the schema
 > on main before that PR merges, the key is still `callback`.
 
@@ -554,8 +555,8 @@ browser-binding nonce the callback checks (see
 after the callback; the orchestrator sets `?flow=<id>` on it so the reload
 resumes this flow, and its origin must equal the request origin.
 
-In the planned ceremony, the frontend navigates to `redirect_url` and the IdP
-callback returns control to the same step:
+The frontend navigates to `redirect_url` and the IdP callback (#1032) returns
+control to the same step:
 
 ```http
 GET /flow/flow_2
