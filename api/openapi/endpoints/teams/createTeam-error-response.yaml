@@ -4,6 +4,7 @@ content:
   application/json:
     schema:
       oneOf:
+        - $ref: '../../components/schemas/errors/auth-csrf_invalid.yaml'
         - $ref: '../../components/schemas/errors/auth-unauthorized.yaml'
         - $ref: '../../components/schemas/errors/evt-invalid.yaml'
         - $ref: '../../components/schemas/errors/internal.yaml'
@@ -16,6 +17,7 @@ content:
       discriminator:
         propertyName: code
         mapping:
+          auth.csrf_invalid: '../../components/schemas/errors/auth-csrf_invalid.yaml'
           auth.unauthorized: '../../components/schemas/errors/auth-unauthorized.yaml'
           evt.invalid: '../../components/schemas/errors/evt-invalid.yaml'
           internal: '../../components/schemas/errors/internal.yaml'
@@ -26,6 +28,11 @@ content:
           team.permission_denied: '../../components/schemas/errors/team-permission_denied.yaml'
           team.project_not_found: '../../components/schemas/errors/team-project_not_found.yaml'
     examples:
+      auth.csrf_invalid:
+        summary: auth.csrf_invalid
+        value:
+          code: auth.csrf_invalid
+          message: 'The request failed cross-site request forgery validation.'
       auth.unauthorized:
         summary: auth.unauthorized
         value:

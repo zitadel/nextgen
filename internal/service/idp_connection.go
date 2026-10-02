@@ -42,7 +42,10 @@ type ListIDPConnectionsOutput struct {
 type IDPConnectionService interface {
 	CreateOrRevise(ctx context.Context, projectID string, document []byte) (*CreateIDPConnectionOutput, error)
 	Get(ctx context.Context, projectID, id string) (*domain.IDPConnection, error)
-	GetBySlug(ctx context.Context, projectID, slug string) (*domain.IDPConnection, error)
+	// GetBySlugs returns the project's connections whose slug is in slugs,
+	// each at its newest revision, in no particular order. A slug with no
+	// connection is absent from the result rather than an error.
+	GetBySlugs(ctx context.Context, projectID string, slugs []string) ([]*domain.IDPConnection, error)
 	GetRevision(ctx context.Context, projectID, revisionID string) (*domain.IDPConnection, error)
 	List(ctx context.Context, input ListIDPConnectionsInput) (*ListIDPConnectionsOutput, error)
 	ListRevisions(ctx context.Context, input ListIDPConnectionRevisionsInput) (*ListIDPConnectionsOutput, error)
@@ -215,8 +218,25 @@ func (s *idpConnectionService) Get(ctx context.Context, projectID, id string) (*
 	return s.get(ctx, projectID, domain.IDPConnectionFieldID, id)
 }
 
-func (s *idpConnectionService) GetBySlug(ctx context.Context, projectID, slug string) (*domain.IDPConnection, error) {
-	return s.get(ctx, projectID, domain.IDPConnectionFieldSlug, slug)
+// GetBySlugs reads the whole slug set in one statement. The flow render calls
+// it outside any management request, so the list runs unrestricted, like the
+// flow definition lookup on the same path. A zero limit compiles to no LIMIT,
+// so one page holds every match.
+func (s *idpConnectionService) GetBySlugs(ctx context.Context, projectID string, slugs []string) ([]*domain.IDPConnection, error) {
+	// An empty OR compiles to nothing and leaves a dangling AND in the WHERE.
+	if len(slugs) == 0 {
+		return nil, nil
+	}
+	result, err := s.v2Pool.Statements().ListIDPConnections(WithAuthzListUnrestricted(ctx), &database.ListOptions[domain.IDPConnectionField]{
+		Filter: database.And(
+			database.Equal(database.Col(domain.IDPConnectionFieldProjectID), projectID),
+			database.Or(equalIDFilters(domain.IDPConnectionFieldSlug, slugs)...),
+		),
+	})
+	if err != nil {
+		return nil, mapListError(err, "failed to list identity provider connections")
+	}
+	return result.Items, nil
 }
 
 func (s *idpConnectionService) get(ctx context.Context, projectID string, field domain.IDPConnectionField, value string) (*domain.IDPConnection, error) {

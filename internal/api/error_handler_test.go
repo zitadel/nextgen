@@ -446,3 +446,19 @@ func TestValidationFieldPaths(t *testing.T) {
 	require.Equal(t, []string{"idp.slug", "idp.oidc.client_secret"}, validationFieldPaths(wrapped))
 	require.Nil(t, validationFieldPaths(&ogenerrors.DecodeRequestError{Err: errors.New("unexpected end of JSON input")}))
 }
+
+// A security handler that cannot reach a decision (the CSRF request state is
+// missing because WithCSRFRequest is not wired) is a server fault: 500, not
+// the 401 a refused credential gets.
+func TestOgenErrorHandlerSecurityInternalErrorIs500(t *testing.T) {
+	t.Parallel()
+	err := &ogenerrors.SecurityError{
+		Security: "NextgenSession",
+		Err:      domain.ErrInternal(errors.New("WithCSRFRequest is not wired")),
+	}
+	rec := httptest.NewRecorder()
+	OgenErrorHandler(t.Context(), rec, httptest.NewRequest(http.MethodPost, "/teams", nil), err)
+
+	require.Equal(t, http.StatusInternalServerError, rec.Code)
+	require.JSONEq(t, `{"code":"internal","message":"An unexpected error occurred."}`, rec.Body.String())
+}

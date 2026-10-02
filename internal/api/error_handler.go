@@ -176,6 +176,12 @@ func OgenErrorHandler(_ context.Context, w http.ResponseWriter, _ *http.Request,
 	)
 
 	switch {
+	case isSecurityInternalError(err):
+		// The security handler could not decide (CSRF request state missing):
+		// a server fault, not a refused credential.
+		status = http.StatusInternalServerError
+		details = domainErrorDetails(domain.ErrInternal(nil))
+
 	case isCSRFError(err):
 		status = http.StatusForbidden
 		details = domainErrorDetails(domain.ErrAuthCSRFInvalid())
@@ -209,12 +215,26 @@ func OgenErrorHandler(_ context.Context, w http.ResponseWriter, _ *http.Request,
 	}
 }
 
+// Codes compared on every error response, read once: building a domain.Error
+// captures its origin.
+var (
+	csrfInvalidCode = domain.ErrAuthCSRFInvalid().Code
+	internalCode    = domain.ErrInternal(nil).Code
+)
+
 // isCSRFError reports a session-cookie request refused by the CSRF checks. It
 // arrives wrapped in ogen's SecurityError, but it is a refusal of an
 // authenticated caller, not a missing credential: 403, not 401.
 func isCSRFError(err error) bool {
 	var e domain.Error
-	return errors.As(err, &e) && e.Code == domain.ErrAuthCSRFInvalid().Code
+	return errors.As(err, &e) && e.Code == csrfInvalidCode
+}
+
+// isSecurityInternalError reports a security handler that failed to reach a
+// decision, as opposed to one that refused the credential.
+func isSecurityInternalError(err error) bool {
+	var e domain.Error
+	return isSecurityError(err) && errors.As(err, &e) && e.Code == internalCode
 }
 
 func isSecurityError(err error) bool {

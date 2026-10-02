@@ -4667,6 +4667,194 @@ func (s *AuthCheckSucceededEventDelegationType) UnmarshalJSON(data []byte) error
 }
 
 // Encode implements json.Marshaler.
+func (s *AuthCsrfInvalid) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *AuthCsrfInvalid) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("code")
+		e.Str("auth.csrf_invalid")
+	}
+	{
+		e.FieldStart("message")
+		e.Str(s.Message)
+	}
+	{
+		if s.Details.Set {
+			e.FieldStart("details")
+			s.Details.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfAuthCsrfInvalid = [3]string{
+	0: "code",
+	1: "message",
+	2: "details",
+}
+
+// Decode decodes AuthCsrfInvalid from json.
+func (s *AuthCsrfInvalid) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AuthCsrfInvalid to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "code":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.Code = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"code\"")
+			}
+		case "message":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Str()
+				s.Message = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"message\"")
+			}
+		case "details":
+			if err := func() error {
+				s.Details.Reset()
+				if err := s.Details.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"details\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode AuthCsrfInvalid")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfAuthCsrfInvalid) {
+					name = jsonFieldsNameOfAuthCsrfInvalid[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *AuthCsrfInvalid) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AuthCsrfInvalid) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s AuthCsrfInvalidDetails) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields implements json.Marshaler.
+func (s AuthCsrfInvalidDetails) encodeFields(e *jx.Encoder) {
+	for k, elem := range s {
+		e.FieldStart(k)
+
+		if len(elem) != 0 {
+			e.Raw(elem)
+		}
+	}
+}
+
+// Decode decodes AuthCsrfInvalidDetails from json.
+func (s *AuthCsrfInvalidDetails) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AuthCsrfInvalidDetails to nil")
+	}
+	m := s.init()
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		var elem jx.Raw
+		if err := func() error {
+			v, err := d.RawAppend(nil)
+			elem = jx.Raw(v)
+			if err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrapf(err, "decode field %q", k)
+		}
+		m[string(k)] = elem
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode AuthCsrfInvalidDetails")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s AuthCsrfInvalidDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AuthCsrfInvalidDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
 func (s *AuthFactorPasskeyEnrolledEvent) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
@@ -13002,6 +13190,22 @@ func (s CompleteClaimForbidden) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case AuthCsrfInvalidCompleteClaimForbidden:
+		e.FieldStart("code")
+		e.Str("auth.csrf_invalid")
+		{
+			s := s.AuthCsrfInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	}
 }
 
@@ -13034,6 +13238,9 @@ func (s *CompleteClaimForbidden) Decode(d *jx.Decoder) error {
 				case "claim.personal_team_not_active":
 					s.Type = ClaimPersonalTeamNotActiveCompleteClaimForbidden
 					found = true
+				case "auth.csrf_invalid":
+					s.Type = AuthCsrfInvalidCompleteClaimForbidden
+					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
 				}
@@ -13054,6 +13261,10 @@ func (s *CompleteClaimForbidden) Decode(d *jx.Decoder) error {
 		}
 	case ClaimPersonalTeamNotActiveCompleteClaimForbidden:
 		if err := s.ClaimPersonalTeamNotActive.Decode(d); err != nil {
+			return err
+		}
+	case AuthCsrfInvalidCompleteClaimForbidden:
+		if err := s.AuthCsrfInvalid.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -15803,6 +16014,22 @@ func (s CreateGrantErrorResponse) Encode(e *jx.Encoder) {
 
 func (s CreateGrantErrorResponse) encodeFields(e *jx.Encoder) {
 	switch s.Type {
+	case AuthCsrfInvalidCreateGrantErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.csrf_invalid")
+		{
+			s := s.AuthCsrfInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case AuthUnauthorizedCreateGrantErrorResponse:
 		e.FieldStart("code")
 		e.Str("auth.unauthorized")
@@ -15973,6 +16200,9 @@ func (s *CreateGrantErrorResponse) Decode(d *jx.Decoder) error {
 					return err
 				}
 				switch typ {
+				case "auth.csrf_invalid":
+					s.Type = AuthCsrfInvalidCreateGrantErrorResponse
+					found = true
 				case "auth.unauthorized":
 					s.Type = AuthUnauthorizedCreateGrantErrorResponse
 					found = true
@@ -16014,6 +16244,10 @@ func (s *CreateGrantErrorResponse) Decode(d *jx.Decoder) error {
 		return errors.New("unable to detect sum type variant")
 	}
 	switch s.Type {
+	case AuthCsrfInvalidCreateGrantErrorResponse:
+		if err := s.AuthCsrfInvalid.Decode(d); err != nil {
+			return err
+		}
 	case AuthUnauthorizedCreateGrantErrorResponse:
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
 			return err
@@ -20164,6 +20398,22 @@ func (s CreateUserErrorResponse) Encode(e *jx.Encoder) {
 
 func (s CreateUserErrorResponse) encodeFields(e *jx.Encoder) {
 	switch s.Type {
+	case AuthCsrfInvalidCreateUserErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.csrf_invalid")
+		{
+			s := s.AuthCsrfInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case AuthUnauthorizedCreateUserErrorResponse:
 		e.FieldStart("code")
 		e.Str("auth.unauthorized")
@@ -20318,6 +20568,9 @@ func (s *CreateUserErrorResponse) Decode(d *jx.Decoder) error {
 					return err
 				}
 				switch typ {
+				case "auth.csrf_invalid":
+					s.Type = AuthCsrfInvalidCreateUserErrorResponse
+					found = true
 				case "auth.unauthorized":
 					s.Type = AuthUnauthorizedCreateUserErrorResponse
 					found = true
@@ -20356,6 +20609,10 @@ func (s *CreateUserErrorResponse) Decode(d *jx.Decoder) error {
 		return errors.New("unable to detect sum type variant")
 	}
 	switch s.Type {
+	case AuthCsrfInvalidCreateUserErrorResponse:
+		if err := s.AuthCsrfInvalid.Decode(d); err != nil {
+			return err
+		}
 	case AuthUnauthorizedCreateUserErrorResponse:
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
 			return err
@@ -20936,6 +21193,22 @@ func (s DeleteGrantErrorResponse) Encode(e *jx.Encoder) {
 
 func (s DeleteGrantErrorResponse) encodeFields(e *jx.Encoder) {
 	switch s.Type {
+	case AuthCsrfInvalidDeleteGrantErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.csrf_invalid")
+		{
+			s := s.AuthCsrfInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case AuthUnauthorizedDeleteGrantErrorResponse:
 		e.FieldStart("code")
 		e.Str("auth.unauthorized")
@@ -21058,6 +21331,9 @@ func (s *DeleteGrantErrorResponse) Decode(d *jx.Decoder) error {
 					return err
 				}
 				switch typ {
+				case "auth.csrf_invalid":
+					s.Type = AuthCsrfInvalidDeleteGrantErrorResponse
+					found = true
 				case "auth.unauthorized":
 					s.Type = AuthUnauthorizedDeleteGrantErrorResponse
 					found = true
@@ -21090,6 +21366,10 @@ func (s *DeleteGrantErrorResponse) Decode(d *jx.Decoder) error {
 		return errors.New("unable to detect sum type variant")
 	}
 	switch s.Type {
+	case AuthCsrfInvalidDeleteGrantErrorResponse:
+		if err := s.AuthCsrfInvalid.Decode(d); err != nil {
+			return err
+		}
 	case AuthUnauthorizedDeleteGrantErrorResponse:
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
 			return err
@@ -21408,6 +21688,22 @@ func (s DeleteUserByIDErrorResponse) Encode(e *jx.Encoder) {
 
 func (s DeleteUserByIDErrorResponse) encodeFields(e *jx.Encoder) {
 	switch s.Type {
+	case AuthCsrfInvalidDeleteUserByIDErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.csrf_invalid")
+		{
+			s := s.AuthCsrfInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case AuthUnauthorizedDeleteUserByIDErrorResponse:
 		e.FieldStart("code")
 		e.Str("auth.unauthorized")
@@ -21530,6 +21826,9 @@ func (s *DeleteUserByIDErrorResponse) Decode(d *jx.Decoder) error {
 					return err
 				}
 				switch typ {
+				case "auth.csrf_invalid":
+					s.Type = AuthCsrfInvalidDeleteUserByIDErrorResponse
+					found = true
 				case "auth.unauthorized":
 					s.Type = AuthUnauthorizedDeleteUserByIDErrorResponse
 					found = true
@@ -21562,6 +21861,10 @@ func (s *DeleteUserByIDErrorResponse) Decode(d *jx.Decoder) error {
 		return errors.New("unable to detect sum type variant")
 	}
 	switch s.Type {
+	case AuthCsrfInvalidDeleteUserByIDErrorResponse:
+		if err := s.AuthCsrfInvalid.Decode(d); err != nil {
+			return err
+		}
 	case AuthUnauthorizedDeleteUserByIDErrorResponse:
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
 			return err
@@ -31573,6 +31876,12 @@ func (s *Field) encodeFields(e *jx.Encoder) {
 		e.Str(s.TextKey)
 	}
 	{
+		if s.Autocomplete.Set {
+			e.FieldStart("autocomplete")
+			s.Autocomplete.Encode(e)
+		}
+	}
+	{
 		if s.Required.Set {
 			e.FieldStart("required")
 			s.Required.Encode(e)
@@ -31592,13 +31901,14 @@ func (s *Field) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfField = [6]string{
+var jsonFieldsNameOfField = [7]string{
 	0: "name",
 	1: "type",
 	2: "text_key",
-	3: "required",
-	4: "value",
-	5: "validation",
+	3: "autocomplete",
+	4: "required",
+	5: "value",
+	6: "validation",
 }
 
 // Decode decodes Field from json.
@@ -31644,6 +31954,16 @@ func (s *Field) Decode(d *jx.Decoder) error {
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"text_key\"")
+			}
+		case "autocomplete":
+			if err := func() error {
+				s.Autocomplete.Reset()
+				if err := s.Autocomplete.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"autocomplete\"")
 			}
 		case "required":
 			if err := func() error {
@@ -36061,6 +36381,12 @@ func (s *FlowStep) encodeFields(e *jx.Encoder) {
 		e.ArrEnd()
 	}
 	{
+		if s.Identifier.Set {
+			e.FieldStart("identifier")
+			s.Identifier.Encode(e)
+		}
+	}
+	{
 		e.FieldStart("actions")
 		e.ArrStart()
 		for _, elem := range s.Actions {
@@ -36090,17 +36416,18 @@ func (s *FlowStep) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfFlowStep = [10]string{
-	0: "name",
-	1: "texts",
-	2: "error",
-	3: "complete",
-	4: "redirect_url",
-	5: "fields",
-	6: "actions",
-	7: "gates",
-	8: "sso_providers",
-	9: "challenge",
+var jsonFieldsNameOfFlowStep = [11]string{
+	0:  "name",
+	1:  "texts",
+	2:  "error",
+	3:  "complete",
+	4:  "redirect_url",
+	5:  "fields",
+	6:  "identifier",
+	7:  "actions",
+	8:  "gates",
+	9:  "sso_providers",
+	10: "challenge",
 }
 
 // Decode decodes FlowStep from json.
@@ -36182,8 +36509,18 @@ func (s *FlowStep) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"fields\"")
 			}
+		case "identifier":
+			if err := func() error {
+				s.Identifier.Reset()
+				if err := s.Identifier.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"identifier\"")
+			}
 		case "actions":
-			requiredBitSet[0] |= 1 << 6
+			requiredBitSet[0] |= 1 << 7
 			if err := func() error {
 				s.Actions = make([]FlowStepAction, 0)
 				if err := d.Arr(func(d *jx.Decoder) error {
@@ -36201,7 +36538,7 @@ func (s *FlowStep) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"actions\"")
 			}
 		case "gates":
-			requiredBitSet[0] |= 1 << 7
+			requiredBitSet[1] |= 1 << 0
 			if err := func() error {
 				if err := s.Gates.Decode(d); err != nil {
 					return err
@@ -36247,8 +36584,8 @@ func (s *FlowStep) Decode(d *jx.Decoder) error {
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [2]uint8{
-		0b11100001,
-		0b00000000,
+		0b10100001,
+		0b00000001,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -36771,6 +37108,136 @@ func (s FlowStepGates) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *FlowStepGates) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *FlowStepIdentifier) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *FlowStepIdentifier) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("name")
+		e.Str(s.Name)
+	}
+	{
+		e.FieldStart("value")
+		e.Str(s.Value)
+	}
+	{
+		e.FieldStart("autocomplete")
+		e.Str(s.Autocomplete)
+	}
+}
+
+var jsonFieldsNameOfFlowStepIdentifier = [3]string{
+	0: "name",
+	1: "value",
+	2: "autocomplete",
+}
+
+// Decode decodes FlowStepIdentifier from json.
+func (s *FlowStepIdentifier) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode FlowStepIdentifier to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "name":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.Name = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"name\"")
+			}
+		case "value":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Str()
+				s.Value = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"value\"")
+			}
+		case "autocomplete":
+			requiredBitSet[0] |= 1 << 2
+			if err := func() error {
+				v, err := d.Str()
+				s.Autocomplete = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"autocomplete\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode FlowStepIdentifier")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000111,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfFlowStepIdentifier) {
+					name = jsonFieldsNameOfFlowStepIdentifier[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *FlowStepIdentifier) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *FlowStepIdentifier) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -56820,6 +57287,40 @@ func (s *OptAuthCheckSucceededEventDelegationType) UnmarshalJSON(data []byte) er
 	return s.Decode(d)
 }
 
+// Encode encodes AuthCsrfInvalidDetails as json.
+func (o OptAuthCsrfInvalidDetails) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes AuthCsrfInvalidDetails from json.
+func (o *OptAuthCsrfInvalidDetails) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptAuthCsrfInvalidDetails to nil")
+	}
+	o.Set = true
+	o.Value = make(AuthCsrfInvalidDetails)
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptAuthCsrfInvalidDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptAuthCsrfInvalidDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes AuthFactorPasskeyEnrolledEventDelegationType as json.
 func (o OptAuthFactorPasskeyEnrolledEventDelegationType) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -59127,6 +59628,39 @@ func (s OptFlowStepComplete) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *OptFlowStepComplete) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes FlowStepIdentifier as json.
+func (o OptFlowStepIdentifier) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes FlowStepIdentifier from json.
+func (o *OptFlowStepIdentifier) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptFlowStepIdentifier to nil")
+	}
+	o.Set = true
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptFlowStepIdentifier) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptFlowStepIdentifier) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -67920,6 +68454,22 @@ func (s PatchMyUserErrorResponse) Encode(e *jx.Encoder) {
 
 func (s PatchMyUserErrorResponse) encodeFields(e *jx.Encoder) {
 	switch s.Type {
+	case AuthCsrfInvalidPatchMyUserErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.csrf_invalid")
+		{
+			s := s.AuthCsrfInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case AuthUnauthorizedPatchMyUserErrorResponse:
 		e.FieldStart("code")
 		e.Str("auth.unauthorized")
@@ -68090,6 +68640,9 @@ func (s *PatchMyUserErrorResponse) Decode(d *jx.Decoder) error {
 					return err
 				}
 				switch typ {
+				case "auth.csrf_invalid":
+					s.Type = AuthCsrfInvalidPatchMyUserErrorResponse
+					found = true
 				case "auth.unauthorized":
 					s.Type = AuthUnauthorizedPatchMyUserErrorResponse
 					found = true
@@ -68131,6 +68684,10 @@ func (s *PatchMyUserErrorResponse) Decode(d *jx.Decoder) error {
 		return errors.New("unable to detect sum type variant")
 	}
 	switch s.Type {
+	case AuthCsrfInvalidPatchMyUserErrorResponse:
+		if err := s.AuthCsrfInvalid.Decode(d); err != nil {
+			return err
+		}
 	case AuthUnauthorizedPatchMyUserErrorResponse:
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
 			return err
@@ -68434,6 +68991,22 @@ func (s PatchProjectErrorResponse) Encode(e *jx.Encoder) {
 
 func (s PatchProjectErrorResponse) encodeFields(e *jx.Encoder) {
 	switch s.Type {
+	case AuthCsrfInvalidPatchProjectErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.csrf_invalid")
+		{
+			s := s.AuthCsrfInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case AuthUnauthorizedPatchProjectErrorResponse:
 		e.FieldStart("code")
 		e.Str("auth.unauthorized")
@@ -68604,6 +69177,9 @@ func (s *PatchProjectErrorResponse) Decode(d *jx.Decoder) error {
 					return err
 				}
 				switch typ {
+				case "auth.csrf_invalid":
+					s.Type = AuthCsrfInvalidPatchProjectErrorResponse
+					found = true
 				case "auth.unauthorized":
 					s.Type = AuthUnauthorizedPatchProjectErrorResponse
 					found = true
@@ -68645,6 +69221,10 @@ func (s *PatchProjectErrorResponse) Decode(d *jx.Decoder) error {
 		return errors.New("unable to detect sum type variant")
 	}
 	switch s.Type {
+	case AuthCsrfInvalidPatchProjectErrorResponse:
+		if err := s.AuthCsrfInvalid.Decode(d); err != nil {
+			return err
+		}
 	case AuthUnauthorizedPatchProjectErrorResponse:
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
 			return err
@@ -72943,6 +73523,22 @@ func (s QueryGrantsErrorResponse) Encode(e *jx.Encoder) {
 
 func (s QueryGrantsErrorResponse) encodeFields(e *jx.Encoder) {
 	switch s.Type {
+	case AuthCsrfInvalidQueryGrantsErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.csrf_invalid")
+		{
+			s := s.AuthCsrfInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case AuthUnauthorizedQueryGrantsErrorResponse:
 		e.FieldStart("code")
 		e.Str("auth.unauthorized")
@@ -73113,6 +73709,9 @@ func (s *QueryGrantsErrorResponse) Decode(d *jx.Decoder) error {
 					return err
 				}
 				switch typ {
+				case "auth.csrf_invalid":
+					s.Type = AuthCsrfInvalidQueryGrantsErrorResponse
+					found = true
 				case "auth.unauthorized":
 					s.Type = AuthUnauthorizedQueryGrantsErrorResponse
 					found = true
@@ -73154,6 +73753,10 @@ func (s *QueryGrantsErrorResponse) Decode(d *jx.Decoder) error {
 		return errors.New("unable to detect sum type variant")
 	}
 	switch s.Type {
+	case AuthCsrfInvalidQueryGrantsErrorResponse:
+		if err := s.AuthCsrfInvalid.Decode(d); err != nil {
+			return err
+		}
 	case AuthUnauthorizedQueryGrantsErrorResponse:
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
 			return err
@@ -77052,6 +77655,22 @@ func (s QueryUsersErrorResponse) Encode(e *jx.Encoder) {
 
 func (s QueryUsersErrorResponse) encodeFields(e *jx.Encoder) {
 	switch s.Type {
+	case AuthCsrfInvalidQueryUsersErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.csrf_invalid")
+		{
+			s := s.AuthCsrfInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case AuthUnauthorizedQueryUsersErrorResponse:
 		e.FieldStart("code")
 		e.Str("auth.unauthorized")
@@ -77174,6 +77793,9 @@ func (s *QueryUsersErrorResponse) Decode(d *jx.Decoder) error {
 					return err
 				}
 				switch typ {
+				case "auth.csrf_invalid":
+					s.Type = AuthCsrfInvalidQueryUsersErrorResponse
+					found = true
 				case "auth.unauthorized":
 					s.Type = AuthUnauthorizedQueryUsersErrorResponse
 					found = true
@@ -77206,6 +77828,10 @@ func (s *QueryUsersErrorResponse) Decode(d *jx.Decoder) error {
 		return errors.New("unable to detect sum type variant")
 	}
 	switch s.Type {
+	case AuthCsrfInvalidQueryUsersErrorResponse:
+		if err := s.AuthCsrfInvalid.Decode(d); err != nil {
+			return err
+		}
 	case AuthUnauthorizedQueryUsersErrorResponse:
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
 			return err
@@ -81494,6 +82120,22 @@ func (s RevokeMySessionErrorResponse) Encode(e *jx.Encoder) {
 
 func (s RevokeMySessionErrorResponse) encodeFields(e *jx.Encoder) {
 	switch s.Type {
+	case AuthCsrfInvalidRevokeMySessionErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.csrf_invalid")
+		{
+			s := s.AuthCsrfInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case AuthUnauthorizedRevokeMySessionErrorResponse:
 		e.FieldStart("code")
 		e.Str("auth.unauthorized")
@@ -81600,6 +82242,9 @@ func (s *RevokeMySessionErrorResponse) Decode(d *jx.Decoder) error {
 					return err
 				}
 				switch typ {
+				case "auth.csrf_invalid":
+					s.Type = AuthCsrfInvalidRevokeMySessionErrorResponse
+					found = true
 				case "auth.unauthorized":
 					s.Type = AuthUnauthorizedRevokeMySessionErrorResponse
 					found = true
@@ -81629,6 +82274,10 @@ func (s *RevokeMySessionErrorResponse) Decode(d *jx.Decoder) error {
 		return errors.New("unable to detect sum type variant")
 	}
 	switch s.Type {
+	case AuthCsrfInvalidRevokeMySessionErrorResponse:
+		if err := s.AuthCsrfInvalid.Decode(d); err != nil {
+			return err
+		}
 	case AuthUnauthorizedRevokeMySessionErrorResponse:
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
 			return err
