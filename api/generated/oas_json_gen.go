@@ -36723,10 +36723,6 @@ func (s *FlowStepIdentifier) Encode(e *jx.Encoder) {
 // encodeFields encodes fields.
 func (s *FlowStepIdentifier) encodeFields(e *jx.Encoder) {
 	{
-		e.FieldStart("name")
-		e.Str(s.Name)
-	}
-	{
 		e.FieldStart("value")
 		e.Str(s.Value)
 	}
@@ -36736,10 +36732,9 @@ func (s *FlowStepIdentifier) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfFlowStepIdentifier = [3]string{
-	0: "name",
-	1: "value",
-	2: "autocomplete",
+var jsonFieldsNameOfFlowStepIdentifier = [2]string{
+	0: "value",
+	1: "autocomplete",
 }
 
 // Decode decodes FlowStepIdentifier from json.
@@ -36751,20 +36746,8 @@ func (s *FlowStepIdentifier) Decode(d *jx.Decoder) error {
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
-		case "name":
-			requiredBitSet[0] |= 1 << 0
-			if err := func() error {
-				v, err := d.Str()
-				s.Name = string(v)
-				if err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"name\"")
-			}
 		case "value":
-			requiredBitSet[0] |= 1 << 1
+			requiredBitSet[0] |= 1 << 0
 			if err := func() error {
 				v, err := d.Str()
 				s.Value = string(v)
@@ -36776,7 +36759,7 @@ func (s *FlowStepIdentifier) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"value\"")
 			}
 		case "autocomplete":
-			requiredBitSet[0] |= 1 << 2
+			requiredBitSet[0] |= 1 << 1
 			if err := func() error {
 				v, err := d.Str()
 				s.Autocomplete = string(v)
@@ -36797,7 +36780,7 @@ func (s *FlowStepIdentifier) Decode(d *jx.Decoder) error {
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [1]uint8{
-		0b00000111,
+		0b00000011,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
