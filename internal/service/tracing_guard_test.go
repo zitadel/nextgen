@@ -67,7 +67,7 @@ func TestServiceMethodsStartSpan(t *testing.T) {
 			service = strings.ToUpper(ident.Name[:1]) + ident.Name[1:]
 		}
 		want := service + "." + d.Name.Name
-		if !startsSpan(d.Body, want) {
+		if !startsSpan(d, want) {
 			missing = append(missing, fset.Position(d.Pos()).String()+": "+want)
 		}
 	}
@@ -76,7 +76,8 @@ func TestServiceMethodsStartSpan(t *testing.T) {
 	}
 }
 
-func startsSpan(body *ast.BlockStmt, want string) bool {
+func startsSpan(d *ast.FuncDecl, want string) bool {
+	body := d.Body
 	if body == nil || len(body.List) < 2 {
 		return false
 	}
@@ -106,7 +107,40 @@ func startsSpan(body *ast.BlockStmt, want string) bool {
 	if !ok || fn.Name != "end" || len(deferred.Call.Args) != 1 {
 		return false
 	}
-	// end dereferences its argument, so it must be the address of the error.
+	// end reads the error through its argument, so it must be the address of
+	// the method's named error result, the last one.
 	arg, ok := deferred.Call.Args[0].(*ast.UnaryExpr)
-	return ok && arg.Op == token.AND
+	if !ok || arg.Op != token.AND {
+		return false
+	}
+	addressed, ok := arg.X.(*ast.Ident)
+	if !ok || d.Type.Results == nil {
+		return false
+	}
+	last := d.Type.Results.List[len(d.Type.Results.List)-1]
+	return len(last.Names) > 0 && addressed.Name == last.Names[len(last.Names)-1].Name
+}
+
+func TestStartsSpanRequiresReturnedError(t *testing.T) {
+	for _, tt := range []struct {
+		arg  string
+		want bool
+	}{
+		{"&err", true},
+		{"&otherErr", false},
+	} {
+		src := `package p
+func (s *xService) M(ctx context.Context) (err error) {
+	ctx, end := startSpan(ctx, "X.M")
+	defer end(` + tt.arg + `)
+	return nil
+}`
+		f, err := parser.ParseFile(token.NewFileSet(), "", src, parser.SkipObjectResolution)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := startsSpan(f.Decls[0].(*ast.FuncDecl), "X.M"); got != tt.want {
+			t.Errorf("defer end(%s): startsSpan = %v, want %v", tt.arg, got, tt.want)
+		}
+	}
 }
