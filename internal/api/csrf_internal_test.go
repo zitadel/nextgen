@@ -92,3 +92,10 @@ func TestCheckSessionCSRF(t *testing.T) {
 		})
 	}
 }
+
+// The api-mock derives the same token (packages/api-mock/src/server.ts
+// csrfTokenFor); this vector is pinned on both sides so the two cannot drift.
+func TestCSRFTokenVector(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, "Rstk677ADwP3NGbLdczBjYCLA5EIxtRtrm-oX7QcYh8", CSRFToken("parity-cookie"))
+}

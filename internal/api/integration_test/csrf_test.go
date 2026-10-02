@@ -16,6 +16,31 @@ import (
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 )
 
+// cookieRequest sends one request with the session cookie and exactly the
+// headers given, bypassing the generated client (which adds the CSRF header on
+// its own), and returns the status and body. The integration tests that need a
+// raw cookie request share it.
+func cookieRequest(t *testing.T, cookie *http.Cookie, method, path, body string, headers map[string]string) (int, string) {
+	t.Helper()
+	req, err := http.NewRequestWithContext(t.Context(), method, harness.EnsureTestServer(t).URL+path, strings.NewReader(body))
+	require.NoError(t, err)
+	if body != "" {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	if cookie != nil {
+		req.AddCookie(cookie)
+	}
+	for name, value := range headers {
+		req.Header.Set(name, value)
+	}
+	resp, err := harness.EnsureHttpClient(t).Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	payload, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	return resp.StatusCode, string(payload)
+}
+
 // TestSessionCSRF pins ADR 053 §5 as scoped for #1300: every unsafe request
 // the session cookie authenticates must be same-origin, and the management
 // writes (plus claim/complete and the user's own profile write) must also
@@ -28,25 +53,9 @@ func TestSessionCSRF(t *testing.T) {
 	harness.SeedProjectAdmin(t, home.ID, operatorID)
 	base := harness.EnsureTestServer(t).URL
 
-	// raw sends one request with the session cookie and whatever headers the
-	// case sets, bypassing the generated client's own CSRF header.
 	raw := func(t *testing.T, method, path, body string, headers map[string]string) (int, string) {
 		t.Helper()
-		req, err := http.NewRequestWithContext(t.Context(), method, base+path, strings.NewReader(body))
-		require.NoError(t, err)
-		if body != "" {
-			req.Header.Set("Content-Type", "application/json")
-		}
-		req.AddCookie(cookie)
-		for name, value := range headers {
-			req.Header.Set(name, value)
-		}
-		resp, err := harness.EnsureHttpClient(t).Do(req)
-		require.NoError(t, err)
-		defer resp.Body.Close()
-		payload, err := io.ReadAll(resp.Body)
-		require.NoError(t, err)
-		return resp.StatusCode, string(payload)
+		return cookieRequest(t, cookie, method, path, body, headers)
 	}
 	createTeam := func() string {
 		return `{"name":"` + helpers.TeamName() + `"}`
@@ -140,26 +149,12 @@ func TestSessionCSRF(t *testing.T) {
 	t.Run("logout needs no token but must be same-origin", func(t *testing.T) {
 		t.Parallel()
 		own := sessionCookieIn(t, home, operatorID)
-		logout := func(t *testing.T, headers map[string]string) (int, string) {
-			t.Helper()
-			req, err := http.NewRequestWithContext(t.Context(), http.MethodDelete, base+"/sessions/me", nil)
-			require.NoError(t, err)
-			req.AddCookie(own)
-			for name, value := range headers {
-				req.Header.Set(name, value)
-			}
-			resp, err := harness.EnsureHttpClient(t).Do(req)
-			require.NoError(t, err)
-			defer resp.Body.Close()
-			payload, err := io.ReadAll(resp.Body)
-			require.NoError(t, err)
-			return resp.StatusCode, string(payload)
-		}
-
-		status, body := logout(t, map[string]string{"Sec-Fetch-Site": "cross-site", "Origin": "https://evil.example"})
+		status, body := cookieRequest(t, own, http.MethodDelete, "/sessions/me", "",
+			map[string]string{"Sec-Fetch-Site": "cross-site", "Origin": "https://evil.example"})
 		requireCSRFRefused(t, status, body)
 
-		status, body = logout(t, map[string]string{"Sec-Fetch-Site": "same-origin"})
+		status, body = cookieRequest(t, own, http.MethodDelete, "/sessions/me", "",
+			map[string]string{"Sec-Fetch-Site": "same-origin"})
 		assert.Equal(t, http.StatusNoContent, status, body)
 	})
 

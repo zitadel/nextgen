@@ -4,7 +4,6 @@ package integration_test
 
 import (
 	"encoding/json"
-	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -17,25 +16,15 @@ import (
 	"github.com/zitadel/nextgen/internal/api/integration_test/test_data"
 )
 
-// consoleCall sends one request with the session cookie (and the CSRF token on
-// writes, as the Console does) and returns the status and body.
+// consoleCall sends one request with the session cookie, and the CSRF token on
+// writes as the Console does, and returns the status and body.
 func consoleCall(t *testing.T, cookie *http.Cookie, method, path, body string) (int, string) {
 	t.Helper()
-	req, err := http.NewRequestWithContext(t.Context(), method, harness.EnsureTestServer(t).URL+path, strings.NewReader(body))
-	require.NoError(t, err)
-	if body != "" {
-		req.Header.Set("Content-Type", "application/json")
-	}
-	req.AddCookie(cookie)
+	var headers map[string]string
 	if method != http.MethodGet {
-		req.Header.Set(internalapi.CSRFHeader, internalapi.CSRFToken(cookie.Value))
+		headers = map[string]string{internalapi.CSRFHeader: internalapi.CSRFToken(cookie.Value)}
 	}
-	resp, err := harness.EnsureHttpClient(t).Do(req)
-	require.NoError(t, err)
-	defer resp.Body.Close()
-	raw, err := io.ReadAll(resp.Body)
-	require.NoError(t, err)
-	return resp.StatusCode, string(raw)
+	return cookieRequest(t, cookie, method, path, body, headers)
 }
 
 // unknownLike returns an id of the same prefix and length as id that names
