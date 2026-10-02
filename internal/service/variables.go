@@ -47,7 +47,10 @@ func NewVariableService(
 	}
 }
 
-func (s *variableService) GetVariables(ctx context.Context, owner domain.VariableOwner, names ...string) ([]*domain.Variable, error) {
+func (s *variableService) GetVariables(ctx context.Context, owner domain.VariableOwner, names ...string) (_ []*domain.Variable, err error) {
+	ctx, end := startSpan(ctx, "VariableService.GetVariables")
+	defer end(&err)
+
 	variables, err := s.v2Pool.Statements().GetVariables(ctx, owner, names...)
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to get variables from database")
@@ -55,7 +58,10 @@ func (s *variableService) GetVariables(ctx context.Context, owner domain.Variabl
 	return variables, nil
 }
 
-func (s *variableService) GetDecryptedVariables(ctx context.Context, owner domain.VariableOwner, names ...string) ([]*domain.Variable, error) {
+func (s *variableService) GetDecryptedVariables(ctx context.Context, owner domain.VariableOwner, names ...string) (_ []*domain.Variable, err error) {
+	ctx, end := startSpan(ctx, "VariableService.GetDecryptedVariables")
+	defer end(&err)
+
 	variables, err := s.GetVariables(ctx, owner, names...)
 	if err != nil {
 		return nil, err
@@ -88,13 +94,15 @@ func (s *variableService) GetDecryptedVariables(ctx context.Context, owner domai
 	return decrypted, nil
 }
 
-func (s *variableService) SetVariables(ctx context.Context, owner domain.VariableOwner, variablesToSet []VariableToSet) error {
+func (s *variableService) SetVariables(ctx context.Context, owner domain.VariableOwner, variablesToSet []VariableToSet) (err error) {
+	ctx, end := startSpan(ctx, "VariableService.SetVariables")
+	defer end(&err)
+
 	if len(variablesToSet) == 0 {
 		return nil
 	}
 
 	var crypter crypto.Crypter
-	var err error
 
 	containsSecret := slices.ContainsFunc(variablesToSet, func(set VariableToSet) bool {
 		return set.IsSecret
@@ -187,7 +195,10 @@ func setVariableError(err error) error {
 	return domain.ErrInternal(err).WithMessage("failed to write variable to database")
 }
 
-func (s *variableService) DeleteVariable(ctx context.Context, owner domain.VariableOwner, name string) error {
+func (s *variableService) DeleteVariable(ctx context.Context, owner domain.VariableOwner, name string) (err error) {
+	ctx, end := startSpan(ctx, "VariableService.DeleteVariable")
+	defer end(&err)
+
 	if err := s.v2Pool.Statements().DeleteVariable(ctx, owner, name); err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return domain.ErrVariableNotFound().WithParent(err)
@@ -197,7 +208,10 @@ func (s *variableService) DeleteVariable(ctx context.Context, owner domain.Varia
 	return nil
 }
 
-func (s *variableService) ReplaceVariablesInPlace(ctx context.Context, owner domain.VariableOwner, doc map[string]any) error {
+func (s *variableService) ReplaceVariablesInPlace(ctx context.Context, owner domain.VariableOwner, doc map[string]any) (err error) {
+	ctx, end := startSpan(ctx, "VariableService.ReplaceVariablesInPlace")
+	defer end(&err)
+
 	placeholders, err := domain.ScanDocumentForVariables(doc)
 	if err != nil {
 		return err

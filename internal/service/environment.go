@@ -37,7 +37,10 @@ func NewEnvironmentService(v2Pool *DB) *EnvironmentService {
 // creation seeds environments inside the transaction that creates the project:
 // a project that committed without its runtime slots would be a project
 // nothing can ever be deployed to, and no later code path would repair it.
-func (s *EnvironmentService) SeedDefaults(ctx context.Context, stmts AllStatements, projectID string) error {
+func (s *EnvironmentService) SeedDefaults(ctx context.Context, stmts AllStatements, projectID string) (err error) {
+	ctx, end := startSpan(ctx, "EnvironmentService.SeedDefaults")
+	defer end(&err)
+
 	return seedDefaultEnvironments(ctx, stmts, projectID)
 }
 
@@ -69,7 +72,10 @@ func emitEnvironmentCreated(ctx context.Context, stmts EventStatements, entity *
 	})
 }
 
-func (s *EnvironmentService) GetByName(ctx context.Context, projectID, name string) (*domain.Environment, error) {
+func (s *EnvironmentService) GetByName(ctx context.Context, projectID, name string) (_ *domain.Environment, err error) {
+	ctx, end := startSpan(ctx, "EnvironmentService.GetByName")
+	defer end(&err)
+
 	validated, err := domain.ValidateEnvironmentName(name)
 	if err != nil {
 		return nil, domain.ErrEnvironmentNotFound()
@@ -84,7 +90,10 @@ func (s *EnvironmentService) GetByName(ctx context.Context, projectID, name stri
 	return entity, nil
 }
 
-func (s *EnvironmentService) List(ctx context.Context, input ListEnvironmentsInput) (*ListEnvironmentsOutput, error) {
+func (s *EnvironmentService) List(ctx context.Context, input ListEnvironmentsInput) (_ *ListEnvironmentsOutput, err error) {
+	ctx, end := startSpan(ctx, "EnvironmentService.List")
+	defer end(&err)
+
 	opts := &database.ListOptions[domain.EnvironmentField]{
 		Filter: database.Equal(database.Col(domain.EnvironmentFieldProjectID), input.ProjectID),
 		Pagination: database.Page[domain.EnvironmentField]{

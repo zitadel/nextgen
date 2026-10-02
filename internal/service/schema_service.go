@@ -69,6 +69,9 @@ func NewSchemaService(
 }
 
 func (s *SchemaService) CreateSchema(ctx context.Context, input CreateSchemaInput) (_ *domain.JSONSchema, err error) {
+	ctx, end := startSpan(ctx, "SchemaService.CreateSchema")
+	defer end(&err)
+
 	model, err := domain.NewJSONSchema(input.ProjectID, input.Schema)
 	if err != nil {
 		return nil, err
@@ -168,9 +171,12 @@ func resolveSchemaError(err error) error {
 	return de
 }
 
-func (s *SchemaService) CreateSchemaByUrl(ctx context.Context, input CreateSchemaByURLInput) (*domain.JSONSchema, error) {
+func (s *SchemaService) CreateSchemaByUrl(ctx context.Context, input CreateSchemaByURLInput) (_ *domain.JSONSchema, err error) {
+	ctx, end := startSpan(ctx, "SchemaService.CreateSchemaByUrl")
+	defer end(&err)
+
 	strURI := input.URL.String()
-	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		_, err := s.schemaResolver.Resolve(ctx, tx.Statements(), input.ProjectID, strURI, nil)
 		if err != nil {
 			return resolveSchemaError(err)
@@ -187,7 +193,10 @@ func (s *SchemaService) CreateSchemaByUrl(ctx context.Context, input CreateSchem
 	return s.v2Pool.Statements().GetJSONSchemaByID(ctx, input.ProjectID, strURI)
 }
 
-func (s *SchemaService) GetSchema(ctx context.Context, projectID string, teamID string, schemaID string) (*domain.JSONSchema, error) {
+func (s *SchemaService) GetSchema(ctx context.Context, projectID string, teamID string, schemaID string) (_ *domain.JSONSchema, err error) {
+	ctx, end := startSpan(ctx, "SchemaService.GetSchema")
+	defer end(&err)
+
 	schema, err := s.v2Pool.Statements().GetJSONSchemaByID(ctx, projectID, schemaID)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
@@ -198,7 +207,10 @@ func (s *SchemaService) GetSchema(ctx context.Context, projectID string, teamID 
 	return schema, nil
 }
 
-func (s *SchemaService) ListSchemas(ctx context.Context, input ListSchemasInput) (*ListSchemasOutput, error) {
+func (s *SchemaService) ListSchemas(ctx context.Context, input ListSchemasInput) (_ *ListSchemasOutput, err error) {
+	ctx, end := startSpan(ctx, "SchemaService.ListSchemas")
+	defer end(&err)
+
 	filters := []database.Filter[domain.JSONSchemaField]{
 		database.Equal(database.Col(domain.JSONSchemaFieldProjectID), input.ProjectID),
 	}

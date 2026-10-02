@@ -162,6 +162,9 @@ func NewUserService(
 }
 
 func (s *userService) ApplyActions(ctx context.Context, actions ...UserAction) (err error) {
+	ctx, end := startSpan(ctx, "UserService.ApplyActions")
+	defer end(&err)
+
 	for _, action := range actions {
 		err = action.Prepare(ctx)
 		if err != nil {
@@ -204,6 +207,9 @@ func (s *userService) emitUserCreateFailedBestEffort(ctx context.Context, action
 }
 
 func (s *userService) CreateUser(ctx context.Context, input CreateUserInput) (_ *domain.User, err error) {
+	ctx, end := startSpan(ctx, "UserService.CreateUser")
+	defer end(&err)
+
 	action := NewCreateUserAction(input, s.schemaStore)
 	if err := s.ApplyActions(ctx, action); err != nil {
 		s.emitUserCreateFailedBestEffort(ctx, action, err)
@@ -249,12 +255,18 @@ func (s *userService) attachUserRefs(ctx context.Context, projectID string, user
 	return nil
 }
 
-func (s *userService) DeleteUser(ctx context.Context, input DeleteUserInput) error {
+func (s *userService) DeleteUser(ctx context.Context, input DeleteUserInput) (err error) {
+	ctx, end := startSpan(ctx, "UserService.DeleteUser")
+	defer end(&err)
+
 	action := NewDeleteUserAction(input)
 	return s.ApplyActions(ctx, action)
 }
 
-func (s *userService) ListUsers(ctx context.Context, input ListUsersInput) (*ListUsersOutput, error) {
+func (s *userService) ListUsers(ctx context.Context, input ListUsersInput) (_ *ListUsersOutput, err error) {
+	ctx, end := startSpan(ctx, "UserService.ListUsers")
+	defer end(&err)
+
 	columnFilters, queryOpts, err := splitUserFilters(input.Filters)
 	if err != nil {
 		return nil, err
@@ -420,6 +432,9 @@ func userField(field string) (domain.UserField, error) {
 }
 
 func (s *userService) ListPasskeys(ctx context.Context, input ListPasskeysInput) (passkeys []*domain.UserPasskey, nextPage string, err error) {
+	ctx, end := startSpan(ctx, "UserService.ListPasskeys")
+	defer end(&err)
+
 	dbpasskeys, err := s.v2Pool.Statements().ListUserPasskeys(
 		ctx, &database.ListOptions[domain.UserPasskeyField]{
 			Filter: database.And(
@@ -462,7 +477,10 @@ func (s *userService) ListPasskeys(ctx context.Context, input ListPasskeysInput)
 // The roster is not lifecycle ownership (ADR 024): a user can sit on several
 // rosters while owning their own lifecycle, which is reported on the user
 // itself.
-func (s *userService) ListUserTeams(ctx context.Context, input ListUserTeamsInput) (*ListUserTeamsOutput, error) {
+func (s *userService) ListUserTeams(ctx context.Context, input ListUserTeamsInput) (_ *ListUserTeamsOutput, err error) {
+	ctx, end := startSpan(ctx, "UserService.ListUserTeams")
+	defer end(&err)
+
 	onRoster := make([]database.Filter[domain.UserTeamField], 0, len(domain.RosterMembershipStatuses))
 	for _, status := range domain.RosterMembershipStatuses {
 		onRoster = append(onRoster, database.Equal(database.Col(domain.UserTeamFieldStatus), status.String()))
@@ -506,7 +524,10 @@ func (s *userService) ListUserTeams(ctx context.Context, input ListUserTeamsInpu
 	}, nil
 }
 
-func (s *userService) GetUserByID(ctx context.Context, input GetUserInput) (*domain.User, error) {
+func (s *userService) GetUserByID(ctx context.Context, input GetUserInput) (_ *domain.User, err error) {
+	ctx, end := startSpan(ctx, "UserService.GetUserByID")
+	defer end(&err)
+
 	user, err := s.v2Pool.Statements().GetUser(ctx, database.And(
 		database.Equal(database.Col(domain.UserFieldProjectID), input.ProjectID),
 		database.Equal(database.Col(domain.UserFieldID), input.UserID),
@@ -528,7 +549,10 @@ func (s *userService) GetUserByID(ctx context.Context, input GetUserInput) (*dom
 // fresh read and the patch statement refuses to write over a row whose
 // updated_at moved past that read, so a lost race re-merges against the
 // interleaved write instead of clobbering it.
-func (s *userService) PatchUser(ctx context.Context, input PatchUserInput) (*domain.User, error) {
+func (s *userService) PatchUser(ctx context.Context, input PatchUserInput) (_ *domain.User, err error) {
+	ctx, end := startSpan(ctx, "UserService.PatchUser")
+	defer end(&err)
+
 	const maxPatchAttempts = 3
 	for attempt := 1; ; attempt++ {
 		action := NewPatchUserAction(input, s.v2Pool, s.schemaStore)
@@ -547,7 +571,10 @@ func (s *userService) PatchUser(ctx context.Context, input PatchUserInput) (*dom
 	return s.GetUserByID(ctx, GetUserInput{ProjectID: input.ProjectID, UserID: input.UserID})
 }
 
-func (s *userService) PatchMyUser(ctx context.Context, input PatchMyUserInput) (*domain.User, error) {
+func (s *userService) PatchMyUser(ctx context.Context, input PatchMyUserInput) (_ *domain.User, err error) {
+	ctx, end := startSpan(ctx, "UserService.PatchMyUser")
+	defer end(&err)
+
 	sessionToken := input.SessionToken
 	if !validSessionToken(sessionToken) {
 		return nil, domain.ErrSessionTokenInvalid()
@@ -563,11 +590,17 @@ func (s *userService) PatchMyUser(ctx context.Context, input PatchMyUserInput) (
 }
 
 func (s *userService) SetPassword(ctx context.Context, input SetPasswordInput) (err error) {
+	ctx, end := startSpan(ctx, "UserService.SetPassword")
+	defer end(&err)
+
 	action := NewSetUserPasswordAction(input, s.hashers)
 	return s.ApplyActions(ctx, action)
 }
 
-func (s *userService) GetMyUser(ctx context.Context, input GetMyUserInput) (*domain.User, error) {
+func (s *userService) GetMyUser(ctx context.Context, input GetMyUserInput) (_ *domain.User, err error) {
+	ctx, end := startSpan(ctx, "UserService.GetMyUser")
+	defer end(&err)
+
 	sessionToken := input.SessionToken
 	if !validSessionToken(sessionToken) {
 		return nil, domain.ErrSessionTokenInvalid()
