@@ -78,6 +78,12 @@ Three rules make that shape hold:
 Use `it.each` for anything that varies by framework, preset or resource. A spec
 suite is a table plus a journey, not a sequence of hand-written near-duplicates.
 
+One exception, in `cli.spec.ts`: it scans `src/**` for the commands the CLI
+suggests, and checks each one against the command list the built CLI reports.
+Reading source from a spec is otherwise forbidden, but the assertion is the
+cross-check between the two sides — split it and each half proves nothing, so
+it stays here deliberately rather than by oversight.
+
 ## Prohibited in specs
 
 - **No listen-on-zero port probes.** A bind-then-close probe races the other
