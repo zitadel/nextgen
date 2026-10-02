@@ -601,21 +601,29 @@ writes. Each resolves independently, highest priority first:
 4. `.env.local` — skipped when the stage is `test`
 5. `.env.<stage>`
 6. `.env`
-7. `zitadel.json`, the `projects.<stage>` entry — server, project id and
-   publishable key, never the secret
-8. `.zitadel/secret`, for project id and secret
-9. Interactive prompt, TTY only, persisted to `.env.<stage>.local`
-10. Error naming the stage, the missing value, and every file consulted
+7. `.zitadel/secret`, for project id and secret — the bootstrap default
+8. Interactive prompt, TTY only, persisted to `.env.<stage>.local`
+9. Error naming the stage, the missing value, and every file consulted
 
-Stage detection, highest priority first: `--env`, `ZITADEL_ENV`, platform signals
-(`VERCEL_ENV`, `NETLIFY_CONTEXT`, `RAILWAY_ENVIRONMENT`), `NODE_ENV`,
+`zitadel.json` is **not** in this chain. It describes configuration content, not
+which server to send it to — see
+[stages](#stages-pointing-one-repository-at-several-projects).
+
+Stage detection, highest priority first: `--stage`, `ZITADEL_STAGE`, platform
+signals (`VERCEL_ENV`, `NETLIFY_CONTEXT`, `RAILWAY_ENVIRONMENT`), `NODE_ENV`,
 `development`. The stage is local only; it selects which `.env` files to read and
-which [`projects` entry](#adding-a-second-project) to use, and never reaches the
-server.
+which [`.env` files](#stages-pointing-one-repository-at-several-projects) to
+read, and never reaches the server.
 
-The two flags do different jobs: `--env <label>` picks an entry from the
-`projects` map, while `--project <id>` names a project id directly and bypasses
-the map.
+**`--stage`, not `--env`.** The selector is deliberately not called `--env`: the
+server has no environments, and a flag that says otherwise is the one place a
+developer would most reasonably conclude it does. `ZITADEL_ENVIRONMENT` is
+deleted for the same reason. The platform signals keep their own names because
+they belong to Vercel and Netlify, not to us.
+
+The two flags do different jobs: `--stage <name>` selects which `.env` files to
+read, while `--project <id>` names a project id directly and overrides whatever
+they say.
 
 **Dotenv never overrides the real process environment.** A platform injecting
 `ZITADEL_PROJECT_ID` must beat a committed `.env`, or a preview deploy silently
@@ -623,89 +631,164 @@ talks to the wrong project.
 
 | Variable | Notes |
 |---|---|
-| `ZITADEL_URL` | server base URL |
-| `ZITADEL_PROJECT_ID` | project |
-| `ZITADEL_PROJECT_SECRET` | CLI and server-side SDK |
+| `ZITADEL_URL` | server base URL — public |
+| `ZITADEL_PROJECT_ID` | project — public |
+| `ZITADEL_PUBLISHABLE_KEY` | public-plane bearer — public |
+| `ZITADEL_PROJECT_SECRET` | CLI and server-side SDK — **secret** |
 | `ZITADEL_RELEASE` | set by the build; read by the server-side SDK |
-| `NEXT_PUBLIC_ZITADEL_RELEASE` / `VITE_…` / `NUXT_PUBLIC_…` | browser bundle |
+| `NEXT_PUBLIC_ZITADEL_PROJECT_ID` / `_PUBLISHABLE_KEY` / `_RELEASE`, and the `VITE_…` and `NUXT_PUBLIC_…` equivalents | browser bundle |
+
+The public/secret column is what decides the file: public values go in the
+committed `.env.<stage>`, the secret in `.env.<stage>.local`.
 
 The release variables are only needed on the fallback path. A browser caller
 answered by layer 2 sends nothing new.
 
-### Adding a second project
+### Stages: pointing one repository at several projects
 
-A stage is a `(server, project)` pair, so "add a production environment" is "add
-a second project". The blocker today is that `.zitadel/secret` holds one project
-id and one secret, so a repository can address exactly one project.
+A stage is a `(server, project)` pair, so "add a production environment" is "bind
+a second stage to a second project". The blocker today is that `.zitadel/secret`
+holds one project id and one secret, so a repository can address exactly one
+project.
 
-`zitadel.json` gains a `projects` map — label to `(server, project,
-publishable_key)`. All three are public-safe, so the map is committed. Each
-project's **secret** is not, and goes to `.env.<label>.local`, which the
-`.env*` entry `setup` already adds to `.gitignore` covers.
+**The local binding is called a stage, not a project.** `project` is a resource —
+`proj_...`, with its own create and read operations — and per
+[the layer hierarchy](../api/hierarchy.md) a team in the platform project owns
+*several* customer projects, so `acme-app` and `acme-admin` are two projects
+belonging to one account. Using the word for a local label too would make
+`zitadel projects add production` read as "create a nested project called
+production", which is a different operation entirely.
 
-```json
-{
-  "projects": {
-    "development": { "server": "local",
-                     "project": "prj_01KDEV7T9QX3M2E8", "publishable_key": "pk_dev_4nYwH6tR2p" },
-    "production":  { "server": "https://api.zitadel.cloud",
-                     "project": "prj_01K9AA9M3K7E2QX8VB4T", "publishable_key": "pk_7kR2pXq9vN3wLmYhT4cB8A" }
-  }
-}
+Three words, three jobs, kept apart:
+
+| Word | Lives | Means |
+|---|---|---|
+| **project** | server | the resource — `proj_...`, owns users, teams, releases |
+| **stage** | client | a label binding `.env` files to one `(server, project)` |
+| **target** | server | what a deployment moves — the project default, or an origin |
+
+#### A stage is just its `.env` files
+
+There is no stages block in `zitadel.json` and no fourth place for these values
+to live. A stage is the set of `.env` files bearing its name.
+
+```ini
+# .env.development          committed
+ZITADEL_URL=http://localhost:8080
+ZITADEL_PROJECT_ID=prj_01KDEV7T9QX3M2E8
+ZITADEL_PUBLISHABLE_KEY=pk_dev_4nYwH6tR2p
 ```
 
-The existing scalar `project` stays valid as sugar for a single unnamed default,
-which is what `setup` writes. Adding a second project migrates it into the map.
+```ini
+# .env.production           committed
+ZITADEL_URL=https://api.zitadel.cloud
+ZITADEL_PROJECT_ID=prj_01K9AA9M3K7E2QX8VB4T
+ZITADEL_PUBLISHABLE_KEY=pk_7kR2pXq9vN3wLmYhT4cB8A
+```
 
-**Labels must match what stage detection produces** — `development`,
-`production`, `preview` — or they can never be selected automatically. The CLI
-warns when a label will only ever be reachable through `--env`.
+```ini
+# .env.production.local     not committed
+ZITADEL_PROJECT_SECRET=sk_proj_9f2Hx8LqT4vRmYpN2wCbVa
+```
+
+Three reasons this beats a block in `zitadel.json`:
+
+- **These values have to be environment variables anyway.** The framework inlines
+  `NEXT_PUBLIC_ZITADEL_PROJECT_ID` into the browser bundle and the server-side
+  SDK reads `ZITADEL_URL`. A `zitadel.json` entry would be a second copy of
+  something that must exist as an env var regardless, and two copies have to
+  agree.
+- **A platform's environment store cannot write `zitadel.json`.** Vercel and
+  Netlify inject `process.env`, which wins at step 2 of
+  [target resolution](#target-resolution). A committed map would therefore be
+  silently overridden in exactly the deployment where being wrong matters most —
+  authoritative-looking and inert.
+- **`zitadel.json` stays purely configuration content.** It describes what gets
+  built into a release. Connection details are not that, and keeping them out
+  means the bundle needs no carve-out for the parts of the file that must not
+  ship.
+
+#### This requires changing the ignore rules
+
+Today `setup` writes ignore entries `[".zitadel/secret", ".env*",
+"!.env.example"]` (`apps/cli/src/lib/orca/patchers/rule/base.ts:233`), so every
+env file is excluded and a stage binding would never be version-controlled.
+
+The split has to follow the convention Next.js already documents and developers
+already hold: **`.env.<stage>` is committed, `.env*.local` is not.**
+
+```
+.zitadel/secret
+.env*.local
+.env
+```
+
+The gain is that the history answers "when did production start pointing at that
+project", and a teammate who clones the repository can see which stages exist
+without being told.
+
+**The hazard this creates, and the guard for it.** A committed `.env.production`
+invites someone to paste a secret into it, which is the same footgun Next.js
+documents. So `zitadel doctor` must fail — not warn — when a committed
+`.env.<stage>` contains `ZITADEL_PROJECT_SECRET`, anything matching `sk_proj_`,
+or any key ending `_SECRET`. That check is a requirement of this layout, not an
+enhancement.
 
 #### Starting local
 
 ```
 $ zitadel setup
-...
 server   local (http://localhost:8080)
 project  prj_01KDEV7T9QX3M2E8  (created)
-wrote    zitadel.json, .zitadel/secret, .env.local
+wrote    zitadel.json, .zitadel/secret, .env.development, .env.local
 ```
 
 #### Adding production
 
 ```
-$ zitadel projects add production
+$ zitadel stages add production
 server?           https://api.zitadel.cloud
-project?          [x] create a new one   [ ] link an existing one
+project?          [x] create a new one   [ ] bind an existing one
 name?             acme
 
 created           prj_01K9AA9M3K7E2QX8VB4T   class=sandbox   unclaimed
-wrote             zitadel.json         projects.production
-                  zitadel.json         projects.development  (migrated from .zitadel/secret)
-                  .env.production.local   ZITADEL_PROJECT_SECRET   (gitignored)
+wrote             .env.production         URL, PROJECT_ID, PUBLISHABLE_KEY   (committed)
+                  .env.production.local   PROJECT_SECRET                    (not committed)
 
 next
-  zitadel deploy --env production     ship your configuration
-  zitadel claim  --env production     attach an owner
-  zitadel projects promote production  once its origins are set
+  zitadel deploy --stage production            ship your configuration
+  zitadel claim  --stage production            attach an owner
+  zitadel projects promote --stage production  once its origins are set
 ```
 
 Creating the project needs no credential — `POST /projects` is public and returns
 the id, the secret and the publishable key. So the whole journey is CLI-driven
 and nothing has to be done in a web console first.
 
-To adopt a project a teammate already created, `--project prj_…` skips creation
-and asks for the secret, or points at `zitadel secret restore`.
+`zitadel stages add` binds; `--project prj_...` binds a project that already
+exists, created by a teammate or by `zitadel projects create`. The two steps are
+separable because they are two concepts; offering to create one is only sugar.
 
 ```
-$ zitadel projects list
-LABEL         SERVER                       PROJECT                   CLASS     CLAIMED
+$ zitadel stages list
+STAGE         SERVER                       PROJECT                   CLASS     CLAIMED
 development   local                        prj_01KDEV7T9QX3M2E8      sandbox   —
 production    https://api.zitadel.cloud    prj_01K9AA9M3K7E2QX8VB4T  sandbox   no
 
 resolved now  development
-              (no --env, ZITADEL_ENV unset, NODE_ENV=development)
+              (no --stage, ZITADEL_STAGE unset, NODE_ENV=development)
 ```
+
+Enumeration is a glob over `.env.*`, excluding `.local` and `.example`, for files
+carrying `ZITADEL_PROJECT_ID`.
+
+**Two stages may point at the same project**, and with env files that is three
+duplicated lines rather than two keys sharing an object. Explicit duplication is
+the right trade here: a `.env.preview` that repeats production's project id says
+plainly that previews run against production users, which is the thing a reader
+needs to notice. Pointing `.env.preview` at a third project instead buys user
+isolation and its own passkeys, and costs a project. Nothing is seeded either
+way.
 
 #### Shipping to it
 
@@ -713,8 +796,8 @@ The new project is empty. The same `.zitadel/` builds a release in it, over
 fresh revisions of its own.
 
 ```
-$ zitadel deploy --env production -m "initial release"
-target     production   https://api.zitadel.cloud   prj_01K9AA9M3K7E2QX8VB4T
+$ zitadel deploy --stage production -m "initial release"
+stage      production   https://api.zitadel.cloud   prj_01K9AA9M3K7E2QX8VB4T
 building   6 resources
 release    sha256:4a5b6c7d  (new in this project)
 
@@ -732,12 +815,14 @@ two would match and `deploy` could assert it — see [Open 1](#open).
 
 #### Making it production
 
+The class belongs to the project, so the verb is a project verb, addressed by
+the stage that selects it.
+
 ```
-$ zitadel claim --env production
-...
+$ zitadel claim --stage production
 claimed    team_acme
 
-$ zitadel projects promote production
+$ zitadel projects promote --stage production
 revalidating 2 origins against the production rules
   https://app.acme.com           primary   exact origin      ✓
   https://*-acmeinc.vercel.app   preview   tenant-anchored   ✓
@@ -745,16 +830,15 @@ class      sandbox -> production
 ```
 
 `promote` is free as a verb because release promotion no longer needs it.
-`zitadel projects demote <label>` is the reverse, and asks for confirmation
-because it re-admits loopback origins to a project holding real users.
+`zitadel projects demote` is the reverse, and asks for confirmation because it
+re-admits loopback origins to a project holding real users.
 
 #### What CI holds
 
-Nothing new in the repository. The production job needs `ZITADEL_PROJECT_SECRET`
-from `.env.production.local` placed in its secret store; the preview job needs
-the narrower preview-deploy credential from
-[Prerequisites](#prerequisites). Server, project and publishable key all come
-from the committed `projects` map.
+One secret per stage. `ZITADEL_PROJECT_SECRET` from `.env.production.local` goes
+into the production job's secret store, and the preview job takes the narrower
+preview-deploy credential from [Prerequisites](#prerequisites). Everything
+else — server, project id, publishable key — is already in the repository.
 
 ### `zitadel status`
 
