@@ -4,6 +4,7 @@ content:
   application/json:
     schema:
       oneOf:
+        - $ref: '../../../../../components/schemas/errors/auth-csrf_invalid.yaml'
         - $ref: '../../../../../components/schemas/errors/auth-unauthorized.yaml'
         - $ref: '../../../../../components/schemas/errors/claim_challenge-not_found.yaml'
         - $ref: '../../../../../components/schemas/errors/claim-no_personal_team.yaml'
@@ -21,6 +22,7 @@ content:
       discriminator:
         propertyName: code
         mapping:
+          auth.csrf_invalid: '../../../../../components/schemas/errors/auth-csrf_invalid.yaml'
           auth.unauthorized: '../../../../../components/schemas/errors/auth-unauthorized.yaml'
           claim_challenge.not_found: '../../../../../components/schemas/errors/claim_challenge-not_found.yaml'
           claim.no_personal_team: '../../../../../components/schemas/errors/claim-no_personal_team.yaml'
@@ -36,6 +38,11 @@ content:
           sess.not_found: '../../../../../components/schemas/errors/sess-not_found.yaml'
           unavailable: '../../../../../components/schemas/errors/unavailable.yaml'
     examples:
+      auth.csrf_invalid:
+        summary: auth.csrf_invalid
+        value:
+          code: auth.csrf_invalid
+          message: 'The request failed cross-site request forgery validation.'
       auth.unauthorized:
         summary: auth.unauthorized
         value:

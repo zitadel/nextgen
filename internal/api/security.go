@@ -134,7 +134,8 @@ var userBoundSessionOperations = map[api.OperationName]bool{
 	api.ListMyProjectsOperation: true,
 	api.GetProjectOperation:     true,
 	api.PatchProjectOperation:   true,
-	// Console management screens (#1300 §1). CSRF for the writes is #1140.
+	// Console management screens (#1300 §1). Their writes need the CSRF token
+	// (ADR 053 §5, csrf.go).
 	api.CreateUserOperation:          true,
 	api.GetUserByIDOperation:         true,
 	api.ListUserPasskeysOperation:    true,
@@ -165,7 +166,7 @@ var secretHashOperations = map[api.OperationName]bool{
 type sessionTokenKey struct{}
 
 // sessionCookieKey carries the raw __nextgen_session value of a request the
-// cookie authenticated, so GET /sessions/me can derive its CSRF token.
+// cookie authenticated, so GET /sessions/me/csrf can derive its CSRF token.
 type sessionCookieKey struct{}
 
 func sessionCookieFromContext(ctx context.Context) (string, bool) {

@@ -2559,6 +2559,59 @@ func (s *AuthCheckSucceededEventDelegationType) UnmarshalText(data []byte) error
 
 // Merged schema.
 // Ref: #
+type AuthCsrfInvalid struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptAuthCsrfInvalidDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *AuthCsrfInvalid) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *AuthCsrfInvalid) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *AuthCsrfInvalid) GetDetails() OptAuthCsrfInvalidDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *AuthCsrfInvalid) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *AuthCsrfInvalid) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *AuthCsrfInvalid) SetDetails(val OptAuthCsrfInvalidDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type AuthCsrfInvalidDetails map[string]jx.Raw
+
+func (s *AuthCsrfInvalidDetails) init() AuthCsrfInvalidDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
 type AuthFactorPasskeyEnrolledEvent struct {
 	// Managed event id (`evt_<opaque>`).
 	ID        string    `json:"id"`
@@ -7828,6 +7881,7 @@ type CompleteClaimForbidden struct {
 	Type                       CompleteClaimForbiddenType // switch on this field
 	ClaimNoPersonalTeam        ClaimNoPersonalTeam
 	ClaimPersonalTeamNotActive ClaimPersonalTeamNotActive
+	AuthCsrfInvalid            AuthCsrfInvalid
 }
 
 // CompleteClaimForbiddenType is oneOf type of CompleteClaimForbidden.
@@ -7837,6 +7891,7 @@ type CompleteClaimForbiddenType string
 const (
 	ClaimNoPersonalTeamCompleteClaimForbidden        CompleteClaimForbiddenType = "claim.no_personal_team"
 	ClaimPersonalTeamNotActiveCompleteClaimForbidden CompleteClaimForbiddenType = "claim.personal_team_not_active"
+	AuthCsrfInvalidCompleteClaimForbidden            CompleteClaimForbiddenType = "auth.csrf_invalid"
 )
 
 // IsClaimNoPersonalTeam reports whether CompleteClaimForbidden is ClaimNoPersonalTeam.
@@ -7847,6 +7902,11 @@ func (s CompleteClaimForbidden) IsClaimNoPersonalTeam() bool {
 // IsClaimPersonalTeamNotActive reports whether CompleteClaimForbidden is ClaimPersonalTeamNotActive.
 func (s CompleteClaimForbidden) IsClaimPersonalTeamNotActive() bool {
 	return s.Type == ClaimPersonalTeamNotActiveCompleteClaimForbidden
+}
+
+// IsAuthCsrfInvalid reports whether CompleteClaimForbidden is AuthCsrfInvalid.
+func (s CompleteClaimForbidden) IsAuthCsrfInvalid() bool {
+	return s.Type == AuthCsrfInvalidCompleteClaimForbidden
 }
 
 // SetClaimNoPersonalTeam sets CompleteClaimForbidden to ClaimNoPersonalTeam.
@@ -7888,6 +7948,27 @@ func (s CompleteClaimForbidden) GetClaimPersonalTeamNotActive() (v ClaimPersonal
 func NewClaimPersonalTeamNotActiveCompleteClaimForbidden(v ClaimPersonalTeamNotActive) CompleteClaimForbidden {
 	var s CompleteClaimForbidden
 	s.SetClaimPersonalTeamNotActive(v)
+	return s
+}
+
+// SetAuthCsrfInvalid sets CompleteClaimForbidden to AuthCsrfInvalid.
+func (s *CompleteClaimForbidden) SetAuthCsrfInvalid(v AuthCsrfInvalid) {
+	s.Type = AuthCsrfInvalidCompleteClaimForbidden
+	s.AuthCsrfInvalid = v
+}
+
+// GetAuthCsrfInvalid returns AuthCsrfInvalid and true boolean if CompleteClaimForbidden is AuthCsrfInvalid.
+func (s CompleteClaimForbidden) GetAuthCsrfInvalid() (v AuthCsrfInvalid, ok bool) {
+	if !s.IsAuthCsrfInvalid() {
+		return v, false
+	}
+	return s.AuthCsrfInvalid, true
+}
+
+// NewAuthCsrfInvalidCompleteClaimForbidden returns new CompleteClaimForbidden from AuthCsrfInvalid.
+func NewAuthCsrfInvalidCompleteClaimForbidden(v AuthCsrfInvalid) CompleteClaimForbidden {
+	var s CompleteClaimForbidden
+	s.SetAuthCsrfInvalid(v)
 	return s
 }
 
@@ -9821,6 +9902,7 @@ func (*CreateGrantConflict) createGrantRes() {}
 // CreateGrantErrorResponse represents sum type.
 type CreateGrantErrorResponse struct {
 	Type                   CreateGrantErrorResponseType // switch on this field
+	AuthCsrfInvalid        AuthCsrfInvalid
 	AuthUnauthorized       AuthUnauthorized
 	EvtInvalid             EvtInvalid
 	GrantAlreadyExists     GrantAlreadyExists
@@ -9837,6 +9919,7 @@ type CreateGrantErrorResponseType string
 
 // Possible values for CreateGrantErrorResponseType.
 const (
+	AuthCsrfInvalidCreateGrantErrorResponse        CreateGrantErrorResponseType = "auth.csrf_invalid"
 	AuthUnauthorizedCreateGrantErrorResponse       CreateGrantErrorResponseType = "auth.unauthorized"
 	EvtInvalidCreateGrantErrorResponse             CreateGrantErrorResponseType = "evt.invalid"
 	GrantAlreadyExistsCreateGrantErrorResponse     CreateGrantErrorResponseType = "grant.already_exists"
@@ -9847,6 +9930,11 @@ const (
 	InternalCreateGrantErrorResponse               CreateGrantErrorResponseType = "internal"
 	ReqInvalidCreateGrantErrorResponse             CreateGrantErrorResponseType = "req.invalid"
 )
+
+// IsAuthCsrfInvalid reports whether CreateGrantErrorResponse is AuthCsrfInvalid.
+func (s CreateGrantErrorResponse) IsAuthCsrfInvalid() bool {
+	return s.Type == AuthCsrfInvalidCreateGrantErrorResponse
+}
 
 // IsAuthUnauthorized reports whether CreateGrantErrorResponse is AuthUnauthorized.
 func (s CreateGrantErrorResponse) IsAuthUnauthorized() bool {
@@ -9891,6 +9979,27 @@ func (s CreateGrantErrorResponse) IsInternal() bool {
 // IsReqInvalid reports whether CreateGrantErrorResponse is ReqInvalid.
 func (s CreateGrantErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidCreateGrantErrorResponse
+}
+
+// SetAuthCsrfInvalid sets CreateGrantErrorResponse to AuthCsrfInvalid.
+func (s *CreateGrantErrorResponse) SetAuthCsrfInvalid(v AuthCsrfInvalid) {
+	s.Type = AuthCsrfInvalidCreateGrantErrorResponse
+	s.AuthCsrfInvalid = v
+}
+
+// GetAuthCsrfInvalid returns AuthCsrfInvalid and true boolean if CreateGrantErrorResponse is AuthCsrfInvalid.
+func (s CreateGrantErrorResponse) GetAuthCsrfInvalid() (v AuthCsrfInvalid, ok bool) {
+	if !s.IsAuthCsrfInvalid() {
+		return v, false
+	}
+	return s.AuthCsrfInvalid, true
+}
+
+// NewAuthCsrfInvalidCreateGrantErrorResponse returns new CreateGrantErrorResponse from AuthCsrfInvalid.
+func NewAuthCsrfInvalidCreateGrantErrorResponse(v AuthCsrfInvalid) CreateGrantErrorResponse {
+	var s CreateGrantErrorResponse
+	s.SetAuthCsrfInvalid(v)
+	return s
 }
 
 // SetAuthUnauthorized sets CreateGrantErrorResponse to AuthUnauthorized.
@@ -12703,6 +12812,7 @@ func (*CreateUserConflict) createUserRes() {}
 // CreateUserErrorResponse represents sum type.
 type CreateUserErrorResponse struct {
 	Type                 CreateUserErrorResponseType // switch on this field
+	AuthCsrfInvalid      AuthCsrfInvalid
 	AuthUnauthorized     AuthUnauthorized
 	EvtInvalid           EvtInvalid
 	Internal             Internal
@@ -12718,6 +12828,7 @@ type CreateUserErrorResponseType string
 
 // Possible values for CreateUserErrorResponseType.
 const (
+	AuthCsrfInvalidCreateUserErrorResponse      CreateUserErrorResponseType = "auth.csrf_invalid"
 	AuthUnauthorizedCreateUserErrorResponse     CreateUserErrorResponseType = "auth.unauthorized"
 	EvtInvalidCreateUserErrorResponse           CreateUserErrorResponseType = "evt.invalid"
 	InternalCreateUserErrorResponse             CreateUserErrorResponseType = "internal"
@@ -12727,6 +12838,11 @@ const (
 	UserNotFoundCreateUserErrorResponse         CreateUserErrorResponseType = "user.not_found"
 	UserPermissionDeniedCreateUserErrorResponse CreateUserErrorResponseType = "user.permission_denied"
 )
+
+// IsAuthCsrfInvalid reports whether CreateUserErrorResponse is AuthCsrfInvalid.
+func (s CreateUserErrorResponse) IsAuthCsrfInvalid() bool {
+	return s.Type == AuthCsrfInvalidCreateUserErrorResponse
+}
 
 // IsAuthUnauthorized reports whether CreateUserErrorResponse is AuthUnauthorized.
 func (s CreateUserErrorResponse) IsAuthUnauthorized() bool {
@@ -12764,6 +12880,27 @@ func (s CreateUserErrorResponse) IsUserNotFound() bool {
 // IsUserPermissionDenied reports whether CreateUserErrorResponse is UserPermissionDenied.
 func (s CreateUserErrorResponse) IsUserPermissionDenied() bool {
 	return s.Type == UserPermissionDeniedCreateUserErrorResponse
+}
+
+// SetAuthCsrfInvalid sets CreateUserErrorResponse to AuthCsrfInvalid.
+func (s *CreateUserErrorResponse) SetAuthCsrfInvalid(v AuthCsrfInvalid) {
+	s.Type = AuthCsrfInvalidCreateUserErrorResponse
+	s.AuthCsrfInvalid = v
+}
+
+// GetAuthCsrfInvalid returns AuthCsrfInvalid and true boolean if CreateUserErrorResponse is AuthCsrfInvalid.
+func (s CreateUserErrorResponse) GetAuthCsrfInvalid() (v AuthCsrfInvalid, ok bool) {
+	if !s.IsAuthCsrfInvalid() {
+		return v, false
+	}
+	return s.AuthCsrfInvalid, true
+}
+
+// NewAuthCsrfInvalidCreateUserErrorResponse returns new CreateUserErrorResponse from AuthCsrfInvalid.
+func NewAuthCsrfInvalidCreateUserErrorResponse(v AuthCsrfInvalid) CreateUserErrorResponse {
+	var s CreateUserErrorResponse
+	s.SetAuthCsrfInvalid(v)
+	return s
 }
 
 // SetAuthUnauthorized sets CreateUserErrorResponse to AuthUnauthorized.
@@ -13129,6 +13266,7 @@ func (s *CurrentDeployment) SetDeployedAt(val time.Time) {
 // DeleteGrantErrorResponse represents sum type.
 type DeleteGrantErrorResponse struct {
 	Type                  DeleteGrantErrorResponseType // switch on this field
+	AuthCsrfInvalid       AuthCsrfInvalid
 	AuthUnauthorized      AuthUnauthorized
 	EvtInvalid            EvtInvalid
 	GrantNotFound         GrantNotFound
@@ -13142,6 +13280,7 @@ type DeleteGrantErrorResponseType string
 
 // Possible values for DeleteGrantErrorResponseType.
 const (
+	AuthCsrfInvalidDeleteGrantErrorResponse       DeleteGrantErrorResponseType = "auth.csrf_invalid"
 	AuthUnauthorizedDeleteGrantErrorResponse      DeleteGrantErrorResponseType = "auth.unauthorized"
 	EvtInvalidDeleteGrantErrorResponse            DeleteGrantErrorResponseType = "evt.invalid"
 	GrantNotFoundDeleteGrantErrorResponse         DeleteGrantErrorResponseType = "grant.not_found"
@@ -13149,6 +13288,11 @@ const (
 	InternalDeleteGrantErrorResponse              DeleteGrantErrorResponseType = "internal"
 	ReqInvalidDeleteGrantErrorResponse            DeleteGrantErrorResponseType = "req.invalid"
 )
+
+// IsAuthCsrfInvalid reports whether DeleteGrantErrorResponse is AuthCsrfInvalid.
+func (s DeleteGrantErrorResponse) IsAuthCsrfInvalid() bool {
+	return s.Type == AuthCsrfInvalidDeleteGrantErrorResponse
+}
 
 // IsAuthUnauthorized reports whether DeleteGrantErrorResponse is AuthUnauthorized.
 func (s DeleteGrantErrorResponse) IsAuthUnauthorized() bool {
@@ -13178,6 +13322,27 @@ func (s DeleteGrantErrorResponse) IsInternal() bool {
 // IsReqInvalid reports whether DeleteGrantErrorResponse is ReqInvalid.
 func (s DeleteGrantErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidDeleteGrantErrorResponse
+}
+
+// SetAuthCsrfInvalid sets DeleteGrantErrorResponse to AuthCsrfInvalid.
+func (s *DeleteGrantErrorResponse) SetAuthCsrfInvalid(v AuthCsrfInvalid) {
+	s.Type = AuthCsrfInvalidDeleteGrantErrorResponse
+	s.AuthCsrfInvalid = v
+}
+
+// GetAuthCsrfInvalid returns AuthCsrfInvalid and true boolean if DeleteGrantErrorResponse is AuthCsrfInvalid.
+func (s DeleteGrantErrorResponse) GetAuthCsrfInvalid() (v AuthCsrfInvalid, ok bool) {
+	if !s.IsAuthCsrfInvalid() {
+		return v, false
+	}
+	return s.AuthCsrfInvalid, true
+}
+
+// NewAuthCsrfInvalidDeleteGrantErrorResponse returns new DeleteGrantErrorResponse from AuthCsrfInvalid.
+func NewAuthCsrfInvalidDeleteGrantErrorResponse(v AuthCsrfInvalid) DeleteGrantErrorResponse {
+	var s DeleteGrantErrorResponse
+	s.SetAuthCsrfInvalid(v)
+	return s
 }
 
 // SetAuthUnauthorized sets DeleteGrantErrorResponse to AuthUnauthorized.
@@ -13375,6 +13540,7 @@ func (*DeleteTeamUnauthorized) deleteTeamRes() {}
 // DeleteUserByIDErrorResponse represents sum type.
 type DeleteUserByIDErrorResponse struct {
 	Type                 DeleteUserByIDErrorResponseType // switch on this field
+	AuthCsrfInvalid      AuthCsrfInvalid
 	AuthUnauthorized     AuthUnauthorized
 	EvtInvalid           EvtInvalid
 	Internal             Internal
@@ -13388,6 +13554,7 @@ type DeleteUserByIDErrorResponseType string
 
 // Possible values for DeleteUserByIDErrorResponseType.
 const (
+	AuthCsrfInvalidDeleteUserByIDErrorResponse      DeleteUserByIDErrorResponseType = "auth.csrf_invalid"
 	AuthUnauthorizedDeleteUserByIDErrorResponse     DeleteUserByIDErrorResponseType = "auth.unauthorized"
 	EvtInvalidDeleteUserByIDErrorResponse           DeleteUserByIDErrorResponseType = "evt.invalid"
 	InternalDeleteUserByIDErrorResponse             DeleteUserByIDErrorResponseType = "internal"
@@ -13395,6 +13562,11 @@ const (
 	UserNotFoundDeleteUserByIDErrorResponse         DeleteUserByIDErrorResponseType = "user.not_found"
 	UserPermissionDeniedDeleteUserByIDErrorResponse DeleteUserByIDErrorResponseType = "user.permission_denied"
 )
+
+// IsAuthCsrfInvalid reports whether DeleteUserByIDErrorResponse is AuthCsrfInvalid.
+func (s DeleteUserByIDErrorResponse) IsAuthCsrfInvalid() bool {
+	return s.Type == AuthCsrfInvalidDeleteUserByIDErrorResponse
+}
 
 // IsAuthUnauthorized reports whether DeleteUserByIDErrorResponse is AuthUnauthorized.
 func (s DeleteUserByIDErrorResponse) IsAuthUnauthorized() bool {
@@ -13424,6 +13596,27 @@ func (s DeleteUserByIDErrorResponse) IsUserNotFound() bool {
 // IsUserPermissionDenied reports whether DeleteUserByIDErrorResponse is UserPermissionDenied.
 func (s DeleteUserByIDErrorResponse) IsUserPermissionDenied() bool {
 	return s.Type == UserPermissionDeniedDeleteUserByIDErrorResponse
+}
+
+// SetAuthCsrfInvalid sets DeleteUserByIDErrorResponse to AuthCsrfInvalid.
+func (s *DeleteUserByIDErrorResponse) SetAuthCsrfInvalid(v AuthCsrfInvalid) {
+	s.Type = AuthCsrfInvalidDeleteUserByIDErrorResponse
+	s.AuthCsrfInvalid = v
+}
+
+// GetAuthCsrfInvalid returns AuthCsrfInvalid and true boolean if DeleteUserByIDErrorResponse is AuthCsrfInvalid.
+func (s DeleteUserByIDErrorResponse) GetAuthCsrfInvalid() (v AuthCsrfInvalid, ok bool) {
+	if !s.IsAuthCsrfInvalid() {
+		return v, false
+	}
+	return s.AuthCsrfInvalid, true
+}
+
+// NewAuthCsrfInvalidDeleteUserByIDErrorResponse returns new DeleteUserByIDErrorResponse from AuthCsrfInvalid.
+func NewAuthCsrfInvalidDeleteUserByIDErrorResponse(v AuthCsrfInvalid) DeleteUserByIDErrorResponse {
+	var s DeleteUserByIDErrorResponse
+	s.SetAuthCsrfInvalid(v)
+	return s
 }
 
 // SetAuthUnauthorized sets DeleteUserByIDErrorResponse to AuthUnauthorized.
@@ -32895,6 +33088,52 @@ func (o OptAuthCheckSucceededEventDelegationType) Or(d AuthCheckSucceededEventDe
 	return d
 }
 
+// NewOptAuthCsrfInvalidDetails returns new OptAuthCsrfInvalidDetails with value set to v.
+func NewOptAuthCsrfInvalidDetails(v AuthCsrfInvalidDetails) OptAuthCsrfInvalidDetails {
+	return OptAuthCsrfInvalidDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptAuthCsrfInvalidDetails is optional AuthCsrfInvalidDetails.
+type OptAuthCsrfInvalidDetails struct {
+	Value AuthCsrfInvalidDetails
+	Set   bool
+}
+
+// IsSet returns true if OptAuthCsrfInvalidDetails was set.
+func (o OptAuthCsrfInvalidDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptAuthCsrfInvalidDetails) Reset() {
+	var v AuthCsrfInvalidDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptAuthCsrfInvalidDetails) SetTo(v AuthCsrfInvalidDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptAuthCsrfInvalidDetails) Get() (v AuthCsrfInvalidDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptAuthCsrfInvalidDetails) Or(d AuthCsrfInvalidDetails) AuthCsrfInvalidDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptAuthFactorPasskeyEnrolledEventDelegationType returns new OptAuthFactorPasskeyEnrolledEventDelegationType with value set to v.
 func NewOptAuthFactorPasskeyEnrolledEventDelegationType(v AuthFactorPasskeyEnrolledEventDelegationType) OptAuthFactorPasskeyEnrolledEventDelegationType {
 	return OptAuthFactorPasskeyEnrolledEventDelegationType{
@@ -46636,6 +46875,7 @@ func (*PatchMyUserConflict) patchMyUserRes() {}
 // PatchMyUserErrorResponse represents sum type.
 type PatchMyUserErrorResponse struct {
 	Type              PatchMyUserErrorResponseType // switch on this field
+	AuthCsrfInvalid   AuthCsrfInvalid
 	AuthUnauthorized  AuthUnauthorized
 	EvtInvalid        EvtInvalid
 	Internal          Internal
@@ -46652,6 +46892,7 @@ type PatchMyUserErrorResponseType string
 
 // Possible values for PatchMyUserErrorResponseType.
 const (
+	AuthCsrfInvalidPatchMyUserErrorResponse   PatchMyUserErrorResponseType = "auth.csrf_invalid"
 	AuthUnauthorizedPatchMyUserErrorResponse  PatchMyUserErrorResponseType = "auth.unauthorized"
 	EvtInvalidPatchMyUserErrorResponse        PatchMyUserErrorResponseType = "evt.invalid"
 	InternalPatchMyUserErrorResponse          PatchMyUserErrorResponseType = "internal"
@@ -46662,6 +46903,11 @@ const (
 	UserInvalidPatchMyUserErrorResponse       PatchMyUserErrorResponseType = "user.invalid"
 	UserNotFoundPatchMyUserErrorResponse      PatchMyUserErrorResponseType = "user.not_found"
 )
+
+// IsAuthCsrfInvalid reports whether PatchMyUserErrorResponse is AuthCsrfInvalid.
+func (s PatchMyUserErrorResponse) IsAuthCsrfInvalid() bool {
+	return s.Type == AuthCsrfInvalidPatchMyUserErrorResponse
+}
 
 // IsAuthUnauthorized reports whether PatchMyUserErrorResponse is AuthUnauthorized.
 func (s PatchMyUserErrorResponse) IsAuthUnauthorized() bool {
@@ -46706,6 +46952,27 @@ func (s PatchMyUserErrorResponse) IsUserInvalid() bool {
 // IsUserNotFound reports whether PatchMyUserErrorResponse is UserNotFound.
 func (s PatchMyUserErrorResponse) IsUserNotFound() bool {
 	return s.Type == UserNotFoundPatchMyUserErrorResponse
+}
+
+// SetAuthCsrfInvalid sets PatchMyUserErrorResponse to AuthCsrfInvalid.
+func (s *PatchMyUserErrorResponse) SetAuthCsrfInvalid(v AuthCsrfInvalid) {
+	s.Type = AuthCsrfInvalidPatchMyUserErrorResponse
+	s.AuthCsrfInvalid = v
+}
+
+// GetAuthCsrfInvalid returns AuthCsrfInvalid and true boolean if PatchMyUserErrorResponse is AuthCsrfInvalid.
+func (s PatchMyUserErrorResponse) GetAuthCsrfInvalid() (v AuthCsrfInvalid, ok bool) {
+	if !s.IsAuthCsrfInvalid() {
+		return v, false
+	}
+	return s.AuthCsrfInvalid, true
+}
+
+// NewAuthCsrfInvalidPatchMyUserErrorResponse returns new PatchMyUserErrorResponse from AuthCsrfInvalid.
+func NewAuthCsrfInvalidPatchMyUserErrorResponse(v AuthCsrfInvalid) PatchMyUserErrorResponse {
+	var s PatchMyUserErrorResponse
+	s.SetAuthCsrfInvalid(v)
+	return s
 }
 
 // SetAuthUnauthorized sets PatchMyUserErrorResponse to AuthUnauthorized.
@@ -46972,6 +47239,7 @@ func (*PatchProjectBadRequest) patchProjectRes() {}
 // PatchProjectErrorResponse represents sum type.
 type PatchProjectErrorResponse struct {
 	Type                    PatchProjectErrorResponseType // switch on this field
+	AuthCsrfInvalid         AuthCsrfInvalid
 	AuthUnauthorized        AuthUnauthorized
 	EvtInvalid              EvtInvalid
 	Internal                Internal
@@ -46988,6 +47256,7 @@ type PatchProjectErrorResponseType string
 
 // Possible values for PatchProjectErrorResponseType.
 const (
+	AuthCsrfInvalidPatchProjectErrorResponse         PatchProjectErrorResponseType = "auth.csrf_invalid"
 	AuthUnauthorizedPatchProjectErrorResponse        PatchProjectErrorResponseType = "auth.unauthorized"
 	EvtInvalidPatchProjectErrorResponse              PatchProjectErrorResponseType = "evt.invalid"
 	InternalPatchProjectErrorResponse                PatchProjectErrorResponseType = "internal"
@@ -46998,6 +47267,11 @@ const (
 	ProjPermissionDeniedPatchProjectErrorResponse    PatchProjectErrorResponseType = "proj.permission_denied"
 	ReqInvalidPatchProjectErrorResponse              PatchProjectErrorResponseType = "req.invalid"
 )
+
+// IsAuthCsrfInvalid reports whether PatchProjectErrorResponse is AuthCsrfInvalid.
+func (s PatchProjectErrorResponse) IsAuthCsrfInvalid() bool {
+	return s.Type == AuthCsrfInvalidPatchProjectErrorResponse
+}
 
 // IsAuthUnauthorized reports whether PatchProjectErrorResponse is AuthUnauthorized.
 func (s PatchProjectErrorResponse) IsAuthUnauthorized() bool {
@@ -47042,6 +47316,27 @@ func (s PatchProjectErrorResponse) IsProjPermissionDenied() bool {
 // IsReqInvalid reports whether PatchProjectErrorResponse is ReqInvalid.
 func (s PatchProjectErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidPatchProjectErrorResponse
+}
+
+// SetAuthCsrfInvalid sets PatchProjectErrorResponse to AuthCsrfInvalid.
+func (s *PatchProjectErrorResponse) SetAuthCsrfInvalid(v AuthCsrfInvalid) {
+	s.Type = AuthCsrfInvalidPatchProjectErrorResponse
+	s.AuthCsrfInvalid = v
+}
+
+// GetAuthCsrfInvalid returns AuthCsrfInvalid and true boolean if PatchProjectErrorResponse is AuthCsrfInvalid.
+func (s PatchProjectErrorResponse) GetAuthCsrfInvalid() (v AuthCsrfInvalid, ok bool) {
+	if !s.IsAuthCsrfInvalid() {
+		return v, false
+	}
+	return s.AuthCsrfInvalid, true
+}
+
+// NewAuthCsrfInvalidPatchProjectErrorResponse returns new PatchProjectErrorResponse from AuthCsrfInvalid.
+func NewAuthCsrfInvalidPatchProjectErrorResponse(v AuthCsrfInvalid) PatchProjectErrorResponse {
+	var s PatchProjectErrorResponse
+	s.SetAuthCsrfInvalid(v)
+	return s
 }
 
 // SetAuthUnauthorized sets PatchProjectErrorResponse to AuthUnauthorized.
@@ -49510,6 +49805,7 @@ func (*QueryGrantsBadRequest) queryGrantsRes() {}
 // QueryGrantsErrorResponse represents sum type.
 type QueryGrantsErrorResponse struct {
 	Type                  QueryGrantsErrorResponseType // switch on this field
+	AuthCsrfInvalid       AuthCsrfInvalid
 	AuthUnauthorized      AuthUnauthorized
 	GrantInvalid          GrantInvalid
 	GrantNotFound         GrantNotFound
@@ -49526,6 +49822,7 @@ type QueryGrantsErrorResponseType string
 
 // Possible values for QueryGrantsErrorResponseType.
 const (
+	AuthCsrfInvalidQueryGrantsErrorResponse       QueryGrantsErrorResponseType = "auth.csrf_invalid"
 	AuthUnauthorizedQueryGrantsErrorResponse      QueryGrantsErrorResponseType = "auth.unauthorized"
 	GrantInvalidQueryGrantsErrorResponse          QueryGrantsErrorResponseType = "grant.invalid"
 	GrantNotFoundQueryGrantsErrorResponse         QueryGrantsErrorResponseType = "grant.not_found"
@@ -49536,6 +49833,11 @@ const (
 	TeamPermissionDeniedQueryGrantsErrorResponse  QueryGrantsErrorResponseType = "team.permission_denied"
 	UserPermissionDeniedQueryGrantsErrorResponse  QueryGrantsErrorResponseType = "user.permission_denied"
 )
+
+// IsAuthCsrfInvalid reports whether QueryGrantsErrorResponse is AuthCsrfInvalid.
+func (s QueryGrantsErrorResponse) IsAuthCsrfInvalid() bool {
+	return s.Type == AuthCsrfInvalidQueryGrantsErrorResponse
+}
 
 // IsAuthUnauthorized reports whether QueryGrantsErrorResponse is AuthUnauthorized.
 func (s QueryGrantsErrorResponse) IsAuthUnauthorized() bool {
@@ -49580,6 +49882,27 @@ func (s QueryGrantsErrorResponse) IsTeamPermissionDenied() bool {
 // IsUserPermissionDenied reports whether QueryGrantsErrorResponse is UserPermissionDenied.
 func (s QueryGrantsErrorResponse) IsUserPermissionDenied() bool {
 	return s.Type == UserPermissionDeniedQueryGrantsErrorResponse
+}
+
+// SetAuthCsrfInvalid sets QueryGrantsErrorResponse to AuthCsrfInvalid.
+func (s *QueryGrantsErrorResponse) SetAuthCsrfInvalid(v AuthCsrfInvalid) {
+	s.Type = AuthCsrfInvalidQueryGrantsErrorResponse
+	s.AuthCsrfInvalid = v
+}
+
+// GetAuthCsrfInvalid returns AuthCsrfInvalid and true boolean if QueryGrantsErrorResponse is AuthCsrfInvalid.
+func (s QueryGrantsErrorResponse) GetAuthCsrfInvalid() (v AuthCsrfInvalid, ok bool) {
+	if !s.IsAuthCsrfInvalid() {
+		return v, false
+	}
+	return s.AuthCsrfInvalid, true
+}
+
+// NewAuthCsrfInvalidQueryGrantsErrorResponse returns new QueryGrantsErrorResponse from AuthCsrfInvalid.
+func NewAuthCsrfInvalidQueryGrantsErrorResponse(v AuthCsrfInvalid) QueryGrantsErrorResponse {
+	var s QueryGrantsErrorResponse
+	s.SetAuthCsrfInvalid(v)
+	return s
 }
 
 // SetAuthUnauthorized sets QueryGrantsErrorResponse to AuthUnauthorized.
@@ -51314,6 +51637,7 @@ func (*QueryUsersBadRequest) queryUsersRes() {}
 // QueryUsersErrorResponse represents sum type.
 type QueryUsersErrorResponse struct {
 	Type                 QueryUsersErrorResponseType // switch on this field
+	AuthCsrfInvalid      AuthCsrfInvalid
 	AuthUnauthorized     AuthUnauthorized
 	Internal             Internal
 	NotImplemented       NotImplemented
@@ -51327,6 +51651,7 @@ type QueryUsersErrorResponseType string
 
 // Possible values for QueryUsersErrorResponseType.
 const (
+	AuthCsrfInvalidQueryUsersErrorResponse      QueryUsersErrorResponseType = "auth.csrf_invalid"
 	AuthUnauthorizedQueryUsersErrorResponse     QueryUsersErrorResponseType = "auth.unauthorized"
 	InternalQueryUsersErrorResponse             QueryUsersErrorResponseType = "internal"
 	NotImplementedQueryUsersErrorResponse       QueryUsersErrorResponseType = "not_implemented"
@@ -51334,6 +51659,11 @@ const (
 	UserNotFoundQueryUsersErrorResponse         QueryUsersErrorResponseType = "user.not_found"
 	UserPermissionDeniedQueryUsersErrorResponse QueryUsersErrorResponseType = "user.permission_denied"
 )
+
+// IsAuthCsrfInvalid reports whether QueryUsersErrorResponse is AuthCsrfInvalid.
+func (s QueryUsersErrorResponse) IsAuthCsrfInvalid() bool {
+	return s.Type == AuthCsrfInvalidQueryUsersErrorResponse
+}
 
 // IsAuthUnauthorized reports whether QueryUsersErrorResponse is AuthUnauthorized.
 func (s QueryUsersErrorResponse) IsAuthUnauthorized() bool {
@@ -51361,6 +51691,27 @@ func (s QueryUsersErrorResponse) IsUserNotFound() bool {
 // IsUserPermissionDenied reports whether QueryUsersErrorResponse is UserPermissionDenied.
 func (s QueryUsersErrorResponse) IsUserPermissionDenied() bool {
 	return s.Type == UserPermissionDeniedQueryUsersErrorResponse
+}
+
+// SetAuthCsrfInvalid sets QueryUsersErrorResponse to AuthCsrfInvalid.
+func (s *QueryUsersErrorResponse) SetAuthCsrfInvalid(v AuthCsrfInvalid) {
+	s.Type = AuthCsrfInvalidQueryUsersErrorResponse
+	s.AuthCsrfInvalid = v
+}
+
+// GetAuthCsrfInvalid returns AuthCsrfInvalid and true boolean if QueryUsersErrorResponse is AuthCsrfInvalid.
+func (s QueryUsersErrorResponse) GetAuthCsrfInvalid() (v AuthCsrfInvalid, ok bool) {
+	if !s.IsAuthCsrfInvalid() {
+		return v, false
+	}
+	return s.AuthCsrfInvalid, true
+}
+
+// NewAuthCsrfInvalidQueryUsersErrorResponse returns new QueryUsersErrorResponse from AuthCsrfInvalid.
+func NewAuthCsrfInvalidQueryUsersErrorResponse(v AuthCsrfInvalid) QueryUsersErrorResponse {
+	var s QueryUsersErrorResponse
+	s.SetAuthCsrfInvalid(v)
+	return s
 }
 
 // SetAuthUnauthorized sets QueryUsersErrorResponse to AuthUnauthorized.
@@ -53546,6 +53897,7 @@ func (s *RequestAPIPayloadMethod) UnmarshalText(data []byte) error {
 // RevokeMySessionErrorResponse represents sum type.
 type RevokeMySessionErrorResponse struct {
 	Type             RevokeMySessionErrorResponseType // switch on this field
+	AuthCsrfInvalid  AuthCsrfInvalid
 	AuthUnauthorized AuthUnauthorized
 	EvtInvalid       EvtInvalid
 	Internal         Internal
@@ -53558,12 +53910,18 @@ type RevokeMySessionErrorResponseType string
 
 // Possible values for RevokeMySessionErrorResponseType.
 const (
+	AuthCsrfInvalidRevokeMySessionErrorResponse  RevokeMySessionErrorResponseType = "auth.csrf_invalid"
 	AuthUnauthorizedRevokeMySessionErrorResponse RevokeMySessionErrorResponseType = "auth.unauthorized"
 	EvtInvalidRevokeMySessionErrorResponse       RevokeMySessionErrorResponseType = "evt.invalid"
 	InternalRevokeMySessionErrorResponse         RevokeMySessionErrorResponseType = "internal"
 	ReqInvalidRevokeMySessionErrorResponse       RevokeMySessionErrorResponseType = "req.invalid"
 	SessNotFoundRevokeMySessionErrorResponse     RevokeMySessionErrorResponseType = "sess.not_found"
 )
+
+// IsAuthCsrfInvalid reports whether RevokeMySessionErrorResponse is AuthCsrfInvalid.
+func (s RevokeMySessionErrorResponse) IsAuthCsrfInvalid() bool {
+	return s.Type == AuthCsrfInvalidRevokeMySessionErrorResponse
+}
 
 // IsAuthUnauthorized reports whether RevokeMySessionErrorResponse is AuthUnauthorized.
 func (s RevokeMySessionErrorResponse) IsAuthUnauthorized() bool {
@@ -53588,6 +53946,27 @@ func (s RevokeMySessionErrorResponse) IsReqInvalid() bool {
 // IsSessNotFound reports whether RevokeMySessionErrorResponse is SessNotFound.
 func (s RevokeMySessionErrorResponse) IsSessNotFound() bool {
 	return s.Type == SessNotFoundRevokeMySessionErrorResponse
+}
+
+// SetAuthCsrfInvalid sets RevokeMySessionErrorResponse to AuthCsrfInvalid.
+func (s *RevokeMySessionErrorResponse) SetAuthCsrfInvalid(v AuthCsrfInvalid) {
+	s.Type = AuthCsrfInvalidRevokeMySessionErrorResponse
+	s.AuthCsrfInvalid = v
+}
+
+// GetAuthCsrfInvalid returns AuthCsrfInvalid and true boolean if RevokeMySessionErrorResponse is AuthCsrfInvalid.
+func (s RevokeMySessionErrorResponse) GetAuthCsrfInvalid() (v AuthCsrfInvalid, ok bool) {
+	if !s.IsAuthCsrfInvalid() {
+		return v, false
+	}
+	return s.AuthCsrfInvalid, true
+}
+
+// NewAuthCsrfInvalidRevokeMySessionErrorResponse returns new RevokeMySessionErrorResponse from AuthCsrfInvalid.
+func NewAuthCsrfInvalidRevokeMySessionErrorResponse(v AuthCsrfInvalid) RevokeMySessionErrorResponse {
+	var s RevokeMySessionErrorResponse
+	s.SetAuthCsrfInvalid(v)
+	return s
 }
 
 // SetAuthUnauthorized sets RevokeMySessionErrorResponse to AuthUnauthorized.

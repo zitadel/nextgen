@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
+	"errors"
 	"net/http"
 
 	api "github.com/zitadel/nextgen/api/generated"
@@ -22,22 +23,18 @@ const CSRFHeader = "X-Zitadel-CSRF"
 // still need the token where one is required.
 var csrfOriginGuard = http.NewCrossOriginProtection()
 
-// csrfProtectedOperations need the X-Zitadel-CSRF token when the session
-// cookie authenticates them: the state-changing management operations plus
-// claim/complete (ADR 053 §5) and the user's own profile write. Logout
-// (revokeMySession) gets the origin check only — customer apps call it
-// through the SDK proxies, which cannot supply the token yet — and the
-// POST query operations are reads, which may omit it.
-var csrfProtectedOperations = map[api.OperationName]bool{
-	api.CreateUserOperation:     true,
-	api.DeleteUserByIDOperation: true,
-	api.CreateTeamOperation:     true,
-	api.UpdateTeamOperation:     true,
-	api.PatchProjectOperation:   true,
-	api.CreateGrantOperation:    true,
-	api.DeleteGrantOperation:    true,
-	api.CompleteClaimOperation:  true,
-	api.PatchMyUserOperation:    true,
+// csrfTokenExemptOperations are the state-changing requests the session
+// cookie may authenticate without the X-Zitadel-CSRF token; every other one
+// needs it (ADR 053 §5), so an operation that starts accepting the cookie is
+// protected without being listed. These still get the origin check. Logout
+// (revokeMySession) is exempt because customer apps call it through the SDK
+// proxies, which cannot supply the token yet; the POST query operations are
+// reads.
+var csrfTokenExemptOperations = map[api.OperationName]bool{
+	api.RevokeMySessionOperation: true,
+	api.QueryUsersOperation:      true,
+	api.QueryTeamsOperation:      true,
+	api.QueryGrantsOperation:     true,
 }
 
 type csrfRequestKey struct{}
@@ -67,6 +64,15 @@ func WithCSRFRequest(next http.Handler) http.Handler {
 	})
 }
 
+// CSRFRequestRecorded reports whether WithCSRFRequest ran for the request
+// ctx belongs to. The server's wiring test uses it to pin that the middleware
+// sits in front of the API, since checkSessionCSRF refuses every
+// cookie-authenticated request without it.
+func CSRFRequestRecorded(ctx context.Context) bool {
+	_, ok := ctx.Value(csrfRequestKey{}).(csrfRequest)
+	return ok
+}
+
 // CSRFToken derives the CSRF token for a session cookie value: an HMAC-SHA256
 // keyed by the cookie over a fixed label. Only a holder of the HttpOnly
 // cookie can compute or learn it — from GET /sessions/me/csrf, which a cross-site
@@ -80,16 +86,24 @@ func CSRFToken(sessionCookie string) string {
 
 // checkSessionCSRF enforces ADR 053 §5 on a request the session cookie
 // authenticates. Safe methods always pass; unsafe ones must be same-origin,
-// and protected operations must also carry the session's token.
+// and, unless exempt, must also carry the session's token.
+//
+// A request that did not pass through WithCSRFRequest is refused: without the
+// recorded method and origin the check cannot tell a safe request from a
+// forged one, and passing it would turn a wiring mistake into an open door.
 func checkSessionCSRF(ctx context.Context, operationName api.OperationName, sessionCookie string) error {
 	req, ok := ctx.Value(csrfRequestKey{}).(csrfRequest)
-	if !ok || !req.unsafe {
+	if !ok {
+		return domain.ErrInternal(errors.New("WithCSRFRequest is not wired")).
+			WithMessage("CSRF request state missing")
+	}
+	if !req.unsafe {
 		return nil
 	}
 	if req.originErr != nil {
 		return domain.ErrAuthCSRFInvalid()
 	}
-	if !csrfProtectedOperations[operationName] {
+	if csrfTokenExemptOperations[operationName] {
 		return nil
 	}
 	want := CSRFToken(sessionCookie)
