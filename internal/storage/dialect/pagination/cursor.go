@@ -3,6 +3,7 @@ package pagination
 import (
 	"encoding/base64"
 	"encoding/json"
+	"math"
 	"slices"
 
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -28,18 +29,37 @@ func New[F ~uint8](orderBy database.OrderBy[F], values []any) *Cursor[F] {
 	}
 }
 
-// MarshalNext returns a marshaled keyset cursor when the page is full and OrderBy
-// has at least one column; otherwise nil. Empty OrderBy never emits a token.
-func MarshalNext[F ~uint8, T any](
-	orderBy database.OrderBy[F],
-	items []*T,
+// Page runs one keyset page: run fetches the requested limit plus a look-ahead
+// probe row, and Page trims the probe and returns the rows to serve with the
+// next-page token. Fetch and trim are a single operation, so they cannot drift.
+// A token is emitted only when the probe proved a further page exists, so an
+// exact-multiple final page reports none (#849). limit 0 is unbounded; an empty
+// OrderBy still trims but emits no token.
+func Page[F ~uint8, T any](
+	p database.Page[F],
 	schema database.Schema[F, T],
-	limit uint32,
-) []byte {
-	if limit == 0 || len(items) != int(limit) || len(orderBy.Columns) == 0 {
-		return nil
+	run func(limit uint32) ([]*T, error),
+) ([]*T, []byte, error) {
+	// Fetch one extra row as the probe. At the uint32 maximum limit+1 is
+	// unrepresentable, but no result set can hold 2^32 rows, so a page that
+	// large has no successor and emitting no token is correct.
+	fetch := p.Limit
+	if fetch != 0 && fetch != math.MaxUint32 {
+		fetch++
 	}
-	return New(orderBy, schema.ValuesFrom(items[len(items)-1], orderBy.Columns)).Marshal()
+	items, err := run(fetch)
+	if err != nil {
+		return nil, nil, err
+	}
+	if p.Limit == 0 || uint64(len(items)) <= uint64(p.Limit) {
+		return items, nil, nil
+	}
+	page := items[:p.Limit]
+	if len(p.OrderBy.Columns) == 0 {
+		return page, nil, nil
+	}
+	token := New(p.OrderBy, schema.ValuesFrom(page[len(page)-1], p.OrderBy.Columns)).Marshal()
+	return page, token, nil
 }
 
 func CursorFromToken[F ~uint8](token []byte) (*Cursor[F], error) {
