@@ -74,7 +74,7 @@ Disambiguating these first, because two of them survive and one does not.
 | # | Thing | Where | Fate |
 |---|---|---|---|
 | 1 | **The runtime slot** — `environments` table, `dev`/`staging`/`prod`, `current_deployment_id`, ADR 035 | `internal/domain/environment.go` | **Deleted.** This is the whole of the proposal. |
-| 2 | **The project's origin-rule class** — a project-level `development \| preview \| production` flag gating which wildcard origin patterns may be saved | [security-and-origins.md §15-43](../api/security-and-origins.md), "LOCKED", **not implemented** | **Survives, renamed.** It is a project maturity flag, not a slot. Calling it `environment` is the confusion; `origin_policy` or tying it to claim state removes it. |
+| 2 | **The project's origin-rule class** — a project-level `development \| preview \| production` flag gating which wildcard origin patterns may be saved | [security-and-origins.md §15-43](../api/security-and-origins.md), "LOCKED", **not implemented** | **Survives, renamed and reduced to two values.** See [Project class](#project-class). It is a posture, not a slot. |
 | 3 | **The developer's local stage** — `development`/`preview`/`production` as a label selecting which `.env` files and which target to use | CLI, deleted in #1286; `ZITADEL_ENVIRONMENT` in scaffolds | **Survives, client-only.** Never sent to the server. |
 
 Most of the muddle in the current design space comes from these three sharing a
@@ -85,6 +85,7 @@ word. The proposal is: delete 1, rename 2, keep 3 local.
 ```mermaid
 flowchart LR
   P["Project
+  class: sandbox | production
   origin allowlist
   publishable key
   current_deployment_id"]
@@ -133,6 +134,97 @@ commands, and all of [#1311](https://github.com/zitadel/nextgen/issues/1311).
 Blast radius is real but bounded: environment appears across domain, three
 dialects plus migrations, service, api, and roughly fifteen test files, with
 `deployment` and `variable` as the two coupled entities.
+
+## Project class
+
+The project needs one flag, because the hazards this design has to contain are
+all properties of a project as a whole rather than of any single origin entry.
+An individual `http://localhost:3000` entry is unobjectionable; a project that
+serves real users *and* accepts `http://localhost:3000` is the problem, because
+any page on any developer's machine can then drive flows against real users.
+
+```
+project.class: sandbox | production
+```
+
+| | `sandbox` (default) | `production` |
+|---|---|---|
+| Loopback origins (`http://localhost:*`, `127.0.0.1`, `[::1]`) | Allowed | **Rejected at save** |
+| Shared-host wildcards (`*.vercel.app`, `*.netlify.app`, `*.pages.dev`) | Allowed | **Rejected at save** |
+| Empty allowlist, meaning allow-all | Allowed | **Rejected** — a non-empty allowlist is mandatory |
+| Custom-domain wildcards (`*.acme.com`) | Allowed | Allowed, with domain ownership verification |
+| Release pinning by an uncredentialled caller | Allowed | **Rejected** — see below |
+| Real email / SMS delivery | Claim-gated, a separate axis ([secret.md](secret.md#capability-matrix)) | Same |
+
+**Two values, not three.** `security-and-origins.md` specifies
+`development | preview | production`, but its `development` and `preview` rows
+have *identical* origin rules — they differ only in rate limits and dashboard
+banners. Rate limiting is its own axis and should not ride on this flag, so the
+third value buys nothing and costs a concept.
+
+### Why this flag earns its place: it fixes the capability problem
+
+The uncomfortable admission in
+[the release resolver](#the-uncomfortable-part-stated-plainly) is that an
+uncredentialled browser caller's release hash functions as a capability. The
+class confines that admission to where it does not matter:
+
+- On a **`production`** project, pinning requires a credential — the publishable
+  key or the project secret. Serving an arbitrary old release is then an
+  authorized operation, not a known-the-hash operation, and the downgrade
+  concern goes away.
+- On a **`sandbox`** project, pinning is open, because that is what makes
+  previews and local development work, and the blast radius is test data on a
+  project with no real users by construction.
+
+This is a better answer than anything available without the flag, and it is the
+main reason to add it rather than derive the same rules from claim state.
+
+### Consequence: previews live on a sandbox project
+
+A `production` project rejects shared-host wildcards, so a Vercel preview URL
+cannot reach it. Previews therefore point at a `sandbox` project — which is also
+where [Variables](#variables) already pushed them, since a preview needing its
+own IdP client needs its own project. The two constraints agree, which is a good
+sign.
+
+The default shape for a team is then three projects, not three environments:
+
+| Project | Class | Origins | Who moves its current release |
+|---|---|---|---|
+| dev | `sandbox` | loopback, shared by the whole team | nobody — see [the next section](#many-developers-one-shared-server) |
+| preview | `sandbox` | `*.vercel.app` or equivalent | CI, per branch, or nobody if every build pins |
+| production | `production` | `https://app.acme.com` | CI, on merge |
+
+That is the same three-way split environments were providing, with two
+differences that both favour this model: the boundary is a project, so user and
+variable isolation is real rather than a documented absence
+([#1308](https://github.com/zitadel/nextgen/pull/1308) decided environments share
+data); and the count is a developer's choice rather than a seeded default.
+
+> The post-MVP fix `security-and-origins.md` already names — CI injecting the
+> exact preview URL into the allowlist at deploy and removing it at teardown —
+> would let previews run against a `production` project without wildcards. Worth
+> keeping in view, not worth waiting for.
+
+### Transitions
+
+- **`sandbox` → `production`** revalidates every stored origin against the
+  `production` column and fails the transition, naming each offender, if any
+  violates it. Requires a claimed project: an unclaimed project has no
+  accountable owner and should not be serving real users.
+- **`production` → `sandbox`** is a downgrade that re-admits loopback origins to
+  a project holding real users. It requires explicit confirmation from the claim
+  holder and is audited. It is not forbidden — a project can be retired — but it
+  is never incidental.
+
+### What this is not
+
+It is not environment #1 under a new name, and the difference is worth being
+precise about: there is **one** flag per project, it holds no release pointer, it
+has no name of its own, no set to belong to, no deployment history, and no
+lifecycle beyond the two transitions above. Nothing resolves *to* it. It
+constrains what a project may accept; it never selects what a request is served.
 
 ## Release identity on the wire
 
@@ -218,9 +310,12 @@ needs the allowlist to actually work.
 3. **A hash named → that release,** if it belongs to the caller's project and is
    not revoked. Permitted for a caller holding the publishable key or the
    project secret.
-4. **An uncredentialled caller naming a hash is refused** (`403`). Not because
-   the refusal is airtight — see below — but because allowing it makes the
-   `security: []` path strictly more dangerous than it is now.
+4. **Whether an uncredentialled caller may name a hash depends on the
+   [project class](#project-class).** On a `production` project it is refused
+   (`403`): pinning there requires the publishable key or the project secret. On
+   a `sandbox` project it is allowed, because local development and previews
+   depend on it and the project holds no real users. This is the rule the class
+   exists for.
 5. **The hash is resolved once per flow and sealed into the flow state.** This
    follows an existing precedent rather than inventing one: `FlowState` already
    seals `UserSchemaURL` at start time "so a mid-flow default change doesn't
@@ -255,8 +350,11 @@ names the project and constrains the origin, but neither stops a non-browser
 client holding both values — and the key is public by construction while the
 hash ships in the bundle.
 
-This is tolerable, and should be designed for deliberately rather than
-discovered later:
+[Project class](#project-class) confines this to `sandbox` projects, where there
+are no real users to harm; on a `production` project pinning needs a credential
+and the problem does not arise. What follows therefore applies to `sandbox`
+projects, and is the reason the confinement matters rather than a residual worry
+about production:
 
 - **The hash is unguessable**, because it covers ULID revision ids. (A content
   equivalence hash, per the decision above, would be *less* unguessable —
@@ -289,7 +387,9 @@ implies otherwise.
 | Hash names a release of another project, or none | 404 | `rel.not_found` |
 | Short hash matches more than one release | 400 | `rel.ambiguous` |
 | Release revoked | 409 | `rel.revoked` |
-| Uncredentialled caller named a hash | 403 | `rel.pin_not_permitted` |
+| Uncredentialled caller named a hash on a `production` project | 403 | `rel.pin_not_permitted` |
+| Loopback or shared-host wildcard origin saved on a `production` project | 400 | `proj.origin_not_permitted_for_class` |
+| `sandbox` → `production` while a stored origin violates the class | 400 | `proj.class_transition_blocked` |
 
 ### The two shapes the ask named
 
@@ -334,6 +434,89 @@ hash is unchanged".
 > endpoint accepting full bundle content and materialising revisions in the
 > target project — which restores a registry-like push/pull at the cost of a
 > second construction path.
+
+## Many developers, one shared server
+
+Five developers each run the frontend on `http://localhost:3000`, all pointing at
+one shared `sandbox` project on a shared server. Each has their own uncommitted
+`.zitadel/` edits. This is the ordinary case, and it is the case the environment
+model handled worst — it needs an environment per developer, with naming,
+expiry and collection, which is most of what
+[#1311](https://github.com/zitadel/nextgen/issues/1311) was for.
+
+The origin cannot separate them: all five send the same `Origin`. The release
+hash can, because it travels on the request rather than being a property of where
+the request came from.
+
+### The mechanism
+
+1. A developer edits `.zitadel/flows/login.json`.
+2. The dev-server hook **builds a release and does not activate it** — a
+   `POST /releases`-shaped call returning a hash. Content-hash dedup means
+   identical content across two developers reuses one row rather than creating a
+   second.
+3. The hash lands in the local runtime document. This does not need inventing:
+   `.zitadel/local/runtime.json` already exists, and
+   `standaloneRuntimeResolver` (`cmd/server/console_runtime.go:53-56`) already
+   serves a runtime document carrying the default project id and the publishable
+   key to console and login. The current hash joins that document.
+4. The browser sends it as `X-Zitadel-Release` on flow calls.
+5. The shared project's current release is **never touched**. Each developer sees
+   their own configuration; none of them can disturb the other four.
+
+### The invariant this establishes
+
+> **In the inner loop, nobody activates.** Building a release is a save;
+> activating one is a deploy. Only CI, or an explicit `zitadel deploy`, moves a
+> project's current release.
+
+ADR 035 left "inner-loop semantics" explicitly open — "whether every local save
+creates a release (Vercel-shaped local dev) or only explicit `zitadel deploy`
+does (Terraform-shaped)". This answers it, and the answer is neither of the two
+offered: **every save creates a release, no save activates one.** That split is
+only available once a release can be served without being the project's current
+one, which is exactly what this design adds.
+
+It also generalises ADR 035's existing promise. There, "revisions drafted
+outside a release are inert". Here, one level up: *releases that were never
+activated are inert to everyone except a caller that names them.*
+
+### Why the hash must come from a runtime document in dev, not the build
+
+A build-time constant is right for a deployed app and wrong for the inner loop: a
+developer editing `.zitadel/` expects the next page load to reflect it, not the
+next rebuild. In development the hash is read per request from the local runtime
+document; in a deployed app it is baked in as `NEXT_PUBLIC_ZITADEL_RELEASE` and
+friends. Same header on the wire, two sources.
+
+This is also the honest reason the hash is a header and not something negotiated
+once per session: in dev it changes on roughly every file save.
+
+### What it costs
+
+A release row per distinct local content state, per developer, on a shared
+project. Content-hash dedup bounds this by distinct content rather than by number
+of saves, but it is still a lot of rows, and they are all never-activated.
+
+So **release collection replaces environment collection.** We delete the preview
+environment garbage collector and acquire a release one. That trade is worth
+stating plainly rather than presenting the deletion as free — but the new
+collector is much simpler than the one it replaces: a release that has never
+been activated, has not been resolved recently, and is older than some retention
+window is collectable. No names to reuse, no origins to orphan, no expiry to
+renew, no idempotent-create-renews-TTL semantics. Just unreferenced and cold.
+
+An activated release is never collected while it is in any project's deployment
+history, which is what makes rollback meaningful.
+
+### What this does not solve
+
+Five developers share the project, so they share its users, sessions and
+variables. A developer who deletes a test user deletes it for everyone. That is
+the same trade [#1308](https://github.com/zitadel/nextgen/pull/1308) already
+accepted between environments, and the escape hatch is the same as everywhere
+else in this design: a developer who needs isolation uses their own project,
+which costs them a `ZITADEL_PROJECT_ID` in `.env.local` and nothing else.
 
 ## Variables
 
@@ -459,8 +642,15 @@ depends on.
   specified do not survive; releases do, nearly intact.
 - **ADR 062's scope section is amended** to drop the environment level.
 - **ADR 036 is simplified:** "keys are issued per environment" becomes "per
-  project", and allow-all origin lists are gated by project maturity (thing 2
-  above) rather than environment class.
+  project", and allow-all origin lists are gated by
+  [project class](#project-class) rather than environment class.
+- **One field is added to the project** — `class`, two values, plus the save-time
+  origin validation and the two transitions it implies. This is the only new
+  concept in the design, and it pays for itself by making release pinning on a
+  production project an authorized operation rather than a capability one.
+- **Release collection replaces environment collection.** The preview-environment
+  garbage collector goes; a simpler never-activated-and-cold release collector
+  arrives. Not free, but a smaller mechanism than the one removed.
 - **[#1311](https://github.com/zitadel/nextgen/issues/1311) is dropped** rather
   than implemented, and [#1308](https://github.com/zitadel/nextgen/pull/1308)'s
   lifecycle half with it. #1308's data-isolation half survives and is
@@ -475,7 +665,8 @@ depends on.
 - **A preview shares its project's data and variables.** Already true under
   #1308; worth restating because it is what a developer will be surprised by.
 - **Arbitrary release pinning by a browser caller rests on hash
-  unguessability** — the honest cost of having no browser-holdable secret.
+  unguessability** — but only on `sandbox` projects, which is the point of the
+  class.
 
 ## Open
 
@@ -483,18 +674,33 @@ depends on.
    hash: exists today, unguessable, not reproducible across projects, so no
    checkable promotion. Content hash: reproducible, enables promotion-by-equality,
    but guessable by anyone who can guess the configuration — which weakens the
-   capability argument the SPA path depends on. Keeping both, exposing the
-   pointer hash and using the content hash only for CI assertions, is probably
-   the answer; it needs deciding before anything else.
+   capability argument the `sandbox` SPA path depends on. Keeping both, exposing
+   the pointer hash and using the content hash only for CI assertions, is
+   probably the answer; it needs deciding before anything else.
 2. **Portable releases or not** — the promotion trade. If releases become
    portable, stages could share a project again and the design gains an escape
    hatch it otherwise lacks.
 3. **Whether `current_deployment_id` belongs on the project row** or is derived
    from the newest deployment. The column is what exists; the index for the
    query exists too.
-4. **Whether `rel.pin_not_permitted` is worth having** before ADR 036 closes the
-   uncredentialled flow path. It may be simpler to require the publishable key
-   for release pinning from day one and let that force the ADR 036 work.
-5. **Release retention.** ADR 035 left it out of scope. With no environments
-   there is no "nothing points at this" signal other than the deployment log, so
-   the question is now slightly sharper.
+4. **Whether a `production` project's pin rule can be enforced before ADR 036
+   lands.** The rule needs a credential on the flow operations, which today take
+   none. Either this design waits on ADR 036's publishable-key work, or
+   `production`-class projects simply refuse pinning outright until it does —
+   which is safe, and costs production previews that have to live on a `sandbox`
+   project anyway.
+5. **Release retention window and what counts as "resolved recently".** The
+   collector needs a last-resolved timestamp on the release, which is a write on
+   the hot path — or an approximation that avoids one. Whether a
+   never-activated release is collectable after days or weeks is a product
+   decision; whether it is tracked precisely is an engineering one.
+6. **Whether the class is two values or whether rate limiting wants a third.**
+   This note collapses `security-and-origins.md`'s three to two on the grounds
+   that `development` and `preview` have identical origin rules. If rate limits
+   end up wanting to key on the same flag rather than its own, the third value
+   comes back.
+7. **Whether `class` should gate anything else already claim-gated.** Real
+   email/SMS is gated on claim today. Two near-parallel axes — claimed, and
+   `production` — risk drifting. Worth deciding whether `production` requires
+   claim (this note says yes) and whether anything else should move onto the
+   class.
