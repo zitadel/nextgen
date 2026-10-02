@@ -621,4 +621,27 @@ describe("users screen", () => {
     expect(bodies).toHaveLength(2);
     expect(bodies.at(-1)).not.toHaveProperty("expand");
   });
+
+  it("does not ask for the expansion again on Load more once it was refused", async () => {
+    // A refusal does not turn into a pass by paging, so a later page skips the
+    // refused attempt instead of costing two requests every time.
+    const bodies = recordQueries((body) => {
+      if (body.expand) return HttpResponse.json({ message: "not permitted" }, { status: 403 });
+      return body.page_token
+        ? HttpResponse.json({ users: [{ id: "user_2", attributes: { email: "omar@acme.com" } }] })
+        : HttpResponse.json({
+            users: [{ id: "user_1", attributes: { email: "maya@acme.com" } }],
+            next_page_token: "page-2",
+          });
+    });
+    await renderUsers();
+    expect(await screen.findByText("maya@acme.com")).toBeInTheDocument();
+    expect(bodies).toHaveLength(2);
+
+    await userEvent.click(screen.getByRole("button", { name: "Load more" }));
+    expect(await screen.findByText("omar@acme.com")).toBeInTheDocument();
+    expect(bodies).toHaveLength(3);
+    expect(bodies.at(-1)).toMatchObject({ page_token: "page-2" });
+    expect(bodies.at(-1)).not.toHaveProperty("expand");
+  });
 });

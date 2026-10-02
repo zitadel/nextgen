@@ -15,6 +15,7 @@ import (
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/api/integration_test/test_data"
+	"github.com/zitadel/nextgen/internal/domain"
 )
 
 // TestConsoleManagementAcceptsSession pins #1300 §1: the embedded Console
@@ -459,10 +460,10 @@ func TestConsoleSessionReadsTargetProjectByID(t *testing.T) {
 	})
 }
 
-// TestConsoleSessionExpandsUserTeams pins #1300 §4 (relaxed): a session mints
-// no scopes, so the team_membership.read / team.read ceilings on
-// queryUsers' expansions let a user principal through once it has passed the
-// Check on the target project. The Console's Team column depends on it.
+// TestConsoleSessionExpandsUserTeams pins #1300 §4: a session mints no
+// scopes, so queryUsers' team_membership.read / team.read expansions ask the
+// resolver for read authority on the target project instead. The Console's
+// Team column depends on it.
 func TestConsoleSessionExpandsUserTeams(t *testing.T) {
 	t.Parallel()
 
@@ -493,6 +494,100 @@ func TestConsoleSessionExpandsUserTeams(t *testing.T) {
 	owner, ok := member.Metadata.LifecycleOwnerTeam.Get()
 	require.True(t, ok, "expand lifecycle_owner_team must embed the owner: %s", helpers.MustMarshal(t, member))
 	assert.Equal(t, memberTeamID, owner.ID)
+}
+
+// TestConsoleSessionPartialAccessDoesNotExpand pins #1300 §4 hardened: the
+// expand permissions come from the resolver (viewer on the target project),
+// not from passing the list check. A viewer grant scoped to one team is a
+// foothold, so the list answers with the users that team's scope reaches, but
+// it is not project-wide read authority, so expanding memberships or the
+// owner team is refused.
+func TestConsoleSessionPartialAccessDoesNotExpand(t *testing.T) {
+	t.Parallel()
+
+	_, operatorID, cookie := ownSessionUser(t)
+
+	customer, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	_, teamID := harness.CreateUserOwnedByTeam(t, customer.ID)
+	asgn := &domain.AuthzAssignment{
+		ProjectID:     customer.ID,
+		CatalogID:     domain.SystemCatalogID,
+		PrincipalType: domain.AuthzPrincipalTypeUser,
+		PrincipalID:   operatorID,
+		ObjectType:    "project",
+		Relation:      "viewer",
+	}
+	asgn.ApplyScope(domain.NewTeamAssignmentScope(teamID))
+	require.NoError(t, harness.EnsureServiceDB(t).Statements().CreateAuthzAssignment(t.Context(), asgn))
+
+	session, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	session.SetSessionToken(cookie.Value)
+	params := api.QueryUsersParams{ProjectID: api.NewOptProjectID(api.ProjectID(customer.ID))}
+
+	listed, err := session.QueryUsers(t.Context(), &api.QueryUsersRequest{}, params)
+	require.NoError(t, err)
+	require.IsType(t, &api.QueryUsersResponse{}, listed, "the foothold still lists: %s", helpers.MustMarshal(t, listed))
+
+	byTeam := &api.QueryUsersRequest{}
+	require.NoError(t, byTeam.UnmarshalJSON([]byte(`{"filter":[{"field":"team_id","operation":"equals","value":"`+teamID+`"}]}`)))
+	for name, req := range map[string]*api.QueryUsersRequest{
+		"expand teams":                {Expand: []api.UserExpand{api.UserExpandTeams}},
+		"expand lifecycle owner team": {Expand: []api.UserExpand{api.UserExpandLifecycleOwnerTeam}},
+		// The filter reads the same memberships by another route, so it takes
+		// the same gate.
+		"team_id filter": byTeam,
+	} {
+		t.Run(name, func(t *testing.T) {
+			resp, err := session.QueryUsers(t.Context(), req, params)
+			require.NoError(t, err)
+			require.IsType(t, &api.QueryUsersForbidden{}, resp, helpers.MustMarshal(t, resp))
+			assert.Equal(t, api.ErrorCode("user.permission_denied"), resp.(*api.QueryUsersForbidden).Code)
+		})
+	}
+}
+
+// TestConsoleSessionByIDTeamFilterNeedsProjectRead closes the side door next
+// to TestConsoleSessionPartialAccessDoesNotExpand: GET /users/{id}?team_id=
+// answers "is this user an active member of that team", the membership read
+// POST /users/query gates behind project-wide read for a session. A viewer
+// grant on just this user reads the user, but not their memberships.
+func TestConsoleSessionByIDTeamFilterNeedsProjectRead(t *testing.T) {
+	t.Parallel()
+
+	_, operatorID, cookie := ownSessionUser(t)
+	customer, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	memberID, teamID := harness.CreateUserOwnedByTeam(t, customer.ID)
+	asgn := &domain.AuthzAssignment{
+		ProjectID:     customer.ID,
+		CatalogID:     domain.SystemCatalogID,
+		PrincipalType: domain.AuthzPrincipalTypeUser,
+		PrincipalID:   operatorID,
+		ObjectType:    "project",
+		Relation:      "viewer",
+	}
+	asgn.ApplyScope(domain.NewResourceAssignmentScope(memberID))
+	require.NoError(t, harness.EnsureServiceDB(t).Statements().CreateAuthzAssignment(t.Context(), asgn))
+
+	session, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	session.SetSessionToken(cookie.Value)
+
+	read, err := session.GetUserByID(t.Context(), api.GetUserByIDParams{UserID: api.UserID(memberID)})
+	require.NoError(t, err)
+	require.IsType(t, &api.User{}, read, "the grant reads the user: %s", helpers.MustMarshal(t, read))
+
+	byTeam, err := session.GetUserByID(t.Context(), api.GetUserByIDParams{
+		UserID: api.UserID(memberID),
+		TeamID: api.NewOptTeamID(api.TeamID(teamID)),
+	})
+	require.NoError(t, err)
+	require.IsType(t, &api.GetUserByIDErrorResponseStatusCode{}, byTeam, helpers.MustMarshal(t, byTeam))
+	refused := byTeam.(*api.GetUserByIDErrorResponseStatusCode)
+	assert.Equal(t, http.StatusForbidden, refused.StatusCode)
+	assert.True(t, refused.Response.IsUserPermissionDenied(), helpers.MustMarshal(t, byTeam))
 }
 
 // TestConsoleManagementBearerIgnoresStaleCookie pins the dual-scheme

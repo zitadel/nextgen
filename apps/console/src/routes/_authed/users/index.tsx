@@ -70,16 +70,25 @@ type UsersPage = Awaited<ReturnType<typeof api.queryUsers>>;
  *
  * `expand: ["teams"]` needs `team_membership.read` on top of `user.read`, and a
  * credential carrying one without the other is refused the whole request rather
- * than just the relation (ADR 059). A Console session passes once it may list
- * the project (#1306); the refusal still falls back to the unexpanded read for
- * a credential that may not, so the screen loses its Team column, not its users.
+ * than just the relation (ADR 059). A Console session passes when it may read
+ * the whole project; a grant on only part of it is refused, and the refusal
+ * falls back to the unexpanded read, so the screen loses its Team column, not
+ * its users.
+ *
+ * `expand` is false once a page was served without the expansion: a refusal
+ * does not turn into a pass by paging, so Load more asks for the plain page
+ * directly instead of being refused first every time.
  */
 async function fetchUsers(
   projectId: string,
   pageToken?: string,
+  expand = true,
 ): Promise<UsersPage & { teamsExpanded: boolean }> {
   const body = { limit: PAGE_SIZE, page_token: pageToken };
   const params = { project_id: projectId };
+  if (!expand) {
+    return { ...(await api.queryUsers(body, params)), teamsExpanded: false };
+  }
   try {
     return {
       ...(await api.queryUsers({ ...body, expand: ["teams"] }, params)),
@@ -227,7 +236,7 @@ function UsersScreen() {
     const generation = loaded;
     setLoadingMore(true);
     try {
-      const page = await fetchUsers(projectId, nextPageToken);
+      const page = await fetchUsers(projectId, nextPageToken, teamsExpanded);
       // A later page can carry a schema the first page never referenced, which
       // would otherwise render its users with every cell blank.
       const nextColumns = await columnsForUsers(projectId, [...users, ...page.users]);

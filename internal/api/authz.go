@@ -443,6 +443,38 @@ func requireExpandScope(ctx context.Context, scope string, denied func() domain.
 	return denied().WithMessage(msg)
 }
 
+// userReadsProject reports whether the credential is a user principal (the
+// Console session) with read on the whole of projectID, which stands in for the
+// team_membership.read / team.read scopes such a principal never mints. The
+// system catalog has no finer read permission than the project viewer role
+// (ADR 054 §5). For an operation that has no list check whose decision it can
+// use (GET /users/{id}?team_id=), it asks the resolver.
+func (h *Handler) userReadsProject(ctx context.Context, projectID string) (bool, error) {
+	sc, ok := GetScopeContext(ctx)
+	if !ok || sc.PrincipalType != domain.AuthzPrincipalTypeUser {
+		return false, nil
+	}
+	if h == nil || h.pool == nil {
+		return false, domain.ErrInternal(errors.New("authz statements not configured"))
+	}
+	dec, err := checkProjectAccess(ctx, resolver.New(), h.pool.Statements(), projectID, opRead, nil)
+	if err != nil {
+		return false, err
+	}
+	return dec == resolver.DecisionAllow, nil
+}
+
+// requireMembershipReadUnless is requireMembershipRead, waived when the caller
+// is a session with read on the whole project (userReadsProject, or the list
+// check's project-wide decision): the gate POST /users/query and
+// GET /users/{id}?team_id= share.
+func requireMembershipReadUnless(ctx context.Context, sessionReadsProject bool) error {
+	if sessionReadsProject {
+		return nil
+	}
+	return requireMembershipRead(ctx)
+}
+
 func requireMembershipRead(ctx context.Context) error {
 	return requireExpandScope(ctx, "team_membership.read", domain.ErrUserPermissionDenied,
 		"reading a user's team memberships requires team_membership.read")
@@ -481,27 +513,41 @@ func mapAuthzDecision(dec resolver.Decision, res resourceAccess, op accessOp) er
 // compileList / ListUsers); Forbidden attaches the EXISTS predicate via
 // the same Resolver used for Check; NotFound 404s.
 func (h *Handler) requireProjectListAccess(ctx context.Context, projectID string, res resourceAccess, kind domain.ResourceKind) (context.Context, error) {
+	ctx, _, err := h.requireProjectListAccessDecision(ctx, projectID, res, kind)
+	return ctx, err
+}
+
+// requireProjectListAccessDecision is requireProjectListAccess that also
+// reports whether the access is project-wide (the read Check allowed the
+// project) rather than partial (a foothold narrowed by a filter).
+func (h *Handler) requireProjectListAccessDecision(ctx context.Context, projectID string, res resourceAccess, kind domain.ResourceKind) (context.Context, bool, error) {
 	if h == nil || h.pool == nil {
-		return ctx, domain.ErrInternal(errors.New("authz statements not configured"))
+		return ctx, false, domain.ErrInternal(errors.New("authz statements not configured"))
 	}
-	return requireProjectListAccess(ctx, h.pool.Statements(), projectID, res, kind)
+	return requireProjectListAccessWithDecision(ctx, h.pool.Statements(), projectID, res, kind)
 }
 
 func requireProjectListAccess(ctx context.Context, stmts service.AuthzResolverStatements, projectID string, res resourceAccess, kind domain.ResourceKind) (context.Context, error) {
+	ctx, _, err := requireProjectListAccessWithDecision(ctx, stmts, projectID, res, kind)
+	return ctx, err
+}
+
+func requireProjectListAccessWithDecision(ctx context.Context, stmts service.AuthzResolverStatements, projectID string, res resourceAccess, kind domain.ResourceKind) (context.Context, bool, error) {
 	r := resolver.New()
 	dec, err := checkProjectAccess(ctx, r, stmts, projectID, opRead, nil)
 	if err != nil {
-		return ctx, mapCeilingError(err, res, opRead, nil)
+		return ctx, false, mapCeilingError(err, res, opRead, nil)
 	}
 	switch dec {
 	case resolver.DecisionAllow:
-		return service.WithAuthzListSkipOnce(ctx), nil
+		return service.WithAuthzListSkipOnce(ctx), true, nil
 	case resolver.DecisionForbidden:
-		return withAuthzListFilter(ctx, r, stmts, projectID, kind, opRead)
+		ctx, err := withAuthzListFilter(ctx, r, stmts, projectID, kind, opRead)
+		return ctx, false, err
 	case resolver.DecisionNotFound, resolver.DecisionUnspecified:
-		return ctx, res.miss(opRead)
+		return ctx, false, res.miss(opRead)
 	default:
-		return ctx, res.miss(opRead)
+		return ctx, false, res.miss(opRead)
 	}
 }
 
