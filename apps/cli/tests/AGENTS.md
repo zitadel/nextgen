@@ -96,7 +96,10 @@ A spec body contains a fixture call, a command, and matchers — nothing else:
   `platform.capturesBrandingPublishes()`. msw stays in `helpers/platform.ts`.
 - **One assertion vocabulary**, from `tests/helpers/matchers.ts`: `toSucceed`,
   `toFail`, `toFailWith`, `toExitWith`, `toBeSkipped`, `toExplain`, `toHintAt`,
-  `toSuggest`, `toSay`, `toReportNothingToDo`. Never a bare `exitCode` compare.
+  `toSuggest`, `toPrint`, `toPrintNoJson`, `toSay`, `toReportNothingToDo`.
+  Never a bare `exitCode` compare. Rendered output is asserted with `toPrint`,
+  which reads stdout alone — `toSay` spans stdout and stderr, so it cannot tell
+  a summary printed to the wrong channel from one printed to the right one.
 - **No comments.** A step that needs explaining needs a named helper with a
   line of TSDoc instead.
 - **One shape**: arrange, blank line, a single command under test, blank line,

@@ -78,8 +78,8 @@ describe("status", () => {
 
         const result = await app.runWithoutServer(["status", "--server", "https://self.example"]);
 
-        expect(result).toSay("Zitadel status.");
-        expect(result).toSay("project=proj-001");
+        expect(result).toPrint("Zitadel status.");
+        expect(result).toPrint("project=proj-001");
       });
 
       it("names a non-default server", async () => {
@@ -87,7 +87,15 @@ describe("status", () => {
 
         const result = await app.runWithoutServer(["status", "--server", "https://self.example"]);
 
-        expect(result).toSay("(server: self.example)");
+        expect(result).toPrint("(server: self.example)");
+      });
+
+      it("renders text rather than a json envelope", async () => {
+        const app = await aConfiguredApp();
+
+        const result = await app.runWithoutServer(["status", "--server", "https://self.example"]);
+
+        expect(result).toPrintNoJson();
       });
 
       it("closes with what to do next", async () => {
@@ -95,7 +103,7 @@ describe("status", () => {
 
         const result = await app.runWithoutServer(["status", "--server", "https://self.example"]);
 
-        expect(result).toSay("Next:");
+        expect(result).toPrint("Next:");
       });
     });
   });

@@ -147,6 +147,33 @@ expect.extend({
     };
   },
 
+  toPrint(received: CliResult, text: string) {
+    const pass = received.stdout.includes(text);
+    return {
+      pass,
+      message: () =>
+        pass
+          ? `expected stdout not to contain "${text}", but it did`
+          : `expected stdout to contain "${text}", but stdout was:\n\n${
+              received.stdout.trim().slice(0, 600) || "(empty)"
+            }`,
+    };
+  },
+
+  toPrintNoJson(received: CliResult) {
+    const printed = received.stdout.trim();
+    const pass = printed.length > 0 && !printed.startsWith("{");
+    return {
+      pass,
+      message: () =>
+        pass
+          ? `expected stdout to be a JSON envelope, but it was not`
+          : `expected stdout to carry rendered text rather than JSON, but it was:\n\n${
+              printed.slice(0, 300) || "(empty)"
+            }`,
+    };
+  },
+
   toSay(received: CliResult, text: string) {
     const output = `${received.stdout}\n${received.stderr}`;
     const pass = output.includes(text);
@@ -190,7 +217,11 @@ declare module "vitest" {
     toHintAt(text: string): T;
     /** One of the suggested `next_commands` contains this text. */
     toSuggest(command: string): T;
-    /** The rendered output, stdout or stderr, contains this text. */
+    /** stdout contains this text. Prefer it over `toSay` for rendered output. */
+    toPrint(text: string): T;
+    /** stdout carries rendered text, and is neither empty nor a JSON envelope. */
+    toPrintNoJson(): T;
+    /** The output, stdout or stderr, contains this text. */
     toSay(text: string): T;
     /** Plan totals that are all zero. */
     toReportNothingToDo(): T;

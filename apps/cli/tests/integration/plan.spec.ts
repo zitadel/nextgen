@@ -105,7 +105,7 @@ describe("plan", () => {
 
         const result = await app.planRendered();
 
-        expect(result).toSay("company");
+        expect(result).toPrint("company");
       });
       it("says a new revision will be published and the flow re-pinned", async () => {
         const app = await aSetUpApp();
@@ -113,8 +113,8 @@ describe("plan", () => {
 
         const result = await app.planRendered();
 
-        expect(result).toSay("will publish a new revision");
-        expect(result).toSay("user_schema will be re-pinned to the new revision");
+        expect(result).toPrint("will publish a new revision");
+        expect(result).toPrint("user_schema will be re-pinned to the new revision");
       });
       it("does not report fields the server echoes back as changes", async () => {
         const app = await aSetUpApp();
@@ -122,8 +122,8 @@ describe("plan", () => {
 
         const result = await app.planRendered();
 
-        expect(result).not.toSay("audience");
-        expect(result).not.toSay("x-audit");
+        expect(result).not.toPrint("audience");
+        expect(result).not.toPrint("x-audit");
       });
     });
   });
