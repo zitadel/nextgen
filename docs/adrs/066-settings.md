@@ -31,8 +31,9 @@
   built-in default.
 - One key-value table, a row per property path, immutable and discriminated by a
   `revision_id` that a release pins.
-- A value may be a variable reference, which is how a setting varies per environment,
-  at the cost of validating only at deployment.
+- A value may be a variable reference, which is how a setting varies per environment.
+  Variables resolve at read time, so a settings value is validated both when it is
+  deployed and when a variable it references is written.
 
 ## Context
 
@@ -104,13 +105,26 @@ describe the value of a setting. This does not come without cost though: since
 variables cannot be evaluated without an environment, validation cannot be done
 until a deployment happens (which links a release and an environment).
 
-Changing a variable does not change the release. It takes effect with a new
-deployment of the same release with the updated variables, and is validated then;
-a rollback is a deployment of the previous variables. Deployment-time validation is
-deferred by ADR 062 and has to land with this.
+Variables are resolved at read time (ADR 062) and are not revisioned, so a
+deployment cannot pin their values. Validation therefore runs at two points, both
+before a value can be read:
 
-A missing variable follows ADR 062: the reference is rendered as is. For a settings
-value that then fails validation (§4) unless the literal is valid for the setting.
+- **Deployment**: every variable reference in the release's settings revision must
+  exist in the target environment, and its resolved value must pass validation
+  (§4). Otherwise the deployment is refused. Deployment-time validation is deferred
+  by ADR 062 and has to land with this.
+- **Variable write**: writing or deleting a variable is refused when it would make a
+  setting in the environment's deployed release invalid or leave a reference
+  unresolved.
+
+Changing a variable does not change the release and needs no deployment: it takes
+effect on the next read once it passes validation. Undoing it is writing the previous
+value again, not a rollback; a rollback (ADR 035) restores the release, not variable
+values.
+
+ADR 062 renders a missing variable as is. A settings value never does: an unresolved
+reference is refused at both points above, even when the literal would be valid for
+the setting.
 
 ### 4. Validation and reads
 
@@ -123,8 +137,14 @@ configuration or the built-in default. An invalid value refuses the operation
 instead, and never falls back.
 
 This fallback is fail-open: a release that drops a value, or pins no settings
-revision at all, silently gets the system value, which can be weaker than what the
-project had. How security-relevant settings guard against that is an open question.
+revision at all, gets the system value, which can be weaker than what the project
+had. #899 forbids that happening silently, so the per-setting specification marks
+whether a setting is security-relevant, and a deployment is refused when, compared
+with the environment's current release, it drops a configured security-relevant
+setting or the whole settings revision. The caller can override this only with an
+explicit acknowledgement naming each dropped setting, which needs the deployment
+permission and is recorded in the deployment's audit event (ADR 048). This is the
+server-side counterpart of ADR 035's removal safety.
 
 A read reports the scope the value came from, which #899 requires and which is where
 "inherited" would go later.
@@ -177,9 +197,8 @@ which stays system-only. A behaviour change for self-hosters, needing its own is
 ## Open questions
 
 - Whether `x-auth-methods` folds into a settings document.
-- How security-relevant settings avoid the fail-open fallback (§4): refuse a
-  deployment whose release drops a value the previous one held, or require the system
-  value to be at least as strict as the bound.
+- Whether the system value of a security-relevant setting must also be at least as
+  strict as the bound, which would make the guard in §4 unnecessary for that setting.
 - The password hasher in environments that share user data (preview environments):
   a different hasher per environment can lock users out, so whether it may vary per
   environment, and where `Verifiers` lives. The same holds for rollback: users
