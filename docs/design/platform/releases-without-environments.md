@@ -264,7 +264,9 @@ environment model was the cost of maintaining that second identifier:
 - minting `preview-<name>` and keeping it in step with a branch name
 - name uniqueness, collisions, and whether a rename is allowed
 - an `origins` array per environment, and keeping it in sync with the name
-- idempotent-create-renews-TTL, so `zitadel preview` could be re-run per branch
+- idempotent-create-renews-TTL as an explicit semantic, so `zitadel preview`
+  could be re-run per branch — the command keeps the property, by upserting a row
+  keyed on the URL rather than reconciling a name
 - `X-Zitadel-Environment`, which exists only because a wildcard-matched origin
   could not say which *name* it belonged to
 
@@ -1457,35 +1459,114 @@ One `deploy_id`, one row per target plus one for the default. The removal
 confirmation is ADR 035's rule unchanged; what changed is that the comparison is
 per target rather than per environment.
 
-### `zitadel deploy --origin` — a preview
+`--origin` narrows this to one of the project's `primary` origins, for a project
+with several production hostnames. It will not accept a `preview` origin — that
+is [`zitadel preview`](#zitadel-preview--ship-to-one-ephemeral-origin), and the
+two verbs do not cross.
+
+### `zitadel preview` — ship to one ephemeral origin
+
+**The command survives. What it loses is `--name`.** It is worth keeping as its
+own verb rather than folding into `zitadel deploy --origin`, for a reason that
+is about safety rather than taste:
+
+> `deploy` and `deploy --origin X` differ enormously in blast radius — one moves
+> production, the other touches one disposable URL. Distinguishing them by the
+> presence of a flag puts shipping to production one forgotten flag away. **The
+> flag is the footgun.** Two verbs cost nothing and the mistake becomes
+> impossible.
+
+So the boundary is the verb, and it is enforced by the origin's `kind`:
+
+| Verb | May target | Sets a TTL |
+|---|---|---|
+| `zitadel deploy` | the project default and `primary` origins | no — primary origins do not expire |
+| `zitadel preview` | `preview` origins only | yes, renewed on each run |
+
+`zitadel deploy --origin https://acme-git-sso-acmeinc.vercel.app` is refused, and
+so is `zitadel preview --origin https://app.acme.com`. **The verb and the origin
+kind must agree**, which is a guarantee the single-verb-plus-flag shape cannot
+offer.
+
+#### It infers the origin instead of minting a name
+
+This is what `--name` is replaced by, and it is strictly less work for the
+developer. In CI the platform already publishes the URL:
 
 ```
-$ zitadel deploy --origin https://acme-git-sso-acmeinc.vercel.app --ttl 7d
-building    3 changed resources
-release     sha256:9f2c1a7b  (exists, reusing)
-
+$ zitadel preview
+platform    vercel  (VERCEL_BRANCH_URL)
 origin      https://acme-git-sso-acmeinc.vercel.app
             matches https://*-acmeinc.vercel.app (preview)  ✓
-            created, expires 2026-10-09T14:10:00Z
 
+building    3 changed resources
+release     sha256:9f2c1a7b  (exists, reusing)
+origin      created, expires 2026-10-09T14:10:00Z
 deployed    dep_01KB3F8N2P9S5WQZ
 ```
 
-This is the whole of what `zitadel preview --name feat-sso` used to be, minus the
-name. Re-running it on the next push to the branch renews `expires_at` and moves
-the origin's pointer, so the preview URL is stable across pushes — the property
-#1311 needed idempotent-create-renews-TTL for, obtained here because the URL is
-the key.
+No arguments. Compare `zitadel preview --name feat-sso`, which required the
+developer to invent a name, keep it in step with the branch, and separately
+ensure an origin was registered against it.
 
-Note `release sha256:9f2c1a7b (exists, reusing)`: content-hash dedup means
-deploying the same content to a second target creates no second release. That is
+Origin resolution, highest priority first:
+
+1. `--origin <url>`
+2. The platform's own branch URL — `VERCEL_BRANCH_URL`, `DEPLOY_PRIME_URL`
+   (Netlify), `CF_PAGES_URL` (Cloudflare Pages), and the equivalents the CLI's
+   existing platform detectors already recognise
+3. Error naming the variables it looked for
+
+**Branch URL, not deployment URL.** Vercel publishes both `VERCEL_URL` (unique
+per deployment) and `VERCEL_BRANCH_URL` (stable per branch); Netlify publishes
+`DEPLOY_URL` and `DEPLOY_PRIME_URL` the same way. The branch-stable one is
+correct here: it is the origin a reviewer opens, and it is what makes re-running
+the command on the next push renew rather than accumulate. Using the
+per-deployment URL would create one origin row per push and leave the reviewer's
+link pointing at a row nothing renews.
+
+The resolved origin is validated against the project's allowlist **before**
+anything is built, so a pattern that does not cover the branch URL fails
+immediately rather than after a release has been created.
+
+Outside CI there is no preview URL to infer, and guessing one would be worse than
+refusing:
+
+```
+$ zitadel preview
+error  no preview URL found
+       looked for: VERCEL_BRANCH_URL, DEPLOY_PRIME_URL, CF_PAGES_URL
+
+       `zitadel preview` runs in a deploy pipeline, where the platform
+       publishes the URL. For local work use `zitadel dev`.
+       To target a URL explicitly: zitadel preview --origin <url>
+```
+
+#### Idempotence comes free
+
+Re-running on the next push to the same branch renews `expires_at` and moves that
+origin's pointer. The preview URL stays stable across pushes, and an abandoned
+branch's origin expires and is collected without anyone deciding to.
+
+#1311 needed explicit create-or-renew semantics for this — "creating an existing
+name renews `expires_at` instead of failing, which is what makes `zitadel
+preview` idempotent per branch". Here it is not a semantic at all: the URL is the
+key, so the second run is simply an upsert on the row it already wrote. The
+property survives; the machinery for it does not.
+
+Note `release sha256:9f2c1a7b (exists, reusing)` — content-hash dedup means
+shipping the same content to a second target creates no second release. That is
 also how CI asserts a promotion.
 
-In CI the origin comes from the platform:
+#### In CI
 
 ```yaml
-- run: zitadel deploy --origin "https://$VERCEL_BRANCH_URL" --ttl 7d
+- run: zitadel preview --ttl 7d        # preview job, origin inferred
+- run: zitadel deploy -m "$MSG"        # production job, after merge
 ```
+
+Which is the other argument for two verbs: the pipeline reads correctly without
+a comment explaining which flag makes it safe.
 
 ### `zitadel origins` — the inventory
 
@@ -1617,7 +1698,7 @@ consulted, in order:
 | Was | Now |
 |---|---|
 | `zitadel environments list` | `zitadel status`, `zitadel origins list` |
-| `zitadel preview --name feat-sso` | `zitadel deploy --origin <url>` |
+| `zitadel preview --name feat-sso` | `zitadel preview` — the command stays, the name goes, the origin is inferred |
 | `zitadel promote dev staging` | `zitadel deploy` against the other target, asserting the digest is unchanged |
 | `--environment production` | stage detection, local only, never sent |
 | `zitadel plan` / `apply` | `zitadel status` / `deploy` (ADR 035 already) |
