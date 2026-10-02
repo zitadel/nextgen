@@ -51,3 +51,25 @@ describe("an argument that must not be blank", () => {
     expect((parseJson(result.stdout) as { message: string }).message).toContain("Name the owner");
   });
 });
+
+/**
+ * `-v` is the short form every well-known CLI binds to verbosity, so the alias
+ * is part of the agent contract. `resources` is the probe: it describes the CLI
+ * offline, so these assert the parse without a server. Dropping `char: "v"`
+ * from the base flag would make `-v` an unknown flag and fail the first case.
+ */
+describe("the -v short flag", () => {
+  it("is accepted as the alias for --verbose", async () => {
+    const short = await runCliForTest(["resources", "-v", "--json"]);
+    const long = await runCliForTest(["resources", "--verbose", "--json"]);
+
+    expect(short.exitCode).toBe(0);
+    expect(parseJson(short.stdout)).toEqual(parseJson(long.stdout));
+  });
+
+  it("stays a wired alias, not a catch-all for any short flag", async () => {
+    const result = await runCliForTest(["resources", "-Z", "--json"]);
+
+    expect(result.exitCode).not.toBe(0);
+  });
+});

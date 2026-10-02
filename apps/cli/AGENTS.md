@@ -18,6 +18,14 @@ Scope pointers first — this file's own body covers **telemetry only**:
 - The test contract — the unit/spec split and one spec per command — is
   [`tests/AGENTS.md`](tests/AGENTS.md). Read it before adding or moving any
   test.
+- The flag surface deliberately tracks the [WebCLI spec](https://webcli.com/)
+  (`--help`/`-h`, `-v`/`--verbose`, `--version`, kebab-case long flags,
+  `--no-<flag>` negation, errors to stderr, data to stdout) so an agent can
+  drive the CLI from the conventions it already knows. Two deviations are
+  intentional: `-n` is `--non-interactive` (not `--dry-run`, which is long-only)
+  and machine output is `--json` (not `--output json`). Keep that alignment in
+  mind when adding a global flag, and document the agent-facing contract in
+  [`SKILLS.md`](SKILLS.md), not here.
 
 # Analytics Tracking — Mixpanel
 
