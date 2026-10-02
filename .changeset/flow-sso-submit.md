@@ -32,4 +32,6 @@ sends its page URL, with the flow id set in the `flow` query parameter, as
 When the orchestrator resumes a flow handle, from the `flow` query
 parameter or from `resume-flow-id`, and the flow no longer resolves, it
 starts a new flow instead of showing a startup error, with a console
-warning naming the handle.
+warning naming the handle. This covers the return from an external sign-in
+after the flow cookie's window: the browser no longer sends the required
+cookie and the server refuses the request with 400.

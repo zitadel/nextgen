@@ -297,18 +297,29 @@ describe("<zitadel-login> with identity providers", () => {
     expect(seen).not.toContain("POST /flow");
   });
 
+  const notFound = { code: "flow.not_found", message: "flow not found" };
+  // What the server answers when the required cookie is absent: the
+  // parameter decoder refuses the request before the handler runs.
+  const missingCookie = {
+    code: "req.invalid",
+    message: "The request is invalid and fails base validation.",
+    details: { details: { fields: ["_zflow"] } },
+  };
+
   it.each([
-    { source: "the URL", status: 404, mount: (el: ZitadelLogin) => el },
-    { source: "the URL", status: 410, mount: (el: ZitadelLogin) => el },
+    { source: "the URL", status: 400, body: missingCookie, mount: (el: ZitadelLogin) => el },
+    { source: "the URL", status: 404, body: notFound, mount: (el: ZitadelLogin) => el },
+    { source: "the URL", status: 410, body: notFound, mount: (el: ZitadelLogin) => el },
     {
       source: "resume-flow-id",
       status: 404,
+      body: notFound,
       mount: (el: ZitadelLogin) => {
         el.resumeFlowId = "flow_stale";
         return el;
       },
     },
-  ])("starts over when the flow from $source answers $status", async ({ source, status, mount }) => {
+  ])("starts over when the flow from $source answers $status", async ({ source, status, body, mount }) => {
     // The cookie window can close during the external sign-in, and a flow
     // can finish in another tab. The handle then names nothing, and a page
     // stuck on a startup error has no way forward.
@@ -317,11 +328,7 @@ describe("<zitadel-login> with identity providers", () => {
       seen.push(`${request.method} ${new URL(request.url).pathname}`);
     };
     server.events.on("request:start", record);
-    server.use(
-      http.get("*/flow/:id", () =>
-        HttpResponse.json({ code: "flow.not_found", message: "flow not found" }, { status }),
-      ),
-    );
+    server.use(http.get("*/flow/:id", () => HttpResponse.json(body, { status })));
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const original = window.location.href;
     if (source === "the URL") window.history.replaceState({}, "", "/login?flow=flow_stale");
