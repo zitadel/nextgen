@@ -21,7 +21,7 @@ tasks:
       - "src/generated/shadcn.css"
 
   lint:
-    command: "corepack pnpm exec oxlint ."
+    command: "corepack pnpm run lint"
     deps:
       - "generate"
 

@@ -59,7 +59,8 @@
     "build": "tsdown",
     "test": "vitest run --project unit",
     "test:browser": "vitest run --project browser",
-    "test:all": "vitest run"
+    "test:all": "vitest run",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@zitadel/config": "workspace:*",
@@ -73,15 +74,16 @@
     "@types/react": "catalog:",
     "@vitest/browser": "catalog:",
     "@vitest/browser-playwright": "catalog:",
+    "@zitadel/api": "workspace:*",
     "@zitadel/api-mock": "workspace:*",
+    "@zitadel/design-tokens": "workspace:*",
+    "@zitadel/eslint-config": "workspace:*",
     "jsdom": "catalog:",
+    "lightningcss": "catalog:",
     "msw": "catalog:",
     "playwright": "catalog:",
     "ts-lit-plugin": "catalog:",
-    "lightningcss": "catalog:",
     "tsdown": "catalog:",
-    "tslib": "catalog:",
-    "@zitadel/api": "workspace:*",
-    "@zitadel/design-tokens": "workspace:*"
+    "tslib": "catalog:"
   }
 }

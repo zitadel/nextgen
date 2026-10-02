@@ -1,10 +1,11 @@
 import { join } from "node:path";
 
-import { npmDistTagForCliVersion } from "../../../../public-cli";
-import { configCandidates } from "../config-paths";
-import type { FileOp } from "../file-writer/types";
 import type { PatchContext, PatchView } from "../../types";
+import type { FileOp } from "../file-writer/types";
+
+import { npmDistTagForCliVersion } from "../../../../public-cli";
 import { AbstractRulePatcher } from "../base";
+import { configCandidates } from "../config-paths";
 import { devScriptPortOp } from "../dev-script-port";
 import { nuxtConfigEdit } from "./nuxt-config";
 import {

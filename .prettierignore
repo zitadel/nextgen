@@ -22,5 +22,9 @@ out-tsc
 coverage
 test-output
 
+# Generated code (never reformat; also ignored by the shared ESLint config)
+*.gen.ts
+**/mockServiceWorker.js
+
 # Lockfile (do not reformat)
 pnpm-lock.yaml

@@ -8,7 +8,7 @@ dependsOn:
 
 tasks:
   lint:
-    command: "corepack pnpm exec oxlint ."
+    command: "corepack pnpm run lint"
 
   # The e2e tasks themselves are opt-in (`runInCI: false`), which would leave
   # the specs entirely outside CI's type surface — API contract drift in a

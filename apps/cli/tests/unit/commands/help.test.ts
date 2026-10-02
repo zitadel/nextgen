@@ -1,8 +1,7 @@
+import { Plugin } from "@oclif/core";
 import { mkdtemp, readFile, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-
-import { Plugin } from "@oclif/core";
 import { describe, expect, it } from "vitest";
 
 import { COMMAND_GROUPS } from "../../../src/lib/oclif/groups";

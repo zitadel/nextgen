@@ -1,3 +1,5 @@
+import type { Detector, FrameworkFacts } from "./types";
+
 import { ZitadelError } from "../../errors";
 import {
   dependencySpecProvablyBelowMajor,
@@ -6,7 +8,6 @@ import {
   readPackageJson,
 } from "./package-json";
 import { detectDevPort, issuerFromPort } from "./port";
-import type { Detector, FrameworkFacts } from "./types";
 
 /**
  * Detects a Vite + React single-page app and extracts its facts: the source

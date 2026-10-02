@@ -50,23 +50,15 @@
     "nuxt": ">=4"
   },
   "devDependencies": {
-    "@eslint/js": "catalog:",
-    "@eslint/json": "catalog:",
-    "@eslint/markdown": "catalog:",
-    "@nuxt/eslint-plugin": "^0.7.0",
+    "@nuxt/eslint-plugin": "catalog:",
     "@vitest/coverage-v8": "catalog:sdk",
+    "@zitadel/eslint-config": "workspace:*",
     "eslint": "catalog:",
-    "eslint-config-prettier": "catalog:",
-    "eslint-import-resolver-typescript": "catalog:",
-    "eslint-plugin-import": "catalog:",
-    "eslint-plugin-perfectionist": "catalog:",
-    "eslint-plugin-prettier": "catalog:",
     "h3": "^1.15.3",
     "nuxt": "catalog:",
     "prettier": "catalog:",
     "tsup": "catalog:",
     "typescript": "^5.7.3",
-    "typescript-eslint": "catalog:",
     "vitest": "catalog:sdk"
   }
 }

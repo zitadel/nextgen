@@ -1,9 +1,9 @@
 import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-
 import { afterEach, describe, expect, it } from "vitest";
 
+import { ZitadelError } from "../../../src/lib/errors";
 import {
   hasZitadelConfig,
   hasZitadelSecret,
@@ -11,7 +11,6 @@ import {
   readZitadelSecret,
   writeZitadelSecret,
 } from "../../../src/lib/project";
-import { ZitadelError } from "../../../src/lib/errors";
 
 const tempDirs: string[] = [];
 
@@ -121,7 +120,8 @@ describe("readZitadelSecret", () => {
   it("throws when a required string field is missing", async () => {
     const cwd = await makeTempDir();
     await mkdir(join(cwd, ".zitadel"), { recursive: true });
-    const { project_secret: _omit, ...partial } = VALID_SECRET;
+    const partial: Record<string, unknown> = { ...VALID_SECRET };
+    delete partial.project_secret;
     await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify(partial));
 
     await expect(readZitadelSecret(cwd)).rejects.toThrow(

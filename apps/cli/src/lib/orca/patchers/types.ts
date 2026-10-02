@@ -1,6 +1,7 @@
-import type { FrameworkFacts } from "../detectors/types";
 import type { CreateProject201 } from "@zitadel/api/generated/model";
+
 import type { ScaffoldFileClass, ScaffoldPosture } from "../../sync/types";
+import type { FrameworkFacts } from "../detectors/types";
 
 /**
  * The minimal, project-independent view a patcher needs to enumerate the files

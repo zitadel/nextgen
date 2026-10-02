@@ -8,6 +8,7 @@ import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "vitest";
 
 import type { MockHandle } from "./handlers.js";
+
 import { applyBranding, clearBranding, PASSWORD_FIELD, setupMockHandlers } from "./index.js";
 
 const PROJECT_ID = "proj_demo";

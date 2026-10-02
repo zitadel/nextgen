@@ -1,5 +1,5 @@
-import { setProxyPath } from "./base-url";
 import { createZitadelClient, type ZitadelApi } from "./api-factory";
+import { setProxyPath } from "./base-url";
 
 /**
  * Input options for {@link configureZitadel}.

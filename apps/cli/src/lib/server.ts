@@ -2,8 +2,8 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { ZitadelError } from "./errors";
-import { resolveLocalServer } from "./local-server/runtime";
 import { parseJsonObject } from "./json";
+import { resolveLocalServer } from "./local-server/runtime";
 
 /**
  * Server URL used when nothing else resolves. Also surfaced in hints and

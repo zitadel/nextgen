@@ -17,7 +17,6 @@
  */
 
 import { release } from "node:os";
-
 import { type Dispatcher, getGlobalDispatcher, setGlobalDispatcher } from "undici";
 
 import { type Consent, resolveConsent } from "./telemetry/consent";

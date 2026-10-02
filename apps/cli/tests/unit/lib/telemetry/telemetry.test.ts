@@ -1,8 +1,10 @@
 import type { Callback, Mixpanel as MixpanelClient, Modifiers, Properties } from "mixpanel";
+
 import { describe, expect, it } from "vitest";
 
-import { Telemetry, type TelemetryDeps } from "../../../../src/lib/telemetry";
 import type { Identity } from "../../../../src/lib/telemetry/identity";
+
+import { Telemetry, type TelemetryDeps } from "../../../../src/lib/telemetry";
 
 type Tracked = { event: string; properties: Properties };
 
@@ -88,7 +90,9 @@ describe("Telemetry (generic core)", () => {
   });
 
   it("exposes the first-run flag from identity", () => {
-    const t = Telemetry.create(deps([], { loadIdentity: () => ({ distinctId: "x", isFirstRun: true }) }));
+    const t = Telemetry.create(
+      deps([], { loadIdentity: () => ({ distinctId: "x", isFirstRun: true }) }),
+    );
     expect(t.isFirstRun).toBe(true);
   });
 
@@ -122,7 +126,9 @@ describe("Telemetry (generic core)", () => {
 
   it("swallows a synchronous client.track throw", () => {
     const sink: Tracked[] = [];
-    const t = Telemetry.create(deps(sink, { initClient: () => fakeClient(sink, { throwOnTrack: true }) }));
+    const t = Telemetry.create(
+      deps(sink, { initClient: () => fakeClient(sink, { throwOnTrack: true }) }),
+    );
     expect(() => t.track("e", {})).not.toThrow();
   });
 

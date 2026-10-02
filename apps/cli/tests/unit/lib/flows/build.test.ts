@@ -1,6 +1,5 @@
-import { describe, expect, it } from "vitest";
-
 import { CreateFlowDefinitionBody } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
+import { describe, expect, it } from "vitest";
 
 import { buildFlow } from "../../../../src/lib/flows";
 

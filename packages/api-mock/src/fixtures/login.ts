@@ -12,8 +12,9 @@
  */
 import type { CreateFlow201, CreateFlow201Step } from "@zitadel/api/generated/model";
 
-import { signHandoffToken } from "../crypto.js";
 import type { StoredCredential } from "../lib/authn/index.js";
+
+import { signHandoffToken } from "../crypto.js";
 
 /**
  * The field name every credential step uses: the schema pointer into the user
@@ -426,7 +427,9 @@ export function ssoConflictStep(input: StepFixtureInput): CreateFlow201 {
   return wrap(input, {
     name: "sso-conflict",
     texts: { title_key: "sso-conflict.title", description_key: "sso-conflict.description" },
-    fields: [{ name: "password", type: "password", text_key: "password.field.password", required: true }],
+    fields: [
+      { name: "password", type: "password", text_key: "password.field.password", required: true },
+    ],
     actions: [
       { name: "submit", kind: "submit", text_key: "sso-conflict.action.submit", primary: true },
       { name: "passkey", kind: "passkey", text_key: "sso-conflict.action.passkey" },

@@ -1500,9 +1500,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
       // (ADR 022). The kind-based exclusion also keeps it out of the generic
       // secondary-button loop.
       expect(element.shadowRoot?.querySelector('[data-action="back"]')).toBeNull();
-      expect(
-        element.shadowRoot?.querySelector('[data-testid="zitadel-action-back"]'),
-      ).toBeNull();
+      expect(element.shadowRoot?.querySelector('[data-testid="zitadel-action-back"]')).toBeNull();
     });
 
     it("pushes a single sentinel entry without touching the URL", async () => {
@@ -1593,9 +1591,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
       // ON the sentinel. That is not a request to go back in the flow.
       window.dispatchEvent(new PopStateEvent("popstate", { state: { zl: true } }));
 
-      const submitsAfter = mock
-        .getCaptured()
-        .filter((req) => req.kind === "submitFlowStep").length;
+      const submitsAfter = mock.getCaptured().filter((req) => req.kind === "submitFlowStep").length;
       expect(submitsAfter).toBe(submitsBefore);
 
       // The widget stays armed: a real back press still maps to the back

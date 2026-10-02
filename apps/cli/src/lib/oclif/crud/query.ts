@@ -1,5 +1,6 @@
-import { ZitadelError } from "../../errors";
 import type { FilterField } from "./types";
+
+import { ZitadelError } from "../../errors";
 
 /**
  * The `--filter` / `--sort` grammar every list shares.

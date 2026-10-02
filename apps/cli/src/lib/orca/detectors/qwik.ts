@@ -1,6 +1,7 @@
+import type { Detector, FrameworkFacts } from "./types";
+
 import { hasDependency, readPackageJson } from "./package-json";
 import { detectDevPort, issuerFromPort } from "./port";
-import type { Detector, FrameworkFacts } from "./types";
 
 /**
  * Detects a Vite + Qwik single-page app: depends on `@builder.io/qwik` and

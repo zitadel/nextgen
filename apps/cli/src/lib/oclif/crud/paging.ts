@@ -1,6 +1,7 @@
+import type { Page } from "./types";
+
 import { ZitadelError } from "../../errors";
 import { isObject } from "../../json";
-import type { Page } from "./types";
 
 /**
  * Walk a cursor-paginated endpoint. `request` performs one page; the

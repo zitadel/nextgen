@@ -4,13 +4,12 @@ import { classMap } from "lit/directives/class-map.js";
 import { ifDefined } from "lit/directives/if-defined.js";
 import { live } from "lit/directives/live.js";
 
-import checkboxStyles from "./zl-checkbox.css?inline";
+import type { AtomManifest } from "../manifest.js";
 
 import { emit } from "../internal/emit.js";
 import { nextUid } from "../internal/unique-id.js";
-import type { AtomManifest } from "../manifest.js";
 import { baseHostStyles, surfaceStyles } from "../styles/index.js";
-
+import checkboxStyles from "./zl-checkbox.css?inline";
 import "./zl-icon.js";
 
 /** Detail shape emitted by the `zl-change` event. */
@@ -43,10 +42,7 @@ export class ZlCheckbox extends LitElement {
     delegatesFocus: true,
   };
 
-  static override styles = [
-    baseHostStyles,
-    ...surfaceStyles(checkboxStyles),
-  ];
+  static override styles = [baseHostStyles, ...surfaceStyles(checkboxStyles)];
 
   /**
    * Field name — used as the key in form submission and in `zl-change` detail.
@@ -165,7 +161,13 @@ export class ZlCheckbox extends LitElement {
           />
           <span class="zr-checkbox__box" part="box">
             <span class="zr-checkbox__face" part="face">
-              <zl-icon class="zr-checkbox__check" part="check" name="check" size="16" decorative></zl-icon>
+              <zl-icon
+                class="zr-checkbox__check"
+                part="check"
+                name="check"
+                size="16"
+                decorative
+              ></zl-icon>
             </span>
           </span>
           ${labelText

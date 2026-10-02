@@ -1,6 +1,3 @@
-/* oxlint-disable playwright/expect-expect, playwright/no-conditional-in-test */
-import { randomUUID } from "node:crypto";
-
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import {
   clickFlowAction,
@@ -14,6 +11,7 @@ import {
   registerWithPassword,
   type ProfileEntry,
 } from "@zitadel/testing/playwright";
+import { randomUUID } from "node:crypto";
 
 test.describe.configure({ mode: "serial" });
 test.setTimeout(60_000);
@@ -169,9 +167,7 @@ async function gotoLogin(page: Page): Promise<void> {
 async function skipPasskeyUpsellIfVisible(page: Page): Promise<void> {
   const skip = page.getByRole("button", { name: /skip for now/i });
   const nextState = await Promise.race([
-    skip
-      .waitFor({ state: "visible", timeout: 30_000 })
-      .then(() => "passkey-upsell" as const),
+    skip.waitFor({ state: "visible", timeout: 30_000 }).then(() => "passkey-upsell" as const),
     signedInLocator(page)
       .first()
       .waitFor({ state: "visible", timeout: 30_000 })
@@ -225,9 +221,7 @@ async function logout(page: Page): Promise<void> {
     await logout.waitFor({ state: "visible", timeout: 5_000 });
   }
   await logout.click();
-  const loggedOutUrl = expectsProtectedRouteRedirect
-    ? loginUrl
-    : /\/(?:login)?(?:[/?#]|$)/;
+  const loggedOutUrl = expectsProtectedRouteRedirect ? loginUrl : /\/(?:login)?(?:[/?#]|$)/;
   await expect(page).toHaveURL(loggedOutUrl);
   await expectSessionCleared(page);
 }
@@ -236,19 +230,14 @@ async function expectSessionCleared(page: Page): Promise<void> {
   await expect
     .poll(
       async () =>
-        (await page.context().cookies()).some(
-          (cookie) => cookie.name === "__nextgen_session",
-        ),
+        (await page.context().cookies()).some((cookie) => cookie.name === "__nextgen_session"),
       { timeout: 5000 },
     )
     .toBe(false);
 }
 
 function isInterruptedByLoginNavigation(error: unknown): boolean {
-  return (
-    error instanceof Error &&
-    isExpectedNavigationRace(error.message, "/login")
-  );
+  return error instanceof Error && isExpectedNavigationRace(error.message, "/login");
 }
 
 function isExpectedNavigationRace(message: string, path: string): boolean {

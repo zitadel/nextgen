@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/web-components-vite";
-import { html, nothing } from "lit";
 
+import { html, nothing } from "lit";
 import "@zitadel/components/atoms";
 
 interface ButtonArgs {
@@ -39,7 +39,10 @@ const meta: Meta<ButtonArgs> = {
     loading: { control: "boolean" },
     disabled: { control: "boolean" },
     block: { control: "boolean" },
-    leadingIcon: { control: "boolean", description: "Render a leading icon in the `leading` slot." },
+    leadingIcon: {
+      control: "boolean",
+      description: "Render a leading icon in the `leading` slot.",
+    },
   },
 };
 

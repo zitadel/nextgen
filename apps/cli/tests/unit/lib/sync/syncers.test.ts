@@ -1,14 +1,13 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import { http, HttpResponse } from "msw";
-import { setupServer } from "msw/node";
-
 import { createZitadelClient } from "@zitadel/api/client";
 import { DEFAULT_FLOW_SCHEMA_URI } from "@zitadel/config/defaults";
+import { http, HttpResponse } from "msw";
+import { setupServer } from "msw/node";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
-import { FLOWS_DIR } from "../../../../src/lib/flows";
-import { SCHEMAS_DIR } from "../../../../src/lib/user-schema";
-import { makeSyncers } from "../../../../src/lib/sync/syncers";
 import { ZitadelError } from "../../../../src/lib/errors";
+import { FLOWS_DIR } from "../../../../src/lib/flows";
+import { makeSyncers } from "../../../../src/lib/sync/syncers";
+import { SCHEMAS_DIR } from "../../../../src/lib/user-schema";
 
 /**
  * The CLI now consumes the orval-generated client directly. Syncer
@@ -29,14 +28,24 @@ afterEach(() => server.resetHandlers());
 
 describe("makeSyncers", () => {
   it("returns the schema and flow syncers in order", () => {
-    const syncers = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
+    const syncers = makeSyncers({
+      client,
+      projectId: "proj-1",
+      env: {},
+      cwd: "/tmp/zitadel-sync-test",
+    });
 
     expect(syncers).toHaveLength(3);
     expect(syncers.map((s) => s.kind)).toEqual(["schema", "flow", "branding"]);
   });
 
   it("configures the schema syncer (immutable, SCHEMAS_DIR)", () => {
-    const [schema] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
+    const [schema] = makeSyncers({
+      client,
+      projectId: "proj-1",
+      env: {},
+      cwd: "/tmp/zitadel-sync-test",
+    });
 
     expect(schema.kind).toBe("schema");
     expect(schema.directory).toBe(SCHEMAS_DIR);
@@ -45,7 +54,12 @@ describe("makeSyncers", () => {
   });
 
   it("configures the flow syncer (revisioned, FLOWS_DIR)", () => {
-    const [, flow] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
+    const [, flow] = makeSyncers({
+      client,
+      projectId: "proj-1",
+      env: {},
+      cwd: "/tmp/zitadel-sync-test",
+    });
 
     expect(flow.kind).toBe("flow");
     expect(flow.directory).toBe(FLOWS_DIR);
@@ -57,7 +71,12 @@ describe("makeSyncers", () => {
 
 describe("SchemaSyncer", () => {
   it("validate accepts a user-schema body with the required spec fields", () => {
-    const [schema] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
+    const [schema] = makeSyncers({
+      client,
+      projectId: "proj-1",
+      env: {},
+      cwd: "/tmp/zitadel-sync-test",
+    });
 
     expect(() =>
       schema.validate({
@@ -70,13 +89,23 @@ describe("SchemaSyncer", () => {
   });
 
   it("validate throws E_VALIDATION on a malformed JSON Schema", () => {
-    const [schema] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
+    const [schema] = makeSyncers({
+      client,
+      projectId: "proj-1",
+      env: {},
+      cwd: "/tmp/zitadel-sync-test",
+    });
 
     expect(() => schema.validate({ type: 123 })).toThrow(ZitadelError);
   });
 
   it("validate throws E_VALIDATION when the kind discriminator is missing", () => {
-    const [schema] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
+    const [schema] = makeSyncers({
+      client,
+      projectId: "proj-1",
+      env: {},
+      cwd: "/tmp/zitadel-sync-test",
+    });
 
     expect(() => schema.validate({ type: "object" })).toThrow(ZitadelError);
   });
@@ -98,7 +127,12 @@ describe("SchemaSyncer", () => {
         }),
       ),
     );
-    const [schema] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
+    const [schema] = makeSyncers({
+      client,
+      projectId: "proj-1",
+      env: {},
+      cwd: "/tmp/zitadel-sync-test",
+    });
     const data = { kind: "user-schema", version: 1 };
 
     const result = await schema.create(data);
@@ -114,14 +148,17 @@ describe("SchemaSyncer", () => {
 
   it("create degrades to no canonical body when the follow-up fetch fails", async () => {
     server.use(
-      http.post(`${BASE}/schemas`, () =>
-        HttpResponse.json({ id: "schema-id-2" }, { status: 201 }),
-      ),
+      http.post(`${BASE}/schemas`, () => HttpResponse.json({ id: "schema-id-2" }, { status: 201 })),
       http.get(`${BASE}/schemas/schema-id-2`, () =>
         HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
       ),
     );
-    const [schema] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
+    const [schema] = makeSyncers({
+      client,
+      projectId: "proj-1",
+      env: {},
+      cwd: "/tmp/zitadel-sync-test",
+    });
 
     const result = await schema.create({ kind: "user-schema" });
 
@@ -130,12 +167,22 @@ describe("SchemaSyncer", () => {
   });
 
   it("update throws E_NOT_IMPLEMENTED — schemas are revisioned, edits publish a new revision", async () => {
-    const [schema] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
+    const [schema] = makeSyncers({
+      client,
+      projectId: "proj-1",
+      env: {},
+      cwd: "/tmp/zitadel-sync-test",
+    });
     await expect(schema.update("schema-id-1", { a: 1 })).rejects.toThrow(/revisioned/);
   });
 
   it("exposes revisioned=true — a schema-file hash change publishes a new revision", () => {
-    const [schema] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
+    const [schema] = makeSyncers({
+      client,
+      projectId: "proj-1",
+      env: {},
+      cwd: "/tmp/zitadel-sync-test",
+    });
     expect(schema.revisioned).toBe(true);
   });
 
@@ -151,7 +198,12 @@ describe("SchemaSyncer", () => {
         });
       }),
     );
-    const [schema] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
+    const [schema] = makeSyncers({
+      client,
+      projectId: "proj-1",
+      env: {},
+      cwd: "/tmp/zitadel-sync-test",
+    });
 
     const body = await schema.fetch?.("schema-id-1");
 
@@ -175,7 +227,12 @@ describe("SchemaSyncer", () => {
         });
       }),
     );
-    const [schema] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
+    const [schema] = makeSyncers({
+      client,
+      projectId: "proj-1",
+      env: {},
+      cwd: "/tmp/zitadel-sync-test",
+    });
 
     const body = await schema.fetch?.(id);
 
@@ -196,12 +253,22 @@ const VALID_FLOW = {
 
 describe("FlowDefinitionSyncer", () => {
   it("validate accepts a well-formed flow definition", () => {
-    const [, flow] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
+    const [, flow] = makeSyncers({
+      client,
+      projectId: "proj-1",
+      env: {},
+      cwd: "/tmp/zitadel-sync-test",
+    });
     expect(() => flow.validate(VALID_FLOW)).not.toThrow();
   });
 
   it("validate throws E_VALIDATION on a malformed flow definition", () => {
-    const [, flow] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
+    const [, flow] = makeSyncers({
+      client,
+      projectId: "proj-1",
+      env: {},
+      cwd: "/tmp/zitadel-sync-test",
+    });
     expect(() => flow.validate({ version: 99, kind: "wrong" })).toThrow(ZitadelError);
   });
 
@@ -222,7 +289,12 @@ describe("FlowDefinitionSyncer", () => {
   };
 
   it("validate throws E_VALIDATION when a referenced env var is missing", () => {
-    const [, flow] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
+    const [, flow] = makeSyncers({
+      client,
+      projectId: "proj-1",
+      env: {},
+      cwd: "/tmp/zitadel-sync-test",
+    });
     expect(() => flow.validate(FLOW_WITH_ENV_REF)).toThrow(ZitadelError);
   });
 
@@ -247,7 +319,12 @@ describe("FlowDefinitionSyncer", () => {
         );
       }),
     );
-    const [, flow] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
+    const [, flow] = makeSyncers({
+      client,
+      projectId: "proj-1",
+      env: {},
+      cwd: "/tmp/zitadel-sync-test",
+    });
     const data = { name: "Default", status: "active", version: 2 };
 
     const result = await flow.create(data);
@@ -263,7 +340,12 @@ describe("FlowDefinitionSyncer", () => {
   });
 
   it("update and delete throw E_NOT_IMPLEMENTED (revisioned resource)", async () => {
-    const [, flow] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
+    const [, flow] = makeSyncers({
+      client,
+      projectId: "proj-1",
+      env: {},
+      cwd: "/tmp/zitadel-sync-test",
+    });
 
     // No handler is registered, so a request here would fail as unhandled.
     await expect(flow.update("flow-id-1", { status: "active" })).rejects.toThrow(/revisioned/);
@@ -288,7 +370,12 @@ describe("FlowDefinitionSyncer", () => {
         });
       }),
     );
-    const [, flow] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
+    const [, flow] = makeSyncers({
+      client,
+      projectId: "proj-1",
+      env: {},
+      cwd: "/tmp/zitadel-sync-test",
+    });
 
     const body = await flow.fetch?.("flow-id-1");
 
@@ -376,9 +463,9 @@ describe("BrandingSyncer", () => {
     const { liquid_template: _reference, ...legacy } = descriptor;
     void _reference;
 
-    expect(() =>
-      branding.validate({ ...legacy, liquid_template_file: "./login.liquid" }),
-    ).toThrow(/liquid_template_file is no longer supported/);
+    expect(() => branding.validate({ ...legacy, liquid_template_file: "./login.liquid" })).toThrow(
+      /liquid_template_file is no longer supported/,
+    );
   });
 
   it("validate throws E_VALIDATION on non-https asset URLs (server parity)", async () => {

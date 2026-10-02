@@ -2,6 +2,7 @@ import { consola } from "consola";
 
 import { createZitadelClient } from "../lib/api-client";
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
+import { readZitadelSecret } from "../lib/project";
 import {
   buildSyncPlan,
   collectPlanWarnings,
@@ -10,7 +11,6 @@ import {
   renderPlan,
   summarizePlan,
 } from "../lib/sync";
-import { readZitadelSecret } from "../lib/project";
 
 /**
  * `zitadel plan` — validate config and preview the sync diff without mutating.

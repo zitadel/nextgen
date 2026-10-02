@@ -2,10 +2,10 @@ import { LitElement, html, nothing } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 
-import pillStyles from "./zl-pill.css?inline";
-
 import type { AtomManifest } from "../manifest.js";
+
 import { baseHostStyles, surfaceStyles } from "../styles/index.js";
+import pillStyles from "./zl-pill.css?inline";
 
 /**
  * Atom: `<zl-pill>` — the shadcn `Badge`, used for status and for the session
@@ -52,7 +52,8 @@ export class ZlPill extends LitElement {
         href=${this.href}
         rel="noopener"
         aria-label=${this.ariaLabel ?? nothing}
-      ><slot></slot></a>`;
+        ><slot></slot
+      ></a>`;
     }
     return html`<span class=${classes} part="pill"><slot></slot></span>`;
   }

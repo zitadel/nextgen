@@ -1,6 +1,7 @@
 import "@zitadel/components";
 
 import type { ZitadelLogin } from "@zitadel/components";
+
 import { useEffect, useRef } from "react";
 
 import { useConsoleProject } from "../../hooks/use-console-project";
@@ -56,7 +57,6 @@ export function LoginPreview({ journey, flowName, theme }: Props) {
     };
     // `theme` is seeded here but deliberately not a remount key: a switch
     // repaints the element below rather than restarting its flow.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [journey, flowName, project]);
 
   // Separate from the mount: a theme switch repaints the element that is

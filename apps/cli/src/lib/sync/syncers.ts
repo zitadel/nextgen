@@ -1,3 +1,4 @@
+import type { ZitadelClient } from "@zitadel/api/client";
 import type {
   CreateBranding201,
   CreateBrandingBody,
@@ -5,13 +6,18 @@ import type {
   CreateFlowDefinitionBodyFlowDefinition,
   CreateSchemaBody,
 } from "@zitadel/api/generated/model";
-import { consola } from "consola";
 
-import type { ZitadelClient } from "@zitadel/api/client";
 import { DEFAULT_FLOW_SCHEMA_URI } from "@zitadel/config/defaults";
 import { normalizeFlowBody, normalizeSchemaBody } from "@zitadel/config/normalize";
-import { brandingConfigSchema, flowConfigSchema, schemaConfigSchema } from "@zitadel/config/schemas";
+import {
+  brandingConfigSchema,
+  flowConfigSchema,
+  schemaConfigSchema,
+} from "@zitadel/config/schemas";
 import { validateLoginTemplate } from "@zitadel/config/template";
+import { consola } from "consola";
+
+import type { ResourceSyncer } from "./types.js";
 
 import {
   BRANDING_DIR,
@@ -20,10 +26,9 @@ import {
   toBrandingWireBody,
   toLocalBrandingBody,
 } from "../branding";
+import { ZitadelError } from "../errors";
 import { FLOWS_DIR, flowEnvRefs } from "../flows";
 import { SCHEMAS_DIR } from "../user-schema";
-import { ZitadelError } from "../errors";
-import type { ResourceSyncer } from "./types.js";
 
 /** Runtime environment lookup used to resolve `${VAR}` / `*_env` references. */
 type EnvLookup = Record<string, string | undefined>;
@@ -125,7 +130,10 @@ class SchemaSyncer implements ResourceSyncer {
    * loudly if a caller reaches it.
    */
   async update(_id: string, _data: object): Promise<{ canonical?: object }> {
-    throw new ZitadelError("E_NOT_IMPLEMENTED", "schemas are revisioned — edit publishes a new revision, not an update");
+    throw new ZitadelError(
+      "E_NOT_IMPLEMENTED",
+      "schemas are revisioned — edit publishes a new revision, not an update",
+    );
   }
 
   async delete(id: string): Promise<void> {

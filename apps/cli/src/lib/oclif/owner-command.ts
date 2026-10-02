@@ -1,11 +1,12 @@
 import { Flags } from "@oclif/core";
 import { consola } from "consola";
 
+import type { GlobalOptions } from "./types";
+
 import { createZitadelClient, type ZitadelClient } from "../api-client";
 import { ZitadelError } from "../errors";
 import { readZitadelSecret } from "../project";
 import { BaseCommand } from "./base";
-import type { GlobalOptions } from "./types";
 
 /**
  * A command that addresses one owner of a project's variables. The platform has

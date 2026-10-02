@@ -3,6 +3,7 @@ import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import type { LocalAdmin } from "../../../../src/lib/local-server/admin-credential";
+
 import { claimProjectAsAdmin } from "../../../../src/lib/local-server/claim-as-admin";
 
 const SERVER = "http://local-admin.invalid:8080";
@@ -38,10 +39,12 @@ const sessionHandlers = [
   http.post(`${SERVER}/auth_attempts/:attempt/handoff`, () =>
     HttpResponse.json({ handoff_token: "handoff_1" }),
   ),
-  http.post(`${SERVER}/sessions/exchange`, () =>
-    new HttpResponse(null, {
-      headers: { "set-cookie": "__nextgen_session=admin_session; Path=/; HttpOnly" },
-    }),
+  http.post(
+    `${SERVER}/sessions/exchange`,
+    () =>
+      new HttpResponse(null, {
+        headers: { "set-cookie": "__nextgen_session=admin_session; Path=/; HttpOnly" },
+      }),
   ),
 ];
 
@@ -67,7 +70,12 @@ afterEach(() => {
 afterAll(() => server.close());
 
 const claim = () =>
-  claimProjectAsAdmin({ serverUrl: SERVER, projectId: PROJECT, projectSecret: "sk_project", admin });
+  claimProjectAsAdmin({
+    serverUrl: SERVER,
+    projectId: PROJECT,
+    projectSecret: "sk_project",
+    admin,
+  });
 
 describe("claiming a project as the local admin", () => {
   it("opens the claim with the project secret and completes it as the admin", async () => {

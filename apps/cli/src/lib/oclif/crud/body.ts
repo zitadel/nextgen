@@ -1,10 +1,11 @@
 import { readFile } from "node:fs/promises";
 import { text } from "node:stream/consumers";
 
-import { ZitadelError } from "../../errors";
-import { findSecretKey, refuseSecret } from "./secrets";
-import { parseJsonObject } from "../../json";
 import type { Json } from "./types";
+
+import { ZitadelError } from "../../errors";
+import { parseJsonObject } from "../../json";
+import { findSecretKey, refuseSecret } from "./secrets";
 
 /**
  * The raw body of a write, from `--data` (inline), `--file <path>`, or

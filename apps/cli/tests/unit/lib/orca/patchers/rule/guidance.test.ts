@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import type { PatchContext } from "../../../../../../src/lib/orca/patchers/types";
+
 import {
   AGENTS_HEADER,
   agentsGuidanceSection,
@@ -7,7 +9,6 @@ import {
   removeGuidanceSection,
   upsertGuidanceSection,
 } from "../../../../../../src/lib/orca/patchers/rule/guidance";
-import type { PatchContext } from "../../../../../../src/lib/orca/patchers/types";
 
 const ctx: PatchContext = {
   framework: { id: "next", devPort: 3000, url: "http://localhost:3000" },

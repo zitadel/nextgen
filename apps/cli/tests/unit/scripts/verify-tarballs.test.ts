@@ -4,7 +4,6 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
-
 import { afterEach, describe, expect, it } from "vitest";
 
 const execFile = promisify(execFileCallback);

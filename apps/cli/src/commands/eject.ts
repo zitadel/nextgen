@@ -2,11 +2,12 @@ import { Flags } from "@oclif/core";
 import { readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
+import type { EjectActions } from "../lib/orca/patchers/types";
+
 import { ZitadelError } from "../lib/errors";
+import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
 import { createOrca } from "../lib/orca";
 import { AGENTS_HEADER, removeGuidanceSection } from "../lib/orca/patchers/rule/guidance";
-import type { EjectActions } from "../lib/orca/patchers/types";
 import { MANAGED_MARKER } from "../lib/paths";
 import { readRendererId, readZitadelConfig } from "../lib/project";
 

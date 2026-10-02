@@ -1,5 +1,4 @@
 import { join } from "node:path";
-
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { nextAppEnv } from "../../src/app-env";
@@ -153,8 +152,8 @@ describe("withZitadel", () => {
   // serves directly.
   describe("when the instance serves the app itself", () => {
     const embedded = (): WithZitadelOptions => {
-      const { app: _app, ...rest } = options();
-      return { ...rest, appOrigin: "http://localhost:8092" };
+      const { configDir, port, zitadel } = options();
+      return { configDir, port, zitadel, appOrigin: "http://localhost:8092" };
     };
 
     it("generates the boot entry alone", () => {

@@ -19,11 +19,7 @@ export async function readState(cwd: string): Promise<ZitadelState> {
  * with sorted keys disabled (state is engine-managed, not human-
  * authored, so deterministic ordering isn't required here).
  */
-export async function updateState(
-  cwd: string,
-  key: string,
-  entry: ResourceEntry,
-): Promise<void> {
+export async function updateState(cwd: string, key: string, entry: ResourceEntry): Promise<void> {
   const current = await readState(cwd);
   const updated: ZitadelState = {
     ...current,
@@ -52,7 +48,8 @@ export async function updateScaffold(cwd: string, scaffold: ScaffoldManifest): P
  */
 export async function removeFromState(cwd: string, key: string): Promise<void> {
   const current = await readState(cwd);
-  const { [key]: _removed, ...rest } = current.resources;
+  const rest = { ...current.resources };
+  delete rest[key];
   const updated: ZitadelState = { ...current, resources: rest };
   await writeFile(join(cwd, ".zitadel/state.json"), JSON.stringify(updated, null, 2));
 }

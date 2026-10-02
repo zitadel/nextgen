@@ -16,7 +16,7 @@ Scope pointers first — this file's own body covers **telemetry only**:
 - The journey e2e contract is
   [`apps/cli-journey-e2e/AGENTS.md`](../cli-journey-e2e/AGENTS.md).
 
-# Analytics Tracking — Mixpanel
+## Analytics Tracking — Mixpanel
 
 This package (`@zitadel/cli`) uses **Mixpanel** for anonymous product analytics.
 Mixpanel is the single source of truth for usage events. Do not introduce any

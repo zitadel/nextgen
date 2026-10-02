@@ -1,3 +1,11 @@
+import type {
+  CreateFlow201,
+  CreateFlowBody,
+  ExchangeHandoffBody,
+  SubmitFlowStepBody,
+} from "@zitadel/api/generated/model";
+import type { RequestHandler } from "msw";
+
 /**
  * MSW handler factory for the mock Flow API.
  *
@@ -21,13 +29,6 @@ import {
   getGetFlowStepMockHandler,
   getSubmitFlowStepMockHandler,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.msw";
-import type {
-  CreateFlow201,
-  CreateFlowBody,
-  ExchangeHandoffBody,
-  SubmitFlowStepBody,
-} from "@zitadel/api/generated/model";
-import type { RequestHandler } from "msw";
 
 import { withBranding } from "./branding.js";
 import {
@@ -50,8 +51,8 @@ import {
   type FlowStepName,
   type SsoOutcome,
 } from "./flow-machine.js";
-import { SsoIdentityStore } from "./lib/sso-identities.js";
 import { AuthnStore, type PasskeyProof } from "./lib/authn/index.js";
+import { SsoIdentityStore } from "./lib/sso-identities.js";
 
 export type CapturedRequest =
   | { kind: "createFlow"; body: CreateFlowBody }
@@ -247,7 +248,8 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
         before === "passkey-setup" && !setupCred ? "error.passkey_setup_failed" : null;
       if (setupErrorKey) {
         const base = withBranding(passkeySetupStep(passkeyUpsellInput));
-        const { challenge: _c, ...step } = base.step;
+        const step = { ...base.step };
+        delete step.challenge;
         return { ...base, step: { ...step, error: setupErrorKey } };
       }
 
@@ -269,7 +271,8 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
           iss,
         };
         const base = withBranding(passkeyLoginStep(loginInput));
-        const { challenge: _c, ...step } = base.step;
+        const step = { ...base.step };
+        delete step.challenge;
         return { ...base, step: { ...step, error: passkeyLoginErrorKey } };
       }
 

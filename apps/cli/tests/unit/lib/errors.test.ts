@@ -1,6 +1,5 @@
-import { describe, expect, it } from "vitest";
-
 import { ApiError } from "@zitadel/api/runtime/fetch";
+import { describe, expect, it } from "vitest";
 
 import { EXIT_CODES, ZitadelError, toZitadelError } from "../../../src/lib/errors";
 
@@ -80,9 +79,7 @@ describe("toZitadelError", () => {
     const result = toZitadelError(errno);
     expect(result.code).toBe("E_CONFLICT");
     expect(result.message).toBe("file exists");
-    expect(result.hint).toBe(
-      "A file already exists. Use --force to overwrite or remove it first.",
-    );
+    expect(result.hint).toBe("A file already exists. Use --force to overwrite or remove it first.");
   });
 
   it("maps ENOENT errno errors to E_VALIDATION", () => {
@@ -166,7 +163,10 @@ describe("toZitadelError", () => {
       {
         code: "flowdef.invalid",
         message: "flow definition: invalid",
-        details: { details: "required fields [company] in user schema are missing in the flow definition steps" },
+        details: {
+          details:
+            "required fields [company] in user schema are missing in the flow definition steps",
+        },
       },
       "PUT http://mock/flow_definitions/flow_1?project_id=proj_1 returned 400",
     );

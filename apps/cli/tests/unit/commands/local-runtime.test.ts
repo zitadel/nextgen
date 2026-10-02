@@ -2,7 +2,6 @@ import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/pr
 import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
@@ -1157,10 +1156,6 @@ function runtimeFor(cwd: string, serverUrl: string): RuntimeMetadata {
     created_at: "2026-06-09T00:00:00.000Z",
     cli_version: "0.0.0-test",
   };
-}
-
-function runtimePidOf(stdout: string): number {
-  return (parseJson(stdout) as { data: { runtime: { pid: number } } }).data.runtime.pid;
 }
 
 async function expectedDefaultImage(): Promise<string> {

@@ -1,8 +1,7 @@
+import Ajv2020 from "ajv/dist/2020";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-
-import Ajv2020 from "ajv/dist/2020";
 import { describe, expect, it } from "vitest";
 
 // Verification receipt for the IdP design docs (docs/design/idp/): loads the
@@ -15,14 +14,8 @@ import { describe, expect, it } from "vitest";
 // the repo.
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "../../..");
-const readme = readFileSync(
-  join(repoRoot, "docs/design/idp/README.md"),
-  "utf8",
-);
-const resourceModel = readFileSync(
-  join(repoRoot, "docs/design/idp/1-resource-model.md"),
-  "utf8",
-);
+const readme = readFileSync(join(repoRoot, "docs/design/idp/README.md"), "utf8");
+const resourceModel = readFileSync(join(repoRoot, "docs/design/idp/1-resource-model.md"), "utf8");
 const authMethodSelection = readFileSync(
   join(repoRoot, "docs/design/idp/2-auth-method-selection.md"),
   "utf8",
@@ -93,47 +86,238 @@ const connectionCases: ReadonlyArray<[string, object, boolean]> = [
   ["oidc carrying an oauth2 block", { ...oidc, oauth2: oauth2Block }, false],
   ["oauth2 carrying an oidc block", { ...oauth2, oidc: oidcBlock }, false],
   ["issuer at root (flat shape)", { ...oidc, issuer: "https://a" }, false],
-  ["oidc missing issuer", { ...root, protocol: "oidc", oidc: { ...oidcBlock, issuer: undefined } }, false],
-  ["oauth2 missing an endpoint", { ...oauth2, oauth2: { ...oauth2Block, token_endpoint: undefined } }, false],
+  [
+    "oidc missing issuer",
+    { ...root, protocol: "oidc", oidc: { ...oidcBlock, issuer: undefined } },
+    false,
+  ],
+  [
+    "oauth2 missing an endpoint",
+    { ...oauth2, oauth2: { ...oauth2Block, token_endpoint: undefined } },
+    false,
+  ],
   ["oauth2 without subject_claim", { ...root, protocol: "oauth2", oauth2: oauth2Block }, false],
   // credentials
-  ["oidc missing client_id", { ...root, protocol: "oidc", oidc: { ...oidcBlock, client_id: undefined } }, false],
-  ["oidc missing client_secret", { ...root, protocol: "oidc", oidc: { ...oidcBlock, client_secret: undefined } }, false],
-  ["literal client_secret in block", { ...root, protocol: "oidc", oidc: { ...oidcBlock, client_secret: "leak" } }, false],
-  ["client_secret reference with text around it", { ...root, protocol: "oidc", oidc: { ...oidcBlock, client_secret: "a8f3c1-${{ TAIL }}" } }, false],
-  ["client_secret_env twin (ADR 062)", { ...root, protocol: "oidc", oidc: { ...oidcBlock, client_secret: undefined, client_secret_env: "S" } }, false],
-  ["client_id as a variable reference", { ...root, protocol: "oidc", oidc: { ...oidcBlock, client_id: "${{ ID }}" } }, true],
-  ["camelCase leftover (clientId)", { ...root, protocol: "oidc", oidc: { ...oidcBlock, client_id: undefined, clientId: "c" } }, false],
-  ["secret_strategy not shipped", { ...root, protocol: "oidc", oidc: { ...oidcBlock, secret_strategy: "static" } }, false],
-  ["token_endpoint_auth_method post", { ...root, protocol: "oidc", oidc: { ...oidcBlock, token_endpoint_auth_method: "client_secret_post" } }, true],
-  ["token_endpoint_auth_method unknown", { ...root, protocol: "oidc", oidc: { ...oidcBlock, token_endpoint_auth_method: "client_secret_jwt" } }, false],
-  ["response_mode cut from 851 (returns with Apple)", { ...root, protocol: "oidc", oidc: { ...oidcBlock, response_mode: "form_post" } }, false],
-  ["dynamic_authorize_parameters cut from 851", { ...root, protocol: "oidc", oidc: { ...oidcBlock, dynamic_authorize_parameters: { login_hint: "email" } } }, false],
+  [
+    "oidc missing client_id",
+    { ...root, protocol: "oidc", oidc: { ...oidcBlock, client_id: undefined } },
+    false,
+  ],
+  [
+    "oidc missing client_secret",
+    { ...root, protocol: "oidc", oidc: { ...oidcBlock, client_secret: undefined } },
+    false,
+  ],
+  [
+    "literal client_secret in block",
+    { ...root, protocol: "oidc", oidc: { ...oidcBlock, client_secret: "leak" } },
+    false,
+  ],
+  [
+    "client_secret reference with text around it",
+    { ...root, protocol: "oidc", oidc: { ...oidcBlock, client_secret: "a8f3c1-${{ TAIL }}" } },
+    false,
+  ],
+  [
+    "client_secret_env twin (ADR 062)",
+    {
+      ...root,
+      protocol: "oidc",
+      oidc: { ...oidcBlock, client_secret: undefined, client_secret_env: "S" },
+    },
+    false,
+  ],
+  [
+    "client_id as a variable reference",
+    { ...root, protocol: "oidc", oidc: { ...oidcBlock, client_id: "${{ ID }}" } },
+    true,
+  ],
+  [
+    "camelCase leftover (clientId)",
+    { ...root, protocol: "oidc", oidc: { ...oidcBlock, client_id: undefined, clientId: "c" } },
+    false,
+  ],
+  [
+    "secret_strategy not shipped",
+    { ...root, protocol: "oidc", oidc: { ...oidcBlock, secret_strategy: "static" } },
+    false,
+  ],
+  [
+    "token_endpoint_auth_method post",
+    {
+      ...root,
+      protocol: "oidc",
+      oidc: { ...oidcBlock, token_endpoint_auth_method: "client_secret_post" },
+    },
+    true,
+  ],
+  [
+    "token_endpoint_auth_method unknown",
+    {
+      ...root,
+      protocol: "oidc",
+      oidc: { ...oidcBlock, token_endpoint_auth_method: "client_secret_jwt" },
+    },
+    false,
+  ],
+  [
+    "response_mode cut from 851 (returns with Apple)",
+    { ...root, protocol: "oidc", oidc: { ...oidcBlock, response_mode: "form_post" } },
+    false,
+  ],
+  [
+    "dynamic_authorize_parameters cut from 851",
+    {
+      ...root,
+      protocol: "oidc",
+      oidc: { ...oidcBlock, dynamic_authorize_parameters: { login_hint: "email" } },
+    },
+    false,
+  ],
   // reserved authorize parameters (engine-owned; propertyNames guard)
-  ["static param prompt allowed", { ...root, protocol: "oidc", oidc: { ...oidcBlock, static_authorize_parameters: { prompt: "select_account" } } }, true],
-  ["static param reserved (state)", { ...root, protocol: "oidc", oidc: { ...oidcBlock, static_authorize_parameters: { state: "x" } } }, false],
-  ["static param reserved (redirect_uri)", { ...oauth2, oauth2: { ...oauth2Block, static_authorize_parameters: { redirect_uri: "https://evil.example" } } }, false],
-  ["static param client_secret", { ...root, protocol: "oidc", oidc: { ...oidcBlock, static_authorize_parameters: { client_secret: "leak" } } }, false],
-  ["static param client_assertion", { ...oauth2, oauth2: { ...oauth2Block, static_authorize_parameters: { client_assertion: "eyJhbGc" } } }, false],
+  [
+    "static param prompt allowed",
+    {
+      ...root,
+      protocol: "oidc",
+      oidc: { ...oidcBlock, static_authorize_parameters: { prompt: "select_account" } },
+    },
+    true,
+  ],
+  [
+    "static param reserved (state)",
+    {
+      ...root,
+      protocol: "oidc",
+      oidc: { ...oidcBlock, static_authorize_parameters: { state: "x" } },
+    },
+    false,
+  ],
+  [
+    "static param reserved (redirect_uri)",
+    {
+      ...oauth2,
+      oauth2: {
+        ...oauth2Block,
+        static_authorize_parameters: { redirect_uri: "https://evil.example" },
+      },
+    },
+    false,
+  ],
+  [
+    "static param client_secret",
+    {
+      ...root,
+      protocol: "oidc",
+      oidc: { ...oidcBlock, static_authorize_parameters: { client_secret: "leak" } },
+    },
+    false,
+  ],
+  [
+    "static param client_assertion",
+    {
+      ...oauth2,
+      oauth2: { ...oauth2Block, static_authorize_parameters: { client_assertion: "eyJhbGc" } },
+    },
+    false,
+  ],
   // TLS on endpoint URLs (pattern; localhost carve-out for dev)
-  ["http issuer rejected", { ...root, protocol: "oidc", oidc: { ...oidcBlock, issuer: "http://accounts.google.com" } }, false],
-  ["http localhost issuer allowed (dev)", { ...root, protocol: "oidc", oidc: { ...oidcBlock, issuer: "http://localhost:8080" } }, true],
-  ["issuer without a host", { ...root, protocol: "oidc", oidc: { ...oidcBlock, issuer: "https://" } }, false],
-  ["issuer with trailing text", { ...root, protocol: "oidc", oidc: { ...oidcBlock, issuer: "https://issuer.example trailing-junk" } }, false],
-  ["issuer with a query in place of the host", { ...root, protocol: "oidc", oidc: { ...oidcBlock, issuer: "https://?query" } }, false],
-  ["issuer with a query rejected (OIDC Discovery)", { ...root, protocol: "oidc", oidc: { ...oidcBlock, issuer: "https://login.example/tenant?x=1" } }, false],
-  ["issuer with port and path", { ...root, protocol: "oidc", oidc: { ...oidcBlock, issuer: "https://login.example:8443/tenant" } }, true],
-  ["authorization_endpoint with a query", { ...root, protocol: "oidc", oidc: { ...oidcBlock, authorization_endpoint: "https://login.example/authorize?prompt=select_account" } }, true],
-  ["authorization_endpoint with a fragment rejected (RFC 6749)", { ...root, protocol: "oidc", oidc: { ...oidcBlock, authorization_endpoint: "https://login.example/authorize#x" } }, false],
-  ["http token_endpoint rejected", { ...oauth2, oauth2: { ...oauth2Block, token_endpoint: "http://t.example" } }, false],
+  [
+    "http issuer rejected",
+    { ...root, protocol: "oidc", oidc: { ...oidcBlock, issuer: "http://accounts.google.com" } },
+    false,
+  ],
+  [
+    "http localhost issuer allowed (dev)",
+    { ...root, protocol: "oidc", oidc: { ...oidcBlock, issuer: "http://localhost:8080" } },
+    true,
+  ],
+  [
+    "issuer without a host",
+    { ...root, protocol: "oidc", oidc: { ...oidcBlock, issuer: "https://" } },
+    false,
+  ],
+  [
+    "issuer with trailing text",
+    {
+      ...root,
+      protocol: "oidc",
+      oidc: { ...oidcBlock, issuer: "https://issuer.example trailing-junk" },
+    },
+    false,
+  ],
+  [
+    "issuer with a query in place of the host",
+    { ...root, protocol: "oidc", oidc: { ...oidcBlock, issuer: "https://?query" } },
+    false,
+  ],
+  [
+    "issuer with a query rejected (OIDC Discovery)",
+    {
+      ...root,
+      protocol: "oidc",
+      oidc: { ...oidcBlock, issuer: "https://login.example/tenant?x=1" },
+    },
+    false,
+  ],
+  [
+    "issuer with port and path",
+    {
+      ...root,
+      protocol: "oidc",
+      oidc: { ...oidcBlock, issuer: "https://login.example:8443/tenant" },
+    },
+    true,
+  ],
+  [
+    "authorization_endpoint with a query",
+    {
+      ...root,
+      protocol: "oidc",
+      oidc: {
+        ...oidcBlock,
+        authorization_endpoint: "https://login.example/authorize?prompt=select_account",
+      },
+    },
+    true,
+  ],
+  [
+    "authorization_endpoint with a fragment rejected (RFC 6749)",
+    {
+      ...root,
+      protocol: "oidc",
+      oidc: { ...oidcBlock, authorization_endpoint: "https://login.example/authorize#x" },
+    },
+    false,
+  ],
+  [
+    "http token_endpoint rejected",
+    { ...oauth2, oauth2: { ...oauth2Block, token_endpoint: "http://t.example" } },
+    false,
+  ],
   // scopes
-  ["oidc scopes absent", { ...root, protocol: "oidc", oidc: { ...oidcBlock, scopes: undefined } }, false],
+  [
+    "oidc scopes absent",
+    { ...root, protocol: "oidc", oidc: { ...oidcBlock, scopes: undefined } },
+    false,
+  ],
   ["oidc scopes empty", { ...root, protocol: "oidc", oidc: { ...oidcBlock, scopes: [] } }, false],
-  ["oidc scopes without openid", { ...root, protocol: "oidc", oidc: { ...oidcBlock, scopes: ["profile"] } }, false],
+  [
+    "oidc scopes without openid",
+    { ...root, protocol: "oidc", oidc: { ...oidcBlock, scopes: ["profile"] } },
+    false,
+  ],
   // strategy contract projections
   [
     "github strategy with user:email",
-    { ...oauth2, oauth2: { ...oauth2Block, scopes: ["user:email"], supplementary_fetch: "github_primary_email" } },
+    {
+      ...oauth2,
+      oauth2: {
+        ...oauth2Block,
+        scopes: ["user:email"],
+        supplementary_fetch: "github_primary_email",
+      },
+    },
     true,
   ],
   [
@@ -143,53 +327,112 @@ const connectionCases: ReadonlyArray<[string, object, boolean]> = [
   ],
   [
     "strategy on oidc (field absent from the block)",
-    { ...root, protocol: "oidc", oidc: { ...oidcBlock, supplementary_fetch: "github_primary_email" } },
+    {
+      ...root,
+      protocol: "oidc",
+      oidc: { ...oidcBlock, supplementary_fetch: "github_primary_email" },
+    },
     false,
   ],
   [
     "unknown strategy name (closed enum)",
-    { ...oauth2, oauth2: { ...oauth2Block, scopes: ["user:email"], supplementary_fetch: "future_thing" } },
+    {
+      ...oauth2,
+      oauth2: { ...oauth2Block, scopes: ["user:email"], supplementary_fetch: "future_thing" },
+    },
     false,
   ],
   // provisioning (linking policy deferred with the account-linking journey)
   ["creation auto (default)", { ...oidc, provisioning: { creation: "auto" } }, true],
   ["creation disabled", { ...oidc, provisioning: { creation: "disabled" } }, true],
-  ["creation auto_only (deferred — no fail-closed branch in 851)", { ...oidc, provisioning: { creation: "auto_only" } }, false],
+  [
+    "creation auto_only (deferred — no fail-closed branch in 851)",
+    { ...oidc, provisioning: { creation: "auto_only" } },
+    false,
+  ],
   ["creation collect (not planned)", { ...oidc, provisioning: { creation: "collect" } }, false],
-  ["is_creation_allowed (replaced by creation)", { ...oidc, provisioning: { is_creation_allowed: true } }, false],
-  ["is_auto_creation (replaced by creation)", { ...oidc, provisioning: { is_auto_creation: true } }, false],
-  ["auto_linking (deferred — no linking in 851)", { ...oidc, provisioning: { auto_linking: "never" } }, false],
+  [
+    "is_creation_allowed (replaced by creation)",
+    { ...oidc, provisioning: { is_creation_allowed: true } },
+    false,
+  ],
+  [
+    "is_auto_creation (replaced by creation)",
+    { ...oidc, provisioning: { is_auto_creation: true } },
+    false,
+  ],
+  [
+    "auto_linking (deferred — no linking in 851)",
+    { ...oidc, provisioning: { auto_linking: "never" } },
+    false,
+  ],
   ["is_linking_allowed (deferred)", { ...oidc, provisioning: { is_linking_allowed: true } }, false],
-  ["is_auto_update (deferred — awaits per-property verification state)", { ...oidc, provisioning: { is_auto_update: false } }, false],
+  [
+    "is_auto_update (deferred — awaits per-property verification state)",
+    { ...oidc, provisioning: { is_auto_update: false } },
+    false,
+  ],
   ["unknown provisioning flag", { ...oidc, provisioning: { is_magic: true } }, false],
-  ["default_schema (dropped field)", { ...oidc, provisioning: { default_schema: "user-human" } }, false],
+  [
+    "default_schema (dropped field)",
+    { ...oidc, provisioning: { default_schema: "user-human" } },
+    false,
+  ],
   [
     "$supplementary_fetch coverage on the GitHub shape",
     {
       ...oauth2,
       verified_claims: { email: "$supplementary_fetch" },
-      oauth2: { ...oauth2Block, scopes: ["user:email"], supplementary_fetch: "github_primary_email" },
+      oauth2: {
+        ...oauth2Block,
+        scopes: ["user:email"],
+        supplementary_fetch: "github_primary_email",
+      },
     },
     true,
   ],
   // verified_claims value classes
-  ["verified_claims literal true accepted (Entra trust)", { ...oidc, verified_claims: { email: true } }, true],
+  [
+    "verified_claims literal true accepted (Entra trust)",
+    { ...oidc, verified_claims: { email: true } },
+    true,
+  ],
   ["verified_claims false rejected", { ...oidc, verified_claims: { email: false } }, false],
   ["verified_claims number rejected", { ...oidc, verified_claims: { email: 42 } }, false],
   ["verified_claims $-typo rejected", { ...oidc, verified_claims: { email: "$strateggy" } }, false],
   ["old $strategy sentinel rejected", { ...oidc, verified_claims: { email: "$strategy" } }, false],
   // claim_mapping value classes: plain string = exact top-level claim key;
   // $-strings and non-strings are reserved for future mapping forms
-  ["claim_mapping dotted value accepted (dot is part of the key)", { ...oidc, claim_mapping: { email: "plan.name" } }, true],
-  ["claim_mapping $-value rejected (reserved)", { ...oidc, claim_mapping: { email: "$expr" } }, false],
-  ["claim_mapping object value rejected (reserved)", { ...oidc, claim_mapping: { email: { expr: "login" } } }, false],
+  [
+    "claim_mapping dotted value accepted (dot is part of the key)",
+    { ...oidc, claim_mapping: { email: "plan.name" } },
+    true,
+  ],
+  [
+    "claim_mapping $-value rejected (reserved)",
+    { ...oidc, claim_mapping: { email: "$expr" } },
+    false,
+  ],
+  [
+    "claim_mapping object value rejected (reserved)",
+    { ...oidc, claim_mapping: { email: { expr: "login" } } },
+    false,
+  ],
   // slug bounds (pattern + maxLength) and the documented pkce opt-out
   ["slug uppercase rejected", { ...oidc, slug: "Google" }, false],
   ["slug over 64 chars rejected", { ...oidc, slug: "a".repeat(65) }, false],
-  ["pkce_enabled false accepted (documented opt-out)", { ...oidc, oidc: { ...oidcBlock, pkce_enabled: false } }, true],
+  [
+    "pkce_enabled false accepted (documented opt-out)",
+    { ...oidc, oidc: { ...oidcBlock, pkce_enabled: false } },
+    true,
+  ],
   // dropped root fields
   ["kind (dropped)", { ...oidc, kind: "idp" }, false],
-  ["enabled (dropped — availability is the policy gates + runtime disable)", { ...oidc, enabled: true }, false],
+  [
+    "enabled (dropped — availability is the policy gates + runtime disable)",
+    { ...oidc, enabled: true },
+    false,
+  ],
   ["audience (not a connection concern)", { ...oidc, audience: { team_ids: ["t"] } }, false],
   ["typo at root", { ...oidc, slugg: "x" }, false],
 ];
@@ -271,9 +514,11 @@ describe("scaffolded flow (schemas/default-login.scaffold.json)", () => {
     // The on_success enum gains create_user_with_sso once #1037 adds the value
     // and its engine handler together; the editor schema mirrors the API until
     // then. sso_providers is already a slug list, so it no longer differs.
-    const validate = new Ajv2020({ strict: false, validateFormats: false, allErrors: true }).compile(
-      flowMeta,
-    );
+    const validate = new Ajv2020({
+      strict: false,
+      validateFormats: false,
+      allErrors: true,
+    }).compile(flowMeta);
     expect(validate(flow)).toBe(false);
     for (const err of validate.errors ?? []) {
       const onSuccess = err.keyword === "enum" && err.instancePath.endsWith("/on_success");
@@ -316,8 +561,14 @@ describe("scaffolded flow (schemas/default-login.scaffold.json)", () => {
     // One-step recovery for every account type: password field, passkey
     // action, and the provider buttons all sit on the conflict step itself.
     expect(byName.get("sso-conflict")!.fields).toEqual(["x-auth-methods#password"]);
-    expect(byName.get("sso-conflict")!.actions?.map((a) => a.kind)).toEqual(["submit", "passkey", "navigate"]);
-    expect(byName.get("sso-conflict")!.transitions!["user_already_exists"]!.target).toBe("sso-conflict");
+    expect(byName.get("sso-conflict")!.actions?.map((a) => a.kind)).toEqual([
+      "submit",
+      "passkey",
+      "navigate",
+    ]);
+    expect(byName.get("sso-conflict")!.transitions!["user_already_exists"]!.target).toBe(
+      "sso-conflict",
+    );
     for (const step of flow.steps) {
       for (const t of Object.values(step.transitions ?? {})) {
         expect(t.action).not.toBe("pivot");
@@ -363,13 +614,24 @@ describe("forward compatibility (1-resource-model.md · Forward compatibility)",
   // state. Every file valid today must stay valid.
   it("today's examples survive the post-Apple extension", () => {
     const extended = JSON.parse(JSON.stringify(connectionSchema)) as {
-      properties: Record<string, { required: string[]; properties: Record<string, unknown>; allOf?: unknown[] }>;
+      properties: Record<
+        string,
+        { required: string[]; properties: Record<string, unknown>; allOf?: unknown[] }
+      >;
     };
     for (const block of ["oidc", "oauth2"]) {
       const b = extended.properties[block]!;
       b.required = b.required.filter((r) => r !== "client_secret");
-      b.properties["secret_strategy"] = { type: "string", enum: ["static", "apple_jwt"], default: "static" };
-      b.properties["response_mode"] = { type: "string", enum: ["query", "form_post"], default: "query" };
+      b.properties["secret_strategy"] = {
+        type: "string",
+        enum: ["static", "apple_jwt"],
+        default: "static",
+      };
+      b.properties["response_mode"] = {
+        type: "string",
+        enum: ["query", "form_post"],
+        default: "query",
+      };
       b.properties["secret_params"] = {
         type: "object",
         additionalProperties: false,
@@ -382,7 +644,10 @@ describe("forward compatibility (1-resource-model.md · Forward compatibility)",
       b.allOf = [
         ...(b.allOf ?? []),
         {
-          if: { properties: { secret_strategy: { const: "apple_jwt" } }, required: ["secret_strategy"] },
+          if: {
+            properties: { secret_strategy: { const: "apple_jwt" } },
+            required: ["secret_strategy"],
+          },
           then: {
             required: ["secret_params"],
             properties: { secret_params: { required: ["team_id", "key_id", "private_key_env"] } },
@@ -467,7 +732,11 @@ describe("cross-doc anchors resolve (docs/design/idp)", () => {
   const slugs = (doc: string) =>
     new Set(
       [...doc.matchAll(/^#{1,6} (.+)$/gm)].map((m) =>
-        m[1]!.toLowerCase().replace(/[^\w\- ]/g, "").trim().replace(/ /g, "-"),
+        m[1]!
+          .toLowerCase()
+          .replace(/[^\w\- ]/g, "")
+          .trim()
+          .replace(/ /g, "-"),
       ),
     );
   const headings = new Map(Object.entries(docs).map(([name, text]) => [name, slugs(text)]));
@@ -521,8 +790,7 @@ describe("provider catalog (4-cli-provider-setup.md · The Provider Catalog)", (
   // from the example), provisioning = scaffold default.
   const scaffold = (key: string, clientId: string) => {
     const entry = catalog[key]!;
-    const { protocol, subject_claim, verified_claims, ...blocks } =
-      entry.protocol_block;
+    const { protocol, subject_claim, verified_claims, ...blocks } = entry.protocol_block;
     return {
       slug: key,
       protocol,
@@ -544,10 +812,10 @@ describe("provider catalog (4-cli-provider-setup.md · The Provider Catalog)", (
     ["google", googleExample],
     ["github", githubExample],
   ])("entry %s scaffolds the example connection verbatim", (key, example) => {
-    const { $schema: _, ...expected } = example;
+    const expected = { ...example };
+    delete expected.$schema;
     const protocol = catalog[key]!.protocol_block.protocol;
-    const clientId = (expected[protocol] as Record<string, unknown>)
-      .client_id as string;
+    const clientId = (expected[protocol] as Record<string, unknown>).client_id as string;
     expect(scaffold(key, clientId)).toEqual(expected);
   });
 });

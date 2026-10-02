@@ -1,4 +1,3 @@
-/* oxlint-disable playwright/expect-expect */
 import assert from "node:assert/strict";
 import net from "node:net";
 import { test } from "vitest";

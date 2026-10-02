@@ -34,7 +34,8 @@
     "dev": "tsx watch bin/start.ts",
     "test": "vitest run --project unit",
     "test:browser": "vitest run --project browser",
-    "test:all": "vitest run"
+    "test:all": "vitest run",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@mswjs/http-middleware": "catalog:",
@@ -54,6 +55,7 @@
     "@types/node": "catalog:",
     "@vitest/browser": "catalog:",
     "@vitest/browser-playwright": "catalog:",
+    "@zitadel/eslint-config": "workspace:*",
     "msw": "catalog:",
     "playwright": "catalog:",
     "tsx": "catalog:",

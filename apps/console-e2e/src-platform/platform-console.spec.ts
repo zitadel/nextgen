@@ -1,4 +1,5 @@
 import type { Page } from "@playwright/test";
+
 import { expect, registerWithPassword, test } from "@zitadel/testing/playwright";
 
 /**
@@ -86,9 +87,7 @@ test("a platform operator reaches every management screen without an error", asy
     .getByRole("navigation", { name: "Primary" })
     .getByRole("link", { name: "Project settings" })
     .click();
-  await expect(page).toHaveURL(
-    new RegExp(`/project\\?project=${zitadel.handle.projectId}$`),
-  );
+  await expect(page).toHaveURL(new RegExp(`/project\\?project=${zitadel.handle.projectId}$`));
   await expectNoErrorState(page);
 
   const field = page.getByLabel("Project name");

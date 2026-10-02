@@ -2,8 +2,6 @@ import { LitElement, html, nothing } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import { unsafeSVG } from "lit/directives/unsafe-svg.js";
-
-import iconStyles from "./zl-icon.css?inline";
 import {
   ArrowLeft,
   ArrowRight,
@@ -23,7 +21,9 @@ import {
 } from "lucide";
 
 import type { AtomManifest } from "../manifest.js";
+
 import { surfaceStyles } from "../styles/index.js";
+import iconStyles from "./zl-icon.css?inline";
 
 /**
  * Atom: `<zl-icon>` — renders a curated glyph from the Lucide icon library.
@@ -85,7 +85,9 @@ export class ZlIcon extends LitElement {
           role=${hidden ? "presentation" : "img"}
           aria-hidden=${hidden ? "true" : "false"}
           aria-label=${hidden ? nothing : ariaLabel}
-        >${unsafeSVG(ICON_MARKUP[this.name])}</svg>
+        >
+          ${unsafeSVG(ICON_MARKUP[this.name])}
+        </svg>
       </span>
     `;
   }

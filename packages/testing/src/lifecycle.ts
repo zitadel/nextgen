@@ -2,6 +2,8 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import type { LocalZitadelRuntime } from "./types";
+
 import { runCli, tail, type RunCliResult } from "./cli";
 import {
   describeEnvelopeError,
@@ -10,7 +12,6 @@ import {
   type StartEnvelopeData,
 } from "./envelope";
 import { getFreePort } from "./ports";
-import type { LocalZitadelRuntime } from "./types";
 
 export interface BootServerOptions {
   /** TCP port for the instance; defaults to an OS-assigned free port. */
@@ -105,7 +106,6 @@ export async function bootLocalServer(options: BootServerOptions = {}): Promise<
     } catch (stopError) {
       // Both errors are preserved in AggregateError.errors, which the rule
       // below cannot model.
-      // oxlint-disable-next-line preserve-caught-error
       throw new AggregateError(
         [startError, stopError],
         `${startError.message}\nStopping the possibly-running instance also failed: ${

@@ -1,7 +1,6 @@
-import { join } from "node:path";
-
 import { defineConfig, devices } from "@playwright/test";
 import { withZitadel } from "@zitadel/testing/playwright";
+import { join } from "node:path";
 
 /**
  * The embedded surfaces, served the way a customer gets them.

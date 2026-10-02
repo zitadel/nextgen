@@ -9,7 +9,7 @@ dependsOn:
 
 tasks:
   lint:
-    command: "corepack pnpm exec oxlint ."
+    command: "corepack pnpm run lint"
 
   typecheck:
     command: "corepack pnpm run typecheck"

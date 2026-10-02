@@ -1,13 +1,13 @@
+import { type ZitadelProject } from "@zitadel/api/config";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import { type ZitadelProject } from "@zitadel/api/config";
 
+import { emit } from "../internal/emit.js";
+import { baseHostStyles, focusVisibleStyles, t } from "../styles/index.js";
 import { getSession, revokeSession } from "./api-client.js";
 import { applyBaseTokens, applyBrandingTokens } from "./branding-to-tokens.js";
 import { resolveApi, type ProjectAttrs } from "./resolve-api.js";
 import { ThemeController, type ThemeMode } from "./theme-controller.js";
-import { emit } from "../internal/emit.js";
-import { baseHostStyles, focusVisibleStyles, t } from "../styles/index.js";
 
 /**
  * `<zitadel-logout>` — orchestrator-tier element that lets the signed-in user

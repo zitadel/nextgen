@@ -1,5 +1,5 @@
-import net from "node:net";
 import { randomInt } from "node:crypto";
+import net from "node:net";
 
 /**
  * Why a fixed block instead of asking the kernel via listen(:0): the runner

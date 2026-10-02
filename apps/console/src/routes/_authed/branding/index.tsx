@@ -2,6 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Monitor, Smartphone, Sun, Workflow } from "lucide-react";
 import { useState } from "react";
 
+import type { BrandingRevision } from "@/lib/branding-palette";
+
 import { LoginPreview, type PreviewJourney } from "@/components/branding/login-preview";
 import { SettingsPanel } from "@/components/branding/settings-panel";
 import { RESOURCE_HEADER, RESOURCE_PAGE } from "@/components/resource-list";
@@ -16,7 +18,6 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { BrandingRevision } from "@/lib/branding-palette";
 import { flowDisplayName } from "@/lib/flow-definition";
 
 import { api } from "../../../api/zitadel";
@@ -25,7 +26,10 @@ import { projectScopeDeps, requireProjectScope } from "../../../lib/project-scop
 export const Route = createFileRoute("/_authed/branding/")({
   // Nested under Login flows, as in the design: branding is how those flows
   // render, not a resource of its own. Sub-rows carry no icon.
-  staticData: { scope: "project", nav: { label: "Branding", order: 1, parent: "/flow-definitions" } },
+  staticData: {
+    scope: "project",
+    nav: { label: "Branding", order: 1, parent: "/flow-definitions" },
+  },
   loaderDeps: projectScopeDeps,
   loader: async ({ deps }) => {
     // Newest first, so the head of the list is what visitors see today. The

@@ -1,6 +1,7 @@
 import { consola } from "consola";
 
 import type { BoxAction } from "../../lib/box";
+
 import { ZitadelError } from "../../lib/errors";
 import { customizeAndPublishActions, verifyLoginAction } from "../../lib/journey-guidance";
 import {

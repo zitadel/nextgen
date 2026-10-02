@@ -1,9 +1,9 @@
-import { applyBranding, clearBranding } from "@zitadel/api-mock";
 import type { Meta, StoryObj } from "@storybook/web-components-vite";
-import { http, HttpResponse } from "msw";
-import { html } from "lit";
-import { initialize, mswLoader } from "msw-storybook-addon";
 
+import { applyBranding, clearBranding } from "@zitadel/api-mock";
+import { html } from "lit";
+import { http, HttpResponse } from "msw";
+import { initialize, mswLoader } from "msw-storybook-addon";
 import "@zitadel/components";
 
 import { brandingPresets, type BrandingPresetId } from "./branding-presets.js";

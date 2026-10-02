@@ -1,6 +1,7 @@
-import { npmDistTagForCliVersion } from "../../../../public-cli";
-import type { FileOp } from "../file-writer/types";
 import type { PatchContext, PatchView } from "../../types";
+import type { FileOp } from "../file-writer/types";
+
+import { npmDistTagForCliVersion } from "../../../../public-cli";
 import { AbstractRulePatcher } from "../base";
 import { type ViteSupport, buildViteProxyOp } from "../vite-support";
 import { appTemplate } from "./templates";

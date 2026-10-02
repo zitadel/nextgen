@@ -3,6 +3,7 @@ import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import type { LocalAdmin } from "../../../../src/lib/local-server/admin-credential";
+
 import { adminSessionCookie, consoleSignInUrl } from "../../../../src/lib/local-server/sign-in";
 
 const SERVER = "http://local-admin.invalid:8080";
@@ -21,7 +22,10 @@ async function record(request: Request): Promise<void> {
   const url = new URL(request.url);
   calls.push({
     path: url.pathname,
-    body: await request.clone().json().catch(() => undefined),
+    body: await request
+      .clone()
+      .json()
+      .catch(() => undefined),
     authorization: request.headers.get("authorization"),
     origin: request.headers.get("origin"),
   });
@@ -46,13 +50,19 @@ const signInHandlers = [
     const { method } = (await request.json()) as { method: string };
     return HttpResponse.json({ challenge_id: `ch_${method}`, method }, { status: 201 });
   }),
-  http.post(`${SERVER}/auth_attempts/:attempt/challenges/:challenge/verify`, async ({ request }) => {
-    await record(request);
-    return HttpResponse.json({ attempt_id: "att_1", state: "in_progress" });
-  }),
+  http.post(
+    `${SERVER}/auth_attempts/:attempt/challenges/:challenge/verify`,
+    async ({ request }) => {
+      await record(request);
+      return HttpResponse.json({ attempt_id: "att_1", state: "in_progress" });
+    },
+  ),
   http.post(`${SERVER}/auth_attempts/:attempt/handoff`, async ({ request }) => {
     await record(request);
-    return HttpResponse.json({ handoff_token: "handoff/one+time", expires_at: "2027-01-01T00:00:00Z" });
+    return HttpResponse.json({
+      handoff_token: "handoff/one+time",
+      expires_at: "2027-01-01T00:00:00Z",
+    });
   }),
 ];
 
@@ -70,7 +80,9 @@ describe("local admin sign-in", () => {
     const url = await consoleSignInUrl(SERVER, admin);
 
     // The token is a bearer credential in a query string, so it is encoded.
-    expect(url).toBe(`${SERVER}/ui/console/login?handoff=${encodeURIComponent("handoff/one+time")}`);
+    expect(url).toBe(
+      `${SERVER}/ui/console/login?handoff=${encodeURIComponent("handoff/one+time")}`,
+    );
 
     expect(calls.map((call) => call.path)).toEqual([
       "/auth_attempts",
@@ -168,7 +180,9 @@ describe("local admin sign-in", () => {
       nextCommands: ["zitadel logs"],
     });
     expect((error as { hint: string }).hint).toContain("zitadel reset --force");
-    expect((error as { nextCommands: string[] }).nextCommands).not.toContain("zitadel reset --force");
+    expect((error as { nextCommands: string[] }).nextCommands).not.toContain(
+      "zitadel reset --force",
+    );
   });
 
   it("reports a rejected password with the server's own message", async () => {

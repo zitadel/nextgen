@@ -10,12 +10,13 @@
     "publish-tarballs": "node scripts/publish-tarballs.mjs",
     "verify-tarballs": "node scripts/verify-tarballs.mjs",
     "e2e-local": "node scripts/run-local.mjs",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "lint": "eslint ."
   },
   "devDependencies": {
     "@playwright/test": "catalog:",
+    "@zitadel/eslint-config": "workspace:*",
     "@zitadel/testing": "workspace:*",
-    "eslint-plugin-playwright": "catalog:",
     "typescript": "catalog:"
   }
 }

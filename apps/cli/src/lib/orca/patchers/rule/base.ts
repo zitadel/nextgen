@@ -1,20 +1,7 @@
+import { metaSchemaFiles, META_SCHEMA_DIR } from "@zitadel/config/meta-schemas";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { metaSchemaFiles, META_SCHEMA_DIR } from "@zitadel/config/meta-schemas";
-
-import { stableStringify } from "../../../json";
-import { normalizePublicCliJson } from "../../../public-cli";
-import { DEFAULT_SERVER } from "../../../server";
-import { scaffold } from "./file-writer";
-import type { FileOp, ScaffoldPlan } from "./file-writer/types";
-import {
-  AGENTS_HEADER,
-  agentsGuidanceSection,
-  README_HEADER,
-  readmeGuidanceSection,
-  upsertGuidanceSection,
-} from "./guidance";
 import type {
   ConfigWiringStatus,
   EjectActions,
@@ -24,6 +11,19 @@ import type {
   PatchResult,
   PatchView,
 } from "../types";
+import type { FileOp, ScaffoldPlan } from "./file-writer/types";
+
+import { stableStringify } from "../../../json";
+import { normalizePublicCliJson } from "../../../public-cli";
+import { DEFAULT_SERVER } from "../../../server";
+import { scaffold } from "./file-writer";
+import {
+  AGENTS_HEADER,
+  agentsGuidanceSection,
+  README_HEADER,
+  readmeGuidanceSection,
+  upsertGuidanceSection,
+} from "./guidance";
 import { reclaimableOps, withoutExistingTargets } from "./reclaim";
 
 /**
@@ -106,7 +106,11 @@ export abstract class AbstractRulePatcher implements Patcher {
         continue;
       }
       const candidates = typeof op.path === "string" ? [op.path] : op.path;
-      let path = candidates[0]!;
+      const firstCandidate = candidates[0];
+      if (firstCandidate === undefined) {
+        continue;
+      }
+      let path = firstCandidate;
       let source: string | undefined;
       for (const candidate of candidates) {
         const contents = await readTextIfExists(join(opts.cwd, candidate));
@@ -151,7 +155,10 @@ export abstract class AbstractRulePatcher implements Patcher {
       configEdits: this.routeConfigEdits(view),
       guidanceFiles: ["AGENTS.md", "README.md"],
       fileClasses: Object.fromEntries(
-        markedFiles.map((path) => [path, infrastructure.has(path) ? "infrastructure" : "presentation"]),
+        markedFiles.map((path) => [
+          path,
+          infrastructure.has(path) ? "infrastructure" : "presentation",
+        ]),
       ),
       conditionalFiles: this.conditionallyScaffoldedFiles(view),
       retiredAlternates: this.retiredAlternateFiles(view),

@@ -1,8 +1,5 @@
 import { test as base, type Page } from "@playwright/test";
 
-import { waitForHandshake } from "./handshake";
-import { connectZitadel } from "./index";
-import { enableVirtualPasskey, type VirtualPasskey } from "./passkey";
 import type {
   ConnectedZitadel,
   Identity,
@@ -12,6 +9,10 @@ import type {
   SeedUserInput,
   SeedUsersTemplate,
 } from "./types";
+
+import { waitForHandshake } from "./handshake";
+import { connectZitadel } from "./index";
+import { enableVirtualPasskey, type VirtualPasskey } from "./passkey";
 
 export interface AuthenticatedPage {
   /** A page in its own context, already carrying the session cookie. */
@@ -54,7 +55,7 @@ export const test = base.extend<ZitadelTestFixtures, ZitadelWorkerFixtures>({
   zitadel: [
     // Playwright derives fixture dependencies from the destructuring pattern,
     // so the empty pattern is required here.
-    // oxlint-disable-next-line no-empty-pattern
+    // eslint-disable-next-line no-empty-pattern -- Playwright requires the empty destructuring to signal "no fixture deps"
     async ({}, use) => {
       const handshakePath = process.env.ZITADEL_TESTING_HANDSHAKE;
       if (!handshakePath) {
@@ -104,9 +105,10 @@ export const test = base.extend<ZitadelTestFixtures, ZitadelWorkerFixtures>({
     }
     const session = await zitadel.seedSession({ origin: baseURL });
     const context = await browser.newContext({ baseURL });
-    // `addCookies` takes either url or domain/path; url derives the rest.
-    const { path: _path, ...cookie } = session.cookie;
-    await context.addCookies([{ ...cookie, url: baseURL }]);
+    // `addCookies` takes either url or domain/path; url derives the rest, so we
+    // forward every field except `path`.
+    const { name, value, httpOnly, secure, sameSite } = session.cookie;
+    await context.addCookies([{ name, value, httpOnly, secure, sameSite, url: baseURL }]);
     const page = await context.newPage();
     await use({ page, user: session.user, session });
     await context.close();

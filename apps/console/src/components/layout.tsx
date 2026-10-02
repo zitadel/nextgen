@@ -12,9 +12,7 @@ import type { ReactNode } from "react";
  * app uses explicit max-w-* + the grid below instead.
  */
 export function Page({ children }: { children: ReactNode }) {
-  return (
-    <div className="mx-auto w-full max-w-[120rem] px-6 py-8 2xl:px-8">{children}</div>
-  );
+  return <div className="mx-auto w-full max-w-[120rem] px-6 py-8 2xl:px-8">{children}</div>;
 }
 
 /** The fixed column every settings screen renders in, centred in the main area. */

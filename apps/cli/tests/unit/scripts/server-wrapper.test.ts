@@ -1,8 +1,8 @@
-import { describe, expect, it } from "vitest";
-import { chmod, mkdtemp, stat, writeFile } from "node:fs/promises";
 import { EventEmitter } from "node:events";
+import { chmod, mkdtemp, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { describe, expect, it } from "vitest";
 
 type ServerWrapperModule = {
   ensureExecutable: (binaryPath: string, platform?: string) => void;

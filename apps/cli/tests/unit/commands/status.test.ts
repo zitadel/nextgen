@@ -1,9 +1,8 @@
+import { http, HttpResponse } from "msw";
+import { setupServer } from "msw/node";
 import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
-
-import { http, HttpResponse } from "msw";
-import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import {
@@ -245,7 +244,14 @@ describe("status command", () => {
     await chmod(join(binDir, "docker"), 0o755);
 
     const res = await runCliForTest(
-      ["status", "--cwd", relative(process.cwd(), cwd), "--json", "--server", "https://api.zitadel.cloud"],
+      [
+        "status",
+        "--cwd",
+        relative(process.cwd(), cwd),
+        "--json",
+        "--server",
+        "https://api.zitadel.cloud",
+      ],
       { PATH: `${binDir}:${process.env.PATH ?? ""}` },
     );
 

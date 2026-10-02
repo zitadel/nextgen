@@ -1,7 +1,8 @@
-import { Link, type LinkProps } from "@tanstack/react-router";
 import type { LucideIcon } from "lucide-react";
-import { Construction } from "lucide-react";
 import type { ReactNode } from "react";
+
+import { Link, type LinkProps } from "@tanstack/react-router";
+import { Construction } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 

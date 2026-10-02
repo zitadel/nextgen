@@ -1,12 +1,6 @@
 import { Flags } from "@oclif/core";
 
-import { ZitadelError } from "../../../errors";
-import { isObject } from "../../../json";
-import { publicCliCommand } from "../../../public-cli";
 import type { CommandResult, GlobalOptions } from "../../types";
-import { readRawBody } from "../body";
-import { bodyFieldFlags, bodyFromFlags, describeBody, fieldExample, needsRawBody } from "../fields";
-import { article, dryRunResult, idArg, idName, parseOrThrow } from "../shared";
 import type {
   CreateSpec,
   Json,
@@ -14,6 +8,13 @@ import type {
   ResourceDescriptor,
   UpdateSpec,
 } from "../types";
+
+import { ZitadelError } from "../../../errors";
+import { isObject } from "../../../json";
+import { publicCliCommand } from "../../../public-cli";
+import { readRawBody } from "../body";
+import { bodyFieldFlags, bodyFromFlags, describeBody, fieldExample, needsRawBody } from "../fields";
+import { article, dryRunResult, idArg, idName, parseOrThrow } from "../shared";
 import {
   type OperationDefinition,
   type OperationInput,

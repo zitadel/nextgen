@@ -1,13 +1,11 @@
+import { resetPlatformStore, setupPlatformHandlers } from "@zitadel/api-mock/platform";
+import { HttpResponse, http } from "msw";
+import { setupServer } from "msw/node";
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Readable } from "node:stream";
-
-import { HttpResponse, http } from "msw";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import { setupServer } from "msw/node";
-
-import { resetPlatformStore, setupPlatformHandlers } from "@zitadel/api-mock/platform";
 
 import { parseJson, runCliForTest } from "../../helpers/run-cli";
 

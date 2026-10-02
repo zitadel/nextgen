@@ -5,18 +5,19 @@
  * by writing a class and appending an instance to the registry below.
  */
 import type { SanityCheck } from "./types";
+
+import { ClaimCheck } from "./claim";
 import { ConfigCheck } from "./config";
-import { SecretCheck } from "./secret";
-import { SecretPermissionsCheck } from "./secret-permissions";
-import { GitignoreCheck } from "./gitignore";
-import { EnvExampleCheck } from "./env-example";
-import { FrameworkCheck } from "./framework";
 import { DependencyCheck } from "./dependency";
 import { DependencyVersionCheck } from "./dependency-version";
+import { EnvExampleCheck } from "./env-example";
+import { FrameworkCheck } from "./framework";
+import { GitignoreCheck } from "./gitignore";
 import { ManagedFilesCheck } from "./managed-files";
 import { ProjectMatchCheck } from "./project-match";
 import { SchemaCheck } from "./schema";
-import { ClaimCheck } from "./claim";
+import { SecretCheck } from "./secret";
+import { SecretPermissionsCheck } from "./secret-permissions";
 
 export type { SanityCheck, CheckContext, CheckOutcome } from "./types";
 export { AbstractSanityCheck } from "./types";

@@ -18,6 +18,7 @@ import { GetFlowStepResponse } from "@zitadel/api/generated/endpoints/zitadelNex
 import { describe, expect, test } from "vitest";
 
 import type { StepFixtureInput } from "./login.js";
+
 import {
   doneStep,
   identifierStep,

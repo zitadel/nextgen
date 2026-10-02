@@ -1,5 +1,6 @@
-import { ZitadelError, type ZitadelErrorCode } from "../../../lib/errors";
 import type { Orca } from "../../../lib/orca";
+
+import { ZitadelError, type ZitadelErrorCode } from "../../../lib/errors";
 
 /** Pass/fail/advisory outcome of a single {@link SanityCheck}. */
 export type CheckOutcome = {

@@ -1,15 +1,13 @@
+import { spawnSync } from "node:child_process";
 import { readdir, readFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { spawnSync } from "node:child_process";
 
 import { PUBLIC_PACKAGE_DIRS } from "../../../scripts/release-manifest.mjs";
 
 const [tarballsDir, ...flags] = process.argv.slice(2);
 if (!tarballsDir || tarballsDir.startsWith("--")) {
-  throw new Error(
-    "usage: node apps/cli-journey-e2e/scripts/verify-tarballs.mjs <tarballs-dir>",
-  );
+  throw new Error("usage: node apps/cli-journey-e2e/scripts/verify-tarballs.mjs <tarballs-dir>");
 }
 if (flags.length > 0) {
   throw new Error(`unknown flags: ${flags.join(", ")}`);
@@ -19,9 +17,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, "../../..");
 // Journey registries and release artifact dirs carry the same set: exactly
 // the public release packages, nothing on top.
-const requiredPackageNames = new Set(
-  await Promise.all(PUBLIC_PACKAGE_DIRS.map(packageName)),
-);
+const requiredPackageNames = new Set(await Promise.all(PUBLIC_PACKAGE_DIRS.map(packageName)));
 const dependencyFields = [
   "dependencies",
   "devDependencies",
@@ -33,9 +29,7 @@ const semverVersion = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
 const manifests = new Map();
 const serverPlatformPackagePattern = /^@zitadel\/server-(?:darwin|linux|win32)-/;
 
-const tarballs = (await readdir(tarballsDir))
-  .filter((file) => file.endsWith(".tgz"))
-  .sort();
+const tarballs = (await readdir(tarballsDir)).filter((file) => file.endsWith(".tgz")).sort();
 
 if (tarballs.length === 0) {
   throw new Error(`no .tgz files found in ${tarballsDir}`);
@@ -133,9 +127,7 @@ function assertValidVersions(manifests) {
 }
 
 async function packageName(relativePath) {
-  const pkg = JSON.parse(
-    await readFile(join(repoRoot, relativePath, "package.json"), "utf8"),
-  );
+  const pkg = JSON.parse(await readFile(join(repoRoot, relativePath, "package.json"), "utf8"));
   if (typeof pkg.name !== "string" || pkg.name.length === 0) {
     throw new Error(`${relativePath}/package.json has no name`);
   }

@@ -1,10 +1,10 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-
 import semver from "semver";
 
-import { addExactCommandFor, detectPackageManager } from "../../../lib/package-manager";
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
+
+import { addExactCommandFor, detectPackageManager } from "../../../lib/package-manager";
 
 /**
  * Verifies that exactly-pinned `@zitadel/*` dependencies match this CLI's own
@@ -51,9 +51,7 @@ export class DependencyVersionCheck implements SanityCheck {
       ...(pkg.devDependencies ?? {}),
     }).filter(([name]) => name.startsWith("@zitadel/"));
     const exact = declared.filter(([, version]) => semver.valid(version.trim()) !== null);
-    const mismatched = exact.filter(
-      ([, version]) => !semver.eq(version.trim(), ctx.cliVersion),
-    );
+    const mismatched = exact.filter(([, version]) => !semver.eq(version.trim(), ctx.cliVersion));
     if (mismatched.length > 0) {
       // Repair with the project's own package manager and an exact-save flag:
       // a bare `npm install` would switch managers on a pnpm/yarn/bun project

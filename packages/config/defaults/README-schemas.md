@@ -83,7 +83,7 @@ For example:
 
 ------------------------------------------------------------------------
 
-# Making changes
+## Making changes
 
 The most common workflow looks like this:
 
@@ -109,7 +109,7 @@ update any login flows that reference it.
 
 ------------------------------------------------------------------------
 
-# Common changes
+## Common changes
 
 ## Add a new field
 

@@ -1,9 +1,8 @@
+import { resetPlatformStore, setupPlatformHandlers } from "@zitadel/api-mock/platform";
+import { setupServer } from "msw/node";
 import { mkdir, mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-
-import { resetPlatformStore, setupPlatformHandlers } from "@zitadel/api-mock/platform";
-import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { parseJson, runCliForTest } from "../helpers/run-cli";
@@ -57,9 +56,7 @@ describe("patch then eject round-trip", () => {
     expect(await readFile(join(cwd, "app/login/page.tsx"), "utf8")).toContain(MANAGED_MARKER);
     expect(await readFile(join(cwd, "middleware.ts"), "utf8")).toContain(MANAGED_MARKER);
     expect(await readFile(join(cwd, "AGENTS.md"), "utf8")).toContain("zitadel:guidance:begin");
-    expect(await readFile(join(cwd, "README.md"), "utf8")).toContain(
-      "## Authentication (Zitadel)",
-    );
+    expect(await readFile(join(cwd, "README.md"), "utf8")).toContain("## Authentication (Zitadel)");
 
     // Simulate the user replacing the register page with their own (unmarked) file.
     await writeFile(

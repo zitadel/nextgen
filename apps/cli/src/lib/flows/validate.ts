@@ -1,4 +1,5 @@
 import type { CreateFlowDefinitionBodyFlowDefinition } from "@zitadel/api/generated/model";
+
 import { flowConfigSchema } from "@zitadel/config/schemas";
 
 import { ZitadelError } from "../errors";

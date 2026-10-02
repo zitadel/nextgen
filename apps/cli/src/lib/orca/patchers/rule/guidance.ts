@@ -1,3 +1,5 @@
+import type { PatchContext } from "../types";
+
 /**
  * Scaffolded guidance for humans (`README.md`) and agents (`AGENTS.md`):
  * the golden journey from a fresh scaffold to a customized, published
@@ -7,7 +9,6 @@
  * rerun replaces only its own section.
  */
 import { publicCliCommand } from "../../../public-cli";
-import type { PatchContext } from "../types";
 
 const MARKER_BEGIN = "<!-- zitadel:guidance:begin -->";
 const MARKER_END = "<!-- zitadel:guidance:end -->";

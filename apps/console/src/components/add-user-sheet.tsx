@@ -27,6 +27,7 @@ import {
 
 import { api } from "../api/zitadel";
 import { describeError } from "../lib/api-error";
+import { useRequiredProjectScope } from "../lib/project-scope";
 // Parked — design decisions log D6, plus no grant endpoints. See the block below.
 // import {
 //   ProjectAccess,
@@ -40,7 +41,6 @@ import {
   schemaFieldSummary,
   schemaFields,
 } from "../lib/schema";
-import { useRequiredProjectScope } from "../lib/project-scope";
 
 /** A schema plus the id needed to reference it in the created user's `schema`. */
 interface SchemaOption {
@@ -177,9 +177,7 @@ function AddUserForm({
 
   const selected = schemas?.find((option) => option.id === schemaId);
   const fields = selected ? schemaFields(selected.schema) : [];
-  const missingRequired = fields.some(
-    (entry) => entry.required && !values[entry.key]?.trim(),
-  );
+  const missingRequired = fields.some((entry) => entry.required && !values[entry.key]?.trim());
 
   const selectSchema = useCallback((next: string) => {
     setSchemaId(next);
@@ -215,10 +213,7 @@ function AddUserForm({
           attributes[entry.key] = value;
         }
       }
-      await api.createUser(
-        { schema: selected.id, attributes },
-        { project_id: projectId },
-      );
+      await api.createUser({ schema: selected.id, attributes }, { project_id: projectId });
       await onCreated();
       onClose();
     } catch (cause) {
@@ -260,9 +255,7 @@ function AddUserForm({
               key={entry.key}
               field={entry}
               value={values[entry.key] ?? ""}
-              onChange={(value) =>
-                setValues((current) => ({ ...current, [entry.key]: value }))
-              }
+              onChange={(value) => setValues((current) => ({ ...current, [entry.key]: value }))}
             />
           ))}
         </div>
@@ -294,12 +287,7 @@ function AddUserForm({
 
       <Separator />
       <SheetFooter className={FOOTER}>
-        <Button
-          type="button"
-          variant="secondary"
-          className="gap-1.5 px-2.5"
-          onClick={onClose}
-        >
+        <Button type="button" variant="secondary" className="gap-1.5 px-2.5" onClick={onClose}>
           Cancel
         </Button>
         <Button
@@ -318,7 +306,7 @@ function AddUserForm({
 
 /** Searchable schema picker, composed from the shared Combobox. */
 function SchemaPicker({
-  id,
+  id: _id,
   schemas,
   selected,
   onSelect,

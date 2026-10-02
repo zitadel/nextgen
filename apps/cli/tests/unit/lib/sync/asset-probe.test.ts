@@ -1,11 +1,12 @@
+import { http, HttpResponse } from "msw";
+import { setupServer } from "msw/node";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-
-import { http, HttpResponse } from "msw";
-import { setupServer } from "msw/node";
 import { Agent } from "undici";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+
+import type { ResourceSyncer, SyncAction } from "../../../../src/lib/sync/types";
 
 import {
   annotateAssetWarnings,
@@ -13,7 +14,6 @@ import {
 } from "../../../../src/lib/sync/asset-probe";
 import { buildSyncPlan } from "../../../../src/lib/sync/loop";
 import { collectPlanWarnings } from "../../../../src/lib/sync/plan-renderer";
-import type { ResourceSyncer, SyncAction } from "../../../../src/lib/sync/types";
 import { userAgentInterceptor } from "../../../../src/lib/user-agent";
 
 const { lookupMock } = vi.hoisted(() => ({ lookupMock: vi.fn() }));

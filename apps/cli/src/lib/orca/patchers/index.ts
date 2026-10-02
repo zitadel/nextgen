@@ -1,3 +1,5 @@
+import type { Patcher } from "./types";
+
 import { AngularPatcher } from "./rule/angular";
 import { NextPatcher } from "./rule/next";
 import { NuxtPatcher } from "./rule/nuxt";
@@ -6,7 +8,6 @@ import { ReactPatcher } from "./rule/react";
 import { SolidPatcher } from "./rule/solid";
 import { SveltePatcher } from "./rule/svelte";
 import { VuePatcher } from "./rule/vue";
-import type { Patcher } from "./types";
 
 /**
  * Active patchers, in priority order; the first whose `canPatch` matches wins.

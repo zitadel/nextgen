@@ -1,5 +1,6 @@
-import { describeBody } from "./fields";
 import type { Json, ResourceRegistry } from "./types";
+
+import { describeBody } from "./fields";
 
 /**
  * A machine-readable description of what a registry exposes: one entry per
@@ -10,7 +11,6 @@ import type { Json, ResourceRegistry } from "./types";
  */
 export const describeRegistry = <Ctx>(registry: ResourceRegistry<Ctx>): readonly Json[] =>
   Object.entries(registry).map(([topic, resource]) => {
-
     return {
       topic,
       singular: resource.singular,

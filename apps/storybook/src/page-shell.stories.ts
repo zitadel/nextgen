@@ -1,8 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/web-components-vite";
+
 import { layoutChromeCss, zitadelTrustmarkInnerHtml } from "@zitadel/components";
 import { html, nothing } from "lit";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
-
 import "@zitadel/components/atoms";
 
 /**

@@ -1,6 +1,7 @@
+import type { Detector, FrameworkFacts } from "./types";
+
 import { hasDependency, readPackageJson } from "./package-json";
 import { detectDevPort, issuerFromPort } from "./port";
-import type { Detector, FrameworkFacts } from "./types";
 
 /**
  * Detects a Vite + Svelte single-page app: depends on `svelte` and `vite` but

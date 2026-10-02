@@ -167,8 +167,7 @@ export const de: Locale = {
 
   // --- Passkey-Fehler ---
   "error.passkey_cancelled": "Die Passkey-Abfrage wurde vorzeitig geschlossen.",
-  "error.passkey_timeout":
-    "Die Passkey-Anfrage hat zu lange gedauert. Bitte versuche es erneut.",
+  "error.passkey_timeout": "Die Passkey-Anfrage hat zu lange gedauert. Bitte versuche es erneut.",
   "error.passkey_not_registered":
     "Dieser Passkey ist nicht registriert. Bitte melde dich mit E-Mail und Passwort an.",
   "error.passkey_setup_failed":

@@ -29,7 +29,6 @@ vi.mock("../../../../src/lib/local-server/runtime", async (importOriginal) => ({
 }));
 
 import { confirm, isCancel, select, text } from "@clack/prompts";
-import { detectHealthyLocalServer } from "../../../../src/lib/local-server/runtime";
 
 import {
   DevPortPrompt,
@@ -42,6 +41,7 @@ import {
   type PromptContext,
   type SetupAnswers,
 } from "../../../../src/commands/setup/prompts";
+import { detectHealthyLocalServer } from "../../../../src/lib/local-server/runtime";
 
 const FRAMEWORK = {
   id: "next",
@@ -146,11 +146,7 @@ describe("ServerPrompt", () => {
       initialValue: "http://localhost:8080",
     });
     const values = selectOptionsFromFirstCall().map((option) => option.value);
-    expect(values).toEqual([
-      "https://api.zitadel.cloud",
-      "http://localhost:8080",
-      "__custom__",
-    ]);
+    expect(values).toEqual(["https://api.zitadel.cloud", "http://localhost:8080", "__custom__"]);
   });
 
   it("offers only Cloud and Custom when no local server is detected", async () => {
@@ -298,4 +294,3 @@ describe("SETUP_PROMPTS", () => {
     ]);
   });
 });
-

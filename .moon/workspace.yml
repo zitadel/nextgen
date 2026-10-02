@@ -19,6 +19,7 @@ projects:
     config: "packages/config"
     components: "packages/components"
     design-tokens: "packages/design-tokens"
+    eslint-config: "packages/eslint-config"
     sdk-angular: "packages/sdk-angular"
     sdk-core: "packages/sdk-core"
     sdk-next: "packages/sdk-next"

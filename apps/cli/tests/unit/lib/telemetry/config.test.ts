@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  resolveTelemetryHost,
-  resolveTelemetryToken,
-} from "../../../../src/lib/telemetry/config";
+import { resolveTelemetryHost, resolveTelemetryToken } from "../../../../src/lib/telemetry/config";
 
 const DEV_TOKEN = "0fb432b08a9797b87b0eebcbee11706e";
 const PROD_TOKEN = "f56fd7315ccd614fba8eecb2a8966152";

@@ -1,6 +1,5 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
-
 import { _resetConfigForTesting } from "@zitadel/api/config";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 /**
  * Pins both branches of the API base (Console ADR 0002 §4, revised): the

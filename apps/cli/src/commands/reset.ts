@@ -1,5 +1,5 @@
-import { Flags } from "@oclif/core";
 import { cancel, confirm, isCancel } from "@clack/prompts";
+import { Flags } from "@oclif/core";
 
 import { ZitadelError } from "../lib/errors";
 import { stopBinaryRuntime } from "../lib/local-server/binary";

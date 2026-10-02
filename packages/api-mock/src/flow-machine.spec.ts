@@ -127,7 +127,12 @@ describe("sso-conflict", () => {
   it("rotates the session token on every hop, as the engine does", () => {
     const actor = atProvider();
     const atRedirect = actor.getSnapshot().context.sessionToken;
-    actor.send({ type: "SUBMIT", action: "callback", fields: {}, sso_outcome: "user_already_exists" });
+    actor.send({
+      type: "SUBMIT",
+      action: "callback",
+      fields: {},
+      sso_outcome: "user_already_exists",
+    });
 
     expect(actor.getSnapshot().context.sessionToken).not.toBe(atRedirect);
   });

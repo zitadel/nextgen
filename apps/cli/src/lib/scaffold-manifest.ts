@@ -2,10 +2,11 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { join, isAbsolute, relative, sep } from "node:path";
 
-import { isObject } from "./json";
 import type { EjectActions } from "./orca/patchers/types";
-import { readState, updateScaffold } from "./sync/state";
 import type { ScaffoldManifest, ScaffoldPosture } from "./sync/types";
+
+import { isObject } from "./json";
+import { readState, updateScaffold } from "./sync/state";
 
 /**
  * Content hash of one scaffolded file as recorded in the scaffold manifest.

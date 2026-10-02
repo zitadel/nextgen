@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { AngularPatcher } from "../../../../../../../src/lib/orca/patchers/rule/angular";
 import type {
   FileOp,
   ScaffoldPlan,
 } from "../../../../../../../src/lib/orca/patchers/rule/file-writer/types";
 import type { PatchContext } from "../../../../../../../src/lib/orca/patchers/types";
+
+import { AngularPatcher } from "../../../../../../../src/lib/orca/patchers/rule/angular";
 import { MANAGED_MARKER } from "../../../../../../../src/lib/paths";
 
 function ctx(): PatchContext {

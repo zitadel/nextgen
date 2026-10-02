@@ -1,17 +1,17 @@
+import { consola } from "consola";
 import { createHash } from "node:crypto";
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 
-import { consola } from "consola";
+import type { PlanResourceChange } from "./plan-renderer.js";
+import type { FlowRepin, ResourceEntry, ResourceSyncer, SyncAction } from "./types.js";
 
 import { ZitadelError } from "../errors";
 import { FLOWS_DIR } from "../flows";
 import { stableStringify } from "../json";
 import { annotateAssetWarnings } from "./asset-probe.js";
 import { validatePlannedFlows } from "./flow-validation.js";
-import type { PlanResourceChange } from "./plan-renderer.js";
 import { readState, removeFromState, updateState } from "./state.js";
-import type { FlowRepin, ResourceEntry, ResourceSyncer, SyncAction } from "./types.js";
 
 /**
  * Compute the sync plan for `cwd` against the state file and (when
@@ -383,7 +383,12 @@ export async function runSyncLoop(
           hash: await writeBack(action, canonical, fallbackHash),
         });
         consola.info(`Updated the ${action.syncer.kind} on Zitadel from ${action.path}`);
-        applied.push({ kind: action.syncer.kind, action: "update", file: action.path, id: action.id });
+        applied.push({
+          kind: action.syncer.kind,
+          action: "update",
+          file: action.path,
+          id: action.id,
+        });
         break;
       }
       case "delete": {
@@ -392,7 +397,12 @@ export async function runSyncLoop(
         consola.info(
           `Deleted the ${action.syncer.kind} on Zitadel because ${action.path} was removed locally`,
         );
-        applied.push({ kind: action.syncer.kind, action: "delete", file: action.path, id: action.id });
+        applied.push({
+          kind: action.syncer.kind,
+          action: "delete",
+          file: action.path,
+          id: action.id,
+        });
         break;
       }
       case "skip": {
@@ -594,10 +604,7 @@ export function hashResourceContent(data: object): string {
  * reordering keys or spelling out a meta-schema default does not read as an
  * edit.
  */
-export function hashForState(
-  syncer: Pick<ResourceSyncer, "normalize">,
-  data: object,
-): string {
+export function hashForState(syncer: Pick<ResourceSyncer, "normalize">, data: object): string {
   const normalized = syncer.normalize?.(data) ?? data;
   return createHash("sha256").update(stableStringify(normalized)).digest("hex");
 }

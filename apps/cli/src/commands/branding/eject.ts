@@ -1,10 +1,5 @@
-import { mkdir, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
-
 import { cancel, isCancel, select } from "@clack/prompts";
 import { Flags } from "@oclif/core";
-import { consola } from "consola";
-
 import {
   BRANDING_DESIGNS,
   DEFAULT_BRANDING_CONFIG_PATH,
@@ -13,7 +8,14 @@ import {
   brandingReadmeContent,
   getDefaultBrandingConfig,
 } from "@zitadel/config/defaults";
-import { BRANDING_FILE_SCHEMA_REF, META_SCHEMA_DIR, metaSchemaFiles } from "@zitadel/config/meta-schemas";
+import {
+  BRANDING_FILE_SCHEMA_REF,
+  META_SCHEMA_DIR,
+  metaSchemaFiles,
+} from "@zitadel/config/meta-schemas";
+import { consola } from "consola";
+import { mkdir, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 
 import { BRANDING_DIR } from "../../lib/branding";
 import { BRANDING_DESIGN_INFO, resolveBrandingDesign } from "../../lib/branding/designs";

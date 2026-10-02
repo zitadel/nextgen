@@ -1,10 +1,11 @@
+import type { PlaywrightTestConfig } from "@playwright/test";
+
 import { existsSync } from "node:fs";
 import { extname, isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import type { PlaywrightTestConfig } from "@playwright/test";
-
 import type { AppEnvTemplate } from "./app-env";
+
 import {
   APP_RUNNER_CONFIG_ENV,
   HANDSHAKE_ENV,

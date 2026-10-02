@@ -1,5 +1,6 @@
-import { useRouter } from "@tanstack/react-router";
 import type { ErrorComponentProps } from "@tanstack/react-router";
+
+import { useRouter } from "@tanstack/react-router";
 import { ApiError } from "@zitadel/api/runtime/fetch";
 import { AlertCircle, Loader2, TriangleAlert } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";

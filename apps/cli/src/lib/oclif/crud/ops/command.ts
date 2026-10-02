@@ -1,9 +1,10 @@
 import type { Command, Interfaces } from "@oclif/core";
 
-import { ZitadelError } from "../../../errors";
-import { BaseCommand } from "../../base";
 import type { CommandResult, GlobalOptions, JsonEnvelope } from "../../types";
 import type { Json, ResourceCommandOptions, ResourceDescriptor } from "../types";
+
+import { ZitadelError } from "../../../errors";
+import { BaseCommand } from "../../base";
 
 /** Everything an operation needs to know about the resource it serves. */
 export type OperationDefinition<Ctx, Spec> = Readonly<{

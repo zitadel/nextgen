@@ -1,8 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/web-components-vite";
+
 import { applyBranding, clearBranding, setupMockHandlers } from "@zitadel/api-mock";
 import { html } from "lit";
 import { initialize, mswLoader } from "msw-storybook-addon";
 import "@zitadel/components";
+
 import { brandingPresets, type BrandingPresetId } from "./branding-presets.js";
 
 // MSW lives only on the orchestrator (the atoms make no requests), so the

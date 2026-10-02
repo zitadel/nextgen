@@ -1,11 +1,10 @@
-import { randomUUID } from "node:crypto";
-import { setTimeout as delay } from "node:timers/promises";
-
 import mixpanelLib, {
   type Mixpanel as MixpanelClient,
   type Modifiers,
   type Properties,
 } from "mixpanel";
+import { randomUUID } from "node:crypto";
+import { setTimeout as delay } from "node:timers/promises";
 
 import { resolveTelemetryHost } from "./config";
 import { resolveConsent } from "./consent";
@@ -148,9 +147,7 @@ export class Telemetry {
    * a synchronous throw or an error callback must not surface to the caller or
    * leak as an unhandled rejection.
    */
-  private enqueue(
-    send: (client: MixpanelClient, done: () => void) => void,
-  ): void {
+  private enqueue(send: (client: MixpanelClient, done: () => void) => void): void {
     const client = this.client;
     if (!client) {
       return;

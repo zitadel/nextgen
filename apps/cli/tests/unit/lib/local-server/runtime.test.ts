@@ -1,7 +1,6 @@
 import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -82,7 +81,8 @@ describe("local server runtime metadata", () => {
   it("treats legacy runtime metadata without backend as Docker metadata", async () => {
     const paths = await ensureLocalState(cwd);
     const metadata = runtimeFor(cwd);
-    const { backend: _backend, ...legacy } = metadata;
+    const legacy: Record<string, unknown> = { ...metadata };
+    delete legacy.backend;
     await writeFile(paths.runtimeFile, `${JSON.stringify(legacy, null, 2)}\n`);
 
     await expect(readRuntimeMetadata(cwd)).resolves.toEqual(metadata);

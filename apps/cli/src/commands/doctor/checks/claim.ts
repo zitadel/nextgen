@@ -1,6 +1,7 @@
+import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
+
 import { CLAIM_WINDOW_DAYS, claimState, type ClaimState } from "../../../lib/claim-state";
 import { readProjectServer, readZitadelConfig, readZitadelSecret } from "../../../lib/project";
-import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
 
 /**
  * Reports whether the project is attached to a team, reading `claimed_at` and

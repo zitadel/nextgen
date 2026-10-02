@@ -1,4 +1,5 @@
 import type { Property } from "../property";
+
 import { envEnabled } from "./env-flag";
 
 /** Coarse CI provider name, or `undefined` when not running in CI. */

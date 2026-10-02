@@ -2,7 +2,6 @@ import { Box } from "lucide-react";
 import { useId, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { MetaItem } from "@/components/ui/meta-item";
 import {
   Combobox,
   ComboboxAnchor,
@@ -13,6 +12,7 @@ import {
   ComboboxTrigger,
   ComboboxValue,
 } from "@/components/ui/combobox";
+import { MetaItem } from "@/components/ui/meta-item";
 
 /** A project the operator can grant access to. */
 export interface ProjectOption {

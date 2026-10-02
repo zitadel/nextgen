@@ -11,7 +11,9 @@ function devScriptOf(source: string): string | undefined {
 
 describe("devScriptPortEdit", () => {
   it("pins the port on a dev script that declares none", () => {
-    const out = devScriptPortEdit("http://localhost:3456")(pkg({ dev: "next dev", build: "next build" }));
+    const out = devScriptPortEdit("http://localhost:3456")(
+      pkg({ dev: "next dev", build: "next build" }),
+    );
     expect(devScriptOf(out)).toBe("next dev --port 3456");
     // Sibling scripts survive untouched.
     expect(devScriptOf(out)).not.toBe(undefined);
@@ -45,7 +47,9 @@ describe("devScriptPortEdit", () => {
   });
 
   it("fails with actionable guidance when package.json is missing", () => {
-    expect(() => devScriptPortEdit("http://localhost:3456")(undefined)).toThrow(/package\.json is required/);
+    expect(() => devScriptPortEdit("http://localhost:3456")(undefined)).toThrow(
+      /package\.json is required/,
+    );
   });
 });
 

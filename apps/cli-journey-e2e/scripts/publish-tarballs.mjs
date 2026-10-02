@@ -1,6 +1,6 @@
+import { spawnSync } from "node:child_process";
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
-import { spawnSync } from "node:child_process";
 
 const tarballsDir = process.argv[2];
 if (!tarballsDir) {
@@ -8,9 +8,7 @@ if (!tarballsDir) {
 }
 
 const registryUrl = process.env.JOURNEY_REGISTRY_URL ?? "http://127.0.0.1:4873";
-const tarballs = (await readdir(tarballsDir))
-  .filter((file) => file.endsWith(".tgz"))
-  .sort();
+const tarballs = (await readdir(tarballsDir)).filter((file) => file.endsWith(".tgz")).sort();
 
 if (tarballs.length === 0) {
   throw new Error(`no .tgz files found in ${tarballsDir}`);

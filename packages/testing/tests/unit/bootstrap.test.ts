@@ -1,8 +1,7 @@
+import { DEFAULT_FLOW_SCHEMA_URI } from "@zitadel/config/defaults";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-
-import { DEFAULT_FLOW_SCHEMA_URI } from "@zitadel/config/defaults";
 
 import { bootstrapProject } from "../../src/bootstrap";
 

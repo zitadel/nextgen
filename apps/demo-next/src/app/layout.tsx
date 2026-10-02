@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+
 import { auth, NextgenProvider } from "@zitadel/sdk-next/server";
 
 export const metadata: Metadata = {

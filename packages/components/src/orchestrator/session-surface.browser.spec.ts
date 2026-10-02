@@ -1,5 +1,6 @@
-import { configureZitadel, _resetConfigForTesting } from "@zitadel/api/config";
 import type { ZitadelProject } from "@zitadel/api/config";
+
+import { configureZitadel, _resetConfigForTesting } from "@zitadel/api/config";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import "./zitadel-session.js";
@@ -136,9 +137,7 @@ describe("<zitadel-session> surface (chromium)", () => {
     const shell = element.shadowRoot?.querySelector("zl-page-shell") as HTMLElement;
     expect(shell.hasAttribute("data-widget")).toBe(false);
     // The page paint lives on the internal page shell, not the session host.
-    expect(element.getBoundingClientRect().height).toBeGreaterThanOrEqual(
-      window.innerHeight - 1,
-    );
+    expect(element.getBoundingClientRect().height).toBeGreaterThanOrEqual(window.innerHeight - 1);
     const surface = shell.shadowRoot?.querySelector(".zr-page-shell") as HTMLElement;
     expect(luminance(getComputedStyle(surface).backgroundColor)).toBeLessThan(60);
 

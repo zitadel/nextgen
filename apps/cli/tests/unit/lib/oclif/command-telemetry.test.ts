@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 
+import type { GlobalOptions } from "../../../../src/lib/oclif/types";
+
 import {
   commandEventProperties,
   deviceProfileProperties,
 } from "../../../../src/lib/oclif/command-telemetry";
-import type { GlobalOptions } from "../../../../src/lib/oclif/types";
 
 function meta(overrides: Partial<GlobalOptions> = {}): GlobalOptions {
   return {
@@ -25,7 +26,10 @@ function meta(overrides: Partial<GlobalOptions> = {}): GlobalOptions {
 
 describe("commandEventProperties", () => {
   it("emits allow-listed dimensions and never the raw source/cwd", () => {
-    const props = commandEventProperties(meta({ source: "https://auth.internal.acme.com/x" }), "sess-1");
+    const props = commandEventProperties(
+      meta({ source: "https://auth.internal.acme.com/x" }),
+      "sess-1",
+    );
     const serialized = JSON.stringify(props);
     expect(serialized).not.toContain("auth.internal.acme.com");
     expect(serialized).not.toContain("/work/app");

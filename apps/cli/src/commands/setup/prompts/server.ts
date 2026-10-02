@@ -1,9 +1,10 @@
 import { select, spinner, text } from "@clack/prompts";
 
+import type { PromptContext, SetupAnswers, SetupPrompt } from "./types";
+
 import { detectHealthyLocalServer } from "../../../lib/local-server/runtime";
 import { DEFAULT_SERVER } from "../../../lib/server";
 import { bail } from "./cancel";
-import type { PromptContext, SetupAnswers, SetupPrompt } from "./types";
 
 /** Sentinel returned by the choice select when the user picks "Custom URL". */
 const CUSTOM = "__custom__";
@@ -86,9 +87,7 @@ async function detectLocalServer(cwd: string): Promise<string | undefined> {
   s.start("Checking for a local Zitadel server");
   const detected = await detectHealthyLocalServer(cwd);
   s.stop(
-    detected
-      ? `Found local Zitadel server at ${detected}.`
-      : "No local Zitadel server detected.",
+    detected ? `Found local Zitadel server at ${detected}.` : "No local Zitadel server detected.",
   );
   return detected;
 }

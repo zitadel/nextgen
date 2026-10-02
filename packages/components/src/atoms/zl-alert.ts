@@ -1,14 +1,13 @@
 import { LitElement, html } from "lit";
 import { customElement, property } from "lit/decorators.js";
 
-import alertStyles from "./zl-alert.css?inline";
+import type { AtomManifest } from "../manifest.js";
+import type { IconName } from "./zl-icon.js";
 
 import { emit } from "../internal/emit.js";
-import type { AtomManifest } from "../manifest.js";
 import { baseHostStyles, surfaceStyles } from "../styles/index.js";
-
 import "./zl-icon.js";
-import type { IconName } from "./zl-icon.js";
+import alertStyles from "./zl-alert.css?inline";
 
 /**
  * Atom: `<zl-alert>` — inline status message replacing the legacy
@@ -48,12 +47,10 @@ import type { IconName } from "./zl-icon.js";
  */
 @customElement("zl-alert")
 export class ZlAlert extends LitElement {
-  static override styles = [
-    baseHostStyles,
-    ...surfaceStyles(alertStyles),
-  ];
+  static override styles = [baseHostStyles, ...surfaceStyles(alertStyles)];
 
-  @property({ reflect: true }) accessor severity: "error" | "success" | "warning" | "info" = "error";
+  @property({ reflect: true }) accessor severity: "error" | "success" | "warning" | "info" =
+    "error";
 
   @property() accessor heading: string | undefined = undefined;
 
@@ -70,7 +67,9 @@ export class ZlAlert extends LitElement {
       >
         <zl-icon class="zr-alert__icon" part="icon" name=${iconName} size="16" decorative></zl-icon>
         <div class="zr-alert__body" part="body">
-          ${this.heading ? html`<span class="zr-alert__title" part="title">${this.heading}</span>` : null}
+          ${this.heading
+            ? html`<span class="zr-alert__title" part="title">${this.heading}</span>`
+            : null}
           <div class="zr-alert__message" part="message">
             <slot></slot>
           </div>

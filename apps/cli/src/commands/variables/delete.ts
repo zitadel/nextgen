@@ -1,11 +1,11 @@
-import { Args, Flags } from "@oclif/core";
 import { cancel, confirm, isCancel } from "@clack/prompts";
+import { Args, Flags } from "@oclif/core";
 
+import { ZitadelError } from "../../lib/errors";
 import { CommandGroups, OwnerCommand, type JsonEnvelope } from "../../lib/oclif";
 import { dryRunResult } from "../../lib/oclif/crud/shared";
-import { ZitadelError } from "../../lib/errors";
-import { assertVariableName } from "../../lib/variables";
 import { publicCliCommand } from "../../lib/public-cli";
+import { assertVariableName } from "../../lib/variables";
 
 /**
  * The `variables delete` topic command — remove one variable from the project

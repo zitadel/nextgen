@@ -1,3 +1,5 @@
+import type { Detector } from "./types";
+
 import { AngularDetector } from "./angular";
 import { NextDetector } from "./next";
 import { NuxtDetector } from "./nuxt";
@@ -6,7 +8,6 @@ import { ReactDetector } from "./react";
 import { SolidDetector } from "./solid";
 import { SvelteDetector } from "./svelte";
 import { VueDetector } from "./vue";
-import type { Detector } from "./types";
 
 /**
  * Active detectors, in probe order. The orchestrator tries each until one

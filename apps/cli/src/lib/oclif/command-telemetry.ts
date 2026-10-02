@@ -1,4 +1,6 @@
 import type { Properties } from "../telemetry";
+import type { GlobalOptions } from "./types";
+
 import { ciFlag } from "../telemetry/dimensions/ci-flag";
 import { ciProvider } from "../telemetry/dimensions/ci-provider";
 import { country } from "../telemetry/dimensions/country";
@@ -6,7 +8,6 @@ import { hostAgent } from "../telemetry/dimensions/host-agent";
 import { invocationChannel } from "../telemetry/dimensions/invocation-channel";
 import { operatingSystem } from "../telemetry/dimensions/operating-system";
 import { serverKind } from "./server-kind";
-import type { GlobalOptions } from "./types";
 
 /**
  * CLI-specific telemetry glue: the only place that turns a {@link GlobalOptions}

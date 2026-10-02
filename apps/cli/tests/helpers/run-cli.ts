@@ -1,7 +1,6 @@
+import { run } from "@oclif/core";
 import { readFileSync } from "node:fs";
 import { format } from "node:util";
-
-import { run } from "@oclif/core";
 
 import { publicCliCommand } from "../../src/lib/public-cli";
 import { cliPackageRoot } from "./oclif-build";

@@ -1,10 +1,10 @@
 import { LitElement, html } from "lit";
 import { customElement, property } from "lit/decorators.js";
 
-import cardStyles from "./zl-card.css?inline";
-
 import type { AtomManifest } from "../manifest.js";
+
 import { baseHostStyles, surfaceStyles } from "../styles/index.js";
+import cardStyles from "./zl-card.css?inline";
 
 /**
  * Atom: `<zl-card>` — the auth-card surface used by every flow screen.

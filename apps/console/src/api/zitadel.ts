@@ -35,8 +35,7 @@ import { configureZitadel, getApi } from "@zitadel/api/config";
  * `VITE_CONSOLE_API_BASE` as unset, so the client must too — with `??`, a
  * present-but-empty var in a shell or CI would silently bypass the dev proxy.
  */
-export const apiBase =
-  import.meta.env.VITE_CONSOLE_API_BASE || (import.meta.env.DEV ? "/api" : "");
+export const apiBase = import.meta.env.VITE_CONSOLE_API_BASE || (import.meta.env.DEV ? "/api" : "");
 
 /**
  * The app-wide `ZitadelProject` handle — root ADR 016: configure once,

@@ -29,8 +29,8 @@ import {
 } from "@/components/ui/table";
 
 import { api } from "../../../api/zitadel";
-import { formatDate } from "../../../lib/date";
 import { sanitizeNextPath } from "../../../auth/session";
+import { formatDate } from "../../../lib/date";
 import { useProjectScope, useSelectProjectTarget } from "../../../lib/project-scope";
 
 /**
@@ -208,7 +208,6 @@ function ProjectsScreen() {
     </div>
   );
 }
-
 
 /**
  * The row menu.

@@ -30,13 +30,13 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 import type { NavGroup } from "../../nav";
+
 import { type ThemePreference, useTheme } from "../../theme";
 import { ContextSwitcher } from "./ContextSwitcher";
 import { ZitadelLogo } from "./icons";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-
 import { useNavItems } from "./use-nav-items";
 
 /**
@@ -406,7 +406,9 @@ function ContextBar() {
     <div className="sticky top-0 z-10 flex items-start justify-between gap-4 bg-background px-2 py-3 md:items-center md:px-4">
       <div className="flex min-w-0 flex-1 flex-col gap-2 md:flex-row md:items-center">
         {/* Desktop only — mobile keeps the persistent Sidebar 07. icon rail. */}
-        {state === "expanded" && <SidebarTrigger className="hidden text-foreground md:inline-flex" />}
+        {state === "expanded" && (
+          <SidebarTrigger className="hidden text-foreground md:inline-flex" />
+        )}
         <ContextSwitcher />
       </div>
       <ThemeToggle />

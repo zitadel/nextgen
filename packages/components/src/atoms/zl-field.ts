@@ -1,20 +1,20 @@
 import type { CreateFlow201StepFieldsItemType } from "@zitadel/api/generated/model";
+
 import { LitElement, html, nothing, type PropertyValues } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import { ifDefined } from "lit/directives/if-defined.js";
 import { live } from "lit/directives/live.js";
 
-import fieldStyles from "./zl-field.css?inline";
+import type { AtomManifest } from "../manifest.js";
+import type { IconName } from "./zl-icon.js";
 
 import { emit } from "../internal/emit.js";
 import { hookName } from "../internal/hook-name.js";
 import { nextUid } from "../internal/unique-id.js";
-import type { AtomManifest } from "../manifest.js";
 import { baseHostStyles, surfaceStyles } from "../styles/index.js";
-
 import "./zl-icon.js";
-import type { IconName } from "./zl-icon.js";
+import fieldStyles from "./zl-field.css?inline";
 
 /**
  * Alias of the orval-generated wire enum for field types so the atom's
@@ -53,10 +53,7 @@ export class ZlField extends LitElement {
     delegatesFocus: true,
   };
 
-  static override styles = [
-    baseHostStyles,
-    ...surfaceStyles(fieldStyles),
-  ];
+  static override styles = [baseHostStyles, ...surfaceStyles(fieldStyles)];
 
   /**
    * Field name — used as the key in form submission and in `zl-input` event
@@ -176,8 +173,7 @@ export class ZlField extends LitElement {
       "zr-field--success": showSuccess,
       "zr-field--disabled": this.disabled,
     });
-    const showDefaultTrailing =
-      this.trailingIcon && !this.hasSuffixSlot && !this.disabled;
+    const showDefaultTrailing = this.trailingIcon && !this.hasSuffixSlot && !this.disabled;
     const trailing = showDefaultTrailing ? this.renderTrailingIcon() : null;
     const wrapClass = classMap({
       "zr-field__wrap": true,
@@ -256,9 +252,7 @@ export class ZlField extends LitElement {
     return html`
       <label class="zr-field__label" part="label" id=${labelId} for=${this.inputId}>
         <span>${this.label}</span>
-        ${this.required
-          ? html`<span class="zr-field__required" aria-hidden="true">*</span>`
-          : null}
+        ${this.required ? html`<span class="zr-field__required" aria-hidden="true">*</span>` : null}
       </label>
     `;
   }

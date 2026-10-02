@@ -1,8 +1,7 @@
-import { setTimeout as sleep } from "node:timers/promises";
-
 import { Flags } from "@oclif/core";
 import { ApiError } from "@zitadel/api/runtime/fetch";
 import consola from "consola";
+import { setTimeout as sleep } from "node:timers/promises";
 
 import { createZitadelClient } from "../lib/api-client";
 import { wrapForBox } from "../lib/box";
@@ -125,7 +124,8 @@ export default class Claim extends BaseCommand {
         data: {
           title: "Zitadel claim was not started.",
           project_id: secret.project_id,
-          would: "Open a browser to claim this project, then record the owning team in .zitadel/secret.",
+          would:
+            "Open a browser to claim this project, then record the owning team in .zitadel/secret.",
         },
         nextCommands: ["zitadel claim"],
       });

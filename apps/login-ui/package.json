@@ -8,7 +8,8 @@
     "preview": "vite preview --host 0.0.0.0",
     "typecheck": "tsc --noEmit -p tsconfig.app.json",
     "test": "vitest run",
-    "test:all": "pnpm run test"
+    "test:all": "pnpm run test",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@zitadel/components": "workspace:*",
@@ -16,6 +17,7 @@
   },
   "devDependencies": {
     "@types/node": "catalog:",
+    "@zitadel/eslint-config": "workspace:*",
     "typescript": "catalog:",
     "vite": "catalog:"
   }

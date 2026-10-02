@@ -237,10 +237,7 @@ function ProfileField({ label, value }: { label: string; value: string }) {
 
   return (
     <Field>
-      <FieldLabel
-        htmlFor={id}
-        className="text-foreground font-serif text-sm leading-5 font-normal"
-      >
+      <FieldLabel htmlFor={id} className="text-foreground font-serif text-sm leading-5 font-normal">
         {label}
       </FieldLabel>
       {/* `bg-background`, not the card's own fill: the design resolves the input
@@ -266,4 +263,3 @@ function userMetadata(user: Record<string, unknown>): { status?: string; created
   const record = metadata as Record<string, unknown>;
   return { status: field(record, "status"), createdAt: field(record, "created_at") };
 }
-

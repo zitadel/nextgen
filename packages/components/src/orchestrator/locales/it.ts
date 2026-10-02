@@ -77,8 +77,7 @@ export const it: Locale = {
   // Step: collect-passkey-email (solo e-mail — registrazione solo passkey)
   // ═══════════════════════════════════════════════════════════════════════════
   "collect-passkey-email.title": "Crea il tuo account",
-  "collect-passkey-email.description":
-    "Inserisci la tua e-mail per configurare una passkey",
+  "collect-passkey-email.description": "Inserisci la tua e-mail per configurare una passkey",
   "collect-passkey-email.field.email": "E-mail",
   "collect-passkey-email.field.email.placeholder": "tu@esempio.com",
   "collect-passkey-email.action.submit": "Continua",

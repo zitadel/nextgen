@@ -1,8 +1,3 @@
-import { chmod, mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
-import { createServer } from "node:http";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-
 import {
   resetPlatformStore,
   setupPlatformHandlers,
@@ -10,6 +5,10 @@ import {
 } from "@zitadel/api-mock/platform";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
+import { chmod, mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
+import { createServer } from "node:http";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { parseJson, runCliForTest } from "../helpers/run-cli";
@@ -93,15 +92,17 @@ describe("Next setup integration", () => {
     expect(setupJson.data.next_actions.join("\n")).toContain("/profile shows Signed in");
     expect(setupJson.data.next_actions.join("\n")).toContain(".zitadel/schemas/");
     expect(setupJson.data.next_actions.join("\n")).toContain(".zitadel/flows/");
-    expect(setupJson.data.next_actions.join("\n")).toContain("See your changes before they go live");
+    expect(setupJson.data.next_actions.join("\n")).toContain(
+      "See your changes before they go live",
+    );
     // Setup never applies a login template (#1039): no branding files, no
     // design in the envelope, and the look guidance points at the opt-in.
     expect(setupJson.data).not.toHaveProperty("design");
     expect(setupJson.data.next_actions.join("\n")).toContain("branding eject");
     expect(setupJson.data.next_actions.join("\n")).not.toMatch(/revision 1/i);
-    expect(
-      setupJson.data.files_written.some((path) => path.startsWith(".zitadel/branding/")),
-    ).toBe(false);
+    expect(setupJson.data.files_written.some((path) => path.startsWith(".zitadel/branding/"))).toBe(
+      false,
+    );
     expect(setupJson.data.files_written).toContain(".zitadel/schemas/default-human-user.json");
     expect(setupJson.data.files_written).toContain(".zitadel/flows/default-login.json");
     // files_written carries deduplicated file paths only: no directories,
@@ -391,7 +392,14 @@ describe("Next setup integration", () => {
 
   it("refuses setup below the Next 15 floor with an explicit error", async () => {
     const cwd = await createNextProject("^14.2.0");
-    const setup = await cli(["setup", "--cwd", cwd, "--non-interactive", "--json", "--skip-install"]);
+    const setup = await cli([
+      "setup",
+      "--cwd",
+      cwd,
+      "--non-interactive",
+      "--json",
+      "--skip-install",
+    ]);
     // ADR 043: unsupported versions are a loud gate, never a silent
     // narrowing — the envelope carries the machine code and the floor.
     expect(setup.exitCode).toBe(3);
@@ -409,7 +417,14 @@ describe("Next setup integration", () => {
     // upgrade hint, not a generic validation error recommending --fix (which
     // cannot repair an unsupported version).
     const cwd = await createNextProject();
-    const setup = await cli(["setup", "--cwd", cwd, "--non-interactive", "--json", "--skip-install"]);
+    const setup = await cli([
+      "setup",
+      "--cwd",
+      cwd,
+      "--non-interactive",
+      "--json",
+      "--skip-install",
+    ]);
     expect(setup.exitCode).toBe(0);
     const pkgPath = join(cwd, "package.json");
     const pkg = JSON.parse(await readFile(pkgPath, "utf8")) as {
@@ -432,7 +447,14 @@ describe("Next setup integration", () => {
 
   it("skips rerun setup without rewriting edited schema or flow config", async () => {
     const cwd = await createNextProject();
-    const setup = await cli(["setup", "--cwd", cwd, "--non-interactive", "--json", "--skip-install"]);
+    const setup = await cli([
+      "setup",
+      "--cwd",
+      cwd,
+      "--non-interactive",
+      "--json",
+      "--skip-install",
+    ]);
     expect(setup.exitCode).toBe(0);
 
     const flowPath = join(cwd, ".zitadel/flows/default-login.json");
@@ -442,7 +464,14 @@ describe("Next setup integration", () => {
     await writeFile(flowPath, editedFlow);
     await writeFile(schemaPath, editedSchema);
 
-    const rerun = await cli(["setup", "--cwd", cwd, "--non-interactive", "--json", "--skip-install"]);
+    const rerun = await cli([
+      "setup",
+      "--cwd",
+      cwd,
+      "--non-interactive",
+      "--json",
+      "--skip-install",
+    ]);
     expect(rerun.exitCode).toBe(0);
     expect((parseJson(rerun.stdout) as { status: string }).status).toBe("skipped");
     await expect(readFile(flowPath, "utf8")).resolves.toBe(editedFlow);
@@ -459,7 +488,14 @@ describe("Next setup integration", () => {
       ),
     );
 
-    const failed = await cli(["setup", "--cwd", cwd, "--non-interactive", "--json", "--skip-install"]);
+    const failed = await cli([
+      "setup",
+      "--cwd",
+      cwd,
+      "--non-interactive",
+      "--json",
+      "--skip-install",
+    ]);
     expect(failed.exitCode).not.toBe(0);
     expect((parseJson(failed.stdout) as { status: string }).status).toBe("error");
     // The skip marker must be gone — otherwise every rerun reports
@@ -730,7 +766,6 @@ describe("Next setup integration", () => {
     const planAfterJson = parseJson(planAfter.stdout) as { data: { total: number } };
     expect(planAfterJson.data.total).toBe(0);
   });
-
 });
 
 async function createNextProject(nextVersion = "^16.0.0"): Promise<string> {

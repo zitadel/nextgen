@@ -1,5 +1,4 @@
 import { resolve } from "node:path";
-
 import { describe, expect, it } from "vitest";
 
 import { MANAGED_MARKER, resolveCwd } from "../../../src/lib/paths";

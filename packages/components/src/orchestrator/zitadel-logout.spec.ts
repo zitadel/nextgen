@@ -1,8 +1,7 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-
+import { configureZitadel, _resetConfigForTesting } from "@zitadel/api/config";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
-import { configureZitadel, _resetConfigForTesting } from "@zitadel/api/config";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import "./zitadel-logout.js";
 import type { ZitadelLogout } from "./zitadel-logout.js";

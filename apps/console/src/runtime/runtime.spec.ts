@@ -175,7 +175,9 @@ describe("retryRuntime", () => {
     fetchMock.mockRejectedValueOnce(new TypeError("network down"));
     expect(await initRuntime()).toMatchObject({ ok: false });
 
-    fetchMock.mockResolvedValue(jsonResponse({ mode: "standalone", console_project_id: "proj_up" }));
+    fetchMock.mockResolvedValue(
+      jsonResponse({ mode: "standalone", console_project_id: "proj_up" }),
+    );
 
     expect(await retryRuntime()).toEqual({
       ok: true,
