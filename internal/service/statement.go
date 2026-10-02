@@ -32,6 +32,7 @@ type AllStatements interface {
 	EnvironmentStatements
 	ReleaseStatements
 	IDPConnectionStatements
+	IDPIdentityLinkStatements
 	DeploymentStatements
 	TeamStatements
 	TeamMembershipStatements
@@ -183,6 +184,11 @@ type IDPConnectionStatements interface {
 	// one connection created in the same instant have no newest, so the second
 	// returns *database.UniqueError.
 	ReviseIDPConnection(ctx context.Context, entity *domain.IDPConnection) error
+	// LockIDPConnection takes the connection row's write lock for the rest of
+	// the transaction, so concurrent revisions of one connection serialize. It
+	// must be called inside a transaction. An unknown id returns
+	// *database.NoRowFoundError.
+	LockIDPConnection(ctx context.Context, projectID, id string) error
 	// GetIDPConnection returns the connection matching filter at its newest
 	// revision. No match returns *database.NoRowFoundError.
 	GetIDPConnection(ctx context.Context, filter database.Filter[domain.IDPConnectionField]) (*domain.IDPConnection, error)
@@ -198,6 +204,20 @@ type IDPConnectionStatements interface {
 	// the cursor. An unknown connection returns an empty page, so a handler
 	// needs GetIDPConnection to tell that from a connection with no revisions.
 	ListIDPConnectionRevisions(ctx context.Context, projectID, connectionID string, page database.Page[domain.IDPConnectionField]) (*database.ListResult[*domain.IDPConnection], error)
+}
+
+// IDPIdentityLinkStatements stores which user a provider subject resolves to.
+type IDPIdentityLinkStatements interface {
+	Statements
+	// CreateIDPIdentityLink inserts one link and sets its id and CreatedAt. It
+	// runs on the caller's executor, so inside pool.Transaction the user and its
+	// first link commit together. A second link for the same (project_id,
+	// connection_id, subject) returns *database.UniqueError. An unknown user or
+	// connection returns *database.ForeignKeyError.
+	CreateIDPIdentityLink(ctx context.Context, link *domain.IDPIdentityLink) error
+	// GetIDPIdentityLink returns the link matching filter. No match returns
+	// *database.NoRowFoundError.
+	GetIDPIdentityLink(ctx context.Context, filter database.Filter[domain.IDPIdentityLinkField]) (*domain.IDPIdentityLink, error)
 }
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods

@@ -176,7 +176,8 @@ marked platform project, there is no guess left to override, so the pin is
 removed rather than carried forward — a second, configurable answer to
 "which project is the platform project" would just reintroduce the ambiguity
 the marker removes. `VITE_CONSOLE_PROJECT_ID` is unaffected; it is a
-development-only client override (§3), not a deployment fact.
+development-only client override (§3), not a deployment fact. *(It has since
+been removed as well; see the amendment at the end of §3.)*
 
 Deployments that already hold customer projects but no reserved platform
 project get **no adoption path**. They are recreated, consistent with the alpha
@@ -280,6 +281,15 @@ authorized API data loaded after sign-in.
 it does not choose a different Console login project and does not grant access.
 `VITE_CONSOLE_PROJECT_ID` remains a development-only override.
 
+> **Amendment (2026-09-30, asked in #1300, removed in #1345):**
+> `VITE_CONSOLE_PROJECT_ID` is removed. Development takes the sign-in project
+> from `runtime.json` like production: `console:dev-real` and the real e2e lane
+> serve the document from their instance (the seeded project, or
+> `proj_platform` with bootstrap in claim mode), and the api-mock serves one
+> naming its platform project. The pin had also
+> preferred a default selection among the operator's projects; the default is
+> now their only project, or none.
+
 ### 4. The embedded Console uses a first-party session credential
 
 The Console performs same-origin API calls with its HttpOnly
@@ -300,6 +310,12 @@ not the embedded deployment contract. Until the session resolver and the
 required assignments exist, management calls fail closed. The Console must
 not compensate by exposing a secret or treating every authenticated platform
 user as an administrator.
+
+> **Amendment (2026-09-25, #1300):** the bridge is gone. The management
+> operations the Console uses accept the session cookie and authorize it through
+> the signed-in person's grants on the target project, and the Vite dev proxy no
+> longer injects a project secret — it forwards requests as-is. Dev and the
+> embedded build take the same credential path.
 
 ### 5. Portal surfaces render from effective permissions
 

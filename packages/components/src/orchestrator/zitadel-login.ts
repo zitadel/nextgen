@@ -31,7 +31,7 @@ import { resolveLogoUrl } from "./branding.js";
 import type { ResolvedTheme } from "./theme-controller.js";
 import type { Branding } from "./branding.js";
 import { stampExportparts } from "./exportparts.js";
-import { createLiquidEngine, localiseFlowErrorKeys } from "./liquid.js";
+import { createLiquidEngine, localiseFlowErrorKeys, parseSsoError } from "./liquid.js";
 import { en, builtinLocales, type Locale } from "./locales/index.js";
 import { patchMandatoryGates } from "./mandatory-gates.js";
 import { resolveApi, type ProjectAttrs } from "./resolve-api.js";
@@ -50,6 +50,13 @@ import layoutChromeCss from "./templates/layout-chrome.css?inline";
  * change here.
  */
 type FieldAtom = HTMLElement & { formValue: string };
+
+/**
+ * The reserved action that starts an external sign-in, fixed by the flow
+ * submit contract (`flow-submit-request.yaml`): it is the one action name the
+ * engine interprets itself rather than looking up in the step's actions.
+ */
+const SSO_ACTION = "sso";
 
 /** Narrow a rendered named element to the `formValue` field-atom contract. */
 function isFieldAtom(el: Element): el is FieldAtom {
@@ -88,6 +95,33 @@ function isFieldAtom(el: Element): el is FieldAtom {
  * - `docs/design/branding/form-participation.md`
  * - `docs/design/flowengine/template-security.md`
  */
+
+/**
+ * The flow handle a provider callback left in the URL, if any.
+ *
+ * The identity-provider callback finishes by navigating the browser back to
+ * the page the sign-in started on with `?flow=<id>` appended -- a full page
+ * load, so nothing of the previous document survives to carry the handle.
+ * Reading it here means every host page resumes correctly without code of its
+ * own; doing it per framework would mean the same few lines in each of the
+ * scaffolded templates, and a page that forgot them would silently restart the
+ * flow instead of completing the sign-in.
+ *
+ * A handle from the URL is not a capability: `GET /flow/{id}` only answers
+ * when the sealed flow cookie names that same id, so an id someone else put
+ * there resolves to nothing.
+ */
+function flowIdFromLocation(): string {
+  if (typeof window === "undefined") {
+    return "";
+  }
+  try {
+    return new URLSearchParams(window.location.search).get("flow") ?? "";
+  } catch {
+    return "";
+  }
+}
+
 @customElement("zitadel-login")
 export class ZitadelLogin extends ZitadelSurface {
   static override shadowRootOptions: ShadowRootInit = {
@@ -162,6 +196,10 @@ export class ZitadelLogin extends ZitadelSurface {
    * the orchestrator hits `GET /flow/{id}` instead of `POST /flow` on
    * mount, so a page reload after a network blip can re-render the same
    * step without losing collected state.
+   *
+   * Leaving it empty falls back to the `flow` query parameter, which is how a
+   * provider callback hands the flow back (see {@link flowIdFromLocation}), so
+   * a host page needs no code of its own for external sign-in to finish.
    */
   @property({ type: String, attribute: "resume-flow-id" }) accessor resumeFlowId = "";
 
@@ -278,6 +316,10 @@ export class ZitadelLogin extends ZitadelSurface {
       // <zl-passkey> emits `zl-passkey-error` when the ceremony fails or is
       // cancelled. Surface the error on the current step.
       root.addEventListener("zl-passkey-error", this.handlePasskeyError as EventListener);
+      // <zl-sso-providers> emits `zl-sso-select` when a provider button is
+      // chosen. The answer is a non-terminal step carrying `redirect_url`,
+      // which `applyResponse` follows on its way out.
+      root.addEventListener("zl-sso-select", this.handleSsoSelect as EventListener);
     }
     return root;
   }
@@ -511,10 +553,8 @@ export class ZitadelLogin extends ZitadelSurface {
 
   /**
    * "Secured with Zitadel" attribution chrome injected into every
-   * template's page-shell footer slot. Controlled by
-   * `branding.attribution.show_zitadel` — defaults to `true` for
-   * community / OSS deployments. Licensed tenants can suppress the badge
-   * entirely or swap it for a `custom_link` value.
+   * template's page-shell footer slot. Reads `branding.attribution`, which
+   * the wire contract does not carry, so the mark always renders.
    */
   private renderAttributionHtml(placement: "footer" | "inline" = "footer"): string {
     const attribution = this.branding?.attribution;
@@ -557,8 +597,9 @@ export class ZitadelLogin extends ZitadelSurface {
       // unhandled promise rejection from `firstUpdated`'s microtask.
       const { project: cfg, api } = resolveApi(this.project, this.projectAttrs, "<zitadel-login>");
       let wire: CreateFlow201;
-      if (this.resumeFlowId) {
-        wire = await getCurrentStep(api, this.resumeFlowId);
+      const resumeId = this.resumeFlowId || flowIdFromLocation();
+      if (resumeId) {
+        wire = await getCurrentStep(api, resumeId);
       } else {
         if (!cfg.projectId) {
           throw new Error(
@@ -679,7 +720,33 @@ export class ZitadelLogin extends ZitadelSurface {
       }
     }
 
+    if (this.maybeRedirectToProvider(wire)) return;
     void this.maybeCompleteFlow(wire);
+  }
+
+  /**
+   * Hand the browser to an identity provider.
+   *
+   * `step.redirect_url` is the engine's answer to `action: "sso"`: a full-page
+   * navigation to the provider's authorization endpoint, which is the only way
+   * the user can authenticate there. It is not a completion — the flow resumes
+   * when the provider returns to the callback — so it is deliberately separate
+   * from {@link maybeCompleteFlow} and emits its own event rather than
+   * `zitadel-flow-complete`, which hosts treat as "signed in".
+   *
+   * Returns whether it navigated, so the caller can stop.
+   */
+  private maybeRedirectToProvider(response: CreateFlow201): boolean {
+    const target = response.step.redirect_url;
+    // A terminal step carries `redirect_url` too — the engine copies the
+    // relying party's `redirect_uri` onto it when a sign-in completes
+    // (`terminate()` in flow_state_machine.go). That is a finished sign-in,
+    // not a trip to a provider, and it belongs to `maybeCompleteFlow`.
+    if (!target || response.step.complete) return false;
+    emit(this, "zitadel-flow-redirect", { redirect_url: target, step: response.step });
+    if (typeof window === "undefined") return false;
+    window.location.assign(target);
+    return true;
   }
 
   /**
@@ -741,7 +808,8 @@ export class ZitadelLogin extends ZitadelSurface {
     // localise via the catalog with generic per-rule fallbacks; anything
     // else (outcome names, diagnostics) stays verbatim.
     const rawErrors: FlowError[] = step.error
-      ? (localiseFlowErrorKeys(step.error, {
+      ? (parseSsoError(step.error) ??
+        localiseFlowErrorKeys(step.error, {
           locale: this.resolveLocale(),
           stepName: step.name ?? "",
           // Inline-routed keys downgrade to a banner message when the
@@ -1021,6 +1089,21 @@ export class ZitadelLogin extends ZitadelSurface {
     void this.submit(event.detail?.action ?? null);
   };
 
+  /**
+   * A provider was chosen. `sso` is the reserved action the flow contract
+   * defines for this, carrying the connection id the button reported.
+   *
+   * Nothing is released afterwards: submitting re-renders the step, which
+   * replaces the provider atom outright, and a failed submit re-renders it
+   * again with `loading` back to false — so the buttons come back enabled on
+   * their own.
+   */
+  private handleSsoSelect = (event: CustomEvent<{ providerId?: string }>): void => {
+    const providerId = event.detail?.providerId;
+    if (this.loading || !providerId) return;
+    void this.submit(SSO_ACTION, undefined, providerId);
+  };
+
   /** Secondary navigation rows (`data-action` on `.zl-card-nav__link`). */
   private handleDelegatedAction = (event: Event): void => {
     const target = (event.target as HTMLElement | null)?.closest<HTMLElement>("[data-action]");
@@ -1153,6 +1236,7 @@ export class ZitadelLogin extends ZitadelSurface {
   private async submit(
     action: string | null,
     challengeResponse?: SubmitFlowStepBodyChallengeResponse,
+    ssoProviderId?: string,
   ): Promise<void> {
     if (!this.response || this.loading) return;
     const { id, session_token } = this.response;
@@ -1168,6 +1252,7 @@ export class ZitadelLogin extends ZitadelSurface {
         action: action ?? "submit",
         fields,
         ...(challengeResponse ? { challenge_response: challengeResponse } : {}),
+        ...(ssoProviderId ? { sso_provider_id: ssoProviderId } : {}),
       };
       const { api } = resolveApi(this.project, this.projectAttrs, "<zitadel-login>");
       const wire = await apiSubmitStep(api, id, body);
@@ -1264,6 +1349,10 @@ function isAllowedSelectValue(field: CreateFlow201StepFieldsItem, value: string)
  * is the flow's own last word — it still renders.
  */
 function navigatesOnComplete(wire: CreateFlow201, postSignInUrl: string | undefined): boolean {
+  // A non-terminal step carrying `redirect_url` hands the browser to an
+  // identity provider mid-flow — the flow is not finished, but this document
+  // is leaving, so the step must not paint either.
+  if (wire.step.redirect_url && !wire.step.complete) return true;
   const behavior = wire.step.complete;
   if (behavior === "redirect") return Boolean(wire.redirect_uri);
   if (behavior === "show") return Boolean(wire.handoff_token && postSignInUrl);

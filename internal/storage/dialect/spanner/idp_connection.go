@@ -20,6 +20,9 @@ const (
 	// The revision's created_at is served as UpdatedAt, so the insert returns
 	// it. This is also the whole of a revise, where the foreign key on
 	// (project_id, connection_id) reports an unknown connection.
+	// The default CURRENT_TIMESTAMP() is taken when this statement runs, after
+	// the revise transaction read the connection row, so revision order follows
+	// lock order.
 	createIDPConnectionRevisionStmt = `INSERT INTO idp_connection_revisions ` +
 		`(project_id, id, connection_id, document) VALUES (@p1, @p2, @p3, @p4) THEN RETURN created_at`
 
@@ -28,6 +31,8 @@ const (
 	// a connection nobody revised would look edited.
 	createFirstIDPConnectionRevisionStmt = `INSERT INTO idp_connection_revisions ` +
 		`(project_id, id, connection_id, document, created_at) VALUES (@p1, @p2, @p3, @p4, @p5)`
+
+	lockIDPConnectionStmt = `SELECT id FROM idp_connections WHERE project_id = @p1 AND id = @p2 FOR UPDATE`
 
 	// One row per revision, carrying its connection's identity. The last column
 	// is the revision's created_at, which reads serve as UpdatedAt.
@@ -74,7 +79,7 @@ func (s idpConnectionStatements) CreateIDPConnection(ctx context.Context, entity
 		// insert must bind the value this attempt returned, not one an earlier
 		// attempt left on the entity.
 		var createdAt time.Time
-		if err := tx.Write(ctx, stmt, scanIDPConnectionTimestamp(&createdAt)); err != nil {
+		if err := tx.Write(ctx, stmt, scanReturnedTimestamp(&createdAt)); err != nil {
 			return err
 		}
 		revision := buildStatement(createFirstIDPConnectionRevisionStmt,
@@ -115,16 +120,16 @@ func (s idpConnectionStatements) ReviseIDPConnection(ctx context.Context, entity
 		entity.ID,
 		document,
 	).statement()
-	if err := s.db.Write(ctx, revision, scanIDPConnectionTimestamp(&entity.UpdatedAt)); err != nil {
+	if err := s.db.Write(ctx, revision, scanReturnedTimestamp(&entity.UpdatedAt)); err != nil {
 		return idpconnection.ReviseNotFound(err)
 	}
 	entity.RevisionID = revisionID
 	return nil
 }
 
-// scanIDPConnectionTimestamp reads the created_at a write returned into dst,
+// scanReturnedTimestamp reads the created_at a write returned into dst,
 // in UTC like the reads.
-func scanIDPConnectionTimestamp(dst *time.Time) func(*spanner.RowIterator) error {
+func scanReturnedTimestamp(dst *time.Time) func(*spanner.RowIterator) error {
 	return func(iter *spanner.RowIterator) error {
 		_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
 			if err := row.Columns(dst); err != nil {
@@ -135,6 +140,21 @@ func scanIDPConnectionTimestamp(dst *time.Time) func(*spanner.RowIterator) error
 		})
 		return err
 	}
+}
+
+// LockIDPConnection implements [service.IDPConnectionStatements].
+//
+// FOR UPDATE takes an exclusive lock on the connection row. A plain read would
+// take only a shared lock, which two revises can hold at once, so both would
+// read the same newest revision and both commit. With the exclusive lock a
+// concurrent revise of the same connection aborts, and ReadWriteTransaction
+// replays it after the first commits. The emulator cannot prove this: it runs
+// one read-write transaction at a time process-wide.
+func (s idpConnectionStatements) LockIDPConnection(ctx context.Context, projectID, id string) error {
+	return s.db.Query(ctx, buildStatement(lockIDPConnectionStmt, projectID, id).statement(), func(iter *spanner.RowIterator) error {
+		_, err := collectOneRow(iter, func(*spanner.Row) (struct{}, error) { return struct{}{}, nil })
+		return err
+	})
 }
 
 // GetIDPConnection implements [service.IDPConnectionStatements].

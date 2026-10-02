@@ -7,8 +7,8 @@
  * the orchestrator's vocabulary (`BrandingPalette`, `BrandingShape`) without a
  * second definition that can drift from the revision it paints.
  *
- * `attribution` is the one genuine client extension: it is a property of the
- * embedding, not of the stored revision.
+ * `attribution` is the one client extension: the stored revision has no such
+ * field.
  */
 import type {
   CreateFlow201Branding,
@@ -75,10 +75,9 @@ export function resolveLogoUrl(
 /**
  * Wire shape plus the embedding-owned attribution block.
  *
- * `attribution.show_zitadel` controls the "Secured with Zitadel" pill in
- * the orchestrator footer. Tenants set it to `false` only when they have a
- * licence that permits removing attribution (community / OSS deployments
- * always show it).
+ * `attribution.show_zitadel` controls the "Secured with Zitadel" mark in
+ * the orchestrator footer. The wire contract has no such field, so a flow
+ * response never carries it and the mark always renders.
  */
 export type Branding = CreateFlow201Branding & {
   attribution?: BrandingAttribution;

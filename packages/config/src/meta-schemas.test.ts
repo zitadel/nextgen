@@ -155,6 +155,7 @@ describe("meta-schemas", () => {
       return flow;
     };
     const provider = "google";
+    const providers = (n: number): string[] => Array.from({ length: n }, (_, i) => `idp-${i}`);
     const cases: Array<[string, Record<string, unknown>, boolean]> = [
       ["sso_providers without transitions", { sso_providers: [provider] }, false],
       [
@@ -166,6 +167,16 @@ describe("meta-schemas", () => {
         "sso_providers with a callback",
         { sso_providers: [provider], transitions: { callback: { target: "extra" } } },
         true,
+      ],
+      [
+        "twenty sso_providers",
+        { sso_providers: providers(20), transitions: { callback: { target: "extra" } } },
+        true,
+      ],
+      [
+        "twenty-one sso_providers",
+        { sso_providers: providers(21), transitions: { callback: { target: "extra" } } },
+        false,
       ],
       [
         "terminal step with actions",

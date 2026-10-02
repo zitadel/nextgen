@@ -1,5 +1,7 @@
 package domain
 
+import "cmp"
+
 // Typed event payloads (deny-by-default allowlists). Keep in sync with
 // docs/design/api/events-catalog.md and OpenAPI Event discriminator schemas.
 
@@ -294,4 +296,59 @@ type AuthzRevokedPayload struct {
 type AuthFactorPayload struct {
 	UserID   string `json:"user_id"`
 	FactorID string `json:"factor_id,omitempty"`
+}
+
+// IDPConnectionPayload is shared by idp.created (snapshot) and idp.updated
+// (delta). revision_id is on both: it is the revision the write appended, a
+// secondary id, since entity_id is the connection. The document body stays
+// out, so client_secret references and endpoints never reach the audit trail.
+//
+// Template is a pointer so the delta can tell "unchanged" (absent) from
+// "removed" (the empty string).
+type IDPConnectionPayload struct {
+	Slug        string  `json:"slug,omitempty"`
+	Protocol    string  `json:"protocol,omitempty"`
+	Template    *string `json:"template,omitempty"`
+	DisplayName string  `json:"display_name,omitempty"`
+	RevisionID  string  `json:"revision_id"`
+}
+
+// IDPConnectionPayloadSnapshot is the allowlisted create snapshot for idp.created.
+func IDPConnectionPayloadSnapshot(connection *IDPConnection) (IDPConnectionPayload, error) {
+	doc, err := ParseIDPConnectionDocument(connection.Document)
+	if err != nil {
+		return IDPConnectionPayload{}, err
+	}
+	payload := IDPConnectionPayload{
+		Slug:        connection.Slug,
+		Template:    doc.Template,
+		DisplayName: doc.DisplayName,
+		RevisionID:  connection.RevisionID,
+	}
+	if doc.Protocol != nil {
+		payload.Protocol = *doc.Protocol
+	}
+	return payload, nil
+}
+
+// IDPConnectionPayloadDelta is the idp.updated payload: the new revision id,
+// plus display_name and template when they differ from previous. Slug and
+// protocol are fixed for the life of the connection, so they never change.
+func IDPConnectionPayloadDelta(previous, next *IDPConnection) (IDPConnectionPayload, error) {
+	before, err := ParseIDPConnectionDocument(previous.Document)
+	if err != nil {
+		return IDPConnectionPayload{}, err
+	}
+	after, err := ParseIDPConnectionDocument(next.Document)
+	if err != nil {
+		return IDPConnectionPayload{}, err
+	}
+	payload := IDPConnectionPayload{RevisionID: next.RevisionID}
+	if before.DisplayName != after.DisplayName {
+		payload.DisplayName = after.DisplayName
+	}
+	if !sameString(before.Template, after.Template) {
+		payload.Template = cmp.Or(after.Template, new(""))
+	}
+	return payload, nil
 }

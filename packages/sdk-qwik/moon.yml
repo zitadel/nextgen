@@ -48,7 +48,18 @@ tasks:
       # the later release step instead of the normal build/test graph.
       runInCI: false
 
+  # Chromium for the browser-mode test suite. Self-contained (like components):
+  # the `test` task depends on it so `moon ci :test` provisions it in CI.
+  install-browsers:
+    command: "corepack pnpm exec playwright install chromium"
+    options:
+      cache: false
+
+  # Runs the Vitest suite in real Chromium (see vitest.config.ts): Qwik 2's
+  # client render and the wrapped Lit web components need a real DOM. The
+  # browser project pays a Chromium cold start, which this lane covers in CI.
   test:
-    command: "corepack pnpm run test"
+    command: "corepack pnpm run test:all"
     deps:
+      - "install-browsers"
       - "build"

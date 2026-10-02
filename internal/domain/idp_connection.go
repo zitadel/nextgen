@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -28,6 +29,101 @@ func ErrIDPConnectionNotFound() Error {
 // them. details names the offending field.
 func ErrIDPConnectionFieldImmutable(details any) Error {
 	return newError(PrefixIDPConnection.ErrorCodePrefix("field_immutable"), "identity provider connection: the field is fixed for the life of the connection", details, nil)
+}
+
+// ErrIDPConnectionPermissionDenied answers a caller whose project grant does
+// not reach the operation, such as a viewer revising a connection.
+func ErrIDPConnectionPermissionDenied() Error {
+	return newError(PrefixIDPConnection.ErrorCodePrefix("permission_denied"), "identity provider connection: the caller's project role does not allow this operation", nil, nil)
+}
+
+// ErrIDPConnectionRevisionConflict reports a revision that landed on the same
+// instant as another revision of the same connection, so neither is newest.
+func ErrIDPConnectionRevisionConflict() Error {
+	return newError(PrefixIDPConnection.ErrorCodePrefix("revision_conflict"), "identity provider connection: another revision of the same connection was created at the same instant", nil, nil)
+}
+
+// IDPConnectionDocument holds the few document fields the server reads. The
+// rest of the document belongs to the API contract and stays opaque here.
+type IDPConnectionDocument struct {
+	Protocol     *string `json:"protocol"`
+	SubjectClaim *string `json:"subject_claim"`
+	Template     *string `json:"template"`
+	DisplayName  string  `json:"display_name"`
+	OIDC         struct {
+		Issuer *string `json:"issuer"`
+	} `json:"oidc"`
+	OAuth2 struct {
+		TokenEndpoint    *string `json:"token_endpoint"`
+		UserinfoEndpoint *string `json:"userinfo_endpoint"`
+	} `json:"oauth2"`
+}
+
+func ParseIDPConnectionDocument(document []byte) (IDPConnectionDocument, error) {
+	var doc IDPConnectionDocument
+	err := json.Unmarshal(document, &doc)
+	return doc, err
+}
+
+// IDPConnectionImmutableFieldsChanged returns the dotted paths of the identity
+// fields that next changes against stored (see ErrIDPConnectionFieldImmutable).
+// subject_claim is always compared. On an OIDC connection whose protocol
+// stays OIDC, an absent subject_claim counts as "sub", because the engine
+// resolves it to that claim (internal/idp). On a protocol change it is
+// compared as written, since the two protocols' defaults differ, and the
+// endpoint fields are skipped: those of two protocols are not comparable.
+// The order is protocol, subject_claim, then endpoints.
+func IDPConnectionImmutableFieldsChanged(stored, next []byte) ([]string, error) {
+	before, err := ParseIDPConnectionDocument(stored)
+	if err != nil {
+		return nil, err
+	}
+	after, err := ParseIDPConnectionDocument(next)
+	if err != nil {
+		return nil, err
+	}
+	var changed []string
+	protocolChanged := !sameString(before.Protocol, after.Protocol)
+	if protocolChanged {
+		changed = append(changed, "protocol")
+	}
+	beforeClaim, afterClaim := before.SubjectClaim, after.SubjectClaim
+	if !protocolChanged && sameString(before.Protocol, &oidcProtocol) {
+		beforeClaim, afterClaim = subOrClaim(beforeClaim), subOrClaim(afterClaim)
+	}
+	if !sameString(beforeClaim, afterClaim) {
+		changed = append(changed, "subject_claim")
+	}
+	if protocolChanged {
+		return changed, nil
+	}
+	for _, field := range []struct {
+		path          string
+		before, after *string
+	}{
+		{"oidc.issuer", before.OIDC.Issuer, after.OIDC.Issuer},
+		{"oauth2.token_endpoint", before.OAuth2.TokenEndpoint, after.OAuth2.TokenEndpoint},
+		{"oauth2.userinfo_endpoint", before.OAuth2.UserinfoEndpoint, after.OAuth2.UserinfoEndpoint},
+	} {
+		if !sameString(field.before, field.after) {
+			changed = append(changed, field.path)
+		}
+	}
+	return changed, nil
+}
+
+var oidcProtocol, oidcDefaultSubjectClaim = "oidc", "sub"
+
+// subOrClaim returns claim, or "sub" when it is absent.
+func subOrClaim(claim *string) *string {
+	if claim == nil {
+		return &oidcDefaultSubjectClaim
+	}
+	return claim
+}
+
+func sameString(a, b *string) bool {
+	return a == b || (a != nil && b != nil && *a == *b)
 }
 
 // ErrIDPDiscoveryFailed reports that the provider's discovery document could
@@ -73,6 +169,44 @@ func ErrIDPEndpointsPartial(missing []string) Error {
 // accepts the protocol, but the engine does not serve it yet (#1066).
 func ErrIDPOAuth2Unsupported() Error {
 	return newError(PrefixIDPConnection.ErrorCodePrefix("oauth2_unsupported"), "identity provider connection: the oauth2 protocol is not supported yet", nil, nil)
+}
+
+// ErrIDPExchangeFailed reports that the code exchange yielded no token. One
+// code covers the whole step, as discovery_failed does: the token endpoint
+// answered with an error such as invalid_grant or with a non-conformant
+// body, or no answer arrived because the address was denied, the connection
+// failed, or an egress cap struck.
+func ErrIDPExchangeFailed(cause error) Error {
+	return newError(PrefixIDPConnection.ErrorCodePrefix("exchange_failed"), "identity provider connection: the code exchange failed", nil, cause)
+}
+
+// ErrIDPIDTokenInvalid reports an id_token the engine will not accept: absent
+// from the token response, signed with an algorithm outside the allowlist or
+// with a key the JWKS endpoint does not serve, or carrying an issuer,
+// audience, expiry, or nonce other than the attempt expects.
+func ErrIDPIDTokenInvalid(cause error) Error {
+	return newError(PrefixIDPConnection.ErrorCodePrefix("id_token_invalid"), "identity provider connection: the id_token is invalid", nil, cause)
+}
+
+// ErrIDPUserinfoFailed reports a userinfo response the engine cannot take
+// claims from: no answer, a non-2xx status, a body that is not a JSON
+// object, or a sub other than the id_token's.
+func ErrIDPUserinfoFailed(cause error) Error {
+	return newError(PrefixIDPConnection.ErrorCodePrefix("userinfo_failed"), "identity provider connection: the userinfo request failed", nil, cause)
+}
+
+// ErrIDPSupplementaryFetchFailed reports that the connection's
+// supplementary_fetch strategy could not complete: its request failed or
+// its response did not parse. An empty result is not a failure.
+func ErrIDPSupplementaryFetchFailed(cause error) Error {
+	return newError(PrefixIDPConnection.ErrorCodePrefix("supplementary_fetch_failed"), "identity provider connection: the supplementary fetch failed", nil, cause)
+}
+
+// ErrIDPSubjectInvalid reports a subject claim the engine cannot key an
+// identity on: absent, null, empty, or a boolean, object, or array. The
+// cause names the claim and the shape, never the value.
+func ErrIDPSubjectInvalid(cause error) Error {
+	return newError(PrefixIDPConnection.ErrorCodePrefix("subject_invalid"), "identity provider connection: the subject claim is absent or not a string or number", nil, cause)
 }
 
 // IDPConnection is one identity provider connection at one revision. The

@@ -1,39 +1,40 @@
 import { playwright } from "@vitest/browser-playwright";
 import { defineConfig } from "vitest/config";
 
+import { baseTest, sourceConditions } from "../../vitest.shared.mjs";
 import { liquidRaw } from "./vite-liquid-plugin.js";
 
-/** Shared plugins for all vitest projects. */
+/** Shared plugins for every project in this config. */
 const sharedPlugins = () => [liquidRaw()];
 
 /**
- * Two test projects:
+ * Two projects in one config, selected per lane (no separate config files):
  *
- * - `unit` — runs in jsdom. Fast feedback for the bulk of the suite. Skips
- *   the form-associated custom-element checks because jsdom 29 only ships a
- *   partial implementation.
- * - `browser` — runs in real Chromium via Playwright. Owns the
- *   `*.browser.spec.ts` files: form participation, Enter-to-submit, focus
- *   management, and other behaviours that require a real platform.
+ * - `unit` (jsdom): the bulk of the suite. The fast local `test` = `vitest run
+ *   --project unit`. Skips the form-associated custom-element checks that
+ *   jsdom 29 only partially implements.
+ * - `browser` (real Chromium via Playwright): `*.browser.spec.ts` — form
+ *   participation, Enter-to-submit, focus management. Local-only selector
+ *   `test:browser` = `vitest run --project browser` (heavy Chromium cold start).
  *
- * `pnpm test` runs the unit project (the default in CI / pre-commit).
- * `pnpm test:browser` runs the browser project. `pnpm test:all` runs both.
+ * The CI gate is `test:all` = `vitest run`, which runs both projects in one
+ * process and emits one aggregated junit.xml.
  */
 export default defineConfig({
+  cacheDir: ".vitest",
   plugins: sharedPlugins(),
-  resolve: { conditions: ["@zitadel/source"] },
+  resolve: { conditions: sourceConditions },
   test: {
+    ...baseTest,
     name: "@zitadel/components",
-    watch: false,
-    coverage: {
-      reportsDirectory: "./test-output/vitest/coverage",
-      provider: "v8",
-      include: ["src/**/*.ts"],
-    },
     projects: [
       {
+        // Each project is its own Vite instance, so it needs its own cacheDir;
+        // a distinct subdir under the shared .vitest keeps the two deps caches
+        // from colliding.
+        cacheDir: ".vitest/unit",
         plugins: sharedPlugins(),
-        resolve: { conditions: ["@zitadel/source"] },
+        resolve: { conditions: sourceConditions },
         test: {
           name: "unit",
           globals: true,
@@ -43,8 +44,9 @@ export default defineConfig({
         },
       },
       {
+        cacheDir: ".vitest/browser",
         plugins: sharedPlugins(),
-        resolve: { conditions: ["@zitadel/source"] },
+        resolve: { conditions: sourceConditions },
         test: {
           name: "browser",
           globals: true,

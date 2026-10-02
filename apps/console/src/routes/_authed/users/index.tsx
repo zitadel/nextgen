@@ -32,6 +32,11 @@ import {
 import { StatusBadge } from "@/components/status-badge";
 
 import { api } from "../../../api/zitadel";
+import {
+  projectScopeDeps,
+  requireProjectScope,
+  useRequiredProjectScope,
+} from "../../../lib/project-scope";
 import { displayValue, field } from "../../../lib/record";
 import { type SchemaField, type UserSchema, schemaColumns } from "../../../lib/schema";
 import { userAttributes, userIdentifier, userIdentity } from "../../../lib/user";
@@ -40,14 +45,16 @@ export const Route = createFileRoute("/_authed/users/")({
   // `User`, not `Users`: the sidebar frame's row carries `lucide/User`, the
   // single-person glyph. The plural two-person one reads as a group.
   // Order 3: Teams sits at 2.
-  staticData: { nav: { label: "Users", order: 3, icon: User } },
-  loader: async () => {
-    const page = await fetchUsers();
+  staticData: { scope: "project", nav: { label: "Users", order: 3, icon: User } },
+  loaderDeps: projectScopeDeps,
+  loader: async ({ deps }) => {
+    const projectId = requireProjectScope(deps.project);
+    const page = await fetchUsers(projectId);
     return {
       users: page.users,
       teamsExpanded: page.teamsExpanded,
       nextPageToken: page.next_page_token ?? undefined,
-      columns: await columnsForUsers(page.users),
+      columns: await columnsForUsers(projectId, page.users),
     };
   },
   component: UsersScreen,
@@ -56,20 +63,31 @@ export const Route = createFileRoute("/_authed/users/")({
 type UsersPage = Awaited<ReturnType<typeof api.queryUsers>>;
 
 /**
- * One page of users, with each user's team memberships embedded.
+ * One page of the selected project's users, with each user's team memberships
+ * embedded. `project_id` names the target (#1303): without it the server
+ * answers for the caller's own project, which on a platform deployment is not
+ * the one selected.
  *
  * `expand: ["teams"]` needs `team_membership.read` on top of `user.read`, and a
  * credential carrying one without the other is refused the whole request rather
- * than just the relation (ADR 059). The refusal therefore falls back to the
- * unexpanded read: the screen loses its Team column, not its users.
+ * than just the relation (ADR 059). A Console session passes once it may list
+ * the project (#1306); the refusal still falls back to the unexpanded read for
+ * a credential that may not, so the screen loses its Team column, not its users.
  */
-async function fetchUsers(pageToken?: string): Promise<UsersPage & { teamsExpanded: boolean }> {
+async function fetchUsers(
+  projectId: string,
+  pageToken?: string,
+): Promise<UsersPage & { teamsExpanded: boolean }> {
   const body = { limit: PAGE_SIZE, page_token: pageToken };
+  const params = { project_id: projectId };
   try {
-    return { ...(await api.queryUsers({ ...body, expand: ["teams"] })), teamsExpanded: true };
+    return {
+      ...(await api.queryUsers({ ...body, expand: ["teams"] }, params)),
+      teamsExpanded: true,
+    };
   } catch (cause) {
     if (!(cause instanceof ApiError) || cause.status !== 403) throw cause;
-    return { ...(await api.queryUsers(body)), teamsExpanded: false };
+    return { ...(await api.queryUsers(body, params)), teamsExpanded: false };
   }
 }
 
@@ -90,13 +108,20 @@ function isPresent<T>(value: T | undefined | null): value is T {
  * Only the loaded users' schemas are fetched, not every schema in the project:
  * one nobody uses would add a column that is blank in every row. Each user
  * carries `schema`, so the set is known without a second list call.
+ *
+ * Schema ids are unique per project only — the seeded default carries the same
+ * `$id` everywhere — and the server resolves an ambiguous id in the caller's
+ * own project, so `project_id` names the one these users live in.
  */
-async function columnsForUsers(users: Record<string, unknown>[]): Promise<SchemaField[]> {
+async function columnsForUsers(
+  projectId: string,
+  users: Record<string, unknown>[],
+): Promise<SchemaField[]> {
   const schemaIds = [...new Set(users.map((user) => field(user, "schema")).filter(isPresent))];
   const schemas = await Promise.all(
     schemaIds.map(async (id) => {
       try {
-        return (await api.getSchemaById(id)).schema as UserSchema;
+        return (await api.getSchemaById(id, { project_id: projectId })).schema as UserSchema;
       } catch {
         // One unreadable schema costs its columns, not the screen. The rows
         // still render from the fallback below.
@@ -163,6 +188,7 @@ function searchShortcutLabel(): string {
 }
 
 function UsersScreen() {
+  const projectId = useRequiredProjectScope();
   const loaded = Route.useLoaderData();
   const router = useRouter();
   const [query, setQuery] = useState("");
@@ -201,10 +227,10 @@ function UsersScreen() {
     const generation = loaded;
     setLoadingMore(true);
     try {
-      const page = await fetchUsers(nextPageToken);
+      const page = await fetchUsers(projectId, nextPageToken);
       // A later page can carry a schema the first page never referenced, which
       // would otherwise render its users with every cell blank.
-      const nextColumns = await columnsForUsers([...users, ...page.users]);
+      const nextColumns = await columnsForUsers(projectId, [...users, ...page.users]);
       // A delete or a create while this was in flight has already reset the list
       // to a fresh first page. This page answers a question about the previous
       // one — appending it would re-add rows the server no longer returns — so

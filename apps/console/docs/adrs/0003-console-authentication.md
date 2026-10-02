@@ -121,6 +121,12 @@ fails those requests closed. No production `/api` shim or secret injection is
 planned. Once ADR 053 lands, the dev proxy drops the secret; the Console client
 does not change.
 
+> **Amendment (2026-09-25, #1300):** the bridge is gone. The management
+> operations the Console uses accept the session cookie and authorize it through
+> the signed-in person's grants on the target project, and the Vite dev proxy no
+> longer injects a project secret — it forwards requests as-is. Dev and the
+> embedded build take the same credential path.
+
 ### 5. Recorded caveats
 
 - **Dark-only widget.** The widget's surface CSS still uses the legacy
@@ -131,8 +137,9 @@ does not change.
   the SPA with the cookie present. Accepted; an `onFlowComplete` +
   `router.navigate` in-SPA handoff is possible later.
 - **Identity project vs protected project.** The login flow runs against the
-  reserved platform project discovered through `runtime.json` (with
-  `VITE_CONSOLE_PROJECT_ID` only as a local-dev override). Data calls may
+  reserved platform project discovered through `runtime.json`, in
+  development as in production (the `VITE_CONSOLE_PROJECT_ID` override was
+  removed in #1345, as asked in #1300). Data calls may
   target any customer project the signed-in principal is authorized to use;
   Console ADR 0004 and root ADR 053 keep those scopes distinct.
 - **Fail-closed session probe.** Any `fetchSession` failure (including a
@@ -146,13 +153,14 @@ does not change.
   client only.
 - `AppShell` moves from `__root` to `_authed`; screens keep their URLs
   (pathless layout) and their loaders/boundaries (ADR 0001) untouched.
-- The secret's remaining use is server-side (dev proxy env); the browser
-  bundle still never contains it (ADR 005 holds).
+- The Console uses no project secret at all since 2026-09-25 (#1300) — not in
+  the browser bundle (ADR 005 holds) and not in the dev proxy either; dev
+  tooling uses it only server-side, to seed and grant.
 - **~~Dependency to track~~ resolved 2026-08-12 by withdrawal (ADR 0002):**
   no Go `/api` mount exists or is planned — the deployed console calls the
-  API at the origin root. The deployed management surface now waits on
+  API at the origin root. The deployed management surface waited on
   session-derived target permissions (root ADRs 032/033/053) rather than on a
-  secret-injecting mount.
+  secret-injecting mount; those landed with #1300.
 - Tests: the `_authed` guard is covered by `src/routes/auth-guard.spec.tsx`;
   existing screen specs mock `@/auth/session` and run as signed-in.
 

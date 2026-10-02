@@ -5954,14 +5954,15 @@ type Branding struct {
 	// editor validates and autocompletes it. The CLI strips it before upload;
 	// the platform ignores it.
 	Schema OptString `json:"$schema"`
-	// Degrade preset (`centered` or `split`) the bundled default template
-	// branches on, and the fallback when a custom template fails validation.
+	// Layout preset the revision declares, `centered` or `split`. It is
+	// validated on publish and handed to the template as `branding.layout`.
+	// The bundled default template does not read it, so changing it alone
+	// changes nothing on screen, and it is not an appearance control.
 	// Not a design catalog: the ejectable designs (`centered`, `minimal`)
-	// ship as templates and map onto one of
-	// these two values; switch designs with
+	// ship as templates and both carry `centered`; switch designs with
 	// `zitadel branding eject --design <name>` instead of editing this field.
-	// Ejected templates may ignore it. Selects a template rather than restyling
-	// the widget, so it is not an appearance control.
+	// `split` is carried by revisions published from the earlier split
+	// designs.
 	Layout OptBrandingLayout `json:"layout"`
 	// The LiquidJS template for rendering this step. The orchestrator renders
 	// it into its Shadow DOM with the capability dictionaries as context.
@@ -5970,7 +5971,8 @@ type Branding struct {
 	// `theme.dark.logo_url` is set. Prefer the per-side marks — one file
 	// cannot serve both surfaces.
 	LogoURL OptURI `json:"logo_url"`
-	// Hero/background image URL, used by the split layout.
+	// Hero image URL, for templates that reference `branding.hero_url`. The
+	// bundled default template does not use it.
 	HeroURL    OptURI                `json:"hero_url"`
 	Theme      OptBrandingTheme      `json:"theme"`
 	Typography OptBrandingTypography `json:"typography"`
@@ -6553,14 +6555,15 @@ func (s *BrandingCreatedPayload) SetHeroURL(val OptString) {
 	s.HeroURL = val
 }
 
-// Degrade preset (`centered` or `split`) the bundled default template
-// branches on, and the fallback when a custom template fails validation.
+// Layout preset the revision declares, `centered` or `split`. It is
+// validated on publish and handed to the template as `branding.layout`.
+// The bundled default template does not read it, so changing it alone
+// changes nothing on screen, and it is not an appearance control.
 // Not a design catalog: the ejectable designs (`centered`, `minimal`)
-// ship as templates and map onto one of
-// these two values; switch designs with
+// ship as templates and both carry `centered`; switch designs with
 // `zitadel branding eject --design <name>` instead of editing this field.
-// Ejected templates may ignore it. Selects a template rather than restyling
-// the widget, so it is not an appearance control.
+// `split` is carried by revisions published from the earlier split
+// designs.
 type BrandingLayout string
 
 const (
@@ -7034,8 +7037,10 @@ func NewIntBrandingShapeRadius(v int) BrandingShapeRadius {
 // Publishing one side makes it the only theme that resolves, even under `auto`
 // or an operating-system preference for the other. Publishing both lets `auto`
 // follow the operating system, each side using its own logo and palette.
-// The element-level `theme` property overrides `mode`, but cannot select a
-// side the project never published.
+// The element-level `theme` property overrides `mode`. When one side is
+// published it cannot select the other. Publishing neither side leaves
+// `mode`, the `theme` property and the operating system to pick one, painted
+// with the maintained defaults.
 // Ref: #
 type BrandingTheme struct {
 	// Which published side may run. `auto` follows the operating system.
@@ -7124,8 +7129,10 @@ func (s *BrandingThemeMode) UnmarshalText(data []byte) error {
 }
 
 // One complete theme side. Light and dark are independent surfaces — neither
-// inherits from the other, and a side that is absent is never used, whatever
-// `mode` or the operating system asks for.
+// inherits from the other. When a revision publishes one side, the absent
+// side is never used, whatever `mode` or the operating system asks for. When
+// it publishes neither, either side can resolve and paints the maintained
+// defaults.
 // Ref: #
 type BrandingThemeSide struct {
 	// The mark for this surface. A logo is never recoloured, so each side
@@ -7170,9 +7177,10 @@ type BrandingTypography struct {
 	// example. Must be https; unlike the logo and hero assets there is no
 	// loopback carve-out. Rejected without `font_family`, which would name
 	// nothing to paint with.
-	// Stored but not applied to an embedded widget: the embedding page loads
-	// the face, and Zitadel does not inject a stylesheet into a document it
-	// does not own.
+	// Loaded only when the login component runs as `variant="page"`, the
+	// full-page login. In the default `variant="widget"` it is stored but not
+	// loaded: the component injects no stylesheet, and the embedding page
+	// loads the face.
 	FontURL OptURI `json:"font_url"`
 	// Multiplier on the base text sizes, `1` when omitted.
 	Scale OptFloat64 `json:"scale"`
@@ -10501,10 +10509,15 @@ func (*CreateIdpCreated) createIdpRes() {}
 
 // CreateIdpErrorResponse represents sum type.
 type CreateIdpErrorResponse struct {
-	Type             CreateIdpErrorResponseType // switch on this field
-	AuthUnauthorized AuthUnauthorized
-	Internal         Internal
-	ReqInvalid       ReqInvalid
+	Type                CreateIdpErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	EvtInvalid          EvtInvalid
+	IdpFieldImmutable   IdpFieldImmutable
+	IdpNotFound         IdpNotFound
+	IdpPermissionDenied IdpPermissionDenied
+	IdpRevisionConflict IdpRevisionConflict
+	Internal            Internal
+	ReqInvalid          ReqInvalid
 }
 
 // CreateIdpErrorResponseType is oneOf type of CreateIdpErrorResponse.
@@ -10512,14 +10525,44 @@ type CreateIdpErrorResponseType string
 
 // Possible values for CreateIdpErrorResponseType.
 const (
-	AuthUnauthorizedCreateIdpErrorResponse CreateIdpErrorResponseType = "auth.unauthorized"
-	InternalCreateIdpErrorResponse         CreateIdpErrorResponseType = "internal"
-	ReqInvalidCreateIdpErrorResponse       CreateIdpErrorResponseType = "req.invalid"
+	AuthUnauthorizedCreateIdpErrorResponse    CreateIdpErrorResponseType = "auth.unauthorized"
+	EvtInvalidCreateIdpErrorResponse          CreateIdpErrorResponseType = "evt.invalid"
+	IdpFieldImmutableCreateIdpErrorResponse   CreateIdpErrorResponseType = "idp.field_immutable"
+	IdpNotFoundCreateIdpErrorResponse         CreateIdpErrorResponseType = "idp.not_found"
+	IdpPermissionDeniedCreateIdpErrorResponse CreateIdpErrorResponseType = "idp.permission_denied"
+	IdpRevisionConflictCreateIdpErrorResponse CreateIdpErrorResponseType = "idp.revision_conflict"
+	InternalCreateIdpErrorResponse            CreateIdpErrorResponseType = "internal"
+	ReqInvalidCreateIdpErrorResponse          CreateIdpErrorResponseType = "req.invalid"
 )
 
 // IsAuthUnauthorized reports whether CreateIdpErrorResponse is AuthUnauthorized.
 func (s CreateIdpErrorResponse) IsAuthUnauthorized() bool {
 	return s.Type == AuthUnauthorizedCreateIdpErrorResponse
+}
+
+// IsEvtInvalid reports whether CreateIdpErrorResponse is EvtInvalid.
+func (s CreateIdpErrorResponse) IsEvtInvalid() bool {
+	return s.Type == EvtInvalidCreateIdpErrorResponse
+}
+
+// IsIdpFieldImmutable reports whether CreateIdpErrorResponse is IdpFieldImmutable.
+func (s CreateIdpErrorResponse) IsIdpFieldImmutable() bool {
+	return s.Type == IdpFieldImmutableCreateIdpErrorResponse
+}
+
+// IsIdpNotFound reports whether CreateIdpErrorResponse is IdpNotFound.
+func (s CreateIdpErrorResponse) IsIdpNotFound() bool {
+	return s.Type == IdpNotFoundCreateIdpErrorResponse
+}
+
+// IsIdpPermissionDenied reports whether CreateIdpErrorResponse is IdpPermissionDenied.
+func (s CreateIdpErrorResponse) IsIdpPermissionDenied() bool {
+	return s.Type == IdpPermissionDeniedCreateIdpErrorResponse
+}
+
+// IsIdpRevisionConflict reports whether CreateIdpErrorResponse is IdpRevisionConflict.
+func (s CreateIdpErrorResponse) IsIdpRevisionConflict() bool {
+	return s.Type == IdpRevisionConflictCreateIdpErrorResponse
 }
 
 // IsInternal reports whether CreateIdpErrorResponse is Internal.
@@ -10548,6 +10591,111 @@ func (s CreateIdpErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bo
 func NewAuthUnauthorizedCreateIdpErrorResponse(v AuthUnauthorized) CreateIdpErrorResponse {
 	var s CreateIdpErrorResponse
 	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetEvtInvalid sets CreateIdpErrorResponse to EvtInvalid.
+func (s *CreateIdpErrorResponse) SetEvtInvalid(v EvtInvalid) {
+	s.Type = EvtInvalidCreateIdpErrorResponse
+	s.EvtInvalid = v
+}
+
+// GetEvtInvalid returns EvtInvalid and true boolean if CreateIdpErrorResponse is EvtInvalid.
+func (s CreateIdpErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
+	if !s.IsEvtInvalid() {
+		return v, false
+	}
+	return s.EvtInvalid, true
+}
+
+// NewEvtInvalidCreateIdpErrorResponse returns new CreateIdpErrorResponse from EvtInvalid.
+func NewEvtInvalidCreateIdpErrorResponse(v EvtInvalid) CreateIdpErrorResponse {
+	var s CreateIdpErrorResponse
+	s.SetEvtInvalid(v)
+	return s
+}
+
+// SetIdpFieldImmutable sets CreateIdpErrorResponse to IdpFieldImmutable.
+func (s *CreateIdpErrorResponse) SetIdpFieldImmutable(v IdpFieldImmutable) {
+	s.Type = IdpFieldImmutableCreateIdpErrorResponse
+	s.IdpFieldImmutable = v
+}
+
+// GetIdpFieldImmutable returns IdpFieldImmutable and true boolean if CreateIdpErrorResponse is IdpFieldImmutable.
+func (s CreateIdpErrorResponse) GetIdpFieldImmutable() (v IdpFieldImmutable, ok bool) {
+	if !s.IsIdpFieldImmutable() {
+		return v, false
+	}
+	return s.IdpFieldImmutable, true
+}
+
+// NewIdpFieldImmutableCreateIdpErrorResponse returns new CreateIdpErrorResponse from IdpFieldImmutable.
+func NewIdpFieldImmutableCreateIdpErrorResponse(v IdpFieldImmutable) CreateIdpErrorResponse {
+	var s CreateIdpErrorResponse
+	s.SetIdpFieldImmutable(v)
+	return s
+}
+
+// SetIdpNotFound sets CreateIdpErrorResponse to IdpNotFound.
+func (s *CreateIdpErrorResponse) SetIdpNotFound(v IdpNotFound) {
+	s.Type = IdpNotFoundCreateIdpErrorResponse
+	s.IdpNotFound = v
+}
+
+// GetIdpNotFound returns IdpNotFound and true boolean if CreateIdpErrorResponse is IdpNotFound.
+func (s CreateIdpErrorResponse) GetIdpNotFound() (v IdpNotFound, ok bool) {
+	if !s.IsIdpNotFound() {
+		return v, false
+	}
+	return s.IdpNotFound, true
+}
+
+// NewIdpNotFoundCreateIdpErrorResponse returns new CreateIdpErrorResponse from IdpNotFound.
+func NewIdpNotFoundCreateIdpErrorResponse(v IdpNotFound) CreateIdpErrorResponse {
+	var s CreateIdpErrorResponse
+	s.SetIdpNotFound(v)
+	return s
+}
+
+// SetIdpPermissionDenied sets CreateIdpErrorResponse to IdpPermissionDenied.
+func (s *CreateIdpErrorResponse) SetIdpPermissionDenied(v IdpPermissionDenied) {
+	s.Type = IdpPermissionDeniedCreateIdpErrorResponse
+	s.IdpPermissionDenied = v
+}
+
+// GetIdpPermissionDenied returns IdpPermissionDenied and true boolean if CreateIdpErrorResponse is IdpPermissionDenied.
+func (s CreateIdpErrorResponse) GetIdpPermissionDenied() (v IdpPermissionDenied, ok bool) {
+	if !s.IsIdpPermissionDenied() {
+		return v, false
+	}
+	return s.IdpPermissionDenied, true
+}
+
+// NewIdpPermissionDeniedCreateIdpErrorResponse returns new CreateIdpErrorResponse from IdpPermissionDenied.
+func NewIdpPermissionDeniedCreateIdpErrorResponse(v IdpPermissionDenied) CreateIdpErrorResponse {
+	var s CreateIdpErrorResponse
+	s.SetIdpPermissionDenied(v)
+	return s
+}
+
+// SetIdpRevisionConflict sets CreateIdpErrorResponse to IdpRevisionConflict.
+func (s *CreateIdpErrorResponse) SetIdpRevisionConflict(v IdpRevisionConflict) {
+	s.Type = IdpRevisionConflictCreateIdpErrorResponse
+	s.IdpRevisionConflict = v
+}
+
+// GetIdpRevisionConflict returns IdpRevisionConflict and true boolean if CreateIdpErrorResponse is IdpRevisionConflict.
+func (s CreateIdpErrorResponse) GetIdpRevisionConflict() (v IdpRevisionConflict, ok bool) {
+	if !s.IsIdpRevisionConflict() {
+		return v, false
+	}
+	return s.IdpRevisionConflict, true
+}
+
+// NewIdpRevisionConflictCreateIdpErrorResponse returns new CreateIdpErrorResponse from IdpRevisionConflict.
+func NewIdpRevisionConflictCreateIdpErrorResponse(v IdpRevisionConflict) CreateIdpErrorResponse {
+	var s CreateIdpErrorResponse
+	s.SetIdpRevisionConflict(v)
 	return s
 }
 
@@ -15718,6 +15866,8 @@ type Event struct {
 	FlowdefCreatedEvent            FlowdefCreatedEvent
 	FlowdefDeletedEvent            FlowdefDeletedEvent
 	FlowdefUpdatedEvent            FlowdefUpdatedEvent
+	IdpCreatedEvent                IdpCreatedEvent
+	IdpUpdatedEvent                IdpUpdatedEvent
 	ProjectCreatedEvent            ProjectCreatedEvent
 	ProjectDeletedEvent            ProjectDeletedEvent
 	ProjectUpdatedEvent            ProjectUpdatedEvent
@@ -15756,6 +15906,8 @@ const (
 	FlowdefCreatedEventEvent            EventType = "flowdef.created"
 	FlowdefDeletedEventEvent            EventType = "flowdef.deleted"
 	FlowdefUpdatedEventEvent            EventType = "flowdef.updated"
+	IdpCreatedEventEvent                EventType = "idp.created"
+	IdpUpdatedEventEvent                EventType = "idp.updated"
 	ProjectCreatedEventEvent            EventType = "project.created"
 	ProjectDeletedEventEvent            EventType = "project.deleted"
 	ProjectUpdatedEventEvent            EventType = "project.updated"
@@ -15822,6 +15974,12 @@ func (s Event) IsFlowdefDeletedEvent() bool { return s.Type == FlowdefDeletedEve
 
 // IsFlowdefUpdatedEvent reports whether Event is FlowdefUpdatedEvent.
 func (s Event) IsFlowdefUpdatedEvent() bool { return s.Type == FlowdefUpdatedEventEvent }
+
+// IsIdpCreatedEvent reports whether Event is IdpCreatedEvent.
+func (s Event) IsIdpCreatedEvent() bool { return s.Type == IdpCreatedEventEvent }
+
+// IsIdpUpdatedEvent reports whether Event is IdpUpdatedEvent.
+func (s Event) IsIdpUpdatedEvent() bool { return s.Type == IdpUpdatedEventEvent }
 
 // IsProjectCreatedEvent reports whether Event is ProjectCreatedEvent.
 func (s Event) IsProjectCreatedEvent() bool { return s.Type == ProjectCreatedEventEvent }
@@ -16201,6 +16359,48 @@ func (s Event) GetFlowdefUpdatedEvent() (v FlowdefUpdatedEvent, ok bool) {
 func NewFlowdefUpdatedEventEvent(v FlowdefUpdatedEvent) Event {
 	var s Event
 	s.SetFlowdefUpdatedEvent(v)
+	return s
+}
+
+// SetIdpCreatedEvent sets Event to IdpCreatedEvent.
+func (s *Event) SetIdpCreatedEvent(v IdpCreatedEvent) {
+	s.Type = IdpCreatedEventEvent
+	s.IdpCreatedEvent = v
+}
+
+// GetIdpCreatedEvent returns IdpCreatedEvent and true boolean if Event is IdpCreatedEvent.
+func (s Event) GetIdpCreatedEvent() (v IdpCreatedEvent, ok bool) {
+	if !s.IsIdpCreatedEvent() {
+		return v, false
+	}
+	return s.IdpCreatedEvent, true
+}
+
+// NewIdpCreatedEventEvent returns new Event from IdpCreatedEvent.
+func NewIdpCreatedEventEvent(v IdpCreatedEvent) Event {
+	var s Event
+	s.SetIdpCreatedEvent(v)
+	return s
+}
+
+// SetIdpUpdatedEvent sets Event to IdpUpdatedEvent.
+func (s *Event) SetIdpUpdatedEvent(v IdpUpdatedEvent) {
+	s.Type = IdpUpdatedEventEvent
+	s.IdpUpdatedEvent = v
+}
+
+// GetIdpUpdatedEvent returns IdpUpdatedEvent and true boolean if Event is IdpUpdatedEvent.
+func (s Event) GetIdpUpdatedEvent() (v IdpUpdatedEvent, ok bool) {
+	if !s.IsIdpUpdatedEvent() {
+		return v, false
+	}
+	return s.IdpUpdatedEvent, true
+}
+
+// NewIdpUpdatedEventEvent returns new Event from IdpUpdatedEvent.
+func NewIdpUpdatedEventEvent(v IdpUpdatedEvent) Event {
+	var s Event
+	s.SetIdpUpdatedEvent(v)
 	return s
 }
 
@@ -17223,6 +17423,21 @@ type Field struct {
 	Type FieldType `json:"type"`
 	// Localization key for the field label.
 	TextKey string `json:"text_key"`
+	// Value for the HTML `autocomplete` attribute of the input rendered
+	// for this field, so password managers and browser autofill
+	// recognise it. A space-separated token list; put it on the
+	// attribute verbatim and do not reinterpret it.
+	// The engine emits `username` on the field carrying the user's
+	// identifier, or `email` when that field's `type` is `email`. On a
+	// password field it emits `current-password` where the submitted
+	// value is verified against the stored credential, and
+	// `new-password` where the value is saved as the user's password —
+	// so a manager offers to fill on sign-in and to generate on
+	// registration. Omitted when no token applies, in which case render
+	// no attribute rather than an empty one.
+	// Autofill only: it says nothing about validation, and the input's
+	// `type` still comes from `type`.
+	Autocomplete OptString `json:"autocomplete"`
 	// The field MUST be present and non-empty on submit. Mirrors the
 	// schema's top-level `required` array.
 	Required OptBool `json:"required"`
@@ -17253,6 +17468,11 @@ func (s *Field) GetTextKey() string {
 	return s.TextKey
 }
 
+// GetAutocomplete returns the value of Autocomplete.
+func (s *Field) GetAutocomplete() OptString {
+	return s.Autocomplete
+}
+
 // GetRequired returns the value of Required.
 func (s *Field) GetRequired() OptBool {
 	return s.Required
@@ -17281,6 +17501,11 @@ func (s *Field) SetType(val FieldType) {
 // SetTextKey sets the value of TextKey.
 func (s *Field) SetTextKey(val string) {
 	s.TextKey = val
+}
+
+// SetAutocomplete sets the value of Autocomplete.
+func (s *Field) SetAutocomplete(val OptString) {
+	s.Autocomplete = val
 }
 
 // SetRequired sets the value of Required.
@@ -18849,11 +19074,17 @@ type FlowDefinitionStep struct {
 	// order. Each names the `slug` of a connection under `.zitadel/idps/`; the
 	// connection carries the display name and template, so a rename there
 	// reaches every step without editing the flow. The rendered step the client
-	// receives carries the resolved `{id, name, template}` objects instead.
+	// receives carries the resolved `{id, name, template}` objects instead. A
+	// step offers at most 20 providers.
 	SSOProviders []string `json:"sso_providers"`
 	// Server-side mutation to execute when this step completes successfully.
 	// Runs after field validation passes, before the transition fires.
-	// - create_user: creates the user record (registration flows).
+	// - create_user: creates the user record (registration flows)
+	// - create_user_with_sso: creates the user record from the identity an
+	// external provider returned, linking it to that identity. Accepted by
+	// the API so an SSO flow can be authored and stored; the engine handler
+	// is not wired yet, and a step reaching it fails with a flow integrity
+	// error rather than creating anything.
 	OnSuccess OptFlowDefinitionStepOnSuccess `json:"on_success"`
 	// Marks this as a terminal step. Tells the frontend what to do:
 	// - redirect: navigate to redirect_uri (OIDC/SAML callback done)
@@ -19008,17 +19239,24 @@ func (s *FlowDefinitionStepGates) init() FlowDefinitionStepGates {
 
 // Server-side mutation to execute when this step completes successfully.
 // Runs after field validation passes, before the transition fires.
-// - create_user: creates the user record (registration flows).
+// - create_user: creates the user record (registration flows)
+// - create_user_with_sso: creates the user record from the identity an
+// external provider returned, linking it to that identity. Accepted by
+// the API so an SSO flow can be authored and stored; the engine handler
+// is not wired yet, and a step reaching it fails with a flow integrity
+// error rather than creating anything.
 type FlowDefinitionStepOnSuccess string
 
 const (
-	FlowDefinitionStepOnSuccessCreateUser FlowDefinitionStepOnSuccess = "create_user"
+	FlowDefinitionStepOnSuccessCreateUser        FlowDefinitionStepOnSuccess = "create_user"
+	FlowDefinitionStepOnSuccessCreateUserWithSSO FlowDefinitionStepOnSuccess = "create_user_with_sso"
 )
 
 // AllValues returns all FlowDefinitionStepOnSuccess values.
 func (FlowDefinitionStepOnSuccess) AllValues() []FlowDefinitionStepOnSuccess {
 	return []FlowDefinitionStepOnSuccess{
 		FlowDefinitionStepOnSuccessCreateUser,
+		FlowDefinitionStepOnSuccessCreateUserWithSSO,
 	}
 }
 
@@ -19026,6 +19264,8 @@ func (FlowDefinitionStepOnSuccess) AllValues() []FlowDefinitionStepOnSuccess {
 func (s FlowDefinitionStepOnSuccess) MarshalText() ([]byte, error) {
 	switch s {
 	case FlowDefinitionStepOnSuccessCreateUser:
+		return []byte(s), nil
+	case FlowDefinitionStepOnSuccessCreateUserWithSSO:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -19037,6 +19277,9 @@ func (s *FlowDefinitionStepOnSuccess) UnmarshalText(data []byte) error {
 	switch FlowDefinitionStepOnSuccess(data) {
 	case FlowDefinitionStepOnSuccessCreateUser:
 		*s = FlowDefinitionStepOnSuccessCreateUser
+		return nil
+	case FlowDefinitionStepOnSuccessCreateUserWithSSO:
+		*s = FlowDefinitionStepOnSuccessCreateUserWithSSO
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
@@ -19654,6 +19897,33 @@ type FlowStep struct {
 	// template iterates this array; for keyed lookup it builds a name-indexed
 	// map locally.
 	Fields []Field `json:"fields"`
+	// The user's identifier, collected on an earlier step, for this
+	// step's form to carry alongside the password. Present only when the
+	// step collects a password and does not itself collect the
+	// identifier — a step that collects the identifier carries it in
+	// `fields` instead, and needs nothing here.
+	// A password manager saves an identifier and a password as one
+	// credential, and reads both from the same form. A step that
+	// collects only the password leaves it nothing to pair with, so the
+	// engine hands the identifier back here.
+	// **What the client does with it.** Put one more control in the same
+	// form element as the password input, carrying `name`, `value` and
+	// `autocomplete` as given. It must be:
+	// - *hidden* — the user already supplied this value on the previous
+	// step and is not being asked for it again;
+	// - *not editable* — the engine has already resolved the user from
+	// this value, so a changed one would not change who is signing in;
+	// - *left out of the submission* — see below.
+	// Any control a password manager can read works; the fields are
+	// named for an HTML input because that is the shape managers expect.
+	// **Do not submit it.** The step's `fields` are the whole
+	// submission. This name is not among them, so sending it back fails
+	// the step with an `error.<name>_unknown_field` violation. Clients
+	// that build their submission from `fields` (rather than from
+	// whatever the form contains) get this for free.
+	// It is also not display text: do not render it as a greeting or a
+	// label. `texts.description_key` is the place for that.
+	Identifier OptFlowStepIdentifier `json:"identifier"`
 	// Ordered list of available user actions. The LiquidJS template iterates
 	// this array and builds a name-indexed map locally for keyed lookup.
 	Actions []FlowStepAction `json:"actions"`
@@ -19700,6 +19970,11 @@ func (s *FlowStep) GetRedirectURL() OptURI {
 // GetFields returns the value of Fields.
 func (s *FlowStep) GetFields() []Field {
 	return s.Fields
+}
+
+// GetIdentifier returns the value of Identifier.
+func (s *FlowStep) GetIdentifier() OptFlowStepIdentifier {
+	return s.Identifier
 }
 
 // GetActions returns the value of Actions.
@@ -19750,6 +20025,11 @@ func (s *FlowStep) SetRedirectURL(val OptURI) {
 // SetFields sets the value of Fields.
 func (s *FlowStep) SetFields(val []Field) {
 	s.Fields = val
+}
+
+// SetIdentifier sets the value of Identifier.
+func (s *FlowStep) SetIdentifier(val OptFlowStepIdentifier) {
+	s.Identifier = val
 }
 
 // SetActions sets the value of Actions.
@@ -20066,6 +20346,75 @@ func (s *FlowStepGates) init() FlowStepGates {
 		*s = m
 	}
 	return m
+}
+
+// The user's identifier, collected on an earlier step, for this
+// step's form to carry alongside the password. Present only when the
+// step collects a password and does not itself collect the
+// identifier — a step that collects the identifier carries it in
+// `fields` instead, and needs nothing here.
+// A password manager saves an identifier and a password as one
+// credential, and reads both from the same form. A step that
+// collects only the password leaves it nothing to pair with, so the
+// engine hands the identifier back here.
+// **What the client does with it.** Put one more control in the same
+// form element as the password input, carrying `name`, `value` and
+// `autocomplete` as given. It must be:
+// - *hidden* — the user already supplied this value on the previous
+// step and is not being asked for it again;
+// - *not editable* — the engine has already resolved the user from
+// this value, so a changed one would not change who is signing in;
+// - *left out of the submission* — see below.
+// Any control a password manager can read works; the fields are
+// named for an HTML input because that is the shape managers expect.
+// **Do not submit it.** The step's `fields` are the whole
+// submission. This name is not among them, so sending it back fails
+// the step with an `error.<name>_unknown_field` violation. Clients
+// that build their submission from `fields` (rather than from
+// whatever the form contains) get this for free.
+// It is also not display text: do not render it as a greeting or a
+// label. `texts.description_key` is the place for that.
+type FlowStepIdentifier struct {
+	// The user-schema property the identifier was collected into.
+	// Use it as the control's `name`.
+	Name string `json:"name"`
+	// The identifier the user supplied. Use it as the control's
+	// `value`, verbatim.
+	Value string `json:"value"`
+	// Value for the control's HTML `autocomplete` attribute, used
+	// verbatim. `username` is the token that pairs an identifier
+	// with a password in the same form.
+	Autocomplete string `json:"autocomplete"`
+}
+
+// GetName returns the value of Name.
+func (s *FlowStepIdentifier) GetName() string {
+	return s.Name
+}
+
+// GetValue returns the value of Value.
+func (s *FlowStepIdentifier) GetValue() string {
+	return s.Value
+}
+
+// GetAutocomplete returns the value of Autocomplete.
+func (s *FlowStepIdentifier) GetAutocomplete() string {
+	return s.Autocomplete
+}
+
+// SetName sets the value of Name.
+func (s *FlowStepIdentifier) SetName(val string) {
+	s.Name = val
+}
+
+// SetValue sets the value of Value.
+func (s *FlowStepIdentifier) SetValue(val string) {
+	s.Value = val
+}
+
+// SetAutocomplete sets the value of Autocomplete.
+func (s *FlowStepIdentifier) SetAutocomplete(val string) {
+	s.Autocomplete = val
 }
 
 // Ref: #
@@ -23707,10 +24056,12 @@ func (*GetHealthOK) getHealthRes() {}
 
 // GetIdpByIdErrorResponse represents sum type.
 type GetIdpByIdErrorResponse struct {
-	Type             GetIdpByIdErrorResponseType // switch on this field
-	AuthUnauthorized AuthUnauthorized
-	Internal         Internal
-	ReqInvalid       ReqInvalid
+	Type                GetIdpByIdErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	IdpNotFound         IdpNotFound
+	IdpPermissionDenied IdpPermissionDenied
+	Internal            Internal
+	ReqInvalid          ReqInvalid
 }
 
 // GetIdpByIdErrorResponseType is oneOf type of GetIdpByIdErrorResponse.
@@ -23718,14 +24069,26 @@ type GetIdpByIdErrorResponseType string
 
 // Possible values for GetIdpByIdErrorResponseType.
 const (
-	AuthUnauthorizedGetIdpByIdErrorResponse GetIdpByIdErrorResponseType = "auth.unauthorized"
-	InternalGetIdpByIdErrorResponse         GetIdpByIdErrorResponseType = "internal"
-	ReqInvalidGetIdpByIdErrorResponse       GetIdpByIdErrorResponseType = "req.invalid"
+	AuthUnauthorizedGetIdpByIdErrorResponse    GetIdpByIdErrorResponseType = "auth.unauthorized"
+	IdpNotFoundGetIdpByIdErrorResponse         GetIdpByIdErrorResponseType = "idp.not_found"
+	IdpPermissionDeniedGetIdpByIdErrorResponse GetIdpByIdErrorResponseType = "idp.permission_denied"
+	InternalGetIdpByIdErrorResponse            GetIdpByIdErrorResponseType = "internal"
+	ReqInvalidGetIdpByIdErrorResponse          GetIdpByIdErrorResponseType = "req.invalid"
 )
 
 // IsAuthUnauthorized reports whether GetIdpByIdErrorResponse is AuthUnauthorized.
 func (s GetIdpByIdErrorResponse) IsAuthUnauthorized() bool {
 	return s.Type == AuthUnauthorizedGetIdpByIdErrorResponse
+}
+
+// IsIdpNotFound reports whether GetIdpByIdErrorResponse is IdpNotFound.
+func (s GetIdpByIdErrorResponse) IsIdpNotFound() bool {
+	return s.Type == IdpNotFoundGetIdpByIdErrorResponse
+}
+
+// IsIdpPermissionDenied reports whether GetIdpByIdErrorResponse is IdpPermissionDenied.
+func (s GetIdpByIdErrorResponse) IsIdpPermissionDenied() bool {
+	return s.Type == IdpPermissionDeniedGetIdpByIdErrorResponse
 }
 
 // IsInternal reports whether GetIdpByIdErrorResponse is Internal.
@@ -23754,6 +24117,48 @@ func (s GetIdpByIdErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok b
 func NewAuthUnauthorizedGetIdpByIdErrorResponse(v AuthUnauthorized) GetIdpByIdErrorResponse {
 	var s GetIdpByIdErrorResponse
 	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetIdpNotFound sets GetIdpByIdErrorResponse to IdpNotFound.
+func (s *GetIdpByIdErrorResponse) SetIdpNotFound(v IdpNotFound) {
+	s.Type = IdpNotFoundGetIdpByIdErrorResponse
+	s.IdpNotFound = v
+}
+
+// GetIdpNotFound returns IdpNotFound and true boolean if GetIdpByIdErrorResponse is IdpNotFound.
+func (s GetIdpByIdErrorResponse) GetIdpNotFound() (v IdpNotFound, ok bool) {
+	if !s.IsIdpNotFound() {
+		return v, false
+	}
+	return s.IdpNotFound, true
+}
+
+// NewIdpNotFoundGetIdpByIdErrorResponse returns new GetIdpByIdErrorResponse from IdpNotFound.
+func NewIdpNotFoundGetIdpByIdErrorResponse(v IdpNotFound) GetIdpByIdErrorResponse {
+	var s GetIdpByIdErrorResponse
+	s.SetIdpNotFound(v)
+	return s
+}
+
+// SetIdpPermissionDenied sets GetIdpByIdErrorResponse to IdpPermissionDenied.
+func (s *GetIdpByIdErrorResponse) SetIdpPermissionDenied(v IdpPermissionDenied) {
+	s.Type = IdpPermissionDeniedGetIdpByIdErrorResponse
+	s.IdpPermissionDenied = v
+}
+
+// GetIdpPermissionDenied returns IdpPermissionDenied and true boolean if GetIdpByIdErrorResponse is IdpPermissionDenied.
+func (s GetIdpByIdErrorResponse) GetIdpPermissionDenied() (v IdpPermissionDenied, ok bool) {
+	if !s.IsIdpPermissionDenied() {
+		return v, false
+	}
+	return s.IdpPermissionDenied, true
+}
+
+// NewIdpPermissionDeniedGetIdpByIdErrorResponse returns new GetIdpByIdErrorResponse from IdpPermissionDenied.
+func NewIdpPermissionDeniedGetIdpByIdErrorResponse(v IdpPermissionDenied) GetIdpByIdErrorResponse {
+	var s GetIdpByIdErrorResponse
+	s.SetIdpPermissionDenied(v)
 	return s
 }
 
@@ -23841,10 +24246,12 @@ func (*GetIdpByIdUnauthorized) getIdpByIdRes() {}
 
 // GetIdpRevisionByIdErrorResponse represents sum type.
 type GetIdpRevisionByIdErrorResponse struct {
-	Type             GetIdpRevisionByIdErrorResponseType // switch on this field
-	AuthUnauthorized AuthUnauthorized
-	Internal         Internal
-	ReqInvalid       ReqInvalid
+	Type                GetIdpRevisionByIdErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	IdpNotFound         IdpNotFound
+	IdpPermissionDenied IdpPermissionDenied
+	Internal            Internal
+	ReqInvalid          ReqInvalid
 }
 
 // GetIdpRevisionByIdErrorResponseType is oneOf type of GetIdpRevisionByIdErrorResponse.
@@ -23852,14 +24259,26 @@ type GetIdpRevisionByIdErrorResponseType string
 
 // Possible values for GetIdpRevisionByIdErrorResponseType.
 const (
-	AuthUnauthorizedGetIdpRevisionByIdErrorResponse GetIdpRevisionByIdErrorResponseType = "auth.unauthorized"
-	InternalGetIdpRevisionByIdErrorResponse         GetIdpRevisionByIdErrorResponseType = "internal"
-	ReqInvalidGetIdpRevisionByIdErrorResponse       GetIdpRevisionByIdErrorResponseType = "req.invalid"
+	AuthUnauthorizedGetIdpRevisionByIdErrorResponse    GetIdpRevisionByIdErrorResponseType = "auth.unauthorized"
+	IdpNotFoundGetIdpRevisionByIdErrorResponse         GetIdpRevisionByIdErrorResponseType = "idp.not_found"
+	IdpPermissionDeniedGetIdpRevisionByIdErrorResponse GetIdpRevisionByIdErrorResponseType = "idp.permission_denied"
+	InternalGetIdpRevisionByIdErrorResponse            GetIdpRevisionByIdErrorResponseType = "internal"
+	ReqInvalidGetIdpRevisionByIdErrorResponse          GetIdpRevisionByIdErrorResponseType = "req.invalid"
 )
 
 // IsAuthUnauthorized reports whether GetIdpRevisionByIdErrorResponse is AuthUnauthorized.
 func (s GetIdpRevisionByIdErrorResponse) IsAuthUnauthorized() bool {
 	return s.Type == AuthUnauthorizedGetIdpRevisionByIdErrorResponse
+}
+
+// IsIdpNotFound reports whether GetIdpRevisionByIdErrorResponse is IdpNotFound.
+func (s GetIdpRevisionByIdErrorResponse) IsIdpNotFound() bool {
+	return s.Type == IdpNotFoundGetIdpRevisionByIdErrorResponse
+}
+
+// IsIdpPermissionDenied reports whether GetIdpRevisionByIdErrorResponse is IdpPermissionDenied.
+func (s GetIdpRevisionByIdErrorResponse) IsIdpPermissionDenied() bool {
+	return s.Type == IdpPermissionDeniedGetIdpRevisionByIdErrorResponse
 }
 
 // IsInternal reports whether GetIdpRevisionByIdErrorResponse is Internal.
@@ -23890,6 +24309,48 @@ func (s GetIdpRevisionByIdErrorResponse) GetAuthUnauthorized() (v AuthUnauthoriz
 func NewAuthUnauthorizedGetIdpRevisionByIdErrorResponse(v AuthUnauthorized) GetIdpRevisionByIdErrorResponse {
 	var s GetIdpRevisionByIdErrorResponse
 	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetIdpNotFound sets GetIdpRevisionByIdErrorResponse to IdpNotFound.
+func (s *GetIdpRevisionByIdErrorResponse) SetIdpNotFound(v IdpNotFound) {
+	s.Type = IdpNotFoundGetIdpRevisionByIdErrorResponse
+	s.IdpNotFound = v
+}
+
+// GetIdpNotFound returns IdpNotFound and true boolean if GetIdpRevisionByIdErrorResponse is IdpNotFound.
+func (s GetIdpRevisionByIdErrorResponse) GetIdpNotFound() (v IdpNotFound, ok bool) {
+	if !s.IsIdpNotFound() {
+		return v, false
+	}
+	return s.IdpNotFound, true
+}
+
+// NewIdpNotFoundGetIdpRevisionByIdErrorResponse returns new GetIdpRevisionByIdErrorResponse from IdpNotFound.
+func NewIdpNotFoundGetIdpRevisionByIdErrorResponse(v IdpNotFound) GetIdpRevisionByIdErrorResponse {
+	var s GetIdpRevisionByIdErrorResponse
+	s.SetIdpNotFound(v)
+	return s
+}
+
+// SetIdpPermissionDenied sets GetIdpRevisionByIdErrorResponse to IdpPermissionDenied.
+func (s *GetIdpRevisionByIdErrorResponse) SetIdpPermissionDenied(v IdpPermissionDenied) {
+	s.Type = IdpPermissionDeniedGetIdpRevisionByIdErrorResponse
+	s.IdpPermissionDenied = v
+}
+
+// GetIdpPermissionDenied returns IdpPermissionDenied and true boolean if GetIdpRevisionByIdErrorResponse is IdpPermissionDenied.
+func (s GetIdpRevisionByIdErrorResponse) GetIdpPermissionDenied() (v IdpPermissionDenied, ok bool) {
+	if !s.IsIdpPermissionDenied() {
+		return v, false
+	}
+	return s.IdpPermissionDenied, true
+}
+
+// NewIdpPermissionDeniedGetIdpRevisionByIdErrorResponse returns new GetIdpRevisionByIdErrorResponse from IdpPermissionDenied.
+func NewIdpPermissionDeniedGetIdpRevisionByIdErrorResponse(v IdpPermissionDenied) GetIdpRevisionByIdErrorResponse {
+	var s GetIdpRevisionByIdErrorResponse
+	s.SetIdpPermissionDenied(v)
 	return s
 }
 
@@ -27437,6 +27898,504 @@ func NewStringIdpConnectionVerifiedClaimsItem(v string) IdpConnectionVerifiedCla
 	return s
 }
 
+// Merged schema.
+// Ref: #
+type IdpCreatedEvent struct {
+	// Managed event id (`evt_<opaque>`).
+	ID        string    `json:"id"`
+	ProjectID ProjectID `json:"project_id"`
+	// Emit-time team scope, when the actor operated under a team.
+	TeamID OptNilString `json:"team_id"`
+	// Merged property.
+	EventType string `json:"event_type"`
+	// Wide-event category.
+	Category IdpCreatedEventCategory `json:"category"`
+	// When the action happened (server/storage clock, dialect-owned).
+	OccurredAt time.Time `json:"occurred_at"`
+	// When the row was inserted (server/storage clock, dialect-owned).
+	CreatedAt time.Time `json:"created_at"`
+	// Who triggered the event.
+	ActorID OptNilString `json:"actor_id"`
+	// Actor kind.
+	ActorType OptNilIdpCreatedEventActorType `json:"actor_type"`
+	// Resource type affected.
+	EntityType OptNilString `json:"entity_type"`
+	// Resource id affected.
+	EntityID OptNilString `json:"entity_id"`
+	// Application or agent that produced the event.
+	ClientID string `json:"client_id"`
+	// Token id present at emit time, when any.
+	TokenID OptString `json:"token_id"`
+	// Delegation kind (omit when unset).
+	DelegationType OptIdpCreatedEventDelegationType `json:"delegation_type"`
+	DelegationID   OptString                        `json:"delegation_id"`
+	Grantor        OptString                        `json:"grantor"`
+	// Device fingerprint correlation id.
+	Fingerprint OptString `json:"fingerprint"`
+	// HTTP request correlation id.
+	RequestID OptNilString `json:"request_id"`
+	// Session correlation id.
+	SessionID OptNilString `json:"session_id"`
+	// Login flow correlation id.
+	FlowID   OptNilString     `json:"flow_id"`
+	Metadata OptEventMetadata `json:"metadata"`
+	Payload  IdpPayload       `json:"payload"`
+}
+
+// GetID returns the value of ID.
+func (s *IdpCreatedEvent) GetID() string {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *IdpCreatedEvent) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *IdpCreatedEvent) GetTeamID() OptNilString {
+	return s.TeamID
+}
+
+// GetEventType returns the value of EventType.
+func (s *IdpCreatedEvent) GetEventType() string {
+	return s.EventType
+}
+
+// GetCategory returns the value of Category.
+func (s *IdpCreatedEvent) GetCategory() IdpCreatedEventCategory {
+	return s.Category
+}
+
+// GetOccurredAt returns the value of OccurredAt.
+func (s *IdpCreatedEvent) GetOccurredAt() time.Time {
+	return s.OccurredAt
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *IdpCreatedEvent) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetActorID returns the value of ActorID.
+func (s *IdpCreatedEvent) GetActorID() OptNilString {
+	return s.ActorID
+}
+
+// GetActorType returns the value of ActorType.
+func (s *IdpCreatedEvent) GetActorType() OptNilIdpCreatedEventActorType {
+	return s.ActorType
+}
+
+// GetEntityType returns the value of EntityType.
+func (s *IdpCreatedEvent) GetEntityType() OptNilString {
+	return s.EntityType
+}
+
+// GetEntityID returns the value of EntityID.
+func (s *IdpCreatedEvent) GetEntityID() OptNilString {
+	return s.EntityID
+}
+
+// GetClientID returns the value of ClientID.
+func (s *IdpCreatedEvent) GetClientID() string {
+	return s.ClientID
+}
+
+// GetTokenID returns the value of TokenID.
+func (s *IdpCreatedEvent) GetTokenID() OptString {
+	return s.TokenID
+}
+
+// GetDelegationType returns the value of DelegationType.
+func (s *IdpCreatedEvent) GetDelegationType() OptIdpCreatedEventDelegationType {
+	return s.DelegationType
+}
+
+// GetDelegationID returns the value of DelegationID.
+func (s *IdpCreatedEvent) GetDelegationID() OptString {
+	return s.DelegationID
+}
+
+// GetGrantor returns the value of Grantor.
+func (s *IdpCreatedEvent) GetGrantor() OptString {
+	return s.Grantor
+}
+
+// GetFingerprint returns the value of Fingerprint.
+func (s *IdpCreatedEvent) GetFingerprint() OptString {
+	return s.Fingerprint
+}
+
+// GetRequestID returns the value of RequestID.
+func (s *IdpCreatedEvent) GetRequestID() OptNilString {
+	return s.RequestID
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *IdpCreatedEvent) GetSessionID() OptNilString {
+	return s.SessionID
+}
+
+// GetFlowID returns the value of FlowID.
+func (s *IdpCreatedEvent) GetFlowID() OptNilString {
+	return s.FlowID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *IdpCreatedEvent) GetMetadata() OptEventMetadata {
+	return s.Metadata
+}
+
+// GetPayload returns the value of Payload.
+func (s *IdpCreatedEvent) GetPayload() IdpPayload {
+	return s.Payload
+}
+
+// SetID sets the value of ID.
+func (s *IdpCreatedEvent) SetID(val string) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *IdpCreatedEvent) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *IdpCreatedEvent) SetTeamID(val OptNilString) {
+	s.TeamID = val
+}
+
+// SetEventType sets the value of EventType.
+func (s *IdpCreatedEvent) SetEventType(val string) {
+	s.EventType = val
+}
+
+// SetCategory sets the value of Category.
+func (s *IdpCreatedEvent) SetCategory(val IdpCreatedEventCategory) {
+	s.Category = val
+}
+
+// SetOccurredAt sets the value of OccurredAt.
+func (s *IdpCreatedEvent) SetOccurredAt(val time.Time) {
+	s.OccurredAt = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *IdpCreatedEvent) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetActorID sets the value of ActorID.
+func (s *IdpCreatedEvent) SetActorID(val OptNilString) {
+	s.ActorID = val
+}
+
+// SetActorType sets the value of ActorType.
+func (s *IdpCreatedEvent) SetActorType(val OptNilIdpCreatedEventActorType) {
+	s.ActorType = val
+}
+
+// SetEntityType sets the value of EntityType.
+func (s *IdpCreatedEvent) SetEntityType(val OptNilString) {
+	s.EntityType = val
+}
+
+// SetEntityID sets the value of EntityID.
+func (s *IdpCreatedEvent) SetEntityID(val OptNilString) {
+	s.EntityID = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *IdpCreatedEvent) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetTokenID sets the value of TokenID.
+func (s *IdpCreatedEvent) SetTokenID(val OptString) {
+	s.TokenID = val
+}
+
+// SetDelegationType sets the value of DelegationType.
+func (s *IdpCreatedEvent) SetDelegationType(val OptIdpCreatedEventDelegationType) {
+	s.DelegationType = val
+}
+
+// SetDelegationID sets the value of DelegationID.
+func (s *IdpCreatedEvent) SetDelegationID(val OptString) {
+	s.DelegationID = val
+}
+
+// SetGrantor sets the value of Grantor.
+func (s *IdpCreatedEvent) SetGrantor(val OptString) {
+	s.Grantor = val
+}
+
+// SetFingerprint sets the value of Fingerprint.
+func (s *IdpCreatedEvent) SetFingerprint(val OptString) {
+	s.Fingerprint = val
+}
+
+// SetRequestID sets the value of RequestID.
+func (s *IdpCreatedEvent) SetRequestID(val OptNilString) {
+	s.RequestID = val
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *IdpCreatedEvent) SetSessionID(val OptNilString) {
+	s.SessionID = val
+}
+
+// SetFlowID sets the value of FlowID.
+func (s *IdpCreatedEvent) SetFlowID(val OptNilString) {
+	s.FlowID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *IdpCreatedEvent) SetMetadata(val OptEventMetadata) {
+	s.Metadata = val
+}
+
+// SetPayload sets the value of Payload.
+func (s *IdpCreatedEvent) SetPayload(val IdpPayload) {
+	s.Payload = val
+}
+
+type IdpCreatedEventActorType string
+
+const (
+	IdpCreatedEventActorTypeHuman   IdpCreatedEventActorType = "human"
+	IdpCreatedEventActorTypeService IdpCreatedEventActorType = "service"
+	IdpCreatedEventActorTypeSystem  IdpCreatedEventActorType = "system"
+	IdpCreatedEventActorTypeAgent   IdpCreatedEventActorType = "agent"
+)
+
+// AllValues returns all IdpCreatedEventActorType values.
+func (IdpCreatedEventActorType) AllValues() []IdpCreatedEventActorType {
+	return []IdpCreatedEventActorType{
+		IdpCreatedEventActorTypeHuman,
+		IdpCreatedEventActorTypeService,
+		IdpCreatedEventActorTypeSystem,
+		IdpCreatedEventActorTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s IdpCreatedEventActorType) MarshalText() ([]byte, error) {
+	switch s {
+	case IdpCreatedEventActorTypeHuman:
+		return []byte(s), nil
+	case IdpCreatedEventActorTypeService:
+		return []byte(s), nil
+	case IdpCreatedEventActorTypeSystem:
+		return []byte(s), nil
+	case IdpCreatedEventActorTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *IdpCreatedEventActorType) UnmarshalText(data []byte) error {
+	switch IdpCreatedEventActorType(data) {
+	case IdpCreatedEventActorTypeHuman:
+		*s = IdpCreatedEventActorTypeHuman
+		return nil
+	case IdpCreatedEventActorTypeService:
+		*s = IdpCreatedEventActorTypeService
+		return nil
+	case IdpCreatedEventActorTypeSystem:
+		*s = IdpCreatedEventActorTypeSystem
+		return nil
+	case IdpCreatedEventActorTypeAgent:
+		*s = IdpCreatedEventActorTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Wide-event category.
+type IdpCreatedEventCategory string
+
+const (
+	IdpCreatedEventCategoryRequest IdpCreatedEventCategory = "request"
+	IdpCreatedEventCategoryAuth    IdpCreatedEventCategory = "auth"
+	IdpCreatedEventCategorySession IdpCreatedEventCategory = "session"
+	IdpCreatedEventCategoryAdmin   IdpCreatedEventCategory = "admin"
+	IdpCreatedEventCategoryEntity  IdpCreatedEventCategory = "entity"
+	IdpCreatedEventCategorySignal  IdpCreatedEventCategory = "signal"
+)
+
+// AllValues returns all IdpCreatedEventCategory values.
+func (IdpCreatedEventCategory) AllValues() []IdpCreatedEventCategory {
+	return []IdpCreatedEventCategory{
+		IdpCreatedEventCategoryRequest,
+		IdpCreatedEventCategoryAuth,
+		IdpCreatedEventCategorySession,
+		IdpCreatedEventCategoryAdmin,
+		IdpCreatedEventCategoryEntity,
+		IdpCreatedEventCategorySignal,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s IdpCreatedEventCategory) MarshalText() ([]byte, error) {
+	switch s {
+	case IdpCreatedEventCategoryRequest:
+		return []byte(s), nil
+	case IdpCreatedEventCategoryAuth:
+		return []byte(s), nil
+	case IdpCreatedEventCategorySession:
+		return []byte(s), nil
+	case IdpCreatedEventCategoryAdmin:
+		return []byte(s), nil
+	case IdpCreatedEventCategoryEntity:
+		return []byte(s), nil
+	case IdpCreatedEventCategorySignal:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *IdpCreatedEventCategory) UnmarshalText(data []byte) error {
+	switch IdpCreatedEventCategory(data) {
+	case IdpCreatedEventCategoryRequest:
+		*s = IdpCreatedEventCategoryRequest
+		return nil
+	case IdpCreatedEventCategoryAuth:
+		*s = IdpCreatedEventCategoryAuth
+		return nil
+	case IdpCreatedEventCategorySession:
+		*s = IdpCreatedEventCategorySession
+		return nil
+	case IdpCreatedEventCategoryAdmin:
+		*s = IdpCreatedEventCategoryAdmin
+		return nil
+	case IdpCreatedEventCategoryEntity:
+		*s = IdpCreatedEventCategoryEntity
+		return nil
+	case IdpCreatedEventCategorySignal:
+		*s = IdpCreatedEventCategorySignal
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Delegation kind (omit when unset).
+type IdpCreatedEventDelegationType string
+
+const (
+	IdpCreatedEventDelegationTypeDirect    IdpCreatedEventDelegationType = "direct"
+	IdpCreatedEventDelegationTypeDelegated IdpCreatedEventDelegationType = "delegated"
+	IdpCreatedEventDelegationTypePatShared IdpCreatedEventDelegationType = "pat_shared"
+	IdpCreatedEventDelegationTypeExchanged IdpCreatedEventDelegationType = "exchanged"
+)
+
+// AllValues returns all IdpCreatedEventDelegationType values.
+func (IdpCreatedEventDelegationType) AllValues() []IdpCreatedEventDelegationType {
+	return []IdpCreatedEventDelegationType{
+		IdpCreatedEventDelegationTypeDirect,
+		IdpCreatedEventDelegationTypeDelegated,
+		IdpCreatedEventDelegationTypePatShared,
+		IdpCreatedEventDelegationTypeExchanged,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s IdpCreatedEventDelegationType) MarshalText() ([]byte, error) {
+	switch s {
+	case IdpCreatedEventDelegationTypeDirect:
+		return []byte(s), nil
+	case IdpCreatedEventDelegationTypeDelegated:
+		return []byte(s), nil
+	case IdpCreatedEventDelegationTypePatShared:
+		return []byte(s), nil
+	case IdpCreatedEventDelegationTypeExchanged:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *IdpCreatedEventDelegationType) UnmarshalText(data []byte) error {
+	switch IdpCreatedEventDelegationType(data) {
+	case IdpCreatedEventDelegationTypeDirect:
+		*s = IdpCreatedEventDelegationTypeDirect
+		return nil
+	case IdpCreatedEventDelegationTypeDelegated:
+		*s = IdpCreatedEventDelegationTypeDelegated
+		return nil
+	case IdpCreatedEventDelegationTypePatShared:
+		*s = IdpCreatedEventDelegationTypePatShared
+		return nil
+	case IdpCreatedEventDelegationTypeExchanged:
+		*s = IdpCreatedEventDelegationTypeExchanged
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Merged schema.
+// Ref: #
+type IdpFieldImmutable struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptIdpFieldImmutableDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *IdpFieldImmutable) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *IdpFieldImmutable) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *IdpFieldImmutable) GetDetails() OptIdpFieldImmutableDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *IdpFieldImmutable) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *IdpFieldImmutable) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *IdpFieldImmutable) SetDetails(val OptIdpFieldImmutableDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type IdpFieldImmutableDetails map[string]jx.Raw
+
+func (s *IdpFieldImmutableDetails) init() IdpFieldImmutableDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
 // Field to filter or sort identity provider connections by:
 // - `slug`: unique within the project. `equals` returns the newest revision
 // of that connection
@@ -27481,6 +28440,178 @@ func (s *IdpFilterField) UnmarshalText(data []byte) error {
 	default:
 		return errors.Errorf("invalid value: %q", data)
 	}
+}
+
+// Merged schema.
+// Ref: #
+type IdpNotFound struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptIdpNotFoundDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *IdpNotFound) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *IdpNotFound) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *IdpNotFound) GetDetails() OptIdpNotFoundDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *IdpNotFound) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *IdpNotFound) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *IdpNotFound) SetDetails(val OptIdpNotFoundDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type IdpNotFoundDetails map[string]jx.Raw
+
+func (s *IdpNotFoundDetails) init() IdpNotFoundDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Shared allowlisted fields for `idp.created` (snapshot) and `idp.updated`
+// (delta: only changed fields present, plus the new `revision_id`). The
+// connection id is the event's `entity_id`. The connection document, and with
+// it the `client_secret` reference, is never included.
+// Ref: #
+type IdpPayload struct {
+	Slug     OptString `json:"slug"`
+	Protocol OptString `json:"protocol"`
+	// The rendering template hint. On `idp.updated`, the empty string means
+	// the revision removed it.
+	Template    OptString `json:"template"`
+	DisplayName OptString `json:"display_name"`
+	// The revision the write appended.
+	RevisionID string `json:"revision_id"`
+}
+
+// GetSlug returns the value of Slug.
+func (s *IdpPayload) GetSlug() OptString {
+	return s.Slug
+}
+
+// GetProtocol returns the value of Protocol.
+func (s *IdpPayload) GetProtocol() OptString {
+	return s.Protocol
+}
+
+// GetTemplate returns the value of Template.
+func (s *IdpPayload) GetTemplate() OptString {
+	return s.Template
+}
+
+// GetDisplayName returns the value of DisplayName.
+func (s *IdpPayload) GetDisplayName() OptString {
+	return s.DisplayName
+}
+
+// GetRevisionID returns the value of RevisionID.
+func (s *IdpPayload) GetRevisionID() string {
+	return s.RevisionID
+}
+
+// SetSlug sets the value of Slug.
+func (s *IdpPayload) SetSlug(val OptString) {
+	s.Slug = val
+}
+
+// SetProtocol sets the value of Protocol.
+func (s *IdpPayload) SetProtocol(val OptString) {
+	s.Protocol = val
+}
+
+// SetTemplate sets the value of Template.
+func (s *IdpPayload) SetTemplate(val OptString) {
+	s.Template = val
+}
+
+// SetDisplayName sets the value of DisplayName.
+func (s *IdpPayload) SetDisplayName(val OptString) {
+	s.DisplayName = val
+}
+
+// SetRevisionID sets the value of RevisionID.
+func (s *IdpPayload) SetRevisionID(val string) {
+	s.RevisionID = val
+}
+
+// Merged schema.
+// Ref: #
+type IdpPermissionDenied struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptIdpPermissionDeniedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *IdpPermissionDenied) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *IdpPermissionDenied) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *IdpPermissionDenied) GetDetails() OptIdpPermissionDeniedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *IdpPermissionDenied) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *IdpPermissionDenied) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *IdpPermissionDenied) SetDetails(val OptIdpPermissionDeniedDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type IdpPermissionDeniedDetails map[string]jx.Raw
+
+func (s *IdpPermissionDeniedDetails) init() IdpPermissionDeniedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
 }
 
 // The protocol used by the identity provider.
@@ -27610,6 +28741,504 @@ func (s *IdpResponse) SetDefinition(val IdpConnection) {
 
 func (*IdpResponse) getIdpByIdRes()         {}
 func (*IdpResponse) getIdpRevisionByIdRes() {}
+
+// Merged schema.
+// Ref: #
+type IdpRevisionConflict struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptIdpRevisionConflictDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *IdpRevisionConflict) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *IdpRevisionConflict) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *IdpRevisionConflict) GetDetails() OptIdpRevisionConflictDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *IdpRevisionConflict) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *IdpRevisionConflict) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *IdpRevisionConflict) SetDetails(val OptIdpRevisionConflictDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type IdpRevisionConflictDetails map[string]jx.Raw
+
+func (s *IdpRevisionConflictDetails) init() IdpRevisionConflictDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type IdpUpdatedEvent struct {
+	// Managed event id (`evt_<opaque>`).
+	ID        string    `json:"id"`
+	ProjectID ProjectID `json:"project_id"`
+	// Emit-time team scope, when the actor operated under a team.
+	TeamID OptNilString `json:"team_id"`
+	// Merged property.
+	EventType string `json:"event_type"`
+	// Wide-event category.
+	Category IdpUpdatedEventCategory `json:"category"`
+	// When the action happened (server/storage clock, dialect-owned).
+	OccurredAt time.Time `json:"occurred_at"`
+	// When the row was inserted (server/storage clock, dialect-owned).
+	CreatedAt time.Time `json:"created_at"`
+	// Who triggered the event.
+	ActorID OptNilString `json:"actor_id"`
+	// Actor kind.
+	ActorType OptNilIdpUpdatedEventActorType `json:"actor_type"`
+	// Resource type affected.
+	EntityType OptNilString `json:"entity_type"`
+	// Resource id affected.
+	EntityID OptNilString `json:"entity_id"`
+	// Application or agent that produced the event.
+	ClientID string `json:"client_id"`
+	// Token id present at emit time, when any.
+	TokenID OptString `json:"token_id"`
+	// Delegation kind (omit when unset).
+	DelegationType OptIdpUpdatedEventDelegationType `json:"delegation_type"`
+	DelegationID   OptString                        `json:"delegation_id"`
+	Grantor        OptString                        `json:"grantor"`
+	// Device fingerprint correlation id.
+	Fingerprint OptString `json:"fingerprint"`
+	// HTTP request correlation id.
+	RequestID OptNilString `json:"request_id"`
+	// Session correlation id.
+	SessionID OptNilString `json:"session_id"`
+	// Login flow correlation id.
+	FlowID   OptNilString     `json:"flow_id"`
+	Metadata OptEventMetadata `json:"metadata"`
+	Payload  IdpPayload       `json:"payload"`
+}
+
+// GetID returns the value of ID.
+func (s *IdpUpdatedEvent) GetID() string {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *IdpUpdatedEvent) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *IdpUpdatedEvent) GetTeamID() OptNilString {
+	return s.TeamID
+}
+
+// GetEventType returns the value of EventType.
+func (s *IdpUpdatedEvent) GetEventType() string {
+	return s.EventType
+}
+
+// GetCategory returns the value of Category.
+func (s *IdpUpdatedEvent) GetCategory() IdpUpdatedEventCategory {
+	return s.Category
+}
+
+// GetOccurredAt returns the value of OccurredAt.
+func (s *IdpUpdatedEvent) GetOccurredAt() time.Time {
+	return s.OccurredAt
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *IdpUpdatedEvent) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetActorID returns the value of ActorID.
+func (s *IdpUpdatedEvent) GetActorID() OptNilString {
+	return s.ActorID
+}
+
+// GetActorType returns the value of ActorType.
+func (s *IdpUpdatedEvent) GetActorType() OptNilIdpUpdatedEventActorType {
+	return s.ActorType
+}
+
+// GetEntityType returns the value of EntityType.
+func (s *IdpUpdatedEvent) GetEntityType() OptNilString {
+	return s.EntityType
+}
+
+// GetEntityID returns the value of EntityID.
+func (s *IdpUpdatedEvent) GetEntityID() OptNilString {
+	return s.EntityID
+}
+
+// GetClientID returns the value of ClientID.
+func (s *IdpUpdatedEvent) GetClientID() string {
+	return s.ClientID
+}
+
+// GetTokenID returns the value of TokenID.
+func (s *IdpUpdatedEvent) GetTokenID() OptString {
+	return s.TokenID
+}
+
+// GetDelegationType returns the value of DelegationType.
+func (s *IdpUpdatedEvent) GetDelegationType() OptIdpUpdatedEventDelegationType {
+	return s.DelegationType
+}
+
+// GetDelegationID returns the value of DelegationID.
+func (s *IdpUpdatedEvent) GetDelegationID() OptString {
+	return s.DelegationID
+}
+
+// GetGrantor returns the value of Grantor.
+func (s *IdpUpdatedEvent) GetGrantor() OptString {
+	return s.Grantor
+}
+
+// GetFingerprint returns the value of Fingerprint.
+func (s *IdpUpdatedEvent) GetFingerprint() OptString {
+	return s.Fingerprint
+}
+
+// GetRequestID returns the value of RequestID.
+func (s *IdpUpdatedEvent) GetRequestID() OptNilString {
+	return s.RequestID
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *IdpUpdatedEvent) GetSessionID() OptNilString {
+	return s.SessionID
+}
+
+// GetFlowID returns the value of FlowID.
+func (s *IdpUpdatedEvent) GetFlowID() OptNilString {
+	return s.FlowID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *IdpUpdatedEvent) GetMetadata() OptEventMetadata {
+	return s.Metadata
+}
+
+// GetPayload returns the value of Payload.
+func (s *IdpUpdatedEvent) GetPayload() IdpPayload {
+	return s.Payload
+}
+
+// SetID sets the value of ID.
+func (s *IdpUpdatedEvent) SetID(val string) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *IdpUpdatedEvent) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *IdpUpdatedEvent) SetTeamID(val OptNilString) {
+	s.TeamID = val
+}
+
+// SetEventType sets the value of EventType.
+func (s *IdpUpdatedEvent) SetEventType(val string) {
+	s.EventType = val
+}
+
+// SetCategory sets the value of Category.
+func (s *IdpUpdatedEvent) SetCategory(val IdpUpdatedEventCategory) {
+	s.Category = val
+}
+
+// SetOccurredAt sets the value of OccurredAt.
+func (s *IdpUpdatedEvent) SetOccurredAt(val time.Time) {
+	s.OccurredAt = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *IdpUpdatedEvent) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetActorID sets the value of ActorID.
+func (s *IdpUpdatedEvent) SetActorID(val OptNilString) {
+	s.ActorID = val
+}
+
+// SetActorType sets the value of ActorType.
+func (s *IdpUpdatedEvent) SetActorType(val OptNilIdpUpdatedEventActorType) {
+	s.ActorType = val
+}
+
+// SetEntityType sets the value of EntityType.
+func (s *IdpUpdatedEvent) SetEntityType(val OptNilString) {
+	s.EntityType = val
+}
+
+// SetEntityID sets the value of EntityID.
+func (s *IdpUpdatedEvent) SetEntityID(val OptNilString) {
+	s.EntityID = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *IdpUpdatedEvent) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetTokenID sets the value of TokenID.
+func (s *IdpUpdatedEvent) SetTokenID(val OptString) {
+	s.TokenID = val
+}
+
+// SetDelegationType sets the value of DelegationType.
+func (s *IdpUpdatedEvent) SetDelegationType(val OptIdpUpdatedEventDelegationType) {
+	s.DelegationType = val
+}
+
+// SetDelegationID sets the value of DelegationID.
+func (s *IdpUpdatedEvent) SetDelegationID(val OptString) {
+	s.DelegationID = val
+}
+
+// SetGrantor sets the value of Grantor.
+func (s *IdpUpdatedEvent) SetGrantor(val OptString) {
+	s.Grantor = val
+}
+
+// SetFingerprint sets the value of Fingerprint.
+func (s *IdpUpdatedEvent) SetFingerprint(val OptString) {
+	s.Fingerprint = val
+}
+
+// SetRequestID sets the value of RequestID.
+func (s *IdpUpdatedEvent) SetRequestID(val OptNilString) {
+	s.RequestID = val
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *IdpUpdatedEvent) SetSessionID(val OptNilString) {
+	s.SessionID = val
+}
+
+// SetFlowID sets the value of FlowID.
+func (s *IdpUpdatedEvent) SetFlowID(val OptNilString) {
+	s.FlowID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *IdpUpdatedEvent) SetMetadata(val OptEventMetadata) {
+	s.Metadata = val
+}
+
+// SetPayload sets the value of Payload.
+func (s *IdpUpdatedEvent) SetPayload(val IdpPayload) {
+	s.Payload = val
+}
+
+type IdpUpdatedEventActorType string
+
+const (
+	IdpUpdatedEventActorTypeHuman   IdpUpdatedEventActorType = "human"
+	IdpUpdatedEventActorTypeService IdpUpdatedEventActorType = "service"
+	IdpUpdatedEventActorTypeSystem  IdpUpdatedEventActorType = "system"
+	IdpUpdatedEventActorTypeAgent   IdpUpdatedEventActorType = "agent"
+)
+
+// AllValues returns all IdpUpdatedEventActorType values.
+func (IdpUpdatedEventActorType) AllValues() []IdpUpdatedEventActorType {
+	return []IdpUpdatedEventActorType{
+		IdpUpdatedEventActorTypeHuman,
+		IdpUpdatedEventActorTypeService,
+		IdpUpdatedEventActorTypeSystem,
+		IdpUpdatedEventActorTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s IdpUpdatedEventActorType) MarshalText() ([]byte, error) {
+	switch s {
+	case IdpUpdatedEventActorTypeHuman:
+		return []byte(s), nil
+	case IdpUpdatedEventActorTypeService:
+		return []byte(s), nil
+	case IdpUpdatedEventActorTypeSystem:
+		return []byte(s), nil
+	case IdpUpdatedEventActorTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *IdpUpdatedEventActorType) UnmarshalText(data []byte) error {
+	switch IdpUpdatedEventActorType(data) {
+	case IdpUpdatedEventActorTypeHuman:
+		*s = IdpUpdatedEventActorTypeHuman
+		return nil
+	case IdpUpdatedEventActorTypeService:
+		*s = IdpUpdatedEventActorTypeService
+		return nil
+	case IdpUpdatedEventActorTypeSystem:
+		*s = IdpUpdatedEventActorTypeSystem
+		return nil
+	case IdpUpdatedEventActorTypeAgent:
+		*s = IdpUpdatedEventActorTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Wide-event category.
+type IdpUpdatedEventCategory string
+
+const (
+	IdpUpdatedEventCategoryRequest IdpUpdatedEventCategory = "request"
+	IdpUpdatedEventCategoryAuth    IdpUpdatedEventCategory = "auth"
+	IdpUpdatedEventCategorySession IdpUpdatedEventCategory = "session"
+	IdpUpdatedEventCategoryAdmin   IdpUpdatedEventCategory = "admin"
+	IdpUpdatedEventCategoryEntity  IdpUpdatedEventCategory = "entity"
+	IdpUpdatedEventCategorySignal  IdpUpdatedEventCategory = "signal"
+)
+
+// AllValues returns all IdpUpdatedEventCategory values.
+func (IdpUpdatedEventCategory) AllValues() []IdpUpdatedEventCategory {
+	return []IdpUpdatedEventCategory{
+		IdpUpdatedEventCategoryRequest,
+		IdpUpdatedEventCategoryAuth,
+		IdpUpdatedEventCategorySession,
+		IdpUpdatedEventCategoryAdmin,
+		IdpUpdatedEventCategoryEntity,
+		IdpUpdatedEventCategorySignal,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s IdpUpdatedEventCategory) MarshalText() ([]byte, error) {
+	switch s {
+	case IdpUpdatedEventCategoryRequest:
+		return []byte(s), nil
+	case IdpUpdatedEventCategoryAuth:
+		return []byte(s), nil
+	case IdpUpdatedEventCategorySession:
+		return []byte(s), nil
+	case IdpUpdatedEventCategoryAdmin:
+		return []byte(s), nil
+	case IdpUpdatedEventCategoryEntity:
+		return []byte(s), nil
+	case IdpUpdatedEventCategorySignal:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *IdpUpdatedEventCategory) UnmarshalText(data []byte) error {
+	switch IdpUpdatedEventCategory(data) {
+	case IdpUpdatedEventCategoryRequest:
+		*s = IdpUpdatedEventCategoryRequest
+		return nil
+	case IdpUpdatedEventCategoryAuth:
+		*s = IdpUpdatedEventCategoryAuth
+		return nil
+	case IdpUpdatedEventCategorySession:
+		*s = IdpUpdatedEventCategorySession
+		return nil
+	case IdpUpdatedEventCategoryAdmin:
+		*s = IdpUpdatedEventCategoryAdmin
+		return nil
+	case IdpUpdatedEventCategoryEntity:
+		*s = IdpUpdatedEventCategoryEntity
+		return nil
+	case IdpUpdatedEventCategorySignal:
+		*s = IdpUpdatedEventCategorySignal
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Delegation kind (omit when unset).
+type IdpUpdatedEventDelegationType string
+
+const (
+	IdpUpdatedEventDelegationTypeDirect    IdpUpdatedEventDelegationType = "direct"
+	IdpUpdatedEventDelegationTypeDelegated IdpUpdatedEventDelegationType = "delegated"
+	IdpUpdatedEventDelegationTypePatShared IdpUpdatedEventDelegationType = "pat_shared"
+	IdpUpdatedEventDelegationTypeExchanged IdpUpdatedEventDelegationType = "exchanged"
+)
+
+// AllValues returns all IdpUpdatedEventDelegationType values.
+func (IdpUpdatedEventDelegationType) AllValues() []IdpUpdatedEventDelegationType {
+	return []IdpUpdatedEventDelegationType{
+		IdpUpdatedEventDelegationTypeDirect,
+		IdpUpdatedEventDelegationTypeDelegated,
+		IdpUpdatedEventDelegationTypePatShared,
+		IdpUpdatedEventDelegationTypeExchanged,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s IdpUpdatedEventDelegationType) MarshalText() ([]byte, error) {
+	switch s {
+	case IdpUpdatedEventDelegationTypeDirect:
+		return []byte(s), nil
+	case IdpUpdatedEventDelegationTypeDelegated:
+		return []byte(s), nil
+	case IdpUpdatedEventDelegationTypePatShared:
+		return []byte(s), nil
+	case IdpUpdatedEventDelegationTypeExchanged:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *IdpUpdatedEventDelegationType) UnmarshalText(data []byte) error {
+	switch IdpUpdatedEventDelegationType(data) {
+	case IdpUpdatedEventDelegationTypeDirect:
+		*s = IdpUpdatedEventDelegationTypeDirect
+		return nil
+	case IdpUpdatedEventDelegationTypeDelegated:
+		*s = IdpUpdatedEventDelegationTypeDelegated
+		return nil
+	case IdpUpdatedEventDelegationTypePatShared:
+		*s = IdpUpdatedEventDelegationTypePatShared
+		return nil
+	case IdpUpdatedEventDelegationTypeExchanged:
+		*s = IdpUpdatedEventDelegationTypeExchanged
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
 
 // The claim challenge minted for a project.
 // Ref: #
@@ -29109,10 +30738,12 @@ func (s *ListFlowDefinitionsRevisions) UnmarshalText(data []byte) error {
 
 // ListIdpRevisionsErrorResponse represents sum type.
 type ListIdpRevisionsErrorResponse struct {
-	Type             ListIdpRevisionsErrorResponseType // switch on this field
-	AuthUnauthorized AuthUnauthorized
-	Internal         Internal
-	ReqInvalid       ReqInvalid
+	Type                ListIdpRevisionsErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	IdpNotFound         IdpNotFound
+	IdpPermissionDenied IdpPermissionDenied
+	Internal            Internal
+	ReqInvalid          ReqInvalid
 }
 
 // ListIdpRevisionsErrorResponseType is oneOf type of ListIdpRevisionsErrorResponse.
@@ -29120,14 +30751,26 @@ type ListIdpRevisionsErrorResponseType string
 
 // Possible values for ListIdpRevisionsErrorResponseType.
 const (
-	AuthUnauthorizedListIdpRevisionsErrorResponse ListIdpRevisionsErrorResponseType = "auth.unauthorized"
-	InternalListIdpRevisionsErrorResponse         ListIdpRevisionsErrorResponseType = "internal"
-	ReqInvalidListIdpRevisionsErrorResponse       ListIdpRevisionsErrorResponseType = "req.invalid"
+	AuthUnauthorizedListIdpRevisionsErrorResponse    ListIdpRevisionsErrorResponseType = "auth.unauthorized"
+	IdpNotFoundListIdpRevisionsErrorResponse         ListIdpRevisionsErrorResponseType = "idp.not_found"
+	IdpPermissionDeniedListIdpRevisionsErrorResponse ListIdpRevisionsErrorResponseType = "idp.permission_denied"
+	InternalListIdpRevisionsErrorResponse            ListIdpRevisionsErrorResponseType = "internal"
+	ReqInvalidListIdpRevisionsErrorResponse          ListIdpRevisionsErrorResponseType = "req.invalid"
 )
 
 // IsAuthUnauthorized reports whether ListIdpRevisionsErrorResponse is AuthUnauthorized.
 func (s ListIdpRevisionsErrorResponse) IsAuthUnauthorized() bool {
 	return s.Type == AuthUnauthorizedListIdpRevisionsErrorResponse
+}
+
+// IsIdpNotFound reports whether ListIdpRevisionsErrorResponse is IdpNotFound.
+func (s ListIdpRevisionsErrorResponse) IsIdpNotFound() bool {
+	return s.Type == IdpNotFoundListIdpRevisionsErrorResponse
+}
+
+// IsIdpPermissionDenied reports whether ListIdpRevisionsErrorResponse is IdpPermissionDenied.
+func (s ListIdpRevisionsErrorResponse) IsIdpPermissionDenied() bool {
+	return s.Type == IdpPermissionDeniedListIdpRevisionsErrorResponse
 }
 
 // IsInternal reports whether ListIdpRevisionsErrorResponse is Internal.
@@ -29158,6 +30801,48 @@ func (s ListIdpRevisionsErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized
 func NewAuthUnauthorizedListIdpRevisionsErrorResponse(v AuthUnauthorized) ListIdpRevisionsErrorResponse {
 	var s ListIdpRevisionsErrorResponse
 	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetIdpNotFound sets ListIdpRevisionsErrorResponse to IdpNotFound.
+func (s *ListIdpRevisionsErrorResponse) SetIdpNotFound(v IdpNotFound) {
+	s.Type = IdpNotFoundListIdpRevisionsErrorResponse
+	s.IdpNotFound = v
+}
+
+// GetIdpNotFound returns IdpNotFound and true boolean if ListIdpRevisionsErrorResponse is IdpNotFound.
+func (s ListIdpRevisionsErrorResponse) GetIdpNotFound() (v IdpNotFound, ok bool) {
+	if !s.IsIdpNotFound() {
+		return v, false
+	}
+	return s.IdpNotFound, true
+}
+
+// NewIdpNotFoundListIdpRevisionsErrorResponse returns new ListIdpRevisionsErrorResponse from IdpNotFound.
+func NewIdpNotFoundListIdpRevisionsErrorResponse(v IdpNotFound) ListIdpRevisionsErrorResponse {
+	var s ListIdpRevisionsErrorResponse
+	s.SetIdpNotFound(v)
+	return s
+}
+
+// SetIdpPermissionDenied sets ListIdpRevisionsErrorResponse to IdpPermissionDenied.
+func (s *ListIdpRevisionsErrorResponse) SetIdpPermissionDenied(v IdpPermissionDenied) {
+	s.Type = IdpPermissionDeniedListIdpRevisionsErrorResponse
+	s.IdpPermissionDenied = v
+}
+
+// GetIdpPermissionDenied returns IdpPermissionDenied and true boolean if ListIdpRevisionsErrorResponse is IdpPermissionDenied.
+func (s ListIdpRevisionsErrorResponse) GetIdpPermissionDenied() (v IdpPermissionDenied, ok bool) {
+	if !s.IsIdpPermissionDenied() {
+		return v, false
+	}
+	return s.IdpPermissionDenied, true
+}
+
+// NewIdpPermissionDeniedListIdpRevisionsErrorResponse returns new ListIdpRevisionsErrorResponse from IdpPermissionDenied.
+func NewIdpPermissionDeniedListIdpRevisionsErrorResponse(v IdpPermissionDenied) ListIdpRevisionsErrorResponse {
+	var s ListIdpRevisionsErrorResponse
+	s.SetIdpPermissionDenied(v)
 	return s
 }
 
@@ -34337,6 +36022,52 @@ func (o OptFlowStepComplete) Or(d FlowStepComplete) FlowStepComplete {
 	return d
 }
 
+// NewOptFlowStepIdentifier returns new OptFlowStepIdentifier with value set to v.
+func NewOptFlowStepIdentifier(v FlowStepIdentifier) OptFlowStepIdentifier {
+	return OptFlowStepIdentifier{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFlowStepIdentifier is optional FlowStepIdentifier.
+type OptFlowStepIdentifier struct {
+	Value FlowStepIdentifier
+	Set   bool
+}
+
+// IsSet returns true if OptFlowStepIdentifier was set.
+func (o OptFlowStepIdentifier) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFlowStepIdentifier) Reset() {
+	var v FlowStepIdentifier
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFlowStepIdentifier) SetTo(v FlowStepIdentifier) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFlowStepIdentifier) Get() (v FlowStepIdentifier, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFlowStepIdentifier) Or(d FlowStepIdentifier) FlowStepIdentifier {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptFlowSubmitRequestChallengeResponse returns new OptFlowSubmitRequestChallengeResponse with value set to v.
 func NewOptFlowSubmitRequestChallengeResponse(v FlowSubmitRequestChallengeResponse) OptFlowSubmitRequestChallengeResponse {
 	return OptFlowSubmitRequestChallengeResponse{
@@ -36033,6 +37764,282 @@ func (o OptIdpConnectionVerifiedClaims) Get() (v IdpConnectionVerifiedClaims, ok
 
 // Or returns value if set, or given parameter if does not.
 func (o OptIdpConnectionVerifiedClaims) Or(d IdpConnectionVerifiedClaims) IdpConnectionVerifiedClaims {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptIdpCreatedEventDelegationType returns new OptIdpCreatedEventDelegationType with value set to v.
+func NewOptIdpCreatedEventDelegationType(v IdpCreatedEventDelegationType) OptIdpCreatedEventDelegationType {
+	return OptIdpCreatedEventDelegationType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptIdpCreatedEventDelegationType is optional IdpCreatedEventDelegationType.
+type OptIdpCreatedEventDelegationType struct {
+	Value IdpCreatedEventDelegationType
+	Set   bool
+}
+
+// IsSet returns true if OptIdpCreatedEventDelegationType was set.
+func (o OptIdpCreatedEventDelegationType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptIdpCreatedEventDelegationType) Reset() {
+	var v IdpCreatedEventDelegationType
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptIdpCreatedEventDelegationType) SetTo(v IdpCreatedEventDelegationType) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptIdpCreatedEventDelegationType) Get() (v IdpCreatedEventDelegationType, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptIdpCreatedEventDelegationType) Or(d IdpCreatedEventDelegationType) IdpCreatedEventDelegationType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptIdpFieldImmutableDetails returns new OptIdpFieldImmutableDetails with value set to v.
+func NewOptIdpFieldImmutableDetails(v IdpFieldImmutableDetails) OptIdpFieldImmutableDetails {
+	return OptIdpFieldImmutableDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptIdpFieldImmutableDetails is optional IdpFieldImmutableDetails.
+type OptIdpFieldImmutableDetails struct {
+	Value IdpFieldImmutableDetails
+	Set   bool
+}
+
+// IsSet returns true if OptIdpFieldImmutableDetails was set.
+func (o OptIdpFieldImmutableDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptIdpFieldImmutableDetails) Reset() {
+	var v IdpFieldImmutableDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptIdpFieldImmutableDetails) SetTo(v IdpFieldImmutableDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptIdpFieldImmutableDetails) Get() (v IdpFieldImmutableDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptIdpFieldImmutableDetails) Or(d IdpFieldImmutableDetails) IdpFieldImmutableDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptIdpNotFoundDetails returns new OptIdpNotFoundDetails with value set to v.
+func NewOptIdpNotFoundDetails(v IdpNotFoundDetails) OptIdpNotFoundDetails {
+	return OptIdpNotFoundDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptIdpNotFoundDetails is optional IdpNotFoundDetails.
+type OptIdpNotFoundDetails struct {
+	Value IdpNotFoundDetails
+	Set   bool
+}
+
+// IsSet returns true if OptIdpNotFoundDetails was set.
+func (o OptIdpNotFoundDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptIdpNotFoundDetails) Reset() {
+	var v IdpNotFoundDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptIdpNotFoundDetails) SetTo(v IdpNotFoundDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptIdpNotFoundDetails) Get() (v IdpNotFoundDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptIdpNotFoundDetails) Or(d IdpNotFoundDetails) IdpNotFoundDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptIdpPermissionDeniedDetails returns new OptIdpPermissionDeniedDetails with value set to v.
+func NewOptIdpPermissionDeniedDetails(v IdpPermissionDeniedDetails) OptIdpPermissionDeniedDetails {
+	return OptIdpPermissionDeniedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptIdpPermissionDeniedDetails is optional IdpPermissionDeniedDetails.
+type OptIdpPermissionDeniedDetails struct {
+	Value IdpPermissionDeniedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptIdpPermissionDeniedDetails was set.
+func (o OptIdpPermissionDeniedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptIdpPermissionDeniedDetails) Reset() {
+	var v IdpPermissionDeniedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptIdpPermissionDeniedDetails) SetTo(v IdpPermissionDeniedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptIdpPermissionDeniedDetails) Get() (v IdpPermissionDeniedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptIdpPermissionDeniedDetails) Or(d IdpPermissionDeniedDetails) IdpPermissionDeniedDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptIdpRevisionConflictDetails returns new OptIdpRevisionConflictDetails with value set to v.
+func NewOptIdpRevisionConflictDetails(v IdpRevisionConflictDetails) OptIdpRevisionConflictDetails {
+	return OptIdpRevisionConflictDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptIdpRevisionConflictDetails is optional IdpRevisionConflictDetails.
+type OptIdpRevisionConflictDetails struct {
+	Value IdpRevisionConflictDetails
+	Set   bool
+}
+
+// IsSet returns true if OptIdpRevisionConflictDetails was set.
+func (o OptIdpRevisionConflictDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptIdpRevisionConflictDetails) Reset() {
+	var v IdpRevisionConflictDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptIdpRevisionConflictDetails) SetTo(v IdpRevisionConflictDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptIdpRevisionConflictDetails) Get() (v IdpRevisionConflictDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptIdpRevisionConflictDetails) Or(d IdpRevisionConflictDetails) IdpRevisionConflictDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptIdpUpdatedEventDelegationType returns new OptIdpUpdatedEventDelegationType with value set to v.
+func NewOptIdpUpdatedEventDelegationType(v IdpUpdatedEventDelegationType) OptIdpUpdatedEventDelegationType {
+	return OptIdpUpdatedEventDelegationType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptIdpUpdatedEventDelegationType is optional IdpUpdatedEventDelegationType.
+type OptIdpUpdatedEventDelegationType struct {
+	Value IdpUpdatedEventDelegationType
+	Set   bool
+}
+
+// IsSet returns true if OptIdpUpdatedEventDelegationType was set.
+func (o OptIdpUpdatedEventDelegationType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptIdpUpdatedEventDelegationType) Reset() {
+	var v IdpUpdatedEventDelegationType
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptIdpUpdatedEventDelegationType) SetTo(v IdpUpdatedEventDelegationType) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptIdpUpdatedEventDelegationType) Get() (v IdpUpdatedEventDelegationType, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptIdpUpdatedEventDelegationType) Or(d IdpUpdatedEventDelegationType) IdpUpdatedEventDelegationType {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -37879,6 +39886,132 @@ func (o OptNilFlowdefUpdatedEventActorType) Get() (v FlowdefUpdatedEventActorTyp
 
 // Or returns value if set, or given parameter if does not.
 func (o OptNilFlowdefUpdatedEventActorType) Or(d FlowdefUpdatedEventActorType) FlowdefUpdatedEventActorType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilIdpCreatedEventActorType returns new OptNilIdpCreatedEventActorType with value set to v.
+func NewOptNilIdpCreatedEventActorType(v IdpCreatedEventActorType) OptNilIdpCreatedEventActorType {
+	return OptNilIdpCreatedEventActorType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilIdpCreatedEventActorType is optional nullable IdpCreatedEventActorType.
+type OptNilIdpCreatedEventActorType struct {
+	Value IdpCreatedEventActorType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilIdpCreatedEventActorType was set.
+func (o OptNilIdpCreatedEventActorType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilIdpCreatedEventActorType) Reset() {
+	var v IdpCreatedEventActorType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilIdpCreatedEventActorType) SetTo(v IdpCreatedEventActorType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilIdpCreatedEventActorType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilIdpCreatedEventActorType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v IdpCreatedEventActorType
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilIdpCreatedEventActorType) Get() (v IdpCreatedEventActorType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilIdpCreatedEventActorType) Or(d IdpCreatedEventActorType) IdpCreatedEventActorType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilIdpUpdatedEventActorType returns new OptNilIdpUpdatedEventActorType with value set to v.
+func NewOptNilIdpUpdatedEventActorType(v IdpUpdatedEventActorType) OptNilIdpUpdatedEventActorType {
+	return OptNilIdpUpdatedEventActorType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilIdpUpdatedEventActorType is optional nullable IdpUpdatedEventActorType.
+type OptNilIdpUpdatedEventActorType struct {
+	Value IdpUpdatedEventActorType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilIdpUpdatedEventActorType was set.
+func (o OptNilIdpUpdatedEventActorType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilIdpUpdatedEventActorType) Reset() {
+	var v IdpUpdatedEventActorType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilIdpUpdatedEventActorType) SetTo(v IdpUpdatedEventActorType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilIdpUpdatedEventActorType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilIdpUpdatedEventActorType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v IdpUpdatedEventActorType
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilIdpUpdatedEventActorType) Get() (v IdpUpdatedEventActorType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilIdpUpdatedEventActorType) Or(d IdpUpdatedEventActorType) IdpUpdatedEventActorType {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -47796,10 +49929,13 @@ func (*QueryIdpsBadRequest) queryIdpsRes() {}
 
 // QueryIdpsErrorResponse represents sum type.
 type QueryIdpsErrorResponse struct {
-	Type             QueryIdpsErrorResponseType // switch on this field
-	AuthUnauthorized AuthUnauthorized
-	Internal         Internal
-	ReqInvalid       ReqInvalid
+	Type                QueryIdpsErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	IdpNotFound         IdpNotFound
+	IdpPermissionDenied IdpPermissionDenied
+	Internal            Internal
+	NotImplemented      NotImplemented
+	ReqInvalid          ReqInvalid
 }
 
 // QueryIdpsErrorResponseType is oneOf type of QueryIdpsErrorResponse.
@@ -47807,9 +49943,12 @@ type QueryIdpsErrorResponseType string
 
 // Possible values for QueryIdpsErrorResponseType.
 const (
-	AuthUnauthorizedQueryIdpsErrorResponse QueryIdpsErrorResponseType = "auth.unauthorized"
-	InternalQueryIdpsErrorResponse         QueryIdpsErrorResponseType = "internal"
-	ReqInvalidQueryIdpsErrorResponse       QueryIdpsErrorResponseType = "req.invalid"
+	AuthUnauthorizedQueryIdpsErrorResponse    QueryIdpsErrorResponseType = "auth.unauthorized"
+	IdpNotFoundQueryIdpsErrorResponse         QueryIdpsErrorResponseType = "idp.not_found"
+	IdpPermissionDeniedQueryIdpsErrorResponse QueryIdpsErrorResponseType = "idp.permission_denied"
+	InternalQueryIdpsErrorResponse            QueryIdpsErrorResponseType = "internal"
+	NotImplementedQueryIdpsErrorResponse      QueryIdpsErrorResponseType = "not_implemented"
+	ReqInvalidQueryIdpsErrorResponse          QueryIdpsErrorResponseType = "req.invalid"
 )
 
 // IsAuthUnauthorized reports whether QueryIdpsErrorResponse is AuthUnauthorized.
@@ -47817,8 +49956,23 @@ func (s QueryIdpsErrorResponse) IsAuthUnauthorized() bool {
 	return s.Type == AuthUnauthorizedQueryIdpsErrorResponse
 }
 
+// IsIdpNotFound reports whether QueryIdpsErrorResponse is IdpNotFound.
+func (s QueryIdpsErrorResponse) IsIdpNotFound() bool {
+	return s.Type == IdpNotFoundQueryIdpsErrorResponse
+}
+
+// IsIdpPermissionDenied reports whether QueryIdpsErrorResponse is IdpPermissionDenied.
+func (s QueryIdpsErrorResponse) IsIdpPermissionDenied() bool {
+	return s.Type == IdpPermissionDeniedQueryIdpsErrorResponse
+}
+
 // IsInternal reports whether QueryIdpsErrorResponse is Internal.
 func (s QueryIdpsErrorResponse) IsInternal() bool { return s.Type == InternalQueryIdpsErrorResponse }
+
+// IsNotImplemented reports whether QueryIdpsErrorResponse is NotImplemented.
+func (s QueryIdpsErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedQueryIdpsErrorResponse
+}
 
 // IsReqInvalid reports whether QueryIdpsErrorResponse is ReqInvalid.
 func (s QueryIdpsErrorResponse) IsReqInvalid() bool {
@@ -47846,6 +50000,48 @@ func NewAuthUnauthorizedQueryIdpsErrorResponse(v AuthUnauthorized) QueryIdpsErro
 	return s
 }
 
+// SetIdpNotFound sets QueryIdpsErrorResponse to IdpNotFound.
+func (s *QueryIdpsErrorResponse) SetIdpNotFound(v IdpNotFound) {
+	s.Type = IdpNotFoundQueryIdpsErrorResponse
+	s.IdpNotFound = v
+}
+
+// GetIdpNotFound returns IdpNotFound and true boolean if QueryIdpsErrorResponse is IdpNotFound.
+func (s QueryIdpsErrorResponse) GetIdpNotFound() (v IdpNotFound, ok bool) {
+	if !s.IsIdpNotFound() {
+		return v, false
+	}
+	return s.IdpNotFound, true
+}
+
+// NewIdpNotFoundQueryIdpsErrorResponse returns new QueryIdpsErrorResponse from IdpNotFound.
+func NewIdpNotFoundQueryIdpsErrorResponse(v IdpNotFound) QueryIdpsErrorResponse {
+	var s QueryIdpsErrorResponse
+	s.SetIdpNotFound(v)
+	return s
+}
+
+// SetIdpPermissionDenied sets QueryIdpsErrorResponse to IdpPermissionDenied.
+func (s *QueryIdpsErrorResponse) SetIdpPermissionDenied(v IdpPermissionDenied) {
+	s.Type = IdpPermissionDeniedQueryIdpsErrorResponse
+	s.IdpPermissionDenied = v
+}
+
+// GetIdpPermissionDenied returns IdpPermissionDenied and true boolean if QueryIdpsErrorResponse is IdpPermissionDenied.
+func (s QueryIdpsErrorResponse) GetIdpPermissionDenied() (v IdpPermissionDenied, ok bool) {
+	if !s.IsIdpPermissionDenied() {
+		return v, false
+	}
+	return s.IdpPermissionDenied, true
+}
+
+// NewIdpPermissionDeniedQueryIdpsErrorResponse returns new QueryIdpsErrorResponse from IdpPermissionDenied.
+func NewIdpPermissionDeniedQueryIdpsErrorResponse(v IdpPermissionDenied) QueryIdpsErrorResponse {
+	var s QueryIdpsErrorResponse
+	s.SetIdpPermissionDenied(v)
+	return s
+}
+
 // SetInternal sets QueryIdpsErrorResponse to Internal.
 func (s *QueryIdpsErrorResponse) SetInternal(v Internal) {
 	s.Type = InternalQueryIdpsErrorResponse
@@ -47864,6 +50060,27 @@ func (s QueryIdpsErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalQueryIdpsErrorResponse(v Internal) QueryIdpsErrorResponse {
 	var s QueryIdpsErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets QueryIdpsErrorResponse to NotImplemented.
+func (s *QueryIdpsErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedQueryIdpsErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if QueryIdpsErrorResponse is NotImplemented.
+func (s QueryIdpsErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedQueryIdpsErrorResponse returns new QueryIdpsErrorResponse from NotImplemented.
+func NewNotImplementedQueryIdpsErrorResponse(v NotImplemented) QueryIdpsErrorResponse {
+	var s QueryIdpsErrorResponse
+	s.SetNotImplemented(v)
 	return s
 }
 

@@ -9,9 +9,10 @@ gate, not as a demo-app e2e suite. The canonical contract is
 [`apps/cli-journey-e2e/AGENTS.md`](../../apps/cli-journey-e2e/AGENTS.md) —
 tarball packing (`moon run release:pack`), the `PUBLIC_RELEASE_PACKAGES`
 manifest + `verify-tarballs.mjs` enforcement, the 8-framework matrix, the
-four CI-gated journey variants (`journey_fresh_app`, `journey_passkey`,
-`journey_preexisting`, `journey_testkit`) with `JOURNEY_MATRIX` collapsing,
-port doctrine, and WebAuthn/`localhost` rules all live there. Review pointers
+single `--ci` runner invocation that runs all journey variants (fresh-app,
+passkey, pre-existing app, testkit) concurrently with `--matrix single|full`
+collapsing the framework set, port doctrine, and WebAuthn/`localhost` rules
+all live there. Review pointers
 on top of it:
 
 - CI must install Zitadel packages from current workflow tarballs through the

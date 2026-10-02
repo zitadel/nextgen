@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/api",
-  "version": "1.0.0-alpha.23",
+  "version": "1.0.0-alpha.24",
   "description": "Generated TypeScript API client for the pre-release Zitadel preview.",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/api#readme",
   "bugs": {
@@ -70,7 +70,9 @@
   },
   "scripts": {
     "generate": "orval --config orval.config.ts --clean",
-    "build": "tsdown"
+    "build": "tsdown",
+    "test": "vitest run",
+    "test:all": "pnpm run test"
   },
   "devDependencies": {
     "@faker-js/faker": "catalog:",

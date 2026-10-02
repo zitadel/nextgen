@@ -24,7 +24,7 @@ change needs a changeset, and the whole train versions together.
   changeset. Do not deep-import between SDK packages; go through the
   published entry points.
 - **Peer dependencies**: framework runtimes (`react`, `vue`, `@angular/core`,
-  `solid-js`, `svelte`, `@builder.io/qwik`, `next`, `nuxt`) are
+  `solid-js`, `svelte`, `@qwik.dev/core`, `next`, `nuxt`) are
   `peerDependencies`, never hard dependencies — an SDK must not pin its
   host framework.
 - **TypeScript floor**: consumers need TypeScript ≥ 5.0 (the entry points use

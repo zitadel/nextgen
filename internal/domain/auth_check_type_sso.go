@@ -33,11 +33,12 @@ type SSOStatePayload struct {
 	// runs without PKCE. The verifier travels to the provider's token endpoint
 	// later, so it cannot be stored in the clear (ADR 029, data at rest).
 	EncryptedPKCEVerifier string `json:"encrypted_pkce_verifier,omitempty"`
-	// OIDCNonceHash is HashSecret of the nonce sent in the authorize request.
-	// After that the record only compares it with the id_token's nonce claim,
-	// so it is never read back (ADR 029, verify-only values).
-	OIDCNonceHash string `json:"oidc_nonce_hash"`
-	ReturnTarget  string `json:"return_target"`
+	// OIDCNonce is the nonce sent in the authorize request, as issued. Unlike
+	// the binding nonce it is not verify-only: the id_token verifier takes the
+	// value and compares it with the token's nonce claim in one pass with the
+	// other checks, so a hash would leave the callback nothing to pass.
+	OIDCNonce    string `json:"oidc_nonce"`
+	ReturnTarget string `json:"return_target"`
 }
 
 // MatchesBindingNonce reports whether plain is the nonce this record was issued
@@ -45,23 +46,10 @@ type SSOStatePayload struct {
 // reading the stored field. Empty plain never matches, so a missing cookie
 // cannot pass.
 func (p SSOStatePayload) MatchesBindingNonce(plain string) bool {
-	return matchesHash(plain, p.BindingNonceHash)
-}
-
-// MatchesOIDCNonce reports whether plain is the nonce this record was issued
-// with. The callback compares the id_token's nonce claim through this. Empty
-// plain never matches, so an id_token without the claim cannot pass.
-func (p SSOStatePayload) MatchesOIDCNonce(plain string) bool {
-	return matchesHash(plain, p.OIDCNonceHash)
-}
-
-// matchesHash compares a presented plaintext with a stored HashSecret digest in
-// constant time. An empty plaintext or an empty digest never matches.
-func matchesHash(plain, storedHash string) bool {
-	if plain == "" || storedHash == "" {
+	if plain == "" || p.BindingNonceHash == "" {
 		return false
 	}
-	return subtle.ConstantTimeCompare([]byte(HashSecret(plain)), []byte(storedHash)) == 1
+	return subtle.ConstantTimeCompare([]byte(HashSecret(plain)), []byte(p.BindingNonceHash)) == 1
 }
 
 // DecryptPKCEVerifier returns the plaintext verifier for the token exchange,
@@ -84,7 +72,9 @@ func (p SSOStatePayload) DecryptPKCEVerifier(dec crypto.Decrypter) (string, erro
 }
 
 // LogValue implements [slog.LogValuer]. The nonces and the PKCE verifier are
-// replay material, so only the non-secret routing fields are logged.
+// replay material, so only the non-secret routing fields are logged. For the
+// OIDC nonce, stored in the clear, this list is the only thing keeping it off
+// the log.
 //
 // The receiver is a value so that both SSOStatePayload and *SSOStatePayload
 // redact. With a pointer receiver the value form is not a [slog.LogValuer], so
@@ -168,9 +158,10 @@ func (c SSOCallbackCheck) LogValue() slog.Value {
 var _ AuthCheck = (*SSOCallbackCheck)(nil)
 
 // SSOState is what NewSSOState hands the submit step: the four plaintext
-// secrets it needs and the record to persist. None of them is stored as such.
-// The state becomes the record's lookup hash, both nonces become hashes in the
-// payload, the verifier AES-GCM ciphertext (ADR 029).
+// secrets it needs and the record to persist. The state becomes the record's
+// lookup hash, the binding nonce a hash in the payload, the verifier AES-GCM
+// ciphertext (ADR 029). Only the OIDC nonce is stored as issued, because the
+// callback has to hand the value to the id_token verifier.
 type SSOState struct {
 	State        string            // plaintext state, goes to the provider
 	PKCEVerifier string            // plaintext verifier for PKCEChallenge; empty when PKCE is off
@@ -191,8 +182,9 @@ func (s SSOState) LogValue() slog.Value {
 // NewSSOState mints the secrets. Every value is crypto/rand and base64url: the
 // state (16 bytes), the binding nonce (16 bytes), the OIDC nonce (16 bytes) and
 // the PKCE verifier (32 bytes, the 43-character form RFC 7636 §4.1 recommends).
-// State and both nonces reach the record only as their HashSecret digests.
-// The record's own id is left to the storage layer (ADR 047).
+// State and the binding nonce reach the record only as their HashSecret
+// digests. The OIDC nonce is stored as issued. The record's own id is left to
+// the storage layer (ADR 047).
 //
 // pkceEncrypter nil means PKCE is disabled for this connection: no verifier is
 // minted. Otherwise the verifier is encrypted with it before it is placed on
@@ -239,7 +231,7 @@ func NewSSOState(providerSlug, connectionRevisionID, returnTarget string, pkceEn
 				ConnectionRevisionID:  connectionRevisionID,
 				BindingNonceHash:      HashSecret(bindingNonce),
 				EncryptedPKCEVerifier: encryptedVerifier,
-				OIDCNonceHash:         HashSecret(oidcNonce),
+				OIDCNonce:             oidcNonce,
 				ReturnTarget:          returnTarget,
 			},
 		},
