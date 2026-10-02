@@ -30,10 +30,10 @@ parse the result rather than scraping human output.
 - Flags follow the conventions a model already expects from curl, ssh and wget:
   `--help`/`-h`, `--version`, `-v`/`--verbose`, kebab-case long flags, both
   `--flag value` and `--flag=value`, and `--no-telemetry`-style negation. `-v`
-  is the short form of `--verbose` on every product command; the built-in oclif
-  utilities (`version`, `which`, `search`, …) do not share these global flags —
-  each carries only its own, so check `<command> --help` for a utility's flag
-  surface. Two deliberate deviations worth knowing: `-n` is `--non-interactive`
+  is the short form of `--verbose` on every product command (the built-in oclif
+  utilities such as `version` and `which` have their own smaller flag surface —
+  the per-command `--help` above is authoritative). Two deliberate deviations
+  worth knowing: `-n` is `--non-interactive`
   (not `--dry-run`, which is long-only), and machine output is `--json` (not
   `--output json`). These are the agent-critical flags, so they keep the
   spellings agents reach for most.
