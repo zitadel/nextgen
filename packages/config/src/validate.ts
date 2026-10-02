@@ -101,11 +101,15 @@ const FLIP_OUTCOME_IMPACTS: Readonly<Record<string, string>> = {
 /** Action kinds a flow author may declare; `back` is engine-injected. */
 const DECLARABLE_ACTION_KINDS = new Set(["submit", "passkey", "passkey_register", "navigate"]);
 
-/** Mirrors `flowBackActionName` in flow_state_machine.go. */
-const BACK_ACTION_NAME = "back";
-
-/** Mirrors `FlowActionSSO` in flow_state_machine.go. */
-const SSO_ACTION_NAME = "sso";
+/**
+ * Action names the engine claims, with the reason the validator reports.
+ * Mirrors `flowBackActionName` and `FlowActionSSO` in flow_state_machine.go.
+ * A Map, not an object, so a name like `constructor` cannot match by accident.
+ */
+const RESERVED_ACTION_NAMES = new Map([
+  ["back", "engine-injected back navigation"],
+  ["sso", "sso submissions"],
+]);
 
 /** Mirrors `authMethodPrefix` in flow_definition.go. */
 const AUTH_METHOD_PREFIX = "x-auth-methods#";
@@ -329,20 +333,12 @@ function validateStep(step: FlowStep): FlowValidationIssue[] {
         ),
       );
     }
-    if (action.name === BACK_ACTION_NAME) {
+    const reserved = RESERVED_ACTION_NAMES.get(action.name);
+    if (reserved !== undefined) {
       issues.push(
         error(
           "steps",
-          `step ${q(name)}: action name ${q(action.name)} is reserved for engine-injected back navigation`,
-          name,
-        ),
-      );
-    }
-    if (action.name === SSO_ACTION_NAME) {
-      issues.push(
-        error(
-          "steps",
-          `step ${q(name)}: action name ${q(action.name)} is reserved for sso submissions`,
+          `step ${q(name)}: action name ${q(action.name)} is reserved for ${reserved}`,
           name,
         ),
       );
