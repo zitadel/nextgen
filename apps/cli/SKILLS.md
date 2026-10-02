@@ -31,11 +31,12 @@ parse the result rather than scraping human output.
   `--help`/`-h`, `--version`, `-v`/`--verbose`, kebab-case long flags, both
   `--flag value` and `--flag=value`, and `--no-telemetry`-style negation. `-v`
   is the short form of `--verbose` on every product command; the built-in oclif
-  utilities (`version`, `which`, …) are the exception — they expose their own
-  `--verbose` with no short form, so reach for `--verbose` there. Two deliberate
-  deviations worth knowing: `-n` is `--non-interactive` (not `--dry-run`, which
-  is long-only), and machine output is `--json` (not `--output json`). These are
-  the agent-critical flags, so they keep the spellings agents reach for most.
+  utilities (`version`, `which`, `search`, …) do not share these global flags —
+  each carries only its own, so check `<command> --help` for a utility's flag
+  surface. Two deliberate deviations worth knowing: `-n` is `--non-interactive`
+  (not `--dry-run`, which is long-only), and machine output is `--json` (not
+  `--output json`). These are the agent-critical flags, so they keep the
+  spellings agents reach for most.
 
 ```sh
 npx @zitadel/cli@alpha <command> --non-interactive --json
