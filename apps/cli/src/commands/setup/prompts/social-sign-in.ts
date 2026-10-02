@@ -1,4 +1,4 @@
-import { note, password, select, text } from "@clack/prompts";
+import { multiselect, note, password, text } from "@clack/prompts";
 
 import {
   credentialVariables,
@@ -11,16 +11,10 @@ import { askConnectionEndpoints, callbackUriFor } from "../../../lib/idp";
 import { issuerFromPort } from "../../../lib/orca";
 
 import { bail } from "./cancel";
-import type { PromptContext, SetupAnswers, SetupPrompt } from "./types";
+import type { PromptContext, SetupAnswers, SetupPrompt, SsoAnswer } from "./types";
 
 /**
- * Stands for "no provider". Empty rather than a word, so it can never collide
- * with a catalog key, and a string because clack options carry one.
- */
-const NONE = "";
-
-/**
- * "Add a social sign-in provider?" — the one onboarding question that needs
+ * "Add social sign-in providers?" — the one onboarding question that needs
  * something from outside the terminal, so it asks last of the configuration
  * questions and takes "not now" as a first-class answer (#1081).
  *
@@ -38,56 +32,67 @@ const NONE = "";
  */
 export class SocialSignInPrompt implements SetupPrompt {
   async ask(answers: SetupAnswers, ctx: PromptContext): Promise<SetupAnswers> {
-    const provider = ctx.ssoFromFlag ? answers.sso?.provider : await this.chooseProvider();
-    if (provider === undefined) {
-      return answers;
+    // `--sso` names the set; the wizard asks for it only when no flag did.
+    const chosen = ctx.ssoFromFlag
+      ? answers.sso.map((answer) => answer.provider)
+      : await this.chooseProviders();
+    if (chosen.length === 0) {
+      return { ...answers, sso: [] };
     }
 
-    const entry = idpProvider(provider);
-    // Before the announcement, which names the vendor's console: on a
-    // development build the provider may not be the vendor at all.
-    const endpoints = answers.sso?.endpoints ?? (await askConnectionEndpoints({
-        provider,
-        developmentBuild: ctx.developmentBuild === true,
-        command: "Setup",
-      }));
-    this.announce(entry, answers.devPort, endpoints?.issuer);
+    // Asked per provider rather than once: each registers its own OAuth
+    // application, so each has its own console, its own client id and its own
+    // secret. A flagged run still gets asked for whatever the flags left out.
+    const collected: SsoAnswer[] = [];
+    for (const provider of chosen) {
+      const flagged = answers.sso.find((answer) => answer.provider === provider);
+      const entry = idpProvider(provider);
+      // Before the announcement, which names the vendor's console: on a
+      // development build the provider may not be the vendor at all.
+      const endpoints =
+        flagged?.endpoints ??
+        (await askConnectionEndpoints({
+          provider,
+          developmentBuild: ctx.developmentBuild === true,
+          command: "Setup",
+        }));
+      this.announce(entry, answers.devPort, endpoints?.issuer);
 
-    const clientId =
-      answers.sso?.clientId !== undefined && answers.sso.clientId !== ""
-        ? answers.sso.clientId
-        : await this.askClientId();
-    const secret =
-      answers.sso?.secret !== undefined && answers.sso.secret !== ""
-        ? answers.sso.secret
-        : await this.askSecret(provider);
-    return { ...answers, sso: { provider, clientId, secret, endpoints } };
+      const clientId =
+        flagged?.clientId !== undefined && flagged.clientId !== ""
+          ? flagged.clientId
+          : await this.askClientId(entry);
+      const secret =
+        flagged?.secret !== undefined && flagged.secret !== ""
+          ? flagged.secret
+          : await this.askSecret(provider);
+      collected.push({ provider, clientId, secret, endpoints });
+    }
+    return { ...answers, sso: collected };
   }
 
-  /** The provider, or `undefined` when the developer wants none. */
-  private async chooseProvider(): Promise<string | undefined> {
-    const chosen = await select({
-      message: "Add a social sign-in provider?",
-      initialValue: NONE,
-      options: [
-        {
-          value: NONE,
-          label: "Not now — email sign-in only",
-          // Plain wording, not a quoted command line: a suggested command
-          // belongs in `next_commands` (rendered through `publicCliCommand`,
-          // which knows the installed version), and the contract test holds
-          // that line.
-          hint: "the sso enable command adds one later",
-        },
-        ...IDP_PROVIDERS.map((provider) => ({
-          value: provider,
-          label: `Continue with ${idpProvider(provider).displayName}`,
-          hint: "needs an OAuth app you register with the provider",
-        })),
-      ],
+  /**
+   * The providers to enable, empty when the developer wants none.
+   *
+   * A multi-select rather than one choice: a project may offer several at
+   * once, and the schema and flow already carry `sso_providers` as a list.
+   * `required: false` is what makes "none" an answer -- an explicit "not now"
+   * option cannot coexist with ticking a provider beside it.
+   */
+  private async chooseProviders(): Promise<readonly string[]> {
+    const chosen = await multiselect({
+      message: "Add social sign-in providers?",
+      // Nothing preselected, and declining costs nothing: `sso enable`
+      // performs this journey on an existing Project later.
+      required: false,
+      options: IDP_PROVIDERS.map((provider) => ({
+        value: provider,
+        label: `Continue with ${idpProvider(provider).displayName}`,
+        hint: "needs an OAuth app you register with the provider",
+      })),
     });
     bail(chosen);
-    return String(chosen) === NONE ? undefined : String(chosen);
+    return Array.isArray(chosen) ? chosen.map(String) : [];
   }
 
   /**
@@ -114,9 +119,11 @@ export class SocialSignInPrompt implements SetupPrompt {
   }
 
 
-  private async askClientId(): Promise<string> {
+  private async askClientId(entry: IdpProvider): Promise<string> {
     const answer = await text({
-      message: "Client ID",
+      // Named, because several providers may be asked for in a row and an
+      // unqualified "Client ID" three times over says nothing about which.
+      message: `Client ID (${entry.displayName})`,
       // Vendors format these differently, so only emptiness can be checked.
       validate: (value) => ((value ?? "").trim() === "" ? "Enter the client id." : undefined),
     });
