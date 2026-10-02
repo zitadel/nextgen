@@ -873,8 +873,16 @@ consulted, in order:
 
 ## Prerequisites
 
-Three things this design needs that do not exist yet.
+Four things this design needs that do not exist yet.
 
+- **The publishable key, accepted on the flow operations.** ADR 036 specifies it
+  — an origin-scoped, public-safe bearer that resolves the project server-side
+  "replacing loose `project_id` request fields as the attribution mechanism" —
+  and the SDK already sends it. But there is no `publishableKey` security scheme
+  in `api/openapi/security/`, and the flow operations are declared `security: []`,
+  so they authenticate nobody. **Every rule here that turns on "does the caller
+  hold a credential" depends on this**, including the whole of the project
+  class's effect on release pinning. It is the largest of these four.
 - **A working origin matcher and a preview-host registry.** Matching is exact
   string equality today, so wildcard patterns match nothing at all.
 - **A preview-deploy credential**, narrower than the project secret, or the
