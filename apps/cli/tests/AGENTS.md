@@ -100,7 +100,25 @@ A spec body contains a fixture call, a command, and matchers — nothing else:
 - **No comments.** A step that needs explaining needs a named helper with a
   line of TSDoc instead.
 - **One shape**: arrange, blank line, a single command under test, blank line,
-  assertions.
+  assertions. One claim per test — split rather than assert two things.
+- **One skeleton.** Every suite is two top-level groups, in this order:
+
+  ```ts
+  describe("<command>", () => {
+    describe("against an unavailable platform", () => { ... });
+
+    describe("against the platform", () => {
+      describe("--json", () => { ... });
+      describe("rendered for a terminal", () => { ... });
+    });
+  });
+  ```
+
+  The first group says what the command does when the platform is not
+  answering — most fail, and the local ones (`doctor`, `status`, `stop`,
+  `reset`, `eject`) deliberately carry on, which is worth stating rather than
+  leaving to be discovered. The `--json` and rendered groups never interleave;
+  a command with no human-rendered output simply has no second group.
 
 Formatting is prettier's, per the repo's `.prettierrc.json`, so nothing is
 hand-wrapped.

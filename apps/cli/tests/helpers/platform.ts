@@ -19,6 +19,14 @@ export interface PlatformMock {
   /** Makes storing a schema fail, so a command fails partway through. */
   rejectsSchemaUploads(): void;
 
+  /**
+   * Makes every request fail as a platform that is down would, which the CLI
+   * maps to `E_NETWORK`. A synthetic transport error is not used: the CLI's
+   * detector matches undici's "fetch failed", not msw's "Failed to fetch", so
+   * it would surface as a validation failure instead.
+   */
+  isUnavailable(): void;
+
   /** Drops any arranged failure, so the platform answers normally again. */
   recovers(): void;
 
@@ -42,6 +50,14 @@ export function usePlatformMock(): PlatformMock {
       server.use(
         http.post("*/schemas", () =>
           HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
+        ),
+      );
+    },
+
+    isUnavailable() {
+      server.use(
+        http.all("*", () =>
+          HttpResponse.json({ code: "unavailable", message: "down" }, { status: 503 }),
         ),
       );
     },

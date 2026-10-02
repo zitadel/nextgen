@@ -1,0 +1,47 @@
+import { describe, expect, it } from "vitest";
+
+import { usePlatformMock } from "../helpers/platform";
+import { anApp, aSetUpApp } from "../helpers/project";
+
+const platform = usePlatformMock();
+
+describe("console", () => {
+  describe("against an unavailable platform", () => {
+    it("fails", async () => {
+      const app = await aSetUpApp();
+      platform.isUnavailable();
+
+      const result = await app.run(["console", "--json"]);
+
+      expect(result).toFailWith("E_VALIDATION");
+    });
+  });
+
+  describe("against the platform", () => {
+    describe("--json", () => {
+      it("refuses a project with no local runtime behind it", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["console", "--json"]);
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+
+      it("says there is no local admin to sign in as", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["console", "--json"]);
+
+        expect(result).toExplain("No local admin in this directory");
+      });
+
+      it("refuses a directory that was never set up", async () => {
+        const app = await anApp();
+
+        const result = await app.run(["console", "--json"]);
+
+        expect(result).toFail();
+      });
+    });
+  });
+});

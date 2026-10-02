@@ -7,83 +7,7 @@ import { usePlatformMock } from "../helpers/platform";
 import { anApp } from "../helpers/project";
 import { expectedPublicCliCommand, parseJson, runCliForTest } from "../helpers/run-cli";
 
-usePlatformMock();
-
-describe("the cli", () => {
-  it("leaves an unknown command to oclif and emits no envelope", async () => {
-    const result = await runCliForTest(["bogus", "--json"]);
-
-    expect(result).toExitWith(127);
-    expect(result.stdout.trim()).toBe("");
-  });
-
-  it("names the failure and the way out when run before setup", async () => {
-    const app = await anApp();
-
-    const result = await app.apply();
-
-    expect(result).toFailWith("E_VALIDATION");
-    expect(result).toSuggest(expectedPublicCliCommand("setup"));
-  });
-
-  it("resolves the real server when nothing says otherwise", async () => {
-    const app = await anApp();
-
-    const result = await app.runWithoutServer(["status", "--json"]);
-
-    expect(app.envelopeOf(result).source).toBe("https://api.zitadel.cloud");
-  });
-
-  it("prefers the server named in zitadel.json", async () => {
-    const app = await anApp();
-    await app.writeProjectFile(
-      "zitadel.json",
-      JSON.stringify({
-        $schema: "https://schemas.zitadel.com/v2/project.schema.json",
-        project: "existing",
-        server: "https://self.example",
-      }),
-    );
-
-    const result = await app.runWithoutServer(["status", "--json"]);
-
-    expect(app.envelopeOf(result).source).toBe("https://self.example");
-  });
-
-  it("only ever suggests commands a user can run", async () => {
-    const listed = await runCliForTest(["commands", "--json"]);
-    expect(listed).toSucceed();
-    const visible = new Set(
-      (parseJson(listed.stdout) as Array<{ id?: unknown }>)
-        .map((command) => command.id)
-        .filter((id): id is string => typeof id === "string"),
-    );
-
-    const suggested = await suggestedCommandIds();
-
-    expect([...suggested].sort()).toEqual(expect.arrayContaining(["apply", "doctor", "setup"]));
-    for (const command of suggested) {
-      expect(visible, `${command} is suggested but not a visible command`).toContain(command);
-    }
-  });
-});
-
-/** Every command id the source suggests through `publicCliCommand` or copy. */
-async function suggestedCommandIds(): Promise<Set<string>> {
-  const commands = new Set<string>();
-  for (const file of await typescriptFiles(join(import.meta.dirname, "../../src"))) {
-    const source = await readFile(file, "utf8");
-    for (const match of source.matchAll(/publicCliCommand\(\s*(["`])([^"`$]*)/g)) {
-      const id = commandIdFromArgs(match[2]);
-      if (id) commands.add(id);
-    }
-    for (const match of source.matchAll(/["`]zitadel\s+([^"`]*)/g)) {
-      const id = commandIdFromArgs(match[1] ?? "");
-      if (id) commands.add(id);
-    }
-  }
-  return commands;
-}
+const platform = usePlatformMock();
 
 /** `"sso enable --flag"` and `"sso:enable"` both name the id `sso:enable`. */
 function commandIdFromArgs(args: string): string | undefined {
@@ -108,3 +32,105 @@ async function typescriptFiles(dir: string): Promise<string[]> {
   }
   return files;
 }
+
+/** Every command id the source suggests through `publicCliCommand` or copy. */
+async function suggestedCommandIds(): Promise<Set<string>> {
+  const commands = new Set<string>();
+  for (const file of await typescriptFiles(join(import.meta.dirname, "../../src"))) {
+    const source = await readFile(file, "utf8");
+    for (const match of source.matchAll(/publicCliCommand\(\s*(["`])([^"`$]*)/g)) {
+      const id = commandIdFromArgs(match[2]);
+      if (id) commands.add(id);
+    }
+    for (const match of source.matchAll(/["`]zitadel\s+([^"`]*)/g)) {
+      const id = commandIdFromArgs(match[1] ?? "");
+      if (id) commands.add(id);
+    }
+  }
+  return commands;
+}
+
+describe("the cli", () => {
+  describe("against an unavailable platform", () => {
+    it("still names the failure and the way out", async () => {
+      const app = await anApp();
+      platform.isUnavailable();
+
+      const result = await app.apply();
+
+      expect(result).toFailWith("E_VALIDATION");
+    });
+  });
+
+  describe("against the platform", () => {
+    describe("--json", () => {
+      it("names the failure when run before setup", async () => {
+        const app = await anApp();
+
+        const result = await app.apply();
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+
+      it("points at setup as the way out", async () => {
+        const app = await anApp();
+
+        const result = await app.apply();
+
+        expect(result).toSuggest(expectedPublicCliCommand("setup"));
+      });
+
+      it("resolves the real server when nothing says otherwise", async () => {
+        const app = await anApp();
+
+        const result = await app.runWithoutServer(["status", "--json"]);
+
+        expect(app.envelopeOf(result).source).toBe("https://api.zitadel.cloud");
+      });
+
+      it("prefers the server named in zitadel.json", async () => {
+        const app = await anApp();
+        await app.writeConfig({
+          $schema: "https://schemas.zitadel.com/v2/project.schema.json",
+          project: "existing",
+          server: "https://self.example",
+        });
+
+        const result = await app.runWithoutServer(["status", "--json"]);
+
+        expect(app.envelopeOf(result).source).toBe("https://self.example");
+      });
+
+      it("only ever suggests commands a user can run", async () => {
+        const listed = await runCliForTest(["commands", "--json"]);
+        expect(listed).toSucceed();
+        const visible = new Set(
+          (parseJson(listed.stdout) as Array<{ id?: unknown }>)
+            .map((command) => command.id)
+            .filter((id): id is string => typeof id === "string"),
+        );
+
+        const suggested = await suggestedCommandIds();
+
+        expect([...suggested].sort()).toEqual(expect.arrayContaining(["apply", "doctor", "setup"]));
+        for (const command of suggested) {
+          expect(visible, `${command} is suggested but not a visible command`).toContain(command);
+        }
+      });
+    });
+
+    describe("handled by oclif rather than us", () => {
+      it("exits 127 for a command that does not exist", async () => {
+        const result = await runCliForTest(["bogus", "--json"]);
+
+        expect(result).toExitWith(127);
+      });
+
+      it("emits no envelope for a command that does not exist", async () => {
+        const result = await runCliForTest(["bogus", "--json"]);
+
+        expect(result.stdout.trim()).toBe("");
+      });
+    });
+  });
+});

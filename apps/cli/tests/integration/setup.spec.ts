@@ -7,105 +7,182 @@ import { anApp } from "../helpers/project";
 
 const platform = usePlatformMock();
 
+const SCAFFOLDED_PAGES = ["app/login/page.tsx", "app/register/page.tsx", "app/profile/page.tsx"];
+
 describe("setup", () => {
-  it("scaffolds the project, registers it, and leaves nothing to reconcile", async () => {
-    const app = await anApp();
+  describe("against an unavailable platform", () => {
+    it("fails when the platform is unavailable", async () => {
+      const app = await anApp();
+      platform.isUnavailable();
 
-    const result = await app.setup([], { install: true });
+      const result = await app.setup();
 
-    expect(result).toSucceed();
-    const { data } = app.envelopeOf<{ files_written: string[] }>(result);
-    expect(data.files_written).toContain(".zitadel/schemas/default-human-user.json");
-    expect(data.files_written).toContain(".zitadel/flows/default-login.json");
-    expect(new Set(data.files_written).size).toBe(data.files_written.length);
-    expect(await app.publishedSchemas()).toHaveLength(1);
-    expect(await app.publishedFlows()).toHaveLength(1);
-    expect(await app.plan()).toReportNothingToDo();
-  });
-
-  it("installs the dependencies it added", async () => {
-    const app = await anApp();
-
-    const result = await app.setup([], { install: true });
-
-    expect(result).toSucceed();
-    expect(await app.installInvocation()).toEqual({
-      cwd: await realpath(app.path),
-      args: ["install"],
+      expect(result).toFailWith("E_NETWORK");
     });
   });
 
-  it("keeps the package manager's own output off stdout", async () => {
-    const app = await anApp();
+  describe("against the platform", () => {
+    describe("--json", () => {
+      it("scaffolds the project", async () => {
+        const app = await anApp();
+        const before = await app.snapshot();
 
-    const result = await app.setup([], { install: true });
+        const result = await app.setup();
 
-    expect(result.stdout).not.toContain("fake npm stdout");
-    expect(result.stderr).toContain("fake npm stdout");
-  });
+        expect(result).toSucceed();
+        expect((await before.changes()).added).toEqual(expect.arrayContaining(SCAFFOLDED_PAGES));
+      });
 
-  it("refuses an app below the supported framework version without touching it", async () => {
-    const app = await anApp({ nextVersion: "^14.2.0" });
+      it("reports the configuration files it wrote", async () => {
+        const app = await anApp();
 
-    const result = await app.setup();
+        const result = await app.setup();
 
-    expect(result).toFailWith("E_UNSUPPORTED_PROJECT_SHAPE");
-    expect(result).toExplain("below the supported floor");
-    expect(await app.hasBeenConfigured()).toBe(false);
-  });
+        const { data } = app.envelopeOf<{ files_written: string[] }>(result);
+        expect(data.files_written).toContain(".zitadel/schemas/default-human-user.json");
+        expect(data.files_written).toContain(".zitadel/flows/default-login.json");
+      });
 
-  it("skips a rerun and leaves the developer's edits in place", async () => {
-    const app = await anApp();
-    expect(await app.setup()).toSucceed();
-    await app.editUserSchema((schema) => {
-      schema.properties.company = { type: "string" };
+      it("reports each written file once", async () => {
+        const app = await anApp();
+
+        const result = await app.setup();
+
+        const { data } = app.envelopeOf<{ files_written: string[] }>(result);
+        expect(new Set(data.files_written).size).toBe(data.files_written.length);
+      });
+
+      it("registers the schema and the flow with the platform", async () => {
+        const app = await anApp();
+
+        expect(await app.setup()).toSucceed();
+
+        expect(await app.publishedSchemas()).toHaveLength(1);
+        expect(await app.publishedFlows()).toHaveLength(1);
+      });
+
+      it("leaves nothing to reconcile", async () => {
+        const app = await anApp();
+
+        expect(await app.setup()).toSucceed();
+
+        expect(await app.plan()).toReportNothingToDo();
+      });
+
+      it("installs the dependencies it added", async () => {
+        const app = await anApp();
+
+        expect(await app.setup([], { install: true })).toSucceed();
+
+        expect(await app.installInvocation()).toEqual({
+          cwd: await realpath(app.path),
+          args: ["install"],
+        });
+      });
+
+      it("keeps the package manager's own output off stdout", async () => {
+        const app = await anApp();
+
+        const result = await app.setup([], { install: true });
+
+        expect(result.stdout).not.toContain("fake npm stdout");
+        expect(result.stderr).toContain("fake npm stdout");
+      });
+
+      it("refuses an app below the supported framework version", async () => {
+        const app = await anApp({ nextVersion: "^14.2.0" });
+
+        const result = await app.setup();
+
+        expect(result).toFailWith("E_UNSUPPORTED_PROJECT_SHAPE");
+        expect(result).toExplain("below the supported floor");
+      });
+
+      it("writes nothing to an app it refuses", async () => {
+        const app = await anApp({ nextVersion: "^14.2.0" });
+        const before = await app.snapshot();
+
+        await app.setup();
+
+        expect(await before.changes()).toMatchObject({ added: [], modified: [], removed: [] });
+      });
+
+      it("skips a rerun", async () => {
+        const app = await anApp();
+        expect(await app.setup()).toSucceed();
+
+        const rerun = await app.setup();
+
+        expect(rerun).toBeSkipped();
+      });
+
+      it("leaves the developer's edits in place on a rerun", async () => {
+        const app = await anApp();
+        expect(await app.setup()).toSucceed();
+        await app.editUserSchema((schema) => {
+          schema.properties.company = { type: "string" };
+        });
+
+        expect(await app.setup()).toBeSkipped();
+
+        expect((await app.plan()).total).toBeGreaterThan(0);
+      });
+
+      it("does not claim to be configured after a failed run", async () => {
+        const app = await anApp();
+        platform.isUnavailable();
+
+        expect(await app.setup()).toFail();
+
+        expect(await app.hasBeenConfigured()).toBe(false);
+      });
+
+      it("lets a rerun finish what a failed run started", async () => {
+        const app = await anApp();
+        platform.rejectsSchemaUploads();
+        expect(await app.setup()).toFail();
+        platform.recovers();
+
+        expect(await app.setup(["--force"])).toSucceed();
+
+        expect(await app.plan()).toReportNothingToDo();
+      });
+
+      it.each([
+        { preset: "passkey-first", entersOn: "passkey-first", method: "passkey" },
+        { preset: "password-first", entersOn: "identifier", method: "password" },
+      ])("enters the $preset journey on $entersOn", async ({ preset, entersOn }) => {
+        const app = await anApp();
+
+        expect(await app.setup(["--preset", preset])).toSucceed();
+
+        const { flow_definition } = await app.publishedFlow();
+        expect(flow_definition.purposes).toMatchObject({ login: entersOn, register: "register" });
+      });
+
+      it.each([
+        { preset: "passkey-first", method: "passkey" },
+        { preset: "password-first", method: "password" },
+      ])("enables $method for the $preset preset", async ({ preset, method }) => {
+        const app = await anApp();
+
+        expect(await app.setup(["--preset", preset])).toSucceed();
+
+        const { schema } = await app.publishedSchema();
+        expect(schema["x-auth-methods"]).toMatchObject({ [method]: { enabled: true } });
+      });
+
+      it.each(["business", "minimal"])(
+        "scaffolds the pages for the %s use case",
+        async (useCase) => {
+          const app = await anApp();
+          const before = await app.snapshot();
+
+          expect(await app.setup(["--use-case", useCase])).toSucceed();
+
+          expect((await before.changes()).added).toEqual(expect.arrayContaining(SCAFFOLDED_PAGES));
+        },
+      );
     });
-
-    expect(await app.setup()).toBeSkipped();
-
-    expect((await app.plan()).total).toBeGreaterThan(0);
-  });
-
-  it("lets a rerun finish what a failed run started", async () => {
-    const app = await anApp();
-    platform.rejectsSchemaUploads();
-    expect(await app.setup()).toFail();
-    expect(await app.hasBeenConfigured()).toBe(false);
-    platform.recovers();
-
-    expect(await app.setup(["--force"])).toSucceed();
-
-    expect(await app.publishedSchemas()).toHaveLength(1);
-    expect(await app.publishedFlows()).toHaveLength(1);
-    expect(await app.plan()).toReportNothingToDo();
-  });
-
-  it.each([
-    { preset: "passkey-first", entersOn: "passkey-first", method: "passkey" },
-    { preset: "password-first", entersOn: "identifier", method: "password" },
-  ])("scaffolds the $preset journey", async ({ preset, entersOn, method }) => {
-    const app = await anApp();
-
-    expect(await app.setup(["--preset", preset])).toSucceed();
-
-    const { flow_definition } = await app.publishedFlow();
-    expect(flow_definition.purposes).toMatchObject({ login: entersOn, register: "register" });
-    const { schema } = await app.publishedSchema();
-    expect(schema["x-auth-methods"]).toMatchObject({ [method]: { enabled: true } });
-    expect(await app.plan()).toReportNothingToDo();
-  });
-
-  it.each([
-    { useCase: "business", wiresOverlay: true },
-    { useCase: "minimal", wiresOverlay: false },
-  ])("wires the $useCase copy into the pages it scaffolds", async ({ useCase, wiresOverlay }) => {
-    const app = await anApp();
-
-    expect(await app.setup(["--use-case", useCase])).toSucceed();
-
-    for (const page of ["app/login/page.tsx", "app/register/page.tsx"]) {
-      const source = await app.readProjectFile(page);
-      expect(source.includes("element.locales = businessLocales")).toBe(wiresOverlay);
-    }
   });
 });

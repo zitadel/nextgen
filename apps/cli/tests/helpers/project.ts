@@ -1,4 +1,5 @@
-import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { chmod, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Readable } from "node:stream";
@@ -78,6 +79,19 @@ export interface ProjectVariable {
 export interface RegisteredIdp {
   readonly id: string;
   readonly slug: string;
+}
+
+/**
+ * What a command did to the project, as a tree rather than as content.
+ *
+ * A spec asserts that a file was written, removed or left alone; whether its
+ * bytes are right is the patcher's own unit test.
+ */
+export interface ProjectChanges {
+  readonly added: string[];
+  readonly modified: string[];
+  readonly removed: string[];
+  readonly unchanged: string[];
 }
 
 /** The user schema as committed, which the developer owns and edits. */
@@ -271,6 +285,28 @@ export class ScaffoldedApp {
     return result;
   }
 
+  /** Sets a project variable, whose value is piped rather than passed as a flag. */
+  setVariable(name: string, value: string, { secret = false } = {}): Promise<CliResult> {
+    return this.pipingStdin(value, () =>
+      this.cli([
+        "variables",
+        "set",
+        name,
+        "--project-level",
+        "--json",
+        ...(secret ? ["--secret"] : []),
+      ]),
+    );
+  }
+
+  getVariable(name: string): Promise<CliResult> {
+    return this.cli(["variables", "get", name, "--project-level", "--json"]);
+  }
+
+  deleteVariable(name: string): Promise<CliResult> {
+    return this.cli(["variables", "delete", name, "--project-level", "--force", "--json"]);
+  }
+
   /** The providers the platform has registered. */
   registeredIdps(): Promise<RegisteredIdp[]> {
     return this.listed<RegisteredIdp>("idps");
@@ -335,12 +371,24 @@ export class ScaffoldedApp {
     }
   }
 
+  /**
+   * Records the project's files so a later `changesSince` can say what a
+   * command touched, without a spec reading any content.
+   */
+  snapshot(): Promise<ProjectSnapshot> {
+    return ProjectSnapshot.of(this.path);
+  }
+
   readProjectFile(relativePath: string): Promise<string> {
     return readFile(join(this.path, relativePath), "utf8");
   }
 
   writeProjectFile(relativePath: string, contents: string): Promise<void> {
     return writeFile(join(this.path, relativePath), contents);
+  }
+
+  deleteProjectFile(relativePath: string): Promise<void> {
+    return rm(join(this.path, relativePath));
   }
 
   async hasProjectFile(relativePath: string): Promise<boolean> {
@@ -429,14 +477,18 @@ export class ScaffoldedApp {
     return result;
   }
 
+  private pipingSecret<T>(secret: string, run: () => Promise<T>): Promise<T> {
+    return this.pipingStdin(secret, run);
+  }
+
   /**
    * `runCliForTest` runs in-process, so a scripted run would otherwise read
    * the test runner's own stdin and block on a stream that never ends.
    */
-  private async pipingSecret<T>(secret: string, run: () => Promise<T>): Promise<T> {
+  private async pipingStdin<T>(text: string, run: () => Promise<T>): Promise<T> {
     const original = Object.getOwnPropertyDescriptor(process, "stdin");
     Object.defineProperty(process, "stdin", {
-      value: Readable.from([secret]),
+      value: Readable.from([text]),
       configurable: true,
     });
     try {
@@ -447,6 +499,59 @@ export class ScaffoldedApp {
       }
     }
   }
+}
+
+/** The project's files and their hashes at a moment in time. */
+export class ProjectSnapshot {
+  private constructor(
+    private readonly root: string,
+    private readonly files: Map<string, string>,
+  ) {}
+
+  static async of(root: string): Promise<ProjectSnapshot> {
+    return new ProjectSnapshot(root, await hashTree(root));
+  }
+
+  /** What has been added, modified, removed or left alone since. */
+  async changes(): Promise<ProjectChanges> {
+    const now = await hashTree(this.root);
+    const added: string[] = [];
+    const modified: string[] = [];
+    const removed: string[] = [];
+    const unchanged: string[] = [];
+
+    for (const [path, hash] of now) {
+      const before = this.files.get(path);
+      if (before === undefined) added.push(path);
+      else if (before === hash) unchanged.push(path);
+      else modified.push(path);
+    }
+    for (const path of this.files.keys()) {
+      if (!now.has(path)) removed.push(path);
+    }
+
+    return {
+      added: added.sort(),
+      modified: modified.sort(),
+      removed: removed.sort(),
+      unchanged: unchanged.sort(),
+    };
+  }
+}
+
+async function hashTree(root: string, prefix = ""): Promise<Map<string, string>> {
+  const files = new Map<string, string>();
+  for (const entry of await readdir(join(root, prefix), { withFileTypes: true })) {
+    if (entry.name === "node_modules") continue;
+    const path = prefix ? `${prefix}/${entry.name}` : entry.name;
+    if (entry.isDirectory()) {
+      for (const [nested, hash] of await hashTree(root, path)) files.set(nested, hash);
+    } else if (entry.isFile()) {
+      const contents = await readFile(join(root, path));
+      files.set(path, createHash("sha256").update(contents).digest("hex"));
+    }
+  }
+  return files;
 }
 
 function only<T>(items: T[], what: string): T {

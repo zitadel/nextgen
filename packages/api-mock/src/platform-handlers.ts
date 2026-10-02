@@ -40,9 +40,13 @@ import type {
 import {
   CompleteClaimResponse,
   CreateFlowDefinitionBody,
+  CreateIdpBody,
+  CreateIdpQueryParams,
+  CreateIdpResponse,
   CreateProjectBody,
   CreateSchemaBody,
   CreateSchemaQueryParams,
+  DeleteVariableQueryParams,
   GetClaimStatusParams,
   GetClaimStatusQueryParams,
   GetClaimStatusResponse,
@@ -51,29 +55,28 @@ import {
   GetClaimWindowResponse,
   GetFlowDefinitionParams,
   GetFlowDefinitionResponse,
+  GetIdpByIdParams,
+  GetIdpByIdQueryParams,
+  GetIdpByIdResponse,
   GetProjectParams,
   GetProjectResponse,
   GetSchemaByIdParams,
   GetSchemaByIdQueryParams,
+  GetVariableQueryParams,
+  GetVariableResponse,
+  GetVariablesQueryParams,
+  GetVariablesResponse,
   InitClaimParams,
   ListFlowDefinitionsQueryParams,
   ListFlowDefinitionsResponse,
   ListSchemasQueryParams,
-  CreateIdpBody,
-  CreateIdpQueryParams,
-  CreateIdpResponse,
-  GetIdpByIdParams,
-  GetIdpByIdQueryParams,
-  GetIdpByIdResponse,
-  GetVariablesQueryParams,
-  GetVariablesResponse,
   QueryIdpsBody,
   QueryIdpsQueryParams,
   QueryIdpsResponse,
   QueryUsersBody,
   UpdateVariablesBody,
-  UpdateVariablesResponse,
   UpdateVariablesQueryParams,
+  UpdateVariablesResponse,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import { validateFlowDefinition } from "@zitadel/config/validate";
 import {
@@ -1336,6 +1339,44 @@ export function setupPlatformHandlers() {
         return out.response;
       }
       return HttpResponse.json(out.data);
+    }),
+
+    // One variable by name, which `variables get` and `variables delete`
+    // address directly. A variable belongs to the owner that entered it, so a
+    // name another owner of the same project holds answers `var.not_found`
+    // and leaves that owner's value standing.
+    http.get("*/variables/:variableName", ({ request, params }) => {
+      const query = parse(GetVariableQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const owner = variableOwner(query.data.project_id, query.data.environment_name);
+      const held = store.variables.get(owner)?.get(String(params.variableName));
+      if (held === undefined) {
+        return HttpResponse.json(errorBody("var.not_found", "variable not found"), { status: 404 });
+      }
+      const body = held.secret ? { secret: true } : held.value;
+      const out = parse(GetVariableResponse, body, "mock_response_invalid");
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data);
+    }),
+
+    http.delete("*/variables/:variableName", ({ request, params }) => {
+      const query = parse(DeleteVariableQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const owner = variableOwner(query.data.project_id, query.data.environment_name);
+      const owned = store.variables.get(owner);
+      const name = String(params.variableName);
+      if (owned?.has(name) !== true) {
+        return HttpResponse.json(errorBody("var.not_found", "variable not found"), { status: 404 });
+      }
+      owned.delete(name);
+      store.variables.set(owner, owned);
+      return new HttpResponse(null, { status: 204 });
     }),
 
     http.patch("*/variables", async ({ request }) => {

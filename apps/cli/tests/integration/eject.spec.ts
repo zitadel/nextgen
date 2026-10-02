@@ -1,14 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "../helpers/platform";
-import { anApp, aSetUpApp } from "../helpers/project";
-
-const MANAGED_MARKER = "zitadel-cli: managed-file v1";
+import { anApp, aSetUpApp, type ScaffoldedApp } from "../helpers/project";
 
 const platform = usePlatformMock();
 
-/** A Next 15 app through setup, whose boundary file is `middleware.ts`. */
-async function aPatchedApp() {
+/** A Next 15 app through setup, carrying a README the developer wrote. */
+async function aPatchedApp(): Promise<ScaffoldedApp> {
   const app = await anApp({ nextVersion: "^15.0.0" });
   await app.writeProjectFile("README.md", "# demo-next-app\n\nDeploy notes.\n");
   expect(await app.setup()).toSucceed();
@@ -16,61 +14,166 @@ async function aPatchedApp() {
 }
 
 describe("eject", () => {
-  it("removes what setup created and leaves what the developer owns", async () => {
-    const app = await aPatchedApp();
-    expect(await app.readProjectFile("middleware.ts")).toContain(MANAGED_MARKER);
-    await app.writeProjectFile(
-      "app/register/page.tsx",
-      "export default function Page() { return null; }\n",
-    );
+  describe("against an unavailable platform", () => {
+    it("still removes the managed files", async () => {
+      const app = await aPatchedApp();
+      platform.isUnavailable();
 
-    const result = await app.run(["eject", "--force", "--json"]);
+      const result = await app.run(["eject", "--force", "--json"]);
 
-    expect(result).toSucceed();
-    const { data } = app.envelopeOf<{ files_removed: string[]; files_preserved: string[] }>(result);
-    expect(data.files_removed).toEqual(
-      expect.arrayContaining(["app/login/page.tsx", "middleware.ts", "zitadel.json", ".zitadel"]),
-    );
-    expect(data.files_preserved).toContain("app/register/page.tsx");
-    for (const gone of [".zitadel", "zitadel.json", "app/login/page.tsx", "middleware.ts"]) {
-      expect(await app.hasProjectFile(gone), `${gone} should be gone`).toBe(false);
-    }
-    expect(await app.hasProjectFile("app/register/page.tsx")).toBe(true);
+      expect(result).toSucceed();
+    });
   });
 
-  it("takes its guidance back out of the developer's own README", async () => {
-    const app = await aPatchedApp();
-    expect(await app.readProjectFile("README.md")).toContain("## Authentication (Zitadel)");
+  describe("against the platform", () => {
+    describe("--json", () => {
+      it("reports the managed files it removed", async () => {
+        const app = await aPatchedApp();
 
-    const result = await app.run(["eject", "--force", "--json"]);
+        const result = await app.run(["eject", "--force", "--json"]);
 
-    const { data } = app.envelopeOf<{ files_removed: string[] }>(result);
-    expect(data.files_removed).toContain("AGENTS.md");
-    expect(data.files_removed).toContain("README.md (managed section)");
-    expect(await app.hasProjectFile("AGENTS.md")).toBe(false);
-    const readme = await app.readProjectFile("README.md");
-    expect(readme).toContain("Deploy notes.");
-    expect(readme).not.toContain("## Authentication (Zitadel)");
+        expect(result).toSucceed();
+        const { data } = app.envelopeOf<{ files_removed: string[] }>(result);
+        expect(data.files_removed).toEqual(
+          expect.arrayContaining([
+            "app/login/page.tsx",
+            "middleware.ts",
+            "zitadel.json",
+            ".zitadel",
+          ]),
+        );
+      });
+
+      it("reports the developer's own file as preserved", async () => {
+        const app = await aPatchedApp();
+        await app.writeProjectFile(
+          "app/register/page.tsx",
+          "export default function Page() { return null; }\n",
+        );
+
+        const result = await app.run(["eject", "--force", "--json"]);
+
+        const { data } = app.envelopeOf<{ files_preserved: string[] }>(result);
+        expect(data.files_preserved).toContain("app/register/page.tsx");
+      });
+
+      it("removes the managed files from the project", async () => {
+        const app = await aPatchedApp();
+        const before = await app.snapshot();
+
+        await app.run(["eject", "--force", "--json"]);
+
+        const { removed } = await before.changes();
+        expect(removed).toEqual(
+          expect.arrayContaining(["zitadel.json", "app/login/page.tsx", "middleware.ts"]),
+        );
+      });
+
+      it("leaves the developer's own file in the project", async () => {
+        const app = await aPatchedApp();
+        await app.writeProjectFile(
+          "app/register/page.tsx",
+          "export default function Page() { return null; }\n",
+        );
+        const before = await app.snapshot();
+
+        await app.run(["eject", "--force", "--json"]);
+
+        const { unchanged } = await before.changes();
+        expect(unchanged).toContain("app/register/page.tsx");
+      });
+
+      it("takes its own guidance file away and edits the developer's in place", async () => {
+        const app = await aPatchedApp();
+        const before = await app.snapshot();
+
+        await app.run(["eject", "--force", "--json"]);
+
+        const { removed, modified } = await before.changes();
+        expect(removed).toContain("AGENTS.md");
+        expect(modified).toContain("README.md");
+      });
+    });
   });
 });
 
 describe("branding eject", () => {
-  it("publishes the ejected design on the next apply", async () => {
-    const published = platform.capturesBrandingPublishes();
-    const app = await aSetUpApp();
-    expect(published.count).toBe(0);
+  describe("against an unavailable platform", () => {
+    it("still writes the design locally", async () => {
+      const app = await aSetUpApp();
+      platform.isUnavailable();
 
-    expect(
-      await app.run(["branding", "eject", "--design", "minimal", "--non-interactive", "--json"]),
-    ).toSucceed();
-    expect(await app.apply()).toSucceed();
+      const result = await app.run([
+        "branding",
+        "eject",
+        "--design",
+        "minimal",
+        "--non-interactive",
+        "--json",
+      ]);
 
-    expect(published.count).toBe(1);
-    expect(published.last).toMatchObject({ layout: "centered" });
-    expect(typeof published.last?.liquid_template).toBe("string");
-    expect(await app.committed.brandingDescriptor()).toMatchObject({
-      liquid_template: { $file: "./login.liquid" },
+      expect(result).toSucceed();
     });
-    expect(await app.plan()).toReportNothingToDo();
+  });
+
+  describe("against the platform", () => {
+    describe("--json", () => {
+      it("publishes nothing by itself", async () => {
+        const published = platform.capturesBrandingPublishes();
+        const app = await aSetUpApp();
+
+        const result = await app.run([
+          "branding",
+          "eject",
+          "--design",
+          "minimal",
+          "--non-interactive",
+          "--json",
+        ]);
+
+        expect(result).toSucceed();
+        expect(published.count).toBe(0);
+      });
+
+      it("publishes the ejected design on the next apply", async () => {
+        const published = platform.capturesBrandingPublishes();
+        const app = await aSetUpApp();
+        expect(
+          await app.run([
+            "branding",
+            "eject",
+            "--design",
+            "minimal",
+            "--non-interactive",
+            "--json",
+          ]),
+        ).toSucceed();
+
+        const result = await app.apply();
+
+        expect(result).toSucceed();
+        expect(published.count).toBe(1);
+        expect(published.last).toMatchObject({ layout: "centered" });
+      });
+
+      it("leaves nothing to reconcile once the design is published", async () => {
+        platform.capturesBrandingPublishes();
+        const app = await aSetUpApp();
+        expect(
+          await app.run([
+            "branding",
+            "eject",
+            "--design",
+            "minimal",
+            "--non-interactive",
+            "--json",
+          ]),
+        ).toSucceed();
+
+        expect(await app.apply()).toSucceed();
+
+        expect(await app.plan()).toReportNothingToDo();
+      });
+    });
   });
 });
