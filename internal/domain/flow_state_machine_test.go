@@ -742,6 +742,7 @@ func TestFlowStateMachine_Process_SSO_EmitsRedirectStep(t *testing.T) {
 	assert.Empty(t, result.Step.Actions)
 	assert.Equal(t, "nonce-1", result.SSOBindingNonce)
 	assert.Equal(t, "credentials", result.State.CurrentStep, "the flow waits on the step the provider was picked from")
+	assert.Equal(t, time.Unix(1700000000, 0).UTC(), result.State.IssuedAt, "the re-sealed cookie starts a fresh window for the external leg")
 }
 
 func TestFlowStateMachine_Process_SSO_InvalidSubmissions(t *testing.T) {

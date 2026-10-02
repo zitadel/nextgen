@@ -3,6 +3,8 @@
 package integration_test
 
 import (
+	"bytes"
+	"io"
 	"net/http"
 	"net/url"
 	"testing"
@@ -56,23 +58,33 @@ func TestFlowSSOSubmitRedirectsToProvider(t *testing.T) {
 	require.IsType(t, &api.FlowResponseHeaders{}, createResp, helpers.MustMarshal(t, createResp))
 	flowHeaders := createResp.(*api.FlowResponseHeaders)
 	flowID := flowHeaders.Response.ID
-	zflow := mustExtractZflow(t, flowHeaders.SetCookie.Value)
+	zflow := mustExtractZflow(t, flowHeaders.SetCookie)
 
-	origin, err := url.Parse("https://login.example.test")
-	require.NoError(t, err)
-	returnTarget, err := url.Parse("https://login.example.test/login?flow=" + flowID)
-	require.NoError(t, err)
-
-	resp, err := f.client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
+	// Sent raw: the generated client surfaces only the first Set-Cookie
+	// line, and this response has two.
+	returnTarget := url.URL{Scheme: "https", Host: "login.example.test", Path: "/login", RawQuery: "flow=" + flowID}
+	submission := api.FlowSubmitRequest{
 		Action:        "sso",
 		SSOProviderID: api.NewOptString("google"),
-		ReturnTarget:  api.NewOptURI(*returnTarget),
-	}, api.SubmitFlowStepParams{ID: flowID, Zflow: zflow, Origin: api.NewOptURI(*origin)})
+		ReturnTarget:  api.NewOptURI(returnTarget),
+	}
+	body, err := submission.MarshalJSON()
 	require.NoError(t, err)
-	require.IsType(t, &api.SubmitFlowStepOK{}, resp, helpers.MustMarshal(t, resp))
-	ok := resp.(*api.SubmitFlowStepOK)
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, harness.EnsureTestServer(t).URL+"/flow/"+flowID+"/submit", bytes.NewReader(body))
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Origin", "https://login.example.test")
+	req.AddCookie(&http.Cookie{Name: "_zflow", Value: zflow})
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	respBody, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, resp.StatusCode, string(respBody))
+	var ok api.FlowResponse
+	require.NoError(t, ok.UnmarshalJSON(respBody), string(respBody))
 
-	step := ok.Response.Step
+	step := ok.Step
 	require.Equal(t, "sso-redirect", step.Name)
 	require.Equal(t, "sso.redirect.title", step.Texts.Value.TitleKey.Value)
 	require.Empty(t, step.Fields)
@@ -89,12 +101,14 @@ func TestFlowSSOSubmitRedirectsToProvider(t *testing.T) {
 	require.NotEmpty(t, query.Get("state"))
 	require.NotEmpty(t, query.Get("nonce"))
 
-	// The one cookie slot binds the browser; the flow cookie is not rotated
-	// because the state did not change. Without a request host the handler
-	// keeps Secure, so the cookie carries the __Host- prefix.
-	cookies := (&http.Response{Header: http.Header{"Set-Cookie": []string{ok.SetCookie.Value}}}).Cookies()
-	require.Len(t, cookies, 1, ok.SetCookie.Value)
-	binding := cookies[0]
+	// The flow cookie is re-sealed first, then the binding cookie. Without a
+	// request host the handler keeps Secure, so the binding cookie carries
+	// the __Host- prefix.
+	cookies := resp.Cookies()
+	require.Len(t, cookies, 2, resp.Header.Values("Set-Cookie"))
+	require.Equal(t, "_zflow", cookies[0].Name)
+	require.NotEmpty(t, cookies[0].Value)
+	binding := cookies[1]
 	require.Equal(t, "__Host-_zsso", binding.Name)
 	require.True(t, binding.HttpOnly)
 	require.True(t, binding.Secure)

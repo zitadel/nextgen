@@ -85,7 +85,7 @@ func (h *Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest) (a
 
 	resp := h.buildFlowResponse(ctx, result, false)
 	return &api.FlowResponseHeaders{
-		SetCookie: api.NewOptString(flowSetCookie(ctx, cookieValue, false)),
+		SetCookie: []string{flowSetCookie(ctx, cookieValue, false)},
 		Response:  resp,
 	}, nil
 }
@@ -150,10 +150,12 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 		originStr = h
 	}
 	originAllowed := false
+	requestOrigin := ""
 	if originStr != "" {
 		originURL, err := url.Parse(originStr)
 		if err == nil {
 			if rp := passkeyRPFromOrigin(*originURL); rp != nil {
+				requestOrigin = originURL.Scheme + "://" + originURL.Host
 				project, err := h.projectService.Get(ctx, state.ProjectID)
 				if err != nil {
 					// A project lookup failing mid-submit is a server-side
@@ -171,8 +173,11 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 	}
 	// An external sign-in is bound to the request origin: the provider sends
 	// the browser back to its callback route, and the page the browser then
-	// returns to must be on it. A return target on any other origin would be
-	// an open redirect through the callback.
+	// returns to must be on it. For a browser the origin header is not
+	// writable, so a page on one origin cannot aim the return at another.
+	// A non-browser client chooses both values, and until environments
+	// declare an issuer origin the guards that hold then are the provider's
+	// registered redirect URI and the Strict flow cookie.
 	if req.Action == domain.FlowActionSSO || req.SSOProviderID.IsSet() {
 		if !originAllowed {
 			return nil, domain.ErrRequestInvalid().WithMessage("an sso submission needs a request origin")
@@ -181,11 +186,16 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 		if !ok {
 			return nil, domain.ErrRequestInvalid().WithMessage("return_target is required for action sso")
 		}
-		if returnOrigin := returnTarget.Scheme + "://" + returnTarget.Host; !strings.EqualFold(returnOrigin, originStr) {
-			return nil, domain.ErrRequestInvalid().WithMessage(fmt.Sprintf("return_target origin %q is not the request origin %q", returnOrigin, originStr))
+		// No page URL carries userinfo; it is only ever a way to dress a
+		// foreign host up as the origin.
+		if returnTarget.User != nil {
+			return nil, domain.ErrRequestInvalid().WithMessage("return_target must not carry userinfo")
+		}
+		if returnOrigin := returnTarget.Scheme + "://" + returnTarget.Host; !strings.EqualFold(returnOrigin, requestOrigin) {
+			return nil, domain.ErrRequestInvalid().WithMessage(fmt.Sprintf("return_target origin %q is not the request origin %q", returnOrigin, requestOrigin))
 		}
 		submitReq.SSOReturn = &domain.FlowSSOReturn{
-			RedirectURI:  originStr + idpCallbackPath,
+			RedirectURI:  requestOrigin + idpCallbackPath,
 			ReturnTarget: returnTarget.String(),
 		}
 	}
@@ -198,15 +208,6 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 	terminal := result.Step != nil && result.Step.Complete != nil
 	flowResp := h.buildFlowResponse(ctx, result, terminal)
 
-	// The redirect step leaves the flow state as it is, so the response's one
-	// cookie slot carries the binding nonce instead of a re-sealed _zflow.
-	if result.SSOBindingNonce != "" {
-		return &api.SubmitFlowStepOK{
-			SetCookie: api.NewOptString(ssoBindingSetCookie(ctx, result.SSOBindingNonce)),
-			Response:  flowResp,
-		}, nil
-	}
-
 	cookieValue, err := h.sealState(ctx, result.State)
 	if err != nil {
 		return nil, err
@@ -215,13 +216,20 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 	// Validation error: state machine keeps the user on the step with Error set.
 	if result.Step != nil && result.Step.Error != nil {
 		return &api.SubmitFlowStepBadRequest{
-			SetCookie: api.NewOptString(flowSetCookie(ctx, cookieValue, false)),
+			SetCookie: []string{flowSetCookie(ctx, cookieValue, false)},
 			Response:  flowResp,
 		}, nil
 	}
 
+	// _zflow stays first: the generated client reads only the first
+	// Set-Cookie line. The redirect step adds the binding cookie the callback
+	// checks.
+	cookies := []string{flowSetCookie(ctx, cookieValue, terminal)}
+	if result.SSOBindingNonce != "" {
+		cookies = append(cookies, ssoBindingSetCookie(ctx, result.SSOBindingNonce))
+	}
 	return &api.SubmitFlowStepOK{
-		SetCookie: api.NewOptString(flowSetCookie(ctx, cookieValue, terminal)),
+		SetCookie: cookies,
 		Response:  flowResp,
 	}, nil
 }

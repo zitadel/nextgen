@@ -544,10 +544,13 @@ Set-Cookie: __Host-_zsso=<binding nonce>; Path=/; Max-Age=900; HttpOnly; Secure;
 }
 ```
 
-The flow state does not change on this response, so `_zflow` is not
-rotated; the one `Set-Cookie` carries the browser-binding nonce the callback
-checks. `return_target` is the page hosting the orchestrator, where the flow
-resumes after the callback; its origin must equal the request origin.
+The flow state does not change on this response, but `_zflow` is re-sealed
+like on every response, so its ten-minute window restarts at the submission.
+A second `Set-Cookie` line carries the
+browser-binding nonce the callback checks (see
+[The Binding Cookie](../idp/3-social-login-flow.md#the-binding-cookie)).
+`return_target` is the page hosting the orchestrator, where the flow resumes
+after the callback; its origin must equal the request origin.
 
 In the planned ceremony, the frontend navigates to `redirect_url` and the IdP
 callback returns control to the same step:

@@ -430,8 +430,9 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, def *FlowDefiniti
 
 // processSSO starts an external sign-in with a provider the step offers
 // and emits the redirect step. The flow state is left as it is: the user
-// is still on this step until the resolution after the callback routes it,
-// and the response's cookie slot goes to the binding nonce.
+// is still on this step until the resolution after the callback routes it.
+// IssuedAt is refreshed like on every other response, so the flow cookie's
+// window restarts at this submission.
 func (r *FlowStateMachineRuntime) processSSO(pc *processCtx) (FlowStepResult, error) {
 	in := pc.in
 	if in.Action != FlowActionSSO || in.SSOProvider == nil {
@@ -463,6 +464,7 @@ func (r *FlowStateMachineRuntime) processSSO(pc *processCtx) (FlowStepResult, er
 	case err != nil:
 		return FlowStepResult{}, err
 	}
+	pc.state.IssuedAt = r.now()
 	return FlowStepResult{
 		State: pc.state,
 		Step: &FlowStep{

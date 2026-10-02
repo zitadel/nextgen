@@ -19840,12 +19840,12 @@ func (*FlowResponse) getFlowStepRes() {}
 
 // FlowResponseHeaders wraps FlowResponse with response headers.
 type FlowResponseHeaders struct {
-	SetCookie OptString
+	SetCookie []string
 	Response  FlowResponse
 }
 
 // GetSetCookie returns the value of SetCookie.
-func (s *FlowResponseHeaders) GetSetCookie() OptString {
+func (s *FlowResponseHeaders) GetSetCookie() []string {
 	return s.SetCookie
 }
 
@@ -19855,7 +19855,7 @@ func (s *FlowResponseHeaders) GetResponse() FlowResponse {
 }
 
 // SetSetCookie sets the value of SetCookie.
-func (s *FlowResponseHeaders) SetSetCookie(val OptString) {
+func (s *FlowResponseHeaders) SetSetCookie(val []string) {
 	s.SetCookie = val
 }
 

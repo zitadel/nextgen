@@ -13,8 +13,12 @@ import (
 const idpCallbackPath = "/__nextgen/idp/callback"
 
 // ssoBindingCookieName is the browser-binding cookie's name. The `__Host-`
-// prefix requires Secure, so an http development origin, where Secure is
-// dropped for Safari (see cookieSecureFromContext), drops the prefix too.
+// prefix requires Secure, so an http loopback host, where Secure is dropped
+// for Safari (see cookieSecureFromContext), drops the prefix too. Non-loopback
+// http keeps the prefix and Secure, and the browser discards the cookie: such
+// a deployment is unsupported. The callback must pick the name through this
+// function from its own request; a submit and a callback that reach the
+// server over different schemes do not find each other's cookie.
 func ssoBindingCookieName(secure bool) string {
 	if secure {
 		return "__Host-_zsso"

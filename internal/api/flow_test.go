@@ -112,7 +112,7 @@ type testServer struct {
 
 // newTestServer serves the handler bare. Secure on a cookie follows the
 // effective request host, which only WithRequestHostMiddleware injects, so
-// a test that asserts the http development shape passes it as middleware.
+// a test that asserts the http loopback shape passes it as middleware.
 func newTestServer(t *testing.T, middleware ...func(http.Handler) http.Handler) *testServer {
 	t.Helper()
 
@@ -351,6 +351,13 @@ func TestSubmitFlowStep_SSO_BindsTheBrowserAndKeepsTheFlowCookie(t *testing.T) {
 			wantCookie: "__Host-_zsso=nonce-1; Path=/; Max-Age=900; HttpOnly; Secure; SameSite=Lax",
 		},
 		{
+			// Browsers send a bare origin; a trailing slash from another
+			// client must not end up in redirect_uri.
+			name:       "origin with a trailing slash is normalised",
+			origin:     "https://login.example.com/",
+			wantCookie: "__Host-_zsso=nonce-1; Path=/; Max-Age=900; HttpOnly; Secure; SameSite=Lax",
+		},
+		{
 			// The test server listens on http loopback, which the middleware
 			// turns into the effective host Secure follows.
 			name:       "http loopback host drops the prefix and Secure",
@@ -370,18 +377,28 @@ func TestSubmitFlowStep_SSO_BindsTheBrowserAndKeepsTheFlowCookie(t *testing.T) {
 				SSOBindingNonce: "nonce-1",
 			}
 
+			bareOrigin := strings.TrimSuffix(tt.origin, "/")
 			resp, body := doRequestWithOrigin(t, http.MethodPost, ts.srv.URL+"/flow/flow_1/submit", map[string]any{
 				"action":          "sso",
 				"sso_provider_id": "google",
-				"return_target":   tt.origin + "/login?flow=flow_1",
+				"return_target":   bareOrigin + "/login?flow=flow_1",
 			}, ts.sealCookie(t, state), tt.origin)
 			require.Equal(t, http.StatusOK, resp.StatusCode, string(body))
-			require.Equal(t, []string{tt.wantCookie}, resp.Header.Values("Set-Cookie"), "the one cookie slot carries the binding nonce, not _zflow")
+			// Two lines, _zflow first: the generated client reads only the
+			// first Set-Cookie line, so the order is part of the contract.
+			setCookies := resp.Header.Values("Set-Cookie")
+			require.Len(t, setCookies, 2, setCookies)
+			zflow, err := http.ParseSetCookie(setCookies[0])
+			require.NoError(t, err)
+			require.Equal(t, "_zflow", zflow.Name)
+			require.NotEmpty(t, zflow.Value)
+			require.Equal(t, 600, zflow.MaxAge, "the redirect response re-seals the flow cookie")
+			require.Equal(t, tt.wantCookie, setCookies[1])
 
 			require.Equal(t, "google", *ts.fake.gotSubmitReq.SSOProviderID)
 			require.Equal(t, &domain.FlowSSOReturn{
-				RedirectURI:  tt.origin + "/__nextgen/idp/callback",
-				ReturnTarget: tt.origin + "/login?flow=flow_1",
+				RedirectURI:  bareOrigin + "/__nextgen/idp/callback",
+				ReturnTarget: bareOrigin + "/login?flow=flow_1",
 			}, ts.fake.gotSubmitReq.SSOReturn)
 			var out struct {
 				Step struct {
@@ -413,6 +430,12 @@ func TestSubmitFlowStep_SSO_RejectsAnUnboundReturn(t *testing.T) {
 			name:   "return_target with the origin as userinfo",
 			origin: origin,
 			body:   map[string]any{"action": "sso", "sso_provider_id": "google", "return_target": "https://login.example.com@evil.example.com/login"},
+		},
+		{
+			// The host is the origin, but no page URL carries userinfo.
+			name:   "return_target with userinfo on the origin host",
+			origin: origin,
+			body:   map[string]any{"action": "sso", "sso_provider_id": "google", "return_target": "https://evil.example.com@login.example.com/login"},
 		},
 		{
 			name:   "return_target missing",

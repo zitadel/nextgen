@@ -81,13 +81,34 @@ The `state` record serves as the server-side, single-use anchor for the attempt:
   `Strict` would drop the cookie on exactly that navigation and fail every
   attempt.
   The shipped `_zflow` cookie is `Strict`, so its settings cannot be copied.
-- **Development on `http://`:** Safari rejects `Secure` on `http://localhost`
-  (Chrome and Firefox accept it).
-  The shipped `_zflow` cookie lets `Secure` follow the request scheme for that
+- **Development on `http://` loopback:** Safari rejects `Secure` on
+  `http://localhost` (Chrome and Firefox accept it).
+  The shipped `_zflow` cookie drops `Secure` on an http loopback host for that
   reason (`internal/api/flow.go`), which a `__Host-` cookie cannot.
-  On an `http://` development origin the binding cookie therefore drops the
-  `__Host-` prefix and `Secure` and keeps `HttpOnly`, `Path=/`, and
-  `SameSite=Lax`; on every `https://` origin the prefix is required.
+  On an http loopback host the binding cookie therefore drops the `__Host-`
+  prefix and `Secure` and keeps `HttpOnly`, `Path=/`, and `SameSite=Lax`.
+  Every other host keeps the prefix and `Secure`; a non-loopback `http://`
+  deployment is unsupported, the browser discards the cookie there.
+  The callback derives the name from its own request the same way, so a
+  submit and a callback that reach the server over different schemes do not
+  find each other's cookie.
+- **Lifetime:** the record expires with the attempt. The cookie gets the
+  attempt's full TTL at the submission, so it outlives the record by the
+  time spent on the step; a lingering cookie is inert, the record holds only
+  the hash of its nonce.
+  `_zflow` is re-sealed on the redirect response like on every other, so its
+  ten-minute window restarts at the submission; a return after it gets
+  `flow.cookie_expired` while the record is still valid.
+- **One origin:** the API and the page share an origin. The binding cookie
+  is set on the API origin and the callback route and `redirect_uri` are
+  built from the page origin; the `Strict` flow cookie already requires the
+  two to be the same.
+- **Two `Set-Cookie` lines, `_zflow` first:** the flow responses declare the
+  header as a list and the generated server writes one line per cookie
+  (OpenAPI's comma-joined form is invalid for `Set-Cookie`). The order is a
+  contract: the generated Go client reads only the first line, which must
+  stay `_zflow`. For the same reason no cookie may contain a comma, so the
+  cookies use `Max-Age`, never `Expires`.
 
 The engine owns the protocol parameters of the authorize request: `client_id`,
 `redirect_uri`, `response_type`, `scope`, `state`, `nonce`, `code_challenge`,
