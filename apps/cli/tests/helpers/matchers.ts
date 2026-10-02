@@ -1,5 +1,6 @@
 import { expect } from "vitest";
 
+import { EXIT_CODE_FOR, type ErrorCode } from "./errors";
 import { parseJson } from "./run-cli";
 
 /** Matchers that assert the CLI's behaviour in its own terms. */
@@ -97,15 +98,19 @@ expect.extend({
     };
   },
 
-  toFailWith(received: CliResult, code: string) {
+  toFailWith(received: CliResult, code: ErrorCode) {
     const envelope = envelopeOf(received);
-    const pass = received.exitCode !== 0 && envelope.status === "error" && envelope.code === code;
+    const expectedExit = EXIT_CODE_FOR[code];
+    const named = envelope.status === "error" && envelope.code === code;
+    const pass = named && received.exitCode === expectedExit;
     return {
       pass,
       message: () =>
         pass
           ? `expected the command not to fail with ${code}, but it did`
-          : `expected the command to fail with ${code}, but ${describeResult(received)}`,
+          : named
+            ? `expected ${code} to exit ${expectedExit}, but ${describeResult(received)}`
+            : `expected the command to fail with ${code}, but ${describeResult(received)}`,
     };
   },
 
@@ -209,8 +214,11 @@ declare module "vitest" {
     toFail(): T;
     /** This exact exit code, for a code that is itself the contract. */
     toExitWith(code: number): T;
-    /** A non-zero exit and an error envelope carrying this code. */
-    toFailWith(code: string): T;
+    /**
+     * An error envelope carrying this code, exiting with the number
+     * `EXIT_CODE_FOR` says it maps to.
+     */
+    toFailWith(code: ErrorCode): T;
     /** The envelope's `message` mentions this text. */
     toExplain(text: string): T;
     /** The envelope's `hint` mentions this text. */

@@ -1,4 +1,9 @@
-import { resetPlatformStore, setupPlatformHandlers } from "@zitadel/api-mock/platform";
+import {
+  completeClaimChallenge,
+  resetPlatformStore,
+  setupPlatformHandlers,
+  snapshotPlatformStore,
+} from "@zitadel/api-mock/platform";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll } from "vitest";
@@ -37,6 +42,12 @@ export interface PlatformMock {
   /** Drops any arranged failure, so the platform answers normally again. */
   recovers(): void;
 
+  /**
+   * Completes the claim challenge as soon as `claim` opens one, standing in
+   * for the person who would finish it in a browser.
+   */
+  completesTheNextClaim(): void;
+
   /** Records every published branding revision, which the mock does not keep. */
   capturesBrandingPublishes(): Captured<Record<string, unknown>>;
 }
@@ -44,10 +55,14 @@ export interface PlatformMock {
 /** Starts the mock platform for a spec file and resets it between tests. */
 export function usePlatformMock(): PlatformMock {
   const server = setupServer(...setupPlatformHandlers());
+  const watchers: NodeJS.Timeout[] = [];
 
   beforeAll(() => server.listen({ onUnhandledRequest: "warn" }));
   afterAll(() => server.close());
   afterEach(() => {
+    for (const watcher of watchers.splice(0)) {
+      clearInterval(watcher);
+    }
     server.resetHandlers();
     resetPlatformStore();
   });
@@ -75,6 +90,19 @@ export function usePlatformMock(): PlatformMock {
 
     recovers() {
       server.resetHandlers();
+    },
+
+    completesTheNextClaim() {
+      const watcher = setInterval(() => {
+        const { claimChallengeIds, projectIds } = snapshotPlatformStore();
+        const challengeId = claimChallengeIds[0];
+        const projectId = projectIds[0];
+        if (challengeId !== undefined && projectId !== undefined) {
+          clearInterval(watcher);
+          completeClaimChallenge(challengeId, projectId);
+        }
+      }, 20);
+      watchers.push(watcher);
     },
 
     capturesBrandingPublishes() {

@@ -8,6 +8,9 @@ const platform = usePlatformMock();
 /** Prints the link and gives up quickly, rather than opening a browser and waiting. */
 const WITHOUT_A_BROWSER = ["claim", "--no-open", "--timeout", "1", "--json"];
 
+/** Waits long enough for the claim to be completed out of band. */
+const WAITING_FOR_A_BROWSER = ["claim", "--no-open", "--timeout", "10", "--json"];
+
 describe("claim", () => {
   describe("against an invalid server", () => {
     describe("that is not a zitadel api", () => {
@@ -50,6 +53,23 @@ describe("claim", () => {
 
         expect(result).toFail();
       });
+    });
+
+    it("claims the project once the challenge is completed", async () => {
+      const app = await aSetUpApp();
+      platform.completesTheNextClaim();
+
+      const result = await app.run(WAITING_FOR_A_BROWSER);
+
+      expect(result).toSucceed();
+    }, 30000);
+
+    it("reports nothing minted on a dry run", async () => {
+      const app = await aSetUpApp();
+
+      const result = await app.run([...WITHOUT_A_BROWSER, "--dry-run"]);
+
+      expect(result).toBeSkipped();
     });
   });
 });

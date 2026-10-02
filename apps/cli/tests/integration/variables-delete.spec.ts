@@ -60,5 +60,25 @@ describe("variables delete", () => {
         expect(result).toFail();
       });
     });
+
+    it("removes nothing on a dry run", async () => {
+      const app = await aSetUpApp();
+      expect(await app.setVariable("FOO", "bar")).toSucceed();
+
+      const result = await app.run([
+        "variables",
+        "delete",
+        "FOO",
+        "--project-level",
+        "--force",
+        "--dry-run",
+        "--json",
+      ]);
+
+      expect(result).toSucceed();
+      expect(await app.projectVariables()).toEqual(
+        expect.arrayContaining([expect.objectContaining({ name: "FOO" })]),
+      );
+    });
   });
 });

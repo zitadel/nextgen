@@ -137,5 +137,18 @@ describe("apply", () => {
         expect(result).toSucceed();
       });
     });
+
+    it("changes nothing on a dry run", async () => {
+      const app = await aSetUpApp();
+      await addCompanyFieldAndUseIt(app);
+      const published = await app.publishedSchema();
+      const before = await app.snapshot();
+
+      const result = await app.apply(["--dry-run"]);
+
+      expect(result).toSucceed();
+      expect(await app.publishedSchema()).toEqual(published);
+      expect(await before.changes()).toMatchObject({ added: [], modified: [], removed: [] });
+    });
   });
 });

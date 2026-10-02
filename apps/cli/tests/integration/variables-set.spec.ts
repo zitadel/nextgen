@@ -56,5 +56,21 @@ describe("variables set", () => {
         expect(app.envelopeOf<{ secret: boolean }>(result).data.secret).toBe(true);
       });
     });
+
+    it("enters nothing on a dry run", async () => {
+      const app = await aSetUpApp();
+
+      const result = await app.run([
+        "variables",
+        "set",
+        "FOO",
+        "--project-level",
+        "--dry-run",
+        "--json",
+      ]);
+
+      expect(result).toSucceed();
+      expect(await app.projectVariables()).toEqual([]);
+    });
   });
 });

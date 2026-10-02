@@ -107,5 +107,15 @@ describe("eject", () => {
         expect(modified).toContain("README.md");
       });
     });
+
+    it("changes nothing on a dry run", async () => {
+      const app = await aPatchedApp();
+      const before = await app.snapshot();
+
+      const result = await app.run(["eject", "--force", "--dry-run", "--json"]);
+
+      expect(result).toSucceed();
+      expect(await before.changes()).toMatchObject({ added: [], modified: [], removed: [] });
+    });
   });
 });
