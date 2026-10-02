@@ -461,11 +461,10 @@ func (r *FlowStateMachineRuntime) processSSO(pc *processCtx) (FlowStepResult, er
 	// cleanup in Process never runs on this early-return path).
 	pc.state.ClearPendingChallenge()
 	out, err := r.ssoRedirects.Issue(pc.ctx, FlowIssueSSORedirectInput{
-		ProjectID:    pc.state.ProjectID,
-		AttemptID:    pc.state.AuthAttemptID,
-		ProviderSlug: in.SSOProvider.ID,
-		RedirectURI:  in.SSOReturn.RedirectURI,
-		ReturnTarget: in.SSOReturn.ReturnTarget,
+		ProjectID:     pc.state.ProjectID,
+		AttemptID:     pc.state.AuthAttemptID,
+		ProviderSlug:  in.SSOProvider.ID,
+		FlowSSOReturn: *in.SSOReturn,
 	})
 	switch {
 	case errors.Is(err, ErrIDPConnectionNotFound()):

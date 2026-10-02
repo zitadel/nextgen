@@ -11,11 +11,12 @@ record on the auth attempt and returns the `sso-redirect` step, whose
 `redirect_url` is the provider's authorize URL with `state`, `nonce` and,
 when the connection enables PKCE, an S256 code challenge. A `${{ NAME }}`
 `client_id` is filled from the project's variables. The response re-seals
-`_zflow` and adds the browser-binding cookie the callback checks. On https
-it is `__Host-_zsso` with `Secure`. When the request host is http loopback
-(local development, where Safari rejects `Secure`), it is `_zsso` with no
-`Secure`; the `__Host-` prefix is dropped because it requires `Secure`. In
-both cases the cookie is `HttpOnly`, `Path=/` and `SameSite=Lax`.
+`_zflow` and adds the browser-binding cookie the callback checks. On every
+host except http loopback it is `__Host-_zsso` with `Secure`. When the
+request host is http loopback (local development, where Safari rejects
+`Secure`), it is `_zsso` with no `Secure`; the `__Host-` prefix is dropped
+because it requires `Secure`. In both cases the cookie is `HttpOnly`,
+`Path=/` and `SameSite=Lax`.
 
 The flow responses' `Set-Cookie` header is now declared as a list, one
 header line per cookie, `_zflow` first. Browsers never expose the header to

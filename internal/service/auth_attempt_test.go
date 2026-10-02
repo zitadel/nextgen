@@ -473,18 +473,8 @@ func TestAuthAttemptService_IssueSSOState(t *testing.T) {
 		assert.Empty(t, issued.Pending.EncryptedPKCEVerifier)
 	})
 
-	t.Run("refuses an expired attempt before minting", func(t *testing.T) {
-		ctrl := gomock.NewController(t)
-		stmts := mocks.NewMockAllStatements(ctrl)
-		stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), "proj", "att-1").Return(&domain.AuthAttempt{
-			ProjectID: "proj", ID: "att-1", CreatedAt: time.Now().Add(-time.Hour), TimeToLive: new(time.Minute),
-		}, nil)
-
-		_, err := newAuthAttemptSvc(ctrl, stmts, nil, nil).IssueSSOState(t.Context(), input)
-
-		require.ErrorIs(t, err, domain.ErrAuthAttemptInvalidState())
-	})
-
+	// The guard is PrepareChallenge, covered in the domain tests; this
+	// shows only that IssueSSOState runs it before minting.
 	t.Run("refuses a handed off attempt before minting", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		stmts := mocks.NewMockAllStatements(ctrl)

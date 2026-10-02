@@ -1016,7 +1016,7 @@ func (UnimplementedHandler) SetUserPassword(ctx context.Context, req *SetUserPas
 // the external sign-in and the return must complete within it.
 // - A second `Set-Cookie` line carries the browser-binding cookie the
 // callback checks: `HttpOnly`, `Path=/`, `SameSite=Lax`.
-// - On https it is `__Host-_zsso` with `Secure`.
+// - On every host except http loopback it is `__Host-_zsso` with `Secure`.
 // - When the request host is http loopback (local development, where
 // Safari rejects `Secure`), it is `_zsso` with no `Secure`; the
 // `__Host-` prefix is dropped because it requires `Secure`.

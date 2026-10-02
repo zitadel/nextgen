@@ -16,14 +16,12 @@ type FlowSSORedirectIssuer interface {
 }
 
 // FlowIssueSSORedirectInput names the provider the user picked and what the
-// API derived from the request: the callback route the provider redirects
-// to and the page the browser returns to once the callback has run.
+// API derived from the request, the callback route and the return page.
 type FlowIssueSSORedirectInput struct {
 	ProjectID    string
 	AttemptID    string
 	ProviderSlug string
-	RedirectURI  string
-	ReturnTarget string
+	FlowSSOReturn
 }
 
 // FlowSSORedirectOutput is the authorize URL and the nonce the handler sets
