@@ -141,8 +141,10 @@ const (
 )
 
 // passwordAutocomplete is the token a password field carries under each
-// purpose: login verifies the submitted password, register and recovery
-// establish one.
+// purpose: signing in asks for the password the user already has, registering
+// and recovering ask them to choose one. It describes what the form asks for,
+// not what the engine does with the value — dispatch decides that on its own
+// terms, so neither tracks the other.
 //
 // Mapped one purpose at a time, deliberately. An unlisted purpose yields no
 // token rather than inheriting a default, so reauth cannot tell a password
