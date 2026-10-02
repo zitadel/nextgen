@@ -5,10 +5,10 @@
 Flow steps now tell the client how to tag password and identifier inputs for
 password managers and browser autofill.
 
-- **Every field carries an `autocomplete` token.** The identifier your user
-  schema designates gets `username`, or `email` when it is an email address. A
-  password gets `current-password` where it is verified and `new-password` where
-  a new one is saved.
+- **Identifier and password fields carry an `autocomplete` token.** The
+  identifier your user schema designates gets `username`, or `email` when it is
+  an email address. A password gets `current-password` where it is verified and
+  `new-password` where a new one is saved. Every other field carries none.
 - **A password step carries the identifier collected before it.** When a step
   asks for a password but not the identifier, it also returns the identifier
   from the earlier step, so one form can hold both and a manager saves them as a
