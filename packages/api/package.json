@@ -78,6 +78,7 @@
   "devDependencies": {
     "@faker-js/faker": "catalog:",
     "@zitadel/eslint-config": "workspace:*",
+    "eslint": "catalog:",
     "msw": "catalog:",
     "orval": "catalog:",
     "tsdown": "catalog:",

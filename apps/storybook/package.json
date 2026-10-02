@@ -33,6 +33,7 @@
     "@vitest/browser-playwright": "catalog:",
     "@zitadel/eslint-config": "workspace:*",
     "dompurify": "catalog:",
+    "eslint": "catalog:",
     "liquidjs": "catalog:",
     "lucide": "catalog:",
     "lucide-react": "catalog:",

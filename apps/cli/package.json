@@ -121,6 +121,7 @@
     "@zitadel/api-mock": "workspace:*",
     "@zitadel/eslint-config": "workspace:*",
     "@zitadel/sdk-next": "workspace:*",
+    "eslint": "catalog:",
     "msw": "catalog:",
     "oclif": "catalog:",
     "tsdown": "^0.21.10",

@@ -17,6 +17,8 @@
     "@playwright/test": "catalog:",
     "@zitadel/eslint-config": "workspace:*",
     "@zitadel/testing": "workspace:*",
+    "eslint": "catalog:",
+    "eslint-plugin-playwright": "catalog:",
     "typescript": "catalog:"
   }
 }

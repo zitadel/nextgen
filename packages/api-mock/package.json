@@ -56,6 +56,7 @@
     "@vitest/browser": "catalog:",
     "@vitest/browser-playwright": "catalog:",
     "@zitadel/eslint-config": "workspace:*",
+    "eslint": "catalog:",
     "msw": "catalog:",
     "playwright": "catalog:",
     "tsx": "catalog:",

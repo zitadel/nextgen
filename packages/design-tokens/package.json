@@ -37,6 +37,7 @@
   },
   "devDependencies": {
     "@zitadel/eslint-config": "workspace:*",
+    "eslint": "catalog:",
     "tsdown": "catalog:",
     "tslib": "catalog:",
     "tsx": "catalog:"

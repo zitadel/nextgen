@@ -1,5 +1,6 @@
+import type * as React from "react";
+
 import { Check, ChevronDown, X } from "lucide-react";
-import * as React from "react";
 import { type ReactNode, useState } from "react";
 
 import {

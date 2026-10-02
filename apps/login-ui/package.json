@@ -18,6 +18,7 @@
   "devDependencies": {
     "@types/node": "catalog:",
     "@zitadel/eslint-config": "workspace:*",
+    "eslint": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:"
   }

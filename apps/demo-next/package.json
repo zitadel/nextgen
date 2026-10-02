@@ -34,6 +34,11 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@zitadel/eslint-config": "workspace:*",
+    "eslint": "catalog:",
+    "eslint-plugin-jsx-a11y": "catalog:",
+    "eslint-plugin-react": "catalog:",
+    "eslint-plugin-react-hooks": "catalog:",
+    "eslint-plugin-testing-library": "catalog:",
     "typescript": "^5.7.3"
   }
 }

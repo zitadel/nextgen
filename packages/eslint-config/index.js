@@ -11,21 +11,21 @@ import tseslint from "typescript-eslint";
 
 // The ESLint flat-config base shared by every Zitadel SDK package and app.
 //
-// It carries only what is identical across all of them: the recommended
-// JS/TS/import rule sets, the perfectionist + prettier wiring, the hardened
-// TypeScript rules, and the JSON/Markdown languages. It deliberately declares
-// no top-level `ignores` and no framework plugins (React, Svelte, Solid, Qwik,
-// Nuxt, …) — per ESLint guidance, `ignores` are the consumer's responsibility,
-// and framework layers are too package-specific to live here. Each consumer
-// spreads this base and adds its own `ignores` and framework config on top:
+// It carries what is identical across all of them: the universal `ignores`
+// for build/generated/coverage output (kept in sync with the repo
+// `.prettierignore`), the recommended JS/TS/import rule sets, the
+// perfectionist + prettier wiring, the hardened TypeScript rules, and the
+// JSON/Markdown languages. It deliberately declares no framework plugins
+// (React, Svelte, Solid, Qwik, Nuxt, …) — those layers are too
+// package-specific to live here. Each consumer spreads this base and adds only
+// its own package-specific `ignores` and framework config on top:
 //
 //   import { defineConfig } from "eslint/config";
 //   import zitadel from "@zitadel/eslint-config";
 //
 //   export default defineConfig(
-//     { ignores: ["dist/**", "node_modules/**"] },
 //     zitadel,
-//     // …framework-specific blocks…
+//     // …package-specific ignores or framework blocks…
 //   );
 //
 // The source glob intentionally includes `tsx`/`jsx` so JSX-based consumers are
@@ -55,6 +55,7 @@ export default tseslint.config(
       "**/out-tsc/**",
       "**/.next/**",
       "**/.nuxt/**",
+      "**/.nuxt-typecheck/**",
       "**/.output/**",
       "**/.svelte-kit/**",
       "**/storybook-static/**",

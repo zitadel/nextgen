@@ -60,6 +60,7 @@
   "devDependencies": {
     "@playwright/test": "catalog:",
     "@zitadel/eslint-config": "workspace:*",
+    "eslint": "catalog:",
     "msw": "catalog:",
     "tsdown": "catalog:",
     "tslib": "catalog:",

@@ -78,6 +78,7 @@
     "@zitadel/api-mock": "workspace:*",
     "@zitadel/design-tokens": "workspace:*",
     "@zitadel/eslint-config": "workspace:*",
+    "eslint": "catalog:",
     "jsdom": "catalog:",
     "lightningcss": "catalog:",
     "msw": "catalog:",
