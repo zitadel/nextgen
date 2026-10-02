@@ -168,9 +168,9 @@ responsibilities are deliberately narrow:
   it from `GET /sessions/me/csrf` once per session and keeps it in memory; it
   is not a credential on its own. The cookie it is bound to can change in
   another tab, so a write refused with `403 auth.csrf_invalid` makes the console
-  read the session again. It is never retried: the same person gets a fresh
-  token for their next attempt, and if someone else, or nobody, is signed in
-  now, the page starts over.
+  read the session again. Still the same person: it loads a fresh token and the
+  write is retried once with it. Someone else, or nobody: the write is not
+  retried, so it never runs as another person, and the page starts over.
 - **Error mapping** — non-2xx throws `ApiError`; loaders let it propagate to
   the route `errorComponent`. `ApiError.status` drives status-specific copy
   (e.g. a `401`/`403` "you don't have access" surface once auth lands).
