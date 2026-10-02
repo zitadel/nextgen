@@ -190,6 +190,13 @@ func TestConsoleSessionFootholdWithoutPermissionIsForbidden(t *testing.T) {
 			t.Parallel()
 			status, body := consoleCall(t, cookie, tc.method, tc.path, tc.body)
 			assert.Equal(t, http.StatusForbidden, status, body)
+			// A CSRF refusal is a 403 too; this must be the authorization
+			// denial (`<resource>.permission_denied`), not the security layer.
+			var refusal struct {
+				Code string `json:"code"`
+			}
+			require.NoError(t, json.Unmarshal([]byte(body), &refusal), body)
+			assert.True(t, strings.HasSuffix(refusal.Code, ".permission_denied"), body)
 		})
 	}
 }

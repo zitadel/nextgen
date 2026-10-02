@@ -260,8 +260,11 @@ unchanged; only the cookie-authenticated browser leg it opens is affected.
 >   `POST …/query` reads. A refusal is `403 auth.csrf_invalid`, declared in each
 >   affected operation's error responses.
 >
-> Session liveness (the "active user session" condition above) is tracked
-> separately.
+> Session liveness (the "active user session" condition above) needs no
+> check of its own: revoking or rotating a session deletes its token records,
+> a token record expires with its session, and every request introspects the
+> cookie against that record, so a signed-out session is refused at once.
+> `TestConsoleSessionRevokedStopsAuthorizing` pins it.
 
 ### 6. Project discovery is an authorization query
 
