@@ -38,10 +38,9 @@ type UserAction interface {
 }
 
 type SetPasswordInput struct {
-	ProjectID                string
-	UserID                   string
-	Password                 string
-	IsPasswordChangeRequired bool
+	ProjectID string
+	UserID    string
+	Password  string
 }
 
 type GetUserInput struct {
@@ -818,10 +817,9 @@ func (o *SetPasswordUserAction) Prepare(ctx context.Context) (err error) {
 
 func (o *SetPasswordUserAction) Apply(ctx context.Context, stmts AllStatements) error {
 	pw := &domain.SetUserPassword{
-		ProjectID:      o.ProjectID,
-		UserID:         o.UserID,
-		EncodedHash:    o.hash,
-		ChangeRequired: o.IsPasswordChangeRequired,
+		ProjectID:   o.ProjectID,
+		UserID:      o.UserID,
+		EncodedHash: o.hash,
 	}
 	err := stmts.SetUserPassword(ctx, pw)
 	if err != nil {
