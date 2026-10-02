@@ -1317,6 +1317,37 @@ func TestValidator_SSOCollisionHasNoOwnOutcome(t *testing.T) {
 	assert.Contains(t, errorDetails(t, err), `transition key "sso_user_already_exists" is not an action name or reserved outcome`)
 }
 
+// The engine raises sso_authenticated right after it bound the user, and
+// sso_user_not_found with the provider's claims still parked: a re-purpose
+// would drop that user or those claims, and a cross-flow action cannot carry
+// them. The shared user_already_exists keeps both.
+func TestValidator_SSOOutcomeRejectsPurposeAndAction(t *testing.T) {
+	schema := mustSchema(t, userSchemaIDAndPassword)
+	for _, outcome := range []string{domain.FlowImplicitOutcomeSSOAuthenticated, domain.FlowImplicitOutcomeSSOUserNotFound} {
+		for name, tr := range map[string]domain.FlowStepTransition{
+			"purpose": {Target: "register", Purpose: gu.Ptr(domain.FlowDefinitionPurposeRegister)},
+			"action":  {Target: "other-flow", Action: gu.Ptr(domain.Switch)},
+		} {
+			t.Run(outcome+" with "+name, func(t *testing.T) {
+				def := purposedNavDef(nil)
+				def.Steps[0].Transitions[outcome] = tr
+				_, err := domain.ValidateFlowDefinition(schema, def)
+				require.Error(t, err)
+				assert.Contains(t, errorDetails(t, err), fmt.Sprintf(
+					`step "identifier": transition %q is an sso outcome and cannot declare purpose or action`, outcome))
+			})
+		}
+	}
+	t.Run("user_already_exists with purpose", func(t *testing.T) {
+		def := purposedNavDef(nil)
+		def.Steps[1].Transitions[domain.FlowImplicitOutcomeUserAlreadyExists] = domain.FlowStepTransition{
+			Target: "identifier", Purpose: gu.Ptr(domain.FlowDefinitionPurposeLogin),
+		}
+		_, err := domain.ValidateFlowDefinition(schema, def)
+		require.NoError(t, err)
+	})
+}
+
 // ---- on_success manifest cross-check ----
 
 // create_user must have password collected somewhere upstream.
