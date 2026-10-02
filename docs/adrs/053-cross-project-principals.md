@@ -252,10 +252,13 @@ unchanged; only the cookie-authenticated browser leg it opens is affected.
 >   server-side state or keys. Only a holder of the HttpOnly cookie can learn
 >   it, from its own cookie-authenticated resource, `GET /sessions/me/csrf`.
 > - **Scope.** The origin check covers every unsafe request the cookie
->   authenticates. The token is required on the management writes,
->   `claim/complete` and `patchMyUser`. Sign-out (`revokeMySession`) gets the
->   origin check only, because customer apps call it through the SDK proxies,
->   which cannot supply the token yet. The `POST …/query` reads need no token.
+>   authenticates. The token is required on all of them by default, so an
+>   operation that starts accepting the cookie is covered without being
+>   listed; only an explicit exemption list skips it. Sign-out
+>   (`revokeMySession`) is exempt, because customer apps call it through the
+>   SDK proxies, which cannot supply the token yet, and so are the
+>   `POST …/query` reads. A refusal is `403 auth.csrf_invalid`, declared in each
+>   affected operation's error responses.
 >
 > Session liveness (the "active user session" condition above) is tracked
 > separately.
