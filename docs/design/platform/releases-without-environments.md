@@ -37,11 +37,11 @@ The two jobs split cleanly:
 | Job | Where it goes |
 |---|---|
 | "Talk to *this* server, about *this* project" | The client, resolved from the process environment and `.env` files. Never travels as a word like `staging`. |
-| "Serve *this* release" | The request. The caller names a release by content hash; absent that, the project serves its current release. |
+| "Serve *this* release" | The request. Resolved from the exact origin it arrived on, or named explicitly by content hash when there is no origin to resolve from. |
 
 A stage is therefore a `(server, project)` pair that the developer's tooling
-already varies per deploy target. A preview is a release hash. The server never
-learns the word `production`.
+already varies per deploy target. A preview is an origin serving a release. The
+server never learns the word `production`.
 
 Three things make this cheaper than it sounds.
 
@@ -73,7 +73,7 @@ Disambiguating these first, because two of them survive and one does not.
 
 | # | Thing | Where | Fate |
 |---|---|---|---|
-| 1 | **The runtime slot** — `environments` table, `dev`/`staging`/`prod`, `current_deployment_id`, ADR 035 | `internal/domain/environment.go` | **Deleted.** This is the whole of the proposal. |
+| 1 | **The runtime slot** — `environments` table, `dev`/`staging`/`prod`, `current_deployment_id`, ADR 035 | `internal/domain/environment.go` | **Deleted as a named entity.** Its routing job survives as an [origin row](#origins-the-allowlist-and-the-inventory) keyed by URL instead of by name; its seeded set, naming and lifecycle do not. |
 | 2 | **The project's origin-rule class** — a project-level `development \| preview \| production` flag gating which wildcard origin patterns may be saved | [security-and-origins.md §15-43](../api/security-and-origins.md), "LOCKED", **not implemented** | **Survives, renamed and reduced to two values.** See [Project class](#project-class-and-origin-kinds). It is a posture, not a slot. |
 | 3 | **The developer's local stage** — `development`/`preview`/`production` as a label selecting which `.env` files and which target to use | CLI, deleted in #1286; `ZITADEL_ENVIRONMENT` in scaffolds | **Survives, client-only.** Never sent to the server. |
 
@@ -86,36 +86,46 @@ word. The proposal is: delete 1, rename 2, keep 3 local.
 flowchart LR
   P["Project
   class: sandbox | production
-  origin allowlist
+  allowed_origins (patterns)
   publishable key
   current_deployment_id"]
+  O1["Origin row
+  app.acme.com
+  current_deployment_id"]
+  O2["Origin row
+  acme-git-foo.vercel.app
+  current_deployment_id, expires_at"]
   R1["Release A
   content_hash, immutable"]
   R2["Release B
   content_hash, immutable"]
   D[Deployment log]
-  P -->|serves| R1
-  P -.->|addressable by hash| R2
+  P --> O1
+  P --> O2
+  O1 -->|serves| R1
+  O2 -->|serves| R2
+  P -.->|fallback, no Origin| R1
   P --> D
   D --> R1
   D --> R2
 ```
 
-**Project.** Unchanged as the data boundary. Takes over
-`current_deployment_id` — the same denormalised nullable column the environment
-row carries today (`internal/storage/environment/schema.go:29-33`, no foreign
-key, written only inside the deployment transaction). Moving it from the
-environment row to the project row preserves the mechanism exactly: one-row
-reads, a single compare for optimistic concurrency, self-healing on a dangling
-pointer.
+**Project.** Unchanged as the data boundary. Carries the authored origin
+*patterns* and a `current_deployment_id` that answers callers with no `Origin`
+at all — see [Origins](#origins-the-allowlist-and-the-inventory) for why those
+are two different things and why both pointers are needed.
 
-**Release.** Unchanged. `ContentHash` is promoted from an internal dedup key to
-the public wire identifier; `rel_<ULID>` stays as the storage primary key, so
+**Origin row.** An exact origin that exists right now and the release it serves.
+This is the routing record. It is the environment row with its `name` column
+deleted — see [the honest accounting](#the-honest-accounting).
+
+**Release.** Unchanged. `ContentHash` becomes the public wire identifier;
+`rel_<ULID>` stays as the storage primary key, so
 [ADR 047](../../adrs/047-dialect-id-generation.md) is untouched.
 
-**Deployment.** Unchanged except that `EnvironmentID` becomes nothing: the
-project is the target. `reason` keeps `deploy` and `rollback`; `promote` and
-`source_environment_id` go — see
+**Deployment.** `EnvironmentID` goes; what replaces it is a set of origins —
+a deployment is *this release, live at these origins, from this moment.* `reason`
+keeps `deploy` and `rollback`; `promote` and `source_environment_id` go — see
 [what promotion becomes](#what-promotion-becomes). The idempotence already
 implemented (same release → no write, `Created: false`, 200 instead of 201,
 `internal/storage/dialect/sqlite/deployment.go:85-88`) and
@@ -127,13 +137,137 @@ from project creation (`internal/service/project.go:173`), the
 `environment.created` event and its payload, `ResourceKindEnvironment`, the
 `environment.read` scope, `GET /environments[/{name}]`, the `environment_id`
 column on `deployments` and on `variables` (with the `environment_ref` generated
-column and its composite FK), the `environment_name` query parameter on the
-four variable operations, the read-only `zitadel environments list|get`
-commands, and all of [#1311](https://github.com/zitadel/nextgen/issues/1311).
+column and its composite FK), the `environment_name` query parameter on the four
+variable operations, the read-only `zitadel environments list|get` commands, and
+the environment-naming half of
+[#1311](https://github.com/zitadel/nextgen/issues/1311).
 
 Blast radius is real but bounded: environment appears across domain, three
 dialects plus migrations, service, api, and roughly fifteen test files, with
 `deployment` and `variable` as the two coupled entities.
+
+## Origins: the allowlist and the inventory
+
+Three questions arrive together and have one answer:
+
+- Should a deployment be related to origins?
+- Should the server hold a map of which release each origin serves?
+- Is there a difference between the origins a project *allows* and the origins
+  that *exist*?
+
+**Yes, yes, and the third one is why the first two are yes.** "Origins" is
+currently one word for two things with opposite properties.
+
+| | **Allowlist** | **Inventory** |
+|---|---|---|
+| What it is | A rule | A fact |
+| Written by | A human, in `zitadel.json`, reviewed in a PR | A deploy, by CI |
+| Shape | Patterns — `https://*-acmeinc.vercel.app` | Exact origins — `https://acme-git-foo-acmeinc.vercel.app` |
+| Lifetime | As long as the project | As long as the deployment it records |
+| Question it answers | May traffic from here be served at all? | What is this URL serving? |
+| Can it route? | **No.** A pattern matches many hosts. | **Yes.** That is its whole job. |
+
+Conflating them is not a hypothetical problem — it is the bug on `main`.
+`project.PreviewOrigins` holds patterns like `*.vercel.app`, and
+`validateOriginAgainstProject` compares them by **exact string equality**
+(`internal/api/flow.go:371`). So the field is simultaneously a security control
+and a routing hint, and because it is checked as neither, its entries match
+nothing at all.
+
+### The two records
+
+```
+project.allowed_origins: ["https://app.acme.com", "https://*-acmeinc.vercel.app"]
+                          -- patterns. authored. gate only.
+
+origin rows:
+  { origin: "https://app.acme.com",                  current_deployment_id: dep_1 }
+  { origin: "https://acme-git-foo-acmeinc.vercel.app", current_deployment_id: dep_7,
+    expires_at: "2026-10-09T00:00:00Z" }
+                          -- exact. recorded by a deploy. routes.
+```
+
+An origin row is created by a deploy naming where it is going, and it carries the
+same `current_deployment_id` column the environment row carries today, with the
+same rules: denormalised, no foreign key, written inside the deployment
+transaction.
+
+### What this does to resolution
+
+Resolution becomes three layers, each doing one job:
+
+1. **Gate.** Does the request's `Origin` match an `allowed_origins` pattern? No
+   → `403`. Wildcards are fine here; gating is the only thing they are good for.
+2. **Route.** Is there an origin row for this exact `Origin`? Yes → serve the
+   release it points at. **No header, no build-time injection, no client
+   involvement whatsoever.**
+3. **Fall back.** No origin row — so either a caller with no `Origin` (a
+   server-side app, which is the common case behind the scaffolds' proxy), or an
+   origin that is allowed but has never been deployed to. Use an explicit
+   `X-Zitadel-Release` if present, otherwise the project's
+   `current_deployment_id`.
+
+Both project-level and origin-level pointers survive and neither is redundant:
+layer 2 needs an `Origin` to match, and a server-side app sends none.
+
+### Three things this fixes
+
+**The client stops needing to know about releases.** Layer 2 means a browser
+caller sends nothing new — no `X-Zitadel-Release`, no
+`NEXT_PUBLIC_ZITADEL_RELEASE`, no SDK field, no first `X-Zitadel-*` header in
+`packages/api/src/runtime/fetch.ts`. Every SDK and scaffold change this note
+proposed becomes optional rather than required.
+
+**The capability problem disappears.** A caller no longer *asks* for a release;
+it gets what its origin serves. The hash stops being an input on the hot path, so
+"knowing the hash is what authorizes serving it" stops being true. On a
+`production` project, layer 3's header path can then be refused outright for
+uncredentialled callers with nothing lost, because every legitimate browser
+caller is answered by layer 2.
+
+**It resolves the hash hinge, in favour of the content hash.** [Open
+question 1](#open) weighed an unguessable pointer hash against a reproducible
+content hash, and the argument for the pointer hash was that unguessability
+protected the uncredentialled pin path. That path is gone. So the hash can be the
+*content-equivalence* hash — reproducible across projects — and
+[promotion by digest equality](#what-promotion-becomes) becomes checkable. The
+user-visible identifier and the CI assertion can be the same value after all.
+
+**It also removes #1311's worst complexity.** #1311 needed "literal origins route,
+wildcard origins gate, and a wildcard-reached request must carry
+`X-Zitadel-Environment` to disambiguate". Layers 1 and 2 are that rule, minus the
+header: a wildcard match is a gate hit with no route, which falls to layer 3
+rather than needing the client to break a tie.
+
+### The honest accounting
+
+An origin row is an environment row with the `name` column deleted. It keeps
+`current_deployment_id`, `created_at`, an optional `expires_at`, and it needs a
+collector. That is most of the entity this note set out to delete, and pretending
+otherwise would be dishonest.
+
+The deletion that remains is nonetheless real, and worth being precise about:
+**an environment's name was a second identifier for something that already had a
+perfectly good globally-unique one — its URL.** Every awkward part of the
+environment model was the cost of maintaining that second identifier:
+
+- minting `preview-<name>` and keeping it in step with a branch name
+- name uniqueness, collisions, and whether a rename is allowed
+- an `origins` array per environment, and keeping it in sync with the name
+- idempotent-create-renews-TTL, so `zitadel preview` could be re-run per branch
+- `X-Zitadel-Environment`, which exists only because a wildcard-matched origin
+  could not say which *name* it belonged to
+
+All of that goes. What is left is a row keyed by the thing the developer already
+knows and already owns. The entity does not disappear; the naming layer does, and
+the naming layer was the expensive part.
+
+> **This is the decision to make.** Either accept an origin inventory — a routing
+> record with a lifecycle, which is #1311 with names removed — and get silent
+> previews, no client changes and a reproducible hash; or keep origins as a pure
+> allowlist and keep the client-carried hash, with the capability caveat and a
+> build-injected release id. The note now argues for the former, but it is a
+> genuine trade and the second is still coherent.
 
 ## Project class and origin kinds
 
@@ -173,7 +307,7 @@ being production because it also has previews.
 ### Why the class earns its place
 
 Without it, the uncomfortable admission in
-[the release resolver](#the-uncomfortable-part-stated-plainly) — that an
+[the release resolver](#the-uncomfortable-part-and-how-much-of-it-is-left) — that an
 uncredentialled browser caller's release hash functions as a capability —
 applies everywhere. With it:
 
@@ -190,11 +324,21 @@ Allowed, and the reasons to want them are good: a branch build tested against
 the real configuration, the real IdP clients, the real variables. Three
 constraints apply, and the third is not a policy choice.
 
-**1. A preview entry must pin a release.** No hash on the request → `400`, not
-"serve the current release". Two reasons: a preview URL silently rendering
-production configuration is a footgun, and requiring the hash composes with the
-hash being unguessable, so a stranger who reaches a matching origin still cannot
-be served anything.
+**1. A preview must name its release, and registering an origin row is the good
+way to do it.** A preview URL silently rendering production configuration is a
+footgun, so matching a `preview` pattern must never fall through to the project's
+current release. Two ways to satisfy that, and they rank:
+
+- **Preferred — the deploy registers an origin row** for the exact preview URL
+  (`acme-git-foo-acmeinc.vercel.app`) pointing at the release it shipped. Layer 2
+  of [resolution](#rules) then answers, the client sends nothing, and a stranger
+  who reaches a matching wildcard has no row of their own and gets nothing.
+- **Fallback — the build injects `X-Zitadel-Release`.** For platforms where no
+  registration step is available. Requires the publishable key on a `production`
+  project, and leans on the hash being hard to guess.
+
+A `preview` match with neither a row nor a permitted header is `400`, never the
+project's current release.
 
 **2. A shared-host wildcard must be tenant-anchored.** See below.
 
@@ -388,47 +532,55 @@ needs the allowlist to actually work.
 
 ### Rules
 
-1. **Resolve the project from the credential where one exists** — publishable
-   key or project secret. A body `project_id` that disagrees is `403`. Where no
-   credential exists (today's `security: []` flow path), the body field stands,
-   and that is the path ADR 036 is closing.
-2. **No hash named → the project's current release.** Every caller. The ordinary
-   path, and the only path an uncredentialled caller gets — except on a
-   `preview`-kind origin, where it is an error instead (rule 4).
-3. **A hash named → that release,** if it belongs to the caller's project and is
-   not revoked. Permitted for a caller holding the publishable key or the
-   project secret.
-4. **Whether an uncredentialled caller may name a hash depends on the
-   [project class](#project-class-and-origin-kinds).** On a `production` project
-   pinning requires the publishable key or the project secret, so an anonymous
-   pin is refused (`403`) — but previews are unaffected, because every preview
-   build carries the publishable key. On a `sandbox` project pinning is open,
-   because local development depends on it and the project holds no real users.
-   This is the rule the class exists for.
-   The converse also holds: **a `preview`-kind origin *must* name a hash**, and
-   gets `400` if it does not. A preview URL serving the project's current release
-   is a footgun, and requiring the hash is what leaves a stranger who reaches a
-   matching shared-host origin with nothing to be served. See
-   [preview origins on a production project](#preview-origins-on-a-production-project).
-5. **The hash is resolved once per flow and sealed into the flow state.** This
-   follows an existing precedent rather than inventing one: `FlowState` already
-   seals `UserSchemaURL` at start time "so a mid-flow default change doesn't
-   reshape in-flight data" (`internal/domain/flow_state.go:21-24`), and already
-   carries `SessionVersion` / `StepVersion` integrity counters. A sealed release
-   hash is the same idea, one level up. This is the one piece of
-   [#536](https://github.com/zitadel/nextgen/issues/536) that survives intact.
-6. **A hash from another project is `404`,** matching the project-boundary
+**Project first.** Resolve the project from the credential where one exists —
+publishable key or project secret. A body `project_id` that disagrees is `403`.
+Where no credential exists (today's `security: []` flow path) the body field
+stands, and that is the path ADR 036 is closing.
+
+**Then the release, in three layers**
+([why three](#what-this-does-to-resolution)):
+
+1. **Gate.** `Origin` present and matching no `allowed_origins` pattern → `403`.
+   `Origin` absent falls straight through; there is nothing to check.
+2. **Route.** An origin row for this exact `Origin` → serve the release its
+   `current_deployment_id` points at. The caller sent nothing and needed to know
+   nothing. This answers almost all browser traffic.
+3. **Fall back.** No origin row. An explicit `X-Zitadel-Release` wins if present
+   and permitted; otherwise the project's `current_deployment_id`.
+
+**Who may use layer 3's header.** This is the only place the class still
+matters. On a `production` project the header requires the publishable key or
+the project secret, so an anonymous pin is `403`. On a `sandbox` project it is
+open, because local development leans on it and the project holds no real users.
+A `preview`-kind pattern that was matched by layer 1 but produced no layer 2 row
+is a deploy that did not register its origin: serve the fallback and say so in
+the response, rather than guessing.
+
+**Then, regardless of which layer answered**
+
+4. **The resolved release is sealed into the flow state.** This follows an
+   existing precedent rather than inventing one: `FlowState` already seals
+   `UserSchemaURL` at start time "so a mid-flow default change doesn't reshape
+   in-flight data" (`internal/domain/flow_state.go:21-24`), and already carries
+   `SessionVersion` / `StepVersion` integrity counters. A sealed release is the
+   same idea one level up, and it matters more now: layer 2 means a deploy can
+   move an origin's release *while* a user is signing in. This is the one piece
+   of [#536](https://github.com/zitadel/nextgen/issues/536) that survives intact.
+5. **A hash from another project is `404`,** matching the project-boundary
    convention the rest of the API follows.
-7. **A revoked release is `409`.** Revoking the current release is refused —
-   move the pointer first.
-8. **A project always has a current release.** One is built from
+6. **A revoked release is `409`.** Revoking a release any origin row currently
+   serves is refused — move that origin first.
+7. **A project always has a current release.** One is built from
    `packages/config/defaults` at project creation — replacing `SeedDefaults`'
-   call site in the project-create transaction — so rule 2 never has to answer
+   call site in the project-create transaction — so layer 3 never has to answer
    "nothing is deployed".
 
-**Where the hash rides.** `X-Zitadel-Release`, a request header, as the closed
-prototype [#1258](https://github.com/zitadel/nextgen/pull/1258) had it. A header
-rather than a body field because resolution must work on endpoints with no body.
+**Where the hash rides, when it rides at all.** `X-Zitadel-Release`, a request
+header, as the closed prototype
+[#1258](https://github.com/zitadel/nextgen/pull/1258) had it — a header rather
+than a body field because resolution must work on endpoints with no body. With
+layer 2 in place this is no longer the primary path: it is for callers with no
+`Origin` to route on, which in practice means server-side apps and CI.
 
 Note on the seam: the project id arrives in the **body** of `POST /flow`, so a
 `net/http` middleware cannot read it without buffering. The ogen middleware chain
@@ -436,24 +588,33 @@ Note on the seam: the project id arrives in the **body** of `POST /flow`, so a
 seam with the decoded request in hand, and is where resolution belongs. Also
 note the path is `/flow`, singular — #536's text says `/flows`.
 
-### The uncomfortable part, stated plainly
+### The uncomfortable part, and how much of it is left
 
-For a browser SPA, which cannot hold a secret, **the release hash is a
-capability: knowing it is what authorizes serving it.** The publishable key
-names the project and constrains the origin, but neither stops a non-browser
-client holding both values — and the key is public by construction while the
-hash ships in the bundle.
+On the client-carried-hash path, for a browser SPA that cannot hold a secret,
+**the release hash is a capability: knowing it is what authorizes serving it.**
+The publishable key names the project and constrains the origin, but neither
+stops a non-browser client holding both values — and the key is public by
+construction while the hash ships in the bundle.
 
-[Project class](#project-class-and-origin-kinds) confines this to `sandbox` projects, where there
-are no real users to harm; on a `production` project pinning needs a credential
-and the problem does not arise. What follows therefore applies to `sandbox`
-projects, and is the reason the confinement matters rather than a residual worry
-about production:
+Two things shrink this to almost nothing, and it is worth being precise about
+what remains:
 
-- **The hash is unguessable**, because it covers ULID revision ids. (A content
-  equivalence hash, per the decision above, would be *less* unguessable —
-  derivable by anyone who can guess the configuration. That is a genuine
-  argument for keeping both hashes and putting the pointer hash on the wire.)
+- **The [origin inventory](#origins-the-allowlist-and-the-inventory) removes the
+  path.** When layer 2 answers, no hash is sent, so there is no capability to
+  hold. Every browser caller whose deploy registered an origin is simply out of
+  scope for this concern.
+- **The [project class](#project-class-and-origin-kinds) gates the remainder.**
+  On a `production` project the fallback header needs a credential, so an
+  anonymous pin is refused outright.
+
+What is left is `sandbox` projects using the fallback header — local development,
+and previews on platforms with no registration step. There the hash is still a
+capability, and these still apply:
+
+- **The hash is hard to guess.** The pointer hash covers ULID revision ids, so
+  release enumeration is infeasible. A content-equivalence hash would be weaker
+  here — but see [Open 1](#open): with layer 2 carrying production traffic, that
+  weakness no longer blocks the reproducible hash.
 - **`GET /releases` stays on the operator plane.** A listing that leaked hashes
   would undo the previous point.
 - **Revocation is the containment tool.** The real risk of arbitrary pinning is a
@@ -482,7 +643,8 @@ implies otherwise.
 | Short hash matches more than one release | 400 | `rel.ambiguous` |
 | Release revoked | 409 | `rel.revoked` |
 | Uncredentialled caller named a hash on a `production` project | 403 | `rel.pin_not_permitted` |
-| `preview`-kind origin named no hash | 400 | `rel.required` |
+| `preview` pattern matched, no origin row and no permitted header | 400 | `rel.required` |
+| Revoking a release an origin row currently serves | 409 | `rel.in_service` |
 | Loopback origin, or a wildcard `primary` entry, saved on a `production` project | 400 | `proj.origin_not_permitted_for_class` |
 | Shared-host wildcard that is not tenant-anchored, on a `production` project | 400 | `proj.origin_not_tenant_anchored` |
 | Shared-host wildcard on a host the registry does not know | 400 | `proj.origin_host_unknown` |
@@ -765,6 +927,10 @@ depends on.
 
 ## SDK changes
 
+**All of these become optional** once origins route: a browser caller answered by
+layer 2 sends nothing new. They are what the fallback path needs, and what a
+server-side app needs, not what every client needs.
+
 - `ZitadelConfig` (`packages/api/src/runtime/config.ts`) gains
   `release?: string` beside `projectId` and `publishableKey`.
 - `packages/api/src/runtime/fetch.ts` sends `X-Zitadel-Release` when configured.
@@ -793,12 +959,22 @@ depends on.
   release pinning on a production project an authorized operation rather than a
   capability one, and the kind is what lets one project be production *and* host
   previews.
+- **An origin inventory is new** — a row per exact live origin, carrying
+  `current_deployment_id` and an optional `expires_at`, plus a collector for
+  expired rows. This is the environment row with its name deleted, and the
+  [honest accounting](#the-honest-accounting) says so plainly: the entity is
+  reshaped, not removed. What it buys is previews that need no client changes,
+  and the removal of the naming layer that made #1311 expensive.
 - **An origin matcher and a preview-host registry are new.** Matching is exact
   string equality today, so wildcards do not work at all — the `*.vercel.app`
   entries the setup CLI writes into `preview_origins` match nothing. The matcher
   is needed regardless; the registry recording where each host's tenant-unique
   label sits is specific to allowing shared-host previews on production, and is
   the price of the ask.
+- **The SDK and scaffold changes become optional.** With origins routing, a
+  browser caller sends nothing new; `X-Zitadel-Release` and the
+  `NEXT_PUBLIC_ZITADEL_RELEASE` family are for the fallback path and server-side
+  apps only.
 - **RP ID has to become a project setting** for own-domain previews to use
   production passkeys, instead of being derived per request from the full
   hostname. Adjacent work, not strictly part of this design, but previews on a
@@ -828,13 +1004,16 @@ depends on.
 
 ## Open
 
-1. **Pointer hash or content-equivalence hash on the wire.** The hinge. Pointer
-   hash: exists today, unguessable, not reproducible across projects, so no
-   checkable promotion. Content hash: reproducible, enables promotion-by-equality,
-   but guessable by anyone who can guess the configuration — which weakens the
-   capability argument the `sandbox` SPA path depends on. Keeping both, exposing
-   the pointer hash and using the content hash only for CI assertions, is
-   probably the answer; it needs deciding before anything else.
+1. **Pointer hash or content-equivalence hash on the wire — now leaning
+   content.** This was the hinge while the client carried the hash on every
+   request: the pointer hash's unguessability was load-bearing, and a
+   reproducible content hash is guessable by anyone who can guess the
+   configuration. The [origin inventory](#origins-the-allowlist-and-the-inventory)
+   takes the hash off the hot path, so unguessability stops being load-bearing
+   and the content-equivalence hash becomes affordable — which makes
+   [promotion by digest equality](#what-promotion-becomes) checkable. What still
+   needs deciding is whether `sandbox` projects using the fallback header are
+   enough of a case to keep both hashes.
 2. **Portable releases or not** — the promotion trade. If releases become
    portable, stages could share a project again and the design gains an escape
    hatch it otherwise lacks.
