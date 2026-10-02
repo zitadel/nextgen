@@ -18,18 +18,12 @@ Scope pointers first — this file's own body covers **telemetry only**:
 - The test contract — the unit/spec split and one spec per command — is
   [`tests/AGENTS.md`](tests/AGENTS.md). Read it before adding or moving any
   test.
-- The flag surface deliberately tracks the [WebCLI spec](https://webcli.com/)
-  (`--help`/`-h`, `-v`/`--verbose`, `--version`, kebab-case long flags,
-  `--no-<flag>` negation) so an agent can drive the CLI from the conventions it
-  already knows. Output channels follow the same expectation in human mode —
-  logs and errors on stderr, data on stdout — with one deliberate exception:
-  under `--json` the whole envelope, success *or* failure, is the single object
-  on stdout (`logJson` in `src/lib/oclif/base.ts`), because that envelope is the
-  machine contract. Two flag deviations are also intentional: `-n` is
-  `--non-interactive` (not `--dry-run`, which is long-only) and machine output
-  is `--json` (not `--output json`). Keep that alignment in mind when adding a
-  global flag, and document the agent-facing contract in [`SKILLS.md`](SKILLS.md),
-  not here.
+- The flag surface deliberately tracks the [WebCLI spec](https://webcli.com/) so
+  an agent can drive the CLI from conventions it already knows. That is the
+  rationale; the canonical flag list, output-channel rules and the two
+  intentional deviations are the invocation rules in [`SKILLS.md`](SKILLS.md).
+  Keep that alignment in mind when adding a global flag, and record it there —
+  not in a second copy here.
 
 # Analytics Tracking — Mixpanel
 
