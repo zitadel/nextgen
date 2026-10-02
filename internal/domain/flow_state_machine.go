@@ -340,9 +340,10 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 		return FlowStepResult{}, false, nil
 	}
 	parked, err := r.ssoIdentities.LoadParked(ctx, FlowSSOLoadInput{
-		ProjectID:     state.ProjectID,
-		AttemptID:     state.AuthAttemptID,
-		UserSchemaURL: state.UserSchemaURL,
+		ProjectID:       state.ProjectID,
+		AttemptID:       state.AuthAttemptID,
+		UserSchemaURL:   state.UserSchemaURL,
+		ResolvedCheckID: state.SSOResolvedCheckID,
 	})
 	if err != nil {
 		return FlowStepResult{}, false, fmt.Errorf("flow state machine: load parked sso identity: %w", err)
@@ -368,7 +369,7 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 		}
 		return result, true, err
 	}
-	if parked == nil || parked.CheckID == state.SSOResolvedCheckID {
+	if parked == nil {
 		return FlowStepResult{}, false, nil
 	}
 	// Creation under `auto` (create or collide) is not resolved yet: the row

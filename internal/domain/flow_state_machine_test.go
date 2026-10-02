@@ -4322,7 +4322,15 @@ func TestFlowStateMachine_Render_SSOReplayGuardSkipsResolution(t *testing.T) {
 	t.Parallel()
 	w, def, state := ssoRenderWorld(t)
 	state.SSOResolvedCheckID = "ch-1"
-	w.expectParked(linkedParked(), nil)
+	// The engine hands its guard to the service, which skips the resolved row.
+	w.ssoIdentities.EXPECT().
+		LoadParked(gomock.Any(), domain.FlowSSOLoadInput{
+			ProjectID:       testProjectID,
+			AttemptID:       "att-1",
+			UserSchemaURL:   defaultSchemaURL,
+			ResolvedCheckID: "ch-1",
+		}).
+		Return(nil, nil)
 	w.ssoIdentities.EXPECT().BindLinked(gomock.Any(), gomock.Any()).Times(0)
 
 	result, err := w.sm.Render(t.Context(), def, state)

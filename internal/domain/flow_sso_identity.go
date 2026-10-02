@@ -26,7 +26,12 @@ type FlowSSOIdentityService interface {
 	CreateLinked(ctx context.Context, in FlowSSOCreateInput) (userID string, err error)
 }
 
-type FlowSSOLoadInput struct{ ProjectID, AttemptID, UserSchemaURL string }
+type FlowSSOLoadInput struct {
+	ProjectID, AttemptID, UserSchemaURL string
+	// ResolvedCheckID is [FlowState.SSOResolvedCheckID]. A parked row with
+	// this id was already resolved, so LoadParked returns nil, nil for it.
+	ResolvedCheckID string
+}
 
 // FlowSSOParkedIdentity is a parked callback result, resolved against its
 // pinned connection revision and the identity links.

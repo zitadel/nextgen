@@ -399,6 +399,39 @@ func TestFlowSSOIdentityResolver_BindLinked_RefusesExpiredAttempt(t *testing.T) 
 	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
 }
 
+// A parked row the engine already resolved (creation disabled leaves it
+// parked) is skipped before the revision and link reads.
+func TestFlowSSOIdentityResolver_LoadParked_AlreadyResolvedSkipsReads(t *testing.T) {
+	t.Parallel()
+	f := newSSOResolverFixture(t)
+	f.stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), ssoProjectID, ssoAttemptID).Return(parkedAttempt(parkedResult()), nil)
+	f.connections.EXPECT().GetRevision(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+	f.stmts.EXPECT().GetIDPIdentityLink(gomock.Any(), gomock.Any()).Times(0)
+
+	in := loadInput()
+	in.ResolvedCheckID = "ch-1"
+	got, err := f.resolver.LoadParked(t.Context(), in)
+	require.NoError(t, err)
+	assert.Nil(t, got)
+}
+
+// An earlier bind lost its handoff, then a second ceremony parked a row the
+// engine already resolved: the row still wins, so the earlier user is not
+// signed in.
+func TestFlowSSOIdentityResolver_LoadParked_BoundAttemptWithResolvedRowIsNil(t *testing.T) {
+	t.Parallel()
+	f := newSSOResolverFixture(t)
+	f.stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), ssoProjectID, ssoAttemptID).
+		Return(parkedAttempt(parkedResult(), boundFactors()...), nil)
+	f.connections.EXPECT().GetRevision(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+
+	in := loadInput()
+	in.ResolvedCheckID = "ch-1"
+	got, err := f.resolver.LoadParked(t.Context(), in)
+	require.NoError(t, err)
+	assert.Nil(t, got)
+}
+
 func expiredAttempt(a *domain.AuthAttempt) *domain.AuthAttempt {
 	ttl := time.Minute
 	a.CreatedAt = time.Now().Add(-time.Hour)
@@ -414,5 +447,20 @@ func TestFlowSSOIdentityResolver_LoadParked_ExpiredAttemptWithParkedRowRestarts(
 	f.connections.EXPECT().GetRevision(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 
 	_, err := f.resolver.LoadParked(t.Context(), loadInput())
+	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
+}
+
+// The replay shortcut would hide a dead attempt on every later render, so the
+// state check runs before it.
+func TestFlowSSOIdentityResolver_LoadParked_HandedOffAttemptRestartsBeforeReplayShortcut(t *testing.T) {
+	t.Parallel()
+	f := newSSOResolverFixture(t)
+	handedOff := parkedAttempt(parkedResult())
+	handedOff.HandoffToken = &domain.HandoffToken{}
+	f.stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), ssoProjectID, ssoAttemptID).Return(handedOff, nil)
+
+	in := loadInput()
+	in.ResolvedCheckID = "ch-1"
+	_, err := f.resolver.LoadParked(t.Context(), in)
 	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
 }

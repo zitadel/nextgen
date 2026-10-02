@@ -32,13 +32,20 @@ func (r *FlowSSOIdentityResolver) LoadParked(ctx context.Context, in domain.Flow
 		return nil, fmt.Errorf("load parked sso identity: read attempt: %w", err)
 	}
 	// A dead attempt can neither settle a parked identity nor hand off, so the
-	// flow restarts instead of rendering a step whose submissions fail.
+	// flow restarts instead of rendering a step whose submissions fail. It runs
+	// before the replay shortcut below, which would hide it on every render.
 	if attempt.IsExpired() || attempt.IsHandedOff() {
 		return nil, domain.ErrFlowRestartRequired()
 	}
 	check, ok := attempt.SSOCallback()
 	if !ok || check.Result == nil {
 		return boundThroughSSO(attempt), nil
+	}
+	// An already resolved row (creation disabled leaves it parked) needs none
+	// of the reads below. It still wins over an earlier bind, as an
+	// unresolved row does.
+	if check.ID == in.ResolvedCheckID {
+		return nil, nil
 	}
 	result := check.Result
 
