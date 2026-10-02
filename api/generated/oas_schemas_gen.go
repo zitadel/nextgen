@@ -19845,12 +19845,12 @@ func (*FlowResponse) getFlowStepRes() {}
 
 // FlowResponseHeaders wraps FlowResponse with response headers.
 type FlowResponseHeaders struct {
-	SetCookie OptString
+	SetCookie []string
 	Response  FlowResponse
 }
 
 // GetSetCookie returns the value of SetCookie.
-func (s *FlowResponseHeaders) GetSetCookie() OptString {
+func (s *FlowResponseHeaders) GetSetCookie() []string {
 	return s.SetCookie
 }
 
@@ -19860,7 +19860,7 @@ func (s *FlowResponseHeaders) GetResponse() FlowResponse {
 }
 
 // SetSetCookie sets the value of SetCookie.
-func (s *FlowResponseHeaders) SetSetCookie(val OptString) {
+func (s *FlowResponseHeaders) SetSetCookie(val []string) {
 	s.SetCookie = val
 }
 
@@ -20429,6 +20429,15 @@ type FlowSubmitRequest struct {
 	// ID of the selected SSO provider (from `sso_providers[].id`).
 	// Required when `action` is "sso".
 	SSOProviderID OptString `json:"sso_provider_id"`
+	// The page hosting the orchestrator, where the flow resumes after an
+	// external sign-in: the callback sends the browser here unchanged, and
+	// the page loads `GET /flow/{id}` to render the next step. The client
+	// puts the flow id in it; the orchestrator reads `?flow=<id>` on the
+	// reload. Required when `action` is "sso". An absolute URL; the server
+	// parses it and keeps a fragment, so a hash-routed page returns to its
+	// route. Its origin must equal the request origin; any other origin is
+	// rejected and no sign-in is started.
+	ReturnTarget OptString `json:"return_target"`
 }
 
 // GetSessionToken returns the value of SessionToken.
@@ -20461,6 +20470,11 @@ func (s *FlowSubmitRequest) GetSSOProviderID() OptString {
 	return s.SSOProviderID
 }
 
+// GetReturnTarget returns the value of ReturnTarget.
+func (s *FlowSubmitRequest) GetReturnTarget() OptString {
+	return s.ReturnTarget
+}
+
 // SetSessionToken sets the value of SessionToken.
 func (s *FlowSubmitRequest) SetSessionToken(val OptString) {
 	s.SessionToken = val
@@ -20489,6 +20503,11 @@ func (s *FlowSubmitRequest) SetChallengeResponse(val OptFlowSubmitRequestChallen
 // SetSSOProviderID sets the value of SSOProviderID.
 func (s *FlowSubmitRequest) SetSSOProviderID(val OptString) {
 	s.SSOProviderID = val
+}
+
+// SetReturnTarget sets the value of ReturnTarget.
+func (s *FlowSubmitRequest) SetReturnTarget(val OptString) {
+	s.ReturnTarget = val
 }
 
 // Response to a pending challenge on the step. Required when the step has a
