@@ -4354,6 +4354,17 @@ func TestFlowStateMachine_Render_SSORestartRequiredPropagates(t *testing.T) {
 	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
 }
 
+// The attempt read on every render also ends a flow whose attempt is dead,
+// on a step that offers no sso_providers too.
+func TestFlowStateMachine_Render_DeadAttemptRestartsStepWithoutSSO(t *testing.T) {
+	t.Parallel()
+	w, _, state := ssoRenderWorld(t)
+	w.expectParked(nil, domain.ErrFlowRestartRequired())
+
+	_, err := w.sm.Render(t.Context(), signupDefinition(), state)
+	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
+}
+
 func TestFlowStateMachine_Render_SSOCreationDisabledRendersStepError(t *testing.T) {
 	t.Parallel()
 	w, def, state := ssoRenderWorld(t)
@@ -4418,8 +4429,9 @@ func TestFlowStateMachine_Render_SSOBoundAttemptRetriesHandoff(t *testing.T) {
 	assert.Equal(t, "u1", result.State.CollectedData.UserID)
 }
 
-// Two requests retried the same lost handoff and the other one won: this one
-// renders the step quietly, with no token and no error.
+// Two requests retried the same lost handoff and the other one won: the
+// attempt is handed off, so this one restarts, as every later render of this
+// cookie would.
 func TestFlowStateMachine_Render_SSOBoundAttemptRetryLosesRace(t *testing.T) {
 	t.Parallel()
 	w, def, state := ssoRenderWorld(t)
@@ -4427,11 +4439,8 @@ func TestFlowStateMachine_Render_SSOBoundAttemptRetryLosesRace(t *testing.T) {
 	w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).
 		Return(domain.FlowHandoffOutput{}, domain.ErrAuthAttemptAlreadyHandedOff())
 
-	result, err := w.sm.Render(t.Context(), def, state)
-	require.NoError(t, err)
-	assert.Equal(t, "credentials", result.Step.Name)
-	assert.Nil(t, result.Step.Complete)
-	assert.Empty(t, result.HandoffToken)
+	_, err := w.sm.Render(t.Context(), def, state)
+	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
 }
 
 func TestFlowStateMachine_Render_SSOBoundAttemptWithRecordedUserRendersStep(t *testing.T) {

@@ -31,6 +31,11 @@ func (r *FlowSSOIdentityResolver) LoadParked(ctx context.Context, in domain.Flow
 	if err != nil {
 		return nil, fmt.Errorf("load parked sso identity: read attempt: %w", err)
 	}
+	// A dead attempt can neither settle a parked identity nor hand off, so the
+	// flow restarts instead of rendering a step whose submissions fail.
+	if attempt.IsExpired() || attempt.IsHandedOff() {
+		return nil, domain.ErrFlowRestartRequired()
+	}
 	check, ok := attempt.SSOCallback()
 	if !ok || check.Result == nil {
 		return boundThroughSSO(attempt), nil
@@ -102,9 +107,6 @@ func (r *FlowSSOIdentityResolver) LoadParked(ctx context.Context, in domain.Flow
 // marker: only a bind writes it, together with the user factor. A factor
 // copied in from a session carries the older attempt id and does not count.
 func boundThroughSSO(attempt *domain.AuthAttempt) *domain.FlowSSOParkedIdentity {
-	if attempt.HandedOffAt != nil {
-		return nil
-	}
 	if sso, ok := domain.CheckAs[*domain.AuthFactorSSO](attempt, domain.AuthCheckTypeSSO); !ok || sso.AttemptID != attempt.ID {
 		return nil
 	}
@@ -125,6 +127,11 @@ func (r *FlowSSOIdentityResolver) BindLinked(ctx context.Context, in domain.Flow
 		attempt, err := stmts.GetAuthAttemptByID(ctx, in.ProjectID, in.AttemptID)
 		if err != nil {
 			return fmt.Errorf("bind sso identity: read attempt: %w", err)
+		}
+		// The attempt may have died since LoadParked read it; the deleted row
+		// rolls back with the transaction.
+		if attempt.IsExpired() || attempt.IsHandedOff() {
+			return domain.ErrFlowRestartRequired()
 		}
 		bound, alreadyBound := domain.CheckAs[*domain.AuthFactorUser](attempt, domain.AuthCheckTypeUser)
 		if alreadyBound && bound.UserID != in.UserID {

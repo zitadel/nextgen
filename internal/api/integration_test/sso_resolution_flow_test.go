@@ -197,11 +197,11 @@ func TestSSOResolutionExistingLinkRoutesAuthenticated(t *testing.T) {
 	requireAuthenticated(t, f.getStep(t, flow))
 
 	// A second load with the cookie from before the resolution, as a double
-	// load or a second tab sends it: the row is settled, so no second handoff.
+	// load or a second tab sends it: the attempt is handed off, so no second
+	// handoff, and the flow restarts instead of showing a step it cannot finish.
 	again := f.getStep(t, flow)
-	require.IsType(t, &api.FlowResponseHeaders{}, again, helpers.MustMarshal(t, again))
-	assert.Equal(t, "identifier", again.(*api.FlowResponseHeaders).Response.Step.Name)
-	assert.False(t, again.(*api.FlowResponseHeaders).Response.HandoffToken.Set)
+	require.IsType(t, &api.GetFlowStepConflict{}, again, helpers.MustMarshal(t, again))
+	assert.Equal(t, "flow.restart_required", string(again.(*api.GetFlowStepConflict).Code))
 
 	attempt := f.attempt(t, flow)
 	userFactor, ok := domain.CheckAs[*domain.AuthFactorUser](attempt, domain.AuthCheckTypeUser)

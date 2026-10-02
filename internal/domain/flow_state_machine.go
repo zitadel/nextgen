@@ -2,7 +2,6 @@ package domain
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
@@ -325,8 +324,9 @@ func (r *FlowStateMachineRuntime) Render(ctx context.Context, def *FlowDefinitio
 // produced the result; otherwise Render goes on to render the step as usual.
 //
 // It runs on every render, so every GET /flow/{id} pays one attempt read even
-// without SSO. Filtering on steps that offer sso_providers would change what
-// back navigation sees, so the read stays until it measurably matters.
+// without SSO. The read is not only for SSO: LoadParked also restarts any flow
+// whose attempt expired or was handed off. Do not limit it to steps that offer
+// sso_providers.
 //
 // The outcome is raised with an empty action, so an unwired transition
 // degrades to the step-error re-render, as a handler diversion does.
@@ -359,21 +359,12 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 		if err != nil {
 			return FlowStepResult{}, false, err
 		}
-		// Snapshot in the cookie's own form: if a concurrent retry wins the
-		// handoff, this request renders the step exactly as the cookie had it.
-		before, err := json.Marshal(state)
-		if err != nil {
-			return FlowStepResult{}, false, fmt.Errorf("flow state machine: snapshot state: %w", err)
-		}
 		recordResolvedUser(state, parked.BoundUserID)
 		result, err := r.routeOutcome(pc, resolvedFields, FlowImplicitOutcomeSSOAuthenticated, false)
 		if errors.Is(err, ErrAuthAttemptAlreadyHandedOff()) {
-			var restored FlowState
-			if err := json.Unmarshal(before, &restored); err != nil {
-				return FlowStepResult{}, false, fmt.Errorf("flow state machine: restore state: %w", err)
-			}
-			*state = restored
-			return FlowStepResult{}, false, nil
+			// A concurrent retry won the handoff. A handed-off attempt restarts
+			// the flow on every later render too, so this one does the same.
+			return FlowStepResult{}, false, ErrFlowRestartRequired()
 		}
 		return result, true, err
 	}

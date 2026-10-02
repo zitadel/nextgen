@@ -9,13 +9,15 @@ import "context"
 type FlowSSOIdentityService interface {
 	// LoadParked returns nil, nil when the attempt has no parked result, unless
 	// an earlier bind left it waiting for its handoff (see BoundUserID). It
-	// returns ErrFlowRestartRequired when the provider's subject is linked to
-	// a user under another schema than the flow's.
+	// returns ErrFlowRestartRequired when the attempt is expired or handed
+	// off, and when the provider's subject is linked to a user under another
+	// schema than the flow's.
 	LoadParked(ctx context.Context, in FlowSSOLoadInput) (*FlowSSOParkedIdentity, error)
 	// BindLinked records the linked user and an sso factor on the attempt and
 	// deletes the parked row with in.CheckID, in one transaction. It returns
-	// ErrFlowRestartRequired when the attempt already carries another user, and
-	// ErrSSOStateInvalid, before writing anything, when that row is gone.
+	// ErrFlowRestartRequired when the attempt already carries another user or
+	// is expired or handed off, and ErrSSOStateInvalid, before writing
+	// anything, when that row is gone.
 	BindLinked(ctx context.Context, in FlowSSOBindInput) error
 	// CreateLinked creates the user, its identity link and the attempt
 	// factors in one transaction, and returns the new user's id. It is
