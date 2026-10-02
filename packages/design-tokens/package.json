@@ -19,8 +19,8 @@
     "./package.json": "./package.json",
     ".": {
       "@zitadel/source": "./src/generated/tokens.ts",
-      "types": "./dist/tokens.d.mts",
-      "import": "./dist/tokens.mjs"
+      "types": "./dist/tokens.d.ts",
+      "import": "./dist/tokens.js"
     },
     "./css/tokens.css": "./src/generated/tokens.css",
     "./css/tailwind.css": "./src/generated/tailwind.css",
@@ -30,13 +30,14 @@
     "sync": "tsx scripts/sync-from-figma.ts",
     "sync:export": "tsx scripts/sync-from-export.ts",
     "generate": "tsx scripts/build.ts",
-    "build": "tsdown",
+    "build": "vite build",
     "test": "vitest run",
     "test:all": "pnpm run test"
   },
   "devDependencies": {
-    "tsdown": "catalog:",
     "tslib": "catalog:",
-    "tsx": "catalog:"
+    "tsx": "catalog:",
+    "vite": "catalog:",
+    "vite-plugin-dts": "catalog:"
   }
 }
