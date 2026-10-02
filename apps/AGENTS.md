@@ -5,11 +5,14 @@ Shared conventions for the deployable apps. Read together with the
 
 ## Vercel build output
 
-**Standalone Vercel sites build into `dist/` inside the app** (`apps/<app>/dist`),
-and the app's `vercel.json` sets `"outputDirectory": "dist"`. Keep it `dist` — do
-not introduce per-app output names (`storybook-static`, `build`, `out`, …). The
-global `dist` rule in [`.gitignore`](../.gitignore) already covers it, so no
-per-app ignore entry is needed.
+**Standalone Vercel sites build into `dist/` inside the app** (`apps/<app>/dist`).
+The output is `dist` either because the app's `vercel.json` sets
+`"outputDirectory": "dist"` (e.g. `storybook`) or because its framework preset
+already defaults there (e.g. `docs`, whose [`vercel.json`](docs/vercel.json) uses
+`"framework": "vite"` and so needs no explicit key). Keep it `dist` — do not
+introduce per-app output names (`storybook-static`, `build`, `out`, …). The global
+`dist` rule in [`.gitignore`](../.gitignore) already covers it, so no per-app
+ignore entry is needed.
 
 Two apps are **exceptions**, for reasons that are not a style choice:
 
