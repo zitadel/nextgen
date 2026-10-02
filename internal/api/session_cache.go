@@ -7,7 +7,8 @@ const sessionStateCacheControl = "private, no-store"
 // WithSessionStateNoStore prevents any GET /sessions/me or GET
 // /sessions/me/csrf response from being stored. It wraps the generated server
 // so the header is also present on security and decoding errors emitted
-// before the operation handler runs.
+// before the operation handler runs. TestWithSessionStateNoStoreCoversTheSpec
+// keeps the path list in step with the OpenAPI source.
 func WithSessionStateNoStore(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet && (r.URL.Path == "/sessions/me" || r.URL.Path == "/sessions/me/csrf") {

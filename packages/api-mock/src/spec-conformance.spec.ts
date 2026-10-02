@@ -53,7 +53,7 @@ import {
   expireClaimWindow,
   snapshotPlatformStore,
 } from "./platform-handlers.js";
-import { PLATFORM_PROJECT_ID, startMockServer } from "./server.js";
+import { PLATFORM_PROJECT_ID, csrfTokenFor, startMockServer } from "./server.js";
 
 const PORT = 4456;
 const BASE = `http://localhost:${PORT}`;
@@ -211,6 +211,11 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     // Session is gone after revocation.
     const after = await fetch(`${BASE}/sessions/me`, { headers: { cookie: sessionCookie } });
     expect(after.status).toBe(401);
+  });
+
+  test("derives the CSRF token exactly as the Go server does", () => {
+    // Pinned on both sides (internal/api/csrf_internal_test.go TestCSRFTokenVector).
+    expect(csrfTokenFor("parity-cookie")).toBe("Rstk677ADwP3NGbLdczBjYCLA5EIxtRtrm-oX7QcYh8");
   });
 
   test("GET /sessions/me/csrf without a session answers a 401 that is not stored", async () => {
