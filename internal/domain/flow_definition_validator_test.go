@@ -1530,53 +1530,38 @@ func TestValidator_DeclaredBackKindRejected(t *testing.T) {
 	assert.Contains(t, errorDetails(t, err), `action "back" has kind=back, which is engine-injected and cannot be declared`)
 }
 
-// TestValidator_ReservedBackNameRejected guards the action name "back"
-// itself. Even with a non-back kind, an authored action named "back"
-// would collide at render time with the engine-injected back action —
-// the client would see two "back" buttons and route to the customer's
-// kind rather than the injected one.
-func TestValidator_ReservedBackNameRejected(t *testing.T) {
+// TestValidator_ReservedActionNamesRejected guards the action names the
+// engine claims for itself, whatever kind the author gives them. "back"
+// would collide at render time with the engine-injected back action: the
+// client would see two "back" buttons and route to the customer's kind.
+// "sso" is dispatched to the sso path on submission, so an authored action
+// of that name would validate and then fail every submission with
+// flow.invalid_action.
+func TestValidator_ReservedActionNamesRejected(t *testing.T) {
 	schema := mustSchema(t, userSchemaIDAndPassword)
-	def := domain.FlowDefinition{
-		ProjectID: "p", Name: "f", SchemaVersion: "1",
-		UserSchema: "https://tenant.com/schemas/idpw-user.json",
-		Purposes:   map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step"},
-		Steps: []domain.FlowDefinitionStep{
-			{
-				Name: "step", Fields: []domain.Field{"email"},
-				Actions:     []domain.FlowStepAction{{Name: "back", Kind: domain.FlowActionKindNavigate}},
-				Transitions: map[string]domain.FlowStepTransition{"back": {Target: "done"}},
-			},
-			{Name: "done", Complete: gu.Ptr(domain.FlowStepCompleteShow)},
-		},
+	for name, reason := range map[string]string{
+		"back": "engine-injected back navigation",
+		"sso":  "sso submissions",
+	} {
+		t.Run(name, func(t *testing.T) {
+			def := domain.FlowDefinition{
+				ProjectID: "p", Name: "f", SchemaVersion: "1",
+				UserSchema: "https://tenant.com/schemas/idpw-user.json",
+				Purposes:   map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step"},
+				Steps: []domain.FlowDefinitionStep{
+					{
+						Name: "step", Fields: []domain.Field{"email"},
+						Actions:     []domain.FlowStepAction{{Name: name, Kind: domain.FlowActionKindNavigate}},
+						Transitions: map[string]domain.FlowStepTransition{name: {Target: "done"}},
+					},
+					{Name: "done", Complete: gu.Ptr(domain.FlowStepCompleteShow)},
+				},
+			}
+			_, err := domain.ValidateFlowDefinition(schema, def)
+			require.Error(t, err)
+			assert.Contains(t, errorDetails(t, err), fmt.Sprintf("action name %q is reserved for %s", name, reason))
+		})
 	}
-	_, err := domain.ValidateFlowDefinition(schema, def)
-	require.Error(t, err)
-	assert.Contains(t, errorDetails(t, err), `action name "back" is reserved for engine-injected back navigation`)
-}
-
-// TestValidator_ReservedSSONameRejected guards the action name "sso".
-// Process dispatches a submission named "sso" to the sso path, so an
-// authored navigate action of that name would validate and then fail
-// every submission with flow.invalid_action.
-func TestValidator_ReservedSSONameRejected(t *testing.T) {
-	schema := mustSchema(t, userSchemaIDAndPassword)
-	def := domain.FlowDefinition{
-		ProjectID: "p", Name: "f", SchemaVersion: "1",
-		UserSchema: "https://tenant.com/schemas/idpw-user.json",
-		Purposes:   map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step"},
-		Steps: []domain.FlowDefinitionStep{
-			{
-				Name: "step", Fields: []domain.Field{"email"},
-				Actions:     []domain.FlowStepAction{{Name: "sso", Kind: domain.FlowActionKindNavigate}},
-				Transitions: map[string]domain.FlowStepTransition{"sso": {Target: "done"}},
-			},
-			{Name: "done", Complete: gu.Ptr(domain.FlowStepCompleteShow)},
-		},
-	}
-	_, err := domain.ValidateFlowDefinition(schema, def)
-	require.Error(t, err)
-	assert.Contains(t, errorDetails(t, err), `action name "sso" is reserved for sso submissions`)
 }
 
 func TestValidator_MissingRequiredUserSchemaFields(t *testing.T) {
