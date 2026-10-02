@@ -26,6 +26,7 @@ import {
   deviceProfileProperties,
   FIRST_RUN_NOTICE,
 } from "./command-telemetry";
+import { nonBlankString } from "./flags";
 
 /**
  * Base class for every oclif command. Owns the global flags, builds the
@@ -59,8 +60,8 @@ export abstract class BaseCommand extends Command {
    * `flags.force` into {@link GlobalOptions.force} for those commands.
    */
   static override baseFlags = {
-    cwd: Flags.string({ char: "c", description: "Project directory to operate on." }),
-    server: Flags.string({ char: "s", description: "Override the resolved server URL." }),
+    cwd: nonBlankString({ char: "c", description: "Project directory to operate on." }),
+    server: nonBlankString({ char: "s", description: "Override the resolved server URL." }),
     "non-interactive": Flags.boolean({
       char: "n",
       description: "Disable prompts. Required when scripting or running as an agent.",

@@ -116,6 +116,11 @@ const RAIL_BUTTON = "size-7!";
  */
 const BACK_BUTTON = "group-data-[collapsible=icon]:size-7!";
 
+// The rule under the header sits inside its 48px, so the bottom inset gives
+// up the pixel the rule takes.
+const SETTINGS_HEADER =
+  "border-b border-border pb-[calc(--spacing(2)-1px)] group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:border-0 group-data-[collapsible=icon]:p-0";
+
 /**
  * The sidebar has two views and the **route** decides which is showing:
  * `/settings` and anything beneath it render Settings, everything else renders
@@ -183,19 +188,19 @@ function PortalHeader() {
  */
 function SettingsHeader() {
   return (
-    <SidebarHeader className="group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:p-0">
+    <SidebarHeader className={SETTINGS_HEADER}>
       <div className={RAIL_HEADER}>
         <SidebarTrigger className={RAIL_BUTTON} />
       </div>
       {/* One row, restyled per state — rendering a separate rail copy would put
-          two "Back to app" links in the accessibility tree at once, with only
+          two "Back to dashboard" links in the accessibility tree at once, with only
           CSS deciding which one is real. */}
       <SidebarMenu className="group-data-[collapsible=icon]:h-11 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:justify-center">
         <SidebarMenuItem>
-          <SidebarMenuButton asChild tooltip="Back to app" className={BACK_BUTTON}>
+          <SidebarMenuButton asChild tooltip="Back to dashboard" className={BACK_BUTTON}>
             <Link to="/">
               <ArrowLeft aria-hidden />
-              <span>Back to app</span>
+              <span>Back to dashboard</span>
             </Link>
           </SidebarMenuButton>
         </SidebarMenuItem>
@@ -210,10 +215,9 @@ function SettingsHeader() {
  * Rows attach the same way Portal's do, through `staticData.nav` on the route,
  * and declare `view: "settings"` so they leave the primary list alone.
  *
- * A heading renders only when a route claims it. `ACCOUNT / Profile` needs a
- * call that updates a user (#693) and is not built, and Admins moved to the
- * project page (#1238), so today no route claims either heading and the nav
- * is empty rather than a heading over nothing.
+ * A heading renders only when a route claims it. Profile claims `ACCOUNT`.
+ * No screen claims `WORKSPACE` yet, so that heading is absent rather than a
+ * heading over nothing.
  */
 function SettingsNav() {
   const items = useNavItems("settings");
@@ -225,7 +229,7 @@ function SettingsNav() {
         const rows = items.filter((item) => item.nav.group === group);
         if (rows.length === 0) return null;
         return (
-          <SidebarGroup key={group} role="navigation" aria-label={group} className="py-0">
+          <SidebarGroup key={group} role="navigation" aria-label={group}>
             <SidebarGroupLabel>{group}</SidebarGroupLabel>
             <SidebarMenu className="gap-0 group-data-[collapsible=icon]:gap-1">
               {rows.map((item) => {
@@ -327,16 +331,13 @@ function PortalNav() {
  * The identity block: 32px avatar, name, email. It is drawn twice — as the
  * footer trigger and again as the dropdown's header — so it lives in one place.
  *
- * The gradient is the design's `Gradient/Red` style rather than a token: it is
- * a placeholder portrait, and no avatar image source exists on the session yet.
+ * The gradient is the design's `Gradient/Red`, a placeholder portrait: no
+ * avatar image source exists on the session yet.
  */
 function UserIdentity({ primary, secondary }: { primary: string; secondary?: string }) {
   return (
     <>
-      <span
-        aria-hidden
-        className="size-8 shrink-0 rounded-full bg-[linear-gradient(232deg,#f25543_17%,#0f0f11_75%)]"
-      />
+      <span aria-hidden className="size-8 shrink-0 rounded-full bg-(image:--zl-gradient-red)" />
       <span className="flex min-w-0 flex-1 flex-col gap-0.5 leading-none">
         <span className="truncate text-sm leading-none font-semibold">{primary}</span>
         {secondary && <span className="truncate text-xs leading-none">{secondary}</span>}

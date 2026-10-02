@@ -112,7 +112,20 @@ export function toZitadelError(error: unknown): ZitadelError {
         : error.status >= 500
           ? "E_NETWORK"
           : "E_VALIDATION";
-    return new ZitadelError(code, apiErrorMessage(error), { details });
+    // The platform names the fields it rejected, and the message does not
+    // repeat them: `idp.field_immutable` says only "the field is fixed for the
+    // life of the connection", which leaves the reader to guess which of a
+    // connection document's fields it meant. Promoting them to the hint puts
+    // the answer where the failure is read, not only in `--json`.
+    const fields = rejectedFields(error.body);
+    return new ZitadelError(code, apiErrorMessage(error), {
+      ...(fields.length > 0
+        ? {
+            hint: `The server rejected ${fields.length === 1 ? "this field" : "these fields"}: ${fields.join(", ")}.`,
+          }
+        : {}),
+      details,
+    });
   }
 
   if (isErrnoException(error)) {
@@ -164,6 +177,34 @@ export function toZitadelError(error: unknown): ZitadelError {
  * envelope (`{ code, message, … }`). Its presence proves the request reached
  * a real Zitadel platform API rather than an arbitrary HTTP server.
  */
+/**
+ * The dotted field paths a platform error envelope blames, if any.
+ *
+ * The envelope nests them under `details`, and the server wraps its own
+ * `details` map in the response's `details` field, so the paths arrive at
+ * `body.details.details.fields`. Both depths are read: the extra wrapper is
+ * the serialiser's doing rather than part of the contract, and a reader that
+ * insisted on it would go silent the day it goes away.
+ */
+function rejectedFields(body: unknown): string[] {
+  const seen = new Set<string>();
+  let node: unknown = body;
+  for (let depth = 0; depth < 4 && isObject(node); depth += 1) {
+    const fields = (node as { fields?: unknown }).fields;
+    if (Array.isArray(fields)) {
+      for (const field of fields) {
+        if (typeof field === "string" && field !== "") seen.add(field);
+      }
+    }
+    node = (node as { details?: unknown }).details;
+  }
+  return [...seen];
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
 function isPlatformErrorEnvelope(body: unknown): boolean {
   return (
     typeof body === "object" &&
@@ -201,6 +242,11 @@ function isZodLikeError(error: unknown): boolean {
     "issues" in error &&
     Array.isArray((error as { issues: unknown }).issues)
   );
+}
+
+/** Whether a caught error is the given `errno` code. */
+export function isErrno(error: unknown, code: string): boolean {
+  return typeof error === "object" && error !== null && "code" in error && error.code === code;
 }
 
 function errorMessage(error: unknown): string {

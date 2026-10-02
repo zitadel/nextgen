@@ -64,7 +64,7 @@ describe("seedUser via connectZitadel", () => {
     expect(captured.userAuth).toBe("Bearer secret_1");
     expect(captured.userQuery).toBe("proj_1");
     expect(captured.passwordUserId).toBe("user_1");
-    expect(captured.passwordBody).toEqual({ password: user.password, is_change_required: false });
+    expect(captured.passwordBody).toEqual({ password: user.password });
   });
 
   it("honors explicit email, password, and extra attributes", async () => {

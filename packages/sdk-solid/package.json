@@ -43,7 +43,7 @@
   "devDependencies": {
     "@solidjs/testing-library": "^0.8.10",
     "@testing-library/jest-dom": "^6.0.0",
-    "@vitest/coverage-v8": "catalog:sdk",
+    "@vitest/coverage-v8": "catalog:",
     "@zitadel/eslint-config": "workspace:*",
     "eslint": "catalog:",
     "eslint-plugin-solid": "catalog:",
@@ -51,9 +51,9 @@
     "prettier": "catalog:",
     "solid-js": "^1.9.12",
     "typescript": "catalog:",
-    "vite": "catalog:sdk",
+    "vite": "catalog:",
     "vite-plugin-dts": "catalog:",
     "vite-plugin-solid": "^2.11.0",
-    "vitest": "catalog:sdk"
+    "vitest": "catalog:"
   }
 }

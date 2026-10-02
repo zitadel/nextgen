@@ -1,6 +1,7 @@
 import type { ZitadelClient } from "@zitadel/api/client";
 import type {
   CreateFlowDefinition201,
+  CreateIdpBodyIdp,
   CreateSchema201,
   CreateSchemaBody,
 } from "@zitadel/api/generated/model";
@@ -18,13 +19,22 @@ import {
   type SetupPreset,
   type SetupUseCase,
 } from "@zitadel/config/defaults";
+import { type ConnectionEndpoints, idpProvider } from "@zitadel/config/idp";
 import { normalizeFlowBody, normalizeSchemaBody } from "@zitadel/config/normalize";
 import { consola } from "consola";
-import { mkdir, writeFile } from "node:fs/promises";
+import { access, mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import { ZitadelError } from "./errors";
 import { FLOWS_DIR } from "./flows";
+import {
+  applySsoToFlow,
+  applySsoToSchema,
+  authMethods,
+  CONNECTION_SCHEMA_REF,
+  IDPS_DIR,
+  refuseResolvedSecret,
+} from "./idp";
 import { stableStringify } from "./json";
 import { normalizePublicCliProse } from "./public-cli";
 import { hashForState, writeBackResource } from "./sync";
@@ -56,6 +66,16 @@ export async function materializeSetupResources(opts: {
   /** Use case (schema field set) to scaffold; defaults to minimal. */
   useCase?: SetupUseCase;
   /**
+   * Social provider to enable while scaffolding. Its connection is written
+   * and created before the schema and flow that reference it, so the Project
+   * is never published naming a provider the platform does not hold.
+   */
+  /**
+   * The providers to enable, in the order they were chosen. One connection is
+   * created per entry, and every slug is added to the schema and the flow.
+   */
+  sso?: readonly { provider: string; clientId: string; endpoints?: ConnectionEndpoints }[];
+  /**
    * CLI version used to render `zitadel …` command mentions in the scaffolded
    * READMEs as runnable `npx @zitadel/cli@<version> …` commands — the CLI is
    * not a dependency of the generated app, so the bare command doesn't exist
@@ -70,10 +90,86 @@ export async function materializeSetupResources(opts: {
   const preset = opts.preset ?? DEFAULT_SETUP_PRESET;
   const useCase = opts.useCase ?? DEFAULT_SETUP_USE_CASE;
 
-  const { $id: _templateId, ...schemaBody } = getDefaultHumanUserSchema({ preset, useCase }) as {
-    $id?: string;
-  } & Record<string, unknown>;
+  const { $id: _templateId, ...schemaTemplate } = getDefaultHumanUserSchema({
+    preset,
+    useCase,
+  }) as { $id?: string } & Record<string, unknown>;
   void _templateId;
+
+  // The connection goes first, and is created before the schema and flow that
+  // name its slug: a Project should never be published claiming a provider the
+  // platform does not hold. Its claim mapping reads the template's properties,
+  // which enabling the provider does not change.
+  // Every connection is built and every path checked before the first create.
+  // Checking inside the loop would refuse "before anything is created" only
+  // for the first provider: a conflict on the second would leave the first
+  // created on the platform, its file written and its state recorded, and
+  // setup does not remove a connection file it wrote -- so the retry would
+  // then refuse on that file too, with nothing but the developer able to
+  // clear it. One pass to build and refuse, a second to create.
+  const planned: Array<{ slug: string; connectionPath: string; connection: object }> = [];
+  for (const chosen of opts.sso ?? []) {
+    const connection = idpProvider(chosen.provider).connection({
+      endpoints: chosen.endpoints,
+      schemaProperties: Object.keys((schemaTemplate.properties as object | undefined) ?? {}),
+      schemaRef: CONNECTION_SCHEMA_REF,
+    });
+    const slug = typeof connection.slug === "string" ? connection.slug : undefined;
+    if (!slug) continue;
+    const connectionPath = `${IDPS_DIR}/${slug}.json`;
+    // Refused before anything is created, for two reasons: the file is the
+    // developer's (see {@link CONNECTION_EXISTS}), and finding out after the
+    // create would leave the project holding a connection no local file
+    // tracks.
+    if (await exists(join(opts.cwd, connectionPath))) {
+      throw new ZitadelError("E_CONFLICT", `${connectionPath} already exists`, {
+        hint: CONNECTION_EXISTS.hint,
+        nextCommands: CONNECTION_EXISTS.nextCommands,
+      });
+    }
+    planned.push({ slug, connectionPath, connection });
+  }
+
+  const slugs: string[] = planned.map((entry) => entry.slug);
+  for (const { connectionPath, connection } of planned) {
+    // The create comes before the file. Setup does not remove a connection
+    // file it wrote -- that rule is what keeps a developer's own file safe --
+    // so writing first would leave one behind on any failure here and the
+    // retry would then refuse on it, with nothing able to clear it but the
+    // developer. Creating first means a failure leaves nothing to clear.
+    //
+    // `client_secret` travels as its `${{ NAME }}` reference: the platform
+    // resolves it from the environment's variables, so no credential is sent
+    // here and none is written to the file.
+    const created = await opts.client.createIdp(
+      { idp: connection as CreateIdpBodyIdp },
+      { project_id: opts.projectId },
+    );
+
+    await mkdir(join(opts.cwd, IDPS_DIR), { recursive: true });
+    // Still `wx` rather than `opts.force`: the check above is the early
+    // refusal, this is the one that cannot be raced.
+    if (await writeResourceFile(opts.cwd, connectionPath, connection, false, CONNECTION_EXISTS)) {
+      filesWritten.push(join(opts.cwd, connectionPath));
+    }
+    // The same guard the syncer applies: this write puts the canonical body
+    // into a file the developer commits, so a resolved secret must stop here
+    // rather than land on disk.
+    const canonical = (created.definition ?? connection) as object;
+    refuseResolvedSecret(canonical, requiredString(created.id, "created connection id"));
+    const written = await writeBackResource(opts.cwd, connectionPath, {}, canonical);
+    await updateState(opts.cwd, connectionPath, {
+      id: requiredString(created.id, "created identity provider connection id"),
+      hash: written.hash,
+    });
+  }
+
+  // Each slug in turn: the edits are additive and idempotent, so folding them
+  // builds one schema that names every chosen provider.
+  const schemaBody = slugs.reduce<Record<string, unknown>>(
+    (document, slug) => applySsoToSchema(document, slug).document as Record<string, unknown>,
+    schemaTemplate,
+  );
 
   const schemaWritten = await writeResourceFile(
     opts.cwd,
@@ -112,7 +208,15 @@ export async function materializeSetupResources(opts: {
     hash: schemaHash,
   });
 
-  const flowBody = getDefaultLoginFlow({ userSchemaUrl: schemaId, preset, useCase });
+  const flowTemplate = getDefaultLoginFlow({ userSchemaUrl: schemaId, preset, useCase });
+  // The conflict step the provider needs can only offer what this schema
+  // actually enables, so the methods are read back off the composed document
+  // rather than inferred from the preset.
+  const flowBody = slugs.reduce<typeof flowTemplate>(
+    (document, slug) =>
+      applySsoToFlow(document, slug, authMethods(schemaBody)).document as typeof flowTemplate,
+    flowTemplate,
+  );
 
   const flowWritten = await writeResourceFile(
     opts.cwd,
@@ -190,11 +294,39 @@ async function writeReadmeFile(cwd: string, relPath: string, content: string): P
   }
 }
 
+/**
+ * What to do about a connection file setup will not touch.
+ *
+ * Setup neither replaces nor removes one, with or without `--force`: a
+ * connection may hold a client id someone registered with the vendor and a slug
+ * the schemas and flows already name, and the IdP contract makes these files
+ * tenant-owned. So the one rule is that setup does not write there, and the
+ * developer decides what happens to the file.
+ */
+const CONNECTION_EXISTS: { hint: string; nextCommands: string[] } = {
+  hint:
+    "A connection file is yours to keep, so setup never replaces or removes one. " +
+    "Remove it and run setup again to scaffold a fresh one, or keep it and enable the " +
+    "provider afterwards to reuse it.",
+  nextCommands: ["zitadel sso enable --provider google"],
+};
+
+/** Whether a path is there, without caring why it is not. */
+async function exists(path: string): Promise<boolean> {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function writeResourceFile(
   cwd: string,
   relPath: string,
   body: object,
   force: boolean,
+  onExists?: { hint: string; nextCommands?: string[] },
 ): Promise<boolean> {
   const contents = `${stableStringify(body)}\n`;
   try {
@@ -203,7 +335,10 @@ async function writeResourceFile(
   } catch (error) {
     if (isErrno(error, "EEXIST")) {
       throw new ZitadelError("E_CONFLICT", `${relPath} already exists`, {
-        hint: "Move the file aside or rerun setup with --force if you want setup to replace it.",
+        hint:
+          onExists?.hint ??
+          "Move the file aside or rerun setup with --force if you want setup to replace it.",
+        nextCommands: onExists?.nextCommands,
       });
     }
     throw error;

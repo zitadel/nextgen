@@ -8,6 +8,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { makeTestSession } from "../../auth/session.fixture";
 import { listMyProjectsCached } from "../../lib/project-scope";
 import { createAppRouter } from "../../router";
+import { _setRuntimeForTesting } from "../../runtime/runtime";
 import { resetClaimAttemptsForTests } from "./index";
 
 /**
@@ -70,9 +71,9 @@ beforeEach(() => {
   // same URL, so without this each test would replay the previous one's
   // outcome instead of calling the server.
   resetClaimAttemptsForTests();
-  // The widget renders only when a project id resolves (ADR 0004 §§2–3);
-  // pin the dev override so the unauthenticated branch exercises it.
-  vi.stubEnv("VITE_CONSOLE_PROJECT_ID", "proj_platform");
+  // The widget renders only when a project id resolves (ADR 0004 §§2–3). A
+  // claim signs in to the platform project, which the runtime document names.
+  _setRuntimeForTesting({ mode: "standalone", console_project_id: "proj_platform" });
 });
 
 afterEach(() => {
@@ -149,8 +150,8 @@ describe("claim page", () => {
 
   it("opens the console on the project just claimed, not a list read before it", async () => {
     // Before the claim the developer holds no project; afterwards, the claimed
-    // one. The console pins the platform project (claim mode), which they
-    // cannot manage, so the claimed project must be what gets selected.
+    // one. The console signs in to the platform project (claim mode), which
+    // they cannot manage, so the claimed project must be what gets selected.
     fetchSession.mockResolvedValue(makeTestSession());
     let claimed = false;
     server.use(

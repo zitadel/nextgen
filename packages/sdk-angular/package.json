@@ -55,14 +55,14 @@
     "@angular/platform-browser": "^22.0.5",
     "@angular/router": "^22.0.5",
     "@testing-library/angular": "^19.4.1",
-    "@vitest/coverage-v8": "catalog:sdk",
+    "@vitest/coverage-v8": "catalog:",
     "@zitadel/eslint-config": "workspace:*",
     "eslint": "catalog:",
     "jsdom": "catalog:",
     "prettier": "catalog:",
     "typescript": "catalog:",
-    "vite": "catalog:sdk",
-    "vitest": "catalog:sdk",
+    "vite": "catalog:",
+    "vitest": "catalog:",
     "zone.js": "~0.16.0"
   }
 }

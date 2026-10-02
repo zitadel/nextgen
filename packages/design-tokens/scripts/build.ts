@@ -2,7 +2,8 @@
  * Builds the public token surfaces of `@zitadel/design-tokens` from:
  *   - `src/generated/figma.tokens.json` — resolved shadcn colours + container scale
  *   - `src/overrides.ts` — fonts, motion, focus, breakpoints, container roles
- *     that sit off Figma's scale, and the roles shadcn has no name for
+ *     that sit off Figma's scale, the roles shadcn has no name for, and the
+ *     gradients composed from the exported gradient colours
  *
  * Emits four files into `src/generated/`:
  *
@@ -314,6 +315,17 @@ function build(): BuildResult {
     }
   }
 
+  // ---- composed gradients: the exported gradient colours, at the angle and
+  // positions the Figma style draws them. Appended after the themed groups so
+  // the stops they read are already emitted.
+  for (const [name, { angle, stops }] of Object.entries(overrides.gradient)) {
+    const parts = stops.map(({ color, mode, at }) => `${gradientStop(color, mode)} ${at}`);
+    push(cssVarName("gradient", name), `linear-gradient(${angle}, ${parts.join(", ")})`, [
+      "gradient",
+      toCamel(name),
+    ]);
+  }
+
   const css = emitCss(cssVars, lightVars);
   return {
     css,
@@ -333,6 +345,17 @@ function setDeep(target: Record<string, unknown>, path: string[], value: string)
     cursor = cursor[key] as Record<string, unknown>;
   }
   cursor[path[path.length - 1] ?? ""] = value;
+}
+
+/** Read one exported `gradient/*` colour in one mode, failing loud if the designer dropped it. */
+function gradientStop(color: string, mode: "dark" | "light"): Hex {
+  const value = shadcn.themed?.gradient?.[color]?.[mode];
+  if (!value) {
+    throw new Error(
+      `figma.tokens.json has no gradient.${color} — cannot compose the gradient that reads it. Was it renamed?`,
+    );
+  }
+  return value;
 }
 
 /** Container roles that are a step on Figma's scale, keyed by kebab-case role name. */

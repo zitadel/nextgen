@@ -86,6 +86,15 @@ function devApiProxy(mode: string): Record<string, ProxyOptions> {
   // serves the API (`src/api/zitadel.ts`, Console ADR 0002 §4).
   const env = loadEnv(mode, import.meta.dirname, "VITE_");
   const apiBase = env.VITE_CONSOLE_API_BASE || defaultApiBase;
+  // Removed in #1345: the console takes the project it signs into from the
+  // server's `/console/runtime.json`. Said out loud, because a `.env.local`
+  // that still sets it would otherwise be ignored without a word.
+  if (env.VITE_CONSOLE_PROJECT_ID) {
+    console.warn(
+      "[console] VITE_CONSOLE_PROJECT_ID is no longer read and has no effect: the console " +
+        "takes its sign-in project from /console/runtime.json. Remove it from your env.",
+    );
+  }
   // Node-only var — deliberately NOT VITE_ prefixed, so it is never inlined
   // into the client bundle. Loading with an empty prefix stays config-time and
   // server-side only, so `.env.local` works without exporting it in the shell;

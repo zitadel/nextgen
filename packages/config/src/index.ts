@@ -1,5 +1,6 @@
 export * from "./branding-url.js";
 export * from "./defaults.js";
+export * from "./idp/index.js";
 export * from "./meta-schemas.js";
 export * from "./normalize.js";
 export * from "./schemas.js";

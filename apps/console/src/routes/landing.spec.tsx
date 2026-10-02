@@ -5,6 +5,8 @@ import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
+import { _setRuntimeForTesting } from "../runtime/runtime";
+
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
 vi.mock("@/auth/session", async (importOriginal) => {
@@ -42,8 +44,8 @@ function project(id: string, name: string) {
 }
 
 /**
- * `/` has no screen of its own and lands on the first one behind it; `/settings`
- * is a view with nothing built in it yet and says so.
+ * Neither `/` nor `/settings` has a screen of its own; each lands on the first
+ * one behind it.
  *
  * Worth its own spec because these are the two paths nobody navigates to
  * deliberately: `/` is where sign-in, the logo and the claim flow's "Open the
@@ -134,66 +136,21 @@ describe("landing routes", () => {
     expect(unpaged).toBe(1);
   });
 
-  it("takes the pinned dev project among the person's own", async () => {
-    vi.stubEnv("VITE_CONSOLE_PROJECT_ID", "proj_2");
-    // Several on offer: without the pin the person would be asked to choose.
-    server.use(
-      http.get("http://localhost/api/users/me/projects", () =>
-        HttpResponse.json({ projects: [project("proj_1", "Acme"), project("proj_2", "Globex")] }),
-      ),
-      http.post("http://localhost/api/teams/query", () => HttpResponse.json({ teams: [] })),
-    );
-    try {
-      const router = await renderAt("/");
-
-      await waitFor(() => expect(router.state.location.pathname).toBe("/teams"));
-      expect(router.state.location.search).toMatchObject({ project: "proj_2" });
-    } finally {
-      vi.stubEnv("VITE_CONSOLE_PROJECT_ID", "");
-    }
-  });
-
-  it("ignores a pin the person holds no grant on", async () => {
-    // `dev-real --claim` pins the platform project, which the developer who
-    // just claimed a project cannot manage: their project is the default.
-    vi.stubEnv("VITE_CONSOLE_PROJECT_ID", "proj_platform");
+  it("selects the person's project, not the one the console signs into", async () => {
+    // `dev-real --claim` and a platform deployment sign in to the platform
+    // project, which the developer who just claimed a project cannot manage:
+    // their project is the default.
+    _setRuntimeForTesting({ mode: "standalone", console_project_id: "proj_platform" });
     server.use(
       http.get("http://localhost/api/users/me/projects", () =>
         HttpResponse.json({ projects: [project("proj_1", "Acme")] }),
       ),
       http.post("http://localhost/api/teams/query", () => HttpResponse.json({ teams: [] })),
     );
-    try {
-      const router = await renderAt("/");
+    const router = await renderAt("/");
 
-      await waitFor(() => expect(router.state.location.pathname).toBe("/teams"));
-      expect(router.state.location.search).toMatchObject({ project: "proj_1" });
-    } finally {
-      vi.stubEnv("VITE_CONSOLE_PROJECT_ID", "");
-    }
-  });
-
-  it("recognises a pin further down the person's projects", async () => {
-    // The list is one page; a pin past it is checked by id, which the server
-    // answers only for a project the person holds a grant on.
-    vi.stubEnv("VITE_CONSOLE_PROJECT_ID", "proj_42");
-    server.use(
-      http.get("http://localhost/api/users/me/projects", () =>
-        HttpResponse.json({ projects: [project("proj_1", "Acme")], next_page_token: "page_2" }),
-      ),
-      http.get("http://localhost/api/projects/proj_42", () =>
-        HttpResponse.json(project("proj_42", "Far down")),
-      ),
-      http.post("http://localhost/api/teams/query", () => HttpResponse.json({ teams: [] })),
-    );
-    try {
-      const router = await renderAt("/");
-
-      await waitFor(() => expect(router.state.location.pathname).toBe("/teams"));
-      expect(router.state.location.search).toMatchObject({ project: "proj_42" });
-    } finally {
-      vi.stubEnv("VITE_CONSOLE_PROJECT_ID", "");
-    }
+    await waitFor(() => expect(router.state.location.pathname).toBe("/teams"));
+    expect(router.state.location.search).toMatchObject({ project: "proj_1" });
   });
 
   it("does not take one listed project as the only one while more pages follow", async () => {
@@ -211,19 +168,15 @@ describe("landing routes", () => {
   it("selects nothing for a person with no projects", async () => {
     // Not the sign-in project either: on a platform deployment that is the
     // platform project, and every screen in it would refuse this person.
-    vi.stubEnv("VITE_CONSOLE_PROJECT_ID", "proj_platform");
+    _setRuntimeForTesting({ mode: "standalone", console_project_id: "proj_platform" });
     server.use(
       http.get("http://localhost/api/users/me/projects", () => HttpResponse.json({ projects: [] })),
     );
-    try {
-      const router = await renderAt("/");
+    const router = await renderAt("/");
 
-      await waitFor(() => expect(router.state.location.pathname).toBe("/projects"));
-      expect(router.state.location.search).not.toHaveProperty("project");
-      expect(await screen.findByText("No projects yet.")).toBeInTheDocument();
-    } finally {
-      vi.stubEnv("VITE_CONSOLE_PROJECT_ID", "");
-    }
+    await waitFor(() => expect(router.state.location.pathname).toBe("/projects"));
+    expect(router.state.location.search).not.toHaveProperty("project");
+    expect(await screen.findByText("No projects yet.")).toBeInTheDocument();
   });
 
   it("selects nothing when the person's projects cannot be read", async () => {
@@ -240,18 +193,20 @@ describe("landing routes", () => {
     expect(router.state.location.search).not.toHaveProperty("project");
   });
 
-  it("shows the empty settings view from settings", async () => {
-    // Settings has no built screen yet: Admins moved to the project page
-    // (#1238) and Profile is not built, so the account dropdown's target is the
-    // view's own empty state rather than a redirect somewhere unrelated.
+  it("lands on Profile from settings", async () => {
+    // Settings has no landing page of its own; the account dropdown's target
+    // forwards to the first settings screen.
+    server.use(
+      http.get("http://localhost/api/users/me", () =>
+        HttpResponse.json({ id: "user_1", attributes: { email: "maya@example.com" } }),
+      ),
+    );
     const router = await renderAt("/settings");
 
-    await waitFor(() => expect(router.state.location.pathname).toBe("/settings"));
-    expect(await screen.findByRole("heading", { name: "Settings" })).toBeInTheDocument();
-    expect(screen.getByText("No settings yet.")).toBeInTheDocument();
-    // Asserted here, where the Settings nav is actually mounted: no route
-    // claims a Settings heading any more, so neither a WORKSPACE group over
-    // nothing nor an Admins row survives.
+    await waitFor(() => expect(router.state.location.pathname).toBe("/settings/profile"));
+    expect(await screen.findByRole("heading", { name: "Profile" })).toBeInTheDocument();
+    // No screen claims WORKSPACE, so the heading is absent and no Admins row
+    // survives from when that screen lived here.
     expect(screen.queryByRole("navigation", { name: "WORKSPACE" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Admins/ })).not.toBeInTheDocument();
   });

@@ -12,6 +12,7 @@ import { stableStringify } from "../json";
 import { annotateAssetWarnings } from "./asset-probe.js";
 import { validatePlannedFlows } from "./flow-validation.js";
 import { readState, removeFromState, updateState } from "./state.js";
+import { FatalFetchError } from "./types.js";
 
 /**
  * Compute the sync plan for `cwd` against the state file and (when
@@ -109,6 +110,9 @@ export async function buildSyncPlan(
         try {
           oldContent = await syncer.fetch(entry.id);
         } catch (err) {
+          if (err instanceof FatalFetchError) {
+            throw err.reason;
+          }
           consola.debug(`fetch ${syncer.kind} ${entry.id} failed:`, err);
         }
       }
@@ -377,9 +381,15 @@ export async function runSyncLoop(
           newId && action.repin
             ? await adoptRepin(action.path, action.content, action.repin, newId)
             : action.content;
-        const { canonical } = await action.syncer.update(action.id, content);
+        const { id: landedOn, canonical } = await action.syncer.update(action.id, content);
         const fallbackHash = newId ? hashForState(action.syncer, content) : action.hash;
+        // The id the write reported, not the one it was given: a write
+        // addressed by document content can land on a different resource than
+        // the tracked one, and state has to follow it or the next plan reads
+        // the resource the file no longer describes.
+        const trackedId = landedOn ?? action.id;
         await updateState(cwd, action.path, {
+          id: trackedId,
           hash: await writeBack(action, canonical, fallbackHash),
         });
         consola.info(`Updated the ${action.syncer.kind} on Zitadel from ${action.path}`);
@@ -387,7 +397,7 @@ export async function runSyncLoop(
           kind: action.syncer.kind,
           action: "update",
           file: action.path,
-          id: action.id,
+          id: trackedId,
         });
         break;
       }
@@ -529,6 +539,10 @@ async function fetchOldIfAsked(
   try {
     return await syncer.fetch(id);
   } catch (err) {
+    // A syncer that refused on purpose is not a fetch that merely failed.
+    if (err instanceof FatalFetchError) {
+      throw err.reason;
+    }
     consola.debug(`fetch ${syncer.kind} ${id} failed:`, err);
     return null;
   }

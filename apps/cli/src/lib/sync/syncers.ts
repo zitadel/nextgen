@@ -4,14 +4,17 @@ import type {
   CreateBrandingBody,
   CreateFlowDefinition201,
   CreateFlowDefinitionBodyFlowDefinition,
+  CreateIdpBodyIdp,
   CreateSchemaBody,
 } from "@zitadel/api/generated/model";
 
 import { DEFAULT_FLOW_SCHEMA_URI } from "@zitadel/config/defaults";
+import { isVariableReference } from "@zitadel/config/idp";
 import { normalizeFlowBody, normalizeSchemaBody } from "@zitadel/config/normalize";
 import {
   brandingConfigSchema,
   flowConfigSchema,
+  idpConnectionConfigSchema,
   schemaConfigSchema,
 } from "@zitadel/config/schemas";
 import { validateLoginTemplate } from "@zitadel/config/template";
@@ -28,7 +31,9 @@ import {
 } from "../branding";
 import { ZitadelError } from "../errors";
 import { FLOWS_DIR, flowEnvRefs } from "../flows";
+import { IDPS_DIR, refuseResolvedSecret } from "../idp";
 import { SCHEMAS_DIR } from "../user-schema";
+import { FatalFetchError } from "./types.js";
 
 /** Runtime environment lookup used to resolve `${VAR}` / `*_env` references. */
 type EnvLookup = Record<string, string | undefined>;
@@ -53,6 +58,9 @@ export function makeSyncers(opts: {
 }): ReadonlyArray<ResourceSyncer> {
   return [
     new SchemaSyncer(opts.client, opts.projectId, opts.env),
+    // Before flows: a flow step naming a connection slug is only valid once
+    // that connection exists on the platform.
+    new IdpConnectionSyncer(opts.client, opts.projectId),
     new FlowDefinitionSyncer(opts.client, opts.projectId, opts.env),
     new BrandingSyncer(opts.client, opts.projectId, opts.env, opts.cwd),
   ];
@@ -64,10 +72,169 @@ export function makeSyncers(opts: {
  * the missing names. Shared by every syncer so the check is identical for
  * schemas and flows, and runs in the sync engine before any platform call.
  */
+/**
+ * A mutation response, checked before it is treated as the canonical body.
+ *
+ * Both write paths return the stored document and the sync loop writes it back
+ * to the file on disk, so this is the last point before a resolved secret would
+ * be committed.
+ */
+function canonicalDefinition(definition: object | undefined, id: unknown): object | undefined {
+  if (definition === undefined) {
+    return undefined;
+  }
+  refuseResolvedSecret(definition, typeof id === "string" ? id : "the connection");
+  return definition;
+}
+
+/** The value a Zod issue path points at, or `undefined` when it is absent. */
+function valueAt(data: object, path: ReadonlyArray<PropertyKey>): unknown {
+  let current: unknown = data;
+  for (const key of path) {
+    if (typeof current !== "object" || current === null) {
+      return undefined;
+    }
+    current = (current as Record<PropertyKey, unknown>)[key];
+  }
+  return current;
+}
+
 function assertEnvRefs(data: object, env: EnvLookup): void {
   const missing = flowEnvRefs(data).filter((name) => !env[name]);
   if (missing.length > 0) {
     throw new ZitadelError("E_VALIDATION", `Missing environment variables: ${missing.join(", ")}`);
+  }
+}
+
+/**
+ * Syncs `.zitadel/idps/*.json`, one identity provider connection per file.
+ *
+ * `mutable` with `revisioned: false`: the connection keeps one id for life and
+ * the server files each edit as a revision beneath it, so an edit is an update
+ * here rather than a new resource, and nothing that references the slug has to
+ * be re-pinned.
+ *
+ * Deletion is not supported yet (#1013): what should happen to users already
+ * linked to a connection is undesigned, so a removed file is reported and no
+ * deletion is sent.
+ *
+ * `fetch` reads the stored connection so an update plans with a field-level
+ * diff, as every other resource does. It refuses a body whose `client_secret`
+ * is a value rather than a `${{ NAME }}` reference: previews must never print
+ * a credential (area 4), and the CLI's own `validate` makes a literal secret
+ * unuploadable, so one coming back from a read means the server resolved it
+ * and the plan must stop rather than render it.
+ */
+class IdpConnectionSyncer implements ResourceSyncer {
+  readonly kind = "idp";
+  readonly directory = IDPS_DIR;
+  readonly mutable = true;
+  readonly revisioned = false;
+
+  constructor(
+    private readonly client: ZitadelClient,
+    private readonly projectId: string,
+  ) {}
+
+  /**
+   * Parse against the generated `CreateIdpBody.idp` Zod, the orval-emitted
+   * equivalent of `idp-connection.json`. A literal `client_secret` fails that
+   * pattern, so it is caught here and named plainly: it is the one mistake
+   * that would publish a credential.
+   */
+  validate(data: object): void {
+    const result = idpConnectionConfigSchema.safeParse(data);
+    if (result.success) {
+      return;
+    }
+    // Only a stored value that is not a reference is the mistake this names.
+    // A missing or wrongly-typed `client_secret` fails at the same path, and
+    // telling someone to replace a value with a reference when the field is
+    // not there sends them looking for something that does not exist.
+    const literalSecret = result.error.issues.some((issue) => {
+      if (issue.path.length <= 1 || issue.path[issue.path.length - 1] !== "client_secret") {
+        return false;
+      }
+      const stored = valueAt(data, issue.path);
+      return typeof stored === "string" && !isVariableReference(stored);
+    });
+    throw new ZitadelError(
+      "E_VALIDATION",
+      literalSecret
+        ? "Connection file's client_secret must reference a variable, not hold a value"
+        : "Connection file is not a valid identity provider connection",
+      {
+        hint: literalSecret
+          ? 'Use "client_secret": "${{ NAME }}" and publish the value with `variables set NAME --secret`.'
+          : undefined,
+        details: { issues: result.error.issues },
+      },
+    );
+  }
+
+  /**
+   * `POST /idps` creates the connection when its slug is new to the project.
+   * The response carries the stored document, so no follow-up fetch is needed.
+   */
+  async create(data: object): Promise<{ id: string; canonical?: object }> {
+    const result = await this.client.createIdp(
+      { idp: data as CreateIdpBodyIdp },
+      { project_id: this.projectId },
+    );
+    // Guarded before it becomes canonical: `writeBackResource` commits the
+    // canonical body to `.zitadel/idps/`, so a resolved secret here would be
+    // written to a file the developer commits.
+    return { id: result.id, canonical: canonicalDefinition(result.definition, result.id) };
+  }
+
+  /**
+   * The same call: a document whose slug already exists revises that
+   * connection, keeping its id. The id is passed for the sync loop's benefit
+   * and deliberately unused — the slug inside the document addresses the row.
+   */
+  async update(_id: string, data: object): Promise<{ id?: string; canonical?: object }> {
+    const result = await this.client.createIdp(
+      { idp: data as CreateIdpBodyIdp },
+      { project_id: this.projectId },
+    );
+    // The id comes back because the slug decides which connection the write
+    // landed on: editing it names a different connection, and the server
+    // creates one. Returning the id keeps state pointing at that connection
+    // rather than the one the slug used to name.
+    return {
+      id: typeof result.id === "string" ? result.id : undefined,
+      canonical: canonicalDefinition(result.definition, result.id),
+    };
+  }
+
+  /**
+   * The stored connection, for the plan's before/after.
+   *
+   * Comparison-only: the result is rendered, never written back or uploaded,
+   * so it is returned as the server states it apart from the secret guard.
+   */
+  async fetch(id: string): Promise<object> {
+    const body = await this.client.getIdpById(id, { project_id: this.projectId });
+    const definition = (body.definition ?? {}) as object;
+    try {
+      refuseResolvedSecret(definition, id);
+    } catch (err) {
+      // Fatal rather than a fetch that failed: the planner swallows an ordinary
+      // failure and plans without a diff, which would turn a server resolving
+      // secrets into a silently missing before/after.
+      throw new FatalFetchError(err as Error);
+    }
+    return definition;
+  }
+
+  async delete(_id: string): Promise<void> {
+    throw new ZitadelError(
+      "E_NOT_IMPLEMENTED",
+      "Deleting an identity provider connection is not supported yet",
+      {
+        hint: "Restore the file, or remove the connection on the platform once deletion is designed (#1013).",
+      },
+    );
   }
 }
 

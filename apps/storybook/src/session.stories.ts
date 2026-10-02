@@ -3,13 +3,10 @@ import type { Meta, StoryObj } from "@storybook/web-components-vite";
 import { applyBranding, clearBranding } from "@zitadel/api-mock";
 import { html } from "lit";
 import { http, HttpResponse } from "msw";
-import { initialize, mswLoader } from "msw-storybook-addon";
+import { mswLoader } from "msw-storybook-addon";
 import "@zitadel/components";
 
 import { brandingPresets, type BrandingPresetId } from "./branding-presets.js";
-
-// Idempotent: the orchestrator story may have already started the worker.
-initialize({ onUnhandledRequest: "bypass" });
 
 const STORY_IDENTIFIER = "qwertz@acme.com";
 

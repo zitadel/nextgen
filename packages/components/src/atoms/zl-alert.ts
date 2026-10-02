@@ -73,6 +73,8 @@ export class ZlAlert extends LitElement {
           <div class="zr-alert__message" part="message">
             <slot></slot>
           </div>
+          <slot name="detail" class="zr-alert__detail" part="detail"></slot>
+          <slot name="link" class="zr-alert__link" part="link"></slot>
         </div>
         ${this.dismissible
           ? html`<button

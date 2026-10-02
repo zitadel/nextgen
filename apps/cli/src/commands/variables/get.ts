@@ -1,6 +1,4 @@
-import { Args } from "@oclif/core";
-
-import { CommandGroups, OwnerCommand, type JsonEnvelope } from "../../lib/oclif";
+import { CommandGroups, type JsonEnvelope, nonBlankArg, OwnerCommand } from "../../lib/oclif";
 import { renderDetail } from "../../lib/oclif/crud/table";
 import { assertVariableName, toVariableRow, variableCells } from "../../lib/variables";
 
@@ -21,7 +19,7 @@ export default class VariablesGet extends OwnerCommand {
     "<%= config.bin %> variables get GOOGLE_CLIENT_ID --project-level --json",
   ];
   static override args = {
-    name: Args.string({ required: true, description: "Variable name to read." }),
+    name: nonBlankArg({ required: true, description: "Variable name to read." }),
   };
 
   async run(): Promise<JsonEnvelope> {

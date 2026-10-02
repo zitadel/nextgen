@@ -75,7 +75,7 @@
     "@testing-library/react": "catalog:",
     "@testing-library/user-event": "catalog:",
     "@types/react": "catalog:",
-    "@vitest/coverage-v8": "catalog:sdk",
+    "@vitest/coverage-v8": "catalog:",
     "@zitadel/eslint-config": "workspace:*",
     "eslint": "catalog:",
     "eslint-plugin-jsx-a11y": "catalog:",
@@ -86,6 +86,6 @@
     "next": "^16.2.11",
     "prettier": "catalog:",
     "typescript": "^5.7.3",
-    "vitest": "catalog:sdk"
+    "vitest": "catalog:"
   }
 }

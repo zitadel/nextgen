@@ -2,6 +2,8 @@ import type { Page } from "@playwright/test";
 
 import { expect } from "@zitadel/testing/playwright";
 
+import { completeLogin } from "./login";
+
 /**
  * Shared helpers for the real-instance console suites.
  *
@@ -14,12 +16,8 @@ import { expect } from "@zitadel/testing/playwright";
 type ProjectHandle = { baseUrl: string; projectId: string; projectSecret: string };
 
 /**
- * Grants a seeded user admin on the instance's project, then completes the
- * console's login screen (Console ADR 0003) with it: the default-login flow's
- * identifier step ("Email" + "Continue"),
- * then the password step ("Password" + "Sign in"). The widget exchanges the
- * handoff for the `__nextgen_session` cookie and performs a full-document
- * navigation away from /login.
+ * Grants a seeded user admin on the instance's project, then signs in with it
+ * through the console's login screen (`completeLogin` in `login.ts`).
  */
 export async function signIn(
   page: Page,
@@ -30,22 +28,7 @@ export async function signIn(
   // person sees is what their grants allow, so every signed-in test user is
   // made an admin of the instance's project first.
   await grantProjectAdmin(handle, user.id);
-  await page.goto("/login");
-  await page.getByLabel("Email").fill(user.email);
-  await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await page.getByLabel("Password").fill(user.password);
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await page.waitForURL((url) => !url.pathname.endsWith("/login"));
-
-  // The URL leaving /login is not the end of signing in. The widget's terminal
-  // step is a full-document navigation to postSignInUrl, and the `_authed`
-  // guard resolves the session again on the way into the layout. Returning at
-  // the URL change leaves those in flight, and they interrupt whatever the
-  // caller navigates to next ("Navigation to /x is interrupted by another
-  // navigation to /"). The shell's own navigation renders only once the guard
-  // has let the layout through, so waiting for it waits for the sign-in to
-  // have finished landing.
-  await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();
+  await completeLogin(page, user);
 }
 
 /**

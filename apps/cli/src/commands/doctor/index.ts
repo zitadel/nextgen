@@ -23,7 +23,7 @@ import {
   type RuntimeBackend,
   type RuntimeMetadata,
 } from "../../lib/local-server/runtime";
-import { BaseCommand, CommandGroups, type JsonEnvelope } from "../../lib/oclif";
+import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
 import { createOrca } from "../../lib/orca";
 import { listenersForPort } from "../../lib/prober/ports";
 import { hasZitadelConfig } from "../../lib/project";
@@ -59,7 +59,7 @@ export default class Doctor extends BaseCommand {
   static override groupOrder = 3;
   static override flags = {
     fix: Flags.boolean({ description: "Repair missing files and stale managed wiring." }),
-    image: Flags.string({ description: "Container image to check." }),
+    image: nonBlankString({ description: "Container image to check." }),
     port: Flags.integer({ description: "Local HTTP port.", default: DEFAULT_LOCAL_SERVER_PORT }),
     runtime: Flags.string({
       description: "Local runtime backend.",

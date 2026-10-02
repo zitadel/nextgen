@@ -2,10 +2,11 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { Link2, Workflow } from "lucide-react";
 
 import { EYEBROW, MetaRule, MetaValue } from "@/components/detail-meta";
+import { ICON_PLATE, MetaCard } from "@/components/detail-page";
 import { DocumentViewer } from "@/components/document-viewer";
 import { DETAIL_PANEL_PAGE } from "@/components/layout";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import {
   Table,
@@ -79,11 +80,8 @@ function FlowDefinitionDetail() {
           {/* Stacks below `sm` so a long schema name cannot squeeze the title. */}
           <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
             <div className="flex min-w-0 items-center gap-3">
-              <span
-                aria-hidden
-                className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted"
-              >
-                <Workflow className="size-4 text-foreground" />
+              <span aria-hidden className={ICON_PLATE}>
+                <Workflow className="size-4" />
               </span>
               <h1 className="truncate font-serif text-lg leading-6 text-foreground">{name}</h1>
             </div>
@@ -98,13 +96,11 @@ function FlowDefinitionDetail() {
           </div>
 
           {/* The frame draws a third value, `EXPIRES AT`; nothing backs it. */}
-          <Card className="gap-0 rounded-md py-0 shadow-xs">
-            <CardContent className="flex flex-col px-5 py-3.5 sm:flex-row sm:flex-wrap sm:items-start">
-              <MetaValue label="Flow ID" value={definitionId} copyable />
-              <MetaRule />
-              <MetaValue label="Created" value={formatDate(createdAt)} />
-            </CardContent>
-          </Card>
+          <MetaCard>
+            <MetaValue label="Flow ID" value={definitionId} copyable />
+            <MetaRule />
+            <MetaValue label="Created" value={formatDate(createdAt)} />
+          </MetaCard>
         </div>
 
         <Separator />

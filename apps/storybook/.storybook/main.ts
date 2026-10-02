@@ -58,8 +58,13 @@ const config: StorybookConfig = {
   stories: ["../src/**/*.stories.ts"],
   addons: ["@storybook/addon-a11y", "@storybook/addon-vitest"],
   staticDirs: [{ from: apiMockPublicDir, to: "/" }],
-  // Inject the workspace-source reload poller into the preview iframe.
-  previewHead: (head) => `${head}${reloadPollerScript}`,
+  // Inject the workspace-source reload poller into the preview iframe — but only
+  // in `storybook dev`. Its `__zitadel_reload_token` endpoint is served by the
+  // dev server's `configureServer` hook alone, so in a static build (e.g. the
+  // Vercel preview) the poller would fetch a nonexistent path every 500ms
+  // forever. `storybook build` runs with `NODE_ENV=production`, so gate on that.
+  previewHead: (head) =>
+    process.env.NODE_ENV === "production" ? head : `${head}${reloadPollerScript}`,
   async viteFinal(viteConfig) {
     viteConfig.optimizeDeps = {
       ...viteConfig.optimizeDeps,

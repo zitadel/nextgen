@@ -40,7 +40,7 @@ import {
   type RuntimeMetadata,
 } from "../lib/local-server/runtime";
 import { consoleSignInUrl } from "../lib/local-server/sign-in";
-import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
+import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../lib/oclif";
 import { listenersForPort, type TcpListener } from "../lib/prober/ports";
 import { publicCliCommand } from "../lib/public-cli";
 
@@ -51,7 +51,7 @@ export default class Start extends BaseCommand {
   static override group = CommandGroups.localServer;
   static override groupOrder = 1;
   static override flags = {
-    image: Flags.string({ description: "Container image to run." }),
+    image: nonBlankString({ description: "Container image to run." }),
     port: Flags.integer({ description: "Local HTTP port.", default: DEFAULT_LOCAL_SERVER_PORT }),
     runtime: Flags.string({
       description: "Local runtime backend.",

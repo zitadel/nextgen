@@ -1,3 +1,5 @@
+import { buildStampedChannel } from "../build-channel";
+
 /**
  * Resolves the Mixpanel ingestion token and API host for a CLI invocation.
  *
@@ -36,23 +38,6 @@ const HOSTS = {
 } as const;
 
 export type TelemetryRegion = keyof typeof HOSTS;
-
-declare const __ZITADEL_TELEMETRY_CHANNEL__: string | undefined;
-
-/**
- * Channel stamped into the bundle at build time. tsdown's `define` always
- * replaces the bare `__ZITADEL_TELEMETRY_CHANNEL__` identifier — with
- * `"development"` by default and `"production"` only in the release build — so
- * the shipped CLI routes to the right project with no per-user env var. The
- * identifier is undefined only in unbundled runs (e.g. unit tests importing this
- * module directly); the `typeof` guard returns `""` there so those runs fall
- * through to the dev default without a ReferenceError.
- */
-function buildStampedChannel(): string {
-  return typeof __ZITADEL_TELEMETRY_CHANNEL__ === "string"
-    ? __ZITADEL_TELEMETRY_CHANNEL__.trim().toLowerCase()
-    : "";
-}
 
 /**
  * Decide which project the events belong to. Precedence: an explicit

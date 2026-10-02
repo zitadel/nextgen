@@ -318,6 +318,9 @@ func toFlowStep(step *domain.FlowStep) api.FlowStep {
 		Actions: toFlowStepActions(step.Actions),
 		Gates:   api.FlowStepGates{},
 	}
+	if len(step.SSOProviders) > 0 {
+		out.SSOProviders = toFlowStepSSOProviders(step.SSOProviders)
+	}
 	if step.Error != nil {
 		out.Error = api.NewOptNilString(*step.Error)
 	}
@@ -331,6 +334,12 @@ func toFlowStep(step *domain.FlowStep) api.FlowStep {
 	}
 	if step.Challenge != nil {
 		out.Challenge = api.NewOptFlowStepChallenge(toFlowStepChallenge(*step.Challenge))
+	}
+	if step.Identifier != nil {
+		out.Identifier = api.NewOptFlowStepIdentifier(api.FlowStepIdentifier{
+			Value:        step.Identifier.Value,
+			Autocomplete: step.Identifier.Autocomplete,
+		})
 	}
 	return out
 }
@@ -421,6 +430,9 @@ func toFlowField(f domain.FlowField) api.Field {
 		TextKey:  f.TextKey,
 		Required: api.NewOptBool(f.Required),
 	}
+	if f.Autocomplete != "" {
+		out.Autocomplete = api.NewOptString(f.Autocomplete)
+	}
 	if f.Value != nil {
 		out.Value = jx.Raw(jsonQuoted(*f.Value))
 	}
@@ -473,6 +485,14 @@ func toFlowStepActions(actions []domain.FlowAction) []api.FlowStepAction {
 			TextKey: api.NewOptString(a.TextKey),
 			Primary: api.NewOptBool(a.Primary),
 		}
+	}
+	return out
+}
+
+func toFlowStepSSOProviders(providers []domain.FlowSSOProvider) []api.SSOProvider {
+	out := make([]api.SSOProvider, len(providers))
+	for i, p := range providers {
+		out[i] = api.SSOProvider{ID: p.ID, Name: p.Name, Template: p.Template}
 	}
 	return out
 }

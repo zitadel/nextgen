@@ -51,14 +51,10 @@ export function validateProjectScopeSearch(search: Record<string, unknown>): Pro
  * Only a project the person can act on is ever chosen for them — one
  * `GET /users/me/projects` lists — because the session authorizes every
  * management call through their grants on it (#1300). Standalone optimises for
- * one project (ADR 0004 §6), so:
- *
- * 1. The `VITE_CONSOLE_PROJECT_ID` dev pin, when it is one of their projects.
- *    A pin they hold no grant on is ignored: in `dev-real --claim` it names the
- *    platform project, which the claiming developer cannot manage.
- * 2. Otherwise, their only project.
- * 3. With none or several, nothing: scoped screens go to Projects, which lists
- *    the choice or says there is none.
+ * one project (ADR 0004 §6), so their only project is selected; with none or
+ * several, nothing is, and scoped screens go to Projects, which lists the
+ * choice or says there is none. One listed project is not the only one while
+ * more pages follow.
  *
  * The sign-in project (`getConsoleProjectId()`) is deliberately not a
  * fallback. It is the platform project on a deployment that bootstraps one,
@@ -73,30 +69,7 @@ export async function resolveDefaultProjectScope(): Promise<string | undefined> 
     return undefined;
   }
   const { projects } = page;
-  const more = Boolean(page.next_page_token);
-  const pinned = import.meta.env.VITE_CONSOLE_PROJECT_ID;
-  if (pinned && (await canManage(pinned, projects, more))) return pinned;
-  return projects.length === 1 && !more ? projects[0]?.id : undefined;
-}
-
-/**
- * Whether `project` is one of the person's. The list is one page; past it,
- * `GET /projects/{id}` answers a session only for a project it holds a grant
- * on, so a pin further down the list is still recognised without walking it.
- */
-async function canManage(
-  project: string,
-  listed: { id: string }[],
-  more: boolean,
-): Promise<boolean> {
-  if (listed.some((entry) => entry.id === project)) return true;
-  if (!more) return false;
-  try {
-    await api.getProject(project);
-    return true;
-  } catch {
-    return false;
-  }
+  return projects.length === 1 && !page.next_page_token ? projects[0]?.id : undefined;
 }
 
 /**

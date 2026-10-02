@@ -28,6 +28,7 @@ export interface DesignTokenOverrides {
   focus: FocusTokens;
   breakpoint: BreakpointTokens;
   container: ContainerTokens;
+  gradient: GradientTokens;
 }
 
 /**
@@ -37,6 +38,25 @@ export interface DesignTokenOverrides {
 export interface ColorRoleTokens {
   link: { dark: string; light: string };
   warning: { dark: string; light: string };
+  /**
+   * The identity-provider button's surface, border and label.
+   *
+   * Separate roles rather than the neutral ones so every provider button
+   * keeps one neutral look whatever the tenant's palette: a vendor's mark on a
+   * brand-coloured fill (the Google "G" on pink) reads as broken, and a stack
+   * of providers should look like one group. `PALETTE_MAP` deliberately never
+   * names these (`branding-to-tokens.ts`), which is what keeps branding out;
+   * a host page can still set them in its own CSS.
+   *
+   * The values are the design's outline button, so the shipped login page
+   * matches Figma with no tenant input at all. They are not Google's exact
+   * button themes — like Auth0 and Clerk, one neutral style serves every
+   * provider — and moving to those is a change of values here, nothing else.
+   */
+  provider: { dark: string; light: string };
+  // Kebab-cased because the build emits each key verbatim as `--zl-<key>`.
+  "provider-border": { dark: string; light: string };
+  "provider-foreground": { dark: string; light: string };
 }
 
 export interface FontTokens {
@@ -102,6 +122,31 @@ export interface ContainerTokens {
   settings: string;
 }
 
+/** One stop of a composed gradient: which exported `gradient/*` colour, and where. */
+export interface GradientStop {
+  /** Kebab-case name of the exported colour, e.g. `red-start`. */
+  color: string;
+  /**
+   * Which mode's value to bake in. A Figma gradient style has fixed stops, so
+   * a stop that reads a themed colour must say which side it was drawn with.
+   */
+  mode: "dark" | "light";
+  /** Stop position, e.g. `17.263%`. */
+  at: string;
+}
+
+/**
+ * Gradients composed from the exported `gradient/*` colours. Figma publishes
+ * the colours as variables but keeps each gradient as a style, which the sync
+ * cannot read, so the angle and stop positions are recorded here until the
+ * design system publishes them as variables. Emitted as one
+ * `--zl-gradient-<name>` `linear-gradient()` value, the same in both modes,
+ * as the style is.
+ */
+export interface GradientTokens {
+  [name: string]: { angle: string; stops: readonly GradientStop[] };
+}
+
 export const overrides: DesignTokenOverrides = {
   colorRole: {
     // The frames give links no colour of their own — they take the surrounding
@@ -114,6 +159,15 @@ export const overrides: DesignTokenOverrides = {
     // weight as `--zl-destructive` in each mode. Raised with design — see the
     // open questions on the rebuild.
     warning: { dark: "#fbbf24", light: "#d97706" },
+    // shadcn's outline button as the Figma frame draws it: the page surface
+    // inside the `input` border, label in the page foreground; in dark, the
+    // fill is `input` at 30%. Literal rather than a reference to `background`
+    // / `input` / `foreground`: a typed token value must resolve on its own,
+    // which the snapshot spec enforces — and a reference would let a tenant's
+    // palette back in through those roles.
+    provider: { dark: "#ffffff0b", light: "#fafafa" },
+    "provider-border": { dark: "#ffffff26", light: "#e5e5e5" },
+    "provider-foreground": { dark: "#fafafa", light: "#0a0a0a" },
   },
   font: {
     family: {
@@ -154,5 +208,16 @@ export const overrides: DesignTokenOverrides = {
     // 704px. The settings frames draw this column and the scale has no step
     // for it (`2xl` is 672, `3xl` is 768).
     settings: "44rem",
+  },
+  gradient: {
+    // The `Gradient/Red` style: red/start to base/end, with base/end at its
+    // dark value on both sides.
+    red: {
+      angle: "232.14deg",
+      stops: [
+        { color: "red-start", mode: "dark", at: "17.263%" },
+        { color: "base-end", mode: "dark", at: "74.94%" },
+      ],
+    },
   },
 };

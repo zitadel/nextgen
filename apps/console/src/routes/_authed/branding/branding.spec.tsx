@@ -18,9 +18,26 @@ vi.mock("@/auth/session", async (importOriginal) => {
 // connect and needs a browser to paint. Neither is what this spec is about:
 // the widget's own behaviour is covered in `@zitadel/components`.
 vi.mock("@/components/branding/login-preview", () => ({
-  LoginPreview: ({ journey, flowName }: { journey: string; flowName: string }) => (
-    <div data-testid="preview" data-flow={flowName}>
+  LoginPreview: ({
+    journey,
+    flowName,
+    state,
+    onStates,
+  }: {
+    journey: string;
+    flowName: string;
+    state: string;
+    onStates?: (states: string[]) => void;
+  }) => (
+    <div data-testid="preview" data-flow={flowName} data-state={state}>
       {journey}
+      {/* Stands in for the served step arriving with no required field. */}
+      <button
+        type="button"
+        onClick={() => onStates?.(["default", "submission_error", "loading", "success"])}
+      >
+        serve a step with nothing to flag
+      </button>
     </div>
   ),
 }));
@@ -224,12 +241,58 @@ describe("branding screen", () => {
     expect(screen.getByTestId("preview")).toHaveAttribute("data-flow", "default-login");
   });
 
+  it("switches the previewed state", async () => {
+    serveRevision();
+    await renderAt("/branding");
+
+    expect(await screen.findByTestId("preview")).toHaveAttribute("data-state", "default");
+    await userEvent.click(screen.getByLabelText("Previewed state"));
+    const menu = await screen.findByRole("listbox");
+    expect(
+      within(menu)
+        .getAllByRole("option")
+        .map((option) => option.textContent),
+    ).toEqual([
+      "State: Default",
+      "State: Validation errors",
+      "State: Submission error",
+      "State: Loading",
+      "State: Success",
+    ]);
+    await userEvent.click(within(menu).getByText("State: Validation errors"));
+    expect(screen.getByTestId("preview")).toHaveAttribute("data-state", "validation_error");
+  });
+
+  it("does not offer validation errors for a step with nothing to flag", async () => {
+    serveRevision();
+    await renderAt("/branding");
+
+    await userEvent.click(await screen.findByLabelText("Previewed state"));
+    await userEvent.click(
+      within(await screen.findByRole("listbox")).getByText("State: Validation errors"),
+    );
+    expect(screen.getByTestId("preview")).toHaveAttribute("data-state", "validation_error");
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "serve a step with nothing to flag" }),
+    );
+
+    // The pick falls back to the default, and the option cannot be chosen.
+    expect(screen.getByTestId("preview")).toHaveAttribute("data-state", "default");
+    await userEvent.click(screen.getByLabelText("Previewed state"));
+    expect(
+      within(await screen.findByRole("listbox")).getByRole("option", {
+        name: "State: Validation errors",
+      }),
+    ).toHaveAttribute("aria-disabled", "true");
+  });
+
   it("offers only the journeys it can actually render", async () => {
     serveRevision();
     await renderAt("/branding");
 
-    // Passkey needs a step the flow reaches after an identifier, which waits on
-    // the state selector.
+    // Passkey needs a step the flow reaches after an identifier, which the
+    // preview cannot ask for.
     expect(await screen.findByRole("tab", { name: "Sign up" })).toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Passkey" })).not.toBeInTheDocument();
   });

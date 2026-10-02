@@ -15,7 +15,6 @@ vi.mock("@/auth/session", async (importOriginal) => {
 });
 
 vi.stubEnv("VITE_CONSOLE_API_BASE", "http://localhost/api");
-vi.stubEnv("VITE_CONSOLE_PROJECT_ID", "proj_console");
 
 const USERS_URL = "http://localhost/api/users";
 const USERS_QUERY_URL = `${USERS_URL}/query`;

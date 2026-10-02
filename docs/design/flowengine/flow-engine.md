@@ -449,6 +449,8 @@ an identifier. Login routes a missing user through `user_not_found` to
 > **Direction:** SSO is stubbed in today's engine (`ErrUnsupported` — see
 > [capabilities.md](capabilities.md)). The definition below validates against
 > the shipped schema; the runtime exchange shows the intended ceremony.
+> The example uses the `sso_authenticated` key from #1371; against the schema
+> on main before that PR merges, the key is still `callback`.
 
 **Flow Definition:**
 
@@ -472,7 +474,7 @@ an identifier. Login routes a missing user through `user_not_found` to
       "transitions": {
         "submit": { "target": "signin" },
         "user_not_found": { "target": "login" },
-        "callback": { "target": "done" }
+        "sso_authenticated": { "target": "done" }
       }
     },
     {
@@ -492,7 +494,7 @@ an identifier. Login routes a missing user through `user_not_found` to
 
 The author never writes a `transitions.sso` — the engine handles the reserved
 `sso` action transparently (IdP redirect, code exchange, user resolution) and
-fires `callback` on this step when the IdP returns.
+fires `sso_authenticated` on this step when the IdP returns.
 
 **Frontend interaction:**
 
@@ -547,7 +549,7 @@ callback returns control to the same step:
 GET /flow/flow_2
 ```
 ```json
-← 200  (planned SSO callback fires the authored `callback` transition)
+← 200  (planned SSO callback fires the authored `sso_authenticated` transition)
 {
   "id": "flow_2",
   "session_id": "sess_2",

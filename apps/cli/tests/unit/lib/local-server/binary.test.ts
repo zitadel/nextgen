@@ -18,6 +18,11 @@ vi.mock("node:child_process", async (importOriginal) => {
 describe("local server binary helpers", () => {
   afterEach(() => {
     vi.useRealTimers();
+    // `clearAllMocks` resets the `spawn` mock's call history between tests. Under
+    // Vitest 4 `restoreAllMocks` only restores `spyOn` spies and no longer clears
+    // a `vi.fn()` module mock's `.mock.calls`, so without this a later test reads
+    // an earlier test's `spawn.mock.calls[0]`.
+    vi.clearAllMocks();
     vi.restoreAllMocks();
     vi.unstubAllEnvs();
   });

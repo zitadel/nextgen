@@ -52,12 +52,12 @@
     "@zitadel/api": "workspace:*"
   },
   "devDependencies": {
-    "@vitest/coverage-v8": "catalog:sdk",
+    "@vitest/coverage-v8": "catalog:",
     "@zitadel/eslint-config": "workspace:*",
     "eslint": "catalog:",
     "prettier": "catalog:",
     "typescript": "catalog:",
-    "vite": "catalog:sdk",
-    "vitest": "catalog:sdk"
+    "vite": "catalog:",
+    "vitest": "catalog:"
   }
 }

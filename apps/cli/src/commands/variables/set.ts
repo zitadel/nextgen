@@ -1,8 +1,8 @@
 import { cancel, isCancel, password, text } from "@clack/prompts";
-import { Args, Flags } from "@oclif/core";
+import { Flags } from "@oclif/core";
 
 import { ZitadelError } from "../../lib/errors";
-import { CommandGroups, OwnerCommand, type JsonEnvelope } from "../../lib/oclif";
+import { CommandGroups, type JsonEnvelope, nonBlankArg, OwnerCommand } from "../../lib/oclif";
 import { dryRunResult } from "../../lib/oclif/crud/shared";
 import { publicCliCommand } from "../../lib/public-cli";
 import {
@@ -31,7 +31,7 @@ export default class VariablesSet extends OwnerCommand {
     "<%= config.bin %> variables set SESSION_TTL --project-level --as number",
   ];
   static override args = {
-    name: Args.string({
+    name: nonBlankArg({
       required: true,
       description: "Variable name (letters, digits and underscores).",
     }),

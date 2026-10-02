@@ -24,7 +24,8 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 
 import "./zitadel-login.js";
 import type { ZlAlert } from "../atoms/zl-alert.js";
-import type { ZitadelLogin } from "./zitadel-login.js";
+
+import { loginPreviewStatesFor, type ZitadelLogin } from "./zitadel-login.js";
 
 const API_BASE = "https://flow.test.invalid";
 
@@ -2018,5 +2019,409 @@ describe("<zitadel-login> against the typed Flow API", () => {
     await waitFor(() => submittedFields ?? null);
     expect(submittedFields).toEqual({ email: "" });
     expect(submittedFields).not.toHaveProperty("maritalStatus");
+  });
+});
+
+describe("<zitadel-login preview-state>", () => {
+  let host: HTMLDivElement;
+
+  beforeAll(() => {
+    host = document.createElement("div");
+    document.body.appendChild(host);
+  });
+
+  afterEach(() => {
+    host.innerHTML = "";
+  });
+
+  async function mountPreview(state: ZitadelLogin["previewState"]): Promise<ZitadelLogin> {
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.purpose = "login";
+    element.project = testProject;
+    element.previewState = state;
+    host.appendChild(element);
+    await waitFor(() => element.shadowRoot?.querySelector("zl-card"));
+    return element;
+  }
+
+  /** The operations the mock saw. */
+  function requests(): string[] {
+    return mock.getCaptured().map((entry) => entry.kind);
+  }
+
+  it("starts the real flow and shows its first step in the default state", async () => {
+    const element = await mountPreview("default");
+
+    expect(element.shadowRoot?.querySelector('zl-field[name="email"]')).not.toBeNull();
+    expect(element.shadowRoot?.querySelector("zl-alert")).toBeNull();
+    expect(requests()).toEqual(["createFlow"]);
+  });
+
+  it("flags every required field in the validation_error state", async () => {
+    const element = await mountPreview("validation_error");
+
+    const field = await waitFor(() => {
+      const candidate = element.shadowRoot?.querySelector('zl-field[name="email"][invalid]');
+      return candidate?.getAttribute("error") ? candidate : null;
+    });
+    // The server's own key, localised the way a real rejection is.
+    expect(field.getAttribute("error")).toBe("Please enter an email address");
+    expect(element.shadowRoot?.textContent).not.toContain("error.email_required");
+  });
+
+  it("shows the server-failure banner in the submission_error state", async () => {
+    const element = await mountPreview("submission_error");
+
+    const alert = await waitFor(() =>
+      element.shadowRoot?.querySelector<ZlAlert>("zl-alert[data-zl-step-error]"),
+    );
+    expect(alert.getAttribute("heading")).toBe("We couldn't complete your sign in.");
+    expect(alert.textContent).toContain("Please try again in a few minutes");
+    expect(element.shadowRoot?.querySelector("zl-field[invalid]")).toBeNull();
+  });
+
+  it("holds the busy treatment in the loading state", async () => {
+    const element = await mountPreview("loading");
+
+    await waitFor(() => (element.getAttribute("aria-busy") === "true" ? element : null));
+    expect(element.shadowRoot?.querySelector("form")?.getAttribute("aria-busy")).toBe("true");
+    // Still the served step underneath, not a loader slot.
+    expect(element.shadowRoot?.querySelector('zl-field[name="email"]')).not.toBeNull();
+  });
+
+  it("paints the terminal screen in the success state without completing anything", async () => {
+    const completeEvents: Event[] = [];
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.addEventListener("zitadel-flow-complete", (event) => completeEvents.push(event));
+    element.purpose = "login";
+    element.project = testProject;
+    element.previewState = "success";
+    element.postSignInUrl = "/admin";
+    host.appendChild(element);
+
+    await waitFor(() =>
+      element.shadowRoot?.textContent?.includes("You're signed in") ? element : null,
+    );
+    expect(element.shadowRoot?.querySelector("zl-field")).toBeNull();
+    expect(element.shadowRoot?.querySelector("zl-card.zl-card--terminal")).not.toBeNull();
+    expect(completeEvents).toHaveLength(0);
+    // No handoff exchange: the only request is the start.
+    expect(requests()).toEqual(["createFlow"]);
+  });
+
+  it("submits nothing: Enter, actions and back are dropped", async () => {
+    const element = await mountPreview("default");
+    type(element, "email", "alice@acme.com");
+
+    submit(element);
+    submit(element, "register");
+    element.shadowRoot
+      ?.querySelector("form")
+      ?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    // Give any submit that slipped through time to reach the network.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(requests()).toEqual(["createFlow"]);
+    expect(element.shadowRoot?.querySelector('zl-field[name="email"]')).not.toBeNull();
+    // Enter did not run the client-side required gate either: the state the
+    // preview was asked for is what stays on screen.
+    expect(element.shadowRoot?.querySelector("zl-field[invalid]")).toBeNull();
+  });
+
+  it("follows a submit that lands after preview is switched on", async () => {
+    let release: (() => void) | undefined;
+    server.use(
+      http.post(
+        "*/flow/*/submit",
+        () =>
+          new Promise((resolve) => {
+            release = () =>
+              resolve(
+                HttpResponse.json({
+                  id: "flow-1",
+                  session_id: "sess-1",
+                  session_token: "token-1",
+                  step: {
+                    name: "password",
+                    texts: { title_key: "password.title" },
+                    fields: [
+                      {
+                        name: "password",
+                        type: "password",
+                        text_key: "password.field.password",
+                        required: true,
+                      },
+                    ],
+                    actions: [
+                      {
+                        name: "submit",
+                        kind: "submit",
+                        text_key: "submit.continue",
+                        primary: true,
+                      },
+                    ],
+                    gates: {},
+                  },
+                  branding: {},
+                }),
+              );
+          }),
+      ),
+    );
+    const element = await mountPreview("");
+    type(element, "email", "alice@acme.com");
+    submit(element);
+    await waitFor(() => release);
+
+    element.previewState = "default";
+    await element.updateComplete;
+    release?.();
+    await waitFor(() => element.shadowRoot?.querySelector('zl-field[name="password"]'));
+
+    // The step the server moved to is what the states derive from now.
+    element.previewState = "validation_error";
+    await waitFor(() => element.shadowRoot?.querySelector('zl-field[name="password"][invalid]'));
+    expect(element.shadowRoot?.querySelector('zl-field[name="email"]')).toBeNull();
+  });
+
+  it("paints the named terminal step in the success state", async () => {
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.purpose = "login";
+    element.project = testProject;
+    element.previewState = "success";
+    element.previewSuccessStep = "welcome";
+    element.locales = { en: { "welcome.title": "Welcome aboard" } };
+    host.appendChild(element);
+
+    await waitFor(() =>
+      element.shadowRoot?.textContent?.includes("Welcome aboard") ? element : null,
+    );
+    expect(element.shadowRoot?.textContent).not.toContain("You're signed in");
+  });
+
+  it("starts no passkey ceremony for a served step that carries a challenge", async () => {
+    server.use(
+      http.post("*/flow", () =>
+        HttpResponse.json(
+          {
+            id: "flow-1",
+            session_id: "sess-1",
+            session_token: "token-1",
+            step: {
+              name: "passkey-login",
+              texts: { title_key: "passkey-login.title" },
+              fields: [],
+              actions: [],
+              gates: {},
+              challenge: {
+                method: "passkey",
+                challenge_id: "ch-1",
+                options: { challenge: "AAAA", rpId: "localhost" },
+              },
+            },
+            branding: {},
+          },
+          { status: 201 },
+        ),
+      ),
+    );
+
+    // `<zl-passkey>` starts its ceremony as soon as it connects; here that
+    // fails at once (no WebAuthn), which is what reports an attempt.
+    const attempts: Event[] = [];
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.addEventListener("zl-passkey-error", (event) => attempts.push(event));
+    element.purpose = "login";
+    element.project = testProject;
+    element.previewState = "default";
+    host.appendChild(element);
+    await waitFor(() => element.shadowRoot?.querySelector("zl-card"));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(element.shadowRoot?.querySelector("zl-passkey")).toBeNull();
+    expect(attempts).toHaveLength(0);
+  });
+
+  it("takes no history entry for a served step that can go back", async () => {
+    serveBackCapableStep();
+    const pushState = vi.spyOn(history, "pushState");
+    try {
+      await mountPreview("default");
+
+      // No sentinel: the browser's back gesture stays the host page's own.
+      const sentinels = pushState.mock.calls.filter(
+        ([state]) => (state as { zl?: boolean } | null)?.zl === true,
+      );
+      expect(sentinels).toHaveLength(0);
+    } finally {
+      pushState.mockRestore();
+    }
+  });
+
+  /** A served step the browser's back gesture can leave. */
+  function serveBackCapableStep(): void {
+    server.use(
+      http.post("*/flow", () =>
+        HttpResponse.json(
+          {
+            id: "flow-1",
+            session_id: "sess-1",
+            session_token: "token-1",
+            step: {
+              name: "password",
+              texts: { title_key: "password.title" },
+              fields: [],
+              actions: [{ name: "back", kind: "back", text_key: "action.back" }],
+              gates: {},
+            },
+            branding: {},
+          },
+          { status: 201 },
+        ),
+      ),
+    );
+  }
+
+  function sentinelPushes(pushState: { mock: { calls: unknown[][] } }): number {
+    return pushState.mock.calls.filter(([state]) => (state as { zl?: boolean } | null)?.zl === true)
+      .length;
+  }
+
+  it("gives the history entry back when preview is switched on mid-flow", async () => {
+    serveBackCapableStep();
+    const pushState = vi.spyOn(history, "pushState");
+    const back = vi.spyOn(history, "back");
+    try {
+      const element = await mountPreview("");
+      expect(sentinelPushes(pushState)).toBe(1);
+
+      element.previewState = "default";
+      await element.updateComplete;
+
+      // The entry is retired, so a back press leaves the page as it would
+      // without the element rather than being caught and dropped.
+      expect(back).toHaveBeenCalledTimes(1);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(sentinelPushes(pushState)).toBe(1);
+    } finally {
+      pushState.mockRestore();
+      back.mockRestore();
+    }
+  });
+
+  it("takes the history entry when preview is switched off on a step that can go back", async () => {
+    serveBackCapableStep();
+    const pushState = vi.spyOn(history, "pushState");
+    try {
+      const element = await mountPreview("default");
+      expect(sentinelPushes(pushState)).toBe(0);
+
+      element.previewState = "";
+      await element.updateComplete;
+
+      expect(sentinelPushes(pushState)).toBe(1);
+    } finally {
+      pushState.mockRestore();
+      history.back();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+  });
+
+  it("offers validation_error only for a step with a required field to flag", () => {
+    type Step = Parameters<typeof loginPreviewStatesFor>[0];
+    const step = (fields: Step["fields"]): Step => ({
+      name: "identifier",
+      texts: {},
+      fields,
+      actions: [],
+      gates: {},
+    });
+
+    expect(
+      loginPreviewStatesFor(
+        step([
+          { name: "email", type: "email", text_key: "identifier.field.email", required: true },
+        ]),
+      ),
+    ).toContain("validation_error");
+    // An optional field, a must-accept checkbox, or no fields at all: an empty
+    // submit flags nothing, so the state would look like `default`.
+    expect(
+      loginPreviewStatesFor(
+        step([
+          { name: "nickname", type: "text", text_key: "profile.field.nickname" },
+          { name: "terms", type: "checkbox", text_key: "profile.field.terms", required: true },
+        ]),
+      ),
+    ).toEqual(["default", "submission_error", "loading", "success"]);
+    expect(loginPreviewStatesFor(step([]))).not.toContain("validation_error");
+  });
+
+  it("runs the flow for real when the value is not a known state", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const element = await mountPreview("validation-error" as ZitadelLogin["previewState"]);
+
+      expect(element.shadowRoot?.querySelector("zl-alert")).toBeNull();
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('preview-state="validation-error"'),
+      );
+
+      type(element, "email", "alice@acme.com");
+      submit(element);
+      await waitFor(() => (requests().includes("submitFlowStep") ? true : null));
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("switches state in place, without starting another flow", async () => {
+    const element = await mountPreview("default");
+
+    element.previewState = "validation_error";
+    await waitFor(() => element.shadowRoot?.querySelector('zl-field[name="email"][invalid]'));
+
+    element.previewState = "default";
+    await waitFor(() => element.shadowRoot?.querySelector('zl-field[name="email"]:not([invalid])'));
+    expect(element.shadowRoot?.querySelector("zl-alert")).toBeNull();
+    expect(requests()).toEqual(["createFlow"]);
+  });
+});
+
+describe("<zitadel-login preview-state> repaint", () => {
+  let host: HTMLDivElement;
+
+  beforeAll(() => {
+    host = document.createElement("div");
+    document.body.appendChild(host);
+  });
+
+  afterEach(() => {
+    host.innerHTML = "";
+  });
+
+  it("keeps typed input and leaves focus alone when the state changes", async () => {
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.purpose = "login";
+    element.project = testProject;
+    element.previewState = "default";
+    host.appendChild(element);
+    await waitFor(() => element.shadowRoot?.querySelector('zl-field[name="email"]'));
+    type(element, "email", "alice@acme.com");
+    // Focus sits with the operator's control outside the element.
+    const control = document.createElement("button");
+    document.body.appendChild(control);
+    control.focus();
+
+    element.previewState = "submission_error";
+    await waitFor(() => element.shadowRoot?.querySelector("zl-alert[data-zl-step-error]"));
+    await element.updateComplete;
+
+    const field = element.shadowRoot?.querySelector<HTMLElement & { formValue: string }>(
+      'zl-field[name="email"]',
+    );
+    expect(field?.formValue).toBe("alice@acme.com");
+    expect(document.activeElement).toBe(control);
+    control.remove();
   });
 });

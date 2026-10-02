@@ -42,15 +42,15 @@
   },
   "devDependencies": {
     "@testing-library/vue": "^8.1.0",
-    "@vitest/coverage-v8": "catalog:sdk",
+    "@vitest/coverage-v8": "catalog:",
     "@zitadel/eslint-config": "workspace:*",
     "eslint": "catalog:",
     "jsdom": "catalog:",
     "prettier": "catalog:",
     "typescript": "catalog:",
-    "vite": "catalog:sdk",
+    "vite": "catalog:",
     "vite-plugin-dts": "catalog:",
-    "vitest": "catalog:sdk",
+    "vitest": "catalog:",
     "vue": "catalog:"
   }
 }

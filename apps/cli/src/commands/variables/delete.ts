@@ -1,8 +1,8 @@
 import { cancel, confirm, isCancel } from "@clack/prompts";
-import { Args, Flags } from "@oclif/core";
+import { Flags } from "@oclif/core";
 
 import { ZitadelError } from "../../lib/errors";
-import { CommandGroups, OwnerCommand, type JsonEnvelope } from "../../lib/oclif";
+import { CommandGroups, type JsonEnvelope, nonBlankArg, OwnerCommand } from "../../lib/oclif";
 import { dryRunResult } from "../../lib/oclif/crud/shared";
 import { publicCliCommand } from "../../lib/public-cli";
 import { assertVariableName } from "../../lib/variables";
@@ -24,7 +24,7 @@ export default class VariablesDelete extends OwnerCommand {
     "<%= config.bin %> variables delete GOOGLE_CLIENT_ID --project-level --force",
   ];
   static override args = {
-    name: Args.string({ required: true, description: "Variable name to delete." }),
+    name: nonBlankArg({ required: true, description: "Variable name to delete." }),
   };
   static override flags = {
     // `--force` is per command, not global: here it permits a deletion.

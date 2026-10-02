@@ -13,8 +13,8 @@ import "./zl-icon.js";
  * Atom: `<zl-button>` — the entire Figma button matrix in a single atom.
  *
  * Variant axes, matching the design system's own:
- *   - hierarchy: primary | secondary | text
- *   - size:      medium (48 × auto) | small (40 × auto)
+ *   - hierarchy: primary | secondary | outline | text
+ *   - size:      medium (36 × auto) | small (32 × auto)
  *   - state:     enabled / hovered / focused / pressed / disabled
  *                (derived from interaction, not props)
  *   - slots:     `leading` icon, `trailing` icon, default for the label.
@@ -46,7 +46,7 @@ import "./zl-icon.js";
  *     gap            8px between icon/label/icon
  *     font           Arimo SemiBold (600)
  *                    medium: 16/24    small: 14/20
- *     icon          24px medium, 16px small
+ *     icon          16px at both sizes
  *     focus ring    2px solid #f4f4f6, 2px offset
  *     transition    background-color / color / border-color, fast standard
  *
@@ -70,7 +70,8 @@ export class ZlButton extends LitElement {
 
   static override styles = [baseHostStyles, ...surfaceStyles(buttonStyles)];
 
-  @property({ reflect: true }) accessor hierarchy: "primary" | "secondary" | "text" = "primary";
+  @property({ reflect: true }) accessor hierarchy: "primary" | "secondary" | "outline" | "text" =
+    "primary";
 
   @property({ reflect: true }) accessor size: "medium" | "small" = "medium";
 
@@ -152,12 +153,7 @@ export class ZlButton extends LitElement {
         ${body}
         ${loading
           ? html`<span class="spinner" part="spinner"
-              ><zl-icon
-                name="spinner"
-                size=${size === "small" ? "16" : "24"}
-                spin
-                decorative
-              ></zl-icon
+              ><zl-icon name="spinner" size="16" spin decorative></zl-icon
             ></span>`
           : html`<slot name="trailing"></slot>`}
       </button>

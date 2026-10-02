@@ -1,5 +1,7 @@
 import { resolve } from "node:path";
-import { defineConfig } from "vite";
+// `defineConfig` comes from `vitest/config` (not `vite`) so the `test` field
+// typechecks: Vitest 4 no longer augments Vite's own `UserConfig` with `test`.
+import { defineConfig } from "vitest/config";
 
 import { baseTest } from "../../vitest.shared.mjs";
 

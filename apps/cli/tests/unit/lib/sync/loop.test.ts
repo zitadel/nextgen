@@ -1,13 +1,14 @@
 import { createZitadelClient } from "@zitadel/api/client";
 import { getDefaultHumanUserSchema, getDefaultLoginFlow } from "@zitadel/config/defaults";
 import { normalizeFlowBody, normalizeSchemaBody } from "@zitadel/config/normalize";
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ResourceSyncer } from "../../../../src/lib/sync/syncers";
 
+import { ZitadelError } from "../../../../src/lib/errors";
 import {
   buildSyncPlan,
   hashForState,
@@ -15,6 +16,7 @@ import {
   writeBackResource,
 } from "../../../../src/lib/sync/loop";
 import { makeSyncers } from "../../../../src/lib/sync/syncers";
+import { FatalFetchError } from "../../../../src/lib/sync/types";
 
 const client = createZitadelClient({ baseUrl: "http://test.local" });
 
@@ -269,6 +271,30 @@ describe("buildSyncPlan", () => {
     }
   });
 
+  it("propagates a fatal fetch refusal instead of planning without a diff", async () => {
+    // The swallow above is right for a network error and wrong for a syncer
+    // that refused on purpose -- degrading that to "no diff" would hide the
+    // reason it refused.
+    const cwd = makeCwd();
+    try {
+      await writeState(cwd, {
+        framework: "next",
+        resources: { ".zitadel/schemas/old.json": { id: "old-id", hash: "abc" } },
+      });
+      await mkdir(join(cwd, ".zitadel/schemas"), { recursive: true });
+
+      const refusal = new ZitadelError("E_VALIDATION", "the response held a secret");
+      const fetchFn = vi.fn().mockRejectedValue(new FatalFetchError(refusal));
+      const syncer = makeSyncer({ fetch: fetchFn });
+
+      await expect(buildSyncPlan(cwd, [syncer], true)).rejects.toThrow(
+        /the response held a secret/,
+      );
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
   it("leaves oldContent null when fetch throws", async () => {
     const cwd = makeCwd();
     try {
@@ -329,6 +355,57 @@ describe("buildSyncPlan validation (real syncers)", () => {
 });
 
 describe("runSyncLoop", () => {
+  it("records the id the write reported, not the one it was given", async () => {
+    // A connection is addressed by the slug inside the document, so editing
+    // that slug names a different connection and the server creates one. State
+    // has to follow it: left pointing at the old id, the next plan reads the
+    // connection the file no longer describes.
+    const cwd = makeCwd();
+    try {
+      await writeState(cwd, {
+        framework: "next",
+        resources: { ".zitadel/schemas/user.json": { id: "idp_AAA", hash: "stale" } },
+      });
+      await writeResource(cwd, ".zitadel/schemas", "user.json", { kind: "user-schema" });
+
+      const syncer = makeSyncer({
+        mutable: true,
+        update: vi.fn().mockResolvedValue({ id: "idp_BBB" }),
+      });
+      await runSyncLoop(cwd, [syncer]);
+
+      const state = JSON.parse(await readFile(join(cwd, ".zitadel/state.json"), "utf8")) as {
+        resources: Record<string, { id?: string }>;
+      };
+      expect(state.resources[".zitadel/schemas/user.json"]?.id).toBe("idp_BBB");
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps the tracked id when the write reports none", async () => {
+    // A write that cannot change identity says nothing, and state must not be
+    // blanked by that silence.
+    const cwd = makeCwd();
+    try {
+      await writeState(cwd, {
+        framework: "next",
+        resources: { ".zitadel/schemas/user.json": { id: "sch_AAA", hash: "stale" } },
+      });
+      await writeResource(cwd, ".zitadel/schemas", "user.json", { kind: "user-schema" });
+
+      const syncer = makeSyncer({ mutable: true, update: vi.fn().mockResolvedValue({}) });
+      await runSyncLoop(cwd, [syncer]);
+
+      const state = JSON.parse(await readFile(join(cwd, ".zitadel/state.json"), "utf8")) as {
+        resources: Record<string, { id?: string }>;
+      };
+      expect(state.resources[".zitadel/schemas/user.json"]?.id).toBe("sch_AAA");
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
   it("creates resource when no id in state", async () => {
     const cwd = makeCwd();
     try {

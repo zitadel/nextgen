@@ -137,3 +137,34 @@ describe("sso-conflict", () => {
     expect(actor.getSnapshot().context.sessionToken).not.toBe(atRedirect);
   });
 });
+
+/**
+ * The mock offers provider buttons on every step in `PROVIDER_STEPS`
+ * (`sso-providers.ts`), so every one of those steps has to act on the press.
+ * A step that advertises a button and then falls through to its own default
+ * reports a journey the engine would never produce.
+ */
+describe("every step that offers providers acts on the press", () => {
+  it("leaves for the provider from sign-up, not the password step", () => {
+    const actor = startFlowActor();
+    actor.send({ type: "START", purpose: "register" });
+    actor.send({ type: "SUBMIT", action: "sso", fields: {}, sso_provider_id: "google" });
+
+    expect(actor.getSnapshot().value).toBe("sso-redirect");
+    expect(actor.getSnapshot().context.ssoProviderId).toBe("google");
+  });
+
+  it("leaves for the provider from the conflict step, rather than signing in", () => {
+    const actor = atProvider();
+    actor.send({
+      type: "SUBMIT",
+      action: "callback",
+      fields: { email: "ada@example.test" },
+      sso_outcome: "user_already_exists",
+    });
+    actor.send({ type: "SUBMIT", action: "sso", fields: {}, sso_provider_id: "acme" });
+
+    expect(actor.getSnapshot().value).toBe("sso-redirect");
+    expect(actor.getSnapshot().context.ssoProviderId).toBe("acme");
+  });
+});

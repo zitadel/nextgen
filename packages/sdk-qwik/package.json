@@ -41,19 +41,21 @@
     "@zitadel/sdk-core": "workspace:*"
   },
   "peerDependencies": {
-    "@builder.io/qwik": "^1.5.0"
+    "@qwik.dev/core": "^2.0.0-beta.45"
   },
   "devDependencies": {
-    "@builder.io/qwik": "^1.19.0",
-    "@vitest/coverage-v8": "catalog:sdk",
+    "@qwik.dev/core": "^2.0.0-beta.45",
+    "@vitest/browser": "catalog:",
+    "@vitest/browser-playwright": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
     "@zitadel/eslint-config": "workspace:*",
     "eslint": "catalog:",
     "eslint-plugin-qwik": "catalog:",
-    "jsdom": "catalog:",
+    "playwright": "catalog:",
     "prettier": "catalog:",
     "typescript": "catalog:",
-    "vite": "catalog:sdk",
+    "vite": "catalog:",
     "vite-plugin-dts": "catalog:",
-    "vitest": "catalog:sdk"
+    "vitest": "catalog:"
   }
 }

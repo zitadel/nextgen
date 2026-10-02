@@ -1,5 +1,3 @@
-import { Flags } from "@oclif/core";
-
 import type { CommandResult, GlobalOptions } from "../../types";
 import type {
   CreateSpec,
@@ -12,6 +10,7 @@ import type {
 import { ZitadelError } from "../../../errors";
 import { isObject } from "../../../json";
 import { publicCliCommand } from "../../../public-cli";
+import { nonBlankString } from "../../flags";
 import { readRawBody } from "../body";
 import { bodyFieldFlags, bodyFromFlags, describeBody, fieldExample, needsRawBody } from "../fields";
 import { article, dryRunResult, idArg, idName, parseOrThrow } from "../shared";
@@ -24,13 +23,13 @@ import {
 
 /** `--data` / `--file`: the whole body at once, for anything the field flags cannot express. */
 const rawBodyFlags = {
-  data: Flags.string({
+  data: nonBlankString({
     // No `-d`: the CLI conventions reserve that short form for `--debug`.
     description: "Whole body as a JSON object, instead of the field flags.",
     exclusive: ["file"],
     helpGroup: "RAW BODY",
   }),
-  file: Flags.string({
+  file: nonBlankString({
     description: "Read the body from a JSON file; `-` reads stdin.",
     exclusive: ["data"],
     helpGroup: "RAW BODY",

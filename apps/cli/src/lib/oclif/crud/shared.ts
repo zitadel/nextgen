@@ -1,9 +1,8 @@
-import { Args } from "@oclif/core";
-
 import type { CommandResult } from "../types";
 import type { Json, ResourceDescriptor, Schema } from "./types";
 
 import { ZitadelError } from "../../errors";
+import { nonBlankArg } from "../flags";
 import { redactSecrets } from "./secrets";
 
 /** Helpers shared by more than one verb builder. */
@@ -15,7 +14,7 @@ export const idName = <Ctx>(resource: ResourceDescriptor<Ctx>): string => resour
 export const idArg = <Ctx>(resource: ResourceDescriptor<Ctx>) => {
   const name = idName(resource);
   const description = resource.idDescription ?? `${resource.singular} ${name}`;
-  return { [name]: Args.string({ required: true, description }) };
+  return { [name]: nonBlankArg({ required: true, description }) };
 };
 
 /** The value the caller passed for that argument. */

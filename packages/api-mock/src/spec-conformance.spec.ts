@@ -230,6 +230,19 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(body.code).toBe("session_not_found");
   });
 
+  test("GET /console/runtime.json names the project the console signs into", async () => {
+    // Not in the OpenAPI spec: the Go server serves it from its root mux
+    // (Console ADR 0004 §3). The console's mock dev loop boots on it, so the
+    // path and both fields are the contract. The platform project, so a
+    // console session can complete a claim (see the claim lifecycle below).
+    const res = await fetch(`${BASE}/console/runtime.json`);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      mode: "standalone",
+      console_project_id: PLATFORM_PROJECT_ID,
+    });
+  });
+
   test("POST /projects returns the spec-defined project shape", async () => {
     const res = await fetch(`${BASE}/projects`, {
       method: "POST",
@@ -1102,6 +1115,49 @@ describe("api-mock idp connections and variables", () => {
     const body = (await res.json()) as Record<string, unknown>;
     expect(GetVariablesResponse.safeParse(body).success).toBe(true);
     expect(body.GOOGLE_CLIENT_ID).toBe("824.apps.googleusercontent.com");
+  });
+
+  test("reads and deletes one variable by name", async () => {
+    const projectId = await newProject("vars-by-name");
+    await fetch(`${BASE}/variables?project_id=${projectId}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ SESSION_TTL: { value: 900, secret: false } }),
+    });
+
+    const read = await fetch(`${BASE}/variables/SESSION_TTL?project_id=${projectId}`);
+    expect(read.status).toBe(200);
+    expect(await read.json()).toBe(900);
+
+    const removed = await fetch(`${BASE}/variables/SESSION_TTL?project_id=${projectId}`, {
+      method: "DELETE",
+    });
+    expect(removed.status).toBe(204);
+    expect((await fetch(`${BASE}/variables/SESSION_TTL?project_id=${projectId}`)).status).toBe(404);
+  });
+
+  test("answers var.not_found for a name this owner does not hold", async () => {
+    const projectId = await newProject("vars-missing");
+
+    const res = await fetch(`${BASE}/variables/ABSENT?project_id=${projectId}`);
+
+    expect(res.status).toBe(404);
+    expect(((await res.json()) as { code?: string }).code).toBe("var.not_found");
+  });
+
+  test.each([
+    ["a name the schema rejects", "bad-name"],
+    ["a name past the length cap", "N".repeat(256)],
+  ])("refuses %s rather than reporting it missing", async (_label, name) => {
+    // variable-name.yaml allows word characters up to 255, so an unusable name
+    // is a bad request: answering `var.not_found` would tell a caller the name
+    // is free when it could never be used.
+    const projectId = await newProject("vars-invalid-name");
+
+    for (const method of ["GET", "DELETE"]) {
+      const res = await fetch(`${BASE}/variables/${name}?project_id=${projectId}`, { method });
+      expect(res.status, `${method} ${name}`).toBe(400);
+    }
   });
 
   test("never reads a secret's value back", async () => {

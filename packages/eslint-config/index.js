@@ -114,6 +114,12 @@ export default tseslint.config(
       // also happens to expose a same-named named export.
       "import/no-named-as-default": "off",
       "import/order": "off",
+      // The generated `@zitadel/api` SDK resolves through multi-megabyte,
+      // build-time-generated files that the import resolver can't reliably
+      // follow across every consumer; TypeScript validates these imports, so
+      // exempt the package (and its subpaths) from `no-unresolved`. Paired with
+      // the `import/ignore` setting above that skips its export parsing.
+      "import/no-unresolved": ["error", { ignore: ["^@zitadel/api(/|$)"] }],
       "perfectionist/sort-imports": ["error", { type: "natural" }],
       "prettier/prettier": "error",
       "@typescript-eslint/no-explicit-any": "error",
@@ -129,7 +135,11 @@ export default tseslint.config(
   },
   {
     files: TEST_FILES,
-    rules: { "@typescript-eslint/no-non-null-assertion": "off" },
+    rules: {
+      "@typescript-eslint/no-non-null-assertion": "off",
+      // Tests routinely use `any` for mocks, fixtures, and parsed JSON.
+      "@typescript-eslint/no-explicit-any": "off",
+    },
   },
   prettierConfig,
   {
