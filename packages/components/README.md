@@ -272,9 +272,21 @@ renders the bundled `default.liquid`. Tracked as a follow-up.
 | `resumeFlowId` / `resume-flow-id` | `string` | Resume an existing flow handle instead of starting fresh |
 
 Events: `zitadel-flow-input`, `zitadel-flow-step`, `zitadel-flow-complete`,
-`zitadel-flow-error`. `zitadel-flow-step` fires for every applied step
-including the first, so a host app can drive its own chrome (progress,
-headings, analytics) from mount onwards rather than from the first submit.
+`zitadel-flow-error`, `zitadel-flow-redirect`. `zitadel-flow-step` fires for
+every applied step including the first, so a host app can drive its own chrome
+(progress, headings, analytics) from mount onwards rather than from the first
+submit.
+
+`zitadel-flow-redirect` fires when a step hands the browser to an identity
+provider, carrying the URL to send it to. The widget then navigates there
+itself, with `window.location.assign`: the provider's authorization endpoint
+is a full-page destination on another origin, so there is nothing a router
+could do with it. The event is a notification, not a hook — it is not
+cancelable, and a host listener cannot substitute its own navigation. Use it
+to record the hand-off (analytics, a spinner, saving scroll state) before the
+page goes away. The framework wrappers surface it as `onFlowRedirect`, except
+Vue and Angular, which emit `flowRedirect`, and Qwik, which takes
+`onFlowRedirect$`.
 The orchestrator exposes `::part(form)` for tenant-side CSS hooks. Adopts
 design tokens and `branding.font_url` into its shadow root on each update.
 
@@ -390,8 +402,7 @@ moon run storybook:dev
 
 # --- Package checks ---
 
-moon run components:test
-moon run components:test-browser
+moon run components:test          # unit + browser projects (test:all)
 moon run components:typecheck
 moon run components:build
 ```

@@ -1,4 +1,4 @@
-import { Flags } from "@oclif/core";
+import { nonBlankString } from "../../flags";
 
 import { chosenColumns } from "../columns";
 import { fieldPaths } from "../paths";
@@ -31,7 +31,7 @@ export class GetOperation<Ctx> extends ResourceCommand<Ctx, GetSpec<Ctx>> {
         `<%= config.bin %> ${topic} get <id> --json`,
       ],
       flags: {
-        fields: Flags.string({
+        fields: nonBlankString({
           description:
             "Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is unaffected.",
         }),

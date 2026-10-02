@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/config",
-  "version": "1.0.0-alpha.23",
+  "version": "1.0.0-alpha.24",
   "description": "Versioned Zitadel local config schemas and defaults",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/config#readme",
   "bugs": {
@@ -32,6 +32,11 @@
       "@zitadel/source": "./src/defaults.ts",
       "types": "./dist/defaults.d.mts",
       "import": "./dist/defaults.mjs"
+    },
+    "./idp": {
+      "@zitadel/source": "./src/idp/index.ts",
+      "types": "./dist/idp/index.d.mts",
+      "import": "./dist/idp/index.mjs"
     },
     "./schemas": {
       "@zitadel/source": "./src/schemas.ts",
@@ -82,9 +87,13 @@
   },
   "scripts": {
     "sync-schemas": "node scripts/sync-meta-schemas.mjs",
-    "build": "node scripts/sync-meta-schemas.mjs && tsdown",
-    "typecheck": "node scripts/sync-meta-schemas.mjs && tsc --build tsconfig.json",
-    "test": "node scripts/sync-meta-schemas.mjs && vitest run --passWithNoTests",
+    "prebuild": "pnpm run sync-schemas",
+    "build": "tsdown",
+    "pretypecheck": "pnpm run sync-schemas",
+    "typecheck": "tsc --build tsconfig.json",
+    "pretest": "pnpm run sync-schemas",
+    "test": "vitest run",
+    "test:all": "pnpm run test",
     "lint": "oxlint ."
   },
   "dependencies": {

@@ -85,6 +85,31 @@ func TestToFlowField_EnumSurfaces(t *testing.T) {
 	require.Equal(t, []string{"Single", "Married", "Divorced", "Widowed"}, got.Validation.Value.Enum)
 }
 
+func TestToFlowStep_EmitsSSOProvidersInOrder(t *testing.T) {
+	t.Parallel()
+
+	got := toFlowStep(&domain.FlowStep{
+		Name: "identifier",
+		SSOProviders: []domain.FlowSSOProvider{
+			{ID: "google", Name: "Google", Template: "google"},
+			{ID: "github", Name: "GitHub", Template: "github"},
+		},
+	})
+
+	require.Equal(t, []apigen.SSOProvider{
+		{ID: "google", Name: "Google", Template: "google"},
+		{ID: "github", Name: "GitHub", Template: "github"},
+	}, got.SSOProviders)
+}
+
+func TestToFlowStep_NoSSOProvidersLeavesListEmpty(t *testing.T) {
+	t.Parallel()
+
+	got := toFlowStep(&domain.FlowStep{Name: "identifier"})
+
+	require.Empty(t, got.SSOProviders)
+}
+
 func TestValidateOriginAgainstProject(t *testing.T) {
 	t.Parallel()
 

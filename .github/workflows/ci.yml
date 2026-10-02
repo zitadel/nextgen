@@ -83,6 +83,10 @@ jobs:
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' }}
         run: moon run server:check-generate-pruned
 
+      # Chromium for the standalone e2e suites and journeys, gated by ci-mode.
+      # The components/api-mock/storybook browser `:test` lanes provision their
+      # own Chromium through a moon `install-browsers` dep, so they need no step
+      # here — moon installs it exactly when one of those tasks is affected.
       - name: Cache Playwright browsers
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.browsers == 'true' }}
         uses: actions/cache@v4
@@ -97,7 +101,7 @@ jobs:
       - name: Run Moon build and test graph
         id: moon-ci
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
-        run: moon ci :lint :typecheck :build :test :test-browser :check-adrs
+        run: moon ci :lint :typecheck :build :test :check-adrs
 
       - name: Report Moon CI failures
         if: ${{ failure() && steps.moon-ci.conclusion == 'failure' }}

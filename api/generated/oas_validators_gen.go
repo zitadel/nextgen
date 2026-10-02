@@ -4768,8 +4768,8 @@ func (s *FlowDefinitionStep) Validate() error {
 		if err := (validate.Array{
 			MinLength:    0,
 			MinLengthSet: false,
-			MaxLength:    0,
-			MaxLengthSet: false,
+			MaxLength:    20,
+			MaxLengthSet: true,
 		}).ValidateLength(len(s.SSOProviders)); err != nil {
 			return errors.Wrap(err, "array")
 		}
@@ -4908,6 +4908,8 @@ func (s FlowDefinitionStepGates) Validate() error {
 func (s FlowDefinitionStepOnSuccess) Validate() error {
 	switch s {
 	case "create_user":
+		return nil
+	case "create_user_with_sso":
 		return nil
 	default:
 		return errors.Errorf("invalid value: %v", s)

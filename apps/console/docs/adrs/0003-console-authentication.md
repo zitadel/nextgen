@@ -137,8 +137,9 @@ does not change.
   the SPA with the cookie present. Accepted; an `onFlowComplete` +
   `router.navigate` in-SPA handoff is possible later.
 - **Identity project vs protected project.** The login flow runs against the
-  reserved platform project discovered through `runtime.json` (with
-  `VITE_CONSOLE_PROJECT_ID` only as a local-dev override). Data calls may
+  reserved platform project discovered through `runtime.json`, in
+  development as in production (the `VITE_CONSOLE_PROJECT_ID` override was
+  removed in #1345, as asked in #1300). Data calls may
   target any customer project the signed-in principal is authorized to use;
   Console ADR 0004 and root ADR 053 keep those scopes distinct.
 - **Fail-closed session probe.** Any `fetchSession` failure (including a
