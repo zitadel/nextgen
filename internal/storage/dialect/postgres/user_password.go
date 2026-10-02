@@ -2,8 +2,6 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
-	"fmt"
 
 	"github.com/jackc/pgx/v5"
 
@@ -14,22 +12,29 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/userpassword"
 )
 
-const setUserPasswordStmt = `INSERT INTO zitadel_nextgen.user_passwords (
-	id, project_id, user_id, encoded_hash, change_required, verification_id
-) VALUES ($1, $2, $3, $4, $5, $6)
-ON CONFLICT (project_id, user_id) DO UPDATE SET
-	encoded_hash = EXCLUDED.encoded_hash,
-	change_required = EXCLUDED.change_required,
-	verification_id = EXCLUDED.verification_id,
-	changed_at = NOW(),
-	failed_attempts = 0,
-	last_successful_check = NULL,
-	updated_at = NOW()
+const (
+	setUserPasswordStmt = `INSERT INTO zitadel_nextgen.user_passwords (
+	id, project_id, user_id, encoded_hash, created_at
+) SELECT $1, $2, $3, $4, stamp.at
+FROM (SELECT clock_timestamp() AS at) AS stamp
 RETURNING id`
 
-const userPasswordQuery = `SELECT id, project_id, user_id, encoded_hash, change_required,
-	changed_at, verification_id, last_successful_check, failed_attempts, created_at, updated_at
+	userPasswordColumns = `id, project_id, user_id, encoded_hash, created_at`
+
+	userPasswordQuery = `SELECT ` + userPasswordColumns + `
 FROM zitadel_nextgen.user_passwords`
+
+	currentUserPassword = `NOT EXISTS (SELECT 1 FROM zitadel_nextgen.user_passwords newer` +
+		` WHERE newer.project_id = user_passwords.project_id` +
+		` AND newer.user_id = user_passwords.user_id` +
+		` AND newer.created_at > user_passwords.created_at)`
+
+	userPasswordHistoryQuery = `SELECT ` + userPasswordColumns + `
+FROM zitadel_nextgen.user_passwords
+WHERE project_id = $1 AND user_id = $2
+ORDER BY created_at DESC
+LIMIT $3 OFFSET 1`
+)
 
 type userPasswordStatements struct{ statement }
 
@@ -51,8 +56,6 @@ func (ps userPasswordStatements) SetUserPassword(ctx context.Context, pw *domain
 		pw.ProjectID,
 		pw.UserID,
 		pw.EncodedHash,
-		pw.ChangeRequired,
-		pw.VerificationID,
 	).Scan(&pw.ID)
 	return wrapError(err)
 }
@@ -76,7 +79,7 @@ func (ps userPasswordStatements) GetUserPassword(ctx context.Context, filter dat
 // ListUserPasswords implements [service.UserPasswordStatements].
 func (ps userPasswordStatements) ListUserPasswords(ctx context.Context, filter *database.ListOptions[domain.UserPasswordField]) (*database.ListResult[*domain.UserPassword], error) {
 	var compiler statementCompiler
-	if err := compileRead(&compiler, userPasswordQuery, filter, userpassword.Schema); err != nil {
+	if err := compileRead(&compiler, userPasswordQuery, filter, userpassword.Schema, currentUserPassword); err != nil {
 		return nil, err
 	}
 
@@ -103,102 +106,26 @@ func (ps userPasswordStatements) ListUserPasswords(ctx context.Context, filter *
 	}, nil
 }
 
-// UpdateUserPassword implements [service.UserPasswordStatements].
-func (ps userPasswordStatements) UpdateUserPassword(ctx context.Context, filter database.Filter[domain.UserPasswordField], updates ...domain.UserPasswordUpdate) error {
-	if filter == nil {
-		return fmt.Errorf("UserPassword filter is required")
-	}
-	if len(updates) == 0 {
-		return database.ErrNoChanges
-	}
-
-	var c statementCompiler
-	c.WriteString("UPDATE zitadel_nextgen.user_passwords SET ")
-	sep := ""
-	writeAssign := func(col string, arg any) {
-		c.WriteString(sep)
-		sep = ", "
-		c.WriteString(col)
-		c.WriteString(" = ")
-		c.WriteArg(arg)
-	}
-
-	for _, update := range updates {
-		switch u := update.(type) {
-		case *domain.UserPasswordEncodedHashUpdate:
-			writeAssign("encoded_hash", u.EncodedHash)
-		case *domain.UserPasswordChangeRequiredUpdate:
-			writeAssign("change_required", u.ChangeRequired)
-		case *domain.UserPasswordChangedAtUpdate:
-			writeAssign("changed_at", u.ChangedAt)
-		case *domain.UserPasswordVerificationIDUpdate:
-			writeAssign("verification_id", u.VerificationID)
-		case *domain.UserPasswordLastSuccessfulCheckUpdate:
-			writeAssign("last_successful_check", u.LastSuccessfulCheck)
-		case *domain.UserPasswordIncrementFailedAttemptsUpdate:
-			c.WriteString(sep)
-			sep = ", "
-			c.WriteString("failed_attempts = failed_attempts + ")
-			c.WriteArg(u.Delta)
-		case *domain.UserPasswordResetFailedAttemptsUpdate:
-			writeAssign("failed_attempts", int16(0))
-		default:
-			return fmt.Errorf("unknown UserPasswordUpdate %T", update)
-		}
-	}
-
-	c.WriteString(", updated_at = NOW() WHERE ")
-	compileFilter(&c, filter, userpassword.Schema)
-
-	tag, err := ps.client.Exec(ctx, c.String(), c.args...)
+// GetUserPasswordHistory implements [service.UserPasswordStatements].
+func (ps userPasswordStatements) GetUserPasswordHistory(ctx context.Context, projectID, userID string) ([]*domain.UserPassword, error) {
+	rows, err := ps.client.Query(ctx, userPasswordHistoryQuery, projectID, userID, domain.UserPasswordHistoryDepth)
 	if err != nil {
-		return wrapError(err)
+		return nil, wrapError(err)
 	}
-	if tag.RowsAffected() == 0 {
-		return wrapError(pgx.ErrNoRows)
-	}
-	return nil
-}
-
-// DeleteUserPassword implements [service.UserPasswordStatements].
-func (ps userPasswordStatements) DeleteUserPassword(ctx context.Context, filter database.Filter[domain.UserPasswordField]) error {
-	if filter == nil {
-		return fmt.Errorf("UserPassword filter is required")
-	}
-	var c statementCompiler
-	c.WriteString("DELETE FROM zitadel_nextgen.user_passwords WHERE ")
-	compileFilter(&c, filter, userpassword.Schema)
-	_, err := ps.client.Exec(ctx, c.String(), c.args...)
-	return wrapError(err)
+	passwords, err := pgx.CollectRows(rows, ps.scanUserPassword)
+	return passwords, wrapError(err)
 }
 
 func (ps userPasswordStatements) scanUserPassword(row pgx.CollectableRow) (*domain.UserPassword, error) {
 	pw := new(domain.UserPassword)
-	var (
-		verificationID      sql.NullString
-		lastSuccessfulCheck sql.NullTime
-	)
 	if err := row.Scan(
 		&pw.ID,
 		&pw.ProjectID,
 		&pw.UserID,
 		&pw.EncodedHash,
-		&pw.ChangeRequired,
-		&pw.ChangedAt,
-		&verificationID,
-		&lastSuccessfulCheck,
-		&pw.FailedAttempts,
 		&pw.CreatedAt,
-		&pw.UpdatedAt,
 	); err != nil {
 		return nil, err
-	}
-	if verificationID.Valid {
-		pw.VerificationID = &verificationID.String
-	}
-	if lastSuccessfulCheck.Valid {
-		ts := lastSuccessfulCheck.Time
-		pw.LastSuccessfulCheck = &ts
 	}
 	return pw, nil
 }
