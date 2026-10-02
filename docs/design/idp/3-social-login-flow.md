@@ -64,7 +64,7 @@ The `state` record serves as the server-side, single-use anchor for the attempt:
 | **PKCE Verifier** | Present when the connection enables PKCE (`pkce_enabled`, the default); the challenge is always `S256` when sent. A connection may set `pkce_enabled: false` only for a provider whose token endpoint rejects the parameters ([area 1](1-resource-model.md#the-connection-schema)); binding then rests on `state` and, for OIDC, `nonce`. |
 | **OIDC `nonce`** | Echoed in the `id_token` to bind the issued token strictly to this authorize request. |
 | **Expiry** | Sets a bounded time window for the external leg, inheriting the attempt's overall TTL. |
-| **Return Target** | The browser destination after callback processing: the page hosting the orchestrator, sent as `return_target` on the submission, where the flow resumes with `GET /flow/{id}`. Its origin must equal the request origin, which stands in for the environment's declared issuer origin until environments exist. Never read from callback input: an attacker-supplied target is an open redirect. |
+| **Return Target** | The browser destination after callback processing: the page hosting the orchestrator with `?flow=<id>` set, sent as `return_target` on the submission, where the flow resumes with `GET /flow/{id}`. Its origin must equal the request origin, which stands in for the environment's declared issuer origin until environments exist. Never read from callback input: an attacker-supplied target is an open redirect. |
 
 > **Security Note:** A guessable or reusable `state` parameter introduces
 > classic OAuth CSRF and code-injection vulnerabilities.

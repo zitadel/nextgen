@@ -444,6 +444,10 @@ func (r *FlowStateMachineRuntime) processSSO(pc *processCtx) (FlowStepResult, er
 	if in.SSOReturn == nil {
 		return FlowStepResult{}, fmt.Errorf("%w: sso return params missing", ErrFlowIntegrity())
 	}
+	// Leaving for the provider abandons any pending ceremony; without this
+	// the stale challenge re-attaches on the next render (the mismatch
+	// cleanup in Process never runs on this early-return path).
+	pc.state.ClearPendingChallenge()
 	out, err := r.ssoRedirects.Issue(pc.ctx, FlowIssueSSORedirectInput{
 		ProjectID:    pc.state.ProjectID,
 		AttemptID:    pc.state.AuthAttemptID,

@@ -20491,10 +20491,11 @@ type FlowSubmitRequest struct {
 	// Required when `action` is "sso".
 	SSOProviderID OptString `json:"sso_provider_id"`
 	// The page hosting the orchestrator, where the flow resumes after an
-	// external sign-in: the callback sends the browser here, and the page
-	// loads `GET /flow/{id}` to render the next step. Required when `action`
-	// is "sso". Its origin must equal the request origin; any other origin is
-	// rejected and no sign-in is started.
+	// external sign-in: the callback sends the browser here unchanged, and
+	// the page loads `GET /flow/{id}` to render the next step. The client
+	// puts the flow id in it; the orchestrator reads `?flow=<id>` on the
+	// reload. Required when `action` is "sso". Its origin must equal the
+	// request origin; any other origin is rejected and no sign-in is started.
 	ReturnTarget OptURI `json:"return_target"`
 }
 

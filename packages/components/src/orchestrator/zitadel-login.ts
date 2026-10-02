@@ -100,12 +100,13 @@ function isFieldAtom(el: Element): el is FieldAtom {
  * The flow handle a provider callback left in the URL, if any.
  *
  * The identity-provider callback finishes by navigating the browser back to
- * the page the sign-in started on with `?flow=<id>` appended -- a full page
- * load, so nothing of the previous document survives to carry the handle.
- * Reading it here means every host page resumes correctly without code of its
- * own; doing it per framework would mean the same few lines in each of the
- * scaffolded templates, and a page that forgot them would silently restart the
- * flow instead of completing the sign-in.
+ * the `return_target` the sso submission sent, which is the page the sign-in
+ * started on with `?flow=<id>` set (see {@link returnTargetFor}) -- a full
+ * page load, so nothing of the previous document survives to carry the
+ * handle. Reading it here means every host page resumes correctly without
+ * code of its own; doing it per framework would mean the same few lines in
+ * each of the scaffolded templates, and a page that forgot them would silently
+ * restart the flow instead of completing the sign-in.
  *
  * A handle from the URL is not a capability: `GET /flow/{id}` only answers
  * when the sealed flow cookie names that same id, so an id someone else put
@@ -116,10 +117,25 @@ function flowIdFromLocation(): string {
     return "";
   }
   try {
-    return new URLSearchParams(window.location.search).get("flow") ?? "";
+    return new URLSearchParams(window.location.search).get(FLOW_QUERY_PARAM) ?? "";
   } catch {
     return "";
   }
+}
+
+/** The query parameter the orchestrator reads the flow id from after a provider callback. */
+const FLOW_QUERY_PARAM = "flow";
+
+/**
+ * The page URL the callback sends the browser back to, with this flow's id
+ * in the query so the reload resumes the flow (see {@link flowIdFromLocation}).
+ * Set, not appended: a page already carrying `?flow=` from an earlier return
+ * would otherwise send two ids.
+ */
+function returnTargetFor(flowId: string): string {
+  const target = new URL(window.location.href);
+  target.searchParams.set(FLOW_QUERY_PARAM, flowId);
+  return target.toString();
 }
 
 @customElement("zitadel-login")
@@ -1255,7 +1271,7 @@ export class ZitadelLogin extends ZitadelSurface {
         // The page the callback brings the browser back to; the engine
         // refuses a target on another origin.
         ...(ssoProviderId
-          ? { sso_provider_id: ssoProviderId, return_target: window.location.href }
+          ? { sso_provider_id: ssoProviderId, return_target: returnTargetFor(id) }
           : {}),
       };
       const { api } = resolveApi(this.project, this.projectAttrs, "<zitadel-login>");

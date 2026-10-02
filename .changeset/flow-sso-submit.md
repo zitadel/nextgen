@@ -26,4 +26,5 @@ orchestrator where the flow resumes after the callback. It is required with
 action `sso`, and its origin must equal the request origin. A provider the
 engine cannot start a sign-in with re-renders the step with
 `error.sso_unavailable`, which the orchestrator localizes. The orchestrator
-sends its page URL as `return_target` on an sso submission.
+sends its page URL, with the flow id set in the `flow` query parameter, as
+`return_target` on an sso submission.

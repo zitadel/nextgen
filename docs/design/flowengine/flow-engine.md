@@ -551,7 +551,8 @@ A second `Set-Cookie` line carries the
 browser-binding nonce the callback checks (see
 [The Binding Cookie](../idp/3-social-login-flow.md#the-binding-cookie)).
 `return_target` is the page hosting the orchestrator, where the flow resumes
-after the callback; its origin must equal the request origin.
+after the callback; the orchestrator sets `?flow=<id>` on it so the reload
+resumes this flow, and its origin must equal the request origin.
 
 In the planned ceremony, the frontend navigates to `redirect_url` and the IdP
 callback returns control to the same step:

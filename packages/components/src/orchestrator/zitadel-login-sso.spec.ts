@@ -139,7 +139,38 @@ describe("<zitadel-login> with identity providers", () => {
     expect(submits).toHaveLength(1);
     expect(submits[0]?.body.action).toBe("sso");
     expect(submits[0]?.body.sso_provider_id).toBe(GOOGLE.id);
-    expect(submits[0]?.body.return_target).toBe(window.location.href);
+  });
+
+  it("sends the page URL with this flow's id as the return target", async () => {
+    const { href } = window.location;
+    window.history.replaceState(null, "", "/login?tab=sso#top");
+    try {
+      const element = await mountLogin();
+      const atom = providerAtom(element);
+      await atom.updateComplete;
+
+      await withStubbedNavigation(async () => {
+        atom.shadowRoot?.querySelectorAll("zl-button")[0]?.dispatchEvent(
+          new MouseEvent("click", { bubbles: true, composed: true }),
+        );
+        await waitFor(() =>
+          mock.getCaptured().some((entry) => entry.kind === "submitFlowStep") ? true : null,
+        );
+      });
+
+      const submit = mock
+        .getCaptured()
+        .find((entry): entry is Extract<typeof entry, { kind: "submitFlowStep" }> =>
+          entry.kind === "submitFlowStep",
+        );
+      const target = new URL(submit?.body.return_target ?? "");
+      expect(target.searchParams.get("flow")).toBe(submit?.flowId);
+      expect(target.origin + target.pathname).toBe(`${window.location.origin}/login`);
+      expect(target.searchParams.get("tab")).toBe("sso");
+      expect(target.hash).toBe("#top");
+    } finally {
+      window.history.replaceState(null, "", href);
+    }
   });
 
   it("hands the browser to the provider's authorize URL", async () => {

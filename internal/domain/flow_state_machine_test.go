@@ -846,6 +846,58 @@ func TestFlowStateMachine_Process_SSO_ProviderUnavailableReRendersStep(t *testin
 	assert.Empty(t, result.SSOBindingNonce)
 }
 
+// Picking a provider abandons a ceremony the step had pending, on the
+// redirect and on the re-render after a provider outage alike.
+func TestFlowStateMachine_Process_SSO_ClearsPendingChallenge(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		issue    func(w *flowTestWorld)
+		wantStep string
+	}{
+		{
+			name: "redirect",
+			issue: func(w *flowTestWorld) {
+				w.ssoRedirects.EXPECT().Issue(gomock.Any(), gomock.Any()).
+					Return(domain.FlowSSORedirectOutput{RedirectURL: "https://accounts.google.com/o/oauth2/v2/auth?state=abc", BindingNonce: "nonce-1"}, nil)
+			},
+			wantStep: domain.FlowStepNameSSORedirect,
+		},
+		{
+			name: "provider unavailable",
+			issue: func(w *flowTestWorld) {
+				w.ssoRedirects.EXPECT().Issue(gomock.Any(), gomock.Any()).
+					Return(domain.FlowSSORedirectOutput{}, domain.ErrFlowSSOUnavailable(errors.New("discovery timed out")))
+				w.ssoProviders.EXPECT().
+					Resolve(gomock.Any(), testProjectID, "credentials", []string{"google", "github"}).
+					Return([]domain.FlowSSOProvider{{ID: "google", Name: "Google"}, {ID: "github", Name: "GitHub"}}, nil)
+			},
+			wantStep: "credentials",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			w := newFlowTestWorld(t)
+			def := ssoStepDefinition()
+			state := startSSOStepFlow(t, w, def)
+			state.PendingChallenge = &domain.FlowPendingChallenge{ID: "ch-1", Method: domain.FlowChallengeMethodPasskey}
+			tt.issue(w)
+
+			result, err := w.sm.Process(t.Context(), def, state, domain.FlowSubmitInput{
+				Action:      domain.FlowActionSSO,
+				SSOProvider: &domain.FlowSSOProviderRef{ID: "google"},
+				SSOReturn:   ssoSubmitReturn,
+			})
+			require.NoError(t, err)
+			require.NotNil(t, result.Step)
+			assert.Equal(t, tt.wantStep, result.Step.Name)
+			assert.Nil(t, result.State.PendingChallenge)
+			assert.Nil(t, result.Step.Challenge, "a cleared challenge is not rendered")
+		})
+	}
+}
+
 func TestFlowStateMachine_Process_SSO_AttemptErrorPassesThrough(t *testing.T) {
 	t.Parallel()
 	w := newFlowTestWorld(t)
