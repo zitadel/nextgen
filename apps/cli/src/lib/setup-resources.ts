@@ -71,7 +71,11 @@ export async function materializeSetupResources(opts: {
    * and created before the schema and flow that reference it, so the Project
    * is never published naming a provider the platform does not hold.
    */
-  sso?: { provider: string; clientId: string; endpoints?: ConnectionEndpoints };
+  /**
+   * The providers to enable, in the order they were chosen. One connection is
+   * created per entry, and every slug is added to the schema and the flow.
+   */
+  sso?: readonly { provider: string; clientId: string; endpoints?: ConnectionEndpoints }[];
   /**
    * CLI version used to render `zitadel …` command mentions in the scaffolded
    * READMEs as runnable `npx @zitadel/cli@<version> …` commands — the CLI is
@@ -97,15 +101,22 @@ export async function materializeSetupResources(opts: {
   // name its slug: a Project should never be published claiming a provider the
   // platform does not hold. Its claim mapping reads the template's properties,
   // which enabling the provider does not change.
-  const connection = opts.sso
-    ? idpProvider(opts.sso.provider).connection({
-        endpoints: opts.sso.endpoints,
-        schemaProperties: Object.keys((schemaTemplate.properties as object | undefined) ?? {}),
-        schemaRef: CONNECTION_SCHEMA_REF,
-      })
-    : undefined;
-  const slug = typeof connection?.slug === "string" ? connection.slug : undefined;
-  if (connection && slug) {
+  // Every connection is built and every path checked before the first create.
+  // Checking inside the loop would refuse "before anything is created" only
+  // for the first provider: a conflict on the second would leave the first
+  // created on the platform, its file written and its state recorded, and
+  // setup does not remove a connection file it wrote -- so the retry would
+  // then refuse on that file too, with nothing but the developer able to
+  // clear it. One pass to build and refuse, a second to create.
+  const planned: Array<{ slug: string; connectionPath: string; connection: object }> = [];
+  for (const chosen of opts.sso ?? []) {
+    const connection = idpProvider(chosen.provider).connection({
+      endpoints: chosen.endpoints,
+      schemaProperties: Object.keys((schemaTemplate.properties as object | undefined) ?? {}),
+      schemaRef: CONNECTION_SCHEMA_REF,
+    });
+    const slug = typeof connection.slug === "string" ? connection.slug : undefined;
+    if (!slug) continue;
     const connectionPath = `${IDPS_DIR}/${slug}.json`;
     // Refused before anything is created, for two reasons: the file is the
     // developer's (see {@link CONNECTION_EXISTS}), and finding out after the
@@ -117,7 +128,11 @@ export async function materializeSetupResources(opts: {
         nextCommands: CONNECTION_EXISTS.nextCommands,
       });
     }
+    planned.push({ slug, connectionPath, connection });
+  }
 
+  const slugs: string[] = planned.map((entry) => entry.slug);
+  for (const { connectionPath, connection } of planned) {
     // The create comes before the file. Setup does not remove a connection
     // file it wrote -- that rule is what keeps a developer's own file safe --
     // so writing first would leave one behind on any failure here and the
@@ -150,9 +165,12 @@ export async function materializeSetupResources(opts: {
     });
   }
 
-  const schemaBody = slug
-    ? (applySsoToSchema(schemaTemplate, slug).document as Record<string, unknown>)
-    : schemaTemplate;
+  // Each slug in turn: the edits are additive and idempotent, so folding them
+  // builds one schema that names every chosen provider.
+  const schemaBody = slugs.reduce<Record<string, unknown>>(
+    (document, slug) => applySsoToSchema(document, slug).document as Record<string, unknown>,
+    schemaTemplate,
+  );
 
   const schemaWritten = await writeResourceFile(
     opts.cwd,
@@ -195,9 +213,11 @@ export async function materializeSetupResources(opts: {
   // The conflict step the provider needs can only offer what this schema
   // actually enables, so the methods are read back off the composed document
   // rather than inferred from the preset.
-  const flowBody = (
-    slug ? applySsoToFlow(flowTemplate, slug, authMethods(schemaBody)).document : flowTemplate
-  ) as typeof flowTemplate;
+  const flowBody = slugs.reduce<typeof flowTemplate>(
+    (document, slug) =>
+      applySsoToFlow(document, slug, authMethods(schemaBody)).document as typeof flowTemplate,
+    flowTemplate,
+  );
 
   const flowWritten = await writeResourceFile(
     opts.cwd,
