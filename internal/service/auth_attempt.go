@@ -667,11 +667,13 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 		if err != nil {
 			return passwordChallenge, nil, nil, domain.ErrAuthAttemptProofRejected(err)
 		}
+		// A variable of its own: err is returned as is above, and the error
+		// response generator would count a wrong password as returnable there.
 		_, end := startSpan(ctx, "password.Verify")
-		err = password.Verify(p.Password, s.passwordVerifier)
-		end(&err)
-		if err != nil {
-			return passwordChallenge, nil, nil, domain.ErrAuthAttemptProofRejected(err)
+		verifyErr := password.Verify(p.Password, s.passwordVerifier)
+		end(&verifyErr)
+		if verifyErr != nil {
+			return passwordChallenge, nil, nil, domain.ErrAuthAttemptProofRejected(verifyErr)
 		}
 		return passwordChallenge, attempt.SetPasswordFactor(), nil, nil
 
