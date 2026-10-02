@@ -15,7 +15,7 @@ import (
 // later; the authz tables cascade from projects, so one delete takes a test's
 // whole contribution with it. The convention is written down in
 // internal/AGENTS.md.
-func (h *Harness) EnsureProjectService(t *testing.T) service.ProjectService {
+func (h *Harness) EnsureProjectService(t testing.TB) service.ProjectService {
 	t.Helper()
 	return cleanupProjectService{
 		ProjectService: h.ensureProjectService(t),
@@ -26,7 +26,7 @@ func (h *Harness) EnsureProjectService(t *testing.T) service.ProjectService {
 
 // ensureProjectService is the cached service itself, without the cleanup. Only
 // callers whose project must outlive the test that first asked for it use this.
-func (h *Harness) ensureProjectService(t *testing.T) service.ProjectService {
+func (h *Harness) ensureProjectService(t testing.TB) service.ProjectService {
 	t.Helper()
 	h.projectService.mutex.Lock()
 	defer h.projectService.mutex.Unlock()
@@ -47,7 +47,7 @@ func (h *Harness) ensureProjectService(t *testing.T) service.ProjectService {
 // project. It is built per call rather than cached so it holds that test's *T.
 type cleanupProjectService struct {
 	service.ProjectService
-	t     *testing.T
+	t     testing.TB
 	stmts service.AllStatements
 }
 
@@ -69,7 +69,7 @@ func (s cleanupProjectService) Create(ctx context.Context, name string, previewO
 // created through the API rather than through [Harness.EnsureProjectService]:
 // the handler holds the unwrapped service, so that project is the test's to
 // remove.
-func (h *Harness) CleanupProject(t *testing.T, projectID string) {
+func (h *Harness) CleanupProject(t testing.TB, projectID string) {
 	t.Helper()
 	cleanupProject(t, h.EnsureServiceDB(t).Statements(), projectID)
 }
@@ -77,7 +77,7 @@ func (h *Harness) CleanupProject(t *testing.T, projectID string) {
 // cleanupProject fails the owning test when the delete fails. Swallowing it
 // would leave rows in the database every later test reads past, which is the
 // cost this whole convention exists to avoid.
-func cleanupProject(t *testing.T, stmts service.AllStatements, projectID string) {
+func cleanupProject(t testing.TB, stmts service.AllStatements, projectID string) {
 	t.Cleanup(func() {
 		// context.Background(), because t.Context() is already cancelled here.
 		// A project the test deleted itself reports false, not an error.
@@ -96,7 +96,7 @@ func cleanupProject(t *testing.T, stmts service.AllStatements, projectID string)
 // It creates through the unwrapped service: this project is cached on the
 // harness and pinned on the handler for the whole run, so deleting it when the
 // first test that happened to need it ends would break every later test.
-func (h *Harness) EnsurePlatformProject(t *testing.T) *domain.Project {
+func (h *Harness) EnsurePlatformProject(t testing.TB) *domain.Project {
 	t.Helper()
 	h.platformProject.mutex.Lock()
 	defer h.platformProject.mutex.Unlock()

@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func MustMarshal(t *testing.T, v any) string {
+func MustMarshal(t testing.TB, v any) string {
 	t.Helper()
 	m, err := json.Marshal(addressable(v))
 	require.NoError(t, err)
@@ -33,7 +33,7 @@ func addressable(v any) any {
 	return p.Interface()
 }
 
-func MustUnmarshal[T any](t *testing.T, bs []byte) *T {
+func MustUnmarshal[T any](t testing.TB, bs []byte) *T {
 	t.Helper()
 	v := new(T)
 	err := json.Unmarshal(bs, v)

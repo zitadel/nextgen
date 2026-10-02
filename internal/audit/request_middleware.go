@@ -6,6 +6,8 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"go.opentelemetry.io/otel/trace"
+
 	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/events"
@@ -65,6 +67,14 @@ func WithRequestEventMiddleware(buf *RequestBuffer, next http.Handler) http.Hand
 		if !ok || ac == nil || ac.ProjectID == "" {
 			return
 		}
+		// This middleware runs outside the server span, so the enqueue span
+		// starts as its child from the context the ogen middleware left behind,
+		// after the server span has ended.
+		if server := middleware.GetServerSpanContext(ctx); server.IsSampled() {
+			var span trace.Span
+			ctx, span = tracer.Start(trace.ContextWithSpanContext(ctx, server), "audit.EnqueueRequestEvent")
+			defer span.End()
+		}
 		status := sw.status
 		if status == 0 {
 			status = http.StatusOK
@@ -94,7 +104,7 @@ func WithRequestEventMiddleware(buf *RequestBuffer, next http.Handler) http.Hand
 				ev.Metadata = meta
 			}
 		}
-		buf.EnqueueSince(ev, start)
+		buf.EnqueueSince(ctx, ev, start)
 	})
 }
 

@@ -12,7 +12,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-func (h *Harness) EnsureUserService(t *testing.T) service.UserService {
+func (h *Harness) EnsureUserService(t testing.TB) service.UserService {
 	t.Helper()
 	h.userService.mutex.Lock()
 	defer h.userService.mutex.Unlock()
@@ -32,7 +32,7 @@ func (h *Harness) EnsureUserService(t *testing.T) service.UserService {
 // own and returns its id. The user stays self-owned — see
 // [Harness.CreateUserOwnedByTeam] for the team-owned shape. The id and email
 // are randomized, so repeated calls in one project stay unique.
-func (h *Harness) CreateUserWithTeam(t *testing.T, projectID string) string {
+func (h *Harness) CreateUserWithTeam(t testing.TB, projectID string) string {
 	t.Helper()
 
 	userID, _ := h.createUserInTeam(t, projectID, false)
@@ -43,13 +43,13 @@ func (h *Harness) CreateUserWithTeam(t *testing.T, projectID string) string {
 // its own owns (ADR 024) and returns both ids. Ownership is what the session
 // team filter reads, so this is the shape that filter's tests need; roster
 // membership alone is [Harness.CreateUserWithTeam].
-func (h *Harness) CreateUserOwnedByTeam(t *testing.T, projectID string) (userID, teamID string) {
+func (h *Harness) CreateUserOwnedByTeam(t testing.TB, projectID string) (userID, teamID string) {
 	t.Helper()
 
 	return h.createUserInTeam(t, projectID, true)
 }
 
-func (h *Harness) createUserInTeam(t *testing.T, projectID string, owned bool) (userID, teamID string) {
+func (h *Harness) createUserInTeam(t testing.TB, projectID string, owned bool) (userID, teamID string) {
 	t.Helper()
 
 	team, err := h.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
@@ -80,7 +80,7 @@ type UserFixture struct {
 	Pool *service.DB
 }
 
-func (h *Harness) EnsureUserFixture(t *testing.T) UserFixture {
+func (h *Harness) EnsureUserFixture(t testing.TB) UserFixture {
 	t.Helper()
 	return UserFixture{Pool: h.EnsureServiceDB(t)}
 }
@@ -116,7 +116,7 @@ func (f UserFixture) GetPasswordByUserID(ctx context.Context, projectID, userID 
 	))
 }
 
-func CreateSessionUsingPassword(t *testing.T,
+func CreateSessionUsingPassword(t testing.TB,
 	authAttempts service.AuthAttemptService,
 	sessionService service.SessionService,
 	projectID string, userEmail string, userPassword string) (*domain.Session, error) {

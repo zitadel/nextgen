@@ -2,10 +2,15 @@ package audit
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"go.opentelemetry.io/otel/codes"
+	semconv "go.opentelemetry.io/otel/semconv/v1.39.0"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/zitadel/nextgen/internal/domain"
 )
@@ -51,6 +56,9 @@ type bufferedEvent struct {
 	// this so request.api sorts before in-TX Path B events on the same
 	// request_id. MaxAge still uses enqueuedAt (buffer residency).
 	startedAt time.Time
+	// spanContext is the enqueue span of a sampled request. The flush span
+	// links to it; it is invalid when the request was not sampled.
+	spanContext trace.SpanContext
 }
 
 // RequestBuffer is an in-process Path A queue. Flush when the buffer holds at
@@ -86,16 +94,17 @@ func NewRequestBuffer(insert EventBatchInserter, cfg RequestBufferConfig) *Reque
 // Enqueue adds a request event. Drops when full (never blocks).
 // occurred_at is enqueue time (tests / callers without a request start).
 func (b *RequestBuffer) Enqueue(ev *domain.Event) {
-	b.enqueue(ev, time.Time{})
+	b.enqueue(ev, time.Time{}, trace.SpanContext{})
 }
 
 // EnqueueSince records a request event whose forensic occurred_at is startedAt
-// (HTTP middleware entry), not enqueue/flush time.
-func (b *RequestBuffer) EnqueueSince(ev *domain.Event, startedAt time.Time) {
-	b.enqueue(ev, startedAt)
+// (HTTP middleware entry), not enqueue/flush time. The flush span links to the
+// span in ctx.
+func (b *RequestBuffer) EnqueueSince(ctx context.Context, ev *domain.Event, startedAt time.Time) {
+	b.enqueue(ev, startedAt, trace.SpanContextFromContext(ctx))
 }
 
-func (b *RequestBuffer) enqueue(ev *domain.Event, startedAt time.Time) {
+func (b *RequestBuffer) enqueue(ev *domain.Event, startedAt time.Time, spanContext trace.SpanContext) {
 	if ev == nil || ev.ProjectID == "" {
 		return
 	}
@@ -113,7 +122,7 @@ func (b *RequestBuffer) enqueue(ev *domain.Event, startedAt time.Time) {
 	if startedAt.IsZero() {
 		startedAt = now
 	}
-	b.buf = append(b.buf, bufferedEvent{event: ev, enqueuedAt: now, startedAt: startedAt})
+	b.buf = append(b.buf, bufferedEvent{event: ev, enqueuedAt: now, startedAt: startedAt, spanContext: spanContext})
 	shouldWake := b.shouldFlushLocked()
 	b.mu.Unlock()
 	if shouldWake {
@@ -198,8 +207,21 @@ func (b *RequestBuffer) flush(batch []bufferedEvent) {
 		return
 	}
 	events := make([]*domain.Event, len(batch))
+	var links []trace.Link
 	for i, item := range batch {
 		events[i] = item.event
+		if item.spanContext.IsValid() {
+			links = append(links, trace.Link{SpanContext: item.spanContext})
+		}
+	}
+	// The flush is a root of its own, linked to the requests it writes for:
+	// the sampler keeps it when one of them was sampled. With no link it
+	// would be dropped anyway, so it is not started.
+	ctx := context.Background()
+	if len(links) > 0 {
+		var span trace.Span
+		ctx, span = tracer.Start(ctx, "audit.FlushRequestEvents", trace.WithSpanKind(trace.SpanKindConsumer), trace.WithLinks(links...))
+		defer span.End()
 	}
 	const maxAttempts = 3
 	backoff := 50 * time.Millisecond
@@ -210,8 +232,8 @@ func (b *RequestBuffer) flush(batch []bufferedEvent) {
 		for i, item := range batch {
 			events[i].OccurredAtWait = time.Since(item.startedAt)
 		}
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		lastErr = b.insert.InsertEvents(ctx, events)
+		insertCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		lastErr = b.insert.InsertEvents(insertCtx, events)
 		cancel()
 		if lastErr == nil {
 			b.flushed.Add(uint64(len(events)))
@@ -223,6 +245,9 @@ func (b *RequestBuffer) flush(batch []bufferedEvent) {
 		}
 	}
 	b.dropped.Add(uint64(len(events)))
+	span := trace.SpanFromContext(ctx)
+	span.SetStatus(codes.Error, "")
+	span.SetAttributes(semconv.ErrorTypeKey.String(fmt.Sprintf("%T", lastErr)))
 	slog.Error("failed to flush request audit event batch; dropping after retries",
 		slog.Int("batch_size", len(events)),
 		slog.Uint64("dropped_total", b.dropped.Load()),
