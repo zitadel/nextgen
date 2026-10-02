@@ -20,18 +20,30 @@ import (
 	"github.com/zitadel/passwap/scrypt"
 	"github.com/zitadel/passwap/sha2"
 	"github.com/zitadel/passwap/verifier"
+	xbcrypt "golang.org/x/crypto/bcrypt"
 )
 
 var (
 	ErrAlgorithmNotSupported = errors.New("the algorithm is not supported")
 	ErrBoundsError           = errors.New("the hash parameters are not within the configured limits")
 	ErrInvalidHash           = errors.New("the hash is invalid")
+	// ErrPasswordTooLong is returned when the hashing algorithm cannot take
+	// the whole password: bcrypt stops at 72 bytes.
+	ErrPasswordTooLong = errors.New("the password is too long for the hashing algorithm")
 )
 
 type PasswapHasher struct {
 	*passwap.Swapper
 	Prefixes     []string
 	HexSupported bool
+}
+
+func (h *PasswapHasher) Hash(password string) (string, error) {
+	encoded, err := h.Swapper.Hash(password)
+	if errors.Is(err, xbcrypt.ErrPasswordTooLong) {
+		return "", fmt.Errorf("%w: %w", ErrPasswordTooLong, err)
+	}
+	return encoded, err
 }
 
 func (h *PasswapHasher) VerifyHash(encoded string, target string) error {

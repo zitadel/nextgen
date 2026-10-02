@@ -1135,3 +1135,18 @@ func TestHasherFactory(t *testing.T) {
 		assert.NotEmpty(t, encoded)
 	})
 }
+
+func TestPasswapHasher_HashRejectsWhatBcryptCannotTake(t *testing.T) {
+	config := &HashConfig{Hasher: HasherConfig{
+		Algorithm: HashNameBcrypt,
+		Params:    map[string]any{"cost": 4},
+	}}
+	h, err := config.NewHasher()
+	require.NoError(t, err)
+
+	_, err = h.Hash(strings.Repeat("a", 72))
+	require.NoError(t, err, "72 bytes fit")
+
+	_, err = h.Hash(strings.Repeat("a", 73))
+	assert.ErrorIs(t, err, ErrPasswordTooLong)
+}
