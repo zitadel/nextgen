@@ -264,6 +264,10 @@ func validateSteps(steps []FlowDefinitionStep) error {
 				return ErrFlowDefinitionInvalid(fmt.Sprintf(
 					"step %q: action name %q is reserved for engine-injected back navigation", step.Name, a.Name), nil)
 			}
+			if a.Name == FlowActionSSO {
+				return ErrFlowDefinitionInvalid(fmt.Sprintf(
+					"step %q: action name %q is reserved for sso submissions", step.Name, a.Name), nil)
+			}
 			actionNames[a.Name] = struct{}{}
 		}
 

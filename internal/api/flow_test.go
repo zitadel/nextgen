@@ -442,6 +442,26 @@ func TestSubmitFlowStep_SSO_ProviderIDAloneDoesNotSelectTheBranch(t *testing.T) 
 	require.Contains(t, string(body), "flow.invalid_action")
 }
 
+// A handed-off attempt cannot start another sign-in. Only a client that
+// kept the flow cookie past the terminal response reaches this, so the
+// browser never sees it; the status is the same conflict the attempt
+// endpoints answer with.
+func TestSubmitFlowStep_SSO_HandedOffAttemptIsAConflict(t *testing.T) {
+	const origin = "https://login.example.com"
+	ts := newTestServer(t)
+	state := &domain.FlowState{ID: "flow_1", ProjectID: "proj_1", SessionID: "sess_1", IssuedAt: time.Now()}
+	ts.fake.submitErr = domain.ErrAuthAttemptAlreadyHandedOff()
+	ts.projects.EXPECT().Get(gomock.Any(), "proj_1").Return(&domain.Project{PreviewOrigins: []string{origin}}, nil)
+
+	resp, body := doRequestWithOrigin(t, http.MethodPost, ts.srv.URL+"/flow/flow_1/submit", map[string]any{
+		"action":          "sso",
+		"sso_provider_id": "google",
+		"return_target":   origin + "/login",
+	}, ts.sealCookie(t, state), origin)
+	require.Equal(t, http.StatusConflict, resp.StatusCode, string(body))
+	require.Contains(t, string(body), "att.already_handed_off")
+}
+
 // The length limit is the generated validation's: the request is refused
 // before the handler reads the project.
 func TestSubmitFlowStep_SSO_RejectsAnOverlongReturnTarget(t *testing.T) {
