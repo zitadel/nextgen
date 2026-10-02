@@ -2,11 +2,18 @@
 "@zitadel/server": minor
 ---
 
-Flow steps now tell the client how to tag each input for password managers and
-browser autofill. Every field carries an `autocomplete` token — `username` or
-`email` on the identifier your schema designates, `current-password` where the
-password is verified and `new-password` where a new one is saved — and a step
-that collects a password without collecting the identifier also carries the
-identifier collected earlier, so a form can hold both and a manager can store
-them as one credential. A custom login template can read either from the step
-payload instead of guessing from field or step names.
+Flow steps now tell the client how to tag password and identifier inputs for
+password managers and browser autofill.
+
+- **Every field carries an `autocomplete` token.** The identifier your user
+  schema designates gets `username`, or `email` when it is an email address. A
+  password gets `current-password` where it is verified and `new-password` where
+  a new one is saved.
+- **A password step carries the identifier collected before it.** When a step
+  asks for a password but not the identifier, it also returns the identifier
+  from the earlier step, so one form can hold both and a manager saves them as a
+  single credential.
+
+Both come from the schema designation and the flow's purpose, so renaming the
+identifier property or a step no longer changes which tokens appear. The bundled
+login UI adopts them separately.

@@ -128,11 +128,8 @@ type FlowStep struct {
 	Fields       []FlowField
 	Actions      []FlowAction
 	SSOProviders []FlowSSOProvider
-	// Identifier carries the identifier collected on an earlier step so a
-	// form holding a password can hold the identifier beside it. Set only
-	// when the step collects a password and does not itself collect the
-	// identifier. Render-only: the step's Fields stay the whole
-	// submission.
+	// Identifier is set only when the step collects a password without
+	// collecting the identifier. Render-only — see [FlowStepIdentifier].
 	Identifier *FlowStepIdentifier
 	// Challenge is a pending authentication ceremony the client must
 	// satisfy before re-submitting (e.g. a passkey assertion). Nil unless
@@ -141,19 +138,11 @@ type FlowStep struct {
 }
 
 // FlowStepIdentifier mirrors the OpenAPI `flow-step.identifier`: the
-// identifier a password form renders beside the password input, as a
-// hidden control, so a password manager stores the two as one credential.
+// identifier a password form carries as a hidden control, so a password
+// manager stores the two as one credential. Never read back on submit.
 type FlowStepIdentifier struct {
-	// Name is the user-schema property the identifier was collected
-	// into, used as the rendered input's name.
-	Name string
-
-	// Value is the identifier the user supplied on the earlier step.
-	Value string
-
-	// Autocomplete is the token the rendered input carries, always
-	// [AutocompleteUsername]: it is what pairs an identifier with a
-	// password in the same form.
+	Name         string
+	Value        string
 	Autocomplete string
 }
 
@@ -1436,10 +1425,10 @@ func (r *FlowStateMachineRuntime) buildStep(ctx context.Context, state *FlowStat
 	}, nil
 }
 
-// applyAutocomplete stamps each field's autofill token for the purpose the
-// flow is running under. Rendering-only, so it runs here rather than in the
-// resolver: validation and challenge dispatch read the same resolved fields
-// and have no use for the token.
+// applyAutocomplete stamps each field's autofill token. The purpose is not
+// known at resolve time — the definition validator resolves without one, and
+// applyOutcomeFlip can change it mid-flow — so the token belongs to a render
+// rather than to the resolved field set.
 func applyAutocomplete(fields []FlowField, purpose FlowDefinitionPurpose) []FlowField {
 	out := make([]FlowField, len(fields))
 	copy(out, fields)
@@ -1449,18 +1438,10 @@ func applyAutocomplete(fields []FlowField, purpose FlowDefinitionPurpose) []Flow
 	return out
 }
 
-// pairedIdentifier returns the identifier a password form renders beside
-// the password input, or nil when the step needs none.
-//
-// A password manager stores an identifier and a password as one credential
-// and reads both from the same form. A step that collects the password on
-// its own — the second step of a two-step sign-in — leaves the manager
-// nothing to pair, so the engine hands the collected identifier back for
-// the form to carry as a hidden control.
-//
-// Nil when the step collects no password, when it collects the identifier
-// itself (the field already carries it), when the schema designates no
-// identifier, or when nothing has been collected for it yet.
+// pairedIdentifier returns the identifier a password form carries beside
+// the password input so a manager can store the two as one credential.
+// Nil unless the step collects a password, collects no identifier of its
+// own, and the schema designates one a value was collected for.
 func pairedIdentifier(resolved FlowResolvedFields, collected map[string]any) *FlowStepIdentifier {
 	if resolved.IdentifierName == "" {
 		return nil

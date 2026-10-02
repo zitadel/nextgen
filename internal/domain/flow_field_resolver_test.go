@@ -24,8 +24,6 @@ func TestAutocompleteForField(t *testing.T) {
 			want:    domain.AutocompleteEmail,
 		},
 		{
-			// The designation, not the property name, makes a field the
-			// identifier — so a tenant calling it `handle` still pairs.
 			name:    "a text-typed identifier takes the username token",
 			field:   domain.FlowField{Name: "handle", Challenge: domain.FlowFieldChallengeIdentifier, Type: domain.FlowFieldTypeText},
 			purpose: domain.FlowDefinitionPurposeLogin,

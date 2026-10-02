@@ -4236,8 +4236,7 @@ func TestFlowStateMachine_Process_PurposeToggleDoesNotGrowState(t *testing.T) {
 }
 
 // twoStepLoginDefinition collects the identifier and the password on
-// separate steps — the shape that leaves a password manager nothing to pair
-// unless the password step carries the identifier back.
+// separate steps.
 func twoStepLoginDefinition() *domain.FlowDefinition {
 	show := domain.FlowStepCompleteShow
 	return &domain.FlowDefinition{
@@ -4303,8 +4302,6 @@ func TestFlowStateMachine_TwoStepLogin_PasswordStepPairsTheIdentifier(t *testing
 	require.NotNil(t, start.Step)
 	require.Equal(t, "identifier", start.Step.Name)
 
-	// The identifier step carries its own token and needs no pairing hint:
-	// the field it renders is the identifier.
 	require.Len(t, start.Step.Fields, 1)
 	assert.Equal(t, "email", start.Step.Fields[0].Name)
 	assert.Equal(t, domain.AutocompleteEmail, start.Step.Fields[0].Autocomplete)
@@ -4321,21 +4318,17 @@ func TestFlowStateMachine_TwoStepLogin_PasswordStepPairsTheIdentifier(t *testing
 	require.Len(t, result.Step.Fields, 1)
 	assert.Equal(t, domain.AutocompleteCurrentPassword, result.Step.Fields[0].Autocomplete)
 
-	// The password step declares no identifier field, so the engine hands
-	// the collected one back for the form to carry alongside the password.
 	require.NotNil(t, result.Step.Identifier)
 	assert.Equal(t, "email", result.Step.Identifier.Name)
 	assert.Equal(t, email, result.Step.Identifier.Value)
 	assert.Equal(t, domain.AutocompleteUsername, result.Step.Identifier.Autocomplete)
 
-	// The hint is render-only: it must not become a field the client
-	// submits back, or dispatch would re-resolve the identifier.
+	// Render-only: submitting it back would re-resolve the identifier.
 	assert.False(t, containsFieldName(result.Step.Fields, "email"))
 }
 
-// A reload on the password step is the case the client cannot cover: the
-// widget keeps collected values in memory only, so a fresh document has no
-// identifier to pair, while GET /flow/{id} re-renders from the flow state.
+// The case a client cannot cover for itself: the widget keeps collected
+// values in memory only, while GET /flow/{id} re-renders from flow state.
 func TestFlowStateMachine_RenderAfterReload_StillPairsTheIdentifier(t *testing.T) {
 	t.Parallel()
 	w := newFlowTestWorld(t)
@@ -4394,8 +4387,7 @@ func TestFlowStateMachine_MultiStepRegister_PasswordStepIsANewPassword(t *testin
 		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
 		AnyTimes()
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return(attemptID, nil)
-	// Registration looks the identifier up to detect a collision; not
-	// finding one is the path that continues to the password step.
+	// Not finding the identifier is the path on to the password step.
 	w.authAttemptService.EXPECT().
 		SubmitIdentifier(gomock.Any(), gomock.Any()).
 		Return("", domain.ErrAuthAttemptProofRejected(nil)).
@@ -4423,8 +4415,6 @@ func TestFlowStateMachine_MultiStepRegister_PasswordStepIsANewPassword(t *testin
 	require.Len(t, result.Step.Fields, 1)
 	assert.Equal(t, domain.AutocompleteNewPassword, result.Step.Fields[0].Autocomplete)
 
-	// A manager saves the pair on registration too, so the hint applies
-	// wherever the password is collected on its own.
 	require.NotNil(t, result.Step.Identifier)
 	assert.Equal(t, "email", result.Step.Identifier.Name)
 	assert.Equal(t, email, result.Step.Identifier.Value)
@@ -4451,8 +4441,7 @@ func TestFlowStateMachine_SingleCardLogin_NeedsNoPairingHint(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, start.Step)
 
-	// One card collects both, so the identifier is already an input in the
-	// form the manager reads.
+	// One card collects both, so the identifier is already in the form.
 	assert.Nil(t, start.Step.Identifier)
 
 	byName := map[string]string{}
