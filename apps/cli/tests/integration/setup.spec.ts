@@ -248,14 +248,35 @@ describe("setup", () => {
         expect(connection.oidc.client_secret).toBe("${{ GOOGLE_CLIENT_SECRET }}");
       });
 
-      it("keeps that provider's credentials out of every committed document", async () => {
+      it("keeps that provider's credentials out of every file in the project", async () => {
         const app = await anApp();
         expect(await app.setupWithSso("google", SOCIAL_CREDENTIALS)).toSucceed();
 
-        const written = await app.committed.asText("google");
+        expect(await app.filesContaining(SOCIAL_CREDENTIALS.secret)).toEqual([]);
+        expect(await app.filesContaining(SOCIAL_CREDENTIALS.clientId)).toEqual([]);
+      });
 
-        expect(written).not.toContain(SOCIAL_CREDENTIALS.secret);
-        expect(written).not.toContain(SOCIAL_CREDENTIALS.clientId);
+      it("names that provider among the published auth methods", async () => {
+        const app = await anApp();
+        expect(await app.setupWithSso("google", SOCIAL_CREDENTIALS)).toSucceed();
+
+        const { schema } = await app.publishedSchema();
+
+        expect(schema["x-auth-methods"]?.sso).toEqual({ enabled: true, providers: ["google"] });
+      });
+
+      it("offers that provider on the published steps a sign-in starts from", async () => {
+        const app = await anApp();
+        expect(await app.setupWithSso("google", SOCIAL_CREDENTIALS)).toSucceed();
+
+        const offering = await app.stepsOfferingSso();
+
+        expect(offering.map((step) => step.name)).toEqual(
+          expect.arrayContaining(["identifier", "register"]),
+        );
+        for (const step of offering) {
+          expect(Object.keys(step.transitions ?? {}), step.name).toContain("callback");
+        }
       });
 
       it("leaves nothing to reconcile after enabling one during setup", async () => {

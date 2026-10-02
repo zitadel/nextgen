@@ -102,13 +102,11 @@ describe("sso enable", () => {
         expect(connection.oidc.client_secret).toBe("${{ GOOGLE_CLIENT_SECRET }}");
       });
 
-      it("keeps both credentials out of every committed document", async () => {
+      it("keeps both credentials out of every file in the project", async () => {
         const app = await anAppWithGoogle();
 
-        const written = await app.committed.asText(GOOGLE);
-
-        expect(written).not.toContain(CREDENTIALS.secret);
-        expect(written).not.toContain(CREDENTIALS.clientId);
+        expect(await app.filesContaining(CREDENTIALS.secret)).toEqual([]);
+        expect(await app.filesContaining(CREDENTIALS.clientId)).toEqual([]);
       });
 
       it("leaves the provider for apply to publish", async () => {

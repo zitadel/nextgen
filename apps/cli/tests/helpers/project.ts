@@ -398,6 +398,24 @@ export class ScaffoldedApp {
     return ProjectSnapshot.of(this.path);
   }
 
+  /**
+   * Every file in the project whose text contains this string.
+   *
+   * The credential checks need the whole tree, not the documents a journey
+   * happens to name: a secret written into `.env.local`, a scaffolded page or
+   * `zitadel.json` is just as committed as one in the connection.
+   */
+  async filesContaining(text: string): Promise<string[]> {
+    const found: string[] = [];
+    for (const relativePath of (await ProjectSnapshot.of(this.path)).paths()) {
+      const contents = await readFile(join(this.path, relativePath), "utf8").catch(() => "");
+      if (contents.includes(text)) {
+        found.push(relativePath);
+      }
+    }
+    return found.sort();
+  }
+
   readProjectFile(relativePath: string): Promise<string> {
     return readFile(join(this.path, relativePath), "utf8");
   }
@@ -529,6 +547,11 @@ export class ProjectSnapshot {
 
   static async of(root: string): Promise<ProjectSnapshot> {
     return new ProjectSnapshot(root, await hashTree(root));
+  }
+
+  /** Every file the project held when this was taken. */
+  paths(): string[] {
+    return [...this.files.keys()].sort();
   }
 
   /** What has been added, modified, removed or left alone since. */
