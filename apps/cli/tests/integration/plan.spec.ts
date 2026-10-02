@@ -4,14 +4,6 @@ import { describe, expect, it } from "vitest";
 import { usePlatformMock } from "../helpers/platform";
 import { aSetUpApp, NOTHING_TO_RECONCILE } from "../helpers/project";
 
-/**
- * `plan` — what the developer is told will happen, before anything happens.
- *
- * The diff rendering itself is unit-tested. What only a spec can show is that
- * the plan agrees with what `setup` and `apply` actually did, and that it
- * refuses a definition the platform would reject rather than letting `apply`
- * discover it halfway through.
- */
 usePlatformMock();
 
 describe("plan", () => {
@@ -20,8 +12,8 @@ describe("plan", () => {
     const stateBefore = await app.readProjectFile(".zitadel/state.json");
 
     expect(await app.plan()).toMatchObject(NOTHING_TO_RECONCILE);
-    // A preview must not move sync state, or the next plan is diffing against
-    // a position the developer never applied.
+    // A preview that moves sync state leaves the next plan diffing against a
+    // position the developer never applied.
     expect(await app.readProjectFile(".zitadel/state.json")).toBe(stateBefore);
   });
 

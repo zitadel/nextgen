@@ -1,4 +1,4 @@
-import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Readable } from "node:stream";
@@ -189,6 +189,29 @@ export class ScaffoldedApp {
     return this.cli(args, env, { envelope: false });
   }
 
+  /**
+   * Runs the CLI without `--server`, so the spec observes which server the CLI
+   * resolves on its own.
+   */
+  runWithoutServer(args: string[], env: NodeJS.ProcessEnv = {}): Promise<CliResult> {
+    return runCliForTest([...args, "--cwd", this.path], env);
+  }
+
+  /** Writes a file into the project, for a spec arranging a specific state. */
+  writeProjectFile(relativePath: string, contents: string): Promise<void> {
+    return writeFile(join(this.path, relativePath), contents);
+  }
+
+  /** Whether a path exists in the project. */
+  async hasProjectFile(relativePath: string): Promise<boolean> {
+    try {
+      await stat(join(this.path, relativePath));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   // ------------------------------------------------------------ observations
 
   /** The parsed `--json` envelope. Throws with the output when it is not JSON. */
@@ -369,11 +392,10 @@ export function assertEnvelope(result: CliResult, args: string[] = []): void {
  * scaffolds into (ADR 044). Removes itself when the test finishes, so a spec
  * carries no teardown.
  */
-export async function anApp(
-  framework: "next" = "next",
-  { nextVersion = "^16.0.0" }: { nextVersion?: string } = {},
-): Promise<ScaffoldedApp> {
-  const path = await mkdtemp(join(tmpdir(), `zitadel-${framework}-`));
+export async function anApp({
+  nextVersion = "^16.0.0",
+}: { nextVersion?: string } = {}): Promise<ScaffoldedApp> {
+  const path = await mkdtemp(join(tmpdir(), "zitadel-next-"));
   onTestFinished(() => rm(path, { recursive: true, force: true }));
 
   await mkdir(join(path, "app"), { recursive: true });
