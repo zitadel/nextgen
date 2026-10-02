@@ -46,6 +46,7 @@ import {
   CreateProjectBody,
   CreateSchemaBody,
   CreateSchemaQueryParams,
+  DeleteVariableParams,
   DeleteVariableQueryParams,
   GetClaimStatusParams,
   GetClaimStatusQueryParams,
@@ -62,6 +63,7 @@ import {
   GetProjectResponse,
   GetSchemaByIdParams,
   GetSchemaByIdQueryParams,
+  GetVariableParams,
   GetVariableQueryParams,
   GetVariableResponse,
   GetVariablesQueryParams,
@@ -1346,12 +1348,20 @@ export function setupPlatformHandlers() {
     // name another owner of the same project holds answers `var.not_found`
     // and leaves that owner's value standing.
     http.get("*/variables/:variableName", ({ request, params }) => {
+      const path = parse(
+        GetVariableParams,
+        { variable_name: String(params.variableName) },
+        "invalid_request",
+      );
+      if (!path.ok) {
+        return path.response;
+      }
       const query = parse(GetVariableQueryParams, queryRecord(request), "invalid_query");
       if (!query.ok) {
         return query.response;
       }
       const owner = variableOwner(query.data.project_id, query.data.environment_name);
-      const held = store.variables.get(owner)?.get(String(params.variableName));
+      const held = store.variables.get(owner)?.get(path.data.variable_name);
       if (held === undefined) {
         return HttpResponse.json(errorBody("var.not_found", "variable not found"), { status: 404 });
       }
@@ -1364,13 +1374,21 @@ export function setupPlatformHandlers() {
     }),
 
     http.delete("*/variables/:variableName", ({ request, params }) => {
+      const path = parse(
+        DeleteVariableParams,
+        { variable_name: String(params.variableName) },
+        "invalid_request",
+      );
+      if (!path.ok) {
+        return path.response;
+      }
       const query = parse(DeleteVariableQueryParams, queryRecord(request), "invalid_query");
       if (!query.ok) {
         return query.response;
       }
       const owner = variableOwner(query.data.project_id, query.data.environment_name);
       const owned = store.variables.get(owner);
-      const name = String(params.variableName);
+      const name = path.data.variable_name;
       if (owned?.has(name) !== true) {
         return HttpResponse.json(errorBody("var.not_found", "variable not found"), { status: 404 });
       }
