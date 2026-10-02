@@ -11,7 +11,7 @@ import type {
 import { ApiError, apiErrorMessage } from "@zitadel/api/runtime/fetch";
 import { zitadelTrustmarkInnerHtml } from "../internal/attribution-markup.js";
 import type { Liquid, Template } from "liquidjs";
-import { css, html, LitElement, type PropertyValues } from "lit";
+import { css, html, LitElement, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 
 import "../atoms/index.js";
@@ -584,8 +584,34 @@ export class ZitadelLogin extends ZitadelSurface {
       novalidate
       aria-busy=${this.loading ? "true" : "false"}
     >
-      ${unsafeHTML(rendered)}
+      ${this.renderPairedIdentifier()}${unsafeHTML(rendered)}
     </form>`;
+  }
+
+  /**
+   * Renders `step.identifier` as the control a password manager pairs with the
+   * password input. No `name` keeps it out of every submission; clipping it
+   * rather than `display:none` or `type="hidden"` keeps a manager able to see
+   * it. It lives here and not in the template because the sanitiser drops a
+   * raw `<input>` from template output, so ejected templates get it for free.
+   *
+   * `value` is the attribute, not a `.value` property binding: a manager
+   * reading the markup has to find the address there, and the control is
+   * readonly and untabbable, so it can never go dirty and drift from it.
+   */
+  private renderPairedIdentifier() {
+    const identifier = this.response?.step.identifier;
+    if (!identifier?.value) return nothing;
+    return html`<input
+      type="text"
+      part="paired-identifier"
+      readonly
+      tabindex="-1"
+      aria-hidden="true"
+      autocomplete=${identifier.autocomplete}
+      value=${identifier.value}
+      style="position:absolute;width:1px;height:1px;margin:-1px;padding:0;border:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap"
+    />`;
   }
 
   /**
