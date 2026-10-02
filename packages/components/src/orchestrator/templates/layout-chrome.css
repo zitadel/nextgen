@@ -159,6 +159,16 @@ img[data-zl-asset-broken] {
    hidden (its page already carries one). Stamped by the orchestrator on the
    shell so it covers user-ejected templates too. Screen-reader-only rather
    than display:none — the step keeps its accessible name. */
+/* A terminal step is a heading with no form under it, so the heading is
+   centred in the card rather than left-aligned over fields that are not
+   there, and the card drops the gap it keeps for a body. */
+.zl-card--terminal .zl-card-title,
+.zl-card--terminal .zl-card-subtitle {
+  text-align: center;
+}
+.zl-card--terminal::part(card) {
+  gap: 0;
+}
 [data-suppress-header] .zl-card-title,
 [data-suppress-header] .zl-card-subtitle {
   position: absolute;

@@ -272,7 +272,7 @@ export default class Setup extends BaseCommand {
       devPort: framework.devPort,
       preset: (flags.preset as SetupPreset | undefined) ?? DEFAULT_SETUP_PRESET,
       useCase: (flags["use-case"] as SetupUseCase | undefined) ?? DEFAULT_SETUP_USE_CASE,
-      sso: ssoFromCommandLine,
+      sso: ssoFromCommandLine === undefined ? [] : [ssoFromCommandLine],
     };
 
     if (!nonInteractive && !dryRun) {
@@ -299,7 +299,16 @@ export default class Setup extends BaseCommand {
     this.recordTelemetry({
       preset: answers.preset,
       use_case: answers.useCase,
-      sso: answers.sso?.provider ?? "none",
+      // One slug, "none", or "multiple" -- never a joined set. A dimension's
+      // value space has to stay enumerable: comma-joining n providers makes it
+      // combinatorial, and the question telemetry answers here is whether a
+      // project enabled a provider at all, not which combination.
+      sso:
+        answers.sso.length === 0
+          ? "none"
+          : answers.sso.length === 1
+            ? (answers.sso[0]?.provider ?? "none")
+            : "multiple",
     });
 
     const issuer = issuerFromPort(answers.devPort);
@@ -335,9 +344,10 @@ export default class Setup extends BaseCommand {
             preset: answers.preset,
             useCase: answers.useCase,
             devPort: answers.devPort,
-            sso: answers.sso
-              ? { provider: answers.sso.provider, clientId: answers.sso.clientId }
-              : undefined,
+            sso: answers.sso.map((answer) => ({
+              provider: answer.provider,
+              clientId: answer.clientId,
+            })),
           },
         );
     consola.success(`Created project ${project.id}`);
@@ -434,31 +444,37 @@ export default class Setup extends BaseCommand {
     // Zitadel Cloud as much as against a local server. A refusal is reported
     // rather than failing setup: everything else is already provisioned, and
     // `variables set` publishes it later.
-    let ssoSecret: SecretOutcome | undefined;
-    let ssoClientId: PublishState | undefined;
-    if (answers.sso && !dryRun) {
-      const idVariable = credentialVariables(answers.sso.provider).clientId;
-      const variable = credentialVariables(answers.sso.provider).clientSecret;
+    // One outcome per provider, keyed by slug: the summary reports each
+    // separately, because one provider's publish can land while another's does
+    // not, and telling the developer "the secret did not reach the project"
+    // without saying whose would leave them guessing.
+    const ssoOutcomes = new Map<string, { clientId: PublishState; secret: SecretOutcome }>();
+    if (answers.sso.length > 0 && !dryRun) {
       const publish = ssoCredentialPublisher(answers.server, project);
-      ssoClientId = await publishClientId({
-        name: idVariable,
-        value: answers.sso.clientId,
-        publish,
-      });
-      ssoSecret = await storeClientSecret({ name: variable, value: answers.sso.secret, publish });
-      if (answers.sso.endpoints?.issuer !== undefined) {
-        // Said out loud: a connection pointing somewhere other than the
-        // vendor is not what the developer will want in the end, and nothing
-        // else in the summary would show it.
-        consola.warn(
-          `${idpProvider(answers.sso.provider).displayName} points at ` +
-            `${answers.sso.endpoints.issuer}, not the provider`,
-        );
+      for (const answer of answers.sso) {
+        const idVariable = credentialVariables(answer.provider).clientId;
+        const variable = credentialVariables(answer.provider).clientSecret;
+        const clientId = await publishClientId({
+          name: idVariable,
+          value: answer.clientId,
+          publish,
+        });
+        const secret = await storeClientSecret({ name: variable, value: answer.secret, publish });
+        ssoOutcomes.set(answer.provider, { clientId, secret });
+        if (answer.endpoints?.issuer !== undefined) {
+          // Said out loud: a connection pointing somewhere other than the
+          // vendor is not what the developer will want in the end, and nothing
+          // else in the summary would show it.
+          consola.warn(
+            `${idpProvider(answer.provider).displayName} points at ` +
+              `${answer.endpoints.issuer}, not the provider`,
+          );
+        }
+        reportClientIdOutcome(idVariable, clientId, this.meta.cliVersion);
+        // The wizard refuses an empty secret, so a deferred publish here only
+        // ever means there was no project to publish to.
+        reportSecretOutcome(secret, this.meta.cliVersion, false);
       }
-      reportClientIdOutcome(idVariable, ssoClientId, this.meta.cliVersion);
-      // The wizard refuses an empty secret, so a deferred publish here only
-      // ever means there was no project to publish to.
-      reportSecretOutcome(ssoSecret, this.meta.cliVersion, false);
     }
 
     if (!dryRun) {
@@ -640,19 +656,26 @@ export default class Setup extends BaseCommand {
         // The provider enabled during scaffolding, or null. `secret` reports
         // where the value went, never the value itself — `published` is the
         // one that decides whether the provider button works.
-        sso: answers.sso
-          ? {
-              provider: answers.sso.provider,
-              client_id: answers.sso.clientId,
-              connection: `.zitadel/idps/${answers.sso.provider}.json`,
-              client_id_variable: ssoClientId
-                ? { variable: credentialVariables(answers.sso.provider).clientId, published: ssoClientId }
-                : null,
-              secret: ssoSecret
-                ? { variable: ssoSecret.name, published: ssoSecret.published }
-                : null,
-            }
-          : null,
+        // A list, one entry per provider enabled during scaffolding, empty
+        // when none was. An agent reading this needs to know which provider a
+        // deferred publish belongs to, so the outcomes stay per entry.
+        sso: answers.sso.map((answer) => {
+          const outcome = ssoOutcomes.get(answer.provider);
+          return {
+            provider: answer.provider,
+            client_id: answer.clientId,
+            connection: `.zitadel/idps/${answer.provider}.json`,
+            client_id_variable: outcome
+              ? {
+                  variable: credentialVariables(answer.provider).clientId,
+                  published: outcome.clientId,
+                }
+              : null,
+            secret: outcome
+              ? { variable: outcome.secret.name, published: outcome.secret.published }
+              : null,
+          };
+        }),
         // Branding guidance before the claim nudge: make it yours, then
         // claim to keep it (the same order the manifesto's journey walks).
         next_actions: [
@@ -665,17 +688,21 @@ export default class Setup extends BaseCommand {
         // nothing to act on. `sso enable` reports the same recovery step.
         next_commands: [
           ...republishCommands(
-            [
-              {
-                name:
-                  answers.sso === undefined
-                    ? undefined
-                    : credentialVariables(answers.sso.provider).clientId,
-                secret: false,
-                published: ssoClientId,
-              },
-              { name: ssoSecret?.name, secret: true, published: ssoSecret?.published },
-            ],
+            answers.sso.flatMap((answer) => {
+              const outcome = ssoOutcomes.get(answer.provider);
+              return [
+                {
+                  name: credentialVariables(answer.provider).clientId,
+                  secret: false,
+                  published: outcome?.clientId,
+                },
+                {
+                  name: outcome?.secret.name,
+                  secret: true,
+                  published: outcome?.secret.published,
+                },
+              ];
+            }),
             this.meta.cliVersion,
           ),
           ...installOutcome.nextCommands,
@@ -815,7 +842,10 @@ async function ssoFromFlags(
     // after setup reports success. It is never a flag — that would put it in
     // shell history, a process listing and CI logs.
     throw new ZitadelError("E_VALIDATION", `--sso ${flags.sso} needs the client secret on stdin`, {
-      hint: `Pipe it in, e.g. \`printf '%s' "$GOOGLE_CLIENT_SECRET" | zitadel setup --sso ${flags.sso} --sso-client-id ${clientId} ...\`.`,
+      // The client id is the developer's own, already on their command line,
+      // so the example names the flag rather than echoing the value back into
+      // a line they may paste somewhere else.
+      hint: `Pipe it in, e.g. \`printf '%s' "$GOOGLE_CLIENT_SECRET" | zitadel setup --sso ${flags.sso} --sso-client-id <id> ...\`.`,
     });
   }
   return { provider: flags.sso, clientId, secret: piped };
@@ -827,6 +857,15 @@ async function ssoFromFlags(
  * a flag here silently changes what the retry scaffolds.
  */
 type SetupRetryOptions = {
+  /**
+   * The directory setup was pointed at, when it was not the shell's own.
+   * Named in the guidance rather than passed as `--cwd` in the command text:
+   * a path can carry spaces and metacharacters, and nothing escapes a
+   * suggested command for a shell -- the same reason the client id is not
+   * interpolated either. Prose the developer reads, not an argument a shell
+   * splits.
+   */
+  cwd?: string;
   framework?: string;
   preset?: SetupPreset;
   useCase?: SetupUseCase;
@@ -841,7 +880,7 @@ type SetupRetryOptions = {
    * goes to the project's variables, which is where the engine resolves the
    * connection's `${{ NAME }}` from.
    */
-  sso?: { provider: string; clientId: string };
+  sso?: readonly { provider: string; clientId: string }[];
 };
 
 /**
@@ -866,8 +905,18 @@ function setupRetryFlags(opts: SetupRetryOptions): string {
   if (opts.devPort !== undefined) {
     parts.push(`--dev-port ${opts.devPort}`);
   }
-  if (opts.sso) {
-    parts.push(`--sso ${opts.sso.provider} --sso-client-id ${opts.sso.clientId}`);
+  // Only the first: `--sso` takes one provider, and a scripted rerun can pipe
+  // only one secret. A retry naming several would not be runnable, which is
+  // the whole point of this line. The rest are not silently dropped -- the
+  // guidance that uses this emits an `sso enable` command for each, because
+  // `--sso` makes the rerun skip the multi-select, so a provider left out here
+  // could not be reselected.
+  const [firstSso] = opts.sso ?? [];
+  if (firstSso) {
+    // Provider only. `--sso-client-id` would interpolate a value the wizard
+    // accepted on emptiness alone into a command run verbatim, and nothing
+    // here escapes it for a shell. The rerun asks for the id.
+    parts.push(`--sso ${firstSso.provider}`);
   }
   // `--non-interactive` is dropped when a provider is being configured: that
   // combination reads the client secret from stdin, and a command handed over
@@ -875,7 +924,7 @@ function setupRetryFlags(opts: SetupRetryOptions): string {
   // fails the moment it is run. Interactively the rerun asks for the secret,
   // which is the one way a plain command can obtain it -- putting it in the
   // command text is never an option.
-  if (opts.nonInteractive && !opts.sso) {
+  if (opts.nonInteractive && firstSso === undefined) {
     parts.push("--non-interactive");
   }
   parts.push("--server local");
@@ -888,6 +937,7 @@ function setupRetryFlags(opts: SetupRetryOptions): string {
  * — TTY/JSON-inferred non-interactivity re-infers itself on the retry.
  */
 function retryOptionsFromFlags(flags: {
+  cwd?: string;
   framework?: string;
   preset?: string;
   "use-case"?: string;
@@ -901,12 +951,19 @@ function retryOptionsFromFlags(flags: {
     framework: flags.framework,
     preset: flags.preset as SetupPreset | undefined,
     useCase: flags["use-case"] as SetupUseCase | undefined,
+    cwd: flags.cwd,
     renderer: flags.renderer,
     devPort: flags["dev-port"],
     nonInteractive: Boolean(flags["non-interactive"]),
+    // The provider survives on its own. A suggested retry carries `--sso`
+    // without `--sso-client-id` -- the id is never put in command text -- so
+    // requiring both here would drop the provider from the next suggestion if
+    // that retry failed again before the wizard ran, and the developer would
+    // be told to set up without the provider they asked for. An empty id
+    // means "ask for it", which is what the wizard does with it.
     sso:
-      flags.sso !== undefined && flags["sso-client-id"] !== undefined
-        ? { provider: flags.sso, clientId: flags["sso-client-id"] }
+      flags.sso !== undefined
+        ? [{ provider: flags.sso, clientId: flags["sso-client-id"] ?? "" }]
         : undefined,
   };
 }
@@ -932,6 +989,58 @@ function ssoCredentialPublisher(
   };
 }
 
+/**
+ * The providers a setup retry cannot carry, and how to restore them.
+ *
+ * `--sso` names one provider and makes the rerun skip the multi-select, so
+ * every other provider chosen would be lost unless it is restored explicitly.
+ * Both recovery paths need this -- the one before the wizard and the one for a
+ * failed project creation -- and the second was missed when this was written
+ * inline, which is exactly the kind of thing one copy prevents.
+ */
+function runFromHint(retry: SetupRetryOptions): string {
+  if (retry.cwd === undefined || retry.cwd === process.cwd()) {
+    return "";
+  }
+  return `Run these from ${retry.cwd}, which is the project they configure. `;
+}
+
+function ssoRecovery(
+  retry: SetupRetryOptions,
+  cliVersion: string,
+): { hint: string; commands: string[] } {
+  const chosen = retry.sso ?? [];
+  const remaining = chosen.slice(1);
+  if (remaining.length === 0) {
+    return { hint: "", commands: [] };
+  }
+  return {
+    hint:
+      `The rerun configures ${chosen[0]?.provider ?? ""} only; add the rest with the sso enable ` +
+      "commands below, which ask for each client id. ",
+    // The client id is not interpolated into the command. These strings are
+    // run verbatim, especially by agents, and nothing escapes them for a
+    // shell: a value the wizard accepted -- it only refuses an empty one --
+    // could split into two arguments or carry a metacharacter that changes
+    // what the command does. `sso enable` asks for the id, exactly as it asks
+    // for the secret, which was never put in command text for the same
+    // reason.
+    // `--server local`, as the setup retry pins it. Server resolution prefers
+    // `ZITADEL_API_BASE` over the project's own `zitadel.json`, so an
+    // unpinned `sso enable` run with that variable set would publish the
+    // client id and secret to whatever it names, using the local project's
+    // token -- leaving the local provider unconfigured and the credentials
+    // somewhere nobody asked for. Both callers of this are local-server
+    // failures, so `local` is the server meant in every case.
+    commands: remaining.map((provider) =>
+      publicCliCommand(
+        `sso enable --provider ${provider.provider} --server local`,
+        cliVersion,
+      ),
+    ),
+  };
+}
+
 async function createProjectWithLocalHint(
   client: ReturnType<typeof createZitadelClient>,
   server: string,
@@ -954,14 +1063,16 @@ async function createProjectWithLocalHint(
   } catch (error) {
     const normalized = toZitadelError(error);
     const retryFlags = setupRetryFlags(retry);
+    const sso = ssoRecovery(retry, cliVersion);
     throw new ZitadelError(normalized.code, normalized.message, {
       hint:
         `${normalized.hint ? `${normalized.hint} ` : ""}` +
         "If you meant to use a local Zitadel server, start it first " +
-        `and retry setup with ${retryFlags}.`,
+        `and retry setup with ${retryFlags}. ${runFromHint(retry)}${sso.hint}`.trimEnd(),
       nextCommands: [
         publicCliCommand("start", cliVersion),
         publicCliCommand(`setup ${retryFlags}`, cliVersion),
+        ...sso.commands,
       ],
       details: {
         server,
@@ -983,19 +1094,23 @@ function localSetupHint(error: unknown, retry: SetupRetryOptions, cliVersion: st
   }
 
   const setupCommand = `setup ${setupRetryFlags(retry)}`;
+  const sso = ssoRecovery(retry, cliVersion);
 
   return new ZitadelError(normalized.code, normalized.message, {
     hint:
       `${normalized.hint ? `${normalized.hint} ` : ""}` +
       "Start local Zitadel first, then rerun setup. " +
-      (retry.sso
-        ? "The rerun asks for the client secret, because a command cannot carry one. " +
-          "To script it instead, pipe the secret in and add --non-interactive. "
+      runFromHint(retry) +
+      (retry.sso && retry.sso.length > 0
+        ? "The rerun asks for the client id and secret, because a command carries neither. " +
+          "To script it instead, add --sso-client-id and --non-interactive, and pipe the secret in. "
         : "") +
+      sso.hint +
       "After setup succeeds, follow its next_commands to start the app and verify registration, logout, and login in the browser.",
     nextCommands: [
       publicCliCommand("start", cliVersion),
       publicCliCommand(setupCommand, cliVersion),
+      ...sso.commands,
     ],
     details: normalized.details,
   });
@@ -1084,7 +1199,7 @@ function buildSummary(opts: {
   server: string;
   issuer: string;
   scaffoldedFramework: boolean;
-  sso?: SsoAnswer;
+  sso: readonly SsoAnswer[];
 }): Section[] {
   const {
     projectFacts,
@@ -1158,11 +1273,14 @@ function buildSummary(opts: {
     const hit = pickWrittenFile(writtenRel, suffix);
     if (hit) customizeRows.push({ label, value: stylePath(dir), secondary: "see its README.md" });
   }
-  if (sso) {
+  // One row per provider: each has its own connection file, and a developer
+  // scanning the summary for where to edit needs the path that belongs to the
+  // provider they are looking at.
+  for (const answer of sso) {
     customizeRows.push({
       label: "Social sign-in",
-      value: idpProvider(sso.provider).displayName,
-      secondary: stylePath(`.zitadel/idps/${sso.provider}.json`),
+      value: idpProvider(answer.provider).displayName,
+      secondary: stylePath(`.zitadel/idps/${answer.provider}.json`),
     });
   }
 

@@ -58,4 +58,13 @@ describe("setup telemetry dimensions", () => {
     expect(source).toContain("options: [...IDP_PROVIDERS]");
     expect([...IDP_PROVIDERS].every((slug) => /^[a-z][a-z0-9_-]*$/.test(slug))).toBe(true);
   });
+
+  // Setup can enable several providers at once. The dimension stays
+  // enumerable by collapsing that to one bucket rather than joining the
+  // slugs, which would make the value space combinatorial.
+  it("reports several providers as one bucket, not a joined set", async () => {
+    const source = await readFile(setupCommand, "utf8");
+    expect(source).toContain('"multiple"');
+    expect(source).not.toContain('.map((a) => a.provider).join(',);
+  });
 });

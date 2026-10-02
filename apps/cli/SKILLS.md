@@ -27,6 +27,16 @@ parse the result rather than scraping human output.
   the CLI's HTTP `User-Agent`.
 - See `README.md` (its commands section is generated from the CLI's own
   metadata) or run `zitadel <command> --help` for the full per-command flag list.
+- Flags follow the conventions a model already expects from curl, ssh and wget:
+  `--help`/`-h`, `--version`, `-v`/`--verbose`, kebab-case long flags, both
+  `--flag value` and `--flag=value`, and `--no-telemetry`-style negation. `-v`
+  is the short form of `--verbose` on every product command (the built-in oclif
+  utilities such as `version` and `which` have their own smaller flag surface —
+  the per-command `--help` above is authoritative). Two deliberate deviations
+  worth knowing: `-n` is `--non-interactive`
+  (not `--dry-run`, which is long-only), and machine output is `--json` (not
+  `--output json`). These are the agent-critical flags, so they keep the
+  spellings agents reach for most.
 
 ```sh
 npx @zitadel/cli@alpha <command> --non-interactive --json
@@ -439,8 +449,12 @@ docker --image <ref>` remains the explicit image override for debugging.
   where the key is also an action on that step. If a step the command edits has
   an action named like an outcome it writes there, the command stops with
   `E_VALIDATION` naming the step and the action, and changes no file. `setup`
-  asks the same question during onboarding (`--sso`, `--sso-client-id`, secret
-  on stdin). `plan`/`apply` then publish the connection; **deleting** one is not
+  asks during onboarding too, as a multi-select over the catalog, so a run can
+  enable several providers at once; its `data.sso` is a **list**, one entry per
+  provider, each carrying that provider's connection path and the publish
+  outcome for its client id and secret. `--sso` and `--sso-client-id` name a
+  single provider, because a scripted run pipes one secret on stdin — the rest
+  are added with `sso enable`. `plan`/`apply` then publish the connection; **deleting** one is not
   supported yet (#1013), so a removed file fails `apply` with
   `E_NOT_IMPLEMENTED`.
 - `branding eject` — take ownership of the login template: scaffold

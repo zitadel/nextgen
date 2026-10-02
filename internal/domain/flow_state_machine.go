@@ -131,10 +131,22 @@ type FlowStep struct {
 	Fields       []FlowField
 	Actions      []FlowAction
 	SSOProviders []FlowSSOProvider
+	// Identifier is set only when the step collects a password without
+	// collecting the identifier. Render-only — see [FlowStepIdentifier].
+	Identifier *FlowStepIdentifier
 	// Challenge is a pending authentication ceremony the client must
 	// satisfy before re-submitting (e.g. a passkey assertion). Nil unless
 	// the engine just issued one.
 	Challenge *FlowStepChallenge
+}
+
+// FlowStepIdentifier mirrors the OpenAPI `flow-step.identifier`: the
+// identifier a password form carries as a hidden control, so a password
+// manager stores the two as one credential. It carries no field name — the
+// control the client renders has none, so it is never submitted.
+type FlowStepIdentifier struct {
+	Value        string
+	Autocomplete string
 }
 
 // FlowStepChallenge mirrors the OpenAPI `flow-step.challenge`: a pending
@@ -1518,6 +1530,7 @@ func (r *FlowStateMachineRuntime) buildStep(ctx context.Context, state *FlowStat
 			TextKey: step.Name + ".action." + flowBackActionName,
 		})
 	}
+	applyAutocomplete(resolved.Fields, state.CurrentPurpose)
 	return &FlowStep{
 		Name:         step.Name,
 		Texts:        FlowStepTexts{TitleKey: step.Name + ".title", DescriptionKey: step.Name + ".description"},
@@ -1527,7 +1540,48 @@ func (r *FlowStateMachineRuntime) buildStep(ctx context.Context, state *FlowStat
 		Fields:       resolved.Fields,
 		Actions:      actions,
 		SSOProviders: providers,
+		Identifier:   pairedIdentifier(resolved, state.CollectedData.UserData),
 	}, nil
+}
+
+// applyAutocomplete stamps each field's autofill token. The purpose is not
+// known at resolve time — the definition validator resolves without one, and
+// applyOutcomeFlip can change it mid-flow — so the token belongs to a render
+// rather than to the resolved field set.
+func applyAutocomplete(fields []FlowField, purpose FlowDefinitionPurpose) {
+	for i := range fields {
+		fields[i].Autocomplete = AutocompleteForField(fields[i], purpose)
+	}
+}
+
+// pairedIdentifier returns the identifier a password form carries beside
+// the password input so a manager can store the two as one credential.
+// Nil unless the step collects a password, collects no identifier of its
+// own, and the schema designates one a value was collected for.
+func pairedIdentifier(resolved FlowResolvedFields, collected map[string]any) *FlowStepIdentifier {
+	if resolved.IdentifierName == "" {
+		return nil
+	}
+	var holdsPassword bool
+	for _, f := range resolved.Fields {
+		switch f.Challenge {
+		case FlowFieldChallengeIdentifier:
+			return nil
+		case FlowFieldChallengePassword:
+			holdsPassword = true
+		}
+	}
+	if !holdsPassword {
+		return nil
+	}
+	value, ok := collectedString(collected, resolved.IdentifierName)
+	if !ok {
+		return nil
+	}
+	return &FlowStepIdentifier{
+		Value:        value,
+		Autocomplete: AutocompleteUsername,
+	}
 }
 
 // resolveSSOProviders renders the step's connection slugs through the
@@ -1618,11 +1672,26 @@ func prefillFromCollected(resolved *FlowResolvedFields, collected map[string]any
 		if resolved.Fields[i].Value != nil {
 			continue
 		}
-		if v, ok := maputil.GetNested[string](collected, AttributeKey(resolved.Fields[i].Name).Nodes()); ok && v != "" {
+		if v, ok := collectedString(collected, resolved.Fields[i].Name); ok {
 			val := v
 			resolved.Fields[i].Value = &val
 		}
 	}
+}
+
+// collectedString returns the value collected for a dotted property path when
+// one is there and non-empty. A collected-but-empty value is the same as
+// nothing to the callers that re-render it: there is no prefill to make and no
+// identifier to pair.
+//
+// [FindCollectedFieldByChallenge] deliberately does not go through here — it
+// reads a value of any type and asks only whether it is present.
+func collectedString(collected map[string]any, name string) (string, bool) {
+	v, ok := maputil.GetNested[string](collected, AttributeKey(name).Nodes())
+	if !ok || v == "" {
+		return "", false
+	}
+	return v, true
 }
 
 func mergeCollected(state *FlowState, fields map[string]any) error {

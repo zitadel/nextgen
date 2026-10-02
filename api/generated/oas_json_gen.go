@@ -31479,6 +31479,12 @@ func (s *Field) encodeFields(e *jx.Encoder) {
 		e.Str(s.TextKey)
 	}
 	{
+		if s.Autocomplete.Set {
+			e.FieldStart("autocomplete")
+			s.Autocomplete.Encode(e)
+		}
+	}
+	{
 		if s.Required.Set {
 			e.FieldStart("required")
 			s.Required.Encode(e)
@@ -31498,13 +31504,14 @@ func (s *Field) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfField = [6]string{
+var jsonFieldsNameOfField = [7]string{
 	0: "name",
 	1: "type",
 	2: "text_key",
-	3: "required",
-	4: "value",
-	5: "validation",
+	3: "autocomplete",
+	4: "required",
+	5: "value",
+	6: "validation",
 }
 
 // Decode decodes Field from json.
@@ -31550,6 +31557,16 @@ func (s *Field) Decode(d *jx.Decoder) error {
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"text_key\"")
+			}
+		case "autocomplete":
+			if err := func() error {
+				s.Autocomplete.Reset()
+				if err := s.Autocomplete.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"autocomplete\"")
 			}
 		case "required":
 			if err := func() error {
@@ -36155,6 +36172,12 @@ func (s *FlowStep) encodeFields(e *jx.Encoder) {
 		e.ArrEnd()
 	}
 	{
+		if s.Identifier.Set {
+			e.FieldStart("identifier")
+			s.Identifier.Encode(e)
+		}
+	}
+	{
 		e.FieldStart("actions")
 		e.ArrStart()
 		for _, elem := range s.Actions {
@@ -36184,17 +36207,18 @@ func (s *FlowStep) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfFlowStep = [10]string{
-	0: "name",
-	1: "texts",
-	2: "error",
-	3: "complete",
-	4: "redirect_url",
-	5: "fields",
-	6: "actions",
-	7: "gates",
-	8: "sso_providers",
-	9: "challenge",
+var jsonFieldsNameOfFlowStep = [11]string{
+	0:  "name",
+	1:  "texts",
+	2:  "error",
+	3:  "complete",
+	4:  "redirect_url",
+	5:  "fields",
+	6:  "identifier",
+	7:  "actions",
+	8:  "gates",
+	9:  "sso_providers",
+	10: "challenge",
 }
 
 // Decode decodes FlowStep from json.
@@ -36276,8 +36300,18 @@ func (s *FlowStep) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"fields\"")
 			}
+		case "identifier":
+			if err := func() error {
+				s.Identifier.Reset()
+				if err := s.Identifier.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"identifier\"")
+			}
 		case "actions":
-			requiredBitSet[0] |= 1 << 6
+			requiredBitSet[0] |= 1 << 7
 			if err := func() error {
 				s.Actions = make([]FlowStepAction, 0)
 				if err := d.Arr(func(d *jx.Decoder) error {
@@ -36295,7 +36329,7 @@ func (s *FlowStep) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"actions\"")
 			}
 		case "gates":
-			requiredBitSet[0] |= 1 << 7
+			requiredBitSet[1] |= 1 << 0
 			if err := func() error {
 				if err := s.Gates.Decode(d); err != nil {
 					return err
@@ -36341,8 +36375,8 @@ func (s *FlowStep) Decode(d *jx.Decoder) error {
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [2]uint8{
-		0b11100001,
-		0b00000000,
+		0b10100001,
+		0b00000001,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -36865,6 +36899,119 @@ func (s FlowStepGates) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *FlowStepGates) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *FlowStepIdentifier) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *FlowStepIdentifier) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("value")
+		e.Str(s.Value)
+	}
+	{
+		e.FieldStart("autocomplete")
+		e.Str(s.Autocomplete)
+	}
+}
+
+var jsonFieldsNameOfFlowStepIdentifier = [2]string{
+	0: "value",
+	1: "autocomplete",
+}
+
+// Decode decodes FlowStepIdentifier from json.
+func (s *FlowStepIdentifier) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode FlowStepIdentifier to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "value":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.Value = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"value\"")
+			}
+		case "autocomplete":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Str()
+				s.Autocomplete = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"autocomplete\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode FlowStepIdentifier")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfFlowStepIdentifier) {
+					name = jsonFieldsNameOfFlowStepIdentifier[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *FlowStepIdentifier) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *FlowStepIdentifier) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -60601,6 +60748,39 @@ func (s OptFlowStepComplete) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *OptFlowStepComplete) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes FlowStepIdentifier as json.
+func (o OptFlowStepIdentifier) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes FlowStepIdentifier from json.
+func (o *OptFlowStepIdentifier) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptFlowStepIdentifier to nil")
+	}
+	o.Set = true
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptFlowStepIdentifier) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptFlowStepIdentifier) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -90849,17 +91029,10 @@ func (s *SetUserPasswordRequest) encodeFields(e *jx.Encoder) {
 		e.FieldStart("password")
 		e.Str(s.Password)
 	}
-	{
-		if s.IsChangeRequired.Set {
-			e.FieldStart("is_change_required")
-			s.IsChangeRequired.Encode(e)
-		}
-	}
 }
 
-var jsonFieldsNameOfSetUserPasswordRequest = [2]string{
+var jsonFieldsNameOfSetUserPasswordRequest = [1]string{
 	0: "password",
-	1: "is_change_required",
 }
 
 // Decode decodes SetUserPasswordRequest from json.
@@ -90882,16 +91055,6 @@ func (s *SetUserPasswordRequest) Decode(d *jx.Decoder) error {
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"password\"")
-			}
-		case "is_change_required":
-			if err := func() error {
-				s.IsChangeRequired.Reset()
-				if err := s.IsChangeRequired.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"is_change_required\"")
 			}
 		default:
 			return d.Skip()
