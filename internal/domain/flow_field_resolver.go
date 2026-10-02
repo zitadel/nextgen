@@ -140,11 +140,24 @@ const (
 	AutocompleteNewPassword     = "new-password"
 )
 
+// passwordAutocomplete is the token a password field carries under each
+// purpose: login verifies the submitted password, register and recovery
+// establish one.
+//
+// Mapped one purpose at a time, deliberately. An unlisted purpose yields no
+// token rather than inheriting a default, so reauth cannot tell a password
+// manager to generate a replacement for the password it is asking the user
+// to confirm. A journey that collects a password adds its entry here.
+var passwordAutocomplete = map[FlowDefinitionPurpose]string{
+	FlowDefinitionPurposeLogin:    AutocompleteCurrentPassword,
+	FlowDefinitionPurposeRegister: AutocompleteNewPassword,
+	FlowDefinitionPurposeRecovery: AutocompleteNewPassword,
+}
+
 // AutocompleteForField returns the autofill token for a resolved field
-// under the given purpose, or "" when none applies. The identifier's
-// token follows its type, never its name. A password's follows the
-// purpose, mirroring the verify-versus-establish condition
-// dispatchChallenges applies.
+// under the given purpose, or "" when none applies. The identifier's token
+// follows its type, never its name; a password's comes from
+// [passwordAutocomplete].
 func AutocompleteForField(f FlowField, purpose FlowDefinitionPurpose) string {
 	switch f.Challenge {
 	case FlowFieldChallengeIdentifier:
@@ -153,10 +166,7 @@ func AutocompleteForField(f FlowField, purpose FlowDefinitionPurpose) string {
 		}
 		return AutocompleteUsername
 	case FlowFieldChallengePassword:
-		if purpose == FlowDefinitionPurposeLogin {
-			return AutocompleteCurrentPassword
-		}
-		return AutocompleteNewPassword
+		return passwordAutocomplete[purpose]
 	}
 	return ""
 }

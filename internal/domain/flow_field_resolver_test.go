@@ -48,6 +48,21 @@ func TestAutocompleteForField(t *testing.T) {
 			want:    domain.AutocompleteNewPassword,
 		},
 		{
+			// Unmapped on purpose: a step-up prompt asks the user to confirm
+			// the password they already have, so "new-password" would tell a
+			// manager to replace it. No token beats the wrong one.
+			name:    "a password under reauth takes no token until that journey maps one",
+			field:   domain.FlowField{Challenge: domain.FlowFieldChallengePassword, Type: domain.FlowFieldTypePassword},
+			purpose: domain.FlowDefinitionPurposeReauth,
+			want:    "",
+		},
+		{
+			name:    "a password under link_account takes no token",
+			field:   domain.FlowField{Challenge: domain.FlowFieldChallengePassword, Type: domain.FlowFieldTypePassword},
+			purpose: domain.FlowDefinitionPurposeLinkAccount,
+			want:    "",
+		},
+		{
 			name:    "a plain property takes no token",
 			field:   domain.FlowField{Name: "given_name", Type: domain.FlowFieldTypeText},
 			purpose: domain.FlowDefinitionPurposeRegister,
