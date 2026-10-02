@@ -6,7 +6,7 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 )
 
-func (h *Harness) EnsureEventService(t *testing.T) *service.EventService {
+func (h *Harness) EnsureEventService(t testing.TB) *service.EventService {
 	t.Helper()
 	h.eventService.mutex.Lock()
 	defer h.eventService.mutex.Unlock()

@@ -667,7 +667,10 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 		if err != nil {
 			return passwordChallenge, nil, nil, domain.ErrAuthAttemptProofRejected(err)
 		}
-		if err := password.Verify(p.Password, s.passwordVerifier); err != nil {
+		_, end := startSpan(ctx, "password.Verify")
+		err = password.Verify(p.Password, s.passwordVerifier)
+		end(&err)
+		if err != nil {
 			return passwordChallenge, nil, nil, domain.ErrAuthAttemptProofRejected(err)
 		}
 		return passwordChallenge, attempt.SetPasswordFactor(), nil, nil

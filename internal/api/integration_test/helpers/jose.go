@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func (h *Harness) EnsureJoseSigner(t *testing.T) jose.Signer {
+func (h *Harness) EnsureJoseSigner(t testing.TB) jose.Signer {
 	t.Helper()
 	h.joseSigner.mutex.Lock()
 	defer h.joseSigner.mutex.Unlock()

@@ -397,7 +397,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 			// logging is done at net/http level
 		),
 		oasapi.WithMeterProvider(telemetry.MeterProvider()),
-		oasapi.WithTracerProvider(telemetry.TracerProvider()),
+		oasapi.WithTracerProvider(api.NewOgenTracerProvider(telemetry.TracerProvider())),
 		oasapi.WithErrorHandler(api.OgenErrorHandler))
 	if err != nil {
 		return fmt.Errorf("failed to build api server: %w", err)

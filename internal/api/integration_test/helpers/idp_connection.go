@@ -7,7 +7,7 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 )
 
-func (h *Harness) EnsureIDPConnectionService(t *testing.T) service.IDPConnectionService {
+func (h *Harness) EnsureIDPConnectionService(t testing.TB) service.IDPConnectionService {
 	t.Helper()
 	h.idpConnectionService.mutex.Lock()
 	defer h.idpConnectionService.mutex.Unlock()

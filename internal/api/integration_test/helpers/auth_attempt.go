@@ -6,7 +6,7 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 )
 
-func (h *Harness) EnsureAuthAttemptService(t *testing.T) service.AuthAttemptService {
+func (h *Harness) EnsureAuthAttemptService(t testing.TB) service.AuthAttemptService {
 	t.Helper()
 	h.authAttemptService.mutex.Lock()
 	defer h.authAttemptService.mutex.Unlock()
