@@ -434,8 +434,12 @@ docker --image <ref>` remains the explicit image override for debugging.
   never a flag — it is prompted for, or read from stdin on a non-interactive
   run, as `variables set` does — and only its `${{ NAME }}` reference reaches
   the connection file. A step edited by hand is left alone and reported. `setup`
-  asks the same question during onboarding (`--sso`, `--sso-client-id`, secret
-  on stdin). `plan`/`apply` then publish the connection; **deleting** one is not
+  asks during onboarding too, as a multi-select over the catalog, so a run can
+  enable several providers at once; its `data.sso` is a **list**, one entry per
+  provider, each carrying that provider's connection path and the publish
+  outcome for its client id and secret. `--sso` and `--sso-client-id` name a
+  single provider, because a scripted run pipes one secret on stdin — the rest
+  are added with `sso enable`. `plan`/`apply` then publish the connection; **deleting** one is not
   supported yet (#1013), so a removed file fails `apply` with
   `E_NOT_IMPLEMENTED`.
 - `branding eject` — take ownership of the login template: scaffold

@@ -186,6 +186,46 @@ describe("setup command", () => {
     expect(json.data.next_commands[2]).toMatch(/^npx @zitadel\/cli@\S+ plan$/);
   });
 
+  // `data.sso` is a list, one entry per provider, because setup can enable
+  // several. An agent that kept parsing the old object would read nothing, so
+  // the shape is pinned here rather than left to the summary box.
+  it("reports the enabled providers as a list in the json envelope", async () => {
+    const cwd = await makeNextProject();
+
+    const res = await setup(cwd, [
+      "--dry-run",
+      "--framework",
+      "next",
+      "--sso",
+      "google",
+      "--sso-client-id",
+      "1234-abc.apps.googleusercontent.com",
+    ]);
+
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as {
+      data: { sso: Array<{ provider: string; client_id: string; connection: string }> };
+    };
+    expect(Array.isArray(json.data.sso)).toBe(true);
+    expect(json.data.sso).toHaveLength(1);
+    expect(json.data.sso[0]).toMatchObject({
+      provider: "google",
+      client_id: "1234-abc.apps.googleusercontent.com",
+      connection: ".zitadel/idps/google.json",
+    });
+  });
+
+  // No provider is an empty list, not a missing key or null: a consumer can
+  // iterate the field without checking which of three shapes it holds.
+  it("reports an empty list when no provider was enabled", async () => {
+    const cwd = await makeNextProject();
+
+    const res = await setup(cwd, ["--dry-run", "--framework", "next"]);
+
+    const json = parseJson(res.stdout) as { data: { sso: unknown[] } };
+    expect(json.data.sso).toEqual([]);
+  });
+
   // Every project starts unattached, so setup is where the developer first
   // learns the project is temporary and that `zitadel claim` exists.
   //

@@ -36,7 +36,7 @@ Every render has access to the capability dictionaries from [`../flowengine/flow
 | Binding         | Shape                                                        | Source                  |
 | --------------- | ------------------------------------------------------------ | ----------------------- |
 | `step`          | `{ name, complete, texts: { title_key, description_key } }`  | Flow payload            |
-| `fields`        | Ordered array of fields, each carrying its `name`            | Flow payload            |
+| `fields`        | Ordered array of fields, each carrying its `name` and, where one applies, its `autocomplete` token | Flow payload            |
 | `actions`       | Ordered array of actions, `primary: true` on the primary one | Flow payload            |
 | `gates`         | Dictionary keyed by gate name                                | Flow payload            |
 | `sso_providers` | Array of providers                                           | Flow payload            |
@@ -168,6 +168,7 @@ zitadel apply                           # publishes an immutable branding revisi
 Every template should render:
 
 - One field atom per entry in the `fields` array, with `name` matching the entry's `name`: `<zl-checkbox>` for `checkbox`, `<zl-select>` for `select`, `<zl-field>` for every other type.
+- The entry's `autocomplete` on that atom's `autocomplete` attribute, verbatim, so password managers and browser autofill recognise the identifier and password inputs. Never derive the token from the field's or the step's name: the identifier is whatever property the schema designates, and whether a password is filled or generated depends on the flow's purpose, neither of which a name reveals.
 - One primary `<zl-button>` wired to the action with `primary: true`.
 - An affordance for each secondary action: a `<zl-button hierarchy="secondary">` or a link carrying `data-action`.
 - `<zl-passkey>` when the step carries a passkey `challenge`.
@@ -175,6 +176,8 @@ Every template should render:
 - A single trailing `{% mandatory_gates %}` tag.
 
 Of these, the authoring validator enforces the last one only. At render time `{% mandatory_gates %}` appends any required field and the primary action a template left out; nothing else on the list is checked or repaired. No atom renders `gates` (`captcha`) or `sso_providers` yet, so a template has nothing to place for them. See [`validator.md`](validator.md) for what ships and for the structural validation design, and [`../flowengine/template-security.md`](../flowengine/template-security.md) for the security rules.
+
+A template renders no identifier control for a password-only step. A step that collects a password without the identifier carries one in `step.identifier` for the surrounding form to hold, so a manager can save the pair — but that is the widget's to place, not the template's: the template context exposes `step` as `name`, `complete` and `texts` only, and the sanitiser drops a raw `<input>` or `<form>` regardless (`FORBID_TAGS` in `packages/components/src/orchestrator/sanitiser.ts`). An ejected template keeps the behaviour by leaving it alone.
 
 ## Grouping (decided: one global template)
 

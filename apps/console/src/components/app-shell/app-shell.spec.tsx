@@ -56,9 +56,14 @@ const NEVER_SHOWN = [
 const MY_PROJECTS = "*/api/users/me/projects";
 // `/` lands on Teams, so most tests read it once a project is selected.
 const TEAMS_QUERY = "*/api/teams/query";
+// `/settings` lands on Profile, which reads the signed-in person's own record.
+const MY_USER = "*/api/users/me";
 const server = setupServer(
   http.get(MY_PROJECTS, () =>
     HttpResponse.json({ projects: [{ id: "proj_1", name: "console-dev" }] }),
+  ),
+  http.get(MY_USER, () =>
+    HttpResponse.json({ id: "user_1", attributes: { email: "dev@zitadel.local" } }),
   ),
   http.post(TEAMS_QUERY, () => HttpResponse.json({ teams: [] })),
 );
@@ -161,7 +166,7 @@ describe("app shell navigation", () => {
 /**
  * The sidebar has two views and the route picks between them, so a settings URL
  * restores the Settings view rather than dropping the operator back into Portal
- * chrome. The account dropdown is the way in; `Back to app` is the way out.
+ * chrome. The account dropdown is the way in; `Back to dashboard` is the way out.
  */
 describe("settings view", () => {
   it("shows the portal nav and the account dropdown's entry point by default", async () => {
@@ -172,7 +177,7 @@ describe("settings view", () => {
     await userEvent.click(screen.getByRole("button", { name: /^Account:/ }));
     // Log out, not Sign out, and Settings alongside it — both per the design.
     expect(await screen.findByRole("menuitem", { name: "Log out" })).toBeInTheDocument();
-    // The selection rides along, so `Back to app` returns to the same project.
+    // The selection rides along, so `Back to dashboard` returns to the same project.
     expect(screen.getByRole("menuitem", { name: "Settings" })).toHaveAttribute(
       "href",
       scopedPath("/settings", "proj_1"),
@@ -183,7 +188,7 @@ describe("settings view", () => {
     renderShell("/settings");
     // The way back out is present...
     // One project, so it is selected here too, and the way back keeps it.
-    expect(await screen.findByRole("link", { name: "Back to app" })).toHaveAttribute(
+    expect(await screen.findByRole("link", { name: "Back to dashboard" })).toHaveAttribute(
       "href",
       scopedPath("/", "proj_1"),
     );
@@ -197,7 +202,7 @@ describe("settings view", () => {
     // are portal chrome; the sidebar keeps a trigger of its own, so the
     // collapse is not lost with them.
     renderShell("/settings");
-    await screen.findByRole("link", { name: "Back to app" });
+    await screen.findByRole("link", { name: "Back to dashboard" });
 
     expect(screen.queryByRole("button", { name: "Switch project" })).not.toBeInTheDocument();
     expect(screen.queryByRole("radio", { name: "Dark" })).not.toBeInTheDocument();

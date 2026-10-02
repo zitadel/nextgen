@@ -106,8 +106,10 @@ properties:
       order. Each names the `slug` of a connection under `.zitadel/idps/`; the
       connection carries the display name and template, so a rename there
       reaches every step without editing the flow. The rendered step the client
-      receives carries the resolved `{id, name, template}` objects instead.
+      receives carries the resolved `{id, name, template}` objects instead. A
+      step offers at most 20 providers.
     uniqueItems: true
+    maxItems: 20
     items:
       type: string
       pattern: ^[a-z0-9][a-z0-9_-]*$
