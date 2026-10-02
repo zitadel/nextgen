@@ -1455,8 +1455,8 @@ func pairedIdentifier(resolved FlowResolvedFields, collected map[string]any) *Fl
 	if !holdsPassword {
 		return nil
 	}
-	value, ok := maputil.GetNested[string](collected, AttributeKey(resolved.IdentifierName).Nodes())
-	if !ok || value == "" {
+	value, ok := collectedString(collected, resolved.IdentifierName)
+	if !ok {
 		return nil
 	}
 	return &FlowStepIdentifier{
@@ -1553,11 +1553,26 @@ func prefillFromCollected(resolved *FlowResolvedFields, collected map[string]any
 		if resolved.Fields[i].Value != nil {
 			continue
 		}
-		if v, ok := maputil.GetNested[string](collected, AttributeKey(resolved.Fields[i].Name).Nodes()); ok && v != "" {
+		if v, ok := collectedString(collected, resolved.Fields[i].Name); ok {
 			val := v
 			resolved.Fields[i].Value = &val
 		}
 	}
+}
+
+// collectedString returns the value collected for a dotted property path when
+// one is there and non-empty. A collected-but-empty value is the same as
+// nothing to the callers that re-render it: there is no prefill to make and no
+// identifier to pair.
+//
+// [FindCollectedFieldByChallenge] deliberately does not go through here — it
+// reads a value of any type and asks only whether it is present.
+func collectedString(collected map[string]any, name string) (string, bool) {
+	v, ok := maputil.GetNested[string](collected, AttributeKey(name).Nodes())
+	if !ok || v == "" {
+		return "", false
+	}
+	return v, true
 }
 
 func mergeCollected(state *FlowState, fields map[string]any) error {
