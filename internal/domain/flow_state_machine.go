@@ -139,9 +139,9 @@ type FlowStep struct {
 
 // FlowStepIdentifier mirrors the OpenAPI `flow-step.identifier`: the
 // identifier a password form carries as a hidden control, so a password
-// manager stores the two as one credential. Never read back on submit.
+// manager stores the two as one credential. It carries no field name — the
+// control the client renders has none, so it is never submitted.
 type FlowStepIdentifier struct {
-	Name         string
 	Value        string
 	Autocomplete string
 }
@@ -1460,7 +1460,6 @@ func pairedIdentifier(resolved FlowResolvedFields, collected map[string]any) *Fl
 		return nil
 	}
 	return &FlowStepIdentifier{
-		Name:         resolved.IdentifierName,
 		Value:        value,
 		Autocomplete: AutocompleteUsername,
 	}

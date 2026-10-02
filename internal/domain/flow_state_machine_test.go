@@ -4319,7 +4319,6 @@ func TestFlowStateMachine_TwoStepLogin_PasswordStepPairsTheIdentifier(t *testing
 	assert.Equal(t, domain.AutocompleteCurrentPassword, result.Step.Fields[0].Autocomplete)
 
 	require.NotNil(t, result.Step.Identifier)
-	assert.Equal(t, "email", result.Step.Identifier.Name)
 	assert.Equal(t, email, result.Step.Identifier.Value)
 	assert.Equal(t, domain.AutocompleteUsername, result.Step.Identifier.Autocomplete)
 
@@ -4369,7 +4368,6 @@ func TestFlowStateMachine_RenderAfterReload_StillPairsTheIdentifier(t *testing.T
 	require.Equal(t, "password", reloaded.Step.Name)
 
 	require.NotNil(t, reloaded.Step.Identifier)
-	assert.Equal(t, "email", reloaded.Step.Identifier.Name)
 	assert.Equal(t, email, reloaded.Step.Identifier.Value)
 	require.Len(t, reloaded.Step.Fields, 1)
 	assert.Equal(t, domain.AutocompleteCurrentPassword, reloaded.Step.Fields[0].Autocomplete)
@@ -4416,7 +4414,6 @@ func TestFlowStateMachine_MultiStepRegister_PasswordStepIsANewPassword(t *testin
 	assert.Equal(t, domain.AutocompleteNewPassword, result.Step.Fields[0].Autocomplete)
 
 	require.NotNil(t, result.Step.Identifier)
-	assert.Equal(t, "email", result.Step.Identifier.Name)
 	assert.Equal(t, email, result.Step.Identifier.Value)
 }
 

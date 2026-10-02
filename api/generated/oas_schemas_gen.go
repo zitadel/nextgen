@@ -19911,23 +19911,23 @@ type FlowStep struct {
 	// credential, and reads both from the same form. A step that
 	// collects only the password leaves it nothing to pair with, so the
 	// engine hands the identifier back here.
-	// **What the client does with it.** Put one more control in the same
-	// form element as the password input, carrying `name`, `value` and
-	// `autocomplete` as given. It must be:
-	// - *hidden* — the user already supplied this value on the previous
-	// step and is not being asked for it again;
-	// - *not editable* — the engine has already resolved the user from
-	// this value, so a changed one would not change who is signing in;
-	// - *left out of the submission* — see below.
-	// Any control a password manager can read works; the fields are
-	// named for an HTML input because that is the shape managers expect.
-	// **Do not submit it.** The step's `fields` are the whole
-	// submission. This name is not among them, so sending it back fails
-	// the step with an `error.<name>_unknown_field` violation. Clients
-	// that build their submission from `fields` (rather than from
-	// whatever the form contains) get this for free.
-	// It is also not display text: do not render it as a greeting or a
-	// label. `texts.description_key` is the place for that.
+	// **What the client does with it.** Add one input to the same form
+	// element as the password, carrying `value` and `autocomplete` as
+	// given, and:
+	// - *with no `name`* — a control without a name is never submitted,
+	// so the form data stays exactly the step's `fields`. That is what
+	// keeps this input from reaching the engine as an unknown field,
+	// whether the client builds its submission from `fields` or from
+	// whatever the form contains;
+	// - *read-only* — the engine already resolved the user from this
+	// value, so a changed one would not change who is signing in;
+	// - *hidden from view* — the user supplied it on the previous step
+	// and is not being asked for it again. Prefer hiding a real input
+	// with CSS over `type="hidden"`: a manager looks for a
+	// credential-shaped control, and a hidden-typed input is easy to
+	// skip.
+	// It is not display text: do not render it as a greeting or a label.
+	// `texts.description_key` is the place for that.
 	Identifier OptFlowStepIdentifier `json:"identifier"`
 	// Ordered list of available user actions. The LiquidJS template iterates
 	// this array and builds a name-indexed map locally for keyed lookup.
@@ -20362,39 +20362,31 @@ func (s *FlowStepGates) init() FlowStepGates {
 // credential, and reads both from the same form. A step that
 // collects only the password leaves it nothing to pair with, so the
 // engine hands the identifier back here.
-// **What the client does with it.** Put one more control in the same
-// form element as the password input, carrying `name`, `value` and
-// `autocomplete` as given. It must be:
-// - *hidden* — the user already supplied this value on the previous
-// step and is not being asked for it again;
-// - *not editable* — the engine has already resolved the user from
-// this value, so a changed one would not change who is signing in;
-// - *left out of the submission* — see below.
-// Any control a password manager can read works; the fields are
-// named for an HTML input because that is the shape managers expect.
-// **Do not submit it.** The step's `fields` are the whole
-// submission. This name is not among them, so sending it back fails
-// the step with an `error.<name>_unknown_field` violation. Clients
-// that build their submission from `fields` (rather than from
-// whatever the form contains) get this for free.
-// It is also not display text: do not render it as a greeting or a
-// label. `texts.description_key` is the place for that.
+// **What the client does with it.** Add one input to the same form
+// element as the password, carrying `value` and `autocomplete` as
+// given, and:
+// - *with no `name`* — a control without a name is never submitted,
+// so the form data stays exactly the step's `fields`. That is what
+// keeps this input from reaching the engine as an unknown field,
+// whether the client builds its submission from `fields` or from
+// whatever the form contains;
+// - *read-only* — the engine already resolved the user from this
+// value, so a changed one would not change who is signing in;
+// - *hidden from view* — the user supplied it on the previous step
+// and is not being asked for it again. Prefer hiding a real input
+// with CSS over `type="hidden"`: a manager looks for a
+// credential-shaped control, and a hidden-typed input is easy to
+// skip.
+// It is not display text: do not render it as a greeting or a label.
+// `texts.description_key` is the place for that.
 type FlowStepIdentifier struct {
-	// The user-schema property the identifier was collected into.
-	// Use it as the control's `name`.
-	Name string `json:"name"`
-	// The identifier the user supplied. Use it as the control's
+	// The identifier the user supplied. Use it as the input's
 	// `value`, verbatim.
 	Value string `json:"value"`
-	// Value for the control's HTML `autocomplete` attribute, used
+	// Value for the input's HTML `autocomplete` attribute, used
 	// verbatim. `username` is the token that pairs an identifier
 	// with a password in the same form.
 	Autocomplete string `json:"autocomplete"`
-}
-
-// GetName returns the value of Name.
-func (s *FlowStepIdentifier) GetName() string {
-	return s.Name
 }
 
 // GetValue returns the value of Value.
@@ -20405,11 +20397,6 @@ func (s *FlowStepIdentifier) GetValue() string {
 // GetAutocomplete returns the value of Autocomplete.
 func (s *FlowStepIdentifier) GetAutocomplete() string {
 	return s.Autocomplete
-}
-
-// SetName sets the value of Name.
-func (s *FlowStepIdentifier) SetName(val string) {
-	s.Name = val
 }
 
 // SetValue sets the value of Value.

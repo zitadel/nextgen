@@ -142,14 +142,12 @@ func TestToFlowStep_CarriesThePairedIdentifier(t *testing.T) {
 	got := toFlowStep(&domain.FlowStep{
 		Name: "password",
 		Identifier: &domain.FlowStepIdentifier{
-			Name:         "email",
 			Value:        "alice@example.com",
 			Autocomplete: domain.AutocompleteUsername,
 		},
 	})
 
 	require.True(t, got.Identifier.Set)
-	require.Equal(t, "email", got.Identifier.Value.Name)
 	require.Equal(t, "alice@example.com", got.Identifier.Value.Value)
 	require.Equal(t, domain.AutocompleteUsername, got.Identifier.Value.Autocomplete)
 }

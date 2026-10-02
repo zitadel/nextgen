@@ -337,7 +337,6 @@ func toFlowStep(step *domain.FlowStep) api.FlowStep {
 	}
 	if step.Identifier != nil {
 		out.Identifier = api.NewOptFlowStepIdentifier(api.FlowStepIdentifier{
-			Name:         step.Identifier.Name,
 			Value:        step.Identifier.Value,
 			Autocomplete: step.Identifier.Autocomplete,
 		})
