@@ -30,9 +30,14 @@ observe afterwards.
 **One spec file per command, named after the command.** `setup.spec.ts`,
 `plan.spec.ts`, `sso-enable.spec.ts`, `variables.spec.ts`. A command's spec is
 the only spec that drives that command as its subject. There are no
-cross-command spec files, no "contract" files and no "round-trip" files: a
-property that holds across all commands is a property of the base command class,
-so it is a unit test over the command table instead.
+cross-command spec files, no "contract" files and no "round-trip" files.
+
+A property that must hold for *every* command belongs in the fixture, not in a
+suite of its own. The envelope contract works this way: `ScaffoldedApp` checks
+it on every `--json` invocation, so every spec gets it for free and a
+regression fails inside the spec of the command that broke. A dedicated
+contract suite only ever covers the commands somebody remembered to list, and
+reports the failure far from its cause.
 
 The generated resource commands (`users:list`, `teams:get`, …) come from one
 factory in `src/lib/oclif/crud/`. They are one spec — `resources.spec.ts`,
