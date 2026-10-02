@@ -7,6 +7,11 @@ import { anApp } from "../helpers/project";
 
 const platform = usePlatformMock();
 
+const SOCIAL_CREDENTIALS = {
+  clientId: "1234-abc.apps.googleusercontent.com",
+  secret: "the-client-secret",
+};
+
 const SCAFFOLDED_PAGES = ["app/login/page.tsx", "app/register/page.tsx", "app/profile/page.tsx"];
 
 describe("setup", () => {
@@ -196,6 +201,33 @@ describe("setup", () => {
           expect((await before.changes()).added).toEqual(expect.arrayContaining(SCAFFOLDED_PAGES));
         },
       );
+    });
+
+    it("registers a social provider asked for during setup", async () => {
+      const app = await anApp();
+
+      const result = await app.setupWithSso("google", SOCIAL_CREDENTIALS);
+
+      expect(result).toSucceed();
+      expect((await app.registeredIdps()).map((idp) => idp.slug)).toEqual(["google"]);
+    });
+
+    it("commits references to that provider's credentials, never the credentials", async () => {
+      const app = await anApp();
+      expect(await app.setupWithSso("google", SOCIAL_CREDENTIALS)).toSucceed();
+
+      const written = await app.committed.asText("google");
+
+      expect(written).toContain("${{ GOOGLE_CLIENT_ID }}");
+      expect(written).not.toContain(SOCIAL_CREDENTIALS.secret);
+      expect(written).not.toContain(SOCIAL_CREDENTIALS.clientId);
+    });
+
+    it("leaves nothing to reconcile after enabling one during setup", async () => {
+      const app = await anApp();
+      expect(await app.setupWithSso("google", SOCIAL_CREDENTIALS)).toSucceed();
+
+      expect(await app.plan()).toReportNothingToDo();
     });
   });
 });
