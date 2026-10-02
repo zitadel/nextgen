@@ -4358,7 +4358,6 @@ func TestFlowStateMachine_Render_SSOCreationDisabledRendersStepError(t *testing.
 	t.Parallel()
 	w, def, state := ssoRenderWorld(t)
 	w.expectParked(&domain.FlowSSOParkedIdentity{CheckID: "ch-1", ConnectionID: "idp-1", Subject: "sub-1", CreationDisabled: true}, nil)
-	w.ssoIdentities.EXPECT().DeleteParked(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 	w.ssoIdentities.EXPECT().BindLinked(gomock.Any(), gomock.Any()).Times(0)
 	w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).Times(0)
 
@@ -4379,7 +4378,6 @@ func TestFlowStateMachine_Render_SSOUnlinkedAutoLeavesParkedRow(t *testing.T) {
 	t.Parallel()
 	w, def, state := ssoRenderWorld(t)
 	w.expectParked(&domain.FlowSSOParkedIdentity{CheckID: "ch-1", ConnectionID: "idp-1", Subject: "sub-1"}, nil)
-	w.ssoIdentities.EXPECT().DeleteParked(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 
 	result, err := w.sm.Render(t.Context(), def, state)
 	require.NoError(t, err)

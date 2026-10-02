@@ -17,11 +17,10 @@ type FlowSSOIdentityService interface {
 	// ErrFlowRestartRequired when the attempt already carries another user, and
 	// ErrSSOStateInvalid, before writing anything, when that row is gone.
 	BindLinked(ctx context.Context, in FlowSSOBindInput) error
-	// DeleteParked removes the parked row with checkID. It returns
-	// ErrSSOStateInvalid when that row is gone.
-	DeleteParked(ctx context.Context, projectID, attemptID, checkID string) error
 	// CreateLinked creates the user, its identity link and the attempt
-	// factors in one transaction, and returns the new user's id.
+	// factors in one transaction, and returns the new user's id. It is
+	// reserved for the auto-creation branch and returns ErrFlowUnsupported
+	// until that branch lands.
 	CreateLinked(ctx context.Context, in FlowSSOCreateInput) (userID string, err error)
 }
 

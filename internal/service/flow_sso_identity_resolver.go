@@ -155,10 +155,6 @@ func (r *FlowSSOIdentityResolver) BindLinked(ctx context.Context, in domain.Flow
 	})
 }
 
-func (r *FlowSSOIdentityResolver) DeleteParked(ctx context.Context, projectID, attemptID, checkID string) error {
-	return r.db.Statements().DeleteSSOCallback(ctx, projectID, attemptID, checkID)
-}
-
 func (r *FlowSSOIdentityResolver) CreateLinked(context.Context, domain.FlowSSOCreateInput) (string, error) {
 	return "", fmt.Errorf("%w: sso auto creation", domain.ErrFlowUnsupported())
 }
