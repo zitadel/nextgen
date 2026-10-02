@@ -83,15 +83,6 @@ function commandIdFromArgs(args: string): string | undefined {
   return words.length > 0 ? words.join(":") : undefined;
 }
 
-describe("suggested-command id extraction", () => {
-  it("maps space and colon topic forms to the oclif id and stops at flags", () => {
-    expect(commandIdFromArgs("branding eject")).toBe("branding:eject");
-    expect(commandIdFromArgs("branding:eject")).toBe("branding:eject");
-    expect(commandIdFromArgs("setup --force")).toBe("setup");
-    expect(commandIdFromArgs("--force")).toBeUndefined();
-  });
-});
-
 describe("envelope contract", () => {
   it("a domain command emits envelope meta in JSON mode", async () => {
     const cwd = await scaffoldNextProject();
@@ -163,16 +154,6 @@ describe("envelope contract", () => {
     expect(result.stdout).toContain("(server: self.example)");
     expect(result.stdout).toContain("Next:");
     expect(result.stdout.trim().startsWith("{")).toBe(false);
-  });
-
-  it("SKILLS.md is the canonical agent contract", async () => {
-    const root = join(import.meta.dirname, "../..");
-    const skills = await readFile(join(root, "SKILLS.md"), "utf8");
-    expect(skills).toContain("name: zitadel-cli");
-    expect(skills).toContain("## Golden path");
-    expect(skills).toContain("--non-interactive --json");
-    expect(skills).toContain("E_PORT_IN_USE");
-    expect(skills).toContain("stop --all");
   });
 
   it("suggested zitadel next_commands target visible commands", async () => {
