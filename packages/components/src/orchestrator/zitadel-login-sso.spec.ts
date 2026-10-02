@@ -322,7 +322,7 @@ describe("<zitadel-login> with identity providers", () => {
         HttpResponse.json({ code: "flow.not_found", message: "flow not found" }, { status }),
       ),
     );
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const original = window.location.href;
     if (source === "the URL") window.history.replaceState({}, "", "/login?flow=flow_stale");
 
