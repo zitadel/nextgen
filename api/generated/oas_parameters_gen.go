@@ -2730,10 +2730,9 @@ type GetFlowStepParams struct {
 	// when a flow pivot or pop occurs — always use the `id` from the latest response.
 	ID string
 	// Encrypted flow state cookie set by `POST /flow` or the previous
-	// `POST /flow/{id}/submit`. The cookie holds a map of flow states keyed
-	// by flow ID, allowing multiple concurrent flows in the same browser
-	// (e.g. login in one tab, registration in another). The server uses the
-	// `{id}` path parameter to look up the correct flow state from the cookie.
+	// `POST /flow/{id}/submit`. The cookie holds the sealed state of one
+	// flow; the `{id}` path parameter must name that flow, any other id is
+	// refused.
 	// Browsers send this automatically; non-browser clients must capture the
 	// `Set-Cookie` header and resend it.
 	Zflow string
@@ -9009,17 +9008,18 @@ type SubmitFlowStepParams struct {
 	// when a flow pivot or pop occurs — always use the `id` from the latest response.
 	ID string
 	// Encrypted flow state cookie set by `POST /flow` or the previous
-	// `POST /flow/{id}/submit`. The cookie holds a map of flow states keyed
-	// by flow ID, allowing multiple concurrent flows in the same browser
-	// (e.g. login in one tab, registration in another). The server uses the
-	// `{id}` path parameter to look up the correct flow state from the cookie.
+	// `POST /flow/{id}/submit`. The cookie holds the sealed state of one
+	// flow; the `{id}` path parameter must name that flow, any other id is
+	// refused.
 	// Browsers send this automatically; non-browser clients must capture the
 	// `Set-Cookie` header and resend it.
 	Zflow string
 	// Standard browser `Origin` header. When a step issues a passkey
 	// challenge, the server derives the WebAuthn relying-party id and the
-	// allowed origin from this value. Browsers send it automatically on the
-	// fetch POST; no client action is required.
+	// allowed origin from this value. An sso submission is bound to it as
+	// well: `return_target` must be on this origin, and the callback route
+	// is built under it (see External sign-in above). Browsers send it
+	// automatically on the fetch POST; no client action is required.
 	Origin OptURI `json:",omitempty,omitzero"`
 }
 

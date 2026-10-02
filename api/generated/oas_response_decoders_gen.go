@@ -1029,25 +1029,27 @@ func decodeCreateFlowResponse(resp *http.Response) (res CreateFlowRes, _ error) 
 				if err := func() error {
 					if err := h.HasParam(cfg); err == nil {
 						if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
-							var wrapperDotSetCookieVal string
-							if err := func() error {
-								val, err := d.DecodeValue()
-								if err != nil {
+							return d.DecodeArray(func(d uri.Decoder) error {
+								var wrapperDotSetCookieVal string
+								if err := func() error {
+									val, err := d.DecodeValue()
+									if err != nil {
+										return err
+									}
+
+									c, err := conv.ToString(val)
+									if err != nil {
+										return err
+									}
+
+									wrapperDotSetCookieVal = c
+									return nil
+								}(); err != nil {
 									return err
 								}
-
-								c, err := conv.ToString(val)
-								if err != nil {
-									return err
-								}
-
-								wrapperDotSetCookieVal = c
+								wrapper.SetCookie = append(wrapper.SetCookie, wrapperDotSetCookieVal)
 								return nil
-							}(); err != nil {
-								return err
-							}
-							wrapper.SetCookie.SetTo(wrapperDotSetCookieVal)
-							return nil
+							})
 						}); err != nil {
 							return err
 						}
@@ -12272,25 +12274,27 @@ func decodeSubmitFlowStepResponse(resp *http.Response) (res SubmitFlowStepRes, _
 				if err := func() error {
 					if err := h.HasParam(cfg); err == nil {
 						if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
-							var wrapperDotSetCookieVal string
-							if err := func() error {
-								val, err := d.DecodeValue()
-								if err != nil {
+							return d.DecodeArray(func(d uri.Decoder) error {
+								var wrapperDotSetCookieVal string
+								if err := func() error {
+									val, err := d.DecodeValue()
+									if err != nil {
+										return err
+									}
+
+									c, err := conv.ToString(val)
+									if err != nil {
+										return err
+									}
+
+									wrapperDotSetCookieVal = c
+									return nil
+								}(); err != nil {
 									return err
 								}
-
-								c, err := conv.ToString(val)
-								if err != nil {
-									return err
-								}
-
-								wrapperDotSetCookieVal = c
+								wrapper.SetCookie = append(wrapper.SetCookie, wrapperDotSetCookieVal)
 								return nil
-							}(); err != nil {
-								return err
-							}
-							wrapper.SetCookie.SetTo(wrapperDotSetCookieVal)
-							return nil
+							})
 						}); err != nil {
 							return err
 						}
@@ -12356,25 +12360,27 @@ func decodeSubmitFlowStepResponse(resp *http.Response) (res SubmitFlowStepRes, _
 				if err := func() error {
 					if err := h.HasParam(cfg); err == nil {
 						if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
-							var wrapperDotSetCookieVal string
-							if err := func() error {
-								val, err := d.DecodeValue()
-								if err != nil {
+							return d.DecodeArray(func(d uri.Decoder) error {
+								var wrapperDotSetCookieVal string
+								if err := func() error {
+									val, err := d.DecodeValue()
+									if err != nil {
+										return err
+									}
+
+									c, err := conv.ToString(val)
+									if err != nil {
+										return err
+									}
+
+									wrapperDotSetCookieVal = c
+									return nil
+								}(); err != nil {
 									return err
 								}
-
-								c, err := conv.ToString(val)
-								if err != nil {
-									return err
-								}
-
-								wrapperDotSetCookieVal = c
+								wrapper.SetCookie = append(wrapper.SetCookie, wrapperDotSetCookieVal)
 								return nil
-							}(); err != nil {
-								return err
-							}
-							wrapper.SetCookie.SetTo(wrapperDotSetCookieVal)
-							return nil
+							})
 						}); err != nil {
 							return err
 						}
