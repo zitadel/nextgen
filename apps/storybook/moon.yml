@@ -35,7 +35,7 @@ tasks:
       - "components:build"
       - "design-tokens:build"
     outputs:
-      - "storybook-static/**/*"
+      - "dist/**/*"
     options:
       runInCI: false
 
