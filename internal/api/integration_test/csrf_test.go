@@ -42,10 +42,9 @@ func cookieRequest(t *testing.T, cookie *http.Cookie, method, path, body string,
 }
 
 // TestSessionCSRF pins ADR 053 §5 as scoped for #1300: every unsafe request
-// the session cookie authenticates must be same-origin, and the management
-// writes (plus claim/complete and the user's own profile write) must also
-// carry the session-bound X-Zitadel-CSRF token that GET /sessions/me/csrf
-// hands out. A Bearer caller is untouched.
+// the session cookie authenticates must be same-origin, and, except sign-out and
+// the POST query reads, must also carry the session-bound X-Zitadel-CSRF token
+// that GET /sessions/me/csrf hands out. A Bearer caller is untouched.
 func TestSessionCSRF(t *testing.T) {
 	t.Parallel()
 

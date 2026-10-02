@@ -257,8 +257,8 @@ unchanged; only the cookie-authenticated browser leg it opens is affected.
 >   listed; only an explicit exemption list skips it. Sign-out
 >   (`revokeMySession`) is exempt, because customer apps call it through the
 >   SDK proxies, which cannot supply the token yet, and so are the
->   `POST …/query` reads. A refusal is `403 auth.csrf_invalid`, declared in each
->   affected operation's error responses.
+>   `POST …/query` reads. A refusal is `403 auth.csrf_invalid`, listed in each
+>   affected operation's default error responses.
 >
 > Session liveness (the "active user session" condition above) is tracked
 > separately.

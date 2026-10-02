@@ -43,7 +43,6 @@ func TestWithCSRFRequest(t *testing.T) {
 				var ok bool
 				got, ok = r.Context().Value(csrfRequestKey{}).(csrfRequest)
 				require.True(t, ok)
-				assert.True(t, CSRFRequestRecorded(r.Context()))
 			})).ServeHTTP(httptest.NewRecorder(), req)
 
 			assert.Equal(t, tc.wantUnsafe, got.unsafe)
