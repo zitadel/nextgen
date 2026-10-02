@@ -65,7 +65,7 @@ func (h *Handler) DeleteUserByID(ctx context.Context, params api.DeleteUserByIDP
 func (h *Handler) QueryUsers(ctx context.Context, req *api.QueryUsersRequest, params api.QueryUsersParams) (api.QueryUsersRes, error) {
 	scopeCtx, _ := GetScopeContext(ctx)
 	projectID := string(params.ProjectID.Or(api.ProjectID(scopeCtx.ProjectID)))
-	ctx, err := h.requireProjectListAccess(ctx, projectID, userAccess, domain.ResourceKindUser)
+	ctx, projectWide, err := h.requireProjectListAccessDecision(ctx, projectID, userAccess, domain.ResourceKindUser)
 	if err != nil {
 		return nil, err
 	}
@@ -76,13 +76,13 @@ func (h *Handler) QueryUsers(ctx context.Context, req *api.QueryUsersRequest, pa
 	// reads the same memberships by a different route — it answers "who is in
 	// this team", one page at a time — so it takes the same gate.
 	readsMemberships := input.IncludeTeams || filtersOnTeamID(req.Filter)
-	// A Console session mints no scopes, so the list check's resolver answer
-	// stands in for them (#1300 §4, see userReadsListedProject). Decided here,
-	// for this list, rather than in the shared ceiling, so another endpoint does
-	// not inherit it by accepting the cookie.
-	sessionReads := userReadsListedProject(ctx)
-	if readsMemberships && !sessionReads {
-		if err := requireMembershipRead(ctx); err != nil {
+	// A Console session mints no scopes, so the list check's resolver decision
+	// stands in for them (#1300 §4, see userReadsProject). Decided here, for this
+	// list, rather than in the shared ceiling, so another endpoint does not
+	// inherit it by accepting the cookie.
+	sessionReads := projectWide && scopeCtx.PrincipalType == domain.AuthzPrincipalTypeUser
+	if readsMemberships {
+		if err := requireMembershipReadUnless(ctx, sessionReads); err != nil {
 			return nil, err
 		}
 	}
@@ -237,10 +237,8 @@ func (h *Handler) GetUserByID(ctx context.Context, params api.GetUserByIDParams)
 		if err != nil {
 			return nil, err
 		}
-		if !reads {
-			if err := requireMembershipRead(ctx); err != nil {
-				return nil, err
-			}
+		if err := requireMembershipReadUnless(ctx, reads); err != nil {
+			return nil, err
 		}
 		teamID = new(string(params.TeamID.Value))
 	}
