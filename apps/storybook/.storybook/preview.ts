@@ -56,14 +56,24 @@ const preview: Preview = {
   // (rather than only styling `body.sb-show-main`) means the addon-vitest a11y
   // run sees the intended background, so contrast checks pass. Orchestrator
   // stories use `layout: "fullscreen"` and paint their own branding surface.
-  // Key the story subtree on the story id so switching stories tears the DOM
-  // down and rebuilds it rather than reusing it. `<zitadel-login>` is a stateful
-  // custom element, and lit-html otherwise keeps the same instance across
-  // stories: once a flow is driven to its terminal "signed-in" step, that state
-  // leaks into the next orchestrator story, which then renders blank until a
-  // full reload. Keying forces a fresh element per story so each starts clean.
+  // Key the story subtree so lit-html tears the DOM down and rebuilds it rather
+  // than reusing it across renders. The mock-backed stories hold a stateful
+  // custom element (`<zitadel-login>` / `<zitadel-session>`); without a fresh
+  // element, a flow driven to its terminal "signed-in" step leaks into the next
+  // render -- the next story renders blank, or a knob change silently does
+  // nothing -- until a full reload.
+  //
+  // MSW is orchestrator-only here, so `parameters.msw` marks exactly the
+  // stateful stories (not matched by title, which is brittle). Those key on the
+  // args too, so they also remount when a knob changes, not only when switching
+  // stories. Atoms are stateless and key on the story id alone.
   decorators: [
-    (story, context) => html`${keyed(context.id, html`<div class="sb-canvas">${story()}</div>`)}`,
+    (story, context) => {
+      const key = context.parameters?.msw
+        ? `${context.id}:${JSON.stringify(context.args)}`
+        : context.id;
+      return html`${keyed(key, html`<div class="sb-canvas">${story()}</div>`)}`;
+    },
   ],
 };
 
