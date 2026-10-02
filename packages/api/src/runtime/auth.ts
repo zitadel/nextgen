@@ -35,7 +35,7 @@ const CSRF_SLOT = Symbol.for("@zitadel/api/auth:csrf");
 
 interface CsrfSlot {
   token?: string;
-  onRejected?: () => void;
+  onRejected?: () => Promise<string | undefined>;
 }
 
 function csrfSlot(): CsrfSlot {
@@ -55,14 +55,19 @@ export function setApiCsrfToken(token: string | undefined): void {
  * Registers what to do when a state-changing request is refused with
  * `403 auth.csrf_invalid`: the token is tied to the session cookie, which
  * another tab can replace by signing in again, or it was never loaded.
- * `customFetch` only notifies; the refused request stays refused, so a write is
- * never replayed under a session it was not prepared for. The handler re-checks
- * the session and loads the token the browser's current cookie needs.
+ *
+ * The handler re-checks the session. It returns a fresh token only when the
+ * session still belongs to the person the request was made for; `customFetch`
+ * then retries the request once with it. Returning `undefined` (someone else,
+ * or nobody, is signed in now) leaves the request refused, so a write is never
+ * replayed under a session it was not prepared for.
  */
-export function setApiCsrfRejectionHandler(onRejected: (() => void) | undefined): void {
+export function setApiCsrfRejectionHandler(
+  onRejected: (() => Promise<string | undefined>) | undefined,
+): void {
   csrfSlot().onRejected = onRejected;
 }
 
-export function getApiCsrfRejectionHandler(): (() => void) | undefined {
+export function getApiCsrfRejectionHandler(): (() => Promise<string | undefined>) | undefined {
   return csrfSlot().onRejected;
 }

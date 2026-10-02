@@ -51,10 +51,11 @@ function stubCsrf(respond: () => Response) {
 const token = (value: string) => () => HttpResponse.json({ csrf_token: value });
 const failing = () => HttpResponse.json({ code: "internal", message: "no" }, { status: 500 });
 
-/** Fires the rejection customFetch reports on a 403 auth.csrf_invalid, and waits for the re-check. */
-async function rejectWrite() {
-  getApiCsrfRejectionHandler()?.();
-  await new Promise((resolve) => setTimeout(resolve, 50));
+/** What customFetch does on a 403 auth.csrf_invalid: ask for a token to retry with. */
+function rejectWrite(): Promise<string | undefined> {
+  const onRejected = getApiCsrfRejectionHandler();
+  if (!onRejected) throw new Error("session.ts registers the rejection handler");
+  return onRejected();
 }
 
 describe("fetchSession", () => {
@@ -117,14 +118,15 @@ describe("fetchSession", () => {
 });
 
 describe("CSRF rejection", () => {
-  it("loads the token again when the same person is still signed in", async () => {
+  it("hands back a fresh token when the same person is still signed in", async () => {
     stubSession("user_a");
     stubCsrf(failing);
     await fetchSession();
     expect(getApiCsrfToken()).toBeUndefined();
 
     stubCsrf(token("tok"));
-    await rejectWrite();
+    // The token comes back, so customFetch retries the write once with it.
+    expect(await rejectWrite()).toBe("tok");
 
     expect(getApiCsrfToken()).toBe("tok");
     expect(sessionPage.reload).not.toHaveBeenCalled();
@@ -140,7 +142,8 @@ describe("CSRF rejection", () => {
 
     stubSession("user_b");
     stubCsrf(token("tok_b"));
-    await rejectWrite();
+    // Nothing to retry with: the write is not replayed as user_b.
+    expect(await rejectWrite()).toBeUndefined();
 
     expect(sessionPage.reload).toHaveBeenCalledOnce();
     expect(getApiCsrfToken()).toBeUndefined();
@@ -152,7 +155,7 @@ describe("CSRF rejection", () => {
     await fetchSession();
 
     stubSession(null);
-    await rejectWrite();
+    expect(await rejectWrite()).toBeUndefined();
 
     expect(sessionPage.reload).toHaveBeenCalledOnce();
     expect(getApiCsrfToken()).toBeUndefined();
