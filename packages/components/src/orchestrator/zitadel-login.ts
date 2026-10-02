@@ -589,20 +589,11 @@ export class ZitadelLogin extends ZitadelSurface {
   }
 
   /**
-   * The identifier a password-only step carries (`step.identifier`), as the
-   * control a password manager pairs with the password input so it saves the
-   * two as one credential.
-   *
-   * Rendered here rather than by the template, for three reasons: it has to
-   * sit inside the form the orchestrator owns, the sanitiser drops a raw
-   * `<input>` out of template output, and an ejected template then keeps the
-   * behaviour without carrying any of this itself.
-   *
-   * No `name`, so it is never submitted — `collectSubmitFields` builds from
-   * `step.fields`, and a nameless control is left out of a native submission
-   * too. `readonly` because the engine already resolved the user from this
-   * value. Hidden by clipping rather than `display:none` or `type="hidden"`,
-   * both of which a manager may skip over.
+   * Renders `step.identifier` as the control a password manager pairs with the
+   * password input. No `name` keeps it out of every submission; clipping it
+   * rather than `display:none` or `type="hidden"` keeps a manager able to see
+   * it. It lives here and not in the template because the sanitiser drops a
+   * raw `<input>` from template output, so ejected templates get it for free.
    */
   private renderPairedIdentifier() {
     const identifier = this.response?.step.identifier;

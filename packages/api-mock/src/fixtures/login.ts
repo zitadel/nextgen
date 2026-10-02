@@ -85,12 +85,13 @@ function wrap(
 }
 
 /**
- * The identifier a password-only step hands back so the rendered form can
- * carry it beside the password and a manager saves the two as one credential.
- * Mirrors the engine: present only when an identifier was collected earlier,
- * and always the `username` token.
+ * `step.identifier` for a step that collects the password on its own: the
+ * address captured earlier, or nothing when the step was reached without one
+ * (an SSO flow that skipped the identifier step). Which steps carry it is the
+ * caller's business — only {@link passwordStep} and
+ * {@link registerPasswordStep} ask.
  */
-function pairedIdentifier(
+function collectedIdentifier(
   input: StepFixtureInput,
 ): CreateFlow201Step["identifier"] | undefined {
   if (!input.capturedEmail) return undefined;
@@ -214,7 +215,7 @@ export function registerPasswordStep(input: StepFixtureInput): CreateFlow201 {
         validation: { min_length: 8 },
       },
     ],
-    identifier: pairedIdentifier(input),
+    identifier: collectedIdentifier(input),
     actions: [
       {
         name: "submit",
@@ -254,7 +255,7 @@ export function passwordStep(input: StepFixtureInput): CreateFlow201 {
         required: true,
       },
     ],
-    identifier: pairedIdentifier(input),
+    identifier: collectedIdentifier(input),
     actions: [
       { name: "submit", kind: "submit", text_key: "password.action.signin", primary: true },
       { name: "back", kind: "back", text_key: "action.back" },
