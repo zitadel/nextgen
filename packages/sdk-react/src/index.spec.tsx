@@ -45,6 +45,15 @@ describe("ZitadelLogin", () => {
     expect(el!.lang).toBe("de");
   });
 
+  it("forwards the preview props to the widget", () => {
+    const { container } = render(
+      <ZitadelLogin project={project} previewState="success" previewSuccessStep="welcome" />,
+    );
+    const el = container.querySelector<ZitadelLoginElement>("zitadel-login");
+    expect(el!.previewState).toBe("success");
+    expect(el!.previewSuccessStep).toBe("welcome");
+  });
+
   it.each(Object.entries(ZITADEL_LOGIN_EVENT_HANDLERS))(
     "forwards %s to its callback",
     (eventName, handlerProp) => {

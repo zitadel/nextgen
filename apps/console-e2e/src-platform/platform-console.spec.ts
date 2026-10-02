@@ -75,6 +75,20 @@ test("a platform operator reaches every management screen without an error", asy
     await expectNoErrorState(page);
   }
 
+  // The branding preview starts its flow in the selected customer project,
+  // not the platform project the operator signed in to. Only here do the two
+  // differ, so the request body is what says which one it ran in.
+  const flowStart = page.waitForRequest(
+    (request) => request.method() === "POST" && new URL(request.url()).pathname.endsWith("/flow"),
+  );
+  await page.goto("/ui/console/branding");
+  expect((await flowStart).postDataJSON()).toMatchObject({
+    project_id: zitadel.handle.projectId,
+  });
+  await expect(
+    page.locator("zitadel-login").getByRole("textbox", { name: "Email" }),
+  ).toBeVisible();
+
   // The granted customer project: listed on the overview, where a row opens
   // the project (selects it, lands on Teams); its own page is Project settings.
   await page.goto("/ui/console/projects");
