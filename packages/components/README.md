@@ -270,6 +270,8 @@ renders the bundled `default.liquid`. Tracked as a follow-up.
 | `locales` | `Record<string, Locale>` | Custom locale dictionaries keyed by language code; spread over the built-in dictionary so partial overrides work |
 | `postSignInUrl` / `post-sign-in-url` | `string` | After `complete: "show"`, exchange the `handoff_token` for a session cookie and navigate here |
 | `resumeFlowId` / `resume-flow-id` | `string` | Resume an existing flow handle instead of starting fresh |
+| `previewState` / `preview-state` | `'default' \| 'validation_error' \| 'submission_error' \| 'loading' \| 'success'` | Preview mode for operator surfaces such as the console's branding screen. The flow still starts, so the step is the one the project serves; the element then shows it in this state and submits nothing. Only the purpose's entry step can be previewed. `LOGIN_PREVIEW_STATES` lists the values, and `loginPreviewStatesFor(step)` the ones that show a served step differently from `default`; any other value runs the flow for real |
+| `previewSuccessStep` / `preview-success-step` | `string` | The terminal step the `success` preview paints, for a flow definition that names it differently from the default flow's `done` |
 
 Events: `zitadel-flow-input`, `zitadel-flow-step`, `zitadel-flow-complete`,
 `zitadel-flow-error`, `zitadel-flow-redirect`. `zitadel-flow-step` fires for

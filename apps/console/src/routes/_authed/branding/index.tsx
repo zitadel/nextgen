@@ -2,7 +2,11 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Monitor, Smartphone, Sun, Workflow } from "lucide-react";
 import { useState } from "react";
 
-import { LoginPreview, type PreviewJourney } from "@/components/branding/login-preview";
+import {
+  LoginPreview,
+  type PreviewJourney,
+  type PreviewState,
+} from "@/components/branding/login-preview";
 import { SettingsPanel } from "@/components/branding/settings-panel";
 import { RESOURCE_HEADER, RESOURCE_PAGE } from "@/components/resource-list";
 import { Button } from "@/components/ui/button";
@@ -50,6 +54,7 @@ export const Route = createFileRoute("/_authed/branding/")({
       name: entry.flow_definition.name,
       label: flowDisplayName(entry.flow_definition),
       purposes: Object.keys(entry.flow_definition.purposes ?? {}),
+      successStep: successStepName(entry.flow_definition.steps),
     }));
     const latest = revisions[0];
     if (!latest) return { revision: {} as BrandingRevision, flows: previewFlows };
@@ -59,16 +64,38 @@ export const Route = createFileRoute("/_authed/branding/")({
   component: BrandingScreen,
 });
 
-/** A flow the preview can run, and the purposes it serves. */
-type PreviewFlow = { name: string; label: string; purposes: string[] };
+/** A flow the preview can run, the purposes it serves, and its terminal screen. */
+type PreviewFlow = { name: string; label: string; purposes: string[]; successStep?: string };
 
-// Passkey is absent until the state selector lands: it needs a step the flow
-// only reaches after an identifier, and a tab that renders the sign-in step
-// under another name claims a journey it does not preview.
+/**
+ * The step a flow ends on a screen with: its one `complete: "show"` step. A
+ * flow that declares none, or several, leaves the choice to the element.
+ */
+function successStepName(steps: { name: string; complete?: string }[] = []): string | undefined {
+  const shown = steps.filter((step) => step.complete === "show");
+  return shown.length === 1 ? shown[0]?.name : undefined;
+}
+
+// Passkey is absent: it needs a step the flow only reaches after an
+// identifier, which the preview cannot ask for (the element shows the entry
+// step in a chosen state; a later step exists only once the server has walked
+// the flow to it), and a tab that renders the sign-in step under another name
+// claims a journey it does not preview.
 const JOURNEYS: { id: PreviewJourney; label: string }[] = [
   { id: "register", label: "Sign up" },
   { id: "login", label: "Sign in" },
 ];
+
+// The states of the design's selector, in its order. All of them are the
+// element's own rendering of the step the project serves; none writes to it.
+// Keyed by state, so one the element gains has to be labelled here to compile.
+const STATE_LABELS: Record<PreviewState, string> = {
+  default: "Default",
+  validation_error: "Validation errors",
+  submission_error: "Submission error",
+  loading: "Loading",
+  success: "Success",
+};
 
 // The flow selector is drawn as a ghost button, not a bordered select: no
 // border or shadow, and its icons take the foreground colour rather than the
@@ -90,6 +117,11 @@ function BrandingScreen() {
   // What the operator last picked; `activeFlowName` below is what renders.
   const [flowName, setFlowName] = useState(flows[0]?.name ?? "");
   const [theme, setTheme] = useState<PreviewTheme>("revision");
+  const [state, setState] = useState<PreviewState>("default");
+  // The states that show the served step differently from `default`, and the
+  // preview they were reported for. A step with no required field has nothing
+  // to flag, so "Validation errors" is not offered for it.
+  const [served, setServed] = useState<{ preview: string; states: PreviewState[] } | null>(null);
   const [narrow, setNarrow] = useState(false);
 
   // Only the journeys the chosen flow actually serves: asking it for a purpose
@@ -111,6 +143,12 @@ function BrandingScreen() {
   const activeJourney = journeys.some((entry) => entry.id === journey)
     ? journey
     : (journeys[0]?.id ?? journey);
+  // Until the step of the flow on screen has arrived, every state is offered.
+  const preview = `${activeFlowName}:${activeJourney}`;
+  const states = served?.preview === preview ? served.states : null;
+  // Derived like `activeJourney`: a pick this step cannot show previews the
+  // default, and comes back when a step that can show it is served.
+  const activeState = states && !states.includes(state) ? "default" : state;
   // Unset, a widget follows the visitor: the panel shows `auto` for it too.
   const revisionMode = revision.theme?.mode ?? "auto";
 
@@ -120,9 +158,10 @@ function BrandingScreen() {
         <h1 className="font-serif text-2xl leading-6 tracking-tight text-foreground">Branding</h1>
       </div>
 
-      {/* Two rows on a phone, one on a desktop: the design pairs the selectors
-          on the first row and the tabs with the environment buttons on the
-          second, each edge-aligned. The separators only exist inline. */}
+      {/* Three rows on a phone, one on a desktop: the flow selector, then the
+          tabs with the environment buttons edge-aligned, then the state
+          selector, which is too wide to share the tabs' row at that width.
+          The separators only exist inline. */}
       <div className="mt-3 flex flex-col gap-2 lg:flex-row lg:items-center lg:gap-[10px] lg:px-2">
         {flows.length > 0 && (
           <div className="flex items-center justify-between gap-[10px]">
@@ -147,7 +186,7 @@ function BrandingScreen() {
             <Separator orientation="vertical" className="hidden h-5! lg:block" />
           </div>
         )}
-        <div className="flex items-center justify-between gap-[10px] lg:flex-1">
+        <div className="flex flex-wrap items-center gap-x-[10px] gap-y-2 lg:flex-1">
           <Tabs
             value={activeJourney}
             onValueChange={(value) => setJourney(value as PreviewJourney)}
@@ -160,8 +199,32 @@ function BrandingScreen() {
               ))}
             </TabsList>
           </Tabs>
+          {/* After the tabs, as the design orders the row: flow, screen, state.
+              No icon on this one; the flow selector alone carries its glyph. */}
+          <div className="order-last flex basis-full items-center gap-[10px] sm:order-none sm:basis-auto">
+            <Separator orientation="vertical" className="hidden h-5! lg:block" />
+            <Select
+              value={activeState}
+              onValueChange={(value) => setState(value as PreviewState)}
+            >
+              <SelectTrigger aria-label="Previewed state" className={GHOST_TRIGGER}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent position="popper" sideOffset={4}>
+                {Object.entries(STATE_LABELS).map(([id, label]) => (
+                  <SelectItem
+                    key={id}
+                    value={id}
+                    disabled={states !== null && !states.includes(id as PreviewState)}
+                  >
+                    State: {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-          <div className="flex items-center gap-2 lg:ml-auto">
+          <div className="ml-auto flex items-center gap-2">
             <Button
               variant="outline"
               size="icon"
@@ -198,7 +261,14 @@ function BrandingScreen() {
           {/* The widget is content-sized, so the preview constrains the width
               rather than the element: that is what an embedding page does. */}
           <div className={narrow ? "w-[24rem]" : "w-full max-w-[32rem]"}>
-            <LoginPreview journey={activeJourney} flowName={activeFlowName} theme={theme} />
+            <LoginPreview
+              journey={activeJourney}
+              flowName={activeFlowName}
+              theme={theme}
+              state={activeState}
+              successStep={selected?.successStep}
+              onStates={(next) => setServed({ preview, states: next })}
+            />
           </div>
         </Card>
 
