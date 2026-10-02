@@ -13,7 +13,7 @@ describe("the cli", () => {
   it("leaves an unknown command to oclif and emits no envelope", async () => {
     const result = await runCliForTest(["bogus", "--json"]);
 
-    expect(result.exitCode).toBe(127);
+    expect(result).toExitWith(127);
     expect(result.stdout.trim()).toBe("");
   });
 
@@ -52,7 +52,7 @@ describe("the cli", () => {
 
   it("only ever suggests commands a user can run", async () => {
     const listed = await runCliForTest(["commands", "--json"]);
-    expect(listed.exitCode).toBe(0);
+    expect(listed).toSucceed();
     const visible = new Set(
       (parseJson(listed.stdout) as Array<{ id?: unknown }>)
         .map((command) => command.id)
@@ -61,9 +61,7 @@ describe("the cli", () => {
 
     const suggested = await suggestedCommandIds();
 
-    expect([...suggested].sort()).toEqual(
-      expect.arrayContaining(["apply", "doctor", "setup"]),
-    );
+    expect([...suggested].sort()).toEqual(expect.arrayContaining(["apply", "doctor", "setup"]));
     for (const command of suggested) {
       expect(visible, `${command} is suggested but not a visible command`).toContain(command);
     }

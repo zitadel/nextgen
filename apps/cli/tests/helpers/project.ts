@@ -7,6 +7,9 @@ import { expect, onTestFinished } from "vitest";
 
 import { parseJson, runCliForTest } from "./run-cli";
 
+const SCHEMA_FILE = ".zitadel/schemas/default-human-user.json";
+const FLOW_FILE = ".zitadel/flows/default-login.json";
+
 /** Where the mock platform answers. Not a real host; msw intercepts it. */
 export const MOCK_SERVER_URL = "http://mock.zitadel.test";
 
@@ -77,6 +80,27 @@ export interface RegisteredIdp {
   readonly slug: string;
 }
 
+/** The user schema as committed, which the developer owns and edits. */
+export interface UserSchemaDocument {
+  properties: Record<string, unknown>;
+  "x-auth-methods"?: Record<string, { enabled: boolean; providers?: string[] }>;
+}
+
+/** The login flow as committed, which the developer owns and edits. */
+export interface FlowDocument {
+  purposes: Record<string, string>;
+  steps: Array<{
+    name: string;
+    fields?: string[];
+    transitions?: Record<string, unknown>;
+    sso_providers?: string[];
+  }>;
+}
+
+interface PackageJson {
+  dependencies: Record<string, string>;
+}
+
 /**
  * A port from this worker's own block, because a bind-then-close probe races
  * the other vitest workers: a reserved port gets taken as an outbound source
@@ -114,12 +138,17 @@ class CommittedFiles {
     }>;
   }
 
+  /** The ejected branding descriptor. */
+  brandingDescriptor(): Promise<Record<string, unknown>> {
+    return this.read(".zitadel/branding/branding.json");
+  }
+
   /** Every committed configuration document as one string. */
   async asText(slug: string): Promise<string> {
     const documents = await Promise.all([
       this.read(`.zitadel/idps/${slug}.json`),
-      this.read(".zitadel/schemas/default-human-user.json"),
-      this.read(".zitadel/flows/default-login.json"),
+      this.read(SCHEMA_FILE),
+      this.read(FLOW_FILE),
     ]);
     return JSON.stringify(documents);
   }
@@ -323,13 +352,56 @@ export class ScaffoldedApp {
     }
   }
 
-  /** Edits a configuration document, as the developer owning it would. */
-  async editDocument(
-    relativePath: string,
-    edit: (document: Record<string, unknown>) => void,
-  ): Promise<void> {
+  /** Edits the committed user schema, as the developer owning it would. */
+  editUserSchema(edit: (schema: UserSchemaDocument) => void): Promise<void> {
+    return this.editDocument(SCHEMA_FILE, edit);
+  }
+
+  /** Edits the committed login flow, as the developer owning it would. */
+  editLoginFlow(edit: (flow: FlowDocument) => void): Promise<void> {
+    return this.editDocument(FLOW_FILE, edit);
+  }
+
+  editPackageJson(edit: (pkg: PackageJson) => void): Promise<void> {
+    return this.editDocument("package.json", edit);
+  }
+
+  /** Adds a second flow definition, for a spec whose input is the flow itself. */
+  addFlow(name: string, definition: unknown): Promise<void> {
+    return this.writeProjectFile(
+      `.zitadel/flows/${name}.json`,
+      `${JSON.stringify(definition, null, 2)}\n`,
+    );
+  }
+
+  /** Whether the project has been set up, which `zitadel.json` records. */
+  hasBeenConfigured(): Promise<boolean> {
+    return this.hasProjectFile("zitadel.json");
+  }
+
+  /** Writes `zitadel.json`, for a spec arranging a particular configuration. */
+  writeConfig(config: Record<string, unknown>): Promise<void> {
+    return this.writeProjectFile("zitadel.json", JSON.stringify(config, null, 2));
+  }
+
+  /** Writes the local secret a configured project carries. */
+  async writeLocalSecret(projectId: string): Promise<void> {
+    await mkdir(join(this.path, ".zitadel"), { recursive: true });
+    await this.writeProjectFile(
+      ".zitadel/secret",
+      JSON.stringify({
+        project_id: projectId,
+        project_secret: "sk",
+        preview_secret: "sk",
+        preview_origins: [],
+        created_at: "2026-01-01T00:00:00.000Z",
+      }),
+    );
+  }
+
+  private async editDocument<T>(relativePath: string, edit: (document: T) => void): Promise<void> {
     const contents = await readFile(join(this.path, relativePath), "utf8");
-    const document = JSON.parse(contents) as Record<string, unknown>;
+    const document = JSON.parse(contents) as T;
     edit(document);
     await writeFile(join(this.path, relativePath), `${JSON.stringify(document, null, 2)}\n`);
   }

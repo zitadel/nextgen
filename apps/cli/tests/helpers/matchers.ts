@@ -75,6 +75,28 @@ expect.extend({
     };
   },
 
+  toExitWith(received: CliResult, code: number) {
+    const pass = received.exitCode === code;
+    return {
+      pass,
+      message: () =>
+        pass
+          ? `expected the command not to exit ${code}, but it did`
+          : `expected the command to exit ${code}, but ${describeResult(received)}`,
+    };
+  },
+
+  toFail(received: CliResult) {
+    const pass = received.exitCode !== 0;
+    return {
+      pass,
+      message: () =>
+        pass
+          ? `expected the command to succeed, but it failed`
+          : `expected the command to fail, but ${describeResult(received)}`,
+    };
+  },
+
   toFailWith(received: CliResult, code: string) {
     const envelope = envelopeOf(received);
     const pass = received.exitCode !== 0 && envelope.status === "error" && envelope.code === code;
@@ -156,6 +178,10 @@ declare module "vitest" {
     toSucceed(): T;
     /** Exit 0 and `status: "skipped"` — the command found nothing to do. */
     toBeSkipped(): T;
+    /** A non-zero exit, whatever the reason. */
+    toFail(): T;
+    /** This exact exit code, for a code that is itself the contract. */
+    toExitWith(code: number): T;
     /** A non-zero exit and an error envelope carrying this code. */
     toFailWith(code: string): T;
     /** The envelope's `message` mentions this text. */

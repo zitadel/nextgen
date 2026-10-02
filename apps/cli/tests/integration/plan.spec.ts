@@ -1,15 +1,21 @@
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "../helpers/platform";
-import { aSetUpApp } from "../helpers/project";
+import { aSetUpApp, type ScaffoldedApp } from "../helpers/project";
 
 usePlatformMock();
 
+/** Adds a field to the committed user schema, as a developer would. */
+function addCompanyField(app: ScaffoldedApp): Promise<void> {
+  return app.editUserSchema((schema) => {
+    schema.properties.company = { type: "string", description: "Company name" };
+  });
+}
+
 /** Drops the transition the platform requires on a login entry step. */
-async function breakTheLoginEntryStep(app: Awaited<ReturnType<typeof aSetUpApp>>): Promise<void> {
-  await app.editDocument(".zitadel/flows/default-login.json", (flow) => {
-    const steps = flow.steps as Array<{ name: string; transitions: Record<string, unknown> }>;
-    delete steps.find((step) => step.name === "identifier")?.transitions.user_not_found;
+function breakTheLoginEntryStep(app: ScaffoldedApp): Promise<void> {
+  return app.editLoginFlow((flow) => {
+    delete flow.steps.find((step) => step.name === "identifier")?.transitions?.user_not_found;
   });
 }
 
@@ -22,9 +28,7 @@ describe("plan", () => {
 
   it("previews without consuming the change it previewed", async () => {
     const app = await aSetUpApp();
-    await app.editDocument(".zitadel/schemas/default-human-user.json", (schema) => {
-      (schema.properties as Record<string, unknown>).company = { type: "string" };
-    });
+    await addCompanyField(app);
 
     const first = await app.plan();
     const second = await app.plan();
@@ -35,12 +39,7 @@ describe("plan", () => {
 
   it("describes a one-field schema edit as exactly that one field", async () => {
     const app = await aSetUpApp();
-    await app.editDocument(".zitadel/schemas/default-human-user.json", (schema) => {
-      (schema.properties as Record<string, unknown>).company = {
-        type: "string",
-        description: "Company name",
-      };
-    });
+    await addCompanyField(app);
 
     const plan = await app.planRendered();
 
@@ -52,7 +51,7 @@ describe("plan", () => {
     expect(plan).not.toSay("x-audit");
   });
 
-  it("refuses a flow the platform would reject, before apply can publish half of it", async () => {
+  it("refuses a flow the platform would reject, before apply publishes half of it", async () => {
     const app = await aSetUpApp();
     const published = await app.publishedFlow();
     await breakTheLoginEntryStep(app);
@@ -70,10 +69,9 @@ describe("plan", () => {
     await breakTheLoginEntryStep(app);
     expect(await app.planAttempt()).toFailWith("E_VALIDATION");
 
-    await app.editDocument(".zitadel/flows/default-login.json", (flow) => {
-      const steps = flow.steps as Array<{ name: string; transitions: Record<string, unknown> }>;
-      const entry = steps.find((step) => step.name === "identifier");
-      if (entry) entry.transitions.user_not_found = { target: "register" };
+    await app.editLoginFlow((flow) => {
+      const entry = flow.steps.find((step) => step.name === "identifier");
+      if (entry?.transitions) entry.transitions.user_not_found = { target: "register" };
     });
 
     expect(await app.plan()).toReportNothingToDo();

@@ -1,4 +1,3 @@
-import { http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "../helpers/platform";
@@ -6,9 +5,9 @@ import { anApp, aSetUpApp } from "../helpers/project";
 
 const MANAGED_MARKER = "zitadel-cli: managed-file v1";
 
-const server = usePlatformMock();
+const platform = usePlatformMock();
 
-/** A Next 15 app, whose boundary file is `middleware.ts` rather than `proxy.ts`. */
+/** A Next 15 app through setup, whose boundary file is `middleware.ts`. */
 async function aPatchedApp() {
   const app = await anApp({ nextVersion: "^15.0.0" });
   await app.writeProjectFile("README.md", "# demo-next-app\n\nDeploy notes.\n");
@@ -33,7 +32,6 @@ describe("eject", () => {
       expect.arrayContaining(["app/login/page.tsx", "middleware.ts", "zitadel.json", ".zitadel"]),
     );
     expect(data.files_preserved).toContain("app/register/page.tsx");
-
     for (const gone of [".zitadel", "zitadel.json", "app/login/page.tsx", "middleware.ts"]) {
       expect(await app.hasProjectFile(gone), `${gone} should be gone`).toBe(false);
     }
@@ -58,41 +56,21 @@ describe("eject", () => {
 
 describe("branding eject", () => {
   it("publishes the ejected design on the next apply", async () => {
-    const published: Array<Record<string, unknown>> = [];
-    server.use(
-      http.post("*/branding", async ({ request }) => {
-        const body = (await request.json()) as Record<string, unknown>;
-        published.push(body);
-        return HttpResponse.json(
-          { id: "brandrev_setup_1", created_at: "2026-08-04T00:00:00.000Z", branding: body },
-          { status: 201 },
-        );
-      }),
-      http.get("*/branding/:id", ({ params }) =>
-        HttpResponse.json({
-          id: params.id,
-          created_at: "2026-08-04T00:00:00.000Z",
-          branding: published.at(-1) ?? {},
-        }),
-      ),
-    );
+    const published = platform.capturesBrandingPublishes();
     const app = await aSetUpApp();
-    expect(published).toHaveLength(0);
+    expect(published.count).toBe(0);
 
     expect(
       await app.run(["branding", "eject", "--design", "minimal", "--non-interactive", "--json"]),
     ).toSucceed();
     expect(await app.apply()).toSucceed();
 
-    expect(published).toHaveLength(1);
-    expect(published[0]).toMatchObject({ layout: "centered" });
-    expect(typeof published[0]?.liquid_template).toBe("string");
-
-    const descriptor = JSON.parse(
-      await app.readProjectFile(".zitadel/branding/branding.json"),
-    ) as Record<string, unknown>;
-    expect(descriptor.liquid_template).toEqual({ $file: "./login.liquid" });
-
+    expect(published.count).toBe(1);
+    expect(published.last).toMatchObject({ layout: "centered" });
+    expect(typeof published.last?.liquid_template).toBe("string");
+    expect(await app.committed.brandingDescriptor()).toMatchObject({
+      liquid_template: { $file: "./login.liquid" },
+    });
     expect(await app.plan()).toReportNothingToDo();
   });
 });

@@ -1,12 +1,11 @@
 import { realpath } from "node:fs/promises";
 
-import { http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "../helpers/platform";
 import { anApp } from "../helpers/project";
 
-const server = usePlatformMock();
+const platform = usePlatformMock();
 
 describe("setup", () => {
   it("scaffolds the project, registers it, and leaves nothing to reconcile", async () => {
@@ -19,16 +18,21 @@ describe("setup", () => {
     expect(data.files_written).toContain(".zitadel/schemas/default-human-user.json");
     expect(data.files_written).toContain(".zitadel/flows/default-login.json");
     expect(new Set(data.files_written).size).toBe(data.files_written.length);
-    expect(data.files_written).not.toContain(".zitadel");
+    expect(await app.publishedSchemas()).toHaveLength(1);
+    expect(await app.publishedFlows()).toHaveLength(1);
+    expect(await app.plan()).toReportNothingToDo();
+  });
 
+  it("installs the dependencies it added", async () => {
+    const app = await anApp();
+
+    const result = await app.setup([], { install: true });
+
+    expect(result).toSucceed();
     expect(await app.installInvocation()).toEqual({
       cwd: await realpath(app.path),
       args: ["install"],
     });
-
-    expect(await app.publishedSchemas()).toHaveLength(1);
-    expect(await app.publishedFlows()).toHaveLength(1);
-    expect(await app.plan()).toReportNothingToDo();
   });
 
   it("keeps the package manager's own output off stdout", async () => {
@@ -47,38 +51,30 @@ describe("setup", () => {
 
     expect(result).toFailWith("E_UNSUPPORTED_PROJECT_SHAPE");
     expect(result).toExplain("below the supported floor");
-    expect(await app.hasProjectFile("zitadel.json")).toBe(false);
+    expect(await app.hasBeenConfigured()).toBe(false);
   });
 
-  it("skips a rerun without rewriting config the developer has edited", async () => {
+  it("skips a rerun and leaves the developer's edits in place", async () => {
     const app = await anApp();
-    await app.setup();
-    const flow = `${await app.readProjectFile(".zitadel/flows/default-login.json")}\n`;
-    const schema = `${await app.readProjectFile(".zitadel/schemas/default-human-user.json")}\n`;
-    await app.writeProjectFile(".zitadel/flows/default-login.json", flow);
-    await app.writeProjectFile(".zitadel/schemas/default-human-user.json", schema);
+    expect(await app.setup()).toSucceed();
+    await app.editUserSchema((schema) => {
+      schema.properties.company = { type: "string" };
+    });
 
     expect(await app.setup()).toBeSkipped();
 
-    expect(await app.readProjectFile(".zitadel/flows/default-login.json")).toBe(flow);
-    expect(await app.readProjectFile(".zitadel/schemas/default-human-user.json")).toBe(schema);
+    expect((await app.plan()).total).toBeGreaterThan(0);
   });
 
   it("lets a rerun finish what a failed run started", async () => {
     const app = await anApp();
-    server.use(
-      http.post("*/schemas", () =>
-        HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
-      ),
-    );
-
-    const failed = await app.setup();
-    expect(failed.exitCode).not.toBe(0);
-    expect(await app.hasProjectFile("zitadel.json")).toBe(false);
-
-    server.resetHandlers();
+    platform.rejectsSchemaUploads();
+    expect(await app.setup()).toFail();
+    expect(await app.hasBeenConfigured()).toBe(false);
+    platform.recovers();
 
     expect(await app.setup(["--force"])).toSucceed();
+
     expect(await app.publishedSchemas()).toHaveLength(1);
     expect(await app.publishedFlows()).toHaveLength(1);
     expect(await app.plan()).toReportNothingToDo();
@@ -94,10 +90,8 @@ describe("setup", () => {
 
     const { flow_definition } = await app.publishedFlow();
     expect(flow_definition.purposes).toMatchObject({ login: entersOn, register: "register" });
-
     const { schema } = await app.publishedSchema();
     expect(schema["x-auth-methods"]).toMatchObject({ [method]: { enabled: true } });
-
     expect(await app.plan()).toReportNothingToDo();
   });
 

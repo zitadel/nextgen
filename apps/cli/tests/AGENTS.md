@@ -85,10 +85,25 @@ Three rules make that shape hold:
 Use `it.each` for anything that varies by framework, preset or resource. A spec
 suite is a table plus a journey, not a sequence of hand-written near-duplicates.
 
-Assert through the matchers in `tests/helpers/matchers.ts` — `toSucceed`,
-`toFailWith`, `toExplain`, `toHintAt`, `toSuggest`, `toSay`, `toBeSkipped`,
-`toReportNothingToDo`. A spec body carries no comments: if a step needs
-explaining, it needs a named helper with a line of TSDoc instead.
+A spec body contains a fixture call, a command, and matchers — nothing else:
+
+- **No paths.** Edit through `app.editUserSchema`, `app.editLoginFlow`,
+  `app.editPackageJson`, `app.addFlow`; arrange through `app.writeConfig` and
+  `app.writeLocalSecret`. A `.zitadel/...` string in a spec is only ever a
+  value the CLI reported back.
+- **No HTTP.** The platform is arranged in its own terms —
+  `platform.rejectsSchemaUploads()`, `platform.recovers()`,
+  `platform.capturesBrandingPublishes()`. msw stays in `helpers/platform.ts`.
+- **One assertion vocabulary**, from `tests/helpers/matchers.ts`: `toSucceed`,
+  `toFail`, `toFailWith`, `toExitWith`, `toBeSkipped`, `toExplain`, `toHintAt`,
+  `toSuggest`, `toSay`, `toReportNothingToDo`. Never a bare `exitCode` compare.
+- **No comments.** A step that needs explaining needs a named helper with a
+  line of TSDoc instead.
+- **One shape**: arrange, blank line, a single command under test, blank line,
+  assertions.
+
+Formatting is prettier's, per the repo's `.prettierrc.json`, so nothing is
+hand-wrapped.
 
 One exception, in `cli.spec.ts`: it scans `src/**` for the commands the CLI
 suggests, and checks each one against the command list the built CLI reports.
