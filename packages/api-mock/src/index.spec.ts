@@ -176,6 +176,12 @@ describe("setupMockHandlers", () => {
         sso_provider_id: "google",
       }),
     ).rejects.toMatchObject({ status: 400, body: { code: "req.invalid" } });
+    // A refused submission is still a request the caller made.
+    const captured = mock.getCaptured();
+    expect(captured[captured.length - 1]).toMatchObject({
+      kind: "submitFlowStep",
+      body: { action: "sso", sso_provider_id: "google" },
+    });
   });
 
   /**
