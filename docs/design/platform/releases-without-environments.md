@@ -601,7 +601,8 @@ writes. Each resolves independently, highest priority first:
 4. `.env.local` — skipped when the stage is `test`
 5. `.env.<stage>`
 6. `.env`
-7. `zitadel.json`, public-safe values only — never the secret
+7. `zitadel.json`, the `projects.<stage>` entry — server, project id and
+   publishable key, never the secret
 8. `.zitadel/secret`, for project id and secret
 9. Interactive prompt, TTY only, persisted to `.env.<stage>.local`
 10. Error naming the stage, the missing value, and every file consulted
@@ -609,7 +610,12 @@ writes. Each resolves independently, highest priority first:
 Stage detection, highest priority first: `--env`, `ZITADEL_ENV`, platform signals
 (`VERCEL_ENV`, `NETLIFY_CONTEXT`, `RAILWAY_ENVIRONMENT`), `NODE_ENV`,
 `development`. The stage is local only; it selects which `.env` files to read and
-never reaches the server.
+which [`projects` entry](#adding-a-second-project) to use, and never reaches the
+server.
+
+The two flags do different jobs: `--env <label>` picks an entry from the
+`projects` map, while `--project <id>` names a project id directly and bypasses
+the map.
 
 **Dotenv never overrides the real process environment.** A platform injecting
 `ZITADEL_PROJECT_ID` must beat a committed `.env`, or a preview deploy silently
@@ -625,6 +631,130 @@ talks to the wrong project.
 
 The release variables are only needed on the fallback path. A browser caller
 answered by layer 2 sends nothing new.
+
+### Adding a second project
+
+A stage is a `(server, project)` pair, so "add a production environment" is "add
+a second project". The blocker today is that `.zitadel/secret` holds one project
+id and one secret, so a repository can address exactly one project.
+
+`zitadel.json` gains a `projects` map — label to `(server, project,
+publishable_key)`. All three are public-safe, so the map is committed. Each
+project's **secret** is not, and goes to `.env.<label>.local`, which the
+`.env*` entry `setup` already adds to `.gitignore` covers.
+
+```json
+{
+  "projects": {
+    "development": { "server": "local",
+                     "project": "prj_01KDEV7T9QX3M2E8", "publishable_key": "pk_dev_4nYwH6tR2p" },
+    "production":  { "server": "https://api.zitadel.cloud",
+                     "project": "prj_01K9AA9M3K7E2QX8VB4T", "publishable_key": "pk_7kR2pXq9vN3wLmYhT4cB8A" }
+  }
+}
+```
+
+The existing scalar `project` stays valid as sugar for a single unnamed default,
+which is what `setup` writes. Adding a second project migrates it into the map.
+
+**Labels must match what stage detection produces** — `development`,
+`production`, `preview` — or they can never be selected automatically. The CLI
+warns when a label will only ever be reachable through `--env`.
+
+#### Starting local
+
+```
+$ zitadel setup
+...
+server   local (http://localhost:8080)
+project  prj_01KDEV7T9QX3M2E8  (created)
+wrote    zitadel.json, .zitadel/secret, .env.local
+```
+
+#### Adding production
+
+```
+$ zitadel projects add production
+server?           https://api.zitadel.cloud
+project?          [x] create a new one   [ ] link an existing one
+name?             acme
+
+created           prj_01K9AA9M3K7E2QX8VB4T   class=sandbox   unclaimed
+wrote             zitadel.json         projects.production
+                  zitadel.json         projects.development  (migrated from .zitadel/secret)
+                  .env.production.local   ZITADEL_PROJECT_SECRET   (gitignored)
+
+next
+  zitadel deploy --env production     ship your configuration
+  zitadel claim  --env production     attach an owner
+  zitadel projects promote production  once its origins are set
+```
+
+Creating the project needs no credential — `POST /projects` is public and returns
+the id, the secret and the publishable key. So the whole journey is CLI-driven
+and nothing has to be done in a web console first.
+
+To adopt a project a teammate already created, `--project prj_…` skips creation
+and asks for the secret, or points at `zitadel secret restore`.
+
+```
+$ zitadel projects list
+LABEL         SERVER                       PROJECT                   CLASS     CLAIMED
+development   local                        prj_01KDEV7T9QX3M2E8      sandbox   —
+production    https://api.zitadel.cloud    prj_01K9AA9M3K7E2QX8VB4T  sandbox   no
+
+resolved now  development
+              (no --env, ZITADEL_ENV unset, NODE_ENV=development)
+```
+
+#### Shipping to it
+
+The new project is empty. The same `.zitadel/` builds a release in it, over
+fresh revisions of its own.
+
+```
+$ zitadel deploy --env production -m "initial release"
+target     production   https://api.zitadel.cloud   prj_01K9AA9M3K7E2QX8VB4T
+building   6 resources
+release    sha256:4a5b6c7d  (new in this project)
+
+  no deployment yet — 6 resources will be created
+  origins to sync: https://app.acme.com (primary)
+
+continue? [y/N] y
+deployed   dpl_01KC4N8P2S5WQZ   2 deployment records written
+```
+
+**`new in this project` is the open question made concrete.** The development
+project holds the same content under a different digest, because a pointer
+digest covers revision ids and those are per-project. With a content digest the
+two would match and `deploy` could assert it — see [Open 1](#open).
+
+#### Making it production
+
+```
+$ zitadel claim --env production
+...
+claimed    team_acme
+
+$ zitadel projects promote production
+revalidating 2 origins against the production rules
+  https://app.acme.com           primary   exact origin      ✓
+  https://*-acmeinc.vercel.app   preview   tenant-anchored   ✓
+class      sandbox -> production
+```
+
+`promote` is free as a verb because release promotion no longer needs it.
+`zitadel projects demote <label>` is the reverse, and asks for confirmation
+because it re-admits loopback origins to a project holding real users.
+
+#### What CI holds
+
+Nothing new in the repository. The production job needs `ZITADEL_PROJECT_SECRET`
+from `.env.production.local` placed in its secret store; the preview job needs
+the narrower preview-deploy credential from
+[Prerequisites](#prerequisites). Server, project and publishable key all come
+from the committed `projects` map.
 
 ### `zitadel status`
 
