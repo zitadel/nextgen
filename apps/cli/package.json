@@ -22,7 +22,7 @@
     "bin",
     "dist",
     "oclif.manifest.json",
-    "SKILLS.md"
+    "skills"
   ],
   "publishConfig": {
     "access": "public"

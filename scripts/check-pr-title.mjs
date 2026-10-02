@@ -61,10 +61,11 @@ const REPO_META_MARKDOWN = new Set(["AGENTS.md", "CHANGELOG.md", "CONTRIBUTING.m
 
 // Files that ship only when their package does — a README under
 // `packages/design-tokens/` (a build input, never published) reaches nobody, while
-// `packages/sdk-react/README.md` is the page a customer reads on npm. `SKILLS.md`
-// is here because `apps/cli/package.json` lists it in `files`, so the CLI agent
-// contract is installed alongside the binary.
-const PUBLISHED_ONLY_FILENAMES = new Set(["README.md", "package.json", "SKILLS.md"]);
+// `packages/sdk-react/README.md` is the page a customer reads on npm. `SKILL.md`
+// is here because `apps/cli/package.json` lists `skills` in `files`, so the CLI
+// agent contract (an Agent Skill) is installed alongside the binary. `SKILLS.md`
+// stays for any unpublished package that keeps the legacy single-file name.
+const PUBLISHED_ONLY_FILENAMES = new Set(["README.md", "package.json", "SKILL.md", "SKILLS.md"]);
 
 const NON_SHIPPING_ROOT_FILES = new Set([
   "Dockerfile",
