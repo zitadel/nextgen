@@ -399,6 +399,16 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
     expect(element.shadowRoot?.activeElement).toBe(field);
   });
 
+  it("variant=page keeps its initial focus when mounted in a preview state", async () => {
+    const element = await mount(identifierStep, (el) => {
+      el.variant = "page";
+      el.previewState = "validation_error";
+    });
+    const field = await waitFor(() => element.shadowRoot?.querySelector("zl-field[invalid]"));
+    await waitFor(() => (element.shadowRoot?.activeElement === field ? field : null));
+    expect(element.shadowRoot?.activeElement).toBe(field);
+  });
+
   it("variant=page focuses a select when it is the first field", async () => {
     const element = await mount(selectOnlyStep, (el) => {
       el.variant = "page";

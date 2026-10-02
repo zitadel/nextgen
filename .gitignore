@@ -93,9 +93,6 @@ test-output
 apps/docs/.source/
 apps/docs/.generated/
 
-## Storybook static build
-storybook-static/
-
 ## Go build cache
 .go/
 
