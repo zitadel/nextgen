@@ -15,6 +15,7 @@ import * as React from "react";
 
 import type {
   ZitadelFlowCompleteDetail,
+  ZitadelFlowRedirectDetail,
   ZitadelFlowErrorDetail,
   ZitadelFlowInputDetail,
   ZitadelFlowStepDetail,
@@ -66,6 +67,9 @@ const ZitadelLoginElementReact = createComponent({
     onZitadelFlowComplete: "zitadel-flow-complete" as EventName<
       CustomEvent<ZitadelFlowCompleteDetail>
     >,
+    onZitadelFlowRedirect: "zitadel-flow-redirect" as EventName<
+      CustomEvent<ZitadelFlowRedirectDetail>
+    >,
     onZitadelFlowError: "zitadel-flow-error" as EventName<CustomEvent<ZitadelFlowErrorDetail>>,
   },
 });
@@ -106,7 +110,7 @@ export type ZitadelLoginReactProps = ZitadelLoginProps & { children?: React.Reac
 
 export const ZitadelLogin = React.forwardRef<ZitadelLoginElement, ZitadelLoginReactProps>(
   function ZitadelLogin(
-    { purpose, onFlowStep, onFlowInput, onFlowComplete, onFlowError, ...props },
+    { purpose, onFlowStep, onFlowInput, onFlowComplete, onFlowRedirect, onFlowError, ...props },
     ref,
   ) {
     return (
@@ -117,6 +121,7 @@ export const ZitadelLogin = React.forwardRef<ZitadelLoginElement, ZitadelLoginRe
         onZitadelFlowStep={onFlowStep && ((event) => onFlowStep(event.detail))}
         onZitadelFlowInput={onFlowInput && ((event) => onFlowInput(event.detail))}
         onZitadelFlowComplete={onFlowComplete && ((event) => onFlowComplete(event.detail))}
+        onZitadelFlowRedirect={onFlowRedirect && ((event) => onFlowRedirect(event.detail))}
         onZitadelFlowError={onFlowError && ((event) => onFlowError(event.detail))}
       />
     );

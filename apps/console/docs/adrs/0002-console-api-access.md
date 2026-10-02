@@ -136,7 +136,7 @@ import { configureZitadel, getApi } from "@zitadel/api/config";
 
 const project = configureZitadel({
   proxyPath: import.meta.env.VITE_CONSOLE_API_BASE ?? "/api", // same-origin API base
-  projectId: import.meta.env.VITE_CONSOLE_PROJECT_ID ?? "",
+  projectId: "", // learnt at boot from /console/runtime.json (Console ADR 0004 §3)
 });
 
 export const api = getApi(project);

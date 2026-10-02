@@ -416,6 +416,32 @@ docker --image <ref>` remains the explicit image override for debugging.
   `--object-type` (e.g. `human-user`). Non-interactive/`--json` prints one row
   per revision (newest first); interactive adds a picker that fetches and
   pretty-prints the selected revision body.
+- `sso enable --provider <name>` — add a social identity provider to a Project
+  and wire it into sign-in. It reports the redirect URI to register with the
+  vendor (`<issuer>/__nextgen/idp/callback`), then writes
+  `.zitadel/idps/<slug>.json`, enables `sso` on the user schema (`--schema` when
+  the Project has more than one), and adds the provider to every login flow that
+  runs against that schema — the button on each step that can start a sign-in,
+  plus a `register-sso` step for a new external identity and an `sso-conflict`
+  step for an email that already has an account, the latter offering only the
+  methods that schema enables. Idempotent: a provider already configured is
+  reused, and a rerun that passes `--client-id` republishes it to the project
+  variable, so a changed id takes effect rather than being ignored. Two
+  matching connections stop the command without changing a file, as does a
+  `--client-id` that disagrees with a *literal* one already in the connection
+  file — a hand-written connection holding a real id rather than the scaffolded
+  `${{ NAME }}` reference. The client secret is
+  never a flag — it is prompted for, or read from stdin on a non-interactive
+  run, as `variables set` does — and only its `${{ NAME }}` reference reaches
+  the connection file. A step edited by hand is left alone and reported. `setup`
+  asks during onboarding too, as a multi-select over the catalog, so a run can
+  enable several providers at once; its `data.sso` is a **list**, one entry per
+  provider, each carrying that provider's connection path and the publish
+  outcome for its client id and secret. `--sso` and `--sso-client-id` name a
+  single provider, because a scripted run pipes one secret on stdin — the rest
+  are added with `sso enable`. `plan`/`apply` then publish the connection; **deleting** one is not
+  supported yet (#1013), so a removed file fails `apply` with
+  `E_NOT_IMPLEMENTED`.
 - `branding eject` — take ownership of the login template: scaffold
   `.zitadel/branding/` (a `branding.json` descriptor plus the `login.liquid`
   template) from a shipped design, `--design centered|minimal` (the default card, or

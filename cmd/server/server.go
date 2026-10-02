@@ -321,6 +321,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		fields,
 		createUserHandler,
 		flowAuth,
+		service.NewFlowSSOProviderResolver(idpConnectionService),
 		time.Now,
 	)
 

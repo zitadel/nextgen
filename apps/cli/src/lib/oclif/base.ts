@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 
 import { Command, Flags } from "@oclif/core";
+
+import { nonBlankString } from "./flags";
 import consola from "consola";
 
 import { toZitadelError, type ZitadelError } from "../errors";
@@ -59,8 +61,8 @@ export abstract class BaseCommand extends Command {
    * `flags.force` into {@link GlobalOptions.force} for those commands.
    */
   static override baseFlags = {
-    cwd: Flags.string({ char: "c", description: "Project directory to operate on." }),
-    server: Flags.string({ char: "s", description: "Override the resolved server URL." }),
+    cwd: nonBlankString({ char: "c", description: "Project directory to operate on." }),
+    server: nonBlankString({ char: "s", description: "Override the resolved server URL." }),
     "non-interactive": Flags.boolean({
       char: "n",
       description: "Disable prompts. Required when scripting or running as an agent.",
