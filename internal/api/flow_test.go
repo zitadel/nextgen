@@ -480,3 +480,23 @@ func TestGetFlowStep_RestartRequiredReturns409(t *testing.T) {
 		t.Errorf("expected the restart code, got %s", body)
 	}
 }
+
+// A submit on an attempt another request already handed off is a conflict,
+// as on the attempt endpoints, not an internal error.
+func TestSubmitFlowStep_HandedOffAttemptReturns409(t *testing.T) {
+	ts := newTestServer(t)
+	state := &domain.FlowState{ID: "flow_1", ProjectID: "proj_1", SessionID: "sess_1", IssuedAt: time.Now()}
+	cookieVal := ts.sealCookie(t, state)
+	ts.fake.submitErr = domain.ErrAuthAttemptAlreadyHandedOff()
+
+	resp, body := doRequest(t, http.MethodPost, ts.srv.URL+"/flow/flow_1/submit", map[string]any{
+		"action": "submit",
+		"fields": map[string]any{"identifier": "alice@example.com"},
+	}, cookieVal)
+	if resp.StatusCode != http.StatusConflict {
+		t.Fatalf("status = %d, want 409 (body = %s)", resp.StatusCode, body)
+	}
+	if !strings.Contains(string(body), "att.already_handed_off") {
+		t.Errorf("expected the handed-off code, got %s", body)
+	}
+}

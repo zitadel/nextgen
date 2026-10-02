@@ -265,6 +265,27 @@ describe("steps", () => {
     );
   });
 
+  for (const outcome of ["sso_authenticated", "sso_user_not_found"]) {
+    it(`rejects purpose or action on ${outcome}`, () => {
+      for (const transition of [
+        { target: "register", purpose: "register" },
+        { target: "other-flow", action: "switch" },
+      ]) {
+        const def = flow();
+        step(def, "identifier").transitions[outcome] = transition;
+        expect(messages(validateFlowDefinition(def))).toContain(
+          `step "identifier": transition "${outcome}" is an sso outcome and cannot declare purpose or action`,
+        );
+      }
+    });
+  }
+
+  it("accepts purpose on the shared user_already_exists", () => {
+    const def = flow();
+    step(def, "register").transitions.user_already_exists = { target: "identifier", purpose: "login" };
+    expect(errors(validateFlowDefinition(def))).toEqual([]);
+  });
+
   it("collects issues across independent steps", () => {
     const def = flow();
     step(def, "identifier").transitions.jump = { target: "done" };

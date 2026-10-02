@@ -14,10 +14,12 @@ example:
     - name: email
       type: email
       text_key: login.field.email
+      autocomplete: username
       required: true
     - name: password
       type: password
       text_key: login.field.password
+      autocomplete: current-password
       required: true
   actions:
     - name: submit
@@ -88,6 +90,54 @@ properties:
     items:
       $ref: field.yaml
     default: []
+  identifier:
+    type: object
+    required: [value, autocomplete]
+    description: |
+      The user's identifier, collected on an earlier step, for this
+      step's form to carry alongside the password. Present only when the
+      step collects a password and does not itself collect the
+      identifier — a step that collects the identifier carries it in
+      `fields` instead, and needs nothing here.
+
+      A password manager saves an identifier and a password as one
+      credential, and reads both from the same form. A step that
+      collects only the password leaves it nothing to pair with, so the
+      engine hands the identifier back here.
+
+      **What the client does with it.** Add one input to the same form
+      element as the password, carrying `value` and `autocomplete` as
+      given, and:
+
+      - *with no `name`* — a control without a name is never submitted,
+        so the form data stays exactly the step's `fields`. That is what
+        keeps this input from reaching the engine as an unknown field,
+        whether the client builds its submission from `fields` or from
+        whatever the form contains;
+      - *read-only* — the engine already resolved the user from this
+        value, so a changed one would not change who is signing in;
+      - *hidden from view* — the user supplied it on the previous step
+        and is not being asked for it again. Prefer hiding a real input
+        with CSS over `type="hidden"`: a manager looks for a
+        credential-shaped control, and a hidden-typed input is easy to
+        skip.
+
+      It is not display text: do not render it as a greeting or a label.
+      `texts.description_key` is the place for that.
+    properties:
+      value:
+        type: string
+        description: |
+          The identifier the user supplied. Use it as the input's
+          `value`, verbatim.
+        example: alice@acme.com
+      autocomplete:
+        type: string
+        description: |
+          Value for the input's HTML `autocomplete` attribute, used
+          verbatim. `username` is the token that pairs an identifier
+          with a password in the same form.
+        example: username
   actions:
     type: array
     description: |

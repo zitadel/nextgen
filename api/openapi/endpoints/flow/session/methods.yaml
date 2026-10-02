@@ -28,7 +28,8 @@ get:
     '409':
       description: |
         The flow must be restarted: the provider's identity belongs to a
-        user the flow cannot continue with.
+        user the flow cannot continue with, or the flow's auth attempt
+        expired or was already handed off.
       content:
         application/json:
           schema:

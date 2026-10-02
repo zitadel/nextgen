@@ -369,12 +369,24 @@ function validateStep(step: FlowStep): FlowValidationIssue[] {
     }
   }
 
-  for (const transitionKey of step.transitions.keys()) {
+  for (const [transitionKey, t] of step.transitions) {
     if (!actionNames.has(transitionKey) && !(RESERVED_OUTCOMES as readonly string[]).includes(transitionKey)) {
       issues.push(
         error(
           "steps",
           `step ${q(name)}: transition key ${q(transitionKey)} is not an action name or reserved outcome (user_not_found, user_already_exists, sso_user_not_found, sso_authenticated)`,
+          name,
+        ),
+      );
+    }
+    // The sso outcomes carry a bound user or parked claims, which a
+    // re-purpose would drop and another flow cannot receive.
+    const isSsoOutcome = transitionKey === "sso_authenticated" || transitionKey === "sso_user_not_found";
+    if (isSsoOutcome && (t.purpose !== null || t.action !== null)) {
+      issues.push(
+        error(
+          "steps",
+          `step ${q(name)}: transition ${q(transitionKey)} is an sso outcome and cannot declare purpose or action`,
           name,
         ),
       );

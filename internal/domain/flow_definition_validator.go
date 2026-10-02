@@ -292,12 +292,19 @@ func validateSteps(steps []FlowDefinitionStep) error {
 		}
 
 		// every transition key must be an action name or a reserved outcome
-		for transitionKey := range step.Transitions {
+		for transitionKey, t := range step.Transitions {
 			_, isAction := actionNames[transitionKey]
 			_, isReserved := reservedOutcomes[transitionKey]
 			if !isAction && !isReserved {
 				return ErrFlowDefinitionInvalid(fmt.Sprintf(
 					"step %q: transition key %q is not an action name or reserved outcome (user_not_found, user_already_exists, sso_user_not_found, sso_authenticated)", step.Name, transitionKey), nil)
+			}
+			// the sso outcomes carry a bound user or parked claims, which a
+			// re-purpose would drop and another flow cannot receive
+			isSSOOutcome := transitionKey == FlowImplicitOutcomeSSOAuthenticated || transitionKey == FlowImplicitOutcomeSSOUserNotFound
+			if isSSOOutcome && (t.Purpose != nil || t.Action != nil) {
+				return ErrFlowDefinitionInvalid(fmt.Sprintf(
+					"step %q: transition %q is an sso outcome and cannot declare purpose or action", step.Name, transitionKey), nil)
 			}
 		}
 

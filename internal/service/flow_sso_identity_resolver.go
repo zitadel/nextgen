@@ -34,12 +34,13 @@ func (r *FlowSSOIdentityResolver) LoadParked(ctx context.Context, in domain.Flow
 	if err != nil {
 		return nil, fmt.Errorf("load parked sso identity: read attempt: %w", err)
 	}
-	check, ok := attempt.SSOCallback()
-	// A dead attempt cannot settle a parked identity, and the replay shortcut
-	// below would hide it on every later render.
-	if ok && (attempt.IsExpired() || attempt.IsHandedOff()) {
+	// A dead attempt can neither settle a parked identity nor hand off, so the
+	// flow restarts instead of rendering a step whose submissions fail. It runs
+	// before the replay shortcut below, which would hide it on every render.
+	if attempt.IsExpired() || attempt.IsHandedOff() {
 		return nil, domain.ErrFlowRestartRequired()
 	}
+	check, ok := attempt.SSOCallback()
 	var attemptUserID string
 	if user, bound := domain.CheckAs[*domain.AuthFactorUser](attempt, domain.AuthCheckTypeUser); bound {
 		attemptUserID = user.UserID
@@ -52,13 +53,17 @@ func (r *FlowSSOIdentityResolver) LoadParked(ctx context.Context, in domain.Flow
 		// identifier submission. The marker holds nothing else to read.
 		return &domain.FlowSSOParkedIdentity{CollisionUserID: check.Result.CollisionUserID, AttemptUserID: attemptUserID}, nil
 	}
-	// An already resolved row (sso_user_not_found leaves it parked) needs
-	// none of the reads below.
-	if !ok || check.Result == nil || check.ID == in.ResolvedCheckID {
+	if !ok || check.Result == nil {
 		if bound := boundThroughSSO(attempt); bound != nil {
 			bound.AttemptUserID = attemptUserID
 			return bound, nil
 		}
+		return nil, nil
+	}
+	// An already resolved row (sso_user_not_found or creation disabled leaves
+	// it parked) needs none of the reads below. It still wins over an earlier
+	// bind, as an unresolved row does.
+	if check.ID == in.ResolvedCheckID {
 		return nil, nil
 	}
 	result := check.Result
@@ -129,9 +134,6 @@ func (r *FlowSSOIdentityResolver) LoadParked(ctx context.Context, in domain.Flow
 // marker: only a bind writes it, together with the user factor. A factor
 // copied in from a session carries the older attempt id and does not count.
 func boundThroughSSO(attempt *domain.AuthAttempt) *domain.FlowSSOParkedIdentity {
-	if attempt.HandedOffAt != nil {
-		return nil
-	}
 	if sso, ok := domain.CheckAs[*domain.AuthFactorSSO](attempt, domain.AuthCheckTypeSSO); !ok || sso.AttemptID != attempt.ID {
 		return nil
 	}

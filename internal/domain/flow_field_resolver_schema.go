@@ -78,6 +78,7 @@ func (r *SchemaFieldResolver) Resolve(schema *jsonschema.Schema, stepName string
 	return FlowResolvedFields{
 		Fields:           fields,
 		ImplicitOutcomes: implicit,
+		IdentifierName:   identifier,
 	}, nil
 }
 

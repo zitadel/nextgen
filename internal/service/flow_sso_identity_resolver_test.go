@@ -179,18 +179,26 @@ func TestFlowSSOIdentityResolver_LoadParked_BoundAttemptWithParkedResultPrefersR
 	assert.Empty(t, got.BoundUserID)
 }
 
-// After a successful handoff there is nothing to retry: a second load with an
-// older cookie renders the step instead of failing on a second handoff.
-func TestFlowSSOIdentityResolver_LoadParked_HandedOffBoundAttemptIsNil(t *testing.T) {
+// A bound attempt that was handed off, or expired, cannot hand off again: a
+// load with an older cookie restarts instead of rendering a step whose next
+// submission fails.
+func TestFlowSSOIdentityResolver_LoadParked_DeadBoundAttemptRestarts(t *testing.T) {
 	t.Parallel()
-	f := newSSOResolverFixture(t)
-	handedOff := time.Now()
-	f.stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), ssoProjectID, ssoAttemptID).
-		Return(&domain.AuthAttempt{ProjectID: ssoProjectID, ID: ssoAttemptID, Checks: boundFactors(), HandedOffAt: &handedOff}, nil)
+	handedOff := &domain.AuthAttempt{ProjectID: ssoProjectID, ID: ssoAttemptID, Checks: boundFactors()}
+	handedOff.HandoffToken = &domain.HandoffToken{}
+	for name, attempt := range map[string]*domain.AuthAttempt{
+		"handed off": handedOff,
+		"expired":    expiredAttempt(&domain.AuthAttempt{ProjectID: ssoProjectID, ID: ssoAttemptID, Checks: boundFactors()}),
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			f := newSSOResolverFixture(t)
+			f.stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), ssoProjectID, ssoAttemptID).Return(attempt, nil)
 
-	got, err := f.resolver.LoadParked(t.Context(), loadInput())
-	require.NoError(t, err)
-	assert.Nil(t, got)
+			_, err := f.resolver.LoadParked(t.Context(), loadInput())
+			require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
+		})
+	}
 }
 
 func TestFlowSSOIdentityResolver_LoadParked_LinkFound(t *testing.T) {
@@ -567,14 +575,48 @@ func TestFlowSSOIdentityResolver_FindUniqueOwner(t *testing.T) {
 	}
 }
 
-// A parked row the engine already resolved (sso_user_not_found leaves it in
-// place) is skipped before the revision and link reads.
+// The attempt expired between the load and the bind: nothing is written, and
+// the deleted row rolls back with the transaction.
+func TestFlowSSOIdentityResolver_BindLinked_RefusesExpiredAttempt(t *testing.T) {
+	t.Parallel()
+	f := newSSOResolverFixture(t)
+	f.inTransaction(t)
+	f.stmts.EXPECT().DeleteSSOCallback(gomock.Any(), ssoProjectID, ssoAttemptID, "ch-1").Return(nil)
+	f.stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), ssoProjectID, ssoAttemptID).Return(expiredAttempt(parkedAttempt(parkedResult())), nil)
+	f.stmts.EXPECT().AddAuthAttemptFactor(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+	f.stmts.EXPECT().SetAuthAttemptFactor(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+
+	err := f.resolver.BindLinked(t.Context(), domain.FlowSSOBindInput{
+		ProjectID: ssoProjectID, AttemptID: ssoAttemptID, CheckID: "ch-1", UserID: "user-1", ConnectionID: "idp-1", LinkID: "idplink-1",
+	})
+	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
+}
+
+// A parked row the engine already resolved (sso_user_not_found or creation
+// disabled leaves it parked) is skipped before the revision and link reads.
 func TestFlowSSOIdentityResolver_LoadParked_AlreadyResolvedSkipsReads(t *testing.T) {
 	t.Parallel()
 	f := newSSOResolverFixture(t)
 	f.stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), ssoProjectID, ssoAttemptID).Return(parkedAttempt(parkedResult()), nil)
 	f.connections.EXPECT().GetRevision(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 	f.stmts.EXPECT().GetIDPIdentityLink(gomock.Any(), gomock.Any()).Times(0)
+
+	in := loadInput()
+	in.ResolvedCheckID = "ch-1"
+	got, err := f.resolver.LoadParked(t.Context(), in)
+	require.NoError(t, err)
+	assert.Nil(t, got)
+}
+
+// An earlier bind lost its handoff, then a second ceremony parked a row the
+// engine already resolved: the row still wins, so the earlier user is not
+// signed in.
+func TestFlowSSOIdentityResolver_LoadParked_BoundAttemptWithResolvedRowIsNil(t *testing.T) {
+	t.Parallel()
+	f := newSSOResolverFixture(t)
+	f.stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), ssoProjectID, ssoAttemptID).
+		Return(parkedAttempt(parkedResult(), boundFactors()...), nil)
+	f.connections.EXPECT().GetRevision(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 
 	in := loadInput()
 	in.ResolvedCheckID = "ch-1"
@@ -614,19 +656,6 @@ func TestFlowSSOIdentityResolver_LoadParked_HandedOffAttemptRestartsBeforeReplay
 	in.ResolvedCheckID = "ch-1"
 	_, err := f.resolver.LoadParked(t.Context(), in)
 	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
-}
-
-// Without an SSO row there is nothing to resolve, and a plain render of a
-// flow with a dead attempt keeps its behaviour.
-func TestFlowSSOIdentityResolver_LoadParked_DeadAttemptWithoutSSORowIsNil(t *testing.T) {
-	t.Parallel()
-	f := newSSOResolverFixture(t)
-	f.stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), ssoProjectID, ssoAttemptID).
-		Return(expiredAttempt(&domain.AuthAttempt{ProjectID: ssoProjectID, ID: ssoAttemptID}), nil)
-
-	got, err := f.resolver.LoadParked(t.Context(), loadInput())
-	require.NoError(t, err)
-	assert.Nil(t, got)
 }
 
 // event returns the first inserted event of eventType, or nil.

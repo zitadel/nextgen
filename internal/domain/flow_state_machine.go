@@ -2,7 +2,6 @@ package domain
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
@@ -134,10 +133,22 @@ type FlowStep struct {
 	Fields       []FlowField
 	Actions      []FlowAction
 	SSOProviders []FlowSSOProvider
+	// Identifier is set only when the step collects a password without
+	// collecting the identifier. Render-only — see [FlowStepIdentifier].
+	Identifier *FlowStepIdentifier
 	// Challenge is a pending authentication ceremony the client must
 	// satisfy before re-submitting (e.g. a passkey assertion). Nil unless
 	// the engine just issued one.
 	Challenge *FlowStepChallenge
+}
+
+// FlowStepIdentifier mirrors the OpenAPI `flow-step.identifier`: the
+// identifier a password form carries as a hidden control, so a password
+// manager stores the two as one credential. It carries no field name — the
+// control the client renders has none, so it is never submitted.
+type FlowStepIdentifier struct {
+	Value        string
+	Autocomplete string
 }
 
 // FlowStepChallenge mirrors the OpenAPI `flow-step.challenge`: a pending
@@ -327,8 +338,9 @@ func (r *FlowStateMachineRuntime) Render(ctx context.Context, def *FlowDefinitio
 // produced the result; otherwise Render goes on to render the step as usual.
 //
 // It runs on every render, so every GET /flow/{id} pays one attempt read even
-// without SSO. Filtering on steps that offer sso_providers would change what
-// back navigation sees, so the read stays until it measurably matters.
+// without SSO. The read is not only for SSO: LoadParked also restarts any flow
+// whose attempt expired or was handed off. Do not limit it to steps that offer
+// sso_providers.
 //
 // The outcome is raised with an empty action, so an unwired transition
 // degrades to the step-error re-render, as a handler diversion does.
@@ -362,21 +374,12 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 		if err != nil {
 			return FlowStepResult{}, false, err
 		}
-		// Snapshot in the cookie's own form: if a concurrent retry wins the
-		// handoff, this request renders the step exactly as the cookie had it.
-		before, err := json.Marshal(state)
-		if err != nil {
-			return FlowStepResult{}, false, fmt.Errorf("flow state machine: snapshot state: %w", err)
-		}
 		recordResolvedUser(state, parked.BoundUserID)
 		result, err := r.routeOutcome(pc, resolvedFields, FlowImplicitOutcomeSSOAuthenticated, false)
 		if errors.Is(err, ErrAuthAttemptAlreadyHandedOff()) {
-			var restored FlowState
-			if err := json.Unmarshal(before, &restored); err != nil {
-				return FlowStepResult{}, false, fmt.Errorf("flow state machine: restore state: %w", err)
-			}
-			*state = restored
-			return FlowStepResult{}, false, nil
+			// A concurrent retry won the handoff. A handed-off attempt restarts
+			// the flow on every later render too, so this one does the same.
+			return FlowStepResult{}, false, ErrFlowRestartRequired()
 		}
 		return result, true, err
 	}
@@ -404,7 +407,7 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 		result, err := r.routeOutcome(pc, resolvedFields, FlowImplicitOutcomeUserAlreadyExists, false)
 		return result, true, err
 	}
-	if parked == nil || parked.CheckID == state.SSOResolvedCheckID {
+	if parked == nil {
 		return FlowStepResult{}, false, nil
 	}
 
@@ -439,6 +442,14 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 		return result, true, err
 	}
 
+	// The bind cannot be undone, so it runs only when the outcome can route:
+	// a stored definition is validated only on write. Otherwise the step
+	// shows the outcome as an unwired one, and the row stays parked.
+	if t, ok := currentStep.Transitions[FlowImplicitOutcomeSSOAuthenticated]; !ok || t.Action != nil || t.Purpose != nil {
+		msg := FlowImplicitOutcomeSSOAuthenticated
+		result, err := r.renderStepError(pc, resolvedFields, &msg)
+		return result, true, err
+	}
 	err = r.ssoIdentities.BindLinked(ctx, FlowSSOBindInput{
 		ProjectID:    state.ProjectID,
 		AttemptID:    state.AuthAttemptID,
@@ -1742,6 +1753,7 @@ func (r *FlowStateMachineRuntime) buildStep(ctx context.Context, state *FlowStat
 			TextKey: step.Name + ".action." + flowBackActionName,
 		})
 	}
+	applyAutocomplete(resolved.Fields, state.CurrentPurpose)
 	return &FlowStep{
 		Name:         step.Name,
 		Texts:        FlowStepTexts{TitleKey: step.Name + ".title", DescriptionKey: step.Name + ".description"},
@@ -1751,7 +1763,48 @@ func (r *FlowStateMachineRuntime) buildStep(ctx context.Context, state *FlowStat
 		Fields:       resolved.Fields,
 		Actions:      actions,
 		SSOProviders: providers,
+		Identifier:   pairedIdentifier(resolved, state.CollectedData.UserData),
 	}, nil
+}
+
+// applyAutocomplete stamps each field's autofill token. The purpose is not
+// known at resolve time — the definition validator resolves without one, and
+// applyOutcomeFlip can change it mid-flow — so the token belongs to a render
+// rather than to the resolved field set.
+func applyAutocomplete(fields []FlowField, purpose FlowDefinitionPurpose) {
+	for i := range fields {
+		fields[i].Autocomplete = AutocompleteForField(fields[i], purpose)
+	}
+}
+
+// pairedIdentifier returns the identifier a password form carries beside
+// the password input so a manager can store the two as one credential.
+// Nil unless the step collects a password, collects no identifier of its
+// own, and the schema designates one a value was collected for.
+func pairedIdentifier(resolved FlowResolvedFields, collected map[string]any) *FlowStepIdentifier {
+	if resolved.IdentifierName == "" {
+		return nil
+	}
+	var holdsPassword bool
+	for _, f := range resolved.Fields {
+		switch f.Challenge {
+		case FlowFieldChallengeIdentifier:
+			return nil
+		case FlowFieldChallengePassword:
+			holdsPassword = true
+		}
+	}
+	if !holdsPassword {
+		return nil
+	}
+	value, ok := collectedString(collected, resolved.IdentifierName)
+	if !ok {
+		return nil
+	}
+	return &FlowStepIdentifier{
+		Value:        value,
+		Autocomplete: AutocompleteUsername,
+	}
 }
 
 // resolveSSOProviders renders the step's connection slugs through the
@@ -1842,11 +1895,26 @@ func prefillFromCollected(resolved *FlowResolvedFields, collected map[string]any
 		if resolved.Fields[i].Value != nil {
 			continue
 		}
-		if v, ok := maputil.GetNested[string](collected, AttributeKey(resolved.Fields[i].Name).Nodes()); ok && v != "" {
+		if v, ok := collectedString(collected, resolved.Fields[i].Name); ok {
 			val := v
 			resolved.Fields[i].Value = &val
 		}
 	}
+}
+
+// collectedString returns the value collected for a dotted property path when
+// one is there and non-empty. A collected-but-empty value is the same as
+// nothing to the callers that re-render it: there is no prefill to make and no
+// identifier to pair.
+//
+// [FindCollectedFieldByChallenge] deliberately does not go through here — it
+// reads a value of any type and asks only whether it is present.
+func collectedString(collected map[string]any, name string) (string, bool) {
+	v, ok := maputil.GetNested[string](collected, AttributeKey(name).Nodes())
+	if !ok || v == "" {
+		return "", false
+	}
+	return v, true
 }
 
 func mergeCollected(state *FlowState, fields map[string]any) error {
