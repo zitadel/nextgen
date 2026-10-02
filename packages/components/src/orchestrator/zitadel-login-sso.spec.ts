@@ -152,9 +152,9 @@ describe("<zitadel-login> with identity providers", () => {
       await atom.updateComplete;
 
       await withStubbedNavigation(async () => {
-        atom.shadowRoot?.querySelectorAll("zl-button")[0]?.dispatchEvent(
-          new MouseEvent("click", { bubbles: true, composed: true }),
-        );
+        atom.shadowRoot
+          ?.querySelectorAll("zl-button")[0]
+          ?.dispatchEvent(new MouseEvent("click", { bubbles: true, composed: true }));
         await waitFor(() =>
           mock.getCaptured().some((entry) => entry.kind === "submitFlowStep") ? true : null,
         );
@@ -162,8 +162,9 @@ describe("<zitadel-login> with identity providers", () => {
 
       const submit = mock
         .getCaptured()
-        .find((entry): entry is Extract<typeof entry, { kind: "submitFlowStep" }> =>
-          entry.kind === "submitFlowStep",
+        .find(
+          (entry): entry is Extract<typeof entry, { kind: "submitFlowStep" }> =>
+            entry.kind === "submitFlowStep",
         );
       const target = new URL(submit?.body.return_target ?? "");
       expect(target.searchParams.get("flow")).toBe(submit?.flowId);
@@ -319,38 +320,41 @@ describe("<zitadel-login> with identity providers", () => {
         return el;
       },
     },
-  ])("starts over when the flow from $source answers $status", async ({ source, status, body, mount }) => {
-    // The cookie window can close during the external sign-in, and a flow
-    // can finish in another tab. The handle then names nothing, and a page
-    // stuck on a startup error has no way forward.
-    const seen: string[] = [];
-    const record = ({ request }: { request: Request }) => {
-      seen.push(`${request.method} ${new URL(request.url).pathname}`);
-    };
-    server.events.on("request:start", record);
-    server.use(http.get("*/flow/:id", () => HttpResponse.json(body, { status })));
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
-    const original = window.location.href;
-    if (source === "the URL") window.history.replaceState({}, "", "/login?flow=flow_stale");
+  ])(
+    "starts over when the flow from $source answers $status",
+    async ({ source, status, body, mount }) => {
+      // The cookie window can close during the external sign-in, and a flow
+      // can finish in another tab. The handle then names nothing, and a page
+      // stuck on a startup error has no way forward.
+      const seen: string[] = [];
+      const record = ({ request }: { request: Request }) => {
+        seen.push(`${request.method} ${new URL(request.url).pathname}`);
+      };
+      server.events.on("request:start", record);
+      server.use(http.get("*/flow/:id", () => HttpResponse.json(body, { status })));
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+      const original = window.location.href;
+      if (source === "the URL") window.history.replaceState({}, "", "/login?flow=flow_stale");
 
-    let warned: string[];
-    try {
-      const element = mount(document.createElement("zitadel-login") as ZitadelLogin);
-      element.purpose = "login";
-      element.project = testProject;
-      host.appendChild(element);
-      await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
-    } finally {
-      window.history.replaceState({}, "", original);
-      server.events.removeListener("request:start", record);
-      warned = warn.mock.calls.map((call) => String(call[0]));
-      warn.mockRestore();
-    }
+      let warned: string[];
+      try {
+        const element = mount(document.createElement("zitadel-login") as ZitadelLogin);
+        element.purpose = "login";
+        element.project = testProject;
+        host.appendChild(element);
+        await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
+      } finally {
+        window.history.replaceState({}, "", original);
+        server.events.removeListener("request:start", record);
+        warned = warn.mock.calls.map((call) => String(call[0]));
+        warn.mockRestore();
+      }
 
-    expect(seen).toContain("GET /flow/flow_stale");
-    expect(seen).toContain("POST /flow");
-    expect(warned).toEqual([expect.stringContaining("flow_stale")]);
-  });
+      expect(seen).toContain("GET /flow/flow_stale");
+      expect(seen).toContain("POST /flow");
+      expect(warned).toEqual([expect.stringContaining("flow_stale")]);
+    },
+  );
 
   it("offers no providers when the project has enabled none", async () => {
     clearSsoProviders();
