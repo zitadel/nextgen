@@ -42,6 +42,12 @@ export type ClaimOutcome =
    * every completion 401s and re-signing-in just loops.
    */
   | { kind: "unauthenticated" }
+  /**
+   * 403 `auth.csrf_invalid`: the request was not accepted as coming from this
+   * console (another site, or a session token the shared fetch could not
+   * refresh). Not a team problem, so it does not take the team branches.
+   */
+  | { kind: "csrf_refused"; message: string }
   /** 429, 5xx, network — nothing the page can name; retryable. */
   | { kind: "error"; message: string };
 
@@ -77,6 +83,9 @@ export async function completeProjectClaim(
         case 401:
           return { kind: "unauthenticated" };
         case 403:
+          if (errorCode(cause.body) === "auth.csrf_invalid") {
+            return { kind: "csrf_refused", message };
+          }
           return personalTeamOutcome(message, cause.body);
         case 400:
         case 404:
@@ -118,6 +127,12 @@ function alreadyClaimedDetails(body: unknown): { teamId?: string; dashboardUrl?:
  * end — the server never said this account is permanently stuck, and offering a
  * retry that fails is kinder than refusing one that would have worked.
  */
+function errorCode(body: unknown): string | undefined {
+  if (!body || typeof body !== "object") return undefined;
+  const code = (body as Record<string, unknown>).code;
+  return typeof code === "string" ? code : undefined;
+}
+
 function personalTeamOutcome(message: string, body: unknown): ClaimOutcome {
   const record = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
   if (record.code === "claim.personal_team_not_active") {

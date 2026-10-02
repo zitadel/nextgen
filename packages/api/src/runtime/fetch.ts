@@ -1,9 +1,12 @@
-import { getApiAuthToken, getApiCsrfToken } from "./auth";
+import { getApiAuthToken, getApiCsrfToken, getApiCsrfTokenRefresher } from "./auth";
 
 /** The header the session-bound CSRF token travels in (ADR 053 §5). */
 export const CSRF_HEADER = "X-Zitadel-CSRF";
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+
+/** The code the server answers a refused CSRF check with. */
+const CSRF_INVALID = "auth.csrf_invalid";
 
 /**
  * Framework-neutral failure type the orval-generated client throws on
@@ -38,7 +41,9 @@ export class ApiError extends Error {
  *
  * - bearer auth — read from `runtime/auth.ts` and attached automatically;
  * - the CSRF header — the session-bound token from `runtime/auth.ts`, on
- *   unsafe methods only, when a first-party surface has set one;
+ *   unsafe methods only, when a first-party surface has set one; a request it
+ *   carried that answers `403 auth.csrf_invalid` re-reads the token once, via
+ *   the registered refresher, and is retried with it;
  * - non-2xx → throw — orval's stock client parses the body regardless
  *   of status, so callers would have to inspect every response. Throw
  *   `ApiError` on `!res.ok` so failures interrupt control flow;
@@ -54,15 +59,29 @@ export async function customFetch<T>(url: string, options: RequestInit): Promise
   }
   const csrfToken = getApiCsrfToken();
   const method = (options.method ?? "GET").toUpperCase();
-  if (csrfToken && !SAFE_METHODS.has(method) && !headers.has(CSRF_HEADER)) {
+  const addsCsrf = Boolean(csrfToken) && !SAFE_METHODS.has(method) && !headers.has(CSRF_HEADER);
+  if (addsCsrf && csrfToken) {
     headers.set(CSRF_HEADER, csrfToken);
   }
 
-  const res = await fetch(url, { ...options, headers });
+  let res = await fetch(url, { ...options, headers });
+  let noBody = [204, 205, 304].includes(res.status);
+  let rawBody = noBody ? "" : await res.text();
+  let parsed = rawBody ? (safeJsonParse(rawBody) as unknown) : undefined;
 
-  const noBody = [204, 205, 304].includes(res.status);
-  const rawBody = noBody ? "" : await res.text();
-  const parsed = rawBody ? (safeJsonParse(rawBody) as unknown) : undefined;
+  // The token went stale: the session cookie changed under this page (another
+  // tab signed in again). Re-read it once and retry; a second refusal stands.
+  const refresh = getApiCsrfTokenRefresher();
+  if (addsCsrf && refresh && res.status === 403 && errorCode(parsed) === CSRF_INVALID) {
+    const fresh = await refresh().catch(() => undefined);
+    if (fresh && fresh !== csrfToken) {
+      headers.set(CSRF_HEADER, fresh);
+      res = await fetch(url, { ...options, headers });
+      noBody = [204, 205, 304].includes(res.status);
+      rawBody = noBody ? "" : await res.text();
+      parsed = rawBody ? (safeJsonParse(rawBody) as unknown) : undefined;
+    }
+  }
 
   if (!res.ok) {
     const message = `${options.method ?? "GET"} ${url} returned ${res.status}`;
@@ -125,6 +144,10 @@ function pickDetailString(details: unknown): string | undefined {
     }
   }
   return undefined;
+}
+
+function errorCode(body: unknown): string | undefined {
+  return isRecord(body) && typeof body.code === "string" ? body.code : undefined;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
