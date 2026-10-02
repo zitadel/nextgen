@@ -28,8 +28,10 @@ func ssoBindingCookieName(secure bool) string {
 
 // ssoBindingSetCookie is the Set-Cookie value that binds the callback to
 // this browser. SameSite=Lax, not Strict: the callback is a cross-site
-// top-level GET, which a Strict cookie is not sent with. It lives as long
-// as the attempt the state record belongs to.
+// top-level GET, which a Strict cookie is not sent with. It gets the
+// attempt's full TTL from this submission, so it outlives the record by the
+// time already spent on the step; a lingering cookie is inert, the record
+// holds only the hash of its nonce.
 func ssoBindingSetCookie(ctx context.Context, nonce string) string {
 	secure := cookieSecureFromContext(ctx)
 	return (&http.Cookie{

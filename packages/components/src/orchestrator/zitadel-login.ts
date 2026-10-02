@@ -704,11 +704,14 @@ export class ZitadelLogin extends ZitadelSurface {
           wire = await getCurrentStep(api, resumeId);
         } catch (error) {
           // A handle can outlive its flow: the cookie window closed during
-          // the external sign-in (404) or the flow finished in another tab
-          // (410). This is still the sign-in page, and a startup error
-          // would leave it with no way forward, so start over. Logged so a
-          // host passing a wrong handle does not get a silent restart.
-          const gone = error instanceof ApiError && (error.status === 404 || error.status === 410);
+          // the external sign-in, so the browser no longer sends the
+          // required cookie (400), the cookie names another flow (404), or
+          // the flow finished in another tab (410). This is still the
+          // sign-in page, and a startup error would leave it with no way
+          // forward, so start over. Logged so a host passing a wrong handle
+          // does not get a silent restart.
+          const gone =
+            error instanceof ApiError && (error.status === 400 || error.status === 404 || error.status === 410);
           if (!gone) throw error;
           console.warn(`[zitadel-login] flow ${resumeId} no longer resolves; starting a new flow.`);
         }

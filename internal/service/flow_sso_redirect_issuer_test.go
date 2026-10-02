@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -34,7 +35,7 @@ func ssoConnectionDocument(pkce bool) []byte {
 			"client_id": "client-1",
 			"client_secret": "${{ GOOGLE_SECRET }}",
 			"scopes": ["openid", "email"],
-			"pkce_enabled": ` + map[bool]string{true: "true", false: "false"}[pkce] + `,
+			"pkce_enabled": ` + strconv.FormatBool(pkce) + `,
 			"authorization_endpoint": "https://accounts.example.test/authorize",
 			"token_endpoint": "https://accounts.example.test/token",
 			"userinfo_endpoint": "https://accounts.example.test/userinfo",
@@ -44,12 +45,25 @@ func ssoConnectionDocument(pkce bool) []byte {
 	return []byte(doc)
 }
 
+// ssoClientIDReferenceDocument is the static connection with its client_id
+// pointing at a project variable.
+var ssoClientIDReferenceDocument = []byte(strings.Replace(string(ssoConnectionDocument(false)), `"client-1"`, `"${{ GOOGLE_CLIENT_ID }}"`, 1))
+
+// ssoDiscoveryDocument has no endpoints, so building the client fetches the
+// issuer's discovery document.
+const ssoDiscoveryDocument = `{
+	"slug": "google", "protocol": "oidc", "display_name": "Google",
+	"oidc": {"issuer": "https://accounts.example.test", "client_id": "client-1", "client_secret": "s", "scopes": ["openid"]}
+}`
+
 var ssoIssueInput = domain.FlowIssueSSORedirectInput{
 	ProjectID:    "proj-1",
 	AttemptID:    "attempt-1",
 	ProviderSlug: "google",
-	RedirectURI:  "https://auth.example.com/__nextgen/idp/callback",
-	ReturnTarget: "https://auth.example.com/login?flow=flow-1",
+	FlowSSOReturn: domain.FlowSSOReturn{
+		RedirectURI:  "https://auth.example.com/__nextgen/idp/callback",
+		ReturnTarget: "https://auth.example.com/login?flow=flow-1",
+	},
 }
 
 // failingTransport stands in for an unreachable provider.
@@ -59,15 +73,36 @@ func (failingTransport) RoundTrip(*http.Request) (*http.Response, error) {
 	return nil, errors.New("dial tcp: connection refused")
 }
 
+// ssoIssuer builds the issuer over a connection service that answers the
+// slug with document, nil meaning no connection. A dependency left nil gets
+// a mock that expects no call.
+func ssoIssuer(t *testing.T, document []byte, attempts *fakeAuthAttempts, keys service.KeyService, variables service.VariableService, client *http.Client) *service.FlowSSORedirectIssuer {
+	t.Helper()
+	ctrl := gomock.NewController(t)
+	connections := servicemocks.NewMockIDPConnectionService(ctrl)
+	var found []*domain.IDPConnection
+	if document != nil {
+		found = []*domain.IDPConnection{{Slug: "google", RevisionID: "idprev_1", Document: document}}
+	}
+	connections.EXPECT().GetBySlugs(gomock.Any(), "proj-1", []string{"google"}).Return(found, nil)
+	if keys == nil {
+		keys = servicemocks.NewMockKeyService(ctrl)
+	}
+	if variables == nil {
+		variables = servicemocks.NewMockVariableService(ctrl)
+	}
+	if client == nil {
+		client = &http.Client{}
+	}
+	return service.NewFlowSSORedirectIssuer(connections, attempts, keys, variables, client)
+}
+
 func TestFlowSSORedirectIssuer_Issue(t *testing.T) {
 	t.Parallel()
 
 	t.Run("builds the authorize url from the issued state with pkce", func(t *testing.T) {
 		t.Parallel()
 		ctrl := gomock.NewController(t)
-		connections := servicemocks.NewMockIDPConnectionService(ctrl)
-		connections.EXPECT().GetBySlugs(gomock.Any(), "proj-1", []string{"google"}).
-			Return([]*domain.IDPConnection{{Slug: "google", RevisionID: "idprev_1", Document: ssoConnectionDocument(true)}}, nil)
 		keys := servicemocks.NewMockKeyService(ctrl)
 		crypter := cryptomock.NewMockCrypter(ctrl)
 		keys.EXPECT().GetProjectCrypter(gomock.Any(), "proj-1", domain.EncryptionKeyPurposeSecret).Return(crypter, nil)
@@ -78,7 +113,7 @@ func TestFlowSSORedirectIssuer_Issue(t *testing.T) {
 			OIDCNonce:    "nonce-1",
 		}}
 
-		out, err := service.NewFlowSSORedirectIssuer(connections, attempts, keys, servicemocks.NewMockVariableService(ctrl), &http.Client{}).Issue(t.Context(), ssoIssueInput)
+		out, err := ssoIssuer(t, ssoConnectionDocument(true), attempts, keys, nil, nil).Issue(t.Context(), ssoIssueInput)
 		require.NoError(t, err)
 
 		assert.Equal(t, service.IssueSSOStateInput{
@@ -108,17 +143,12 @@ func TestFlowSSORedirectIssuer_Issue(t *testing.T) {
 
 	t.Run("a client_id reference is filled from the project variable", func(t *testing.T) {
 		t.Parallel()
-		ctrl := gomock.NewController(t)
-		doc := strings.Replace(string(ssoConnectionDocument(false)), `"client-1"`, `"${{ GOOGLE_CLIENT_ID }}"`, 1)
-		connections := servicemocks.NewMockIDPConnectionService(ctrl)
-		connections.EXPECT().GetBySlugs(gomock.Any(), "proj-1", []string{"google"}).
-			Return([]*domain.IDPConnection{{Slug: "google", RevisionID: "idprev_1", Document: []byte(doc)}}, nil)
-		variables := servicemocks.NewMockVariableService(ctrl)
+		variables := servicemocks.NewMockVariableService(gomock.NewController(t))
 		variables.EXPECT().GetVariables(gomock.Any(), domain.VariableOwner{ProjectID: "proj-1"}, "GOOGLE_CLIENT_ID").
 			Return([]*domain.Variable{{Name: "GOOGLE_CLIENT_ID", Value: "client-from-variable"}}, nil)
 		attempts := &fakeAuthAttempts{issueSSOState: &domain.SSOState{State: "state-1", BindingNonce: "bind-1", OIDCNonce: "nonce-1"}}
 
-		out, err := service.NewFlowSSORedirectIssuer(connections, attempts, servicemocks.NewMockKeyService(ctrl), variables, &http.Client{}).Issue(t.Context(), ssoIssueInput)
+		out, err := ssoIssuer(t, ssoClientIDReferenceDocument, attempts, nil, variables, nil).Issue(t.Context(), ssoIssueInput)
 		require.NoError(t, err)
 
 		u, err := url.Parse(out.RedirectURL)
@@ -128,46 +158,32 @@ func TestFlowSSORedirectIssuer_Issue(t *testing.T) {
 
 	t.Run("a client_id reference with no variable is unavailable and issues no record", func(t *testing.T) {
 		t.Parallel()
-		ctrl := gomock.NewController(t)
-		doc := strings.Replace(string(ssoConnectionDocument(false)), `"client-1"`, `"${{ GOOGLE_CLIENT_ID }}"`, 1)
-		connections := servicemocks.NewMockIDPConnectionService(ctrl)
-		connections.EXPECT().GetBySlugs(gomock.Any(), "proj-1", []string{"google"}).
-			Return([]*domain.IDPConnection{{Slug: "google", RevisionID: "idprev_1", Document: []byte(doc)}}, nil)
-		variables := servicemocks.NewMockVariableService(ctrl)
+		variables := servicemocks.NewMockVariableService(gomock.NewController(t))
 		variables.EXPECT().GetVariables(gomock.Any(), domain.VariableOwner{ProjectID: "proj-1"}, "GOOGLE_CLIENT_ID").Return(nil, nil)
 		attempts := &fakeAuthAttempts{}
 
-		_, err := service.NewFlowSSORedirectIssuer(connections, attempts, servicemocks.NewMockKeyService(ctrl), variables, &http.Client{}).Issue(t.Context(), ssoIssueInput)
+		_, err := ssoIssuer(t, ssoClientIDReferenceDocument, attempts, nil, variables, nil).Issue(t.Context(), ssoIssueInput)
 		require.ErrorIs(t, err, domain.ErrFlowSSOUnavailable(nil))
 		assert.Empty(t, attempts.issueSSOStateIn.AttemptID)
 	})
 
 	t.Run("a client_id reference to a secret is unavailable and issues no record", func(t *testing.T) {
 		t.Parallel()
-		ctrl := gomock.NewController(t)
-		doc := strings.Replace(string(ssoConnectionDocument(false)), `"client-1"`, `"${{ GOOGLE_CLIENT_ID }}"`, 1)
-		connections := servicemocks.NewMockIDPConnectionService(ctrl)
-		connections.EXPECT().GetBySlugs(gomock.Any(), "proj-1", []string{"google"}).
-			Return([]*domain.IDPConnection{{Slug: "google", RevisionID: "idprev_1", Document: []byte(doc)}}, nil)
-		variables := servicemocks.NewMockVariableService(ctrl)
+		variables := servicemocks.NewMockVariableService(gomock.NewController(t))
 		variables.EXPECT().GetVariables(gomock.Any(), domain.VariableOwner{ProjectID: "proj-1"}, "GOOGLE_CLIENT_ID").
 			Return([]*domain.Variable{{Name: "GOOGLE_CLIENT_ID", Value: "ciphertext", IsSecret: true}}, nil)
 		attempts := &fakeAuthAttempts{}
 
-		_, err := service.NewFlowSSORedirectIssuer(connections, attempts, servicemocks.NewMockKeyService(ctrl), variables, &http.Client{}).Issue(t.Context(), ssoIssueInput)
+		_, err := ssoIssuer(t, ssoClientIDReferenceDocument, attempts, nil, variables, nil).Issue(t.Context(), ssoIssueInput)
 		require.ErrorIs(t, err, domain.ErrFlowSSOUnavailable(nil))
 		assert.Empty(t, attempts.issueSSOStateIn.AttemptID)
 	})
 
 	t.Run("without pkce no crypter is read and no challenge is sent", func(t *testing.T) {
 		t.Parallel()
-		ctrl := gomock.NewController(t)
-		connections := servicemocks.NewMockIDPConnectionService(ctrl)
-		connections.EXPECT().GetBySlugs(gomock.Any(), "proj-1", []string{"google"}).
-			Return([]*domain.IDPConnection{{Slug: "google", RevisionID: "idprev_1", Document: ssoConnectionDocument(false)}}, nil)
 		attempts := &fakeAuthAttempts{issueSSOState: &domain.SSOState{State: "state-1", BindingNonce: "bind-1", OIDCNonce: "nonce-1"}}
 
-		out, err := service.NewFlowSSORedirectIssuer(connections, attempts, servicemocks.NewMockKeyService(ctrl), servicemocks.NewMockVariableService(ctrl), &http.Client{}).Issue(t.Context(), ssoIssueInput)
+		out, err := ssoIssuer(t, ssoConnectionDocument(false), attempts, nil, nil, nil).Issue(t.Context(), ssoIssueInput)
 		require.NoError(t, err)
 
 		assert.Nil(t, attempts.issueSSOStateIn.PKCEEncrypter)
@@ -179,28 +195,18 @@ func TestFlowSSORedirectIssuer_Issue(t *testing.T) {
 
 	t.Run("unknown slug is not found and issues no record", func(t *testing.T) {
 		t.Parallel()
-		ctrl := gomock.NewController(t)
-		connections := servicemocks.NewMockIDPConnectionService(ctrl)
-		connections.EXPECT().GetBySlugs(gomock.Any(), "proj-1", []string{"google"}).Return(nil, nil)
 		attempts := &fakeAuthAttempts{}
 
-		_, err := service.NewFlowSSORedirectIssuer(connections, attempts, servicemocks.NewMockKeyService(ctrl), servicemocks.NewMockVariableService(ctrl), &http.Client{}).Issue(t.Context(), ssoIssueInput)
+		_, err := ssoIssuer(t, nil, attempts, nil, nil, nil).Issue(t.Context(), ssoIssueInput)
 		require.ErrorIs(t, err, domain.ErrIDPConnectionNotFound())
 		assert.Empty(t, attempts.issueSSOStateIn.AttemptID)
 	})
 
 	t.Run("discovery failure is unavailable with the engine error as cause and issues no record", func(t *testing.T) {
 		t.Parallel()
-		ctrl := gomock.NewController(t)
-		connections := servicemocks.NewMockIDPConnectionService(ctrl)
-		connections.EXPECT().GetBySlugs(gomock.Any(), "proj-1", []string{"google"}).
-			Return([]*domain.IDPConnection{{Slug: "google", RevisionID: "idprev_1", Document: []byte(`{
-				"slug": "google", "protocol": "oidc", "display_name": "Google",
-				"oidc": {"issuer": "https://accounts.example.test", "client_id": "client-1", "client_secret": "s", "scopes": ["openid"]}
-			}`)}}, nil)
 		attempts := &fakeAuthAttempts{}
 
-		_, err := service.NewFlowSSORedirectIssuer(connections, attempts, servicemocks.NewMockKeyService(ctrl), servicemocks.NewMockVariableService(ctrl), &http.Client{Transport: failingTransport{}}).Issue(t.Context(), ssoIssueInput)
+		_, err := ssoIssuer(t, []byte(ssoDiscoveryDocument), attempts, nil, nil, &http.Client{Transport: failingTransport{}}).Issue(t.Context(), ssoIssueInput)
 		require.ErrorIs(t, err, domain.ErrFlowSSOUnavailable(nil))
 		require.ErrorIs(t, err, domain.ErrIDPDiscoveryFailed(nil))
 		assert.Empty(t, attempts.issueSSOStateIn.AttemptID)
@@ -208,45 +214,28 @@ func TestFlowSSORedirectIssuer_Issue(t *testing.T) {
 
 	t.Run("document breaking a protocol rule is unavailable", func(t *testing.T) {
 		t.Parallel()
-		ctrl := gomock.NewController(t)
-		connections := servicemocks.NewMockIDPConnectionService(ctrl)
-		connections.EXPECT().GetBySlugs(gomock.Any(), "proj-1", []string{"google"}).
-			Return([]*domain.IDPConnection{{Slug: "google", RevisionID: "idprev_1", Document: []byte(`{
-				"slug": "google", "protocol": "oidc", "display_name": "Google",
-				"oidc": {"issuer": "https://accounts.example.test", "client_id": "client-1", "client_secret": "s", "scopes": ["email"]}
-			}`)}}, nil)
+		doc := strings.Replace(ssoDiscoveryDocument, `["openid"]`, `["email"]`, 1)
 
-		_, err := service.NewFlowSSORedirectIssuer(connections, &fakeAuthAttempts{}, servicemocks.NewMockKeyService(ctrl), servicemocks.NewMockVariableService(ctrl), &http.Client{}).Issue(t.Context(), ssoIssueInput)
+		_, err := ssoIssuer(t, []byte(doc), &fakeAuthAttempts{}, nil, nil, nil).Issue(t.Context(), ssoIssueInput)
 		require.ErrorIs(t, err, domain.ErrFlowSSOUnavailable(nil))
 		require.ErrorIs(t, err, domain.ErrIDPScopesMissingOpenID())
 	})
 
 	t.Run("undecodable document is internal, not unavailable", func(t *testing.T) {
 		t.Parallel()
-		ctrl := gomock.NewController(t)
-		connections := servicemocks.NewMockIDPConnectionService(ctrl)
-		connections.EXPECT().GetBySlugs(gomock.Any(), "proj-1", []string{"google"}).
-			Return([]*domain.IDPConnection{{Slug: "google", RevisionID: "idprev_1", Document: []byte(`{`)}}, nil)
 
-		_, err := service.NewFlowSSORedirectIssuer(connections, &fakeAuthAttempts{}, servicemocks.NewMockKeyService(ctrl), servicemocks.NewMockVariableService(ctrl), &http.Client{}).Issue(t.Context(), ssoIssueInput)
+		_, err := ssoIssuer(t, []byte(`{`), &fakeAuthAttempts{}, nil, nil, nil).Issue(t.Context(), ssoIssueInput)
 		require.ErrorIs(t, err, domain.ErrInternal(nil))
 		assert.NotErrorIs(t, err, domain.ErrFlowSSOUnavailable(nil))
 	})
 
 	t.Run("a cancelled request is unavailable without a provider warning", func(t *testing.T) {
 		t.Parallel()
-		ctrl := gomock.NewController(t)
-		connections := servicemocks.NewMockIDPConnectionService(ctrl)
-		connections.EXPECT().GetBySlugs(gomock.Any(), "proj-1", []string{"google"}).
-			Return([]*domain.IDPConnection{{Slug: "google", RevisionID: "idprev_1", Document: []byte(`{
-				"slug": "google", "protocol": "oidc", "display_name": "Google",
-				"oidc": {"issuer": "https://accounts.example.test", "client_id": "client-1", "client_secret": "s", "scopes": ["openid"]}
-			}`)}}, nil)
 		var logs bytes.Buffer
 		ctx, cancel := context.WithCancel(zlog.WithLoggingContext(t.Context(), slog.New(slog.NewTextHandler(&logs, nil))))
 		cancel()
 
-		_, err := service.NewFlowSSORedirectIssuer(connections, &fakeAuthAttempts{}, servicemocks.NewMockKeyService(ctrl), servicemocks.NewMockVariableService(ctrl), &http.Client{}).Issue(ctx, ssoIssueInput)
+		_, err := ssoIssuer(t, []byte(ssoDiscoveryDocument), &fakeAuthAttempts{}, nil, nil, nil).Issue(ctx, ssoIssueInput)
 		require.ErrorIs(t, err, domain.ErrFlowSSOUnavailable(nil))
 		require.ErrorIs(t, err, context.Canceled)
 		assert.Empty(t, logs.String())
@@ -254,13 +243,9 @@ func TestFlowSSORedirectIssuer_Issue(t *testing.T) {
 
 	t.Run("attempt error passes through", func(t *testing.T) {
 		t.Parallel()
-		ctrl := gomock.NewController(t)
-		connections := servicemocks.NewMockIDPConnectionService(ctrl)
-		connections.EXPECT().GetBySlugs(gomock.Any(), "proj-1", []string{"google"}).
-			Return([]*domain.IDPConnection{{Slug: "google", RevisionID: "idprev_1", Document: ssoConnectionDocument(false)}}, nil)
 		attempts := &fakeAuthAttempts{issueSSOStateErr: domain.ErrAuthAttemptAlreadyHandedOff()}
 
-		_, err := service.NewFlowSSORedirectIssuer(connections, attempts, servicemocks.NewMockKeyService(ctrl), servicemocks.NewMockVariableService(ctrl), &http.Client{}).Issue(t.Context(), ssoIssueInput)
+		_, err := ssoIssuer(t, ssoConnectionDocument(false), attempts, nil, nil, nil).Issue(t.Context(), ssoIssueInput)
 		require.ErrorIs(t, err, domain.ErrAuthAttemptAlreadyHandedOff())
 	})
 }

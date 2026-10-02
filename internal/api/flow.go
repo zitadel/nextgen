@@ -149,7 +149,6 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 	} else if h, ok := requestOriginFromContext(ctx); ok {
 		originStr = h
 	}
-	originAllowed := false
 	requestOrigin := ""
 	if originStr != "" {
 		originURL, err := url.Parse(originStr)
@@ -166,7 +165,6 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 				if err := validateOriginAgainstProject(originStr, project); err != nil {
 					return nil, domain.ErrRequestInvalid().WithMessage(err.Error())
 				}
-				originAllowed = true
 				submitReq.PasskeyRP = rp
 			}
 		}
@@ -181,7 +179,7 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 	// Only the action selects the branch: a provider id on another action
 	// goes through to the engine, which refuses it as an invalid action.
 	if req.Action == domain.FlowActionSSO {
-		if !originAllowed {
+		if requestOrigin == "" {
 			return nil, domain.ErrRequestInvalid().WithMessage("an sso submission needs a request origin")
 		}
 		rawTarget, ok := req.ReturnTarget.Get()
@@ -192,16 +190,18 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 		// leaves a fragment in the path, and a hash-routed page needs it
 		// back as a fragment.
 		returnTarget, err := url.Parse(rawTarget)
-		if err != nil || returnTarget.Scheme == "" || returnTarget.Host == "" {
-			return nil, domain.ErrRequestInvalid().WithMessage(fmt.Sprintf("return_target %q is not an absolute URL", rawTarget))
+		if err != nil {
+			return nil, domain.ErrRequestInvalid().WithMessage(fmt.Sprintf("return_target %q is not a URL", rawTarget))
 		}
 		// No page URL carries userinfo; it is only ever a way to dress a
 		// foreign host up as the origin.
 		if returnTarget.User != nil {
 			return nil, domain.ErrRequestInvalid().WithMessage("return_target must not carry userinfo")
 		}
-		if returnOrigin := returnTarget.Scheme + "://" + returnTarget.Host; !strings.EqualFold(returnOrigin, requestOrigin) {
-			return nil, domain.ErrRequestInvalid().WithMessage(fmt.Sprintf("return_target origin %q is not the request origin %q", returnOrigin, requestOrigin))
+		// A relative or scheme-less target fails here too: its origin lacks
+		// a scheme or a host, which the request origin always has.
+		if !strings.EqualFold(returnTarget.Scheme+"://"+returnTarget.Host, requestOrigin) {
+			return nil, domain.ErrRequestInvalid().WithMessage(fmt.Sprintf("return_target %q is not on the request origin %q", rawTarget, requestOrigin))
 		}
 		submitReq.SSOReturn = &domain.FlowSSOReturn{
 			RedirectURI:  requestOrigin + idpCallbackPath,

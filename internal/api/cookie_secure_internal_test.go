@@ -4,8 +4,9 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestCookieSecureFromContext(t *testing.T) {
@@ -171,8 +172,6 @@ func TestCookies_HaveNoComma(t *testing.T) {
 		"session":       sessionCookie(ctx, "tok", 60),
 		"session clear": deleteSessionCookie(ctx),
 	} {
-		if strings.Contains(cookie, ",") {
-			t.Errorf("%s cookie contains a comma: %q", name, cookie)
-		}
+		assert.NotContains(t, cookie, ",", "%s cookie", name)
 	}
 }

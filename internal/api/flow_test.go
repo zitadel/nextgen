@@ -333,22 +333,28 @@ func TestSubmitFlowStep_TerminalSurfacesHandoffToken(t *testing.T) {
 	}
 }
 
-// TestSubmitFlowStep_UnknownPropertiesReturnError covers #1103: a submit body
-// keying its values under an unrecognised top-level property (e.g. "data"
-// instead of "fields") used to be silently accepted with the fields ignored,
-// so the resulting empty submission came back as a 200 with a misleading
-// "value missing" step error instead of a request error.
 func TestSubmitFlowStep_SSO_BindsTheBrowserAndResealsTheFlowCookie(t *testing.T) {
 	tests := []struct {
 		name       string
 		origin     string
 		middleware []func(http.Handler) http.Handler
-		wantCookie string
+		// returnTarget defaults to the login page on the bare origin.
+		returnTarget string
+		wantCookie   string
 	}{
 		{
 			name:       "https origin gets the __Host- cookie",
 			origin:     "https://login.example.com",
 			wantCookie: "__Host-_zsso=nonce-1; Path=/; Max-Age=900; HttpOnly; Secure; SameSite=Lax",
+		},
+		{
+			// A hash-routed page lives in its fragment; the callback must
+			// bring the browser back to the route, not to a percent-encoded
+			// path.
+			name:         "return_target keeps its fragment",
+			origin:       "https://login.example.com",
+			returnTarget: "https://login.example.com/app#/sign-in?flow=flow_1",
+			wantCookie:   "__Host-_zsso=nonce-1; Path=/; Max-Age=900; HttpOnly; Secure; SameSite=Lax",
 		},
 		{
 			// Browsers send a bare origin; a trailing slash from another
@@ -378,10 +384,14 @@ func TestSubmitFlowStep_SSO_BindsTheBrowserAndResealsTheFlowCookie(t *testing.T)
 			}
 
 			bareOrigin := strings.TrimSuffix(tt.origin, "/")
+			returnTarget := tt.returnTarget
+			if returnTarget == "" {
+				returnTarget = bareOrigin + "/login?flow=flow_1"
+			}
 			resp, body := doRequestWithOrigin(t, http.MethodPost, ts.srv.URL+"/flow/flow_1/submit", map[string]any{
 				"action":          "sso",
 				"sso_provider_id": "google",
-				"return_target":   bareOrigin + "/login?flow=flow_1",
+				"return_target":   returnTarget,
 			}, ts.sealCookie(t, state), tt.origin)
 			require.Equal(t, http.StatusOK, resp.StatusCode, string(body))
 			// Two lines, _zflow first: the generated client reads only the
@@ -398,7 +408,7 @@ func TestSubmitFlowStep_SSO_BindsTheBrowserAndResealsTheFlowCookie(t *testing.T)
 			require.Equal(t, "google", *ts.fake.gotSubmitReq.SSOProviderID)
 			require.Equal(t, &domain.FlowSSOReturn{
 				RedirectURI:  bareOrigin + "/__nextgen/idp/callback",
-				ReturnTarget: bareOrigin + "/login?flow=flow_1",
+				ReturnTarget: returnTarget,
 			}, ts.fake.gotSubmitReq.SSOReturn)
 			var out struct {
 				Step struct {
@@ -452,29 +462,6 @@ func TestSubmitFlowStep_SSO_HandedOffAttemptIsAConflict(t *testing.T) {
 	require.Contains(t, string(body), "att.already_handed_off")
 }
 
-// A hash-routed page lives in its fragment; the callback must bring the
-// browser back to the route, not to a percent-encoded path.
-func TestSubmitFlowStep_SSO_KeepsTheReturnTargetFragment(t *testing.T) {
-	const origin = "https://login.example.com"
-	const target = origin + "/app#/sign-in?flow=flow_1"
-	ts := newTestServer(t)
-	state := &domain.FlowState{ID: "flow_1", ProjectID: "proj_1", SessionID: "sess_1", IssuedAt: time.Now()}
-	ts.projects.EXPECT().Get(gomock.Any(), "proj_1").Return(&domain.Project{PreviewOrigins: []string{origin}}, nil)
-	ts.fake.submitResult = domain.FlowStepResult{
-		State:           state,
-		Step:            &domain.FlowStep{Name: "sso-redirect", RedirectURL: new("https://accounts.example.test/authorize?state=s")},
-		SSOBindingNonce: "nonce-1",
-	}
-
-	resp, body := doRequestWithOrigin(t, http.MethodPost, ts.srv.URL+"/flow/flow_1/submit", map[string]any{
-		"action":          "sso",
-		"sso_provider_id": "google",
-		"return_target":   target,
-	}, ts.sealCookie(t, state), origin)
-	require.Equal(t, http.StatusOK, resp.StatusCode, string(body))
-	require.Equal(t, target, ts.fake.gotSubmitReq.SSOReturn.ReturnTarget)
-}
-
 // The length limit is the generated validation's: the request is refused
 // before the handler reads the project.
 func TestSubmitFlowStep_SSO_RejectsAnOverlongReturnTarget(t *testing.T) {
@@ -495,57 +482,61 @@ func TestSubmitFlowStep_SSO_RejectsAnOverlongReturnTarget(t *testing.T) {
 func TestSubmitFlowStep_SSO_RejectsAnUnboundReturn(t *testing.T) {
 	const origin = "https://login.example.com"
 	tests := []struct {
-		name   string
-		origin string
-		body   map[string]any
+		name     string
+		noOrigin bool
+		body     map[string]any
 	}{
 		{
-			name:   "return_target on another origin",
-			origin: origin,
-			body:   map[string]any{"action": "sso", "sso_provider_id": "google", "return_target": "https://evil.example.com/login"},
+			name: "return_target on another origin",
+			body: map[string]any{"action": "sso", "sso_provider_id": "google", "return_target": "https://evil.example.com/login"},
 		},
 		{
 			// The request origin sits in the userinfo part; the host is foreign.
-			name:   "return_target with the origin as userinfo",
-			origin: origin,
-			body:   map[string]any{"action": "sso", "sso_provider_id": "google", "return_target": "https://login.example.com@evil.example.com/login"},
+			name: "return_target with the origin as userinfo",
+			body: map[string]any{"action": "sso", "sso_provider_id": "google", "return_target": "https://login.example.com@evil.example.com/login"},
 		},
 		{
 			// The host is the origin, but no page URL carries userinfo.
-			name:   "return_target with userinfo on the origin host",
-			origin: origin,
-			body:   map[string]any{"action": "sso", "sso_provider_id": "google", "return_target": "https://evil.example.com@login.example.com/login"},
+			name: "return_target with userinfo on the origin host",
+			body: map[string]any{"action": "sso", "sso_provider_id": "google", "return_target": "https://evil.example.com@login.example.com/login"},
 		},
 		{
-			name:   "return_target missing",
-			origin: origin,
-			body:   map[string]any{"action": "sso", "sso_provider_id": "google"},
+			name: "return_target missing",
+			body: map[string]any{"action": "sso", "sso_provider_id": "google"},
 		},
 		{
-			name:   "return_target relative",
-			origin: origin,
-			body:   map[string]any{"action": "sso", "sso_provider_id": "google", "return_target": "/login?flow=flow_1"},
+			name: "return_target relative",
+			body: map[string]any{"action": "sso", "sso_provider_id": "google", "return_target": "/login?flow=flow_1"},
 		},
 		{
-			name: "no request origin",
-			body: map[string]any{"action": "sso", "sso_provider_id": "google", "return_target": origin + "/login"},
+			name:     "no request origin",
+			noOrigin: true,
+			body:     map[string]any{"action": "sso", "sso_provider_id": "google", "return_target": origin + "/login"},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ts := newTestServer(t)
 			state := &domain.FlowState{ID: "flow_1", ProjectID: "proj_1", SessionID: "sess_1", IssuedAt: time.Now()}
-			if tt.origin != "" {
+			requestOrigin := origin
+			if tt.noOrigin {
+				requestOrigin = ""
+			} else {
 				ts.projects.EXPECT().Get(gomock.Any(), "proj_1").Return(&domain.Project{PreviewOrigins: []string{origin}}, nil)
 			}
 
-			resp, body := doRequestWithOrigin(t, http.MethodPost, ts.srv.URL+"/flow/flow_1/submit", tt.body, ts.sealCookie(t, state), tt.origin)
+			resp, body := doRequestWithOrigin(t, http.MethodPost, ts.srv.URL+"/flow/flow_1/submit", tt.body, ts.sealCookie(t, state), requestOrigin)
 			require.Equal(t, http.StatusBadRequest, resp.StatusCode, string(body))
 			require.Empty(t, ts.fake.gotSubmitReq.Action, "no sign-in is started")
 		})
 	}
 }
 
+// TestSubmitFlowStep_UnknownPropertiesReturnError covers #1103: a submit body
+// keying its values under an unrecognised top-level property (e.g. "data"
+// instead of "fields") used to be silently accepted with the fields ignored,
+// so the resulting empty submission came back as a 200 with a misleading
+// "value missing" step error instead of a request error.
 func TestSubmitFlowStep_UnknownPropertiesReturnError(t *testing.T) {
 	ts := newTestServer(t)
 	state := &domain.FlowState{ID: "flow_1", IssuedAt: time.Now()}
