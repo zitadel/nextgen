@@ -50,10 +50,12 @@ then adds the `X-Zitadel-CSRF` header to every unsafe request. Clear it with
 that use a project secret leave it unset, and nothing is added.
 
 The token is bound to the session cookie, which another tab can replace by
-signing in again. Register `setApiCsrfRejectionHandler(() => …)` to learn about
-an unsafe request refused with `403 auth.csrf_invalid`: re-check the session
-there and load the token its cookie needs. The refused request is not retried,
-so a write is never replayed under a session it was not prepared for.
+signing in again. Register `setApiCsrfRejectionHandler(async () => …)` for an
+unsafe request refused with `403 auth.csrf_invalid`: re-check the session there,
+and return a fresh token only if it still belongs to the person the request was
+made for. `customFetch` then retries the request once with it; returning
+`undefined` leaves it refused, so a write is never replayed under someone
+else's session.
 `apiErrorCode(error)` from `@zitadel/api/runtime/fetch` reads the code of an
 `ApiError`. The token slot is shared across copies of this package loaded in the
 same page.

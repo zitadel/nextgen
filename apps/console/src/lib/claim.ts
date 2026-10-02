@@ -43,9 +43,9 @@ export type ClaimOutcome =
    */
   | { kind: "unauthenticated" }
   /**
-   * 403 `auth.csrf_invalid`: the request was not accepted as coming from this
-   * console (another site, or a session token that was stale or missing). Not a
-   * team problem, so it does not take the team branches.
+   * 403 `auth.csrf_invalid`, still refused after the shared fetch's one retry:
+   * someone else is signed in now, or the request came from another site. Not
+   * a team problem, so it does not take the team branches.
    */
   | { kind: "csrf_refused"; message: string }
   /** 429, 5xx, network — nothing the page can name; retryable. */

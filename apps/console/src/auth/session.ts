@@ -87,32 +87,39 @@ function readCsrfToken(): Promise<string | undefined> {
   );
 }
 
-/** Stores the token for `userId`, keeping the current one when the read failed. */
-async function loadCsrfToken(userId: string, pending?: Promise<string | undefined>): Promise<void> {
+/**
+ * Stores the token for `userId`, keeping the current one when the read failed.
+ * Returns the token it stored, if any.
+ */
+async function loadCsrfToken(
+  userId: string,
+  pending?: Promise<string | undefined>,
+): Promise<string | undefined> {
   const token = await (pending ?? readCsrfToken());
-  if (!token) return;
+  if (!token) return undefined;
   // The shared fetch adds it to every unsafe request from here on.
   setApiCsrfToken(token);
   tokenUserId = userId;
+  return token;
 }
 
 /** Test seam: the full reload a rejection ends in when the person changed. */
 export const sessionPage = { reload: () => window.location.reload() };
 
-let recheck: Promise<void> | undefined;
+let recheck: Promise<string | undefined> | undefined;
 
 /**
  * Runs when a write was refused with `403 auth.csrf_invalid`: the token was
  * stale (another tab replaced the cookie by signing in again) or never loaded.
- * The refused write stays refused; it is never replayed, so nothing prepared as
- * one person runs as another. The session is read again instead:
+ * The session is read again:
  *
- * - still the person this page shows: their token is loaded, and the next
- *   attempt goes through;
- * - someone else, or nobody: this page belongs to a session that is gone, so
- *   everything cached for it is dropped and the page starts over.
+ * - still the person this page shows: their token is loaded and returned, and
+ *   the shared fetch retries the write once with it;
+ * - someone else, or nobody: nothing is returned, so the write stays refused
+ *   and is never replayed as another person. This page belongs to a session
+ *   that is gone, so everything cached for it is dropped and it starts over.
  */
-async function recheckAfterRejection(): Promise<void> {
+async function recheckAfterRejection(): Promise<string | undefined> {
   const shownUserId = tokenUserId ?? cachedSession?.session.user_id;
   cachedSession = null;
   let session: ConsoleSession | null;
@@ -129,16 +136,18 @@ async function recheckAfterRejection(): Promise<void> {
   ) {
     invalidateSessionCache();
     sessionPage.reload();
-    return;
+    return undefined;
   }
   cachedSession = { at: Date.now(), session };
-  await loadCsrfToken(session.user_id);
+  return loadCsrfToken(session.user_id);
 }
 
+// Concurrent refusals share one re-check.
 setApiCsrfRejectionHandler(() => {
   recheck ??= recheckAfterRejection().finally(() => {
     recheck = undefined;
   });
+  return recheck;
 });
 
 /**

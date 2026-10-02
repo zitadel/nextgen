@@ -72,27 +72,56 @@ describe("customFetch CSRF header", () => {
   });
 });
 
+const created = () => new Response(JSON.stringify({ id: "team_1" }), { status: 201 });
+
 describe("customFetch CSRF refusal", () => {
-  it("notifies the rejection handler and does not retry", async () => {
+  it("retries once with the token the handler hands back", async () => {
+    const sent = scriptedFetch([csrfRefused, created]);
+    setApiCsrfToken("stale");
+    setApiCsrfRejectionHandler(async () => "fresh");
+    await expect(customFetch("http://api.test/teams", { method: "POST", body: "{}" })).resolves.toEqual({
+      id: "team_1",
+    });
+    expect(sent).toEqual(["stale", "fresh"]);
+  });
+
+  it("recovers a write that went out without a token", async () => {
+    const sent = scriptedFetch([csrfRefused, created]);
+    setApiCsrfRejectionHandler(async () => "fresh");
+    await expect(customFetch("http://api.test/teams", { method: "POST" })).resolves.toEqual({ id: "team_1" });
+    expect(sent).toEqual([null, "fresh"]);
+  });
+
+  // The handler hands back nothing when someone else, or nobody, is signed in
+  // now: the write is not replayed under a session it was not prepared for.
+  it("does not retry when the handler hands back no token", async () => {
     const sent = scriptedFetch([csrfRefused]);
     setApiCsrfToken("stale");
-    const onRejected = vi.fn();
-    setApiCsrfRejectionHandler(onRejected);
-    await expect(customFetch("http://api.test/teams", { method: "POST", body: "{}" })).rejects.toBeInstanceOf(
-      ApiError,
-    );
-    expect(onRejected).toHaveBeenCalledOnce();
-    // Never replayed: the write is not run under a session it was not prepared for.
+    setApiCsrfRejectionHandler(async () => undefined);
+    await expect(customFetch("http://api.test/teams", { method: "POST" })).rejects.toBeInstanceOf(ApiError);
     expect(sent).toEqual(["stale"]);
   });
 
-  it("notifies when no token was set, so a missing token can be loaded", async () => {
-    const sent = scriptedFetch([csrfRefused]);
-    const onRejected = vi.fn();
+  it("retries at most once", async () => {
+    const sent = scriptedFetch([csrfRefused, csrfRefused]);
+    setApiCsrfToken("stale");
+    const onRejected = vi.fn(async () => "fresh");
     setApiCsrfRejectionHandler(onRejected);
     await expect(customFetch("http://api.test/teams", { method: "POST" })).rejects.toBeInstanceOf(ApiError);
+    expect(sent).toEqual(["stale", "fresh"]);
     expect(onRejected).toHaveBeenCalledOnce();
-    expect(sent).toEqual([null]);
+  });
+
+  it("does not retry a body that can be read only once", async () => {
+    const sent = scriptedFetch([csrfRefused]);
+    setApiCsrfToken("stale");
+    const onRejected = vi.fn(async () => "fresh");
+    setApiCsrfRejectionHandler(onRejected);
+    await expect(
+      customFetch("http://api.test/teams", { method: "POST", body: new ReadableStream() }),
+    ).rejects.toBeInstanceOf(ApiError);
+    expect(onRejected).not.toHaveBeenCalled();
+    expect(sent).toEqual(["stale"]);
   });
 
   it("leaves other 403 answers and safe methods alone", async () => {
@@ -101,7 +130,7 @@ describe("customFetch CSRF refusal", () => {
       csrfRefused,
     ]);
     setApiCsrfToken("tok");
-    const onRejected = vi.fn();
+    const onRejected = vi.fn(async () => "fresh");
     setApiCsrfRejectionHandler(onRejected);
     await expect(customFetch("http://api.test/teams", { method: "POST" })).rejects.toBeInstanceOf(ApiError);
     await expect(customFetch("http://api.test/teams", { method: "GET" })).rejects.toBeInstanceOf(ApiError);
