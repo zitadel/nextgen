@@ -1,9 +1,9 @@
-import { nonBlankArg } from "../flags";
+import type { CommandResult } from "../types";
+import type { Json, ResourceDescriptor, Schema } from "./types";
 
 import { ZitadelError } from "../../errors";
-import type { CommandResult } from "../types";
+import { nonBlankArg } from "../flags";
 import { redactSecrets } from "./secrets";
-import type { Json, ResourceDescriptor, Schema } from "./types";
 
 /** Helpers shared by more than one verb builder. */
 

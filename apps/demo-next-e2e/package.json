@@ -3,13 +3,16 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "eslint ."
   },
   "devDependencies": {
     "@playwright/test": "catalog:",
     "@zitadel/api-mock": "workspace:*",
+    "@zitadel/eslint-config": "workspace:*",
     "@zitadel/sdk-next": "workspace:*",
     "@zitadel/testing": "workspace:*",
+    "eslint": "catalog:",
     "eslint-plugin-playwright": "catalog:",
     "typescript": "catalog:"
   }

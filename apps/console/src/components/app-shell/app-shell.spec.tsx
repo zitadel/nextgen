@@ -7,8 +7,8 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 
 import { scopedPath } from "@/lib/project-scope.fixture";
 
-import { THEME_STORAGE_KEY } from "../../theme";
 import { createAppRouter } from "../../router";
+import { THEME_STORAGE_KEY } from "../../theme";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
@@ -17,7 +17,6 @@ vi.mock("@/auth/session", async (importOriginal) => {
   const { makeTestSession } = await import("@/auth/session.fixture");
   return { ...actual, fetchSession: vi.fn(async () => makeTestSession()) };
 });
-
 
 /**
  * The sidebar lists only screens that exist. Entries come from `staticData.nav`
@@ -39,13 +38,7 @@ const NESTED_BRANDING = { parent: "Login flows", label: "Branding" };
 // Absent for two different reasons, both deliberate:
 //   - the first four have no endpoint at all
 //   - Sessions was built, but `POST /sessions/query` answers 501 (#699)
-const NEVER_SHOWN = [
-  "App groups",
-  "Applications",
-  "Analytics",
-  "Activity Log",
-  "Sessions",
-];
+const NEVER_SHOWN = ["App groups", "Applications", "Analytics", "Activity Log", "Sessions"];
 
 // A path pattern rather than an absolute URL: this spec imports the router
 // statically, so `api/zitadel.ts` evaluates its base URL before `vi.stubEnv`
@@ -106,7 +99,9 @@ describe("app shell navigation", () => {
 
     const [parent] = nav
       .getAllByRole("listitem")
-      .filter((li) => within(li).getAllByRole("link")[0]?.textContent?.trim() === NESTED_NAV.parent);
+      .filter(
+        (li) => within(li).getAllByRole("link")[0]?.textContent?.trim() === NESTED_NAV.parent,
+      );
     expect(parent).toBeDefined();
     expect(
       within(parent as HTMLElement).getByRole("link", { name: NESTED_NAV.label }),
@@ -345,7 +340,9 @@ describe("project pill", () => {
     const list = within(await screen.findByRole("list", { name: "Switch project" }));
     await userEvent.click(list.getByRole("link", { name: "Delta" }));
 
-    await vi.waitFor(() => expect(router.state.location.search).toMatchObject({ project: "proj_2" }));
+    await vi.waitFor(() =>
+      expect(router.state.location.search).toMatchObject({ project: "proj_2" }),
+    );
     expect(router.state.location.pathname).toBe("/teams");
     await vi.waitFor(() => expect(pill).toHaveTextContent("Delta"));
     expect(screen.queryByRole("list", { name: "Switch project" })).not.toBeInTheDocument();

@@ -1,8 +1,7 @@
+import Ajv2020 from "ajv/dist/2020";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-
-import Ajv2020 from "ajv/dist/2020";
 import { describe, expect, it } from "vitest";
 
 import { GoogleProvider } from "./google.js";

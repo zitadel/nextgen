@@ -16,8 +16,9 @@
 import { MANDATORY_GATES_TAG } from "@zitadel/config/template";
 import { Liquid } from "liquidjs";
 
-import type { FlowError } from "./template-context.js";
 import type { Locale } from "./locales/en.js";
+import type { FlowError } from "./template-context.js";
+
 import { hookName } from "../internal/hook-name.js";
 import { mandatoryGatesMarkerComment } from "./mandatory-gates.js";
 import defaultTemplate from "./templates/default.liquid";
@@ -100,9 +101,7 @@ export function createLiquidEngine(options: CreateLiquidOptions): Liquid {
         template = lookupKey;
         if (lookupKey !== "" && !warnedMissingKeys.has(lookupKey)) {
           warnedMissingKeys.add(lookupKey);
-          console.warn(
-            `[zitadel-login] missing text key "${lookupKey}" — rendering the raw key`,
-          );
+          console.warn(`[zitadel-login] missing text key "${lookupKey}" — rendering the raw key`);
         }
       }
       return interpolate(template, args.map(stringify));
@@ -330,10 +329,7 @@ export function parseSsoError(raw: string): FlowError[] | null {
   }
 }
 
-export function localiseFlowErrorKeys(
-  raw: string,
-  ctx: FlowErrorKeyContext,
-): FlowError[] | null {
+export function localiseFlowErrorKeys(raw: string, ctx: FlowErrorKeyContext): FlowError[] | null {
   const segments = raw.split("; ");
   if (!segments.every((segment) => segment.startsWith("error."))) return null;
   return segments.map((key) => localiseFlowErrorKey(key, ctx));

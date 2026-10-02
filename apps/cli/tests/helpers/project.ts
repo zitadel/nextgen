@@ -3,7 +3,6 @@ import { chmod, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "n
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Readable } from "node:stream";
-
 import { expect, onTestFinished } from "vitest";
 
 import { parseJson, runCliForTest } from "./run-cli";

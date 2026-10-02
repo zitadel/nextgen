@@ -10,6 +10,7 @@
  * reports it — an `error` event on the element.
  */
 import type { CreateFlow201Step } from "@zitadel/api/generated/model";
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import heroTemplate from "./__fixtures__/legacy-designs/hero.liquid";

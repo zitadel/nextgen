@@ -1,7 +1,6 @@
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-
 import { afterEach, describe, expect, it } from "vitest";
 
 import { openInBrowser, type BrowserDeps } from "../../../src/lib/browser";
@@ -45,7 +44,9 @@ function harness(
 function stripHarnessKeys(
   overrides: Partial<BrowserDeps> & { onPath?: string[]; procVersion?: string },
 ): Partial<BrowserDeps> {
-  const { onPath: _onPath, procVersion: _procVersion, ...rest } = overrides;
+  const rest = { ...overrides };
+  delete rest.onPath;
+  delete rest.procVersion;
   return rest;
 }
 

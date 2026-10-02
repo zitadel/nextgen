@@ -1,4 +1,3 @@
-import { type ZitadelProject } from "@zitadel/api/config";
 import type {
   CreateFlow201,
   CreateFlow201Step,
@@ -8,15 +7,20 @@ import type {
   SubmitFlowStepBodyChallengeResponse,
   SubmitFlowStepBodyFields,
 } from "@zitadel/api/generated/model";
-import { ApiError, apiErrorMessage } from "@zitadel/api/runtime/fetch";
-import { zitadelTrustmarkInnerHtml } from "../internal/attribution-markup.js";
 import type { Liquid, Template } from "liquidjs";
+
+import { type ZitadelProject } from "@zitadel/api/config";
+import { ApiError, apiErrorMessage } from "@zitadel/api/runtime/fetch";
 import { css, html, LitElement, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-
-import "../atoms/index.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 
+import "../atoms/index.js";
+import type { Branding } from "./branding.js";
+import type { FlowError, FlowIdentity, LiquidContext } from "./template-context.js";
+import type { ResolvedTheme } from "./theme-controller.js";
+
+import { zitadelTrustmarkInnerHtml } from "../internal/attribution-markup.js";
 import { emit } from "../internal/emit.js";
 import { escapeHtml } from "../internal/escape-html.js";
 import {
@@ -28,8 +32,6 @@ import {
 import { armAssetFallbacks } from "./asset-fallback.js";
 import { validateBranding } from "./branding-validator.js";
 import { resolveLogoUrl } from "./branding.js";
-import type { ResolvedTheme } from "./theme-controller.js";
-import type { Branding } from "./branding.js";
 import { stampExportparts } from "./exportparts.js";
 import { createLiquidEngine, localiseFlowErrorKeys, parseSsoError } from "./liquid.js";
 import { en, builtinLocales, type Locale } from "./locales/index.js";
@@ -37,9 +39,7 @@ import { patchMandatoryGates } from "./mandatory-gates.js";
 import { resolveApi, type ProjectAttrs } from "./resolve-api.js";
 import { createSanitiser } from "./sanitiser.js";
 import { ZitadelSurface } from "./surface.js";
-import type { FlowError, FlowIdentity, LiquidContext } from "./template-context.js";
 import { TEMPLATE_NAMES } from "./template-names.js";
-
 import layoutChromeCss from "./templates/layout-chrome.css?inline";
 
 /**
@@ -711,7 +711,8 @@ export class ZitadelLogin extends ZitadelSurface {
           // forward, so start over. Logged so a host passing a wrong handle
           // does not get a silent restart.
           const gone =
-            error instanceof ApiError && (error.status === 400 || error.status === 404 || error.status === 410);
+            error instanceof ApiError &&
+            (error.status === 400 || error.status === 404 || error.status === 410);
           if (!gone) throw error;
           console.warn(`[zitadel-login] flow ${resumeId} no longer resolves; starting a new flow.`);
         }
@@ -1341,7 +1342,8 @@ export class ZitadelLogin extends ZitadelSurface {
     // This path replaces the response without going through applyResponse;
     // the fresh error must not start life dismissed.
     this.stepErrorDismissed = false;
-    const { challenge: _dropped, ...stepWithoutChallenge } = this.response.step;
+    const stepWithoutChallenge = { ...this.response.step };
+    delete stepWithoutChallenge.challenge;
     this.response = {
       ...this.response,
       step: { ...stepWithoutChallenge, error: errorKey },

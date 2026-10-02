@@ -1,4 +1,5 @@
 import type { Page } from "@playwright/test";
+
 import { describe, expect, it } from "vitest";
 
 import { enableVirtualPasskey } from "../../src/passkey";
@@ -90,9 +91,7 @@ describe("enableVirtualPasskey", () => {
   it("swallows teardown errors and still detaches the session", async () => {
     const fake = fakeCdpPage({
       failSend: (method) =>
-        method === "WebAuthn.removeVirtualAuthenticator"
-          ? new Error("Target closed")
-          : undefined,
+        method === "WebAuthn.removeVirtualAuthenticator" ? new Error("Target closed") : undefined,
     });
     const passkey = await enableVirtualPasskey(fake.page);
 
@@ -119,8 +118,6 @@ describe("enableVirtualPasskey", () => {
       }),
     } as unknown as Page;
 
-    await expect(enableVirtualPasskey(page)).rejects.toThrow(
-      /Chromium's virtual authenticator/,
-    );
+    await expect(enableVirtualPasskey(page)).rejects.toThrow(/Chromium's virtual authenticator/);
   });
 });

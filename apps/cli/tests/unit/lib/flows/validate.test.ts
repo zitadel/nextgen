@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { buildFlow, validateFlows } from "../../../../src/lib/flows";
 import { ZitadelError } from "../../../../src/lib/errors";
+import { buildFlow, validateFlows } from "../../../../src/lib/flows";
 
 describe("validateFlows", () => {
   it("returns the parsed flows on success", () => {

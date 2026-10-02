@@ -23,7 +23,6 @@
     "@typescript/native-preview": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "oxfmt": "catalog:",
-    "oxlint": "catalog:",
     "sharp": "catalog:",
     "tsx": "catalog:",
     "typescript": "catalog:",

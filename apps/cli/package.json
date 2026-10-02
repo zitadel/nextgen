@@ -86,7 +86,8 @@
     "test:all": "pnpm run test",
     "readme": "oclif readme",
     "prepack": "tsdown && oclif manifest",
-    "postpack": "rm -f oclif.manifest.json"
+    "postpack": "rm -f oclif.manifest.json",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@clack/prompts": "catalog:",
@@ -118,7 +119,9 @@
     "@types/wrap-ansi": "^3.0.0",
     "@vitest/coverage-v8": "catalog:",
     "@zitadel/api-mock": "workspace:*",
+    "@zitadel/eslint-config": "workspace:*",
     "@zitadel/sdk-next": "workspace:*",
+    "eslint": "catalog:",
     "msw": "catalog:",
     "oclif": "catalog:",
     "tsdown": "^0.21.10",

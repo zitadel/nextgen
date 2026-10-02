@@ -10,7 +10,8 @@
     "test": "vitest run",
     "test:all": "pnpm run test",
     "dev:real": "tsx --conditions=@zitadel/source scripts/dev-real.mts",
-    "dev:claim": "tsx --conditions=@zitadel/source scripts/dev-real.mts --claim"
+    "dev:claim": "tsx --conditions=@zitadel/source scripts/dev-real.mts --claim",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@fontsource/arimo": "catalog:",
@@ -39,7 +40,6 @@
   "devDependencies": {
     "@tailwindcss/vite": "catalog:",
     "@tanstack/devtools-vite": "catalog:",
-    "@tanstack/eslint-plugin-router": "catalog:",
     "@tanstack/router-plugin": "catalog:",
     "@testing-library/jest-dom": "catalog:",
     "@testing-library/react": "catalog:",
@@ -48,7 +48,13 @@
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@vitejs/plugin-react": "catalog:",
+    "@zitadel/eslint-config": "workspace:*",
     "@zitadel/testing": "workspace:*",
+    "eslint": "catalog:",
+    "eslint-plugin-jsx-a11y": "catalog:",
+    "eslint-plugin-react": "catalog:",
+    "eslint-plugin-react-hooks": "catalog:",
+    "eslint-plugin-testing-library": "catalog:",
     "jsdom": "catalog:",
     "msw": "catalog:",
     "tsx": "catalog:",

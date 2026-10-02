@@ -9,7 +9,8 @@
     "build": "storybook build --output-dir dist",
     "typecheck": "tsc --build tsconfig.json",
     "test": "vitest run --project=storybook",
-    "test:all": "pnpm run test"
+    "test:all": "pnpm run test",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@zitadel/api": "workspace:*",
@@ -30,7 +31,9 @@
     "@types/react-dom": "catalog:",
     "@vitest/browser": "catalog:",
     "@vitest/browser-playwright": "catalog:",
+    "@zitadel/eslint-config": "workspace:*",
     "dompurify": "catalog:",
+    "eslint": "catalog:",
     "liquidjs": "catalog:",
     "lucide": "catalog:",
     "lucide-react": "catalog:",

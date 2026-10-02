@@ -1,5 +1,4 @@
 import { spawnSync } from "node:child_process";
-
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
 import { NextScaffolder } from "../../../../../src/lib/orca/scaffolders/next";

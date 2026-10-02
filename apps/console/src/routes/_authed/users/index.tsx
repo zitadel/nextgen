@@ -1,5 +1,5 @@
-import { ApiError } from "@zitadel/api/runtime/fetch";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
+import { ApiError } from "@zitadel/api/runtime/fetch";
 import { Box, Loader2, MoreVertical, Plus, Search, User } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -12,6 +12,7 @@ import {
   RESOURCE_TABLE_WRAP,
   ResourceHeadCell,
 } from "@/components/resource-list";
+import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -29,7 +30,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { StatusBadge } from "@/components/status-badge";
 
 import { api } from "../../../api/zitadel";
 import {
@@ -278,26 +278,30 @@ function UsersScreen() {
   // search whatever the project's schema actually defines.
   const rows = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    return users.map((user, index) => toUserRow(user, index, columns)).filter((row) => {
-      if (needle === "") return true;
-      // Team names only while the column is on screen. A later page served
-      // without the expansion drops the column while the rows fetched before it
-      // keep their memberships, and searching those would filter the table on
-      // something the operator cannot see.
-      const teams = teamsExpanded ? row.teams.map((team) => team.name) : [];
-      return [
-        row.id,
-        row.name,
-        row.identifier ?? "",
-        ...teams,
-        ...columns.map((column) => row.values[column.key] ?? ""),
-      ].some((value) => value.toLowerCase().includes(needle));
-    });
+    return users
+      .map((user, index) => toUserRow(user, index, columns))
+      .filter((row) => {
+        if (needle === "") return true;
+        // Team names only while the column is on screen. A later page served
+        // without the expansion drops the column while the rows fetched before it
+        // keep their memberships, and searching those would filter the table on
+        // something the operator cannot see.
+        const teams = teamsExpanded ? row.teams.map((team) => team.name) : [];
+        return [
+          row.id,
+          row.name,
+          row.identifier ?? "",
+          ...teams,
+          ...columns.map((column) => row.values[column.key] ?? ""),
+        ].some((value) => value.toLowerCase().includes(needle));
+      });
   }, [users, query, columns, teamsExpanded]);
 
   return (
     <div className={`${RESOURCE_PAGE} pt-4`}>
-      <h1 className={`${RESOURCE_HEADER} text-foreground font-serif text-2xl leading-6 tracking-tight`}>
+      <h1
+        className={`${RESOURCE_HEADER} text-foreground font-serif text-2xl leading-6 tracking-tight`}
+      >
         Users
       </h1>
 
@@ -443,11 +447,7 @@ function UsersScreen() {
   );
 }
 
-function toUserRow(
-  user: Record<string, unknown>,
-  index: number,
-  columns: SchemaField[],
-): UserRow {
+function toUserRow(user: Record<string, unknown>, index: number, columns: SchemaField[]): UserRow {
   const id = field(user, "id") ?? `unknown-user-${index}`;
   const attributes = userAttributes(user);
   const values: Record<string, string> = {};
@@ -514,7 +514,6 @@ function userStatus(user: Record<string, unknown>): string | undefined {
   if (!metadata || typeof metadata !== "object") return undefined;
   return field(metadata as Record<string, unknown>, "status");
 }
-
 
 /**
  * The teams a user belongs to, glyphed the way the design draws the cell and the

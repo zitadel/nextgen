@@ -1,4 +1,5 @@
 import type { Meta } from "@storybook/web-components-vite";
+
 import {
   applyBranding,
   applySsoProviders,
@@ -6,9 +7,10 @@ import {
   clearSsoProviders,
   setupMockHandlers,
 } from "@zitadel/api-mock";
+import { LOGIN_PREVIEW_STATES, type LoginPreviewState } from "@zitadel/components";
 import { html } from "lit";
 import { mswLoader } from "msw-storybook-addon";
-import { LOGIN_PREVIEW_STATES, type LoginPreviewState } from "@zitadel/components";
+
 import { brandingPresets, type BrandingPresetId } from "./branding-presets.js";
 
 /**

@@ -1,7 +1,8 @@
+import type { RendererId, RendererSpec } from "./types";
+
 import { ZitadelError } from "../../../../../errors";
 import { litRenderer } from "./lit";
 import { reactRenderer } from "./react";
-import type { RendererId, RendererSpec } from "./types";
 
 /**
  * Runtime mirror of the {@link RendererId} union, used by {@link isRendererId}

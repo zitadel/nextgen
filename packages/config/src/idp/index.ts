@@ -1,3 +1,5 @@
+import type { IdpProvider } from "./provider.js";
+
 /**
  * The providers `zitadel setup` and `sso enable` can scaffold a connection for.
  *
@@ -8,7 +10,6 @@
  * behaviour. Holding that in the provider keeps it out of the callers.
  */
 import { GoogleProvider } from "./google.js";
-import type { IdpProvider } from "./provider.js";
 
 const PROVIDERS: readonly IdpProvider[] = Object.freeze([new GoogleProvider()]);
 

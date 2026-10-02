@@ -2,6 +2,9 @@ import { readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 
 import type { ConfigWiringStatus, EjectActions } from "../../../lib/orca/patchers/types";
+import type { ScaffoldFileClass, ScaffoldManifest } from "../../../lib/sync/types";
+import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
+
 import { MANAGED_MARKER } from "../../../lib/paths";
 import { readRendererId, readZitadelConfig } from "../../../lib/project";
 import {
@@ -10,9 +13,7 @@ import {
   writeScaffoldManifest,
 } from "../../../lib/scaffold-manifest";
 import { updateScaffold } from "../../../lib/sync/state";
-import type { ScaffoldFileClass, ScaffoldManifest } from "../../../lib/sync/types";
 import { loadPatchContext } from "../patch-context";
-import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
 
 /**
  * Per-file classification reported in the check's `details`:
@@ -68,9 +69,7 @@ export class ManagedFilesCheck implements SanityCheck {
     const { mode, rows } = evaluated;
     const wiring = await probeConfigWiring(ctx);
     const actions = await resolveArtifacts(ctx);
-    const boundaries = actions
-      ? await detectBoundaryConflicts(actions, ctx.cwd, manifest)
-      : [];
+    const boundaries = actions ? await detectBoundaryConflicts(actions, ctx.cwd, manifest) : [];
     const missing = rows.filter((row) => row.state === "missing");
     const missingInfrastructure = missing.filter((row) => row.class === "infrastructure");
     const detachedInfrastructure = wiring.filter(
@@ -97,9 +96,7 @@ export class ManagedFilesCheck implements SanityCheck {
     }
     if (detachedInfrastructure.length > 0) {
       failures.push(
-        `detached managed config wiring: ${detachedInfrastructure
-          .map((s) => s.path)
-          .join(", ")}`,
+        `detached managed config wiring: ${detachedInfrastructure.map((s) => s.path).join(", ")}`,
       );
     }
     for (const conflict of conflicts) {
@@ -140,7 +137,9 @@ export class ManagedFilesCheck implements SanityCheck {
       name: this.name,
       status: "pass",
       message: `Scaffolded app files are present (${rows.length} tracked${
-        wiring.length > 0 ? `, ${wiring.length} wiring${wiring.length === 1 ? "" : "s"} verified` : ""
+        wiring.length > 0
+          ? `, ${wiring.length} wiring${wiring.length === 1 ? "" : "s"} verified`
+          : ""
       }${mode === "template" ? ", from templates" : ""})`,
       details,
     };
@@ -283,14 +282,10 @@ async function detectBoundaryConflicts(
  * framework — the probe is skipped silently and the responsible check
  * reports the real problem.
  */
-async function probeConfigWiring(
-  ctx: CheckContext,
-): Promise<ReadonlyArray<ConfigWiringStatus>> {
+async function probeConfigWiring(ctx: CheckContext): Promise<ReadonlyArray<ConfigWiringStatus>> {
   try {
     const patchCtx = await loadPatchContext(ctx.cwd, ctx.orca, ctx.cliVersion);
-    return await ctx.orca
-      .patcherFor(patchCtx.framework.id)
-      .verify(patchCtx, { cwd: ctx.cwd });
+    return await ctx.orca.patcherFor(patchCtx.framework.id).verify(patchCtx, { cwd: ctx.cwd });
   } catch {
     return [];
   }

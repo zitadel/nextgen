@@ -1,11 +1,9 @@
-/* oxlint-disable playwright/no-conditional-in-test */
+import { expect, test } from "@playwright/test";
+import { registerWithPassword } from "@zitadel/testing/playwright";
 import { execFile } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
-
-import { expect, test } from "@playwright/test";
-import { registerWithPassword } from "@zitadel/testing/playwright";
 
 /**
  * The local ownership journey. `zitadel start` boots the server with the
@@ -183,7 +181,10 @@ async function journeyMetadataOrSkip(): Promise<JourneyMetadata & { localRuntime
   const metadata = JSON.parse(
     await readFile(join(requiredEnv("JOURNEY_OUTPUT_DIR"), "metadata.json"), "utf8"),
   ) as JourneyMetadata;
-  test.skip(metadata.framework !== "next", "local ownership is framework-independent; next lane only");
+  test.skip(
+    metadata.framework !== "next",
+    "local ownership is framework-independent; next lane only",
+  );
   test.skip(
     process.env.JOURNEY_PREEXISTING_APP === "1",
     "the fresh-app lane already proves local ownership; keep the preexisting lane lean",

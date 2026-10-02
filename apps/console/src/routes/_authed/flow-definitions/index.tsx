@@ -2,8 +2,8 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { Ellipsis, LogIn, Workflow } from "lucide-react";
 
 import { EYEBROW } from "@/components/detail-meta";
-import { StatusBadge } from "@/components/status-badge";
 import { RESOURCE_HEADER, RESOURCE_PAGE } from "@/components/resource-list";
+import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {

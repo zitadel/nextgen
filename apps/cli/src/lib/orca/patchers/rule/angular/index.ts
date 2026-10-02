@@ -1,8 +1,9 @@
+import type { PatchContext, PatchView } from "../../types";
+import type { FileOp } from "../file-writer/types";
+
 import { ZitadelError } from "../../../../errors";
 import { isObject, parseJsonObject, setTopLevelJsonKey } from "../../../../json";
 import { npmDistTagForCliVersion } from "../../../../public-cli";
-import type { FileOp } from "../file-writer/types";
-import type { PatchContext, PatchView } from "../../types";
 import { AbstractRulePatcher } from "../base";
 import { angularProxyEdit } from "./angular-json";
 import { angularRoutesEdit } from "./angular-routes";

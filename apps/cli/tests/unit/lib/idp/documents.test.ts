@@ -1,15 +1,10 @@
+import { getDefaultHumanUserSchema, getDefaultLoginFlow } from "@zitadel/config/defaults";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-
 import { describe, expect, it } from "vitest";
 
-import { getDefaultHumanUserSchema, getDefaultLoginFlow } from "@zitadel/config/defaults";
-import {
-  applySsoToFlow,
-  applySsoToSchema,
-  ssoEditRefusal,
-} from "../../../../src/lib/idp";
+import { applySsoToFlow, applySsoToSchema, ssoEditRefusal } from "../../../../src/lib/idp";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "../../../../../..");
 
@@ -26,7 +21,10 @@ function targetsOf(flow: object, step: string): Record<string, string> {
     | Record<string, { target?: string }>
     | undefined;
   return Object.fromEntries(
-    Object.entries(transitions ?? {}).map(([outcome, transition]) => [outcome, transition.target ?? ""]),
+    Object.entries(transitions ?? {}).map(([outcome, transition]) => [
+      outcome,
+      transition.target ?? "",
+    ]),
   );
 }
 
@@ -46,12 +44,18 @@ function shippedFlow(): Record<string, unknown> {
 
 describe("applySsoToSchema", () => {
   it("enables the provider without touching password or passkey", () => {
-    const schema = getDefaultHumanUserSchema({ useCase: "minimal" }) as unknown as Record<string, unknown>;
+    const schema = getDefaultHumanUserSchema({ useCase: "minimal" }) as unknown as Record<
+      string,
+      unknown
+    >;
     const before = structuredClone(schema["x-auth-methods"]) as Record<string, unknown>;
 
     const { document, changed } = applySsoToSchema(schema, "google");
 
-    const methods = (document as Record<string, unknown>)["x-auth-methods"] as Record<string, unknown>;
+    const methods = (document as Record<string, unknown>)["x-auth-methods"] as Record<
+      string,
+      unknown
+    >;
     expect(changed).toBe(true);
     expect(methods.sso).toEqual({ enabled: true, providers: ["google"] });
     expect(methods.password).toEqual(before.password);
@@ -70,7 +74,10 @@ describe("applySsoToSchema", () => {
     const first = applySsoToSchema(getDefaultHumanUserSchema({ useCase: "minimal" }), "google");
     const second = applySsoToSchema(first.document, "github");
 
-    const methods = (second.document as Record<string, unknown>)["x-auth-methods"] as Record<string, unknown>;
+    const methods = (second.document as Record<string, unknown>)["x-auth-methods"] as Record<
+      string,
+      unknown
+    >;
     expect((methods.sso as { providers: string[] }).providers).toEqual(["google", "github"]);
   });
 });
@@ -121,11 +128,17 @@ describe("applySsoToFlow", () => {
   });
 
   it("offers only the methods the schema enables on the conflict step", () => {
-    const { document } = applySsoToFlow(shippedFlow(), "google", { password: false, passkey: true });
+    const { document } = applySsoToFlow(shippedFlow(), "google", {
+      password: false,
+      passkey: true,
+    });
     const step = stepNamed(document, "sso-conflict");
 
     expect(step.fields).toEqual([]);
-    expect((step.actions as Array<{ name: string }>).map((a) => a.name)).toEqual(["passkey", "sign_in"]);
+    expect((step.actions as Array<{ name: string }>).map((a) => a.name)).toEqual([
+      "passkey",
+      "sign_in",
+    ]);
     expect(step.transitions).not.toHaveProperty("submit");
   });
 
@@ -198,7 +211,9 @@ describe("applySsoToFlow", () => {
     const conflict = stepNamed(document, "sso-conflict");
 
     expect(conflict.transitions).not.toHaveProperty("sign_in");
-    expect((conflict.actions as Array<{ name: string }>).map((a) => a.name)).not.toContain("sign_in");
+    expect((conflict.actions as Array<{ name: string }>).map((a) => a.name)).not.toContain(
+      "sign_in",
+    );
   });
 
   it("is a no-op the second time", () => {
@@ -227,7 +242,9 @@ describe("applySsoToFlow", () => {
 
   it("adds the new steps before the terminal step", () => {
     const { document } = applySsoToFlow(shippedFlow(), "google", bothMethods);
-    const names = ((document as { steps: Array<Record<string, unknown>> }).steps ?? []).map((s) => s.name);
+    const names = ((document as { steps: Array<Record<string, unknown>> }).steps ?? []).map(
+      (s) => s.name,
+    );
 
     expect(names.indexOf("register-sso")).toBeLessThan(names.indexOf("done"));
     expect(names.indexOf("sso-conflict")).toBeLessThan(names.indexOf("done"));
@@ -259,7 +276,10 @@ describe("register-sso collects what registration collects", () => {
     // a password box here would collect something the mutation never stores.
     for (const useCase of ["minimal", "consumer", "business"] as const) {
       const fields = ssoFields(useCase) as string[];
-      expect(fields.some((field) => field.startsWith("x-auth-methods#")), useCase).toBe(false);
+      expect(
+        fields.some((field) => field.startsWith("x-auth-methods#")),
+        useCase,
+      ).toBe(false);
     }
   });
 
@@ -297,8 +317,12 @@ describe("the terminal the generated routes point at", () => {
       password: true,
       passkey: false,
     });
-    const steps = (document as { steps: { name: string; transitions?: Record<string, { target: string }> }[] }).steps;
-    const targets = steps.flatMap((step) => Object.values(step.transitions ?? {}).map((t) => t.target));
+    const steps = (
+      document as { steps: { name: string; transitions?: Record<string, { target: string }> }[] }
+    ).steps;
+    const targets = steps.flatMap((step) =>
+      Object.values(step.transitions ?? {}).map((t) => t.target),
+    );
 
     expect(targets).toContain("complete");
     expect(targets).not.toContain("done");
@@ -309,12 +333,16 @@ describe("the terminal the generated routes point at", () => {
       password: false,
       passkey: true,
     });
-    const steps = (document as { steps: { name: string; transitions?: Record<string, { target: string }> }[] }).steps;
+    const steps = (
+      document as { steps: { name: string; transitions?: Record<string, { target: string }> }[] }
+    ).steps;
     const names = new Set(steps.map((step) => step.name));
 
     for (const step of steps) {
       for (const [outcome, transition] of Object.entries(step.transitions ?? {})) {
-        expect(names, `${step.name}.${outcome} targets a missing step`).toContain(transition.target);
+        expect(names, `${step.name}.${outcome} targets a missing step`).toContain(
+          transition.target,
+        );
       }
     }
   });
@@ -324,8 +352,12 @@ describe("the terminal the generated routes point at", () => {
       password: true,
       passkey: false,
     });
-    const steps = (document as { steps: { name: string; transitions?: Record<string, { target: string }> }[] }).steps;
-    const targets = steps.flatMap((step) => Object.values(step.transitions ?? {}).map((t) => t.target));
+    const steps = (
+      document as { steps: { name: string; transitions?: Record<string, { target: string }> }[] }
+    ).steps;
+    const targets = steps.flatMap((step) =>
+      Object.values(step.transitions ?? {}).map((t) => t.target),
+    );
 
     expect(targets).toContain("done");
   });
@@ -359,9 +391,9 @@ describe("a hand-edited owned step", () => {
       password: true,
       passkey: true,
     });
-    const conflict = (document as { steps: { name: string; sso_providers?: unknown[] }[] }).steps.find(
-      (step) => step.name === "sso-conflict",
-    );
+    const conflict = (
+      document as { steps: { name: string; sso_providers?: unknown[] }[] }
+    ).steps.find((step) => step.name === "sso-conflict");
 
     expect(skipped.map((entry) => entry.region)).toContain("steps.sso-conflict");
     expect(conflict?.sso_providers).toEqual(["github"]);
@@ -384,9 +416,9 @@ describe("a hand-edited owned step", () => {
       "google",
       { password: true, passkey: true },
     );
-    const conflict = (document as { steps: { name: string; sso_providers?: unknown[] }[] }).steps.find(
-      (step) => step.name === "sso-conflict",
-    );
+    const conflict = (
+      document as { steps: { name: string; sso_providers?: unknown[] }[] }
+    ).steps.find((step) => step.name === "sso-conflict");
 
     expect(skipped).toEqual([]);
     expect(conflict?.sso_providers).toEqual(["google"]);

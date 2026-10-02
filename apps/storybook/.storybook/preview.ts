@@ -1,5 +1,6 @@
-import { configureZitadel } from "@zitadel/api/config";
 import type { Preview } from "@storybook/web-components-vite";
+
+import { configureZitadel } from "@zitadel/api/config";
 import { html } from "lit";
 import { keyed } from "lit/directives/keyed.js";
 import { initialize } from "msw-storybook-addon";
@@ -21,6 +22,7 @@ customElements.define = (name, constructor, options) => {
 import "@zitadel/design-tokens/css/tokens.css";
 // Side-effect: register every `<zl-*>` atom AND the `<zitadel-login>` orchestrator.
 import "@zitadel/components";
+
 // Workbench chrome (dark canvas to match the Figma dark mode).
 import "../src/preview.css";
 

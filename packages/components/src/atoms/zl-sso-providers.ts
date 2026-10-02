@@ -1,13 +1,12 @@
 import { LitElement, html, nothing } from "lit";
 import { customElement, property } from "lit/decorators.js";
 
-import ssoStyles from "./zl-sso-providers.css?inline";
+import type { AtomManifest } from "../manifest.js";
 
 import { emit } from "../internal/emit.js";
-import type { AtomManifest } from "../manifest.js";
 import { baseHostStyles, surfaceStyles } from "../styles/index.js";
-
 import { SHIPPED_BRAND_ICON_NAMES, type BrandIconName } from "./zl-icon.js";
+import ssoStyles from "./zl-sso-providers.css?inline";
 import "./zl-button.js";
 import "./zl-icon.js";
 
@@ -74,7 +73,8 @@ export class ZlSsoProviders extends LitElement {
    * already localised; the fallback is English so a template that forgets it
    * still renders a sentence rather than a key.
    */
-  @property({ attribute: "label-format" }) accessor labelFormat = `Continue with ${NAME_PLACEHOLDER}`;
+  @property({ attribute: "label-format" }) accessor labelFormat =
+    `Continue with ${NAME_PLACEHOLDER}`;
 
   /** Text for the rule above the buttons. Omitted renders no rule. */
   @property({ attribute: "divider-label" }) accessor dividerLabel: string | undefined = undefined;
@@ -98,7 +98,12 @@ export class ZlSsoProviders extends LitElement {
     return html`
       <div class="zr-sso" part="root" @zl-submit=${stopInnerSubmit}>
         ${this.dividerLabel
-          ? html`<div class="zr-sso__divider" part="divider" role="separator" aria-label=${this.dividerLabel}>
+          ? html`<div
+              class="zr-sso__divider"
+              part="divider"
+              role="separator"
+              aria-label=${this.dividerLabel}
+            >
               <span aria-hidden="true">${this.dividerLabel}</span>
             </div>`
           : nothing}
@@ -157,7 +162,6 @@ export class ZlSsoProviders extends LitElement {
       name: provider.name,
     });
   }
-
 }
 
 /**

@@ -1,3 +1,5 @@
+import type { AtomManifest } from "./manifest.js";
+
 /**
  * Aggregate registry of every shipped `<zl-*>` atom's manifest.
  *
@@ -18,7 +20,6 @@ import {
   zlSelectManifest,
   zlSsoProvidersManifest,
 } from "./atoms/index.js";
-import type { AtomManifest } from "./manifest.js";
 
 export const manifestRegistry: readonly AtomManifest[] = [
   zlAlertManifest,

@@ -136,7 +136,12 @@ function AddTeamForm({
         <Button type="button" variant="secondary" className="gap-1.5 px-2.5" onClick={onClose}>
           Cancel
         </Button>
-        <Button type="submit" size="sm" className="gap-1 px-2.5 text-xs" disabled={empty || submitting}>
+        <Button
+          type="submit"
+          size="sm"
+          className="gap-1 px-2.5 text-xs"
+          disabled={empty || submitting}
+        >
           {submitting && <Loader2 className="size-3 animate-spin" aria-hidden />}
           Add team
         </Button>

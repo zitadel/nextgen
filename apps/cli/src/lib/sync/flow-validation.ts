@@ -1,10 +1,10 @@
+import { validateFlowDefinition, type FlowValidationIssue } from "@zitadel/config/validate";
 import { consola } from "consola";
 
-import { validateFlowDefinition, type FlowValidationIssue } from "@zitadel/config/validate";
+import type { ResourceEntry, SyncAction } from "./types.js";
 
 import { ZitadelError } from "../errors";
 import { FLOWS_DIR } from "../flows";
-import type { ResourceEntry, SyncAction } from "./types.js";
 
 /**
  * Pre-flight semantic validation for every flow this plan uploads,

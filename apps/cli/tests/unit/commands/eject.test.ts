@@ -1,11 +1,10 @@
 import { access, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-
 import { afterEach, describe, expect, it } from "vitest";
 
-import { parseJson, runCliForTest } from "../../helpers/run-cli";
 import { MANAGED_MARKER } from "../../../src/lib/paths";
+import { parseJson, runCliForTest } from "../../helpers/run-cli";
 
 function eject(cwd: string, extra: string[] = []) {
   return runCliForTest([

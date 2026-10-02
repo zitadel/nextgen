@@ -4,13 +4,12 @@ import { classMap } from "lit/directives/class-map.js";
 import { ifDefined } from "lit/directives/if-defined.js";
 import { live } from "lit/directives/live.js";
 
-import selectStyles from "./zl-select.css?inline";
+import type { AtomManifest } from "../manifest.js";
 
 import { emit } from "../internal/emit.js";
 import { nextUid } from "../internal/unique-id.js";
-import type { AtomManifest } from "../manifest.js";
 import { baseHostStyles, surfaceStyles } from "../styles/index.js";
-
+import selectStyles from "./zl-select.css?inline";
 import "./zl-icon.js";
 
 /** A single choice in a `<zl-select>` listbox. */
@@ -51,10 +50,7 @@ export class ZlSelect extends LitElement {
     delegatesFocus: true,
   };
 
-  static override styles = [
-    baseHostStyles,
-    ...surfaceStyles(selectStyles),
-  ];
+  static override styles = [baseHostStyles, ...surfaceStyles(selectStyles)];
 
   /**
    * Field name — used as the key in form submission and in `zl-change` detail.
@@ -222,7 +218,9 @@ export class ZlSelect extends LitElement {
                   value=${option.value}
                   ?disabled=${option.disabled ?? false}
                   .selected=${live(option.value === this.value)}
-                >${option.label}</option>`,
+                >
+                  ${option.label}
+                </option>`,
             )}
           </select>
           <div
@@ -245,13 +243,7 @@ export class ZlSelect extends LitElement {
             ${this.listOptions.map((option) => this.renderOption(option))}
           </ul>
         </div>
-        <div
-          class="zr-select__error"
-          part="error"
-          id=${errorId}
-          role="alert"
-          ?hidden=${!showError}
-        >
+        <div class="zr-select__error" part="error" id=${errorId} role="alert" ?hidden=${!showError}>
           ${this.error}
         </div>
       </div>

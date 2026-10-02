@@ -1,8 +1,8 @@
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import type { StorybookConfig } from "@storybook/web-components-vite";
 
 import { apiMockPublicDir } from "@zitadel/api-mock/public-dir";
-import type { StorybookConfig } from "@storybook/web-components-vite";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 // Dev-only Vite plugin that loads the orchestrator's `.liquid` templates as raw
 // strings. It is build tooling, not part of `@zitadel/components`' published API
@@ -10,7 +10,6 @@ import type { StorybookConfig } from "@storybook/web-components-vite";
 // mirroring how the package's own `vitest.config.ts` imports it — rather than
 // through a package export that would resolve to an unpublished `.ts` file.
 import { liquidRaw } from "../../../packages/components/vite-liquid-plugin.js";
-
 import { optimizeDepsExclude, optimizeDepsInclude } from "./optimize-deps.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -86,10 +85,22 @@ const config: StorybookConfig = {
     // logic hot, without changing how the rest of the workspace resolves it.
     const componentsSrc = resolve(packagesDir, "components/src");
     const componentsAlias = [
-      { find: /^@zitadel\/components\/atoms$/, replacement: resolve(componentsSrc, "atoms/index.ts") },
-      { find: /^@zitadel\/components\/manifests$/, replacement: resolve(componentsSrc, "manifests.ts") },
-      { find: /^@zitadel\/components\/tokens$/, replacement: resolve(componentsSrc, "tokens/index.ts") },
-      { find: /^@zitadel\/components\/orchestrator$/, replacement: resolve(componentsSrc, "orchestrator/index.ts") },
+      {
+        find: /^@zitadel\/components\/atoms$/,
+        replacement: resolve(componentsSrc, "atoms/index.ts"),
+      },
+      {
+        find: /^@zitadel\/components\/manifests$/,
+        replacement: resolve(componentsSrc, "manifests.ts"),
+      },
+      {
+        find: /^@zitadel\/components\/tokens$/,
+        replacement: resolve(componentsSrc, "tokens/index.ts"),
+      },
+      {
+        find: /^@zitadel\/components\/orchestrator$/,
+        replacement: resolve(componentsSrc, "orchestrator/index.ts"),
+      },
       { find: /^@zitadel\/components$/, replacement: resolve(componentsSrc, "index.ts") },
     ];
     const existingAlias = viteConfig.resolve.alias;

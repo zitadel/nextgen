@@ -21,11 +21,17 @@ implicitInputs:
   - "/.moon/tasks/**/*.yml"
   # Extended by every {apps,packages}/*/tsconfig*.json.
   - "/tsconfig.base.json"
-  # Extended by every project-local .oxlintrc.json (oxlint lint tasks).
-  - "/.oxlintrc.json"
-  # Resolved upward from each linted file by prettier; enforced in the sdk-*
-  # eslint lint tasks via eslint-plugin-prettier.
+  # Resolved upward from each linted file by prettier; enforced in every
+  # eslint lint task via eslint-plugin-prettier.
   - "/.prettierrc.json"
+  # eslint-plugin-prettier honours .prettierignore (it skips files it lists),
+  # so a change to it changes lint results and must invalidate the lint cache.
+  - "/.prettierignore"
+  # The shared eslint flat-config base, spread into every project's
+  # eslint.config.js. Without this a change to the base would leave every
+  # consumer's eslint lint task cache-hit (and unselected by `moon ci`),
+  # linting against stale rules.
+  - "/packages/eslint-config/index.js"
   # Spread into every project's vitest config's `test` block. Without these a
   # change to the shared base would leave every project's test task cache-hit
   # (and unselected by `moon ci`), running stale config.

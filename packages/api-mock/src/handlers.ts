@@ -1,3 +1,11 @@
+import type {
+  CreateFlow201,
+  CreateFlowBody,
+  CreateFlowBodyPurpose,
+  ExchangeHandoffBody,
+  SubmitFlowStepBody,
+} from "@zitadel/api/generated/model";
+
 /**
  * MSW handler factory for the mock Flow API.
  *
@@ -20,17 +28,9 @@ import {
   getExchangeHandoffResponseMock,
   getGetFlowStepMockHandler,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.msw";
-import type {
-  CreateFlow201,
-  CreateFlowBody,
-  CreateFlowBodyPurpose,
-  ExchangeHandoffBody,
-  SubmitFlowStepBody,
-} from "@zitadel/api/generated/model";
 import { http, HttpResponse, type RequestHandler } from "msw";
 
 import { withBranding } from "./branding.js";
-import { withSsoProviders } from "./sso-providers.js";
 import {
   doneStep,
   identifierStep,
@@ -51,8 +51,9 @@ import {
   type FlowStepName,
   type SsoOutcome,
 } from "./flow-machine.js";
-import { SsoIdentityStore } from "./lib/sso-identities.js";
 import { AuthnStore, type PasskeyProof } from "./lib/authn/index.js";
+import { SsoIdentityStore } from "./lib/sso-identities.js";
+import { withSsoProviders } from "./sso-providers.js";
 
 export type CapturedRequest =
   | { kind: "createFlow"; body: CreateFlowBody }

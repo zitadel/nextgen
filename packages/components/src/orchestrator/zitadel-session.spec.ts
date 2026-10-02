@@ -1,8 +1,7 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-
+import { configureZitadel, _resetConfigForTesting } from "@zitadel/api/config";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
-import { configureZitadel, _resetConfigForTesting } from "@zitadel/api/config";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import "./zitadel-session.js";
 import type { ZitadelSession } from "./zitadel-session.js";
@@ -126,7 +125,9 @@ describe("<zitadel-session>", () => {
     const element = mount();
     await flush(element);
     expect(shadowQuery<HTMLElement>(element, ".title").textContent?.trim()).toBe("Signed in as");
-    expect(shadowQuery<HTMLElement>(element, ".identity").textContent?.trim()).toBe("alice@acme.com");
+    expect(shadowQuery<HTMLElement>(element, ".identity").textContent?.trim()).toBe(
+      "alice@acme.com",
+    );
   });
 
   it("falls back to user_id when the session ref carries no identifier", async () => {
@@ -146,7 +147,7 @@ describe("<zitadel-session>", () => {
 
   it("suppress-header visually hides the heading but keeps it accessible", async () => {
     currentEmail = "alice@acme.com";
-    const element = mount('<zitadel-session suppress-header></zitadel-session>');
+    const element = mount("<zitadel-session suppress-header></zitadel-session>");
     await flush(element);
     // Boolean attribute reflects into the property (and back — reflect
     // keeps DOM assertions honest under React 19's property-first binding).
@@ -167,16 +168,17 @@ describe("<zitadel-session>", () => {
     const element = mount();
     await flush(element);
     expect(element.suppressHeader).toBe(false);
-    expect(
-      shadowQuery<HTMLElement>(element, ".title").classList.contains("sr-only"),
-    ).toBe(false);
+    expect(shadowQuery<HTMLElement>(element, ".title").classList.contains("sr-only")).toBe(false);
     expect(shadowQuery<HTMLElement>(element, ".identity").getAttribute("slot")).toBe("header");
   });
 
   it("renders a single primary Sign out action", async () => {
     const element = mount();
     await flush(element);
-    const out = shadowQuery<HTMLElement>(element, 'zl-button[data-testid="zitadel-session-logout"]');
+    const out = shadowQuery<HTMLElement>(
+      element,
+      'zl-button[data-testid="zitadel-session-logout"]',
+    );
     expect(out.getAttribute("hierarchy")).toBe("primary");
     expect(
       element.shadowRoot?.querySelector('zl-button[data-testid="zitadel-session-continue"]'),
@@ -244,7 +246,9 @@ describe("<zitadel-session>", () => {
     await new Promise((resolve) => setTimeout(resolve, 32));
     await element.updateComplete;
 
-    expect(shadowQuery<HTMLElement>(element, ".error").textContent?.trim().length).toBeGreaterThan(0);
+    expect(shadowQuery<HTMLElement>(element, ".error").textContent?.trim().length).toBeGreaterThan(
+      0,
+    );
     expect(loc.current).toBe("");
   });
 });

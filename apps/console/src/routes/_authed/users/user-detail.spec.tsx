@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+
 import { scopedPath } from "@/lib/project-scope.fixture";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
@@ -46,7 +47,11 @@ function stub({
     identifier: "maya@acme.com",
     identifier_property: "email",
     attributes: { email: "maya@acme.com", companyName: "Acme" },
-    metadata: { status: "active", created_at: "2026-07-12T09:00:00Z", updated_at: "2026-07-12T09:00:00Z" },
+    metadata: {
+      status: "active",
+      created_at: "2026-07-12T09:00:00Z",
+      updated_at: "2026-07-12T09:00:00Z",
+    },
   },
   passkeys = [{ id: "pk_1", name: "MacBook", created_at: "2026-07-01T00:00:00Z" }],
   passkeysStatus = 200,
@@ -244,7 +249,9 @@ describe("user detail", () => {
     await renderDetail();
 
     await userEvent.click(await screen.findByRole("tab", { name: "Authentication" }));
-    expect(within(screen.getByRole("tabpanel")).getByText("Could not be loaded")).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("tabpanel")).getByText("Could not be loaded"),
+    ).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "maya@acme.com" })).toBeInTheDocument();
   });
 

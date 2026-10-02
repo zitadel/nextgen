@@ -1,9 +1,9 @@
 import { select } from "@clack/prompts";
-
 import { SETUP_PRESETS, type SetupPreset } from "@zitadel/config/defaults";
 
-import { bail } from "./cancel";
 import type { PromptContext, SetupAnswers, SetupPrompt } from "./types";
+
+import { bail } from "./cancel";
 
 /**
  * "How should users sign in?" — picks the schema+flow preset the scaffold

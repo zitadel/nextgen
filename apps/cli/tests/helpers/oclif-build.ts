@@ -1,8 +1,7 @@
-import { access } from "node:fs/promises";
-import { format } from "node:util";
-import { fileURLToPath } from "node:url";
-
 import { run } from "@oclif/core";
+import { access } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
+import { format } from "node:util";
 
 export const cliPackageRoot = fileURLToPath(new URL("../../", import.meta.url));
 

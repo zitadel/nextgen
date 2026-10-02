@@ -120,7 +120,9 @@ export function toZitadelError(error: unknown): ZitadelError {
     const fields = rejectedFields(error.body);
     return new ZitadelError(code, apiErrorMessage(error), {
       ...(fields.length > 0
-        ? { hint: `The server rejected ${fields.length === 1 ? "this field" : "these fields"}: ${fields.join(", ")}.` }
+        ? {
+            hint: `The server rejected ${fields.length === 1 ? "this field" : "these fields"}: ${fields.join(", ")}.`,
+          }
         : {}),
       details,
     });

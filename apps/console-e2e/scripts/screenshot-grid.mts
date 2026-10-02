@@ -23,11 +23,10 @@
  *                         are replaced; anything else there is left alone.
  */
 
+import { type Browser, type Page, chromium, errors } from "@playwright/test";
 import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-
-import { type Browser, type Page, chromium, errors } from "@playwright/test";
 
 import { completeLogin } from "../src-real/login";
 
@@ -63,7 +62,12 @@ const SCREENS: Screen[] = [
   { name: "Team detail", path: "/teams", firstRow: "/teams/" },
   { name: "Users", path: "/users" },
   { name: "User detail", path: "/users", firstRow: "/users/" },
-  { name: "User detail — Authentication", path: "/users", firstRow: "/users/", tab: "Authentication" },
+  {
+    name: "User detail — Authentication",
+    path: "/users",
+    firstRow: "/users/",
+    tab: "Authentication",
+  },
   { name: "Login flows", path: "/flow-definitions" },
   { name: "Login flow detail", path: "/flow-definitions", firstRow: "/flow-definitions/" },
   { name: "Branding", path: "/branding" },
@@ -141,7 +145,10 @@ async function resolveUrls(page: Page, project: string): Promise<Map<Screen, str
 }
 
 function fileName(screen: Screen, theme: string, viewport: string): string {
-  const slug = screen.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const slug = screen.name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
   return `${slug}.${theme}.${viewport}.png`;
 }
 
@@ -177,8 +184,7 @@ async function capture(browser: Browser, urls: Map<Screen, string>, storage: str
 }
 
 function contactSheet(urls: Map<Screen, string>): string {
-  const escape = (text: string) =>
-    text.replace(/[&<>"]/g, (char) => `&#${char.charCodeAt(0)};`);
+  const escape = (text: string) => text.replace(/[&<>"]/g, (char) => `&#${char.charCodeAt(0)};`);
   const rows = [...urls.keys()]
     .map((screen) => {
       const cells = THEMES.flatMap((theme) =>

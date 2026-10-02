@@ -1,0 +1,15 @@
+id: "eslint-config"
+language: "typescript"
+# Configuration package: the shared ESLint flat config every other project
+# consumes. Marked `configuration` so any layer (library, tool, application,
+# automation) may depend on it without tripping project-type constraints. It
+# ships `index.js` as source, so there is no build or test task.
+layer: "configuration"
+stack: "frontend"
+
+tasks:
+  lint:
+    command: "corepack pnpm run lint"
+
+  typecheck:
+    command: "corepack pnpm run typecheck"

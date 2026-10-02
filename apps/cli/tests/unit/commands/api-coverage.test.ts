@@ -1,7 +1,6 @@
+import * as endpoints from "@zitadel/api/generated/endpoints/zitadelNextGen";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-
-import * as endpoints from "@zitadel/api/generated/endpoints/zitadelNextGen";
 import { describe, expect, it } from "vitest";
 
 import { RESOURCES } from "../../../src/commands/resources";

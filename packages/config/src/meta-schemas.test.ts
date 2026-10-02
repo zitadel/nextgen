@@ -1,8 +1,7 @@
+import Ajv2020 from "ajv/dist/2020";
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-
-import Ajv2020 from "ajv/dist/2020";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -283,11 +282,13 @@ describe("meta-schemas", () => {
     expect(check({ hero_url: "https://cdn.example.com/hero.png" })).toBe(true);
     expect(check({ hero_url: "HTTPS://cdn.example.com/hero.png" })).toBe(true);
     expect(check({ logo_url: "https://cdn.example.com:8443/logo.svg" })).toBe(true);
-    expect(check({ theme: { light: { logo_url: "https://cdn.example.com:8443/on-light.svg" } } })).toBe(
-      true,
-    );
     expect(
-      check({ typography: { font_family: "Inter", font_url: "https://fonts.example.com:8443/css" } }),
+      check({ theme: { light: { logo_url: "https://cdn.example.com:8443/on-light.svg" } } }),
+    ).toBe(true);
+    expect(
+      check({
+        typography: { font_family: "Inter", font_url: "https://fonts.example.com:8443/css" },
+      }),
     ).toBe(true);
     // Loopback HTTP is the dev-posture carve-out, mirrored across the zod
     // and Go gates: editors must not flag what plan/apply accept.

@@ -1,12 +1,13 @@
 import { join } from "node:path";
 
-import { MANAGED_MARKER } from "../../../../paths";
-import type { FileOp } from "../file-writer/types";
 import type { PatchContext, PatchView } from "../../types";
+import type { FileOp } from "../file-writer/types";
+import type { RendererSpec } from "./renderers/types";
+
+import { MANAGED_MARKER } from "../../../../paths";
 import { AbstractRulePatcher } from "../base";
 import { devScriptPortOp } from "../dev-script-port";
 import { getRenderer } from "./renderers/registry";
-import type { RendererSpec } from "./renderers/types";
 
 /**
  * Next.js request-boundary file at the project root. Wires `nextgenMiddleware` so the

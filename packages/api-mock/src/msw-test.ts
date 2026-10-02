@@ -13,7 +13,9 @@ export const worker: SetupWorker = setupWorker();
 
 export const test = testBase.extend<{ worker: SetupWorker }>({
   worker: [
-    // oxlint-disable-next-line no-empty-pattern
+    // This fixture needs no other fixtures; the empty pattern keeps `use`
+    // positional, which eslint flags here.
+    // eslint-disable-next-line no-empty-pattern
     async ({}, use) => {
       await worker.start({ onUnhandledRequest: "error" });
       await use(worker);

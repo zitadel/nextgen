@@ -4,8 +4,9 @@ import type {
   FileOp,
   ScaffoldPlan,
 } from "../../../../../../../src/lib/orca/patchers/rule/file-writer/types";
-import { QwikPatcher } from "../../../../../../../src/lib/orca/patchers/rule/qwik";
 import type { PatchContext } from "../../../../../../../src/lib/orca/patchers/types";
+
+import { QwikPatcher } from "../../../../../../../src/lib/orca/patchers/rule/qwik";
 import { MANAGED_MARKER } from "../../../../../../../src/lib/paths";
 
 function ctx(): PatchContext {

@@ -1,14 +1,10 @@
-import { Flags } from "@oclif/core";
 import { cancel, isCancel, password, text } from "@clack/prompts";
+import { Flags } from "@oclif/core";
 
-import {
-  CommandGroups,
-  type JsonEnvelope,
-  nonBlankArg,
-  OwnerCommand,
-} from "../../lib/oclif";
-import { dryRunResult } from "../../lib/oclif/crud/shared";
 import { ZitadelError } from "../../lib/errors";
+import { CommandGroups, type JsonEnvelope, nonBlankArg, OwnerCommand } from "../../lib/oclif";
+import { dryRunResult } from "../../lib/oclif/crud/shared";
+import { publicCliCommand } from "../../lib/public-cli";
 import {
   assertVariableName,
   parseVariableValue,
@@ -16,7 +12,6 @@ import {
   VARIABLE_TYPES,
   type VariableType,
 } from "../../lib/variables";
-import { publicCliCommand } from "../../lib/public-cli";
 
 /**
  * The `variables set` topic command — enter or replace one variable at the

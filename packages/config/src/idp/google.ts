@@ -1,5 +1,6 @@
-import { OidcProvider } from "./oidc-provider.js";
 import type { CallbackGuidance } from "./provider.js";
+
+import { OidcProvider } from "./oidc-provider.js";
 
 /**
  * Google, as `zitadel setup` and `sso enable` scaffold it.

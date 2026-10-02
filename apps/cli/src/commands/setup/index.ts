@@ -1,9 +1,7 @@
-import { rm } from "node:fs/promises";
-import { basename, join } from "node:path";
+import type { CreateProject201 } from "@zitadel/api/generated/model";
 
 import { intro, outro } from "@clack/prompts";
 import { Flags } from "@oclif/core";
-import type { CreateProject201 } from "@zitadel/api/generated/model";
 import {
   DEFAULT_SETUP_PRESET,
   DEFAULT_SETUP_USE_CASE,
@@ -14,11 +12,15 @@ import {
 } from "@zitadel/config/defaults";
 import { credentialVariables, idpProvider, IDP_PROVIDERS } from "@zitadel/config/idp";
 import { consola } from "consola";
+import { rm } from "node:fs/promises";
+import { basename, join } from "node:path";
+
+import type { PatchContext } from "../../lib/orca/patchers/types";
 
 import { createZitadelClient } from "../../lib/api-client";
-import { isDevelopmentBuild } from "../../lib/build-channel";
 import { renderBoxActions, wrapForBox } from "../../lib/box";
 import { setupDesignRemovedError } from "../../lib/branding/designs";
+import { isDevelopmentBuild } from "../../lib/build-channel";
 import {
   claimAction,
   claimBoxAction,
@@ -38,17 +40,11 @@ import {
   type SecretPublisher,
 } from "../../lib/idp";
 import { brandingGuidanceAction } from "../../lib/journey-guidance";
-import {
-  BaseCommand,
-  CommandGroups,
-  type JsonEnvelope,
-  nonBlankString,
-} from "../../lib/oclif";
-import { serverKind } from "../../lib/oclif/server-kind";
 import { readLocalAdmin } from "../../lib/local-server/admin-credential";
 import { claimProjectAsAdmin } from "../../lib/local-server/claim-as-admin";
 import { readPlatformRuntime } from "../../lib/local-server/runtime";
-import { readZitadelSecret, writeZitadelSecret } from "../../lib/project";
+import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
+import { serverKind } from "../../lib/oclif/server-kind";
 import {
   createOrca,
   inspectScaffoldTarget,
@@ -57,27 +53,26 @@ import {
   type Orca,
   type ScaffoldTarget,
 } from "../../lib/orca";
+import { derivePosture } from "../../lib/orca/patchers/posture";
 import {
   AVAILABLE_RENDERER_IDS,
   RENDERER_IDS,
 } from "../../lib/orca/patchers/rule/next/renderers/registry";
-import type { PatchContext } from "../../lib/orca/patchers/types";
-import { hasZitadelConfig, hasZitadelSecret } from "../../lib/project";
+import {
+  readZitadelSecret,
+  writeZitadelSecret,
+  hasZitadelConfig,
+  hasZitadelSecret,
+} from "../../lib/project";
 import { publicCliCommand } from "../../lib/public-cli";
-import { derivePosture } from "../../lib/orca/patchers/posture";
 import { writeScaffoldManifest } from "../../lib/scaffold-manifest";
-import { readStdin } from "../../lib/variables";
 import {
   materializeSetupResources,
   type MaterializeSetupResourcesResult,
 } from "../../lib/setup-resources";
+import { readStdin } from "../../lib/variables";
 import { installDependenciesForSetup } from "./install";
-import {
-  PickFrameworkPrompt,
-  SETUP_PROMPTS,
-  type SetupAnswers,
-  type SsoAnswer,
-} from "./prompts";
+import { PickFrameworkPrompt, SETUP_PROMPTS, type SetupAnswers, type SsoAnswer } from "./prompts";
 import {
   detectProjectFacts,
   fileNameOf,
@@ -109,9 +104,7 @@ const FRAMEWORK_OPTIONS = createOrca()
  * guaranteed to fail and an explicit pass is rejected at parse time — before
  * any remote project is created.
  */
-const UNAVAILABLE_RENDERER_IDS = RENDERER_IDS.filter(
-  (id) => !AVAILABLE_RENDERER_IDS.includes(id),
-);
+const UNAVAILABLE_RENDERER_IDS = RENDERER_IDS.filter((id) => !AVAILABLE_RENDERER_IDS.includes(id));
 const RENDERER_FLAG_DESCRIPTION =
   UNAVAILABLE_RENDERER_IDS.length === 0
     ? "Renderer (default: react)."
@@ -214,10 +207,7 @@ export default class Setup extends BaseCommand {
         `Detected ${framework.id}${framework.devPort ? ` (dev port ${framework.devPort})` : ""}`,
       );
     } catch (error) {
-      if (
-        error instanceof ZitadelError &&
-        error.code === "E_FRAMEWORK_NOT_DETECTED"
-      ) {
+      if (error instanceof ZitadelError && error.code === "E_FRAMEWORK_NOT_DETECTED") {
         const target = await inspectScaffoldTarget(cwd);
         if (!target.scaffoldable) {
           throw frameworkDetectionWithScaffoldTarget(error, cwd, target);
@@ -762,10 +752,7 @@ async function resolveScaffoldFramework(
  * that accepts and stalls cannot hang setup after the real work is done.
  * Exported so the fail-closed behavior is testable without a live server.
  */
-export async function localServerHostsPlatform(
-  server: string,
-  timeoutMs = 1500,
-): Promise<boolean> {
+export async function localServerHostsPlatform(server: string, timeoutMs = 1500): Promise<boolean> {
   return Boolean(await readPlatformRuntime(server, timeoutMs));
 }
 
@@ -1033,10 +1020,7 @@ function ssoRecovery(
     // somewhere nobody asked for. Both callers of this are local-server
     // failures, so `local` is the server meant in every case.
     commands: remaining.map((provider) =>
-      publicCliCommand(
-        `sso enable --provider ${provider.provider} --server local`,
-        cliVersion,
-      ),
+      publicCliCommand(`sso enable --provider ${provider.provider} --server local`, cliVersion),
     ),
   };
 }
@@ -1201,16 +1185,8 @@ function buildSummary(opts: {
   scaffoldedFramework: boolean;
   sso: readonly SsoAnswer[];
 }): Section[] {
-  const {
-    projectFacts,
-    writtenRel,
-    depsAdded,
-    project,
-    server,
-    issuer,
-    scaffoldedFramework,
-    sso,
-  } = opts;
+  const { projectFacts, writtenRel, depsAdded, project, server, issuer, scaffoldedFramework, sso } =
+    opts;
   const packageJsonHit = pickWrittenFile(writtenRel, "package.json");
 
   const detected: Row[] = [{ label: "Framework", value: formatFrameworkLine(projectFacts) }];

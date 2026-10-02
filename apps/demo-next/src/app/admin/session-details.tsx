@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import type { GetMySession200, GetMySession200FactorsItem } from "@zitadel/api/generated/model";
+
+import { useEffect, useState } from "react";
 
 /**
  * Client component that fetches session details via the generated API client's
@@ -56,7 +57,9 @@ export function SessionDetails() {
           {rows.map(([label, value]) => (
             <tr key={label} style={{ borderBottom: "1px solid #e5e7eb" }}>
               <td style={{ padding: "6px 8px", color: "#6b7280", fontWeight: 500 }}>{label}</td>
-              <td style={{ padding: "6px 8px", fontFamily: "monospace", wordBreak: "break-all" }}>{value}</td>
+              <td style={{ padding: "6px 8px", fontFamily: "monospace", wordBreak: "break-all" }}>
+                {value}
+              </td>
             </tr>
           ))}
         </tbody>

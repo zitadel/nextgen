@@ -1,24 +1,19 @@
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-
 import type {
   CreateFlowDefinitionBodyFlowDefinition,
   CreateSchemaBody,
 } from "@zitadel/api/generated/model";
 
-import defaultHumanUserSchemaTemplate from "../defaults/default-human-user.json" with {
-  type: "json",
-};
-import defaultLoginFlowTemplate from "../defaults/default-login.json" with {
-  type: "json",
-};
-import passkeyFirstHumanUserSchemaTemplate from "../defaults/presets/passkey-first/human-user.json" with {
-  type: "json",
-};
-import passkeyFirstLoginFlowTemplate from "../defaults/presets/passkey-first/login.json" with {
-  type: "json",
-};
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
+import defaultHumanUserSchemaTemplate from "../defaults/default-human-user.json" with { type: "json" };
+import defaultLoginFlowTemplate from "../defaults/default-login.json" with { type: "json" };
+import passkeyFirstHumanUserSchemaTemplate from "../defaults/presets/passkey-first/human-user.json" with { type: "json" };
+import passkeyFirstLoginFlowTemplate from "../defaults/presets/passkey-first/login.json" with { type: "json" };
+
+// Re-exported on the `@zitadel/config/defaults` entry point (consumed by the
+// CLI). The package barrel re-exports them through this module, so `index.ts`
+// must NOT also `export * from "./readmes.js"` or the names collide.
 export { brandingReadmeContent, flowsReadmeContent, schemasReadmeContent } from "./readmes.js";
 
 export const DEFAULT_BUILTIN_SCHEMA_BASE = "https://nextgen.com/api/schemas";
@@ -263,9 +258,7 @@ export type DefaultConfigRenderOptions = {
   useCase?: string;
 };
 
-export function defaultHumanUserSchemaUrl(
-  builtinSchemaBase = DEFAULT_BUILTIN_SCHEMA_BASE,
-): string {
+export function defaultHumanUserSchemaUrl(builtinSchemaBase = DEFAULT_BUILTIN_SCHEMA_BASE): string {
   return `${trimTrailingSlash(builtinSchemaBase)}/default-human-user.json`;
 }
 

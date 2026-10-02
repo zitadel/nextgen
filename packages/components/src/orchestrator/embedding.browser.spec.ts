@@ -1,10 +1,13 @@
-import { configureZitadel, _resetConfigForTesting } from "@zitadel/api/config";
 import type { ZitadelProject } from "@zitadel/api/config";
 import type { CreateFlow201 } from "@zitadel/api/generated/model";
+
+import { configureZitadel, _resetConfigForTesting } from "@zitadel/api/config";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { page } from "vitest/browser";
 
 import "./zitadel-login.js";
+import type { ZitadelLogin } from "./zitadel-login.js";
+
 import minimalTemplate from "../../../config/defaults/branding/minimal/login.liquid";
 // Raw imports via the liquidRaw Vite plugin — @zitadel/config/defaults reads
 // files with node:fs at call time, which cannot run inside Chromium. The
@@ -13,7 +16,6 @@ import minimalTemplate from "../../../config/defaults/branding/minimal/login.liq
 import heroTemplate from "./__fixtures__/legacy-designs/hero.liquid";
 import splitRightTemplate from "./__fixtures__/legacy-designs/split-right.liquid";
 import splitTemplate from "./__fixtures__/legacy-designs/split.liquid";
-import type { ZitadelLogin } from "./zitadel-login.js";
 
 /**
  * Real-browser checks for the widget-first embedding contract.
@@ -562,9 +564,9 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
     const mark = element.shadowRoot?.querySelector(".zl-attribution") as HTMLElement;
     expect(mark.closest(".zl-split__form")).toBeTruthy();
     expect(mark.getAttribute("slot")).toBeNull();
-    expect(
-      Math.round(mark.getBoundingClientRect().top - card.getBoundingClientRect().bottom),
-    ).toBe(24);
+    expect(Math.round(mark.getBoundingClientRect().top - card.getBoundingClientRect().bottom)).toBe(
+      24,
+    );
   });
 
   it("a split template with no anchor still slots the trustmark into the shell footer", async () => {

@@ -29,8 +29,8 @@
 import type { SetupWorker } from "msw/browser";
 
 import { applyBranding, clearBranding } from "./branding.js";
-import { applySsoProviders, clearSsoProviders } from "./sso-providers.js";
 import { setupMockHandlers, type CapturedRequest, type MockHandle } from "./handlers.js";
+import { applySsoProviders, clearSsoProviders } from "./sso-providers.js";
 
 /** Tracks the most recent handle from setupMock() for browser-path delegation. */
 let _browserHandle: MockHandle | null = null;

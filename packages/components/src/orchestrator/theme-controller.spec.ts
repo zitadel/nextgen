@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ThemeController } from "./theme-controller.js";
 import type { Branding } from "./branding.js";
+
+import { ThemeController } from "./theme-controller.js";
 
 type FakeMql = MediaQueryList & {
   __triggerChange: (matches: boolean) => void;

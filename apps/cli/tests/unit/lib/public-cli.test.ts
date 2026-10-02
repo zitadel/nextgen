@@ -13,9 +13,7 @@ describe("public CLI command formatting", () => {
   it("keeps dist-tag detection separate from alpha follow-up selectors", () => {
     expect(npmDistTagForCliVersion("0.1.0-alpha.1")).toBe("alpha");
     expect(npmSelectorForCliVersion("0.1.0-alpha.1")).toBe("0.1.0-alpha.1");
-    expect(publicCliCommand("start", "0.1.0-alpha.1")).toBe(
-      "npx @zitadel/cli@0.1.0-alpha.1 start",
-    );
+    expect(publicCliCommand("start", "0.1.0-alpha.1")).toBe("npx @zitadel/cli@0.1.0-alpha.1 start");
   });
 
   it("uses latest for stable versions", () => {
@@ -30,9 +28,7 @@ describe("public CLI command formatting", () => {
   });
 
   it("keeps non-alpha prereleases on their dist-tag", () => {
-    expect(publicCliCommand("start", "0.1.0-beta.2")).toBe(
-      "npx @zitadel/cli@beta start",
-    );
+    expect(publicCliCommand("start", "0.1.0-beta.2")).toBe("npx @zitadel/cli@beta start");
   });
 
   it("normalizes bare zitadel follow-ups and leaves other commands alone", () => {
@@ -54,9 +50,7 @@ describe("normalizePublicCliProse", () => {
         "Start over with `zitadel branding eject --design <name>`.",
         "0.1.0-alpha.1",
       ),
-    ).toBe(
-      "Start over with `npx @zitadel/cli@0.1.0-alpha.1 branding eject --design <name>`.",
-    );
+    ).toBe("Start over with `npx @zitadel/cli@0.1.0-alpha.1 branding eject --design <name>`.");
   });
 
   it("rewrites a bare `zitadel` span and fenced-block command lines", () => {

@@ -1,6 +1,3 @@
-import { readdir, readFile } from "node:fs/promises";
-import { join } from "node:path";
-
 import {
   credentialVariables,
   idpProvider,
@@ -8,6 +5,8 @@ import {
   referencedVariable,
   type IdpProvider,
 } from "@zitadel/config/idp";
+import { readdir, readFile } from "node:fs/promises";
+import { join } from "node:path";
 
 import { isErrno, ZitadelError } from "../errors";
 import { isObject } from "../json";
@@ -100,7 +99,10 @@ function clientIdOf(file: ConnectionFile): string | undefined {
 }
 
 /** One credential field, from whichever protocol block the file carries. */
-function credentialOf(file: ConnectionFile, field: "client_id" | "client_secret"): string | undefined {
+function credentialOf(
+  file: ConnectionFile,
+  field: "client_id" | "client_secret",
+): string | undefined {
   for (const key of ["oidc", "oauth2"] as const) {
     const block = file.body[key];
     if (isObject(block) && typeof block[field] === "string") {
@@ -238,7 +240,12 @@ function refuseCollidingVariables(
 /** What the caller should do with the provider's connection. */
 export type ConnectionPlan =
   | { readonly action: "reuse"; readonly file: ConnectionFile; readonly slug: string }
-  | { readonly action: "create"; readonly name: string; readonly path: string; readonly slug: string };
+  | {
+      readonly action: "create";
+      readonly name: string;
+      readonly path: string;
+      readonly slug: string;
+    };
 
 /**
  * Decide whether the provider already has a connection in this Project.
@@ -264,10 +271,14 @@ export function planConnection(options: {
 
   if (matches.length > 1) {
     const names = matches.map((m) => m.path).join(", ");
-    throw new ZitadelError("E_CONFLICT", `More than one ${entry.displayName} connection exists: ${names}`, {
-      hint: "Keep the one this Project should use and remove the others, then run the command again.",
-      details: { provider: options.provider, files: matches.map((m) => m.path) },
-    });
+    throw new ZitadelError(
+      "E_CONFLICT",
+      `More than one ${entry.displayName} connection exists: ${names}`,
+      {
+        hint: "Keep the one this Project should use and remove the others, then run the command again.",
+        details: { provider: options.provider, files: matches.map((m) => m.path) },
+      },
+    );
   }
 
   const [match] = matches;
@@ -285,7 +296,11 @@ export function planConnection(options: {
         `${match.path} already uses client id ${existing}, not ${options.clientId}`,
         {
           hint: "Edit the connection file to change its client id, or run the command without one to reuse it.",
-          details: { file: match.path, stored_client_id: existing, supplied_client_id: options.clientId },
+          details: {
+            file: match.path,
+            stored_client_id: existing,
+            supplied_client_id: options.clientId,
+          },
         },
       );
     }
@@ -295,12 +310,21 @@ export function planConnection(options: {
     // connection on the next apply for want of it.
     const matchSlug = match.body.slug;
     if (typeof matchSlug !== "string" || matchSlug === "") {
-      throw new ZitadelError("E_VALIDATION", `${match.path} is a ${entry.displayName} connection with no slug`, {
-        hint: "Add a slug to the connection file -- the schemas and flows reference it by that name.",
-        details: { file: match.path },
-      });
+      throw new ZitadelError(
+        "E_VALIDATION",
+        `${match.path} is a ${entry.displayName} connection with no slug`,
+        {
+          hint: "Add a slug to the connection file -- the schemas and flows reference it by that name.",
+          details: { file: match.path },
+        },
+      );
     }
-    refuseCollidingVariables(credentialVariablesOf(match, matchSlug), matchSlug, options.files, match);
+    refuseCollidingVariables(
+      credentialVariablesOf(match, matchSlug),
+      matchSlug,
+      options.files,
+      match,
+    );
     return { action: "reuse", file: match, slug: matchSlug };
   }
 
@@ -310,10 +334,14 @@ export function planConnection(options: {
   const path = `${IDPS_DIR}/${name}`;
   const occupied = options.files.find((file) => file.name === name);
   if (occupied !== undefined) {
-    throw new ZitadelError("E_CONFLICT", `${path} already exists and is not a ${entry.displayName} connection`, {
-      hint: "Rename or remove that file, then run the command again.",
-      details: { file: path },
-    });
+    throw new ZitadelError(
+      "E_CONFLICT",
+      `${path} already exists and is not a ${entry.displayName} connection`,
+      {
+        hint: "Rename or remove that file, then run the command again.",
+        details: { file: path },
+      },
+    );
   }
   refuseCollidingVariables(credentialVariables(slug), slug, options.files);
   return { action: "create", name, path, slug };

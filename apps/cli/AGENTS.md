@@ -25,7 +25,7 @@ Scope pointers first — this file's own body covers **telemetry only**:
   Keep that alignment in mind when adding a global flag, and record it there —
   not in a second copy here.
 
-# Analytics Tracking — Mixpanel
+## Analytics Tracking — Mixpanel
 
 This package (`@zitadel/cli`) uses **Mixpanel** for anonymous product analytics.
 Mixpanel is the single source of truth for usage events. Do not introduce any

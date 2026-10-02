@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/web-components-vite";
-import { html, nothing } from "lit";
 
+import { html, nothing } from "lit";
 import "@zitadel/components/atoms";
 
 interface PillArgs {

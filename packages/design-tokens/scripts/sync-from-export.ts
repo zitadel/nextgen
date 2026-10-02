@@ -162,9 +162,14 @@ class Registry {
   private lookup(path: string, mode: string): Raw {
     const byMode = this.index.get(path);
     if (!byMode) throw new Error(`Unresolved reference: {${path}}`);
-    if (byMode.has(mode)) return byMode.get(mode)!;
-    if (byMode.has(NO_MODE)) return byMode.get(NO_MODE)!;
-    if (byMode.size === 1) return [...byMode.values()][0]!;
+    const direct = byMode.get(mode);
+    if (direct !== undefined) return direct;
+    const shared = byMode.get(NO_MODE);
+    if (shared !== undefined) return shared;
+    if (byMode.size === 1) {
+      const [only] = byMode.values();
+      if (only !== undefined) return only;
+    }
     throw new Error(
       `Ambiguous reference {${path}} in mode ${mode}: defined for modes [${[...byMode.keys()].join(", ")}]`,
     );
@@ -179,7 +184,8 @@ class Registry {
     const raw = this.lookup(path, mode);
     if (typeof raw === "string") {
       const match = raw.match(ALIAS);
-      if (match) return this.resolve(match[1]!.trim(), mode, seen);
+      const ref = match?.[1];
+      if (ref !== undefined) return this.resolve(ref.trim(), mode, seen);
     }
     return raw;
   }
@@ -230,13 +236,14 @@ function withRole(
 /** The single collection that owns `color.*`. */
 function semanticCollection(assigned: Map<ParsedCollection, CollectionRole>): ParsedCollection {
   const found = withRole(assigned, "semantic");
-  if (found.length !== 1) {
+  const [collection] = found;
+  if (found.length !== 1 || !collection) {
     throw new Error(
       `Exactly one collection must have role "semantic" (found ${found.length}` +
         `${found.length > 0 ? `: ${found.map((c) => c.name).join(", ")}` : ""}). See src/collections.ts.`,
     );
   }
-  return found[0]!;
+  return collection;
 }
 
 function findMode(c: ParsedCollection, wanted: string): string {
@@ -248,7 +255,8 @@ function findMode(c: ParsedCollection, wanted: string): string {
 /** The leaves a collection declared for `wanted` (`"light"`, `"dark"`). */
 function leavesForMode(c: ParsedCollection, wanted: string): Map<string, Raw> {
   const leaves = c.leaves.get(findMode(c, wanted));
-  if (!leaves) throw new Error(`Collection ${c.name} declared a ${wanted} mode but exported no leaves for it`);
+  if (!leaves)
+    throw new Error(`Collection ${c.name} declared a ${wanted} mode but exported no leaves for it`);
   return leaves;
 }
 
@@ -315,7 +323,10 @@ function resolveThemedPairs(
  * `color.<name> = {dark,light}` from the `base` group only, skipping any leaf
  * that does not resolve to a hex colour.
  */
-function buildColorSurface(theme: ParsedCollection, registry: Registry): Record<string, ThemedColor> {
+function buildColorSurface(
+  theme: ParsedCollection,
+  registry: Registry,
+): Record<string, ThemedColor> {
   const paths = [...leavesForMode(theme, "light").keys()].filter((p) => p.startsWith("base."));
   // `base.sidebar-accent` -> `sidebar-accent`; `base.chart-1` -> `chart-1`.
   const entries = paths.map((path) => ({ path, name: kebab(path.split(".").slice(1)) }));
@@ -330,7 +341,10 @@ function buildColorSurface(theme: ParsedCollection, registry: Registry): Record<
  * variable names, so `build.ts` maps the ones we consume onto semantic names of
  * our own. Kept keyed by the raw Figma name here so that mapping is explicit.
  */
-function buildCustomSurface(theme: ParsedCollection, registry: Registry): Record<string, ThemedColor> {
+function buildCustomSurface(
+  theme: ParsedCollection,
+  registry: Registry,
+): Record<string, ThemedColor> {
   const paths = [...leavesForMode(theme, "light").keys()].filter((p) => p.startsWith("custom."));
   const entries = paths.map((path) => ({ path, name: path.slice("custom.".length) }));
   return resolveThemedPairs(theme, registry, entries).pairs;
@@ -352,7 +366,8 @@ function buildThemedGroups(
     const parts = path.split(".");
     // A leaf sitting at the collection root has no group of its own; fall back
     // to the collection name so it still gets a namespace of its own.
-    const group = parts.length > 1 ? kebab([parts[0]!]) : kebab([c.name]);
+    const first = parts[0] ?? "";
+    const group = parts.length > 1 ? kebab([first]) : kebab([c.name]);
     const name = kebab(parts.length > 1 ? parts.slice(1) : parts);
     const bucket = byGroup.get(group);
     if (bucket) bucket.push({ path, name });
@@ -371,14 +386,17 @@ function buildThemedGroups(
 
 /** Nest a dotted path into `target`, camel-casing each segment. */
 function setNested(target: Record<string, unknown>, path: string, value: Raw): void {
-  const parts = path.split(".").map((p) => p.replace(/-([a-z0-9])/g, (_, ch: string) => ch.toUpperCase()));
+  const parts = path
+    .split(".")
+    .map((p) => p.replace(/-([a-z0-9])/g, (_, ch: string) => ch.toUpperCase()));
+  const last = parts.pop();
+  if (last === undefined) throw new Error("setNested called with an empty path");
   let cursor = target;
-  for (let i = 0; i < parts.length - 1; i += 1) {
-    const key = parts[i]!;
+  for (const key of parts) {
     if (typeof cursor[key] !== "object" || cursor[key] === null) cursor[key] = {};
     cursor = cursor[key] as Record<string, unknown>;
   }
-  cursor[parts[parts.length - 1]!] = value;
+  cursor[last] = value;
 }
 
 /**
@@ -389,7 +407,11 @@ function setNested(target: Record<string, unknown>, path: string, value: Raw): v
  * `15`, indistinguishable from a real `15` step and neighbouring a `16` step
  * worth 4rem. Step names are data here, not identifiers.
  */
-function buildFlatGroup(group: string, source: Map<string, Raw>, registry: Registry): Record<string, unknown> {
+function buildFlatGroup(
+  group: string,
+  source: Map<string, Raw>,
+  registry: Registry,
+): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   const prefix = `${group}.`;
   for (const path of source.keys()) {
@@ -400,7 +422,11 @@ function buildFlatGroup(group: string, source: Map<string, Raw>, registry: Regis
 }
 
 /** Project a single-mode group (e.g. `radius`, `text`) into a resolved tree. */
-function buildGroup(group: string, singleMode: Map<string, Raw>, registry: Registry): Record<string, unknown> {
+function buildGroup(
+  group: string,
+  singleMode: Map<string, Raw>,
+  registry: Registry,
+): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   const prefix = `${group}.`;
   for (const path of singleMode.keys()) {
@@ -503,7 +529,9 @@ export function syncTokens(
     if (Object.keys(groups).length === 0) {
       throw new Error(
         `Themed collection ${c.name} (${c.file}) produced no colours` +
-          (skipped.length > 0 ? `; no leaf resolved to a hex in both modes (${skipped.join(", ")})` : ""),
+          (skipped.length > 0
+            ? `; no leaf resolved to a hex in both modes (${skipped.join(", ")})`
+            : ""),
       );
     }
     for (const [group, entries] of Object.entries(groups)) {
@@ -589,8 +617,10 @@ async function main(): Promise<void> {
 
   const out = syncTokens(files);
   await writeFile(TOKENS_FILE, `${JSON.stringify(out, null, 2)}\n`);
-  const themedGroups = Object.entries(out.themed).map(([g, e]) => `${g} (${Object.keys(e).length})`);
-  // eslint-disable-next-line no-console
+  const themedGroups = Object.entries(out.themed).map(
+    ([g, e]) => `${g} (${Object.keys(e).length})`,
+  );
+
   console.log(
     `design-tokens sync-export: resolved ${out.$source.resolvedLeaves} leaves across ${out.$source.collections.length} collections; ` +
       `surfaced ${Object.keys(out.color).length} colours` +
@@ -599,28 +629,27 @@ async function main(): Promise<void> {
   );
   const { unclassifiedCollections, staleCollectionRoles } = out.$source;
   if (unclassifiedCollections.length > 0) {
-    // eslint-disable-next-line no-console
     console.warn(
       `WARNING: ${unclassifiedCollections.join(", ")} not classified in src/collections.ts — ` +
         `defaulted to registry-only, so they surface nothing. design-tokens:test will fail until classified.`,
     );
   }
   if (staleCollectionRoles.length > 0) {
-    // eslint-disable-next-line no-console
     console.warn(
       `WARNING: src/collections.ts classifies ${staleCollectionRoles.join(", ")}, but no export declares them. ` +
         `Renamed or removed in Figma?`,
     );
   }
-  // eslint-disable-next-line no-console
-  console.warn("Now run `moon run design-tokens:generate` and review the tokens.snapshot.spec.ts diff.");
+
+  console.warn(
+    "Now run `moon run design-tokens:generate` and review the tokens.snapshot.spec.ts diff.",
+  );
 }
 
 // Only run the filesystem sync when invoked directly (`tsx sync-from-export.ts`),
 // not when imported by the unit test.
 if (argv[1] && import.meta.url === pathToFileURL(argv[1]).href) {
   main().catch((err) => {
-    // eslint-disable-next-line no-console
     console.error(err);
     process.exit(1);
   });

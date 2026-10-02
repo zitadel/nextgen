@@ -11,6 +11,11 @@ export default defineNuxtConfig({
           "@zitadel/api/config": ["../../../packages/api/src/runtime/config.ts"],
         },
       },
+      // Keep the flat ESLint config out of Nuxt's type program: vue-tsc would
+      // otherwise pull in its dev-only imports (e.g. @eslint/json ships source
+      // .ts that fails under verbatimModuleSyntax). It is a lint config, not
+      // app code, so it has no business in the typecheck.
+      exclude: ["../eslint.config.js"],
     },
   },
   nextgen: {
@@ -21,11 +26,7 @@ export default defineNuxtConfig({
   css: ["~/assets/css/demo-host.css"],
   ssr: true,
   build: {
-    transpile: [
-      "@zitadel/api",
-      "@zitadel/components",
-      "@zitadel/design-tokens",
-    ],
+    transpile: ["@zitadel/api", "@zitadel/components", "@zitadel/design-tokens"],
   },
   runtimeConfig: {
     zitadelUrl: process.env.ZITADEL_URL ?? "http://localhost:8080",

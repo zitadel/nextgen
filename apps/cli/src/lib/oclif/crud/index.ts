@@ -1,17 +1,12 @@
 import type { Command } from "@oclif/core";
 
+import type { ResourceCommandId, ResourceCommandOptions, ResourceRegistry, Verb } from "./types";
+
 import { bindOperation, type OperationClass } from "./ops/command";
 import { DeleteOperation } from "./ops/delete";
 import { ListOperation } from "./ops/list";
 import { GetOperation } from "./ops/read";
 import { CreateOperation, UpdateOperation } from "./ops/write";
-import type {
-  ResourceCommandId,
-  ResourceCommandOptions,
-  ResourceDescriptor,
-  ResourceRegistry,
-  Verb,
-} from "./types";
 
 /**
  * Generic `<topic> <verb>` command factory for oclif. It knows nothing about
@@ -72,6 +67,3 @@ export const buildResourceCommands = <Ctx>(
       ];
     }),
   );
-
-/** Re-exported for registries that want to describe a resource in isolation. */
-export type { ResourceDescriptor };

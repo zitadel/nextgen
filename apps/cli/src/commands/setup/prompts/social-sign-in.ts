@@ -1,5 +1,4 @@
 import { multiselect, note, password, text } from "@clack/prompts";
-
 import {
   credentialVariables,
   idpProvider,
@@ -7,11 +6,11 @@ import {
   type IdpProvider,
 } from "@zitadel/config/idp";
 
+import type { PromptContext, SetupAnswers, SetupPrompt, SsoAnswer } from "./types";
+
 import { askConnectionEndpoints, callbackUriFor } from "../../../lib/idp";
 import { issuerFromPort } from "../../../lib/orca";
-
 import { bail } from "./cancel";
-import type { PromptContext, SetupAnswers, SetupPrompt, SsoAnswer } from "./types";
 
 /**
  * "Add social sign-in providers?" — the one onboarding question that needs
@@ -117,7 +116,6 @@ export class SocialSignInPrompt implements SetupPrompt {
       `${entry.displayName} sign-in`,
     );
   }
-
 
   private async askClientId(entry: IdpProvider): Promise<string> {
     const answer = await text({

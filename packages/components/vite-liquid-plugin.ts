@@ -1,7 +1,7 @@
+import type { Plugin } from "vite";
+
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-
-import type { Plugin } from "vite";
 
 /**
  * Vite/Rollup plugin: import `.liquid` template files as default-exported

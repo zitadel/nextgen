@@ -1,18 +1,13 @@
+import { password, text } from "@clack/prompts";
+import { Flags } from "@oclif/core";
+import { credentialVariables, idpProvider, IDP_PROVIDERS } from "@zitadel/config/idp";
+import { consola } from "consola";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-
-import { Flags } from "@oclif/core";
-import { password, text } from "@clack/prompts";
-import { consola } from "consola";
-
-import { credentialVariables, idpProvider, IDP_PROVIDERS } from "@zitadel/config/idp";
 
 import { createZitadelClient } from "../../lib/api-client";
 import { isDevelopmentBuild } from "../../lib/build-channel";
 import { isErrno, ZitadelError } from "../../lib/errors";
-import { publicCliCommand } from "../../lib/public-cli";
-import { bailOnCancel } from "../../lib/prompt-cancel";
-import { stableStringify } from "../../lib/json";
 import {
   applySsoToFlow,
   applySsoToSchema,
@@ -42,18 +37,16 @@ import {
   type SecretOutcome,
   type SecretPublisher,
 } from "../../lib/idp";
-import {
-  BaseCommand,
-  CommandGroups,
-  type JsonEnvelope,
-  nonBlankString,
-} from "../../lib/oclif";
+import { stableStringify } from "../../lib/json";
+import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
 import {
   readDevelopmentIssuer,
   readZitadelConfig,
   readZitadelSecret,
   type ZitadelSecret,
 } from "../../lib/project";
+import { bailOnCancel } from "../../lib/prompt-cancel";
+import { publicCliCommand } from "../../lib/public-cli";
 import { readState } from "../../lib/sync/state";
 import { readStdin } from "../../lib/variables";
 
@@ -152,7 +145,9 @@ export default class SsoEnable extends BaseCommand {
     const flows = await this.targetFlows(cwd, schema);
 
     consola.info(`Project   ${secretFile.project_id}`);
-    consola.info(`Schema    ${schema.path}${schema.methods.length > 0 ? ` (${schema.methods.join(", ")})` : ""}`);
+    consola.info(
+      `Schema    ${schema.path}${schema.methods.length > 0 ? ` (${schema.methods.join(", ")})` : ""}`,
+    );
 
     if (dryRun) {
       return this.emit({
@@ -227,8 +222,7 @@ export default class SsoEnable extends BaseCommand {
         developmentBuild: isDevelopmentBuild() && !nonInteractive,
         command: "Enable",
       });
-      const clientId =
-        clientIdFlag ?? (await this.askClientId(entry.displayName, nonInteractive));
+      const clientId = clientIdFlag ?? (await this.askClientId(entry.displayName, nonInteractive));
       const secretValue = await this.askClientSecret(scaffolded.clientSecret, nonInteractive);
 
       const publish = this.publisher(secretFile);
@@ -583,12 +577,15 @@ async function publishedIdOf(cwd: string, path: string): Promise<string | undefi
     if (isErrno(error, "ENOENT")) {
       return undefined;
     }
-    throw new ZitadelError("E_VALIDATION", `Cannot read .zitadel/state.json: ${error instanceof Error ? error.message : String(error)}`, {
-      hint:
-        "The file records which platform resource each local file was synced as. " +
-        "Fix or remove it and run `zitadel apply`, then run this command again.",
-      details: { file: ".zitadel/state.json" },
-    });
+    throw new ZitadelError(
+      "E_VALIDATION",
+      `Cannot read .zitadel/state.json: ${error instanceof Error ? error.message : String(error)}`,
+      {
+        hint:
+          "The file records which platform resource each local file was synced as. " +
+          "Fix or remove it and run `zitadel apply`, then run this command again.",
+        details: { file: ".zitadel/state.json" },
+      },
+    );
   }
 }
-

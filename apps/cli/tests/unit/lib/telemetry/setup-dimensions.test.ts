@@ -1,7 +1,6 @@
+import { IDP_PROVIDERS } from "@zitadel/config/idp";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-
-import { IDP_PROVIDERS } from "@zitadel/config/idp";
 import { describe, expect, it } from "vitest";
 
 /**
@@ -65,6 +64,6 @@ describe("setup telemetry dimensions", () => {
   it("reports several providers as one bucket, not a joined set", async () => {
     const source = await readFile(setupCommand, "utf8");
     expect(source).toContain('"multiple"');
-    expect(source).not.toContain('.map((a) => a.provider).join(',);
+    expect(source).not.toContain(".map((a) => a.provider).join(");
   });
 });

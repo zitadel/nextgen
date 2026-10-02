@@ -1,15 +1,11 @@
-import { access, mkdir, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
-
-import { consola } from "consola";
-
+import type { ZitadelClient } from "@zitadel/api/client";
 import type {
   CreateFlowDefinition201,
   CreateIdpBodyIdp,
   CreateSchema201,
   CreateSchemaBody,
 } from "@zitadel/api/generated/model";
-import type { ZitadelClient } from "@zitadel/api/client";
+
 import {
   DEFAULT_FLOW_CONFIG_PATH,
   DEFAULT_FLOW_SCHEMA_URI,
@@ -25,7 +21,11 @@ import {
 } from "@zitadel/config/defaults";
 import { type ConnectionEndpoints, idpProvider } from "@zitadel/config/idp";
 import { normalizeFlowBody, normalizeSchemaBody } from "@zitadel/config/normalize";
+import { consola } from "consola";
+import { access, mkdir, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 
+import { ZitadelError } from "./errors";
 import { FLOWS_DIR } from "./flows";
 import {
   applySsoToFlow,
@@ -40,7 +40,6 @@ import { normalizePublicCliProse } from "./public-cli";
 import { hashForState, writeBackResource } from "./sync";
 import { updateState } from "./sync/state";
 import { SCHEMAS_DIR } from "./user-schema";
-import { ZitadelError } from "./errors";
 
 export type MaterializeSetupResourcesResult = {
   filesWritten: string[];
@@ -281,11 +280,7 @@ export async function materializeSetupResources(opts: {
  * has edited the README should keep their edits when `setup --force` is
  * re-run.
  */
-async function writeReadmeFile(
-  cwd: string,
-  relPath: string,
-  content: string,
-): Promise<boolean> {
+async function writeReadmeFile(cwd: string, relPath: string, content: string): Promise<boolean> {
   const dest = join(cwd, relPath);
   await mkdir(dirname(dest), { recursive: true });
   try {

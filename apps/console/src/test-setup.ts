@@ -1,6 +1,6 @@
 import { configure } from "@testing-library/react";
-import { afterEach, beforeEach } from "vitest";
 import { _resetConfigForTesting } from "@zitadel/api/config";
+import { afterEach, beforeEach } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
 import { clearSessionCaches } from "./lib/session-cache";

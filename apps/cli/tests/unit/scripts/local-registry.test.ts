@@ -1,7 +1,6 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
-
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 
 type RunCall = {
@@ -118,9 +117,7 @@ describe("local registry helper", () => {
     );
     expect(await readFile(paths.verdaccioConfigPath, "utf8")).toContain("'@zitadel/*'");
     expect(await readFile(paths.verdaccioConfigPath, "utf8")).toContain(paths.storagePath);
-    expect(await readFile(paths.verdaccioConfigPath, "utf8")).toContain(
-      "max_body_size: 200mb",
-    );
+    expect(await readFile(paths.verdaccioConfigPath, "utf8")).toContain("max_body_size: 200mb");
 
     const runCalls = calls.filter((call): call is RunCall => "command" in call);
     expect(runCalls[0]).toEqual({

@@ -75,9 +75,7 @@ describe("resolveFileReference", () => {
     const cwd = await makeProject();
     const outside = await makeOutside();
     await symlink(join(outside, "missing.txt"), join(cwd, baseDir, "dangling.liquid"));
-    expect(() => resolveFileReference({ cwd, baseDir }, "./dangling.liquid")).toThrow(
-      ZitadelError,
-    );
+    expect(() => resolveFileReference({ cwd, baseDir }, "./dangling.liquid")).toThrow(ZitadelError);
   });
 
   it("allows a symlink that stays inside the project", async () => {

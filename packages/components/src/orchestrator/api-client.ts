@@ -30,6 +30,7 @@ import type {
   GetMySession200,
   SubmitFlowStepBody,
 } from "@zitadel/api/generated/model";
+
 import { ApiError } from "@zitadel/api/runtime/fetch";
 
 const apiRequestInit: RequestInit = { credentials: "include" };

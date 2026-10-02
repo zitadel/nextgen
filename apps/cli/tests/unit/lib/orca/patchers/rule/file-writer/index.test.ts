@@ -1,12 +1,12 @@
 import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
+import type { ScaffoldPlan } from "../../../../../../../src/lib/orca/patchers/rule/file-writer/types";
 
 import { ZitadelError } from "../../../../../../../src/lib/errors";
 import { scaffold } from "../../../../../../../src/lib/orca/patchers/rule/file-writer/index";
-import type { ScaffoldPlan } from "../../../../../../../src/lib/orca/patchers/rule/file-writer/types";
 
 let dir: string;
 

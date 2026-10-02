@@ -1,10 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Link2, Workflow } from "lucide-react";
 
-import { DocumentViewer } from "@/components/document-viewer";
-import { DETAIL_PANEL_PAGE } from "@/components/layout";
 import { EYEBROW, MetaRule, MetaValue } from "@/components/detail-meta";
 import { ICON_PLATE, MetaCard } from "@/components/detail-page";
+import { DocumentViewer } from "@/components/document-viewer";
+import { DETAIL_PANEL_PAGE } from "@/components/layout";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";

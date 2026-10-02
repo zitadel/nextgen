@@ -407,7 +407,7 @@ verify with `corepack pnpm exec changeset status --since origin/main`.
   `moon ci`, `moon run <project>:<task>`, and release tasks under
   `moon run release:*`.
 - Keep direct underlying tools for implementation details: `vite`, `vitest`,
-  `tsc`, `playwright`, `oxlint`, `go`, `docker buildx`, and `changeset`.
+  `tsc`, `playwright`, `eslint`, `go`, `docker buildx`, and `changeset`.
 - Do not reintroduce Nx or GoReleaser without updating the ADRs first.
 - When unsure about Moon flags, check `moon --help` or the task definition in
   the nearest `moon.yml` before guessing.

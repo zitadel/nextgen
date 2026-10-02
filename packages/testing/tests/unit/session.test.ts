@@ -2,8 +2,9 @@ import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
-import { connectZitadel } from "../../src/index";
 import type { InstanceHandle } from "../../src/types";
+
+import { connectZitadel } from "../../src/index";
 
 const BASE = "http://zitadel-testing.invalid";
 
@@ -184,15 +185,11 @@ describe("seedSession", () => {
       ),
     );
     const zitadel = connectZitadel({ ...handle, appOrigin: undefined });
-    await expect(zitadel.seedSession()).rejects.toThrow(
-      /No Origin header was sent.*appOrigins/s,
-    );
+    await expect(zitadel.seedSession()).rejects.toThrow(/No Origin header was sent.*appOrigins/s);
   });
 
   it("caps the number of flow steps instead of looping", async () => {
-    server.use(
-      http.post(`${BASE}/flow/:id/submit`, () => HttpResponse.json(identifierStep)),
-    );
+    server.use(http.post(`${BASE}/flow/:id/submit`, () => HttpResponse.json(identifierStep)));
     const zitadel = connectZitadel(handle);
     await expect(zitadel.seedSession()).rejects.toThrow(/did not complete within 6 steps/);
   });

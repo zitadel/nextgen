@@ -1,8 +1,9 @@
 import { confirm } from "@clack/prompts";
 
+import type { PromptContext, SetupAnswers, SetupPrompt } from "./types";
+
 import { ZitadelError } from "../../../lib/errors";
 import { bail } from "./cancel";
-import type { PromptContext, SetupAnswers, SetupPrompt } from "./types";
 
 /**
  * "Detected `<framework>`. Proceed?" — the wizard's first question. Accepting

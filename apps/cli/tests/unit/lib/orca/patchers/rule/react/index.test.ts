@@ -4,8 +4,9 @@ import type {
   FileOp,
   ScaffoldPlan,
 } from "../../../../../../../src/lib/orca/patchers/rule/file-writer/types";
-import { ReactPatcher } from "../../../../../../../src/lib/orca/patchers/rule/react";
 import type { PatchContext } from "../../../../../../../src/lib/orca/patchers/types";
+
+import { ReactPatcher } from "../../../../../../../src/lib/orca/patchers/rule/react";
 import { MANAGED_MARKER } from "../../../../../../../src/lib/paths";
 
 function ctx(): PatchContext {

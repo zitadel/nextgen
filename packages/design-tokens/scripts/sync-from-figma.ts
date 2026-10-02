@@ -78,21 +78,27 @@ const lock = JSON.parse(
 async function main(): Promise<void> {
   const token = process.env["FIGMA_TOKEN"];
   if (!token) {
-    throw new Error("FIGMA_TOKEN env var is required. Generate at https://www.figma.com/developers/api#access-tokens and add it to repo secrets for CI.");
+    throw new Error(
+      "FIGMA_TOKEN env var is required. Generate at https://www.figma.com/developers/api#access-tokens and add it to repo secrets for CI.",
+    );
   }
   const published = await fetchVariables(token, lock.fileKey, "published");
   const collections = indexCollections(published);
   const tokensFile = normalise(published, collections);
   await writeFile(OUT, `${JSON.stringify(tokensFile, null, 2)}\n`);
-  // eslint-disable-next-line no-console
+
   console.log(`design-tokens sync: wrote ${OUT}`);
-  // eslint-disable-next-line no-console
+
   console.warn(
     "Remember to bump figma-tokens.lock with the new published version and `pulledAt`/`pulledBy`, then run `moon run design-tokens:generate` and commit the result. CI sync workflow does this automatically; if you ran sync manually, do it now.",
   );
 }
 
-async function fetchVariables(token: string, fileKey: string, endpoint: "published" | "local"): Promise<FigmaVariablesResponse> {
+async function fetchVariables(
+  token: string,
+  fileKey: string,
+  endpoint: "published" | "local",
+): Promise<FigmaVariablesResponse> {
   const url = `https://api.figma.com/v1/files/${fileKey}/variables/${endpoint}`;
   const res = await fetch(url, { headers: { "X-Figma-Token": token } });
   if (!res.ok) {
@@ -130,7 +136,10 @@ interface NormalisedTokensFile {
  * and trim, then route into `primitives.*` or `tokens.*` based on the
  * collection the variable belongs to (`Primitives` vs `Tokens`).
  */
-function normalise(response: FigmaVariablesResponse, collections: Map<string, FigmaVariableCollection>): NormalisedTokensFile {
+function normalise(
+  response: FigmaVariablesResponse,
+  collections: Map<string, FigmaVariableCollection>,
+): NormalisedTokensFile {
   const out: NormalisedTokensFile = {
     $source: {
       fileKey: lock.fileKey,
@@ -178,7 +187,11 @@ function insertPrimitive(
 ): void {
   const [category, ...rest] = path;
   if (type === "COLOR" && category === "color") {
-    setNested(primitives.color, rest, rgbaToHex(value as { r: number; g: number; b: number; a: number }));
+    setNested(
+      primitives.color,
+      rest,
+      rgbaToHex(value as { r: number; g: number; b: number; a: number }),
+    );
     return;
   }
   if (type === "FLOAT" && category === "spacing") {
@@ -204,7 +217,9 @@ function insertSemantic(
   if (isAlias(value)) {
     const target = response.meta?.variables[value.id];
     if (!target) return;
-    const targetPath = target.name.split("/").map((seg) => seg.trim().toLowerCase().replaceAll(" ", "-"));
+    const targetPath = target.name
+      .split("/")
+      .map((seg) => seg.trim().toLowerCase().replaceAll(" ", "-"));
     tokens.color[groupKey][name] = { primitive: pathToDotPath(targetPath) };
     return;
   }
@@ -212,7 +227,12 @@ function insertSemantic(
 }
 
 function isAlias(value: FigmaVariableValue): value is { type: "VARIABLE_ALIAS"; id: string } {
-  return typeof value === "object" && value !== null && "type" in value && value.type === "VARIABLE_ALIAS";
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "type" in value &&
+    value.type === "VARIABLE_ALIAS"
+  );
 }
 
 function pathToDotPath(parts: string[]): string {
@@ -233,18 +253,25 @@ function setNested(target: Record<string, unknown>, path: string[], value: strin
 }
 
 function rgbaToHex(rgba: { r: number; g: number; b: number; a: number }): string {
-  const r = Math.round(rgba.r * 255).toString(16).padStart(2, "0");
-  const g = Math.round(rgba.g * 255).toString(16).padStart(2, "0");
-  const b = Math.round(rgba.b * 255).toString(16).padStart(2, "0");
+  const r = Math.round(rgba.r * 255)
+    .toString(16)
+    .padStart(2, "0");
+  const g = Math.round(rgba.g * 255)
+    .toString(16)
+    .padStart(2, "0");
+  const b = Math.round(rgba.b * 255)
+    .toString(16)
+    .padStart(2, "0");
   if (rgba.a < 1) {
-    const a = Math.round(rgba.a * 255).toString(16).padStart(2, "0");
+    const a = Math.round(rgba.a * 255)
+      .toString(16)
+      .padStart(2, "0");
     return `#${r}${g}${b}${a}`;
   }
   return `#${r}${g}${b}`;
 }
 
 main().catch((err) => {
-  // eslint-disable-next-line no-console
   console.error(err);
   process.exit(1);
 });

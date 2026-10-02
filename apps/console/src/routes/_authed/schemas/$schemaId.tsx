@@ -2,8 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Users } from "lucide-react";
 import { Fragment } from "react";
 
-import { DocumentViewer } from "@/components/document-viewer";
 import { ICON_PLATE } from "@/components/detail-page";
+import { DocumentViewer } from "@/components/document-viewer";
 import { DETAIL_PANEL_PAGE } from "@/components/layout";
 import { SchemaFieldsPanel } from "@/components/schema-fields-panel";
 import { Badge } from "@/components/ui/badge";

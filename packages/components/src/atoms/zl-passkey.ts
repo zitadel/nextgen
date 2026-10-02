@@ -1,9 +1,9 @@
 import { html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 
-import { bufferToBase64Url, base64UrlToBuffer } from "../internal/base64url.js";
 import type { AtomManifest } from "../manifest.js";
 
+import { bufferToBase64Url, base64UrlToBuffer } from "../internal/base64url.js";
 import "./zl-alert.js";
 import "./zl-button.js";
 
@@ -211,9 +211,7 @@ export class ZlPasskey extends LitElement {
 
     try {
       const credential =
-        this.ceremony === "register"
-          ? await this.createCredential()
-          : await this.getCredential();
+        this.ceremony === "register" ? await this.createCredential() : await this.getCredential();
 
       if (!credential) {
         this.emitError("No credential returned by the browser.", false);
@@ -365,9 +363,7 @@ export class ZlPasskey extends LitElement {
    * Serialize a `PublicKeyCredential` to the JSON shape defined in
    * `passkey-proof.yaml`. All `ArrayBuffer` fields are base64url-encoded.
    */
-  private serializeCredential(
-    credential: PublicKeyCredential,
-  ): ZlPasskeyResultDetail["proof"] {
+  private serializeCredential(credential: PublicKeyCredential): ZlPasskeyResultDetail["proof"] {
     const response = credential.response;
 
     const serialized: ZlPasskeyResultDetail["proof"] = {
@@ -382,17 +378,13 @@ export class ZlPasskey extends LitElement {
     // Attestation response (registration)
     if ("attestationObject" in response) {
       const attestation = response as AuthenticatorAttestationResponse;
-      serialized.response.attestationObject = bufferToBase64Url(
-        attestation.attestationObject,
-      );
+      serialized.response.attestationObject = bufferToBase64Url(attestation.attestationObject);
     }
 
     // Assertion response (authentication)
     if ("authenticatorData" in response) {
       const assertion = response as AuthenticatorAssertionResponse;
-      serialized.response.authenticatorData = bufferToBase64Url(
-        assertion.authenticatorData,
-      );
+      serialized.response.authenticatorData = bufferToBase64Url(assertion.authenticatorData);
       serialized.response.signature = bufferToBase64Url(assertion.signature);
       if (assertion.userHandle) {
         serialized.response.userHandle = bufferToBase64Url(assertion.userHandle);

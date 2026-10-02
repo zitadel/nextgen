@@ -1,7 +1,8 @@
 import { spawnSync } from "node:child_process";
 
-import { ZitadelError } from "../../errors";
 import type { Scaffolder } from "./types";
+
+import { ZitadelError } from "../../errors";
 
 /**
  * Base for scaffolders that delegate to an external CLI (e.g. create-next-app).

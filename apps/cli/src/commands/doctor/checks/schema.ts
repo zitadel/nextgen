@@ -1,6 +1,5 @@
-import { join } from "node:path";
-
 import { schemaConfigSchema } from "@zitadel/config/schemas";
+import { join } from "node:path";
 
 import { readJsonDir } from "../../../lib/json-dir";
 import { SCHEMAS_DIR } from "../../../lib/user-schema";

@@ -1,9 +1,9 @@
 import { select } from "@clack/prompts";
-
 import { SETUP_USE_CASES, type SetupUseCase } from "@zitadel/config/defaults";
 
-import { bail } from "./cancel";
 import type { PromptContext, SetupAnswers, SetupPrompt } from "./types";
+
+import { bail } from "./cancel";
 
 /**
  * "Who will sign in to your app?" — picks the use case, which owns the

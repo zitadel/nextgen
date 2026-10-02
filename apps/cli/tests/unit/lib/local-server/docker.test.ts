@@ -3,12 +3,12 @@ import { EventEmitter } from "node:events";
 import { readFile } from "node:fs/promises";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { CONTAINER_DATA_DIR } from "../../../../src/lib/local-server/runtime";
 import {
   dockerRunArgs,
   metadataFromStart,
   startContainer,
 } from "../../../../src/lib/local-server/docker";
+import { CONTAINER_DATA_DIR } from "../../../../src/lib/local-server/runtime";
 
 vi.mock("node:child_process", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:child_process")>();
@@ -107,7 +107,9 @@ describe("local server Docker helpers", () => {
 
     expect(args).toContain("NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=true");
     const mount = args[args.indexOf("--volume", args.indexOf("--env")) + 1];
-    expect(mount).toBe("/tmp/app/.zitadel/local/admin-user.json:/var/lib/zitadel/bootstrap/admin-user.json:ro");
+    expect(mount).toBe(
+      "/tmp/app/.zitadel/local/admin-user.json:/var/lib/zitadel/bootstrap/admin-user.json:ro",
+    );
     // The image's own CMD is replaced, so the migrate default is passed again.
     expect(args.slice(-3)).toEqual([
       "--migrate",

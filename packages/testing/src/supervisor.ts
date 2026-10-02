@@ -6,10 +6,15 @@
  */
 import { access, rm } from "node:fs/promises";
 
+import type { LocalZitadel } from "./types";
+
 import { writeHandshake } from "./handshake";
 import { startLocalZitadel } from "./index";
-import { parseSupervisorConfig, requireHandshakePath, SUPERVISOR_CONFIG_ENV } from "./orchestration";
-import type { LocalZitadel } from "./types";
+import {
+  parseSupervisorConfig,
+  requireHandshakePath,
+  SUPERVISOR_CONFIG_ENV,
+} from "./orchestration";
 
 const LOG = "[zitadel-testing]";
 
@@ -30,7 +35,7 @@ async function main(): Promise<void> {
 
   // Signal handlers close over this binding before the asynchronous boot
   // assigns it.
-  // oxlint-disable-next-line prefer-const
+  // eslint-disable-next-line prefer-const -- read by the signal handlers above before the boot below assigns it, so it must stay a mutable binding
   let zitadel: LocalZitadel | undefined;
   let signalled = false;
   let finishing: Promise<void> | undefined;

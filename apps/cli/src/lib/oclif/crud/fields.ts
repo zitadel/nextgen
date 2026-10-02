@@ -1,9 +1,10 @@
 import { Flags, type Interfaces } from "@oclif/core";
 
+import type { Json, Schema } from "./types";
+
 import { ZitadelError } from "../../errors";
 import { isObject } from "../../json";
 import { isSecretKey, refuseSecret } from "./secrets";
-import type { Json, Schema } from "./types";
 import { unwrap, type ZodLike } from "./zod";
 
 /**
@@ -249,7 +250,6 @@ export const fieldExample = (fields: readonly BodyField[]): string | undefined =
     )
     .join(" ");
 };
-
 
 /** A record key, refused when it names a credential. */
 const secretChecked = (key: string, flag: string): string =>

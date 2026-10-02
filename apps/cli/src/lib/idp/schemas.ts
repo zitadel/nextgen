@@ -1,10 +1,10 @@
 import { readdir, readFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 
-import { FLOWS_DIR } from "../flows";
-import { SCHEMAS_DIR } from "../user-schema";
 import { isErrno, ZitadelError } from "../errors";
+import { FLOWS_DIR } from "../flows";
 import { isObject } from "../json";
+import { SCHEMAS_DIR } from "../user-schema";
 
 /** A user-schema file, with what the command has to show about it. */
 export type SchemaFile = {

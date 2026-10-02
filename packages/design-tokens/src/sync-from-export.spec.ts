@@ -16,7 +16,6 @@
  */
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-
 import { describe, expect, it } from "vitest";
 
 import { syncTokens } from "../scripts/sync-from-export.js";
@@ -44,7 +43,12 @@ describe("syncTokens resolver", () => {
         },
         {
           name: "theme.json",
-          data: { colors: { "primary-light": leaf("{tailwind colors.neutral.900}"), "primary-dark": leaf("{tailwind colors.neutral.200}") } },
+          data: {
+            colors: {
+              "primary-light": leaf("{tailwind colors.neutral.900}"),
+              "primary-dark": leaf("{tailwind colors.neutral.200}"),
+            },
+          },
         },
         {
           name: "mode.json",
@@ -127,7 +131,9 @@ describe("syncTokens resolver", () => {
   // soft lands a reviewable PR; the assertions at the bottom of this file then
   // fail `full-pr` until someone classifies the collection.
   it("defaults an unclassified export to registry-only and reports it", () => {
-    const out = syncTokens([mode, { name: "surprise.json", data: { thing: leaf("#ffffff") } }], { Mode: "semantic" });
+    const out = syncTokens([mode, { name: "surprise.json", data: { thing: leaf("#ffffff") } }], {
+      Mode: "semantic",
+    });
 
     expect(out.$source.unclassifiedCollections).toEqual(["surprise"]);
     // registry-only: still resolvable as an alias, but surfaces nothing.
@@ -136,11 +142,15 @@ describe("syncTokens resolver", () => {
   });
 
   it("reports a manifest entry whose collection no longer exists", () => {
-    expect(syncTokens([mode], { Mode: "semantic", Renamed: "themed" }).$source.staleCollectionRoles).toEqual(["Renamed"]);
+    expect(
+      syncTokens([mode], { Mode: "semantic", Renamed: "themed" }).$source.staleCollectionRoles,
+    ).toEqual(["Renamed"]);
   });
 
   it("requires exactly one semantic collection", () => {
-    expect(() => syncTokens([mode], { Mode: "themed" })).toThrow(/Exactly one collection must have role "semantic"/);
+    expect(() => syncTokens([mode], { Mode: "themed" })).toThrow(
+      /Exactly one collection must have role "semantic"/,
+    );
     expect(() =>
       syncTokens(
         [
@@ -302,7 +312,10 @@ describe("syncTokens against real figma-export/", () => {
   const files = readdirSync(exportDir)
     .filter((n) => n.endsWith(".json"))
     .sort()
-    .map((name) => ({ name, data: JSON.parse(readFileSync(`${exportDir}/${name}`, "utf8")) as unknown }));
+    .map((name) => ({
+      name,
+      data: JSON.parse(readFileSync(`${exportDir}/${name}`, "utf8")) as unknown,
+    }));
 
   it("resolves the designer's exports into the full shadcn colour surface", () => {
     const out = syncTokens(files);
@@ -341,10 +354,13 @@ describe("syncTokens against real figma-export/", () => {
   // Figma collection still produces a reviewable PR — which means this test is
   // the only thing standing between an unclassified collection and a merge.
   it("classifies exactly the collections the export ships", () => {
-    const { collections, unclassifiedCollections, staleCollectionRoles } = syncTokens(files).$source;
+    const { collections, unclassifiedCollections, staleCollectionRoles } =
+      syncTokens(files).$source;
 
     expect(unclassifiedCollections, "add these to src/collections.ts").toEqual([]);
-    expect(staleCollectionRoles, "renamed or removed in Figma; update src/collections.ts").toEqual([]);
+    expect(staleCollectionRoles, "renamed or removed in Figma; update src/collections.ts").toEqual(
+      [],
+    );
     expect(Object.keys(collectionRoles).sort()).toEqual([...collections].sort());
   });
 });

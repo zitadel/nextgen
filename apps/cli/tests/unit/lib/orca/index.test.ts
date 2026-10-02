@@ -1,15 +1,15 @@
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { Orca } from "../../../../src/lib/orca";
 import type { Detector } from "../../../../src/lib/orca";
+import type { Scaffolder } from "../../../../src/lib/orca/scaffolders/types";
+
+import { Orca } from "../../../../src/lib/orca";
 import { detectors } from "../../../../src/lib/orca/detectors";
 import { patchers } from "../../../../src/lib/orca/patchers";
 import { scaffolders } from "../../../../src/lib/orca/scaffolders";
-import type { Scaffolder } from "../../../../src/lib/orca/scaffolders/types";
 
 const orca = new Orca(detectors, scaffolders, patchers);
 
@@ -250,9 +250,7 @@ describe("Orca.scaffold", () => {
       hint: expect.stringContaining("lowercase npm-package-safe"),
       details: expect.objectContaining({
         name: expect.stringContaining("Zitadel-Orca-Bad"),
-        validation_errors: expect.arrayContaining([
-          "name can no longer contain capital letters",
-        ]),
+        validation_errors: expect.arrayContaining(["name can no longer contain capital letters"]),
       }),
     });
     expect(scaffold).not.toHaveBeenCalled();

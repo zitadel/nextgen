@@ -1,8 +1,3 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { createServer, type Server } from "node:http";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-
 import {
   completeClaimChallenge,
   expireClaimChallenge,
@@ -13,6 +8,10 @@ import {
 } from "@zitadel/api-mock/platform";
 import { http, passthrough } from "msw";
 import { setupServer } from "msw/node";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { createServer, type Server } from "node:http";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import {
@@ -97,8 +96,10 @@ async function writeSecret(cwd: string, secret: Record<string, unknown>): Promis
 }
 
 async function readSecret(cwd: string): Promise<Record<string, unknown>> {
-  return JSON.parse(await readFile(join(cwd, ".zitadel/secret"), "utf8")) as Record<string,
-    unknown>;
+  return JSON.parse(await readFile(join(cwd, ".zitadel/secret"), "utf8")) as Record<
+    string,
+    unknown
+  >;
 }
 
 function claim(cwd: string, extra: string[] = []) {
@@ -223,7 +224,9 @@ describe("claim", () => {
     const claimed = await readSecret(cwd);
 
     // Drop the local record so the command has to learn it from the 409.
-    const { claimed_at: _claimedAt, team_id: _teamId, ...withoutClaim } = claimed;
+    const withoutClaim = { ...claimed };
+    delete withoutClaim.claimed_at;
+    delete withoutClaim.team_id;
     await writeSecret(cwd, withoutClaim);
 
     const res = await claim(cwd);
@@ -431,9 +434,7 @@ describe("claim", () => {
  * a port only known at runtime; a real socket is simpler than reshaping the
  * handlers.
  */
-async function startClaimServer(
-  claimUrl = "http://localhost/claim/ch_localstub",
-): Promise<string> {
+async function startClaimServer(claimUrl = "http://localhost/claim/ch_localstub"): Promise<string> {
   const httpServer = createServer((req, res) => {
     const url = req.url ?? "";
     if (url === "/healthz") {

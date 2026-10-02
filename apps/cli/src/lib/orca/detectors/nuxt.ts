@@ -1,9 +1,10 @@
 import { stat } from "node:fs/promises";
 import { join } from "node:path";
 
+import type { Detector, FrameworkFacts } from "./types";
+
 import { hasDependency, readPackageJson } from "./package-json";
 import { detectDevPort, issuerFromPort } from "./port";
-import type { Detector, FrameworkFacts } from "./types";
 
 /**
  * Detects a Nuxt project by its `nuxt` dependency. Like Next.js, Nuxt proxies

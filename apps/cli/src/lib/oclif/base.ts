@@ -1,9 +1,15 @@
+import { Command, Flags } from "@oclif/core";
+import consola from "consola";
 import { randomUUID } from "node:crypto";
 
-import { Command, Flags } from "@oclif/core";
-
-import { nonBlankString } from "./flags";
-import consola from "consola";
+import type { CommandGroup } from "./groups";
+import type {
+  CommandResult,
+  ErrorEnvelope,
+  EnvelopeMeta,
+  GlobalOptions,
+  JsonEnvelope,
+} from "./types";
 
 import { toZitadelError, type ZitadelError } from "../errors";
 import { isObject } from "../json";
@@ -20,14 +26,7 @@ import {
   deviceProfileProperties,
   FIRST_RUN_NOTICE,
 } from "./command-telemetry";
-import type { CommandGroup } from "./groups";
-import type {
-  CommandResult,
-  ErrorEnvelope,
-  EnvelopeMeta,
-  GlobalOptions,
-  JsonEnvelope,
-} from "./types";
+import { nonBlankString } from "./flags";
 
 /**
  * Base class for every oclif command. Owns the global flags, builds the
@@ -258,11 +257,7 @@ export abstract class BaseCommand extends Command {
       return false;
     }
     const argv = process.argv;
-    if (
-      argv.includes("--json") ||
-      argv.includes("--non-interactive") ||
-      argv.includes("-n")
-    ) {
+    if (argv.includes("--json") || argv.includes("--non-interactive") || argv.includes("-n")) {
       return false;
     }
     return Boolean(process.stdout.isTTY && process.stdin.isTTY);

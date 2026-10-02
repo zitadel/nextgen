@@ -1,5 +1,6 @@
-import { MANAGED_MARKER } from "../../../../paths";
 import type { PatchContext } from "../../types";
+
+import { MANAGED_MARKER } from "../../../../paths";
 
 /** `app.vue` — renders the page router. Marker in an HTML comment. */
 export function appVueTemplate(): string {

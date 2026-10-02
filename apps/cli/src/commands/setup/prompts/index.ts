@@ -1,3 +1,5 @@
+import type { SetupPrompt } from "./types";
+
 /**
  * Public surface for the setup wizard prompts. The `setup` command imports
  * {@link SETUP_PROMPTS} and iterates every entry, threading the answers
@@ -14,7 +16,6 @@ import { FrameworkConfirmPrompt } from "./framework-confirm";
 import { ServerPrompt } from "./server";
 import { SignInPresetPrompt } from "./sign-in-preset";
 import { SocialSignInPrompt } from "./social-sign-in";
-import type { SetupPrompt } from "./types";
 import { UseCasePrompt } from "./use-case";
 
 export type { PromptContext, SetupAnswers, SetupPrompt, SsoAnswer } from "./types";

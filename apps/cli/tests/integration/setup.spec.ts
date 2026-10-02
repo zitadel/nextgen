@@ -1,5 +1,4 @@
 import { realpath } from "node:fs/promises";
-
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "../helpers/platform";

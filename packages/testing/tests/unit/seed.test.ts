@@ -2,8 +2,9 @@ import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
-import { connectZitadel } from "../../src/index";
 import type { InstanceHandle } from "../../src/types";
+
+import { connectZitadel } from "../../src/index";
 
 const BASE = "http://zitadel-testing.invalid";
 

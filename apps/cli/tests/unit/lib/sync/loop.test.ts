@@ -1,13 +1,14 @@
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
-
-import { describe, expect, it, vi } from "vitest";
-
 import { createZitadelClient } from "@zitadel/api/client";
 import { getDefaultHumanUserSchema, getDefaultLoginFlow } from "@zitadel/config/defaults";
 import { normalizeFlowBody, normalizeSchemaBody } from "@zitadel/config/normalize";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { describe, expect, it, vi } from "vitest";
 
+import type { ResourceSyncer } from "../../../../src/lib/sync/syncers";
+
+import { ZitadelError } from "../../../../src/lib/errors";
 import {
   buildSyncPlan,
   hashForState,
@@ -16,8 +17,6 @@ import {
 } from "../../../../src/lib/sync/loop";
 import { makeSyncers } from "../../../../src/lib/sync/syncers";
 import { FatalFetchError } from "../../../../src/lib/sync/types";
-import { ZitadelError } from "../../../../src/lib/errors";
-import type { ResourceSyncer } from "../../../../src/lib/sync/syncers";
 
 const client = createZitadelClient({ baseUrl: "http://test.local" });
 
@@ -30,7 +29,12 @@ async function writeState(cwd: string, state: object): Promise<void> {
   await writeFile(join(cwd, ".zitadel/state.json"), JSON.stringify(state));
 }
 
-async function writeResource(cwd: string, dir: string, name: string, contents: object): Promise<void> {
+async function writeResource(
+  cwd: string,
+  dir: string,
+  name: string,
+  contents: object,
+): Promise<void> {
   await mkdir(join(cwd, dir), { recursive: true });
   await writeFile(join(cwd, dir, name), JSON.stringify(contents));
 }
@@ -201,7 +205,10 @@ describe("buildSyncPlan", () => {
         framework: "next",
         resources: { ".zitadel/flows/default.json": { id: "flow-001", hash: "old-hash" } },
       });
-      await writeResource(cwd, ".zitadel/flows", "default.json", { kind: "flow-definition", version: 2 });
+      await writeResource(cwd, ".zitadel/flows", "default.json", {
+        kind: "flow-definition",
+        version: 2,
+      });
 
       const syncer = makeSyncer({ directory: ".zitadel/flows", mutable: true });
       const actions = await buildSyncPlan(cwd, [syncer]);
@@ -319,7 +326,10 @@ describe("buildSyncPlan validation (real syncers)", () => {
       await writeResource(cwd, ".zitadel/schemas", "user.json", { type: 123 });
 
       await expect(
-        buildSyncPlan(cwd, makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" })),
+        buildSyncPlan(
+          cwd,
+          makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" }),
+        ),
       ).rejects.toMatchObject({ code: "E_VALIDATION" });
     } finally {
       await rm(cwd, { recursive: true, force: true });
@@ -333,7 +343,10 @@ describe("buildSyncPlan validation (real syncers)", () => {
       await writeResource(cwd, ".zitadel/flows", "default.json", { version: 99, kind: "wrong" });
 
       await expect(
-        buildSyncPlan(cwd, makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" })),
+        buildSyncPlan(
+          cwd,
+          makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" }),
+        ),
       ).rejects.toMatchObject({ code: "E_VALIDATION" });
     } finally {
       await rm(cwd, { recursive: true, force: true });
@@ -400,7 +413,7 @@ describe("runSyncLoop", () => {
       await writeResource(cwd, ".zitadel/schemas", "user.json", { kind: "user-schema" });
 
       const syncer = makeSyncer();
-      
+
       await runSyncLoop(cwd, [syncer]);
 
       expect(syncer.create).toHaveBeenCalledOnce();
@@ -456,10 +469,7 @@ describe("runSyncLoop", () => {
       expect(syncer.update).not.toHaveBeenCalled();
 
       const state = JSON.parse(
-        await (await import("node:fs/promises")).readFile(
-          join(cwd, ".zitadel/state.json"),
-          "utf8",
-        ),
+        await (await import("node:fs/promises")).readFile(join(cwd, ".zitadel/state.json"), "utf8"),
       ) as { resources: Record<string, { id: string }> };
       expect(state.resources[".zitadel/schemas/user.json"].id).toBe("sch_B");
     } finally {
@@ -480,7 +490,7 @@ describe("runSyncLoop", () => {
       await writeResource(cwd, ".zitadel/flows", "default.json", data);
 
       const syncer = makeSyncer({ directory: ".zitadel/flows", mutable: true });
-      
+
       await runSyncLoop(cwd, [syncer]);
 
       expect(syncer.update).not.toHaveBeenCalled();
@@ -498,10 +508,13 @@ describe("runSyncLoop", () => {
           ".zitadel/flows/default.json": { id: "flow-001", hash: "old-hash" },
         },
       });
-      await writeResource(cwd, ".zitadel/flows", "default.json", { kind: "flow-definition", version: 2 });
+      await writeResource(cwd, ".zitadel/flows", "default.json", {
+        kind: "flow-definition",
+        version: 2,
+      });
 
       const syncer = makeSyncer({ directory: ".zitadel/flows", mutable: true });
-      
+
       await runSyncLoop(cwd, [syncer]);
 
       expect(syncer.update).toHaveBeenCalledOnce();
@@ -841,7 +854,12 @@ describe("auto-repin on schema revise", () => {
         },
       });
       await writeResource(cwd, ".zitadel/schemas", "user.json", { ...SCHEMA_BODY, v: 2 });
-      await writeResource(cwd, ".zitadel/flows", "default.json", validFlowBody("sch_A", { version: 2 }));
+      await writeResource(
+        cwd,
+        ".zitadel/flows",
+        "default.json",
+        validFlowBody("sch_A", { version: 2 }),
+      );
 
       const schemaSyncer = makeSchemaSyncer();
       const create = vi.fn().mockResolvedValue({ id: "flow-002" });
@@ -1466,9 +1484,7 @@ describe("plan-time flow validation", () => {
       const created = actions.find((a) => a.path === FLOW_PATH);
       expect(created?.kind).toBe("create");
       if (created?.kind === "create") {
-        expect(created.warnings?.map((w) => w.rule) ?? []).not.toContain(
-          "warn/default-flow-swap",
-        );
+        expect(created.warnings?.map((w) => w.rule) ?? []).not.toContain("warn/default-flow-swap");
       }
     } finally {
       await rm(cwd, { recursive: true, force: true });
@@ -1500,9 +1516,7 @@ describe("plan-time flow validation", () => {
       const created = actions.find((a) => a.path === ".zitadel/flows/team-login.json");
       expect(created?.kind).toBe("create");
       if (created?.kind === "create") {
-        expect(created.warnings?.map((w) => w.rule) ?? []).not.toContain(
-          "warn/default-flow-swap",
-        );
+        expect(created.warnings?.map((w) => w.rule) ?? []).not.toContain("warn/default-flow-swap");
       }
     } finally {
       await rm(cwd, { recursive: true, force: true });

@@ -3,11 +3,11 @@ import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { scopedPath } from "@/lib/project-scope.fixture";
 
 // Safe as a static import where `@/auth/session` is not: the fixture's only
 // dependency on it is a type, which the transform erases.
 import { makeTestSession } from "@/auth/session.fixture";
+import { scopedPath } from "@/lib/project-scope.fixture";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.

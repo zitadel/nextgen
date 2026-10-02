@@ -1,7 +1,6 @@
-import { join } from "node:path";
-
 import { defineConfig, devices } from "@playwright/test";
 import { nextAppEnv, withZitadel } from "@zitadel/testing/playwright";
+import { join } from "node:path";
 
 /**
  * Real-instance variant of the embedded sign-in e2e:

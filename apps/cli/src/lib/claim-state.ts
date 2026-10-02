@@ -1,6 +1,7 @@
 import type { BoxAction } from "./box";
-import { serverKind } from "./oclif/server-kind";
 import type { ZitadelSecret } from "./project";
+
+import { serverKind } from "./oclif/server-kind";
 import { publicCliCommand } from "./public-cli";
 
 /**
@@ -37,7 +38,6 @@ function formatDeadline(deadline: Date): string {
     timeZoneName: "short",
   });
 }
-
 
 /**
  * Whether this project is attached to a team, as the CLI can tell locally.

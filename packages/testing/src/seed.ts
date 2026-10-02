@@ -1,9 +1,10 @@
-import { randomUUID } from "node:crypto";
-
 import type { ZitadelClient } from "@zitadel/api/client";
 
-import { requireString } from "./bootstrap";
+import { randomUUID } from "node:crypto";
+
 import type { Identity, SeededUser, SeedUserInput, SeedUsersTemplate } from "./types";
+
+import { requireString } from "./bootstrap";
 
 export interface SeedContext {
   projectId: string;

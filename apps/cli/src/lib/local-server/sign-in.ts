@@ -1,10 +1,12 @@
-import { createZitadelClient } from "@zitadel/api/client";
 import type { VerifyChallengeProofBody } from "@zitadel/api/generated/model";
+
+import { createZitadelClient } from "@zitadel/api/client";
 import { ApiError } from "@zitadel/api/runtime/fetch";
+
+import type { LocalAdmin } from "./admin-credential";
 
 import { ZitadelError } from "../errors";
 import { isObject } from "../json";
-import type { LocalAdmin } from "./admin-credential";
 import { PLATFORM_PROJECT_ID, readPlatformRuntime } from "./runtime";
 
 /**

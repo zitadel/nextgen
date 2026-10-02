@@ -1,6 +1,6 @@
 import type { StoryObj } from "@storybook/web-components-vite";
-import { html } from "lit";
 
+import { html } from "lit";
 import { mswLoader } from "msw-storybook-addon";
 
 import {
@@ -35,7 +35,6 @@ export default {
   render: orchestratorRender,
 };
 type Story = StoryObj<OrchestratorArgs>;
-
 
 /**
  * Sign-in, first step: the identifier collects the email only. Submitting

@@ -659,16 +659,17 @@ describe("provider names are server data", () => {
 
 /** Undo the entity escaping the engine applies, as a browser would. */
 function decodeEntities(value: string): string {
-  return value
-    .replaceAll("&#34;", '"')
-    .replaceAll("&#39;", "'")
-    .replaceAll("&lt;", "<")
-    .replaceAll("&gt;", ">")
-    // Unescape &amp; last: decoding it first could turn "&amp;lt;" into "<"
-    // by re-interpreting the revealed "&" as the start of another entity.
-    .replaceAll("&amp;", "&");
+  return (
+    value
+      .replaceAll("&#34;", '"')
+      .replaceAll("&#39;", "'")
+      .replaceAll("&lt;", "<")
+      .replaceAll("&gt;", ">")
+      // Unescape &amp; last: decoding it first could turn "&amp;lt;" into "<"
+      // by re-interpreting the revealed "&" as the start of another entity.
+      .replaceAll("&amp;", "&")
+  );
 }
-
 
 describe("parseSsoError", () => {
   const tag = (obj: Record<string, string>) => "sso_error:" + btoa(JSON.stringify(obj));
@@ -710,8 +711,7 @@ describe("parseSsoError", () => {
     // `atob` alone gives one character per byte, so the provider's own words
     // arrive as mojibake -- which is most providers, in most languages.
     const utf8Tag = (obj: Record<string, string>) =>
-      "sso_error:" +
-      btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(obj))));
+      "sso_error:" + btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(obj))));
 
     const errors = parseSsoError(
       utf8Tag({ code: "access_denied", description: "Anmeldung abgebrochen — über Google" }),
@@ -743,7 +743,9 @@ describe("parseSsoError", () => {
   });
 
   it("degrades a corrupt payload to a generic failure rather than leaking it", () => {
-    expect(parseSsoError("sso_error:not-valid-base64!!")).toEqual([{ text_key: "error.sso_failed" }]);
+    expect(parseSsoError("sso_error:not-valid-base64!!")).toEqual([
+      { text_key: "error.sso_failed" },
+    ]);
   });
 });
 

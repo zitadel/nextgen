@@ -1,7 +1,6 @@
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-
 import { describe, expect, it } from "vitest";
 
 import { ZitadelError } from "../../../../src/lib/errors";
@@ -65,7 +64,12 @@ describe("readConnectionFiles", () => {
 describe("planConnection", () => {
   it("creates google.json when the project has no google connection", () => {
     const plan = planConnection({ provider: "google", files: [] });
-    expect(plan).toEqual({ action: "create", name: "google.json", path: `${IDPS_DIR}/google.json`, slug: "google" });
+    expect(plan).toEqual({
+      action: "create",
+      name: "google.json",
+      path: `${IDPS_DIR}/google.json`,
+      slug: "google",
+    });
   });
 
   it("reuses an existing google connection rather than adding a second", () => {
@@ -88,11 +92,16 @@ describe("planConnection", () => {
       template: "okta",
       oidc: { issuer: "https://acme.okta.com" },
     });
-    expect(planConnection({ provider: "google", files: [other] })).toMatchObject({ action: "create" });
+    expect(planConnection({ provider: "google", files: [other] })).toMatchObject({
+      action: "create",
+    });
   });
 
   it("stops and names the candidates when two google connections exist", () => {
-    const files = [file("google.json", googleBody()), file("google-work.json", googleBody({ slug: "google_work" }))];
+    const files = [
+      file("google.json", googleBody()),
+      file("google-work.json", googleBody({ slug: "google_work" })),
+    ];
     try {
       planConnection({ provider: "google", files });
       expect.unreachable("should have thrown");
@@ -107,7 +116,11 @@ describe("planConnection", () => {
   it("stops when the supplied client id is not the one already configured", () => {
     const existing = file("google.json", googleBody());
     try {
-      planConnection({ provider: "google", files: [existing], clientId: "999.apps.googleusercontent.com" });
+      planConnection({
+        provider: "google",
+        files: [existing],
+        clientId: "999.apps.googleusercontent.com",
+      });
       expect.unreachable("should have thrown");
     } catch (error) {
       expect((error as ZitadelError).code).toBe("E_VALIDATION");
@@ -119,12 +132,20 @@ describe("planConnection", () => {
   it("reuses without complaint when the supplied client id matches", () => {
     const existing = file("google.json", googleBody());
     expect(
-      planConnection({ provider: "google", files: [existing], clientId: "111.apps.googleusercontent.com" }),
+      planConnection({
+        provider: "google",
+        files: [existing],
+        clientId: "111.apps.googleusercontent.com",
+      }),
     ).toMatchObject({ action: "reuse" });
   });
 
   it("refuses to overwrite an unrelated file already called google.json", () => {
-    const squatter = file("google.json", { slug: "google", template: "okta", oidc: { issuer: "https://acme.okta.com" } });
+    const squatter = file("google.json", {
+      slug: "google",
+      template: "okta",
+      oidc: { issuer: "https://acme.okta.com" },
+    });
     try {
       planConnection({ provider: "google", files: [squatter] });
       expect.unreachable("should have thrown");
@@ -135,7 +156,9 @@ describe("planConnection", () => {
   });
 
   it("rejects a provider the catalog does not know", () => {
-    expect(() => planConnection({ provider: "okta", files: [] })).toThrow(/unknown identity provider/);
+    expect(() => planConnection({ provider: "okta", files: [] })).toThrow(
+      /unknown identity provider/,
+    );
   });
 
   it("refuses two slugs whose credentials would land in one variable", () => {

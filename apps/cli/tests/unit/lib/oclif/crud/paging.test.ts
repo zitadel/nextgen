@@ -7,10 +7,12 @@ const cursor = { nextPageToken: DEFAULT_WIRE.nextPageToken };
 describe("collectPages", () => {
   it("fetches one page and reports its next token", async () => {
     const request = vi.fn(async () => ({ users: [1, 2], next_page_token: "p2" }));
-    await expect(collectPages(request, { items: "users", all: false, ...cursor })).resolves.toEqual({
-      items: [1, 2],
-      next: "p2",
-    });
+    await expect(collectPages(request, { items: "users", all: false, ...cursor })).resolves.toEqual(
+      {
+        items: [1, 2],
+        next: "p2",
+      },
+    );
     expect(request).toHaveBeenCalledWith(undefined);
   });
 
@@ -41,14 +43,20 @@ describe("collectPages", () => {
 
   it("treats an empty next_page_token as the last page", async () => {
     await expect(
-      collectPages(async () => ({ users: [], next_page_token: "" }), { items: "users", all: true, ...cursor }),
+      collectPages(async () => ({ users: [], next_page_token: "" }), {
+        items: "users",
+        all: true,
+        ...cursor,
+      }),
     ).resolves.toEqual({ items: [], next: null });
   });
 
   it("stops when the server repeats a cursor, rather than draining forever", async () => {
     // A server that keeps handing back the same token would otherwise loop.
     const request = vi.fn(async () => ({ users: [1], next_page_token: "same" }));
-    await expect(collectPages(request, { items: "users", all: true, ...cursor })).rejects.toMatchObject({
+    await expect(
+      collectPages(request, { items: "users", all: true, ...cursor }),
+    ).rejects.toMatchObject({
       code: "E_VALIDATION",
       message: "The server repeated a page cursor, so --all would never finish",
       details: { cursor: "same" },

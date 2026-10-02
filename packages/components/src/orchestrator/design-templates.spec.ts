@@ -12,6 +12,7 @@
  * tested until the chrome is removed.
  */
 import type { CreateFlow201Step } from "@zitadel/api/generated/model";
+
 import { BRANDING_DESIGNS, getDefaultBrandingConfig } from "@zitadel/config/defaults";
 import { describe, expect, it } from "vitest";
 

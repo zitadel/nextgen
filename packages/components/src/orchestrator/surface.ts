@@ -2,6 +2,7 @@ import { LitElement } from "lit";
 import { property } from "lit/decorators.js";
 
 import type { Branding } from "./branding.js";
+
 import { applyBaseTokens, applyBrandingTokens } from "./branding-to-tokens.js";
 import { applyDefaultFont, applyFontUrl } from "./font-loader.js";
 import { ThemeController, type ThemeMode } from "./theme-controller.js";

@@ -1,4 +1,5 @@
 import type { ZitadelProject } from "@zitadel/sdk-react";
+
 import { useMemo } from "react";
 
 import { apiBase } from "../api/zitadel";

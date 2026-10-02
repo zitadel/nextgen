@@ -2,6 +2,8 @@ import { consola } from "consola";
 
 import { createZitadelClient } from "../lib/api-client";
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
+import { readZitadelSecret } from "../lib/project";
+import { publicCliCommand } from "../lib/public-cli";
 import {
   buildSyncPlan,
   collectPlanWarnings,
@@ -11,8 +13,6 @@ import {
   runSyncLoop,
   summarizePlan,
 } from "../lib/sync";
-import { readZitadelSecret } from "../lib/project";
-import { publicCliCommand } from "../lib/public-cli";
 
 /**
  * `zitadel apply` — validate and upload repo config to the platform.

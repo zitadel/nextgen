@@ -1,11 +1,10 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { _resetConfigForTesting } from "@zitadel/api/config";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import "./zitadel-login.js";
+import type { ZitadelLogout } from "./zitadel-logout.js";
+
 import "./zitadel-logout.js";
-import "./zitadel-session.js";
 import { ZitadelLogin } from "./zitadel-login.js";
-import { ZitadelLogout } from "./zitadel-logout.js";
 import { ZitadelSession } from "./zitadel-session.js";
 
 /**

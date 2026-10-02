@@ -1,13 +1,14 @@
 import type { LookupAddress } from "node:dns";
-import { lookup } from "node:dns/promises";
 import type { RequestOptions } from "node:https";
-import { BlockList, isIP } from "node:net";
 
 import { consola } from "consola";
+import { lookup } from "node:dns/promises";
+import { BlockList, isIP } from "node:net";
 import { Agent, type Dispatcher } from "undici";
 
-import { userAgentInterceptor } from "../user-agent";
 import type { SyncAction, SyncActionWarning } from "./types.js";
+
+import { userAgentInterceptor } from "../user-agent";
 
 /**
  * Branding descriptor fields whose value is a URL the login page fetches as

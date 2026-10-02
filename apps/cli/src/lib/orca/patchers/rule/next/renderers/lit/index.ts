@@ -1,5 +1,6 @@
-import { MANAGED_MARKER } from "../../../../../../paths";
 import type { RendererSpec } from "../types";
+
+import { MANAGED_MARKER } from "../../../../../../paths";
 
 /**
  * Placeholder renderer for the `<zitadel-flow>` Lit web component. Declared

@@ -1,3 +1,4 @@
+import { startLocalZitadel, type LocalZitadel, type SeededUser } from "@zitadel/testing";
 /**
  * The console's real-data dev loop: one command that boots a real Zitadel,
  * seeds it, and starts Vite against it.
@@ -37,8 +38,6 @@ import { spawn } from "node:child_process";
 import { access, mkdir, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-
-import { startLocalZitadel, type LocalZitadel, type SeededUser } from "@zitadel/testing";
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const workspaceRoot = resolve(appDir, "../..");
@@ -97,6 +96,14 @@ const EXTRA_USERS: ReadonlyArray<{ email: string; givenName: string; familyName:
   { email: "barbara.liskov@example.com", givenName: "Barbara", familyName: "Liskov" },
 ];
 
+function extraUserAt(index: number): (typeof EXTRA_USERS)[number] {
+  const user = EXTRA_USERS[index];
+  if (!user) {
+    throw new Error(`[console-dev-real] no extra user at index ${index}`);
+  }
+  return user;
+}
+
 if (configuredServerBinary) {
   await access(serverBinary).catch(() => {
     console.error(`[console-dev-real] server binary not found at ${serverBinary}`);
@@ -124,8 +131,7 @@ if (configuredServerBinary) {
 }
 
 // Signal handlers close over this before the asynchronous boot assigns it.
-// oxlint-disable-next-line prefer-const
-let zitadel: LocalZitadel | undefined;
+let zitadel: LocalZitadel | undefined; // eslint-disable-line prefer-const
 let stopping: Promise<void> | undefined;
 
 function shutdown(code: number): Promise<void> {
@@ -163,10 +169,10 @@ try {
   seeded.push(await zitadel.seedUser(DEV_USER));
   seeded.push(
     ...(await zitadel.seedUsers(EXTRA_USERS.length, {
-      email: (index) => EXTRA_USERS[index]!.email,
+      email: (index) => extraUserAt(index).email,
       attributes: (index) => {
-        const { email: _email, ...attributes } = EXTRA_USERS[index]!;
-        return attributes;
+        const { givenName, familyName } = extraUserAt(index);
+        return { givenName, familyName };
       },
     })),
   );

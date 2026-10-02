@@ -1,8 +1,7 @@
+import { defaultHumanUserSchemaUrl } from "@zitadel/config";
 import { pbkdf2Sync, randomBytes } from "node:crypto";
 import { chmod, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-
-import { defaultHumanUserSchemaUrl } from "@zitadel/config";
 
 import { ZitadelError } from "../errors";
 import { isObject } from "../json";
@@ -85,7 +84,9 @@ function malformedAdminFile(cause?: unknown): ZitadelError {
   return new ZitadelError("E_VALIDATION", `${LOCAL_ADMIN_FILE} is malformed`, {
     hint: `Delete ${LOCAL_ADMIN_FILE} and run \`zitadel reset --force\`, then \`zitadel start\`. Both are needed: reset keeps ${LOCAL_ADMIN_FILE}, and deleting it alone leaves the server holding the old password.`,
     nextCommands: [`rm ${LOCAL_ADMIN_FILE}`, "zitadel reset --force", "zitadel start"],
-    ...(cause ? { details: { cause: cause instanceof Error ? cause.message : String(cause) } } : {}),
+    ...(cause
+      ? { details: { cause: cause instanceof Error ? cause.message : String(cause) } }
+      : {}),
   });
 }
 
@@ -120,9 +121,13 @@ export async function ensureLocalAdmin(
   // Unique per write, not per process: two starts in one process (or a retry)
   // must not rename each other's staging file away.
   const staging = `${userFile}.${randomBytes(6).toString("hex")}.tmp`;
-  await writeFile(staging, `${JSON.stringify(bootstrapUserDocument(admin, schemaUrl), null, 2)}\n`, {
-    mode: 0o644,
-  });
+  await writeFile(
+    staging,
+    `${JSON.stringify(bootstrapUserDocument(admin, schemaUrl), null, 2)}\n`,
+    {
+      mode: 0o644,
+    },
+  );
   await chmod(staging, 0o644).catch(() => undefined);
   await rename(staging, userFile);
 

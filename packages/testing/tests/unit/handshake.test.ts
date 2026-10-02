@@ -1,11 +1,11 @@
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-
 import { describe, expect, it } from "vitest";
 
-import { readHandshakeSync, waitForHandshake, writeHandshake } from "../../src/handshake";
 import type { InstanceHandle } from "../../src/types";
+
+import { readHandshakeSync, waitForHandshake, writeHandshake } from "../../src/handshake";
 
 const handle: InstanceHandle = {
   baseUrl: "http://localhost:8092",

@@ -1,0 +1,48 @@
+{
+  "name": "@zitadel/eslint-config",
+  "version": "1.0.0-alpha.24",
+  "description": "Shared ESLint flat config base for Zitadel SDK packages and apps",
+  "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/eslint-config#readme",
+  "bugs": {
+    "url": "https://github.com/zitadel/nextgen/issues"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zitadel/nextgen.git",
+    "directory": "packages/eslint-config"
+  },
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./index.js"
+  },
+  "files": [
+    "index.js"
+  ],
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@eslint/js": "catalog:",
+    "@eslint/json": "catalog:",
+    "@eslint/markdown": "catalog:",
+    "eslint-config-prettier": "catalog:",
+    "eslint-import-resolver-typescript": "catalog:",
+    "eslint-plugin-import": "catalog:",
+    "eslint-plugin-perfectionist": "catalog:",
+    "eslint-plugin-prettier": "catalog:",
+    "globals": "catalog:",
+    "prettier": "catalog:",
+    "typescript-eslint": "catalog:"
+  },
+  "peerDependencies": {
+    "eslint": "^9.0.0",
+    "typescript": ">=5.0.0"
+  },
+  "devDependencies": {
+    "eslint": "catalog:",
+    "typescript": "catalog:"
+  }
+}

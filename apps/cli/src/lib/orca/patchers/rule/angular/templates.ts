@@ -1,5 +1,6 @@
-import { MANAGED_MARKER } from "../../../../paths";
 import type { PatchContext } from "../../types";
+
+import { MANAGED_MARKER } from "../../../../paths";
 import { PROXY_PATH } from "../proxy";
 import {
   assertNoUnreviewedProjectSecretProxy,

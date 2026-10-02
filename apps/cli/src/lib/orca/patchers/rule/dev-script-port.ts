@@ -1,7 +1,8 @@
+import type { FileOp } from "./file-writer/types";
+
 import { ZitadelError } from "../../../errors";
 import { isObject, parseJsonObject, setTopLevelJsonKey } from "../../../json";
 import { extractPort, portFromIssuer, withDevPort } from "../../detectors/port";
-import type { FileOp } from "./file-writer/types";
 
 /**
  * Pins the `dev` script to the port setup registered as the project's origin.

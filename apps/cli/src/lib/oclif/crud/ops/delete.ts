@@ -1,9 +1,10 @@
 import { cancel, confirm, isCancel } from "@clack/prompts";
 import { Flags } from "@oclif/core";
 
+import type { CommandResult, GlobalOptions } from "../../types";
+
 import { ZitadelError } from "../../../errors";
 import { publicCliCommand } from "../../../public-cli";
-import type { CommandResult, GlobalOptions } from "../../types";
 import { article, capitalize, dryRunResult, idArg, idValue } from "../shared";
 
 /** Past tense reported beside the id, per verb. */
@@ -13,6 +14,7 @@ const PAST: Readonly<Record<string, string>> = {
   deactivate: "deactivated",
 };
 import type { DeleteSpec } from "../types";
+
 import {
   type OperationDefinition,
   type OperationInput,

@@ -1,7 +1,6 @@
-import { join } from "node:path";
-
 import { defineConfig, devices } from "@playwright/test";
 import { withZitadel, type AppEnvTemplate } from "@zitadel/testing/playwright";
+import { join } from "node:path";
 
 /**
  * Real-instance console coverage:

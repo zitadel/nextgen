@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import "./zl-sso-providers.js";
-import type { ZlSsoProviders, ZlSsoSelectDetail } from "./zl-sso-providers.js";
 import type { ZlButton } from "./zl-button.js";
+import type { ZlSsoProviders, ZlSsoSelectDetail } from "./zl-sso-providers.js";
 
 const GOOGLE = { id: "idp_google_1", name: "Google", template: "google" };
 const GITHUB = { id: "idp_github_1", name: "GitHub", template: "github" };

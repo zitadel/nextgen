@@ -17,7 +17,6 @@
  * clobber each other — not a pattern any current consumer uses.
  */
 import * as endpoints from "../generated/endpoints/zitadelNextGen";
-
 import { setApiAuthToken } from "./auth";
 import { setProxyPath } from "./base-url";
 

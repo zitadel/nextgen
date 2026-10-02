@@ -1,27 +1,3 @@
-/**
- * MSW handlers for the Zitadel platform API used by the CLI.
- *
- * Every mutating endpoint validates its request (path params, query
- * params, body) against the generated Zod schemas from
- * `@zitadel/api/generated/endpoints/zitadelNextGen.zod` — the
- * same source of truth the real server's OpenAPI spec generates. Every
- * read endpoint validates its response on the way out, so the mock
- * cannot lie about its own outputs. Wire-shape drift in either
- * direction fails fast in `vitest run` instead of surfacing only
- * against a live Zitadel.
- *
- * Usage (Node / vitest):
- *
- *   import { setupServer } from 'msw/node';
- *   import { setupPlatformHandlers, resetPlatformStore } from '@zitadel/api-mock/platform';
- *
- *   const server = setupServer(...setupPlatformHandlers());
- *   beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
- *   afterAll(() => server.close());
- *   afterEach(() => { server.resetHandlers(); resetPlatformStore(); });
- */
-import { randomBytes, randomUUID } from "node:crypto";
-
 import type {
   CompleteClaim200,
   CreateFlowDefinition201,
@@ -37,6 +13,8 @@ import type {
   ListFlowDefinitions200,
   ListSchemas200,
 } from "@zitadel/api/generated/model";
+import type { z } from "zod";
+
 import {
   CompleteClaimResponse,
   CreateFlowDefinitionBody,
@@ -80,13 +58,32 @@ import {
   UpdateVariablesQueryParams,
   UpdateVariablesResponse,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
+import { getDefaultHumanUserSchema, getDefaultLoginFlow } from "@zitadel/config/defaults";
 import { validateFlowDefinition } from "@zitadel/config/validate";
-import {
-  getDefaultHumanUserSchema,
-  getDefaultLoginFlow,
-} from "@zitadel/config/defaults";
 import { http, HttpResponse } from "msw";
-import type { z } from "zod";
+/**
+ * MSW handlers for the Zitadel platform API used by the CLI.
+ *
+ * Every mutating endpoint validates its request (path params, query
+ * params, body) against the generated Zod schemas from
+ * `@zitadel/api/generated/endpoints/zitadelNextGen.zod` — the
+ * same source of truth the real server's OpenAPI spec generates. Every
+ * read endpoint validates its response on the way out, so the mock
+ * cannot lie about its own outputs. Wire-shape drift in either
+ * direction fails fast in `vitest run` instead of surfacing only
+ * against a live Zitadel.
+ *
+ * Usage (Node / vitest):
+ *
+ *   import { setupServer } from 'msw/node';
+ *   import { setupPlatformHandlers, resetPlatformStore } from '@zitadel/api-mock/platform';
+ *
+ *   const server = setupServer(...setupPlatformHandlers());
+ *   beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+ *   afterAll(() => server.close());
+ *   afterEach(() => { server.resetHandlers(); resetPlatformStore(); });
+ */
+import { randomBytes, randomUUID } from "node:crypto";
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -340,7 +337,7 @@ function flowResponse(r: FlowDefinitionRecord): GetFlowDefinition200 {
       // After the spread: an update that omits `status` keeps the stored one,
       // which is what the endpoint documents.
       status: r.status,
-    } as unknown as GetFlowDefinition200['flow_definition'],
+    } as unknown as GetFlowDefinition200["flow_definition"],
     created_at: r.createdAt,
     updated_at: r.updatedAt,
   } as unknown as GetFlowDefinition200;
@@ -432,7 +429,10 @@ function matchesIdpFilters(
  * for the life of the connection, and a mock that accepted it would let the CLI
  * pass a test the real service fails.
  */
-function immutableFieldClash(before: Record<string, unknown>, after: Record<string, unknown>): string | undefined {
+function immutableFieldClash(
+  before: Record<string, unknown>,
+  after: Record<string, unknown>,
+): string | undefined {
   for (const field of ["protocol", "subject_claim"] as const) {
     if (before[field] !== undefined && before[field] !== after[field]) {
       return field;
@@ -463,7 +463,9 @@ function immutableFieldClash(before: Record<string, unknown>, after: Record<stri
  * level, which is a different owner from any environment under it.
  */
 function variableOwner(projectId: string, environmentName?: string): string {
-  return environmentName === undefined ? `project:${projectId}` : `env:${projectId}/${environmentName}`;
+  return environmentName === undefined
+    ? `project:${projectId}`
+    : `env:${projectId}/${environmentName}`;
 }
 
 /** What a read of one owner says: a value, or that a secret is held. */
@@ -632,7 +634,10 @@ export function completeClaimChallenge(
 ): { status: number; body: CompleteClaim200 | ErrorBody } {
   const challenge = store.claimChallenges.get(challengeId);
   if (!challenge || challenge.projectId !== projectId) {
-    return { status: 404, body: errorBody("claim_challenge.not_found", "claim challenge not found") };
+    return {
+      status: 404,
+      body: errorBody("claim_challenge.not_found", "claim challenge not found"),
+    };
   }
   // Fail closed on a challenge without its project, mirroring the server's
   // proj.not_found: a claim must never be minted from an inconsistent store,
@@ -709,15 +714,12 @@ export function completeClaimChallenge(
  * `schema_fetch_failed`, but fixtures here may pin external URLs.
  * Returns null when the definition is valid.
  */
-function invalidFlowDefinitionResponse(
-  flowDefinition: Record<string, unknown>,
-): Response | null {
+function invalidFlowDefinitionResponse(flowDefinition: Record<string, unknown>): Response | null {
   const ref = flowDefinition.user_schema;
   const schema = typeof ref === "string" ? store.schemas.get(ref)?.body : undefined;
-  const firstError = validateFlowDefinition(
-    flowDefinition,
-    schema as object | undefined,
-  ).find((issue) => issue.severity === "error");
+  const firstError = validateFlowDefinition(flowDefinition, schema as object | undefined).find(
+    (issue) => issue.severity === "error",
+  );
   if (!firstError) {
     return null;
   }
@@ -879,13 +881,19 @@ export function setupPlatformHandlers() {
 
       const challenge = store.claimChallenges.get(query.data.challenge_id);
       if (!challenge || challenge.projectId !== path.data.project_id) {
-        return HttpResponse.json(errorBody("claim_challenge.not_found", "claim challenge not found"), {
-          status: 404,
-        });
+        return HttpResponse.json(
+          errorBody("claim_challenge.not_found", "claim challenge not found"),
+          {
+            status: 404,
+          },
+        );
       }
       if (challenge.initiatingSecret !== token) {
         return HttpResponse.json(
-          errorBody("proj.permission_denied", "the presented project secret did not initiate this challenge"),
+          errorBody(
+            "proj.permission_denied",
+            "the presented project secret did not initiate this challenge",
+          ),
           { status: 403 },
         );
       }
@@ -951,15 +959,21 @@ export function setupPlatformHandlers() {
 
       const challenge = store.claimChallenges.get(query.data.challenge_id);
       if (!challenge || challenge.projectId !== path.data.project_id) {
-        return HttpResponse.json(errorBody("claim_challenge.not_found", "claim challenge not found"), {
-          status: 404,
-        });
+        return HttpResponse.json(
+          errorBody("claim_challenge.not_found", "claim challenge not found"),
+          {
+            status: 404,
+          },
+        );
       }
       const project = store.projects.get(challenge.projectId);
       if (!project) {
-        return HttpResponse.json(errorBody("claim_challenge.not_found", "claim challenge not found"), {
-          status: 404,
-        });
+        return HttpResponse.json(
+          errorBody("claim_challenge.not_found", "claim challenge not found"),
+          {
+            status: 404,
+          },
+        );
       }
 
       // The window belongs to the project, not the challenge: a spent or
@@ -1148,11 +1162,7 @@ export function setupPlatformHandlers() {
     }),
 
     http.get("*/flow_definitions", ({ request }) => {
-      const query = parse(
-        ListFlowDefinitionsQueryParams,
-        queryRecord(request),
-        "invalid_query",
-      );
+      const query = parse(ListFlowDefinitionsQueryParams, queryRecord(request), "invalid_query");
       if (!query.ok) {
         return query.response;
       }
@@ -1169,8 +1179,7 @@ export function setupPlatformHandlers() {
       // only, so a flow whose newest revision lacks the purpose drops out
       // rather than falling back to an older matching revision — filter
       // after selecting the latest to match.
-      const current =
-        query.data.revisions === "latest" ? latestFlowRevisions(matching) : matching;
+      const current = query.data.revisions === "latest" ? latestFlowRevisions(matching) : matching;
       const records = current.filter(
         (r) => !query.data.purpose || flowServesPurpose(r.body, query.data.purpose),
       );
@@ -1246,7 +1255,13 @@ export function setupPlatformHandlers() {
         }
       }
       const record: IdpConnectionRecord = existing
-        ? { ...existing, revisionId: `idprev_${shortId()}`, updatedAt: now, seq: ++store.lastSeq, body: definition }
+        ? {
+            ...existing,
+            revisionId: `idprev_${shortId()}`,
+            updatedAt: now,
+            seq: ++store.lastSeq,
+            body: definition,
+          }
         : {
             id: `idp_${shortId()}`,
             revisionId: `idprev_${shortId()}`,
@@ -1287,8 +1302,7 @@ export function setupPlatformHandlers() {
         .filter((record) => record.projectId === query.data.project_id)
         .filter((record) => matchesIdpFilters(record, body.data.filter))
         .sort((a, b) => {
-          const order =
-            field === "slug" ? a.slug.localeCompare(b.slug) : a.seq - b.seq;
+          const order = field === "slug" ? a.slug.localeCompare(b.slug) : a.seq - b.seq;
           // `seq` stands in for created_at; ids break ties either way.
           return ascending ? order : -order;
         })

@@ -1,7 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { rm } from "node:fs/promises";
 import { join } from "node:path";
-
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
 import { AngularScaffolder } from "../../../../../src/lib/orca/scaffolders/angular";

@@ -1,6 +1,6 @@
-import { createServer, type IncomingMessage, type Server } from "node:http";
-
 import type { Config } from "@oclif/core";
+
+import { createServer, type IncomingMessage, type Server } from "node:http";
 import { Agent, type Dispatcher, getGlobalDispatcher, setGlobalDispatcher } from "undici";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 

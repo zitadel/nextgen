@@ -1,6 +1,5 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
-
 import { ApiError } from "@zitadel/api/runtime/fetch";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createZitadelClient, escapeControlCharacters } from "../../../src/lib/api-client";
 

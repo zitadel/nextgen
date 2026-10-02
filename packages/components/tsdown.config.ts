@@ -1,5 +1,4 @@
 import { readFileSync } from "node:fs";
-
 import { defineConfig, type Plugin } from "tsdown";
 
 /**

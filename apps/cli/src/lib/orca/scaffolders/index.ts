@@ -1,3 +1,5 @@
+import type { Scaffolder } from "./types";
+
 import { AngularScaffolder } from "./angular";
 import { NextScaffolder } from "./next";
 import { NuxtScaffolder } from "./nuxt";
@@ -6,7 +8,6 @@ import { ReactScaffolder } from "./react";
 import { SolidScaffolder } from "./solid";
 import { SvelteScaffolder } from "./svelte";
 import { VueScaffolder } from "./vue";
-import type { Scaffolder } from "./types";
 
 /**
  * Active scaffolders, in priority order. The framework picker derives its

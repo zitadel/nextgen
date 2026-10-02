@@ -1,3 +1,6 @@
+import type { ZitadelLogin, ZitadelSession } from "@zitadel/sdk-next/client";
+
+import { businessLocales } from "@zitadel/sdk-next/client";
 /**
  * Compile-time fixtures for the shipped React JSX declarations
  * (`@zitadel/components/jsx`, pulled in through the `@zitadel/sdk-next/jsx`
@@ -8,8 +11,6 @@
  * standard props (`ref`, `key`, `className`) and the property value types.
  */
 import { createRef } from "react";
-import { businessLocales } from "@zitadel/sdk-next/client";
-import type { ZitadelLogin, ZitadelSession } from "@zitadel/sdk-next/client";
 
 const loginRef = createRef<ZitadelLogin>();
 const sessionRef = createRef<ZitadelSession>();

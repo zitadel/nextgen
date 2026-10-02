@@ -6,9 +6,9 @@ import {
   claimWindowClosedAction,
   type ClaimState,
 } from "../lib/claim-state";
+import { customizeAndPublishActions, verifyLoginAction } from "../lib/journey-guidance";
 import { isProcessRunning } from "../lib/local-server/binary";
 import { inspectContainer } from "../lib/local-server/docker";
-import { customizeAndPublishActions, verifyLoginAction } from "../lib/journey-guidance";
 import {
   DEFAULT_LOCAL_SERVER_URL,
   checkLocalServerHealth,

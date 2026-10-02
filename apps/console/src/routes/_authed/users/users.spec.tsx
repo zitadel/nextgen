@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+
 import { scopedPath } from "@/lib/project-scope.fixture";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
@@ -256,7 +257,10 @@ describe("users screen", () => {
               identifier_property: "email",
               attributes: { given_name: "Grace", family_name: "Hopper", email: "g@x.com" },
             },
-            { id: "user_3", attributes: { username: "nope", givenName: "Radia", email: "r@x.com" } },
+            {
+              id: "user_3",
+              attributes: { username: "nope", givenName: "Radia", email: "r@x.com" },
+            },
           ],
         }),
       ),
@@ -276,12 +280,14 @@ describe("users screen", () => {
     server.use(
       http.post(USERS_QUERY_URL, () =>
         HttpResponse.json({
-          users: [{
-            id: "user_1",
-            identifier: "kenji@acme.com",
-            identifier_property: "email",
-            attributes: { email: "kenji@acme.com", status: "Blocked" },
-          }],
+          users: [
+            {
+              id: "user_1",
+              identifier: "kenji@acme.com",
+              identifier_property: "email",
+              attributes: { email: "kenji@acme.com", status: "Blocked" },
+            },
+          ],
         }),
       ),
     );
@@ -329,8 +335,14 @@ describe("users screen", () => {
       http.post(USERS_QUERY_URL, () =>
         HttpResponse.json({
           users: [
-            { id: "user_1", attributes: { givenName: "Maya", familyName: "Patel", email: "maya@acme.com" } },
-            { id: "user_2", attributes: { givenName: "Sasha", familyName: "Kim", email: "sasha@acme.com" } },
+            {
+              id: "user_1",
+              attributes: { givenName: "Maya", familyName: "Patel", email: "maya@acme.com" },
+            },
+            {
+              id: "user_2",
+              attributes: { givenName: "Sasha", familyName: "Kim", email: "sasha@acme.com" },
+            },
           ],
         }),
       ),
@@ -358,7 +370,11 @@ describe("users screen", () => {
         HttpResponse.json({
           users: [
             { id: "user_1", metadata: { status: "active" }, attributes: { email: "a@x.com" } },
-            { id: "user_2", metadata: { status: "pending_purge" }, attributes: { email: "b@x.com" } },
+            {
+              id: "user_2",
+              metadata: { status: "pending_purge" },
+              attributes: { email: "b@x.com" },
+            },
             // Written before `metadata` existed: nothing is invented for it.
             { id: "user_3", attributes: { email: "c@x.com" } },
           ],
@@ -380,7 +396,9 @@ describe("users screen", () => {
     server.use(
       http.post(USERS_QUERY_URL, () =>
         HttpResponse.json({
-          users: [{ id: "user_1", metadata: { status: "active" }, attributes: { email: "a@x.com" } }],
+          users: [
+            { id: "user_1", metadata: { status: "active" }, attributes: { email: "a@x.com" } },
+          ],
         }),
       ),
     );
@@ -434,7 +452,9 @@ describe("users screen", () => {
         const { page_token: token } = (await request.json()) as { page_token?: string };
         if (token) {
           await secondPageSent;
-          return HttpResponse.json({ users: [{ id: "user_stale", attributes: { email: "stale@x.com" } }] });
+          return HttpResponse.json({
+            users: [{ id: "user_stale", attributes: { email: "stale@x.com" } }],
+          });
         }
         firstPageCalls += 1;
         return HttpResponse.json({

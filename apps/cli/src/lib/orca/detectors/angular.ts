@@ -1,7 +1,8 @@
+import type { Detector, FrameworkFacts } from "./types";
+
 import { ZitadelError } from "../../errors";
 import { hasDependency, readPackageJson } from "./package-json";
 import { detectDevPort, issuerFromPort } from "./port";
-import type { Detector, FrameworkFacts } from "./types";
 
 /** The lowest Angular major the generated templates compile on. */
 const MIN_ANGULAR_MAJOR = 17;

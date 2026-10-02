@@ -33,6 +33,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 import type { NavGroup } from "../../nav";
+
 import { type ThemePreference, useTheme } from "../../theme";
 import { ContextSwitcher } from "./ContextSwitcher";
 import { ZitadelLogo } from "./icons";

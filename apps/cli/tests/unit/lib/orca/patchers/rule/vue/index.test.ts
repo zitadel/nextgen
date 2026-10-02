@@ -4,8 +4,9 @@ import type {
   FileOp,
   ScaffoldPlan,
 } from "../../../../../../../src/lib/orca/patchers/rule/file-writer/types";
-import { VuePatcher } from "../../../../../../../src/lib/orca/patchers/rule/vue";
 import type { PatchContext } from "../../../../../../../src/lib/orca/patchers/types";
+
+import { VuePatcher } from "../../../../../../../src/lib/orca/patchers/rule/vue";
 import { MANAGED_MARKER } from "../../../../../../../src/lib/paths";
 
 function ctx(): PatchContext {

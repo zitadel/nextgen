@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/web-components-vite";
 import type { SsoProvider } from "@zitadel/components";
-import { html } from "lit";
 
+import { html } from "lit";
 import "@zitadel/components/atoms";
 
 const GOOGLE: SsoProvider = { id: "idp_01GOOGLE", name: "Google", template: "google" };

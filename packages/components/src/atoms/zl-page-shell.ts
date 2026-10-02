@@ -1,10 +1,10 @@
 import { LitElement, html } from "lit";
 import { customElement } from "lit/decorators.js";
 
-import pageShellStyles from "./zl-page-shell.css?inline";
-
 import type { AtomManifest } from "../manifest.js";
+
 import { baseHostStyles, surfaceStyles } from "../styles/index.js";
+import pageShellStyles from "./zl-page-shell.css?inline";
 
 /**
  * Atom: `<zl-page-shell>` — the full-bleed auth-page chrome the
@@ -31,10 +31,7 @@ import { baseHostStyles, surfaceStyles } from "../styles/index.js";
  */
 @customElement("zl-page-shell")
 export class ZlPageShell extends LitElement {
-  static override styles = [
-    baseHostStyles,
-    ...surfaceStyles(pageShellStyles),
-  ];
+  static override styles = [baseHostStyles, ...surfaceStyles(pageShellStyles)];
 
   override render() {
     const hasHeader = this.lightDomSlotFilled("header");

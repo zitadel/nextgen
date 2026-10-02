@@ -1,8 +1,8 @@
+import { spawn } from "node:child_process";
 import { appendFile, cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { spawn } from "node:child_process";
 
 import { appPortFromUrl, frameworkForId } from "./frameworks.mjs";
 
@@ -56,7 +56,12 @@ export async function prepareApp(options = {}) {
     // scaffoldable directory — the hinge that flips the emitted pages to the
     // widget posture. The fixture is the checked-in source of truth for what
     // "minimal pre-existing" means per framework.
-    await seedPreexistingApp({ appDir, cp: fs.cp, frameworkId: framework.id, readFile: fs.readFile });
+    await seedPreexistingApp({
+      appDir,
+      cp: fs.cp,
+      frameworkId: framework.id,
+      readFile: fs.readFile,
+    });
   }
 
   let startJson;
@@ -385,10 +390,7 @@ async function assertLocalPackageResolution(input) {
     return;
   }
 
-  const pnpmLockText = await readOptionalFile(
-    join(input.appDir, "pnpm-lock.yaml"),
-    input.readFile,
-  );
+  const pnpmLockText = await readOptionalFile(join(input.appDir, "pnpm-lock.yaml"), input.readFile);
   if (pnpmLockText) {
     assertPnpmLockfileResolution({
       lockfile: pnpmLockText,

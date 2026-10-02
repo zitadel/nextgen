@@ -1,7 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
 import { QwikScaffolder } from "../../../../../src/lib/orca/scaffolders/qwik";

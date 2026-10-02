@@ -94,7 +94,7 @@
     "pretest": "pnpm run sync-schemas",
     "test": "vitest run",
     "test:all": "pnpm run test",
-    "lint": "oxlint ."
+    "lint": "eslint ."
   },
   "dependencies": {
     "@zitadel/api": "workspace:*",
@@ -104,7 +104,9 @@
   },
   "devDependencies": {
     "@types/culori": "catalog:",
+    "@zitadel/eslint-config": "workspace:*",
     "ajv": "catalog:",
+    "eslint": "catalog:",
     "tsdown": "catalog:",
     "tslib": "catalog:",
     "vitest": "catalog:"

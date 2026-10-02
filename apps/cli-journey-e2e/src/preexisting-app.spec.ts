@@ -1,8 +1,6 @@
-/* oxlint-disable playwright/expect-expect */
+import { expect, test } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-
-import { expect, test } from "@playwright/test";
 
 test.describe.configure({ mode: "serial" });
 
@@ -18,10 +16,7 @@ const framework = process.env.JOURNEY_FRAMEWORK ?? "next";
 
 const MANAGED_MARKER = "zitadel-cli: managed-file";
 
-const filesByFramework: Record<
-  string,
-  { authPages: string[]; homepage: string; shell: string }
-> = {
+const filesByFramework: Record<string, { authPages: string[]; homepage: string; shell: string }> = {
   next: {
     authPages: ["app/login/page.tsx", "app/register/page.tsx", "app/profile/page.tsx"],
     homepage: "app/page.tsx",
