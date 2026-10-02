@@ -388,8 +388,9 @@ func TestSSOResolutionCollisionBindsAndKeepsParked(t *testing.T) {
 	resp := f.getStep(t, flow)
 	require.IsType(t, &api.FlowResponseHeaders{}, resp, helpers.MustMarshal(t, resp))
 	got := resp.(*api.FlowResponseHeaders).Response
-	// This definition does not route the outcome, so it surfaces as the error.
-	assert.Equal(t, domain.FlowImplicitOutcomeUserAlreadyExists, got.Step.Error.Value)
+	// The outcome routes back to the identifier step, where the owner signs in.
+	assert.Equal(t, "identifier", got.Step.Name)
+	assert.False(t, got.Step.Error.Set)
 	assert.False(t, got.HandoffToken.Set, "the owner still has to prove a factor")
 
 	attempt := f.attempt(t, flow)
@@ -413,7 +414,7 @@ func TestSSOResolutionCollisionBindsAndKeepsParked(t *testing.T) {
 	// before: the marker catches the state up and the same outcome is raised.
 	retry := f.getStep(t, flow)
 	require.IsType(t, &api.FlowResponseHeaders{}, retry, helpers.MustMarshal(t, retry))
-	assert.Equal(t, domain.FlowImplicitOutcomeUserAlreadyExists, retry.(*api.FlowResponseHeaders).Response.Step.Error.Value)
+	assert.Equal(t, "identifier", retry.(*api.FlowResponseHeaders).Response.Step.Name)
 	userFactor, ok = domain.CheckAs[*domain.AuthFactorUser](f.attempt(t, flow), domain.AuthCheckTypeUser)
 	require.True(t, ok)
 	assert.Equal(t, ownerID, userFactor.UserID)

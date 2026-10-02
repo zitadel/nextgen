@@ -431,9 +431,14 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 		return result, true, err
 	}
 	if parked.Link == nil {
-		outcome, err := r.provisionSSOIdentity(ctx, state, parked)
+		outcome, err := r.provisionSSOIdentity(ctx, state, currentStep, parked)
 		if errors.Is(err, ErrSSOStateInvalid()) {
 			return FlowStepResult{}, false, nil
+		}
+		if errors.Is(err, errSSOCollisionUnroutable) {
+			msg := FlowImplicitOutcomeUserAlreadyExists
+			result, err := r.renderStepError(pc, resolvedFields, &msg)
+			return result, true, err
 		}
 		if err != nil {
 			return FlowStepResult{}, false, err
@@ -477,7 +482,7 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 // otherwise complete, trusted claims create a linked user
 // (sso_authenticated); anything else is collected (sso_user_not_found), with
 // the row left parked for the prefill.
-func (r *FlowStateMachineRuntime) provisionSSOIdentity(ctx context.Context, state *FlowState, parked *FlowSSOParkedIdentity) (string, error) {
+func (r *FlowStateMachineRuntime) provisionSSOIdentity(ctx context.Context, state *FlowState, step *FlowDefinitionStep, parked *FlowSSOParkedIdentity) (string, error) {
 	schema, err := r.schemas.Resolve(ctx, r.schemaStore, state.ProjectID, state.UserSchemaURL, nil)
 	if err != nil {
 		return "", fmt.Errorf("flow state machine: load user schema for sso identity: %w", err)
@@ -486,7 +491,7 @@ func (r *FlowStateMachineRuntime) provisionSSOIdentity(ctx context.Context, stat
 	// schema consumes only the top-level properties it defines.
 	claims := ssoSchemaClaims(schema, parked.Claims)
 	probeClaims, uniqueClaims := ssoUniqueClaims(schema, claims)
-	if bound, err := r.bindSSOCollision(ctx, state, parked, probeClaims); err != nil || bound {
+	if bound, err := r.bindSSOCollision(ctx, state, step, parked, probeClaims); err != nil || bound {
 		return FlowImplicitOutcomeUserAlreadyExists, err
 	}
 	// Neither linked to nor colliding with the user the flow or its attempt
@@ -518,7 +523,7 @@ func (r *FlowStateMachineRuntime) provisionSSOIdentity(ctx context.Context, stat
 	if errors.Is(err, ErrUserAlreadyExists()) {
 		// Lost a race since the probe: whoever took the attribute is bound,
 		// and a race lost on the subject alone falls back to collection.
-		if bound, err := r.bindSSOCollision(ctx, state, parked, probeClaims); err != nil || bound {
+		if bound, err := r.bindSSOCollision(ctx, state, step, parked, probeClaims); err != nil || bound {
 			return FlowImplicitOutcomeUserAlreadyExists, err
 		}
 		return FlowImplicitOutcomeSSOUserNotFound, nil
@@ -589,13 +594,19 @@ func ssoUniqueClaims(schema *jsonschema.Schema, claims map[string]any) (probe, u
 	return probe, unique
 }
 
+// errSSOCollisionUnroutable reports an SSO collision on a step that cannot
+// route user_already_exists; the engine shows the step error instead.
+var errSSOCollisionUnroutable = errors.New("flow state machine: sso collision cannot route user_already_exists")
+
 // bindSSOCollision looks up each project-unique claim, verified or not, until
 // one names an existing user, then binds that user by id. Like a typed
 // identifier it only binds the user: no link, no sso factor. The bind checks
 // the exact parked row first and replaces it by a marker of that user, so a
 // row another request replaced binds nothing (ErrSSOStateInvalid) and a
-// retry after a lost cookie catches up from the marker.
-func (r *FlowStateMachineRuntime) bindSSOCollision(ctx context.Context, state *FlowState, parked *FlowSSOParkedIdentity, probeClaims []string) (bool, error) {
+// retry after a lost cookie catches up from the marker. It returns
+// errSSOCollisionUnroutable, before binding, when step cannot route
+// user_already_exists.
+func (r *FlowStateMachineRuntime) bindSSOCollision(ctx context.Context, state *FlowState, step *FlowDefinitionStep, parked *FlowSSOParkedIdentity, probeClaims []string) (bool, error) {
 	for _, name := range probeClaims {
 		value, _ := parked.Claims[name].(string)
 		if value == "" {
@@ -614,6 +625,13 @@ func (r *FlowStateMachineRuntime) bindSSOCollision(ctx context.Context, state *F
 		// explicit in the engine.
 		if bound := ssoBoundUser(state, parked); bound != "" && bound != owner {
 			return false, ErrFlowRestartRequired()
+		}
+		// The bind cannot be undone, and the validator does not require
+		// user_already_exists on a step with sso_providers, so the bind waits
+		// until the outcome can route. A declared purpose can: it starts that
+		// purpose fresh, as it does for a typed collision.
+		if t, ok := step.Transitions[FlowImplicitOutcomeUserAlreadyExists]; !ok || t.Action != nil {
+			return false, errSSOCollisionUnroutable
 		}
 		if err := r.ssoIdentities.BindCollision(ctx, FlowSSOBindInput{
 			ProjectID: state.ProjectID,

@@ -4717,6 +4717,7 @@ func TestFlowStateMachine_Render_SSOCollisionFlipsRegisterToLogin(t *testing.T) 
 func TestFlowStateMachine_Render_SSOCollisionBindOnDeadAttemptRestarts(t *testing.T) {
 	t.Parallel()
 	w, def, state := ssoRenderWorld(t)
+	def = withSSOOutcomeSteps(def)
 	w.expectParked(unlinkedParked(map[string]any{"email": "alice@example.com"}, nil), nil)
 	w.expectOwner("email", "alice@example.com", "user-9")
 	w.expectBindCollision("user-9", domain.ErrFlowRestartRequired())
@@ -4893,6 +4894,60 @@ func TestFlowStateMachine_Render_SSOOutcomeUnwiredRendersOutcomeToken(t *testing
 	require.NotNil(t, result.Step.Error)
 	assert.Equal(t, domain.FlowImplicitOutcomeSSOUserNotFound, *result.Step.Error)
 	assert.Equal(t, "ch-1", result.State.SSOResolvedCheckID)
+}
+
+// The validator does not require user_already_exists on a step that offers
+// sso_providers. Without a usable one, the owner the probe found is not
+// bound: the step shows the unwired outcome, the row stays parked, and the
+// guard keeps a reload from repeating it.
+func TestFlowStateMachine_Render_SSOCollisionUnroutableDoesNotBind(t *testing.T) {
+	t.Parallel()
+	action := domain.Switch
+	for name, transition := range map[string]*domain.FlowStepTransition{
+		"missing":     nil,
+		"with action": {Target: "other-flow", Action: &action},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			w, def, state := ssoRenderWorld(t)
+			if transition != nil {
+				def.Steps[0].Transitions[domain.FlowImplicitOutcomeUserAlreadyExists] = *transition
+			}
+			w.expectParked(unlinkedParked(map[string]any{"email": "alice@example.com"}, nil), nil)
+			w.expectOwner("email", "alice@example.com", "user-9")
+			w.ssoIdentities.EXPECT().BindCollision(gomock.Any(), gomock.Any()).Times(0)
+			w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Times(0)
+
+			result, err := w.sm.Render(t.Context(), def, state)
+			require.NoError(t, err)
+			assert.Equal(t, "credentials", result.Step.Name)
+			require.NotNil(t, result.Step.Error)
+			assert.Equal(t, domain.FlowImplicitOutcomeUserAlreadyExists, *result.Step.Error)
+			assert.Empty(t, result.State.CollectedData.UserID)
+			assert.Equal(t, "ch-1", result.State.SSOResolvedCheckID)
+		})
+	}
+}
+
+// A purpose on user_already_exists starts that purpose fresh, as it does for
+// a typed collision: the bound user is dropped with a new attempt, and the
+// flow continues on the purpose's entry step instead of getting stuck.
+func TestFlowStateMachine_Render_SSOCollisionWithPurposeStartsThatPurposeFresh(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoRenderWorld(t)
+	register := domain.FlowDefinitionPurposeRegister
+	def.Steps[0].Transitions[domain.FlowImplicitOutcomeUserAlreadyExists] = domain.FlowStepTransition{Target: "credentials", Purpose: &register}
+	w.expectParked(unlinkedParked(map[string]any{"email": "alice@example.com"}, nil), nil)
+	w.expectOwner("email", "alice@example.com", "user-9")
+	w.expectBindCollision("user-9", nil)
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("att-2", nil)
+
+	result, err := w.sm.Render(t.Context(), def, state)
+	require.NoError(t, err)
+	assert.Equal(t, "credentials", result.Step.Name)
+	assert.Nil(t, result.Step.Error)
+	assert.Empty(t, result.State.CollectedData.UserID)
+	assert.Equal(t, "att-2", result.State.AuthAttemptID)
 }
 
 // A stored definition is validated only on write. When its sso_authenticated
