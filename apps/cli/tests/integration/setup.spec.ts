@@ -7,6 +7,11 @@ import { anApp } from "../helpers/project";
 
 const platform = usePlatformMock();
 
+const SOCIAL_CREDENTIALS = {
+  clientId: "1234-abc.apps.googleusercontent.com",
+  secret: "the-client-secret",
+};
+
 const SCAFFOLDED_PAGES = ["app/login/page.tsx", "app/register/page.tsx", "app/profile/page.tsx"];
 
 describe("setup", () => {
@@ -196,6 +201,91 @@ describe("setup", () => {
           expect((await before.changes()).added).toEqual(expect.arrayContaining(SCAFFOLDED_PAGES));
         },
       );
+
+      it("registers a social provider asked for during setup", async () => {
+        const app = await anApp();
+
+        const result = await app.setupWithSso("google", SOCIAL_CREDENTIALS);
+
+        expect(result).toSucceed();
+        expect((await app.registeredIdps()).map((idp) => idp.slug)).toEqual(["google"]);
+      });
+
+      it("publishes that provider's client id as a readable project variable", async () => {
+        const app = await anApp();
+        expect(await app.setupWithSso("google", SOCIAL_CREDENTIALS)).toSucceed();
+
+        const published = await app.projectVariables();
+
+        expect(published).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              name: "GOOGLE_CLIENT_ID",
+              value: SOCIAL_CREDENTIALS.clientId,
+            }),
+          ]),
+        );
+      });
+
+      it("publishes that provider's secret without its value", async () => {
+        const app = await anApp();
+        expect(await app.setupWithSso("google", SOCIAL_CREDENTIALS)).toSucceed();
+
+        const published = await app.projectVariables();
+
+        const held = published.find((variable) => variable.name === "GOOGLE_CLIENT_SECRET");
+        expect(held).toMatchObject({ secret: true });
+        expect(held).not.toHaveProperty("value");
+      });
+
+      it("commits references to both of that provider's credentials", async () => {
+        const app = await anApp();
+        expect(await app.setupWithSso("google", SOCIAL_CREDENTIALS)).toSucceed();
+
+        const connection = await app.committed.idpConnection("google");
+
+        expect(connection.oidc.client_id).toBe("${{ GOOGLE_CLIENT_ID }}");
+        expect(connection.oidc.client_secret).toBe("${{ GOOGLE_CLIENT_SECRET }}");
+      });
+
+      it("keeps that provider's credentials out of every file in the project", async () => {
+        const app = await anApp();
+        expect(await app.setupWithSso("google", SOCIAL_CREDENTIALS)).toSucceed();
+
+        expect(await app.filesContaining(SOCIAL_CREDENTIALS.secret)).toEqual([]);
+        expect(await app.filesContaining(SOCIAL_CREDENTIALS.clientId)).toEqual([]);
+      });
+
+      it("names that provider among the published auth methods", async () => {
+        const app = await anApp();
+        expect(await app.setupWithSso("google", SOCIAL_CREDENTIALS)).toSucceed();
+
+        const { schema } = await app.publishedSchema();
+
+        expect(schema["x-auth-methods"]?.sso).toEqual({ enabled: true, providers: ["google"] });
+      });
+
+      it("offers that provider on the published steps a sign-in starts from", async () => {
+        const app = await anApp();
+        expect(await app.setupWithSso("google", SOCIAL_CREDENTIALS)).toSucceed();
+
+        const offering = await app.stepsOfferingSso();
+
+        expect(offering.map((step) => step.name)).toEqual(
+          expect.arrayContaining(["identifier", "register"]),
+        );
+        for (const step of offering) {
+          expect(step.sso_providers, step.name).toEqual(["google"]);
+          expect(Object.keys(step.transitions ?? {}), step.name).toContain("callback");
+        }
+      });
+
+      it("leaves nothing to reconcile after enabling one during setup", async () => {
+        const app = await anApp();
+        expect(await app.setupWithSso("google", SOCIAL_CREDENTIALS)).toSucceed();
+
+        expect(await app.plan()).toReportNothingToDo();
+      });
     });
   });
 });

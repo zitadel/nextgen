@@ -120,13 +120,21 @@ interface PackageJson {
  * the other vitest workers: a reserved port gets taken as an outbound source
  * port before the CLI binds it.
  *
+ * The band sits below every platform's ephemeral range — macOS allocates from
+ * 49152 and Linux from 32768 — so a reserved port cannot be taken as an
+ * outbound source port by another worker's traffic before the CLI binds it.
+ * It also stays clear of the repository's other deferred-bind reservations,
+ * 22000-23999 for the journey runner and 24000-31999 for embedded Postgres,
+ * which hand out ports before their processes bind just as this does, and of
+ * the fixed ports the other suites pin above 18000.
+ *
  * Indexed by `VITEST_POOL_ID`, the reusable 1-based pool slot.
  * `VITEST_WORKER_ID` is a unique worker identity that keeps climbing as files
  * spawn workers, so indexing by it walks the block past 65535 and hands the
  * CLI a port that cannot exist. The modulo bounds it either way.
  */
-const PORT_FIRST = 42_000;
-const PORT_LAST = 65_000;
+const PORT_FIRST = 16_000;
+const PORT_LAST = 18_000;
 const PORT_BLOCK = 200;
 const PORT_BLOCKS = Math.floor((PORT_LAST - PORT_FIRST) / PORT_BLOCK);
 const POOL_SLOT = Math.max(1, Number(process.env.VITEST_POOL_ID ?? 1));
@@ -213,6 +221,21 @@ export class ScaffoldedApp {
         "--sso",
         provider,
         "--sso-client-id",
+        credentials.clientId,
+      ]),
+    );
+  }
+
+  /** `sso enable` without `--json`, for a spec asserting what the developer reads. */
+  enableSsoRendered(provider: string, credentials: Credentials): Promise<CliResult> {
+    return this.pipingStdin(credentials.secret, () =>
+      this.cli([
+        "sso",
+        "enable",
+        "--non-interactive",
+        "--provider",
+        provider,
+        "--client-id",
         credentials.clientId,
       ]),
     );
@@ -379,6 +402,24 @@ export class ScaffoldedApp {
     return ProjectSnapshot.of(this.path);
   }
 
+  /**
+   * Every file in the project whose text contains this string.
+   *
+   * The credential checks need the whole tree, not the documents a journey
+   * happens to name: a secret written into `.env.local`, a scaffolded page or
+   * `zitadel.json` is just as committed as one in the connection.
+   */
+  async filesContaining(text: string): Promise<string[]> {
+    const found: string[] = [];
+    for (const relativePath of (await ProjectSnapshot.of(this.path)).paths()) {
+      const contents = await readFile(join(this.path, relativePath), "utf8");
+      if (contents.includes(text)) {
+        found.push(relativePath);
+      }
+    }
+    return found.sort();
+  }
+
   readProjectFile(relativePath: string): Promise<string> {
     return readFile(join(this.path, relativePath), "utf8");
   }
@@ -510,6 +551,11 @@ export class ProjectSnapshot {
 
   static async of(root: string): Promise<ProjectSnapshot> {
     return new ProjectSnapshot(root, await hashTree(root));
+  }
+
+  /** Every file the project held when this was taken. */
+  paths(): string[] {
+    return [...this.files.keys()].sort();
   }
 
   /** What has been added, modified, removed or left alone since. */

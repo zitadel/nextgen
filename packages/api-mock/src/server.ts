@@ -148,6 +148,11 @@ export function createMockApp(options: { issuer: string }): express.Express {
   const app = express();
   app.use(cookieParser());
 
+  // CORS reflects any origin, with credentials, on purpose. Besides local
+  // development, apps/mock-zitadel deploys this app publicly for every pull
+  // request so a demo app, an SDK or a manual test on another origin can be
+  // pointed at a branch, and those callers need the session cookie. It serves
+  // only fake data. The real server's rules (ADR 053 §5) are not modelled here.
   app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
     const origin = req.headers.origin;
     res.setHeader("Vary", "Origin");
