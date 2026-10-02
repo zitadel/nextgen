@@ -11,7 +11,7 @@ import type {
 import { ApiError, apiErrorMessage } from "@zitadel/api/runtime/fetch";
 import { zitadelTrustmarkInnerHtml } from "../internal/attribution-markup.js";
 import type { Liquid, Template } from "liquidjs";
-import { css, html, LitElement, type PropertyValues } from "lit";
+import { css, html, LitElement, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 
 import "../atoms/index.js";
@@ -584,8 +584,39 @@ export class ZitadelLogin extends ZitadelSurface {
       novalidate
       aria-busy=${this.loading ? "true" : "false"}
     >
-      ${unsafeHTML(rendered)}
+      ${this.renderPairedIdentifier()}${unsafeHTML(rendered)}
     </form>`;
+  }
+
+  /**
+   * The identifier a password-only step carries (`step.identifier`), as the
+   * control a password manager pairs with the password input so it saves the
+   * two as one credential.
+   *
+   * Rendered here rather than by the template, for three reasons: it has to
+   * sit inside the form the orchestrator owns, the sanitiser drops a raw
+   * `<input>` out of template output, and an ejected template then keeps the
+   * behaviour without carrying any of this itself.
+   *
+   * No `name`, so it is never submitted — `collectSubmitFields` builds from
+   * `step.fields`, and a nameless control is left out of a native submission
+   * too. `readonly` because the engine already resolved the user from this
+   * value. Hidden by clipping rather than `display:none` or `type="hidden"`,
+   * both of which a manager may skip over.
+   */
+  private renderPairedIdentifier() {
+    const identifier = this.response?.step.identifier;
+    if (!identifier?.value) return nothing;
+    return html`<input
+      type="text"
+      part="paired-identifier"
+      readonly
+      tabindex="-1"
+      aria-hidden="true"
+      autocomplete=${identifier.autocomplete}
+      .value=${identifier.value}
+      style="position:absolute;width:1px;height:1px;margin:-1px;padding:0;border:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap"
+    />`;
   }
 
   /**

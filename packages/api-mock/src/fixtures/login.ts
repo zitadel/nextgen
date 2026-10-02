@@ -70,6 +70,19 @@ function emailToUserHandle(email: string): string {
  * Wrap a step shape in the standard {@link CreateFlow201} envelope.
  * All fixtures delegate to this helper so the session fields stay consistent.
  */
+/**
+ * The identifier a password-only step hands back so the rendered form can
+ * carry it beside the password and a manager saves the two as one credential.
+ * Mirrors the engine: present only when an identifier was collected earlier,
+ * and always the `username` token.
+ */
+function pairedIdentifier(
+  input: StepFixtureInput,
+): CreateFlow201Step["identifier"] | undefined {
+  if (!input.capturedEmail) return undefined;
+  return { value: input.capturedEmail, autocomplete: "username" };
+}
+
 function wrap(
   input: StepFixtureInput,
   step: CreateFlow201Step,
@@ -110,6 +123,7 @@ export function identifierStep(input: StepFixtureInput): CreateFlow201 {
         name: "email",
         type: "email",
         text_key: "identifier.field.email",
+        autocomplete: "username",
         required: true,
       },
     ],
@@ -132,6 +146,7 @@ export function registerStep(input: StepFixtureInput): CreateFlow201 {
         name: "email",
         type: "email",
         text_key: "register.field.email",
+        autocomplete: "username",
         required: true,
       },
       {
@@ -194,10 +209,12 @@ export function registerPasswordStep(input: StepFixtureInput): CreateFlow201 {
         name: PASSWORD_FIELD,
         type: "password",
         text_key: "register-password.field.password",
+        autocomplete: "new-password",
         required: true,
         validation: { min_length: 8 },
       },
     ],
+    identifier: pairedIdentifier(input),
     actions: [
       {
         name: "submit",
@@ -233,9 +250,11 @@ export function passwordStep(input: StepFixtureInput): CreateFlow201 {
         name: PASSWORD_FIELD,
         type: "password",
         text_key: "password.field.password",
+        autocomplete: "current-password",
         required: true,
       },
     ],
+    identifier: pairedIdentifier(input),
     actions: [
       { name: "submit", kind: "submit", text_key: "password.action.signin", primary: true },
       { name: "back", kind: "back", text_key: "action.back" },
