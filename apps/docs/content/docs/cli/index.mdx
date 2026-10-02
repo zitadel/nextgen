@@ -8,11 +8,16 @@ The `@zitadel/cli` package scaffolds auth into Next.js, Nuxt, React, Vue, and An
 ## Golden path
 
 ```sh
+mkdir my-app
+cd my-app
 npx @zitadel/cli@alpha doctor
 npx @zitadel/cli@alpha start
 npx @zitadel/cli@alpha setup --server local
 npm run dev
 ```
+
+Run all of these in your app's directory: `start` keeps the local admin there,
+and `setup` and `console` look for it in the current directory only.
 
 For automation:
 
