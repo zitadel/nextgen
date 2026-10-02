@@ -31,7 +31,10 @@ type CreateTeamInput struct {
 	Name      string
 }
 
-func (s *TeamService) Create(ctx context.Context, input CreateTeamInput) (*domain.Team, error) {
+func (s *TeamService) Create(ctx context.Context, input CreateTeamInput) (_ *domain.Team, err error) {
+	ctx, end := startSpan(ctx, "TeamService.Create")
+	defer end(&err)
+
 	model, err := domain.NewTeam(input.ProjectID, input.Name)
 	if err != nil {
 		return nil, err
@@ -65,7 +68,10 @@ func (s *TeamService) Create(ctx context.Context, input CreateTeamInput) (*domai
 	return model, nil
 }
 
-func (s *TeamService) Get(ctx context.Context, projectID string, teamID string) (*domain.Team, error) {
+func (s *TeamService) Get(ctx context.Context, projectID string, teamID string) (_ *domain.Team, err error) {
+	ctx, end := startSpan(ctx, "TeamService.Get")
+	defer end(&err)
+
 	team, err := s.v2Pool.Statements().GetTeam(ctx, database.And(
 		database.Equal(database.Col(domain.TeamFieldProjectID), projectID),
 		database.Equal(database.Col(domain.TeamFieldID), teamID),
@@ -110,7 +116,10 @@ type ListTeamsResponse struct {
 // List returns the teams of a project, ordered and paginated with an opaque
 // cursor token. The returned NextPageToken is empty when the last page has been
 // reached.
-func (s *TeamService) List(ctx context.Context, req ListTeamsRequest) (*ListTeamsResponse, error) {
+func (s *TeamService) List(ctx context.Context, req ListTeamsRequest) (_ *ListTeamsResponse, err error) {
+	ctx, end := startSpan(ctx, "TeamService.List")
+	defer end(&err)
+
 	if req.ProjectID == "" {
 		return nil, domain.ErrTeamProjectNotFound()
 	}
@@ -224,7 +233,10 @@ type UpdateTeamInput struct {
 	Name      *string
 }
 
-func (s *TeamService) Update(ctx context.Context, input UpdateTeamInput) (*domain.Team, error) {
+func (s *TeamService) Update(ctx context.Context, input UpdateTeamInput) (_ *domain.Team, err error) {
+	ctx, end := startSpan(ctx, "TeamService.Update")
+	defer end(&err)
+
 	// Currently, only the name field can be updated.
 	// In case there are more fields, a nil value would mean no change.
 	if input.Name == nil {
@@ -269,8 +281,11 @@ func (s *TeamService) Update(ctx context.Context, input UpdateTeamInput) (*domai
 //
 // Delete is idempotent: DeactivateTeam only touches an active team, so an
 // unknown or already-deactivated team reports success without persisting any changes.
-func (s *TeamService) Delete(ctx context.Context, projectID, teamID string) error {
-	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+func (s *TeamService) Delete(ctx context.Context, projectID, teamID string) (err error) {
+	ctx, end := startSpan(ctx, "TeamService.Delete")
+	defer end(&err)
+
+	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		changed, err := tx.Statements().DeactivateTeam(ctx, projectID, teamID)
 		if err != nil {
 			return err

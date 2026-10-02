@@ -86,7 +86,10 @@ type flowService struct {
 
 var _ FlowService = (*flowService)(nil)
 
-func (s *flowService) Resolve(ctx context.Context, req ResolveFlowRequest) (*domain.FlowDefinition, error) {
+func (s *flowService) Resolve(ctx context.Context, req ResolveFlowRequest) (_ *domain.FlowDefinition, err error) {
+	ctx, end := startSpan(ctx, "FlowService.Resolve")
+	defer end(&err)
+
 	if req.Name != nil {
 		return s.resolveByName(ctx, req)
 	}
@@ -212,7 +215,10 @@ func (s *flowService) resolveFlowSession(ctx context.Context, req StartFlowReque
 	return session.ID, nil
 }
 
-func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (domain.FlowStepResult, error) {
+func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (_ domain.FlowStepResult, err error) {
+	ctx, end := startSpan(ctx, "FlowService.Start")
+	defer end(&err)
+
 	if req.Definition == nil {
 		return domain.FlowStepResult{}, fmt.Errorf("flow service: start without definition")
 	}
@@ -255,7 +261,10 @@ func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (domain.F
 	return domain.FlowStepResult{State: result.State, Step: result.Step}, nil
 }
 
-func (s *flowService) Submit(ctx context.Context, req SubmitFlowRequest) (domain.FlowStepResult, error) {
+func (s *flowService) Submit(ctx context.Context, req SubmitFlowRequest) (_ domain.FlowStepResult, err error) {
+	ctx, end := startSpan(ctx, "FlowService.Submit")
+	defer end(&err)
+
 	if req.State == nil {
 		return domain.FlowStepResult{}, fmt.Errorf("flow service: submit without state")
 	}
@@ -286,7 +295,10 @@ func (s *flowService) Submit(ctx context.Context, req SubmitFlowRequest) (domain
 	}, nil
 }
 
-func (s *flowService) GetStep(ctx context.Context, req GetFlowStepRequest) (domain.FlowStepResult, error) {
+func (s *flowService) GetStep(ctx context.Context, req GetFlowStepRequest) (_ domain.FlowStepResult, err error) {
+	ctx, end := startSpan(ctx, "FlowService.GetStep")
+	defer end(&err)
+
 	if req.State == nil {
 		return domain.FlowStepResult{}, fmt.Errorf("flow service: get step without state")
 	}

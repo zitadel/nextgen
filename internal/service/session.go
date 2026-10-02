@@ -84,7 +84,10 @@ type sessionService struct {
 	cfg    SessionConfig
 }
 
-func (s *sessionService) Create(ctx context.Context, input CreateSessionInput) (*domain.Session, error) {
+func (s *sessionService) Create(ctx context.Context, input CreateSessionInput) (_ *domain.Session, err error) {
+	ctx, end := startSpan(ctx, "SessionService.Create")
+	defer end(&err)
+
 	session, err := domain.NewSession(input.ProjectID, input.UserAgent)
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("Failed to create the session.")
@@ -111,7 +114,10 @@ func (s *sessionService) Create(ctx context.Context, input CreateSessionInput) (
 	return session, nil
 }
 
-func (s *sessionService) Exchange(ctx context.Context, input ExchangeInput) (*domain.Session, error) {
+func (s *sessionService) Exchange(ctx context.Context, input ExchangeInput) (_ *domain.Session, err error) {
+	ctx, end := startSpan(ctx, "SessionService.Exchange")
+	defer end(&err)
+
 	ttl, err := domain.ResolveSessionTTL(input.TTL, s.cfg.DefaultTTL, s.cfg.MaxTTL)
 	if err != nil {
 		return nil, err
@@ -146,7 +152,10 @@ func (s *sessionService) Exchange(ctx context.Context, input ExchangeInput) (*do
 	return session, nil
 }
 
-func (s *sessionService) Get(ctx context.Context, input GetSessionInput) (*domain.Session, error) {
+func (s *sessionService) Get(ctx context.Context, input GetSessionInput) (_ *domain.Session, err error) {
+	ctx, end := startSpan(ctx, "SessionService.Get")
+	defer end(&err)
+
 	session, err := s.v2Pool.Statements().GetSessionByID(ctx, input.ProjectID, input.SessionID)
 	if err != nil {
 		if errors.Is(err, domain.ErrSessionNotFound()) {
@@ -169,7 +178,10 @@ func (s *sessionService) Get(ctx context.Context, input GetSessionInput) (*domai
 	return session, nil
 }
 
-func (s *sessionService) List(ctx context.Context, input ListSessionInput) (*ListSessionsResponse, error) {
+func (s *sessionService) List(ctx context.Context, input ListSessionInput) (_ *ListSessionsResponse, err error) {
+	ctx, end := startSpan(ctx, "SessionService.List")
+	defer end(&err)
+
 	if input.ProjectID == "" {
 		return nil, domain.ErrProjectMissingID()
 	}
@@ -342,7 +354,10 @@ func sessionStateFilter(op, state string, now time.Time) (database.Filter[domain
 	}
 }
 
-func (s *sessionService) Delete(ctx context.Context, input DeleteSessionInput) error {
+func (s *sessionService) Delete(ctx context.Context, input DeleteSessionInput) (err error) {
+	ctx, end := startSpan(ctx, "SessionService.Delete")
+	defer end(&err)
+
 	return s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		err := tx.Statements().DeleteSessionByID(ctx, input.ProjectID, input.SessionID)
 		if err != nil && !errors.Is(err, domain.ErrSessionNotFound()) {

@@ -65,7 +65,10 @@ func NewFlowDefinitionService(
 	}
 }
 
-func (fd *flowDefinitionService) Create(ctx context.Context, req FlowDefinitionRequest) (*domain.FlowDefinition, error) {
+func (fd *flowDefinitionService) Create(ctx context.Context, req FlowDefinitionRequest) (_ *domain.FlowDefinition, err error) {
+	ctx, end := startSpan(ctx, "FlowDefinitionService.Create")
+	defer end(&err)
+
 	purposes, err := mapPurposesToDomain(req.Purposes)
 	if err != nil {
 		return nil, err
@@ -119,7 +122,10 @@ func (fd *flowDefinitionService) Create(ctx context.Context, req FlowDefinitionR
 	return flowDefinition, nil
 }
 
-func (fd *flowDefinitionService) Validate(ctx context.Context, flowDefinition *domain.FlowDefinition) error {
+func (fd *flowDefinitionService) Validate(ctx context.Context, flowDefinition *domain.FlowDefinition) (err error) {
+	ctx, end := startSpan(ctx, "FlowDefinitionService.Validate")
+	defer end(&err)
+
 	sch, err := fd.schemaGetter.GetSchema(ctx, flowDefinition.ProjectID, "", flowDefinition.UserSchema)
 	if err != nil {
 		if errors.Is(err, domain.ErrJSONSchemaNotFound()) {
@@ -177,7 +183,10 @@ func mapPurposesToDomain(reqPurposes map[string]string) (map[domain.FlowDefiniti
 	return purposes, nil
 }
 
-func (fd *flowDefinitionService) Get(ctx context.Context, projectID, id string) (*domain.FlowDefinition, error) {
+func (fd *flowDefinitionService) Get(ctx context.Context, projectID, id string) (_ *domain.FlowDefinition, err error) {
+	ctx, end := startSpan(ctx, "FlowDefinitionService.Get")
+	defer end(&err)
+
 	// todo (grvijayan): get the project ID from the context when the functionality is implemented
 	if projectID == "" {
 		return nil, domain.ErrMissingProjectID()
@@ -210,7 +219,10 @@ type ListFlowDefinitionsResponse struct {
 	NextPageToken string
 }
 
-func (fd *flowDefinitionService) List(ctx context.Context, req ListFlowDefinitionsRequest) (*ListFlowDefinitionsResponse, error) {
+func (fd *flowDefinitionService) List(ctx context.Context, req ListFlowDefinitionsRequest) (_ *ListFlowDefinitionsResponse, err error) {
+	ctx, end := startSpan(ctx, "FlowDefinitionService.List")
+	defer end(&err)
+
 	// todo (grvijayan): get the project ID from the context when the functionality is implemented
 	if req.ProjectID == "" {
 		return nil, domain.ErrMissingProjectID()

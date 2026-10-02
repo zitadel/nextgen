@@ -104,7 +104,10 @@ type projectService struct {
 
 var _ ProjectService = (*projectService)(nil)
 
-func (s *projectService) Create(ctx context.Context, name string, previewOrigins []string, seedDefaults bool) (*domain.Project, error) {
+func (s *projectService) Create(ctx context.Context, name string, previewOrigins []string, seedDefaults bool) (_ *domain.Project, err error) {
+	ctx, end := startSpan(ctx, "ProjectService.Create")
+	defer end(&err)
+
 	project, err := domain.NewProject(name, previewOrigins)
 	if err != nil {
 		return nil, err
@@ -117,7 +120,10 @@ func (s *projectService) Create(ctx context.Context, name string, previewOrigins
 // needs this: its id is well-known (domain.PlatformProjectID) so that every
 // deployment can address the same project, which is the whole point of a
 // bootstrap. Everything else must keep taking a minted id.
-func (s *projectService) CreateWithID(ctx context.Context, id, name string, previewOrigins []string, seedDefaults bool) (*domain.Project, error) {
+func (s *projectService) CreateWithID(ctx context.Context, id, name string, previewOrigins []string, seedDefaults bool) (_ *domain.Project, err error) {
+	ctx, end := startSpan(ctx, "ProjectService.CreateWithID")
+	defer end(&err)
+
 	project, err := domain.NewProject(name, previewOrigins)
 	if err != nil {
 		return nil, err
@@ -301,14 +307,20 @@ func emitFlowdefCreated(ctx context.Context, stmts EventStatements, flowDef *dom
 	})
 }
 
-func (s *projectService) Get(ctx context.Context, id string) (*domain.Project, error) {
+func (s *projectService) Get(ctx context.Context, id string) (_ *domain.Project, err error) {
+	ctx, end := startSpan(ctx, "ProjectService.Get")
+	defer end(&err)
+
 	logger := getLoggingContext(ctx, "project")
 	logger.Info("getting project", slog.String("project_id", id))
 	project, err := s.v2Pool.Statements().GetProjectByID(ctx, id)
 	return project, mapStorageError(err)
 }
 
-func (s *projectService) DefaultProject(ctx context.Context, cfgProjectID string) (*domain.Project, error) {
+func (s *projectService) DefaultProject(ctx context.Context, cfgProjectID string) (_ *domain.Project, err error) {
+	ctx, end := startSpan(ctx, "ProjectService.DefaultProject")
+	defer end(&err)
+
 	if cfgProjectID != "" {
 		project, err := s.Get(ctx, cfgProjectID)
 		if err != nil {
@@ -403,13 +415,16 @@ func (req *UpdateProjectRequest) Validate(hashers *crypto.HasherFactory) error {
 	return nil
 }
 
-func (s *projectService) Update(ctx context.Context, req UpdateProjectRequest) (*domain.Project, error) {
+func (s *projectService) Update(ctx context.Context, req UpdateProjectRequest) (_ *domain.Project, err error) {
+	ctx, end := startSpan(ctx, "ProjectService.Update")
+	defer end(&err)
+
 	if err := req.Validate(s.hashers); err != nil {
 		return nil, err
 	}
 
 	project := &domain.Project{ID: req.ID}
-	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		if req.PasswordHashPolicy != nil {
 			if err := tx.Statements().SetProjectPasswordHashPolicy(ctx, req.ID, *req.PasswordHashPolicy); err != nil {
 				return err
@@ -500,7 +515,10 @@ type ListProjectsResponse struct {
 	NextPageToken string
 }
 
-func (s *projectService) List(ctx context.Context, req ListProjectsRequest) (*ListProjectsResponse, error) {
+func (s *projectService) List(ctx context.Context, req ListProjectsRequest) (_ *ListProjectsResponse, err error) {
+	ctx, end := startSpan(ctx, "ProjectService.List")
+	defer end(&err)
+
 	// TODO (grvijayan): update once a credential can hold a scope wider than one project (ADR 036).
 	if req.ProjectID == "" {
 		return nil, domain.ErrProjectMissingID()
@@ -558,7 +576,10 @@ type ListAuthorizedProjectsRequest struct {
 	PageToken string
 }
 
-func (s *projectService) ListAuthorized(ctx context.Context, req ListAuthorizedProjectsRequest) (*ListProjectsResponse, error) {
+func (s *projectService) ListAuthorized(ctx context.Context, req ListAuthorizedProjectsRequest) (_ *ListProjectsResponse, err error) {
+	ctx, end := startSpan(ctx, "ProjectService.ListAuthorized")
+	defer end(&err)
+
 	// Fail closed: an empty id would bind an empty string into the grant
 	// predicate instead of narrowing it, so there is no safe default here.
 	if req.UserID == "" || req.HomeProjectID == "" {
@@ -632,11 +653,14 @@ func projectField(field string) (domain.ProjectField, error) {
 	}
 }
 
-func (s *projectService) Delete(ctx context.Context, id string) error {
+func (s *projectService) Delete(ctx context.Context, id string) (err error) {
+	ctx, end := startSpan(ctx, "ProjectService.Delete")
+	defer end(&err)
+
 	if id == "" {
 		return domain.ErrProjectMissingID()
 	}
-	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		changed, err := tx.Statements().DeleteProjectByID(ctx, id)
 		if err != nil {
 			return err
