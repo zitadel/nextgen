@@ -12,10 +12,7 @@ describe("doctor", () => {
   it("passes a project straight out of setup", async () => {
     const app = await aSetUpApp();
 
-    const result = await app.doctor();
-
-    expect(result.exitCode, result.stdout).toBe(0);
-    expect(app.envelopeOf(result).status).toBe("ok");
+    expect(await app.doctor()).toSucceed();
   });
 
   it("reports an unsupported framework version and does not offer to fix it", async () => {
@@ -26,24 +23,18 @@ describe("doctor", () => {
 
     const result = await app.doctor();
 
-    expect(result.exitCode, result.stdout).toBe(3);
-    const envelope = app.envelopeOf(result);
-    expect(envelope.code).toBe("E_UNSUPPORTED_PROJECT_SHAPE");
-    expect(envelope.hint).toContain("Upgrade the app to Next 15+");
-    // --fix cannot raise a framework version, so suggesting it would be a lie.
-    expect((envelope.next_commands ?? []).join(" ")).not.toContain("--fix");
+    expect(result).toFailWith("E_UNSUPPORTED_PROJECT_SHAPE");
+    expect(result).toHintAt("Upgrade the app to Next 15+");
+    expect(result).not.toSuggest("--fix");
   });
 
   it("restores a deleted page with the wording the project was set up with", async () => {
     const app = await anApp();
-    expect((await app.setup(["--use-case", "business"])).exitCode).toBe(0);
+    expect(await app.setup(["--use-case", "business"])).toSucceed();
     await rm(join(app.path, "app/login/page.tsx"));
 
-    const result = await app.doctor(["--fix"]);
+    expect(await app.doctor(["--fix"])).toSucceed();
 
-    expect(result.exitCode, result.stdout).toBe(0);
-    // The repair reads the recorded use case rather than assuming setup's
-    // defaults, so the regenerated page keeps the business copy.
     expect(await app.readProjectFile("app/login/page.tsx")).toContain(
       "element.locales = businessLocales",
     );

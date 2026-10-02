@@ -7,32 +7,12 @@ import { expect, onTestFinished } from "vitest";
 
 import { parseJson, runCliForTest } from "./run-cli";
 
-/**
- * A scaffolded app for the specs to drive the CLI against, so a spec can read
- * as the journey it describes rather than as the plumbing that sets it up.
- * Every method runs the real built CLI against the mock platform and returns
- * what a developer could observe afterwards.
- *
- * Keep paths, flag spellings, stdin plumbing and fake binaries in here; keep
- * assertions in the spec (`tests/AGENTS.md`).
- */
-
 /** Where the mock platform answers. Not a real host; msw intercepts it. */
 export const MOCK_SERVER_URL = "http://mock.zitadel.test";
-
-/** What `plan` reports when the project and the platform already agree. */
-export const NOTHING_TO_RECONCILE = { creates: 0, updates: 0, deletes: 0, total: 0 };
 
 export interface Credentials {
   readonly clientId: string;
   readonly secret: string;
-}
-
-export interface FlowStep {
-  readonly name: string;
-  readonly sso_providers?: string[];
-  readonly transitions?: Record<string, unknown>;
-  readonly fields?: string[];
 }
 
 export interface CliResult {
@@ -41,7 +21,6 @@ export interface CliResult {
   readonly stderr: string;
 }
 
-/** The envelope every command emits under `--json`. */
 export interface Envelope<T = Record<string, unknown>> {
   readonly status: "ok" | "skipped" | "error";
   readonly code?: string;
@@ -54,28 +33,59 @@ export interface Envelope<T = Record<string, unknown>> {
   readonly data: T;
 }
 
-interface SyncState {
-  readonly resources: Record<
-    string,
-    { id?: string; previousId?: string; hash?: string; name?: string; status?: string }
-  >;
-  readonly scaffold?: {
-    files: Record<string, { hash: string; class: string }>;
-    scaffolded_framework?: boolean;
-    posture?: string;
+export interface PlanTotals {
+  readonly creates: number;
+  readonly updates: number;
+  readonly deletes: number;
+  readonly total: number;
+}
+
+export interface FlowStep {
+  readonly name: string;
+  readonly sso_providers?: string[];
+  readonly transitions?: Record<string, unknown>;
+  readonly fields?: string[];
+}
+
+export interface PublishedSchema {
+  readonly id: string;
+  readonly schema: {
+    readonly "x-auth-methods"?: Record<string, { enabled: boolean; providers?: string[] }>;
+    readonly properties: Record<string, unknown>;
   };
 }
 
+export interface PublishedFlow {
+  readonly id: string;
+  readonly flow_definition: {
+    readonly name: string;
+    readonly status: string;
+    readonly user_schema: string;
+    readonly purposes: Record<string, string>;
+    readonly steps: FlowStep[];
+  };
+}
+
+export interface ProjectVariable {
+  readonly name: string;
+  readonly value?: string;
+  readonly secret?: boolean;
+}
+
+export interface RegisteredIdp {
+  readonly id: string;
+  readonly slug: string;
+}
+
 /**
- * A port from this worker's own block. A bind-then-close probe races the other
- * vitest workers — a reserved port gets taken as an outbound source port
- * before the CLI binds it — so each worker counts through a disjoint range
- * instead (the same reasoning as `apps/cli-journey-e2e/scripts/ports.mjs`).
+ * A port from this worker's own block, because a bind-then-close probe races
+ * the other vitest workers: a reserved port gets taken as an outbound source
+ * port before the CLI binds it.
  *
- * Indexed by `VITEST_POOL_ID`, the reusable 1-based pool slot. `VITEST_WORKER_ID`
- * is a unique worker identity that keeps climbing as files spawn workers, so
- * indexing by it walks the block past 65535 and hands the CLI a port that
- * cannot exist. The modulo keeps every block inside the range regardless.
+ * Indexed by `VITEST_POOL_ID`, the reusable 1-based pool slot.
+ * `VITEST_WORKER_ID` is a unique worker identity that keeps climbing as files
+ * spawn workers, so indexing by it walks the block past 65535 and hands the
+ * CLI a port that cannot exist. The modulo bounds it either way.
  */
 const PORT_FIRST = 42_000;
 const PORT_LAST = 65_000;
@@ -88,12 +98,54 @@ function nextPort(): number {
   return PORT_BASE + (portOffset++ % PORT_BLOCK);
 }
 
+/**
+ * Files the developer commits and hand-edits.
+ *
+ * A spec reads one only where the committed content is itself the behaviour —
+ * chiefly that a credential is published as a reference and never written in
+ * literally, because a secret in version control cannot be scrubbed later.
+ */
+class CommittedFiles {
+  constructor(private readonly root: string) {}
+
+  idpConnection(slug: string): Promise<{ oidc: { client_id: string; client_secret: string } }> {
+    return this.read(`.zitadel/idps/${slug}.json`) as Promise<{
+      oidc: { client_id: string; client_secret: string };
+    }>;
+  }
+
+  /** Every committed configuration document as one string. */
+  async asText(slug: string): Promise<string> {
+    const documents = await Promise.all([
+      this.read(`.zitadel/idps/${slug}.json`),
+      this.read(".zitadel/schemas/default-human-user.json"),
+      this.read(".zitadel/flows/default-login.json"),
+    ]);
+    return JSON.stringify(documents);
+  }
+
+  private async read(relativePath: string): Promise<Record<string, unknown>> {
+    return JSON.parse(await readFile(join(this.root, relativePath), "utf8")) as Record<
+      string,
+      unknown
+    >;
+  }
+}
+
+/**
+ * A scaffolded app for the specs to drive the CLI against.
+ *
+ * Observations run a command, because a spec's subject is how the CLI behaves
+ * and not how it stores things: a corrupt file matters only insofar as a later
+ * command surfaces it. Sync state and the mock's own store are never read.
+ */
 export class ScaffoldedApp {
-  constructor(readonly path: string) {}
+  readonly committed: CommittedFiles;
 
-  // ---------------------------------------------------------------- commands
+  constructor(readonly path: string) {
+    this.committed = new CommittedFiles(path);
+  }
 
-  /** Scaffolds the project. Installs through a fake npm unless skipped. */
   async setup(
     extraArgs: string[] = [],
     { install = false }: { install?: boolean } = {},
@@ -109,16 +161,8 @@ export class ScaffoldedApp {
     });
   }
 
-  /** Runs `setup` again, as a developer retrying would. */
-  async setupAgain(extraArgs: string[] = []): Promise<CliResult> {
-    return this.cli(["setup", "--json", ...extraArgs]);
-  }
-
-  /**
-   * Runs `setup` with a provider enabled. The client secret is never a flag,
-   * so it is piped the way a script would pipe it.
-   */
-  async setupWithSso(provider: string, credentials: Credentials): Promise<CliResult> {
+  /** The client secret is never a flag, so it is piped as a script would. */
+  setupWithSso(provider: string, credentials: Credentials): Promise<CliResult> {
     return this.pipingSecret(credentials.secret, () =>
       this.setup([
         "--framework",
@@ -131,8 +175,7 @@ export class ScaffoldedApp {
     );
   }
 
-  /** Runs `sso enable` on an already-set-up project. */
-  async enableSso(provider: string, credentials: Credentials): Promise<CliResult> {
+  enableSso(provider: string, credentials: Credentials): Promise<CliResult> {
     return this.pipingSecret(credentials.secret, () =>
       this.cli([
         "sso",
@@ -156,51 +199,41 @@ export class ScaffoldedApp {
     });
   }
 
-  async status(extraArgs: string[] = []): Promise<CliResult> {
+  status(extraArgs: string[] = []): Promise<CliResult> {
     return this.cli(["status", "--json", ...extraArgs]);
   }
 
-  async apply(extraArgs: string[] = []): Promise<CliResult> {
+  apply(extraArgs: string[] = []): Promise<CliResult> {
     return this.cli(["apply", "--non-interactive", "--json", ...extraArgs]);
   }
 
-  /** `plan`'s raw result, for a spec asserting its rendered output. */
-  async planRaw(extraArgs: string[] = []): Promise<CliResult> {
-    return this.cli(["plan", "--non-interactive", ...extraArgs]);
+  /** The totals `plan` reports, for a plan expected to succeed. */
+  async plan(): Promise<PlanTotals> {
+    const result = await this.planAttempt();
+    expect(result, "plan should have succeeded").toSucceed();
+    return this.envelopeOf<PlanTotals>(result).data;
   }
 
-  /** The totals `plan` reports, for comparison against `NOTHING_TO_RECONCILE`. */
-  async plan(): Promise<{ creates: number; updates: number; deletes: number; total: number }> {
-    const result = await this.cli(["plan", "--non-interactive", "--json"]);
-    if (result.exitCode !== 0) {
-      throw new Error(`plan exited ${result.exitCode}: ${result.stderr || result.stdout}`);
-    }
-    return this.envelopeOf(result).data as {
-      creates: number;
-      updates: number;
-      deletes: number;
-      total: number;
-    };
+  /** `plan` as a raw result, for a spec asserting a refusal. */
+  planAttempt(): Promise<CliResult> {
+    return this.cli(["plan", "--non-interactive", "--json"]);
   }
 
-  /** Runs an arbitrary command, for a spec whose subject has no helper yet. */
+  /** `plan` without `--json`, for a spec asserting what the developer reads. */
+  planRendered(): Promise<CliResult> {
+    return this.cli(["plan", "--non-interactive"]);
+  }
+
   run(args: string[], env: NodeJS.ProcessEnv = {}): Promise<CliResult> {
     return this.cli(args, env);
   }
 
-  /**
-   * Runs a command whose output oclif owns rather than our envelope — an
-   * unknown command, `--help`, `--version`. Skips the envelope check that
-   * every other invocation gets.
-   */
+  /** For output oclif owns rather than our envelope: `--help`, `--version`. */
   runUnenveloped(args: string[], env: NodeJS.ProcessEnv = {}): Promise<CliResult> {
     return this.cli(args, env, { envelope: false });
   }
 
-  /**
-   * Runs the CLI without `--server`, so the spec observes which server the CLI
-   * resolves on its own.
-   */
+  /** Without `--server`, so the spec sees which server the CLI resolves itself. */
   async runWithoutServer(args: string[], env: NodeJS.ProcessEnv = {}): Promise<CliResult> {
     const result = await runCliForTest([...args, "--cwd", this.path], env);
     if (args.includes("--json")) {
@@ -209,12 +242,78 @@ export class ScaffoldedApp {
     return result;
   }
 
-  /** Writes a file into the project, for a spec arranging a specific state. */
+  /** The providers the platform has registered. */
+  registeredIdps(): Promise<RegisteredIdp[]> {
+    return this.listed<RegisteredIdp>("idps");
+  }
+
+  publishedSchemas(): Promise<PublishedSchema[]> {
+    return this.listed<PublishedSchema>("schemas");
+  }
+
+  /** The one schema a scaffolded project publishes. */
+  async publishedSchema(): Promise<PublishedSchema> {
+    return only(await this.publishedSchemas(), "schema");
+  }
+
+  publishedFlows(): Promise<PublishedFlow[]> {
+    return this.listed<PublishedFlow>("flow-definitions");
+  }
+
+  /** The one login flow a scaffolded project publishes. */
+  async publishedFlow(): Promise<PublishedFlow> {
+    return only(await this.publishedFlows(), "flow definition");
+  }
+
+  /**
+   * The variables entered on the project itself. Owners are separate rather
+   * than a ladder, so this is the project's own set and not a merge of
+   * anything an environment holds.
+   */
+  async projectVariables(): Promise<ProjectVariable[]> {
+    const result = await this.cli(["variables", "list", "--project-level", "--json"]);
+    expect(result, "variables list should have succeeded").toSucceed();
+    return this.envelopeOf<{ variables: ProjectVariable[] }>(result).data.variables;
+  }
+
+  /**
+   * The published steps a sign-in can start from with a provider offered.
+   *
+   * Non-empty only: the meta-schema defaults `sso_providers` to `[]`, so the
+   * key's presence says nothing.
+   */
+  async stepsOfferingSso(): Promise<FlowStep[]> {
+    const { flow_definition } = await this.publishedFlow();
+    return flow_definition.steps.filter((step) => (step.sso_providers ?? []).length > 0);
+  }
+
+  /** What the fake npm was asked to do, for the install leg of setup. */
+  async installInvocation(): Promise<{ cwd: string; args: string[] }> {
+    if (this.installLogPath === undefined) {
+      throw new Error("setup was not run with { install: true }");
+    }
+    return JSON.parse((await readFile(this.installLogPath, "utf8")).trim()) as {
+      cwd: string;
+      args: string[];
+    };
+  }
+
+  envelopeOf<T = Record<string, unknown>>(result: CliResult): Envelope<T> {
+    try {
+      return parseJson(result.stdout) as Envelope<T>;
+    } catch {
+      throw new Error(`expected a JSON envelope on stdout, got: ${result.stdout || "(empty)"}`);
+    }
+  }
+
+  readProjectFile(relativePath: string): Promise<string> {
+    return readFile(join(this.path, relativePath), "utf8");
+  }
+
   writeProjectFile(relativePath: string, contents: string): Promise<void> {
     return writeFile(join(this.path, relativePath), contents);
   }
 
-  /** Whether a path exists in the project. */
   async hasProjectFile(relativePath: string): Promise<boolean> {
     try {
       await stat(join(this.path, relativePath));
@@ -224,115 +323,23 @@ export class ScaffoldedApp {
     }
   }
 
-  // ------------------------------------------------------------ observations
-
-  /** The parsed `--json` envelope. Throws with the output when it is not JSON. */
-  envelopeOf<T = Record<string, unknown>>(result: CliResult): Envelope<T> {
-    try {
-      return parseJson(result.stdout) as Envelope<T>;
-    } catch {
-      throw new Error(`expected a JSON envelope on stdout, got: ${result.stdout || "(empty)"}`);
-    }
-  }
-
-  /** The error code from a failing command's envelope, or undefined. */
-  codeOf(result: CliResult): string | undefined {
-    try {
-      return (parseJson(result.stdout) as { code?: string }).code;
-    } catch {
-      return undefined;
-    }
-  }
-
-  /** The committed connection file for a provider. */
-  async idpConnection(
-    slug: string,
-  ): Promise<{ oidc: { client_id: string; client_secret: string } }> {
-    return this.readDocument(`.zitadel/idps/${slug}.json`) as Promise<{
-      oidc: { client_id: string; client_secret: string };
-    }>;
-  }
-
-  /** The user schema, whose `x-auth-methods` says which methods are offered. */
-  async userSchema(): Promise<{
-    "x-auth-methods": { sso?: { enabled: boolean; providers: string[] } };
-    properties: Record<string, unknown>;
-  }> {
-    return this.readDocument(".zitadel/schemas/default-human-user.json") as Promise<{
-      "x-auth-methods": { sso?: { enabled: boolean; providers: string[] } };
-      properties: Record<string, unknown>;
-    }>;
-  }
-
-  /** The login flow definition. */
-  async loginFlow(): Promise<{ steps: FlowStep[]; user_schema: string }> {
-    return this.readDocument(".zitadel/flows/default-login.json") as Promise<{
-      steps: FlowStep[];
-      user_schema: string;
-    }>;
-  }
-
-  /** Sync state: server-assigned ids, content hashes, the scaffold manifest. */
-  async syncState(): Promise<SyncState> {
-    return this.readDocument(".zitadel/state.json") as unknown as Promise<SyncState>;
-  }
-
-  /** What the fake npm was asked to do, for the install leg of setup. */
-  async installInvocation(): Promise<{ cwd: string; args: string[] }> {
-    if (this.installLogPath === undefined) {
-      throw new Error("setup was not run with { install: true }");
-    }
-    const log = (await readFile(this.installLogPath, "utf8")).trim();
-    return JSON.parse(log) as { cwd: string; args: string[] };
-  }
-
-  /** Every document the CLI wrote, as one string, to assert a value is absent. */
-  async writtenConfig(slug: string): Promise<string> {
-    return JSON.stringify(await this.documents(slug));
-  }
-
-  /** The three documents, to compare a rerun against an earlier run. */
-  async documents(slug: string): Promise<Record<string, unknown>> {
-    const [connection, userSchema, loginFlow] = await Promise.all([
-      this.readDocument(`.zitadel/idps/${slug}.json`),
-      this.readDocument(".zitadel/schemas/default-human-user.json"),
-      this.readDocument(".zitadel/flows/default-login.json"),
-    ]);
-    return { connection, userSchema, loginFlow };
-  }
-
-  /**
-   * The steps that actually offer a provider. The meta-schema defaults
-   * `sso_providers` to `[]`, so the key's presence means nothing and only a
-   * non-empty list is a step a sign-in can start from.
-   */
-  async stepsOfferingSso(): Promise<FlowStep[]> {
-    const { steps } = await this.loginFlow();
-    return steps.filter((step) => (step.sso_providers ?? []).length > 0);
-  }
-
-  /** Reads a file from the project. */
-  readProjectFile(relativePath: string): Promise<string> {
-    return readFile(join(this.path, relativePath), "utf8");
-  }
-
-  /** Rewrites a JSON document in the project, as a developer editing it would. */
+  /** Edits a configuration document, as the developer owning it would. */
   async editDocument(
     relativePath: string,
     edit: (document: Record<string, unknown>) => void,
   ): Promise<void> {
-    const document = await this.readDocument(relativePath);
+    const contents = await readFile(join(this.path, relativePath), "utf8");
+    const document = JSON.parse(contents) as Record<string, unknown>;
     edit(document);
     await writeFile(join(this.path, relativePath), `${JSON.stringify(document, null, 2)}\n`);
   }
 
-  // ------------------------------------------------------------------ private
-
   private installLogPath: string | undefined;
 
-  private async readDocument(relativePath: string): Promise<Record<string, unknown>> {
-    const contents = await readFile(join(this.path, relativePath), "utf8");
-    return JSON.parse(contents) as Record<string, unknown>;
+  private async listed<T>(topic: string): Promise<T[]> {
+    const result = await this.cli([topic, "list", "--json"]);
+    expect(result, `${topic} list should have succeeded`).toSucceed();
+    return this.envelopeOf<{ items: T[] }>(result).data.items;
   }
 
   private async cli(
@@ -351,8 +358,8 @@ export class ScaffoldedApp {
   }
 
   /**
-   * `runCliForTest` runs in-process, so a scripted run would otherwise read the
-   * test runner's own stdin and block on a stream that never ends.
+   * `runCliForTest` runs in-process, so a scripted run would otherwise read
+   * the test runner's own stdin and block on a stream that never ends.
    */
   private async pipingSecret<T>(secret: string, run: () => Promise<T>): Promise<T> {
     const original = Object.getOwnPropertyDescriptor(process, "stdin");
@@ -370,13 +377,19 @@ export class ScaffoldedApp {
   }
 }
 
+function only<T>(items: T[], what: string): T {
+  if (items.length !== 1) {
+    throw new Error(`expected exactly one ${what} on the platform, found ${items.length}`);
+  }
+  return items[0] as T;
+}
+
 /**
  * The envelope contract, checked on every `--json` invocation a spec makes.
  *
  * It lives here rather than in a suite of its own because a dedicated contract
  * file only covers the commands somebody remembered to list, while this covers
- * every command any spec ever runs — and a command whose envelope regresses
- * fails in its own spec, where the cause is obvious.
+ * every command any spec runs, and fails in the spec of the command that broke.
  */
 export function assertEnvelope(result: CliResult, args: string[] = []): void {
   const where = `\`${args.filter((arg) => !arg.startsWith("-")).join(" ")}\` --json`;
@@ -393,16 +406,14 @@ export function assertEnvelope(result: CliResult, args: string[] = []): void {
   expect(envelope.command, `${where}: command missing`).toBeTypeOf("string");
   expect(envelope.source, `${where}: source missing`).toBeTypeOf("string");
   expect(envelope.status, `${where}: status missing or unknown`).toMatch(/^(ok|skipped|error)$/);
-  // An error envelope is still an envelope, and must name the failure.
   if (envelope.status === "error") {
     expect(envelope.code, `${where}: error envelope carries no code`).toBeTypeOf("string");
   }
 }
 
 /**
- * A minimal app in a temp directory — the pre-existing-app posture `setup`
- * scaffolds into (ADR 044). Removes itself when the test finishes, so a spec
- * carries no teardown.
+ * A minimal app in a temp directory, the pre-existing-app posture setup
+ * scaffolds into. Removes itself when the test finishes.
  */
 export async function anApp({
   nextVersion = "^16.0.0",
@@ -431,20 +442,15 @@ export async function anApp({
   return new ScaffoldedApp(path);
 }
 
-/** A Next app that has already been through `setup`, for specs about later commands. */
+/** An app already through `setup`, for specs about the commands after it. */
 export async function aSetUpApp(extraArgs: string[] = []): Promise<ScaffoldedApp> {
   const app = await anApp();
   const result = await app.setup(extraArgs);
-  if (result.exitCode !== 0) {
-    throw new Error(`arranging setup failed (${result.exitCode}): ${result.stderr}`);
-  }
+  expect(result, "arranging setup should have succeeded").toSucceed();
   return app;
 }
 
-/**
- * A fake `npm` on PATH that records its invocation instead of installing.
- * Faking an external binary is allowed; faking our own modules is not.
- */
+/** A fake `npm` on PATH that records its invocation instead of installing. */
 async function fakePackageManager(): Promise<{ binDir: string; logPath: string }> {
   const binDir = await mkdtemp(join(tmpdir(), "zitadel-fake-pm-"));
   onTestFinished(() => rm(binDir, { recursive: true, force: true }));
@@ -466,7 +472,7 @@ process.stderr.write("fake npm stderr\\n");
   return { binDir, logPath };
 }
 
-/** A fake `docker` on PATH, so doctor's runtime probe does not need a daemon. */
+/** A fake `docker` on PATH, so doctor's runtime probe needs no daemon. */
 async function fakeDocker(): Promise<{ binDir: string; logPath: string }> {
   const binDir = await mkdtemp(join(tmpdir(), "zitadel-fake-docker-"));
   onTestFinished(() => rm(binDir, { recursive: true, force: true }));

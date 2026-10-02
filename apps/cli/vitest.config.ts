@@ -12,6 +12,7 @@ export default defineConfig({
     // renamed suite must not vanish silently. Specs are `*.spec.ts`, unit
     // tests `*.test.ts` (tests/AGENTS.md).
     include: ["tests/**/*.{test,spec}.ts"],
+    setupFiles: ["./tests/helpers/matchers.ts"],
     coverage: {
       ...baseTest.coverage,
       // The specs drive the built CLI, so their execution is attributed to

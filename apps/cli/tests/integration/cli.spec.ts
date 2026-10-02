@@ -22,11 +22,8 @@ describe("the cli", () => {
 
     const result = await app.apply();
 
-    expect(result.exitCode).toBe(3);
-    const envelope = app.envelopeOf(result);
-    expect(envelope.status).toBe("error");
-    expect(envelope.code).toBe("E_VALIDATION");
-    expect(envelope.next_commands).toContain(expectedPublicCliCommand("setup"));
+    expect(result).toFailWith("E_VALIDATION");
+    expect(result).toSuggest(expectedPublicCliCommand("setup"));
   });
 
   it("resolves the real server when nothing says otherwise", async () => {

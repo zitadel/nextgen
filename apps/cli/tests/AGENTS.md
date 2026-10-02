@@ -66,17 +66,29 @@ Three rules make that shape hold:
    commands to reach its starting state, but only non-interactively and without
    asserting on them. `setup.spec.ts` is the only place the setup wizard is the
    subject.
-2. **Assert outcomes, not internals.** A spec may assert the exit code, the
-   envelope `status` and error `code`, what the platform received, which files
-   the project holds, the plan totals, and — for a command that prompts — which
-   questions it asked. It must not assert prose copy, key ordering, generated
-   file contents, internal marker files, or anything else a unit test can reach.
+2. **Observe by running a command.** A spec's subject is how the CLI behaves,
+   not how it stores things, so what a command did is checked by running
+   another one: `idps list`, `schemas list`, `flow-definitions list`,
+   `variables list --project-level`, `plan`. Never `.zitadel/state.json` and
+   never the mock's own store — a corrupt file matters only insofar as a later
+   command surfaces it, and that surfacing is the assertion.
+
+   A committed file may be read where its content *is* the behaviour, through
+   `app.committed`: chiefly that a credential is a `${{ VARIABLE }}` reference
+   and never a literal, because a secret in version control cannot be scrubbed
+   later. Nothing else — not prose copy, key ordering, generated file contents
+   or marker files, all of which a unit test reaches faster.
 3. **One journey per test.** A test that runs setup, then doctor, then plan, then
    apply, then reruns is not a spec; it is five specs sharing a temp directory.
    Split it and let each command's spec own its own leg.
 
 Use `it.each` for anything that varies by framework, preset or resource. A spec
 suite is a table plus a journey, not a sequence of hand-written near-duplicates.
+
+Assert through the matchers in `tests/helpers/matchers.ts` — `toSucceed`,
+`toFailWith`, `toExplain`, `toHintAt`, `toSuggest`, `toSay`, `toBeSkipped`,
+`toReportNothingToDo`. A spec body carries no comments: if a step needs
+explaining, it needs a named helper with a line of TSDoc instead.
 
 One exception, in `cli.spec.ts`: it scans `src/**` for the commands the CLI
 suggests, and checks each one against the command list the built CLI reports.

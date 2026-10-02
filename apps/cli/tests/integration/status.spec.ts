@@ -14,10 +14,10 @@ describe("status", () => {
 
     const result = await app.status();
 
-    expect(result.exitCode).toBe(0);
-    const { data } = app.envelopeOf<{ next_actions: string[]; next_commands: string[] }>(result);
-    expect(data.next_commands.join(" ")).toContain("plan");
-    expect(data.next_commands.join(" ")).not.toContain("apply");
+    expect(result).toSucceed();
+    expect(result).toSuggest("plan");
+    expect(result).not.toSuggest("apply");
+    const { data } = app.envelopeOf<{ next_actions: string[] }>(result);
     expect(data.next_actions.join("\n")).toContain("register a user");
   });
 
@@ -34,10 +34,10 @@ describe("status", () => {
 
     const result = await app.status();
 
-    expect(result.exitCode).toBe(0);
-    const envelope = app.envelopeOf<{ project: { lifecycle: string } }>(result);
-    expect(envelope.status).toBe("ok");
-    expect(envelope.data.project.lifecycle).toBe("orphaned-config");
+    expect(result).toSucceed();
+    expect(app.envelopeOf<{ project: { lifecycle: string } }>(result).data.project.lifecycle).toBe(
+      "orphaned-config",
+    );
   });
 
   it("renders a readable summary when not asked for json", async () => {
@@ -64,11 +64,11 @@ describe("status", () => {
 
     const result = await app.runWithoutServer(["status", "--server", "https://self.example"]);
 
-    expect(result.exitCode).toBe(0);
-    expect(result.stdout).toContain("Zitadel status.");
-    expect(result.stdout).toContain("project=proj-001");
-    expect(result.stdout).toContain("(server: self.example)");
-    expect(result.stdout).toContain("Next:");
+    expect(result).toSucceed();
+    expect(result).toSay("Zitadel status.");
+    expect(result).toSay("project=proj-001");
+    expect(result).toSay("(server: self.example)");
+    expect(result).toSay("Next:");
     expect(result.stdout.trim().startsWith("{")).toBe(false);
   });
 });
