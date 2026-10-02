@@ -1,5 +1,102 @@
 # @zitadel/server
 
+## 1.0.0-alpha.25
+
+### Minor Changes
+
+- [#1352](https://github.com/zitadel/nextgen/pull/1352) [`d821e91`](https://github.com/zitadel/nextgen/commit/d821e91a4f778b29a524c8a67129951795a16f8d) Thanks [@bastionstack](https://github.com/bastionstack)! - The console's branding preview runs in the selected project and shows the login in a chosen state.
+
+  The preview now starts the flow of the project selected in the switcher rather than the console's own, so on a platform deployment it renders a customer project's flow beside that project's branding. A state selector beside the screen tabs shows the step as a visitor first sees it, with validation errors, with a submission error, loading, or on the success screen.
+
+  `<zitadel-login>` gains `preview-state` for this. Set, the element starts the flow as usual, shows the served step in that state, and submits nothing. `preview-success-step` names the terminal step the success state paints, for a flow that does not end on the default `done`. The React `ZitadelLogin` takes both as `previewState` and `previewSuccessStep`. The terminal screen's heading is centred in its card.
+
+- [#1348](https://github.com/zitadel/nextgen/pull/1348) [`8a90d87`](https://github.com/zitadel/nextgen/commit/8a90d879890dc83b136d528e60465c969a22ff74) Thanks [@bastionstack](https://github.com/bastionstack)! - The console gains a Settings → Profile screen. It shows the email address of the signed-in person, read-only, and is where Settings in the account menu now lands.
+
+- [#1281](https://github.com/zitadel/nextgen/pull/1281) [`79527ed`](https://github.com/zitadel/nextgen/commit/79527edba346d39fd43502eb4357d3d19a77ad2d) Thanks [@mridang](https://github.com/mridang)! - A flow step's `on_success` accepts `create_user_with_sso` alongside `create_user`, so a login flow that registers a user from an external identity can be authored, validated and stored. The engine handler is not wired yet: a step that reaches it fails with a flow integrity error naming the mutation rather than creating anything, and no flow can reach it while SSO submissions are refused.
+
+- [#1365](https://github.com/zitadel/nextgen/pull/1365) [`6aca9bb`](https://github.com/zitadel/nextgen/commit/6aca9bb9afcb6e2b33f9e5e5cf5af6c1319d4fe1) Thanks [@grvijayan](https://github.com/grvijayan)! - A flow step offers at most 20 `sso_providers`. The flow definition API and
+  the editor schema both reject a longer list. The render reads the step's
+  whole slug set in one lookup instead of one per slug; the rendered step is
+  unchanged.
+
+  **Breaking:** creating a flow definition whose step lists more than 20
+  provider slugs now fails with a 400. No shipped flow comes near the bound.
+
+- [#1386](https://github.com/zitadel/nextgen/pull/1386) [`6821cc6`](https://github.com/zitadel/nextgen/commit/6821cc62356ef75cce936907d203470f35cd1a9a) Thanks [@grvijayan](https://github.com/grvijayan)! - An sso submission starts the external sign-in. `{action: "sso",
+sso_provider_id, return_target}` on a step that offers `sso_providers`
+  pins the connection at its newest revision, issues the single-use state
+  record on the auth attempt and returns the `sso-redirect` step, whose
+  `redirect_url` is the provider's authorize URL with `state`, `nonce` and,
+  when the connection enables PKCE, an S256 code challenge. A `${{ NAME }}`
+  `client_id` is filled from the project's variables. The response re-seals
+  `_zflow` and adds the browser-binding cookie the callback checks. On every
+  host except http loopback it is `__Host-_zsso` with `Secure`. When the
+  request host is http loopback (local development, where Safari rejects
+  `Secure`), it is `_zsso` with no `Secure`; the `__Host-` prefix is dropped
+  because it requires `Secure`. In both cases the cookie is `HttpOnly`,
+  `Path=/` and `SameSite=Lax`.
+
+  The flow responses' `Set-Cookie` header is now declared as a list, one
+  header line per cookie, `_zflow` first. Browsers never expose the header to
+  script; the shape concerns server-side and generated non-browser clients.
+
+  The submit request gains `return_target`, the page hosting the
+  orchestrator where the flow resumes after the callback. It is required with
+  action `sso`, and its origin must equal the request origin. A provider the
+  engine cannot start a sign-in with re-renders the step with
+  `error.sso_unavailable`, which the orchestrator localizes. The orchestrator
+  sends its page URL, with the flow id set in the `flow` query parameter, as
+  `return_target` on an sso submission.
+
+  When the orchestrator resumes a flow handle, from the `flow` query
+  parameter or from `resume-flow-id`, and the flow no longer resolves, it
+  starts a new flow instead of showing a startup error, with a console
+  warning naming the handle. This covers the return from an external sign-in
+  after the flow cookie's window: the browser no longer sends the required
+  cookie and the server refuses the request with 400.
+
+- [#1369](https://github.com/zitadel/nextgen/pull/1369) [`214d8b2`](https://github.com/zitadel/nextgen/commit/214d8b299480e4eaa311ae241e39827740eb8104) Thanks [@vitorbari](https://github.com/vitorbari)! - Flow steps now tell the client how to tag password and identifier inputs for
+  password managers and browser autofill.
+  - **Identifier and password fields carry an `autocomplete` token.** The
+    identifier your user schema designates gets `username`, including when it is
+    an email address — that is the token a password manager pairs with a
+    password. A password gets `current-password` where it is verified and
+    `new-password` where a new one is saved. Every other field carries none.
+  - **A password step carries the identifier collected before it.** When a step
+    asks for a password but not the identifier, it also returns the identifier
+    from the earlier step, so one form can hold both and a manager saves them as a
+    single credential.
+
+  Both come from the schema designation and the flow's purpose, so renaming the
+  identifier property or a step no longer changes which tokens appear. The bundled
+  login UI adopts them separately.
+
+- [#1363](https://github.com/zitadel/nextgen/pull/1363) [`faccf02`](https://github.com/zitadel/nextgen/commit/faccf02136ff713718e103b18d4128e5a665d02e) Thanks [@wim07101993](https://github.com/wim07101993)! - Remove `is_change_required` from `PUT /users/{user_id}/password`. It was stored but never enforced at login, so it had no effect. Requests that still send it are accepted and the field is ignored.
+
+- [#1359](https://github.com/zitadel/nextgen/pull/1359) [`c8f5f70`](https://github.com/zitadel/nextgen/commit/c8f5f7041e4e231d016f60dc0cce9823765903d3) Thanks [@grvijayan](https://github.com/grvijayan)! - Render a flow step's `sso_providers` from the identity provider connections
+  it names. The definition keeps a list of connection slugs; every render
+  resolves each slug at its newest revision and emits `{id, name, template}`
+  from the connection's `slug`, `display_name` and `template`, in the step's
+  order. A connection without `template` renders `template: ""`. A slug with
+  no connection in the project is dropped from the rendered step and logged.
+
+### Patch Changes
+
+- [#1339](https://github.com/zitadel/nextgen/pull/1339) [`e37bdec`](https://github.com/zitadel/nextgen/commit/e37bdec037ef579a3069b566bf9aae96dd55351d) Thanks [@peintnermax](https://github.com/peintnermax)! - The console's detail screens for users, teams and project settings now share one layout: the same page spacing, an icon beside every title, and the same card for the resource's id and creation date, which the login flow screen uses as well. A long title, such as a user's email address, now wraps on a phone instead of widening the page.
+
+- [#1328](https://github.com/zitadel/nextgen/pull/1328) [`dc201e9`](https://github.com/zitadel/nextgen/commit/dc201e9e43fc7f4a969c592fc849a05692795675) Thanks [@mridang](https://github.com/mridang)! - Ordering a list endpoint by a filter-only field (a computed predicate that has no sortable value, such as the session `has_verified_factors` state) now fails with a typed, self-explanatory error instead of crashing the request. The rule is enforced at the schema layer, so it holds across every dialect.
+
+- [#1402](https://github.com/zitadel/nextgen/pull/1402) [`c363d18`](https://github.com/zitadel/nextgen/commit/c363d1809bf2b8032178ea04e031d50cc365f71b) Thanks [@grvijayan](https://github.com/grvijayan)! - Flow definition validation now refuses an action named `sso`, on the server
+  and in `@zitadel/config`. The engine treats a submission with that action as
+  an external sign-in, so a navigate action of that name validated and then
+  failed every submission with `flow.invalid_action`. An sso submission on an
+  attempt that is already handed off answers `409` with
+  `att.already_handed_off` instead of `500`.
+
+- [#1357](https://github.com/zitadel/nextgen/pull/1357) [`fba561b`](https://github.com/zitadel/nextgen/commit/fba561b67cfb771c0f72c4e293793e4ab86db284) Thanks [@livio-a](https://github.com/livio-a)! - The console's user detail page shows a user's passkeys again when you are signed in. `GET /users/{user_id}/passkeys` now accepts the console session as well as a project secret, so the Passkey row no longer reads "Could not be loaded".
+
+- [#1363](https://github.com/zitadel/nextgen/pull/1363) [`faccf02`](https://github.com/zitadel/nextgen/commit/faccf02136ff713718e103b18d4128e5a665d02e) Thanks [@wim07101993](https://github.com/wim07101993)! - The server now keeps a user's previous passwords, as hashes, whenever the password changes, so a password policy can later refuse a password the user already used.
+
 ## 1.0.0-alpha.24
 
 ### Minor Changes
