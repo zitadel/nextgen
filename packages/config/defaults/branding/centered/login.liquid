@@ -2,7 +2,7 @@
   {% if branding.logo_url %}
     <img slot="header" class="zl-card-logo" src="{{ branding.logo_url }}" alt="" />
   {% endif %}
-  <zl-card>
+  <zl-card{% if step.complete %} class="zl-card--terminal"{% endif %}>
     <h1 slot="header" class="zl-card-title">{{ step.texts.title_key | t: identity.display_name }}</h1>
     {% if step.texts.description_key %}
       {% assign card_subtitle = step.texts.description_key | t: identity.display_name %}
