@@ -10,9 +10,11 @@ A single `@storybook/web-components-vite` instance that hosts `@zitadel/componen
 see `src/session.stories.ts`) — so atoms can be checked against Figma and the
 orchestrators can be driven against `@zitadel/api-mock`. This is the workbench
 for the **login surface only**; console UI iterates on the console dev server
-(ADR 055). It is a dev tool, not a shipped package
-(`private`, no `dist`, `build` is `runInCI: false`), but `storybook:test` runs
-in CI.
+(ADR 055). It is a dev tool, not a published npm package (`private`): it ships
+no package `dist`. It does build a static site into `dist/` via `storybook:build`
+— deployed to Vercel as a shared preview, and the `dist` output convention is in
+[`apps/AGENTS.md`](../AGENTS.md). That build runs in CI (Vercel is a CI
+environment), as does `storybook:test`.
 
 ## Hard rules
 
