@@ -20,9 +20,7 @@ content:
         - $ref: '../../../components/schemas/errors/flow-integrity.yaml'
         - $ref: '../../../components/schemas/errors/flow-invalid_action.yaml'
         - $ref: '../../../components/schemas/errors/flow-not_found.yaml'
-        - $ref: '../../../components/schemas/errors/flow-sso_unavailable.yaml'
         - $ref: '../../../components/schemas/errors/flow-unsupported.yaml'
-        - $ref: '../../../components/schemas/errors/idp-not_found.yaml'
         - $ref: '../../../components/schemas/errors/internal.yaml'
         - $ref: '../../../components/schemas/errors/tkn-invalid.yaml'
         - $ref: '../../../components/schemas/errors/not_implemented.yaml'
@@ -51,9 +49,7 @@ content:
           flow.integrity: '../../../components/schemas/errors/flow-integrity.yaml'
           flow.invalid_action: '../../../components/schemas/errors/flow-invalid_action.yaml'
           flow.not_found: '../../../components/schemas/errors/flow-not_found.yaml'
-          flow.sso_unavailable: '../../../components/schemas/errors/flow-sso_unavailable.yaml'
           flow.unsupported: '../../../components/schemas/errors/flow-unsupported.yaml'
-          idp.not_found: '../../../components/schemas/errors/idp-not_found.yaml'
           internal: '../../../components/schemas/errors/internal.yaml'
           tkn.invalid: '../../../components/schemas/errors/tkn-invalid.yaml'
           not_implemented: '../../../components/schemas/errors/not_implemented.yaml'
@@ -144,21 +140,11 @@ content:
         value:
           code: flow.not_found
           message: 'flow not found'
-      flow.sso_unavailable:
-        summary: flow.sso_unavailable
-        value:
-          code: flow.sso_unavailable
-          message: 'identity provider is unavailable'
       flow.unsupported:
         summary: flow.unsupported
         value:
           code: flow.unsupported
           message: 'flow feature is not supported'
-      idp.not_found:
-        summary: idp.not_found
-        value:
-          code: idp.not_found
-          message: 'identity provider connection: not found'
       internal:
         summary: internal
         value:

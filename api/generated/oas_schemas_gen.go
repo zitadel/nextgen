@@ -19866,59 +19866,6 @@ func (s *FlowResponseHeaders) SetResponse(val FlowResponse) {
 
 func (*FlowResponseHeaders) createFlowRes() {}
 
-// Merged schema.
-// Ref: #
-type FlowSSOUnavailable struct {
-	// Merged property.
-	Code string `json:"code"`
-	// Human-readable explanation of the error.
-	Message string `json:"message"`
-	// Additional error-specific context.
-	Details OptFlowSSOUnavailableDetails `json:"details"`
-}
-
-// GetCode returns the value of Code.
-func (s *FlowSSOUnavailable) GetCode() string {
-	return s.Code
-}
-
-// GetMessage returns the value of Message.
-func (s *FlowSSOUnavailable) GetMessage() string {
-	return s.Message
-}
-
-// GetDetails returns the value of Details.
-func (s *FlowSSOUnavailable) GetDetails() OptFlowSSOUnavailableDetails {
-	return s.Details
-}
-
-// SetCode sets the value of Code.
-func (s *FlowSSOUnavailable) SetCode(val string) {
-	s.Code = val
-}
-
-// SetMessage sets the value of Message.
-func (s *FlowSSOUnavailable) SetMessage(val string) {
-	s.Message = val
-}
-
-// SetDetails sets the value of Details.
-func (s *FlowSSOUnavailable) SetDetails(val OptFlowSSOUnavailableDetails) {
-	s.Details = val
-}
-
-// Additional error-specific context.
-type FlowSSOUnavailableDetails map[string]jx.Raw
-
-func (s *FlowSSOUnavailableDetails) init() FlowSSOUnavailableDetails {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
-
 // A step contains ordered capability arrays: what to collect (fields),
 // what the user can do (actions), and what security gates must be satisfied (gates).
 // The LiquidJS template in `branding.liquid_template` iterates these arrays in order
@@ -35904,52 +35851,6 @@ func (o OptFlowNotFoundDetails) Get() (v FlowNotFoundDetails, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptFlowNotFoundDetails) Or(d FlowNotFoundDetails) FlowNotFoundDetails {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptFlowSSOUnavailableDetails returns new OptFlowSSOUnavailableDetails with value set to v.
-func NewOptFlowSSOUnavailableDetails(v FlowSSOUnavailableDetails) OptFlowSSOUnavailableDetails {
-	return OptFlowSSOUnavailableDetails{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptFlowSSOUnavailableDetails is optional FlowSSOUnavailableDetails.
-type OptFlowSSOUnavailableDetails struct {
-	Value FlowSSOUnavailableDetails
-	Set   bool
-}
-
-// IsSet returns true if OptFlowSSOUnavailableDetails was set.
-func (o OptFlowSSOUnavailableDetails) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptFlowSSOUnavailableDetails) Reset() {
-	var v FlowSSOUnavailableDetails
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptFlowSSOUnavailableDetails) SetTo(v FlowSSOUnavailableDetails) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptFlowSSOUnavailableDetails) Get() (v FlowSSOUnavailableDetails, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptFlowSSOUnavailableDetails) Or(d FlowSSOUnavailableDetails) FlowSSOUnavailableDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -57618,9 +57519,7 @@ type SubmitFlowStepErrorResponse struct {
 	FlowIntegrity       FlowIntegrity
 	FlowInvalidAction   FlowInvalidAction
 	FlowNotFound        FlowNotFound
-	FlowSSOUnavailable  FlowSSOUnavailable
 	FlowUnsupported     FlowUnsupported
-	IdpNotFound         IdpNotFound
 	Internal            Internal
 	TknInvalid          TknInvalid
 	NotImplemented      NotImplemented
@@ -57653,9 +57552,7 @@ const (
 	FlowIntegritySubmitFlowStepErrorResponse       SubmitFlowStepErrorResponseType = "flow.integrity"
 	FlowInvalidActionSubmitFlowStepErrorResponse   SubmitFlowStepErrorResponseType = "flow.invalid_action"
 	FlowNotFoundSubmitFlowStepErrorResponse        SubmitFlowStepErrorResponseType = "flow.not_found"
-	FlowSSOUnavailableSubmitFlowStepErrorResponse  SubmitFlowStepErrorResponseType = "flow.sso_unavailable"
 	FlowUnsupportedSubmitFlowStepErrorResponse     SubmitFlowStepErrorResponseType = "flow.unsupported"
-	IdpNotFoundSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "idp.not_found"
 	InternalSubmitFlowStepErrorResponse            SubmitFlowStepErrorResponseType = "internal"
 	TknInvalidSubmitFlowStepErrorResponse          SubmitFlowStepErrorResponseType = "tkn.invalid"
 	NotImplementedSubmitFlowStepErrorResponse      SubmitFlowStepErrorResponseType = "not_implemented"
@@ -57747,19 +57644,9 @@ func (s SubmitFlowStepErrorResponse) IsFlowNotFound() bool {
 	return s.Type == FlowNotFoundSubmitFlowStepErrorResponse
 }
 
-// IsFlowSSOUnavailable reports whether SubmitFlowStepErrorResponse is FlowSSOUnavailable.
-func (s SubmitFlowStepErrorResponse) IsFlowSSOUnavailable() bool {
-	return s.Type == FlowSSOUnavailableSubmitFlowStepErrorResponse
-}
-
 // IsFlowUnsupported reports whether SubmitFlowStepErrorResponse is FlowUnsupported.
 func (s SubmitFlowStepErrorResponse) IsFlowUnsupported() bool {
 	return s.Type == FlowUnsupportedSubmitFlowStepErrorResponse
-}
-
-// IsIdpNotFound reports whether SubmitFlowStepErrorResponse is IdpNotFound.
-func (s SubmitFlowStepErrorResponse) IsIdpNotFound() bool {
-	return s.Type == IdpNotFoundSubmitFlowStepErrorResponse
 }
 
 // IsInternal reports whether SubmitFlowStepErrorResponse is Internal.
@@ -58143,27 +58030,6 @@ func NewFlowNotFoundSubmitFlowStepErrorResponse(v FlowNotFound) SubmitFlowStepEr
 	return s
 }
 
-// SetFlowSSOUnavailable sets SubmitFlowStepErrorResponse to FlowSSOUnavailable.
-func (s *SubmitFlowStepErrorResponse) SetFlowSSOUnavailable(v FlowSSOUnavailable) {
-	s.Type = FlowSSOUnavailableSubmitFlowStepErrorResponse
-	s.FlowSSOUnavailable = v
-}
-
-// GetFlowSSOUnavailable returns FlowSSOUnavailable and true boolean if SubmitFlowStepErrorResponse is FlowSSOUnavailable.
-func (s SubmitFlowStepErrorResponse) GetFlowSSOUnavailable() (v FlowSSOUnavailable, ok bool) {
-	if !s.IsFlowSSOUnavailable() {
-		return v, false
-	}
-	return s.FlowSSOUnavailable, true
-}
-
-// NewFlowSSOUnavailableSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from FlowSSOUnavailable.
-func NewFlowSSOUnavailableSubmitFlowStepErrorResponse(v FlowSSOUnavailable) SubmitFlowStepErrorResponse {
-	var s SubmitFlowStepErrorResponse
-	s.SetFlowSSOUnavailable(v)
-	return s
-}
-
 // SetFlowUnsupported sets SubmitFlowStepErrorResponse to FlowUnsupported.
 func (s *SubmitFlowStepErrorResponse) SetFlowUnsupported(v FlowUnsupported) {
 	s.Type = FlowUnsupportedSubmitFlowStepErrorResponse
@@ -58182,27 +58048,6 @@ func (s SubmitFlowStepErrorResponse) GetFlowUnsupported() (v FlowUnsupported, ok
 func NewFlowUnsupportedSubmitFlowStepErrorResponse(v FlowUnsupported) SubmitFlowStepErrorResponse {
 	var s SubmitFlowStepErrorResponse
 	s.SetFlowUnsupported(v)
-	return s
-}
-
-// SetIdpNotFound sets SubmitFlowStepErrorResponse to IdpNotFound.
-func (s *SubmitFlowStepErrorResponse) SetIdpNotFound(v IdpNotFound) {
-	s.Type = IdpNotFoundSubmitFlowStepErrorResponse
-	s.IdpNotFound = v
-}
-
-// GetIdpNotFound returns IdpNotFound and true boolean if SubmitFlowStepErrorResponse is IdpNotFound.
-func (s SubmitFlowStepErrorResponse) GetIdpNotFound() (v IdpNotFound, ok bool) {
-	if !s.IsIdpNotFound() {
-		return v, false
-	}
-	return s.IdpNotFound, true
-}
-
-// NewIdpNotFoundSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from IdpNotFound.
-func NewIdpNotFoundSubmitFlowStepErrorResponse(v IdpNotFound) SubmitFlowStepErrorResponse {
-	var s SubmitFlowStepErrorResponse
-	s.SetIdpNotFound(v)
 	return s
 }
 
