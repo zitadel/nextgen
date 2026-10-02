@@ -15,6 +15,9 @@ Scope pointers first — this file's own body covers **telemetry only**:
   `src/lib/claim-state.ts`, `src/commands/doctor/checks/claim.ts`).
 - The journey e2e contract is
   [`apps/cli-journey-e2e/AGENTS.md`](../cli-journey-e2e/AGENTS.md).
+- The test contract — the unit/spec split and one spec per command — is
+  [`tests/AGENTS.md`](tests/AGENTS.md). Read it before adding or moving any
+  test.
 
 # Analytics Tracking — Mixpanel
 
