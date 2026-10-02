@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { getApiCsrfToken, setApiCsrfToken, setApiCsrfTokenRefresher } from "./auth";
-import { ApiError, CSRF_HEADER, customFetch } from "./fetch";
+import { getApiCsrfToken, setApiCsrfRejectionHandler, setApiCsrfToken } from "./auth";
+import { ApiError, CSRF_HEADER, apiErrorCode, customFetch } from "./fetch";
 
 function captureFetch() {
   const seen: Headers[] = [];
@@ -17,7 +17,7 @@ function captureFetch() {
 
 afterEach(() => {
   setApiCsrfToken(undefined);
-  setApiCsrfTokenRefresher(undefined);
+  setApiCsrfRejectionHandler(undefined);
   vi.unstubAllGlobals();
 });
 
@@ -38,7 +38,7 @@ function scriptedFetch(responses: Array<() => Response>) {
 
 const csrfRefused = () =>
   new Response(JSON.stringify({ code: "auth.csrf_invalid", message: "refused" }), { status: 403 });
-const created = () => new Response(JSON.stringify({ id: "team_1" }), { status: 201 });
+
 
 describe("customFetch CSRF header", () => {
   it("sends the token on unsafe methods", async () => {
@@ -72,46 +72,49 @@ describe("customFetch CSRF header", () => {
   });
 });
 
-describe("customFetch stale CSRF token", () => {
-  it("re-reads the token once and retries with it", async () => {
-    const sent = scriptedFetch([csrfRefused, created]);
+describe("customFetch CSRF refusal", () => {
+  it("notifies the rejection handler and does not retry", async () => {
+    const sent = scriptedFetch([csrfRefused]);
     setApiCsrfToken("stale");
-    setApiCsrfTokenRefresher(async () => "fresh");
-    await expect(customFetch("http://api.test/teams", { method: "POST", body: "{}" })).resolves.toEqual({
-      id: "team_1",
-    });
-    expect(sent).toEqual(["stale", "fresh"]);
+    const onRejected = vi.fn();
+    setApiCsrfRejectionHandler(onRejected);
+    await expect(customFetch("http://api.test/teams", { method: "POST", body: "{}" })).rejects.toBeInstanceOf(
+      ApiError,
+    );
+    expect(onRejected).toHaveBeenCalledOnce();
+    // Never replayed: the write is not run under a session it was not prepared for.
+    expect(sent).toEqual(["stale"]);
   });
 
-  it("does not retry a second time", async () => {
-    const sent = scriptedFetch([csrfRefused, csrfRefused]);
-    setApiCsrfToken("stale");
-    setApiCsrfTokenRefresher(async () => "fresh");
+  it("notifies when no token was set, so a missing token can be loaded", async () => {
+    const sent = scriptedFetch([csrfRefused]);
+    const onRejected = vi.fn();
+    setApiCsrfRejectionHandler(onRejected);
     await expect(customFetch("http://api.test/teams", { method: "POST" })).rejects.toBeInstanceOf(ApiError);
-    expect(sent).toEqual(["stale", "fresh"]);
+    expect(onRejected).toHaveBeenCalledOnce();
+    expect(sent).toEqual([null]);
   });
 
-  it("leaves other 403 answers alone", async () => {
-    const sent = scriptedFetch([
+  it("leaves other 403 answers and safe methods alone", async () => {
+    scriptedFetch([
       () => new Response(JSON.stringify({ code: "team.permission_denied", message: "no" }), { status: 403 }),
+      csrfRefused,
     ]);
     setApiCsrfToken("tok");
-    const refresh = vi.fn(async () => "fresh");
-    setApiCsrfTokenRefresher(refresh);
+    const onRejected = vi.fn();
+    setApiCsrfRejectionHandler(onRejected);
     await expect(customFetch("http://api.test/teams", { method: "POST" })).rejects.toBeInstanceOf(ApiError);
-    expect(refresh).not.toHaveBeenCalled();
-    expect(sent).toEqual(["tok"]);
+    await expect(customFetch("http://api.test/teams", { method: "GET" })).rejects.toBeInstanceOf(ApiError);
+    expect(onRejected).not.toHaveBeenCalled();
   });
+});
 
-  it("does not retry without a refresher, or when the token did not change", async () => {
-    scriptedFetch([csrfRefused]);
-    setApiCsrfToken("tok");
-    await expect(customFetch("http://api.test/teams", { method: "POST" })).rejects.toBeInstanceOf(ApiError);
-
-    const sent = scriptedFetch([csrfRefused]);
-    setApiCsrfTokenRefresher(async () => "tok");
-    await expect(customFetch("http://api.test/teams", { method: "POST" })).rejects.toBeInstanceOf(ApiError);
-    expect(sent).toEqual(["tok"]);
+describe("apiErrorCode", () => {
+  it("reads the envelope code from an ApiError or a parsed body", () => {
+    expect(apiErrorCode(new ApiError(403, "u", { code: "auth.csrf_invalid" }, "m"))).toBe("auth.csrf_invalid");
+    expect(apiErrorCode({ code: "user.not_found" })).toBe("user.not_found");
+    expect(apiErrorCode({ raw: "<html>" })).toBeUndefined();
+    expect(apiErrorCode(new Error("x"))).toBeUndefined();
   });
 });
 
