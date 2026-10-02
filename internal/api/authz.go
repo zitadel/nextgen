@@ -443,13 +443,23 @@ func requireExpandScope(ctx context.Context, scope string, denied func() domain.
 	return denied().WithMessage(msg)
 }
 
-// userReadsProject reports whether the credential is a user principal (the
-// Console session) with full read authority on projectID, which stands in for
-// the team_membership.read / team.read expand scopes such a principal never
-// mints. The system catalog has no finer read permission than the project
-// viewer role (ADR 054 §5), so the resolver answers viewer on the target
-// project. A foothold short of it (a partial-access list) does not expand and
-// falls through to the scope gate's 403.
+// userReadsListedProject reports whether the credential is a user principal
+// (the Console session) with full read authority on the project
+// requireProjectListAccess just authorized, which stands in for the
+// team_membership.read / team.read expand scopes such a principal never mints.
+// The system catalog has no finer read permission than the project viewer role
+// (ADR 054 §5), and that check has already run: an Allow left a one-shot skip
+// on ctx, a partial foothold a filter instead. So ctx must be the one the list
+// check returned, read before the list consumes the skip. A foothold short of
+// viewer does not expand and falls through to the scope gate's 403.
+func userReadsListedProject(ctx context.Context) bool {
+	sc, ok := GetScopeContext(ctx)
+	return ok && sc.PrincipalType == domain.AuthzPrincipalTypeUser && service.AuthzListSkipOncePending(ctx)
+}
+
+// userReadsProject is userReadsListedProject for an operation that has no list
+// check to read the answer from (GET /users/{id}?team_id=): it asks the
+// resolver for read on projectID, the same relation the list check uses.
 func (h *Handler) userReadsProject(ctx context.Context, projectID string) (bool, error) {
 	sc, ok := GetScopeContext(ctx)
 	if !ok || sc.PrincipalType != domain.AuthzPrincipalTypeUser {

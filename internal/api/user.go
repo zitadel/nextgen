@@ -76,16 +76,11 @@ func (h *Handler) QueryUsers(ctx context.Context, req *api.QueryUsersRequest, pa
 	// reads the same memberships by a different route — it answers "who is in
 	// this team", one page at a time — so it takes the same gate.
 	readsMemberships := input.IncludeTeams || filtersOnTeamID(req.Filter)
-	// A Console session mints no scopes, so the resolver answers for it
-	// instead (#1300 §4, see userReadsProject). Decided here, for this list,
-	// rather than in the shared ceiling, so another endpoint does not inherit
-	// it by accepting the cookie.
-	sessionReads := false
-	if readsMemberships || input.IncludeLifecycleOwnerTeam {
-		if sessionReads, err = h.userReadsProject(ctx, projectID); err != nil {
-			return nil, err
-		}
-	}
+	// A Console session mints no scopes, so the list check's resolver answer
+	// stands in for them (#1300 §4, see userReadsListedProject). Decided here,
+	// for this list, rather than in the shared ceiling, so another endpoint does
+	// not inherit it by accepting the cookie.
+	sessionReads := userReadsListedProject(ctx)
 	if readsMemberships && !sessionReads {
 		if err := requireMembershipRead(ctx); err != nil {
 			return nil, err
@@ -235,6 +230,18 @@ func (h *Handler) GetUserByID(ctx context.Context, params api.GetUserByIDParams)
 	}
 	var teamID *string
 	if params.TeamID.IsSet() {
+		// team_id answers "is this user an active member of that team", the
+		// membership read POST /users/query gates the same way: by scope for a
+		// project secret, by project-wide read for a session.
+		reads, err := h.userReadsProject(ctx, projectID)
+		if err != nil {
+			return nil, err
+		}
+		if !reads {
+			if err := requireMembershipRead(ctx); err != nil {
+				return nil, err
+			}
+		}
 		teamID = new(string(params.TeamID.Value))
 	}
 
