@@ -106,7 +106,16 @@ const ZitadelSessionElementReact = createComponent({
  * React hosts need them: the widget exposes slots (`attribution-trailing`)
  * that are filled with light-DOM content.
  */
-export type ZitadelLoginReactProps = ZitadelLoginProps & { children?: React.ReactNode };
+export type ZitadelLoginReactProps = ZitadelLoginProps & {
+  children?: React.ReactNode;
+  /**
+   * Preview mode, for an operator surface: the flow starts as usual, then the
+   * element shows the served step in this state and submits nothing.
+   */
+  previewState?: ZitadelLoginElement["previewState"];
+  /** The terminal step the `success` preview paints; the element's `done` when unset. */
+  previewSuccessStep?: string;
+};
 
 export const ZitadelLogin = React.forwardRef<ZitadelLoginElement, ZitadelLoginReactProps>(
   function ZitadelLogin(
