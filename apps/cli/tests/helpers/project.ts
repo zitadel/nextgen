@@ -71,10 +71,18 @@ interface SyncState {
  * vitest workers — a reserved port gets taken as an outbound source port
  * before the CLI binds it — so each worker counts through a disjoint range
  * instead (the same reasoning as `apps/cli-journey-e2e/scripts/ports.mjs`).
+ *
+ * Indexed by `VITEST_POOL_ID`, the reusable 1-based pool slot. `VITEST_WORKER_ID`
+ * is a unique worker identity that keeps climbing as files spawn workers, so
+ * indexing by it walks the block past 65535 and hands the CLI a port that
+ * cannot exist. The modulo keeps every block inside the range regardless.
  */
-const WORKER = Number(process.env.VITEST_WORKER_ID ?? process.env.VITEST_POOL_ID ?? 1);
+const PORT_FIRST = 42_000;
+const PORT_LAST = 65_000;
 const PORT_BLOCK = 200;
-const PORT_BASE = 42_000 + (WORKER - 1) * PORT_BLOCK;
+const PORT_BLOCKS = Math.floor((PORT_LAST - PORT_FIRST) / PORT_BLOCK);
+const POOL_SLOT = Math.max(1, Number(process.env.VITEST_POOL_ID ?? 1));
+const PORT_BASE = PORT_FIRST + ((POOL_SLOT - 1) % PORT_BLOCKS) * PORT_BLOCK;
 let portOffset = 0;
 function nextPort(): number {
   return PORT_BASE + (portOffset++ % PORT_BLOCK);
@@ -193,8 +201,12 @@ export class ScaffoldedApp {
    * Runs the CLI without `--server`, so the spec observes which server the CLI
    * resolves on its own.
    */
-  runWithoutServer(args: string[], env: NodeJS.ProcessEnv = {}): Promise<CliResult> {
-    return runCliForTest([...args, "--cwd", this.path], env);
+  async runWithoutServer(args: string[], env: NodeJS.ProcessEnv = {}): Promise<CliResult> {
+    const result = await runCliForTest([...args, "--cwd", this.path], env);
+    if (args.includes("--json")) {
+      assertEnvelope(result, args);
+    }
+    return result;
   }
 
   /** Writes a file into the project, for a spec arranging a specific state. */
