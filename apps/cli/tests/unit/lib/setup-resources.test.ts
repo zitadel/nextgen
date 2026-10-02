@@ -322,7 +322,8 @@ describe("materializeSetupResources with a social provider", () => {
     } as unknown as ZitadelClient;
   }
 
-  const google = { provider: "google", clientId: "1234-abc.apps.googleusercontent.com" };
+  // A list now: setup enables any number of providers in one run.
+  const google = [{ provider: "google", clientId: "1234-abc.apps.googleusercontent.com" }];
 
   it("writes the connection and records the id the platform assigned", async () => {
     const client = recordingClient();
@@ -526,5 +527,104 @@ describe("materializeSetupResources with a social provider", () => {
     ) as { "x-auth-methods": { sso?: unknown } };
     expect(schema["x-auth-methods"].sso).toBeUndefined();
     expect(client.createIdp).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Cardinality greater than one, which the catalog cannot supply today: it
+ * registers Google alone (`packages/config/src/idp/index.ts`). Mocking the
+ * lookup is the alternative to a production seam that exists only for tests —
+ * the loops under test take whatever `idpProvider` returns, so two distinct
+ * fakes exercise them exactly as two real providers would.
+ */
+describe("materializeSetupResources with several providers", () => {
+  let cwd: string;
+
+  beforeEach(async () => {
+    cwd = await mkdtemp(join(tmpdir(), "zitadel-setup-multi-"));
+    await mkdir(join(cwd, ".zitadel"), { recursive: true });
+    await writeFile(
+      join(cwd, ".zitadel/state.json"),
+      JSON.stringify({ framework: "next", resources: {} }),
+    );
+    vi.resetModules();
+  });
+
+  afterEach(async () => {
+    vi.doUnmock("@zitadel/config/idp");
+    vi.resetModules();
+    await rm(cwd, { recursive: true, force: true });
+  });
+
+  it("creates a connection per provider and names every slug", async () => {
+    const actual = await vi.importActual<typeof import("@zitadel/config/idp")>(
+      "@zitadel/config/idp",
+    );
+    const google = actual.idpProvider("google");
+    // Two providers differing only in slug and display name: enough for the
+    // loops, and the connection body stays a real one the contract accepts.
+    vi.doMock("@zitadel/config/idp", () => ({
+      ...actual,
+      IDP_PROVIDERS: ["google", "acme"],
+      idpProvider: (slug: string) => ({
+        ...google,
+        slug,
+        displayName: slug === "acme" ? "Acme SSO" : "Google",
+        connection: (input: Parameters<typeof google.connection>[0]) => ({
+          ...(google.connection(input) as Record<string, unknown>),
+          slug,
+          display_name: slug === "acme" ? "Acme SSO" : "Google",
+        }),
+      }),
+    }));
+
+    const { materializeSetupResources: materialize } = await import(
+      "../../../src/lib/setup-resources"
+    );
+    const client = {
+      createIdp: vi.fn().mockImplementation(async (body: { idp: { slug?: string } }) => ({
+        // A distinct id per connection, so a first-only bug cannot hide behind
+        // one shared id in the state file.
+        id: `idp_${String(body.idp.slug)}`,
+        definition: body.idp,
+      })),
+      createSchema: vi.fn().mockResolvedValue({ id: "sch_01KWHF" }),
+      createFlowDefinition: vi
+        .fn()
+        .mockImplementation(async (body: { flow_definition: object }) => ({
+          id: "flow_01KWHG",
+          status: "active",
+          flow_definition: body.flow_definition,
+        })),
+    } as unknown as ZitadelClient;
+
+    await materialize({
+      cwd,
+      cliVersion: TEST_CLI_VERSION,
+      client,
+      projectId: "project_123",
+      force: false,
+      sso: [
+        { provider: "google", clientId: "google-client-id" },
+        { provider: "acme", clientId: "acme-client-id" },
+      ],
+    });
+
+    // One create and one file each, not just the first.
+    expect(vi.mocked(client.createIdp).mock.calls).toHaveLength(2);
+    expect(existsSync(join(cwd, IDPS_DIR, "google.json"))).toBe(true);
+    expect(existsSync(join(cwd, IDPS_DIR, "acme.json"))).toBe(true);
+
+    // Both slugs reach the schema and the flow, in the order chosen.
+    const schema = JSON.parse(
+      await readFile(join(cwd, DEFAULT_SCHEMA_CONFIG_PATH), "utf8"),
+    ) as { "x-auth-methods": { sso?: { providers: string[] } } };
+    expect(schema["x-auth-methods"].sso?.providers).toEqual(["google", "acme"]);
+
+    const flow = JSON.parse(await readFile(join(cwd, DEFAULT_FLOW_CONFIG_PATH), "utf8")) as {
+      steps: Array<{ name: string; sso_providers?: string[] }>;
+    };
+    const identifier = flow.steps.find((step) => step.name === "identifier");
+    expect(identifier?.sso_providers).toEqual(["google", "acme"]);
   });
 });
