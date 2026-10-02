@@ -169,6 +169,7 @@ func TestSchemaFieldResolver_Resolve(t *testing.T) {
 					},
 				},
 				ImplicitOutcomes: map[string][]string{"email": identifierOutcomes},
+				IdentifierName:   "email",
 			},
 		},
 		{
@@ -295,6 +296,7 @@ func TestSchemaFieldResolver_Resolve(t *testing.T) {
 					},
 				},
 				ImplicitOutcomes: map[string][]string{"email": identifierOutcomes},
+				IdentifierName:   "email",
 			},
 		},
 		{
@@ -479,6 +481,7 @@ func TestSchemaFieldResolver_Resolve(t *testing.T) {
 					},
 				},
 				ImplicitOutcomes: map[string][]string{"account.email": identifierOutcomes},
+				IdentifierName:   "account.email",
 			},
 		},
 		{
