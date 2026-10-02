@@ -92,10 +92,9 @@ func importFile(
 			return fmt.Errorf("create user: %w", err)
 		}
 		if err := tx.Statements().SetUserPassword(ctx, &domain.SetUserPassword{
-			ProjectID:      doc.Header.ProjectID,
-			UserID:         doc.Header.ID,
-			EncodedHash:    pw.EncodedHash,
-			ChangeRequired: pw.ChangeRequired,
+			ProjectID:   doc.Header.ProjectID,
+			UserID:      doc.Header.ID,
+			EncodedHash: pw.EncodedHash,
 		}); err != nil {
 			return fmt.Errorf("set password: %w", err)
 		}
