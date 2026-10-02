@@ -111,6 +111,11 @@ func (i *FlowSSORedirectIssuer) unavailable(ctx context.Context, in domain.FlowI
 	if errors.Is(err, domain.ErrInternal(nil)) {
 		return domain.ErrInternal(err)
 	}
+	// A cancelled request fails the discovery fetch too; that is not the
+	// provider's fault, and the client is gone, so no warning.
+	if ctx.Err() != nil {
+		return domain.ErrFlowSSOUnavailable(err)
+	}
 	getLoggingContext(ctx, "flow").Warn("sso provider unavailable",
 		slog.String("project_id", in.ProjectID),
 		slog.String("slug", in.ProviderSlug),

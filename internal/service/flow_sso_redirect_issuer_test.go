@@ -1,7 +1,10 @@
 package service_test
 
 import (
+	"bytes"
+	"context"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -14,6 +17,7 @@ import (
 
 	cryptomock "github.com/zitadel/nextgen/internal/crypto/mock"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/service"
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
 )
@@ -227,6 +231,25 @@ func TestFlowSSORedirectIssuer_Issue(t *testing.T) {
 		_, err := service.NewFlowSSORedirectIssuer(connections, &fakeAuthAttempts{}, servicemocks.NewMockKeyService(ctrl), servicemocks.NewMockVariableService(ctrl), &http.Client{}).Issue(t.Context(), ssoIssueInput)
 		require.ErrorIs(t, err, domain.ErrInternal(nil))
 		assert.NotErrorIs(t, err, domain.ErrFlowSSOUnavailable(nil))
+	})
+
+	t.Run("a cancelled request is unavailable without a provider warning", func(t *testing.T) {
+		t.Parallel()
+		ctrl := gomock.NewController(t)
+		connections := servicemocks.NewMockIDPConnectionService(ctrl)
+		connections.EXPECT().GetBySlugs(gomock.Any(), "proj-1", []string{"google"}).
+			Return([]*domain.IDPConnection{{Slug: "google", RevisionID: "idprev_1", Document: []byte(`{
+				"slug": "google", "protocol": "oidc", "display_name": "Google",
+				"oidc": {"issuer": "https://accounts.example.test", "client_id": "client-1", "client_secret": "s", "scopes": ["openid"]}
+			}`)}}, nil)
+		var logs bytes.Buffer
+		ctx, cancel := context.WithCancel(zlog.WithLoggingContext(t.Context(), slog.New(slog.NewTextHandler(&logs, nil))))
+		cancel()
+
+		_, err := service.NewFlowSSORedirectIssuer(connections, &fakeAuthAttempts{}, servicemocks.NewMockKeyService(ctrl), servicemocks.NewMockVariableService(ctrl), &http.Client{}).Issue(ctx, ssoIssueInput)
+		require.ErrorIs(t, err, domain.ErrFlowSSOUnavailable(nil))
+		require.ErrorIs(t, err, context.Canceled)
+		assert.Empty(t, logs.String())
 	})
 
 	t.Run("attempt error passes through", func(t *testing.T) {

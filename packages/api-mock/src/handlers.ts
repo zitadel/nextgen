@@ -28,7 +28,7 @@ import type {
   ExchangeHandoffBody,
   SubmitFlowStepBody,
 } from "@zitadel/api/generated/model";
-import type { RequestHandler } from "msw";
+import { http, HttpResponse, type RequestHandler } from "msw";
 
 import { withBranding } from "./branding.js";
 import { withSsoProviders } from "./sso-providers.js";
@@ -245,6 +245,21 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
       actor = startFlowActor();
       actor.send({ type: "START", purpose: body.purpose });
       return currentResponse();
+    }),
+    // The engine refuses an sso submission without `return_target`, the
+    // page the callback sends the browser back to, before anything else.
+    // The mock has no callback and no cookies, but a caller that omits it
+    // must not pass here and fail against the engine. Returning nothing
+    // hands every other submission to the next handler.
+    http.post("*/flow/:id/submit", async ({ request }) => {
+      const body = (await request.clone().json()) as SubmitFlowStepBody;
+      if (body.action === "sso" && !body.return_target) {
+        return HttpResponse.json(
+          { code: "req.invalid", message: "return_target is required for action sso" },
+          { status: 400 },
+        );
+      }
+      return undefined;
     }),
     getSubmitFlowStepMockHandler(async ({ params, request }) => {
       const flowId = String(params.id);

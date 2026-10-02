@@ -555,20 +555,20 @@ and recovery route without exposing internal technical details to the end user.
   [#534](https://github.com/zitadel/nextgen/issues/534)).
   Until decided, pattern environments render without providers
   ([Constraints & Edge Cases](#constraints--edge-cases)).
-* **State Storage Shape:** Fields on the attempt, or a dedicated table.
-  Consumption must be atomic under concurrent duplicate callbacks (one succeeds,
-  the second gets a reused-state error); `zitadel/zitadel` has no such guard
-  ([`idp_intent.go#L169-L199`](https://github.com/zitadel/zitadel/blob/d488ecb07ffe82d1e5493e9482be48a3e82397cc/internal/command/idp_intent.go#L169-L199))
-  and no TTL on a pending state.
-  Minting is unauthenticated, so the engine caps pending records per flow and
-  rate-limits minting (both 851 requirements); the shape must keep both cheap.
-* **Multi-Tab Behavior:** Defining rules for parallel SSO submissions initiated
-  from a single flow (whether the last-minted state invalidates prior states or
-  both remain valid until consumed).
-  The binding cookie shares this decision: one named `__Host-` cookie holds a
-  single value per host, so a second tab's ceremony overwrites the first tab's
-  nonce and fails it at callback; per-attempt cookie names versus accepting the
-  overwrite must be settled together with the state rule.
+* **State Storage Shape:** Settled in #1073. The record is a `sso_callback`
+  row in the checks table, one per attempt, so a new submission replaces the
+  pending one. Consumption is one guarded update, so concurrent duplicate
+  callbacks succeed exactly once and the rest get the same opaque error as an
+  unknown or expired state; `zitadel/zitadel` has no such guard
+  ([`idp_intent.go#L169-L199`](https://github.com/zitadel/zitadel/blob/d488ecb07ffe82d1e5493e9482be48a3e82397cc/internal/command/idp_intent.go#L169-L199)).
+  The record inherits the attempt's TTL. Creation caps and rate limits are
+  flow-level, not SSO-specific, and belong to the platform's abuse-prevention
+  design (#351; ADR 041, still in PR #472).
+* **Multi-Tab Behavior:** Settled in #1073. A new record for the same attempt
+  replaces the pending one, so the last submission wins and an earlier tab's
+  callback is refused on consume. The binding cookie agrees with that rule:
+  the one `__Host-` cookie holds the newest nonce, so the earlier tab fails
+  the same way. No per-attempt cookie names.
 * **`sso-redirect` Step Shape:** Settled. The submission returns a
   non-terminal step `{name: "sso-redirect", texts.title_key, redirect_url}`
   with no fields or actions (example 4 in

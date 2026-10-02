@@ -178,7 +178,9 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 	// A non-browser client chooses both values, and until environments
 	// declare an issuer origin the guards that hold then are the provider's
 	// registered redirect URI and the Strict flow cookie.
-	if req.Action == domain.FlowActionSSO || req.SSOProviderID.IsSet() {
+	// Only the action selects the branch: a provider id on another action
+	// goes through to the engine, which refuses it as an invalid action.
+	if req.Action == domain.FlowActionSSO {
 		if !originAllowed {
 			return nil, domain.ErrRequestInvalid().WithMessage("an sso submission needs a request origin")
 		}

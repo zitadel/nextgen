@@ -2730,10 +2730,9 @@ type GetFlowStepParams struct {
 	// when a flow pivot or pop occurs — always use the `id` from the latest response.
 	ID string
 	// Encrypted flow state cookie set by `POST /flow` or the previous
-	// `POST /flow/{id}/submit`. The cookie holds a map of flow states keyed
-	// by flow ID, allowing multiple concurrent flows in the same browser
-	// (e.g. login in one tab, registration in another). The server uses the
-	// `{id}` path parameter to look up the correct flow state from the cookie.
+	// `POST /flow/{id}/submit`. The cookie holds the sealed state of one
+	// flow; the `{id}` path parameter must name that flow, any other id is
+	// refused.
 	// Browsers send this automatically; non-browser clients must capture the
 	// `Set-Cookie` header and resend it.
 	Zflow string
@@ -9009,10 +9008,9 @@ type SubmitFlowStepParams struct {
 	// when a flow pivot or pop occurs — always use the `id` from the latest response.
 	ID string
 	// Encrypted flow state cookie set by `POST /flow` or the previous
-	// `POST /flow/{id}/submit`. The cookie holds a map of flow states keyed
-	// by flow ID, allowing multiple concurrent flows in the same browser
-	// (e.g. login in one tab, registration in another). The server uses the
-	// `{id}` path parameter to look up the correct flow state from the cookie.
+	// `POST /flow/{id}/submit`. The cookie holds the sealed state of one
+	// flow; the `{id}` path parameter must name that flow, any other id is
+	// refused.
 	// Browsers send this automatically; non-browser clients must capture the
 	// `Set-Cookie` header and resend it.
 	Zflow string

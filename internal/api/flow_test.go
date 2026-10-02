@@ -338,7 +338,7 @@ func TestSubmitFlowStep_TerminalSurfacesHandoffToken(t *testing.T) {
 // instead of "fields") used to be silently accepted with the fields ignored,
 // so the resulting empty submission came back as a 200 with a misleading
 // "value missing" step error instead of a request error.
-func TestSubmitFlowStep_SSO_BindsTheBrowserAndKeepsTheFlowCookie(t *testing.T) {
+func TestSubmitFlowStep_SSO_BindsTheBrowserAndResealsTheFlowCookie(t *testing.T) {
 	tests := []struct {
 		name       string
 		origin     string
@@ -411,6 +411,25 @@ func TestSubmitFlowStep_SSO_BindsTheBrowserAndKeepsTheFlowCookie(t *testing.T) {
 			require.Equal(t, "https://accounts.example.test/authorize?state=s", out.Step.RedirectURL)
 		})
 	}
+}
+
+// A provider id on another action is not an sso submission: it passes
+// through without the origin and return target checks, and the engine
+// refuses it as an invalid action.
+func TestSubmitFlowStep_SSO_ProviderIDAloneDoesNotSelectTheBranch(t *testing.T) {
+	ts := newTestServer(t)
+	state := &domain.FlowState{ID: "flow_1", ProjectID: "proj_1", SessionID: "sess_1", IssuedAt: time.Now()}
+	ts.fake.submitErr = domain.ErrFlowInvalidAction()
+
+	resp, body := doRequest(t, http.MethodPost, ts.srv.URL+"/flow/flow_1/submit", map[string]any{
+		"action":          "submit",
+		"sso_provider_id": "google",
+	}, ts.sealCookie(t, state))
+	require.Equal(t, http.StatusBadRequest, resp.StatusCode, string(body))
+	require.Equal(t, "submit", ts.fake.gotSubmitReq.Action, "the submission reaches the engine")
+	require.Equal(t, "google", *ts.fake.gotSubmitReq.SSOProviderID)
+	require.Nil(t, ts.fake.gotSubmitReq.SSOReturn)
+	require.Contains(t, string(body), "flow.invalid_action")
 }
 
 func TestSubmitFlowStep_SSO_RejectsAnUnboundReturn(t *testing.T) {

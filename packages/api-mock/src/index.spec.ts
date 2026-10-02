@@ -156,9 +156,26 @@ describe("setupMockHandlers", () => {
       action: "sso",
       fields: {},
       sso_provider_id: "google",
+      return_target: "http://localhost/login",
     });
     expect(submit.step.name).toBe("sso-redirect");
     expect(submit.step.redirect_url).toBeTruthy();
+  });
+
+  /**
+   * The engine requires `return_target` on an sso submission, so the mock
+   * must not hand back a redirect to a caller that omits it.
+   */
+  test("refuses an sso submission without return_target", async () => {
+    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    await expect(
+      submitFlowStep(start.id, {
+        session_token: start.session_token,
+        action: "sso",
+        fields: {},
+        sso_provider_id: "google",
+      }),
+    ).rejects.toMatchObject({ status: 400, body: { code: "req.invalid" } });
   });
 
   /**
@@ -391,6 +408,7 @@ describe("setupMockHandlers — the provider round trip", () => {
       action: "sso",
       fields: {},
       sso_provider_id: "google",
+      return_target: "http://localhost/login",
     });
     expect(redirect.step.name).toBe("sso-redirect");
     expect(redirect.step.redirect_url).toBeTruthy();

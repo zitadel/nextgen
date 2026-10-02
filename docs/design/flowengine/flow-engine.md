@@ -532,6 +532,7 @@ POST /flow/flow_2/submit
 ```
 ```json
 ← 200  (engine-emitted redirect step — not authored in the definition)
+Set-Cookie: _zflow=<encrypted-payload>; Path=/; Max-Age=600; HttpOnly; Secure; SameSite=Strict
 Set-Cookie: __Host-_zsso=<binding nonce>; Path=/; Max-Age=900; HttpOnly; Secure; SameSite=Lax
 {
   "id": "flow_2",
