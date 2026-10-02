@@ -1,5 +1,59 @@
 # @zitadel/components
 
+## 1.0.0-alpha.25
+
+### Minor Changes
+
+- [#1287](https://github.com/zitadel/nextgen/pull/1287) [`0ca8019`](https://github.com/zitadel/nextgen/commit/0ca80197fedb2755964617d9fe5f17e08b1cb95b) Thanks [@mridang](https://github.com/mridang)! - Render the identity providers a login step offers. A new `<zl-sso-providers>` atom draws one button per entry in the step's `sso_providers`, choosing one submits the reserved `sso` action with that connection's id, and the orchestrator follows the `redirect_url` the engine answers with — a new `zitadel-flow-redirect` event, kept separate from `zitadel-flow-complete` because nobody is signed in yet and the flow resumes when the provider returns. Every SDK forwards it, as `onFlowRedirect` in React, Solid and Svelte, `flowRedirect` in Vue and Angular, and `onFlowRedirect$` in Qwik. The atom is driven entirely by the step's data: a mark is looked up by the connection's `template` (Google ships one), and a template without one still gets a working button rather than a wrong logo, which is what a tenant's own OIDC connection will always look like. Copy for the provider buttons and for the `register-sso` and `sso-conflict` steps is added to every builtin locale, and `applySsoProviders()` in the mock API package lets a test or playground offer providers the way a project that ran `zitadel sso enable` does. The shipped `centered` and `minimal` designs carry the provider block; the retired split and hero designs ([#1039](https://github.com/zitadel/nextgen/issues/1039)) do not, so a tenant still on a revision published from one of those sees no provider buttons until it moves to `centered` or `minimal`.
+
+- [#1352](https://github.com/zitadel/nextgen/pull/1352) [`d821e91`](https://github.com/zitadel/nextgen/commit/d821e91a4f778b29a524c8a67129951795a16f8d) Thanks [@bastionstack](https://github.com/bastionstack)! - The console's branding preview runs in the selected project and shows the login in a chosen state.
+
+  The preview now starts the flow of the project selected in the switcher rather than the console's own, so on a platform deployment it renders a customer project's flow beside that project's branding. A state selector beside the screen tabs shows the step as a visitor first sees it, with validation errors, with a submission error, loading, or on the success screen.
+
+  `<zitadel-login>` gains `preview-state` for this. Set, the element starts the flow as usual, shows the served step in that state, and submits nothing. `preview-success-step` names the terminal step the success state paints, for a flow that does not end on the default `done`. The React `ZitadelLogin` takes both as `previewState` and `previewSuccessStep`. The terminal screen's heading is centred in its card.
+
+### Patch Changes
+
+- [#1386](https://github.com/zitadel/nextgen/pull/1386) [`6821cc6`](https://github.com/zitadel/nextgen/commit/6821cc62356ef75cce936907d203470f35cd1a9a) Thanks [@grvijayan](https://github.com/grvijayan)! - An sso submission starts the external sign-in. `{action: "sso",
+sso_provider_id, return_target}` on a step that offers `sso_providers`
+  pins the connection at its newest revision, issues the single-use state
+  record on the auth attempt and returns the `sso-redirect` step, whose
+  `redirect_url` is the provider's authorize URL with `state`, `nonce` and,
+  when the connection enables PKCE, an S256 code challenge. A `${{ NAME }}`
+  `client_id` is filled from the project's variables. The response re-seals
+  `_zflow` and adds the browser-binding cookie the callback checks. On every
+  host except http loopback it is `__Host-_zsso` with `Secure`. When the
+  request host is http loopback (local development, where Safari rejects
+  `Secure`), it is `_zsso` with no `Secure`; the `__Host-` prefix is dropped
+  because it requires `Secure`. In both cases the cookie is `HttpOnly`,
+  `Path=/` and `SameSite=Lax`.
+
+  The flow responses' `Set-Cookie` header is now declared as a list, one
+  header line per cookie, `_zflow` first. Browsers never expose the header to
+  script; the shape concerns server-side and generated non-browser clients.
+
+  The submit request gains `return_target`, the page hosting the
+  orchestrator where the flow resumes after the callback. It is required with
+  action `sso`, and its origin must equal the request origin. A provider the
+  engine cannot start a sign-in with re-renders the step with
+  `error.sso_unavailable`, which the orchestrator localizes. The orchestrator
+  sends its page URL, with the flow id set in the `flow` query parameter, as
+  `return_target` on an sso submission.
+
+  When the orchestrator resumes a flow handle, from the `flow` query
+  parameter or from `resume-flow-id`, and the flow no longer resolves, it
+  starts a new flow instead of showing a startup error, with a console
+  warning naming the handle. This covers the return from an external sign-in
+  after the flow cookie's window: the browser no longer sends the required
+  cookie and the server refuses the request with 400.
+
+- [#1342](https://github.com/zitadel/nextgen/pull/1342) [`c03400d`](https://github.com/zitadel/nextgen/commit/c03400d0a6263534a1fe862eacf198d62979230d) Thanks [@bastionstack](https://github.com/bastionstack)! - The design tokens bundled with the login components gain `--zl-gradient-red`, the design system's red gradient composed from its published stops. Nothing in the login surface reads it.
+
+- [#1287](https://github.com/zitadel/nextgen/pull/1287) [`0ca8019`](https://github.com/zitadel/nextgen/commit/0ca80197fedb2755964617d9fe5f17e08b1cb95b) Thanks [@mridang](https://github.com/mridang)! - Resume the flow an identity-provider callback returns with. The callback finishes by navigating the browser back to the page the sign-in started on with `?flow=<id>` appended. That is a fresh page load, so nothing of the previous document survives to carry the handle, and a page that ignores the parameter starts a new flow — leaving the user on a blank sign-in screen having just signed in. `<zitadel-login>` now falls back to that parameter when `resume-flow-id` is not set, so a host page needs no code of its own for external sign-in to finish; doing it per framework would mean the same few lines in each scaffolded template, and one that forgot them would fail silently. A handle taken from the URL is not a capability: `GET /flow/{id}` only answers when the sealed flow cookie names that same id, so an id someone else put there resolves to nothing.
+
+- Updated dependencies [[`79527ed`](https://github.com/zitadel/nextgen/commit/79527edba346d39fd43502eb4357d3d19a77ad2d), [`0ca8019`](https://github.com/zitadel/nextgen/commit/0ca80197fedb2755964617d9fe5f17e08b1cb95b), [`79527ed`](https://github.com/zitadel/nextgen/commit/79527edba346d39fd43502eb4357d3d19a77ad2d), [`6aca9bb`](https://github.com/zitadel/nextgen/commit/6aca9bb9afcb6e2b33f9e5e5cf5af6c1319d4fe1), [`c363d18`](https://github.com/zitadel/nextgen/commit/c363d1809bf2b8032178ea04e031d50cc365f71b), [`b44b907`](https://github.com/zitadel/nextgen/commit/b44b907bd50fd244440999b8386a79d132b58f1c)]:
+  - @zitadel/config@1.0.0-alpha.25
+
 ## 1.0.0-alpha.24
 
 ### Patch Changes

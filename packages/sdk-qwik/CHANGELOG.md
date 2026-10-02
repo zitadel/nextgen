@@ -1,5 +1,22 @@
 # @zitadel/sdk-qwik
 
+## 1.0.0-alpha.25
+
+### Minor Changes
+
+- [#1287](https://github.com/zitadel/nextgen/pull/1287) [`0ca8019`](https://github.com/zitadel/nextgen/commit/0ca80197fedb2755964617d9fe5f17e08b1cb95b) Thanks [@mridang](https://github.com/mridang)! - Render the identity providers a login step offers. A new `<zl-sso-providers>` atom draws one button per entry in the step's `sso_providers`, choosing one submits the reserved `sso` action with that connection's id, and the orchestrator follows the `redirect_url` the engine answers with — a new `zitadel-flow-redirect` event, kept separate from `zitadel-flow-complete` because nobody is signed in yet and the flow resumes when the provider returns. Every SDK forwards it, as `onFlowRedirect` in React, Solid and Svelte, `flowRedirect` in Vue and Angular, and `onFlowRedirect$` in Qwik. The atom is driven entirely by the step's data: a mark is looked up by the connection's `template` (Google ships one), and a template without one still gets a working button rather than a wrong logo, which is what a tenant's own OIDC connection will always look like. Copy for the provider buttons and for the `register-sso` and `sso-conflict` steps is added to every builtin locale, and `applySsoProviders()` in the mock API package lets a test or playground offer providers the way a project that ran `zitadel sso enable` does. The shipped `centered` and `minimal` designs carry the provider block; the retired split and hero designs ([#1039](https://github.com/zitadel/nextgen/issues/1039)) do not, so a tenant still on a revision published from one of those sees no provider buttons until it moves to `centered` or `minimal`.
+
+- [#1358](https://github.com/zitadel/nextgen/pull/1358) [`67461ef`](https://github.com/zitadel/nextgen/commit/67461efbc0db36d4771af85f09cdc5219e49a5a5) Thanks [@mridang](https://github.com/mridang)! - `@zitadel/sdk-qwik` now targets Qwik 2: it declares a peer dependency on `@qwik.dev/core` (`^2.0.0-beta.45`) in place of `@builder.io/qwik`, so your app must be on Qwik 2 to use it. Qwik 2 runs on Vite 8. The widgets stay reactive to their props, mirroring the other framework SDKs.
+
+  The CLI's Qwik support follows suit. `zitadel setup` now scaffolds and detects Qwik 2 apps: a new app is created on `@qwik.dev/core` and Vite 8 (no Vite 7 pin), and a Qwik 1 project is no longer auto-detected, since it cannot use the Qwik 2 SDK.
+
+### Patch Changes
+
+- Updated dependencies [[`0ca8019`](https://github.com/zitadel/nextgen/commit/0ca80197fedb2755964617d9fe5f17e08b1cb95b), [`d821e91`](https://github.com/zitadel/nextgen/commit/d821e91a4f778b29a524c8a67129951795a16f8d), [`79527ed`](https://github.com/zitadel/nextgen/commit/79527edba346d39fd43502eb4357d3d19a77ad2d), [`6aca9bb`](https://github.com/zitadel/nextgen/commit/6aca9bb9afcb6e2b33f9e5e5cf5af6c1319d4fe1), [`6821cc6`](https://github.com/zitadel/nextgen/commit/6821cc62356ef75cce936907d203470f35cd1a9a), [`c03400d`](https://github.com/zitadel/nextgen/commit/c03400d0a6263534a1fe862eacf198d62979230d), [`faccf02`](https://github.com/zitadel/nextgen/commit/faccf02136ff713718e103b18d4128e5a665d02e), [`0ca8019`](https://github.com/zitadel/nextgen/commit/0ca80197fedb2755964617d9fe5f17e08b1cb95b)]:
+  - @zitadel/components@1.0.0-alpha.25
+  - @zitadel/sdk-core@1.0.0-alpha.25
+  - @zitadel/api@1.0.0-alpha.25
+
 ## 1.0.0-alpha.24
 
 ### Patch Changes
