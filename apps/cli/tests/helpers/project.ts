@@ -120,13 +120,17 @@ interface PackageJson {
  * the other vitest workers: a reserved port gets taken as an outbound source
  * port before the CLI binds it.
  *
+ * The band sits below every platform's ephemeral range — macOS allocates from
+ * 49152 and Linux from 32768 — so a reserved port cannot be taken as an
+ * outbound source port by another worker's traffic before the CLI binds it.
+ *
  * Indexed by `VITEST_POOL_ID`, the reusable 1-based pool slot.
  * `VITEST_WORKER_ID` is a unique worker identity that keeps climbing as files
  * spawn workers, so indexing by it walks the block past 65535 and hands the
  * CLI a port that cannot exist. The modulo bounds it either way.
  */
-const PORT_FIRST = 42_000;
-const PORT_LAST = 65_000;
+const PORT_FIRST = 20_000;
+const PORT_LAST = 32_000;
 const PORT_BLOCK = 200;
 const PORT_BLOCKS = Math.floor((PORT_LAST - PORT_FIRST) / PORT_BLOCK);
 const POOL_SLOT = Math.max(1, Number(process.env.VITEST_POOL_ID ?? 1));

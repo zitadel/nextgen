@@ -28,7 +28,7 @@ A spec drives the built CLI through `runCliForTest` against
 observe afterwards.
 
 **One spec file per command, named after the command.** `setup.spec.ts`,
-`plan.spec.ts`, `sso-enable.spec.ts`, `variables.spec.ts`. A command's spec is
+`plan.spec.ts`, `sso-enable.spec.ts`, `variables-set.spec.ts`. A command's spec is
 the only spec that drives that command as its subject. There are no
 cross-command spec files, no "contract" files and no "round-trip" files.
 
@@ -113,20 +113,24 @@ A spec body contains a fixture call, a command, and matchers — nothing else:
 
   ```ts
   describe("<command>", () => {
-    describe("against an unavailable platform", () => { ... });
+    describe("against an invalid server", () => {
+      describe("that is not a zitadel api", () => { ... });
+      describe("that is down", () => { ... });
+    });
 
-    describe("against the platform", () => {
+    describe("against a valid server", () => {
       describe("--json", () => { ... });
       describe("rendered for a terminal", () => { ... });
     });
   });
   ```
 
-  The first group says what the command does when the platform is not
-  answering — most fail, and the local ones (`doctor`, `status`, `stop`,
-  `reset`, `eject`) deliberately carry on, which is worth stating rather than
-  leaving to be discovered. The `--json` and rendered groups never interleave;
-  a command with no human-rendered output simply has no second group.
+  The first group says what the command does when the server it is pointed at
+  cannot serve the request: one that answers but is not a Zitadel API, and one
+  that is down. Most fail; the local ones (`doctor`, `status`, `stop`, `reset`,
+  `eject`) and `plan` deliberately carry on, which is worth stating rather than
+  leaving to be discovered. The `--json` and rendered groups never interleave,
+  and a command with no human-rendered output simply has no second one.
 
 Formatting is prettier's, per the repo's `.prettierrc.json`, so nothing is
 hand-wrapped.

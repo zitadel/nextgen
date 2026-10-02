@@ -87,8 +87,10 @@ describe("sso enable", () => {
 
         const { data } = app.envelopeOf<{
           client_id: { variable: string; published: string };
+          secret: { variable: string; published: string };
         }>(result);
         expect(data.client_id).toEqual({ variable: "GOOGLE_CLIENT_ID", published: "stored" });
+        expect(data.secret).toEqual({ variable: "GOOGLE_CLIENT_SECRET", published: "stored" });
       });
 
       it("commits references to the credentials rather than the credentials", async () => {
@@ -119,16 +121,21 @@ describe("sso enable", () => {
       });
 
       it("changes nothing when the same provider is enabled again", async () => {
-        const app = await anAppWithGoogle();
+        const app = await anAppServingGoogle();
         const before = {
           variables: await app.projectVariables(),
           connection: await app.committed.idpConnection(GOOGLE),
+          schema: await app.publishedSchema(),
+          flow: await app.publishedFlow(),
         };
 
         expect(await app.enableSso(GOOGLE, CREDENTIALS)).toSucceed();
 
         expect(await app.projectVariables()).toEqual(before.variables);
         expect(await app.committed.idpConnection(GOOGLE)).toEqual(before.connection);
+        expect(await app.publishedSchema()).toEqual(before.schema);
+        expect(await app.publishedFlow()).toEqual(before.flow);
+        expect(await app.plan()).toReportNothingToDo();
       });
 
       describe("once applied", () => {
