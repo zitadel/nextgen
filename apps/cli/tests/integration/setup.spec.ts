@@ -10,18 +10,31 @@ const platform = usePlatformMock();
 const SCAFFOLDED_PAGES = ["app/login/page.tsx", "app/register/page.tsx", "app/profile/page.tsx"];
 
 describe("setup", () => {
-  describe("against an unavailable platform", () => {
-    it("fails when the platform is unavailable", async () => {
-      const app = await anApp();
-      platform.isUnavailable();
+  describe("against an invalid server", () => {
+    describe("that is not a zitadel api", () => {
+      it("fails", async () => {
+        const app = await anApp();
+        platform.isNotZitadel();
 
-      const result = await app.setup();
+        const result = await app.setup();
 
-      expect(result).toFailWith("E_NETWORK");
+        expect(result).toFailWith("E_NOT_FOUND");
+      });
+    });
+
+    describe("that is down", () => {
+      it("fails", async () => {
+        const app = await anApp();
+        platform.isUnavailable();
+
+        const result = await app.setup();
+
+        expect(result).toFailWith("E_NETWORK");
+      });
     });
   });
 
-  describe("against the platform", () => {
+  describe("against a valid server", () => {
     describe("--json", () => {
       it("scaffolds the project", async () => {
         const app = await anApp();
@@ -130,7 +143,7 @@ describe("setup", () => {
 
       it("does not claim to be configured after a failed run", async () => {
         const app = await anApp();
-        platform.isUnavailable();
+        platform.isNotZitadel();
 
         expect(await app.setup()).toFail();
 

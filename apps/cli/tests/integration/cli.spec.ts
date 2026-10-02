@@ -51,18 +51,31 @@ async function suggestedCommandIds(): Promise<Set<string>> {
 }
 
 describe("the cli", () => {
-  describe("against an unavailable platform", () => {
-    it("still names the failure and the way out", async () => {
-      const app = await anApp();
-      platform.isUnavailable();
+  describe("against an invalid server", () => {
+    describe("that is not a zitadel api", () => {
+      it("fails", async () => {
+        const app = await anApp();
+        platform.isNotZitadel();
 
-      const result = await app.apply();
+        const result = await app.apply();
 
-      expect(result).toFailWith("E_VALIDATION");
+        expect(result).toFailWith("E_VALIDATION");
+      });
+    });
+
+    describe("that is down", () => {
+      it("fails", async () => {
+        const app = await anApp();
+        platform.isUnavailable();
+
+        const result = await app.apply();
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
     });
   });
 
-  describe("against the platform", () => {
+  describe("against a valid server", () => {
     describe("--json", () => {
       it("names the failure when run before setup", async () => {
         const app = await anApp();

@@ -18,18 +18,31 @@ async function aConfiguredApp(): Promise<ScaffoldedApp> {
 }
 
 describe("status", () => {
-  describe("against an unavailable platform", () => {
-    it("still reports when the platform is unavailable", async () => {
-      const app = await aSetUpApp();
-      platform.isUnavailable();
+  describe("against an invalid server", () => {
+    describe("that is not a zitadel api", () => {
+      it("still succeeds", async () => {
+        const app = await aSetUpApp();
+        platform.isNotZitadel();
 
-      const result = await app.status();
+        const result = await app.status();
 
-      expect(result).toSucceed();
+        expect(result).toSucceed();
+      });
+    });
+
+    describe("that is down", () => {
+      it("still succeeds", async () => {
+        const app = await aSetUpApp();
+        platform.isUnavailable();
+
+        const result = await app.status();
+
+        expect(result).toSucceed();
+      });
     });
   });
 
-  describe("against the platform", () => {
+  describe("against a valid server", () => {
     describe("--json", () => {
       it("offers plan while nobody has registered", async () => {
         const app = await aSetUpApp();

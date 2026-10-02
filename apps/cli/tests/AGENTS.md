@@ -39,10 +39,15 @@ regression fails inside the spec of the command that broke. A dedicated
 contract suite only ever covers the commands somebody remembered to list, and
 reports the failure far from its cause.
 
+A topic's commands are separate commands: `variables set` is
+`variables-set.spec.ts`, not a suite inside a shared file, so coverage is
+discoverable by filename. The binary's own behaviour — an unknown command,
+which server it resolves — is `cli.spec.ts`.
+
 The generated resource commands (`users:list`, `teams:get`, …) come from one
-factory in `src/lib/oclif/crud/`. They are one spec — `resources.spec.ts`,
-parameterized over the resource table — not one per generated command. The
-factory's behaviour is unit-tested; the spec proves it is wired up.
+factory in `src/lib/oclif/crud/`. They are one spec — `resources.spec.ts` —
+not one per generated command. The factory's behaviour is unit-tested; the
+spec proves it is wired up.
 
 ## The shape of a spec
 

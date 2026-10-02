@@ -6,18 +6,31 @@ import { anApp, aSetUpApp } from "../helpers/project";
 const platform = usePlatformMock();
 
 describe("reset", () => {
-  describe("against an unavailable platform", () => {
-    it("still succeeds", async () => {
-      const app = await aSetUpApp();
-      platform.isUnavailable();
+  describe("against an invalid server", () => {
+    describe("that is not a zitadel api", () => {
+      it("still succeeds", async () => {
+        const app = await aSetUpApp();
+        platform.isNotZitadel();
 
-      const result = await app.run(["reset", "--force", "--json"]);
+        const result = await app.run(["reset", "--force", "--json"]);
 
-      expect(result).toSucceed();
+        expect(result).toSucceed();
+      });
+    });
+
+    describe("that is down", () => {
+      it("still succeeds", async () => {
+        const app = await aSetUpApp();
+        platform.isUnavailable();
+
+        const result = await app.run(["reset", "--force", "--json"]);
+
+        expect(result).toSucceed();
+      });
     });
   });
 
-  describe("against the platform", () => {
+  describe("against a valid server", () => {
     describe("--json", () => {
       it("succeeds when there is no local runtime to delete", async () => {
         const app = await aSetUpApp();

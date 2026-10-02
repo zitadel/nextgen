@@ -13,18 +13,31 @@ function downgradeTheFramework(app: ScaffoldedApp): Promise<void> {
 }
 
 describe("doctor", () => {
-  describe("against an unavailable platform", () => {
-    it("still checks the project", async () => {
-      const app = await aSetUpApp();
-      platform.isUnavailable();
+  describe("against an invalid server", () => {
+    describe("that is not a zitadel api", () => {
+      it("still succeeds", async () => {
+        const app = await aSetUpApp();
+        platform.isNotZitadel();
 
-      const result = await app.doctor();
+        const result = await app.doctor();
 
-      expect(result).toSucceed();
+        expect(result).toSucceed();
+      });
+    });
+
+    describe("that is down", () => {
+      it("still succeeds", async () => {
+        const app = await aSetUpApp();
+        platform.isUnavailable();
+
+        const result = await app.doctor();
+
+        expect(result).toSucceed();
+      });
     });
   });
 
-  describe("against the platform", () => {
+  describe("against a valid server", () => {
     describe("--json", () => {
       it("passes a project straight out of setup", async () => {
         const app = await aSetUpApp();

@@ -41,19 +41,33 @@ async function addCompanyFieldAndUseIt(app: ScaffoldedApp): Promise<void> {
 }
 
 describe("apply", () => {
-  describe("against an unavailable platform", () => {
-    it("fails when the platform is unavailable", async () => {
-      const app = await aSetUpApp();
-      await addCompanyFieldAndUseIt(app);
-      platform.isUnavailable();
+  describe("against an invalid server", () => {
+    describe("that is not a zitadel api", () => {
+      it("fails", async () => {
+        const app = await aSetUpApp();
+        await addCompanyFieldAndUseIt(app);
+        platform.isNotZitadel();
 
-      const result = await app.apply();
+        const result = await app.apply();
 
-      expect(result).toFailWith("E_NETWORK");
+        expect(result).toFailWith("E_NOT_FOUND");
+      });
+    });
+
+    describe("that is down", () => {
+      it("fails", async () => {
+        const app = await aSetUpApp();
+        await addCompanyFieldAndUseIt(app);
+        platform.isUnavailable();
+
+        const result = await app.apply();
+
+        expect(result).toFailWith("E_NETWORK");
+      });
     });
   });
 
-  describe("against the platform", () => {
+  describe("against a valid server", () => {
     describe("--json", () => {
       it("reports a project that already matches as synced", async () => {
         const app = await aSetUpApp();

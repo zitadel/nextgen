@@ -6,18 +6,31 @@ import { anApp, aSetUpApp } from "../helpers/project";
 const platform = usePlatformMock();
 
 describe("console", () => {
-  describe("against an unavailable platform", () => {
-    it("fails", async () => {
-      const app = await aSetUpApp();
-      platform.isUnavailable();
+  describe("against an invalid server", () => {
+    describe("that is not a zitadel api", () => {
+      it("fails", async () => {
+        const app = await aSetUpApp();
+        platform.isNotZitadel();
 
-      const result = await app.run(["console", "--json"]);
+        const result = await app.run(["console", "--json"]);
 
-      expect(result).toFailWith("E_VALIDATION");
+        expect(result).toFailWith("E_VALIDATION");
+      });
+    });
+
+    describe("that is down", () => {
+      it("fails", async () => {
+        const app = await aSetUpApp();
+        platform.isUnavailable();
+
+        const result = await app.run(["console", "--json"]);
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
     });
   });
 
-  describe("against the platform", () => {
+  describe("against a valid server", () => {
     describe("--json", () => {
       it("refuses a project with no local runtime behind it", async () => {
         const app = await aSetUpApp();

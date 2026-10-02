@@ -14,18 +14,31 @@ async function aPatchedApp(): Promise<ScaffoldedApp> {
 }
 
 describe("eject", () => {
-  describe("against an unavailable platform", () => {
-    it("still removes the managed files", async () => {
-      const app = await aPatchedApp();
-      platform.isUnavailable();
+  describe("against an invalid server", () => {
+    describe("that is not a zitadel api", () => {
+      it("still succeeds", async () => {
+        const app = await aPatchedApp();
+        platform.isNotZitadel();
 
-      const result = await app.run(["eject", "--force", "--json"]);
+        const result = await app.run(["eject", "--force", "--json"]);
 
-      expect(result).toSucceed();
+        expect(result).toSucceed();
+      });
+    });
+
+    describe("that is down", () => {
+      it("still succeeds", async () => {
+        const app = await aPatchedApp();
+        platform.isUnavailable();
+
+        const result = await app.run(["eject", "--force", "--json"]);
+
+        expect(result).toSucceed();
+      });
     });
   });
 
-  describe("against the platform", () => {
+  describe("against a valid server", () => {
     describe("--json", () => {
       it("reports the managed files it removed", async () => {
         const app = await aPatchedApp();

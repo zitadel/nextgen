@@ -20,19 +20,33 @@ function breakTheLoginEntryStep(app: ScaffoldedApp): Promise<void> {
 }
 
 describe("plan", () => {
-  describe("against an unavailable platform", () => {
-    it.fails("fails when the platform is unavailable", async () => {
-      const app = await aSetUpApp();
-      await addCompanyField(app);
-      platform.isUnavailable();
+  describe("against an invalid server", () => {
+    describe("that is not a zitadel api", () => {
+      it.fails("fails", async () => {
+        const app = await aSetUpApp();
+        await addCompanyField(app);
+        platform.isNotZitadel();
 
-      const result = await app.planAttempt();
+        const result = await app.planAttempt();
 
-      expect(result).toFailWith("E_NETWORK");
+        expect(result).toFailWith("E_NOT_FOUND");
+      });
+    });
+
+    describe("that is down", () => {
+      it.fails("fails", async () => {
+        const app = await aSetUpApp();
+        await addCompanyField(app);
+        platform.isUnavailable();
+
+        const result = await app.planAttempt();
+
+        expect(result).toFailWith("E_NETWORK");
+      });
     });
   });
 
-  describe("against the platform", () => {
+  describe("against a valid server", () => {
     describe("--json", () => {
       it("has nothing to reconcile after setup", async () => {
         const app = await aSetUpApp();

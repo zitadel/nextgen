@@ -20,6 +20,13 @@ export interface PlatformMock {
   rejectsSchemaUploads(): void;
 
   /**
+   * Answers as a server that is reachable but is not a Zitadel platform API,
+   * which is what a mistyped or wrong `--server` points at: every route 404s
+   * with a body that is not a platform error envelope.
+   */
+  isNotZitadel(): void;
+
+  /**
    * Makes every request fail as a platform that is down would, which the CLI
    * maps to `E_NETWORK`. A synthetic transport error is not used: the CLI's
    * detector matches undici's "fetch failed", not msw's "Failed to fetch", so
@@ -52,6 +59,10 @@ export function usePlatformMock(): PlatformMock {
           HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
         ),
       );
+    },
+
+    isNotZitadel() {
+      server.use(http.all("*", () => HttpResponse.text("<html>not here</html>", { status: 404 })));
     },
 
     isUnavailable() {

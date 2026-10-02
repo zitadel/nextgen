@@ -9,18 +9,31 @@ const platform = usePlatformMock();
 const WITHOUT_A_BROWSER = ["claim", "--no-open", "--timeout", "1", "--json"];
 
 describe("claim", () => {
-  describe("against an unavailable platform", () => {
-    it("fails when the platform is unavailable", async () => {
-      const app = await aSetUpApp();
-      platform.isUnavailable();
+  describe("against an invalid server", () => {
+    describe("that is not a zitadel api", () => {
+      it("fails", async () => {
+        const app = await aSetUpApp();
+        platform.isNotZitadel();
 
-      const result = await app.run(WITHOUT_A_BROWSER);
+        const result = await app.run(WITHOUT_A_BROWSER);
 
-      expect(result).toFail();
+        expect(result).toFail();
+      });
+    });
+
+    describe("that is down", () => {
+      it("fails", async () => {
+        const app = await aSetUpApp();
+        platform.isUnavailable();
+
+        const result = await app.run(WITHOUT_A_BROWSER);
+
+        expect(result).toFail();
+      });
     });
   });
 
-  describe("against the platform", () => {
+  describe("against a valid server", () => {
     describe("--json", () => {
       it("refuses a directory that was never set up", async () => {
         const app = await anApp();
