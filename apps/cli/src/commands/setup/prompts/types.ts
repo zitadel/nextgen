@@ -46,12 +46,16 @@ export type SetupAnswers = {
   /** Use case (schema field set); see `SETUP_USE_CASES` in @zitadel/config. */
   useCase: SetupUseCase;
   /**
-   * Social provider to enable while scaffolding, or `undefined` for email
-   * sign-in only. Chosen by {@link import("./social-sign-in").SocialSignInPrompt};
-   * `sso enable` adds one to an existing Project later, so this is
-   * never the only way in.
+   * Social providers to enable while scaffolding, empty for email sign-in
+   * only. Chosen by {@link import("./social-sign-in").SocialSignInPrompt};
+   * `sso enable` adds one to an existing Project later, so this is never the
+   * only way in.
+   *
+   * A list because a project may offer several at once, and the schema and
+   * flow already carry `sso_providers` as a list of slugs — one answer per
+   * provider, each with its own credentials.
    */
-  sso?: SsoAnswer;
+  sso: readonly SsoAnswer[];
 };
 
 /** Read-only facts a prompt may need. */
