@@ -24,6 +24,16 @@
 > [credentials](../api/credentials.md), [project secret](secret.md),
 > [configuration surface](configuration-surface.md).
 
+## Where to start
+
+| If you want | Read |
+|---|---|
+| The argument in one page | [The claim](#the-claim), [Three things called "environment"](#three-things-are-called-environment) |
+| The data model | [Model](#model-after-the-change), [Entities as JSON](#entities-as-json), [Deployment history](#deployment-history) |
+| The security rules | [Origins](#origins-the-allowlist-and-the-inventory), [Project class](#project-class-and-origin-kinds), [the resolver](#the-release-resolver) |
+| Concrete behaviour | [Worked resolution examples](#worked-resolution-examples), [The CLI end to end](#the-cli-end-to-end) |
+| The hard parts | [The honest accounting](#the-honest-accounting), [The RP ID consequence](#the-rp-id-consequence), [What promotion becomes](#what-promotion-becomes), [Open](#open) |
+
 ## The claim
 
 ADR 035 defines an environment as a runtime slot that runs one release at a
@@ -268,6 +278,223 @@ the naming layer was the expensive part.
 > allowlist and keep the client-carried hash, with the capability caveat and a
 > build-injected release id. The note now argues for the former, but it is a
 > genuine trade and the second is still coherent.
+
+## Entities, as JSON
+
+Four objects. Field names are proposals, not settled wire contracts.
+
+### Project
+
+```json
+{
+  "id": "prj_01K9AA9M3K7E2QX8VB4T",
+  "name": "acme",
+  "class": "production",
+  "publishable_key": "pk_7kR2pXq9vN3wLmYhT4cB8A",
+
+  "allowed_origins": [
+    { "pattern": "https://app.acme.com",         "kind": "primary" },
+    { "pattern": "https://www.acme.com",         "kind": "primary" },
+    { "pattern": "https://*-acmeinc.vercel.app", "kind": "preview" },
+    { "pattern": "https://*.preview.acme.com",   "kind": "preview" }
+  ],
+
+  "current_deployment_id": "dep_01KA7T9QX3M2E8VB",
+  "created_at": "2026-04-21T14:03:11Z"
+}
+```
+
+`allowed_origins` replaces `preview_origins`
+(`internal/domain/project.go:68-70`) and settles a name mismatch that exists
+today: `security-and-origins.md` has always called this field `allowed_origins`
+while the code calls it `PreviewOrigins`. One field with a `kind` per entry beats
+two fields, because the two kinds differ in what they *permit*, not in what they
+*are*.
+
+These are **patterns**. They gate. They never route.
+
+`current_deployment_id` answers callers with no `Origin` to route on — a
+server-side app behind the scaffolds' proxy, the CLI, CI.
+
+### Origin row — the environment replacement
+
+```json
+{
+  "project_id": "prj_01K9AA9M3K7E2QX8VB4T",
+  "origin": "https://app.acme.com",
+  "kind": "primary",
+  "current_deployment_id": "dep_01KA7T9QX3M2E8VB",
+  "created_at": "2026-04-22T09:17:45Z"
+}
+```
+
+```json
+{
+  "project_id": "prj_01K9AA9M3K7E2QX8VB4T",
+  "origin": "https://acme-git-sso-acmeinc.vercel.app",
+  "kind": "preview",
+  "current_deployment_id": "dep_01KB3F8N2P9S5WQZ",
+  "expires_at": "2026-10-09T14:10:00Z",
+  "created_at": "2026-10-02T14:10:00Z"
+}
+```
+
+An **exact** origin, no patterns. One row per live URL. Keyed
+`(project_id, origin)`. `expires_at` is preview-only and is renewed by
+redeploying to the same origin, which is what keeps a preview URL stable across
+pushes to a branch. `primary` rows do not expire.
+
+Put beside `internal/domain/environment.go`, this is that struct with `name`
+removed and `origin` added. The comparison is the point, and the
+[honest accounting](#the-honest-accounting) makes it rather than hiding it.
+
+### Deployment — immutable, append-only
+
+```json
+{
+  "id": "dep_01KB3F8N2P9S5WQZ",
+  "project_id": "prj_01K9AA9M3K7E2QX8VB4T",
+  "deploy_id": "dpl_01KB3F8N2P9S5WQY",
+  "origin": "https://acme-git-sso-acmeinc.vercel.app",
+  "release": "sha256:9f2c1a7b4e83d05f6c2b19ae7d430f821c6b5de90a4f7382",
+  "reason": "deploy",
+  "message": "add phone_number to human-user",
+  "deployed_at": "2026-10-02T14:10:00Z",
+  "deployed_by": "user_01K8ZQ3K7E5M2P9S"
+}
+```
+
+`origin` is the **history axis**, replacing `environment_id`. The empty string
+means *the project default* — the target `project.current_deployment_id` points
+at. That is not a special case invented here: variables already use exactly this
+convention, where `EnvironmentID == ""` is the project level, "an address of its
+own rather than a wildcard" (`internal/domain/variable.go:160-166`).
+
+`deploy_id` correlates the rows one `zitadel deploy` wrote when it touched
+several origins at once. Without it, "deploy to `app.acme.com` and
+`www.acme.com`" is two unrelated facts.
+
+### Release
+
+```json
+{
+  "digest": "sha256:9f2c1a7b4e83d05f6c2b19ae7d430f821c6b5de90a4f7382",
+  "project_id": "prj_01K9AA9M3K7E2QX8VB4T",
+  "pointers": [
+    { "kind": "schema",          "handle": "human-user",    "revision_id": "sch_01KWHF18816ZQE" },
+    { "kind": "flow_definition", "handle": "default-login", "revision_id": "flowdef_01KWHG09JXA" },
+    { "kind": "branding",        "handle": "default",       "revision_id": "brnd_01KWH1P4MYS" }
+  ],
+  "metadata": {
+    "message": "add phone_number to human-user",
+    "git_sha": "4a5b6c7d8e9f0a1b2c3d",
+    "git_dirty": false,
+    "created_by": "user_01K8ZQ3K7E5M2P9S",
+    "created_at": "2026-10-02T14:08:55Z"
+  },
+  "revoked_at": null
+}
+```
+
+Unchanged from what exists, except that `digest` (today's unexposed
+`ContentHash`) is the wire identifier and `rel_<ULID>` stays internal.
+
+## Deployment history
+
+The question the origin inventory has to answer, because losing history would
+make rollback and audit worse than what environments gave.
+
+### Where it lives
+
+**In the `deployments` table, exactly as today, with one column swapped.** The
+history of a target is the set of deployment rows naming it, newest first:
+
+```sql
+-- what app.acme.com is serving, and what it served before
+SELECT * FROM deployments
+ WHERE project_id = ? AND origin = 'https://app.acme.com'
+ ORDER BY deployed_at DESC, id DESC;
+
+-- the project default's history (callers with no Origin)
+SELECT * FROM deployments
+ WHERE project_id = ? AND origin = ''
+ ORDER BY deployed_at DESC, id DESC;
+```
+
+The supporting index is today's with `environment_id` renamed:
+`(project_id, origin, deployed_at DESC, id DESC)` — compare
+`idx_deployments_project_env_deployed_at`
+(`internal/storage/dialect/sqlite/migration/sql/000011_deployments.sql:33-34`),
+whose comment already observes that "the first row under this order is the
+environment's current deployment".
+
+### Four rules that keep it honest
+
+**1. Rows are never mutated, and a pointer move is an insert.** Deploy,
+rollback and redeploy all append. `origins.current_deployment_id` and
+`project.current_deployment_id` are denormalised caches of "the newest row for
+this origin", kept for the reason the existing migration already gives for the
+environment column — "denormalised so env reads are one row and the
+optimistic-concurrency check is one compare"
+(`postgres/migration/sql/000024_deployments.sql:56-61`). Derivable, cached on
+purpose.
+
+**2. `deployments.origin` is a plain string, not a foreign key.** This is the
+rule that makes the design survive garbage collection: **a preview origin can be
+collected and its deployment history stays.** An FK with a cascade would delete
+the audit trail of every preview the moment its row expired, which is strictly
+worse than environments, where at least the row persisted. The string is the
+record; the origin row is just the live pointer.
+
+**3. A release referenced by any deployment row is never collected.** The
+retention rule from
+[many developers](#many-developers-one-shared-server) — collect
+never-activated, cold releases — has to stop exactly here, or history dangles.
+The existing self-healing behaviour covers the residual edge: a dangling
+`current_deployment_id` reads as "nothing running" and repairs on the next deploy
+(`internal/storage/dialect/sqlite/deployment.go:64-78`).
+
+**4. Point-in-time is a query, not a column.** "What was `app.acme.com` serving
+on 1 October" is the newest row for that origin with
+`deployed_at <= '2026-10-01'`. No `superseded_at`, no validity ranges, nothing to
+keep consistent.
+
+### What a history looks like
+
+One project, three targets, read as one log. `origin: ""` is the default; the
+`deploy_id` shows which rows moved together.
+
+| `deployed_at` | `origin` | `release` | `reason` | `deploy_id` |
+|---|---|---|---|---|
+| 10-02 14:10 | `acme-git-sso…vercel.app` | `sha256:9f2c…` | `deploy` | `dpl_…Y` |
+| 10-02 09:30 | `` (default) | `sha256:4a5b…` | `rollback` | `dpl_…W` |
+| 10-02 09:30 | `app.acme.com` | `sha256:4a5b…` | `rollback` | `dpl_…W` |
+| 10-02 09:30 | `www.acme.com` | `sha256:4a5b…` | `rollback` | `dpl_…W` |
+| 10-01 17:02 | `` (default) | `sha256:c3f7…` | `deploy` | `dpl_…V` |
+| 10-01 17:02 | `app.acme.com` | `sha256:c3f7…` | `deploy` | `dpl_…V` |
+| 10-01 17:02 | `www.acme.com` | `sha256:c3f7…` | `deploy` | `dpl_…V` |
+| 09-28 11:44 | `acme-git-pw…vercel.app` | `sha256:81de…` | `deploy` | `dpl_…U` |
+
+Two things to read off it. The `17:02` release went bad and was rolled back at
+`09:30` across all three production targets in one operation — one `deploy_id`,
+three rows, each independently rollback-able afterwards. And
+`acme-git-pw…vercel.app` from 09-28 has since expired and its origin row is gone,
+yet its deployment row is still here, which is rule 2 doing its job.
+
+### What is lost against environments
+
+**A stable name for a target across its whole life.** An environment called
+`staging` kept its history when you pointed it at a new hostname; an origin's
+history is the hostname's. Change the hostname and you start a new history, with
+the old one still readable under the old string but not joined to it.
+
+This is a real loss and it is the correct trade for a preview URL, which is
+disposable by nature. It is a worse trade for a long-lived production hostname
+that gets renamed — rare, and recoverable by reading both strings. If it turns
+out to matter, the fix is a nullable `target_id` grouping origins that are "the
+same place over time", which is the environment's name coming back in its most
+minimal possible form, and should only be added when something concrete demands
+it.
 
 ## Project class and origin kinds
 
@@ -671,6 +898,179 @@ The symmetry: **one of origin or secret must be present, and either alone is
 enough to be served.** Neither present means the current release and nothing
 else.
 
+## Worked resolution examples
+
+All against the project in [Entities](#entities-as-json): `class: production`,
+primary origins `app.acme.com` and `www.acme.com`, preview patterns
+`*-acmeinc.vercel.app` and `*.preview.acme.com`.
+
+### 1. A browser on the production origin
+
+```http
+POST /flow HTTP/1.1
+Origin: https://app.acme.com
+Authorization: Bearer pk_7kR2pXq9vN3wLmYhT4cB8A
+
+{ "project_id": "prj_01K9AA9M3K7E2QX8VB4T", "purpose": "login" }
+```
+
+| Layer | Outcome |
+|---|---|
+| 1 — gate | matches `https://app.acme.com` (primary) ✓ |
+| 2 — route | origin row found → `dep_01KA7T9QX3M2E8VB` → `sha256:4a5b…` |
+| 3 — fall back | not reached |
+
+Serves `sha256:4a5b…`, sealed into the flow state. **The client sent no release
+and knows of none.** This is the shape almost all production traffic has.
+
+### 2. A preview whose deploy registered its origin
+
+```http
+POST /flow HTTP/1.1
+Origin: https://acme-git-sso-acmeinc.vercel.app
+Authorization: Bearer pk_7kR2pXq9vN3wLmYhT4cB8A
+
+{ "project_id": "prj_01K9AA9M3K7E2QX8VB4T", "purpose": "login" }
+```
+
+| Layer | Outcome |
+|---|---|
+| 1 — gate | matches `https://*-acmeinc.vercel.app` (preview) ✓ |
+| 2 — route | origin row found → `dep_01KB3F8N2P9S5WQZ` → `sha256:9f2c…` |
+
+Serves the branch's own release. Byte-identical request to example 1 — only the
+`Origin` differs, and the server did the rest. No header, no build-time
+injection, no SDK change.
+
+Passkey assertion with a production credential fails here, and that is
+[WebAuthn, not policy](#the-rp-id-consequence).
+
+### 3. A preview that could not register its origin
+
+The fallback path, for platforms with no registration step.
+
+```http
+POST /flow HTTP/1.1
+Origin: https://acme-git-hotfix-acmeinc.vercel.app
+Authorization: Bearer pk_7kR2pXq9vN3wLmYhT4cB8A
+X-Zitadel-Release: sha256:81de4c…
+
+{ "project_id": "prj_01K9AA9M3K7E2QX8VB4T", "purpose": "login" }
+```
+
+| Layer | Outcome |
+|---|---|
+| 1 — gate | matches the preview pattern ✓ |
+| 2 — route | **no origin row** |
+| 3 — fall back | header present; publishable key present, so permitted on a `production` project → `sha256:81de4c…` |
+
+Serves the named release. Drop the `Authorization` header and this becomes
+`403 rel.pin_not_permitted`; drop the `X-Zitadel-Release` instead and it becomes
+`400 rel.required`, because a `preview` match must never silently fall through to
+production configuration.
+
+### 4. A server-side app — no `Origin` at all
+
+The common shape behind the scaffolds' `/__nextgen` proxy.
+
+```http
+POST /flow HTTP/1.1
+Authorization: Bearer sk_proj_9f2Hx8LqT4vRmYpN2wCbVa
+
+{ "project_id": "prj_01K9AA9M3K7E2QX8VB4T", "purpose": "login" }
+```
+
+| Layer | Outcome |
+|---|---|
+| 1 — gate | no `Origin`; nothing to check, falls through |
+| 2 — route | nothing to match on |
+| 3 — fall back | no header → `project.current_deployment_id` → `sha256:4a5b…` |
+
+This is why the project-level pointer survives alongside the origin rows: **this
+caller has no origin, so there is no row to find.** Pin a specific release by
+adding `X-Zitadel-Release` — the project secret permits it on any class.
+
+### 5. A stranger on an unrelated Vercel app
+
+```http
+POST /flow HTTP/1.1
+Origin: https://evil-xyz-attacker.vercel.app
+X-Zitadel-Release: sha256:9f2c1a…
+
+{ "project_id": "prj_01K9AA9M3K7E2QX8VB4T", "purpose": "login" }
+```
+
+| Layer | Outcome |
+|---|---|
+| 1 — gate | `*-acmeinc.vercel.app` requires the `-acmeinc` suffix → **no match** |
+
+`403 proj.origin_not_allowed`, before any release is considered. This is the
+[tenant-anchor rule](#the-tenant-anchor-rule) earning its place: under a naive
+`https://*.vercel.app` this request would have passed the gate, and under
+`https://acme-*.vercel.app` the attacker need only name their own Vercel project
+`acme`.
+
+### 6. A stranger who does match the pattern
+
+Someone inside the `acmeinc` Vercel team, or the pattern written too loosely.
+
+```http
+POST /flow HTTP/1.1
+Origin: https://acme-git-nonsense-acmeinc.vercel.app
+X-Zitadel-Release: sha256:9f2c1a…
+
+{ "project_id": "prj_01K9AA9M3K7E2QX8VB4T", "purpose": "login" }
+```
+
+| Layer | Outcome |
+|---|---|
+| 1 — gate | matches the preview pattern ✓ |
+| 2 — route | no origin row for this exact host |
+| 3 — fall back | header present, **but no credential** on a `production` project |
+
+`403 rel.pin_not_permitted`. Three independent things had to hold for this to be
+served and only one did. Note what is *not* load-bearing here: the attacker
+knowing `sha256:9f2c1a…` bought them nothing, which is the whole point of taking
+the hash off the hot path.
+
+### 7. Local development
+
+Same project, but `class: sandbox`, so the fallback header is open.
+
+```http
+POST /flow HTTP/1.1
+Origin: http://project-a.localhost:3000
+X-Zitadel-Release: sha256:c3f7a8…
+
+{ "project_id": "prj_01KDEV…", "purpose": "login" }
+```
+
+| Layer | Outcome |
+|---|---|
+| 1 — gate | loopback, permitted on `sandbox` ✓ |
+| 2 — route | no origin row — nobody registers localhost |
+| 3 — fall back | header present, no credential needed on `sandbox` → `sha256:c3f7a8…` |
+
+The hash comes from the local runtime document rather than a build constant, so a
+`.zitadel/` edit shows on the next page load. Five developers on this project
+each send a different hash and each see their own work; see
+[many developers](#many-developers-one-shared-server).
+
+The hostname is `project-a.localhost`, not `localhost:3000`, because
+[RP ID drops the port](#the-other-variation-different-projects-same-localhost).
+
+### Summary
+
+| # | `Origin` | Credential | Header | Answered by | Result |
+|---|---|---|---|---|---|
+| 1 | primary | publishable key | — | layer 2 | production release |
+| 2 | registered preview | publishable key | — | layer 2 | branch release |
+| 3 | unregistered preview | publishable key | yes | layer 3 | named release |
+| 4 | none | project secret | — | layer 3 | project default |
+| 5 | unmatched | — | yes | layer 1 | `403 origin_not_allowed` |
+| 6 | matched preview | **none** | yes | layer 3 | `403 pin_not_permitted` |
+| 7 | loopback (`sandbox`) | — | yes | layer 3 | named release |
+
 ## What promotion becomes
 
 ADR 035's promise is that "the exact artifact that was tried is the one that
@@ -924,6 +1324,191 @@ depends on.
 - **Resolution is explainable.** `zitadel env` prints each value, its source, and
   the files consulted in order. "Which `.env` did it pick" is the question this
   design will generate most often.
+
+## The CLI, end to end
+
+How the CLI manages what used to be environments. Transcripts are illustrative,
+not a committed surface.
+
+### `zitadel status` — what is running where
+
+Replaces "list the environments and what each one serves". The targets are the
+project default and the origin rows, so the command needs no concept of an
+environment to show them.
+
+```
+$ zitadel status
+server   https://api.zitadel.cloud          (ZITADEL_API_BASE)
+project  prj_01K9AA9M3K7E2QX8VB4T  acme     (.zitadel/secret)
+class    production
+
+local    sha256:9f2c1a7b  (3 files changed since the last release)
+
+TARGET                                  SERVING         DEPLOYED          EXPIRES
+(default)                               sha256:4a5b6c7d  10-02 09:30
+https://app.acme.com                    sha256:4a5b6c7d  10-02 09:30
+https://www.acme.com                    sha256:4a5b6c7d  10-02 09:30
+https://acme-git-sso-acmeinc.vercel.app sha256:9f2c1a7b  10-02 14:10      in 6d
+
+  local differs from (default) — run `zitadel deploy` to ship it
+```
+
+Drift is one comparison: hash the working copy, compare to what each target
+serves. That is honest in a way `zitadel plan` could not be, because the thing
+being compared is an identifier for exactly the bytes.
+
+### `zitadel deploy` — move the production targets
+
+```
+$ zitadel deploy -m "add phone_number to human-user"
+building    3 changed resources
+release     sha256:9f2c1a7b  (new)
+
+deploying to 3 targets
+  (default)                 sha256:4a5b6c7d -> sha256:9f2c1a7b
+  https://app.acme.com      sha256:4a5b6c7d -> sha256:9f2c1a7b
+  https://www.acme.com      sha256:4a5b6c7d -> sha256:9f2c1a7b
+
+  removes: idps/okta   (present in the current release, absent locally)
+
+continue? [y/N] y
+deployed    dpl_01KB3F8N2P9S5WQY   4 deployment records written
+```
+
+One `deploy_id`, one row per target plus one for the default. The removal
+confirmation is ADR 035's rule unchanged; what changed is that the comparison is
+per target rather than per environment.
+
+### `zitadel deploy --origin` — a preview
+
+```
+$ zitadel deploy --origin https://acme-git-sso-acmeinc.vercel.app --ttl 7d
+building    3 changed resources
+release     sha256:9f2c1a7b  (exists, reusing)
+
+origin      https://acme-git-sso-acmeinc.vercel.app
+            matches https://*-acmeinc.vercel.app (preview)  ✓
+            created, expires 2026-10-09T14:10:00Z
+
+deployed    dep_01KB3F8N2P9S5WQZ
+```
+
+This is the whole of what `zitadel preview --name feat-sso` used to be, minus the
+name. Re-running it on the next push to the branch renews `expires_at` and moves
+the origin's pointer, so the preview URL is stable across pushes — the property
+#1311 needed idempotent-create-renews-TTL for, obtained here because the URL is
+the key.
+
+Note `release sha256:9f2c1a7b (exists, reusing)`: content-hash dedup means
+deploying the same content to a second target creates no second release. That is
+also how CI asserts a promotion.
+
+In CI the origin comes from the platform:
+
+```yaml
+- run: zitadel deploy --origin "https://$VERCEL_BRANCH_URL" --ttl 7d
+```
+
+### `zitadel origins` — the inventory
+
+```
+$ zitadel origins list
+ORIGIN                                   KIND     SERVING         EXPIRES
+https://app.acme.com                     primary  sha256:4a5b6c7d  —
+https://www.acme.com                     primary  sha256:4a5b6c7d  —
+https://acme-git-sso-acmeinc.vercel.app  preview  sha256:9f2c1a7b  in 6d
+
+$ zitadel origins rm https://acme-git-sso-acmeinc.vercel.app
+removed. 1 deployment record kept.
+```
+
+"1 deployment record kept" is rule 2 of
+[deployment history](#deployment-history) made visible: removing the routing row
+does not remove the audit trail.
+
+The allowlist is a different command because it is a different kind of thing —
+patterns are authored in `zitadel.json` and synced, not managed imperatively:
+
+```
+$ zitadel allowlist
+PATTERN                           KIND
+https://app.acme.com              primary
+https://www.acme.com              primary
+https://*-acmeinc.vercel.app      preview   tenant-anchored on `-acmeinc` ✓
+https://*.preview.acme.com        preview   domain verified ✓
+```
+
+### `zitadel rollback` — per target
+
+```
+$ zitadel rollback --origin https://app.acme.com
+HISTORY for https://app.acme.com
+  1  sha256:9f2c1a7b  10-02 14:52  deploy    (current)
+  2  sha256:4a5b6c7d  10-02 09:30  rollback
+  3  sha256:c3f7a8b2  10-01 17:02  deploy
+
+roll back to? [2] 2
+deployed    dep_01KB9X2M4P7S  reason=rollback  release=sha256:4a5b6c7d
+```
+
+The history list is the log query from
+[deployment history](#deployment-history), unfiltered by anything but the origin.
+Rollback appends; nothing is mutated, so rolling back and forward leaves a
+readable trail rather than a pointer that has been overwritten twice.
+
+### `zitadel dev` — the inner loop
+
+```
+$ zitadel dev
+watching .zitadel/
+server   http://localhost:8080  (local)
+project  prj_01KDEV…            class=sandbox
+app      http://project-a.localhost:3000
+
+14:22:01  flows/login.json changed
+14:22:01  release sha256:c3f7a8b2 (new, not activated)
+14:22:01  runtime document updated — reload to see it
+```
+
+Two things to notice. **Nothing is activated** — the project's pointer is
+untouched, so a colleague on the same sandbox project is unaffected; see
+[the invariant](#the-invariant-this-establishes). And the hostname is
+`project-a.localhost`, not a bare port, so two projects on one machine do not
+[share a WebAuthn RP ID](#the-other-variation-different-projects-same-localhost).
+
+### `zitadel env` — explain the resolution
+
+The command that exists because this design's most common support question will
+be "which `.env` did it pick".
+
+```
+$ zitadel env
+stage        production          VERCEL_ENV
+server       https://api.zit…   ZITADEL_API_BASE (process env)
+project      prj_01K9AA9M3K…    .env.production.local
+token        sk_proj_9f2H…      process env
+release      sha256:9f2c1a7b    (built from working copy, not yet deployed)
+
+consulted, in order:
+  --server/--project flags      (not set)
+  process env                   server, token
+  .env.production.local         project
+  .env.local                    (not present)
+  .env.production               (no relevant keys)
+  .env                          (no relevant keys)
+  zitadel.json                  (superseded)
+  .zitadel/secret               (superseded)
+```
+
+### What no longer exists
+
+| Was | Now |
+|---|---|
+| `zitadel environments list` | `zitadel status`, `zitadel origins list` |
+| `zitadel preview --name feat-sso` | `zitadel deploy --origin <url>` |
+| `zitadel promote dev staging` | `zitadel deploy` against the other target, asserting the digest is unchanged |
+| `--environment production` | stage detection, local only, never sent |
+| `zitadel plan` / `apply` | `zitadel status` / `deploy` (ADR 035 already) |
 
 ## SDK changes
 
