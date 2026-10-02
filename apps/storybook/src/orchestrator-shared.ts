@@ -8,7 +8,7 @@ import {
 } from "@zitadel/api-mock";
 import { html } from "lit";
 import { mswLoader } from "msw-storybook-addon";
-import "@zitadel/components";
+import { LOGIN_PREVIEW_STATES, type LoginPreviewState } from "@zitadel/components";
 import { brandingPresets, type BrandingPresetId } from "./branding-presets.js";
 
 /**
@@ -41,6 +41,7 @@ export interface OrchestratorArgs {
   branding: BrandingPresetId;
   theme: "" | "light" | "dark" | "auto";
   sso: boolean;
+  previewState: "" | LoginPreviewState;
 }
 
 export const mock = setupMockHandlers();
@@ -72,7 +73,7 @@ export const orchestratorBase = {
     layout: "fullscreen",
     msw: { handlers: mock.handlers },
   },
-  args: { purpose: "login", branding: "centered", theme: "", sso: false },
+  args: { purpose: "login", branding: "centered", theme: "", sso: false, previewState: "" },
   argTypes: {
     purpose: {
       control: "inline-radio",
@@ -95,6 +96,12 @@ export const orchestratorBase = {
       description:
         "Offer identity providers on the steps a sign-in can start from, as a project that ran `zitadel sso enable` has.",
     },
+    previewState: {
+      control: "select",
+      options: ["", ...LOGIN_PREVIEW_STATES],
+      description:
+        "Preview mode: show the served step in a state and submit nothing. Empty runs the flow for real.",
+    },
   },
   beforeEach: ({ args }) => {
     mock.reset();
@@ -103,8 +110,13 @@ export const orchestratorBase = {
     clearSsoProviders();
     if (args.sso) applySsoProviders(SSO_PROVIDERS);
   },
-  render: ({ purpose, theme }) =>
-    html`<zitadel-login variant="page" .purpose=${purpose} theme=${theme}></zitadel-login>`,
+  render: ({ purpose, theme, previewState }) =>
+    html`<zitadel-login
+      variant="page"
+      .purpose=${purpose}
+      theme=${theme}
+      preview-state=${previewState}
+    ></zitadel-login>`,
 } satisfies Omit<Meta<OrchestratorArgs>, "title">;
 
 /**

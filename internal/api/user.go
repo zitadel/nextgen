@@ -304,10 +304,9 @@ func (h *Handler) SetUserPassword(ctx context.Context, req *api.SetUserPasswordR
 		return nil, err
 	}
 	err = h.userService.SetPassword(ctx, service.SetPasswordInput{
-		ProjectID:                projectID,
-		UserID:                   string(params.UserID),
-		Password:                 req.Password,
-		IsPasswordChangeRequired: req.IsChangeRequired.Value,
+		ProjectID: projectID,
+		UserID:    string(params.UserID),
+		Password:  req.Password,
 	})
 	if err != nil {
 		return nil, err

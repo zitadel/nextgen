@@ -16,6 +16,8 @@ const PrefixUserPassword ResourcePrefix = "upw"
 // [NormalizePassword].
 const MaxPasswordLength = 64
 
+const UserPasswordHistoryDepth = 4
+
 func ErrUserPasswordInvalid() Error {
 	return newError("user.password_invalid", "The password provided is invalid.", nil, nil)
 }
@@ -54,17 +56,11 @@ func HashPassword(password string, hasher crypto.Hasher) (string, error) {
 }
 
 type UserPassword struct {
-	ID                  string
-	ProjectID           string
-	UserID              string
-	EncodedHash         string
-	ChangeRequired      bool
-	ChangedAt           time.Time
-	VerificationID      *string
-	LastSuccessfulCheck *time.Time
-	FailedAttempts      int16
-	CreatedAt           time.Time
-	UpdatedAt           time.Time
+	ID          string
+	ProjectID   string
+	UserID      string
+	EncodedHash string
+	CreatedAt   time.Time
 }
 
 func (u *UserPassword) Verify(password string, verifier crypto.HashVerifier) error {
@@ -76,15 +72,13 @@ func (u *UserPassword) Verify(password string, verifier crypto.HashVerifier) err
 }
 
 type SetUserPassword struct {
-	// ID is the password row id. Dialects mint on create and overwrite with the
-	// persisted id on upsert (RETURNING / equivalent) so emitters can set
+	// ID is the new password row's id, minted by the dialect when empty. Every
+	// set adds a row, so each password gets its own id, which emitters use as
 	// entity_id / factor_id.
-	ID             string
-	ProjectID      string
-	UserID         string
-	EncodedHash    string
-	ChangeRequired bool
-	VerificationID *string
+	ID          string
+	ProjectID   string
+	UserID      string
+	EncodedHash string
 }
 
 // UserPasswordField enumerates the fields of UserPassword which can be used for
@@ -97,11 +91,5 @@ const (
 	UserPasswordFieldProjectID
 	UserPasswordFieldUserID
 	UserPasswordFieldEncodedHash
-	UserPasswordFieldChangeRequired
-	UserPasswordFieldChangedAt
-	UserPasswordFieldVerificationID
-	UserPasswordFieldLastSuccessfulCheck
-	UserPasswordFieldFailedAttempts
 	UserPasswordFieldCreatedAt
-	UserPasswordFieldUpdatedAt
 )
