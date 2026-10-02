@@ -127,11 +127,13 @@ A spec body contains a fixture call, a command, and matchers — nothing else:
 
   The first group says what the command does when the server it is pointed at
   cannot serve the request: one that answers but is not a Zitadel API, and one
-  that is down. Most fail. The ones that only read or write the project carry
-  on deliberately — `plan`, `doctor`, `status`, `stop`, `reset`, `eject`,
-  `branding eject`, `resources` and `sso enable` — which is worth stating
-  rather than leaving to be discovered. That list rots: each spec's own first
-  group is the record, not this sentence. The `--json` and rendered groups
+  that is down. Most fail. Some carry on deliberately, for one of two reasons:
+  they never needed the server — `resources` describes the command surface,
+  `stop`, `reset` and `eject` act on the machine — or they reach it and
+  tolerate the failure, as `plan` does for its old-state fetch, `sso enable`
+  for publishing the credentials, and `doctor` and `status` for their probes.
+  Either way it is worth stating rather than leaving to be discovered, and each
+  spec's own first group is the record, not this sentence. The `--json` and rendered groups
   never interleave, and a command with no human-rendered output has no second
   one.
 

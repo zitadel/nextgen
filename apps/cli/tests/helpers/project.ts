@@ -222,6 +222,21 @@ export class ScaffoldedApp {
     );
   }
 
+  /** `sso enable` without `--json`, for a spec asserting what the developer reads. */
+  enableSsoRendered(provider: string, credentials: Credentials): Promise<CliResult> {
+    return this.pipingStdin(credentials.secret, () =>
+      this.cli([
+        "sso",
+        "enable",
+        "--non-interactive",
+        "--provider",
+        provider,
+        "--client-id",
+        credentials.clientId,
+      ]),
+    );
+  }
+
   enableSso(provider: string, credentials: Credentials): Promise<CliResult> {
     return this.pipingSecret(credentials.secret, () =>
       this.cli([

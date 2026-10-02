@@ -187,5 +187,24 @@ describe("sso enable", () => {
         });
       });
     });
+
+    describe("rendered for a terminal", () => {
+      it("says which provider it enabled, and for which schema", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.enableSsoRendered(GOOGLE, CREDENTIALS);
+
+        expect(result).toSucceed();
+        expect(result).toPrint("Enabled Google for default-human-user");
+      });
+
+      it("renders text rather than a json envelope", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.enableSsoRendered(GOOGLE, CREDENTIALS);
+
+        expect(result).toPrintNoJson();
+      });
+    });
   });
 });
