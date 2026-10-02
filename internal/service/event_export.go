@@ -16,7 +16,10 @@ type EventExportAdapter struct {
 	Pool *DB
 }
 
-func (a EventExportAdapter) ListProjectIDs(ctx context.Context) ([]string, error) {
+func (a EventExportAdapter) ListProjectIDs(ctx context.Context) (_ []string, err error) {
+	ctx, end := startSpan(ctx, "EventExportAdapter.ListProjectIDs")
+	defer end(&err)
+
 	return collectProjectIDs(ctx, a.Pool.Statements().ListProjects)
 }
 
@@ -56,7 +59,10 @@ func collectProjectIDs(
 
 // ListClaimedProjectIDs returns project IDs that have completed claim
 // (active owning-team grant, ADR 054 §2), matching ADR 049 export visibility.
-func (a EventExportAdapter) ListClaimedProjectIDs(ctx context.Context) ([]string, error) {
+func (a EventExportAdapter) ListClaimedProjectIDs(ctx context.Context) (_ []string, err error) {
+	ctx, end := startSpan(ctx, "EventExportAdapter.ListClaimedProjectIDs")
+	defer end(&err)
+
 	var (
 		after string
 		all   []string
@@ -74,28 +80,46 @@ func (a EventExportAdapter) ListClaimedProjectIDs(ctx context.Context) ([]string
 	}
 }
 
-func (a EventExportAdapter) DeleteEventsOlderThan(ctx context.Context, createdBefore time.Time) (int64, error) {
+func (a EventExportAdapter) DeleteEventsOlderThan(ctx context.Context, createdBefore time.Time) (_ int64, err error) {
+	ctx, end := startSpan(ctx, "EventExportAdapter.DeleteEventsOlderThan")
+	defer end(&err)
+
 	return a.Pool.Statements().DeleteEventsOlderThan(ctx, createdBefore)
 }
 
-func (a EventExportAdapter) EnsureSink(ctx context.Context, sink *domain.EventSink) error {
+func (a EventExportAdapter) EnsureSink(ctx context.Context, sink *domain.EventSink) (err error) {
+	ctx, end := startSpan(ctx, "EventExportAdapter.EnsureSink")
+	defer end(&err)
+
 	return a.Pool.Statements().EnsureEventSink(ctx, sink)
 }
 
-func (a EventExportAdapter) GetEventSinkCursor(ctx context.Context, sinkID, projectID string) (*domain.EventSinkCursor, error) {
+func (a EventExportAdapter) GetEventSinkCursor(ctx context.Context, sinkID, projectID string) (_ *domain.EventSinkCursor, err error) {
+	ctx, end := startSpan(ctx, "EventExportAdapter.GetEventSinkCursor")
+	defer end(&err)
+
 	return a.Pool.Statements().GetEventSinkCursor(ctx, sinkID, projectID)
 }
 
-func (a EventExportAdapter) UpsertEventSinkCursor(ctx context.Context, cursor *domain.EventSinkCursor) error {
+func (a EventExportAdapter) UpsertEventSinkCursor(ctx context.Context, cursor *domain.EventSinkCursor) (err error) {
+	ctx, end := startSpan(ctx, "EventExportAdapter.UpsertEventSinkCursor")
+	defer end(&err)
+
 	return a.Pool.Statements().UpsertEventSinkCursor(ctx, cursor)
 }
 
-func (a EventExportAdapter) ListEventsAfterCursor(ctx context.Context, projectID string, afterCreatedAt time.Time, afterID string, limit int) ([]*domain.Event, error) {
+func (a EventExportAdapter) ListEventsAfterCursor(ctx context.Context, projectID string, afterCreatedAt time.Time, afterID string, limit int) (_ []*domain.Event, err error) {
+	ctx, end := startSpan(ctx, "EventExportAdapter.ListEventsAfterCursor")
+	defer end(&err)
+
 	return a.Pool.Statements().ListEventsAfterCursor(ctx, projectID, afterCreatedAt, afterID, uint32(limit))
 }
 
 // InsertEvents persists a Path A batch in one transaction.
-func (a EventExportAdapter) InsertEvents(ctx context.Context, events []*domain.Event) error {
+func (a EventExportAdapter) InsertEvents(ctx context.Context, events []*domain.Event) (err error) {
+	ctx, end := startSpan(ctx, "EventExportAdapter.InsertEvents")
+	defer end(&err)
+
 	if len(events) == 0 {
 		return nil
 	}

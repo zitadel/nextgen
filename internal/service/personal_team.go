@@ -54,7 +54,10 @@ func NewPersonalTeamService(
 	}
 }
 
-func (s *personalTeamService) EnsurePersonalTeam(ctx context.Context, projectID, userID string) error {
+func (s *personalTeamService) EnsurePersonalTeam(ctx context.Context, projectID, userID string) (err error) {
+	ctx, end := startSpan(ctx, "PersonalTeamService.EnsurePersonalTeam")
+	defer end(&err)
+
 	// Teams-on-registration is a platform-plane concept: every registration in
 	// every customer project passes through the same funnel, and none of those
 	// may mint teams. A silent no-op, not an error — off-platform callers are
