@@ -857,6 +857,15 @@ async function ssoFromFlags(
  * a flag here silently changes what the retry scaffolds.
  */
 type SetupRetryOptions = {
+  /**
+   * The directory setup was pointed at, when it was not the shell's own.
+   * Named in the guidance rather than passed as `--cwd` in the command text:
+   * a path can carry spaces and metacharacters, and nothing escapes a
+   * suggested command for a shell -- the same reason the client id is not
+   * interpolated either. Prose the developer reads, not an argument a shell
+   * splits.
+   */
+  cwd?: string;
   framework?: string;
   preset?: SetupPreset;
   useCase?: SetupUseCase;
@@ -928,6 +937,7 @@ function setupRetryFlags(opts: SetupRetryOptions): string {
  * — TTY/JSON-inferred non-interactivity re-infers itself on the retry.
  */
 function retryOptionsFromFlags(flags: {
+  cwd?: string;
   framework?: string;
   preset?: string;
   "use-case"?: string;
@@ -941,6 +951,7 @@ function retryOptionsFromFlags(flags: {
     framework: flags.framework,
     preset: flags.preset as SetupPreset | undefined,
     useCase: flags["use-case"] as SetupUseCase | undefined,
+    cwd: flags.cwd,
     renderer: flags.renderer,
     devPort: flags["dev-port"],
     nonInteractive: Boolean(flags["non-interactive"]),
@@ -987,6 +998,13 @@ function ssoCredentialPublisher(
  * failed project creation -- and the second was missed when this was written
  * inline, which is exactly the kind of thing one copy prevents.
  */
+function runFromHint(retry: SetupRetryOptions): string {
+  if (retry.cwd === undefined || retry.cwd === process.cwd()) {
+    return "";
+  }
+  return `Run these from ${retry.cwd}, which is the project they configure. `;
+}
+
 function ssoRecovery(
   retry: SetupRetryOptions,
   cliVersion: string,
@@ -1050,7 +1068,7 @@ async function createProjectWithLocalHint(
       hint:
         `${normalized.hint ? `${normalized.hint} ` : ""}` +
         "If you meant to use a local Zitadel server, start it first " +
-        `and retry setup with ${retryFlags}. ${sso.hint}`.trimEnd(),
+        `and retry setup with ${retryFlags}. ${runFromHint(retry)}${sso.hint}`.trimEnd(),
       nextCommands: [
         publicCliCommand("start", cliVersion),
         publicCliCommand(`setup ${retryFlags}`, cliVersion),
@@ -1082,6 +1100,7 @@ function localSetupHint(error: unknown, retry: SetupRetryOptions, cliVersion: st
     hint:
       `${normalized.hint ? `${normalized.hint} ` : ""}` +
       "Start local Zitadel first, then rerun setup. " +
+      runFromHint(retry) +
       (retry.sso && retry.sso.length > 0
         ? "The rerun asks for the client id and secret, because a command carries neither. " +
           "To script it instead, add --sso-client-id and --non-interactive, and pipe the secret in. "

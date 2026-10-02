@@ -171,6 +171,34 @@ describe("setup command pre-flight", () => {
     expect(json.hint).toContain("--sso-client-id");
   });
 
+  // Recovery commands configure the project setup was pointed at, not the
+  // shell's own directory, and they carry no `--cwd` -- a path can hold spaces
+  // and metacharacters, and nothing escapes a suggested command for a shell.
+  // So the guidance names the directory instead.
+  it("names the project directory when it is not the shell's own", async () => {
+    const cwd = await makeTempDir();
+    await writeFile(join(cwd, "package.json"), JSON.stringify({ dependencies: { next: "^15" } }));
+    await writeRuntimeMetadata(cwd, runtimeFor(cwd, "http://localhost:9"));
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--framework",
+      "next",
+      "--server",
+      "local",
+      "--json",
+    ]);
+
+    const json = parseJson(res.stdout) as { hint?: string; next_commands?: string[] };
+    expect(json.hint).toContain(cwd);
+    // Named in prose, never as an argument a shell would split.
+    for (const command of json.next_commands ?? []) {
+      expect(command).not.toContain("--cwd");
+    }
+  });
+
   // The suggested retry carries `--sso` without `--sso-client-id`, since the id
   // is never put in command text. Following that retry and hitting the same
   // failure again must not drop the provider from the next suggestion -- the
