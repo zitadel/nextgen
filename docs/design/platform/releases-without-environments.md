@@ -655,11 +655,16 @@ rather than a consequence:
 
 | Shape | Projects | Trade |
 |---|---|---|
-| Two | dev (`sandbox`), production (`production`, with `preview` origins) | Fewest moving parts. Previews see real users and real variables, and cannot do passkey unless on your own domain. |
-| Three | dev, preview, production (all previews on the `sandbox` preview project) | Previews are isolated from real users, get their own IdP clients, and can register their own passkeys. Costs a project and a set of variables. |
+| Two | dev (`sandbox`), production (`production`, with `preview` origins) | Fewest moving parts. Previews get their own IdP client through [pattern-scoped variables](#variables), and share real users. No passkey unless the preview is on your own domain. |
+| Three | dev, preview, production (previews on the `sandbox` preview project) | Previews are isolated from real users and can register their own passkeys. Costs a project. |
 
 Both are supported; neither is seeded. That is the difference from environments,
 where the set and its names were decided for the developer at project creation.
+
+Note what is *not* a reason to choose three any more: a preview needing its own
+OAuth client is served by [variables scoped to the preview
+pattern](#variables), on the production project. The remaining reasons are user
+isolation and passkeys.
 
 ### Transitions
 
@@ -1223,27 +1228,100 @@ taken.
 
 ## Variables
 
-ADR 062 scopes a variable to `(project_id, environment_id)`, with the primary
-key `(name, project_id, environment_id)` and `environment_id = ''` already
-meaning the project. Dropping environments means: drop the column, drop the
-`environment_ref` generated column and its composite FK, drop the
-`environment_name` query parameter from the four operations. The `${{ NAME }}`
-format, the five rendering cases, the owner-exact read predicate
-(`internal/storage/variable/query.go:20-33`) and the no-inheritance rule are all
-untouched. **This is the cheapest part of the proposal** — the surviving
-behaviour is already the default path.
+A preview on a production project must be able to use a different IdP client than
+production does, **without being moved off that project.** Otherwise "previews
+are allowed on production projects" is true on paper and useless in practice:
+the first thing a preview needs is its own OAuth client, and if getting one means
+relocating to a `sandbox` project, the permission was never real.
 
-Per-stage credential separation does not disappear with the scope level, because
-a stage is a separate project: the staging project holds the staging Google
-client id, the production project holds the production one. The case ADR 062 was
-written for is served by projects rather than by a scope level.
+So the scope level ADR 062 put on the environment does not disappear — it moves
+onto the thing that replaced the environment.
 
-What is genuinely lost: a preview on the production project — now permitted, see
-[preview origins](#preview-origins-on-a-production-project) — shares that
-project's variables, so it cannot point at a different IdP client than production
-does. That is often exactly what you want from a preview, and when it is not, the
-preview moves to a `sandbox` project with its own variables. A client-side
-choice, which is the whole thesis.
+### The scope
+
+ADR 062 scopes a variable to `(project_id, environment_id)`, primary key
+`(name, project_id, environment_id)`, with `environment_id = ''` already meaning
+the project level — "an address of its own rather than a wildcard"
+(`internal/domain/variable.go:160-166`). The shape survives; the second column
+changes what it names:
+
+```
+(name, project_id, origin_pattern)      origin_pattern = '' means the project
+```
+
+Keyed on the **allowlist pattern**, not on an origin row and not on a release.
+
+| Candidate key | Why not |
+|---|---|
+| Release digest | A release is promoted unchanged. ADR 062 exists because values cannot live in one. |
+| Exact origin row | A preview origin is created per branch and collected after it expires. Setting `GITHUB_CLIENT_SECRET` on every new branch URL defeats the point of having a wildcard pattern at all. |
+| **Allowlist pattern** | Few, authored in `zitadel.json`, reviewed in a PR, stable across branches. Set the preview value once and every preview URL that matches picks it up. |
+
+### Resolution
+
+For each `${{ NAME }}`: the value scoped to the matching pattern if one exists,
+otherwise the project's, otherwise the placeholder is left as-is — which is
+already ADR 062's rule for a variable that does not exist. Where a request
+matches more than one pattern, the more specific wins: a literal beats a
+wildcard, the rule #1311 already used for picking an origin.
+
+```json
+// project level — what production uses
+{ "name": "GOOGLE_CLIENT_ID", "scope": "", "value": "prod-abc.apps.googleusercontent.com" }
+{ "name": "GOOGLE_CLIENT_SECRET", "scope": "", "secret": true }
+
+// overridden for every preview URL, set once
+{ "name": "GOOGLE_CLIENT_ID", "scope": "https://*-acmeinc.vercel.app",
+  "value": "preview-xyz.apps.googleusercontent.com" }
+{ "name": "GOOGLE_CLIENT_SECRET", "scope": "https://*-acmeinc.vercel.app", "secret": true }
+```
+
+A flow served at `acme-git-sso-acmeinc.vercel.app` resolves the preview client;
+the same release served at `app.acme.com` resolves the production one. **Same
+release, same project, different credentials** — which is exactly what ADR 062
+was written to make possible, now without an environment to hang it on.
+
+### This triggers ADR 062's own follow-up rather than contradicting it
+
+ADR 062 decided resolution is an **exact match** with no inheritance: "an owner
+reaches exactly what it entered itself: nothing is inherited from a broader
+owner, and nothing is visible from a narrower one". Two scope levels with
+override is inheritance, so that rule has to give.
+
+It was written to give. ADR 062 §Resolving variables says so directly: "Once more
+scope levels/values are allowed another model might be necessary here to allow
+for inheritance over multiple levels … This is out of scope however and will need
+attention once that usecase is needed." This is that usecase. Without override, a
+preview scope would have to redefine *every* variable rather than the two that
+differ, and nobody will maintain that.
+
+### Two consequences worth naming
+
+**Inheritance means a preview silently uses production credentials unless told
+otherwise.** That is the sensible default — "test my branch against the real
+configuration" is the common ask — but some teams will want the opposite. A
+pattern could mark named variables as non-inheritable, failing the flow closed
+rather than reaching for the production secret. Worth offering; not worth
+specifying here.
+
+**The allowlist stops being a JSON column and becomes a table.** Entries already
+carry a `kind` and a domain-verification state; now they own variables too. That
+is a row, not a string in an array, and the composite foreign key ADR 062 already
+builds with a generated column (`environment_ref`) works the same way against it.
+
+### The entity keeps trying to come back, and the answer keeps being the same
+
+This is the third time in this note that deleting the environment has produced
+something environment-shaped: an [origin row](#origins-the-allowlist-and-the-inventory)
+that holds a release pointer, a [project class](#project-class-and-origin-kinds)
+that gates origin shapes, and now a pattern that owns variables.
+
+The consistent answer is worth stating once: **what is being deleted is not the
+scope, it is the minted name.** A config scope keyed on a URL the developer
+already owns and already knows costs nothing to invent, nothing to keep in sync
+with a branch, and cannot be ambiguous at request time. A config scope keyed on
+`preview-feat-sso` costs all three. Every structure in this design that looks
+like an environment is keyed on the URL, and that is the whole difference.
 
 ## The CLI side: target resolution
 
@@ -1438,6 +1516,40 @@ https://*-acmeinc.vercel.app      preview   tenant-anchored on `-acmeinc` ✓
 https://*.preview.acme.com        preview   domain verified ✓
 ```
 
+### `zitadel variables` — scoped values
+
+```
+$ zitadel variables list
+NAME                  SCOPE                             VALUE
+GOOGLE_CLIENT_ID      (project)                         prod-abc.apps.googleu…
+GOOGLE_CLIENT_SECRET  (project)                         ********
+GOOGLE_CLIENT_ID      https://*-acmeinc.vercel.app      preview-xyz.apps.goog…
+GOOGLE_CLIENT_SECRET  https://*-acmeinc.vercel.app      ********
+SUPPORT_EMAIL         (project)                         help@acme.com
+
+$ zitadel variables set GOOGLE_CLIENT_ID preview-xyz.apps.googleusercontent.com \
+    --scope 'https://*-acmeinc.vercel.app'
+set for 1 scope. every preview URL matching that pattern now resolves it.
+```
+
+Set once against the pattern, not once per branch URL — that is the whole reason
+the scope is the pattern and not the origin row.
+
+```
+$ zitadel variables resolve --origin https://acme-git-sso-acmeinc.vercel.app
+matched https://*-acmeinc.vercel.app (preview)
+
+NAME                  VALUE                             FROM
+GOOGLE_CLIENT_ID      preview-xyz.apps.googleu…         pattern
+GOOGLE_CLIENT_SECRET  ********                          pattern
+SUPPORT_EMAIL         help@acme.com                     project (inherited)
+```
+
+`resolve` exists for the same reason `zitadel env` does: the moment there are two
+scope levels with override, "which value will this URL actually get" stops being
+answerable by reading the config, and an unanswerable question becomes a support
+ticket.
+
 ### `zitadel rollback` — per target
 
 ```
@@ -1534,7 +1646,9 @@ server-side app needs, not what every client needs.
 
 - **ADR 035 is amended substantially.** Environments and deployments as
   specified do not survive; releases do, nearly intact.
-- **ADR 062's scope section is amended** to drop the environment level.
+- **ADR 062's scope level is re-keyed, not dropped** — from the environment id to
+  the allowlist pattern — and its no-inheritance rule is replaced by override,
+  which is the follow-up ADR 062 itself named. See [Variables](#variables).
 - **ADR 036 is simplified:** "keys are issued per environment" becomes "per
   project", and allow-all origin lists are gated by
   [project class](#project-class-and-origin-kinds) rather than environment class.
@@ -1581,7 +1695,8 @@ server-side app needs, not what every client needs.
   resolver can lean on it.
 - **Promotion weakens** from artifact identity to hash equality, and only works
   at all with a content-equivalence hash.
-- **A preview shares its project's data and variables.** Already true under
+- **A preview on a production project shares that project's users and sessions**,
+  though not necessarily its variables. Already true between environments under
   #1308; worth restating because it is what a developer will be surprised by.
 - **Arbitrary release pinning by a browser caller rests on hash
   unguessability** — but only on `sandbox` projects, which is the point of the
