@@ -28,3 +28,8 @@ engine cannot start a sign-in with re-renders the step with
 `error.sso_unavailable`, which the orchestrator localizes. The orchestrator
 sends its page URL, with the flow id set in the `flow` query parameter, as
 `return_target` on an sso submission.
+
+When the orchestrator resumes a flow handle, from the `flow` query
+parameter or from `resume-flow-id`, and the flow no longer resolves, it
+starts a new flow instead of showing a startup error, with a console
+warning naming the handle.
