@@ -70,19 +70,6 @@ function emailToUserHandle(email: string): string {
  * Wrap a step shape in the standard {@link CreateFlow201} envelope.
  * All fixtures delegate to this helper so the session fields stay consistent.
  */
-/**
- * The identifier a password-only step hands back so the rendered form can
- * carry it beside the password and a manager saves the two as one credential.
- * Mirrors the engine: present only when an identifier was collected earlier,
- * and always the `username` token.
- */
-function pairedIdentifier(
-  input: StepFixtureInput,
-): CreateFlow201Step["identifier"] | undefined {
-  if (!input.capturedEmail) return undefined;
-  return { value: input.capturedEmail, autocomplete: "username" };
-}
-
 function wrap(
   input: StepFixtureInput,
   step: CreateFlow201Step,
@@ -95,6 +82,19 @@ function wrap(
     step,
     ...extras,
   };
+}
+
+/**
+ * The identifier a password-only step hands back so the rendered form can
+ * carry it beside the password and a manager saves the two as one credential.
+ * Mirrors the engine: present only when an identifier was collected earlier,
+ * and always the `username` token.
+ */
+function pairedIdentifier(
+  input: StepFixtureInput,
+): CreateFlow201Step["identifier"] | undefined {
+  if (!input.capturedEmail) return undefined;
+  return { value: input.capturedEmail, autocomplete: "username" };
 }
 
 /**
