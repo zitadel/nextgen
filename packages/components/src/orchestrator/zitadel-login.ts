@@ -594,6 +594,10 @@ export class ZitadelLogin extends ZitadelSurface {
    * rather than `display:none` or `type="hidden"` keeps a manager able to see
    * it. It lives here and not in the template because the sanitiser drops a
    * raw `<input>` from template output, so ejected templates get it for free.
+   *
+   * `value` is the attribute, not a `.value` property binding: a manager
+   * reading the markup has to find the address there, and the control is
+   * readonly and untabbable, so it can never go dirty and drift from it.
    */
   private renderPairedIdentifier() {
     const identifier = this.response?.step.identifier;
@@ -605,7 +609,7 @@ export class ZitadelLogin extends ZitadelSurface {
       tabindex="-1"
       aria-hidden="true"
       autocomplete=${identifier.autocomplete}
-      .value=${identifier.value}
+      value=${identifier.value}
       style="position:absolute;width:1px;height:1px;margin:-1px;padding:0;border:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap"
     />`;
   }

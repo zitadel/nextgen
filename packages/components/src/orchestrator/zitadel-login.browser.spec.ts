@@ -614,6 +614,9 @@ describe("<zitadel-login> paired identifier (chromium)", () => {
 
     expect(paired).toBeTruthy();
     expect(paired?.value).toBe("alice@example.com");
+    // As an attribute, not just a property: a manager reading the markup has
+    // to find the address there. A `.value` binding leaves it absent.
+    expect(paired?.getAttribute("value")).toBe("alice@example.com");
     expect(paired?.readOnly).toBe(true);
     // No name: a nameless control is left out of every submission, which is
     // what keeps it from reaching the engine as a field the step never declared.
@@ -651,7 +654,7 @@ describe("<zitadel-login> paired identifier (chromium)", () => {
     const paired = element.shadowRoot
       ?.querySelector("form")
       ?.querySelector<HTMLInputElement>('input[autocomplete="username"]');
-    expect(paired?.value).toBe("alice@example.com");
+    expect(paired?.getAttribute("value")).toBe("alice@example.com");
   });
 
   it("disappears when back lands on a step that collects the identifier itself", async () => {
@@ -701,7 +704,7 @@ describe("<zitadel-login> paired identifier (chromium)", () => {
       const paired = element.shadowRoot?.querySelector<HTMLInputElement>(
         'input[autocomplete="username"]',
       );
-      return paired?.value === "bob@example.com" ? paired : null;
+      return paired?.getAttribute("value") === "bob@example.com" ? paired : null;
     });
   });
 
