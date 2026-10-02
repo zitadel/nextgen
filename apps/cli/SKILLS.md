@@ -27,6 +27,16 @@ parse the result rather than scraping human output.
   the CLI's HTTP `User-Agent`.
 - See `README.md` (its commands section is generated from the CLI's own
   metadata) or run `zitadel <command> --help` for the full per-command flag list.
+- Flags follow the conventions a model already expects from curl, ssh and wget:
+  `--help`/`-h`, `--version`, `-v`/`--verbose`, kebab-case long flags, both
+  `--flag value` and `--flag=value`, and `--no-telemetry`-style negation. `-v`
+  is the short form of `--verbose` on every product command (the built-in oclif
+  utilities such as `version` and `which` have their own smaller flag surface —
+  the per-command `--help` above is authoritative). Two deliberate deviations
+  worth knowing: `-n` is `--non-interactive`
+  (not `--dry-run`, which is long-only), and machine output is `--json` (not
+  `--output json`). These are the agent-critical flags, so they keep the
+  spellings agents reach for most.
 
 ```sh
 npx @zitadel/cli@alpha <command> --non-interactive --json

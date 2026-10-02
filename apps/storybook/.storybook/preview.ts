@@ -1,6 +1,7 @@
 import { configureZitadel } from "@zitadel/api/config";
 import type { Preview } from "@storybook/web-components-vite";
 import { html } from "lit";
+import { keyed } from "lit/directives/keyed.js";
 import { initialize } from "msw-storybook-addon";
 
 // Dev-only: make custom-element registration idempotent. The `<zl-*>` atoms run
@@ -55,7 +56,25 @@ const preview: Preview = {
   // (rather than only styling `body.sb-show-main`) means the addon-vitest a11y
   // run sees the intended background, so contrast checks pass. Orchestrator
   // stories use `layout: "fullscreen"` and paint their own branding surface.
-  decorators: [(story) => html`<div class="sb-canvas">${story()}</div>`],
+  // Key the story subtree so lit-html tears the DOM down and rebuilds it rather
+  // than reusing it across renders. The mock-backed stories hold a stateful
+  // custom element (`<zitadel-login>` / `<zitadel-session>`); without a fresh
+  // element, a flow driven to its terminal "signed-in" step leaks into the next
+  // render -- the next story renders blank, or a knob change silently does
+  // nothing -- until a full reload.
+  //
+  // MSW is orchestrator-only here, so `parameters.msw` marks exactly the
+  // stateful stories (not matched by title, which is brittle). Those key on the
+  // args too, so they also remount when a knob changes, not only when switching
+  // stories. Atoms are stateless and key on the story id alone.
+  decorators: [
+    (story, context) => {
+      const key = context.parameters?.msw
+        ? `${context.id}:${JSON.stringify(context.args)}`
+        : context.id;
+      return html`${keyed(key, html`<div class="sb-canvas">${story()}</div>`)}`;
+    },
+  ],
 };
 
 export default preview;

@@ -57238,9 +57238,6 @@ func (*SetUserPasswordNotFound) setUserPasswordRes() {}
 type SetUserPasswordRequest struct {
 	// The new password for the user.
 	Password string `json:"password"`
-	// Whether the user is required to change their password on the next login.
-	// If not provided, it will default to false.
-	IsChangeRequired OptBool `json:"is_change_required"`
 }
 
 // GetPassword returns the value of Password.
@@ -57248,19 +57245,9 @@ func (s *SetUserPasswordRequest) GetPassword() string {
 	return s.Password
 }
 
-// GetIsChangeRequired returns the value of IsChangeRequired.
-func (s *SetUserPasswordRequest) GetIsChangeRequired() OptBool {
-	return s.IsChangeRequired
-}
-
 // SetPassword sets the value of Password.
 func (s *SetUserPasswordRequest) SetPassword(val string) {
 	s.Password = val
-}
-
-// SetIsChangeRequired sets the value of IsChangeRequired.
-func (s *SetUserPasswordRequest) SetIsChangeRequired(val OptBool) {
-	s.IsChangeRequired = val
 }
 
 // Ref: #
