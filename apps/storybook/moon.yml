@@ -36,8 +36,9 @@ tasks:
       - "design-tokens:build"
     outputs:
       - "dist/**/*"
-    options:
-      runInCI: false
+    # Runs in CI: the Vercel deploy builds the static site from this task, and
+    # Vercel is a CI environment, so a `runInCI: false` here would make moon
+    # report "no tasks found" for `storybook:build` and fail the deploy.
 
   # Installs the Chromium that @storybook/addon-vitest drives. Mirrors the
   # journey e2e pattern (browsers aren't preinstalled on CI runners).
