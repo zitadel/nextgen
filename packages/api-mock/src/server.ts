@@ -30,7 +30,7 @@
  *   GET    /flow_definitions          — list flow definitions
  *   GET    /flow_definitions/:id      — get flow definition
  */
-import { randomBytes, randomUUID } from "node:crypto";
+import { createHmac, randomBytes, randomUUID } from "node:crypto";
 import { type Server } from "node:http";
 
 import { createMiddleware } from "@mswjs/http-middleware";
@@ -82,11 +82,15 @@ const DEMO_DISPLAY_NAMES = new Map<string, string>([
 ]);
 const sessionStore = new Map<string, StoredSession>();
 /**
- * Each session's CSRF token (ADR 053 §5), served by GET /sessions/me/csrf and
- * checked on claim/complete. The Go server derives it from the cookie; any
- * unguessable per-session value is the same contract to a client.
+ * A session's CSRF token (ADR 053 §5), served by GET /sessions/me/csrf and
+ * checked on claim/complete. Derived from the session cookie exactly as the Go
+ * server's CSRFToken does (HMAC-SHA256 keyed by the cookie over a fixed label,
+ * unpadded base64url), so there is no per-session state to keep in step with
+ * the session store.
  */
-const csrfTokens = new Map<string, string>();
+export function csrfTokenFor(sessionToken: string): string {
+  return createHmac("sha256", sessionToken).update("zitadel-csrf-v1").digest("base64url");
+}
 
 /**
  * Generates an opaque session token (random hex, not a JWT).
@@ -280,7 +284,6 @@ export function createMockApp(options: { issuer: string }): express.Express {
         },
       };
       sessionStore.set(opaqueToken, sessionData);
-      csrfTokens.set(opaqueToken, randomBytes(24).toString("base64url"));
 
       const setCookie = [
         `__nextgen_session=${opaqueToken}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${SESSION_TTL_SECONDS}`,
@@ -338,7 +341,6 @@ export function createMockApp(options: { issuer: string }): express.Express {
     // Check expiry
     if (new Date(session.expires_at) < new Date()) {
       sessionStore.delete(token);
-      csrfTokens.delete(token);
       res.status(401).json(errorBody("unauthenticated", "session expired"));
       return;
     }
@@ -352,12 +354,11 @@ export function createMockApp(options: { issuer: string }): express.Express {
     res.setHeader("Cache-Control", "private, no-store");
     const token = (req.cookies as Record<string, string>).__nextgen_session;
     const session = token ? sessionStore.get(token) : undefined;
-    const csrf = token ? csrfTokens.get(token) : undefined;
-    if (!token || !session || !csrf || new Date(session.expires_at) < new Date()) {
+    if (!token || !session || new Date(session.expires_at) < new Date()) {
       res.status(401).json(errorBody("auth.unauthorized", "Missing or invalid session token."));
       return;
     }
-    res.json({ csrf_token: csrf });
+    res.json({ csrf_token: csrfTokenFor(token) });
   });
 
   // DELETE /sessions/me — revoke the current session (logout). Mirrors the
@@ -375,12 +376,10 @@ export function createMockApp(options: { issuer: string }): express.Express {
     }
     if (new Date(session.expires_at) < new Date()) {
       sessionStore.delete(token);
-      csrfTokens.delete(token);
       res.status(409).json(errorBody("session_revoked", "session already revoked or expired"));
       return;
     }
     sessionStore.delete(token);
-    csrfTokens.delete(token);
     res.setHeader("Set-Cookie", [
       `__nextgen_session=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
       `__nextgen_display=; Path=/; SameSite=Lax; Max-Age=0`,
@@ -406,7 +405,7 @@ export function createMockApp(options: { issuer: string }): express.Express {
       // ADR 053 §5: a cookie-authenticated write carries the session's CSRF
       // token. Checked after the credential and before eligibility, in the
       // same order as the Go server's security handler.
-      if (req.get("x-zitadel-csrf") !== csrfTokens.get(token)) {
+      if (req.get("x-zitadel-csrf") !== csrfTokenFor(token)) {
         res
           .status(403)
           .json(
@@ -449,7 +448,6 @@ export function createMockApp(options: { issuer: string }): express.Express {
     const token = (req.cookies as Record<string, string>).__nextgen_session;
     if (token) {
       sessionStore.delete(token);
-      csrfTokens.delete(token);
     }
     res.setHeader("Set-Cookie", [
       `__nextgen_session=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
