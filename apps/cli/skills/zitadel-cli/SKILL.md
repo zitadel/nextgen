@@ -25,8 +25,9 @@ parse the result rather than scraping human output.
   `ZITADEL_TELEMETRY=0` / `DO_NOT_TRACK=1` (per environment); this also skips the
   small end-of-command network flush and drops the `ci/` and `host/` tokens from
   the CLI's HTTP `User-Agent`.
-- See `README.md` (its commands section is generated from the CLI's own
-  metadata) or run `zitadel <command> --help` for the full per-command flag list.
+- See [`references/commands.md`](references/commands.md) for the per-command
+  detail, or run `zitadel <command> --help` for the authoritative per-command
+  flag list.
 - Flags follow the conventions a model already expects from curl, ssh and wget:
   `--help`/`-h`, `--version`, `-v`/`--verbose`, kebab-case long flags, both
   `--flag value` and `--flag=value`, and `--no-telemetry`-style negation. `-v`

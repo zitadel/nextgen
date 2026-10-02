@@ -8,7 +8,7 @@
 
 `apps/cli/skills/zitadel-cli/SKILL.md` is the canonical CLI agent guidance. The CLI package does
 not ship multiple tool-specific mirrors; agents and humans should point to
-`SKILLS.md`.
+`SKILL.md`.
 
 Agents should call `zitadel <command> --non-interactive --json`, parse the JSON envelope, and prefer `next_commands` over prose hints.
 

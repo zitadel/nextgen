@@ -60,7 +60,7 @@ over reading `--help` per command. It contacts no server.
   `data.next_commands` pointing at the matching `get`. `--dry-run` emits
   `{ dry_run: true, verb, topic, body }` without calling the platform.
 - The destructive verb (`delete`, `revoke`, `deactivate`) requires `--force` in non-interactive mode (declared per command, so its help says what it permits)
-  (the error's `next_commands` carries the exact retry) and report what the API
+  (the error's `next_commands` carries the exact retry) and reports what the API
   did: `{ id, deleted: true }` for users and grants, `{ id, revoked: true }` for
   sessions, and `{ id, deactivated: true }` for teams, whose DELETE deactivates
   the team and leaves it readable (ADR 024). Read the property that accompanies
