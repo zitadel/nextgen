@@ -101,7 +101,12 @@ post:
           schema:
             $ref: ../../../components/flows/flow-response.yaml
     '409':
-      description: Version conflict — flow was advanced by another request.
+      description: |
+        Conflict. Either the flow session moved on under another request
+        (`flow.session_conflict`), or the submission is an sso start on an
+        attempt that was already handed off (`att.already_handed_off`). Only
+        a client that kept the flow cookie past the terminal response reaches
+        the second case.
       content:
         application/json:
           schema:
