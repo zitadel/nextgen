@@ -211,7 +211,8 @@ export class ZitadelLogin extends ZitadelSurface {
    * Existing flow handle to resume rather than start a new flow. When set,
    * the orchestrator hits `GET /flow/{id}` instead of `POST /flow` on
    * mount, so a page reload after a network blip can re-render the same
-   * step without losing collected state.
+   * step without losing collected state. A handle that no longer resolves
+   * starts a new flow instead, with a console warning.
    *
    * Leaving it empty falls back to the `flow` query parameter, which is how a
    * provider callback hands the flow back (see {@link flowIdFromLocation}), so
@@ -612,11 +613,23 @@ export class ZitadelLogin extends ZitadelSurface {
       // `handleTransportError` (rendered as `startupError`) rather than as an
       // unhandled promise rejection from `firstUpdated`'s microtask.
       const { project: cfg, api } = resolveApi(this.project, this.projectAttrs, "<zitadel-login>");
-      let wire: CreateFlow201;
+      let wire: CreateFlow201 | undefined;
       const resumeId = this.resumeFlowId || flowIdFromLocation();
       if (resumeId) {
-        wire = await getCurrentStep(api, resumeId);
-      } else {
+        try {
+          wire = await getCurrentStep(api, resumeId);
+        } catch (error) {
+          // A handle can outlive its flow: the cookie window closed during
+          // the external sign-in (404) or the flow finished in another tab
+          // (410). This is still the sign-in page, and a startup error
+          // would leave it with no way forward, so start over. Logged so a
+          // host passing a wrong handle does not get a silent restart.
+          const gone = error instanceof ApiError && (error.status === 404 || error.status === 410);
+          if (!gone) throw error;
+          console.warn(`[zitadel-login] flow ${resumeId} no longer resolves; starting a new flow.`);
+        }
+      }
+      if (!wire) {
         if (!cfg.projectId) {
           throw new Error(
             "<zitadel-login> requires a project id (the `project-id` attribute, " +

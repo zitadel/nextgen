@@ -97,8 +97,9 @@ The `state` record serves as the server-side, single-use anchor for the attempt:
   time spent on the step; a lingering cookie is inert, the record holds only
   the hash of its nonce.
   `_zflow` is re-sealed on the redirect response like on every other, so its
-  ten-minute window restarts at the submission; a return after it gets
-  `flow.cookie_expired` while the record is still valid.
+  ten-minute window restarts at the submission; a return after it finds the
+  flow cookie expired while the record is still valid, and the orchestrator
+  starts a new flow when the id in its URL no longer resolves.
 - **One origin:** the API and the page share an origin. The binding cookie
   is set on the API origin and the callback route and `redirect_uri` are
   built from the page origin; the `Strict` flow cookie already requires the
