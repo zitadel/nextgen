@@ -805,6 +805,44 @@ func (m *MockFlowSSOIdentityService) EXPECT() *MockFlowSSOIdentityServiceMockRec
 	return m.recorder
 }
 
+// BindCollision mocks base method.
+func (m *MockFlowSSOIdentityService) BindCollision(ctx context.Context, in domain.FlowSSOBindInput) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "BindCollision", ctx, in)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// BindCollision indicates an expected call of BindCollision.
+func (mr *MockFlowSSOIdentityServiceMockRecorder) BindCollision(ctx, in any) *MockFlowSSOIdentityServiceBindCollisionCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BindCollision", reflect.TypeOf((*MockFlowSSOIdentityService)(nil).BindCollision), ctx, in)
+	return &MockFlowSSOIdentityServiceBindCollisionCall{Call: call}
+}
+
+// MockFlowSSOIdentityServiceBindCollisionCall wrap *gomock.Call
+type MockFlowSSOIdentityServiceBindCollisionCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockFlowSSOIdentityServiceBindCollisionCall) Return(arg0 error) *MockFlowSSOIdentityServiceBindCollisionCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockFlowSSOIdentityServiceBindCollisionCall) Do(f func(context.Context, domain.FlowSSOBindInput) error) *MockFlowSSOIdentityServiceBindCollisionCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockFlowSSOIdentityServiceBindCollisionCall) DoAndReturn(f func(context.Context, domain.FlowSSOBindInput) error) *MockFlowSSOIdentityServiceBindCollisionCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // BindLinked mocks base method.
 func (m *MockFlowSSOIdentityService) BindLinked(ctx context.Context, in domain.FlowSSOBindInput) error {
 	m.ctrl.T.Helper()
@@ -878,6 +916,45 @@ func (c *MockFlowSSOIdentityServiceCreateLinkedCall) Do(f func(context.Context, 
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockFlowSSOIdentityServiceCreateLinkedCall) DoAndReturn(f func(context.Context, domain.FlowSSOCreateInput) (string, error)) *MockFlowSSOIdentityServiceCreateLinkedCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// FindUniqueOwner mocks base method.
+func (m *MockFlowSSOIdentityService) FindUniqueOwner(ctx context.Context, projectID, attribute, value string) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FindUniqueOwner", ctx, projectID, attribute, value)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// FindUniqueOwner indicates an expected call of FindUniqueOwner.
+func (mr *MockFlowSSOIdentityServiceMockRecorder) FindUniqueOwner(ctx, projectID, attribute, value any) *MockFlowSSOIdentityServiceFindUniqueOwnerCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindUniqueOwner", reflect.TypeOf((*MockFlowSSOIdentityService)(nil).FindUniqueOwner), ctx, projectID, attribute, value)
+	return &MockFlowSSOIdentityServiceFindUniqueOwnerCall{Call: call}
+}
+
+// MockFlowSSOIdentityServiceFindUniqueOwnerCall wrap *gomock.Call
+type MockFlowSSOIdentityServiceFindUniqueOwnerCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockFlowSSOIdentityServiceFindUniqueOwnerCall) Return(userID string, err error) *MockFlowSSOIdentityServiceFindUniqueOwnerCall {
+	c.Call = c.Call.Return(userID, err)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockFlowSSOIdentityServiceFindUniqueOwnerCall) Do(f func(context.Context, string, string, string) (string, error)) *MockFlowSSOIdentityServiceFindUniqueOwnerCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockFlowSSOIdentityServiceFindUniqueOwnerCall) DoAndReturn(f func(context.Context, string, string, string) (string, error)) *MockFlowSSOIdentityServiceFindUniqueOwnerCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

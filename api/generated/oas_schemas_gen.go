@@ -15869,6 +15869,7 @@ type Event struct {
 	FlowdefDeletedEvent            FlowdefDeletedEvent
 	FlowdefUpdatedEvent            FlowdefUpdatedEvent
 	IdpCreatedEvent                IdpCreatedEvent
+	IdpIdentityLinkCreatedEvent    IdpIdentityLinkCreatedEvent
 	IdpUpdatedEvent                IdpUpdatedEvent
 	ProjectCreatedEvent            ProjectCreatedEvent
 	ProjectDeletedEvent            ProjectDeletedEvent
@@ -15909,6 +15910,7 @@ const (
 	FlowdefDeletedEventEvent            EventType = "flowdef.deleted"
 	FlowdefUpdatedEventEvent            EventType = "flowdef.updated"
 	IdpCreatedEventEvent                EventType = "idp.created"
+	IdpIdentityLinkCreatedEventEvent    EventType = "idp.identity_link.created"
 	IdpUpdatedEventEvent                EventType = "idp.updated"
 	ProjectCreatedEventEvent            EventType = "project.created"
 	ProjectDeletedEventEvent            EventType = "project.deleted"
@@ -15979,6 +15981,11 @@ func (s Event) IsFlowdefUpdatedEvent() bool { return s.Type == FlowdefUpdatedEve
 
 // IsIdpCreatedEvent reports whether Event is IdpCreatedEvent.
 func (s Event) IsIdpCreatedEvent() bool { return s.Type == IdpCreatedEventEvent }
+
+// IsIdpIdentityLinkCreatedEvent reports whether Event is IdpIdentityLinkCreatedEvent.
+func (s Event) IsIdpIdentityLinkCreatedEvent() bool {
+	return s.Type == IdpIdentityLinkCreatedEventEvent
+}
 
 // IsIdpUpdatedEvent reports whether Event is IdpUpdatedEvent.
 func (s Event) IsIdpUpdatedEvent() bool { return s.Type == IdpUpdatedEventEvent }
@@ -16382,6 +16389,27 @@ func (s Event) GetIdpCreatedEvent() (v IdpCreatedEvent, ok bool) {
 func NewIdpCreatedEventEvent(v IdpCreatedEvent) Event {
 	var s Event
 	s.SetIdpCreatedEvent(v)
+	return s
+}
+
+// SetIdpIdentityLinkCreatedEvent sets Event to IdpIdentityLinkCreatedEvent.
+func (s *Event) SetIdpIdentityLinkCreatedEvent(v IdpIdentityLinkCreatedEvent) {
+	s.Type = IdpIdentityLinkCreatedEventEvent
+	s.IdpIdentityLinkCreatedEvent = v
+}
+
+// GetIdpIdentityLinkCreatedEvent returns IdpIdentityLinkCreatedEvent and true boolean if Event is IdpIdentityLinkCreatedEvent.
+func (s Event) GetIdpIdentityLinkCreatedEvent() (v IdpIdentityLinkCreatedEvent, ok bool) {
+	if !s.IsIdpIdentityLinkCreatedEvent() {
+		return v, false
+	}
+	return s.IdpIdentityLinkCreatedEvent, true
+}
+
+// NewIdpIdentityLinkCreatedEventEvent returns new Event from IdpIdentityLinkCreatedEvent.
+func NewIdpIdentityLinkCreatedEventEvent(v IdpIdentityLinkCreatedEvent) Event {
+	var s Event
+	s.SetIdpIdentityLinkCreatedEvent(v)
 	return s
 }
 
@@ -23555,6 +23583,8 @@ type GetFlowStepErrorResponse struct {
 	TknInvalid              TknInvalid
 	ReqInvalid              ReqInvalid
 	EncKeyUnknownAlg        EncKeyUnknownAlg
+	UserAlreadyExists       UserAlreadyExists
+	UserInvalid             UserInvalid
 }
 
 // GetFlowStepErrorResponseType is oneOf type of GetFlowStepErrorResponse.
@@ -23589,6 +23619,8 @@ const (
 	TknInvalidGetFlowStepErrorResponse              GetFlowStepErrorResponseType = "tkn.invalid"
 	ReqInvalidGetFlowStepErrorResponse              GetFlowStepErrorResponseType = "req.invalid"
 	EncKeyUnknownAlgGetFlowStepErrorResponse        GetFlowStepErrorResponseType = "enc_key.unknown_alg"
+	UserAlreadyExistsGetFlowStepErrorResponse       GetFlowStepErrorResponseType = "user.already_exists"
+	UserInvalidGetFlowStepErrorResponse             GetFlowStepErrorResponseType = "user.invalid"
 )
 
 // IsAttAlreadyHandedOff reports whether GetFlowStepErrorResponse is AttAlreadyHandedOff.
@@ -23724,6 +23756,16 @@ func (s GetFlowStepErrorResponse) IsReqInvalid() bool {
 // IsEncKeyUnknownAlg reports whether GetFlowStepErrorResponse is EncKeyUnknownAlg.
 func (s GetFlowStepErrorResponse) IsEncKeyUnknownAlg() bool {
 	return s.Type == EncKeyUnknownAlgGetFlowStepErrorResponse
+}
+
+// IsUserAlreadyExists reports whether GetFlowStepErrorResponse is UserAlreadyExists.
+func (s GetFlowStepErrorResponse) IsUserAlreadyExists() bool {
+	return s.Type == UserAlreadyExistsGetFlowStepErrorResponse
+}
+
+// IsUserInvalid reports whether GetFlowStepErrorResponse is UserInvalid.
+func (s GetFlowStepErrorResponse) IsUserInvalid() bool {
+	return s.Type == UserInvalidGetFlowStepErrorResponse
 }
 
 // SetAttAlreadyHandedOff sets GetFlowStepErrorResponse to AttAlreadyHandedOff.
@@ -24290,6 +24332,48 @@ func (s GetFlowStepErrorResponse) GetEncKeyUnknownAlg() (v EncKeyUnknownAlg, ok 
 func NewEncKeyUnknownAlgGetFlowStepErrorResponse(v EncKeyUnknownAlg) GetFlowStepErrorResponse {
 	var s GetFlowStepErrorResponse
 	s.SetEncKeyUnknownAlg(v)
+	return s
+}
+
+// SetUserAlreadyExists sets GetFlowStepErrorResponse to UserAlreadyExists.
+func (s *GetFlowStepErrorResponse) SetUserAlreadyExists(v UserAlreadyExists) {
+	s.Type = UserAlreadyExistsGetFlowStepErrorResponse
+	s.UserAlreadyExists = v
+}
+
+// GetUserAlreadyExists returns UserAlreadyExists and true boolean if GetFlowStepErrorResponse is UserAlreadyExists.
+func (s GetFlowStepErrorResponse) GetUserAlreadyExists() (v UserAlreadyExists, ok bool) {
+	if !s.IsUserAlreadyExists() {
+		return v, false
+	}
+	return s.UserAlreadyExists, true
+}
+
+// NewUserAlreadyExistsGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from UserAlreadyExists.
+func NewUserAlreadyExistsGetFlowStepErrorResponse(v UserAlreadyExists) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetUserAlreadyExists(v)
+	return s
+}
+
+// SetUserInvalid sets GetFlowStepErrorResponse to UserInvalid.
+func (s *GetFlowStepErrorResponse) SetUserInvalid(v UserInvalid) {
+	s.Type = UserInvalidGetFlowStepErrorResponse
+	s.UserInvalid = v
+}
+
+// GetUserInvalid returns UserInvalid and true boolean if GetFlowStepErrorResponse is UserInvalid.
+func (s GetFlowStepErrorResponse) GetUserInvalid() (v UserInvalid, ok bool) {
+	if !s.IsUserInvalid() {
+		return v, false
+	}
+	return s.UserInvalid, true
+}
+
+// NewUserInvalidGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from UserInvalid.
+func NewUserInvalidGetFlowStepErrorResponse(v UserInvalid) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetUserInvalid(v)
 	return s
 }
 
@@ -29081,6 +29165,482 @@ func (s *IdpFilterField) UnmarshalText(data []byte) error {
 	default:
 		return errors.Errorf("invalid value: %q", data)
 	}
+}
+
+// Merged schema.
+// Ref: #
+type IdpIdentityLinkCreatedEvent struct {
+	// Managed event id (`evt_<opaque>`).
+	ID        string    `json:"id"`
+	ProjectID ProjectID `json:"project_id"`
+	// Emit-time team scope, when the actor operated under a team.
+	TeamID OptNilString `json:"team_id"`
+	// Merged property.
+	EventType string `json:"event_type"`
+	// Wide-event category.
+	Category IdpIdentityLinkCreatedEventCategory `json:"category"`
+	// When the action happened (server/storage clock, dialect-owned).
+	OccurredAt time.Time `json:"occurred_at"`
+	// When the row was inserted (server/storage clock, dialect-owned).
+	CreatedAt time.Time `json:"created_at"`
+	// Who triggered the event.
+	ActorID OptNilString `json:"actor_id"`
+	// Actor kind.
+	ActorType OptNilIdpIdentityLinkCreatedEventActorType `json:"actor_type"`
+	// Resource type affected.
+	EntityType OptNilString `json:"entity_type"`
+	// Resource id affected.
+	EntityID OptNilString `json:"entity_id"`
+	// Application or agent that produced the event.
+	ClientID string `json:"client_id"`
+	// Token id present at emit time, when any.
+	TokenID OptString `json:"token_id"`
+	// Delegation kind (omit when unset).
+	DelegationType OptIdpIdentityLinkCreatedEventDelegationType `json:"delegation_type"`
+	DelegationID   OptString                                    `json:"delegation_id"`
+	Grantor        OptString                                    `json:"grantor"`
+	// Device fingerprint correlation id.
+	Fingerprint OptString `json:"fingerprint"`
+	// HTTP request correlation id.
+	RequestID OptNilString `json:"request_id"`
+	// Session correlation id.
+	SessionID OptNilString `json:"session_id"`
+	// Login flow correlation id.
+	FlowID   OptNilString                  `json:"flow_id"`
+	Metadata OptEventMetadata              `json:"metadata"`
+	Payload  IdpIdentityLinkCreatedPayload `json:"payload"`
+}
+
+// GetID returns the value of ID.
+func (s *IdpIdentityLinkCreatedEvent) GetID() string {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *IdpIdentityLinkCreatedEvent) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *IdpIdentityLinkCreatedEvent) GetTeamID() OptNilString {
+	return s.TeamID
+}
+
+// GetEventType returns the value of EventType.
+func (s *IdpIdentityLinkCreatedEvent) GetEventType() string {
+	return s.EventType
+}
+
+// GetCategory returns the value of Category.
+func (s *IdpIdentityLinkCreatedEvent) GetCategory() IdpIdentityLinkCreatedEventCategory {
+	return s.Category
+}
+
+// GetOccurredAt returns the value of OccurredAt.
+func (s *IdpIdentityLinkCreatedEvent) GetOccurredAt() time.Time {
+	return s.OccurredAt
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *IdpIdentityLinkCreatedEvent) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetActorID returns the value of ActorID.
+func (s *IdpIdentityLinkCreatedEvent) GetActorID() OptNilString {
+	return s.ActorID
+}
+
+// GetActorType returns the value of ActorType.
+func (s *IdpIdentityLinkCreatedEvent) GetActorType() OptNilIdpIdentityLinkCreatedEventActorType {
+	return s.ActorType
+}
+
+// GetEntityType returns the value of EntityType.
+func (s *IdpIdentityLinkCreatedEvent) GetEntityType() OptNilString {
+	return s.EntityType
+}
+
+// GetEntityID returns the value of EntityID.
+func (s *IdpIdentityLinkCreatedEvent) GetEntityID() OptNilString {
+	return s.EntityID
+}
+
+// GetClientID returns the value of ClientID.
+func (s *IdpIdentityLinkCreatedEvent) GetClientID() string {
+	return s.ClientID
+}
+
+// GetTokenID returns the value of TokenID.
+func (s *IdpIdentityLinkCreatedEvent) GetTokenID() OptString {
+	return s.TokenID
+}
+
+// GetDelegationType returns the value of DelegationType.
+func (s *IdpIdentityLinkCreatedEvent) GetDelegationType() OptIdpIdentityLinkCreatedEventDelegationType {
+	return s.DelegationType
+}
+
+// GetDelegationID returns the value of DelegationID.
+func (s *IdpIdentityLinkCreatedEvent) GetDelegationID() OptString {
+	return s.DelegationID
+}
+
+// GetGrantor returns the value of Grantor.
+func (s *IdpIdentityLinkCreatedEvent) GetGrantor() OptString {
+	return s.Grantor
+}
+
+// GetFingerprint returns the value of Fingerprint.
+func (s *IdpIdentityLinkCreatedEvent) GetFingerprint() OptString {
+	return s.Fingerprint
+}
+
+// GetRequestID returns the value of RequestID.
+func (s *IdpIdentityLinkCreatedEvent) GetRequestID() OptNilString {
+	return s.RequestID
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *IdpIdentityLinkCreatedEvent) GetSessionID() OptNilString {
+	return s.SessionID
+}
+
+// GetFlowID returns the value of FlowID.
+func (s *IdpIdentityLinkCreatedEvent) GetFlowID() OptNilString {
+	return s.FlowID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *IdpIdentityLinkCreatedEvent) GetMetadata() OptEventMetadata {
+	return s.Metadata
+}
+
+// GetPayload returns the value of Payload.
+func (s *IdpIdentityLinkCreatedEvent) GetPayload() IdpIdentityLinkCreatedPayload {
+	return s.Payload
+}
+
+// SetID sets the value of ID.
+func (s *IdpIdentityLinkCreatedEvent) SetID(val string) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *IdpIdentityLinkCreatedEvent) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *IdpIdentityLinkCreatedEvent) SetTeamID(val OptNilString) {
+	s.TeamID = val
+}
+
+// SetEventType sets the value of EventType.
+func (s *IdpIdentityLinkCreatedEvent) SetEventType(val string) {
+	s.EventType = val
+}
+
+// SetCategory sets the value of Category.
+func (s *IdpIdentityLinkCreatedEvent) SetCategory(val IdpIdentityLinkCreatedEventCategory) {
+	s.Category = val
+}
+
+// SetOccurredAt sets the value of OccurredAt.
+func (s *IdpIdentityLinkCreatedEvent) SetOccurredAt(val time.Time) {
+	s.OccurredAt = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *IdpIdentityLinkCreatedEvent) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetActorID sets the value of ActorID.
+func (s *IdpIdentityLinkCreatedEvent) SetActorID(val OptNilString) {
+	s.ActorID = val
+}
+
+// SetActorType sets the value of ActorType.
+func (s *IdpIdentityLinkCreatedEvent) SetActorType(val OptNilIdpIdentityLinkCreatedEventActorType) {
+	s.ActorType = val
+}
+
+// SetEntityType sets the value of EntityType.
+func (s *IdpIdentityLinkCreatedEvent) SetEntityType(val OptNilString) {
+	s.EntityType = val
+}
+
+// SetEntityID sets the value of EntityID.
+func (s *IdpIdentityLinkCreatedEvent) SetEntityID(val OptNilString) {
+	s.EntityID = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *IdpIdentityLinkCreatedEvent) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetTokenID sets the value of TokenID.
+func (s *IdpIdentityLinkCreatedEvent) SetTokenID(val OptString) {
+	s.TokenID = val
+}
+
+// SetDelegationType sets the value of DelegationType.
+func (s *IdpIdentityLinkCreatedEvent) SetDelegationType(val OptIdpIdentityLinkCreatedEventDelegationType) {
+	s.DelegationType = val
+}
+
+// SetDelegationID sets the value of DelegationID.
+func (s *IdpIdentityLinkCreatedEvent) SetDelegationID(val OptString) {
+	s.DelegationID = val
+}
+
+// SetGrantor sets the value of Grantor.
+func (s *IdpIdentityLinkCreatedEvent) SetGrantor(val OptString) {
+	s.Grantor = val
+}
+
+// SetFingerprint sets the value of Fingerprint.
+func (s *IdpIdentityLinkCreatedEvent) SetFingerprint(val OptString) {
+	s.Fingerprint = val
+}
+
+// SetRequestID sets the value of RequestID.
+func (s *IdpIdentityLinkCreatedEvent) SetRequestID(val OptNilString) {
+	s.RequestID = val
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *IdpIdentityLinkCreatedEvent) SetSessionID(val OptNilString) {
+	s.SessionID = val
+}
+
+// SetFlowID sets the value of FlowID.
+func (s *IdpIdentityLinkCreatedEvent) SetFlowID(val OptNilString) {
+	s.FlowID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *IdpIdentityLinkCreatedEvent) SetMetadata(val OptEventMetadata) {
+	s.Metadata = val
+}
+
+// SetPayload sets the value of Payload.
+func (s *IdpIdentityLinkCreatedEvent) SetPayload(val IdpIdentityLinkCreatedPayload) {
+	s.Payload = val
+}
+
+type IdpIdentityLinkCreatedEventActorType string
+
+const (
+	IdpIdentityLinkCreatedEventActorTypeHuman   IdpIdentityLinkCreatedEventActorType = "human"
+	IdpIdentityLinkCreatedEventActorTypeService IdpIdentityLinkCreatedEventActorType = "service"
+	IdpIdentityLinkCreatedEventActorTypeSystem  IdpIdentityLinkCreatedEventActorType = "system"
+	IdpIdentityLinkCreatedEventActorTypeAgent   IdpIdentityLinkCreatedEventActorType = "agent"
+)
+
+// AllValues returns all IdpIdentityLinkCreatedEventActorType values.
+func (IdpIdentityLinkCreatedEventActorType) AllValues() []IdpIdentityLinkCreatedEventActorType {
+	return []IdpIdentityLinkCreatedEventActorType{
+		IdpIdentityLinkCreatedEventActorTypeHuman,
+		IdpIdentityLinkCreatedEventActorTypeService,
+		IdpIdentityLinkCreatedEventActorTypeSystem,
+		IdpIdentityLinkCreatedEventActorTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s IdpIdentityLinkCreatedEventActorType) MarshalText() ([]byte, error) {
+	switch s {
+	case IdpIdentityLinkCreatedEventActorTypeHuman:
+		return []byte(s), nil
+	case IdpIdentityLinkCreatedEventActorTypeService:
+		return []byte(s), nil
+	case IdpIdentityLinkCreatedEventActorTypeSystem:
+		return []byte(s), nil
+	case IdpIdentityLinkCreatedEventActorTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *IdpIdentityLinkCreatedEventActorType) UnmarshalText(data []byte) error {
+	switch IdpIdentityLinkCreatedEventActorType(data) {
+	case IdpIdentityLinkCreatedEventActorTypeHuman:
+		*s = IdpIdentityLinkCreatedEventActorTypeHuman
+		return nil
+	case IdpIdentityLinkCreatedEventActorTypeService:
+		*s = IdpIdentityLinkCreatedEventActorTypeService
+		return nil
+	case IdpIdentityLinkCreatedEventActorTypeSystem:
+		*s = IdpIdentityLinkCreatedEventActorTypeSystem
+		return nil
+	case IdpIdentityLinkCreatedEventActorTypeAgent:
+		*s = IdpIdentityLinkCreatedEventActorTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Wide-event category.
+type IdpIdentityLinkCreatedEventCategory string
+
+const (
+	IdpIdentityLinkCreatedEventCategoryRequest IdpIdentityLinkCreatedEventCategory = "request"
+	IdpIdentityLinkCreatedEventCategoryAuth    IdpIdentityLinkCreatedEventCategory = "auth"
+	IdpIdentityLinkCreatedEventCategorySession IdpIdentityLinkCreatedEventCategory = "session"
+	IdpIdentityLinkCreatedEventCategoryAdmin   IdpIdentityLinkCreatedEventCategory = "admin"
+	IdpIdentityLinkCreatedEventCategoryEntity  IdpIdentityLinkCreatedEventCategory = "entity"
+	IdpIdentityLinkCreatedEventCategorySignal  IdpIdentityLinkCreatedEventCategory = "signal"
+)
+
+// AllValues returns all IdpIdentityLinkCreatedEventCategory values.
+func (IdpIdentityLinkCreatedEventCategory) AllValues() []IdpIdentityLinkCreatedEventCategory {
+	return []IdpIdentityLinkCreatedEventCategory{
+		IdpIdentityLinkCreatedEventCategoryRequest,
+		IdpIdentityLinkCreatedEventCategoryAuth,
+		IdpIdentityLinkCreatedEventCategorySession,
+		IdpIdentityLinkCreatedEventCategoryAdmin,
+		IdpIdentityLinkCreatedEventCategoryEntity,
+		IdpIdentityLinkCreatedEventCategorySignal,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s IdpIdentityLinkCreatedEventCategory) MarshalText() ([]byte, error) {
+	switch s {
+	case IdpIdentityLinkCreatedEventCategoryRequest:
+		return []byte(s), nil
+	case IdpIdentityLinkCreatedEventCategoryAuth:
+		return []byte(s), nil
+	case IdpIdentityLinkCreatedEventCategorySession:
+		return []byte(s), nil
+	case IdpIdentityLinkCreatedEventCategoryAdmin:
+		return []byte(s), nil
+	case IdpIdentityLinkCreatedEventCategoryEntity:
+		return []byte(s), nil
+	case IdpIdentityLinkCreatedEventCategorySignal:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *IdpIdentityLinkCreatedEventCategory) UnmarshalText(data []byte) error {
+	switch IdpIdentityLinkCreatedEventCategory(data) {
+	case IdpIdentityLinkCreatedEventCategoryRequest:
+		*s = IdpIdentityLinkCreatedEventCategoryRequest
+		return nil
+	case IdpIdentityLinkCreatedEventCategoryAuth:
+		*s = IdpIdentityLinkCreatedEventCategoryAuth
+		return nil
+	case IdpIdentityLinkCreatedEventCategorySession:
+		*s = IdpIdentityLinkCreatedEventCategorySession
+		return nil
+	case IdpIdentityLinkCreatedEventCategoryAdmin:
+		*s = IdpIdentityLinkCreatedEventCategoryAdmin
+		return nil
+	case IdpIdentityLinkCreatedEventCategoryEntity:
+		*s = IdpIdentityLinkCreatedEventCategoryEntity
+		return nil
+	case IdpIdentityLinkCreatedEventCategorySignal:
+		*s = IdpIdentityLinkCreatedEventCategorySignal
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Delegation kind (omit when unset).
+type IdpIdentityLinkCreatedEventDelegationType string
+
+const (
+	IdpIdentityLinkCreatedEventDelegationTypeDirect    IdpIdentityLinkCreatedEventDelegationType = "direct"
+	IdpIdentityLinkCreatedEventDelegationTypeDelegated IdpIdentityLinkCreatedEventDelegationType = "delegated"
+	IdpIdentityLinkCreatedEventDelegationTypePatShared IdpIdentityLinkCreatedEventDelegationType = "pat_shared"
+	IdpIdentityLinkCreatedEventDelegationTypeExchanged IdpIdentityLinkCreatedEventDelegationType = "exchanged"
+)
+
+// AllValues returns all IdpIdentityLinkCreatedEventDelegationType values.
+func (IdpIdentityLinkCreatedEventDelegationType) AllValues() []IdpIdentityLinkCreatedEventDelegationType {
+	return []IdpIdentityLinkCreatedEventDelegationType{
+		IdpIdentityLinkCreatedEventDelegationTypeDirect,
+		IdpIdentityLinkCreatedEventDelegationTypeDelegated,
+		IdpIdentityLinkCreatedEventDelegationTypePatShared,
+		IdpIdentityLinkCreatedEventDelegationTypeExchanged,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s IdpIdentityLinkCreatedEventDelegationType) MarshalText() ([]byte, error) {
+	switch s {
+	case IdpIdentityLinkCreatedEventDelegationTypeDirect:
+		return []byte(s), nil
+	case IdpIdentityLinkCreatedEventDelegationTypeDelegated:
+		return []byte(s), nil
+	case IdpIdentityLinkCreatedEventDelegationTypePatShared:
+		return []byte(s), nil
+	case IdpIdentityLinkCreatedEventDelegationTypeExchanged:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *IdpIdentityLinkCreatedEventDelegationType) UnmarshalText(data []byte) error {
+	switch IdpIdentityLinkCreatedEventDelegationType(data) {
+	case IdpIdentityLinkCreatedEventDelegationTypeDirect:
+		*s = IdpIdentityLinkCreatedEventDelegationTypeDirect
+		return nil
+	case IdpIdentityLinkCreatedEventDelegationTypeDelegated:
+		*s = IdpIdentityLinkCreatedEventDelegationTypeDelegated
+		return nil
+	case IdpIdentityLinkCreatedEventDelegationTypePatShared:
+		*s = IdpIdentityLinkCreatedEventDelegationTypePatShared
+		return nil
+	case IdpIdentityLinkCreatedEventDelegationTypeExchanged:
+		*s = IdpIdentityLinkCreatedEventDelegationTypeExchanged
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Snapshot for `idp.identity_link.created`, written when a sign-in creates a
+// user and links the provider account to it. The link id is the event's
+// `entity_id`. The provider's subject and claims are never included.
+// Ref: #
+type IdpIdentityLinkCreatedPayload struct {
+	// The IdP connection the account signed in through.
+	ConnectionID string `json:"connection_id"`
+	// The user the provider account is linked to.
+	UserID string `json:"user_id"`
+}
+
+// GetConnectionID returns the value of ConnectionID.
+func (s *IdpIdentityLinkCreatedPayload) GetConnectionID() string {
+	return s.ConnectionID
+}
+
+// GetUserID returns the value of UserID.
+func (s *IdpIdentityLinkCreatedPayload) GetUserID() string {
+	return s.UserID
+}
+
+// SetConnectionID sets the value of ConnectionID.
+func (s *IdpIdentityLinkCreatedPayload) SetConnectionID(val string) {
+	s.ConnectionID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *IdpIdentityLinkCreatedPayload) SetUserID(val string) {
+	s.UserID = val
 }
 
 // Merged schema.
@@ -38800,6 +39360,52 @@ func (o OptIdpFieldImmutableDetails) Or(d IdpFieldImmutableDetails) IdpFieldImmu
 	return d
 }
 
+// NewOptIdpIdentityLinkCreatedEventDelegationType returns new OptIdpIdentityLinkCreatedEventDelegationType with value set to v.
+func NewOptIdpIdentityLinkCreatedEventDelegationType(v IdpIdentityLinkCreatedEventDelegationType) OptIdpIdentityLinkCreatedEventDelegationType {
+	return OptIdpIdentityLinkCreatedEventDelegationType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptIdpIdentityLinkCreatedEventDelegationType is optional IdpIdentityLinkCreatedEventDelegationType.
+type OptIdpIdentityLinkCreatedEventDelegationType struct {
+	Value IdpIdentityLinkCreatedEventDelegationType
+	Set   bool
+}
+
+// IsSet returns true if OptIdpIdentityLinkCreatedEventDelegationType was set.
+func (o OptIdpIdentityLinkCreatedEventDelegationType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptIdpIdentityLinkCreatedEventDelegationType) Reset() {
+	var v IdpIdentityLinkCreatedEventDelegationType
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptIdpIdentityLinkCreatedEventDelegationType) SetTo(v IdpIdentityLinkCreatedEventDelegationType) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptIdpIdentityLinkCreatedEventDelegationType) Get() (v IdpIdentityLinkCreatedEventDelegationType, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptIdpIdentityLinkCreatedEventDelegationType) Or(d IdpIdentityLinkCreatedEventDelegationType) IdpIdentityLinkCreatedEventDelegationType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptIdpNotFoundDetails returns new OptIdpNotFoundDetails with value set to v.
 func NewOptIdpNotFoundDetails(v IdpNotFoundDetails) OptIdpNotFoundDetails {
 	return OptIdpNotFoundDetails{
@@ -41025,6 +41631,69 @@ func (o OptNilIdpCreatedEventActorType) Get() (v IdpCreatedEventActorType, ok bo
 
 // Or returns value if set, or given parameter if does not.
 func (o OptNilIdpCreatedEventActorType) Or(d IdpCreatedEventActorType) IdpCreatedEventActorType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilIdpIdentityLinkCreatedEventActorType returns new OptNilIdpIdentityLinkCreatedEventActorType with value set to v.
+func NewOptNilIdpIdentityLinkCreatedEventActorType(v IdpIdentityLinkCreatedEventActorType) OptNilIdpIdentityLinkCreatedEventActorType {
+	return OptNilIdpIdentityLinkCreatedEventActorType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilIdpIdentityLinkCreatedEventActorType is optional nullable IdpIdentityLinkCreatedEventActorType.
+type OptNilIdpIdentityLinkCreatedEventActorType struct {
+	Value IdpIdentityLinkCreatedEventActorType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilIdpIdentityLinkCreatedEventActorType was set.
+func (o OptNilIdpIdentityLinkCreatedEventActorType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilIdpIdentityLinkCreatedEventActorType) Reset() {
+	var v IdpIdentityLinkCreatedEventActorType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilIdpIdentityLinkCreatedEventActorType) SetTo(v IdpIdentityLinkCreatedEventActorType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilIdpIdentityLinkCreatedEventActorType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilIdpIdentityLinkCreatedEventActorType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v IdpIdentityLinkCreatedEventActorType
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilIdpIdentityLinkCreatedEventActorType) Get() (v IdpIdentityLinkCreatedEventActorType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilIdpIdentityLinkCreatedEventActorType) Or(d IdpIdentityLinkCreatedEventActorType) IdpIdentityLinkCreatedEventActorType {
 	if v, ok := o.Get(); ok {
 		return v
 	}
