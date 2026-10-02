@@ -473,6 +473,22 @@ function outcomeCard(outcome: ClaimOutcome, retry: () => void) {
           </Button>
         </StateCard>
       );
+    case "csrf_refused":
+      // The shared fetch has already re-read the session's token once, so a
+      // plain retry would be refused the same way. Reloading starts the page
+      // over with the session and token this browser actually holds now.
+      return (
+        <StateCard title="The claim was not accepted from this page">
+          <p className={BODY_TEXT}>{outcome.message}</p>
+          <p className={BODY_TEXT}>
+            Your sign-in may have changed in another tab. Reload this page, or reopen the claim link
+            from your terminal.
+          </p>
+          <Button onClick={() => window.location.reload()} variant="outline" className="mx-auto w-fit">
+            Reload
+          </Button>
+        </StateCard>
+      );
     case "error":
       return (
         <StateCard title="The claim did not complete">

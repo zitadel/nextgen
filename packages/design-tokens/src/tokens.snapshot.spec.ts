@@ -75,6 +75,7 @@ describe("design-tokens public surface", () => {
         "gradient.lavenderStart",
         "gradient.neutralStart",
         "gradient.purpleStart",
+        "gradient.red",
         "gradient.redStart",
         "gradient.roseStart",
         "motion.duration.base",

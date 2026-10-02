@@ -1,5 +1,5 @@
 import type { GetMySession200 } from "@zitadel/api/generated/model";
-import { setApiCsrfToken } from "@zitadel/api/runtime/auth";
+import { setApiCsrfToken, setApiCsrfTokenRefresher } from "@zitadel/api/runtime/auth";
 
 import { api } from "../api/zitadel";
 import { clearSessionCaches } from "../lib/session-cache";
@@ -55,23 +55,38 @@ export async function fetchSession(): Promise<ConsoleSession | null> {
   if (cachedSession && Date.now() - cachedSession.at < SESSION_CACHE_MS) {
     return cachedSession.session;
   }
+  // Every state-changing management call the cookie authenticates must carry
+  // the session's CSRF token (ADR 053 §5). It has its own resource, read
+  // alongside the session so it costs no extra round trip in sequence, but
+  // only the session decides whether someone is signed in: a failed token read
+  // leaves the token unset, and a write then re-reads it through the refresher.
+  const csrf = readCsrfToken().catch(() => undefined);
   try {
-    // Every state-changing management call the cookie authenticates must
-    // carry the session's CSRF token (ADR 053 §5); it has its own resource,
-    // read alongside the session so it costs no extra round trip in sequence.
-    const [session, csrf] = await Promise.all([
-      api.getMySession(withCredentials),
-      api.getMySessionCsrfToken(withCredentials),
-    ]);
+    const session = await api.getMySession(withCredentials);
     if (session.state !== "active" || !session.user_id) return null;
     cachedSession = { at: Date.now(), session };
     // The shared fetch adds it to every unsafe request from here on.
-    setApiCsrfToken(csrf.csrf_token);
+    setApiCsrfToken(await csrf);
     return session;
   } catch {
     return null;
   }
 }
+
+async function readCsrfToken(): Promise<string> {
+  return (await api.getMySessionCsrfToken(withCredentials)).csrf_token;
+}
+
+// The token is tied to the cookie, which another tab can replace by signing in
+// again. A write that answers 403 auth.csrf_invalid re-reads it once through
+// this; the cached session goes with it, since the new cookie may belong to
+// someone else, and the next navigation reads it afresh.
+setApiCsrfTokenRefresher(async () => {
+  cachedSession = null;
+  const token = await readCsrfToken();
+  setApiCsrfToken(token);
+  return token;
+});
 
 /**
  * Revokes the current session (`DELETE /sessions/me`). The server deletes the

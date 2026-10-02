@@ -358,8 +358,9 @@
         },
         "sso_providers": {
           "type": "array",
-          "description": "Slugs of the identity provider connections this step offers, in display\norder. Each names the `slug` of a connection under `.zitadel/idps/`; the\nconnection carries the display name and template, so a rename there\nreaches every step without editing the flow. The rendered step the client\nreceives carries the resolved `{id, name, template}` objects instead.\n",
+          "description": "Slugs of the identity provider connections this step offers, in display\norder. Each names the `slug` of a connection under `.zitadel/idps/`; the\nconnection carries the display name and template, so a rename there\nreaches every step without editing the flow. The rendered step the client\nreceives carries the resolved `{id, name, template}` objects instead. A\nstep offers at most 20 providers.\n",
           "uniqueItems": true,
+          "maxItems": 20,
           "items": {
             "type": "string",
             "pattern": "^[a-z0-9][a-z0-9_-]*$",

@@ -28,6 +28,7 @@ export interface DesignTokenOverrides {
   focus: FocusTokens;
   breakpoint: BreakpointTokens;
   container: ContainerTokens;
+  gradient: GradientTokens;
 }
 
 /**
@@ -121,6 +122,31 @@ export interface ContainerTokens {
   settings: string;
 }
 
+/** One stop of a composed gradient: which exported `gradient/*` colour, and where. */
+export interface GradientStop {
+  /** Kebab-case name of the exported colour, e.g. `red-start`. */
+  color: string;
+  /**
+   * Which mode's value to bake in. A Figma gradient style has fixed stops, so
+   * a stop that reads a themed colour must say which side it was drawn with.
+   */
+  mode: "dark" | "light";
+  /** Stop position, e.g. `17.263%`. */
+  at: string;
+}
+
+/**
+ * Gradients composed from the exported `gradient/*` colours. Figma publishes
+ * the colours as variables but keeps each gradient as a style, which the sync
+ * cannot read, so the angle and stop positions are recorded here until the
+ * design system publishes them as variables. Emitted as one
+ * `--zl-gradient-<name>` `linear-gradient()` value, the same in both modes,
+ * as the style is.
+ */
+export interface GradientTokens {
+  [name: string]: { angle: string; stops: readonly GradientStop[] };
+}
+
 export const overrides: DesignTokenOverrides = {
   colorRole: {
     // The frames give links no colour of their own — they take the surrounding
@@ -182,5 +208,16 @@ export const overrides: DesignTokenOverrides = {
     // 704px. The settings frames draw this column and the scale has no step
     // for it (`2xl` is 672, `3xl` is 768).
     settings: "44rem",
+  },
+  gradient: {
+    // The `Gradient/Red` style: red/start to base/end, with base/end at its
+    // dark value on both sides.
+    red: {
+      angle: "232.14deg",
+      stops: [
+        { color: "red-start", mode: "dark", at: "17.263%" },
+        { color: "base-end", mode: "dark", at: "74.94%" },
+      ],
+    },
   },
 };

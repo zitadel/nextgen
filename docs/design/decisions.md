@@ -16,6 +16,9 @@
 
 ## Decisions
 
+### D16 · Profile shows the account email only, read-only — 2026-09-30 · [standing]
+Claiming asks for nothing but an email address, and the email cannot be changed, so Settings → Profile is one disabled field with no Save. Name fields are not pulled in from the schema.
+
 ### D15 · Create uses a right-side drawer — 2026-07-31 · [standing]
 Adding a resource (e.g. a user) opens a drawer from the right — the shadcn/ui default interaction pattern. Fields relevant to the current context (e.g. team) are preselected.
 

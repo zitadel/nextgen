@@ -1156,6 +1156,49 @@ describe("api-mock idp connections and variables", () => {
     expect(body.GOOGLE_CLIENT_ID).toBe("824.apps.googleusercontent.com");
   });
 
+  test("reads and deletes one variable by name", async () => {
+    const projectId = await newProject("vars-by-name");
+    await fetch(`${BASE}/variables?project_id=${projectId}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ SESSION_TTL: { value: 900, secret: false } }),
+    });
+
+    const read = await fetch(`${BASE}/variables/SESSION_TTL?project_id=${projectId}`);
+    expect(read.status).toBe(200);
+    expect(await read.json()).toBe(900);
+
+    const removed = await fetch(`${BASE}/variables/SESSION_TTL?project_id=${projectId}`, {
+      method: "DELETE",
+    });
+    expect(removed.status).toBe(204);
+    expect((await fetch(`${BASE}/variables/SESSION_TTL?project_id=${projectId}`)).status).toBe(404);
+  });
+
+  test("answers var.not_found for a name this owner does not hold", async () => {
+    const projectId = await newProject("vars-missing");
+
+    const res = await fetch(`${BASE}/variables/ABSENT?project_id=${projectId}`);
+
+    expect(res.status).toBe(404);
+    expect(((await res.json()) as { code?: string }).code).toBe("var.not_found");
+  });
+
+  test.each([
+    ["a name the schema rejects", "bad-name"],
+    ["a name past the length cap", "N".repeat(256)],
+  ])("refuses %s rather than reporting it missing", async (_label, name) => {
+    // variable-name.yaml allows word characters up to 255, so an unusable name
+    // is a bad request: answering `var.not_found` would tell a caller the name
+    // is free when it could never be used.
+    const projectId = await newProject("vars-invalid-name");
+
+    for (const method of ["GET", "DELETE"]) {
+      const res = await fetch(`${BASE}/variables/${name}?project_id=${projectId}`, { method });
+      expect(res.status, `${method} ${name}`).toBe(400);
+    }
+  });
+
   test("never reads a secret's value back", async () => {
     // ADR 062 §7: a secret can be replaced but not read. Returning the value
     // here would make the encryption it stands for pointless.
