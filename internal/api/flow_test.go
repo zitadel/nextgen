@@ -75,6 +75,9 @@ func (stubAuthAttempt) GetByID(context.Context, string, string) (*domain.AuthAtt
 func (stubAuthAttempt) IssueChallenge(context.Context, service.IssueChallengeInput) (*domain.AuthAttempt, error) {
 	return nil, errors.New("stub auth attempt")
 }
+func (stubAuthAttempt) IssueSSOState(context.Context, service.IssueSSOStateInput) (*domain.SSOState, error) {
+	return nil, errors.New("stub auth attempt")
+}
 func (stubAuthAttempt) VerifyProof(context.Context, service.VerifyProofInput) (*domain.AuthAttempt, error) {
 	return nil, errors.New("stub auth attempt")
 }
@@ -101,12 +104,16 @@ var fixedKey = [32]byte{
 }
 
 type testServer struct {
-	srv     *httptest.Server
-	crypter crypto.Crypter
-	fake    *fakeFlowSvc
+	srv      *httptest.Server
+	crypter  crypto.Crypter
+	fake     *fakeFlowSvc
+	projects *mocks.MockProjectService
 }
 
-func newTestServer(t *testing.T) *testServer {
+// newTestServer serves the handler bare. Secure on a cookie follows the
+// effective request host, which only WithRequestHostMiddleware injects, so
+// a test that asserts the http loopback shape passes it as middleware.
+func newTestServer(t *testing.T, middleware ...func(http.Handler) http.Handler) *testServer {
 	t.Helper()
 
 	crypter := op.NewAES256GCMCrypto(fixedKey, "")
@@ -122,16 +129,23 @@ func newTestServer(t *testing.T) *testServer {
 	// release endpoint fails on an unexpected call instead of panicking on a
 	// nil interface.
 	releaseService := mocks.NewMockReleaseService(mock)
-	handler := api.NewHandler(fake, stubAuthAttempt{}, nil, nil, nil, nil, nil, nil, nil, nil, releaseService, nil, nil, nil, tokenService, keyService, nil, nil, nil, nil, "")
+	// The project service is read only when a submit carries an Origin, so
+	// a test that sends one sets its expectation.
+	projects := mocks.NewMockProjectService(mock)
+	handler := api.NewHandler(fake, stubAuthAttempt{}, nil, projects, nil, nil, nil, nil, nil, nil, releaseService, nil, nil, nil, tokenService, keyService, nil, nil, nil, nil, "")
 	oas, err := gen.NewServer(
 		handler,
 		api.NewSecurityHandler(tokenService),
 		gen.WithErrorHandler(api.OgenErrorHandler),
 	)
 	require.NoError(t, err)
-	srv := httptest.NewServer(oas)
+	var h http.Handler = oas
+	for _, mw := range middleware {
+		h = mw(h)
+	}
+	srv := httptest.NewServer(h)
 	t.Cleanup(srv.Close)
-	return &testServer{srv: srv, crypter: crypter, fake: fake}
+	return &testServer{srv: srv, crypter: crypter, fake: fake, projects: projects}
 }
 
 // sealCookie matches what the handler emits, so tests can skip CreateFlow.
@@ -146,6 +160,11 @@ func (ts *testServer) sealCookie(t *testing.T, state *domain.FlowState) string {
 
 func doRequest(t *testing.T, method, url string, body any, cookieValue string) (*http.Response, []byte) {
 	t.Helper()
+	return doRequestWithOrigin(t, method, url, body, cookieValue, "")
+}
+
+func doRequestWithOrigin(t *testing.T, method, url string, body any, cookieValue, origin string) (*http.Response, []byte) {
+	t.Helper()
 	var rdr io.Reader
 	if body != nil {
 		b, err := json.Marshal(body)
@@ -159,6 +178,9 @@ func doRequest(t *testing.T, method, url string, body any, cookieValue string) (
 	}
 	if cookieValue != "" {
 		req.AddCookie(&http.Cookie{Name: "_zflow", Value: cookieValue})
+	}
+	if origin != "" {
+		req.Header.Set("Origin", origin)
 	}
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
@@ -308,6 +330,185 @@ func TestSubmitFlowStep_TerminalSurfacesHandoffToken(t *testing.T) {
 	}
 	if got, ok := fr.HandoffTokenExpiresAt.Get(); !ok || !got.Equal(expiresAt) {
 		t.Errorf("handoff_token_expires_at = %v (set=%t), want %v", got, ok, expiresAt)
+	}
+}
+
+func TestSubmitFlowStep_SSO_BindsTheBrowserAndResealsTheFlowCookie(t *testing.T) {
+	tests := []struct {
+		name       string
+		origin     string
+		middleware []func(http.Handler) http.Handler
+		// returnTarget defaults to the login page on the bare origin.
+		returnTarget string
+		wantCookie   string
+	}{
+		{
+			name:       "https origin gets the __Host- cookie",
+			origin:     "https://login.example.com",
+			wantCookie: "__Host-_zsso=nonce-1; Path=/; Max-Age=900; HttpOnly; Secure; SameSite=Lax",
+		},
+		{
+			// A hash-routed page lives in its fragment; the callback must
+			// bring the browser back to the route, not to a percent-encoded
+			// path.
+			name:         "return_target keeps its fragment",
+			origin:       "https://login.example.com",
+			returnTarget: "https://login.example.com/app#/sign-in?flow=flow_1",
+			wantCookie:   "__Host-_zsso=nonce-1; Path=/; Max-Age=900; HttpOnly; Secure; SameSite=Lax",
+		},
+		{
+			// Browsers send a bare origin; a trailing slash from another
+			// client must not end up in redirect_uri.
+			name:       "origin with a trailing slash is normalised",
+			origin:     "https://login.example.com/",
+			wantCookie: "__Host-_zsso=nonce-1; Path=/; Max-Age=900; HttpOnly; Secure; SameSite=Lax",
+		},
+		{
+			// The test server listens on http loopback, which the middleware
+			// turns into the effective host Secure follows.
+			name:       "http loopback host drops the prefix and Secure",
+			origin:     "http://localhost:3000",
+			middleware: []func(http.Handler) http.Handler{api.WithRequestHostMiddleware},
+			wantCookie: "_zsso=nonce-1; Path=/; Max-Age=900; HttpOnly; SameSite=Lax",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ts := newTestServer(t, tt.middleware...)
+			state := &domain.FlowState{ID: "flow_1", ProjectID: "proj_1", SessionID: "sess_1", IssuedAt: time.Now()}
+			ts.projects.EXPECT().Get(gomock.Any(), "proj_1").Return(&domain.Project{PreviewOrigins: []string{tt.origin}}, nil)
+			ts.fake.submitResult = domain.FlowStepResult{
+				State:           state,
+				Step:            &domain.FlowStep{Name: "sso-redirect", RedirectURL: new("https://accounts.example.test/authorize?state=s")},
+				SSOBindingNonce: "nonce-1",
+			}
+
+			bareOrigin := strings.TrimSuffix(tt.origin, "/")
+			returnTarget := tt.returnTarget
+			if returnTarget == "" {
+				returnTarget = bareOrigin + "/login?flow=flow_1"
+			}
+			resp, body := doRequestWithOrigin(t, http.MethodPost, ts.srv.URL+"/flow/flow_1/submit", map[string]any{
+				"action":          "sso",
+				"sso_provider_id": "google",
+				"return_target":   returnTarget,
+			}, ts.sealCookie(t, state), tt.origin)
+			require.Equal(t, http.StatusOK, resp.StatusCode, string(body))
+			// Two lines, _zflow first: the generated client reads only the
+			// first Set-Cookie line, so the order is part of the contract.
+			setCookies := resp.Header.Values("Set-Cookie")
+			require.Len(t, setCookies, 2, setCookies)
+			zflow, err := http.ParseSetCookie(setCookies[0])
+			require.NoError(t, err)
+			require.Equal(t, "_zflow", zflow.Name)
+			require.NotEmpty(t, zflow.Value)
+			require.Equal(t, 600, zflow.MaxAge, "the redirect response re-seals the flow cookie")
+			require.Equal(t, tt.wantCookie, setCookies[1])
+
+			require.Equal(t, "google", *ts.fake.gotSubmitReq.SSOProviderID)
+			require.Equal(t, &domain.FlowSSOReturn{
+				RedirectURI:  bareOrigin + "/__nextgen/idp/callback",
+				ReturnTarget: returnTarget,
+			}, ts.fake.gotSubmitReq.SSOReturn)
+			var out struct {
+				Step struct {
+					Name        string `json:"name"`
+					RedirectURL string `json:"redirect_url"`
+				} `json:"step"`
+			}
+			require.NoError(t, json.Unmarshal(body, &out))
+			require.Equal(t, "sso-redirect", out.Step.Name)
+			require.Equal(t, "https://accounts.example.test/authorize?state=s", out.Step.RedirectURL)
+		})
+	}
+}
+
+// A provider id on another action is not an sso submission: it passes
+// through without the origin and return target checks, and the engine
+// refuses it as an invalid action.
+func TestSubmitFlowStep_SSO_ProviderIDAloneDoesNotSelectTheBranch(t *testing.T) {
+	ts := newTestServer(t)
+	state := &domain.FlowState{ID: "flow_1", ProjectID: "proj_1", SessionID: "sess_1", IssuedAt: time.Now()}
+	ts.fake.submitErr = domain.ErrFlowInvalidAction()
+
+	resp, body := doRequest(t, http.MethodPost, ts.srv.URL+"/flow/flow_1/submit", map[string]any{
+		"action":          "submit",
+		"sso_provider_id": "google",
+	}, ts.sealCookie(t, state))
+	require.Equal(t, http.StatusBadRequest, resp.StatusCode, string(body))
+	require.Equal(t, "submit", ts.fake.gotSubmitReq.Action, "the submission reaches the engine")
+	require.Equal(t, "google", *ts.fake.gotSubmitReq.SSOProviderID)
+	require.Nil(t, ts.fake.gotSubmitReq.SSOReturn)
+	require.Contains(t, string(body), "flow.invalid_action")
+}
+
+// The length limit is the generated validation's: the request is refused
+// before the handler reads the project.
+func TestSubmitFlowStep_SSO_RejectsAnOverlongReturnTarget(t *testing.T) {
+	const origin = "https://login.example.com"
+	ts := newTestServer(t)
+	state := &domain.FlowState{ID: "flow_1", ProjectID: "proj_1", SessionID: "sess_1", IssuedAt: time.Now()}
+
+	resp, body := doRequestWithOrigin(t, http.MethodPost, ts.srv.URL+"/flow/flow_1/submit", map[string]any{
+		"action":          "sso",
+		"sso_provider_id": "google",
+		"return_target":   origin + "/login?pad=" + strings.Repeat("x", 2048),
+	}, ts.sealCookie(t, state), origin)
+	require.Equal(t, http.StatusBadRequest, resp.StatusCode, string(body))
+	require.Contains(t, string(body), "return_target")
+	require.Empty(t, ts.fake.gotSubmitReq.Action, "no sign-in is started")
+}
+
+func TestSubmitFlowStep_SSO_RejectsAnUnboundReturn(t *testing.T) {
+	const origin = "https://login.example.com"
+	tests := []struct {
+		name     string
+		noOrigin bool
+		body     map[string]any
+	}{
+		{
+			name: "return_target on another origin",
+			body: map[string]any{"action": "sso", "sso_provider_id": "google", "return_target": "https://evil.example.com/login"},
+		},
+		{
+			// The request origin sits in the userinfo part; the host is foreign.
+			name: "return_target with the origin as userinfo",
+			body: map[string]any{"action": "sso", "sso_provider_id": "google", "return_target": "https://login.example.com@evil.example.com/login"},
+		},
+		{
+			// The host is the origin, but no page URL carries userinfo.
+			name: "return_target with userinfo on the origin host",
+			body: map[string]any{"action": "sso", "sso_provider_id": "google", "return_target": "https://evil.example.com@login.example.com/login"},
+		},
+		{
+			name: "return_target missing",
+			body: map[string]any{"action": "sso", "sso_provider_id": "google"},
+		},
+		{
+			name: "return_target relative",
+			body: map[string]any{"action": "sso", "sso_provider_id": "google", "return_target": "/login?flow=flow_1"},
+		},
+		{
+			name:     "no request origin",
+			noOrigin: true,
+			body:     map[string]any{"action": "sso", "sso_provider_id": "google", "return_target": origin + "/login"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ts := newTestServer(t)
+			state := &domain.FlowState{ID: "flow_1", ProjectID: "proj_1", SessionID: "sess_1", IssuedAt: time.Now()}
+			requestOrigin := origin
+			if tt.noOrigin {
+				requestOrigin = ""
+			} else {
+				ts.projects.EXPECT().Get(gomock.Any(), "proj_1").Return(&domain.Project{PreviewOrigins: []string{origin}}, nil)
+			}
+
+			resp, body := doRequestWithOrigin(t, http.MethodPost, ts.srv.URL+"/flow/flow_1/submit", tt.body, ts.sealCookie(t, state), requestOrigin)
+			require.Equal(t, http.StatusBadRequest, resp.StatusCode, string(body))
+			require.Empty(t, ts.fake.gotSubmitReq.Action, "no sign-in is started")
+		})
 	}
 }
 

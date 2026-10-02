@@ -5,7 +5,6 @@ import type {
   ExchangeHandoffBody,
   SubmitFlowStepBody,
 } from "@zitadel/api/generated/model";
-import type { RequestHandler } from "msw";
 
 /**
  * MSW handler factory for the mock Flow API.
@@ -28,8 +27,8 @@ import {
   getExchangeHandoffMockHandler,
   getExchangeHandoffResponseMock,
   getGetFlowStepMockHandler,
-  getSubmitFlowStepMockHandler,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.msw";
+import { http, HttpResponse, type RequestHandler } from "msw";
 
 import { withBranding } from "./branding.js";
 import {
@@ -247,10 +246,23 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
       actor.send({ type: "START", purpose: body.purpose });
       return currentResponse();
     }),
-    getSubmitFlowStepMockHandler(async ({ params, request }) => {
+    // Hand-written rather than the generated wrapper: that one answers 200
+    // with whatever it is given, and the refusal below is a 400.
+    http.post("*/flow/:id/submit", async ({ params, request }) => {
+      const ok = (step: CreateFlow201) => HttpResponse.json(step, { status: 200 });
       const flowId = String(params.id);
       const body = (await request.clone().json()) as SubmitFlowStepBody;
       captured.push({ kind: "submitFlowStep", flowId, body });
+      // The engine refuses an sso submission without `return_target`, the
+      // page the callback sends the browser back to, before anything else.
+      // The mock has no callback and no cookies, but a caller that omits it
+      // must not pass here and fail against the engine.
+      if (body.action === "sso" && !body.return_target) {
+        return HttpResponse.json(
+          { code: "req.invalid", message: "return_target is required for action sso" },
+          { status: 400 },
+        );
+      }
       const before = actor.getSnapshot().value as FlowStepName | "idle";
       const fields = (body.fields ?? {}) as Record<string, string>;
       const email = fields.email;
@@ -268,7 +280,7 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
           : null;
       if (registrationErrorKey) {
         const base = withBranding(registerStep(fixtureInput));
-        return { ...base, step: { ...base.step, error: registrationErrorKey } };
+        return ok({ ...base, step: { ...base.step, error: registrationErrorKey } });
       }
 
       const contextEmail = snapshot.context.capturedFields.email;
@@ -284,7 +296,7 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
           : null;
       if (loginErrorKey) {
         const base = withBranding(passwordStep({ ...fixtureInput, capturedEmail: contextEmail }));
-        return { ...base, step: { ...base.step, error: loginErrorKey } };
+        return ok({ ...base, step: { ...base.step, error: loginErrorKey } });
       }
 
       const passkeyUpsellInput = { ...fixtureInput, capturedEmail: contextEmail };
@@ -295,7 +307,7 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
           : null;
       if (upsellErrorKey) {
         const base = withBranding(passkeyUpsellStep(passkeyUpsellInput));
-        return { ...base, step: { ...base.step, error: upsellErrorKey } };
+        return ok({ ...base, step: { ...base.step, error: upsellErrorKey } });
       }
 
       const proof = body.challenge_response?.proof as PasskeyProof | undefined;
@@ -309,7 +321,7 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
       if (setupErrorKey) {
         const base = withBranding(passkeySetupStep(passkeyUpsellInput));
         const { challenge: _c, ...step } = base.step;
-        return { ...base, step: { ...step, error: setupErrorKey } };
+        return ok({ ...base, step: { ...step, error: setupErrorKey } });
       }
 
       const loginCred =
@@ -331,7 +343,7 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
         };
         const base = withBranding(passkeyLoginStep(loginInput));
         const { challenge: _c, ...step } = base.step;
-        return { ...base, step: { ...step, error: passkeyLoginErrorKey } };
+        return ok({ ...base, step: { ...step, error: passkeyLoginErrorKey } });
       }
 
       const submitted = loginCred ? { ...fields, email: loginCred.userHandle } : fields;
@@ -358,7 +370,7 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
         sso_provider_id: body.sso_provider_id ?? null,
         sso_outcome: ssoOutcome,
       });
-      return currentResponse();
+      return ok(await currentResponse());
     }),
     getGetFlowStepMockHandler(async ({ params }) => {
       captured.push({ kind: "getFlowStep", flowId: String(params.id) });

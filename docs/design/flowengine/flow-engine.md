@@ -446,9 +446,10 @@ an identifier. Login routes a missing user through `user_not_found` to
 
 ### Example 4: SSO Login (Google)
 
-> **Direction:** SSO is stubbed in today's engine (`ErrUnsupported` — see
-> [capabilities.md](capabilities.md)). The definition below validates against
-> the shipped schema; the runtime exchange shows the intended ceremony.
+> **Direction:** the submission and the `sso-redirect` step are implemented
+> (#1030, see [capabilities.md](capabilities.md)); the callback route that
+> finishes the sign-in is #1032. The definition below validates against the
+> shipped schema; the runtime exchange shows both legs.
 > The example uses the `sso_authenticated` key from #1371; against the schema
 > on main before that PR merges, the key is still `callback`.
 
@@ -528,22 +529,34 @@ User clicks "Continue with Google":
 
 ```http
 POST /flow/flow_2/submit
-{ "action": "sso", "sso_provider_id": "google" }
+{ "action": "sso", "sso_provider_id": "google", "return_target": "https://login.example.com/login?flow=flow_2" }
 ```
 ```json
 ← 200  (engine-emitted redirect step — not authored in the definition)
+Set-Cookie: _zflow=<encrypted-payload>; Path=/; Max-Age=600; HttpOnly; Secure; SameSite=Strict
+Set-Cookie: __Host-_zsso=<binding nonce>; Path=/; Max-Age=900; HttpOnly; Secure; SameSite=Lax
 {
   "id": "flow_2",
   "session_id": "sess_2",
   "step": {
     "name": "sso-redirect",
-    "redirect_url": "https://accounts.google.com/o/oauth2/auth?client_id=...&state=sess_2_google"
+    "texts": { "title_key": "sso.redirect.title" },
+    "redirect_url": "https://accounts.google.com/o/oauth2/auth?client_id=...&redirect_uri=https%3A%2F%2Flogin.example.com%2F__nextgen%2Fidp%2Fcallback&state=<state>&nonce=<nonce>&code_challenge=...&code_challenge_method=S256"
   }
 }
 ```
 
-In the planned ceremony, the frontend navigates to `redirect_url` and the IdP
-callback returns control to the same step:
+The flow state does not change on this response, but `_zflow` is re-sealed
+like on every response, so its ten-minute window restarts at the submission.
+A second `Set-Cookie` line carries the
+browser-binding nonce the callback checks (see
+[The Binding Cookie](../idp/3-social-login-flow.md#the-binding-cookie)).
+`return_target` is the page hosting the orchestrator, where the flow resumes
+after the callback; the orchestrator sets `?flow=<id>` on it so the reload
+resumes this flow, and its origin must equal the request origin.
+
+The frontend navigates to `redirect_url` and the IdP callback (#1032) returns
+control to the same step:
 
 ```http
 GET /flow/flow_2

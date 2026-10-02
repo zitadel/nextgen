@@ -18,6 +18,12 @@ Scope pointers first — this file's own body covers **telemetry only**:
 - The test contract — the unit/spec split and one spec per command — is
   [`tests/AGENTS.md`](tests/AGENTS.md). Read it before adding or moving any
   test.
+- The flag surface deliberately tracks the [WebCLI spec](https://webcli.com/) so
+  an agent can drive the CLI from conventions it already knows. That is the
+  rationale; the canonical flag list, output-channel rules and the two
+  intentional deviations are the invocation rules in [`SKILLS.md`](SKILLS.md).
+  Keep that alignment in mind when adding a global flag, and record it there —
+  not in a second copy here.
 
 ## Analytics Tracking — Mixpanel
 

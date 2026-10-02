@@ -131,6 +131,26 @@ describe("the cli", () => {
       });
     });
 
+    describe("global flags", () => {
+      it("accepts -v as the short form of --verbose", async () => {
+        const result = await runCliForTest(["resources", "-v", "--json"]);
+
+        expect(result).toSucceed();
+      });
+
+      it("rejects an unrecognised short flag", async () => {
+        const result = await runCliForTest(["resources", "-Z", "--json"]);
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+
+      it("accepts --no-color", async () => {
+        const result = await runCliForTest(["resources", "--no-color", "--json"]);
+
+        expect(result).toSucceed();
+      });
+    });
+
     describe("handled by oclif rather than us", () => {
       it("exits 127 for a command that does not exist", async () => {
         const result = await runCliForTest(["bogus", "--json"]);
