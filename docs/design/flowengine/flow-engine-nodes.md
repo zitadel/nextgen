@@ -86,7 +86,8 @@ Every step response contains the capability collections and step-level metadata:
 
 | Property | Type | Purpose |
 |---|---|---|
-| `fields` | `FlowField[]` | Data the user must provide. Ordered array; each entry carries `name`. Resolved from user schema at runtime. |
+| `fields` | `FlowField[]` | Data the user must provide. Ordered array; each entry carries `name`, and an `autocomplete` token where one applies. Resolved from user schema at runtime. |
+| `identifier` | `FlowStepIdentifier \| null` | The identifier collected earlier, for a password-only step's form to carry beside the password so a password manager pairs them. Render-only, and carries no field name: the control has none, so it is never submitted. |
 | `actions` | `FlowAction[]` | Available user actions. Ordered array; each entry carries `name` and `kind`. |
 | `gates` | `Record<string, FlowGate>` | Planned security-gate payload, keyed by gate name. Passkey uses `challenge`, not `gates`; today's runtime emits an empty map. |
 | `sso_providers` | `SSOProvider[]` | Available SSO identity providers. |
