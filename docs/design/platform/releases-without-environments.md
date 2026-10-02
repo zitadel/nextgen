@@ -626,8 +626,8 @@ read, while `--project <id>` names a project id directly and overrides whatever
 they say.
 
 **Dotenv never overrides the real process environment.** A platform injecting
-`ZITADEL_PROJECT_ID` must beat a committed `.env`, or a preview deploy silently
-talks to the wrong project.
+`ZITADEL_PROJECT_ID` must beat a stale `.env` left in the working tree or baked
+into a container image, or a deploy silently talks to the wrong project.
 
 | Variable | Notes |
 |---|---|
@@ -638,8 +638,9 @@ talks to the wrong project.
 | `ZITADEL_RELEASE` | set by the build; read by the server-side SDK |
 | `NEXT_PUBLIC_ZITADEL_PROJECT_ID` / `_PUBLISHABLE_KEY` / `_RELEASE`, and the `VITE_…` and `NUXT_PUBLIC_…` equivalents | browser bundle |
 
-The public/secret column is what decides the file: public values go in the
-committed `.env.<stage>`, the secret in `.env.<stage>.local`.
+No `.env` file is committed, so the public/secret column decides only where a
+value may be *shared* — a publishable key can go in a team chat or a CI variable,
+the project secret only in a secret store.
 
 The release variables are only needed on the fallback path. A browser caller
 answered by layer 2 sends nothing new.
@@ -670,26 +671,30 @@ Three words, three jobs, kept apart:
 #### A stage is just its `.env` files
 
 There is no stages block in `zitadel.json` and no fourth place for these values
-to live. A stage is the set of `.env` files bearing its name.
+to live. A stage is the set of `.env` files bearing its name, and **none of them
+are committed** — the existing ignore rules (`.env*`, with `!.env.example`) stay
+exactly as they are.
 
 ```ini
-# .env.development          committed
+# .env.development.local
 ZITADEL_URL=http://localhost:8080
 ZITADEL_PROJECT_ID=prj_01KDEV7T9QX3M2E8
 ZITADEL_PUBLISHABLE_KEY=pk_dev_4nYwH6tR2p
+ZITADEL_PROJECT_SECRET=sk_proj_7kR2pXq9vN3wLmYhT4cB8A
 ```
 
 ```ini
-# .env.production           committed
+# .env.production.local
 ZITADEL_URL=https://api.zitadel.cloud
 ZITADEL_PROJECT_ID=prj_01K9AA9M3K7E2QX8VB4T
 ZITADEL_PUBLISHABLE_KEY=pk_7kR2pXq9vN3wLmYhT4cB8A
-```
-
-```ini
-# .env.production.local     not committed
 ZITADEL_PROJECT_SECRET=sk_proj_9f2Hx8LqT4vRmYpN2wCbVa
 ```
+
+One file per stage, all of them local. Because nothing is committed, there is no
+reason to split the public values from the secret across two files — the split
+would buy nothing mechanical. `.env.example`, which **is** committed, carries the
+key names with empty values and is what tells a reader what a stage needs.
 
 Three reasons this beats a block in `zitadel.json`:
 
@@ -708,31 +713,58 @@ Three reasons this beats a block in `zitadel.json`:
   means the bundle needs no carve-out for the parts of the file that must not
   ship.
 
-#### This requires changing the ignore rules
+#### In CI there are no files, and no stage either
 
-Today `setup` writes ignore entries `[".zitadel/secret", ".env*",
-"!.env.example"]` (`apps/cli/src/lib/orca/patchers/rule/base.ts:233`), so every
-env file is excluded and a stage binding would never be version-controlled.
+The production job gets `ZITADEL_URL`, `ZITADEL_PROJECT_ID` and
+`ZITADEL_PROJECT_SECRET` injected by the platform or the pipeline's secret
+store. Those land in `process.env`, which already outranks every file, so no
+`.env` file is read and no `--stage` is needed:
 
-The split has to follow the convention Next.js already documents and developers
-already hold: **`.env.<stage>` is committed, `.env*.local` is not.**
+```yaml
+# production job, after merge
+- run: zitadel deploy -m "$MSG"
+  env:
+    ZITADEL_URL:            ${{ vars.ZITADEL_URL }}
+    ZITADEL_PROJECT_ID:     ${{ vars.ZITADEL_PROJECT_ID }}
+    ZITADEL_PROJECT_SECRET: ${{ secrets.ZITADEL_PROJECT_SECRET }}
+
+# pull-request job — origin inferred from VERCEL_BRANCH_URL,
+# and a credential that cannot widen the allowlist
+- run: zitadel preview --ttl 7d
+  env:
+    ZITADEL_URL:           ${{ vars.ZITADEL_URL }}
+    ZITADEL_PROJECT_ID:    ${{ vars.ZITADEL_PROJECT_ID }}
+    ZITADEL_DEPLOY_TOKEN:  ${{ secrets.ZITADEL_PREVIEW_DEPLOY_TOKEN }}
+```
+
+The two jobs read correctly without a comment explaining which flag makes one
+safe, which is the [two-verbs argument](#zitadel-preview) paying off in the place
+it matters.
+
+This also clarifies what the stage is actually for: **it only matters where
+several targets coexist on one machine, which is a developer's laptop.** A CI job
+has exactly one target by construction, injected. The stage is a local affordance
+for switching between dev and prod from one checkout, not part of the deployment
+contract.
+
+#### Discovery is server-side, not repository-side
+
+Since nothing is committed, a teammate who clones the repository cannot see which
+projects exist. That is the right place for the answer not to be: the **server**
+knows. A member of the team can list the projects the team owns, so
+`zitadel stages add` offers them rather than asking for an id:
 
 ```
-.zitadel/secret
-.env*.local
-.env
+$ zitadel stages add production
+server?   https://api.zitadel.cloud
+project?  2 projects this team owns
+          [x] acme          prj_01K9AA9M3K7E2QX8VB4T   class=production
+          [ ] acme-admin    prj_01KBB2M4P7S9WQZ3F8N    class=sandbox
+          [ ] create a new one
 ```
 
-The gain is that the history answers "when did production start pointing at that
-project", and a teammate who clones the repository can see which stages exist
-without being told.
-
-**The hazard this creates, and the guard for it.** A committed `.env.production`
-invites someone to paste a secret into it, which is the same footgun Next.js
-documents. So `zitadel doctor` must fail — not warn — when a committed
-`.env.<stage>` contains `ZITADEL_PROJECT_SECRET`, anything matching `sk_proj_`,
-or any key ending `_SECRET`. That check is a requirement of this layout, not an
-enhancement.
+So the repository holds the shape (`.env.example`) and the server holds the
+inventory. Neither needs to hold both.
 
 #### Starting local
 
@@ -740,7 +772,7 @@ enhancement.
 $ zitadel setup
 server   local (http://localhost:8080)
 project  prj_01KDEV7T9QX3M2E8  (created)
-wrote    zitadel.json, .zitadel/secret, .env.development, .env.local
+wrote    zitadel.json, .zitadel/secret, .env.local, .env.example
 ```
 
 #### Adding production
@@ -752,8 +784,7 @@ project?          [x] create a new one   [ ] bind an existing one
 name?             acme
 
 created           prj_01K9AA9M3K7E2QX8VB4T   class=sandbox   unclaimed
-wrote             .env.production         URL, PROJECT_ID, PUBLISHABLE_KEY   (committed)
-                  .env.production.local   PROJECT_SECRET                    (not committed)
+wrote             .env.production.local   URL, PROJECT_ID, PUBLISHABLE_KEY, PROJECT_SECRET
 
 next
   zitadel deploy --stage production            ship your configuration
@@ -779,16 +810,16 @@ resolved now  development
               (no --stage, ZITADEL_STAGE unset, NODE_ENV=development)
 ```
 
-Enumeration is a glob over `.env.*`, excluding `.local` and `.example`, for files
-carrying `ZITADEL_PROJECT_ID`.
+Enumeration is a glob over `.env.*.local` for files carrying
+`ZITADEL_PROJECT_ID`, plus whatever `process.env` currently supplies. A stage
+that exists only in a CI secret store is invisible locally, which is correct —
+it is not a target this machine can reach.
 
-**Two stages may point at the same project**, and with env files that is three
-duplicated lines rather than two keys sharing an object. Explicit duplication is
-the right trade here: a `.env.preview` that repeats production's project id says
-plainly that previews run against production users, which is the thing a reader
-needs to notice. Pointing `.env.preview` at a third project instead buys user
-isolation and its own passkeys, and costs a project. Nothing is seeded either
-way.
+**Two stages may point at the same project.** A `.env.preview.local` that
+repeats production's project id says plainly that previews run against
+production users, which is the thing worth noticing. Pointing it at a third
+project instead buys user isolation and its own passkeys, and costs a project.
+Nothing is seeded either way.
 
 #### Shipping to it
 
@@ -832,13 +863,6 @@ class      sandbox -> production
 `promote` is free as a verb because release promotion no longer needs it.
 `zitadel projects demote` is the reverse, and asks for confirmation because it
 re-admits loopback origins to a project holding real users.
-
-#### What CI holds
-
-One secret per stage. `ZITADEL_PROJECT_SECRET` from `.env.production.local` goes
-into the production job's secret store, and the preview job takes the narrower
-preview-deploy credential from [Prerequisites](#prerequisites). Everything
-else — server, project id, publishable key — is already in the repository.
 
 ### `zitadel status`
 
