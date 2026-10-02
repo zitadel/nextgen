@@ -165,10 +165,12 @@ responsibilities are deliberately narrow:
   key from ADR 036.
 - **CSRF header** — on state-changing requests `customFetch` sends the
   session's CSRF token in `X-Zitadel-CSRF` (root ADR 053 §5). The console reads
-  it from `GET /sessions/me/csrf` with the session and keeps it in memory; it
-  is not a credential on its own. A write refused with `403 auth.csrf_invalid`
-  re-reads it once and is retried, because the cookie it is bound to can change
-  in another tab.
+  it from `GET /sessions/me/csrf` once per session and keeps it in memory; it
+  is not a credential on its own. The cookie it is bound to can change in
+  another tab, so a write refused with `403 auth.csrf_invalid` makes the console
+  read the session again. It is never retried: the same person gets a fresh
+  token for their next attempt, and if someone else, or nobody, is signed in
+  now, the page starts over.
 - **Error mapping** — non-2xx throws `ApiError`; loaders let it propagate to
   the route `errorComponent`. `ApiError.status` drives status-specific copy
   (e.g. a `401`/`403` "you don't have access" surface once auth lands).

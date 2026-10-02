@@ -474,9 +474,10 @@ function outcomeCard(outcome: ClaimOutcome, retry: () => void) {
         </StateCard>
       );
     case "csrf_refused":
-      // The shared fetch has already re-read the session's token once, so a
-      // plain retry would be refused the same way. Reloading starts the page
-      // over with the session and token this browser actually holds now.
+      // The session's token was stale or missing; the shared fetch has asked the
+      // session module to re-check it, which may already have reloaded the page
+      // if someone else signed in. Reloading starts over with the session and
+      // token this browser actually holds now.
       return (
         <StateCard title="The claim was not accepted from this page">
           <p className={BODY_TEXT}>{outcome.message}</p>

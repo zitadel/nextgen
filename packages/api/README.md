@@ -36,7 +36,7 @@ web components' `project` property.
 | `@zitadel/api/generated/endpoints/zitadelNextGen.zod` | Zod schemas per endpoint |
 | `@zitadel/api/generated/endpoints/zitadelNextGen.msw` | MSW handlers for tests |
 | `@zitadel/api/runtime/base-url` | `setProxyPath()` / `getProxyPath()` — the low-level slot `configureZitadel()` writes; call it directly only when you manage configuration yourself |
-| `@zitadel/api/runtime/auth` | `getApiAuthToken()` and bearer plumbing; `setApiCsrfToken()` / `getApiCsrfToken()` / `setApiCsrfTokenRefresher()` for session-cookie writes (see below) |
+| `@zitadel/api/runtime/auth` | `getApiAuthToken()` and bearer plumbing; `setApiCsrfToken()` / `getApiCsrfToken()` / `setApiCsrfRejectionHandler()` for session-cookie writes (see below) |
 | `@zitadel/api/runtime/fetch` | The shared `customFetch` interceptor |
 
 ### CSRF token for session-cookie writes
@@ -50,10 +50,12 @@ then adds the `X-Zitadel-CSRF` header to every unsafe request. Clear it with
 that use a project secret leave it unset, and nothing is added.
 
 The token is bound to the session cookie, which another tab can replace by
-signing in again. Register `setApiCsrfTokenRefresher(() => …)` with a function
-that re-reads `GET /sessions/me/csrf`, stores the new token and returns it: a
-write refused with `403 auth.csrf_invalid` then re-reads the token once and is
-retried. The token slot is shared across copies of this package loaded in the
+signing in again. Register `setApiCsrfRejectionHandler(() => …)` to learn about
+an unsafe request refused with `403 auth.csrf_invalid`: re-check the session
+there and load the token its cookie needs. The refused request is not retried,
+so a write is never replayed under a session it was not prepared for.
+`apiErrorCode(error)` from `@zitadel/api/runtime/fetch` reads the code of an
+`ApiError`. The token slot is shared across copies of this package loaded in the
 same page.
 
 The generated files come from the OpenAPI 3.1 source in the
