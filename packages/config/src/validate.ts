@@ -104,6 +104,9 @@ const DECLARABLE_ACTION_KINDS = new Set(["submit", "passkey", "passkey_register"
 /** Mirrors `flowBackActionName` in flow_state_machine.go. */
 const BACK_ACTION_NAME = "back";
 
+/** Mirrors `FlowActionSSO` in flow_state_machine.go. */
+const SSO_ACTION_NAME = "sso";
+
 /** Mirrors `authMethodPrefix` in flow_definition.go. */
 const AUTH_METHOD_PREFIX = "x-auth-methods#";
 
@@ -331,6 +334,15 @@ function validateStep(step: FlowStep): FlowValidationIssue[] {
         error(
           "steps",
           `step ${q(name)}: action name ${q(action.name)} is reserved for engine-injected back navigation`,
+          name,
+        ),
+      );
+    }
+    if (action.name === SSO_ACTION_NAME) {
+      issues.push(
+        error(
+          "steps",
+          `step ${q(name)}: action name ${q(action.name)} is reserved for sso submissions`,
           name,
         ),
       );
