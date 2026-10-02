@@ -40,6 +40,9 @@ func Page[F ~uint8, T any](
 	schema database.Schema[F, T],
 	run func(limit uint32) ([]*T, error),
 ) ([]*T, []byte, error) {
+	// Fetch one extra row as the probe. At the uint32 maximum limit+1 is
+	// unrepresentable, but no result set can hold 2^32 rows, so a page that
+	// large has no successor and emitting no token is correct.
 	fetch := p.Limit
 	if fetch != 0 && fetch != math.MaxUint32 {
 		fetch++
