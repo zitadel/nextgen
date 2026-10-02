@@ -144,6 +144,12 @@ describe("the cli", () => {
 
         expect(result).toFailWith("E_VALIDATION");
       });
+
+      it("accepts --no-color", async () => {
+        const result = await runCliForTest(["resources", "--no-color", "--json"]);
+
+        expect(result).toSucceed();
+      });
     });
 
     describe("handled by oclif rather than us", () => {

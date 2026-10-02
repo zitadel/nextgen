@@ -73,6 +73,16 @@ export abstract class BaseCommand extends Command {
     // so there is nothing to collide with.
     verbose: Flags.boolean({ char: "v", description: "Verbose logging." }),
     debug: Flags.boolean({ description: "Debug logging." }),
+    // Declared so oclif accepts `--color`/`--no-color` rather than refusing them
+    // as unknown; the colour decision itself is applied in `bin/run.js` (which
+    // sets NO_COLOR/FORCE_COLOR before the libraries load) and honoured here.
+    // picocolors reads `--no-color` from argv on its own; consola reads the env.
+    color: Flags.boolean({
+      default: true,
+      allowNo: true,
+      description:
+        "Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.",
+    }),
     telemetry: Flags.boolean({
       default: true,
       allowNo: true,
@@ -159,6 +169,11 @@ export abstract class BaseCommand extends Command {
     // `--verbose` is reserved for richer per-step detail and currently maps
     // to the same level as default.
     consola.level = json ? -999 : debug ? 4 : 3;
+    // `--no-color` (or the `NO_COLOR` env) turns colour off; both reach this
+    // process as `NO_COLOR` via `bin/run.js`, and `--no-color` also unsets the
+    // parsed `color` flag. The flag's value is the source of truth here so that
+    // a programmatic `run()` (tests) honours it without the entry-point shim.
+    const useColor = flags.color !== false && !process.env.NO_COLOR;
     // Drop the right-aligned timestamp the FancyReporter adds by default.
     // Timestamps add no value in a one-off CLI run, wrap awkwardly on long
     // lines (e.g. created-schema URL), and clutter the visual rhythm of the
@@ -166,7 +181,7 @@ export abstract class BaseCommand extends Command {
     consola.options.formatOptions = {
       ...consola.options.formatOptions,
       date: false,
-      colors: true,
+      colors: useColor,
       compact: true,
     };
     this.meta = {

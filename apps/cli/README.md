@@ -195,7 +195,7 @@ Validate and upload repo config to the platform.
 ```
 USAGE
   $ zitadel apply [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--telemetry]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -203,6 +203,8 @@ FLAGS
                          an agent.
   -s, --server=<value>   Override the resolved server URL.
   -v, --verbose          Verbose logging.
+      --[no-]color       Colorize human output. Disable with --no-color;
+                         NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
       --[no-]telemetry   Send anonymous usage analytics. Disable with
@@ -253,7 +255,7 @@ Take ownership of the login template: scaffold .zitadel/branding/ from a shipped
 ```
 USAGE
   $ zitadel branding eject [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--telemetry] [-f] [--design <value>]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [-f] [--design <value>]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -262,6 +264,8 @@ FLAGS
                          an agent.
   -s, --server=<value>   Override the resolved server URL.
   -v, --verbose          Verbose logging.
+      --[no-]color       Colorize human output. Disable with --no-color;
+                         NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --design=<value>   Design to start from: centered or minimal (default:
                          centered).
@@ -284,7 +288,7 @@ Get one branding revision by id.
 ```
 USAGE
   $ zitadel branding get ID [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--telemetry] [--fields <value>]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--fields <value>]
 
 ARGUMENTS
   ID  branding revision id
@@ -295,6 +299,8 @@ FLAGS
                          an agent.
   -s, --server=<value>   Override the resolved server URL.
   -v, --verbose          Verbose logging.
+      --[no-]color       Colorize human output. Disable with --no-color;
+                         NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
       --fields=<value>   Fields to show, comma-separated dot-paths. Defaults to
@@ -321,7 +327,8 @@ List branding.
 ```
 USAGE
   $ zitadel branding list [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--telemetry] [--fields <value>] [--plain]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--fields <value>]
+    [--plain]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -329,6 +336,8 @@ FLAGS
                          an agent.
   -s, --server=<value>   Override the resolved server URL.
   -v, --verbose          Verbose logging.
+      --[no-]color       Colorize human output. Disable with --no-color;
+                         NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
       --fields=<value>   Columns to show, comma-separated dot-paths (e.g.
@@ -356,7 +365,8 @@ Claim this project to make it permanent. Opens a browser to create an account or
 ```
 USAGE
   $ zitadel claim [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--telemetry] [--no-open] [--timeout <value>]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--no-open] [--timeout
+    <value>]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -364,6 +374,8 @@ FLAGS
                          an agent.
   -s, --server=<value>   Override the resolved server URL.
   -v, --verbose          Verbose logging.
+      --[no-]color       Colorize human output. Disable with --no-color;
+                         NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
       --no-open          Print the link instead of opening a browser.
@@ -424,7 +436,7 @@ Open the local console, signed in as the local admin created by `zitadel start`.
 ```
 USAGE
   $ zitadel console [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--telemetry] [--no-open]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--no-open]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -432,6 +444,8 @@ FLAGS
                          an agent.
   -s, --server=<value>   Override the resolved server URL.
   -v, --verbose          Verbose logging.
+      --[no-]color       Colorize human output. Disable with --no-color;
+                         NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
       --no-open          Print the sign-in link instead of opening a browser.
@@ -458,8 +472,8 @@ Verify local runtime and project state.
 ```
 USAGE
   $ zitadel doctor [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--telemetry] [--fix] [--image <value>] [--port
-    <value>] [--runtime binary|docker]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--fix] [--image <value>]
+    [--port <value>] [--runtime binary|docker]
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
@@ -467,6 +481,8 @@ FLAGS
                           an agent.
   -s, --server=<value>    Override the resolved server URL.
   -v, --verbose           Verbose logging.
+      --[no-]color        Colorize human output. Disable with --no-color;
+                          NO_COLOR and FORCE_COLOR are honored too.
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
       --fix               Repair missing files and stale managed wiring.
@@ -491,7 +507,7 @@ Remove managed files and local Zitadel state.
 ```
 USAGE
   $ zitadel eject [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--telemetry] [-f]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [-f]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -501,6 +517,8 @@ FLAGS
                          an agent.
   -s, --server=<value>   Override the resolved server URL.
   -v, --verbose          Verbose logging.
+      --[no-]color       Colorize human output. Disable with --no-color;
+                         NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
       --[no-]telemetry   Send anonymous usage analytics. Disable with
@@ -523,7 +541,7 @@ Get one environment by id.
 ```
 USAGE
   $ zitadel environments get NAME [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--telemetry] [--fields <value>]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--fields <value>]
 
 ARGUMENTS
   NAME  environment name
@@ -534,6 +552,8 @@ FLAGS
                          an agent.
   -s, --server=<value>   Override the resolved server URL.
   -v, --verbose          Verbose logging.
+      --[no-]color       Colorize human output. Disable with --no-color;
+                         NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
       --fields=<value>   Fields to show, comma-separated dot-paths. Defaults to
@@ -560,7 +580,7 @@ List environments.
 ```
 USAGE
   $ zitadel environments list [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--telemetry] [--limit <value>] [-a |
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--limit <value>] [-a |
     --page-token <value>] [--fields <value>] [--plain]
 
 FLAGS
@@ -570,6 +590,8 @@ FLAGS
                             as an agent.
   -s, --server=<value>      Override the resolved server URL.
   -v, --verbose             Verbose logging.
+      --[no-]color          Colorize human output. Disable with --no-color;
+                            NO_COLOR and FORCE_COLOR are honored too.
       --debug               Debug logging.
       --dry-run             Preview without mutating files or the platform.
       --fields=<value>      Columns to show, comma-separated dot-paths (e.g.
@@ -601,7 +623,7 @@ Get one event by id.
 ```
 USAGE
   $ zitadel events get ID [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--telemetry] [--fields <value>]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--fields <value>]
 
 ARGUMENTS
   ID  event id
@@ -612,6 +634,8 @@ FLAGS
                          an agent.
   -s, --server=<value>   Override the resolved server URL.
   -v, --verbose          Verbose logging.
+      --[no-]color       Colorize human output. Disable with --no-color;
+                         NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
       --fields=<value>   Fields to show, comma-separated dot-paths. Defaults to
@@ -638,7 +662,7 @@ List events.
 ```
 USAGE
   $ zitadel events list [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--telemetry] [--limit <value>] [-a |
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--limit <value>] [-a |
     --page-token <value>] [--fields <value>] [--plain] [--filter <value>...]
     [--sort <value>]
 
@@ -657,6 +681,10 @@ FLAGS
 
   -v, --verbose
       Verbose logging.
+
+  --[no-]color
+      Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are
+      honored too.
 
   --debug
       Debug logging.
@@ -713,7 +741,7 @@ Get one flow definition by id.
 ```
 USAGE
   $ zitadel flow-definitions get FLOW [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--telemetry] [--fields <value>]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--fields <value>]
 
 ARGUMENTS
   FLOW  flow name (newest revision) or revision id
@@ -724,6 +752,8 @@ FLAGS
                          an agent.
   -s, --server=<value>   Override the resolved server URL.
   -v, --verbose          Verbose logging.
+      --[no-]color       Colorize human output. Disable with --no-color;
+                         NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
       --fields=<value>   Fields to show, comma-separated dot-paths. Defaults to
@@ -750,7 +780,7 @@ List flow-definitions.
 ```
 USAGE
   $ zitadel flow-definitions list [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--telemetry] [--limit <value>] [-a |
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--limit <value>] [-a |
     --page-token <value>] [--fields <value>] [--plain] [--filter <value>...]
 
 FLAGS
@@ -760,6 +790,8 @@ FLAGS
                             as an agent.
   -s, --server=<value>      Override the resolved server URL.
   -v, --verbose             Verbose logging.
+      --[no-]color          Colorize human output. Disable with --no-color;
+                            NO_COLOR and FORCE_COLOR are honored too.
       --debug               Debug logging.
       --dry-run             Preview without mutating files or the platform.
       --fields=<value>      Columns to show, comma-separated dot-paths (e.g.
@@ -796,8 +828,9 @@ Create a grant.
 ```
 USAGE
   $ zitadel grants create [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--telemetry] [--relation viewer|editor|admin]
-    [--expires-at <value>] [--data <value> | --file <value>]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--relation
+    viewer|editor|admin] [--expires-at <value>] [--data <value> | --file
+    <value>]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -805,6 +838,8 @@ FLAGS
                          an agent.
   -s, --server=<value>   Override the resolved server URL.
   -v, --verbose          Verbose logging.
+      --[no-]color       Colorize human output. Disable with --no-color;
+                         NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
       --[no-]telemetry   Send anonymous usage analytics. Disable with
@@ -840,7 +875,7 @@ Delete a grant by id.
 ```
 USAGE
   $ zitadel grants delete ID [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--telemetry] [-f]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [-f]
 
 ARGUMENTS
   ID  grant id
@@ -853,6 +888,8 @@ FLAGS
                          an agent.
   -s, --server=<value>   Override the resolved server URL.
   -v, --verbose          Verbose logging.
+      --[no-]color       Colorize human output. Disable with --no-color;
+                         NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
       --[no-]telemetry   Send anonymous usage analytics. Disable with
@@ -875,7 +912,7 @@ Get one grant by id.
 ```
 USAGE
   $ zitadel grants get ID [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--telemetry] [--fields <value>]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--fields <value>]
 
 ARGUMENTS
   ID  grant id
@@ -886,6 +923,8 @@ FLAGS
                          an agent.
   -s, --server=<value>   Override the resolved server URL.
   -v, --verbose          Verbose logging.
+      --[no-]color       Colorize human output. Disable with --no-color;
+                         NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
       --fields=<value>   Fields to show, comma-separated dot-paths. Defaults to
@@ -912,7 +951,7 @@ List grants.
 ```
 USAGE
   $ zitadel grants list [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--telemetry] [--limit <value>] [-a |
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--limit <value>] [-a |
     --page-token <value>] [--fields <value>] [--plain] [--filter <value>...]
     [--sort <value>]
 
@@ -931,6 +970,10 @@ FLAGS
 
   -v, --verbose
       Verbose logging.
+
+  --[no-]color
+      Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are
+      honored too.
 
   --debug
       Debug logging.
@@ -1011,7 +1054,8 @@ Create an identity provider connection.
 ```
 USAGE
   $ zitadel idps create [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--telemetry] [--data <value> | --file <value>]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--data <value> | --file
+    <value>]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -1019,6 +1063,8 @@ FLAGS
                          an agent.
   -s, --server=<value>   Override the resolved server URL.
   -v, --verbose          Verbose logging.
+      --[no-]color       Colorize human output. Disable with --no-color;
+                         NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
       --[no-]telemetry   Send anonymous usage analytics. Disable with
@@ -1047,7 +1093,7 @@ Get one identity provider connection by id.
 ```
 USAGE
   $ zitadel idps get ID [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--telemetry] [--fields <value>]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--fields <value>]
 
 ARGUMENTS
   ID  identity provider connection id
@@ -1058,6 +1104,8 @@ FLAGS
                          an agent.
   -s, --server=<value>   Override the resolved server URL.
   -v, --verbose          Verbose logging.
+      --[no-]color       Colorize human output. Disable with --no-color;
+                         NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
       --fields=<value>   Fields to show, comma-separated dot-paths. Defaults to
@@ -1084,7 +1132,7 @@ List idps.
 ```
 USAGE
   $ zitadel idps list [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--telemetry] [--limit <value>] [-a |
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--limit <value>] [-a |
     --page-token <value>] [--fields <value>] [--plain] [--filter <value>...]
     [--sort <value>]
 
@@ -1103,6 +1151,10 @@ FLAGS
 
   -v, --verbose
       Verbose logging.
+
+  --[no-]color
+      Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are
+      honored too.
 
   --debug
       Debug logging.
@@ -1157,7 +1209,8 @@ Show local Zitadel server logs.
 ```
 USAGE
   $ zitadel logs [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--telemetry] [--follow] [--tail <value>]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--follow] [--tail
+    <value>]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -1165,6 +1218,8 @@ FLAGS
                          an agent.
   -s, --server=<value>   Override the resolved server URL.
   -v, --verbose          Verbose logging.
+      --[no-]color       Colorize human output. Disable with --no-color;
+                         NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
       --follow           Follow logs.
@@ -1186,7 +1241,7 @@ Validate config without mutation and preview the sync diff.
 ```
 USAGE
   $ zitadel plan [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--telemetry]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -1194,6 +1249,8 @@ FLAGS
                          an agent.
   -s, --server=<value>   Override the resolved server URL.
   -v, --verbose          Verbose logging.
+      --[no-]color       Colorize human output. Disable with --no-color;
+                         NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
       --[no-]telemetry   Send anonymous usage analytics. Disable with
@@ -1213,7 +1270,7 @@ Get one project by id.
 ```
 USAGE
   $ zitadel projects get ID [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--telemetry] [--fields <value>]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--fields <value>]
 
 ARGUMENTS
   ID  project id
@@ -1224,6 +1281,8 @@ FLAGS
                          an agent.
   -s, --server=<value>   Override the resolved server URL.
   -v, --verbose          Verbose logging.
+      --[no-]color       Colorize human output. Disable with --no-color;
+                         NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
       --fields=<value>   Fields to show, comma-separated dot-paths. Defaults to
@@ -1250,7 +1309,7 @@ List projects.
 ```
 USAGE
   $ zitadel projects list [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--telemetry] [--limit <value>] [-a |
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--limit <value>] [-a |
     --page-token <value>] [--fields <value>] [--plain] [--filter <value>...]
     [--sort <value>]
 
@@ -1261,6 +1320,8 @@ FLAGS
                             as an agent.
   -s, --server=<value>      Override the resolved server URL.
   -v, --verbose             Verbose logging.
+      --[no-]color          Colorize human output. Disable with --no-color;
+                            NO_COLOR and FORCE_COLOR are honored too.
       --debug               Debug logging.
       --dry-run             Preview without mutating files or the platform.
       --fields=<value>      Columns to show, comma-separated dot-paths (e.g.
@@ -1300,8 +1361,8 @@ Update a project by id.
 ```
 USAGE
   $ zitadel projects update ID [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--telemetry] [--name <value>] [--password-hash
-    <value>] [--data <value> | --file <value>]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--name <value>]
+    [--password-hash <value>] [--data <value> | --file <value>]
 
 ARGUMENTS
   ID  project id
@@ -1312,6 +1373,8 @@ FLAGS
                          an agent.
   -s, --server=<value>   Override the resolved server URL.
   -v, --verbose          Verbose logging.
+      --[no-]color       Colorize human output. Disable with --no-color;
+                         NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
       --[no-]telemetry   Send anonymous usage analytics. Disable with
@@ -1344,7 +1407,7 @@ Get one release by id.
 ```
 USAGE
   $ zitadel releases get ID [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--telemetry] [--fields <value>]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--fields <value>]
 
 ARGUMENTS
   ID  release id
@@ -1355,6 +1418,8 @@ FLAGS
                          an agent.
   -s, --server=<value>   Override the resolved server URL.
   -v, --verbose          Verbose logging.
+      --[no-]color       Colorize human output. Disable with --no-color;
+                         NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
       --fields=<value>   Fields to show, comma-separated dot-paths. Defaults to
@@ -1381,7 +1446,7 @@ List releases.
 ```
 USAGE
   $ zitadel releases list [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--telemetry] [--limit <value>] [-a |
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--limit <value>] [-a |
     --page-token <value>] [--fields <value>] [--plain]
 
 FLAGS
@@ -1391,6 +1456,8 @@ FLAGS
                             as an agent.
   -s, --server=<value>      Override the resolved server URL.
   -v, --verbose             Verbose logging.
+      --[no-]color          Colorize human output. Disable with --no-color;
+                            NO_COLOR and FORCE_COLOR are honored too.
       --debug               Debug logging.
       --dry-run             Preview without mutating files or the platform.
       --fields=<value>      Columns to show, comma-separated dot-paths (e.g.
@@ -1422,7 +1489,7 @@ Delete the local Zitadel server runtime and data.
 ```
 USAGE
   $ zitadel reset [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--telemetry] [-f]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [-f]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -1432,6 +1499,8 @@ FLAGS
                          an agent.
   -s, --server=<value>   Override the resolved server URL.
   -v, --verbose          Verbose logging.
+      --[no-]color       Colorize human output. Disable with --no-color;
+                         NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
       --[no-]telemetry   Send anonymous usage analytics. Disable with
@@ -1451,7 +1520,7 @@ List the resources this CLI manages and what can be done to each.
 ```
 USAGE
   $ zitadel resources [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--telemetry]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -1459,6 +1528,8 @@ FLAGS
                          an agent.
   -s, --server=<value>   Override the resolved server URL.
   -v, --verbose          Verbose logging.
+      --[no-]color       Colorize human output. Disable with --no-color;
+                         NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
       --[no-]telemetry   Send anonymous usage analytics. Disable with
@@ -1485,7 +1556,7 @@ Get one schema by id.
 ```
 USAGE
   $ zitadel schemas get SCHEMA [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--telemetry] [--fields <value>]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--fields <value>]
 
 ARGUMENTS
   SCHEMA  object type (current revision) or revision id
@@ -1496,6 +1567,8 @@ FLAGS
                          an agent.
   -s, --server=<value>   Override the resolved server URL.
   -v, --verbose          Verbose logging.
+      --[no-]color       Colorize human output. Disable with --no-color;
+                         NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
       --fields=<value>   Fields to show, comma-separated dot-paths. Defaults to
@@ -1522,7 +1595,7 @@ List schemas.
 ```
 USAGE
   $ zitadel schemas list [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--telemetry] [--limit <value>] [-a |
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--limit <value>] [-a |
     --page-token <value>] [--fields <value>] [--plain] [--filter <value>...]
 
 FLAGS
@@ -1532,6 +1605,8 @@ FLAGS
                             as an agent.
   -s, --server=<value>      Override the resolved server URL.
   -v, --verbose             Verbose logging.
+      --[no-]color          Colorize human output. Disable with --no-color;
+                            NO_COLOR and FORCE_COLOR are honored too.
       --debug               Debug logging.
       --dry-run             Preview without mutating files or the platform.
       --fields=<value>      Columns to show, comma-separated dot-paths (e.g.
@@ -1585,7 +1660,7 @@ Get one session by id.
 ```
 USAGE
   $ zitadel sessions get ID [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--telemetry] [--fields <value>]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--fields <value>]
 
 ARGUMENTS
   ID  session id
@@ -1596,6 +1671,8 @@ FLAGS
                          an agent.
   -s, --server=<value>   Override the resolved server URL.
   -v, --verbose          Verbose logging.
+      --[no-]color       Colorize human output. Disable with --no-color;
+                         NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
       --fields=<value>   Fields to show, comma-separated dot-paths. Defaults to
@@ -1622,7 +1699,7 @@ List sessions.
 ```
 USAGE
   $ zitadel sessions list [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--telemetry] [--limit <value>] [-a |
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--limit <value>] [-a |
     --page-token <value>] [--fields <value>] [--plain] [--filter <value>...]
     [--sort <value>]
 
@@ -1641,6 +1718,10 @@ FLAGS
 
   -v, --verbose
       Verbose logging.
+
+  --[no-]color
+      Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are
+      honored too.
 
   --debug
       Debug logging.
@@ -1699,7 +1780,7 @@ Revoke a session by id.
 ```
 USAGE
   $ zitadel sessions revoke ID [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--telemetry] [-f]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [-f]
 
 ARGUMENTS
   ID  session id
@@ -1712,6 +1793,8 @@ FLAGS
                          an agent.
   -s, --server=<value>   Override the resolved server URL.
   -v, --verbose          Verbose logging.
+      --[no-]color       Colorize human output. Disable with --no-color;
+                         NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
       --[no-]telemetry   Send anonymous usage analytics. Disable with
@@ -1734,7 +1817,7 @@ Create a Zitadel project and scaffold local auth.
 ```
 USAGE
   $ zitadel setup [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--telemetry] [-f] [--framework
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [-f] [--framework
     next|nuxt|react|vue|solid|svelte|qwik|angular] [--renderer react]
     [--dev-port <value>] [--skip-install] [--preset
     password-first|passkey-first] [--use-case minimal|consumer|business] [--sso
@@ -1755,6 +1838,10 @@ FLAGS
 
   -v, --verbose
       Verbose logging.
+
+  --[no-]color
+      Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are
+      honored too.
 
   --debug
       Debug logging.
@@ -1820,8 +1907,8 @@ Enable an identity provider for a user schema.
 ```
 USAGE
   $ zitadel sso enable [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--telemetry] [--provider google] [--schema
-    <value>] [--client-id <value>]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--provider google]
+    [--schema <value>] [--client-id <value>]
 
 FLAGS
   -c, --cwd=<value>        Project directory to operate on.
@@ -1831,6 +1918,8 @@ FLAGS
   -v, --verbose            Verbose logging.
       --client-id=<value>  Client id of the application registered with the
                            provider.
+      --[no-]color         Colorize human output. Disable with --no-color;
+                           NO_COLOR and FORCE_COLOR are honored too.
       --debug              Debug logging.
       --dry-run            Preview without mutating files or the platform.
       --provider=<option>  Identity provider to enable.
@@ -1861,8 +1950,8 @@ Start a local Zitadel server.
 ```
 USAGE
   $ zitadel start [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--telemetry] [--image <value>] [--port <value>]
-    [--runtime binary|docker]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--image <value>] [--port
+    <value>] [--runtime binary|docker]
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
@@ -1870,6 +1959,8 @@ FLAGS
                           an agent.
   -s, --server=<value>    Override the resolved server URL.
   -v, --verbose           Verbose logging.
+      --[no-]color        Colorize human output. Disable with --no-color;
+                          NO_COLOR and FORCE_COLOR are honored too.
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
       --image=<value>     Container image to run.
@@ -1893,7 +1984,7 @@ Summarize the local Zitadel server and project state.
 ```
 USAGE
   $ zitadel status [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--telemetry]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -1901,6 +1992,8 @@ FLAGS
                          an agent.
   -s, --server=<value>   Override the resolved server URL.
   -v, --verbose          Verbose logging.
+      --[no-]color       Colorize human output. Disable with --no-color;
+                         NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
       --[no-]telemetry   Send anonymous usage analytics. Disable with
@@ -1920,7 +2013,7 @@ Stop the local Zitadel server.
 ```
 USAGE
   $ zitadel stop [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--telemetry] [--all]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--all]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -1930,6 +2023,8 @@ FLAGS
   -v, --verbose          Verbose logging.
       --all              Stop all discovered CLI-managed local Zitadel runtime
                          processes.
+      --[no-]color       Colorize human output. Disable with --no-color;
+                         NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
       --[no-]telemetry   Send anonymous usage analytics. Disable with
@@ -1949,8 +2044,8 @@ Create a team.
 ```
 USAGE
   $ zitadel teams create [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--telemetry] [--name <value>] [--data <value> |
-    --file <value>]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--name <value>] [--data
+    <value> | --file <value>]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -1958,6 +2053,8 @@ FLAGS
                          an agent.
   -s, --server=<value>   Override the resolved server URL.
   -v, --verbose          Verbose logging.
+      --[no-]color       Colorize human output. Disable with --no-color;
+                         NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
       --[no-]telemetry   Send anonymous usage analytics. Disable with
@@ -1991,7 +2088,7 @@ Deactivate a team by id.
 ```
 USAGE
   $ zitadel teams deactivate ID [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--telemetry] [-f]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [-f]
 
 ARGUMENTS
   ID  team id
@@ -2004,6 +2101,8 @@ FLAGS
                          an agent.
   -s, --server=<value>   Override the resolved server URL.
   -v, --verbose          Verbose logging.
+      --[no-]color       Colorize human output. Disable with --no-color;
+                         NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
       --[no-]telemetry   Send anonymous usage analytics. Disable with
@@ -2026,7 +2125,7 @@ Get one team by id.
 ```
 USAGE
   $ zitadel teams get ID [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--telemetry] [--fields <value>]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--fields <value>]
 
 ARGUMENTS
   ID  team id
@@ -2037,6 +2136,8 @@ FLAGS
                          an agent.
   -s, --server=<value>   Override the resolved server URL.
   -v, --verbose          Verbose logging.
+      --[no-]color       Colorize human output. Disable with --no-color;
+                         NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
       --fields=<value>   Fields to show, comma-separated dot-paths. Defaults to
@@ -2063,7 +2164,7 @@ List teams.
 ```
 USAGE
   $ zitadel teams list [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--telemetry] [--limit <value>] [-a |
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--limit <value>] [-a |
     --page-token <value>] [--fields <value>] [--plain] [--filter <value>...]
     [--sort <value>]
 
@@ -2082,6 +2183,10 @@ FLAGS
 
   -v, --verbose
       Verbose logging.
+
+  --[no-]color
+      Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are
+      honored too.
 
   --debug
       Debug logging.
@@ -2138,8 +2243,8 @@ Update a team by id.
 ```
 USAGE
   $ zitadel teams update ID [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--telemetry] [--name <value>] [--data <value> |
-    --file <value>]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--name <value>] [--data
+    <value> | --file <value>]
 
 ARGUMENTS
   ID  team id
@@ -2150,6 +2255,8 @@ FLAGS
                          an agent.
   -s, --server=<value>   Override the resolved server URL.
   -v, --verbose          Verbose logging.
+      --[no-]color       Colorize human output. Disable with --no-color;
+                         NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
       --[no-]telemetry   Send anonymous usage analytics. Disable with
@@ -2181,7 +2288,7 @@ Remove managed files and local Zitadel state.
 ```
 USAGE
   $ zitadel uninstall [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--telemetry] [-f]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [-f]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -2191,6 +2298,8 @@ FLAGS
                          an agent.
   -s, --server=<value>   Override the resolved server URL.
   -v, --verbose          Verbose logging.
+      --[no-]color       Colorize human output. Disable with --no-color;
+                         NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
       --[no-]telemetry   Send anonymous usage analytics. Disable with
@@ -2213,8 +2322,8 @@ Create an user.
 ```
 USAGE
   $ zitadel users create [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--telemetry] [--schema <value>] [--attributes
-    <value>...] [--data <value> | --file <value>]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--schema <value>]
+    [--attributes <value>...] [--data <value> | --file <value>]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -2222,6 +2331,8 @@ FLAGS
                          an agent.
   -s, --server=<value>   Override the resolved server URL.
   -v, --verbose          Verbose logging.
+      --[no-]color       Colorize human output. Disable with --no-color;
+                         NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
       --[no-]telemetry   Send anonymous usage analytics. Disable with
@@ -2259,7 +2370,7 @@ Delete an user by id.
 ```
 USAGE
   $ zitadel users delete ID [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--telemetry] [-f]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [-f]
 
 ARGUMENTS
   ID  user id
@@ -2272,6 +2383,8 @@ FLAGS
                          an agent.
   -s, --server=<value>   Override the resolved server URL.
   -v, --verbose          Verbose logging.
+      --[no-]color       Colorize human output. Disable with --no-color;
+                         NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
       --[no-]telemetry   Send anonymous usage analytics. Disable with
@@ -2294,7 +2407,7 @@ Get one user by id.
 ```
 USAGE
   $ zitadel users get ID [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--telemetry] [--fields <value>]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--fields <value>]
 
 ARGUMENTS
   ID  user id
@@ -2305,6 +2418,8 @@ FLAGS
                          an agent.
   -s, --server=<value>   Override the resolved server URL.
   -v, --verbose          Verbose logging.
+      --[no-]color       Colorize human output. Disable with --no-color;
+                         NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
       --fields=<value>   Fields to show, comma-separated dot-paths. Defaults to
@@ -2331,7 +2446,7 @@ List users.
 ```
 USAGE
   $ zitadel users list [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--telemetry] [--limit <value>] [-a |
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--limit <value>] [-a |
     --page-token <value>] [--fields <value>] [--plain] [--filter <value>...]
     [--sort <value>]
 
@@ -2350,6 +2465,10 @@ FLAGS
 
   -v, --verbose
       Verbose logging.
+
+  --[no-]color
+      Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are
+      honored too.
 
   --debug
       Debug logging.
@@ -2412,8 +2531,8 @@ Update an user by id.
 ```
 USAGE
   $ zitadel users update ID [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--telemetry] [--schema <value>] [--attributes
-    <value>...] [--data <value> | --file <value>]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--schema <value>]
+    [--attributes <value>...] [--data <value> | --file <value>]
 
 ARGUMENTS
   ID  user id
@@ -2424,6 +2543,8 @@ FLAGS
                          an agent.
   -s, --server=<value>   Override the resolved server URL.
   -v, --verbose          Verbose logging.
+      --[no-]color       Colorize human output. Disable with --no-color;
+                         NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
       --[no-]telemetry   Send anonymous usage analytics. Disable with
@@ -2457,7 +2578,7 @@ Delete one variable from the project.
 ```
 USAGE
   $ zitadel variables delete NAME [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--telemetry] [--project-level] [-f]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--project-level] [-f]
 
 ARGUMENTS
   NAME  Variable name to delete.
@@ -2470,6 +2591,8 @@ FLAGS
                          an agent.
   -s, --server=<value>   Override the resolved server URL.
   -v, --verbose          Verbose logging.
+      --[no-]color       Colorize human output. Disable with --no-color;
+                         NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
       --project-level    Address the project level. Required: it is the only
@@ -2496,7 +2619,7 @@ Get one variable from the project.
 ```
 USAGE
   $ zitadel variables get NAME [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--telemetry] [--project-level]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--project-level]
 
 ARGUMENTS
   NAME  Variable name to read.
@@ -2507,6 +2630,8 @@ FLAGS
                          an agent.
   -s, --server=<value>   Override the resolved server URL.
   -v, --verbose          Verbose logging.
+      --[no-]color       Colorize human output. Disable with --no-color;
+                         NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
       --project-level    Address the project level. Required: it is the only
@@ -2533,7 +2658,8 @@ List the variables entered on the project.
 ```
 USAGE
   $ zitadel variables list [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--telemetry] [--project-level] [--plain]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--project-level]
+    [--plain]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -2541,6 +2667,8 @@ FLAGS
                          an agent.
   -s, --server=<value>   Override the resolved server URL.
   -v, --verbose          Verbose logging.
+      --[no-]color       Colorize human output. Disable with --no-color;
+                         NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
       --plain            Tab-separated rows with no header, for piping. Implied
@@ -2569,8 +2697,8 @@ Set one variable on the project.
 ```
 USAGE
   $ zitadel variables set NAME [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--telemetry] [--project-level] [--secret] [--as
-    string|number|boolean]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--project-level]
+    [--secret] [--as string|number|boolean]
 
 ARGUMENTS
   NAME  Variable name (letters, digits and underscores).
@@ -2585,6 +2713,8 @@ FLAGS
                          reference to the whole field resolves to that type, so
                          a number stays a number.
                          <options: string|number|boolean>
+      --[no-]color       Colorize human output. Disable with --no-color;
+                         NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
       --project-level    Address the project level. Required: it is the only
