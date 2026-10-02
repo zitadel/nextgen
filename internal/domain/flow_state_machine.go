@@ -397,6 +397,14 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 		return result, true, err
 	}
 
+	// The bind cannot be undone, so it runs only when the outcome can route:
+	// a stored definition is validated only on write. Otherwise the step
+	// shows the outcome as an unwired one, and the row stays parked.
+	if t, ok := currentStep.Transitions[FlowImplicitOutcomeSSOAuthenticated]; !ok || t.Action != nil || t.Purpose != nil {
+		msg := FlowImplicitOutcomeSSOAuthenticated
+		result, err := r.renderStepError(pc, resolvedFields, &msg)
+		return result, true, err
+	}
 	err = r.ssoIdentities.BindLinked(ctx, FlowSSOBindInput{
 		ProjectID:    state.ProjectID,
 		AttemptID:    state.AuthAttemptID,

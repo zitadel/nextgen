@@ -4397,6 +4397,40 @@ func TestFlowStateMachine_Render_SSOUnlinkedAutoLeavesParkedRow(t *testing.T) {
 	assert.Empty(t, result.State.SSOResolvedCheckID)
 }
 
+// A stored definition is validated only on write. When its sso_authenticated
+// transition cannot route, the attempt is not bound: the step shows the
+// unwired outcome, and the guard keeps a reload from repeating it.
+func TestFlowStateMachine_Render_SSOUnroutableTransitionDoesNotBind(t *testing.T) {
+	t.Parallel()
+	register := domain.FlowDefinitionPurposeRegister
+	action := domain.Switch
+	for name, transition := range map[string]*domain.FlowStepTransition{
+		"missing":      nil,
+		"with purpose": {Target: "done", Purpose: &register},
+		"with action":  {Target: "other-flow", Action: &action},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			w, def, state := ssoRenderWorld(t)
+			delete(def.Steps[0].Transitions, domain.FlowImplicitOutcomeSSOAuthenticated)
+			if transition != nil {
+				def.Steps[0].Transitions[domain.FlowImplicitOutcomeSSOAuthenticated] = *transition
+			}
+			w.expectParked(linkedParked(), nil)
+			w.ssoIdentities.EXPECT().BindLinked(gomock.Any(), gomock.Any()).Times(0)
+			w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).Times(0)
+
+			result, err := w.sm.Render(t.Context(), def, state)
+			require.NoError(t, err)
+			assert.Equal(t, "credentials", result.Step.Name)
+			require.NotNil(t, result.Step.Error)
+			assert.Equal(t, domain.FlowImplicitOutcomeSSOAuthenticated, *result.Step.Error)
+			assert.Empty(t, result.State.CollectedData.UserID)
+			assert.Equal(t, "ch-1", result.State.SSOResolvedCheckID)
+		})
+	}
+}
+
 func TestFlowStateMachine_Render_SSOBindOnForeignUserRestarts(t *testing.T) {
 	t.Parallel()
 	w, def, state := ssoRenderWorld(t)
