@@ -17428,13 +17428,18 @@ type Field struct {
 	// recognise it. A space-separated token list; put it on the
 	// attribute verbatim and do not reinterpret it.
 	// The engine emits `username` on the field carrying the user's
-	// identifier, or `email` when that field's `type` is `email`. On a
-	// password field it emits `current-password` where the submitted
-	// value is verified against the stored credential, and
-	// `new-password` where the value is saved as the user's password —
-	// so a manager offers to fill on sign-in and to generate on
-	// registration. Omitted when no token applies, in which case render
-	// no attribute rather than an empty one.
+	// identifier, whatever that field's `type` is: `username` is the
+	// token a password manager pairs with a password, while `email`
+	// means contact information, so an email-typed identifier still
+	// takes `username` and matches the `identifier` a later password
+	// step carries. On a password field it emits `current-password`
+	// where the submitted value is verified against the stored
+	// credential, and `new-password` where the value is saved as the
+	// user's password — so a manager offers to fill on sign-in and to
+	// generate on registration. A journey whose purpose does not
+	// establish or verify a password yet emits neither.
+	// Omitted when no token applies, in which case render no attribute
+	// rather than an empty one.
 	// Autofill only: it says nothing about validation, and the input's
 	// `type` still comes from `type`.
 	Autocomplete OptString `json:"autocomplete"`

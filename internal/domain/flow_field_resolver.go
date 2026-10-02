@@ -135,7 +135,6 @@ const (
 // HTML autofill tokens the engine puts on [FlowField.Autocomplete].
 const (
 	AutocompleteUsername        = "username"
-	AutocompleteEmail           = "email"
 	AutocompleteCurrentPassword = "current-password"
 	AutocompleteNewPassword     = "new-password"
 )
@@ -156,16 +155,17 @@ var passwordAutocomplete = map[FlowDefinitionPurpose]string{
 	FlowDefinitionPurposeRecovery: AutocompleteNewPassword,
 }
 
-// AutocompleteForField returns the autofill token for a resolved field
-// under the given purpose, or "" when none applies. The identifier's token
-// follows its type, never its name; a password's comes from
-// [passwordAutocomplete].
+// AutocompleteForField returns the autofill token for a resolved field under
+// the given purpose, or "" when none applies.
+//
+// The identifier always takes [AutocompleteUsername], whatever its type. That
+// is the token a password manager pairs with a password; `email` means contact
+// information, so an email-typed identifier tagged with it would describe the
+// same value two different ways across an identifier step and a password step
+// and weaken the pairing the tokens exist to establish.
 func AutocompleteForField(f FlowField, purpose FlowDefinitionPurpose) string {
 	switch f.Challenge {
 	case FlowFieldChallengeIdentifier:
-		if f.Type == FlowFieldTypeEmail {
-			return AutocompleteEmail
-		}
 		return AutocompleteUsername
 	case FlowFieldChallengePassword:
 		return passwordAutocomplete[purpose]

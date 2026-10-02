@@ -18,10 +18,13 @@ func TestAutocompleteForField(t *testing.T) {
 		want    string
 	}{
 		{
-			name:    "an email-typed identifier takes the email token",
+			// `email` would mean contact information. The identifier is the
+			// half of a credential, so it takes the pairing token whatever
+			// its type — and matches the hidden control on the password step.
+			name:    "an email-typed identifier still takes the username token",
 			field:   domain.FlowField{Challenge: domain.FlowFieldChallengeIdentifier, Type: domain.FlowFieldTypeEmail},
 			purpose: domain.FlowDefinitionPurposeLogin,
-			want:    domain.AutocompleteEmail,
+			want:    domain.AutocompleteUsername,
 		},
 		{
 			name:    "a text-typed identifier takes the username token",

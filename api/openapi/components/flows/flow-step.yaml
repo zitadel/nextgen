@@ -14,7 +14,7 @@ example:
     - name: email
       type: email
       text_key: login.field.email
-      autocomplete: email
+      autocomplete: username
       required: true
     - name: password
       type: password

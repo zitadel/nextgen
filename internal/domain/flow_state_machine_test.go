@@ -4304,7 +4304,7 @@ func TestFlowStateMachine_TwoStepLogin_PasswordStepPairsTheIdentifier(t *testing
 
 	require.Len(t, start.Step.Fields, 1)
 	assert.Equal(t, "email", start.Step.Fields[0].Name)
-	assert.Equal(t, domain.AutocompleteEmail, start.Step.Fields[0].Autocomplete)
+	assert.Equal(t, domain.AutocompleteUsername, start.Step.Fields[0].Autocomplete)
 	assert.Nil(t, start.Step.Identifier)
 
 	result, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
@@ -4448,6 +4448,6 @@ func TestFlowStateMachine_SingleCardLogin_NeedsNoPairingHint(t *testing.T) {
 	for _, f := range start.Step.Fields {
 		byName[f.Name] = f.Autocomplete
 	}
-	assert.Equal(t, domain.AutocompleteEmail, byName["email"])
+	assert.Equal(t, domain.AutocompleteUsername, byName["email"])
 	assert.Equal(t, domain.AutocompleteCurrentPassword, byName["x-auth-methods#password"])
 }
