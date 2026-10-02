@@ -1,6 +1,7 @@
 import { configureZitadel } from "@zitadel/api/config";
 import type { Preview } from "@storybook/web-components-vite";
 import { html } from "lit";
+import { keyed } from "lit/directives/keyed.js";
 import { initialize } from "msw-storybook-addon";
 
 // Dev-only: make custom-element registration idempotent. The `<zl-*>` atoms run
@@ -55,7 +56,15 @@ const preview: Preview = {
   // (rather than only styling `body.sb-show-main`) means the addon-vitest a11y
   // run sees the intended background, so contrast checks pass. Orchestrator
   // stories use `layout: "fullscreen"` and paint their own branding surface.
-  decorators: [(story) => html`<div class="sb-canvas">${story()}</div>`],
+  // Key the story subtree on the story id so switching stories tears the DOM
+  // down and rebuilds it rather than reusing it. `<zitadel-login>` is a stateful
+  // custom element, and lit-html otherwise keeps the same instance across
+  // stories: once a flow is driven to its terminal "signed-in" step, that state
+  // leaks into the next orchestrator story, which then renders blank until a
+  // full reload. Keying forces a fresh element per story so each starts clean.
+  decorators: [
+    (story, context) => html`${keyed(context.id, html`<div class="sb-canvas">${story()}</div>`)}`,
+  ],
 };
 
 export default preview;
