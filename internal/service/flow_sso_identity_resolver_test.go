@@ -25,8 +25,8 @@ const (
 	ssoRevisionID = "idprev-1"
 )
 
-// ssoConnectionDocument is a minimal connection revision the engine parses.
-const ssoConnectionDocument = `{
+// ssoResolverConnectionDocument is a minimal connection revision the engine parses.
+const ssoResolverConnectionDocument = `{
 	"slug": "google",
 	"protocol": "oidc",
 	"display_name": "Google",
@@ -90,7 +90,7 @@ func parkedResult() *domain.SSOCallbackResult {
 func (f *ssoResolverFixture) expectParked(link *domain.IDPIdentityLink, linkErr error) {
 	f.stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), ssoProjectID, ssoAttemptID).Return(parkedAttempt(parkedResult()), nil)
 	f.connections.EXPECT().GetRevision(gomock.Any(), ssoProjectID, ssoRevisionID).
-		Return(&domain.IDPConnection{ProjectID: ssoProjectID, ID: "idp-1", RevisionID: ssoRevisionID, Document: []byte(ssoConnectionDocument)}, nil)
+		Return(&domain.IDPConnection{ProjectID: ssoProjectID, ID: "idp-1", RevisionID: ssoRevisionID, Document: []byte(ssoResolverConnectionDocument)}, nil)
 	f.stmts.EXPECT().GetIDPIdentityLink(gomock.Any(), gomock.Any()).Return(link, linkErr)
 }
 
@@ -161,7 +161,7 @@ func TestFlowSSOIdentityResolver_LoadParked_BoundAttemptWithParkedResultPrefersR
 	f.stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), ssoProjectID, ssoAttemptID).
 		Return(parkedAttempt(parkedResult(), boundFactors()...), nil)
 	f.connections.EXPECT().GetRevision(gomock.Any(), ssoProjectID, ssoRevisionID).
-		Return(&domain.IDPConnection{ProjectID: ssoProjectID, ID: "idp-1", RevisionID: ssoRevisionID, Document: []byte(ssoConnectionDocument)}, nil)
+		Return(&domain.IDPConnection{ProjectID: ssoProjectID, ID: "idp-1", RevisionID: ssoRevisionID, Document: []byte(ssoResolverConnectionDocument)}, nil)
 	f.stmts.EXPECT().GetIDPIdentityLink(gomock.Any(), gomock.Any()).Return(nil, database.NewNoRowFoundError(nil))
 
 	got, err := f.resolver.LoadParked(t.Context(), loadInput())

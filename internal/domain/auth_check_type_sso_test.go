@@ -29,7 +29,7 @@ func TestNewSSOState(t *testing.T) {
 	crypter := &crypto.InverseCrypter{}
 
 	t.Run("mints every secret, leaves the id for storage and hashes the state into StateHash", func(t *testing.T) {
-		sso, err := domain.NewSSOState("google", "idprev_1", "/after-login", crypter)
+		sso, err := domain.NewSSOState("google", "idprev_1", "https://auth.example.com/__nextgen/idp/callback", "/after-login", crypter)
 		require.NoError(t, err)
 		require.NotNil(t, sso)
 		check := sso.Check
@@ -45,6 +45,7 @@ func TestNewSSOState(t *testing.T) {
 		require.NotNil(t, check.Pending)
 		assert.Equal(t, "google", check.Pending.ProviderSlug)
 		assert.Equal(t, "idprev_1", check.Pending.ConnectionRevisionID)
+		assert.Equal(t, "https://auth.example.com/__nextgen/idp/callback", check.Pending.RedirectURI)
 		assert.Equal(t, "/after-login", check.Pending.ReturnTarget)
 		assert.Same(t, check.Pending, check.Payload())
 
@@ -61,7 +62,7 @@ func TestNewSSOState(t *testing.T) {
 	})
 
 	t.Run("the verifier is stored encrypted and round-trips", func(t *testing.T) {
-		sso, err := domain.NewSSOState("google", "idprev_1", "/after-login", crypter)
+		sso, err := domain.NewSSOState("google", "idprev_1", "https://auth.example.com/__nextgen/idp/callback", "/after-login", crypter)
 		require.NoError(t, err)
 
 		stored := sso.Check.Pending.EncryptedPKCEVerifier
@@ -78,7 +79,7 @@ func TestNewSSOState(t *testing.T) {
 	})
 
 	t.Run("the binding nonce is stored only as its hash", func(t *testing.T) {
-		sso, err := domain.NewSSOState("google", "idprev_1", "/after-login", crypter)
+		sso, err := domain.NewSSOState("google", "idprev_1", "https://auth.example.com/__nextgen/idp/callback", "/after-login", crypter)
 		require.NoError(t, err)
 
 		stored := sso.Check.Pending.BindingNonceHash
@@ -92,7 +93,7 @@ func TestNewSSOState(t *testing.T) {
 	})
 
 	t.Run("the oidc nonce is stored as issued", func(t *testing.T) {
-		sso, err := domain.NewSSOState("google", "idprev_1", "/after-login", crypter)
+		sso, err := domain.NewSSOState("google", "idprev_1", "https://auth.example.com/__nextgen/idp/callback", "/after-login", crypter)
 		require.NoError(t, err)
 		// The callback hands this value to the id_token verifier, so a hash
 		// would be of no use to it.
@@ -101,9 +102,9 @@ func TestNewSSOState(t *testing.T) {
 	})
 
 	t.Run("two calls share no secret", func(t *testing.T) {
-		first, err := domain.NewSSOState("google", "idprev_1", "/after-login", crypter)
+		first, err := domain.NewSSOState("google", "idprev_1", "https://auth.example.com/__nextgen/idp/callback", "/after-login", crypter)
 		require.NoError(t, err)
-		second, err := domain.NewSSOState("google", "idprev_1", "/after-login", crypter)
+		second, err := domain.NewSSOState("google", "idprev_1", "https://auth.example.com/__nextgen/idp/callback", "/after-login", crypter)
 		require.NoError(t, err)
 
 		assert.NotEqual(t, first.State, second.State)
@@ -117,7 +118,7 @@ func TestNewSSOState(t *testing.T) {
 	})
 
 	t.Run("no encrypter means no pkce", func(t *testing.T) {
-		sso, err := domain.NewSSOState("github", "idprev_2", "", nil)
+		sso, err := domain.NewSSOState("github", "idprev_2", "", "", nil)
 		require.NoError(t, err)
 		assert.Empty(t, sso.PKCEVerifier)
 		assert.Empty(t, sso.Check.Pending.EncryptedPKCEVerifier)
@@ -155,7 +156,7 @@ func TestSSOStatePayload_DecryptPKCEVerifierResolvesTheWritingKey(t *testing.T) 
 	issuing := keyedCrypter{keyID: "key-1"}
 	rotated := keyedCrypter{keyID: "key-2"}
 
-	sso, err := domain.NewSSOState("google", "idprev_1", "/after-login", issuing)
+	sso, err := domain.NewSSOState("google", "idprev_1", "https://auth.example.com/__nextgen/idp/callback", "/after-login", issuing)
 	require.NoError(t, err)
 
 	// The active key rotated while the ceremony was in flight.
@@ -192,7 +193,7 @@ func TestPKCEChallenge(t *testing.T) {
 func TestSSOState_LogValueOmitsSecrets(t *testing.T) {
 	t.Parallel()
 	crypter := &crypto.InverseCrypter{}
-	sso, err := domain.NewSSOState("google", "idprev_1", "/after-login", crypter)
+	sso, err := domain.NewSSOState("google", "idprev_1", "https://auth.example.com/__nextgen/idp/callback", "/after-login", crypter)
 	require.NoError(t, err)
 	check := sso.Check
 	// The storage layer would have stamped these two.

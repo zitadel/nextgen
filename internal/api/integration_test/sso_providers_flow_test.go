@@ -46,7 +46,7 @@ func TestFlowStepRendersSSOProvidersFromConnection(t *testing.T) {
 
 	stepResp, err := f.client.GetFlowStep(t.Context(), api.GetFlowStepParams{
 		ID:    flowHeaders.Response.ID,
-		Zflow: mustExtractZflow(t, flowHeaders.SetCookie.Value),
+		Zflow: mustExtractZflow(t, flowHeaders.SetCookie),
 	})
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowResponseHeaders{}, stepResp, helpers.MustMarshal(t, stepResp))

@@ -51,3 +51,11 @@ func ErrFlowRestartRequired() Error {
 func ErrFlowIntegrity() Error {
 	return newError(PrefixFlow.ErrorCodePrefix("integrity"), "flow state integrity violation", nil, nil)
 }
+
+// ErrFlowSSOUnavailable reports a provider the engine could not start a
+// sign-in with: discovery failed or the connection document breaks a
+// protocol rule. The user stays on the step and may pick another method;
+// cause is log-only.
+func ErrFlowSSOUnavailable(cause error) Error {
+	return newError(PrefixFlow.ErrorCodePrefix("sso_unavailable"), "identity provider is unavailable", nil, cause)
+}

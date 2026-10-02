@@ -16,7 +16,7 @@ It requires three distinct artifacts to align perfectly:
 | :--- | :--- | :--- |
 | **User schema** | `x-auth-methods: {password, passkey, magic_link, sso, otp}` | The `sso` slot exists. Currently, every entry is strictly `{enabled}` only, with `additionalProperties: false`. |
 | **IdP connection** | The external provider configuration itself. | Outlined in area 1 (no server contract exists yet). |
-| **Flow step** | `sso_providers: ["google"]`, a list of connection slugs. The engine fills the rendered step's `name` and `template` from the connection ([Rendering from the connection](#rendering-from-the-connection)). | The meta-schema, the flow definition API and stored revisions take the slug list; every render resolves each slug through the connection service and emits `{id, name, template}`. The engine still rejects any SSO submission (`ErrFlowUnsupported`, `internal/domain/flow_state_machine.go`). *Constraint:* Any step carrying these **must** define a `transitions.sso_authenticated` (enforced by the validator). |
+| **Flow step** | `sso_providers: ["google"]`, a list of connection slugs. The engine fills the rendered step's `name` and `template` from the connection ([Rendering from the connection](#rendering-from-the-connection)). | The meta-schema, the flow definition API and stored revisions take the slug list; every render resolves each slug through the connection service and emits `{id, name, template}`. *Constraint:* Any step carrying these **must** define a `transitions.sso_authenticated` (enforced by the validator). |
 
 Each authentication method surfaces differently within a flow, meaning there is
 no uniform rendering mechanism across the board:

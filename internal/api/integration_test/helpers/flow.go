@@ -48,6 +48,7 @@ func (h *Harness) EnsureFlowStateMachine(t *testing.T) *domain.FlowStateMachineR
 			authAdapter,
 			service.NewFlowSSOProviderResolver(h.EnsureIDPConnectionService(t)),
 			service.NewFlowSSOIdentityResolver(h.EnsureServiceDB(t), h.EnsureIDPConnectionService(t)),
+			service.NewFlowSSORedirectIssuer(h.EnsureIDPConnectionService(t), h.EnsureAuthAttemptService(t), h.EnsureKeyService(t), h.EnsureVariableService(t), h.EnsureHttpClient(t)),
 			time.Now,
 		)
 	}

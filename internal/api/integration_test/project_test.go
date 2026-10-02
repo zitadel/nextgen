@@ -75,6 +75,10 @@ func (s *stubAuthAttemptService) IssueChallenge(ctx context.Context, input servi
 	return nil, nil
 }
 
+func (s *stubAuthAttemptService) IssueSSOState(ctx context.Context, input service.IssueSSOStateInput) (*domain.SSOState, error) {
+	return nil, nil
+}
+
 // VerifyProof implements [service.AuthAttemptService].
 func (s *stubAuthAttemptService) VerifyProof(ctx context.Context, input service.VerifyProofInput) (*domain.AuthAttempt, error) {
 	return nil, nil
