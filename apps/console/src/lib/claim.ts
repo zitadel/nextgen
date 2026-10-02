@@ -1,4 +1,4 @@
-import { ApiError } from "@zitadel/api/runtime/fetch";
+import { ApiError, apiErrorCode } from "@zitadel/api/runtime/fetch";
 
 import { api } from "../api/zitadel";
 import { fetchSession } from "../auth/session";
@@ -44,8 +44,8 @@ export type ClaimOutcome =
   | { kind: "unauthenticated" }
   /**
    * 403 `auth.csrf_invalid`: the request was not accepted as coming from this
-   * console (another site, or a session token the shared fetch could not
-   * refresh). Not a team problem, so it does not take the team branches.
+   * console (another site, or a session token that was stale or missing). Not a
+   * team problem, so it does not take the team branches.
    */
   | { kind: "csrf_refused"; message: string }
   /** 429, 5xx, network — nothing the page can name; retryable. */
@@ -83,7 +83,7 @@ export async function completeProjectClaim(
         case 401:
           return { kind: "unauthenticated" };
         case 403:
-          if (errorCode(cause.body) === "auth.csrf_invalid") {
+          if (apiErrorCode(cause) === "auth.csrf_invalid") {
             return { kind: "csrf_refused", message };
           }
           return personalTeamOutcome(message, cause.body);
@@ -119,7 +119,8 @@ function alreadyClaimedDetails(body: unknown): { teamId?: string; dashboardUrl?:
 }
 
 /**
- * Splits the 403's two codes (`completeClaim` declares them as a `oneOf`).
+ * Splits the 403's two team codes (`completeClaim` declares them in its 403
+ * `oneOf`, beside `auth.csrf_invalid`, which the caller has already handled).
  * They differ in the only thing the developer cares about: whether signing in
  * again fixes it.
  *
@@ -127,15 +128,9 @@ function alreadyClaimedDetails(body: unknown): { teamId?: string; dashboardUrl?:
  * end — the server never said this account is permanently stuck, and offering a
  * retry that fails is kinder than refusing one that would have worked.
  */
-function errorCode(body: unknown): string | undefined {
-  if (!body || typeof body !== "object") return undefined;
-  const code = (body as Record<string, unknown>).code;
-  return typeof code === "string" ? code : undefined;
-}
-
 function personalTeamOutcome(message: string, body: unknown): ClaimOutcome {
   const record = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
-  if (record.code === "claim.personal_team_not_active") {
+  if (apiErrorCode(body) === "claim.personal_team_not_active") {
     return {
       kind: "personal_team_not_active",
       message,

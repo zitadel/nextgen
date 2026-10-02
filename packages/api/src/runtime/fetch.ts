@@ -1,4 +1,4 @@
-import { getApiAuthToken, getApiCsrfToken, getApiCsrfTokenRefresher } from "./auth";
+import { getApiAuthToken, getApiCsrfRejectionHandler, getApiCsrfToken } from "./auth";
 
 /** The header the session-bound CSRF token travels in (ADR 053 §5). */
 export const CSRF_HEADER = "X-Zitadel-CSRF";
@@ -41,9 +41,9 @@ export class ApiError extends Error {
  *
  * - bearer auth — read from `runtime/auth.ts` and attached automatically;
  * - the CSRF header — the session-bound token from `runtime/auth.ts`, on
- *   unsafe methods only, when a first-party surface has set one; a request it
- *   carried that answers `403 auth.csrf_invalid` re-reads the token once, via
- *   the registered refresher, and is retried with it;
+ *   unsafe methods only, when a first-party surface has set one; an unsafe
+ *   request refused with `403 auth.csrf_invalid` notifies the registered
+ *   rejection handler, and is not retried;
  * - non-2xx → throw — orval's stock client parses the body regardless
  *   of status, so callers would have to inspect every response. Throw
  *   `ApiError` on `!res.ok` so failures interrupt control flow;
@@ -57,30 +57,24 @@ export async function customFetch<T>(url: string, options: RequestInit): Promise
   if (token && !headers.has("authorization")) {
     headers.set("authorization", `Bearer ${token}`);
   }
-  const csrfToken = getApiCsrfToken();
   const method = (options.method ?? "GET").toUpperCase();
-  const addsCsrf = Boolean(csrfToken) && !SAFE_METHODS.has(method) && !headers.has(CSRF_HEADER);
-  if (addsCsrf && csrfToken) {
+  const unsafe = !SAFE_METHODS.has(method) && !headers.has(CSRF_HEADER);
+  const csrfToken = getApiCsrfToken();
+  if (unsafe && csrfToken) {
     headers.set(CSRF_HEADER, csrfToken);
   }
 
-  let res = await fetch(url, { ...options, headers });
-  let noBody = [204, 205, 304].includes(res.status);
-  let rawBody = noBody ? "" : await res.text();
-  let parsed = rawBody ? (safeJsonParse(rawBody) as unknown) : undefined;
+  const res = await fetch(url, { ...options, headers });
 
-  // The token went stale: the session cookie changed under this page (another
-  // tab signed in again). Re-read it once and retry; a second refusal stands.
-  const refresh = getApiCsrfTokenRefresher();
-  if (addsCsrf && refresh && res.status === 403 && errorCode(parsed) === CSRF_INVALID) {
-    const fresh = await refresh().catch(() => undefined);
-    if (fresh && fresh !== csrfToken) {
-      headers.set(CSRF_HEADER, fresh);
-      res = await fetch(url, { ...options, headers });
-      noBody = [204, 205, 304].includes(res.status);
-      rawBody = noBody ? "" : await res.text();
-      parsed = rawBody ? (safeJsonParse(rawBody) as unknown) : undefined;
-    }
+  const noBody = [204, 205, 304].includes(res.status);
+  const rawBody = noBody ? "" : await res.text();
+  const parsed = rawBody ? (safeJsonParse(rawBody) as unknown) : undefined;
+
+  // The token was stale (the session cookie changed under this page) or never
+  // loaded. Tell the app, which re-checks the session; the request itself is
+  // not replayed.
+  if (unsafe && res.status === 403 && apiErrorCode(parsed) === CSRF_INVALID) {
+    getApiCsrfRejectionHandler()?.();
   }
 
   if (!res.ok) {
@@ -103,6 +97,16 @@ function safeJsonParse(text: string): unknown {
   } catch {
     return { raw: text };
   }
+}
+
+/**
+ * The `code` of the server's `{code, message, details}` error envelope: from an
+ * {@link ApiError}, or from a parsed response body. `undefined` when there is
+ * none, e.g. an HTML error page from a proxy.
+ */
+export function apiErrorCode(errorOrBody: unknown): string | undefined {
+  const body = errorOrBody instanceof ApiError ? errorOrBody.body : errorOrBody;
+  return isRecord(body) && typeof body.code === "string" ? body.code : undefined;
 }
 
 /**
@@ -146,9 +150,6 @@ function pickDetailString(details: unknown): string | undefined {
   return undefined;
 }
 
-function errorCode(body: unknown): string | undefined {
-  return isRecord(body) && typeof body.code === "string" ? body.code : undefined;
-}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
