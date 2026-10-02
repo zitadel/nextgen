@@ -10,11 +10,12 @@ import (
 // If client is a db (wraps *sql.DB), a new transaction is started.
 // If client is already a txExecutor, fn runs on it directly (joins the outer tx).
 // Any other queryExecutor type also runs fn directly.
+// The check looks through [tracedExecutor]; fn gets a traced tx.
 func withTransaction(ctx context.Context, client queryExecutor, fn func(ctx context.Context, tx queryExecutor) error) (err error) {
 	type beginner interface {
 		BeginTx(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error)
 	}
-	b, ok := client.(beginner)
+	b, ok := untraced(client).(beginner)
 	if !ok {
 		return fn(ctx, client)
 	}
@@ -33,5 +34,5 @@ func withTransaction(ctx context.Context, client queryExecutor, fn func(ctx cont
 		}
 		err = sqlTx.Commit()
 	}()
-	return fn(ctx, txExecutor{sqlTx: sqlTx})
+	return fn(ctx, traced(txExecutor{sqlTx: sqlTx}))
 }
