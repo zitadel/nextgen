@@ -18,6 +18,8 @@
 > [ADR 063](063-resource-revisions-fixed-id-and-revision-id.md) (revisions),
 > [ADR 062](062-per-environment-variables-and-secrets.md) (variables),
 > [ADR 008](008-users-eav-store.md) (key-value storage),
+> [ADR 024](024-user-team-lifecycle-ownership.md) and
+> [the API hierarchy](../design/api/hierarchy.md) (owners),
 > [ADR 048](048-wide-events-internal-audit-primitive.md) (audit).
 
 ## TL;DR
@@ -41,7 +43,7 @@ is system-only.
 
 That leaves one idea with two mechanisms and two gaps. `session.default_ttl` is
 system-wide with no way for a project to differ, which #899 names as a setting.
-`password_hash_policy` is a column mutated outside ADR 035's release boundary, so it
+`password_hash_policy` (the `password_hash` API field) is a column mutated outside ADR 035's release boundary, so it
 is neither promotable nor attributable. Every further setting picks one of the two
 and inherits its gap.
 
@@ -61,13 +63,16 @@ Settings can be configured in these scopes:
   stored scope in the first implementation.
 
 
-Team and user-schema scopes are left room for (the table below is keyed so they fit)
-but not built without a concrete use case. A user schema already carries
+Team, application (#899) and user-schema scopes are left room for but not built
+without a concrete use case. A user schema already carries
 `x-auth-methods`, which stays where it is; whether it folds into a settings document
 is an open question.
 
 Each scope's schema declares what it can configure, so whether a setting is
 configurable in a scope is a product decision.
+
+Falling back to the system configuration or a built-in default is not inheritance:
+no stored scope overrides another one until #899 is decided.
 
 ### 2. Storage
 
@@ -80,9 +85,15 @@ types since objects will be broken into separate rows.
 An object whose keys are data rather than schema is stored whole like a list, because
 `password_hasher.hasher.params` is valid only as a set for one algorithm.
 
-Each row carries its owner (`project_id` now) and a `revision_id`
-([ADR 063](063-resource-revisions-fixed-id-and-revision-id.md)) as discriminator.
-Rows are immutable, so a change duplicates the whole document under a new
+Which objects are stored whole is read from the settings schema: arrays, and objects
+whose keys are not declared properties (`additionalProperties`).
+
+A settings document is a revisioned resource
+([ADR 063](063-resource-revisions-fixed-id-and-revision-id.md)): one per owner, with a
+fixed `id` and a `revision_id` per revision, pinned by a release like any other kind.
+Each row carries the owner (`project_id` now; a scope-kind column joins it when a
+second scope lands), the `revision_id` and the path, and `(project_id, revision_id,
+path)` is unique. Rows are immutable, so a change duplicates the whole document under a new
 `revision_id`. Writes are expensive by design: we optimise for reads, and once
 overriding lands it simplifies resolving settings.
 
@@ -95,7 +106,8 @@ until a deployment happens (which links a release and an environment).
 
 Changing a variable does not change the release. It takes effect with a new
 deployment of the same release with the updated variables, and is validated then;
-a rollback is a deployment of the previous variables.
+a rollback is a deployment of the previous variables. Deployment-time validation is
+deferred by ADR 062 and has to land with this.
 
 A missing variable follows ADR 062: the reference is rendered as is. For a settings
 value that then fails validation (§4) unless the literal is valid for the setting.
@@ -124,6 +136,16 @@ internal Go service layer rather than over HTTP, so a handler-level read is
 invisible to the hosted login. Not in storage, which lacks request context. The
 service layer is the chokepoint the hosted login, direct clients, administration
 and self-service all pass through.
+
+Every read of a setting goes through that accessor, which resolves the scope and the
+fallback. Handlers and flow steps never read the settings table directly.
+
+Changing a setting is creating and deploying a release, so it needs the permissions
+ADR 035 already requires for those.
+
+A promoted change applies to what is created after it: sessions and credentials that
+exist keep what they were created with, unless the per-setting specification says
+otherwise.
 
 ### 6. Audit
 
@@ -160,8 +182,10 @@ which stays system-only. A behaviour change for self-hosters, needing its own is
   value to be at least as strict as the bound.
 - The password hasher in environments that share user data (preview environments):
   a different hasher per environment can lock users out, so whether it may vary per
-  environment, and where `Verifiers` lives.
+  environment, and where `Verifiers` lives. The same holds for rollback: users
+  rehashed after a promotion (ADR 038) must stay verifiable when the previous
+  revision is deployed again.
 - Whether a deployment may refuse a change that invalidates existing users,
   credentials or sessions, or only warn.
-- Whether the system configuration is readable through the API, so an
-  administrator sees the bounds.
+- Whether the system configuration and the built-in defaults are readable through
+  the API, so an administrator sees the bounds and the effective value.
