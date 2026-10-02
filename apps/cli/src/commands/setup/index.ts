@@ -1007,8 +1007,18 @@ function ssoRecovery(
     // what the command does. `sso enable` asks for the id, exactly as it asks
     // for the secret, which was never put in command text for the same
     // reason.
+    // `--server local`, as the setup retry pins it. Server resolution prefers
+    // `ZITADEL_API_BASE` over the project's own `zitadel.json`, so an
+    // unpinned `sso enable` run with that variable set would publish the
+    // client id and secret to whatever it names, using the local project's
+    // token -- leaving the local provider unconfigured and the credentials
+    // somewhere nobody asked for. Both callers of this are local-server
+    // failures, so `local` is the server meant in every case.
     commands: remaining.map((provider) =>
-      publicCliCommand(`sso enable --provider ${provider.provider}`, cliVersion),
+      publicCliCommand(
+        `sso enable --provider ${provider.provider} --server local`,
+        cliVersion,
+      ),
     ),
   };
 }
