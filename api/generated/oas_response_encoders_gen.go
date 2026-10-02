@@ -508,8 +508,17 @@ func encodeCreateFlowResponse(response CreateFlowRes, w http.ResponseWriter, spa
 					Explode: false,
 				}
 				if err := h.EncodeParam(cfg, func(e uri.Encoder) error {
-					if val, ok := response.SetCookie.Get(); ok {
-						return e.EncodeValue(conv.StringToString(val))
+					if response.SetCookie != nil {
+						return e.EncodeArray(func(e uri.Encoder) error {
+							for i, item := range response.SetCookie {
+								if err := func() error {
+									return e.EncodeValue(conv.StringToString(item))
+								}(); err != nil {
+									return errors.Wrapf(err, "[%d]", i)
+								}
+							}
+							return nil
+						})
 					}
 					return nil
 				}); err != nil {
@@ -2547,8 +2556,17 @@ func encodeGetFlowStepResponse(response GetFlowStepRes, w http.ResponseWriter, s
 					Explode: false,
 				}
 				if err := h.EncodeParam(cfg, func(e uri.Encoder) error {
-					if val, ok := response.SetCookie.Get(); ok {
-						return e.EncodeValue(conv.StringToString(val))
+					if response.SetCookie != nil {
+						return e.EncodeArray(func(e uri.Encoder) error {
+							for i, item := range response.SetCookie {
+								if err := func() error {
+									return e.EncodeValue(conv.StringToString(item))
+								}(); err != nil {
+									return errors.Wrapf(err, "[%d]", i)
+								}
+							}
+							return nil
+						})
 					}
 					return nil
 				}); err != nil {
@@ -6003,8 +6021,17 @@ func encodeSubmitFlowStepResponse(response SubmitFlowStepRes, w http.ResponseWri
 					Explode: false,
 				}
 				if err := h.EncodeParam(cfg, func(e uri.Encoder) error {
-					if val, ok := response.SetCookie.Get(); ok {
-						return e.EncodeValue(conv.StringToString(val))
+					if response.SetCookie != nil {
+						return e.EncodeArray(func(e uri.Encoder) error {
+							for i, item := range response.SetCookie {
+								if err := func() error {
+									return e.EncodeValue(conv.StringToString(item))
+								}(); err != nil {
+									return errors.Wrapf(err, "[%d]", i)
+								}
+							}
+							return nil
+						})
 					}
 					return nil
 				}); err != nil {
@@ -6059,8 +6086,17 @@ func encodeSubmitFlowStepResponse(response SubmitFlowStepRes, w http.ResponseWri
 					Explode: false,
 				}
 				if err := h.EncodeParam(cfg, func(e uri.Encoder) error {
-					if val, ok := response.SetCookie.Get(); ok {
-						return e.EncodeValue(conv.StringToString(val))
+					if response.SetCookie != nil {
+						return e.EncodeArray(func(e uri.Encoder) error {
+							for i, item := range response.SetCookie {
+								if err := func() error {
+									return e.EncodeValue(conv.StringToString(item))
+								}(); err != nil {
+									return errors.Wrapf(err, "[%d]", i)
+								}
+							}
+							return nil
+						})
 					}
 					return nil
 				}); err != nil {

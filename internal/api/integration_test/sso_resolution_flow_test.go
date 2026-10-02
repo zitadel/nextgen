@@ -68,7 +68,7 @@ func (f *ssoResolutionFixture) startFlow(t *testing.T, sessionID string) ssoFlow
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowResponseHeaders{}, resp, helpers.MustMarshal(t, resp))
 	created := resp.(*api.FlowResponseHeaders)
-	zflow := mustExtractZflow(t, created.SetCookie.Value)
+	zflow := mustExtractZflow(t, created.SetCookie)
 	return ssoFlow{
 		id:        created.Response.ID,
 		zflow:     zflow,
@@ -111,7 +111,7 @@ func (f *ssoResolutionFixture) attempt(t *testing.T, flow ssoFlow) *domain.AuthA
 func parkSSOResult(t *testing.T, projectID, attemptID, revisionID, subject string, claims map[string]any, verified map[string]bool) {
 	t.Helper()
 	stmts := harness.EnsureServiceDB(t).Statements()
-	sso, err := domain.NewSSOState("google", revisionID, "/after-login", nil)
+	sso, err := domain.NewSSOState("google", revisionID, "https://auth.example.com/__nextgen/idp/callback", "/after-login", nil)
 	require.NoError(t, err)
 	require.NoError(t, stmts.IssueSSOState(t.Context(), projectID, attemptID, sso.Check))
 	_, err = stmts.ConsumeSSOState(t.Context(), projectID, sso.Check.StateHash, sso.BindingNonce)
@@ -156,7 +156,7 @@ func requireAuthenticated(t *testing.T, resp api.GetFlowStepRes) *api.FlowRespon
 	got := resp.(*api.FlowResponseHeaders)
 	require.Equal(t, "done", got.Response.Step.Name)
 	assert.True(t, got.Response.HandoffToken.Set, "a resolved sign-in hands off")
-	assert.Contains(t, got.SetCookie.Value, "Max-Age=0", "the terminal response clears the flow cookie")
+	assert.Contains(t, strings.Join(got.SetCookie, "\n"), "Max-Age=0", "the terminal response clears the flow cookie")
 	return got
 }
 
@@ -166,8 +166,8 @@ func TestGetFlowStepRotatesCookie(t *testing.T) {
 
 	resp := f.getStep(t, flow)
 	require.IsType(t, &api.FlowResponseHeaders{}, resp, helpers.MustMarshal(t, resp))
-	cookie := resp.(*api.FlowResponseHeaders).SetCookie.Value
-	require.NotContains(t, cookie, "Max-Age=0")
+	cookie := resp.(*api.FlowResponseHeaders).SetCookie
+	require.NotContains(t, strings.Join(cookie, "\n"), "Max-Age=0")
 	rotated := mustExtractZflow(t, cookie)
 	assert.Equal(t, flow.attemptID, openFlowState(t, f.project.ID, rotated).AuthAttemptID)
 }
@@ -311,7 +311,7 @@ func TestSSOResolutionCreationDisabledRerendersWithError(t *testing.T) {
 
 	// The rotated cookie carries the replay guard: the next load renders the
 	// step without the error.
-	flow.zflow = mustExtractZflow(t, resp.(*api.FlowResponseHeaders).SetCookie.Value)
+	flow.zflow = mustExtractZflow(t, resp.(*api.FlowResponseHeaders).SetCookie)
 	again := f.getStep(t, flow)
 	require.IsType(t, &api.FlowResponseHeaders{}, again, helpers.MustMarshal(t, again))
 	assert.Equal(t, "identifier", again.(*api.FlowResponseHeaders).Response.Step.Name)
@@ -489,7 +489,7 @@ func TestSSOResolutionMissingRequiredRoutesSSOUserNotFound(t *testing.T) {
 
 	// The rotated cookie remembers the row, so a reload renders the step
 	// instead of resolving the identity again.
-	flow.zflow = mustExtractZflow(t, resp.(*api.FlowResponseHeaders).SetCookie.Value)
+	flow.zflow = mustExtractZflow(t, resp.(*api.FlowResponseHeaders).SetCookie)
 	reload := f.getStep(t, flow)
 	require.IsType(t, &api.FlowResponseHeaders{}, reload, helpers.MustMarshal(t, reload))
 	assert.False(t, reload.(*api.FlowResponseHeaders).Response.Step.Error.Set)

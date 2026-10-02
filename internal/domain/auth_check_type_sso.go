@@ -25,6 +25,11 @@ func ErrSSOStateInvalid() Error {
 type SSOStatePayload struct {
 	ProviderSlug         string `json:"provider_slug"`
 	ConnectionRevisionID string `json:"connection_revision_id"`
+	// RedirectURI is the authorize request's redirect_uri, which the token
+	// exchange must repeat unchanged (RFC 6749 §4.1.3). The callback cannot
+	// rebuild it from its own request: behind a dev proxy the host it sees is
+	// not the browser origin the submit was bound to.
+	RedirectURI string `json:"redirect_uri"`
 	// BindingNonceHash is HashSecret of the nonce the browser holds in its
 	// __Host- cookie. The record only ever verifies it, so a hash is all it
 	// needs (ADR 029, verify-only values).
@@ -224,7 +229,7 @@ func (s SSOState) LogValue() slog.Value {
 //
 // Only the state's hash is stored, so the plaintext is the single thing that can
 // find the record again.
-func NewSSOState(providerSlug, connectionRevisionID, returnTarget string, pkceEncrypter crypto.Encrypter) (*SSOState, error) {
+func NewSSOState(providerSlug, connectionRevisionID, redirectURI, returnTarget string, pkceEncrypter crypto.Encrypter) (*SSOState, error) {
 	state, err := randomSecret(16)
 	if err != nil {
 		return nil, err
@@ -256,6 +261,7 @@ func NewSSOState(providerSlug, connectionRevisionID, returnTarget string, pkceEn
 			Pending: &SSOStatePayload{
 				ProviderSlug:          providerSlug,
 				ConnectionRevisionID:  connectionRevisionID,
+				RedirectURI:           redirectURI,
 				BindingNonceHash:      HashSecret(bindingNonce),
 				EncryptedPKCEVerifier: encryptedVerifier,
 				OIDCNonce:             oidcNonce,

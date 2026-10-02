@@ -29,6 +29,27 @@ post:
     If a stacked flow (e.g., recovery pivoted from login) finishes, the server
     auto-pops to the parent flow and returns the parent's next step — the
     frontend never sees a `complete` for intermediate flows.
+
+    ## External sign-in
+
+    `{action: "sso", sso_provider_id, return_target}` on a step that offers
+    `sso_providers` returns the engine-emitted `sso-redirect` step, whose
+    `redirect_url` the frontend navigates to.
+
+    - The flow state does not change, but `_zflow` is re-sealed like on
+      every response, so its ten-minute window restarts at this submission;
+      the external sign-in and the return must complete within it.
+    - A second `Set-Cookie` line carries the browser-binding cookie the
+      callback checks: `HttpOnly`, `Path=/`, `SameSite=Lax`.
+    - On every host except http loopback it is `__Host-_zsso` with `Secure`.
+    - When the request host is http loopback (local development, where
+      Safari rejects `Secure`), it is `_zsso` with no `Secure`; the
+      `__Host-` prefix is dropped because it requires `Secure`.
+
+    A connection whose `client_id` is a `${{ NAME }}` reference has it filled
+    from the project's variables. A provider the engine cannot start a
+    sign-in with, including a reference with no variable behind it,
+    re-renders the step with `error.sso_unavailable`.
   tags:
     - Flows
   security: []
@@ -41,8 +62,10 @@ post:
       description: |
         Standard browser `Origin` header. When a step issues a passkey
         challenge, the server derives the WebAuthn relying-party id and the
-        allowed origin from this value. Browsers send it automatically on the
-        fetch POST; no client action is required.
+        allowed origin from this value. An sso submission is bound to it as
+        well: `return_target` must be on this origin, and the callback route
+        is built under it (see External sign-in above). Browsers send it
+        automatically on the fetch POST; no client action is required.
       schema:
         type: string
         format: uri
@@ -82,7 +105,13 @@ post:
           schema:
             $ref: ../../../components/flows/flow-response.yaml
     '409':
-      description: Version conflict — flow was advanced by another request.
+      description: |
+        Conflict. Either the flow session moved on under another request
+        (`flow.session_conflict`), or the submission (an sso start included)
+        reached an attempt that was already handed off
+        (`att.already_handed_off`). Only a client that kept the flow cookie
+        past the terminal response, or a request racing the one that handed
+        the attempt off, reaches the second case.
       content:
         application/json:
           schema:

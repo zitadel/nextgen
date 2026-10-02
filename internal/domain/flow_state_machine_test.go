@@ -68,6 +68,7 @@ type flowTestWorld struct {
 	createUser         *domainmock.MockFlowOnSuccessHandler
 	ssoProviders       *domainmock.MockFlowSSOProviderResolver
 	ssoIdentities      *domainmock.MockFlowSSOIdentityService
+	ssoRedirects       *domainmock.MockFlowSSORedirectIssuer
 	sm                 *domain.FlowStateMachineRuntime
 }
 
@@ -87,6 +88,7 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 	createUser := domainmock.NewMockFlowOnSuccessHandler(mock)
 	ssoProviders := domainmock.NewMockFlowSSOProviderResolver(mock)
 	ssoIdentities := domainmock.NewMockFlowSSOIdentityService(mock)
+	ssoRedirects := domainmock.NewMockFlowSSORedirectIssuer(mock)
 
 	resolver := domain.NewSchemaFieldResolver()
 
@@ -100,6 +102,7 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 		authAttemptService,
 		ssoProviders,
 		ssoIdentities,
+		ssoRedirects,
 		now,
 	)
 
@@ -111,6 +114,7 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 		createUser:         createUser,
 		ssoProviders:       ssoProviders,
 		ssoIdentities:      ssoIdentities,
+		ssoRedirects:       ssoRedirects,
 		sm:                 sm,
 	}
 }
@@ -680,16 +684,19 @@ func TestFlowStateMachine_Process_InvalidActionRejected(t *testing.T) {
 	require.ErrorIs(t, err, domain.ErrFlowInvalidAction())
 }
 
-func TestFlowStateMachine_Process_SSOSubmissionUnsupported(t *testing.T) {
-	t.Parallel()
-	w := newFlowTestWorld(t)
-	def := signupDefinition()
-
+// startSSOStepFlow starts a flow on the sso step and returns its state.
+// The one render expectation it sets is consumed by Start; a test that
+// re-renders adds its own.
+func startSSOStepFlow(t *testing.T, w *flowTestWorld, def *domain.FlowDefinition) *domain.FlowState {
+	t.Helper()
 	w.schemaResolver.EXPECT().
 		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
 		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
 		AnyTimes()
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
+	w.ssoProviders.EXPECT().
+		Resolve(gomock.Any(), testProjectID, "credentials", []string{"google", "github"}).
+		Return([]domain.FlowSSOProvider{{ID: "google", Name: "Google"}, {ID: "github", Name: "GitHub"}}, nil)
 
 	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
 		Definition:    def,
@@ -698,12 +705,178 @@ func TestFlowStateMachine_Process_SSOSubmissionUnsupported(t *testing.T) {
 		UserSchemaURL: defaultSchemaURL,
 	})
 	require.NoError(t, err)
+	return start.State
+}
 
-	_, err = w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
-		Action:      domain.FlowActionSubmit,
+var ssoSubmitReturn = &domain.FlowSSOReturn{
+	RedirectURI:  "https://auth.example.com/__nextgen/idp/callback",
+	ReturnTarget: "https://auth.example.com/login?flow=flow-1",
+}
+
+func TestFlowStateMachine_Process_SSO_EmitsRedirectStep(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+	def := ssoStepDefinition()
+	state := startSSOStepFlow(t, w, def)
+	// Picking a provider abandons a ceremony the step had pending.
+	state.PendingChallenge = &domain.FlowPendingChallenge{ID: "ch-1", Method: domain.FlowChallengeMethodPasskey}
+
+	w.ssoRedirects.EXPECT().
+		Issue(gomock.Any(), domain.FlowIssueSSORedirectInput{
+			ProjectID:     testProjectID,
+			AttemptID:     "attempt-1",
+			ProviderSlug:  "google",
+			FlowSSOReturn: *ssoSubmitReturn,
+		}).
+		Return(domain.FlowSSORedirectOutput{
+			RedirectURL:  "https://accounts.google.com/o/oauth2/v2/auth?state=abc",
+			BindingNonce: "nonce-1",
+		}, nil)
+
+	result, err := w.sm.Process(t.Context(), def, state, domain.FlowSubmitInput{
+		Action:      domain.FlowActionSSO,
+		SSOProvider: &domain.FlowSSOProviderRef{ID: "google"},
+		SSOReturn:   ssoSubmitReturn,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, result.Step)
+	assert.Equal(t, domain.FlowStepNameSSORedirect, result.Step.Name)
+	assert.Equal(t, "sso.redirect.title", result.Step.Texts.TitleKey)
+	require.NotNil(t, result.Step.RedirectURL)
+	assert.Equal(t, "https://accounts.google.com/o/oauth2/v2/auth?state=abc", *result.Step.RedirectURL)
+	assert.Empty(t, result.Step.Fields, "the redirect step collects nothing")
+	assert.Empty(t, result.Step.Actions)
+	assert.Equal(t, "nonce-1", result.SSOBindingNonce)
+	assert.Equal(t, "credentials", result.State.CurrentStep, "the flow waits on the step the provider was picked from")
+	assert.Equal(t, time.Unix(1700000000, 0).UTC(), result.State.IssuedAt, "the re-sealed cookie starts a fresh window for the external leg")
+	assert.Nil(t, result.State.PendingChallenge, "the abandoned ceremony is dropped")
+	assert.Nil(t, result.Step.Challenge, "a cleared challenge is not rendered")
+}
+
+func TestFlowStateMachine_Process_SSO_InvalidSubmissions(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		in   domain.FlowSubmitInput
+	}{
+		{
+			name: "provider not offered on the step",
+			in: domain.FlowSubmitInput{
+				Action:      domain.FlowActionSSO,
+				SSOProvider: &domain.FlowSSOProviderRef{ID: "okta"},
+				SSOReturn:   ssoSubmitReturn,
+			},
+		},
+		{
+			name: "sso action without a provider",
+			in: domain.FlowSubmitInput{
+				Action:    domain.FlowActionSSO,
+				SSOReturn: ssoSubmitReturn,
+			},
+		},
+		{
+			name: "provider on another action",
+			in: domain.FlowSubmitInput{
+				Action:      domain.FlowActionSubmit,
+				SSOProvider: &domain.FlowSSOProviderRef{ID: "google"},
+				SSOReturn:   ssoSubmitReturn,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			w := newFlowTestWorld(t)
+			def := ssoStepDefinition()
+			state := startSSOStepFlow(t, w, def)
+
+			_, err := w.sm.Process(t.Context(), def, state, tt.in)
+			require.ErrorIs(t, err, domain.ErrFlowInvalidAction())
+		})
+	}
+}
+
+func TestFlowStateMachine_Process_SSO_ReturnParamsMissing(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+	def := ssoStepDefinition()
+	state := startSSOStepFlow(t, w, def)
+
+	_, err := w.sm.Process(t.Context(), def, state, domain.FlowSubmitInput{
+		Action:      domain.FlowActionSSO,
 		SSOProvider: &domain.FlowSSOProviderRef{ID: "google"},
 	})
-	require.ErrorIs(t, err, domain.ErrFlowUnsupported())
+	require.ErrorIs(t, err, domain.ErrFlowIntegrity())
+}
+
+func TestFlowStateMachine_Process_SSO_ProviderUnavailableReRendersStep(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+	def := ssoStepDefinition()
+	state := startSSOStepFlow(t, w, def)
+	// The re-render after a provider outage drops a pending ceremony too.
+	state.PendingChallenge = &domain.FlowPendingChallenge{ID: "ch-1", Method: domain.FlowChallengeMethodPasskey}
+	w.ssoRedirects.EXPECT().Issue(gomock.Any(), gomock.Any()).
+		Return(domain.FlowSSORedirectOutput{}, domain.ErrFlowSSOUnavailable(errors.New("discovery timed out")))
+	w.ssoProviders.EXPECT().
+		Resolve(gomock.Any(), testProjectID, "credentials", []string{"google", "github"}).
+		Return([]domain.FlowSSOProvider{{ID: "google", Name: "Google"}, {ID: "github", Name: "GitHub"}}, nil)
+
+	result, err := w.sm.Process(t.Context(), def, state, domain.FlowSubmitInput{
+		Action:      domain.FlowActionSSO,
+		SSOProvider: &domain.FlowSSOProviderRef{ID: "google"},
+		SSOReturn:   ssoSubmitReturn,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, result.Step)
+	assert.Equal(t, "credentials", result.Step.Name)
+	require.NotNil(t, result.Step.Error)
+	assert.Equal(t, domain.FlowStepErrorSSOUnavailable, *result.Step.Error)
+	assert.Len(t, result.Step.SSOProviders, 2, "the other providers stay on offer")
+	assert.Nil(t, result.Step.RedirectURL)
+	assert.Empty(t, result.SSOBindingNonce)
+	assert.Nil(t, result.State.PendingChallenge, "the abandoned ceremony is dropped")
+	assert.Nil(t, result.Step.Challenge, "a cleared challenge is not rendered")
+}
+
+func TestFlowStateMachine_Process_SSO_IssueErrors(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name    string
+		issue   error
+		wantErr error
+	}{
+		{
+			// A slug the render dropped is one the client was never offered,
+			// so a submission naming it is an invalid action rather than a
+			// provider outage.
+			name:    "connection gone is an invalid action",
+			issue:   domain.ErrIDPConnectionNotFound(),
+			wantErr: domain.ErrFlowInvalidAction(),
+		},
+		{
+			name:    "attempt error passes through",
+			issue:   domain.ErrAuthAttemptAlreadyHandedOff(),
+			wantErr: domain.ErrAuthAttemptAlreadyHandedOff(),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			w := newFlowTestWorld(t)
+			def := ssoStepDefinition()
+			state := startSSOStepFlow(t, w, def)
+			w.ssoRedirects.EXPECT().Issue(gomock.Any(), gomock.Any()).Return(domain.FlowSSORedirectOutput{}, tt.issue)
+
+			_, err := w.sm.Process(t.Context(), def, state, domain.FlowSubmitInput{
+				Action:      domain.FlowActionSSO,
+				SSOProvider: &domain.FlowSSOProviderRef{ID: "google"},
+				SSOReturn:   ssoSubmitReturn,
+			})
+			require.ErrorIs(t, err, tt.wantErr)
+		})
+	}
 }
 
 // ssoStepDefinition offers two providers on the signup step, routed to
@@ -3356,6 +3529,7 @@ func TestFlowStepErrorContract(t *testing.T) {
 		domain.FlowStepErrorPasskeyInvalid,
 		domain.FlowStepErrorPasskeyRegistrationInvalid,
 		domain.FlowStepErrorSSOCreationDisabled,
+		domain.FlowStepErrorSSOUnavailable,
 	}
 	for _, key := range stepErrorConsts {
 		assert.True(t, domain.FlowStepErrorAllowed(key), "step-error const %q must honor the contract", key)

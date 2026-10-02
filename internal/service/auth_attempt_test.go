@@ -413,6 +413,93 @@ func TestAuthAttemptService_IssueChallenge(t *testing.T) {
 	})
 }
 
+func TestAuthAttemptService_IssueSSOState(t *testing.T) {
+	input := service.IssueSSOStateInput{
+		ProjectID:            "proj",
+		AttemptID:            "att-1",
+		ProviderSlug:         "google",
+		ConnectionRevisionID: "idpr_1",
+		RedirectURI:          "https://app.example.test/__nextgen/idp/callback",
+		ReturnTarget:         "https://app.example.test/login",
+	}
+
+	t.Run("issues the record with an encrypted pkce verifier", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		encrypter := cryptomock.NewMockEncrypter(ctrl)
+		encrypter.EXPECT().Encrypt(gomock.Any()).DoAndReturn(func(plain string) (string, error) { return "enc:" + plain, nil })
+		var issued *domain.SSOCallbackCheck
+		stmts := mocks.NewMockAllStatements(ctrl)
+		stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), "proj", "att-1").Return(&domain.AuthAttempt{ProjectID: "proj", ID: "att-1"}, nil)
+		stmts.EXPECT().IssueSSOState(gomock.Any(), "proj", "att-1", gomock.Any()).DoAndReturn(func(_ context.Context, _, _ string, check *domain.SSOCallbackCheck) error {
+			issued = check
+			return nil
+		})
+
+		withPKCE := input
+		withPKCE.PKCEEncrypter = encrypter
+		state, err := newAuthAttemptSvc(ctrl, stmts, nil, nil).IssueSSOState(t.Context(), withPKCE)
+
+		require.NoError(t, err)
+		require.NotNil(t, issued)
+		assert.Same(t, state.Check, issued, "the record handed to storage is the one on the state")
+		assert.NotEmpty(t, state.State)
+		assert.NotEmpty(t, state.PKCEVerifier)
+		assert.Equal(t, domain.HashSecret(state.State), issued.StateHash)
+		assert.Equal(t, &domain.SSOStatePayload{
+			ProviderSlug:          "google",
+			ConnectionRevisionID:  "idpr_1",
+			RedirectURI:           "https://app.example.test/__nextgen/idp/callback",
+			BindingNonceHash:      domain.HashSecret(state.BindingNonce),
+			EncryptedPKCEVerifier: "enc:" + state.PKCEVerifier,
+			OIDCNonce:             state.OIDCNonce,
+			ReturnTarget:          "https://app.example.test/login",
+		}, issued.Pending)
+	})
+
+	t.Run("mints no verifier without an encrypter", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		var issued *domain.SSOCallbackCheck
+		stmts := mocks.NewMockAllStatements(ctrl)
+		stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), "proj", "att-1").Return(&domain.AuthAttempt{ProjectID: "proj", ID: "att-1"}, nil)
+		stmts.EXPECT().IssueSSOState(gomock.Any(), "proj", "att-1", gomock.Any()).DoAndReturn(func(_ context.Context, _, _ string, check *domain.SSOCallbackCheck) error {
+			issued = check
+			return nil
+		})
+
+		state, err := newAuthAttemptSvc(ctrl, stmts, nil, nil).IssueSSOState(t.Context(), input)
+
+		require.NoError(t, err)
+		assert.Empty(t, state.PKCEVerifier)
+		assert.Empty(t, issued.Pending.EncryptedPKCEVerifier)
+	})
+
+	// The guard is PrepareChallenge, covered in the domain tests; this
+	// shows only that IssueSSOState runs it before minting.
+	t.Run("refuses a handed off attempt before minting", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		stmts := mocks.NewMockAllStatements(ctrl)
+		stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), "proj", "att-1").Return(&domain.AuthAttempt{
+			ProjectID: "proj", ID: "att-1", HandoffToken: &domain.HandoffToken{},
+		}, nil)
+
+		_, err := newAuthAttemptSvc(ctrl, stmts, nil, nil).IssueSSOState(t.Context(), input)
+
+		require.ErrorIs(t, err, domain.ErrAuthAttemptAlreadyHandedOff())
+	})
+
+	t.Run("passes the storage error through", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		issueErr := errors.New("issue failed")
+		stmts := mocks.NewMockAllStatements(ctrl)
+		stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), "proj", "att-1").Return(&domain.AuthAttempt{ProjectID: "proj", ID: "att-1"}, nil)
+		stmts.EXPECT().IssueSSOState(gomock.Any(), "proj", "att-1", gomock.Any()).Return(issueErr)
+
+		_, err := newAuthAttemptSvc(ctrl, stmts, nil, nil).IssueSSOState(t.Context(), input)
+
+		require.ErrorIs(t, err, issueErr)
+	})
+}
+
 func TestAuthAttemptService_VerifyProof(t *testing.T) {
 	rejectErr := errors.New("user not found")
 	succeedErr := errors.New("persist succeeded check failed")

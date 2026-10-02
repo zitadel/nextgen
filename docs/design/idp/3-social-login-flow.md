@@ -13,8 +13,9 @@ The end-to-end OAuth2/OIDC redirect ceremony progresses through three main
 phases:
 
 ```
-submit { action: "sso", sso_provider_id: "google" }
+submit { action: "sso", sso_provider_id: "google", return_target: "<page hosting the orchestrator>" }
   engine: reject if provider absent from the step's sso_providers
+  engine: fill a ${{ NAME }} client_id from the project's variables
   engine: mint state record, build authorize URL (PKCE), emit sso-redirect step
 browser → provider → user authenticates
 provider → GET {issuer}/__nextgen/idp/callback?code=…&state=…
@@ -63,7 +64,7 @@ The `state` record serves as the server-side, single-use anchor for the attempt:
 | **PKCE Verifier** | Present when the connection enables PKCE (`pkce_enabled`, the default); the challenge is always `S256` when sent. A connection may set `pkce_enabled: false` only for a provider whose token endpoint rejects the parameters ([area 1](1-resource-model.md#the-connection-schema)); binding then rests on `state` and, for OIDC, `nonce`. |
 | **OIDC `nonce`** | Echoed in the `id_token` to bind the issued token strictly to this authorize request. |
 | **Expiry** | Sets a bounded time window for the external leg, inheriting the attempt's overall TTL. |
-| **Return Target** | The browser destination after callback processing, captured at submission time and validated against the environment's declared issuer origin. Never read from callback input: an attacker-supplied target is an open redirect. |
+| **Return Target** | The browser destination after callback processing: the page hosting the orchestrator with `?flow=<id>` set, sent as `return_target` on the submission, where the flow resumes with `GET /flow/{id}`. Its origin must equal the request origin, which stands in for the environment's declared issuer origin until environments exist. Never read from callback input: an attacker-supplied target is an open redirect. |
 
 > **Security Note:** A guessable or reusable `state` parameter introduces
 > classic OAuth CSRF and code-injection vulnerabilities.
@@ -80,13 +81,35 @@ The `state` record serves as the server-side, single-use anchor for the attempt:
   `Strict` would drop the cookie on exactly that navigation and fail every
   attempt.
   The shipped `_zflow` cookie is `Strict`, so its settings cannot be copied.
-- **Development on `http://`:** Safari rejects `Secure` on `http://localhost`
-  (Chrome and Firefox accept it).
-  The shipped `_zflow` cookie lets `Secure` follow the request scheme for that
+- **Development on `http://` loopback:** Safari rejects `Secure` on
+  `http://localhost` (Chrome and Firefox accept it).
+  The shipped `_zflow` cookie drops `Secure` on an http loopback host for that
   reason (`internal/api/flow.go`), which a `__Host-` cookie cannot.
-  On an `http://` development origin the binding cookie therefore drops the
-  `__Host-` prefix and `Secure` and keeps `HttpOnly`, `Path=/`, and
-  `SameSite=Lax`; on every `https://` origin the prefix is required.
+  On an http loopback host the binding cookie therefore drops the `__Host-`
+  prefix and `Secure` and keeps `HttpOnly`, `Path=/`, and `SameSite=Lax`.
+  Every other host keeps the prefix and `Secure`; a non-loopback `http://`
+  deployment is unsupported, the browser discards the cookie there.
+  The callback derives the name from its own request the same way, so a
+  submit and a callback that reach the server over different schemes do not
+  find each other's cookie.
+- **Lifetime:** the record expires with the attempt. The cookie gets the
+  attempt's full TTL at the submission, so it outlives the record by the
+  time spent on the step; a lingering cookie is inert, the record holds only
+  the hash of its nonce.
+  `_zflow` is re-sealed on the redirect response like on every other, so its
+  ten-minute window restarts at the submission; a return after it finds the
+  flow cookie expired while the record is still valid, and the orchestrator
+  starts a new flow when the id in its URL no longer resolves.
+- **One origin:** the API and the page share an origin. The binding cookie
+  is set on the API origin and the callback route and `redirect_uri` are
+  built from the page origin; the `Strict` flow cookie already requires the
+  two to be the same.
+- **Two `Set-Cookie` lines, `_zflow` first:** the flow responses declare the
+  header as a list and the generated server writes one line per cookie
+  (OpenAPI's comma-joined form is invalid for `Set-Cookie`). The order is a
+  contract: the generated Go client reads only the first line, which must
+  stay `_zflow`. For the same reason no cookie may contain a comma, so the
+  cookies use `Max-Age`, never `Expires`.
 
 The engine owns the protocol parameters of the authorize request: `client_id`,
 `redirect_uri`, `response_type`, `scope`, `state`, `nonce`, `code_challenge`,
@@ -496,7 +519,7 @@ and recovery route without exposing internal technical details to the end user.
 | **Callback Route:** Register route under the server HTTP surface; the scaffolded proxy matcher is already prefix-wide (`/__nextgen/:path*`), so no patcher work remains. | Server |
 | **Localization Keys:** Export conflict-step copy (the account-exists explanation plus its submit, passkey, and sign-in actions), error copy, and provider button labels as `text_key` entries. | Login UI / Locale Work |
 | **UI & Branding Assets:** Add conditional SSO blocks to all five branding `login.liquid` templates and `default.liquid`; add provider glyphs to `zl-icon`. | Branding Defaults / Components |
-| **`<zl-sso-providers>` and `sso-redirect`:** An atom rendering one button per provider (`name` and `template` on the rendered step, filled by the engine from the connection; `template` is the brand hint) that submits `{action: "sso", sso_provider_id}`, and orchestrator navigation when a step carries `redirect_url`. | Components / Orchestrator |
+| **`<zl-sso-providers>` and `sso-redirect`:** An atom rendering one button per provider (`name` and `template` on the rendered step, filled by the engine from the connection; `template` is the brand hint) that submits `{action: "sso", sso_provider_id, return_target}`, and orchestrator navigation when a step carries `redirect_url`. | Components / Orchestrator |
 | **Failure-Details Channel:** Details are written to the server log; tenant-side misconfigurations are hidden from the end user. The log never carries authorization codes, tokens, or secret values; claim values follow `x-audit`'s deny-by-default; access logs redact `code` and `state` from the callback query. | Engine; the login UI shows the generic error |
 
 ## Open Points
@@ -532,24 +555,26 @@ and recovery route without exposing internal technical details to the end user.
   [#534](https://github.com/zitadel/nextgen/issues/534)).
   Until decided, pattern environments render without providers
   ([Constraints & Edge Cases](#constraints--edge-cases)).
-* **State Storage Shape:** Fields on the attempt, or a dedicated table.
-  Consumption must be atomic under concurrent duplicate callbacks (one succeeds,
-  the second gets a reused-state error); `zitadel/zitadel` has no such guard
-  ([`idp_intent.go#L169-L199`](https://github.com/zitadel/zitadel/blob/d488ecb07ffe82d1e5493e9482be48a3e82397cc/internal/command/idp_intent.go#L169-L199))
-  and no TTL on a pending state.
-  Minting is unauthenticated, so the engine caps pending records per flow and
-  rate-limits minting (both 851 requirements); the shape must keep both cheap.
-* **Multi-Tab Behavior:** Defining rules for parallel SSO submissions initiated
-  from a single flow (whether the last-minted state invalidates prior states or
-  both remain valid until consumed).
-  The binding cookie shares this decision: one named `__Host-` cookie holds a
-  single value per host, so a second tab's ceremony overwrites the first tab's
-  nonce and fails it at callback; per-attempt cookie names versus accepting the
-  overwrite must be settled together with the state rule.
-* **`sso-redirect` Step Shape:** Confirming whether `{name, redirect_url}`
-  (sketched in example 4) serves as the official wire contract or if the
-  redirect URL should be folded directly into the submission response payload.
-  The return leg is settled in [The `state` Record](#the-state-record): the
+* **State Storage Shape:** Settled in #1073. The record is a `sso_callback`
+  row in the checks table, one per attempt, so a new submission replaces the
+  pending one. Consumption is one guarded update, so concurrent duplicate
+  callbacks succeed exactly once and the rest get the same opaque error as an
+  unknown or expired state; `zitadel/zitadel` has no such guard
+  ([`idp_intent.go#L169-L199`](https://github.com/zitadel/zitadel/blob/d488ecb07ffe82d1e5493e9482be48a3e82397cc/internal/command/idp_intent.go#L169-L199)).
+  The record inherits the attempt's TTL. Creation caps and rate limits are
+  flow-level, not SSO-specific, and belong to the platform's abuse-prevention
+  design (#351; ADR 041, still in PR #472).
+* **Multi-Tab Behavior:** Settled in #1073. A new record for the same attempt
+  replaces the pending one, so the last submission wins and an earlier tab's
+  callback is refused on consume. The binding cookie agrees with that rule:
+  the one `__Host-` cookie holds the newest nonce, so the earlier tab fails
+  the same way. No per-attempt cookie names.
+* **`sso-redirect` Step Shape:** Settled. The submission returns a
+  non-terminal step `{name: "sso-redirect", texts.title_key, redirect_url}`
+  with no fields or actions (example 4 in
+  [`flow-engine.md`](../flowengine/flow-engine.md#example-4-sso-login-google)),
+  and the flow state stays on the step the provider was picked from. The
+  return leg is settled in [The `state` Record](#the-state-record): the
   record carries the return target and the callback route consumes it, never
   reading a destination from callback input.
 
@@ -564,6 +589,6 @@ and recovery route without exposing internal technical details to the end user.
 - [`../flowengine/flow-engine-nodes.md`](../flowengine/flow-engine-nodes.md)
   (step response shape)
 - [`../flowengine/capabilities.md`](../flowengine/capabilities.md) (what is
-  stubbed)
-- `internal/domain/flow_state_machine.go` (the SSO stub), `flow_on_success.go`
+  implemented)
+- `internal/domain/flow_state_machine.go` (the sso branch), `flow_on_success.go`
   (the `on_success` handler interface `create_user_with_sso` joins)

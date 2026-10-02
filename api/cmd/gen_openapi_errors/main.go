@@ -893,6 +893,10 @@ var operationExcludedErrors = map[string][]string{
 	// The flow engine catches a stale parked SSO row with errors.Is and renders
 	// the step; the analysis cannot see that check prune the error.
 	"getFlowStep": {"domain.ErrSSOStateInvalid"},
+	// Both are consumed in the state machine's sso branch: a missing
+	// connection becomes flow.invalid_action, and an unavailable provider
+	// re-renders the step with error.sso_unavailable.
+	"submitFlowStep": {"domain.ErrFlowSSOUnavailable", "domain.ErrIDPConnectionNotFound"},
 }
 
 // methodErrorsFromAnalysis adapts the inferred error sets to the shape the
