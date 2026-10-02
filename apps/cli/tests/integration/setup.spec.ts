@@ -201,33 +201,69 @@ describe("setup", () => {
           expect((await before.changes()).added).toEqual(expect.arrayContaining(SCAFFOLDED_PAGES));
         },
       );
-    });
 
-    it("registers a social provider asked for during setup", async () => {
-      const app = await anApp();
+      it("registers a social provider asked for during setup", async () => {
+        const app = await anApp();
 
-      const result = await app.setupWithSso("google", SOCIAL_CREDENTIALS);
+        const result = await app.setupWithSso("google", SOCIAL_CREDENTIALS);
 
-      expect(result).toSucceed();
-      expect((await app.registeredIdps()).map((idp) => idp.slug)).toEqual(["google"]);
-    });
+        expect(result).toSucceed();
+        expect((await app.registeredIdps()).map((idp) => idp.slug)).toEqual(["google"]);
+      });
 
-    it("commits references to that provider's credentials, never the credentials", async () => {
-      const app = await anApp();
-      expect(await app.setupWithSso("google", SOCIAL_CREDENTIALS)).toSucceed();
+      it("publishes that provider's client id as a readable project variable", async () => {
+        const app = await anApp();
+        expect(await app.setupWithSso("google", SOCIAL_CREDENTIALS)).toSucceed();
 
-      const written = await app.committed.asText("google");
+        const published = await app.projectVariables();
 
-      expect(written).toContain("${{ GOOGLE_CLIENT_ID }}");
-      expect(written).not.toContain(SOCIAL_CREDENTIALS.secret);
-      expect(written).not.toContain(SOCIAL_CREDENTIALS.clientId);
-    });
+        expect(published).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              name: "GOOGLE_CLIENT_ID",
+              value: SOCIAL_CREDENTIALS.clientId,
+            }),
+          ]),
+        );
+      });
 
-    it("leaves nothing to reconcile after enabling one during setup", async () => {
-      const app = await anApp();
-      expect(await app.setupWithSso("google", SOCIAL_CREDENTIALS)).toSucceed();
+      it("publishes that provider's secret without its value", async () => {
+        const app = await anApp();
+        expect(await app.setupWithSso("google", SOCIAL_CREDENTIALS)).toSucceed();
 
-      expect(await app.plan()).toReportNothingToDo();
+        const published = await app.projectVariables();
+
+        const held = published.find((variable) => variable.name === "GOOGLE_CLIENT_SECRET");
+        expect(held).toMatchObject({ secret: true });
+        expect(held).not.toHaveProperty("value");
+      });
+
+      it("commits references to both of that provider's credentials", async () => {
+        const app = await anApp();
+        expect(await app.setupWithSso("google", SOCIAL_CREDENTIALS)).toSucceed();
+
+        const connection = await app.committed.idpConnection("google");
+
+        expect(connection.oidc.client_id).toBe("${{ GOOGLE_CLIENT_ID }}");
+        expect(connection.oidc.client_secret).toBe("${{ GOOGLE_CLIENT_SECRET }}");
+      });
+
+      it("keeps that provider's credentials out of every committed document", async () => {
+        const app = await anApp();
+        expect(await app.setupWithSso("google", SOCIAL_CREDENTIALS)).toSucceed();
+
+        const written = await app.committed.asText("google");
+
+        expect(written).not.toContain(SOCIAL_CREDENTIALS.secret);
+        expect(written).not.toContain(SOCIAL_CREDENTIALS.clientId);
+      });
+
+      it("leaves nothing to reconcile after enabling one during setup", async () => {
+        const app = await anApp();
+        expect(await app.setupWithSso("google", SOCIAL_CREDENTIALS)).toSucceed();
+
+        expect(await app.plan()).toReportNothingToDo();
+      });
     });
   });
 });

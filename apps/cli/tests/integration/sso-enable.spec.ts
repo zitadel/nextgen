@@ -122,6 +122,7 @@ describe("sso enable", () => {
 
       it("changes nothing when the same provider is enabled again", async () => {
         const app = await anAppServingGoogle();
+        const files = await app.snapshot();
         const before = {
           variables: await app.projectVariables(),
           connection: await app.committed.idpConnection(GOOGLE),
@@ -136,6 +137,7 @@ describe("sso enable", () => {
         expect(await app.publishedSchema()).toEqual(before.schema);
         expect(await app.publishedFlow()).toEqual(before.flow);
         expect(await app.plan()).toReportNothingToDo();
+        expect(await files.changes()).toMatchObject({ added: [], modified: [], removed: [] });
       });
 
       describe("once applied", () => {
