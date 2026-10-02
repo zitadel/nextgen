@@ -557,7 +557,10 @@ const pairedPasswordStep: CreateFlow201 = {
       },
     ],
     identifier: { value: "alice@example.com", autocomplete: "username" },
-    actions: [{ name: "submit", kind: "submit", text_key: "submit.signin", primary: true }],
+    actions: [
+      { name: "submit", kind: "submit", text_key: "submit.signin", primary: true },
+      { name: "back", kind: "back", text_key: "action.back" },
+    ],
     gates: {},
   },
 };
@@ -627,6 +630,79 @@ describe("<zitadel-login> paired identifier (chromium)", () => {
     const element = await mount();
     const form = element.shadowRoot?.querySelector("form");
     expect(form?.querySelector('input[autocomplete="username"]')).toBeNull();
+  });
+
+  it("comes back on a reload, which re-renders the step from flow state", async () => {
+    // A reload loses `formValues` — the widget keeps collected values in memory
+    // only — so the pairing has to survive on what GET /flow/{id} returns.
+    setup([pairedPasswordStep]);
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.purpose = "login";
+    element.project = testProject;
+    element.resumeFlowId = "flow_1";
+    host.appendChild(element);
+    await waitFor(() => {
+      const root = element.shadowRoot;
+      return root?.querySelector("zl-field") ? root : null;
+    });
+
+    const resumed = stub.calls.find((call) => (call.init?.method ?? "GET") === "GET");
+    expect(resumed?.url).toContain("/flow/flow_1");
+    const paired = element.shadowRoot
+      ?.querySelector("form")
+      ?.querySelector<HTMLInputElement>('input[autocomplete="username"]');
+    expect(paired?.value).toBe("alice@example.com");
+  });
+
+  it("disappears when back lands on a step that collects the identifier itself", async () => {
+    setup([pairedPasswordStep, identifierStep]);
+    const element = await mount();
+    const root = element.shadowRoot!;
+    expect(root.querySelector('input[autocomplete="username"]')).toBeTruthy();
+
+    root.dispatchEvent(
+      new CustomEvent("zl-submit", {
+        bubbles: true,
+        composed: true,
+        detail: { action: "back" },
+      }),
+    );
+    await waitFor(() =>
+      element.shadowRoot?.querySelectorAll("zl-field").length === 2 ? element : null,
+    );
+    // That step renders the identifier as a real field, so a second copy would
+    // be a duplicate the manager has to choose between.
+    expect(element.shadowRoot?.querySelector('input[autocomplete="username"]')).toBeNull();
+  });
+
+  it("follows the server when a second identifier replaces the first", async () => {
+    // Back, then a different address: the control must not keep the old one.
+    // It reads `step.identifier` rather than the cross-step `formValues` cache,
+    // where earlier entries win on conflict.
+    const second: CreateFlow201 = {
+      ...pairedPasswordStep,
+      step: {
+        ...pairedPasswordStep.step,
+        identifier: { value: "bob@example.com", autocomplete: "username" },
+      },
+    };
+    setup([pairedPasswordStep, second]);
+    const element = await mount();
+    const root = element.shadowRoot!;
+    await fillNativeField(root, "x-auth-methods#password", "hunter2");
+    root.dispatchEvent(
+      new CustomEvent("zl-submit", {
+        bubbles: true,
+        composed: true,
+        detail: { action: "submit" },
+      }),
+    );
+    await waitFor(() => {
+      const paired = element.shadowRoot?.querySelector<HTMLInputElement>(
+        'input[autocomplete="username"]',
+      );
+      return paired?.value === "bob@example.com" ? paired : null;
+    });
   });
 
   it("keeps it out of the submitted fields", async () => {
