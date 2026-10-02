@@ -1,4 +1,12 @@
-import { getApiAuthToken } from "./auth";
+import { getApiAuthToken, getApiCsrfRejectionHandler, getApiCsrfToken } from "./auth";
+
+/** The header the session-bound CSRF token travels in (ADR 053 §5). */
+export const CSRF_HEADER = "X-Zitadel-CSRF";
+
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+
+/** The code the server answers a refused CSRF check with. */
+const CSRF_INVALID = "auth.csrf_invalid";
 
 /**
  * Framework-neutral failure type the orval-generated client throws on
@@ -32,6 +40,11 @@ export class ApiError extends Error {
  * focused on the shape of one HTTP call:
  *
  * - bearer auth — read from `runtime/auth.ts` and attached automatically;
+ * - the CSRF header — the session-bound token from `runtime/auth.ts`, on
+ *   unsafe methods only, when a first-party surface has set one; an unsafe
+ *   request refused with `403 auth.csrf_invalid` asks the registered rejection
+ *   handler for a fresh token and is retried once with it, only if the handler
+ *   returns one (the session still belongs to the same person);
  * - non-2xx → throw — orval's stock client parses the body regardless
  *   of status, so callers would have to inspect every response. Throw
  *   `ApiError` on `!res.ok` so failures interrupt control flow;
@@ -45,12 +58,35 @@ export async function customFetch<T>(url: string, options: RequestInit): Promise
   if (token && !headers.has("authorization")) {
     headers.set("authorization", `Bearer ${token}`);
   }
+  const method = (options.method ?? "GET").toUpperCase();
+  const unsafe = !SAFE_METHODS.has(method) && !headers.has(CSRF_HEADER);
+  const csrfToken = getApiCsrfToken();
+  if (unsafe && csrfToken) {
+    headers.set(CSRF_HEADER, csrfToken);
+  }
 
-  const res = await fetch(url, { ...options, headers });
+  let res = await fetch(url, { ...options, headers });
+  let parsed = await readBody(res);
 
-  const noBody = [204, 205, 304].includes(res.status);
-  const rawBody = noBody ? "" : await res.text();
-  const parsed = rawBody ? (safeJsonParse(rawBody) as unknown) : undefined;
+  // The token was stale (the session cookie changed under this page) or never
+  // loaded. The app re-checks the session and hands back a fresh token only if
+  // it still belongs to the same person; then the request is retried once. A
+  // body that can be read only once cannot be sent again, so it is not retried.
+  const onRejected = getApiCsrfRejectionHandler();
+  if (
+    unsafe &&
+    onRejected &&
+    res.status === 403 &&
+    apiErrorCode(parsed) === CSRF_INVALID &&
+    !isStream(options.body)
+  ) {
+    const fresh = await onRejected().catch(() => undefined);
+    if (fresh && fresh !== csrfToken) {
+      headers.set(CSRF_HEADER, fresh);
+      res = await fetch(url, { ...options, headers });
+      parsed = await readBody(res);
+    }
+  }
 
   if (!res.ok) {
     const message = `${options.method ?? "GET"} ${url} returned ${res.status}`;
@@ -58,6 +94,17 @@ export async function customFetch<T>(url: string, options: RequestInit): Promise
   }
 
   return parsed as T;
+}
+
+/** The parsed body, or `undefined` for the spec's no-body responses. */
+async function readBody(res: Response): Promise<unknown> {
+  if ([204, 205, 304].includes(res.status)) return undefined;
+  const rawBody = await res.text();
+  return rawBody ? (safeJsonParse(rawBody) as unknown) : undefined;
+}
+
+function isStream(body: RequestInit["body"]): boolean {
+  return typeof ReadableStream !== "undefined" && body instanceof ReadableStream;
 }
 
 /**
@@ -72,6 +119,16 @@ function safeJsonParse(text: string): unknown {
   } catch {
     return { raw: text };
   }
+}
+
+/**
+ * The `code` of the server's `{code, message, details}` error envelope: from an
+ * {@link ApiError}, or from a parsed response body. `undefined` when there is
+ * none, e.g. an HTML error page from a proxy.
+ */
+export function apiErrorCode(errorOrBody: unknown): string | undefined {
+  const body = errorOrBody instanceof ApiError ? errorOrBody.body : errorOrBody;
+  return isRecord(body) && typeof body.code === "string" ? body.code : undefined;
 }
 
 /**
@@ -114,6 +171,7 @@ function pickDetailString(details: unknown): string | undefined {
   }
   return undefined;
 }
+
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);

@@ -1,4 +1,5 @@
 import { createZitadelClient } from "@zitadel/api/client";
+import { CSRF_HEADER } from "@zitadel/api/runtime/fetch";
 
 import type { LocalAdmin } from "./admin-credential";
 import { adminSessionCookie, localAdminRequest } from "./sign-in";
@@ -25,12 +26,18 @@ export async function claimProjectAsAdmin(input: {
   }).initClaim(projectId, localAdminRequest(serverUrl));
 
   // claim/complete authenticates by the admin's session cookie, not a bearer
-  // token, so this client carries none.
+  // token, so this client carries none. As a cookie-authenticated write it
+  // also needs the session's CSRF token (ADR 053 §5), which the same cookie
+  // reads from GET /sessions/me/csrf.
   const cookie = await adminSessionCookie(serverUrl, admin);
-  const { team_id, claimed_at } = await createZitadelClient({ baseUrl: serverUrl }).completeClaim(
+  const session = createZitadelClient({ baseUrl: serverUrl });
+  const { csrf_token } = await session.getMySessionCsrfToken(
+    localAdminRequest(serverUrl, { cookie }),
+  );
+  const { team_id, claimed_at } = await session.completeClaim(
     projectId,
     { challenge_id },
-    localAdminRequest(serverUrl, { cookie }),
+    localAdminRequest(serverUrl, { cookie, [CSRF_HEADER]: csrf_token }),
   );
   return { team_id, claimed_at };
 }

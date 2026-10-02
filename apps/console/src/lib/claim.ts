@@ -1,6 +1,7 @@
-import { ApiError } from "@zitadel/api/runtime/fetch";
+import { ApiError, apiErrorCode } from "@zitadel/api/runtime/fetch";
 
 import { api } from "../api/zitadel";
+import { fetchSession } from "../auth/session";
 import { describeError } from "./api-error";
 
 /**
@@ -41,6 +42,12 @@ export type ClaimOutcome =
    * every completion 401s and re-signing-in just loops.
    */
   | { kind: "unauthenticated" }
+  /**
+   * 403 `auth.csrf_invalid`, still refused after the shared fetch's one retry:
+   * someone else is signed in now, or the request came from another site. Not
+   * a team problem, so it does not take the team branches.
+   */
+  | { kind: "csrf_refused"; message: string }
   /** 429, 5xx, network — nothing the page can name; retryable. */
   | { kind: "error"; message: string };
 
@@ -49,8 +56,9 @@ export type ClaimOutcome =
  * authenticated by the `__nextgen_session` cookie.
  *
  * Deliberately the **single** place the completion request is made (#615):
- * when ADR 053 adds the `X-Zitadel-CSRF` requirement it lands in this call
- * alone, and if ADR 054 grows the contract a team-selection parameter, the
+ * it carries ADR 053's `X-Zitadel-CSRF` token, loaded through `fetchSession()`
+ * first because the claim page sits outside the `_authed` guard that normally
+ * loads it; and if ADR 054 grows the contract a team-selection parameter, the
  * body grows here. Callers render the outcome; they do not build the request.
  */
 export async function completeProjectClaim(
@@ -58,6 +66,7 @@ export async function completeProjectClaim(
   challengeId: string,
 ): Promise<ClaimOutcome> {
   try {
+    await fetchSession();
     const result = await api.completeClaim(
       projectId,
       { challenge_id: challengeId },
@@ -74,6 +83,9 @@ export async function completeProjectClaim(
         case 401:
           return { kind: "unauthenticated" };
         case 403:
+          if (apiErrorCode(cause) === "auth.csrf_invalid") {
+            return { kind: "csrf_refused", message };
+          }
           return personalTeamOutcome(message, cause.body);
         case 400:
         case 404:
@@ -107,7 +119,8 @@ function alreadyClaimedDetails(body: unknown): { teamId?: string; dashboardUrl?:
 }
 
 /**
- * Splits the 403's two codes (`completeClaim` declares them as a `oneOf`).
+ * Splits the 403's two team codes (`completeClaim` declares them in its 403
+ * `oneOf`, beside `auth.csrf_invalid`, which the caller has already handled).
  * They differ in the only thing the developer cares about: whether signing in
  * again fixes it.
  *
@@ -117,7 +130,7 @@ function alreadyClaimedDetails(body: unknown): { teamId?: string; dashboardUrl?:
  */
 function personalTeamOutcome(message: string, body: unknown): ClaimOutcome {
   const record = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
-  if (record.code === "claim.personal_team_not_active") {
+  if (apiErrorCode(body) === "claim.personal_team_not_active") {
     return {
       kind: "personal_team_not_active",
       message,
