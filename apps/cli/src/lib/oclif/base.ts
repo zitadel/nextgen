@@ -68,7 +68,10 @@ export abstract class BaseCommand extends Command {
       description: "Disable prompts. Required when scripting or running as an agent.",
     }),
     "dry-run": Flags.boolean({ description: "Preview without mutating files or the platform." }),
-    verbose: Flags.boolean({ description: "Verbose logging." }),
+    // `-v` is the verb every well-known CLI binds to verbosity (curl, ssh,
+    // docker), so an agent reaches for it by reflex; the root `--version` here
+    // carries no short form, so there is nothing to collide with.
+    verbose: Flags.boolean({ char: "v", description: "Verbose logging." }),
     debug: Flags.boolean({ description: "Debug logging." }),
     telemetry: Flags.boolean({
       default: true,
