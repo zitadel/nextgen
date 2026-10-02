@@ -6,7 +6,7 @@ import (
 	"github.com/zitadel/nextgen/internal/api/integration_test/test_data"
 )
 
-func (h *Harness) EnsureTestData(t *testing.T) *test_data.TestData {
+func (h *Harness) EnsureTestData(t testing.TB) *test_data.TestData {
 	t.Helper()
 	h.testData.mutex.Lock()
 	defer h.testData.mutex.Unlock()

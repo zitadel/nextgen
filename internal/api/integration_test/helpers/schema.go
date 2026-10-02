@@ -14,7 +14,7 @@ import (
 
 const BuiltinSchemaBaseURL = "https://test.example.schemas.com/schemas"
 
-func (h *Harness) EnsureSchemaService(t *testing.T) *service.SchemaService {
+func (h *Harness) EnsureSchemaService(t testing.TB) *service.SchemaService {
 	t.Helper()
 	h.schemaService.mutex.Lock()
 	defer h.schemaService.mutex.Unlock()
@@ -29,7 +29,7 @@ func (h *Harness) EnsureSchemaService(t *testing.T) *service.SchemaService {
 	return h.schemaService.value
 }
 
-func (h *Harness) EnsureSchemaStore(t *testing.T) domain.JSONSchemaStore {
+func (h *Harness) EnsureSchemaStore(t testing.TB) domain.JSONSchemaStore {
 	t.Helper()
 	h.schemaStore.mutex.Lock()
 	defer h.schemaStore.mutex.Unlock()
@@ -40,7 +40,7 @@ func (h *Harness) EnsureSchemaStore(t *testing.T) domain.JSONSchemaStore {
 	return h.schemaStore.value
 }
 
-func (h *Harness) EnsureSchemaResolver(t *testing.T) *domain.JSONSchemaResolver {
+func (h *Harness) EnsureSchemaResolver(t testing.TB) *domain.JSONSchemaResolver {
 	t.Helper()
 	h.schemaResolver.mutex.Lock()
 	defer h.schemaResolver.mutex.Unlock()
@@ -60,7 +60,7 @@ func (h *Harness) EnsureSchemaResolver(t *testing.T) *domain.JSONSchemaResolver 
 	return h.schemaResolver.value
 }
 
-func (h *Harness) EnsureSchemaValidator(t *testing.T) *domain.SchemaValidator {
+func (h *Harness) EnsureSchemaValidator(t testing.TB) *domain.SchemaValidator {
 	t.Helper()
 	h.schemaValidator.mutex.Lock()
 	defer h.schemaValidator.mutex.Unlock()
@@ -74,7 +74,7 @@ func (h *Harness) EnsureSchemaValidator(t *testing.T) *domain.SchemaValidator {
 	return h.schemaValidator.value
 }
 
-func (h *Harness) CreateUserSchema(t *testing.T, project *domain.Project, schema string) string {
+func (h *Harness) CreateUserSchema(t testing.TB, project *domain.Project, schema string) string {
 	t.Helper()
 	client, err := NewApiClient(h.EnsureTestServer(t).URL)
 	require.NoError(t, err)
@@ -98,7 +98,7 @@ func (h *Harness) CreateUserSchema(t *testing.T, project *domain.Project, schema
 	return resp.(*api.CreateSchemaResponse).ID
 }
 
-func mustParseURL(t *testing.T, s string) *url.URL {
+func mustParseURL(t testing.TB, s string) *url.URL {
 	u, err := url.Parse(s)
 	require.NoError(t, err)
 	return u

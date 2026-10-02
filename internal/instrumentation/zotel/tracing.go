@@ -39,9 +39,10 @@ func NewTracerProvider(ctx context.Context, cfg ExporterConfig, traceIDRatio flo
 	), nil
 }
 
-// NewSampler returns the sampler of the production tracer provider. A root
-// span is sampled at fraction only when it is a Server span; a child follows
-// its parent.
+// NewSampler returns the sampler of the production tracer provider. A Server
+// root is sampled at fraction. A Consumer root linked to a sampled span is
+// always sampled, so work done later for a sampled request (the audit flush)
+// stays in the trace. Any other root is dropped. A child follows its parent.
 func NewSampler(fraction float64) trace.Sampler {
 	ratio := trace.TraceIDRatioBased(fraction)
 	return trace.ParentBased(

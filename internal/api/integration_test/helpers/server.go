@@ -8,9 +8,10 @@ import (
 	generated "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/service"
+	"go.opentelemetry.io/otel"
 )
 
-func (h *Harness) EnsureTestServer(t *testing.T) *httptest.Server {
+func (h *Harness) EnsureTestServer(t testing.TB) *httptest.Server {
 	t.Helper()
 	h.testServer.mutex.Lock()
 	defer h.testServer.mutex.Unlock()
@@ -23,7 +24,7 @@ func (h *Harness) EnsureTestServer(t *testing.T) *httptest.Server {
 	return h.testServer.value
 }
 
-func (h *Harness) EnsureGeneratedServer(t *testing.T) *generated.Server {
+func (h *Harness) EnsureGeneratedServer(t testing.TB) *generated.Server {
 	t.Helper()
 	h.generatedServer.mutex.Lock()
 	defer h.generatedServer.mutex.Unlock()
@@ -34,13 +35,14 @@ func (h *Harness) EnsureGeneratedServer(t *testing.T) *generated.Server {
 			h.EnsureHandler(t),
 			h.EnsureSecurityHandler(t),
 			generated.WithErrorHandler(api.OgenErrorHandler),
+			generated.WithTracerProvider(api.NewOgenTracerProvider(otel.GetTracerProvider())),
 		)
 		require.NoError(t, err)
 	}
 	return h.generatedServer.value
 }
 
-func (h *Harness) EnsureHandler(t *testing.T) *api.Handler {
+func (h *Harness) EnsureHandler(t testing.TB) *api.Handler {
 	t.Helper()
 	h.handler.mutex.Lock()
 	defer h.handler.mutex.Unlock()
@@ -78,7 +80,7 @@ func (h *Harness) EnsureHandler(t *testing.T) *api.Handler {
 	return h.handler.value
 }
 
-func (h *Harness) EnsureSecurityHandler(t *testing.T) *api.SecurityHandler {
+func (h *Harness) EnsureSecurityHandler(t testing.TB) *api.SecurityHandler {
 	t.Helper()
 	h.securityHandler.mutex.Lock()
 	defer h.securityHandler.mutex.Unlock()

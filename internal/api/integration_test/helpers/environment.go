@@ -6,7 +6,7 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 )
 
-func (h *Harness) EnsureEnvironmentService(t *testing.T) *service.EnvironmentService {
+func (h *Harness) EnsureEnvironmentService(t testing.TB) *service.EnvironmentService {
 	t.Helper()
 	h.environmentService.mutex.Lock()
 	defer h.environmentService.mutex.Unlock()

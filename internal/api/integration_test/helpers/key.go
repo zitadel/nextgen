@@ -15,7 +15,7 @@ import (
 // run, and a project's keys should not be evicted by another project's.
 const keyCacheSize = 512
 
-func (h *Harness) EnsureKeyService(t *testing.T) service.KeyService {
+func (h *Harness) EnsureKeyService(t testing.TB) service.KeyService {
 	t.Helper()
 	h.keyService.mutex.Lock()
 	defer h.keyService.mutex.Unlock()

@@ -43,7 +43,7 @@ const UserSchemaURL = "https://test.example.schemas.com/schemas/default-human-us
 // GenerateUser generates the attributes of a user according to the
 // [default-human-user-schema.json]. The result is the document the schema
 // validates, so it carries no envelope fields.
-func (g *DataGenerator) GenerateUser(t *testing.T, email string) map[string]any {
+func (g *DataGenerator) GenerateUser(t testing.TB, email string) map[string]any {
 	t.Helper()
 
 	u := map[string]any{

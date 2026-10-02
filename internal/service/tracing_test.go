@@ -18,11 +18,12 @@ import (
 	"github.com/zitadel/nextgen/internal/instrumentation/zotel"
 )
 
-// spanExporter sets the global provider once, when the test binary starts:
+// SpanExporter sets the global provider once, when the test binary starts:
 // the package tracer delegates to the first provider set in the process. It
 // is a package variable, not a TestMain, because the postgres_integration
-// build already has a TestMain in this test binary.
-var spanExporter = func() *tracetest.InMemoryExporter {
+// build already has a TestMain in this test binary. It is exported for the
+// span tests in package service_test.
+var SpanExporter = func() *tracetest.InMemoryExporter {
 	exporter := tracetest.NewInMemoryExporter()
 	otel.SetTracerProvider(sdktrace.NewTracerProvider(
 		sdktrace.WithSyncer(exporter),
@@ -48,7 +49,7 @@ func TestStartSpan(t *testing.T) {
 		{name: "plain error gives its type and is a failure", err: errors.New("x@y"), wantType: "*errors.errorString", wantStatus: codes.Error},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			spanExporter.Reset()
+			SpanExporter.Reset()
 			parent, root := otel.Tracer("test").Start(t.Context(), "request", trace.WithSpanKind(trace.SpanKindServer))
 			require.True(t, root.SpanContext().IsSampled())
 
@@ -58,7 +59,7 @@ func TestStartSpan(t *testing.T) {
 			end(&err)
 			root.End()
 
-			spans := spanExporter.GetSpans()
+			spans := SpanExporter.GetSpans()
 			require.Len(t, spans, 2)
 			span := spans[0]
 			assert.Equal(t, "UserService.CreateUser", span.Name)
@@ -76,7 +77,7 @@ func TestStartSpan(t *testing.T) {
 }
 
 func TestStartSpan_parentNotSampled(t *testing.T) {
-	spanExporter.Reset()
+	SpanExporter.Reset()
 	ctx := trace.ContextWithSpanContext(t.Context(), trace.NewSpanContext(trace.SpanContextConfig{
 		TraceID: trace.TraceID{1},
 		SpanID:  trace.SpanID{1},
@@ -88,5 +89,5 @@ func TestStartSpan_parentNotSampled(t *testing.T) {
 	end(&err)
 
 	assert.Equal(t, ctx, got, "no span may be started")
-	assert.Empty(t, spanExporter.GetSpans())
+	assert.Empty(t, SpanExporter.GetSpans())
 }

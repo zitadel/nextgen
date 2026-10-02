@@ -231,7 +231,7 @@ func TestRequestBuffer_OccurredAtWaitUsesRequestStart(t *testing.T) {
 	defer buf.Close()
 
 	started := time.Now().Add(-80 * time.Millisecond)
-	buf.EnqueueSince(&domain.Event{ProjectID: "proj_1", EventType: domain.EventTypeRequestAPI, Category: domain.EventCategoryRequest}, started)
+	buf.EnqueueSince(t.Context(), &domain.Event{ProjectID: "proj_1", EventType: domain.EventTypeRequestAPI, Category: domain.EventCategoryRequest}, started)
 
 	require.Eventually(t, func() bool { return buf.Flushed() >= 1 }, 2*time.Second, 10*time.Millisecond)
 	ins.mu.Lock()
@@ -251,7 +251,7 @@ func TestRequestBuffer_MaxAgeUsesEnqueueTimeNotRequestStart(t *testing.T) {
 	})
 	t.Cleanup(buf.Close)
 
-	buf.EnqueueSince(&domain.Event{ProjectID: "proj_1", EventType: domain.EventTypeRequestAPI, Category: domain.EventCategoryRequest}, time.Now().Add(-2*time.Hour))
+	buf.EnqueueSince(t.Context(), &domain.Event{ProjectID: "proj_1", EventType: domain.EventTypeRequestAPI, Category: domain.EventCategoryRequest}, time.Now().Add(-2*time.Hour))
 	assert.Equal(t, 1, buf.Len())
 	assert.Equal(t, uint64(0), buf.Flushed())
 }
