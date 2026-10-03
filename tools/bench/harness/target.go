@@ -7,10 +7,8 @@ package harness
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"sync"
 
 	"github.com/ogen-go/ogen/ogenerrors"
@@ -18,7 +16,7 @@ import (
 )
 
 // Target is a provisioned server and the one project and user the scenarios
-// run against. Bootstrap writes it as a state file; the sweep hands it to each
+// run against. Bootstrap records it in the manifest; the sweep hands it to each
 // k6 run as environment; the k6 module reads it back.
 type Target struct {
 	Base          string `json:"base"`
@@ -89,29 +87,6 @@ func TargetFromEnv(lookup func(string) (string, bool)) (Target, error) {
 		}
 	}
 	return t, err
-}
-
-// SaveTarget writes the state file. It holds the project secret, so it is
-// created owner-readable only.
-func SaveTarget(path string, t Target) error {
-	b, err := json.MarshalIndent(t, "", "  ")
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(path, append(b, '\n'), 0o600)
-}
-
-// LoadTarget reads a state file written by SaveTarget.
-func LoadTarget(path string) (Target, error) {
-	var t Target
-	b, err := os.ReadFile(path)
-	if err != nil {
-		return t, err
-	}
-	if err := json.Unmarshal(b, &t); err != nil {
-		return t, fmt.Errorf("%s: %w", path, err)
-	}
-	return t, nil
 }
 
 // Credentials is the process-wide credential holder, shared by every VU, and

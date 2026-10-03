@@ -2,8 +2,11 @@ package harness
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -21,8 +24,11 @@ import (
 type Server struct {
 	Base string
 	Dir  string
-	cmd  *exec.Cmd
-	done chan error
+	// Facts are what the harness configured, for the doctor report: the
+	// server does not report them itself.
+	Facts map[string]string
+	cmd   *exec.Cmd
+	done  chan error
 }
 
 // ServerConfig says what to start.
@@ -83,7 +89,13 @@ instrumentation:
 		_ = logFile.Close()
 		return nil, err
 	}
-	s := &Server{Base: fmt.Sprintf("http://localhost:%d", cfg.Port), Dir: cfg.Dir, cmd: cmd, done: make(chan error, 1)}
+	s := &Server{Base: fmt.Sprintf("http://localhost:%d", cfg.Port), Dir: cfg.Dir, cmd: cmd, done: make(chan error, 1), Facts: map[string]string{
+		"dialect":     "sqlite",
+		"replicas":    "1",
+		"log_level":   "warn",
+		"image_tag":   "binary " + bin + " " + binaryDigest(bin),
+		"log_streams": "runtime,ready",
+	}}
 	go func() {
 		s.done <- cmd.Wait()
 		_ = logFile.Close()
@@ -157,4 +169,19 @@ func freePort() (int, error) {
 	}
 	defer l.Close()
 	return l.Addr().(*net.TCPAddr).Port, nil
+}
+
+// binaryDigest identifies the build under test where there is no image tag: a
+// short digest of the executable.
+func binaryDigest(path string) string {
+	f, err := os.Open(path)
+	if err != nil {
+		return "unreadable"
+	}
+	defer f.Close()
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "unreadable"
+	}
+	return "sha256:" + hex.EncodeToString(h.Sum(nil))[:12]
 }
