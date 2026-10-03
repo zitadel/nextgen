@@ -11,10 +11,20 @@ const all = {
 const pick = __ENV.SCEN || 'login';
 if (!all[pick]) throw new Error(`unknown scenario ${pick}; one of ${Object.keys(all).join(', ')}`);
 
+// An empty threshold on `metric{op:<id>}` makes k6 keep and report that
+// sub-metric in its own end-of-test summary, one line per operation. The
+// operation vocabulary comes from the module, so the script never spells an
+// operation id the Go side does not know.
+const perOperation = {};
+for (const op of nextgen.operations()) {
+  for (const metric of nextgen.requestMetrics()) perOperation[`${metric}{op:${op}}`] = [];
+}
+
 export const options = {
   scenarios: {
     [pick]: { ...all[pick], vus: Number(__ENV.VUS || 1), duration: __ENV.DUR || '10s', gracefulStop: '5s' },
   },
+  thresholds: perOperation,
 };
 
 export function login() {

@@ -79,15 +79,20 @@ manually set `name`, k6 sets the `url` system tag to the same value, so no
 sample ever carries a raw path. The number of time series a run emits is
 bounded by the operation list, not by the dataset; this is the property
 [#1104](https://github.com/zitadel/nextgen/issues/1104) asks a test to
-assert, and `k6module` tests it at the request layer while the summariser
-reports it as the `series` column of every run.
+assert, and `k6module` tests it at the request layer. Raw per-sample output
+stays opt-in (`sweep --raw`) for asserting it on a real dataset.
 
-### 3. Built-in metrics are the metrics
+### 3. Built-in metrics are the metrics, and k6 aggregates them
 
 Because k6 performs the call, the `http_req_*` names are the honest ones and
 are not duplicated under module names. Module metrics exist only for what k6
 does not measure (per-iteration logical timings; credential refresh cost for
-[#1107](https://github.com/zitadel/nextgen/issues/1107)).
+[#1107](https://github.com/zitadel/nextgen/issues/1107)). Aggregation is
+k6's as well: the entry script declares an empty threshold on
+`metric{op:<id>}` for every operation and request metric, so k6's own
+end-of-test summary reports each operation on its own line, and a sweep is
+merged from the per-run `--summary-export` documents rather than
+re-aggregated from raw samples.
 
 ### 4. The credential cache is the generated client's `SecuritySource`
 

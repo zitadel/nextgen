@@ -72,6 +72,7 @@ func newSweepCommand(gs *state.GlobalState) *cobra.Command {
 		base, server, fixtures, stateFile, lane, out, script, scenarios, vus string
 		duration                                                             time.Duration
 		port                                                                 int
+		raw                                                                  bool
 	)
 	cmd := &cobra.Command{
 		Use:   "sweep",
@@ -117,6 +118,7 @@ data directory, provisions, measures and stops).`,
 				Script:    scriptPath,
 				Dir:       dir,
 				Commit:    gitCommit(ctx),
+				Raw:       raw,
 				Log:       gs.Stdout,
 			})
 			if err != nil {
@@ -143,13 +145,14 @@ data directory, provisions, measures and stops).`,
 	cmd.Flags().StringVar(&scenarios, "scenarios", "login,getUser", "Scenarios to run, comma separated")
 	cmd.Flags().StringVar(&vus, "vus", "1,5,20", "VU counts to run, comma separated")
 	cmd.Flags().DurationVar(&duration, "duration", 20*time.Second, "Duration of each run")
+	cmd.Flags().BoolVar(&raw, "raw", false, "Also keep k6's per-sample JSON output for every run")
 	return cmd
 }
 
 func newSummarizeCommand(gs *state.GlobalState) *cobra.Command {
 	return &cobra.Command{
 		Use:   "summarize <sweep-dir>",
-		Short: "Rewrite summary.md and aggregate.json for a sweep directory",
+		Short: "Rewrite summary.md and aggregate.json for a sweep directory from k6's per-run summaries",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
 			meta, err := harness.LoadSweepMeta(args[0])

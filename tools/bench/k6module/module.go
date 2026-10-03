@@ -84,6 +84,18 @@ func (m *ModuleInstance) api() (*api.Client, error) {
 	return c, nil
 }
 
+// Operations returns the operation ids, for the entry script to declare one
+// sub-metric per operation from the same vocabulary the tags use.
+func (m *ModuleInstance) Operations() []string {
+	return []string{harness.OpCreateFlow, harness.OpSubmitIdent, harness.OpSubmitPassword, harness.OpGetUser}
+}
+
+// RequestMetrics returns the built-in k6 request metrics the summary reports
+// per operation.
+func (m *ModuleInstance) RequestMetrics() []string {
+	return harness.RequestMetrics
+}
+
 // Login runs the whole login journey — POST /flow, submit identifier, submit
 // password — and returns the handoff token. One JavaScript call, three
 // requests, each tagged with its own operation id.

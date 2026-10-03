@@ -1,23 +1,34 @@
 package harness
 
 import (
-	"bufio"
 	"cmp"
-	"compress/gzip"
 	"encoding/json"
 	"fmt"
-	"io"
-	"maps"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
 )
 
-// Row is one operation of one run, summarised. Durations are milliseconds,
-// as k6 reports them. Series is the number of distinct time series the whole
-// run emitted — the tag-cardinality check: it must not grow with the dataset.
+// RequestMetrics are k6's built-in per-request metrics the summary reports
+// per operation. The entry script declares a `metric{op:<id>}` sub-metric for
+// each of them so k6's own end-of-test summary carries one line per
+// operation; this list and Operations are what it declares them from.
+var RequestMetrics = []string{
+	"http_reqs",
+	"http_req_duration",
+	"http_req_blocked",
+	"http_req_connecting",
+	"http_req_sending",
+	"http_req_waiting",
+	"http_req_receiving",
+	"http_req_failed",
+}
+
+// Row is one operation of one run, read from k6's summary export. Durations
+// are milliseconds, as k6 reports them.
 type Row struct {
 	Scenario string  `json:"scenario"`
 	VUs      int     `json:"vus"`
@@ -25,7 +36,6 @@ type Row struct {
 	N        int     `json:"n"`
 	RPS      float64 `json:"rps"`
 	Failed   int     `json:"failed"`
-	Series   int     `json:"series"`
 
 	Duration   Quantiles `json:"duration"`
 	Blocked    Quantiles `json:"blocked"`
@@ -35,7 +45,7 @@ type Row struct {
 	Receiving  Quantiles `json:"receiving"`
 }
 
-// Quantiles of one metric over one operation.
+// Quantiles of one metric over one operation, as k6 computed them.
 type Quantiles struct {
 	P50 float64 `json:"p50"`
 	P95 float64 `json:"p95"`
@@ -48,8 +58,13 @@ type RunMeta struct {
 	Scenario string `json:"scenario"`
 	VUs      int    `json:"vus"`
 	Duration string `json:"duration"`
-	Samples  string `json:"samples"`
-	Summary  string `json:"summary"`
+	// Export is k6's end-of-test summary (--summary-export) for the run.
+	Export string `json:"export"`
+	// Console is what k6 printed.
+	Console string `json:"console"`
+	// Samples is the raw per-sample output, present only when the sweep ran
+	// with --raw.
+	Samples string `json:"samples,omitempty"`
 }
 
 // SweepMeta is the run metadata #1096 asks every summary to carry.
@@ -64,24 +79,22 @@ type SweepMeta struct {
 	Runs      []RunMeta `json:"runs"`
 }
 
-// point is one line of k6's JSON output that carries a sample.
-type point struct {
-	Type   string `json:"type"`
-	Metric string `json:"metric"`
-	Data   struct {
-		Time  time.Time         `json:"time"`
-		Value float64           `json:"value"`
-		Tags  map[string]string `json:"tags"`
-	} `json:"data"`
+// summaryExport is the part of k6's --summary-export document the merge
+// reads: metric name (a sub-metric is `name{tag:value}`) to its values.
+type summaryExport struct {
+	Metrics map[string]map[string]float64 `json:"metrics"`
 }
 
-// Summarize reads every run in meta and returns one Row per operation.
+var subMetric = regexp.MustCompile(`^(\w+)\{op:(\w+)\}$`)
+
+// Summarize merges the runs of a sweep into one Row per operation per run.
+// Every number comes from k6's own summary; nothing is re-aggregated here.
 func Summarize(dir string, meta SweepMeta) ([]Row, error) {
 	var rows []Row
 	for _, run := range meta.Runs {
-		r, err := summarizeRun(filepath.Join(dir, run.Samples), run)
+		r, err := summarizeRun(filepath.Join(dir, run.Export), run)
 		if err != nil {
-			return nil, fmt.Errorf("%s: %w", run.Samples, err)
+			return nil, fmt.Errorf("%s: %w", run.Export, err)
 		}
 		rows = append(rows, r...)
 	}
@@ -92,110 +105,58 @@ func Summarize(dir string, meta SweepMeta) ([]Row, error) {
 }
 
 func summarizeRun(path string, run RunMeta) ([]Row, error) {
-	f, err := os.Open(path)
+	b, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
-	var r io.Reader = f
-	if strings.HasSuffix(path, ".gz") {
-		gz, err := gzip.NewReader(f)
-		if err != nil {
-			return nil, err
-		}
-		defer gz.Close()
-		r = gz
-	}
-
-	type key struct{ metric, op string }
-	samples := map[key][]float64{}
-	series := map[string]struct{}{}
-	failed := map[string]int{}
-	var first, last time.Time
-
-	sc := bufio.NewScanner(r)
-	sc.Buffer(make([]byte, 0, 64*1024), 16*1024*1024)
-	for sc.Scan() {
-		var p point
-		if err := json.Unmarshal(sc.Bytes(), &p); err != nil {
-			return nil, err
-		}
-		if p.Type != "Point" {
-			continue
-		}
-		series[seriesKey(p.Metric, p.Data.Tags)] = struct{}{}
-		op := p.Data.Tags["op"]
-		if op == "" {
-			continue
-		}
-		samples[key{p.Metric, op}] = append(samples[key{p.Metric, op}], p.Data.Value)
-		if first.IsZero() || p.Data.Time.Before(first) {
-			first = p.Data.Time
-		}
-		if p.Data.Time.After(last) {
-			last = p.Data.Time
-		}
-		if p.Metric == "http_req_failed" && p.Data.Value != 0 {
-			failed[op]++
-		}
-	}
-	if err := sc.Err(); err != nil {
+	var export summaryExport
+	if err := json.Unmarshal(b, &export); err != nil {
 		return nil, err
 	}
 
-	ops := map[string]struct{}{}
-	for k := range samples {
-		if k.metric == "http_req_duration" {
-			ops[k.op] = struct{}{}
+	// metric → op → values
+	byOp := map[string]map[string]map[string]float64{}
+	for name, values := range export.Metrics {
+		m := subMetric.FindStringSubmatch(name)
+		if m == nil {
+			continue
 		}
+		if byOp[m[2]] == nil {
+			byOp[m[2]] = map[string]map[string]float64{}
+		}
+		byOp[m[2]][m[1]] = values
 	}
-	span := last.Sub(first).Seconds()
-	rows := make([]Row, 0, len(ops))
-	for op := range ops {
-		n := len(samples[key{"http_req_duration", op}])
-		row := Row{Scenario: run.Scenario, VUs: run.VUs, Op: op, N: n, Failed: failed[op], Series: len(series)}
-		if span > 0 {
-			row.RPS = float64(n) / span
+
+	rows := make([]Row, 0, len(byOp))
+	for op, metrics := range byOp {
+		// k6 reports every declared sub-metric, including the operations a
+		// scenario never performed; those have no requests and no row.
+		reqs := metrics["http_reqs"]
+		if reqs == nil || reqs["count"] == 0 {
+			continue
 		}
-		row.Duration = quantiles(samples[key{"http_req_duration", op}])
-		row.Blocked = quantiles(samples[key{"http_req_blocked", op}])
-		row.Connecting = quantiles(samples[key{"http_req_connecting", op}])
-		row.Sending = quantiles(samples[key{"http_req_sending", op}])
-		row.Waiting = quantiles(samples[key{"http_req_waiting", op}])
-		row.Receiving = quantiles(samples[key{"http_req_receiving", op}])
-		rows = append(rows, row)
+		rows = append(rows, Row{
+			Scenario:   run.Scenario,
+			VUs:        run.VUs,
+			Op:         op,
+			N:          int(reqs["count"]),
+			RPS:        reqs["rate"],
+			Failed:     int(metrics["http_req_failed"]["passes"]),
+			Duration:   quantiles(metrics["http_req_duration"]),
+			Blocked:    quantiles(metrics["http_req_blocked"]),
+			Connecting: quantiles(metrics["http_req_connecting"]),
+			Sending:    quantiles(metrics["http_req_sending"]),
+			Waiting:    quantiles(metrics["http_req_waiting"]),
+			Receiving:  quantiles(metrics["http_req_receiving"]),
+		})
 	}
 	return rows, nil
 }
 
-// seriesKey is what k6 itself considers one time series: the metric plus
-// the exact tag set.
-func seriesKey(metric string, tags map[string]string) string {
-	keys := slices.Sorted(maps.Keys(tags))
-	var b strings.Builder
-	b.WriteString(metric)
-	for _, k := range keys {
-		b.WriteByte('|')
-		b.WriteString(k)
-		b.WriteByte('=')
-		b.WriteString(tags[k])
-	}
-	return b.String()
-}
-
-func quantiles(v []float64) Quantiles {
-	if len(v) == 0 {
-		return Quantiles{}
-	}
-	s := slices.Clone(v)
-	slices.Sort(s)
-	q := func(p float64) float64 {
-		k := float64(len(s)-1) * p
-		f := int(k)
-		c := min(f+1, len(s)-1)
-		return s[f] + (s[c]-s[f])*(k-float64(f))
-	}
-	return Quantiles{P50: q(0.5), P95: q(0.95), P99: q(0.99)}
+// quantiles reads the trend stats the sweep asks k6 for
+// (--summary-trend-stats): med stands in for p50.
+func quantiles(values map[string]float64) Quantiles {
+	return Quantiles{P50: values["med"], P95: values["p(95)"], P99: values["p(99)"]}
 }
 
 // Markdown renders rows as the comparison table a sweep directory's
@@ -204,12 +165,12 @@ func Markdown(meta SweepMeta, rows []Row) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "# Sweep %s\n\n", meta.StartedAt.UTC().Format(time.RFC3339))
 	fmt.Fprintf(&b, "commit `%s` · lane `%s` · host `%s` (%d CPUs) · %s · target `%s`\n\n", meta.Commit, meta.Lane, meta.Host, meta.CPUs, meta.K6Version, meta.Base)
-	b.WriteString("Durations in ms. `series` is the number of distinct time series the run emitted.\n\n")
-	b.WriteString("| scenario | op | vus | n | req/s | failed | series | dur p50 | dur p95 | dur p99 | blocked p95 | connecting p95 | sending p95 | waiting p95 | receiving p95 |\n")
-	b.WriteString("|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n")
+	b.WriteString("Durations in ms, as k6 reported them per operation.\n\n")
+	b.WriteString("| scenario | op | vus | n | req/s | failed | dur p50 | dur p95 | dur p99 | blocked p95 | connecting p95 | sending p95 | waiting p95 | receiving p95 |\n")
+	b.WriteString("|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n")
 	for _, r := range rows {
-		fmt.Fprintf(&b, "| %s | %s | %d | %d | %.0f | %d | %d | %.2f | %.2f | %.2f | %.3f | %.3f | %.3f | %.2f | %.3f |\n",
-			r.Scenario, r.Op, r.VUs, r.N, r.RPS, r.Failed, r.Series,
+		fmt.Fprintf(&b, "| %s | %s | %d | %d | %.0f | %d | %.2f | %.2f | %.2f | %.3f | %.3f | %.3f | %.2f | %.3f |\n",
+			r.Scenario, r.Op, r.VUs, r.N, r.RPS, r.Failed,
 			r.Duration.P50, r.Duration.P95, r.Duration.P99,
 			r.Blocked.P95, r.Connecting.P95, r.Sending.P95, r.Waiting.P95, r.Receiving.P95)
 	}

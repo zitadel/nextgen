@@ -1,7 +1,6 @@
 package k6module
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -10,10 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/grafana/sobek"
-	"github.com/sirupsen/logrus"
-	"go.k6.io/k6/v2/js/common"
-	"go.k6.io/k6/v2/js/modules"
+	"go.k6.io/k6/v2/js/modulestest"
 	"go.k6.io/k6/v2/lib"
 	"go.k6.io/k6/v2/metrics"
 	"gopkg.in/guregu/null.v3"
@@ -21,43 +17,36 @@ import (
 	"github.com/zitadel/nextgen/tools/bench/harness"
 )
 
-// vuState builds the slice of a VU's lib.State that httpext.MakeRequest
-// reads, with a buffered sample channel the test drains.
-func vuState(t *testing.T) (*lib.State, chan metrics.SampleContainer) {
+// testVU builds a VU in the VU context with the slice of lib.State that
+// httpext.MakeRequest reads, and a buffered sample channel the test drains.
+// The logger is k6's own test logger: lib.State.Logger is a logrus interface
+// by k6's choice, and the test runtime is the one place to get one without
+// importing logrus here.
+func testVU(t *testing.T) (*modulestest.VU, chan metrics.SampleContainer) {
 	t.Helper()
+	rt := modulestest.NewRuntime(t)
 	registry := metrics.NewRegistry()
 	jar, err := cookiejar.New(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	samples := make(chan metrics.SampleContainer, 1024)
-	logger := logrus.New()
-	logger.SetOutput(io.Discard)
-	st := &lib.State{
+	rt.MoveToVUContext(&lib.State{
 		Options: lib.Options{
 			SystemTags:   &metrics.DefaultSystemTagSet,
 			MaxRedirects: null.IntFrom(10),
 		},
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
-		Logger:         logger,
+		Logger:         rt.VU.InitEnvField.Logger,
 		//egress:allow test transport against an httptest server
 		Transport:  http.DefaultTransport,
 		CookieJar:  jar,
 		Samples:    samples,
 		BufferPool: lib.NewBufferPool(),
 		Tags:       lib.NewVUStateTags(registry.RootTagSet()),
-	}
-	return st, samples
+	})
+	return rt.VU, samples
 }
-
-type fakeVU struct {
-	modules.VU
-	ctx context.Context
-}
-
-func (f fakeVU) Context() context.Context { return f.ctx }
-func (fakeVU) Runtime() *sobek.Runtime    { return nil }
-func (fakeVU) Events() common.Events      { return common.Events{} }
 
 // TestDoerBoundsTagsByOperation is the #1104 cardinality property at the
 // request layer: a hundred requests to a hundred distinct /flow/{id}/submit
@@ -75,8 +64,8 @@ func TestDoerBoundsTagsByOperation(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	st, samples := vuState(t)
-	d := &doer{st: st, ctx: func() context.Context { return t.Context() }, origin: "http://origin.test", lane: "test"}
+	vu, samples := testVU(t)
+	d := &doer{st: vu.State(), ctx: vu.Context, origin: "http://origin.test", lane: "test"}
 
 	const n = 100
 	for i := range n {
@@ -133,20 +122,18 @@ func TestDoerStoresCookiesInTheJar(t *testing.T) {
 		http.SetCookie(w, &http.Cookie{Name: "_zflow", Value: "v1", Path: "/"})
 	}))
 	defer srv.Close()
-	st, _ := vuState(t)
-	d := &doer{st: st, ctx: func() context.Context { return t.Context() }, origin: "http://origin.test", lane: "test"}
+	vu, _ := testVU(t)
+	d := &doer{st: vu.State(), ctx: vu.Context, origin: "http://origin.test", lane: "test"}
 	req, _ := http.NewRequestWithContext(harness.WithOp(t.Context(), harness.OpCreateFlow), http.MethodPost, srv.URL+"/flow", strings.NewReader("{}"))
 	if _, err := d.Do(req); err != nil {
 		t.Fatal(err)
 	}
 	u := req.URL
 	var found bool
-	for _, c := range st.CookieJar.Cookies(u) {
+	for _, c := range vu.State().CookieJar.Cookies(u) {
 		found = found || (c.Name == "_zflow" && c.Value == "v1")
 	}
 	if !found {
-		t.Fatalf("jar does not hold _zflow: %v", st.CookieJar.Cookies(u))
+		t.Fatalf("jar does not hold _zflow: %v", vu.State().CookieJar.Cookies(u))
 	}
 }
-
-var _ modules.VU = fakeVU{}

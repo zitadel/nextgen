@@ -33,9 +33,7 @@ because it describes the source tree as a whole, not a published client package.
 default and carries its own copy of the license text. It links
 [k6](https://github.com/grafana/k6), which is itself AGPL-3.0-only, so unlike
 the rest of the AGPL-3.0-only default it is **excluded from any commercial
-licensing** of the product: there is no license under which Zitadel could
-offer it other than AGPL-3.0-only. It is a development tool and is never part
-of a published package or image.
+licensing** of the product.
 
 The Docker images published from this repository, including
 `ghcr.io/zitadel/nextgen`, are AGPL-3.0-only because they contain the server and

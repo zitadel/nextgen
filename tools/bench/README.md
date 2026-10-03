@@ -12,7 +12,10 @@ module that compiles two things into one k6 binary:
   set to the operation id, never a path.
 - `k6 x nextgen` — the command tree: `bootstrap` a target from a fixture
   file, `sweep` every scenario at every VU count, `summarize` a sweep
-  directory.
+  directory k6 does the aggregating: the script declares one
+  `metric{op:<id>}` sub-metric per operation, so k6's own end-of-test summary
+  reports each operation on its own line, and the sweep merges the per-run
+  `--summary-export` documents into one table.
 
 ## Run it
 
@@ -26,8 +29,9 @@ moon run bench:summarize -- out/sweep-<stamp>          # rewrite summary.md / ag
 (`out/nextgen-server`) through Moon, then `k6 x nextgen sweep --server …`
 starts the server on SQLite in a fresh data directory with migrations
 applied and both embedded UIs off, provisions the fixture, runs the matrix
-one run at a time, writes `runs.json`, one raw samples file and one k6
-summary per run, `summary.md` and `aggregate.json`, and stops the server.
+one run at a time, writes `runs.json`, k6's summary export and console
+output per run, `summary.md` and `aggregate.json`, and stops the server.
+`--raw` additionally keeps k6's per-sample JSON output for every run.
 
 Against a server you already run:
 
@@ -51,15 +55,15 @@ read, so a fixture that cannot be driven fails before anything is measured.
 
 ## Layout
 
-| Path                                   | What                                                                                                       |
-| -------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| [`cmd/k6/`](cmd/k6/)                   | the k6 binary with the module and the subcommand compiled in — what `xk6 build` would generate             |
-| [`k6module/`](k6module/)               | `k6/x/nextgen`: root module (target, credential cache), per-VU client, the delegating `Do`                 |
-| [`k6cmd/`](k6cmd/)                     | `k6 x nextgen bootstrap` / `sweep` / `summarize`                                                           |
-| [`harness/`](harness/)                 | operations over the typed client, fixtures, target state, local server lifecycle, sweep runner, summariser |
-| [`scripts/bench.js`](scripts/bench.js) | the one entry script (embedded into the binary)                                                            |
-| [`fixtures/`](fixtures/)               | what a lane provisions                                                                                     |
-| `out/`                                 | everything the tooling writes; gitignored                                                                  |
+| Path                                   | What                                                                                                          |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| [`cmd/k6/`](cmd/k6/)                   | the k6 binary with the module and the subcommand compiled in — what `xk6 build` would generate                |
+| [`k6module/`](k6module/)               | `k6/x/nextgen`: root module (target, credential cache), per-VU client, the delegating `Do`                    |
+| [`k6cmd/`](k6cmd/)                     | `k6 x nextgen bootstrap` / `sweep` / `summarize`                                                              |
+| [`harness/`](harness/)                 | operations over the typed client, fixtures, target state, local server lifecycle, sweep runner, summary merge |
+| [`scripts/bench.js`](scripts/bench.js) | the one entry script (embedded into the binary)                                                               |
+| [`fixtures/`](fixtures/)               | what a lane provisions                                                                                        |
+| `out/`                                 | everything the tooling writes; gitignored                                                                     |
 
 ## Checks
 

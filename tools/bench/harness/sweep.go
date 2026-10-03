@@ -28,6 +28,8 @@ type SweepConfig struct {
 	Dir string
 	// K6 is the k6 binary to run; empty means this very executable.
 	K6 string
+	// Raw also keeps k6's per-sample JSON output for every run.
+	Raw bool
 	// Commit is recorded in the metadata; the sweep does not ask git itself.
 	Commit string
 	Log    io.Writer
@@ -61,7 +63,10 @@ func Sweep(ctx context.Context, cfg SweepConfig) ([]Row, error) {
 	for _, scen := range cfg.Scenarios {
 		for _, vus := range cfg.VUs {
 			name := fmt.Sprintf("%s-%d", scen, vus)
-			run := RunMeta{Scenario: scen, VUs: vus, Duration: cfg.Duration.String(), Samples: name + ".json.gz", Summary: name + ".txt"}
+			run := RunMeta{Scenario: scen, VUs: vus, Duration: cfg.Duration.String(), Export: name + ".json", Console: name + ".txt"}
+			if cfg.Raw {
+				run.Samples = name + ".samples.json.gz"
+			}
 			fmt.Fprintf(cfg.Log, "== %s\n", name)
 			if err := runK6(ctx, k6, cfg, run); err != nil {
 				return nil, fmt.Errorf("%s: %w", name, err)
@@ -109,15 +114,18 @@ func LoadSweepMeta(dir string) (SweepMeta, error) {
 }
 
 func runK6(ctx context.Context, k6 string, cfg SweepConfig, run RunMeta) error {
-	summary, err := os.Create(filepath.Join(cfg.Dir, run.Summary))
+	console, err := os.Create(filepath.Join(cfg.Dir, run.Console))
 	if err != nil {
 		return err
 	}
-	defer summary.Close()
+	defer console.Close()
 
+	// k6 aggregates; the sweep only asks for the stats the table shows and
+	// keeps the document k6 would print anyway.
 	args := []string{
 		"run", "--quiet", "--no-color", "--no-usage-report", "--summary-mode", "compact",
-		"--out", "json=" + filepath.Join(cfg.Dir, run.Samples),
+		"--summary-trend-stats", "avg,min,med,max,p(90),p(95),p(99)",
+		"--summary-export", filepath.Join(cfg.Dir, run.Export),
 		"-e", "SCEN=" + run.Scenario,
 		"-e", "VUS=" + strconv.Itoa(run.VUs),
 		"-e", "DUR=" + run.Duration,
@@ -125,18 +133,20 @@ func runK6(ctx context.Context, k6 string, cfg SweepConfig, run RunMeta) error {
 	for k, v := range cfg.Target.Env() {
 		args = append(args, "-e", k+"="+v)
 	}
+	if run.Samples != "" {
+		args = append(args, "--out", "json="+filepath.Join(cfg.Dir, run.Samples))
+	}
 	args = append(args, cfg.Script)
 
 	cmd := exec.CommandContext(ctx, k6, args...)
-	cmd.Stdout = summary
-	cmd.Stderr = summary
+	cmd.Stdout = console
+	cmd.Stderr = console
 	if err := cmd.Run(); err != nil {
-		tail, _ := os.ReadFile(filepath.Join(cfg.Dir, run.Summary))
+		tail, _ := os.ReadFile(filepath.Join(cfg.Dir, run.Console))
 		return fmt.Errorf("k6 run failed: %w\n%s", err, lastLines(string(tail), 30))
 	}
-	// The summary is k6's; what the operator needs to see at once is whether
-	// anything failed.
-	b, _ := os.ReadFile(filepath.Join(cfg.Dir, run.Summary))
+	// What the operator needs to see at once is whether anything failed.
+	b, _ := os.ReadFile(filepath.Join(cfg.Dir, run.Console))
 	for line := range strings.SplitSeq(string(b), "\n") {
 		if strings.Contains(line, "http_req_failed") || strings.Contains(line, "http_reqs") || strings.Contains(line, "level=error") {
 			fmt.Fprintln(cfg.Log, strings.TrimSpace(line))
