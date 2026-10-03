@@ -1,0 +1,96 @@
+id: "bench"
+language: "go"
+layer: "tool"
+stack: "infrastructure"
+
+# The k6 benchmark harness (ADR 066): a nested Go module that compiles the
+# k6/x/nextgen scenarios and the `k6 x nextgen` command tree into a k6 binary.
+# Tasks run from this directory, so `go` sees tools/bench/go.mod.
+
+fileGroups:
+  benchInputs:
+    - "**/*.go"
+    - "**/*.js"
+    - "go.mod"
+    - "go.sum"
+    - "moon.yml"
+    # The root module is a dependency through the replace directive.
+    - "/**/*.go"
+    - "/go.mod"
+    - "/go.sum"
+
+tasks:
+  format:
+    script: |
+      unformatted="$(gofmt -l .)"
+      if [ -n "$unformatted" ]; then
+        echo "error: gofmt would rewrite the following files:" >&2
+        printf '%s\n' "$unformatted" >&2
+        exit 1
+      fi
+    inputs:
+      - "**/*.go"
+
+  vet:
+    command: "go vet ./..."
+    inputs:
+      - "@group(benchInputs)"
+
+  # The CI build #1096 asks for: the module and the binary compile. No load
+  # is generated here.
+  build:
+    command: "go build -o out/k6 ./cmd/k6"
+    deps:
+      - "vet"
+    inputs:
+      - "@group(benchInputs)"
+    outputs:
+      - "out/k6"
+
+  test:
+    command: "go test -timeout 5m ./..."
+    deps:
+      - "format"
+      - "vet"
+    inputs:
+      - "@group(benchInputs)"
+
+  # The server the local sweep measures. Built here rather than through
+  # workspace:server so the sweep needs no embedded UI build: the harness
+  # starts it with both UI surfaces disabled.
+  build-server:
+    command: "go build -o tools/bench/out/nextgen-server ."
+    inputs:
+      - "/**/*.go"
+      - "/**/*.sql"
+      - "/go.mod"
+      - "/go.sum"
+    outputs:
+      - "out/nextgen-server"
+    options:
+      runFromWorkspaceRoot: true
+      runInCI: false
+
+  # Local sweep: start a server on SQLite, provision fixtures/local.json,
+  # run every scenario at 1, 5 and 20 VUs, summarise. Pass flags through:
+  #   moon run bench:sweep -- --vus 5 --duration 10s --scenarios getUser
+  sweep:
+    command: "out/k6 x nextgen sweep --server out/nextgen-server --fixtures fixtures/local.json"
+    deps:
+      - "build"
+      - "build-server"
+    options:
+      cache: false
+      runInCI: false
+      shell: false
+
+  # Rewrite the summary of an existing sweep directory:
+  #   moon run bench:summarize -- out/sweep-<stamp>
+  summarize:
+    command: "out/k6 x nextgen summarize"
+    deps:
+      - "build"
+    options:
+      cache: false
+      runInCI: false
+      shell: false
