@@ -86,8 +86,12 @@ stays opt-in (`sweep --raw`) for asserting it on a real dataset.
 
 Because k6 performs the call, the `http_req_*` names are the honest ones and
 are not duplicated under module names. Module metrics exist only for what k6
-does not measure (per-iteration logical timings; credential refresh cost for
-[#1107](https://github.com/zitadel/nextgen/issues/1107)). Aggregation is
+cannot know: `nextgen_errors` counts failed operations classified by status
+class and the error-details `code` of the body (k6 sees a step re-served
+with an error key as a plain 200), and later the credential refresh cost for
+[#1107](https://github.com/zitadel/nextgen/issues/1107). Such a metric is
+registered once on the root module and pushed from each VU through its
+sample channel, so thresholds and the summary treat it like a built-in. Aggregation is
 k6's as well: the entry script declares an empty threshold on
 `metric{op:<id>}` for every operation and request metric, so k6's own
 end-of-test summary reports each operation on its own line, and a sweep is
