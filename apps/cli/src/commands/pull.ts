@@ -26,10 +26,10 @@ const HANDLE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
  *
  * The use case is adoption: someone edited a resource through the dashboard or
  * MCP, and the developer brings that revision into the git-tracked source of
- * truth. Targeted only — one `(kind, handle)` per run, no bulk mode. The body
- * is written exactly as the server returns it (its references kept verbatim),
- * so a later `apply` sends back the same ids the server already accepts. The
- * per-kind work — the list endpoint — lives on the resource's syncer.
+ * truth. Targeted only — one `(kind, handle)` per run, no bulk mode. All the
+ * per-kind work (its list endpoint, and turning the server body into the local
+ * file with references by handle) lives on the resource's syncer, so this
+ * command only orchestrates.
  */
 export default class Pull extends BaseCommand {
   static override description =
@@ -93,15 +93,21 @@ export default class Pull extends BaseCommand {
     }
 
     const fetched = await syncer.fetch(id);
-    // Written verbatim apart from transport noise the syncer strips: the server
-    // body's references are exactly what a later apply must send back.
-    const toWrite = syncer.normalizeWrite ? syncer.normalizeWrite(fetched) : fetched;
+    const { body, warnings } = syncer.localise
+      ? await syncer.localise(fetched, syncers)
+      : { body: fetched, warnings: [] };
+    const toWrite = syncer.normalizeWrite ? syncer.normalizeWrite(body) : body;
     const relPath = `${syncer.directory}/${handle}.json`;
+
+    for (const warning of warnings) {
+      consola.warn(warning);
+    }
 
     if (dryRun) {
       consola.success(`Would write ${relPath}`);
       return this.emit({
         status: "ok",
+        warnings,
         // The follow-up is the same pull without --dry-run; the handle is a
         // validated single segment, so it needs no quoting.
         data: {
@@ -137,6 +143,7 @@ export default class Pull extends BaseCommand {
 
     return this.emit({
       status: "ok",
+      warnings,
       // Only suggest plan when the pull was recorded: without a state file plan
       // cannot run, so advertising it would hand the caller a failing command.
       data: {

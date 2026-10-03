@@ -831,3 +831,80 @@ describe("newestRevision", () => {
     expect(branding.newestRevision).toBeUndefined();
   });
 });
+
+describe("localise", () => {
+  /** Localise a flow body against a fresh registry, failing if the flow syncer cannot. */
+  const localiseFlow = (body: object): Promise<{ body: object; warnings: string[] }> => {
+    const syncers = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
+    const flow = syncers.find((syncer) => syncer.kind === "flow");
+    if (flow?.localise === undefined) {
+      throw new Error("the flow syncer should localise");
+    }
+    return flow.localise(body, syncers);
+  };
+
+  it("rewrites a flow's user_schema id to the schema's object type", async () => {
+    server.use(
+      http.get(`${BASE}/schemas/:id`, ({ params }) => {
+        expect(params.id).toBe("sch_abc");
+        return HttpResponse.json({ id: "sch_abc", schema: { objectType: "human-user" }, metadata: {} });
+      }),
+    );
+
+    const { body, warnings } = await localiseFlow({ name: "login", user_schema: "sch_abc" });
+
+    expect(body).toMatchObject({ name: "login", user_schema: "human-user" });
+    expect(warnings).toEqual([]);
+  });
+
+  it.each([
+    ["a URL $id", "https://example.test/human-user.yaml"],
+    ["a URN $id", "urn:example:human-user"],
+    ["a relative-URI $id", "duplicate-id"],
+  ])("resolves %s to the object type (ids are shape-less)", async (_label, reference) => {
+    server.use(
+      http.get(`${BASE}/schemas/:id`, () =>
+        HttpResponse.json({ id: reference, schema: { objectType: "human-user" }, metadata: {} }),
+      ),
+    );
+
+    const { body, warnings } = await localiseFlow({ name: "login", user_schema: reference });
+
+    expect(body).toMatchObject({ user_schema: "human-user" });
+    expect(warnings).toEqual([]);
+  });
+
+  it("keeps the id and warns when the referenced schema revision is gone", async () => {
+    server.use(
+      http.get(`${BASE}/schemas/:id`, () =>
+        HttpResponse.json({ code: "not_found", message: "gone" }, { status: 404 }),
+      ),
+    );
+
+    const { body, warnings } = await localiseFlow({ name: "login", user_schema: "sch_gone" });
+
+    expect(body).toMatchObject({ user_schema: "sch_gone" });
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain("sch_gone");
+  });
+
+  it("keeps the id and warns when the schema has no object type to reference it by", async () => {
+    server.use(
+      http.get(`${BASE}/schemas/:id`, () =>
+        HttpResponse.json({ id: "sch_noobj", schema: { properties: {} }, metadata: {} }),
+      ),
+    );
+
+    const { body, warnings } = await localiseFlow({ name: "login", user_schema: "sch_noobj" });
+
+    expect(body).toMatchObject({ user_schema: "sch_noobj" });
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain("no object type");
+  });
+
+  it("writes a schema body verbatim — a schema references nothing", () => {
+    const [schema] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
+
+    expect(schema.localise).toBeUndefined();
+  });
+});

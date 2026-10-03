@@ -103,7 +103,7 @@ function pull(cwd: string, base: string, args: string[]) {
 }
 
 describe("pull command", () => {
-  it("writes the flow body verbatim and reports it in the envelope", async () => {
+  it("localizes the flow's user_schema to the schema handle and reports it in the envelope", async () => {
     const cwd = await makeCwd();
     const base = await startStub();
 
@@ -118,8 +118,8 @@ describe("pull command", () => {
       path: ".zitadel/flows/login.json",
     });
     const written = JSON.parse(await readFile(join(cwd, ".zitadel/flows/login.json"), "utf8"));
-    // The concrete server id is kept exactly — no rewrite to a handle.
-    expect(written.user_schema).toBe("sch_server_1");
+    // The concrete sch_ id becomes the schema's object-type handle.
+    expect(written.user_schema).toBe("human-user");
   });
 
   it("suggests plan for an initialized project", async () => {

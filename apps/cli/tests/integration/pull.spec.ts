@@ -62,14 +62,8 @@ describe("pull", () => {
       });
 
       it("records the pulled revision, so a follow-up plan reports it in sync", async () => {
-        // A configured project whose flow is pinned to a schema id on the
-        // server; pulling it must leave plan with nothing to upload.
         const project = await aSetUpApp();
-        const schemaId = (await project.publishedSchema()).id;
-        await project.editLoginFlow((flow) => {
-          (flow as unknown as { user_schema: string }).user_schema = schemaId;
-        });
-        expect(await project.apply()).toSucceed();
+        await project.pinLoginFlowToPublishedSchema();
         const flowName = (await project.publishedFlow()).flow_definition.name;
 
         expect(await project.run(["pull", "flow", flowName, "--json"])).toSucceed();
