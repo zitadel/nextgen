@@ -240,8 +240,6 @@ class SchemaSyncer implements ResourceSyncer {
   readonly mutable = false;
   readonly revisioned = true;
   readonly normalize = normalizeSchemaBody;
-  /** A schema id is a minted `sch_…` value or the document's `$id` URI (ADR 063). */
-  private static readonly ID_PREFIX = "sch_";
   // Deliberately no `normalizeWrite`: the server stores schema bytes
   // verbatim, so stripping spelled-out x-* defaults from the local file
   // would drop them from the next published revision. Canonical schema
@@ -328,12 +326,10 @@ class SchemaSyncer implements ResourceSyncer {
   }
 
   async localiseReference(reference: string): Promise<{ value: string; warning?: string }> {
-    // A concrete id is a minted `sch_…` value or a `$id` URI; a bare object
-    // type or a `${VAR}` is already the portable form and stays as it is.
-    const isId = reference.startsWith(SchemaSyncer.ID_PREFIX) || reference.includes("://");
-    if (!isId) {
-      return { value: reference };
-    }
+    // A schema id is shape-less — a minted `sch_…` value, or the document's
+    // `$id`, which may be a URL, a URN or a relative URI (ADR 063). Rather
+    // than guess from its shape, resolve it by reading the schema; a 404 means
+    // the referenced revision is gone, so the id is kept and the caller warned.
     try {
       const body = (await this.fetch(reference)) as { objectType?: string };
       return { value: body.objectType ?? reference };

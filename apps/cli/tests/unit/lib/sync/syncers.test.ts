@@ -857,28 +857,18 @@ describe("localise", () => {
     expect(warnings).toEqual([]);
   });
 
-  it("resolves a URL schema id to the object type", async () => {
+  it.each([
+    ["a URL $id", "https://example.test/human-user.yaml"],
+    ["a URN $id", "urn:example:human-user"],
+    ["a relative-URI $id", "duplicate-id"],
+  ])("resolves %s to the object type (ids are shape-less)", async (_label, reference) => {
     server.use(
       http.get(`${BASE}/schemas/:id`, () =>
-        HttpResponse.json({
-          id: "https://example.test/human-user.yaml",
-          schema: { objectType: "human-user" },
-          metadata: {},
-        }),
+        HttpResponse.json({ id: reference, schema: { objectType: "human-user" }, metadata: {} }),
       ),
     );
 
-    const { body, warnings } = await localiseFlow({
-      name: "login",
-      user_schema: "https://example.test/human-user.yaml",
-    });
-
-    expect(body).toMatchObject({ user_schema: "human-user" });
-    expect(warnings).toEqual([]);
-  });
-
-  it("leaves a bare object-type handle untouched, fetching nothing", async () => {
-    const { body, warnings } = await localiseFlow({ name: "login", user_schema: "human-user" });
+    const { body, warnings } = await localiseFlow({ name: "login", user_schema: reference });
 
     expect(body).toMatchObject({ user_schema: "human-user" });
     expect(warnings).toEqual([]);
