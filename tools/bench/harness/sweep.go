@@ -41,6 +41,8 @@ type SweepConfig struct {
 	// vouches for them (SourceHarness when the sweep started the server).
 	Declared       map[string]string
 	DeclaredSource string
+	// Sessions are the session cache choices of scenarios that use it.
+	Sessions SessionSettings
 }
 
 // Sweep runs the matrix and writes the summary. It returns the rows so a
@@ -85,16 +87,20 @@ func Sweep(ctx context.Context, cfg SweepConfig) ([]Row, error) {
 	}
 
 	host, _ := os.Hostname()
+	if err := cfg.Sessions.Validate(); err != nil {
+		return nil, err
+	}
 	meta := SweepMeta{
-		Doctor:         &report,
-		Commit:         cfg.Commit,
-		RequestTimeout: RequestTimeout.String(),
-		Lane:           cfg.Target.Lane,
-		Host:           host,
-		CPUs:           runtime.NumCPU(),
-		K6Version:      k6Version(ctx, k6),
-		StartedAt:      time.Now(),
-		Base:           cfg.Target.Base,
+		Doctor:          &report,
+		SessionSettings: cfg.Sessions.Env(),
+		Commit:          cfg.Commit,
+		RequestTimeout:  RequestTimeout.String(),
+		Lane:            cfg.Target.Lane,
+		Host:            host,
+		CPUs:            runtime.NumCPU(),
+		K6Version:       k6Version(ctx, k6),
+		StartedAt:       time.Now(),
+		Base:            cfg.Target.Base,
 	}
 
 	for _, scen := range cfg.Scenarios {
@@ -107,6 +113,13 @@ func Sweep(ctx context.Context, cfg SweepConfig) ([]Row, error) {
 			fmt.Fprintf(cfg.Log, "== %s\n", name)
 			if err := runK6(ctx, k6, cfg, run); err != nil {
 				return nil, fmt.Errorf("%s: %w", name, err)
+			}
+			stats, err := ReadSessionStats(filepath.Join(cfg.Dir, run.Export))
+			if err != nil {
+				return nil, fmt.Errorf("%s: %w", name, err)
+			}
+			if stats.Used() {
+				run.Sessions = &stats
 			}
 			meta.Runs = append(meta.Runs, run)
 			// Let the server drain before the next run measures it.
@@ -121,7 +134,16 @@ func Sweep(ctx context.Context, cfg SweepConfig) ([]Row, error) {
 	if err := writeJSON(filepath.Join(cfg.Dir, "runs.json"), meta); err != nil {
 		return nil, err
 	}
-	return WriteSummary(cfg.Dir, meta)
+	rows, err := WriteSummary(cfg.Dir, meta)
+	if err != nil {
+		return nil, err
+	}
+	// A window in which a VU paid for a login is not reported as a result: the
+	// summary says so, and the sweep fails so it cannot be missed.
+	if invalid := meta.Invalid(); len(invalid) > 0 {
+		return rows, fmt.Errorf("invalid windows, do not cite these numbers:\n  %s", strings.Join(invalid, "\n  "))
+	}
+	return rows, nil
 }
 
 // WriteSummary summarises a sweep directory into summary.md and
@@ -168,6 +190,9 @@ func runK6(ctx context.Context, k6 string, cfg SweepConfig, run RunMeta) error {
 		"-e", "DUR=" + run.Duration,
 	}
 	for k, v := range cfg.Target.Env() {
+		args = append(args, "-e", k+"="+v)
+	}
+	for k, v := range cfg.Sessions.Env() {
 		args = append(args, "-e", k+"="+v)
 	}
 	if run.Samples != "" {

@@ -16,6 +16,70 @@ import (
 // op, lane, status_class and code.
 const MetricErrors = "nextgen_errors"
 
+// The session cache's metrics. They are not tagged with an operation: the
+// cache is process-wide, and its cost must stay out of every operation trend.
+const (
+	// MetricSessionMiss counts Gets on the measured path that found no usable
+	// session. Any non-zero value means a VU paid for a login inside a
+	// measured iteration and the window is not valid.
+	MetricSessionMiss = "nextgen_session_cache_miss"
+	// MetricSessionRefresh is the cost of each login the cache paid, in ms,
+	// tagged result=ok|error and path=background|miss.
+	MetricSessionRefresh = "nextgen_session_refresh_duration"
+	// MetricSessionRefreshes counts the logins the cache paid, tagged
+	// result=ok|error and path=background|miss, so the summary can say how
+	// many happened and how many failed.
+	MetricSessionRefreshes = "nextgen_session_refreshes"
+)
+
+// SessionMetrics are the cache's metrics as the entry script declares them,
+// sub-metrics included, so k6's own summary reports each.
+var SessionMetrics = []string{
+	MetricSessionMiss,
+	MetricSessionRefresh,
+	MetricSessionRefreshes,
+	MetricSessionRefreshes + "{result:error}",
+}
+
+// SessionStats is what a run's session cache did, read from k6's summary.
+type SessionStats struct {
+	// Misses is how many measured-path Gets found no usable session. A
+	// non-zero value invalidates the run's window.
+	Misses int `json:"misses"`
+	// Refreshes counts the logins the cache paid and RefreshErrors the ones
+	// that failed.
+	Refreshes     int `json:"refreshes"`
+	RefreshErrors int `json:"refresh_errors"`
+	// RefreshP95 is the 95th percentile cost of one login, in ms.
+	RefreshP95 float64 `json:"refresh_p95_ms"`
+}
+
+// Valid reports whether the window can be reported: no VU paid for a login
+// inside a measured iteration.
+func (s SessionStats) Valid() bool { return s.Misses == 0 }
+
+// Used reports whether the run exercised the cache at all.
+func (s SessionStats) Used() bool { return s.Refreshes > 0 || s.Misses > 0 }
+
+// ReadSessionStats reads a run's session cache numbers from k6's summary
+// export.
+func ReadSessionStats(path string) (SessionStats, error) {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return SessionStats{}, err
+	}
+	var export summaryExport
+	if err := json.Unmarshal(b, &export); err != nil {
+		return SessionStats{}, err
+	}
+	return SessionStats{
+		Misses:        int(export.Metrics[MetricSessionMiss]["count"]),
+		Refreshes:     int(export.Metrics[MetricSessionRefreshes]["count"]),
+		RefreshErrors: int(export.Metrics[MetricSessionRefreshes+"{result:error}"]["count"]),
+		RefreshP95:    export.Metrics[MetricSessionRefresh]["p(95)"],
+	}, nil
+}
+
 // SummaryMetrics are the metrics the summary reports per operation: k6's
 // built-in per-request metrics and the module's error counter. The entry
 // script declares a `metric{op:<id>}` sub-metric for each of them so k6's
@@ -75,6 +139,20 @@ type RunMeta struct {
 	// Samples is the raw per-sample output, present only when the sweep ran
 	// with --raw.
 	Samples string `json:"samples,omitempty"`
+	// Sessions is what the session cache did in the run, present when the
+	// run used it.
+	Sessions *SessionStats `json:"sessions,omitzero"`
+}
+
+// Invalid lists the runs whose window cannot be reported, with the reason.
+func (m SweepMeta) Invalid() []string {
+	var out []string
+	for _, r := range m.Runs {
+		if r.Sessions != nil && !r.Sessions.Valid() {
+			out = append(out, fmt.Sprintf("%s at %d VUs: %d measured-path session cache misses", r.Scenario, r.VUs, r.Sessions.Misses))
+		}
+	}
+	return out
 }
 
 // SweepMeta is the run metadata #1096 asks every summary to carry.
@@ -92,7 +170,10 @@ type SweepMeta struct {
 	// Doctor is the check of the target taken before the first run: what it
 	// was, and which of that was observed rather than declared.
 	Doctor *DoctorReport `json:"doctor,omitzero"`
-	Runs   []RunMeta     `json:"runs"`
+	// SessionSettings are the session cache choices the sweep ran with, as
+	// the environment names them; empty means the defaults.
+	SessionSettings map[string]string `json:"session_settings,omitempty"`
+	Runs            []RunMeta         `json:"runs"`
 }
 
 // summaryExport is the part of k6's --summary-export document the merge
@@ -196,5 +277,26 @@ func Markdown(meta SweepMeta, rows []Row) string {
 			r.Duration.P50, r.Duration.P95, r.Duration.P99,
 			r.Blocked.P95, r.Connecting.P95, r.Sending.P95, r.Waiting.P95, r.Receiving.P95)
 	}
+	if used := sessionRuns(meta); len(used) > 0 {
+		b.WriteString("\nSession cache. Refresh cost is the logins the cache paid on its own path; it is not in any operation above. A run with measured-path misses is invalid: a VU paid for a login inside a measured iteration.\n\n")
+		b.WriteString("| scenario | vus | refreshes | refresh errors | refresh p95 | misses | window |\n|---|---:|---:|---:|---:|---:|---|\n")
+		for _, r := range used {
+			window := "valid"
+			if !r.Sessions.Valid() {
+				window = "INVALID"
+			}
+			fmt.Fprintf(&b, "| %s | %d | %d | %d | %.2f | %d | %s |\n", r.Scenario, r.VUs, r.Sessions.Refreshes, r.Sessions.RefreshErrors, r.Sessions.RefreshP95, r.Sessions.Misses, window)
+		}
+	}
 	return b.String()
+}
+
+func sessionRuns(meta SweepMeta) []RunMeta {
+	var out []RunMeta
+	for _, r := range meta.Runs {
+		if r.Sessions != nil && r.Sessions.Used() {
+			out = append(out, r)
+		}
+	}
+	return out
 }

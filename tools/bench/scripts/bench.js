@@ -3,10 +3,12 @@
 // Scenarios run one at a time; run together they contend for the same machine
 // and the cheap one starves the others.
 import nextgen from 'k6/x/nextgen';
+import exec from 'k6/execution';
 
 const all = {
   login: { executor: 'constant-vus', exec: 'login' },
   getUser: { executor: 'constant-vus', exec: 'getUser' },
+  getMySession: { executor: 'constant-vus', exec: 'getMySession' },
 };
 const pick = __ENV.SCEN || 'login';
 if (!all[pick]) throw new Error(`unknown scenario ${pick}; one of ${Object.keys(all).join(', ')}`);
@@ -19,6 +21,9 @@ const perOperation = {};
 for (const op of nextgen.operations()) {
   for (const metric of nextgen.metrics()) perOperation[`${metric}{op:${op}}`] = [];
 }
+// The session cache's own metrics are reported whole, never per operation:
+// its logins must stay out of every operation trend.
+for (const metric of nextgen.sessionMetrics()) perOperation[metric] = [];
 
 export const options = {
   scenarios: {
@@ -33,4 +38,15 @@ export function login() {
 
 export function getUser() {
   nextgen.getUser();
+}
+
+// The session cache is warmed before anything is measured, so a measured
+// iteration never pays for a login; a miss on the measured path is counted
+// (nextgen_session_cache_miss) and invalidates the window.
+export function setup() {
+  if (pick === 'getMySession') nextgen.warmSessions(Number(__ENV.VUS || 1));
+}
+
+export function getMySession() {
+  nextgen.getMySession(exec.vu.idInTest);
 }
