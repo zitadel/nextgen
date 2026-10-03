@@ -89,7 +89,7 @@ describe("isNonShippingFile", () => {
     "packages/sdk-react/README.md",
     // apps/cli/package.json lists `skills` in `files`, so the skill installs with the CLI.
     "apps/cli/skills/zitadel-cli/SKILL.md",
-    "apps/cli/skills/zitadel-cli/references/commands.md",
+    "apps/cli/skills/zitadel-cli/references/driving-login-ui.md",
     // Scaffolded into a customer's project, so it is product, not repo docs.
     "packages/config/defaults/README-schemas.md",
     "apps/cli/src/lib/orca/patchers/rule/next/README.md",

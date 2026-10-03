@@ -58,8 +58,14 @@ describe("agent contract", () => {
     expect(skill).toContain("E_PORT_IN_USE");
   });
 
-  it("reference files carry the detailed command surface", async () => {
-    const commands = await readFile(join(skillDir, "references/commands.md"), "utf8");
-    expect(commands).toContain("stop --all");
+  it("delegates the command surface to runtime discovery instead of hardcoding it", async () => {
+    const skill = await readFile(join(skillDir, "SKILL.md"), "utf8");
+    // The skill and the installed CLI version move independently, so the skill
+    // must teach discovery rather than enumerate commands that would drift.
+    expect(skill).toContain("## Discovering commands");
+    expect(skill).toContain("<command> --help");
+    expect(skill).toContain("resources --json");
+    // Guard against a regression that re-adds a hardcoded per-command catalog.
+    expect(skill).not.toContain("references/commands.md");
   });
 });

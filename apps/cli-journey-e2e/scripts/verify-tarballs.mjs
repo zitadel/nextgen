@@ -37,8 +37,6 @@ const serverPlatformPackagePattern = /^@zitadel\/server-(?:darwin|linux|win32)-/
 // is core product behavior, so the tarball must carry all of them.
 const cliSkillFiles = [
   "skills/zitadel-cli/SKILL.md",
-  "skills/zitadel-cli/references/commands.md",
-  "skills/zitadel-cli/references/resource-commands.md",
   "skills/zitadel-cli/references/driving-login-ui.md",
 ];
 
