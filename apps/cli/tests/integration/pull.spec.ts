@@ -65,6 +65,11 @@ describe("pull", () => {
           path: `.zitadel/flows/${flowName}.json`,
         });
         expect(await checkout.hasProjectFile(`.zitadel/flows/${flowName}.json`)).toBe(true);
+        // This checkout never ran setup, so there is no state file and plan
+        // would fail — so it is not suggested.
+        expect(checkout.envelopeOf<{ next_commands: string[] }>(result).data.next_commands).toEqual(
+          [],
+        );
       });
 
       it("imports a schema by object type", async () => {
@@ -101,7 +106,12 @@ describe("pull", () => {
         expect(await project.apply()).toSucceed();
         const flowName = (await project.publishedFlow()).flow_definition.name;
 
-        expect(await project.run(["pull", "flow", flowName, "--json"])).toSucceed();
+        const result = await project.run(["pull", "flow", flowName, "--json"]);
+        expect(result).toSucceed();
+        // A configured project has a state file, so plan is recorded and suggested.
+        expect(
+          project.envelopeOf<{ next_commands: string[] }>(result).data.next_commands,
+        ).not.toEqual([]);
 
         expect((await project.plan()).total).toBe(0);
       });

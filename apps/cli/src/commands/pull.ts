@@ -127,11 +127,13 @@ export default class Pull extends BaseCommand {
     await writeFile(absPath, `${JSON.stringify(toWrite, null, 2)}\n`);
 
     // Record the revision this file now represents, so the next plan sees it
-    // in sync rather than as an upload. A fresh checkout that never ran setup
-    // has no state file — plan needs setup there anyway — so a missing file is
-    // skipped, but an unreadable or malformed one is a real failure.
+    // in sync rather than as an upload. A dir that never ran setup has no state
+    // file — plan would fail there, so that case is skipped and plan is not
+    // suggested below; an unreadable or malformed state file is a real failure.
+    let recorded = false;
     try {
       await updateState(cwd, relPath, { id, hash: hashForState(syncer, toWrite) });
+      recorded = true;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
         throw error;
@@ -142,7 +144,15 @@ export default class Pull extends BaseCommand {
     return this.emit({
       status: "ok",
       warnings,
-      data: { kind, handle, id, path: relPath, next_commands: [publicCliCommand("plan", cliVersion)] },
+      // Only suggest plan when the pull was recorded: without a state file plan
+      // cannot run, so advertising it would hand the caller a failing command.
+      data: {
+        kind,
+        handle,
+        id,
+        path: relPath,
+        next_commands: recorded ? [publicCliCommand("plan", cliVersion)] : [],
+      },
       pretty: `Fetched ${id}.\nWrote ${relPath}.`,
     });
   }
