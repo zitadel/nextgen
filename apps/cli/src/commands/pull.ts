@@ -9,29 +9,28 @@ import { ZitadelError } from "../lib/errors";
 import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankArg } from "../lib/oclif";
 import { readZitadelSecret } from "../lib/project";
 import { publicCliCommand } from "../lib/public-cli";
-import { makeSyncers, rewriteRefsToHandles } from "../lib/sync";
+import { makeSyncers } from "../lib/sync";
 
 /**
- * Kinds `pull` supports, as the user types them. The MVP is the two revisioned
- * kinds with a list-by-handle endpoint (#541); others get their pull path when
- * they gain revisioning, which is a new `newestRevision` on their syncer rather
- * than a change here.
+ * Kinds `pull` supports, as the user types them: the revisioned kinds with a
+ * list-by-handle endpoint (#541). Others get their pull path on their syncer
+ * when they gain revisioning.
  */
 const PULLABLE_KINDS = ["schema", "flow"] as const;
 
+/** A handle is a single file-name segment, so it can never escape the kind's directory. */
+const HANDLE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+
 /**
  * `zitadel pull <kind> <handle>` — fold the newest server-side revision of a
- * resource into local `.zitadel/`, so the next `deploy` includes it.
+ * resource into local `.zitadel/`, so the next deploy includes it.
  *
  * The use case is adoption: someone edited a resource through the dashboard or
  * MCP, and the developer brings that revision into the git-tracked source of
- * truth. Targeted only — one `(kind, handle)` per run, no bulk mode.
- *
- * On write, concrete revision ids in cross-resource references are rewritten to
- * handles (a flow's `user_schema` `sch_…` → the schema's `objectType`), so the
- * file joins its dependencies by name. The per-kind knowledge — list endpoint,
- * handle field, which fields are references — lives on each resource's syncer,
- * so this command carries no `if (kind === …)` of its own.
+ * truth. Targeted only — one `(kind, handle)` per run, no bulk mode. All the
+ * per-kind work (its list endpoint, and turning the server body into the local
+ * file with references by handle) lives on the resource's syncer, so this
+ * command only orchestrates.
  */
 export default class Pull extends BaseCommand {
   static override description =
@@ -57,14 +56,18 @@ export default class Pull extends BaseCommand {
   async run(): Promise<JsonEnvelope> {
     const { args, flags } = await this.parse(Pull);
     await this.toMeta(flags);
-    const { cwd, source, env, dryRun } = this.meta;
+    const { cwd, source, env, dryRun, cliVersion } = this.meta;
     const { kind, handle } = args;
+
+    if (!HANDLE.test(handle)) {
+      throw new ZitadelError("E_VALIDATION", `Invalid ${kind} handle "${handle}".`, {
+        hint: "A handle is a single name: letters or digits, then letters, digits, '.', '_' or '-'.",
+      });
+    }
 
     const secret = await readZitadelSecret(cwd);
     consola.info(`Project   ${secret.project_id}`);
     consola.info(`Server    ${source}`);
-    // Verbatim: a pull writes back exactly what the server stores, apart from
-    // the reference rewrite below.
     const client = createZitadelClient(
       { baseUrl: source, token: secret.project_secret },
       { verbatim: true },
@@ -72,8 +75,6 @@ export default class Pull extends BaseCommand {
     const syncers = makeSyncers({ client, projectId: secret.project_id, env, cwd });
     const syncer = syncers.find((candidate) => candidate.kind === kind);
     if (syncer?.newestRevision === undefined || syncer.fetch === undefined) {
-      // Unreachable while `options` gates `kind`, but keeps the contract honest
-      // if a kind is listed before its syncer can serve a pull.
       throw new ZitadelError("E_VALIDATION", `pull is not supported for ${kind} yet.`, {
         hint: `Pullable kinds: ${PULLABLE_KINDS.join(", ")}.`,
       });
@@ -88,7 +89,9 @@ export default class Pull extends BaseCommand {
     }
 
     const fetched = await syncer.fetch(id);
-    const { body, warnings } = await rewriteRefsToHandles(kind, fetched, syncers);
+    const { body, warnings } = syncer.localise
+      ? await syncer.localise(fetched, syncers)
+      : { body: fetched, warnings: [] };
     const toWrite = syncer.normalizeWrite ? syncer.normalizeWrite(body) : body;
     const relPath = `${syncer.directory}/${handle}.json`;
 
@@ -96,24 +99,22 @@ export default class Pull extends BaseCommand {
       consola.warn(warning);
     }
 
-    // A dry run fetches and rewrites — so its warnings and reported id are
-    // real — but leaves the working tree untouched, per the global flag.
     if (dryRun) {
       consola.success(`Would write ${relPath}`);
       return this.emit({
         status: "ok",
         warnings,
+        // The follow-up is the same pull without --dry-run; the handle is a
+        // validated single segment, so it needs no quoting.
         data: {
           kind,
           handle,
           id,
           path: relPath,
           dry_run: true,
-          next_commands: [publicCliCommand("pull", this.meta.cliVersion)],
+          next_commands: [publicCliCommand(`pull ${kind} ${handle}`, cliVersion)],
         },
-        pretty:
-          `Fetched ${id}.\nWould write ${relPath} (dry run).` +
-          (warnings.length > 0 ? `\n${warnings.join("\n")}` : ""),
+        pretty: `Fetched ${id}.\nWould write ${relPath} (dry run).`,
       });
     }
 
@@ -125,16 +126,8 @@ export default class Pull extends BaseCommand {
     return this.emit({
       status: "ok",
       warnings,
-      data: {
-        kind,
-        handle,
-        id,
-        path: relPath,
-        next_commands: [publicCliCommand("plan", this.meta.cliVersion)],
-      },
-      pretty:
-        `Fetched ${id}.\nWrote ${relPath}.` +
-        (warnings.length > 0 ? `\n${warnings.join("\n")}` : ""),
+      data: { kind, handle, id, path: relPath, next_commands: [publicCliCommand("plan", cliVersion)] },
+      pretty: `Fetched ${id}.\nWrote ${relPath}.`,
     });
   }
 }

@@ -106,55 +106,35 @@ export class FatalFetchError extends Error {
   }
 }
 
-/**
- * One cross-resource reference a kind's body carries: the dot path to the
- * field holding the reference, and the kind the referenced id belongs to
- * (matching a syncer's `kind`). `pull` reads these rather than hard-coding
- * which field of which kind points where, so a new reference between two
- * kinds is a row on a syncer's {@link ResourceSyncer.references}, not new
- * logic in the resolver. The MVP's only row is a flow's `user_schema` → a
- * schema; branding and others add theirs as they gain references.
- */
-export interface ReferenceField {
-  readonly path: string;
-  readonly kind: string;
-}
-
 export interface ResourceSyncer {
   readonly kind: string;
   readonly directory: string;
   readonly mutable: boolean;
   readonly revisioned: boolean;
   /**
-   * The id prefix the platform mints for this kind, without the trailing
-   * underscore (`sch`, `flowdef`). The reference resolver uses it to tell a
-   * concrete revision id apart from a value that is already a handle, URL or
-   * `${VAR}` reference, so only a real id is rewritten. Absent for kinds
-   * nothing references.
-   */
-  readonly idPrefix?: string;
-  /**
-   * The field on a fetched body that holds this kind's stable handle — the
-   * name a local file is addressed by and that other resources reference it
-   * by. Schemas use `objectType`, flows use `name`. The reference resolver
-   * reads it to turn a referenced id back into a handle. Absent for kinds
-   * with no handle (a singleton like branding).
-   */
-  readonly handleField?: string;
-  /**
-   * The cross-resource references this kind's body carries. Read by `pull`'s
-   * reference resolver; see {@link ReferenceField}. Absent or empty means the
-   * body references nothing (schemas today), so a pull writes it verbatim.
-   */
-  readonly references?: ReadonlyArray<ReferenceField>;
-  /**
-   * The newest revision id for `handle` via this kind's list endpoint
-   * (`GET /schemas?object_type=`, `GET /flow_definitions?name=`), newest
-   * first; null when the handle names nothing on the server. Present only on
-   * the kinds `pull` supports — a kind without it is not pullable yet and
-   * `pull` refuses it with a clear message rather than crashing.
+   * The newest revision id for `handle` via this kind's list endpoint, or null
+   * when the handle names nothing. Present only on kinds `pull` supports; a
+   * kind without it is refused rather than crashing.
    */
   newestRevision?(handle: string): Promise<string | null>;
+  /**
+   * Turn a freshly fetched server body into the body to write locally, the
+   * inverse of a syncer's create payload. Rewrites this kind's cross-resource
+   * references from concrete revision ids to handles (resolved through the
+   * other syncers), so a pulled file references its dependencies by name.
+   * Absent means the server body is written verbatim.
+   */
+  localise?(
+    serverBody: object,
+    syncers: ReadonlyArray<ResourceSyncer>,
+  ): Promise<{ body: object; warnings: string[] }>;
+  /**
+   * Resolve a stored reference to one of this kind's revisions into the value
+   * another resource should hold for it: a concrete revision id becomes this
+   * kind's handle, while a URL or handle is already portable and returned
+   * unchanged. `warning` is set when the id named a revision that is gone.
+   */
+  localiseReference?(reference: string): Promise<{ value: string; warning?: string }>;
   /**
    * When set, this syncer owns exactly one descriptor file with this
    * basename inside `directory`, and the scan fails (`E_VALIDATION`) on any

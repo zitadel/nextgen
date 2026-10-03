@@ -775,13 +775,11 @@ describe("IdpConnectionSyncer", () => {
 });
 
 /**
- * `pull` reads three declarative members off a syncer — `idPrefix`,
- * `handleField`, `references` — and the `newestRevision` list call. The command
- * itself carries no per-kind knowledge, so this is where that knowledge is
- * asserted: the walker's own logic is covered in `references.test.ts`.
+ * `pull` is thin: each syncer owns how to find its newest revision and how to
+ * turn a server body into the local file. That per-kind logic is asserted here.
  */
-describe("pull support", () => {
-  it("declares the schema's id prefix and handle field, and lists its newest revision", async () => {
+describe("newestRevision", () => {
+  it("lists the newest schema revision for an object type", async () => {
     server.use(
       http.get(`${BASE}/schemas`, ({ request }) => {
         const url = new URL(request.url);
@@ -795,9 +793,6 @@ describe("pull support", () => {
     );
     const [schema] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
 
-    expect(schema.idPrefix).toBe("sch");
-    expect(schema.handleField).toBe("objectType");
-    expect(schema.references ?? []).toEqual([]);
     expect(await schema.newestRevision?.("human-user")).toBe("sch_new");
   });
 
@@ -808,7 +803,7 @@ describe("pull support", () => {
     expect(await schema.newestRevision?.("absent")).toBeNull();
   });
 
-  it("declares the flow's id prefix, handle field and user_schema reference, and lists its newest revision", async () => {
+  it("lists the newest flow revision for a name", async () => {
     server.use(
       http.get(`${BASE}/flow_definitions`, ({ request }) => {
         const url = new URL(request.url);
@@ -821,13 +816,10 @@ describe("pull support", () => {
     );
     const [, , flow] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
 
-    expect(flow.idPrefix).toBe("flowdef");
-    expect(flow.handleField).toBe("name");
-    expect(flow.references).toEqual([{ path: "user_schema", kind: "schema" }]);
     expect(await flow.newestRevision?.("login")).toBe("flowdef_new");
   });
 
-  it("leaves idp and branding unpullable (no newestRevision)", () => {
+  it("leaves idp and branding unpullable", () => {
     const [, idp, , branding] = makeSyncers({
       client,
       projectId: "proj-1",
@@ -837,5 +829,61 @@ describe("pull support", () => {
 
     expect(idp.newestRevision).toBeUndefined();
     expect(branding.newestRevision).toBeUndefined();
+  });
+});
+
+describe("localise", () => {
+  /** Localise a flow body against a fresh registry, failing if the flow syncer cannot. */
+  const localiseFlow = (body: object): Promise<{ body: object; warnings: string[] }> => {
+    const syncers = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
+    const flow = syncers.find((syncer) => syncer.kind === "flow");
+    if (flow?.localise === undefined) {
+      throw new Error("the flow syncer should localise");
+    }
+    return flow.localise(body, syncers);
+  };
+
+  it("rewrites a flow's user_schema id to the schema's object type", async () => {
+    server.use(
+      http.get(`${BASE}/schemas/:id`, ({ params }) => {
+        expect(params.id).toBe("sch_abc");
+        return HttpResponse.json({ id: "sch_abc", schema: { objectType: "human-user" }, metadata: {} });
+      }),
+    );
+
+    const { body, warnings } = await localiseFlow({ name: "login", user_schema: "sch_abc" });
+
+    expect(body).toMatchObject({ name: "login", user_schema: "human-user" });
+    expect(warnings).toEqual([]);
+  });
+
+  it("leaves a user_schema that is already a URL untouched", async () => {
+    const { body, warnings } = await localiseFlow({
+      name: "login",
+      user_schema: "https://example.test/human-user.yaml",
+    });
+
+    expect(body).toMatchObject({ user_schema: "https://example.test/human-user.yaml" });
+    expect(warnings).toEqual([]);
+  });
+
+  it("keeps the id and warns when the referenced schema revision is gone", async () => {
+    server.use(
+      http.get(`${BASE}/schemas/:id`, () =>
+        HttpResponse.json({ code: "not_found", message: "gone" }, { status: 404 }),
+      ),
+    );
+
+    const { body, warnings } = await localiseFlow({ name: "login", user_schema: "sch_gone" });
+
+    expect(body).toMatchObject({ user_schema: "sch_gone" });
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain("sch_gone");
+  });
+
+  it("writes a schema body verbatim — a schema references nothing", () => {
+    const [schema] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
+
+    expect(schema.localise).toBeUndefined();
   });
 });

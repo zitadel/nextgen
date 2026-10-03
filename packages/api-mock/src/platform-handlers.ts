@@ -1175,13 +1175,17 @@ export function setupPlatformHandlers() {
       const records = current.filter(
         (r) => !query.data.purpose || flowServesPurpose(r.body, query.data.purpose),
       );
-      // Honour `limit` so a caller asking for the single newest revision
-      // (`name=…&limit=1`) gets one row, as the server returns.
-      const limited =
-        query.data.limit === undefined ? records : records.slice(0, query.data.limit);
+      // Paginate like `GET /schemas`: the token is the next start index, so a
+      // caller can page past `limit` instead of the rest being unreachable.
+      const start = query.data.page_token === undefined ? 0 : Number(query.data.page_token);
+      if (!Number.isInteger(start) || start < 0) {
+        return HttpResponse.json(errorBody("req.invalid", "invalid page token"), { status: 400 });
+      }
+      const size = query.data.limit ?? records.length;
+      const page = records.slice(start, start + size);
       const responseBody: ListFlowDefinitions200 = {
-        flow_definitions: limited.map(flowResponse),
-        next_page_token: null,
+        flow_definitions: page.map(flowResponse),
+        next_page_token: start + size < records.length ? String(start + size) : null,
       };
       const out = parse(ListFlowDefinitionsResponse, responseBody, "mock_response_invalid");
       if (!out.ok) {

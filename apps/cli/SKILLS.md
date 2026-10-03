@@ -405,7 +405,7 @@ docker --image <ref>` remains the explicit image override for debugging.
   `sch_…` becomes the schema's object type), so the file references its
   dependencies by name. Targeted only — one `(kind, handle)` per run, no bulk
   mode. `data` carries `{ kind, handle, id, path }`; a reference whose revision
-  was deleted stays an id and is reported in `data.warnings`.
+  was deleted stays an id and is reported in the top-level `warnings`.
 - `plan` and `apply --dry-run` also emit `data.warnings`: non-blocking
   findings as `{path, rule, message}`, the same text the human plan prints as
   `# warning:` lines and `apply` prints through stderr. They never fail a run.
