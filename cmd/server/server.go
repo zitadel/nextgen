@@ -124,17 +124,25 @@ func addServerFlags(cmd *cobra.Command, applyMigrations *bool, userFiles *[]stri
 		"Fail the start instead of generating a master key when none is configured (server.generate_master_key: false)")
 }
 
-func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bool) error {
-	var err error
+// run is the server's lifetime. Its result is named so that the deferred
+// report sees what the caller gets: most early returns below are of the form
+// `if err := f(); err != nil { return fmt.Errorf(...) }`, whose err lives in the
+// if's scope and never reached the function-scoped one the defer used to check
+// (#1409).
+func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bool) (err error) {
 	sfs := &ShutdownFuncs{}
 	defer func() {
+		// Logged before the shutdown funcs run: one of them shuts down the
+		// OTel logger provider, after which a record reaches stderr only.
 		if err != nil {
 			slog.Error("run error", slogctx.Err(err))
 		}
-		err = sfs.Exec(context.WithoutCancel(ctx))
-		if err != nil {
-			slog.Error("shutdown error", slogctx.Err(err))
-			os.Exit(1)
+		// Kept apart from err: assigning the shutdown outcome to it would hand
+		// the caller nil after a clean shutdown of a failed start, and the
+		// process would exit 0.
+		if shutdownErr := sfs.Exec(context.WithoutCancel(ctx)); shutdownErr != nil {
+			slog.Error("shutdown error", slogctx.Err(shutdownErr))
+			err = errors.Join(err, shutdownErr)
 			return
 		}
 		slog.Info("shut down application")
