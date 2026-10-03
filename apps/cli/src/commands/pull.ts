@@ -1,15 +1,15 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import { Args } from "@oclif/core";
 import { consola } from "consola";
 
-import { createZitadelClient } from "../lib/api-client";
+import { createZitadelClient, escapeControlCharacters } from "../lib/api-client";
 import { ZitadelError } from "../lib/errors";
 import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankArg } from "../lib/oclif";
 import { readZitadelSecret } from "../lib/project";
 import { publicCliCommand } from "../lib/public-cli";
-import { hashForState, makeSyncers, type ResourceSyncer, updateState } from "../lib/sync";
+import { makeSyncers, type ResourceSyncer, updateState, writeBackResource } from "../lib/sync";
 
 /** A syncer that can serve a pull: it knows how to find and read a revision. */
 type PullableSyncer = ResourceSyncer & {
@@ -43,7 +43,7 @@ export default class Pull extends BaseCommand {
   static override args = {
     kind: Args.string({
       required: true,
-      description: "Resource kind to pull — any revisioned kind a syncer can read.",
+      description: "Resource kind to pull; the error hint lists the kinds pull supports.",
     }),
     handle: nonBlankArg({
       required: true,
@@ -96,11 +96,14 @@ export default class Pull extends BaseCommand {
     const { body, warnings } = syncer.localise
       ? await syncer.localise(fetched, syncers)
       : { body: fetched, warnings: [] };
-    const toWrite = syncer.normalizeWrite ? syncer.normalizeWrite(body) : body;
     const relPath = `${syncer.directory}/${handle}.json`;
+    // The verbatim client leaves server bytes unsanitized, so every value that
+    // reaches the terminal is escaped here; the raw values still go to the
+    // file, the envelope and state.
+    const safeId = escapeControlCharacters(id);
 
     for (const warning of warnings) {
-      consola.warn(warning);
+      consola.warn(escapeControlCharacters(warning));
     }
 
     if (dryRun) {
@@ -118,13 +121,14 @@ export default class Pull extends BaseCommand {
           dry_run: true,
           next_commands: [publicCliCommand(`pull ${kind} ${handle}`, cliVersion)],
         },
-        pretty: `Fetched ${id}.\nWould write ${relPath} (dry run).`,
+        pretty: `Fetched ${safeId}.\nWould write ${relPath} (dry run).`,
       });
     }
 
-    const absPath = join(cwd, relPath);
-    await mkdir(dirname(absPath), { recursive: true });
-    await writeFile(absPath, `${JSON.stringify(toWrite, null, 2)}\n`);
+    await mkdir(dirname(join(cwd, relPath)), { recursive: true });
+    // `writeBackResource` normalizes, carries an existing file's local-only
+    // `$schema` editor pointer over, and returns the hash to record.
+    const { hash } = await writeBackResource(cwd, relPath, syncer, body);
 
     // Record the revision this file now represents, so the next plan sees it
     // in sync rather than as an upload. A dir that never ran setup has no state
@@ -132,7 +136,7 @@ export default class Pull extends BaseCommand {
     // suggested below; an unreadable or malformed state file is a real failure.
     let recorded = false;
     try {
-      await updateState(cwd, relPath, { id, hash: hashForState(syncer, toWrite) });
+      await updateState(cwd, relPath, { id, hash });
       recorded = true;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
@@ -153,7 +157,7 @@ export default class Pull extends BaseCommand {
         path: relPath,
         next_commands: recorded ? [publicCliCommand("plan", cliVersion)] : [],
       },
-      pretty: `Fetched ${id}.\nWrote ${relPath}.`,
+      pretty: `Fetched ${safeId}.\nWrote ${relPath}.`,
     });
   }
 }

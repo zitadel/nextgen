@@ -18,13 +18,10 @@ Scope pointers first — this file's own body covers **telemetry only**:
 - The test contract — the unit/spec split and one spec per command — is
   [`tests/AGENTS.md`](tests/AGENTS.md). Read it before adding or moving any
   test.
-- Every command ships with its integration spec
-  (`tests/integration/<command>.spec.ts`) in the same change that adds the
-  command — a command with no spec is incomplete. The spec drives the built
-  CLI against `@zitadel/api-mock` and follows the invalid-server / valid-server
-  skeleton in [`tests/AGENTS.md`](tests/AGENTS.md); command-level detail
-  (envelope fields, written bytes) belongs in a mirrored unit test, not the
-  spec.
+- A new command ships with both its mirrored unit test (`tests/unit/commands/`)
+  and its integration spec (`tests/integration/`) in the same change — a command
+  missing either is incomplete. Their shape and the unit/spec split are the test
+  contract linked above; it is the single authority, not restated here.
 - The flag surface deliberately tracks the [WebCLI spec](https://webcli.com/) so
   an agent can drive the CLI from conventions it already knows. That is the
   rationale; the canonical flag list, output-channel rules and the two
