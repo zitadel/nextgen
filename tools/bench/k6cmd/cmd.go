@@ -40,7 +40,7 @@ The scenarios live in the k6/x/nextgen module compiled into this binary; these
 commands provision what they run against, run them, and summarise the result.`,
 		SilenceUsage: true,
 	}
-	root.AddCommand(newBootstrapCommand(gs), newCleanCommand(gs), newDoctorCommand(gs), newSweepCommand(gs), newSummarizeCommand(gs))
+	root.AddCommand(newBootstrapCommand(gs), newCleanCommand(gs), newDoctorCommand(gs), newSweepCommand(gs), newSummarizeCommand(gs), newScenariosCommand(gs), newSmokeCommand(gs))
 	return root
 }
 
@@ -278,9 +278,13 @@ metadata, and holds the run lock on the manifest so clean refuses meanwhile.`,
 				return fmt.Errorf("--vus: %w", err)
 			}
 			sessions.Affinity = harness.Affinity(affinity)
+			scenarioList, err := harness.ParseScenarios(scenarios)
+			if err != nil {
+				return err
+			}
 			rows, err := harness.Sweep(ctx, harness.SweepConfig{
 				Target:    resolved.target,
-				Scenarios: strings.Split(scenarios, ","),
+				Scenarios: scenarioList,
 				VUs:       vuList,
 				Duration:  duration,
 				Script:    scriptPath,
@@ -328,6 +332,67 @@ metadata, and holds the run lock on the manifest so clean refuses meanwhile.`,
 	cmd.Flags().DurationVar(&sessions.TTL, "session-ttl", 0, "Ask for this session lifetime instead of the server default; for watching rotation within minutes")
 	cmd.Flags().BoolVar(&raw, "raw", false, "Also keep k6's per-sample JSON output for every run")
 	return cmd
+}
+
+func newScenariosCommand(gs *state.GlobalState) *cobra.Command {
+	return &cobra.Command{
+		Use:   "scenarios",
+		Short: "List the registered scenarios and the operations each performs",
+		Args:  cobra.NoArgs,
+		Run: func(*cobra.Command, []string) {
+			for _, s := range harness.Scenarios {
+				fmt.Fprintf(gs.Stdout, "%-14s %s\n", s.Name, strings.Join(s.Ops, ", "))
+			}
+		},
+	}
+}
+
+func newSmokeCommand(gs *state.GlobalState) *cobra.Command {
+	var cfg harness.SmokeConfig
+	var keep string
+	cmd := &cobra.Command{
+		Use:   "smoke",
+		Short: "Prove the harness still runs: every registered scenario, briefly, against SQLite",
+		Long: `Prove the harness still runs.
+
+Starts the nextgen server on SQLite, checks it, provisions the smallest fixture,
+runs every registered scenario at a handful of VUs for a few seconds each, and
+asserts that the expected metrics come out, then cleans up and asserts the
+target returned to its starting counts. The summary is asserted and discarded
+unless --out keeps it.
+
+It measures nothing. No assertion is about how fast anything is: no latency
+threshold, no throughput floor, no comparison with an earlier run. Scenarios
+come from the harness's own registry, never from a list in a workflow.`,
+		Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			cfg.Dir = keep
+			cfg.Commit = gitCommit(cmd.Context())
+			cfg.Log = gs.Stdout
+			report, err := harness.RunSmoke(cmd.Context(), cfg)
+			if err != nil {
+				return err
+			}
+			fmt.Fprintf(gs.Stdout, "\nsmoke passed: %d scenarios (%s), %d requests, no failures\n",
+				len(report.Scenarios), strings.Join(report.Scenarios, ", "), report.Requests)
+			for _, name := range report.Scenarios {
+				fmt.Fprintf(gs.Stdout, "  %-14s %d distinct time series (bound %d)\n", name, report.Series[name], seriesBound(name))
+			}
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&cfg.Server, "server", "", "The nextgen server binary to start (required)")
+	cmd.Flags().StringVar(&cfg.Fixtures, "fixtures", "fixtures/local.json", "Fixture file; the smallest set a scenario needs")
+	cmd.Flags().IntVar(&cfg.VUs, "vus", 5, "VUs per scenario")
+	cmd.Flags().DurationVar(&cfg.Duration, "duration", 10*time.Second, "Duration of each scenario")
+	cmd.Flags().StringVar(&keep, "out", "", "Keep the run's files here instead of discarding them")
+	_ = cmd.MarkFlagRequired("server")
+	return cmd
+}
+
+func seriesBound(name string) int {
+	sc, _ := harness.LookupScenario(name)
+	return harness.SeriesBound(sc)
 }
 
 func newSummarizeCommand(gs *state.GlobalState) *cobra.Command {

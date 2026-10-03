@@ -5,12 +5,12 @@
 import nextgen from 'k6/x/nextgen';
 import exec from 'k6/execution';
 
-const all = {
-  login: { executor: 'constant-vus', exec: 'login' },
-  getUser: { executor: 'constant-vus', exec: 'getUser' },
-  getMySession: { executor: 'constant-vus', exec: 'getMySession' },
-};
-const pick = __ENV.SCEN || 'login';
+// The scenario table comes from the module's registry, never from a list in
+// this script: a scenario registered in Go is runnable here, and one that is
+// registered without an exported function of its name fails the run.
+const registry = nextgen.scenarios();
+const all = Object.fromEntries(registry.map((s) => [s.name, { executor: 'constant-vus', exec: s.name }]));
+const pick = __ENV.SCEN || registry[0].name;
 if (!all[pick]) throw new Error(`unknown scenario ${pick}; one of ${Object.keys(all).join(', ')}`);
 
 // An empty threshold on `metric{op:<id>}` makes k6 keep and report that
@@ -44,7 +44,7 @@ export function getUser() {
 // iteration never pays for a login; a miss on the measured path is counted
 // (nextgen_session_cache_miss) and invalidates the window.
 export function setup() {
-  if (pick === 'getMySession') nextgen.warmSessions(Number(__ENV.VUS || 1));
+  if (registry.find((s) => s.name === pick).sessions) nextgen.warmSessions(Number(__ENV.VUS || 1));
 }
 
 export function getMySession() {
