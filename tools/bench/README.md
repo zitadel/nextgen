@@ -25,7 +25,7 @@ module that compiles two things into one k6 binary:
 
 ```sh
 moon run bench:sweep                                   # local: SQLite server, fixtures/local.json, 1/5/20 VUs × 20 s
-moon run bench:sweep -- --vus 5 --duration 10s --scenarios getUser
+moon run bench:sweep -- --vus 5 --duration 10s --scenarios getUser   # default: every registered scenario
 moon run bench:summarize -- out/sweep-<stamp>          # rewrite summary.md / aggregate.json
 ```
 
@@ -142,6 +142,49 @@ it is a secret — the password only ever guards a user on a database the sweep
 creates and discards. `bootstrap` applies the file over the API with the
 generated client, then proves it by walking one login journey and one user
 read, so a fixture that cannot be driven fails before anything is measured.
+
+## Smoke lane
+
+The harness is a nested Go module, so `go build ./...`, `go test ./...` and
+`moon ci` at the repository root never compile it, and a renamed wire field,
+a changed helper signature or a changed flow step would break it unnoticed.
+The [`bench-smoke`](../../.github/workflows/bench-smoke.yml) workflow is what
+notices: on pull requests touching `tools/`, `api/`, `internal/` or `cmd/`,
+and before a release, it runs
+
+```sh
+moon run bench:smoke       # = out/k6 x nextgen smoke --server out/nextgen-server
+```
+
+which starts the server on SQLite, runs `doctor`, bootstraps the smallest
+fixture, runs **every registered scenario** at 5 VUs for 10 s each, asserts
+the summary and discards it, then cleans up and asserts the target returned to
+its starting counts (users, projects; the manifest lists nothing). Scenarios
+come from the Go registry ([`harness/scenarios.go`](harness/scenarios.go),
+`k6 x nextgen scenarios`), never from a list in the workflow: a scenario added
+there is covered at once, and one registered without a function of its name in
+`scripts/bench.js` fails the lane.
+
+**It is not a performance gate.** No assertion is about how fast anything is —
+no latency threshold, no throughput floor, no comparison with a previous run —
+because a shared runner under contention cannot support one. It asserts that
+the harness builds, runs, and emits what it claims to:
+
+- one run per registered scenario, none missing, none extra;
+- every operation of the scenario has samples, and its trends carry a full
+  percentile set (a trend with no samples fails; it is not a zero);
+- `http_req_failed` and the classified `nextgen_errors` counter at zero, no
+  session cache misses or failed refreshes;
+- the run metadata is populated: commit, lane, k6 version, and the doctor
+  report with dialect, image tag, replicas and logging;
+- the distinct time-series count is within a bound that grows with the
+  operation list and never with the request volume (a path or id leaking into
+  a tag fails it).
+
+The lane never reports success without executing: the Moon task is
+`cache: false`, `MOON_CACHE=off` covers the build steps, and the tests run with
+`-count=1`. No artefact is uploaded and the temporary directory is removed
+(`smoke --out DIR` keeps it for debugging).
 
 ## Layout
 

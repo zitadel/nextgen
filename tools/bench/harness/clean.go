@@ -281,3 +281,32 @@ func CountUsers(ctx context.Context, m Manifest) (int, error) {
 		token = api.NewOptNilPageToken(next)
 	}
 }
+
+// CountProjects pages through the projects the manifest's credential can
+// list and returns how many there are.
+func CountProjects(ctx context.Context, m Manifest) (int, error) {
+	c, err := ClientFor(m.Target)
+	if err != nil {
+		return 0, err
+	}
+	var (
+		n     int
+		token api.OptNilPageToken
+	)
+	for {
+		res, err := c.QueryProjects(ctx, &api.QueryProjectsRequest{Limit: api.NewOptLimit(100), PageToken: token})
+		if err != nil {
+			return 0, err
+		}
+		page, ok := res.(*api.QueryProjectsResponse)
+		if !ok {
+			return 0, fmt.Errorf("query projects: unexpected response %T", res)
+		}
+		n += len(page.Projects)
+		next, ok := page.NextPageToken.Get()
+		if !ok || next == "" {
+			return n, nil
+		}
+		token = api.NewOptNilPageToken(next)
+	}
+}
