@@ -332,7 +332,16 @@ class SchemaSyncer implements ResourceSyncer {
     // the referenced revision is gone, so the id is kept and the caller warned.
     try {
       const body = (await this.fetch(reference)) as { objectType?: string };
-      return { value: body.objectType ?? reference };
+      // A schema may omit objectType, and the server treats such a revision as
+      // unpinnable (ADR 063 / release validation). Keep the id and warn rather
+      // than silently writing an id that no release can resolve.
+      if (typeof body.objectType !== "string" || body.objectType === "") {
+        return {
+          value: reference,
+          warning: `schema ${reference} has no object type to reference it by; kept the id in user_schema.`,
+        };
+      }
+      return { value: body.objectType };
     } catch (error) {
       if (error instanceof ApiError && error.status === 404) {
         return {

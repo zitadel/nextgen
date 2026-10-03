@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { access, mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import { Args } from "@oclif/core";
@@ -9,7 +9,7 @@ import { ZitadelError } from "../lib/errors";
 import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankArg } from "../lib/oclif";
 import { readZitadelSecret } from "../lib/project";
 import { publicCliCommand } from "../lib/public-cli";
-import { makeSyncers } from "../lib/sync";
+import { hashForState, makeSyncers, updateState } from "../lib/sync";
 
 /**
  * Kinds `pull` supports, as the user types them: the revisioned kinds with a
@@ -121,6 +121,17 @@ export default class Pull extends BaseCommand {
     const absPath = join(cwd, relPath);
     await mkdir(dirname(absPath), { recursive: true });
     await writeFile(absPath, `${JSON.stringify(toWrite, null, 2)}\n`);
+
+    // Record the revision this file now represents, so the next plan sees it
+    // in sync rather than as an upload. A fresh checkout that never ran setup
+    // has no state file; plan needs setup there anyway, so skip in that case.
+    const hasState = await access(join(cwd, ".zitadel/state.json")).then(
+      () => true,
+      () => false,
+    );
+    if (hasState) {
+      await updateState(cwd, relPath, { id, hash: hashForState(syncer, toWrite) });
+    }
     consola.success(`Wrote ${relPath}`);
 
     return this.emit({

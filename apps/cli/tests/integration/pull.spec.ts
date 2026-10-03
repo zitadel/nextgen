@@ -89,6 +89,23 @@ describe("pull", () => {
         expect(await checkout.hasProjectFile(`.zitadel/schemas/${objectType}.json`)).toBe(false);
       });
 
+      it("records the pulled revision so a follow-up plan reports it in sync", async () => {
+        // A configured project whose flow is pinned to a concrete schema id on
+        // the server. Pulling rewrites the id to the handle and must record the
+        // revision, or plan would see the rewritten file as an upload.
+        const project = await aSetUpApp();
+        const schemaId = (await project.publishedSchema()).id;
+        await project.editLoginFlow((flow) => {
+          (flow as unknown as { user_schema: string }).user_schema = schemaId;
+        });
+        expect(await project.apply()).toSucceed();
+        const flowName = (await project.publishedFlow()).flow_definition.name;
+
+        expect(await project.run(["pull", "flow", flowName, "--json"])).toSucceed();
+
+        expect((await project.plan()).total).toBe(0);
+      });
+
       it("fails when the handle names nothing on the server", async () => {
         const checkout = await aFreshCheckoutOf(await aSetUpApp());
 

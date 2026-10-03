@@ -888,6 +888,20 @@ describe("localise", () => {
     expect(warnings[0]).toContain("sch_gone");
   });
 
+  it("keeps the id and warns when the schema has no object type to reference it by", async () => {
+    server.use(
+      http.get(`${BASE}/schemas/:id`, () =>
+        HttpResponse.json({ id: "sch_noobj", schema: { properties: {} }, metadata: {} }),
+      ),
+    );
+
+    const { body, warnings } = await localiseFlow({ name: "login", user_schema: "sch_noobj" });
+
+    expect(body).toMatchObject({ user_schema: "sch_noobj" });
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain("no object type");
+  });
+
   it("writes a schema body verbatim — a schema references nothing", () => {
     const [schema] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
 
