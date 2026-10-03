@@ -400,7 +400,10 @@ docker --image <ref>` remains the explicit image override for debugging.
 - `pull <kind> <handle>` — fetch the newest server-side revision of one resource
   into `.zitadel/`, for adopting an edit made through the dashboard or MCP into
   the repo. `kind` is `schema` or `flow`; `handle` is the schema's object type or
-  the flow's name. Writes `.zitadel/<kind>s/<handle>.json`, rewriting concrete
+  the flow's name. Writes into `.zitadel/<kind>s/` — the file already tracking
+  the handle when one exists (its name may differ, e.g. `default-human-user.json`
+  for the `human-user` schema), else `<handle>.json`; read `data.path` for the
+  file it wrote rather than assuming the handle-derived name. It rewrites concrete
   cross-resource ids to handles so the file references its dependencies by name
   (a flow's `user_schema` `sch_…` becomes the schema's object type) — releases
   resolve those handles against the revision they carry. A reference whose

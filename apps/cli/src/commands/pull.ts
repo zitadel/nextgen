@@ -33,22 +33,24 @@ async function existingFileForHandle(
   let entries: string[];
   try {
     entries = await readdir(join(cwd, syncer.directory));
-  } catch {
-    return undefined;
+  } catch (error) {
+    // No directory yet (a fresh checkout) means no file tracks the handle; any
+    // other error is real and must not be read as "no match".
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return undefined;
+    }
+    throw error;
   }
   for (const entry of entries) {
     if (!entry.endsWith(".json")) {
       continue;
     }
-    try {
-      const body = JSON.parse(
-        await readFile(join(cwd, syncer.directory, entry), "utf8"),
-      ) as object;
-      if (syncer.handleOf?.(body) === handle) {
-        return `${syncer.directory}/${entry}`;
-      }
-    } catch {
-      continue;
+    // A `.json` that cannot be read or parsed is propagated, not skipped:
+    // skipping the file that tracks the handle would write a duplicate and
+    // leave the stale file behind.
+    const body = JSON.parse(await readFile(join(cwd, syncer.directory, entry), "utf8")) as object;
+    if (syncer.handleOf?.(body) === handle) {
+      return `${syncer.directory}/${entry}`;
     }
   }
   return undefined;

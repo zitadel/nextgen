@@ -162,6 +162,18 @@ describe("pull command", () => {
     await expect(stat(join(cwd, ".zitadel/schemas/human-user.json"))).rejects.toThrow();
   });
 
+  it("fails rather than duplicating when an existing file cannot be parsed", async () => {
+    const cwd = await makeCwd();
+    await mkdir(join(cwd, ".zitadel/schemas"), { recursive: true });
+    await writeFile(join(cwd, ".zitadel/schemas/default-human-user.json"), "{ not json");
+    const base = await startStub();
+
+    const res = await pull(cwd, base, ["schema", "human-user"]);
+
+    expect(res.exitCode).not.toBe(0);
+    await expect(stat(join(cwd, ".zitadel/schemas/human-user.json"))).rejects.toThrow();
+  });
+
   it("writes nothing under --dry-run", async () => {
     const cwd = await makeCwd();
     const base = await startStub();
