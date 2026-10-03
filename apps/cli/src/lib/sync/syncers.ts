@@ -9,7 +9,6 @@ import type {
 import { consola } from "consola";
 
 import type { ZitadelClient } from "@zitadel/api/client";
-import { ApiError } from "@zitadel/api/runtime/fetch";
 import { DEFAULT_FLOW_SCHEMA_URI } from "@zitadel/config/defaults";
 import { isVariableReference } from "@zitadel/config/idp";
 import { normalizeFlowBody, normalizeSchemaBody } from "@zitadel/config/normalize";
@@ -324,34 +323,6 @@ class SchemaSyncer implements ResourceSyncer {
     });
     return page.schemas[0]?.id ?? null;
   }
-
-  async localiseReference(reference: string): Promise<{ value: string; warning?: string }> {
-    // A schema id is shape-less — a minted `sch_…` value, or the document's
-    // `$id`, which may be a URL, a URN or a relative URI (ADR 063). Rather
-    // than guess from its shape, resolve it by reading the schema; a 404 means
-    // the referenced revision is gone, so the id is kept and the caller warned.
-    try {
-      const body = (await this.fetch(reference)) as { objectType?: string };
-      // A schema may omit objectType, and the server treats such a revision as
-      // unpinnable (ADR 063 / release validation). Keep the id and warn rather
-      // than silently writing an id that no release can resolve.
-      if (typeof body.objectType !== "string" || body.objectType === "") {
-        return {
-          value: reference,
-          warning: `schema ${reference} has no object type to reference it by; kept the id in user_schema.`,
-        };
-      }
-      return { value: body.objectType };
-    } catch (error) {
-      if (error instanceof ApiError && error.status === 404) {
-        return {
-          value: reference,
-          warning: `schema ${reference} no longer exists; kept the id in user_schema.`,
-        };
-      }
-      throw error;
-    }
-  }
 }
 
 /**
@@ -440,26 +411,6 @@ class FlowDefinitionSyncer implements ResourceSyncer {
       limit: 1,
     });
     return page.flow_definitions[0]?.id ?? null;
-  }
-
-  /**
-   * A flow's one cross-resource reference is `user_schema`, a schema revision.
-   * Hand it to the schema syncer to turn the id into the schema's handle.
-   */
-  async localise(
-    serverBody: object,
-    syncers: ReadonlyArray<ResourceSyncer>,
-  ): Promise<{ body: object; warnings: string[] }> {
-    const schema = syncers.find((syncer) => syncer.kind === "schema");
-    const reference = (serverBody as { user_schema?: unknown }).user_schema;
-    if (schema?.localiseReference === undefined || typeof reference !== "string") {
-      return { body: serverBody, warnings: [] };
-    }
-    const { value, warning } = await schema.localiseReference(reference);
-    return {
-      body: { ...serverBody, user_schema: value },
-      warnings: warning === undefined ? [] : [warning],
-    };
   }
 }
 

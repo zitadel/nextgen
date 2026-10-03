@@ -118,24 +118,6 @@ export interface ResourceSyncer {
    */
   newestRevision?(handle: string): Promise<string | null>;
   /**
-   * Turn a freshly fetched server body into the body to write locally, the
-   * inverse of a syncer's create payload. Rewrites this kind's cross-resource
-   * references from concrete revision ids to handles (resolved through the
-   * other syncers), so a pulled file references its dependencies by name.
-   * Absent means the server body is written verbatim.
-   */
-  localise?(
-    serverBody: object,
-    syncers: ReadonlyArray<ResourceSyncer>,
-  ): Promise<{ body: object; warnings: string[] }>;
-  /**
-   * Resolve a stored reference to one of this kind's revisions into the value
-   * another resource should hold for it: a concrete revision id becomes this
-   * kind's handle, while a URL or handle is already portable and returned
-   * unchanged. `warning` is set when the id named a revision that is gone.
-   */
-  localiseReference?(reference: string): Promise<{ value: string; warning?: string }>;
-  /**
    * When set, this syncer owns exactly one descriptor file with this
    * basename inside `directory`, and the scan fails (`E_VALIDATION`) on any
    * other `*.json` found there. For a revisioned singleton like branding, a
