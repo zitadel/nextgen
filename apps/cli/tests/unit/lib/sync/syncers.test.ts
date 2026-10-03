@@ -857,13 +857,30 @@ describe("localise", () => {
     expect(warnings).toEqual([]);
   });
 
-  it("leaves a user_schema that is already a URL untouched", async () => {
+  it("resolves a URL schema id to the object type", async () => {
+    server.use(
+      http.get(`${BASE}/schemas/:id`, () =>
+        HttpResponse.json({
+          id: "https://example.test/human-user.yaml",
+          schema: { objectType: "human-user" },
+          metadata: {},
+        }),
+      ),
+    );
+
     const { body, warnings } = await localiseFlow({
       name: "login",
       user_schema: "https://example.test/human-user.yaml",
     });
 
-    expect(body).toMatchObject({ user_schema: "https://example.test/human-user.yaml" });
+    expect(body).toMatchObject({ user_schema: "human-user" });
+    expect(warnings).toEqual([]);
+  });
+
+  it("leaves a bare object-type handle untouched, fetching nothing", async () => {
+    const { body, warnings } = await localiseFlow({ name: "login", user_schema: "human-user" });
+
+    expect(body).toMatchObject({ user_schema: "human-user" });
     expect(warnings).toEqual([]);
   });
 
