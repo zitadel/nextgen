@@ -9,14 +9,13 @@ import { ZitadelError } from "../lib/errors";
 import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankArg } from "../lib/oclif";
 import { readZitadelSecret } from "../lib/project";
 import { publicCliCommand } from "../lib/public-cli";
-import { hashForState, makeSyncers, updateState } from "../lib/sync";
+import { hashForState, makeSyncers, type ResourceSyncer, updateState } from "../lib/sync";
 
-/**
- * Kinds `pull` supports, as the user types them: the revisioned kinds with a
- * list-by-handle endpoint (#541). Others get their pull path on their syncer
- * when they gain revisioning.
- */
-const PULLABLE_KINDS = ["schema", "flow"] as const;
+/** A syncer that can serve a pull: it knows how to find and read a revision. */
+type PullableSyncer = ResourceSyncer & {
+  newestRevision: NonNullable<ResourceSyncer["newestRevision"]>;
+  fetch: NonNullable<ResourceSyncer["fetch"]>;
+};
 
 /** A handle is a single file-name segment, so it can never escape the kind's directory. */
 const HANDLE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
@@ -44,8 +43,7 @@ export default class Pull extends BaseCommand {
   static override args = {
     kind: Args.string({
       required: true,
-      options: [...PULLABLE_KINDS],
-      description: "Resource kind to pull.",
+      description: "Resource kind to pull — any revisioned kind a syncer can read.",
     }),
     handle: nonBlankArg({
       required: true,
@@ -73,10 +71,16 @@ export default class Pull extends BaseCommand {
       { verbatim: true },
     );
     const syncers = makeSyncers({ client, projectId: secret.project_id, env, cwd });
-    const syncer = syncers.find((candidate) => candidate.kind === kind);
-    if (syncer?.newestRevision === undefined || syncer.fetch === undefined) {
-      throw new ZitadelError("E_VALIDATION", `pull is not supported for ${kind} yet.`, {
-        hint: `Pullable kinds: ${PULLABLE_KINDS.join(", ")}.`,
+    // A kind is pullable when its syncer can find and read a revision; the set
+    // follows the syncers, so a new revisioned kind needs no change here.
+    const pullable = syncers.filter(
+      (candidate): candidate is PullableSyncer =>
+        candidate.newestRevision !== undefined && candidate.fetch !== undefined,
+    );
+    const syncer = pullable.find((candidate) => candidate.kind === kind);
+    if (syncer === undefined) {
+      throw new ZitadelError("E_VALIDATION", `Cannot pull a ${kind}.`, {
+        hint: `Pullable kinds: ${pullable.map((candidate) => candidate.kind).join(", ")}.`,
       });
     }
 
@@ -84,7 +88,7 @@ export default class Pull extends BaseCommand {
     const id = await syncer.newestRevision(handle);
     if (id === null) {
       throw new ZitadelError("E_NOT_FOUND", `No ${kind} named "${handle}" on the server.`, {
-        hint: `Run \`${kind === "flow" ? "flow-definitions" : "schemas"} list\` to see what this project has.`,
+        hint: "List the project's resources to see which handles exist.",
       });
     }
 

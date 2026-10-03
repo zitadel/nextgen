@@ -121,6 +121,14 @@ describe("pull", () => {
 
         expect(result).toFailWith("E_VALIDATION");
       });
+
+      it("refuses a kind whose syncer cannot pull", async () => {
+        const checkout = await aFreshCheckoutOf(await aSetUpApp());
+
+        const result = await checkout.run(["pull", "branding", "default", "--json"]);
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
     });
 
     describe("rendered for a terminal", () => {
