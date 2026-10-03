@@ -33,6 +33,14 @@ type SweepConfig struct {
 	// Commit is recorded in the metadata; the sweep does not ask git itself.
 	Commit string
 	Log    io.Writer
+	// ManifestPath is the target's manifest. The sweep holds its run lock for
+	// as long as it runs, so `clean` refuses to remove the fixtures under it.
+	ManifestPath string
+	// Declared are the facts about the target the server does not report —
+	// dialect, image tag, replica count, logging — and DeclaredSource says who
+	// vouches for them (SourceHarness when the sweep started the server).
+	Declared       map[string]string
+	DeclaredSource string
 }
 
 // Sweep runs the matrix and writes the summary. It returns the rows so a
@@ -49,8 +57,36 @@ func Sweep(ctx context.Context, cfg SweepConfig) ([]Row, error) {
 		}
 		k6 = self
 	}
+	if cfg.ManifestPath != "" {
+		lock, err := AcquireRunLock(cfg.ManifestPath, "sweep")
+		if err != nil {
+			return nil, err
+		}
+		defer func() { _ = lock.Release() }()
+	}
+
+	// The doctor check runs before the first measurement and its report is
+	// part of the run metadata: it is the record of what was measured.
+	var manifest *Manifest
+	if cfg.ManifestPath != "" {
+		m, err := LoadManifestIfPresent(cfg.ManifestPath)
+		if err != nil {
+			return nil, err
+		}
+		manifest = m
+	}
+	report, err := Doctor(ctx, DoctorOptions{Target: cfg.Target, Manifest: manifest, Declared: cfg.Declared, DeclaredSource: cfg.DeclaredSource})
+	if err != nil {
+		return nil, err
+	}
+	fmt.Fprint(cfg.Log, report.Format())
+	if !report.Reachable {
+		return nil, fmt.Errorf("the target %s is not reachable; nothing was measured", cfg.Target.Base)
+	}
+
 	host, _ := os.Hostname()
 	meta := SweepMeta{
+		Doctor:         &report,
 		Commit:         cfg.Commit,
 		RequestTimeout: RequestTimeout.String(),
 		Lane:           cfg.Target.Lane,
