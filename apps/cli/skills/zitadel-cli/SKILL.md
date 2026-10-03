@@ -152,11 +152,17 @@ framework, sign-in preset, and profile-field options):
 ```sh
 npx @zitadel/cli@alpha doctor --non-interactive --json
 npx @zitadel/cli@alpha start --non-interactive --json
-npx @zitadel/cli@alpha setup --framework next --server local --non-interactive --json
+npx @zitadel/cli@alpha setup --framework next --server local --force --non-interactive --json
 npx @zitadel/cli@alpha doctor --non-interactive --json
 npx @zitadel/cli@alpha plan --non-interactive --json
 npx @zitadel/cli@alpha apply --non-interactive --json
 ```
+
+`setup` scaffolds into an empty directory, or patches an existing app project
+where it detects a framework. It stops on any other non-empty directory and
+asks for `--force` — which the golden path passes because `start` has already
+written `.zitadel/local` into the directory. If you run `setup` before `start`,
+in a truly empty directory, `--force` is not needed.
 
 After `setup`, follow `data.next_commands` to start the app. Prove the generated
 auth flow in a visible browser by registering a unique user, logging out, logging
