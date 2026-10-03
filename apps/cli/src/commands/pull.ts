@@ -1,4 +1,4 @@
-import { access, mkdir, writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import { Args } from "@oclif/core";
@@ -124,13 +124,14 @@ export default class Pull extends BaseCommand {
 
     // Record the revision this file now represents, so the next plan sees it
     // in sync rather than as an upload. A fresh checkout that never ran setup
-    // has no state file; plan needs setup there anyway, so skip in that case.
-    const hasState = await access(join(cwd, ".zitadel/state.json")).then(
-      () => true,
-      () => false,
-    );
-    if (hasState) {
+    // has no state file — plan needs setup there anyway — so a missing file is
+    // skipped, but an unreadable or malformed one is a real failure.
+    try {
       await updateState(cwd, relPath, { id, hash: hashForState(syncer, toWrite) });
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+        throw error;
+      }
     }
     consola.success(`Wrote ${relPath}`);
 
