@@ -1,25 +1,31 @@
 package harness
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"os"
-	"time"
 
-	"github.com/go-faster/jx"
-	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
 )
 
-// Fixture declares what a benchmark target needs: one project and one user
-// with a password. It is a JSON file so a lane's fixtures are data, reviewed
-// and diffed like data; applying it is Bootstrap's job.
+// Fixture declares what a benchmark target needs: one project, one user with
+// a password, and optionally a population of further users. It is a JSON file
+// so a lane's fixtures are data, reviewed and diffed like data; applying it is
+// Bootstrap's job.
 type Fixture struct {
-	Project FixtureProject `json:"project"`
-	User    FixtureUser    `json:"user"`
+	Project    FixtureProject    `json:"project"`
+	User       FixtureUser       `json:"user"`
+	Population FixturePopulation `json:"population"`
+}
+
+// FixturePopulation asks for Count further users named by PopulationEmail,
+// each with the primary user's password. Scenarios that need a spread of
+// users (rather than one hot row) declare it here, so the population is data
+// in the lane's fixture and not something a scenario creates for itself.
+type FixturePopulation struct {
+	Count int `json:"count"`
 }
 
 // FixtureProject is the project to create. The first preview origin is the
@@ -62,6 +68,17 @@ func LoadFixture(path string) (Fixture, error) {
 	if fx.User.Email == "" || fx.User.Password == "" {
 		errs = errors.Join(errs, errors.New("user.email and user.password are required"))
 	}
+	// `clean` only removes what follows the naming convention, so a fixture
+	// that does not could be provisioned but never cleaned up.
+	if fx.Project.Name != "" && !OwnsProjectName(fx.Project.Name) {
+		errs = errors.Join(errs, fmt.Errorf("project.name %q must match %s", fx.Project.Name, projectName))
+	}
+	if fx.User.Email != "" && !OwnsEmail(fx.User.Email) {
+		errs = errors.Join(errs, fmt.Errorf("user.email %q must match %s", fx.User.Email, userEmail))
+	}
+	if fx.Population.Count < 0 {
+		errs = errors.Join(errs, errors.New("population.count must not be negative"))
+	}
 	if errs != nil {
 		return fx, fmt.Errorf("%s: %w", path, errs)
 	}
@@ -69,76 +86,6 @@ func LoadFixture(path string) (Fixture, error) {
 		fx.User.Schema = schemas.DefaultHumanUserSchemaURL(DefaultBuiltinSchemaBase)
 	}
 	return fx, nil
-}
-
-// Bootstrap applies a fixture to a running server through the generated
-// client — POST /projects mints the operator bearer, then the user and its
-// password — and proves the result by walking one login journey and one user
-// read before returning the target. A fixture that cannot be driven is
-// reported here, not as a wall of failed iterations later.
-func Bootstrap(ctx context.Context, base, lane string, fx Fixture) (Target, error) {
-	creds := NewCredentials("")
-	//egress:allow benchmark harness provisioning the server under test
-	c, err := api.NewClient(base, creds, api.WithClient(originDoer{origin: fx.Project.PreviewOrigins[0], client: &http.Client{Timeout: 30 * time.Second}}))
-	if err != nil {
-		return Target{}, err
-	}
-
-	created, err := c.CreateProject(ctx, &api.CreateProjectRequest{
-		Name:           fx.Project.Name,
-		PreviewOrigins: fx.Project.PreviewOrigins,
-		SeedDefaults:   api.NewOptBool(fx.Project.SeedDefaults),
-	})
-	if err != nil {
-		return Target{}, fmt.Errorf("create project: %w", err)
-	}
-	project, ok := created.(*api.CreateProjectResponse)
-	if !ok {
-		return Target{}, fmt.Errorf("create project: unexpected response %T", created)
-	}
-	creds.SetBearer(project.ProjectSecret)
-
-	email, err := json.Marshal(fx.User.Email)
-	if err != nil {
-		return Target{}, err
-	}
-	userRes, err := c.CreateUser(ctx, &api.CreateUserRequest{
-		Schema:     fx.User.Schema,
-		Attributes: api.CreateUserRequestAttributes{"email": jx.Raw(email)},
-	}, api.CreateUserParams{ProjectID: api.ProjectID(project.ID)})
-	if err != nil {
-		return Target{}, fmt.Errorf("create user: %w", err)
-	}
-	user, ok := userRes.(*api.User)
-	if !ok {
-		return Target{}, fmt.Errorf("create user: unexpected response %T", userRes)
-	}
-
-	pwRes, err := c.SetUserPassword(ctx, &api.SetUserPasswordRequest{Password: fx.User.Password}, api.SetUserPasswordParams{UserID: user.ID})
-	if err != nil {
-		return Target{}, fmt.Errorf("set password: %w", err)
-	}
-	if _, ok := pwRes.(*api.SetUserPasswordNoContent); !ok {
-		return Target{}, fmt.Errorf("set password: unexpected response %T", pwRes)
-	}
-
-	t := Target{
-		Base:          base,
-		Lane:          lane,
-		ProjectID:     project.ID,
-		ProjectSecret: project.ProjectSecret,
-		Origin:        fx.Project.PreviewOrigins[0],
-		UserID:        string(user.ID),
-		Email:         fx.User.Email,
-		Password:      fx.User.Password,
-	}
-	if _, err := Login(ctx, c, t); err != nil {
-		return Target{}, fmt.Errorf("proving the login journey: %w", err)
-	}
-	if _, err := GetUser(ctx, c, t); err != nil {
-		return Target{}, fmt.Errorf("proving the user read: %w", err)
-	}
-	return t, nil
 }
 
 // originDoer is the plain transport Bootstrap uses: outside k6 there is no
