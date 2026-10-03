@@ -238,6 +238,10 @@ class SchemaSyncer implements ResourceSyncer {
   readonly directory = SCHEMAS_DIR;
   readonly mutable = false;
   readonly revisioned = true;
+  // A flow's `user_schema` holds a `sch_…` id; `pull` turns it back into this
+  // `objectType` handle so the flow references the schema by name.
+  readonly idPrefix = "sch";
+  readonly handleField = "objectType";
   readonly normalize = normalizeSchemaBody;
   // Deliberately no `normalizeWrite`: the server stores schema bytes
   // verbatim, so stripping spelled-out x-* defaults from the local file
@@ -312,6 +316,17 @@ class SchemaSyncer implements ResourceSyncer {
     const body = await this.client.getSchemaById(id);
     return body.schema;
   }
+
+  /** The newest revision of the object type, for `pull`. `revisions: latest` + limit 1 is the one current row. */
+  async newestRevision(handle: string): Promise<string | null> {
+    const page = await this.client.listSchemas({
+      project_id: this.projectId,
+      object_type: handle,
+      revisions: "latest",
+      limit: 1,
+    });
+    return page.schemas[0]?.id ?? null;
+  }
 }
 
 /**
@@ -324,6 +339,12 @@ class FlowDefinitionSyncer implements ResourceSyncer {
   readonly directory = FLOWS_DIR;
   readonly mutable = false;
   readonly revisioned = true;
+  readonly idPrefix = "flowdef";
+  readonly handleField = "name";
+  // The one cross-resource reference a flow carries today: `user_schema`
+  // points at a schema. `pull` rewrites the `sch_…` id to the schema's
+  // `objectType` handle; add a row here as other references land.
+  readonly references = [{ path: "user_schema", kind: "schema" }] as const;
   readonly normalize = normalizeFlowBody;
   // For flows the comparison form doubles as the file form: everything it
   // strips (envelope keys, the empty `audience` echo) is transport noise.
@@ -390,6 +411,16 @@ class FlowDefinitionSyncer implements ResourceSyncer {
     const envelope = await this.client.getFlowDefinition(id);
 
     return envelope.flow_definition as object;
+  }
+
+  /** The newest revision of the flow name, for `pull`. The list returns a name's revisions newest first. */
+  async newestRevision(handle: string): Promise<string | null> {
+    const page = await this.client.listFlowDefinitions({
+      project_id: this.projectId,
+      name: handle,
+      limit: 1,
+    });
+    return page.flow_definitions[0]?.id ?? null;
   }
 }
 

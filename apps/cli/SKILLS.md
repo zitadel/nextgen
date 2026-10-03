@@ -397,6 +397,15 @@ docker --image <ref>` remains the explicit image override for debugging.
 
 - `plan` — validate config and preview the sync diff without mutating anything.
 - `apply` — validate and upload repo config to the platform.
+- `pull <kind> <handle>` — fetch the newest server-side revision of one resource
+  into `.zitadel/`, for adopting an edit made through the dashboard or MCP into
+  the repo. `kind` is `schema` or `flow`; `handle` is the schema's object type or
+  the flow's name. Writes `.zitadel/<kind>s/<handle>.json` and rewrites concrete
+  revision ids in cross-resource references to handles (a flow's `user_schema`
+  `sch_…` becomes the schema's object type), so the file references its
+  dependencies by name. Targeted only — one `(kind, handle)` per run, no bulk
+  mode. `data` carries `{ kind, handle, id, path }`; a reference whose revision
+  was deleted stays an id and is reported in `data.warnings`.
 - `plan` and `apply --dry-run` also emit `data.warnings`: non-blocking
   findings as `{path, rule, message}`, the same text the human plan prints as
   `# warning:` lines and `apply` prints through stderr. They never fail a run.

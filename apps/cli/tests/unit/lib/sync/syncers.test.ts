@@ -773,3 +773,69 @@ describe("IdpConnectionSyncer", () => {
     await expect(idp.delete("idp_1")).rejects.toThrow(/not supported yet/);
   });
 });
+
+/**
+ * `pull` reads three declarative members off a syncer — `idPrefix`,
+ * `handleField`, `references` — and the `newestRevision` list call. The command
+ * itself carries no per-kind knowledge, so this is where that knowledge is
+ * asserted: the walker's own logic is covered in `references.test.ts`.
+ */
+describe("pull support", () => {
+  it("declares the schema's id prefix and handle field, and lists its newest revision", async () => {
+    server.use(
+      http.get(`${BASE}/schemas`, ({ request }) => {
+        const url = new URL(request.url);
+        expect(url.searchParams.get("object_type")).toBe("human-user");
+        expect(url.searchParams.get("revisions")).toBe("latest");
+        expect(url.searchParams.get("limit")).toBe("1");
+        return HttpResponse.json({
+          schemas: [{ id: "sch_new", schema: { objectType: "human-user" }, metadata: {} }],
+        });
+      }),
+    );
+    const [schema] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
+
+    expect(schema.idPrefix).toBe("sch");
+    expect(schema.handleField).toBe("objectType");
+    expect(schema.references ?? []).toEqual([]);
+    expect(await schema.newestRevision?.("human-user")).toBe("sch_new");
+  });
+
+  it("returns null when a schema handle names nothing", async () => {
+    server.use(http.get(`${BASE}/schemas`, () => HttpResponse.json({ schemas: [] })));
+    const [schema] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
+
+    expect(await schema.newestRevision?.("absent")).toBeNull();
+  });
+
+  it("declares the flow's id prefix, handle field and user_schema reference, and lists its newest revision", async () => {
+    server.use(
+      http.get(`${BASE}/flow_definitions`, ({ request }) => {
+        const url = new URL(request.url);
+        expect(url.searchParams.get("name")).toBe("login");
+        expect(url.searchParams.get("limit")).toBe("1");
+        return HttpResponse.json({
+          flow_definitions: [{ id: "flowdef_new", flow_definition: { name: "login" } }],
+        });
+      }),
+    );
+    const [, , flow] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
+
+    expect(flow.idPrefix).toBe("flowdef");
+    expect(flow.handleField).toBe("name");
+    expect(flow.references).toEqual([{ path: "user_schema", kind: "schema" }]);
+    expect(await flow.newestRevision?.("login")).toBe("flowdef_new");
+  });
+
+  it("leaves idp and branding unpullable (no newestRevision)", () => {
+    const [, idp, , branding] = makeSyncers({
+      client,
+      projectId: "proj-1",
+      env: {},
+      cwd: "/tmp/zitadel-sync-test",
+    });
+
+    expect(idp.newestRevision).toBeUndefined();
+    expect(branding.newestRevision).toBeUndefined();
+  });
+});

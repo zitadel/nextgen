@@ -109,6 +109,8 @@ and agent UIs may display stderr package-manager progress together with stdout.
 - `zitadel status`: summarise the local runtime and project
 - `zitadel plan`: validate config and preview sync changes without mutation
 - `zitadel apply`: validate and upload repo config to Zitadel
+- `zitadel pull <kind> <handle>`: fetch the newest server-side revision of a
+  schema or flow into `.zitadel/`, to adopt a dashboard edit into the repo
 - `zitadel branding eject`: scaffold an editable login template from a design
 - `zitadel schemas list`: list the project's user schemas
 - `zitadel variables list|get|set|delete`: manage the project's variables and
@@ -155,6 +157,7 @@ which ships in this package.
 * [`zitadel projects get ID`](#zitadel-projects-get-id)
 * [`zitadel projects list`](#zitadel-projects-list)
 * [`zitadel projects update ID`](#zitadel-projects-update-id)
+* [`zitadel pull KIND HANDLE`](#zitadel-pull-kind-handle)
 * [`zitadel releases get ID`](#zitadel-releases-get-id)
 * [`zitadel releases list`](#zitadel-releases-list)
 * [`zitadel reset`](#zitadel-reset)
@@ -1398,6 +1401,44 @@ EXAMPLES
   $ zitadel projects update <id> --data '{...}' --json
 
   $ zitadel projects update <id> --file ./project.json
+```
+
+## `zitadel pull KIND HANDLE`
+
+Fetch the newest server-side revision of a resource into .zitadel/.
+
+```
+USAGE
+  $ zitadel pull KIND HANDLE [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry]
+
+ARGUMENTS
+  KIND    (schema|flow) Resource kind to pull.
+  HANDLE  Resource handle: a schema's object type, or a flow's name.
+
+FLAGS
+  -c, --cwd=<value>      Project directory to operate on.
+  -n, --non-interactive  Disable prompts. Required when scripting or running as
+                         an agent.
+  -s, --server=<value>   Override the resolved server URL.
+  -v, --verbose          Verbose logging.
+      --[no-]color       Colorize human output. Disable with --no-color;
+                         NO_COLOR and FORCE_COLOR are honored too.
+      --debug            Debug logging.
+      --dry-run          Preview without mutating files or the platform.
+      --[no-]telemetry   Send anonymous usage analytics. Disable with
+                         --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Fetch the newest server-side revision of a resource into .zitadel/.
+
+EXAMPLES
+  $ zitadel pull schema human-user
+
+  $ zitadel pull flow login
 ```
 
 ## `zitadel releases get ID`

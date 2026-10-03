@@ -14,8 +14,9 @@
  * domain shapes (e.g. `FlowDefinition`) — payloads are opaque
  * `object` until they reach the platform client.
  */
-export type { ResourceSyncer, SyncAction, SyncPlanSummary } from "./types";
+export type { ReferenceField, ResourceSyncer, SyncAction, SyncPlanSummary } from "./types";
 export { makeSyncers } from "./syncers";
+export { rewriteRefsToHandles, type RefRewriteResult } from "./references";
 export type { SyncLoopResult } from "./loop";
 export {
   buildSyncPlan,

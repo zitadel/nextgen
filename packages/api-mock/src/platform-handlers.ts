@@ -1148,11 +1148,12 @@ export function setupPlatformHandlers() {
     }),
 
     http.get("*/flow_definitions", ({ request }) => {
-      const query = parse(
-        ListFlowDefinitionsQueryParams,
-        queryRecord(request),
-        "invalid_query",
-      );
+      // Same `limit` coercion caveat as `GET /schemas` above: URLs carry
+      // strings and the generated zod does not coerce, so the number param is
+      // converted before validation (the ogen server coerces it too).
+      const { limit, ...rest } = queryRecord(request);
+      const raw = { ...rest, ...(limit === undefined ? {} : { limit: Number(limit) }) };
+      const query = parse(ListFlowDefinitionsQueryParams, raw, "invalid_query");
       if (!query.ok) {
         return query.response;
       }
@@ -1174,8 +1175,12 @@ export function setupPlatformHandlers() {
       const records = current.filter(
         (r) => !query.data.purpose || flowServesPurpose(r.body, query.data.purpose),
       );
+      // Honour `limit` so a caller asking for the single newest revision
+      // (`name=…&limit=1`) gets one row, as the server returns.
+      const limited =
+        query.data.limit === undefined ? records : records.slice(0, query.data.limit);
       const responseBody: ListFlowDefinitions200 = {
-        flow_definitions: records.map(flowResponse),
+        flow_definitions: limited.map(flowResponse),
         next_page_token: null,
       };
       const out = parse(ListFlowDefinitionsResponse, responseBody, "mock_response_invalid");
