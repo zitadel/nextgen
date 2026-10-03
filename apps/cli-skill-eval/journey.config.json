@@ -1,0 +1,36 @@
+{
+  "description": "Common questions a developer asks the zitadel CLI, run as one stateful journey against a single project. Each stage is a fresh agent task sharing the project and server the earlier stages built.",
+  "configs": ["with-skill", "baseline"],
+  "stages": [
+    {
+      "id": 1,
+      "title": "Set up a project (first/last name + password)",
+      "grade": "setup",
+      "prompt": "In the current directory, use the zitadel CLI to set up a new Zitadel project. New users must sign up with their first name, last name, and a password. Apply it to a running local server. Work non-interactively and do not ask me questions."
+    },
+    {
+      "id": 2,
+      "title": "List all the projects",
+      "grade": "list-projects",
+      "prompt": "Using the zitadel CLI in this directory, list all the projects and tell me what you find. Work non-interactively and do not ask me questions."
+    },
+    {
+      "id": 3,
+      "title": "Does my project have a client id and secret?",
+      "grade": "inspect-credentials",
+      "prompt": "Using the zitadel CLI in this directory, does my project have a client id and a client secret? Check and tell me yes or no, with the evidence you used. Work non-interactively and do not ask me questions."
+    },
+    {
+      "id": 4,
+      "title": "Add a telephone number field + deploy",
+      "grade": "schema-has-phone",
+      "prompt": "Using the zitadel CLI in this directory, add a telephone number field to my user schema and deploy the change. Work non-interactively and do not ask me questions."
+    },
+    {
+      "id": 5,
+      "title": "Enable passkeys + deploy",
+      "grade": "passkey-enabled",
+      "prompt": "Using the zitadel CLI in this directory, enable passkeys for my users and deploy the change. Work non-interactively and do not ask me questions."
+    }
+  ]
+}

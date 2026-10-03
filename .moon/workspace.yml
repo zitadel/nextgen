@@ -5,6 +5,7 @@ projects:
     release: "tools/release"
     cli: "apps/cli"
     cli-journey-e2e: "apps/cli-journey-e2e"
+    cli-skill-eval: "apps/cli-skill-eval"
     console: "apps/console"
     console-e2e: "apps/console-e2e"
     docs: "apps/docs"
