@@ -29,6 +29,14 @@ apps/server-*/
 The private root workspace package (`package.json`) follows this default
 because it describes the source tree as a whole, not a published client package.
 
+`tools/bench/` — the k6 benchmark harness — is AGPL-3.0-only under this
+default and carries its own copy of the license text. It links
+[k6](https://github.com/grafana/k6), which is itself AGPL-3.0-only, so unlike
+the rest of the AGPL-3.0-only default it is **excluded from any commercial
+licensing** of the product: there is no license under which Zitadel could
+offer it other than AGPL-3.0-only. It is a development tool and is never part
+of a published package or image.
+
 The Docker images published from this repository, including
 `ghcr.io/zitadel/nextgen`, are AGPL-3.0-only because they contain the server and
 embedded console. The OCI label `org.opencontainers.image.licenses` must reflect
