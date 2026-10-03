@@ -1,6 +1,11 @@
 package server
 
 import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -158,4 +163,55 @@ func TestLoadConfigAcceptsStreamsFromEnv(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, []zlog.Stream{zlog.StreamRequest, zlog.StreamService}, cfg.Instrumentation.Log.Streams)
+}
+
+// TestRunLogsTheErrorItReturns pins #1409. run's deferred "run error" record
+// did not fire for the early returns that declare err in an if's scope, among
+// them the bootstrap return this test drives, so such a failed start was only
+// visible through main's log.Fatal, which slog.SetDefault bridges in at INFO.
+// The failure here is the report's own, a data dir that was never migrated,
+// and the record has to come out at ERROR, past a warn level, carrying the
+// error run returns.
+func TestRunLogsTheErrorItReturns(t *testing.T) {
+	_, configPath := tempServerConfig(t)
+	cfg, err := loadConfig(configPath)
+	require.NoError(t, err)
+	// Fails at a return that shadows err: the bootstrap needs the tables that
+	// nothing created in this data dir.
+	cfg.Platform.BootstrapProject = true
+	cfg.Instrumentation.Log.Level = zlog.LevelWarning
+	// With no format, setUpLogging builds on the slog default installed when
+	// run starts, which is how its records land in the buffer below instead of
+	// on stderr.
+	cfg.Instrumentation.Log.Format = instrumentation.LogFormatUnspecified
+
+	var records bytes.Buffer
+	previous, previousOutput, previousFlags := slog.Default(), log.Writer(), log.Flags()
+	slog.SetDefault(slog.New(slog.NewJSONHandler(&records, nil)))
+	// slog.SetDefault also points the log package at the new handler, and
+	// reinstating a stdlib default does not point it back.
+	t.Cleanup(func() {
+		slog.SetDefault(previous)
+		log.SetOutput(previousOutput)
+		log.SetFlags(previousFlags)
+	})
+
+	// Bounded so that a start which no longer fails is reported instead of
+	// waited on until go test's own timeout.
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
+	err = run(ctx, cfg, nil, false)
+	require.ErrorContains(t, err, "failed to bootstrap platform project")
+
+	var runError map[string]any
+	for line := range strings.SplitSeq(strings.TrimSpace(records.String()), "\n") {
+		var record map[string]any
+		require.NoError(t, json.Unmarshal([]byte(line), &record), line)
+		if record["msg"] == "run error" {
+			runError = record
+		}
+	}
+	require.NotNil(t, runError, "no \"run error\" record in:\n%s", records.String())
+	assert.Equal(t, "ERROR", runError["level"])
+	assert.Equal(t, err.Error(), runError["err"])
 }
