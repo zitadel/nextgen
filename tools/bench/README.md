@@ -104,6 +104,47 @@ when the sweep started the server itself and configured them, or `[unknown]`
 with a warning when nobody said. Anything else declared (for example
 `session.default_ttl=10m`) is recorded as given.
 
+## Sessions
+
+The session token is the credential that expires (`session.default_ttl`, ten
+minutes by default); the project secret does not rotate. A scenario that needs
+a session takes it from the process-wide `SessionCache` on the root module,
+never by logging in inside the iteration — a re-login there would put a
+periodic spike on whatever operation came next, aligned across VUs because
+their TTLs align.
+
+- **Warm, then rotate.** `setup()` establishes the sessions before anything is
+  measured. A background path then re-establishes each one `--session-margin`
+  (default 60s) before it expires. The logins use plain `net/http`, so they
+  emit no `http_req_*` samples; their cost is on its own metrics,
+  `nextgen_session_refresh_duration` (tagged `result`, `path`) and
+  `nextgen_session_refreshes`, and is in no operation trend.
+- **Misses invalidate the window.** A `Get` that finds no usable session pays
+  for a login on the measured path. It is counted on
+  `nextgen_session_cache_miss`, `summary.md` marks the run `INVALID`, and the
+  sweep exits non-zero after writing everything. It is never absorbed.
+- **One login per credential.** Concurrent refreshes of the same slot, a miss
+  racing the background path included, share one login journey.
+- **Affinity and capacity.** `--session-affinity shared` (default) is one
+  session reused by every VU; `vu` is one session per VU. They measure
+  different things, so the scenario chooses. `--session-capacity` bounds the
+  slots; asking for more is an error, not an eviction, because an eviction
+  would put a login back on the measured path.
+- **Not the default TTL.** The target's TTL is not raised. `--session-ttl`
+  asks the handoff exchange for a _shorter_ lifetime so rotation can be
+  watched within minutes, and is recorded in `runs.json`; a session that
+  lives no longer than the margin is refused.
+
+`getMySession` (`GET /sessions/me` with a cached session) is the scenario that
+uses it:
+
+```sh
+moon run bench:sweep -- --scenarios getMySession --vus 5 --duration 30m --session-affinity vu
+```
+
+A session replaced by a refresh is left to expire server-side; deleting the
+user (`clean`) removes the rest.
+
 ## Fixtures
 
 [`fixtures/local.json`](fixtures/local.json) declares the project (name,
@@ -120,7 +161,7 @@ read, so a fixture that cannot be driven fails before anything is measured.
 | Path                                   | What                                                                                                   |
 | -------------------------------------- | ------------------------------------------------------------------------------------------------------ |
 | [`cmd/k6/`](cmd/k6/)                   | the k6 binary with the module and the subcommand compiled in — what `xk6 build` would generate         |
-| [`k6module/`](k6module/)               | `k6/x/nextgen`: root module (target, credential cache), per-VU client, the delegating `Do`             |
+| [`k6module/`](k6module/)               | `k6/x/nextgen`: root module (target, credentials, session cache), per-VU client, the delegating `Do`   |
 | [`k6cmd/`](k6cmd/)                     | `k6 x nextgen bootstrap` / `sweep` / `summarize`                                                       |
 | [`harness/`](harness/)                 | operations over the typed client, fixtures, target state, readiness check, sweep runner, summary merge |
 | [`scripts/bench.js`](scripts/bench.js) | the one entry script (embedded into the binary)                                                        |

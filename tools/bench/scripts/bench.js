@@ -5,6 +5,7 @@
 // Scenarios run one at a time; run together they contend for the same machine
 // and the cheap one starves the others.
 import nextgen from 'k6/x/nextgen';
+import exec from 'k6/execution';
 
 const shape = { executor: 'constant-vus', vus: Number(__ENV.VUS || 1), duration: __ENV.DUR || '10s', gracefulStop: '5s' };
 
@@ -14,11 +15,15 @@ const shape = { executor: 'constant-vus', vus: Number(__ENV.VUS || 1), duration:
 // module, so the script never spells a tag value the Go side does not know.
 const thresholds = {};
 for (const name of nextgen.submetrics()) thresholds[name] = [];
+// The session cache's own metrics are reported whole, never per operation:
+// its logins must stay out of every operation trend.
+for (const name of nextgen.sessionMetrics()) thresholds[name] = [];
 
 export const options = {
   scenarios: {
     login: { ...shape, exec: 'login' },
     getUser: { ...shape, exec: 'getUser' },
+    getMySession: { ...shape, exec: 'getMySession' },
   },
   thresholds,
 };
@@ -29,4 +34,17 @@ export function login() {
 
 export function getUser() {
   nextgen.getUser();
+}
+
+// The session cache is warmed before anything is measured, so a measured
+// iteration never pays for a login; a miss on the measured path is counted
+// (nextgen_session_cache_miss) and invalidates the window. `--scenario`
+// leaves only the selected scenario in the options, so this warms nothing
+// for a run that measures no sessions.
+export function setup() {
+  if ('getMySession' in exec.test.options.scenarios) nextgen.warmSessions(Number(__ENV.VUS || 1));
+}
+
+export function getMySession() {
+  nextgen.getMySession(exec.vu.idInTest);
 }

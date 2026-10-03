@@ -20,11 +20,12 @@ const (
 	OpSubmitIdent    = "submit_identifier"
 	OpSubmitPassword = "submit_password"
 	OpGetUser        = "get_user"
+	OpGetMySession   = "get_my_session"
 )
 
 // Operations lists every operation id, for the entry script to declare one
 // sub-metric per operation from the same vocabulary the tags use.
-var Operations = []string{OpCreateFlow, OpSubmitIdent, OpSubmitPassword, OpGetUser}
+var Operations = []string{OpCreateFlow, OpSubmitIdent, OpSubmitPassword, OpGetUser, OpGetMySession}
 
 // opKey carries the operation id from a typed call into the client's Do,
 // which only sees the *http.Request. The generated client propagates the
@@ -155,4 +156,23 @@ func cookieValue(setCookie []string, name string) (string, error) {
 		}
 	}
 	return "", errors.New("response carried no " + name + " cookie")
+}
+
+// GetMySession performs GET /sessions/me presenting the session token the
+// context carries (WithSession) and returns the session id.
+func GetMySession(ctx context.Context, c *api.Client) (string, error) {
+	res, err := c.GetMySession(WithOp(ctx, OpGetMySession))
+	if err != nil {
+		return "", Classify(OpGetMySession, err)
+	}
+	switch r := res.(type) {
+	case *api.SessionResponseHeaders:
+		return string(r.Response.SessionID), nil
+	case *api.AuthUnauthorizedHeaders:
+		return "", &OpError{Op: OpGetMySession, Status: http.StatusUnauthorized, Code: r.Response.Code, Err: errors.New(r.Response.Message)}
+	case *api.SessNotFoundHeaders:
+		return "", &OpError{Op: OpGetMySession, Status: http.StatusNotFound, Code: r.Response.Code, Err: errors.New(r.Response.Message)}
+	default:
+		return "", classifyResponse(OpGetMySession, 0, res)
+	}
 }
