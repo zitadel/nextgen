@@ -118,6 +118,13 @@ export interface ResourceSyncer {
    */
   newestRevision?(handle: string): Promise<string | null>;
   /**
+   * This kind's stable handle as read from a body — a schema's `objectType`, a
+   * flow's `name`. `pull` uses it to find an already-tracked local file for a
+   * handle whose filename differs from it, so it updates that file rather than
+   * writing a duplicate. Undefined when the body carries no handle.
+   */
+  handleOf?(body: object): string | undefined;
+  /**
    * Turn a freshly fetched server body into the body to write locally, the
    * inverse of a syncer's create payload. Rewrites this kind's cross-resource
    * references from concrete revision ids to handles (resolved through the

@@ -1,4 +1,4 @@
-import { mkdir } from "node:fs/promises";
+import { mkdir, readdir, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import { Args } from "@oclif/core";
@@ -19,6 +19,40 @@ type PullableSyncer = ResourceSyncer & {
 
 /** A handle is a single file-name segment, so it can never escape the kind's directory. */
 const HANDLE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+
+/**
+ * The relative path of the local file that already tracks `handle` — found by
+ * reading each file in the kind's directory and asking the syncer for its
+ * handle — or undefined when none does (a fresh checkout, or a new resource).
+ */
+async function existingFileForHandle(
+  cwd: string,
+  syncer: PullableSyncer,
+  handle: string,
+): Promise<string | undefined> {
+  let entries: string[];
+  try {
+    entries = await readdir(join(cwd, syncer.directory));
+  } catch {
+    return undefined;
+  }
+  for (const entry of entries) {
+    if (!entry.endsWith(".json")) {
+      continue;
+    }
+    try {
+      const body = JSON.parse(
+        await readFile(join(cwd, syncer.directory, entry), "utf8"),
+      ) as object;
+      if (syncer.handleOf?.(body) === handle) {
+        return `${syncer.directory}/${entry}`;
+      }
+    } catch {
+      continue;
+    }
+  }
+  return undefined;
+}
 
 /**
  * `zitadel pull <kind> <handle>` — fold the newest server-side revision of a
@@ -96,7 +130,12 @@ export default class Pull extends BaseCommand {
     const { body, warnings } = syncer.localise
       ? await syncer.localise(fetched, syncers)
       : { body: fetched, warnings: [] };
-    const relPath = `${syncer.directory}/${handle}.json`;
+    // Update the resource's existing local file when one already tracks this
+    // handle under a different name (setup writes default-human-user.json for
+    // the human-user schema); only fall back to <handle>.json when none does,
+    // so a pull never leaves a second file for the same resource.
+    const relPath =
+      (await existingFileForHandle(cwd, syncer, handle)) ?? `${syncer.directory}/${handle}.json`;
     // The verbatim client leaves server bytes unsanitized, so every value that
     // reaches the terminal is escaped here; the raw values still go to the
     // file, the envelope and state.

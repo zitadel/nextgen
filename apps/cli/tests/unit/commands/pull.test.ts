@@ -144,6 +144,24 @@ describe("pull command", () => {
     expect(await stat(join(cwd, ".zitadel/flows/login.json"))).toBeTruthy();
   });
 
+  it("updates the existing file that tracks the handle under a different name", async () => {
+    const cwd = await makeCwd();
+    await mkdir(join(cwd, ".zitadel/schemas"), { recursive: true });
+    await writeFile(
+      join(cwd, ".zitadel/schemas/default-human-user.json"),
+      JSON.stringify({ kind: "user-schema", objectType: "human-user", properties: {} }),
+    );
+    const base = await startStub();
+
+    const res = await pull(cwd, base, ["schema", "human-user"]);
+
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as { data: { path: string } };
+    // Writes back the tracked file, not a second human-user.json.
+    expect(json.data.path).toBe(".zitadel/schemas/default-human-user.json");
+    await expect(stat(join(cwd, ".zitadel/schemas/human-user.json"))).rejects.toThrow();
+  });
+
   it("writes nothing under --dry-run", async () => {
     const cwd = await makeCwd();
     const base = await startStub();

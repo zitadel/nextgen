@@ -314,6 +314,11 @@ class SchemaSyncer implements ResourceSyncer {
     return body.schema;
   }
 
+  handleOf(body: object): string | undefined {
+    const objectType = (body as { objectType?: unknown }).objectType;
+    return typeof objectType === "string" ? objectType : undefined;
+  }
+
   /** The newest revision of the object type, for `pull`. `revisions: latest` + limit 1 is the one current row. */
   async newestRevision(handle: string): Promise<string | null> {
     const page = await this.client.listSchemas({
@@ -430,6 +435,11 @@ class FlowDefinitionSyncer implements ResourceSyncer {
     const envelope = await this.client.getFlowDefinition(id);
 
     return envelope.flow_definition as object;
+  }
+
+  handleOf(body: object): string | undefined {
+    const name = (body as { name?: unknown }).name;
+    return typeof name === "string" ? name : undefined;
   }
 
   /** The newest revision of the flow name, for `pull`. The list returns a name's revisions newest first. */
