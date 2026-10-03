@@ -51,15 +51,15 @@ read, so a fixture that cannot be driven fails before anything is measured.
 
 ## Layout
 
-| Path | What |
-|---|---|
-| [`cmd/k6/`](cmd/k6/) | the k6 binary with the module and the subcommand compiled in — what `xk6 build` would generate |
-| [`k6module/`](k6module/) | `k6/x/nextgen`: root module (target, credential cache), per-VU client, the delegating `Do` |
-| [`k6cmd/`](k6cmd/) | `k6 x nextgen bootstrap` / `sweep` / `summarize` |
-| [`harness/`](harness/) | operations over the typed client, fixtures, target state, local server lifecycle, sweep runner, summariser |
-| [`scripts/bench.js`](scripts/bench.js) | the one entry script (embedded into the binary) |
-| [`fixtures/`](fixtures/) | what a lane provisions |
-| `out/` | everything the tooling writes; gitignored |
+| Path                                   | What                                                                                                       |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| [`cmd/k6/`](cmd/k6/)                   | the k6 binary with the module and the subcommand compiled in — what `xk6 build` would generate             |
+| [`k6module/`](k6module/)               | `k6/x/nextgen`: root module (target, credential cache), per-VU client, the delegating `Do`                 |
+| [`k6cmd/`](k6cmd/)                     | `k6 x nextgen bootstrap` / `sweep` / `summarize`                                                           |
+| [`harness/`](harness/)                 | operations over the typed client, fixtures, target state, local server lifecycle, sweep runner, summariser |
+| [`scripts/bench.js`](scripts/bench.js) | the one entry script (embedded into the binary)                                                            |
+| [`fixtures/`](fixtures/)               | what a lane provisions                                                                                     |
+| `out/`                                 | everything the tooling writes; gitignored                                                                  |
 
 ## Checks
 

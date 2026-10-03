@@ -43,7 +43,7 @@ Two facts found while prototyping dissolved the dichotomy:
    phase breakdown, is exported as well.
 2. The generated client has exactly one seam: `WithClient(Do)`. ogen encodes
    the request, calls `Do`, and decodes the response. There is no
-   build-without-send, so the *prepared* shape cannot use the typed client
+   build-without-send, so the _prepared_ shape cannot use the typed client
    for the call at all; but `Do` is enough to hand the call to k6.
 
 ## Decision
@@ -60,8 +60,10 @@ buffer, sets the tags, and calls `httpext.MakeRequest` with the VU's
 The entry script is one JavaScript call per logical operation:
 
 ```js
-import nextgen from 'k6/x/nextgen';
-export function login() { nextgen.login(); }
+import nextgen from "k6/x/nextgen";
+export function login() {
+  nextgen.login();
+}
 ```
 
 Request encoding, response decoding, the operation vocabulary, error
@@ -119,13 +121,13 @@ Measured 2026-10-02 on a workstation against a local SQLite server from
 `main@b44b907bd`, one scenario at a time, 20 s per run, 25 runs, zero failed
 requests.
 
-| Criterion | owned | **delegated (chosen)** | prepared |
-|---|---|---|---|
-| Phase breakdown | identical to k6's — it *is* `httpext.Tracer` behind `httptrace`; p95 at 1 VU `GET /users/{id}`: blocked 3 µs, sending 12 µs, waiting 1.21 ms, receiving 31 µs | k6's own: 3 µs / 17 µs / 1.25 ms / 43 µs | k6's own: 3 µs / 9 µs / 1.16 ms / 34 µs |
-| Cookies | `_zflow` is an explicit ogen parameter; jar unused | jar held `_zflow` on 100 % of flows; explicit parameter also works | jar, implicit |
-| Connection reuse / latency | 98–100 % reused; a process-wide transport changed nothing | k6's transport | k6's transport |
-| JavaScript in the entry script | 9 lines | 9 lines | 21 lines |
-| Tag cardinality | bounded in Go: 15 series (`getUser`), 33 (`login`) at every VU count | 15 / 34 | 33 only if the script passes the module's `name` tag; with plain `k6/http` params, **10,041 series in 20 s** at 5 VUs |
+| Criterion                      | owned                                                                                                                                                         | **delegated (chosen)**                                             | prepared                                                                                                              |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------- |
+| Phase breakdown                | identical to k6's — it _is_ `httpext.Tracer` behind `httptrace`; p95 at 1 VU `GET /users/{id}`: blocked 3 µs, sending 12 µs, waiting 1.21 ms, receiving 31 µs | k6's own: 3 µs / 17 µs / 1.25 ms / 43 µs                           | k6's own: 3 µs / 9 µs / 1.16 ms / 34 µs                                                                               |
+| Cookies                        | `_zflow` is an explicit ogen parameter; jar unused                                                                                                            | jar held `_zflow` on 100 % of flows; explicit parameter also works | jar, implicit                                                                                                         |
+| Connection reuse / latency     | 98–100 % reused; a process-wide transport changed nothing                                                                                                     | k6's transport                                                     | k6's transport                                                                                                        |
+| JavaScript in the entry script | 9 lines                                                                                                                                                       | 9 lines                                                            | 21 lines                                                                                                              |
+| Tag cardinality                | bounded in Go: 15 series (`getUser`), 33 (`login`) at every VU count                                                                                          | 15 / 34                                                            | 33 only if the script passes the module's `name` tag; with plain `k6/http` params, **10,041 series in 20 s** at 5 VUs |
 
 Latency and throughput did not separate the shapes at any VU count
 (`GET /users/{id}` at 20 VUs: 1,792 / 1,775 / 1,709 req/s delegated / owned /
