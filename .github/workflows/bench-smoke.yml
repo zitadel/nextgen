@@ -90,5 +90,10 @@ jobs:
       # harness's own registry, never from a list in this file. Nothing is
       # uploaded: a retained summary from a shared runner is a number somebody
       # will eventually cite.
+      #
+      # `env -u CI -u GITHUB_ACTIONS`: in CI mode moon skips tasks marked
+      # `runInCI: false`, and this task carries it so `moon ci` never selects
+      # it automatically. Running it by name from this workflow is the one
+      # place it should run (ci.yml does the same for the journey lanes).
       - name: Run the smoke lane
-        run: moon run bench:smoke
+        run: env -u CI -u GITHUB_ACTIONS moon run bench:smoke
