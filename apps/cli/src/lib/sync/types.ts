@@ -130,9 +130,11 @@ export interface ResourceSyncer {
   ): Promise<{ body: object; warnings: string[] }>;
   /**
    * Resolve a stored reference to one of this kind's revisions into the value
-   * another resource should hold for it: a concrete revision id becomes this
-   * kind's handle, while a URL or handle is already portable and returned
-   * unchanged. `warning` is set when the id named a revision that is gone.
+   * another resource should hold for it — this kind's handle. Revision ids are
+   * shape-less (a minted `sch_…`, or a `$id` that may be a URL, URN or relative
+   * URI), so the reference is resolved by reading it rather than by guessing
+   * from its shape. `warning` is set when the id named a revision that is gone,
+   * or a revision with no handle to reference it by; the id is then kept.
    */
   localiseReference?(reference: string): Promise<{ value: string; warning?: string }>;
   /**
