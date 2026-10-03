@@ -1,10 +1,10 @@
-id: "cli-skill-eval"
+id: "cli-skill-e2e"
 language: "typescript"
 layer: "automation"
 
 # This is an agent eval, not a test: it needs Docker + a Claude credential and
 # is non-deterministic and slow. It is deliberately kept OUT of CI
-# (runInCI: false) and run on demand: `moon run cli-skill-eval:test`.
+# (runInCI: false) and run on demand: `moon run cli-skill-e2e:test`.
 tasks:
   test:
     command: "corepack pnpm run test"

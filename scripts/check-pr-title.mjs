@@ -48,7 +48,7 @@ const NON_SHIPPING_WORKSPACES = [
   "apps/docs/",
   "apps/mock-zitadel/",
   "apps/storybook/",
-  "apps/cli-skill-eval/",
+  "apps/cli-skill-e2e/",
   "packages/api-mock/",
 ];
 

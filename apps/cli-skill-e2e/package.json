@@ -1,5 +1,5 @@
 {
-  "name": "@zitadel/cli-skill-eval",
+  "name": "@zitadel/cli-skill-e2e",
   "version": "0.0.0",
   "private": true,
   "type": "module",

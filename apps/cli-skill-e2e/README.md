@@ -1,4 +1,4 @@
-# cli-skill-eval
+# cli-skill-e2e
 
 An **agent eval** for the `zitadel-cli` Agent Skill. It does not test the CLI's
 commands (those have their own unit/e2e tests) — it checks whether an agent that
@@ -30,10 +30,10 @@ non-deterministic (an LLM drives it). It is intentionally kept **out of CI**
 
 ```sh
 # reuse captured results (instant) — grade + open the report window
-ENV_FILE=./.secret.env moon run cli-skill-eval:test
+ENV_FILE=./.secret.env moon run cli-skill-e2e:test
 
 # re-run the containers from scratch (tens of minutes), then grade + open
-ENV_FILE=./.secret.env moon run cli-skill-eval:eval
+ENV_FILE=./.secret.env moon run cli-skill-e2e:eval
 # or:  ENV_FILE=./.secret.env FRESH=1 pnpm vitest run
 ```
 
