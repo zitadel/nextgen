@@ -12,11 +12,16 @@ import (
 	"time"
 )
 
-// RequestMetrics are k6's built-in per-request metrics the summary reports
-// per operation. The entry script declares a `metric{op:<id>}` sub-metric for
-// each of them so k6's own end-of-test summary carries one line per
-// operation; this list and Operations are what it declares them from.
-var RequestMetrics = []string{
+// MetricErrors is the module's own counter of failed operations, tagged
+// op, lane, status_class and code.
+const MetricErrors = "nextgen_errors"
+
+// SummaryMetrics are the metrics the summary reports per operation: k6's
+// built-in per-request metrics and the module's error counter. The entry
+// script declares a `metric{op:<id>}` sub-metric for each of them so k6's
+// own end-of-test summary carries one line per operation; this list and
+// Operations are what it declares them from.
+var SummaryMetrics = []string{
 	"http_reqs",
 	"http_req_duration",
 	"http_req_blocked",
@@ -25,6 +30,7 @@ var RequestMetrics = []string{
 	"http_req_waiting",
 	"http_req_receiving",
 	"http_req_failed",
+	MetricErrors,
 }
 
 // Row is one operation of one run, read from k6's summary export. Durations
@@ -35,7 +41,11 @@ type Row struct {
 	Op       string  `json:"op"`
 	N        int     `json:"n"`
 	RPS      float64 `json:"rps"`
-	Failed   int     `json:"failed"`
+	// Failed counts non-2xx/3xx responses (k6's http_req_failed); Errors
+	// counts failed operations as the module classified them, which includes
+	// a 200 that re-served a step with an error key.
+	Failed int `json:"failed"`
+	Errors int `json:"errors"`
 
 	Duration   Quantiles `json:"duration"`
 	Blocked    Quantiles `json:"blocked"`
@@ -69,14 +79,17 @@ type RunMeta struct {
 
 // SweepMeta is the run metadata #1096 asks every summary to carry.
 type SweepMeta struct {
-	Commit    string    `json:"commit"`
-	Lane      string    `json:"lane"`
-	Host      string    `json:"host"`
-	CPUs      int       `json:"cpus"`
-	K6Version string    `json:"k6_version"`
-	StartedAt time.Time `json:"started_at"`
-	Base      string    `json:"base"`
-	Runs      []RunMeta `json:"runs"`
+	Commit string `json:"commit"`
+	// RequestTimeout is the per-request timeout the module applied; k6 owns
+	// the connection pool, so that is the one transport setting to record.
+	RequestTimeout string    `json:"request_timeout"`
+	Lane           string    `json:"lane"`
+	Host           string    `json:"host"`
+	CPUs           int       `json:"cpus"`
+	K6Version      string    `json:"k6_version"`
+	StartedAt      time.Time `json:"started_at"`
+	Base           string    `json:"base"`
+	Runs           []RunMeta `json:"runs"`
 }
 
 // summaryExport is the part of k6's --summary-export document the merge
@@ -142,6 +155,7 @@ func summarizeRun(path string, run RunMeta) ([]Row, error) {
 			N:          int(reqs["count"]),
 			RPS:        reqs["rate"],
 			Failed:     int(metrics["http_req_failed"]["passes"]),
+			Errors:     int(metrics[MetricErrors]["count"]),
 			Duration:   quantiles(metrics["http_req_duration"]),
 			Blocked:    quantiles(metrics["http_req_blocked"]),
 			Connecting: quantiles(metrics["http_req_connecting"]),
@@ -166,11 +180,11 @@ func Markdown(meta SweepMeta, rows []Row) string {
 	fmt.Fprintf(&b, "# Sweep %s\n\n", meta.StartedAt.UTC().Format(time.RFC3339))
 	fmt.Fprintf(&b, "commit `%s` · lane `%s` · host `%s` (%d CPUs) · %s · target `%s`\n\n", meta.Commit, meta.Lane, meta.Host, meta.CPUs, meta.K6Version, meta.Base)
 	b.WriteString("Durations in ms, as k6 reported them per operation.\n\n")
-	b.WriteString("| scenario | op | vus | n | req/s | failed | dur p50 | dur p95 | dur p99 | blocked p95 | connecting p95 | sending p95 | waiting p95 | receiving p95 |\n")
-	b.WriteString("|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n")
+	b.WriteString("| scenario | op | vus | n | req/s | failed | errors | dur p50 | dur p95 | dur p99 | blocked p95 | connecting p95 | sending p95 | waiting p95 | receiving p95 |\n")
+	b.WriteString("|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n")
 	for _, r := range rows {
-		fmt.Fprintf(&b, "| %s | %s | %d | %d | %.0f | %d | %.2f | %.2f | %.2f | %.3f | %.3f | %.3f | %.2f | %.3f |\n",
-			r.Scenario, r.Op, r.VUs, r.N, r.RPS, r.Failed,
+		fmt.Fprintf(&b, "| %s | %s | %d | %d | %.0f | %d | %d | %.2f | %.2f | %.2f | %.3f | %.3f | %.3f | %.2f | %.3f |\n",
+			r.Scenario, r.Op, r.VUs, r.N, r.RPS, r.Failed, r.Errors,
 			r.Duration.P50, r.Duration.P95, r.Duration.P99,
 			r.Blocked.P95, r.Connecting.P95, r.Sending.P95, r.Waiting.P95, r.Receiving.P95)
 	}

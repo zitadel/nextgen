@@ -3,6 +3,7 @@ package harness
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -20,6 +21,10 @@ const (
 	OpSubmitPassword = "submit_password"
 	OpGetUser        = "get_user"
 )
+
+// Operations lists every operation id, for the entry script to declare one
+// sub-metric per operation from the same vocabulary the tags use.
+var Operations = []string{OpCreateFlow, OpSubmitIdent, OpSubmitPassword, OpGetUser}
 
 // opKey carries the operation id from a typed call into the client's Do,
 // which only sees the *http.Request. The generated client propagates the
@@ -48,22 +53,23 @@ type LoginResult struct {
 // Login drives POST /flow → submit identifier → submit password through the
 // typed client and returns the handoff token. The sealed `_zflow` cookie is
 // an explicit parameter of the generated client, so the journey carries it
-// from one response's Set-Cookie into the next request itself.
+// from one response's Set-Cookie into the next request itself. Every failure
+// is an *OpError naming the operation that failed.
 func Login(ctx context.Context, c *api.Client, t Target) (LoginResult, error) {
 	created, err := c.CreateFlow(WithOp(ctx, OpCreateFlow), &api.CreateFlowRequest{
 		ProjectID: api.ProjectID(t.ProjectID),
 		Purpose:   api.CreateFlowRequestPurposeLogin,
 	})
 	if err != nil {
-		return LoginResult{}, fmt.Errorf("%s: %w", OpCreateFlow, err)
+		return LoginResult{}, Classify(OpCreateFlow, err)
 	}
 	flow, ok := created.(*api.FlowResponseHeaders)
 	if !ok {
-		return LoginResult{}, fmt.Errorf("%s: unexpected response %T", OpCreateFlow, created)
+		return LoginResult{}, classifyResponse(OpCreateFlow, http.StatusBadRequest, created)
 	}
 	zflow, err := cookieValue(flow.SetCookie, "_zflow")
 	if err != nil {
-		return LoginResult{}, fmt.Errorf("%s: %w", OpCreateFlow, err)
+		return LoginResult{}, &OpError{Op: OpCreateFlow, Status: http.StatusCreated, Code: CodeUnexpectedResponse, Err: err}
 	}
 
 	step, err := submit(ctx, c, OpSubmitIdent, flow.Response.ID, zflow, map[string]string{"email": t.Email})
@@ -72,7 +78,7 @@ func Login(ctx context.Context, c *api.Client, t Target) (LoginResult, error) {
 	}
 	zflow, err = cookieValue(step.SetCookie, "_zflow")
 	if err != nil {
-		return LoginResult{}, fmt.Errorf("%s: %w", OpSubmitIdent, err)
+		return LoginResult{}, &OpError{Op: OpSubmitIdent, Status: http.StatusOK, Code: CodeUnexpectedResponse, Err: err}
 	}
 
 	step, err = submit(ctx, c, OpSubmitPassword, step.Response.ID, zflow, map[string]string{"x-auth-methods#password": t.Password})
@@ -81,7 +87,8 @@ func Login(ctx context.Context, c *api.Client, t Target) (LoginResult, error) {
 	}
 	handoff, ok := step.Response.HandoffToken.Get()
 	if !ok {
-		return LoginResult{}, fmt.Errorf("%s: no handoff token; step %q", OpSubmitPassword, step.Response.Step.Name)
+		return LoginResult{}, &OpError{Op: OpSubmitPassword, Status: http.StatusOK, Code: CodeUnexpectedResponse,
+			Err: fmt.Errorf("no handoff token; step %q", step.Response.Step.Name)}
 	}
 	return LoginResult{HandoffToken: handoff, SessionID: step.Response.SessionID}, nil
 }
@@ -91,29 +98,29 @@ func submit(ctx context.Context, c *api.Client, op, id, zflow string, fields map
 	for k, v := range fields {
 		b, err := json.Marshal(v)
 		if err != nil {
-			return nil, err
+			return nil, &OpError{Op: op, Code: CodeTransport, Err: err}
 		}
 		raw[k] = jx.Raw(b)
 	}
 	req := &api.FlowSubmitRequest{Action: "submit", Fields: api.NewOptFlowSubmitRequestFields(raw)}
 	res, err := c.SubmitFlowStep(WithOp(ctx, op), req, api.SubmitFlowStepParams{ID: id, Zflow: zflow})
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", op, err)
+		return nil, Classify(op, err)
 	}
 	switch r := res.(type) {
 	case *api.SubmitFlowStepOK:
 		// A rejected input is a 200 with the same step and an error key, not
 		// a 4xx, so it has to be checked here or it counts as a success.
 		if e, ok := r.Response.Step.Error.Get(); ok {
-			return nil, fmt.Errorf("%s: step %q answered error %q", op, r.Response.Step.Name, e)
+			return nil, &OpError{Op: op, Status: http.StatusOK, Code: CodeStepError,
+				Err: fmt.Errorf("step %q answered error %q", r.Response.Step.Name, e)}
 		}
 		return r, nil
 	case *api.SubmitFlowStepBadRequest:
-		return nil, fmt.Errorf("%s: 400 step %q error %q", op, r.Response.Step.Name, r.Response.Step.Error.Or(""))
-	case *api.ErrorDetails:
-		return nil, fmt.Errorf("%s: %s: %s", op, r.Code, r.Message)
+		return nil, &OpError{Op: op, Status: http.StatusBadRequest, Code: CodeStepError,
+			Err: fmt.Errorf("step %q answered error %q", r.Response.Step.Name, r.Response.Step.Error.Or(""))}
 	default:
-		return nil, fmt.Errorf("%s: unexpected response %T", op, res)
+		return nil, classifyResponse(op, http.StatusConflict, res)
 	}
 }
 
@@ -121,17 +128,17 @@ func submit(ctx context.Context, c *api.Client, op, id, zflow string, fields map
 func GetUser(ctx context.Context, c *api.Client, t Target) (*api.User, error) {
 	res, err := c.GetUserByID(WithOp(ctx, OpGetUser), api.GetUserByIDParams{UserID: api.UserID(t.UserID)})
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", OpGetUser, err)
+		return nil, Classify(OpGetUser, err)
 	}
 	switch r := res.(type) {
 	case *api.User:
 		return r, nil
 	case *api.GetUserByIDUnauthorized:
-		return nil, fmt.Errorf("%s: 401 %s", OpGetUser, r.Message)
+		return nil, classifyResponse(OpGetUser, http.StatusUnauthorized, (*api.ErrorDetails)(r))
 	case *api.GetUserByIDNotFound:
-		return nil, fmt.Errorf("%s: 404 %s", OpGetUser, r.Message)
+		return nil, classifyResponse(OpGetUser, http.StatusNotFound, (*api.ErrorDetails)(r))
 	default:
-		return nil, fmt.Errorf("%s: unexpected response %T", OpGetUser, res)
+		return nil, classifyResponse(OpGetUser, 0, res)
 	}
 }
 
@@ -147,5 +154,5 @@ func cookieValue(setCookie []string, name string) (string, error) {
 			return c.Value, nil
 		}
 	}
-	return "", fmt.Errorf("response carried no %s cookie in %d Set-Cookie header(s)", name, len(setCookie))
+	return "", errors.New("response carried no " + name + " cookie")
 }

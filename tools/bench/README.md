@@ -9,7 +9,11 @@ module that compiles two things into one k6 binary:
   hands the request to k6's own `httpext.MakeRequest`, so k6 performs it and
   the built-in `http_req_*` metrics, cookie jar and failure classification
   apply. Tags are bounded by construction: `op`, `lane`, and k6's `name`/`url`
-  set to the operation id, never a path.
+  set to the operation id, never a path. A failed operation is counted on the
+  module's `nextgen_errors` counter, tagged `op`, `lane`, `status_class` and
+  the error-details `code` (or `flow.step_error` for a step re-served with an
+  error key), so it appears in the summary as a classified error rather than
+  as a log line.
 - `k6 x nextgen` — the command tree: `bootstrap` a target from a fixture
   file, `sweep` every scenario at every VU count, `summarize` a sweep
   directory k6 does the aggregating: the script declares one
