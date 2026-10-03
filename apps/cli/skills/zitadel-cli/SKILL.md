@@ -75,8 +75,13 @@ The CLI requires Node.js 24+.
 ## Discovering commands
 
 The CLI ships its own command list and per-command flags, always correct for the
-installed version. Do not work from a remembered or hardcoded list — ask the CLI,
-and treat its output as authoritative:
+installed version. **Do not guess a command name.** Before running any command you
+are not certain of, run `zitadel --help` first and use the exact name it prints:
+command and resource names — including whether a resource is singular or plural
+and the exact verb — are whatever `--help` shows, never what you would assume. A
+wrong guess costs a failed call and a round of recovery; one cheap `--help` up
+front avoids it. `zitadel --help` is a flat list and cheap to read, so reach for
+it first; treat the CLI's own output as authoritative over anything you remember:
 
 ```sh
 npx @zitadel/cli@alpha --help               # every command, grouped by purpose
@@ -92,11 +97,14 @@ auth), local-server commands (run a local Zitadel), configuration commands
 `<resource> <verb>` surface). Read the groups from `--help` rather than from
 memory, since they change as the CLI gains commands.
 
-`resources --json` reports the whole runtime-resource surface at once: every
-resource, its verbs, each verb's `create_fields` / `update_fields` (flag name,
-kind, `required`, any closed value set), its `filter_fields` / `sort_fields`, and
-the `delete_outcome` a destructive verb returns. Prefer it over reading `--help`
-per resource.
+Use `zitadel --help` to find *which* command to run. Use `resources --json` when
+you need a resource's *fields*: it reports the whole runtime-resource surface at
+once — every resource, its verbs, each verb's `create_fields` / `update_fields`
+(flag name, kind, `required`, any closed value set), its `filter_fields` /
+`sort_fields`, and the `delete_outcome` a destructive verb returns — so prefer it
+over reading `<resource> --help` one at a time. A `list` verb's envelope carries
+`data.count`, so a "how many …?" question is one `list --json` call: read the
+count, do not page and tally.
 
 ## Reading the envelope
 
