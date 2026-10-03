@@ -1148,11 +1148,12 @@ export function setupPlatformHandlers() {
     }),
 
     http.get("*/flow_definitions", ({ request }) => {
-      const query = parse(
-        ListFlowDefinitionsQueryParams,
-        queryRecord(request),
-        "invalid_query",
-      );
+      // Same `limit` coercion caveat as `GET /schemas` above: URLs carry
+      // strings and the generated zod does not coerce, so the number param is
+      // converted before validation (the ogen server coerces it too).
+      const { limit, ...rest } = queryRecord(request);
+      const raw = { ...rest, ...(limit === undefined ? {} : { limit: Number(limit) }) };
+      const query = parse(ListFlowDefinitionsQueryParams, raw, "invalid_query");
       if (!query.ok) {
         return query.response;
       }
@@ -1174,9 +1175,24 @@ export function setupPlatformHandlers() {
       const records = current.filter(
         (r) => !query.data.purpose || flowServesPurpose(r.body, query.data.purpose),
       );
+      // Paginate like `GET /schemas`, but bind the token to the revision mode
+      // as the real endpoint does: a cursor minted for `all` is rejected when
+      // replayed with `revisions=latest` and vice versa, since the two walk
+      // different row sets. The token is `<mode>:<next start index>`.
+      const mode = query.data.revisions === "latest" ? "latest" : "all";
+      let start = 0;
+      if (query.data.page_token !== undefined) {
+        const [tokenMode, offset] = query.data.page_token.split(":");
+        start = Number(offset);
+        if (tokenMode !== mode || !Number.isInteger(start) || start < 0) {
+          return HttpResponse.json(errorBody("req.invalid", "invalid page token"), { status: 400 });
+        }
+      }
+      const size = query.data.limit ?? records.length;
+      const page = records.slice(start, start + size);
       const responseBody: ListFlowDefinitions200 = {
-        flow_definitions: records.map(flowResponse),
-        next_page_token: null,
+        flow_definitions: page.map(flowResponse),
+        next_page_token: start + size < records.length ? `${mode}:${start + size}` : null,
       };
       const out = parse(ListFlowDefinitionsResponse, responseBody, "mock_response_invalid");
       if (!out.ok) {

@@ -570,6 +570,68 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(await list("&revisions=latest&purpose=login")).toEqual([loginV2]);
   });
 
+  test("GET /flow_definitions pages with limit and next_page_token", async () => {
+    for (let i = 0; i < 5; i += 1) {
+      const create = await fetch(`${BASE}/flow_definitions`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          project_id: "proj_flow_paging",
+          flow_definition: { ...validFlowDefinitionBody(), name: `paging-${i}` },
+        }),
+      });
+      expect(create.status).toBe(201);
+    }
+
+    // The whole set fits in the default page: no token.
+    const full = await fetch(`${BASE}/flow_definitions?project_id=proj_flow_paging`);
+    expect(full.status).toBe(200);
+    const fullBody = (await full.json()) as {
+      flow_definitions: Array<{ id: string }>;
+      next_page_token?: string | null;
+    };
+    expect(fullBody.flow_definitions).toHaveLength(5);
+    expect(fullBody.next_page_token ?? undefined).toBeUndefined();
+    const wantIds = fullBody.flow_definitions.map((row) => row.id);
+
+    // A limit-2 walk covers the same rows in order, exactly once; every page
+    // before the end carries a token, the last does not.
+    const gotIds: string[] = [];
+    let token: string | undefined;
+    for (const wantSize of [2, 2, 1]) {
+      const url = new URL(`${BASE}/flow_definitions`);
+      url.searchParams.set("project_id", "proj_flow_paging");
+      url.searchParams.set("limit", "2");
+      if (token !== undefined) url.searchParams.set("page_token", token);
+      const page = await fetch(url);
+      expect(page.status).toBe(200);
+      const body = (await page.json()) as {
+        flow_definitions: Array<{ id: string }>;
+        next_page_token?: string | null;
+      };
+      expect(body.flow_definitions).toHaveLength(wantSize);
+      gotIds.push(...body.flow_definitions.map((row) => row.id));
+      token = body.next_page_token ?? undefined;
+    }
+    expect(token).toBeUndefined();
+    expect(gotIds).toEqual(wantIds);
+
+    // A token the mock never minted is rejected, like the real server.
+    const bad = await fetch(`${BASE}/flow_definitions?project_id=proj_flow_paging&page_token=not-a-cursor`);
+    expect(bad.status).toBe(400);
+    expect(((await bad.json()) as { code: string }).code).toBe("req.invalid");
+
+    // A cursor minted under `all` cannot be replayed under `latest`: the two
+    // modes walk different row sets, so the server binds the token to its mode.
+    const allFirst = await fetch(`${BASE}/flow_definitions?project_id=proj_flow_paging&limit=2`);
+    const allToken = ((await allFirst.json()) as { next_page_token: string }).next_page_token;
+    const crossMode = await fetch(
+      `${BASE}/flow_definitions?project_id=proj_flow_paging&limit=2&revisions=latest&page_token=${allToken}`,
+    );
+    expect(crossMode.status).toBe(400);
+    expect(((await crossMode.json()) as { code: string }).code).toBe("req.invalid");
+  });
+
   test("GET /flow_definitions matches ListFlowDefinitionsResponse", async () => {
     // Ensure at least one entry exists so the list is non-trivial.
     const create = await fetch(`${BASE}/flow_definitions`, {
