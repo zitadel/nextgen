@@ -402,10 +402,11 @@ docker --image <ref>` remains the explicit image override for debugging.
   the repo. `kind` is `schema` or `flow`; `handle` is the schema's object type or
   the flow's name. Writes `.zitadel/<kind>s/<handle>.json` with the server's body
   verbatim — its references (a flow's `user_schema`) are kept exactly as stored,
-  so a later `apply` sends the same ids back and the server accepts them, and the
-  revision is recorded in `.zitadel/state.json` so the next `plan` reads in sync.
-  Targeted only — one `(kind, handle)` per run, no bulk mode. `data` carries
-  `{ kind, handle, id, path }`.
+  so a later `apply` sends the same ids back and the server accepts them. In an
+  already-initialized project the revision is recorded in `.zitadel/state.json`
+  so the next `plan` reads in sync; a directory with no state file is written
+  but not recorded, and no `plan` is suggested. Targeted only — one
+  `(kind, handle)` per run, no bulk mode. `data` carries `{ kind, handle, id, path }`.
 - `plan` and `apply --dry-run` also emit `data.warnings`: non-blocking
   findings as `{path, rule, message}`, the same text the human plan prints as
   `# warning:` lines and `apply` prints through stderr. They never fail a run.
