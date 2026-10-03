@@ -128,8 +128,7 @@ func (s *Server) Stop() error {
 	_ = s.cmd.Process.Signal(syscall.SIGTERM)
 	select {
 	case err := <-s.done:
-		var exit *exec.ExitError
-		if errors.As(err, &exit) && exit.ExitCode() == -1 {
+		if exit, ok := errors.AsType[*exec.ExitError](err); ok && exit.ExitCode() == -1 {
 			return nil // signalled, as asked
 		}
 		return err

@@ -7,10 +7,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
-	"sort"
 	"strings"
 	"time"
 )
@@ -171,7 +171,7 @@ func summarizeRun(path string, run RunMeta) ([]Row, error) {
 // seriesKey is what k6 itself considers one time series: the metric plus
 // the exact tag set.
 func seriesKey(metric string, tags map[string]string) string {
-	keys := slices.Sorted(mapsKeys(tags))
+	keys := slices.Sorted(maps.Keys(tags))
 	var b strings.Builder
 	b.WriteString(metric)
 	for _, k := range keys {
@@ -183,22 +183,12 @@ func seriesKey(metric string, tags map[string]string) string {
 	return b.String()
 }
 
-func mapsKeys(m map[string]string) func(yield func(string) bool) {
-	return func(yield func(string) bool) {
-		for k := range m {
-			if !yield(k) {
-				return
-			}
-		}
-	}
-}
-
 func quantiles(v []float64) Quantiles {
 	if len(v) == 0 {
 		return Quantiles{}
 	}
 	s := slices.Clone(v)
-	sort.Float64s(s)
+	slices.Sort(s)
 	q := func(p float64) float64 {
 		k := float64(len(s)-1) * p
 		f := int(k)

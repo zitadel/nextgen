@@ -137,7 +137,7 @@ func runK6(ctx context.Context, k6 string, cfg SweepConfig, run RunMeta) error {
 	// The summary is k6's; what the operator needs to see at once is whether
 	// anything failed.
 	b, _ := os.ReadFile(filepath.Join(cfg.Dir, run.Summary))
-	for _, line := range strings.Split(string(b), "\n") {
+	for line := range strings.SplitSeq(string(b), "\n") {
 		if strings.Contains(line, "http_req_failed") || strings.Contains(line, "http_reqs") || strings.Contains(line, "level=error") {
 			fmt.Fprintln(cfg.Log, strings.TrimSpace(line))
 		}
