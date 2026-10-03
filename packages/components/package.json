@@ -13,7 +13,8 @@
     "directory": "packages/components"
   },
   "files": [
-    "dist"
+    "dist",
+    "skills"
   ],
   "type": "module",
   "main": "./dist/index.mjs",

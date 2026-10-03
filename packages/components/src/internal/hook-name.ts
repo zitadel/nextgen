@@ -13,7 +13,7 @@ const AUTH_METHOD_PREFIX = "x-auth-methods#";
  * `x-auth-methods#<method>` (e.g. `x-auth-methods#password`), but the
  * documented `data-testid` hooks are method-named
  * (`zitadel-field-password`, `zitadel-input-password` — see
- * packages/components/README.md and apps/cli/SKILLS.md). This helper
+ * packages/components/README.md and apps/cli/skills/zitadel-cli/SKILL.md). This helper
  * feeds both hook construction sites: the bundled template's `testid`
  * Liquid filter and `<zl-field>`'s native-input testid.
  *

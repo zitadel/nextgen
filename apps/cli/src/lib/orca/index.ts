@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, readdir, rename, rm } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 
 import { ZitadelError } from "../errors";
@@ -17,16 +17,13 @@ export type FrameworkChoice = Readonly<{ id: string; displayName: string }>;
 
 export type ScaffoldTarget = Readonly<{
   scaffoldable: boolean;
-  hasGitignore: boolean;
-  hasRuntimeOnlyZitadel: boolean;
   reason?: string;
   entries: ReadonlyArray<string>;
 }>;
 
 type ScaffoldStash = Readonly<{
-  gitignore?: string;
   root: string;
-  zitadel?: string;
+  names: ReadonlyArray<string>;
 }>;
 
 /**
@@ -104,22 +101,25 @@ export class Orca {
    * already contains a project ("already scaffolded") and `E_VALIDATION` when no
    * scaffolder supports the framework.
    */
-  async scaffold(cwd: string, framework: string): Promise<FrameworkFacts> {
+  async scaffold(cwd: string, framework: string, force = false): Promise<FrameworkFacts> {
     const target = await inspectScaffoldTarget(cwd);
-    if (!target.scaffoldable) {
+    if (!target.scaffoldable && !force) {
       throw new ZitadelError("E_CONFLICT", `Cannot scaffold: ${cwd} is not empty`, {
         hint:
-          target.reason ??
-          "Run setup in an empty directory, or run setup from an existing supported app project.",
+          `${target.reason ? `${target.reason} ` : ""}Pass --force to scaffold into a ` +
+          "non-empty directory, or run setup from an existing supported app project.",
         details: { entries: target.entries },
       });
     }
     assertNpmSafeScaffoldDirectoryName(cwd);
-    const stash = await stashFreshScaffoldArtifacts(cwd, target);
+    // The underlying scaffolders require an empty directory. When --force lets us
+    // scaffold into a non-empty one, move the existing entries aside, scaffold,
+    // then restore anything the scaffold did not create itself.
+    const stash = target.scaffoldable ? undefined : await stashScaffoldDir(cwd, target.entries);
     try {
       await this.scaffolderFor(framework).scaffold(cwd, framework);
     } finally {
-      await restoreFreshScaffoldArtifacts(cwd, stash);
+      await restoreScaffoldDir(cwd, stash);
     }
     return this.detect(cwd, framework);
   }
@@ -219,184 +219,65 @@ export function createOrca(): Orca {
 }
 
 export async function inspectScaffoldTarget(cwd: string): Promise<ScaffoldTarget> {
-  const entries = await readdir(cwd, { withFileTypes: true });
-  const names = entries.map((entry) => entry.name).sort();
-  let hasGitignore = false;
-  let hasRuntimeOnlyZitadel = false;
-
-  for (const entry of entries) {
-    if (entry.name === ".gitignore") {
-      if (!entry.isFile()) {
-        return {
-          scaffoldable: false,
-          hasGitignore: false,
-          hasRuntimeOnlyZitadel: false,
-          reason: ".gitignore exists but is not a file.",
-          entries: names,
-        };
-      }
-      hasGitignore = true;
-      continue;
-    }
-
-    if (entry.name === ".zitadel") {
-      if (!entry.isDirectory() || !(await isRuntimeOnlyZitadelDir(join(cwd, ".zitadel")))) {
-        return {
-          scaffoldable: false,
-          hasGitignore,
-          hasRuntimeOnlyZitadel: false,
-          reason:
-            ".zitadel contains project state. Move it aside or run setup from an empty app directory.",
-          entries: names,
-        };
-      }
-      hasRuntimeOnlyZitadel = true;
-      continue;
-    }
-
-    return {
-      scaffoldable: false,
-      hasGitignore,
-      hasRuntimeOnlyZitadel: false,
-      reason: `Directory contains ${entry.name}. Run setup from an empty directory to scaffold a new app.`,
-      entries: names,
-    };
+  // A fresh scaffold needs an empty directory. We deliberately keep no allowlist
+  // of "harmless" entries (`.gitignore`, `.zitadel`, `.claude`, …): that list is
+  // a maintenance treadmill, and each tool invents new metadata. Anything present
+  // means not-fresh, and `--force` is the single, explicit override.
+  const entries = await readdir(cwd);
+  const names = [...entries].sort();
+  if (names.length === 0) {
+    return { scaffoldable: true, entries: names };
   }
-
-  return { scaffoldable: true, hasGitignore, hasRuntimeOnlyZitadel, entries: names };
+  return {
+    scaffoldable: false,
+    reason: `Directory is not empty (contains ${names.join(", ")}).`,
+    entries: names,
+  };
 }
 
-async function isRuntimeOnlyZitadelDir(path: string): Promise<boolean> {
-  const entries = await readdir(path, { withFileTypes: true });
-  if (entries.length !== 1 || entries[0]?.name !== "local" || !entries[0].isDirectory()) {
-    return false;
-  }
-  return true;
-}
-
-async function stashFreshScaffoldArtifacts(
+async function stashScaffoldDir(
   cwd: string,
-  target: ScaffoldTarget,
+  names: ReadonlyArray<string>,
 ): Promise<ScaffoldStash | undefined> {
-  if (!target.hasGitignore && !target.hasRuntimeOnlyZitadel) {
+  if (names.length === 0) {
     return undefined;
   }
 
-  const parent = dirname(cwd);
   const root = join(
-    parent,
+    dirname(cwd),
     `.${basename(cwd)}.fresh-scaffold-stash-${String(process.pid)}-${String(Date.now())}`,
   );
   await mkdir(root, { mode: 0o700 });
-
-  const stash: { gitignore?: string; root: string; zitadel?: string } = { root };
-  if (target.hasRuntimeOnlyZitadel) {
-    stash.zitadel = join(root, ".zitadel");
-    await rename(join(cwd, ".zitadel"), stash.zitadel);
+  for (const name of names) {
+    await rename(join(cwd, name), join(root, name));
   }
-  if (target.hasGitignore) {
-    stash.gitignore = join(root, ".gitignore");
-    await rename(join(cwd, ".gitignore"), stash.gitignore);
-  }
-  return stash;
+  return { root, names };
 }
 
-async function restoreFreshScaffoldArtifacts(
-  cwd: string,
-  stash: ScaffoldStash | undefined,
-): Promise<void> {
+async function restoreScaffoldDir(cwd: string, stash: ScaffoldStash | undefined): Promise<void> {
   if (!stash) {
     return;
   }
 
   try {
-    await restoreRuntimeOnlyZitadel(cwd, stash.zitadel);
-    await restoreGitignore(cwd, stash.gitignore);
+    for (const name of stash.names) {
+      const dest = join(cwd, name);
+      // Keep whatever the scaffold itself created at this path; restore the
+      // pre-existing entry only where the scaffold left that name free.
+      if (!(await pathExists(dest))) {
+        await rename(join(stash.root, name), dest);
+      }
+    }
   } finally {
     await rm(stash.root, { recursive: true, force: true });
   }
 }
 
-async function restoreRuntimeOnlyZitadel(cwd: string, stash: string | undefined): Promise<void> {
-  if (!stash) {
-    return;
-  }
-
-  const target = join(cwd, ".zitadel");
+async function pathExists(path: string): Promise<boolean> {
   try {
-    await rename(stash, target);
-    await appendGitignoreEntry(cwd, ".zitadel/local/");
-    return;
-  } catch (error) {
-    if (!isErrno(error, "EEXIST")) {
-      throw error;
-    }
+    await access(path);
+    return true;
+  } catch {
+    return false;
   }
-
-  await mkdir(target, { recursive: true, mode: 0o700 });
-  await rename(join(stash, "local"), join(target, "local"));
-  await rm(stash, { recursive: true, force: true });
-  await appendGitignoreEntry(cwd, ".zitadel/local/");
-}
-
-async function restoreGitignore(cwd: string, stash: string | undefined): Promise<void> {
-  if (!stash) {
-    return;
-  }
-
-  const path = join(cwd, ".gitignore");
-  const stashed = await readFile(stash, "utf8");
-  let current = "";
-  try {
-    current = await readFile(path, "utf8");
-  } catch (error) {
-    if (!isErrno(error, "ENOENT")) {
-      throw error;
-    }
-  }
-
-  const existingLines = new Set(
-    current
-      .split(/\r?\n/g)
-      .map((line) => line.trim())
-      .filter(Boolean),
-  );
-  const missingLines = stashed
-    .split(/\r?\n/g)
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0 && !existingLines.has(line));
-  if (missingLines.length === 0) {
-    return;
-  }
-
-  const prefix = current.length === 0 || current.endsWith("\n") ? "" : "\n";
-  await writeFile(path, `${current}${prefix}${missingLines.join("\n")}\n`);
-}
-
-async function appendGitignoreEntry(cwd: string, entry: string): Promise<void> {
-  const path = join(cwd, ".gitignore");
-  let existing = "";
-  try {
-    existing = await readFile(path, "utf8");
-  } catch (error) {
-    if (!isErrno(error, "ENOENT")) {
-      throw error;
-    }
-  }
-
-  const lines = existing.split(/\r?\n/g).map((line) => line.trim());
-  if (lines.includes(entry)) {
-    return;
-  }
-  const prefix = existing.length === 0 || existing.endsWith("\n") ? "" : "\n";
-  await writeFile(path, `${existing}${prefix}${entry}\n`);
-}
-
-function isErrno(error: unknown, code: string): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error as { code?: unknown }).code === code
-  );
 }

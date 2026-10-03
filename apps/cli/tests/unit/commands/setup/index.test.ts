@@ -81,7 +81,7 @@ describe("setup command pre-flight", () => {
     expect(json.hint).toContain("--framework");
   });
 
-  it("still requires --framework in non-interactive local setup after runtime start", async () => {
+  it("reports a non-empty dir and points at --force when runtime start left .zitadel behind", async () => {
     const cwd = await makeTempDir();
     const serverUrl = await startHealthServer();
     await writeRuntimeMetadata(cwd, runtimeFor(cwd, serverUrl));
@@ -100,7 +100,9 @@ describe("setup command pre-flight", () => {
     const json = parseJson(res.stdout) as { status: string; code: string; hint?: string };
     expect(json.status).toBe("error");
     expect(json.code).toBe("E_FRAMEWORK_NOT_DETECTED");
-    expect(json.hint).toContain("--framework");
+    // `.zitadel/local` from `start` makes the directory non-empty, so the empty
+    // check stops here and points at --force rather than at --framework.
+    expect(json.hint).toContain("--force");
   });
 
   it("keeps the framework in local-runtime-missing setup guidance", async () => {
@@ -294,8 +296,9 @@ describe("setup command pre-flight", () => {
     };
     expect(json.status).toBe("error");
     expect(json.code).toBe("E_FRAMEWORK_NOT_DETECTED");
-    expect(json.message).toContain("not a fresh scaffold target");
-    expect(json.hint).toContain("Directory contains README.md");
+    expect(json.message).toContain("is not empty");
+    expect(json.hint).toContain("README.md");
+    expect(json.hint).toContain("--force");
     expect(json.details.entries).toContain("README.md");
   });
 

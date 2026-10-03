@@ -135,20 +135,19 @@ describe("Orca detection", () => {
     expect(await orca.isFreshScaffoldTarget(await tmp())).toBe(true);
   });
 
-  it("allows .gitignore in a fresh scaffold target", async () => {
+  it("treats any non-empty directory — even just a .gitignore — as not fresh", async () => {
     const cwd = await tmp();
     await writeFile(join(cwd, ".gitignore"), ".zitadel/local/\n");
 
-    expect(await orca.isFreshScaffoldTarget(cwd)).toBe(true);
+    expect(await orca.isFreshScaffoldTarget(cwd)).toBe(false);
   });
 
-  it("allows runtime-only .zitadel/local state in a fresh scaffold target", async () => {
+  it("treats a directory containing .zitadel as not fresh", async () => {
     const cwd = await tmp();
-    await writeFile(join(cwd, ".gitignore"), ".zitadel/local/\n");
     await mkdir(join(cwd, ".zitadel/local"), { recursive: true });
     await writeFile(join(cwd, ".zitadel/local/runtime.json"), "{}");
 
-    expect(await orca.isFreshScaffoldTarget(cwd)).toBe(true);
+    expect(await orca.isFreshScaffoldTarget(cwd)).toBe(false);
   });
 
   it("rejects project state and arbitrary files as fresh scaffold targets", async () => {
@@ -197,7 +196,7 @@ describe("Orca.scaffold", () => {
     await expect(readFile(join(cwd, "package.json"), "utf8")).resolves.toBe("{}");
   });
 
-  it("scaffolds in place while preserving runtime-only .zitadel/local state", async () => {
+  it("with force, scaffolds into a non-empty dir and restores what it did not create", async () => {
     const cwd = await tmpPackageSafe();
     await writeFile(join(cwd, ".gitignore"), ".zitadel/local/\n");
     await mkdir(join(cwd, ".zitadel/local"), { recursive: true });
@@ -206,6 +205,8 @@ describe("Orca.scaffold", () => {
     const guardedScaffolder: Scaffolder = {
       ...fakeScaffolder,
       async scaffold(scaffoldCwd) {
+        // The stash emptied the directory so the underlying generator sees a
+        // clean slate.
         await expect(stat(join(scaffoldCwd, ".zitadel"))).rejects.toMatchObject({
           code: "ENOENT",
         });
@@ -218,15 +219,21 @@ describe("Orca.scaffold", () => {
     };
     const guardedOrca = new Orca([fakeDetector], [guardedScaffolder], []);
 
-    await expect(guardedOrca.scaffold(cwd, "fake")).resolves.toMatchObject({ id: "fake" });
+    await expect(guardedOrca.scaffold(cwd, "fake", true)).resolves.toMatchObject({ id: "fake" });
     await expect(readFile(join(cwd, "package.json"), "utf8")).resolves.toBe("{}");
+    // Untouched by the scaffold, so restored verbatim.
     await expect(readFile(join(cwd, ".zitadel/local/runtime.json"), "utf8")).resolves.toContain(
       "localhost",
     );
-    await expect(readFile(join(cwd, ".gitignore"), "utf8")).resolves.toBe(
-      "node_modules\n.zitadel/local/\n",
-    );
-    await expect(stat(join(cwd, "myapp"))).rejects.toMatchObject({ code: "ENOENT" });
+    // The scaffold created its own .gitignore, so that one wins over the stashed
+    // copy — restore never clobbers what the scaffold produced.
+    await expect(readFile(join(cwd, ".gitignore"), "utf8")).resolves.toBe("node_modules\n");
+  });
+
+  it("refuses a non-empty directory without force", async () => {
+    const cwd = await tmpPackageSafe();
+    await writeFile(join(cwd, ".gitignore"), "x\n");
+    await expect(fakeOrca.scaffold(cwd, "fake")).rejects.toMatchObject({ code: "E_CONFLICT" });
   });
 
   it("throws E_CONFLICT when the directory already contains a project", async () => {

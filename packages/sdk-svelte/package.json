@@ -14,7 +14,8 @@
   "license": "MIT",
   "type": "module",
   "files": [
-    "dist"
+    "dist",
+    "skills"
   ],
   "svelte": "./dist/index.js",
   "types": "./dist/index.d.ts",
