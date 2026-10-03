@@ -344,6 +344,12 @@ export class ScaffoldedApp {
     return only(await this.publishedSchemas(), "schema");
   }
 
+  /** The object type of the published schema — the handle a schema is pulled by. */
+  async publishedSchemaObjectType(): Promise<string> {
+    const { schema } = await this.publishedSchema();
+    return (schema as { objectType: string }).objectType;
+  }
+
   publishedFlows(): Promise<PublishedFlow[]> {
     return this.listed<PublishedFlow>("flow-definitions");
   }

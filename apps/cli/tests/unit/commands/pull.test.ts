@@ -205,6 +205,15 @@ describe("pull command", () => {
     expect((parseJson(res.stdout) as { code: string }).code).toBe("E_VALIDATION");
   });
 
+  it("rejects a handle too long to be a filename", async () => {
+    const cwd = await makeCwd();
+    const base = await startStub();
+
+    const res = await pull(cwd, base, ["schema", "a".repeat(251)]);
+
+    expect((parseJson(res.stdout) as { code: string }).code).toBe("E_VALIDATION");
+  });
+
   it("refuses a kind whose syncer cannot pull", async () => {
     const cwd = await makeCwd();
     const base = await startStub();

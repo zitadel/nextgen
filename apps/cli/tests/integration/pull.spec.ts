@@ -5,8 +5,6 @@ import { anApp, aSetUpApp, type ScaffoldedApp } from "../helpers/project";
 
 const platform = usePlatformMock();
 
-const LOCAL_SCHEMA_FILE = ".zitadel/schemas/default-human-user.json";
-
 /**
  * A fresh working copy of an existing project: a new directory carrying the same
  * `.zitadel/secret`, the way a second developer who cloned the repo reaches it.
@@ -53,7 +51,7 @@ describe("pull", () => {
 
       it("imports a schema by object type", async () => {
         const project = await aSetUpApp();
-        const objectType = JSON.parse(await project.readProjectFile(LOCAL_SCHEMA_FILE)).objectType as string;
+        const objectType = await project.publishedSchemaObjectType();
         const checkout = await aFreshCheckoutOf(project);
 
         expect(await checkout.run(["pull", "schema", objectType, "--json"])).toSucceed();
@@ -75,7 +73,7 @@ describe("pull", () => {
     describe("rendered for a terminal", () => {
       it("prints the path it wrote", async () => {
         const project = await aSetUpApp();
-        const objectType = JSON.parse(await project.readProjectFile(LOCAL_SCHEMA_FILE)).objectType as string;
+        const objectType = await project.publishedSchemaObjectType();
         const checkout = await aFreshCheckoutOf(project);
 
         const result = await checkout.run(["pull", "schema", objectType]);

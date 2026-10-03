@@ -20,6 +20,9 @@ type PullableSyncer = ResourceSyncer & {
 /** A handle is a single file-name segment, so it can never escape the kind's directory. */
 const HANDLE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
+/** Longest handle that keeps `<handle>.json` within the common 255-byte filename limit. */
+const HANDLE_MAX = 250;
+
 /**
  * The relative path of the local file that already tracks `handle` — found by
  * reading each file in the kind's directory and asking the syncer for its
@@ -93,9 +96,9 @@ export default class Pull extends BaseCommand {
     const { cwd, source, env, dryRun, cliVersion } = this.meta;
     const { kind, handle } = args;
 
-    if (!HANDLE.test(handle)) {
+    if (!HANDLE.test(handle) || handle.length > HANDLE_MAX) {
       throw new ZitadelError("E_VALIDATION", `Invalid ${kind} handle "${handle}".`, {
-        hint: "A handle is a single name: letters or digits, then letters, digits, '.', '_' or '-'.",
+        hint: `A handle is a single name of at most ${HANDLE_MAX} characters: letters or digits, then letters, digits, '.', '_' or '-'.`,
       });
     }
 
