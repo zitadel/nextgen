@@ -218,6 +218,8 @@ func newSweepCommand(gs *state.GlobalState) *cobra.Command {
 		base, server, fixtures, manifest, lane, out, script, scenarios, vus string
 		declare                                                             []string
 		duration                                                            time.Duration
+		sessions                                                            harness.SessionSettings
+		affinity                                                            string
 		port                                                                int
 		raw                                                                 bool
 	)
@@ -275,6 +277,7 @@ metadata, and holds the run lock on the manifest so clean refuses meanwhile.`,
 			if err != nil {
 				return fmt.Errorf("--vus: %w", err)
 			}
+			sessions.Affinity = harness.Affinity(affinity)
 			rows, err := harness.Sweep(ctx, harness.SweepConfig{
 				Target:    resolved.target,
 				Scenarios: strings.Split(scenarios, ","),
@@ -289,10 +292,14 @@ metadata, and holds the run lock on the manifest so clean refuses meanwhile.`,
 				ManifestPath:   resolved.manifest,
 				Declared:       declared,
 				DeclaredSource: source,
+				Sessions:       sessions,
 			})
-			if err != nil {
+			// An invalid window comes back with its rows: print what was
+			// measured, with the flag on it, and then fail.
+			if err != nil && rows == nil {
 				return err
 			}
+			sweepErr := err
 			meta, err := harness.LoadSweepMeta(dir)
 			if err != nil {
 				return err
@@ -300,7 +307,7 @@ metadata, and holds the run lock on the manifest so clean refuses meanwhile.`,
 			fmt.Fprintln(gs.Stdout)
 			fmt.Fprint(gs.Stdout, harness.Markdown(meta, rows))
 			fmt.Fprintf(gs.Stdout, "\nwritten to %s\n", dir)
-			return nil
+			return sweepErr
 		},
 	}
 	cmd.Flags().StringVar(&manifest, "manifest", defaultManifest, "The fixture manifest: read as the provisioned target, or written by --base")
@@ -315,6 +322,10 @@ metadata, and holds the run lock on the manifest so clean refuses meanwhile.`,
 	cmd.Flags().StringVar(&scenarios, "scenarios", "login,getUser", "Scenarios to run, comma separated")
 	cmd.Flags().StringVar(&vus, "vus", "1,5,20", "VU counts to run, comma separated")
 	cmd.Flags().DurationVar(&duration, "duration", 20*time.Second, "Duration of each run")
+	cmd.Flags().StringVar(&affinity, "session-affinity", "", "Scenarios using sessions: shared (one session for every VU) or vu (one each); default shared")
+	cmd.Flags().DurationVar(&sessions.Margin, "session-margin", 0, "Refresh a session this long before it expires (default 60s)")
+	cmd.Flags().IntVar(&sessions.Capacity, "session-capacity", 0, "Most sessions the cache holds (default 1024)")
+	cmd.Flags().DurationVar(&sessions.TTL, "session-ttl", 0, "Ask for this session lifetime instead of the server default; for watching rotation within minutes")
 	cmd.Flags().BoolVar(&raw, "raw", false, "Also keep k6's per-sample JSON output for every run")
 	return cmd
 }

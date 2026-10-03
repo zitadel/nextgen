@@ -90,9 +90,10 @@ func TargetFromEnv(lookup func(string) (string, bool)) (Target, error) {
 }
 
 // Credentials is the process-wide credential holder, shared by every VU, and
-// the generated client's SecuritySource. Today it holds the project secret —
-// the operator-plane bearer — and nothing rotates; the refreshing session
-// cache is #1107's job and slots in here.
+// the generated client's SecuritySource. It holds the project secret — the
+// operator-plane bearer, which does not rotate — and presents the session
+// token a call carries (WithSession); the sessions themselves are the
+// SessionCache's.
 type Credentials struct {
 	mu     sync.RWMutex
 	bearer string
@@ -122,10 +123,23 @@ func (c *Credentials) OAuth2(context.Context, api.OperationName) (api.OAuth2, er
 	return api.OAuth2{Token: c.Bearer()}, nil
 }
 
-// NextgenSession implements api.SecuritySource. No session cookie is held;
-// skipping lets the client fall through to the bearer on operations that
-// accept either.
-func (c *Credentials) NextgenSession(context.Context, api.OperationName) (api.NextgenSession, error) {
+// sessionKey carries the session token of the call about to be made.
+type sessionKey struct{}
+
+// WithSession attaches a session token to the context of one typed call. The
+// token travels with the call rather than living in the client, so one
+// client per VU serves every session the cache hands out.
+func WithSession(ctx context.Context, token string) context.Context {
+	return context.WithValue(ctx, sessionKey{}, token)
+}
+
+// NextgenSession implements api.SecuritySource. It presents the session token
+// the call carries; without one the scheme is skipped, letting the client
+// fall through to the bearer on operations that accept either.
+func (c *Credentials) NextgenSession(ctx context.Context, _ api.OperationName) (api.NextgenSession, error) {
+	if token, ok := ctx.Value(sessionKey{}).(string); ok && token != "" {
+		return api.NextgenSession{APIKey: token}, nil
+	}
 	return api.NextgenSession{}, ogenerrors.ErrSkipClientSecurity
 }
 
