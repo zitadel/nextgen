@@ -1,0 +1,94 @@
+name: bench-smoke
+
+# The benchmark harness is a nested Go module, so `go build ./...`, `go test
+# ./...` and `moon ci` at the repository root never compile it. This lane is
+# what notices when a change to the root module (a renamed wire field, a
+# helper signature, a flow field or step shape) breaks it, so the first person
+# to find out is not whoever needs a number.
+#
+# It is NOT a performance gate. No assertion is about how fast anything is: no
+# latency threshold, no throughput floor, no comparison with an earlier run.
+# It asserts that the harness builds, runs every registered scenario and emits
+# the metrics it claims to. Cadence and alerting for real measurements belong
+# to a different kind of runner.
+
+on:
+  pull_request:
+    paths:
+      - "tools/**"
+      - "api/**"
+      - "internal/**"
+      - "cmd/**"
+      - "main.go"
+      - "go.mod"
+      - "go.sum"
+      - ".github/workflows/bench-smoke.yml"
+  workflow_dispatch:
+  # Called by release-publish before a release is published.
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bench-smoke-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  smoke:
+    # A standard runner on purpose: the lane carries no timing assumption, so
+    # it needs no dedicated one, and fork PRs execute untrusted code.
+    runs-on: ubuntu-24.04
+    # A liveness bound, not a latency assertion: it fires when something has
+    # stopped, not when something is slow.
+    timeout-minutes: 30
+    env:
+      # Result caching would let this lane report success without executing:
+      # a sibling benchmark run once passed in 23 seconds by replaying a cached
+      # result from another backend (#974). The smoke task is `cache: false`;
+      # this turns moon's cache off for the build steps too.
+      MOON_CACHE: off
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: pnpm/action-setup@v5
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Put workspace binaries on PATH
+        run: echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
+
+      # Compiles the nested module and the k6 binary with the scenarios in it.
+      # A harness that does not compile fails here.
+      - name: Build the harness
+        run: moon run bench:build
+
+      # `-count=1` so Go's test cache cannot replay a previous result.
+      - name: Test the harness
+        working-directory: tools/bench
+        run: go test -count=1 -timeout 5m ./...
+
+      # Starts the server on SQLite, checks it, provisions the smallest
+      # fixture, runs every scenario the harness registers at 5 VUs for 10 s
+      # each, asserts the summary and discards it, cleans up and asserts the
+      # target returned to its starting counts. Scenarios come from the
+      # harness's own registry, never from a list in this file. Nothing is
+      # uploaded: a retained summary from a shared runner is a number somebody
+      # will eventually cite.
+      - name: Run the smoke lane
+        run: moon run bench:smoke

@@ -156,6 +156,53 @@ database. `bootstrap` applies the file over the API with the
 generated client, then proves it by walking one login journey and one user
 read, so a fixture that cannot be driven fails before anything is measured.
 
+## Smoke lane
+
+The harness is a nested Go module, so `go build ./...`, `go test ./...` and
+`moon ci` at the repository root never compile it, and a renamed wire field,
+a changed helper signature or a changed flow step would break it unnoticed.
+The [`bench-smoke`](../../.github/workflows/bench-smoke.yml) workflow is what
+notices: on pull requests touching `tools/`, `api/`, `internal/` or `cmd/`,
+and before a release, it builds the server, starts it on SQLite with
+[`ci/nextgen.yaml`](ci/nextgen.yaml) (the workflow owns that lifecycle, as the
+lane's provisioning tool; the harness never starts a server) and runs
+
+```sh
+moon run bench:smoke -- --declare dialect=sqlite --declare image_tag=<sha> --declare replicas=1 --declare log_level=warn
+# = dist/k6 x nextgen smoke --base http://localhost:8080 --fixtures fixtures/local.json …
+```
+
+which checks the server answers, runs `doctor`, bootstraps the smallest
+fixture, runs **every registered scenario** at 5 VUs for 10 s each, asserts
+the summary and discards it, then cleans up and asserts the target returned to
+its starting counts (users, projects; the manifest lists nothing). Scenarios
+come from the Go registry ([`harness/scenarios.go`](harness/scenarios.go),
+`k6 x nextgen scenarios`), never from a list in the workflow: a scenario added
+there is covered at once, and one registered without a function of its name in
+`scripts/bench.js` fails the lane.
+
+**It is not a performance gate.** No assertion is about how fast anything is —
+no latency threshold, no throughput floor, no comparison with a previous run —
+because a shared runner under contention cannot support one. It asserts that
+the harness builds, runs, and emits what it claims to:
+
+- one run per registered scenario, none missing, none extra;
+- every operation of the scenario has samples, and its trends carry a full
+  percentile set (a trend with no samples fails; it is not a zero);
+- `http_req_failed` and the classified `nextgen_errors` counter at zero, no
+  session cache misses or failed refreshes;
+- the run metadata is populated: commit, lane, k6 version, and the doctor
+  report with dialect, image tag, replicas and logging — facts the server does
+  not report, so the lane declares them (`--declare`) and a missing one fails;
+- the distinct time-series count is within a bound that grows with the
+  operation list and never with the request volume (a path or id leaking into
+  a tag fails it).
+
+The lane never reports success without executing: the Moon task is
+`cache: false`, `MOON_CACHE=off` covers the build steps, and the tests run with
+`-count=1`. No artefact is uploaded and the temporary directory is removed
+(`smoke --out DIR` keeps it for debugging).
+
 ## Layout
 
 | Path                                   | What                                                                                                   |

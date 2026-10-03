@@ -74,6 +74,22 @@ tasks:
       runInCI: false
       shell: false
 
+  # The harness smoke lane (#1108): build the harness, run every registered
+  # scenario briefly against a server that is already running (the bench-smoke
+  # workflow starts one on SQLite; locally `moon run workspace:server`) and
+  # assert the metrics come out. It measures nothing and asserts nothing about
+  # speed. Never cached: a replayed result would report success without having
+  # executed. The facts the server does not report are passed through:
+  #   moon run bench:smoke -- --declare dialect=sqlite --declare image_tag=dev --declare replicas=1 --declare log_level=warn
+  smoke:
+    command: "dist/k6 x nextgen smoke --base http://localhost:8080 --fixtures fixtures/local.json"
+    deps:
+      - "build"
+    options:
+      cache: false
+      runInCI: false
+      shell: false
+
   # Rewrite the summary of an existing sweep directory:
   #   moon run bench:summarize -- dist/sweep-<stamp>
   summarize:
