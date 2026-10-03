@@ -1175,17 +1175,24 @@ export function setupPlatformHandlers() {
       const records = current.filter(
         (r) => !query.data.purpose || flowServesPurpose(r.body, query.data.purpose),
       );
-      // Paginate like `GET /schemas`: the token is the next start index, so a
-      // caller can page past `limit` instead of the rest being unreachable.
-      const start = query.data.page_token === undefined ? 0 : Number(query.data.page_token);
-      if (!Number.isInteger(start) || start < 0) {
-        return HttpResponse.json(errorBody("req.invalid", "invalid page token"), { status: 400 });
+      // Paginate like `GET /schemas`, but bind the token to the revision mode
+      // as the real endpoint does: a cursor minted for `all` is rejected when
+      // replayed with `revisions=latest` and vice versa, since the two walk
+      // different row sets. The token is `<mode>:<next start index>`.
+      const mode = query.data.revisions === "latest" ? "latest" : "all";
+      let start = 0;
+      if (query.data.page_token !== undefined) {
+        const [tokenMode, offset] = query.data.page_token.split(":");
+        start = Number(offset);
+        if (tokenMode !== mode || !Number.isInteger(start) || start < 0) {
+          return HttpResponse.json(errorBody("req.invalid", "invalid page token"), { status: 400 });
+        }
       }
       const size = query.data.limit ?? records.length;
       const page = records.slice(start, start + size);
       const responseBody: ListFlowDefinitions200 = {
         flow_definitions: page.map(flowResponse),
-        next_page_token: start + size < records.length ? String(start + size) : null,
+        next_page_token: start + size < records.length ? `${mode}:${start + size}` : null,
       };
       const out = parse(ListFlowDefinitionsResponse, responseBody, "mock_response_invalid");
       if (!out.ok) {

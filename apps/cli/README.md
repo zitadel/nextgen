@@ -1413,7 +1413,7 @@ USAGE
     [--dry-run] [-v] [--debug] [--color] [--telemetry]
 
 ARGUMENTS
-  KIND    Resource kind to pull — any revisioned kind a syncer can read.
+  KIND    Resource kind to pull; the error hint lists the kinds pull supports.
   HANDLE  Resource handle: a schema's object type, or a flow's name.
 
 FLAGS

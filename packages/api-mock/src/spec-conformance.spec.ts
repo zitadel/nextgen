@@ -620,6 +620,16 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     const bad = await fetch(`${BASE}/flow_definitions?project_id=proj_flow_paging&page_token=not-a-cursor`);
     expect(bad.status).toBe(400);
     expect(((await bad.json()) as { code: string }).code).toBe("req.invalid");
+
+    // A cursor minted under `all` cannot be replayed under `latest`: the two
+    // modes walk different row sets, so the server binds the token to its mode.
+    const allFirst = await fetch(`${BASE}/flow_definitions?project_id=proj_flow_paging&limit=2`);
+    const allToken = ((await allFirst.json()) as { next_page_token: string }).next_page_token;
+    const crossMode = await fetch(
+      `${BASE}/flow_definitions?project_id=proj_flow_paging&limit=2&revisions=latest&page_token=${allToken}`,
+    );
+    expect(crossMode.status).toBe(400);
+    expect(((await crossMode.json()) as { code: string }).code).toBe("req.invalid");
   });
 
   test("GET /flow_definitions matches ListFlowDefinitionsResponse", async () => {
