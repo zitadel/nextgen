@@ -2,7 +2,9 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"log"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -164,11 +166,12 @@ func TestLoadConfigAcceptsStreamsFromEnv(t *testing.T) {
 }
 
 // TestRunLogsTheErrorItReturns pins #1409. run's deferred "run error" record
-// never fired: it checked a function-scoped err while every early return
-// declared its own in an if's scope, so a failed start was only visible through
-// main's log.Fatal, which slog.SetDefault bridges in at INFO. The failure here
-// is the report's own, a data dir that was never migrated, and the record has
-// to come out at ERROR, past a warn level, carrying the error run returns.
+// did not fire for the early returns that declare err in an if's scope, among
+// them the bootstrap return this test drives, so such a failed start was only
+// visible through main's log.Fatal, which slog.SetDefault bridges in at INFO.
+// The failure here is the report's own, a data dir that was never migrated,
+// and the record has to come out at ERROR, past a warn level, carrying the
+// error run returns.
 func TestRunLogsTheErrorItReturns(t *testing.T) {
 	_, configPath := tempServerConfig(t)
 	cfg, err := loadConfig(configPath)
@@ -183,11 +186,21 @@ func TestRunLogsTheErrorItReturns(t *testing.T) {
 	cfg.Instrumentation.Log.Format = instrumentation.LogFormatUnspecified
 
 	var records bytes.Buffer
-	previous := slog.Default()
+	previous, previousOutput, previousFlags := slog.Default(), log.Writer(), log.Flags()
 	slog.SetDefault(slog.New(slog.NewJSONHandler(&records, nil)))
-	t.Cleanup(func() { slog.SetDefault(previous) })
+	// slog.SetDefault also points the log package at the new handler, and
+	// reinstating a stdlib default does not point it back.
+	t.Cleanup(func() {
+		slog.SetDefault(previous)
+		log.SetOutput(previousOutput)
+		log.SetFlags(previousFlags)
+	})
 
-	err = run(t.Context(), cfg, nil, false)
+	// Bounded so that a start which no longer fails is reported instead of
+	// waited on until go test's own timeout.
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
+	err = run(ctx, cfg, nil, false)
 	require.ErrorContains(t, err, "failed to bootstrap platform project")
 
 	var runError map[string]any

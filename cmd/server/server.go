@@ -124,11 +124,12 @@ func addServerFlags(cmd *cobra.Command, applyMigrations *bool, userFiles *[]stri
 		"Fail the start instead of generating a master key when none is configured (server.generate_master_key: false)")
 }
 
-// run is the server's lifetime. Its result is named so that the deferred
-// report sees what the caller gets: most early returns below are of the form
-// `if err := f(); err != nil { return fmt.Errorf(...) }`, whose err lives in the
-// if's scope and never reached the function-scoped one the defer used to check
-// (#1409).
+// run is the server's lifetime. Its result is named so that the deferred report
+// sees what the caller gets. The early returns that declare err in an if or
+// case scope (`if err := f(); err != nil { return ... }`) never reached the
+// function-scoped err the defer used to check, so those failures went
+// unreported (#1409); the `x, err :=` returns reused that err, but it held the
+// unwrapped cause rather than the value returned.
 func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bool) (err error) {
 	sfs := &ShutdownFuncs{}
 	defer func() {

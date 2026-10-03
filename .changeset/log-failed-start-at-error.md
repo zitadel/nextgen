@@ -2,4 +2,4 @@
 "@zitadel/server": patch
 ---
 
-A server that fails to start now reports why at `ERROR`, through the configured log format and whatever `instrumentation.log.level` is set to. Until now the reason was written at `INFO` without a source, and with the level at `warn` not at all: the process exited with status 1 and an empty log.
+A server that fails to start now logs why at `ERROR`, in the configured log format, so the reason also shows with `instrumentation.log.level: warn`. Until now it was logged at `INFO`, with no indication of where it came from, and with the level at `warn` not at all: the process exited with status 1 and no record of the failure.
