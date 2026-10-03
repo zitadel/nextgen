@@ -7,9 +7,11 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"time"
 
 	api "github.com/zitadel/nextgen/api/generated"
 	"go.k6.io/k6/v2/js/modules"
+	"go.k6.io/k6/v2/metrics"
 
 	"github.com/zitadel/nextgen/tools/bench/harness"
 )
@@ -21,13 +23,14 @@ func init() {
 type contextT = context.Context
 
 // RootModule is constructed once per k6 process. Process-wide state — the
-// target read from the environment and the credential cache — lives here and
-// is shared by every VU.
+// target read from the environment, the credential cache and the module's
+// own metric — lives here and is shared by every VU.
 type RootModule struct {
 	once   sync.Once
 	target harness.Target
 	err    error
 	creds  *harness.Credentials
+	errors *metrics.Metric
 }
 
 var _ modules.Module = (*RootModule)(nil)
@@ -35,11 +38,16 @@ var _ modules.Module = (*RootModule)(nil)
 // NewModuleInstance implements modules.Module.
 func (r *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 	r.once.Do(func() {
-		r.target, r.err = harness.TargetFromEnv(vu.InitEnv().LookupEnv)
+		env := vu.InitEnv()
+		r.target, r.err = harness.TargetFromEnv(env.LookupEnv)
 		if r.err != nil {
 			r.err = errors.Join(errors.New("k6/x/nextgen: run through `k6 x nextgen sweep`, or pass the target as -e"), r.err)
 		}
 		r.creds = harness.NewCredentials(r.target.ProjectSecret)
+		// Registered once, on the root, and pushed from every VU through its
+		// sample channel, so thresholds and the summary see it like a
+		// built-in metric.
+		r.errors = env.Registry.MustNewMetric(harness.MetricErrors, metrics.Counter)
 	})
 	return &ModuleInstance{root: r, vu: vu}
 }
@@ -84,16 +92,40 @@ func (m *ModuleInstance) api() (*api.Client, error) {
 	return c, nil
 }
 
+// fail counts a failed operation on nextgen_errors — tagged with the
+// operation, the lane, the status class and the error code — and returns the
+// error for k6 to fail the iteration with. The request's own sample was
+// already emitted by k6; this is the classification it cannot know.
+func (m *ModuleInstance) fail(op string, err error) error {
+	st := m.vu.State()
+	if st == nil {
+		return err
+	}
+	oe := harness.Classify(op, err)
+	tm := st.Tags.GetCurrentValues()
+	tm.SetTag("op", oe.Op)
+	tm.SetTag("lane", m.root.target.Lane)
+	tm.SetTag("status_class", oe.StatusClass())
+	tm.SetTag("code", oe.Code)
+	metrics.PushIfNotDone(m.vu.Context(), st.Samples, metrics.Sample{
+		TimeSeries: metrics.TimeSeries{Metric: m.root.errors, Tags: tm.Tags},
+		Time:       time.Now(),
+		Metadata:   tm.Metadata,
+		Value:      1,
+	})
+	return oe
+}
+
 // Operations returns the operation ids, for the entry script to declare one
 // sub-metric per operation from the same vocabulary the tags use.
 func (m *ModuleInstance) Operations() []string {
-	return []string{harness.OpCreateFlow, harness.OpSubmitIdent, harness.OpSubmitPassword, harness.OpGetUser}
+	return harness.Operations
 }
 
-// RequestMetrics returns the built-in k6 request metrics the summary reports
-// per operation.
-func (m *ModuleInstance) RequestMetrics() []string {
-	return harness.RequestMetrics
+// Metrics returns the metrics the summary reports per operation: k6's
+// built-in request metrics and the module's nextgen_errors.
+func (m *ModuleInstance) Metrics() []string {
+	return harness.SummaryMetrics
 }
 
 // Login runs the whole login journey — POST /flow, submit identifier, submit
@@ -104,7 +136,11 @@ func (m *ModuleInstance) Login() (harness.LoginResult, error) {
 	if err != nil {
 		return harness.LoginResult{}, err
 	}
-	return harness.Login(m.vu.Context(), c, m.root.target)
+	res, err := harness.Login(m.vu.Context(), c, m.root.target)
+	if err != nil {
+		return harness.LoginResult{}, m.fail(harness.OpCreateFlow, err)
+	}
+	return res, nil
 }
 
 // GetUser performs GET /users/{id} on the fixture user with the cached
@@ -116,7 +152,7 @@ func (m *ModuleInstance) GetUser() (map[string]string, error) {
 	}
 	u, err := harness.GetUser(m.vu.Context(), c, m.root.target)
 	if err != nil {
-		return nil, err
+		return nil, m.fail(harness.OpGetUser, err)
 	}
 	return map[string]string{"id": string(u.ID)}, nil
 }

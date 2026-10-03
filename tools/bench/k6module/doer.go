@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"time"
 
 	"go.k6.io/k6/v2/lib"
 	"go.k6.io/k6/v2/lib/netext/httpext"
@@ -57,7 +56,7 @@ func (d *doer) Do(r *http.Request) (*http.Response, error) {
 		URL:              &u,
 		Req:              r,
 		Body:             body,
-		Timeout:          60 * time.Second,
+		Timeout:          harness.RequestTimeout,
 		Throw:            true,
 		ResponseType:     httpext.ResponseTypeText,
 		ResponseCallback: func(status int) bool { return status < 400 },

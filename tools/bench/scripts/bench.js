@@ -17,7 +17,7 @@ if (!all[pick]) throw new Error(`unknown scenario ${pick}; one of ${Object.keys(
 // operation id the Go side does not know.
 const perOperation = {};
 for (const op of nextgen.operations()) {
-  for (const metric of nextgen.requestMetrics()) perOperation[`${metric}{op:${op}}`] = [];
+  for (const metric of nextgen.metrics()) perOperation[`${metric}{op:${op}}`] = [];
 }
 
 export const options = {

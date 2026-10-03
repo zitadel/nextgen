@@ -51,13 +51,14 @@ func Sweep(ctx context.Context, cfg SweepConfig) ([]Row, error) {
 	}
 	host, _ := os.Hostname()
 	meta := SweepMeta{
-		Commit:    cfg.Commit,
-		Lane:      cfg.Target.Lane,
-		Host:      host,
-		CPUs:      runtime.NumCPU(),
-		K6Version: k6Version(ctx, k6),
-		StartedAt: time.Now(),
-		Base:      cfg.Target.Base,
+		Commit:         cfg.Commit,
+		RequestTimeout: RequestTimeout.String(),
+		Lane:           cfg.Target.Lane,
+		Host:           host,
+		CPUs:           runtime.NumCPU(),
+		K6Version:      k6Version(ctx, k6),
+		StartedAt:      time.Now(),
+		Base:           cfg.Target.Base,
 	}
 
 	for _, scen := range cfg.Scenarios {
