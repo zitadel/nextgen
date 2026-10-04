@@ -35,7 +35,7 @@ function Separator() {
 
 const PANEL_TITLE = "font-serif text-base leading-5 font-normal text-foreground";
 const SECTION_TITLE = "font-serif text-sm leading-5 font-normal text-foreground";
-const SECTION = "flex flex-col gap-[10px] py-2";
+const SECTION = "flex flex-col gap-2.5 py-2";
 
 // A row is 16px on a 26px rhythm.
 const ROW = "flex h-4 items-center justify-between";
@@ -45,7 +45,6 @@ const VALUE_TEXT = "truncate text-xs leading-4 font-normal text-muted-foreground
 
 const COLOUR_ROW = "flex h-5 items-center justify-between";
 const SWATCH = "size-3.5 shrink-0 rounded-[3px] border border-border";
-const ISSUE_BADGE = "rounded-4xl bg-destructive/10 text-destructive dark:bg-destructive/20";
 
 // Keyed by the wire enums, so a lookup is total under noUncheckedIndexedAccess
 // and a value the contract adds fails here rather than rendering blank.
@@ -190,14 +189,14 @@ function PaletteSection({
     <section className={open ? "flex flex-col border-b border-border" : "flex flex-col"}>
       <button
         type="button"
-        className="flex w-full cursor-pointer items-center justify-between py-2"
+        className="flex w-full cursor-pointer items-center justify-between rounded-sm py-2 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
       >
         <span className={SECTION_TITLE}>Colors {side} mode</span>
         <span className="flex items-center gap-2">
           {sideIssues.length > 0 && (
-            <Badge variant="destructive" className={ISSUE_BADGE}>
+            <Badge variant="destructive">
               {sideIssues.length} {sideIssues.length === 1 ? "issue" : "issues"}
             </Badge>
           )}
@@ -281,7 +280,7 @@ function ContrastIssueMarker({ issues }: { issues: ContrastIssue[] }) {
       </PopoverTrigger>
       <PopoverContent
         align="end"
-        className="flex w-auto max-w-[240px] flex-col gap-2.5 border-foreground/10 p-2"
+        className="flex w-auto max-w-60 flex-col gap-2.5 border-foreground/10 p-2"
       >
         {detailed.map((entry) => (
           <PopoverHeader key={entry.label} className="gap-0.5 text-xs leading-4">

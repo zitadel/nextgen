@@ -2,12 +2,15 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 import { createZitadelClient } from "@zitadel/api/client";
 import { ZitadelLogin } from "@zitadel/sdk-react";
 
-import { apiBase } from "../api/zitadel";
-import { fetchSession, sanitizeNextPath } from "../auth/session";
-import { ZitadelMark } from "../components/app-shell/icons";
-import { useConsoleProject } from "../hooks/use-console-project";
-import { getConsoleProjectId, getPublishableKey } from "../runtime/runtime";
-import { useTheme } from "../theme";
+import { apiBase } from "@/api/zitadel";
+import { fetchSession, sanitizeNextPath } from "@/auth/session";
+import { NoProjectYet, StandaloneScreen } from "@/components/standalone-screen";
+import { InlineCode } from "@/components/ui/inline-code";
+import { useConsoleProject } from "@/hooks/use-console-project";
+import { withBasePath } from "@/lib/base-path";
+import { stringParam } from "@/lib/search-params";
+import { getConsoleProjectId, getPublishableKey } from "@/runtime/runtime";
+import { useTheme } from "@/theme";
 
 /**
  * Console sign-in screen (Console ADR 0003).
@@ -41,8 +44,8 @@ import { useTheme } from "../theme";
  */
 export const Route = createFileRoute("/login")({
   validateSearch: (search: Record<string, unknown>): { next?: string; handoff?: string } => ({
-    next: sanitizeNextPath(typeof search.next === "string" ? search.next : undefined),
-    handoff: typeof search.handoff === "string" ? search.handoff : undefined,
+    next: sanitizeNextPath(stringParam(search.next)),
+    handoff: stringParam(search.handoff),
   }),
   beforeLoad: async ({ search }) => {
     // A sign-in link (`/login?handoff=<token>`) printed by the CLI carries a
@@ -100,8 +103,7 @@ async function exchangeLinkHandoff(handoffToken: string): Promise<void> {
 function LoginScreen() {
   const { next } = Route.useSearch();
   const { resolved: theme } = useTheme();
-  const base = import.meta.env.BASE_URL.replace(/\/$/, "");
-  const postSignInUrl = `${base}${next ?? "/"}` || "/";
+  const postSignInUrl = withBasePath(next ?? "/") || "/";
 
   // With the runtime-discovered publishable key the widget sends the
   // public-plane bearer itself, so the handoff exchange needs no server-side
@@ -109,9 +111,7 @@ function LoginScreen() {
   const project = useConsoleProject();
 
   return (
-    <main className="flex min-h-svh flex-col items-center justify-center gap-8 bg-background px-4 py-10">
-      <ZitadelMark size={40} className="text-foreground" aria-hidden />
-      <h1 className="sr-only">Sign in to the Zitadel console</h1>
+    <StandaloneScreen heading="Sign in to the Zitadel console">
       {project ? (
         <ZitadelLogin
           project={project}
@@ -120,9 +120,9 @@ function LoginScreen() {
           postSignInUrl={postSignInUrl}
         />
       ) : (
-        <NoProjectYet />
+        <NoProjectSetupHint />
       )}
-    </main>
+    </StandaloneScreen>
   );
 }
 
@@ -133,17 +133,12 @@ function LoginScreen() {
  * fallback. Refreshing after `zitadel setup` picks the new project up via the
  * runtime document.
  */
-function NoProjectYet() {
+function NoProjectSetupHint() {
   return (
-    <div className="flex max-w-md flex-col gap-3 text-center">
-      <h2 className="font-serif text-xl text-foreground">No project yet</h2>
-      <p className="text-sm text-muted-foreground">
-        This deployment has no project to sign in to. Create one from your application with{" "}
-        <code className="rounded bg-accent px-1.5 py-0.5 text-foreground">
-          npx @zitadel/cli setup
-        </code>{" "}
-        — the first project becomes the console&apos;s default. Then refresh this page.
-      </p>
-    </div>
+    <NoProjectYet>
+      This deployment has no project to sign in to. Create one from your application with{" "}
+      <InlineCode>npx @zitadel/cli setup</InlineCode> — the first project becomes the
+      console&apos;s default. Then refresh this page.
+    </NoProjectYet>
   );
 }

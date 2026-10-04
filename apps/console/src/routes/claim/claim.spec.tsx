@@ -5,11 +5,11 @@ import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { makeTestSession } from "../../auth/session.fixture";
+import { makeTestSession } from "@/test/session.fixture";
 import { listMyProjectsCached } from "../../lib/project-scope";
 import { _setRuntimeForTesting } from "../../runtime/runtime";
 import { createAppRouter } from "../../router";
-import { resetClaimAttemptsForTests } from "./index";
+import { _resetClaimAttemptsForTesting } from "../../lib/claim";
 
 /**
  * The claim page (#615): `claim/init` hands the CLI a URL of the form
@@ -70,7 +70,7 @@ beforeEach(() => {
   // The spend gate outlives a mount by design, and every case here claims the
   // same URL, so without this each test would replay the previous one's
   // outcome instead of calling the server.
-  resetClaimAttemptsForTests();
+  _resetClaimAttemptsForTesting();
   // The widget renders only when a project id resolves (ADR 0004 §§2–3). A
   // claim signs in to the platform project, which the runtime document names.
   _setRuntimeForTesting({ mode: "standalone", console_project_id: "proj_platform" });

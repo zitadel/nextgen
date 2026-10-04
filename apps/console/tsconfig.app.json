@@ -9,6 +9,6 @@
     "rootDir": "src",
     "paths": { "@/*": ["./src/*"] }
   },
-  "exclude": ["out-tsc", "dist", "src/**/*.spec.ts", "src/**/*.spec.tsx", "src/test-setup.ts"],
+  "exclude": ["out-tsc", "dist", "src/**/*.spec.ts", "src/**/*.spec.tsx", "src/test-setup.ts", "src/test"],
   "include": ["src/**/*.ts", "src/**/*.tsx"]
 }

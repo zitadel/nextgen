@@ -3,13 +3,13 @@ import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { scopedPath } from "@/lib/project-scope.fixture";
+import { scopedPath } from "@/test/project-scope.fixture";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
 vi.mock("@/auth/session", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/auth/session")>();
-  const { makeTestSession } = await import("@/auth/session.fixture");
+  const { makeTestSession } = await import("@/test/session.fixture");
   return { ...actual, fetchSession: vi.fn(async () => makeTestSession()) };
 });
 
@@ -58,9 +58,7 @@ async function openDialog() {
 
 describe("delete user dialog", () => {
   it("offers only actions that reach the API", async () => {
-    // The menu used to list Edit user, Reset password and Deactivate, none of
-    // which had an endpoint behind them. A menu of dead controls is worse than
-    // a short menu — it reads as a feature that is broken rather than absent.
+    // Every menu item reaches an endpoint.
     server.use(http.post(USERS_QUERY_URL, () => HttpResponse.json({ users: [USER] })));
     const [{ RouterProvider, createMemoryHistory }, { createAppRouter }] = await Promise.all([
       import("@tanstack/react-router"),
@@ -132,9 +130,8 @@ describe("delete user dialog", () => {
   });
 
   it("cancels without deleting, even with the confirmation typed", async () => {
-    // Regression: the Radix Cancel primitive renders a bare `<button>`, which
-    // inside a `<form>` defaults to `type="submit"` — so Cancel submitted the
-    // form and deleted the user. Caught by the real-instance e2e, pinned here.
+    // Radix Cancel renders a bare `<button>`, which defaults to `type=submit`
+    // inside a form; Cancel must not submit.
     let deleteCalls = 0;
     server.use(
       http.post(USERS_QUERY_URL, () => HttpResponse.json({ users: [USER] })),

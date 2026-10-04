@@ -1,6 +1,6 @@
 import { ApiError } from "@zitadel/api/runtime/fetch";
 
-import { api } from "../api/zitadel";
+import { api } from "@/api/zitadel";
 import { describeError } from "./api-error";
 
 /**
@@ -174,4 +174,57 @@ export async function fetchClaimWindow(
   } catch {
     return undefined;
   }
+}
+
+/**
+ * One claim URL is spent once, however many times this component mounts.
+ *
+ * The ref inside the component gates the effect across re-renders; it cannot
+ * gate mounts, because a fresh instance gets a fresh ref. That gap is not
+ * theoretical: the page can mount twice on the way back from the sign-in
+ * widget, and the second mount re-spends a challenge the first one already
+ * completed. The server is right to refuse it -- a completed challenge
+ * answers 409 `proj.already_claimed` by contract -- but the refusal resolves
+ * last and replaces "Project claimed" with "Already claimed", so a developer
+ * who just claimed their project is told someone else owns it.
+ *
+ * Keeping the attempt rather than a spent flag is what lets the second mount
+ * render the first one's outcome instead of hanging on the spinner.
+ *
+ * Entries are never dropped: a page that has claimed one project holds one
+ * entry, and forgetting it is what reopens the double-spend.
+ */
+const ATTEMPTS_SLOT = Symbol.for("@zitadel/console/claim:attempts");
+
+function claimAttempts(): Map<string, Promise<ClaimOutcome>> {
+  const slots = globalThis as Record<symbol, unknown>;
+  // On globalThis under a Symbol.for key rather than a module-local Map, for
+  // the reason `@zitadel/api`'s config slot is: a second copy of this module
+  // in the same realm would otherwise keep its own gate, and a gate that only
+  // some of the mounts consult is not a gate.
+  slots[ATTEMPTS_SLOT] ??= new Map<string, Promise<ClaimOutcome>>();
+  return slots[ATTEMPTS_SLOT] as Map<string, Promise<ClaimOutcome>>;
+}
+
+/**
+ * Resets the spend gate. Only tests need this: the gate deliberately outlives
+ * a mount, so a spec that renders the same claim URL more than once would
+ * otherwise replay the first render's outcome.
+ */
+export function _resetClaimAttemptsForTesting() {
+  claimAttempts().clear();
+}
+
+export function spendClaim(projectId: string, challengeId: string, retrying: boolean) {
+  const key = `${projectId}:${challengeId}`;
+  const attempts = claimAttempts();
+  const attempt = attempts.get(key);
+  // A retry is a deliberate second spend -- the outcomes that offer one are the
+  // ones a fresh attempt can resolve -- so it replaces the remembered attempt
+  // rather than reading it.
+  if (attempt && !retrying) return attempt;
+
+  const started = completeProjectClaim(projectId, challengeId);
+  attempts.set(key, started);
+  return started;
 }

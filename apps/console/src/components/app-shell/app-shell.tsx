@@ -1,16 +1,8 @@
 import { Link, useMatchRoute } from "@tanstack/react-router";
 // `BookOpen` / `Search` return with the parked footer items below.
-import { ArrowLeft, ChevronsUpDown, Monitor, Moon, Sun } from "lucide-react";
-import { type KeyboardEvent, type ReactNode, useRef } from "react";
+import { ArrowLeft } from "lucide-react";
+import type { ReactNode } from "react";
 
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   Sidebar,
   SidebarContent,
@@ -30,24 +22,24 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import type { NavGroup } from "@/nav";
 
-import type { NavGroup } from "../../nav";
-import { type ThemePreference, useTheme } from "../../theme";
-import { ContextSwitcher } from "./ContextSwitcher";
+import { ContextSwitcher } from "./context-switcher";
 import { ZitadelLogo } from "./icons";
+import { ThemeToggle } from "./theme-toggle";
 import { useNavItems } from "./use-nav-items";
+import { SETTINGS_PATH, type ShellUser, UserMenuItem } from "./user-menu";
+
+export type { ShellUser };
 
 /**
- * Console shell built on shadcn's `Sidebar` block (the "Sidebar 08." Figma
- * frame, `j3qqriDab6WQfrlgLujf4Y`). `collapsible="icon"` gives the 256px →
- * icon-rail collapse with tooltips, ⌘/Ctrl+B, mobile off-canvas, and rail —
- * all from the component. The context bar (sidebar trigger + org/project
- * switchers + theme toggle) sits at the top of the content column in the portal
- * view, and is absent from the Settings view, which the frames draw without one.
- * Colours come
- * from `@zitadel/design-tokens` via the shadcn utility names; the sidebar
- * surface uses `background` per the design (see `ui/sidebar.tsx`).
+ * Console shell built on shadcn's `Sidebar` block. `collapsible="icon"` gives
+ * the 256px → icon-rail collapse with tooltips, ⌘/Ctrl+B, mobile off-canvas, and
+ * rail — all from the component. The context bar (sidebar trigger, project
+ * switcher, theme toggle) sits at the top of the content column in the portal
+ * view, and is absent from the Settings view, which the design draws without
+ * one. Colours come from `@zitadel/design-tokens` via the shadcn utility names;
+ * the sidebar surface uses `background` per the design (see `ui/sidebar.tsx`).
  */
 export function AppShell({
   children,
@@ -72,7 +64,7 @@ export function AppShell({
           stretches the whole page and the window scrolls sideways, rather than
           the table scrolling inside its own card. */}
       <SidebarInset className="min-w-0">
-        {/* No context bar in the Settings view: the settings frames draw none,
+        {/* No context bar in the Settings view: the settings design draws none,
             and the switcher it carries is a *project* control that says nothing
             about an account screen. The sidebar's own header keeps a trigger, so
             collapsing still works without it. */}
@@ -83,22 +75,12 @@ export function AppShell({
   );
 }
 
-/** The signed-in identity as the shell renders it (user-ref vocabulary). */
-export interface ShellUser {
-  display?: string;
-  identifier?: string;
-  userId?: string;
-}
-
 /** Restore the collapse state shadcn persists in the `sidebar_state` cookie. */
 function readSidebarOpen(): boolean {
   if (typeof document === "undefined") return true;
   const match = document.cookie.match(/(?:^|;\s*)sidebar_state=(true|false)/);
   return match ? match[1] === "true" : true;
 }
-
-/** Route prefix that puts the shell into its Settings view. */
-const SETTINGS_PATH = "/settings";
 
 /**
  * The collapsed rail's 44px header band. The rail owns the collapse toggle —
@@ -326,176 +308,22 @@ function PortalNav() {
   );
 }
 
-/**
- * The identity block: 32px avatar, name, email. It is drawn twice — as the
- * footer trigger and again as the dropdown's header — so it lives in one place.
- *
- * The gradient is the design's `Gradient/Red`, a placeholder portrait: no
- * avatar image source exists on the session yet.
- */
-function UserIdentity({ primary, secondary }: { primary: string; secondary?: string }) {
-  return (
-    <>
-      <span aria-hidden className="size-8 shrink-0 rounded-full bg-(image:--zl-gradient-red)" />
-      <span className="flex min-w-0 flex-1 flex-col gap-0.5 leading-none">
-        <span className="truncate text-sm leading-none font-semibold">{primary}</span>
-        {secondary && <span className="truncate text-xs leading-none">{secondary}</span>}
-      </span>
-    </>
-  );
-}
-
-/**
- * Footer account entry: the signed-in identity from `GET /sessions/me`
- * (display → identifier → user id fallback, the user-ref rendering contract of
- * ADR 058), opening the account dropdown (Console ADR 0003).
- *
- * The dropdown is the entry point to the Settings view — `Settings` navigates
- * to the route that switches the sidebar over. Console-local chrome by design:
- * the dark-only `<zitadel-session>` pair is not theme-portable yet (root
- * AGENTS.md bucket rule).
- *
- * Two details come from the design rather than from shadcn's defaults. The
- * container hairline resolves to `foreground/10`, not `border` — the two are
- * interchangeable on the light canvas and visibly are not on the dark one. And
- * the separators sit flush against the rows, so the default `-mx-1 my-1` comes
- * off.
- */
-function UserMenuItem({ user, onSignOut }: { user?: ShellUser; onSignOut?: () => void }) {
-  const primary = user?.display ?? user?.identifier ?? user?.userId ?? "Signed in";
-  // Show the identifier as the secondary line only when the display name is
-  // the primary.
-  const secondary = user?.display ? user.identifier : undefined;
-
-  return (
-    <SidebarMenuItem>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <SidebarMenuButton size="lg" tooltip={primary} aria-label={`Account: ${primary}`}>
-            <UserIdentity primary={primary} secondary={secondary} />
-            <ChevronsUpDown className="ml-auto text-muted-foreground" aria-hidden />
-          </SidebarMenuButton>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent side="top" align="start" className="w-56 border-foreground/10">
-          <DropdownMenuLabel className="flex h-11 items-center gap-2 font-normal">
-            <UserIdentity primary={primary} secondary={secondary} />
-          </DropdownMenuLabel>
-          <DropdownMenuSeparator className="mx-px my-0" />
-          <DropdownMenuItem asChild>
-            <Link to={SETTINGS_PATH}>Settings</Link>
-          </DropdownMenuItem>
-          <DropdownMenuSeparator className="mx-px my-0" />
-          <DropdownMenuItem onSelect={() => onSignOut?.()} disabled={!onSignOut}>
-            Log out
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </SidebarMenuItem>
-  );
-}
-
 function ContextBar() {
   // While the sidebar is collapsed the rail carries the toggle in its header,
   // per the design. Rendering this one as well would put two on screen.
   const { state } = useSidebar();
 
   return (
-    // 64px tall with its content centred, per the navbar every screen frame
-    // draws. `pt-7` bottom-aligned a 40px row into 68px, which pushed every
-    // page 4px down the screen.
+    // 64px tall with its content centred, per the navbar every screen draws.
     <div className="sticky top-0 z-10 flex items-start justify-between gap-4 bg-background px-2 py-3 md:items-center md:px-4">
       <div className="flex min-w-0 flex-1 flex-col gap-2 md:flex-row md:items-center">
-        {/* Desktop only — mobile keeps the persistent Sidebar 07. icon rail. */}
+        {/* Desktop only — mobile keeps the persistent icon rail. */}
         {state === "expanded" && (
           <SidebarTrigger className="hidden text-foreground md:inline-flex" />
         )}
         <ContextSwitcher />
       </div>
       <ThemeToggle />
-    </div>
-  );
-}
-
-// `hint` is what the icon cannot say on its own — a monitor glyph reads as
-// "display", not "follow the operating system". The label stays the short
-// name so the radio's accessible name is not a sentence.
-const THEME_OPTIONS: { value: ThemePreference; label: string; hint: string; icon: typeof Sun }[] = [
-  { value: "light", label: "Light", hint: "Light theme", icon: Sun },
-  { value: "dark", label: "Dark", hint: "Dark theme", icon: Moon },
-  { value: "system", label: "System", hint: "Match system theme", icon: Monitor },
-];
-
-function ThemeToggle() {
-  const { preference, setPreference } = useTheme();
-  const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
-
-  const selectIndex = (index: number) => {
-    const next = THEME_OPTIONS[index];
-    if (!next) return;
-    setPreference(next.value);
-    optionRefs.current[index]?.focus();
-  };
-
-  const onOptionKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
-    const last = THEME_OPTIONS.length - 1;
-    let nextIndex: number | null = null;
-    switch (event.key) {
-      case "ArrowRight":
-      case "ArrowDown":
-        nextIndex = index === last ? 0 : index + 1;
-        break;
-      case "ArrowLeft":
-      case "ArrowUp":
-        nextIndex = index === 0 ? last : index - 1;
-        break;
-      case "Home":
-        nextIndex = 0;
-        break;
-      case "End":
-        nextIndex = last;
-        break;
-      default:
-        return;
-    }
-    event.preventDefault();
-    selectIndex(nextIndex);
-  };
-
-  return (
-    <div
-      role="radiogroup"
-      aria-label="Theme"
-      className="hidden shrink-0 items-center gap-0.5 rounded-md border border-border p-0.5 sm:inline-flex"
-    >
-      {THEME_OPTIONS.map(({ value, label, hint, icon: Icon }, index) => {
-        const active = preference === value;
-        return (
-          <Tooltip key={value}>
-            <TooltipTrigger asChild>
-              <button
-                ref={(node) => {
-                  optionRefs.current[index] = node;
-                }}
-                type="button"
-                role="radio"
-                aria-checked={active}
-                aria-label={label}
-                tabIndex={active ? 0 : -1}
-                onClick={() => setPreference(value)}
-                onKeyDown={(event) => onOptionKeyDown(event, index)}
-                className={`inline-flex size-7 items-center justify-center rounded-sm ${
-                  active
-                    ? "bg-accent text-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <Icon size={15} aria-hidden />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent>{hint}</TooltipContent>
-          </Tooltip>
-        );
-      })}
     </div>
   );
 }

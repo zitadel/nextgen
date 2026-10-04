@@ -1,20 +1,12 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { AlertCircle, Box, Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Box } from "lucide-react";
 
-import { EYEBROW, MetaRule, MetaValue } from "@/components/detail-meta";
+import { api } from "@/api/zitadel";
+import { MetaRule, MetaValue } from "@/components/detail-meta";
 import { DETAIL_BODY, DetailHeader, DetailPage } from "@/components/detail-page";
+import { RenameCard } from "@/components/rename-card";
 import { StatusBadge } from "@/components/status-badge";
-import { Alert, AlertTitle } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Field, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
-import { Separator } from "@/components/ui/separator";
-
-import { api } from "../../../api/zitadel";
-import { describeError } from "../../../lib/api-error";
-import { formatDate } from "../../../lib/date";
+import { formatDate } from "@/lib/date";
 
 /**
  * Team detail.
@@ -24,7 +16,6 @@ import { formatDate } from "../../../lib/date";
  * claims a team is security-relevant, so it needs its own model — verification,
  * and more than one domain per team — rather than a string on `team-response`.
  * That model is not defined yet, so the cell is left out rather than shown empty.
- *
  */
 export const Route = createFileRoute("/_authed/teams/$teamId")({
   staticData: { scope: "project" },
@@ -35,38 +26,6 @@ export const Route = createFileRoute("/_authed/teams/$teamId")({
 function TeamDetail() {
   const team = Route.useLoaderData();
   const router = useRouter();
-
-  // `Tenant name` is the design's label for the team's own `name` — the only
-  // field `PATCH /teams/{team_id}` accepts. Kept as drawn rather than relabelled
-  // `Team name`, which the decisions log's open naming question would have to
-  // settle first.
-  const [name, setName] = useState(team.name);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | undefined>(undefined);
-
-  // A save re-runs the loader, and an edit elsewhere invalidates it; either way
-  // the field follows the record rather than holding a stale draft.
-  useEffect(() => {
-    setName(team.name);
-    setError(undefined);
-  }, [team]);
-
-  const trimmed = name.trim();
-  const dirty = trimmed !== team.name;
-
-  async function save() {
-    if (!dirty || trimmed === "" || saving) return;
-    setSaving(true);
-    setError(undefined);
-    try {
-      await api.updateTeam(team.id, { name: trimmed });
-      await router.invalidate();
-    } catch (cause) {
-      setError(describeError(cause, "Could not save the team."));
-    } finally {
-      setSaving(false);
-    }
-  }
 
   return (
     <DetailPage>
@@ -83,48 +42,21 @@ function TeamDetail() {
         }
       />
 
-      <Card className={`${DETAIL_BODY} gap-0 rounded-xl py-0`}>
-        {/* `Card Content`: inset 24px, 20px top and bottom, with a 16px gap
-            between the header, the rule and the grid. */}
-        <CardContent className="flex flex-col gap-4 px-6 py-5">
-          <span className={EYEBROW}>Details</span>
-          <Separator />
-          <div className="flex flex-col gap-[18px]">
-            <Field>
-              <FieldLabel htmlFor="team-tenant-name">Tenant name</FieldLabel>
-              <Input
-                id="team-tenant-name"
-                name="tenant-name"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                maxLength={200}
-              />
-            </Field>
-            {error && (
-              <Alert variant="destructive">
-                <AlertCircle aria-hidden />
-                <AlertTitle>{error}</AlertTitle>
-              </Alert>
-            )}
-            <div className="flex justify-end">
-              {/* `Variant=Secondary, State=Disabled, Size=sm` — the design's
-                  resting Save is the secondary fill, which `disabled:opacity-50`
-                  then dims. The default (primary) variant stays a bright
-                  call-to-action even greyed out. */}
-              <Button
-                variant="secondary"
-                size="sm"
-                className="gap-1 px-2.5 text-xs"
-                onClick={() => void save()}
-                disabled={!dirty || trimmed === "" || saving}
-              >
-                {saving && <Loader2 className="size-3 animate-spin" aria-hidden />}
-                Save
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* `Tenant name` is the design's label for the team's own `name`, the only
+          field `PATCH /teams/{team_id}` accepts. Relabelling it `Team name`
+          waits on the decisions log's open naming question. */}
+      <RenameCard
+        id="team-tenant-name"
+        label="Tenant name"
+        value={team.name}
+        record={team}
+        onSave={async (name) => {
+          await api.updateTeam(team.id, { name });
+          await router.invalidate();
+        }}
+        errorFallback="Could not save the team."
+        className={DETAIL_BODY}
+      />
     </DetailPage>
   );
 }

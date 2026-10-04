@@ -4,14 +4,13 @@ import { cn } from "@/lib/utils"
 
 /**
  * Two deliberate departures from the registry default, both from the design
- * system's `Type=Input, State=Default` node:
+ * system's Input:
  *
  * - **`bg-background`, not `bg-transparent`.** The design fills an input with
  *   `background`, a surface of its own. Stock shadcn leaves it transparent, so
  *   the field takes on whatever it is sitting on — indistinguishable from the
  *   page while an input is on the page, then visibly wrong the moment one is
- *   placed on a `Card`, which is every detail screen. Fixing it per screen is
- *   why the same note kept coming back; it belongs here, once.
+ *   placed on a `Card`, which is every detail screen.
  * - **`px-2.5`, not `px-3`.** The design insets 10px.
  */
 function Input({ className, type, ...props }: React.ComponentProps<"input">) {

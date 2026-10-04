@@ -27,7 +27,7 @@ afterEach(_resetConfigForTesting);
 // otherwise carry one test's mocked answer into the next.
 beforeEach(clearSessionCaches);
 
-// @ts-expect-error Needed for tests
+// @ts-expect-error not declared on `globalThis`
 global.IS_REACT_ACT_ENVIRONMENT = true;
 
 // jsdom has no matchMedia; the theme hook (src/theme.ts) reads it. Default to

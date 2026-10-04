@@ -1,32 +1,15 @@
-import { AlertCircle, Loader2, UserRoundCog, X } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useId, useState } from "react";
 
-import { Alert, AlertTitle } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
-import {
-  Combobox,
-  ComboboxAnchor,
-  ComboboxContent,
-  ComboboxPlaceholder,
-  ComboboxTrigger,
-  ComboboxValue,
-} from "@/components/ui/combobox";
+import { api } from "@/api/zitadel";
+import { FormSheet, FormSheetForm } from "@/components/form-sheet";
+import { type SchemaOption, SchemaPicker } from "@/components/schema-picker";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { MetaItem } from "@/components/ui/meta-item";
 import { Separator } from "@/components/ui/separator";
-import {
-  Sheet,
-  SheetClose,
-  SheetContent,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
-
-import { api } from "../api/zitadel";
-import { describeError } from "../lib/api-error";
+import { useSubmit } from "@/hooks/use-submit";
+import { describeError } from "@/lib/api-error";
+import { useRequiredProjectScope } from "@/lib/project-scope";
 // Parked — design decisions log D6, plus no grant endpoints. See the block below.
 // import {
 //   ProjectAccess,
@@ -39,31 +22,13 @@ import {
   schemaDisplayName,
   schemaFieldSummary,
   schemaFields,
-} from "../lib/schema";
-import { useRequiredProjectScope } from "../lib/project-scope";
+} from "@/lib/schema";
 
-/** A schema plus the id needed to reference it in the created user's `schema`. */
-interface SchemaOption {
-  id: string;
-  schema: UserSchema;
-  name: string;
-  summary: string;
-}
-
-// Long utility strings live as named constants so Tailwind's scanner sees the
-// full literal (it never sees a concatenated fragment).
-const SHEET = "w-full gap-0 p-0 sm:max-w-[520px]";
-const HEADER = "flex-row items-center justify-between gap-0 px-6 py-5";
-const TITLE = "font-serif text-xl leading-none font-normal";
-const BODY = "flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-6";
 const SECTION = "flex flex-col gap-4";
-const LABEL = "font-serif text-sm leading-5 font-normal text-foreground";
+const LABEL = "text-foreground";
 // The design wraps the label in a row so a marker can sit beside it, rather
 // than appending to the label text itself.
 const LABEL_ROW = "flex w-full items-center gap-2";
-// The footer sits on the page background rather than a raised surface so
-// scrolling body content passes under it.
-const FOOTER = "flex-row items-center justify-end gap-3 bg-background px-6 py-4";
 
 /**
  * The Add user drawer.
@@ -90,16 +55,10 @@ export function AddUserSheet({
   /** Called after a successful create so the caller can refresh its list. */
   onCreated: () => void | Promise<void>;
 }) {
-  const [open, setOpen] = useState(false);
-
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>{children}</SheetTrigger>
-      <SheetContent side="right" showCloseButton={false} className={SHEET}>
-        {/* Remounted per opening so a cancelled draft never reappears. */}
-        {open && <AddUserForm onCreated={onCreated} onClose={() => setOpen(false)} />}
-      </SheetContent>
-    </Sheet>
+    <FormSheet trigger={children}>
+      {(close) => <AddUserForm onCreated={onCreated} onClose={close} />}
+    </FormSheet>
   );
 }
 
@@ -117,8 +76,7 @@ function AddUserForm({
   // const [projects, setProjects] = useState<ProjectOption[]>([]);
   // The design's resting state already shows one empty row.
   // const [access, setAccess] = useState<ProjectAccessRow[]>([{ roles: [] }]);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | undefined>(undefined);
+  const [loadError, setLoadError] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     let cancelled = false;
@@ -167,7 +125,7 @@ function AddUserForm({
         const only = options.length === 1 ? options[0] : undefined;
         if (only) setSchemaId(only.id);
       } catch (cause) {
-        if (!cancelled) setError(describeError(cause, "Could not load user schemas."));
+        if (!cancelled) setLoadError(describeError(cause, "Could not load user schemas."));
       }
     })();
     return () => {
@@ -181,68 +139,54 @@ function AddUserForm({
     (entry) => entry.required && !values[entry.key]?.trim(),
   );
 
+  const create = useSubmit(async () => {
+    if (!selected) return;
+    // Built from the field descriptors rather than the raw values so a
+    // property's declared type survives: an input always yields a string, but
+    // JSON Schema validates a `number`/`integer` property against a JSON
+    // number, and `"42"` would be rejected. A value that will not parse is
+    // sent through untouched so the server explains why, rather than becoming
+    // `NaN` — which `JSON.stringify` would silently turn into `null`.
+    const attributes: Record<string, unknown> = {};
+    for (const entry of fields) {
+      // Optional properties are omitted rather than sent empty: an empty
+      // string fails format validation (`email`) instead of reading as absent.
+      const value = values[entry.key]?.trim() ?? "";
+      if (value === "") continue;
+      if (entry.inputType === "number") {
+        const numeric = Number(value);
+        attributes[entry.key] = Number.isFinite(numeric) ? numeric : value;
+      } else {
+        attributes[entry.key] = value;
+      }
+    }
+    await api.createUser({ schema: selected.id, attributes }, { project_id: projectId });
+    await onCreated();
+    onClose();
+  }, "Could not create the user.");
+
+  const { clearError } = create;
   const selectSchema = useCallback((next: string) => {
     setSchemaId(next);
     // Values are keyed by property name and schemas do not share a namespace,
     // so a leftover value could be written to a property the new schema never
     // declared. Reset rather than merge.
     setValues({});
-    setError(undefined);
-  }, []);
-
-  async function submit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!selected || missingRequired || submitting) return;
-    setSubmitting(true);
-    setError(undefined);
-    try {
-      // Built from the field descriptors rather than the raw values so a
-      // property's declared type survives: an input always yields a string, but
-      // JSON Schema validates a `number`/`integer` property against a JSON
-      // number, and `"42"` would be rejected. A value that will not parse is
-      // sent through untouched so the server explains why, rather than becoming
-      // `NaN` — which `JSON.stringify` would silently turn into `null`.
-      const attributes: Record<string, unknown> = {};
-      for (const entry of fields) {
-        // Optional properties are omitted rather than sent empty: an empty
-        // string fails format validation (`email`) instead of reading as absent.
-        const value = values[entry.key]?.trim() ?? "";
-        if (value === "") continue;
-        if (entry.inputType === "number") {
-          const numeric = Number(value);
-          attributes[entry.key] = Number.isFinite(numeric) ? numeric : value;
-        } else {
-          attributes[entry.key] = value;
-        }
-      }
-      await api.createUser(
-        { schema: selected.id, attributes },
-        { project_id: projectId },
-      );
-      await onCreated();
-      onClose();
-    } catch (cause) {
-      setError(describeError(cause, "Could not create the user."));
-    } finally {
-      setSubmitting(false);
-    }
-  }
+    setLoadError(undefined);
+    clearError();
+  }, [clearError]);
 
   return (
-    <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
-      <SheetHeader className={HEADER}>
-        <SheetTitle className={TITLE}>Add user</SheetTitle>
-        <SheetClose
-          className="cursor-pointer opacity-70 transition-opacity hover:opacity-100 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
-          aria-label="Close"
-        >
-          <X className="size-5" aria-hidden />
-        </SheetClose>
-      </SheetHeader>
-      <Separator />
-
-      <div className={BODY}>
-        <div className={SECTION}>
+    <FormSheetForm
+      title="Add user"
+      submitLabel="Add user"
+      canSubmit={Boolean(selected) && !missingRequired}
+      pending={create.pending}
+      error={create.error ?? loadError}
+      onSubmit={() => void create.run()}
+      onClose={onClose}
+    >
+      <div className={SECTION}>
           <Field>
             <div className={LABEL_ROW}>
               <FieldLabel className={LABEL}>User Schema</FieldLabel>
@@ -284,86 +228,7 @@ function AddUserForm({
             alongside this — restore all four together. */}
         {/* <Separator />
         <ProjectAccess projects={projects} rows={access} onChange={setAccess} /> */}
-        {error && (
-          <Alert variant="destructive">
-            <AlertCircle aria-hidden />
-            <AlertTitle>{error}</AlertTitle>
-          </Alert>
-        )}
-      </div>
-
-      <Separator />
-      <SheetFooter className={FOOTER}>
-        <Button
-          type="button"
-          variant="secondary"
-          className="gap-1.5 px-2.5"
-          onClick={onClose}
-        >
-          Cancel
-        </Button>
-        <Button
-          type="submit"
-          size="sm"
-          className="gap-1 px-2.5 text-xs"
-          disabled={!selected || missingRequired || submitting}
-        >
-          {submitting && <Loader2 className="size-3 animate-spin" aria-hidden />}
-          Add user
-        </Button>
-      </SheetFooter>
-    </form>
-  );
-}
-
-/** Searchable schema picker, composed from the shared Combobox. */
-function SchemaPicker({
-  id,
-  schemas,
-  selected,
-  onSelect,
-}: {
-  id: string;
-  schemas: SchemaOption[] | undefined;
-  selected: SchemaOption | undefined;
-  onSelect: (id: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const loading = schemas === undefined;
-
-  return (
-    <Combobox open={open} onOpenChange={setOpen}>
-      <ComboboxAnchor asChild>
-        <ComboboxTrigger
-          label="User Schema"
-          open={open}
-          disabled={loading}
-          className="w-full"
-          addon={<UserRoundCog className="size-4" />}
-          onOpen={() => setOpen(true)}
-        >
-          {selected ? (
-            <ComboboxValue>{selected.name}</ComboboxValue>
-          ) : (
-            <ComboboxPlaceholder>
-              {loading ? "Loading schemas…" : "Select schema"}
-            </ComboboxPlaceholder>
-          )}
-        </ComboboxTrigger>
-      </ComboboxAnchor>
-      <ComboboxContent
-        options={(schemas ?? []).map((option) => ({
-          value: option.id,
-          label: option.name,
-          description: option.summary || undefined,
-        }))}
-        selected={selected ? [selected.id] : []}
-        searchPlaceholder="Search schemas"
-        emptyLabel="No schemas found."
-        onSelect={onSelect}
-        onClose={() => setOpen(false)}
-      />
-    </Combobox>
+    </FormSheetForm>
   );
 }
 
@@ -396,7 +261,6 @@ function SchemaInput({
         placeholder={field.placeholder}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="h-9 rounded-md px-2.5 py-1 text-sm"
       />
     </Field>
   );
