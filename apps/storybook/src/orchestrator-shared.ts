@@ -8,7 +8,6 @@ import {
   setupMockHandlers,
 } from "@zitadel/api-mock";
 import { html } from "lit";
-import { mswLoader } from "msw-storybook-addon";
 import { LOGIN_PREVIEW_STATES, type LoginPreviewState } from "@zitadel/components";
 import { brandingPresets, type BrandingPresetId } from "./branding-presets.js";
 
@@ -83,7 +82,6 @@ const SSO_SETS: Record<SsoChoice, { id: string; name: string; template: string }
  */
 export const orchestratorBase = {
   tags: ["no-test"],
-  loaders: [mswLoader],
   parameters: {
     layout: "fullscreen",
     msw: { handlers: mock.handlers },

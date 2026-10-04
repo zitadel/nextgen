@@ -1,6 +1,5 @@
 import type { StoryObj } from "@storybook/web-components-vite";
 import { html } from "lit";
-import { mswLoader } from "msw-storybook-addon";
 
 import {
   orchestratorArgTypes,
@@ -25,7 +24,6 @@ import {
 export default {
   title: "Orchestrator/Login/SSO",
   tags: ["no-test"],
-  loaders: [mswLoader],
   parameters: {
     layout: "fullscreen",
     msw: { handlers: mock.handlers },

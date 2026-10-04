@@ -2,7 +2,8 @@ import { configureZitadel } from "@zitadel/api/config";
 import type { Preview } from "@storybook/web-components-vite";
 import { html } from "lit";
 import { keyed } from "lit/directives/keyed.js";
-import { initialize } from "msw-storybook-addon";
+import { setupWorker } from "msw/browser";
+import { mswLoader } from "msw-storybook-addon/csf3";
 
 // Dev-only: make custom-element registration idempotent. The `<zl-*>` atoms run
 // from source here, and any module re-execution (Vite dep-optimization reloads,
@@ -30,22 +31,31 @@ import "../src/preview.css";
 // regardless. Harmless for atom stories, which make no requests.
 configureZitadel({ proxyPath: window.location.origin, projectId: "storybook" });
 
-// One worker for the whole preview, started before any story module runs.
-//
-// Not lazily per story file, which is what this used to do: `initialize()`
-// builds a worker object, and a second call while mocking is already enabled
-// logs "redundant worker.start()" and leaves that second object inert. The
-// per-story `mswLoader` then applies the story's handlers to whichever object
-// its own module closed over -- and when that is the inert one, nothing is
-// intercepted, `onUnhandledRequest: "bypass"` lets the call through to the dev
-// server, and the story fails with a 404 from Storybook itself. Crossing from
-// a story in one file to a story in another was enough to trigger it.
-//
-// Starting it here costs the atom stories nothing: a worker with no matching
-// handler does not intercept, and the atoms make no requests at all.
-initialize({ onUnhandledRequest: "bypass" });
+// The MSW worker unregisters itself when its last client closes. A page opened
+// while that is settling re-registers the same, already active worker: no
+// `activate` fires, so nothing claims the page, and its requests reach the dev
+// server (`POST /flow` answers 404). MSW reloads an uncontrolled page only when
+// it can already see the registration, which it cannot at that moment. Apply
+// the same remedy once the worker has started; the flag stops a reload loop if
+// the page stays uncontrolled.
+const RELOADED_FOR_CONTROL = "zitadel-storybook:msw-control-reload";
+const startWorker = async () => {
+  const worker = setupWorker();
+  await worker.start({ onUnhandledRequest: "bypass" });
+  if (navigator.serviceWorker.controller) {
+    sessionStorage.removeItem(RELOADED_FOR_CONTROL);
+  } else if (!sessionStorage.getItem(RELOADED_FOR_CONTROL)) {
+    sessionStorage.setItem(RELOADED_FOR_CONTROL, "1");
+    location.reload();
+    await new Promise(() => {
+      // Never settles: the reload replaces this page before a story renders.
+    });
+  }
+  return worker;
+};
 
 const preview: Preview = {
+  loaders: [mswLoader(startWorker)],
   parameters: {
     layout: "centered",
     controls: { expanded: true },

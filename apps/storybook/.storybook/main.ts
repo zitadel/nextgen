@@ -57,7 +57,7 @@ const reloadPollerScript = `<script>
 const config: StorybookConfig = {
   framework: "@storybook/web-components-vite",
   stories: ["../src/**/*.stories.ts"],
-  addons: ["@storybook/addon-a11y", "@storybook/addon-vitest"],
+  addons: ["@storybook/addon-a11y", "@storybook/addon-vitest", "msw-storybook-addon"],
   staticDirs: [{ from: apiMockPublicDir, to: "/" }],
   // Inject the workspace-source reload poller into the preview iframe — but only
   // in `storybook dev`. Its `__zitadel_reload_token` endpoint is served by the

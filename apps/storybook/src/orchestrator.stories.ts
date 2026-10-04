@@ -2,7 +2,6 @@ import type { StoryObj } from "@storybook/web-components-vite";
 import { PASSWORD_FIELD } from "@zitadel/api-mock";
 import { html } from "lit";
 
-import { mswLoader } from "msw-storybook-addon";
 
 import {
   fill,
@@ -25,7 +24,6 @@ import {
 export default {
   title: "Orchestrator/Login",
   tags: ["no-test"],
-  loaders: [mswLoader],
   parameters: {
     layout: "fullscreen",
     msw: { handlers: mock.handlers },

@@ -1,5 +1,4 @@
 import type { StoryObj } from "@storybook/web-components-vite";
-import { mswLoader } from "msw-storybook-addon";
 
 import {
   clickAction,
@@ -27,7 +26,6 @@ import {
 export default {
   title: "Orchestrator/Login/Passkeys",
   tags: ["no-test"],
-  loaders: [mswLoader],
   parameters: {
     layout: "fullscreen",
     msw: { handlers: mock.handlers },

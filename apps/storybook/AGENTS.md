@@ -35,9 +35,11 @@ environment), as does `storybook:test`.
   gates render + a11y for every story. Add a `play` function only when no lower
   layer proves the behaviour — the atoms own toggle/form/focus in
   `packages/components` specs, so their stories generally carry no `play`.
-- **MSW is orchestrator-only.** The atoms make no requests, so
-  `msw-storybook-addon` is wired on the orchestrator stories (not globally),
-  and those stories are tagged `no-test` to keep network out of the test run.
+- **MSW handlers are orchestrator-only.** `msw-storybook-addon` starts one
+  worker for the whole preview (`.storybook/preview.ts`); only the orchestrator
+  stories give it handlers, through `parameters.msw`. The atoms make no
+  requests, and the orchestrator stories are tagged `no-test` to keep network
+  out of the test run.
 
 ## Orchestrator stories & the flow engine
 
