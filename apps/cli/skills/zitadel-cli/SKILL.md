@@ -151,6 +151,32 @@ Exit codes mirror the error class (3 = validation, 4 = network or not-found,
 5 = conflict, 1 = auth, 2 = not-implemented). An unknown command is handled by
 the CLI's help layer, not the envelope.
 
+## Clarify before you configure
+
+Driving the CLI non-interactively does not mean deciding *for* the user. When
+the user asks to add authentication but has not said *how*, don't silently pick
+defaults — ask them first, in one short batched question, then run the CLI
+non-interactively with their answers. The two things sit on different sides of
+the conversation: you clarify with the human, then drive the CLI headlessly.
+
+Ask about:
+
+- **Sign-in methods** — password (the usual default), passkeys, and single
+  sign-on. If they want SSO, which providers?
+- **Profile fields** — the user schema starts with first name, last name, and
+  the login identifier plus a password. Which additional fields do they want
+  (for example phone, username, or a display name)?
+
+Offer only what the installed CLI actually supports: read the real sign-in
+presets, profile fields, and SSO options from the CLI first (`setup --help`,
+`resources --json`) and present those, not a list you remember — the options
+move with the CLI version.
+
+Skip the questions and proceed with the defaults above — stating the assumptions
+you made so the user can correct them — in exactly two cases: the user already
+told you what they want, or you are running non-interactively (a one-shot/headless
+invocation) or were explicitly told to just set it up.
+
 ## Golden path
 
 The high-level workflow is stable even as individual flags evolve — run each

@@ -10,6 +10,14 @@ installed exactly as a user would get it (`npx skills add`), across a single
 stateful journey (one project flows through every stage). The stages live in
 [`journey.config.json`](journey.config.json) — adding a question is a data edit.
 
+**"Non-interactive" means the CLI, not the agent.** The agent always drives the
+CLI with `--non-interactive --json`, but it may still converse with the
+developer. A stage with a `user` persona is run as a **multi-turn conversation**:
+the agent prompts (e.g. "which sign-in methods? which profile fields?") and a
+*simulated user* — a cheap, skill-less Claude answering from that persona —
+replies, until the agent is done or the Q&A cap is hit. A stage with no persona
+is a single agent turn. The driver is [`scripts/drive.mjs`](scripts/drive.mjs).
+
 ## Not a CI test
 
 This is slow (tens of minutes), needs Docker and a Claude credential, and is
@@ -49,11 +57,15 @@ its goal (the baseline is captured for comparison, not asserted), then in
 | `FRESH` | `0` | `1` re-runs the containers instead of reusing `out/` |
 | `BRANCH` | `feat/cli-installable-agent-skill` | which branch's skill to install |
 | `MODEL` | `sonnet` | model for the driving agent |
-| `MAX_TURNS` | `40` | per-stage turn cap |
+| `SIM_MODEL` | `haiku` | model for the simulated user answering the agent |
+| `MAX_TURNS` | `40` | per-agent-turn turn cap |
+| `MAX_QA` | `6` | max question/answer rounds per interactive stage |
 
 ## Output
 
-`out/<config>/stage<N>.jsonl` (trajectories), `out/<config>/after-stage<N>.json`
+`out/<config>/stage<N>.jsonl` (trajectories — the agent's stream-json plus a
+`{"type":"sim_user",…}` line per simulated-user answer), `out/<config>/after-stage<N>.json`
 (schema snapshots), `out/journey.html` (the tabbed report: one tab per stage,
+the full conversation — prompt, what the agent asked, what the user answered,
 every command with its output, per-stage tokens). Everything under `out/` is
 gitignored.

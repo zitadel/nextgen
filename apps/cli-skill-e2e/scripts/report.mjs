@@ -29,20 +29,37 @@ function badge(status) {
   return `<span class="b ${c}">${t}</span>`;
 }
 
-function cmdBlocks(pairs) {
-  if (!pairs.length) return '<p class="muted">No commands recorded.</p>';
-  return pairs
-    .map((p) => {
-      const cmd = esc(p.cmd.replace(/\s+/g, " ").trim());
-      let o = p.out || "(no output captured)";
-      let trunc = "";
-      if (o.length > 2500) {
-        o = o.slice(0, 2500);
-        trunc = "\n… (truncated)";
-      }
-      return `<div class="cmd"><div class="c">${cmd}</div><div class="o">${esc(o)}${esc(trunc)}</div></div>`;
-    })
-    .join("\n");
+function cmdBlock(p) {
+  const cmd = esc(p.cmd.replace(/\s+/g, " ").trim());
+  let o = p.out || "(no output captured)";
+  let trunc = "";
+  if (o.length > 2500) {
+    o = o.slice(0, 2500);
+    trunc = "\n… (truncated)";
+  }
+  return `<div class="cmd"><div class="c">${cmd}</div><div class="o">${esc(o)}${esc(trunc)}</div></div>`;
+}
+
+function userBubble(text, label) {
+  return `<div class="msg user"><h4>${esc(label)}</h4><div>${fmtMd(text)}</div></div>`;
+}
+
+function agentBubble(text) {
+  return `<div class="msg agent"><h4>AGENT</h4><div>${fmtMd(text)}</div></div>`;
+}
+
+// Render the whole stage as a conversation, in order: the opening prompt, then
+// each agent message / command and each simulated-user answer as they happened.
+// This is what makes the back-and-forth visible — what the agent asked and what
+// we answered — not just the commands it ended up running.
+function convo(prompt, transcript) {
+  const parts = [userBubble(prompt, "PROMPT")];
+  for (const t of transcript) {
+    if (t.kind === "command") parts.push(cmdBlock(t));
+    else if (t.kind === "text") parts.push(agentBubble(t.text));
+    else if (t.kind === "answer") parts.push(userBubble(t.text, "USER ANSWER"));
+  }
+  return parts.join("\n");
 }
 
 const CSS = `*{box-sizing:border-box}body{font:14px/1.55 -apple-system,Segoe UI,sans-serif;margin:0;color:#111;background:#f7f8fa}
@@ -62,9 +79,11 @@ header{background:#0b0f19;color:#fff;padding:18px 28px}header h1{margin:0;font-s
 .cmd .c{background:#111827;color:#e5e7eb;padding:9px 13px;font:12px/1.5 ui-monospace,Menlo,monospace;white-space:pre-wrap;word-break:break-word}
 .cmd .c::before{content:"$ ";color:#6ee7b7;font-weight:700}
 .cmd .o{background:#0b0f19;color:#cbd5e1;padding:11px 13px;font:11.5px/1.5 ui-monospace,Menlo,monospace;white-space:pre-wrap;word-break:break-word;max-height:420px;overflow:auto}
-.answer{margin-top:16px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:14px}
-.answer h4{margin:0 0 8px;font-size:12px;color:#166534;letter-spacing:.5px}
-.answer code{background:#dcfce7;padding:1px 5px;border-radius:4px;font-size:12px}
+.msg{border-radius:10px;padding:11px 14px;margin:0 0 12px}
+.msg h4{margin:0 0 7px;font-size:11px;letter-spacing:.5px;font-weight:800}
+.msg.user{background:#eff6ff;border:1px solid #bfdbfe}.msg.user h4{color:#1d4ed8}
+.msg.agent{background:#fff;border:1px solid #e5e7eb}.msg.agent h4{color:#6b7280}
+.msg code{background:#eef2ff;padding:1px 5px;border-radius:4px;font-size:12px}
 .muted{color:#9ca3af}`;
 
 const JS = `function show(n){document.querySelectorAll('.stage-panel').forEach(p=>p.style.display='none');document.getElementById('stage-'+n).style.display='block';document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));document.getElementById('tab-'+n).classList.add('active');}
@@ -86,18 +105,15 @@ const panels = stages
         const rows = graded[c];
         if (!rows) return "";
         const r = rows.find((x) => x.stage === s.id);
-        const answer = r.parsed.final.trim()
-          ? `<div class="answer"><h4>AGENT'S ANSWER</h4>${fmtMd(r.parsed.final)}</div>`
-          : "";
         const open = c === "with-skill" ? " open" : "";
-        return `<details class="cfg"${open}><summary>${esc(CONFIG_LABELS[c] || c)} ${badge(r.status)}<span class="why">${esc(r.why)} · ${r.turns} turns · <b>${r.tokens.toLocaleString()} tokens</b></span></summary><div class="body">${cmdBlocks(r.parsed.pairs)}${answer}</div></details>`;
+        return `<details class="cfg"${open}><summary>${esc(CONFIG_LABELS[c] || c)} ${badge(r.status)}<span class="why">${esc(r.why)} · ${r.turns} turns · <b>${r.tokens.toLocaleString()} tokens</b></span></summary><div class="body">${convo(s.prompt, r.parsed.transcript)}</div></details>`;
       })
       .join("");
     return `<div class="stage-panel" id="stage-${s.id}"><div class="prompt">${esc(s.title)}</div>${cfgHtml}</div>`;
   })
   .join("");
 
-const doc = `<!doctype html><html><head><meta charset="utf-8"><title>zitadel-cli journey eval</title><style>${CSS}</style></head><body><header><h1>zitadel-cli skill — multi-stage journey eval</h1><p>One stateful run per config; the same project flows through ${stages.length} stages. Each command is shown with its real output underneath.</p></header><div class="tabs">${tabs}</div><div class="wrap">${panels}</div><script>${JS}</script></body></html>`;
+const doc = `<!doctype html><html><head><meta charset="utf-8"><title>zitadel-cli journey eval</title><style>${CSS}</style></head><body><header><h1>zitadel-cli skill — multi-stage journey eval</h1><p>One stateful run per config; the same project flows through ${stages.length} stages. Each stage is the full conversation — the prompt, what the agent asked, what the user answered, and every command with its real output.</p></header><div class="tabs">${tabs}</div><div class="wrap">${panels}</div><script>${JS}</script></body></html>`;
 
 const dest = join(OUT, "journey.html");
 writeFileSync(dest, doc);

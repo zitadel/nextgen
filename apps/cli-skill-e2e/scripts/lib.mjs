@@ -3,14 +3,30 @@
 import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
-/** Parse one stage trajectory (stream-json JSONL) into command/output pairs. */
+/**
+ * Parse one stage trajectory (stream-json JSONL) into a conversation.
+ *
+ * A stage may be multi-turn: the agent's `claude -p` stream, then a
+ * `{"type":"sim_user","text":…}` line for the simulated user's answer, then the
+ * resumed agent's stream, and so on. So the file can hold several `result`
+ * events (one per agent turn) interleaved with `sim_user` lines. We walk it in
+ * order and build:
+ *   - `transcript`: every turn in sequence — agent text, agent commands (with
+ *     their output), and the simulated user's answers — for the report's
+ *     conversation view.
+ *   - `pairs`: just the command/output pairs across all turns, for grading.
+ *   - `final`: the agent's last text block (its closing answer).
+ *   - `result`: an aggregate across all agent turns — `is_error` from the last
+ *     turn, `num_turns` and `usage` summed — so token/turn totals cover the
+ *     whole conversation, not just its final leg.
+ */
 export function parseStage(file) {
-  const empty = { pairs: [], final: "", result: {} };
+  const empty = { pairs: [], transcript: [], final: "", result: {} };
   if (!existsSync(file)) return empty;
-  const order = [];
-  const outs = new Map();
+  const transcript = [];
+  const cmdById = new Map();
   let final = "";
-  let result = {};
+  const results = [];
   for (const line of readFileSync(file, "utf8").split("\n")) {
     if (!line.trim()) continue;
     let e;
@@ -19,10 +35,18 @@ export function parseStage(file) {
     } catch {
       continue;
     }
-    if (e.type === "assistant") {
+    if (e.type === "sim_user") {
+      transcript.push({ role: "user", kind: "answer", text: e.text ?? "" });
+    } else if (e.type === "assistant") {
       for (const b of e.message?.content ?? []) {
-        if (b?.type === "tool_use" && b.name === "Bash") order.push([b.id, b.input?.command ?? ""]);
-        else if (b?.type === "text") final = b.text ?? "";
+        if (b?.type === "tool_use" && b.name === "Bash") {
+          const entry = { role: "agent", kind: "command", cmd: b.input?.command ?? "", out: "" };
+          cmdById.set(b.id, entry);
+          transcript.push(entry);
+        } else if (b?.type === "text" && (b.text ?? "").trim()) {
+          final = b.text ?? "";
+          transcript.push({ role: "agent", kind: "text", text: b.text ?? "" });
+        }
       }
     } else if (e.type === "user") {
       const content = e.message?.content;
@@ -30,16 +54,34 @@ export function parseStage(file) {
         for (const b of content) {
           if (b?.type === "tool_result") {
             const c = b.content;
-            outs.set(b.tool_use_id, typeof c === "string" ? c : (c ?? []).map((x) => x?.text ?? "").join(""));
+            const out = typeof c === "string" ? c : (c ?? []).map((x) => x?.text ?? "").join("");
+            const entry = cmdById.get(b.tool_use_id);
+            if (entry) entry.out = out;
           }
         }
       }
     } else if (e.type === "result") {
-      result = e;
+      results.push(e);
     }
   }
-  const pairs = order.map(([id, cmd]) => ({ cmd, out: outs.get(id) ?? "" }));
-  return { pairs, final, result };
+  const pairs = transcript.filter((t) => t.kind === "command").map((t) => ({ cmd: t.cmd, out: t.out }));
+  const result = aggregateResults(results);
+  return { pairs, transcript, final, result };
+}
+
+/** Collapse per-turn `result` events into one: last turn's error, summed turns/usage. */
+function aggregateResults(results) {
+  if (!results.length) return {};
+  const last = results[results.length - 1];
+  const usage = {};
+  let numTurns = 0;
+  for (const r of results) {
+    numTurns += r.num_turns ?? 0;
+    for (const [k, v] of Object.entries(r.usage ?? {})) {
+      if (typeof v === "number") usage[k] = (usage[k] ?? 0) + v;
+    }
+  }
+  return { is_error: last.is_error ?? false, num_turns: numTurns || last.num_turns, usage };
 }
 
 export function tokens(result) {

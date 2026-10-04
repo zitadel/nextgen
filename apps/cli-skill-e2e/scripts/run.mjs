@@ -15,8 +15,10 @@ const OUT = process.env.OUT || join(root, "out");
 const REPO = process.env.REPO || "zitadel/nextgen";
 const BRANCH = process.env.BRANCH || "feat/cli-installable-agent-skill";
 const MODEL = process.env.MODEL || "sonnet";
+const SIM_MODEL = process.env.SIM_MODEL || "haiku";
 const IMAGE = process.env.IMAGE || "node:24";
 const MAX_TURNS = process.env.MAX_TURNS || "40";
+const MAX_QA = process.env.MAX_QA || "6";
 const ENV_FILE = process.env.ENV_FILE || "";
 const FRESH = process.env.FRESH === "1";
 
@@ -24,6 +26,11 @@ const hasCred = Boolean(
   ENV_FILE || process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_CODE_OAUTH_TOKEN,
 );
 
+// Each stage is driven as a multi-turn conversation by /harness/scripts/drive.mjs
+// (mounted read-only). "Non-interactive" applies to how the agent drives the
+// CLI, not to the agent↔user conversation, so the driver lets the agent prompt
+// and a simulated user answers. The driver reads /harness/journey.config.json
+// and writes /out/stage<N>.jsonl + /out/after-stage<N>.json.
 const CONTAINER = `set -e
 mkdir -p /work && cd /work
 __INSTALL__
@@ -31,11 +38,7 @@ __INSTALL__
 TOK="\${ANTHROPIC_API_KEY:-}"; case "$TOK" in sk-ant-oat*) export CLAUDE_CODE_OAUTH_TOKEN="$TOK"; unset ANTHROPIC_API_KEY ;; esac
 npm i -g @anthropic-ai/claude-code@latest >/out/claude-install.log 2>&1 || true
 node "$(npm root -g)/@anthropic-ai/claude-code/install.cjs" >>/out/claude-install.log 2>&1 || true
-run_stage() {
-  claude -p "$2" --model "$MODEL" --output-format stream-json --verbose --dangerously-skip-permissions --max-turns "$MAX_TURNS" > "/out/stage$1.jsonl" 2> "/out/stage$1.err" || true
-  cp /work/.zitadel/schemas/*human-user*.json "/out/after-stage$1.json" 2>/dev/null || true
-}
-for i in $(seq 1 "$STAGE_COUNT"); do v="STAGE_$i"; run_stage "$i" "\${!v}"; done
+node /harness/scripts/drive.mjs
 mkdir -p /out/artifacts && cp -r .zitadel /out/artifacts/ 2>/dev/null || true
 cp zitadel.json .env .env.local /out/artifacts/ 2>/dev/null || true`;
 
@@ -66,12 +69,14 @@ function runConfig(name) {
   if (ENV_FILE) args.push("--env-file", ENV_FILE);
   else if (process.env.CLAUDE_CODE_OAUTH_TOKEN) args.push("-e", "CLAUDE_CODE_OAUTH_TOKEN");
   else args.push("-e", "ANTHROPIC_API_KEY");
-  args.push("-e", `STAGE_COUNT=${cfg.stages.length}`);
-  for (const s of cfg.stages) args.push("-e", `STAGE_${s.id}=${s.prompt}`);
-  args.push("-e", `MODEL=${MODEL}`, "-e", `MAX_TURNS=${MAX_TURNS}`, "-e", "IS_SANDBOX=1");
+  args.push("-e", `MODEL=${MODEL}`, "-e", `SIM_MODEL=${SIM_MODEL}`, "-e", `MAX_TURNS=${MAX_TURNS}`);
+  args.push("-e", `MAX_QA=${MAX_QA}`, "-e", "OUT=/out", "-e", "WORK=/work", "-e", "IS_SANDBOX=1");
   args.push("-e", "ZITADEL_TELEMETRY=0", "-e", "DO_NOT_TRACK=1", "-e", "DISABLE_TELEMETRY=1");
   args.push("-e", "DISABLE_AUTOUPDATER=1", "-e", "DISABLE_ERROR_REPORTING=1");
-  args.push("-v", `${dir}:/out`, IMAGE, "bash", "-lc", CONTAINER.replace("__INSTALL__", install));
+  args.push("-v", `${dir}:/out`);
+  args.push("-v", `${root}/scripts:/harness/scripts:ro`);
+  args.push("-v", `${root}/journey.config.json:/harness/journey.config.json:ro`);
+  args.push(IMAGE, "bash", "-lc", CONTAINER.replace("__INSTALL__", install));
 
   const r = spawnSync("docker", args, { stdio: "inherit" });
   if (r.status !== 0) console.error(`!! ${name} docker exited ${r.status}`);
