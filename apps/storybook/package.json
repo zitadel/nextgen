@@ -9,7 +9,7 @@
     "build": "storybook build --output-dir dist",
     "typecheck": "tsc --build tsconfig.json",
     "test": "vitest run --project=storybook",
-    "test:all": "node ./scripts/test-with-retry.mjs"
+    "test:all": "pnpm run test"
   },
   "dependencies": {
     "@zitadel/api": "workspace:*",
