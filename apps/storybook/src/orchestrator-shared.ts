@@ -253,7 +253,16 @@ export function freezePasskeyCeremony(): () => void {
     value: { get: never, create: never },
   });
   return () => {
-    if (originalCredentials) Object.defineProperty(navigator, "credentials", originalCredentials);
+    // `navigator.credentials` is normally an accessor on `Navigator.prototype`,
+    // so there is no OWN descriptor to restore — defining the stub created one
+    // that shadows the prototype. Delete it (don't just skip), or the
+    // never-settling stub leaks into every later story. Mirrors
+    // `packages/components/src/atoms/zl-passkey.spec.ts`.
+    if (originalCredentials) {
+      Object.defineProperty(navigator, "credentials", originalCredentials);
+    } else {
+      delete (navigator as unknown as Record<string, unknown>).credentials;
+    }
     if (originalPublicKeyCredential) {
       Object.defineProperty(window, "PublicKeyCredential", originalPublicKeyCredential);
     } else {
