@@ -31,7 +31,17 @@ export default {
     msw: { handlers: mock.handlers },
   },
   args: { ...orchestratorDefaultArgs, passkey: true },
-  argTypes: orchestratorArgTypes,
+  argTypes: {
+    ...orchestratorArgTypes,
+    // Passkey is offered only on the identifier step, so this whole group is
+    // login-only: lock `purpose` so `register` (which has no passkey action)
+    // can't be selected and silently break these stories.
+    purpose: {
+      ...orchestratorArgTypes.purpose,
+      control: false,
+      table: { ...orchestratorArgTypes.purpose.table, disable: true },
+    },
+  },
   beforeEach: orchestratorBeforeEach,
   render: orchestratorRender,
 };
@@ -60,6 +70,12 @@ export const PasskeyOffered: Story = { args: { passkey: true } };
  */
 export const PasskeyLogin: Story = {
   args: { passkey: true },
+  // This story drives a fixed identifier → passkey-login journey, so the
+  // operator-preview control doesn't apply (preview freezes the entry step and
+  // submits nothing). Lock it rather than let it silently no-op in the URL.
+  argTypes: {
+    previewState: { control: false, table: { disable: true } },
+  },
   render: ({ purpose, variant, theme }) =>
     html`<zitadel-login
       variant=${variant}
