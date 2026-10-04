@@ -81,6 +81,20 @@ that the surfaces reach the API at all. Management screens work here too: they
 authorize with the signed-in user's session cookie and grants (#1300), so a
 test that needs one grants its user access through the API first.
 
+## Platform-project coverage
+
+```sh
+moon run console-e2e:e2e-platform
+```
+
+Boots the built Go binary with the platform project bootstrapped (the server
+default). An operator signs up through the console, is granted the harness
+project by email, and uses the screens on the session cookie alone. The console
+selects that project itself (the operator's only grant, as `?project=`), so the
+screens run in a project other than the one the console signs into.
+`e2e-embedded` cannot cover this: it switches the platform project off to sign
+its seeded users into the harness project.
+
 ## Handling the handshake
 
 The handshake under `.zitadel-testing/` contains the project secret. It is

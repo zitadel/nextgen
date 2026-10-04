@@ -1,10 +1,10 @@
 # Agent Instructions — `apps/console-e2e`
 
-Playwright project for the console's three runtime boundaries. Defer to root
+Playwright project for the console's four runtime boundaries. Defer to root
 [`AGENTS.md`](../../AGENTS.md) for repo-wide rules; lane descriptions and the
 secret-handling caveat live in [`README.md`](README.md).
 
-## The three lanes
+## The four lanes
 
 - `moon run console-e2e:e2e` — **embedded shell smoke**: Vite-preview of the
   built console under its production embed base `/ui/console/`. No live API.

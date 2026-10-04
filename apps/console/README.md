@@ -5,7 +5,8 @@ will manage their account and settings. Built with **shadcn/ui** and
 `@zitadel/design-tokens` (`css/shadcn.css`), and embedded into the Go server
 under `/ui/console/`.
 
-Architecture decisions for this app are recorded in the repo-wide
+Architecture decisions for this app are recorded in the console ADRs under
+[`docs/adrs/`](docs/adrs/README.md); repo-wide decisions are in the root
 [`docs/adrs/`](../../docs/adrs/README.md) index.
 
 Login / shared atom development lives in
@@ -28,40 +29,48 @@ light `[data-theme="light"]` override, so components only reference semantic
 tokens and re-theme automatically. See [`src/theme.ts`](src/theme.ts) and the
 pre-paint script in [`index.html`](index.html).
 
-## Screen coverage (built vs. designed)
+## Screens
 
-The Figma handoff (`j3qqriDab6WQfrlgLujf4Y`, Vega) currently designs the
-**Users** screen (desktop + mobile) and the **Sidebar 08. / Sidebar 07.** chrome.
-Other destinations have no screen design and, mostly, no API yet.
+Every screen is a file route under `src/routes/`, and the sidebar is built from
+each route's `staticData.nav` ([`src/nav.ts`](src/nav.ts)).
 
-**Built and in the sidebar:**
+**In the sidebar:**
 
-- **Users** — Figma Users screen (shadcn `Table` / `Tabs` / …), static mock data
-  until the user-management API lands. Desktop + mobile (`Dashboard xs`) layouts.
-- **Sessions**, **Projects** — list pages still on shared `resource-page`
-  helpers; migrating to shadcn as designs land.
-- **Home** (`/`) — static General mock, reached via the sidebar logo (no nav
-  row). Being replaced when a home design ships.
+- **Projects** (`/projects`): the one entry outside a project, and the only one
+  until a project is selected.
+- **Teams** (`/teams`, `/teams/$teamId`).
+- **Users** (`/users`, `/users/$userId`), with **User schemas** (`/schemas`,
+  `/schemas/$schemaId`) nested under it.
+- **Login flows** (`/flow-definitions`, `/flow-definitions/$definitionId`), with
+  **Branding** (`/branding`) nested under it.
+- **Project settings** (`/project`).
+- **Profile** (`/settings/profile`), in the Settings view.
 
-**Designed sidebar IA not yet built (backlog):** App groups, Applications,
-Analytics, Activity Log (shown as disabled rows). Add each when its design and
-API exist — attaching `staticData.nav` to the new route re-lists it.
+**Not in the sidebar:**
+
+- `/` redirects to Teams, `/settings` to Profile, and `/projects/$projectId` to
+  `/project` with that project selected.
+- `/system` shows server health.
+- `/login` and `/claim` render outside the app shell.
+
+The sidebar lists only built screens (`DESIGN_ONLY_NAV` in `src/nav.ts` is
+empty). Attaching `staticData.nav` to a new route lists it.
 
 ## Shell
 
 `AppShell` is shadcn's `Sidebar` block (`collapsible="icon"`):
 
-- Desktop expanded = Sidebar 08. (256px)
-- Desktop collapsed / mobile = Sidebar 07. icon rail (48px), with a Sheet
+- Desktop expanded = 256px sidebar
+- Desktop collapsed / mobile = icon rail (48px), with a Sheet
   overlay available for the expanded label view
-- Context bar: org/project `Popover` switchers + theme toggle
+- Context bar: project `Popover` switcher + theme toggle
 
 ## API access and auth
 
 The console holds **no long-lived credential in the browser bundle**. It calls a
-same-origin API base (`/api` by default), and a server-side proxy attaches the
-`Authorization: Bearer` token before forwarding to the API. See the Vite proxy
-config and environment variables below.
+same-origin API base (`/api` under the dev server, the origin root when
+embedded). No bearer is attached anywhere: the `__nextgen_session` cookie
+authorizes. See the Vite proxy config and environment variables below.
 
 ### Console sign-in (Console ADR 0003)
 
@@ -77,7 +86,7 @@ The cookie authenticates the console UI, the session endpoints, and the
 management API: a signed-in person sees and changes what their grants on the
 project allow (#1300). No project secret is involved — see
 [ADR 0003](docs/adrs/0003-console-authentication.md) for the model and its
-caveats (including the widget's dark-only styling for now).
+caveats.
 
 ### Runtime discovery and the default project (Console ADR 0004)
 
@@ -119,7 +128,7 @@ document renders a retryable "Server unavailable" screen instead of the app —
 deliberately distinct from the setup hint, because "no project yet" would send
 an operator to `zitadel setup` for a problem setup cannot fix. Running the
 console against something that serves no runtime document (a backend-less
-`vite preview`, the api-mock loop below) is the one legitimate case for the
+`vite preview`) is the one legitimate case for the
 old behavior, and it says so explicitly: set `VITE_CONSOLE_RUNTIME_FALLBACK=1`
 *for the build or dev server*, and discovery failures resolve to `standalone`
 again with a warning in the browser console. Never set it for the embedded
@@ -194,7 +203,7 @@ embed base path.
 | --- | --- | --- |
 | `CONSOLE_BACKEND_URL` | Node (dev proxy) | Upstream API origin (defaults in `vite.config.mts`) |
 | `CONSOLE_DEV_PROXY_LOG` | Node (dev proxy) | Set to `1` to print each proxied request — for a screen that answers 401/403/404 when it is not obvious what the server was asked |
-| `VITE_CONSOLE_API_BASE` | Client | Same-origin API base the SDK calls (default `/api`) |
+| `VITE_CONSOLE_API_BASE` | Client | Same-origin API base the SDK calls (default `/api` under the dev server, the origin root in a build) |
 | `VITE_CONSOLE_RUNTIME_FALLBACK` | Client (build/dev time) | Opt-in for runs with no `/console/runtime.json` (`vite preview`): failed discovery resolves to `standalone` instead of the connectivity error. Never set it for the embedded build |
 
 ## Commands

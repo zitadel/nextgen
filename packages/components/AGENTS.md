@@ -146,14 +146,17 @@ rather than building attribute selectors with `CSS.escape(value)`.
 
 Output from the Liquid pipeline is run through DOMPurify with an allowlist
 built from `manifestRegistry`. When you add a new attribute or part to an atom,
-update its manifest in `manifests.ts` so the sanitiser keeps it. Anything not
-in the allowlist is silently stripped.
+update its manifest in `manifests.ts`: `exportparts` forwarding is derived from
+the manifest's `parts`, so an unlisted part cannot be reached through the
+orchestrator. On `zl-*` elements the sanitiser keeps any lowercase attribute
+name; on other elements, anything not in the allowlist is silently stripped.
 
 ### Tokens, not magic values
 
-Atom styles must consume design tokens through the `t` helper
+An atom's `zl-<atom>.css` references `var(--zl-*)` directly. Styles written in
+a Lit `css` template consume tokens through the `t` helper
 (`src/styles/tokens.ts`), which wraps the `@zitadel/design-tokens` `cssVars`
-tree as Lit `CSSResult` values (e.g. `t.color.surface.defaultWhite`). Tokens
+tree as Lit `CSSResult` values (e.g. `t.theme.background`). Tokens
 themselves are owned by the `@zitadel/design-tokens` package — add new ones
 there, not here. The orchestrator maps `branding` tokens to CSS variables on
 its own shadow root — do not reach for inline styles in atoms.
@@ -227,7 +230,7 @@ route) is covered end-to-end in `apps/demo-next-e2e/` and
 `apps/demo-nuxt-e2e/`, not here. The terminal `handoff_token` is exchanged
 through the generated `exchangeSession` wrapper in `api-client.ts` (which
 hits the SDK proxy path); there is no `session-exchange-path` attribute. Unit
-coverage lives in `api-client.spec.ts` and `zitadel-login.spec.ts`. When a
+coverage lives in `zitadel-login.spec.ts`. When a
 change touches `maybeCompleteFlow` or the `postSignInUrl` path, run **both**
 e2e projects — they exercise different SDK middlewares against the same
 orchestrator code, which is how a regression in one framework slips past the
@@ -242,15 +245,17 @@ the relevant build tasks so CI is safe; manual loops need a fresh
 
 The interactive workbench is [`apps/storybook`](../../apps/storybook/README.md)
 (`moon run storybook:dev`, `:6006`): the Lit atoms and the
-`<zitadel-login>` orchestrator (MSW via `msw-storybook-addon`). It loads the built `dist/`, so rebuild after source
-changes (`moon run components:build`) — the Storybook tasks depend on it.
+`<zitadel-login>` orchestrator (MSW via `msw-storybook-addon`). Its bundler aliases this package to source
+(`apps/storybook/.storybook/main.ts`), so the dev server hot-reloads atom edits without a rebuild.
 
 ## Build
 
 `tsdown.config.ts` produces ESM + `.d.mts` and externalises `lit`, `liquidjs`,
-`dompurify`, and the `@zitadel/api*` packages so npm consumers dedupe
+`dompurify`, and `lucide` so npm consumers dedupe
 with their own copies. Do not bundle those in by default — that breaks shared
-instances and bloats the package.
+instances and bloats the package. `@zitadel/api` and `@zitadel/design-tokens`
+are inlined; `@zitadel/config` stays external in the library build and is
+inlined only into the standalone file.
 
 ## Don't
 

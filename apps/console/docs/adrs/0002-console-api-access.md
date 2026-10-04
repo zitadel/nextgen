@@ -135,7 +135,7 @@ instead of writing its own fetch wrapper:
 import { configureZitadel, getApi } from "@zitadel/api/config";
 
 const project = configureZitadel({
-  proxyPath: import.meta.env.VITE_CONSOLE_API_BASE ?? "/api", // same-origin API base
+  proxyPath: import.meta.env.VITE_CONSOLE_API_BASE || "/api", // same-origin API base
   projectId: "", // learnt at boot from /console/runtime.json (Console ADR 0004 §3)
 });
 
@@ -199,7 +199,7 @@ server: {
 
 So dev and prod differ only in whether a proxy sits in front of the API, never
 in whether the browser holds a secret — it never does. The base resolves in
-`src/api/zitadel.ts` as `VITE_CONSOLE_API_BASE ?? (DEV ? "/api" : "")`: the
+`src/api/zitadel.ts` as `VITE_CONSOLE_API_BASE || (DEV ? "/api" : "")`: the
 env var is the escape hatch for a deployment that mounts the API elsewhere,
 `/api` is the dev-proxy path, and root is what the embedded build talks to.
 `vite preview` deliberately proxies nothing, so it cannot be mistaken for the
