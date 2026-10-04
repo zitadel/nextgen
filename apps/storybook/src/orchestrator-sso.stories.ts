@@ -61,10 +61,10 @@ export const SignUpWithSsoProviders: Story = { args: { sso: "google", purpose: "
  */
 export const RegisterAfterProvider: Story = {
   args: { sso: "google" },
-  render: ({ purpose, theme }) => {
+  render: ({ purpose, variant, theme }) => {
     const flowId = mock.returnFromProvider({ provider: "google", email: "ada@example.com" });
     return html`<zitadel-login
-      variant="page"
+      variant=${variant}
       .purpose=${purpose}
       theme=${theme}
       resume-flow-id=${flowId}
@@ -79,10 +79,10 @@ export const RegisterAfterProvider: Story = {
  */
 export const ConflictAfterProvider: Story = {
   args: { sso: "google" },
-  render: ({ purpose, theme }) => {
+  render: ({ purpose, variant, theme }) => {
     const flowId = mock.returnFromProvider({ provider: "google", email: "exists@example.com" });
     return html`<zitadel-login
-      variant="page"
+      variant=${variant}
       .purpose=${purpose}
       theme=${theme}
       resume-flow-id=${flowId}

@@ -120,12 +120,14 @@ export const RegisterPasswordStep: Story = {
 export const RecoverStep: Story = {
   play: async ({ canvasElement }) => {
     const login = canvasElement.querySelector("zitadel-login");
+    // The recover affordance is a `navigate` action rendered as an anchor with a
+    // stable `data-action`; match on that, not its localized label (the
+    // orchestrator translates action text from `navigator.language`, so a
+    // text match would time out in a non-English browser).
     const link = await waitFor(() =>
-      [...(login?.shadowRoot?.querySelectorAll("a") ?? [])].find((a) =>
-        /forgot/i.test(a.textContent ?? ""),
-      ),
+      login?.shadowRoot?.querySelector('[data-action="recover"]'),
     );
-    (link as HTMLAnchorElement).click();
+    (link as HTMLElement).click();
     await waitFor(
       () =>
         login?.shadowRoot != null &&

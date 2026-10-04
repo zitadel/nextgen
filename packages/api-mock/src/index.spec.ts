@@ -8,7 +8,14 @@ import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "vitest";
 
 import type { MockHandle } from "./handlers.js";
-import { applyBranding, clearBranding, PASSWORD_FIELD, setupMockHandlers } from "./index.js";
+import {
+  applyBranding,
+  applyPasskey,
+  clearBranding,
+  clearPasskey,
+  PASSWORD_FIELD,
+  setupMockHandlers,
+} from "./index.js";
 
 const PROJECT_ID = "proj_demo";
 
@@ -47,6 +54,9 @@ beforeEach(() => {
   server.use(...mock.handlers);
   mock.reset();
   clearBranding();
+  // The passkey offer is a module-level overlay like branding; clear it so a
+  // test that enables it cannot leak the action into the next test's flow.
+  clearPasskey();
 });
 
 afterEach(() => {
@@ -550,5 +560,45 @@ describe("returnFromProvider", () => {
 
     const second = mock.returnFromProvider({ provider: "google", email: "grace@example.test" });
     expect((await getFlowStep(second)).step.name).toBe("done");
+  });
+});
+
+describe("passkey overlay", () => {
+  test("is off by default: the identifier step offers no passkey action", async () => {
+    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    expect(start.step.name).toBe("identifier");
+    expect(start.step.actions?.some((a) => a.name === "passkey")).toBe(false);
+  });
+
+  test("applyPasskey adds exactly one identifier action and routes to passkey-login", async () => {
+    applyPasskey(true);
+
+    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    expect(start.step.name).toBe("identifier");
+    const offered = (start.step.actions ?? []).filter((a) => a.name === "passkey");
+    expect(offered).toHaveLength(1);
+    expect(offered[0]?.kind).toBe("passkey");
+
+    // A re-render must not accumulate a second copy (the overlay is idempotent).
+    const reread = await getFlowStep(start.id);
+    expect((reread.step.actions ?? []).filter((a) => a.name === "passkey")).toHaveLength(1);
+
+    // Choosing it reaches the dedicated passkey-login step with its WebAuthn
+    // challenge — the journey the Storybook PasskeyLogin story drives.
+    const login = await submitFlowStep(start.id, {
+      session_token: start.session_token,
+      action: "passkey",
+      fields: { email: "alice@acme.com" },
+    });
+    expect(login.step.name).toBe("passkey-login");
+    expect(login.step.challenge?.method).toBe("passkey");
+  });
+
+  test("clearPasskey removes the action again", async () => {
+    applyPasskey(true);
+    clearPasskey();
+
+    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    expect(start.step.actions?.some((a) => a.name === "passkey")).toBe(false);
   });
 });
