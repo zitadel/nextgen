@@ -1,6 +1,7 @@
 import type { Meta } from "@storybook/web-components-vite";
 import {
   applyBranding,
+  applyPasskey,
   applySsoProviders,
   clearBranding,
   clearSsoProviders,
@@ -38,23 +39,37 @@ import { brandingPresets, type BrandingPresetId } from "./branding-presets.js";
  */
 export interface OrchestratorArgs {
   purpose: "login" | "register";
-  branding: BrandingPresetId;
+  variant: "widget" | "page";
+  branding: BrandingPresetId | "none";
   theme: "" | "light" | "dark" | "auto";
-  sso: boolean;
+  sso: SsoChoice;
+  passkey: boolean;
   previewState: "" | LoginPreviewState;
 }
+
+/** Which identity providers the mocked flow offers — a scalar so it stays in
+ * the shareable Storybook URL. */
+export type SsoChoice = "off" | "google" | "google-github";
 
 export const mock = setupMockHandlers();
 
 /**
- * What `zitadel sso enable google` leaves in the flow, plus a tenant's own OIDC
- * connection — the second one has no brand mark, which is what every provider
- * looks like before its artwork lands.
+ * Identity-provider sets the `sso` control can hand to the mock, as
+ * `zitadel sso enable <provider>` would leave in the flow. `google-github`
+ * adds a second well-known provider so list rendering is visible; a provider
+ * whose `template` has no brand mark still gets a labelled button.
+ *
+ * Keyed by a scalar choice so the control round-trips in the Storybook URL
+ * (an editable provider array would not), keeping stories shareable.
  */
-export const SSO_PROVIDERS = [
-  { id: "google", name: "Google", template: "google" },
-  { id: "acme", name: "Acme SSO", template: "oidc-generic" },
-];
+const SSO_SETS: Record<SsoChoice, { id: string; name: string; template: string }[]> = {
+  off: [],
+  google: [{ id: "google", name: "Google", template: "google" }],
+  "google-github": [
+    { id: "google", name: "Google", template: "google" },
+    { id: "github", name: "GitHub", template: "github" },
+  ],
+};
 
 /**
  * The shared setup every `<zitadel-login>` story group uses: one mock, one set
@@ -73,46 +88,101 @@ export const orchestratorBase = {
     layout: "fullscreen",
     msw: { handlers: mock.handlers },
   },
-  args: { purpose: "login", branding: "centered", theme: "", sso: false, previewState: "" },
+  args: {
+    purpose: "login",
+    variant: "page",
+    branding: "centered",
+    theme: "",
+    sso: "off",
+    passkey: false,
+    previewState: "",
+  },
   argTypes: {
+    // Two sections in the Controls panel: props the host sets on the
+    // `<zitadel-login>` element, and the values the flow engine (here, the
+    // mock backend) returns in its responses.
     purpose: {
-      control: "inline-radio",
+      control: { type: "inline-radio", labels: { login: "login (sign in)", register: "register (sign up)" } },
       options: ["login", "register"],
-      description: "Flow purpose — which step (and fields) the mock returns.",
+      description:
+        "Host prop `purpose`: which flow to run — `login` (sign in) or `register` (sign up). Decides the first step, and the fields, the mock returns.",
+      table: {
+        category: "Component",
+        type: { summary: '"login" | "register"' },
+        defaultValue: { summary: "login" },
+      },
     },
-    branding: {
-      control: "select",
-      options: Object.keys(brandingPresets),
-      description: "Tenant branding the mock overlays on every response.",
+    variant: {
+      control: "inline-radio",
+      options: ["page", "widget"],
+      description:
+        "Host prop `variant`: how the element fills its container. `page` = fills its box and paints its own background (a full-page login; default theme `dark`). `widget` = shrinks to its content and stays transparent, to embed inside your own page (default theme `auto`).",
+      table: {
+        category: "Component",
+        type: { summary: '"page" | "widget"' },
+        // The element's own default is `widget`; these stories render `page`.
+        defaultValue: { summary: "widget" },
+      },
     },
     theme: {
-      control: "inline-radio",
+      control: {
+        type: "select",
+        labels: {
+          "": "unset (defer to branding)",
+          light: "light",
+          dark: "dark",
+          auto: "auto (follow OS)",
+        },
+      },
       options: ["", "light", "dark", "auto"],
       description:
-        "The embedding page's own preference. Empty defers to the revision's mode; a side the revision does not publish cannot be selected.",
-    },
-    sso: {
-      control: "boolean",
-      description:
-        "Offer identity providers on the steps a sign-in can start from, as a project that ran `zitadel sso enable` has.",
+        "Host prop `theme`: the embedding page's colour-mode preference. `unset` defers to the branding's own mode; `light`/`dark` force a side; `auto` follows the visitor's OS. Takes precedence over the branding's mode — EXCEPT a branding that publishes only one side forces that side and ignores this (e.g. `dark`, `light-only`).",
+      table: {
+        category: "Component",
+        type: { summary: '"" | "light" | "dark" | "auto"' },
+        defaultValue: { summary: "unset" },
+      },
     },
     previewState: {
       control: "select",
       options: ["", ...LOGIN_PREVIEW_STATES],
       description:
-        "Preview mode: show the served step in a state and submit nothing. Empty runs the flow for real.",
+        "Host prop `preview-state` (operator preview): freeze the current step in a visual state — e.g. `validation_error`, `loading`, `success` — and submit nothing. `unset` runs the flow for real.",
+      table: { category: "Component", defaultValue: { summary: "unset" } },
+    },
+    branding: {
+      control: "select",
+      options: ["none", ...Object.keys(brandingPresets)],
+      description:
+        "Backend-returned branding the mock overlays on every response (the component has no `branding` prop — it renders what the flow engine sends). `none` = no branding, so the component uses its design-system defaults (which ship both light and dark). Presets ending in a single side (`dark`, `light-only`) demonstrate the single-sided gating on `theme`.",
+      table: { category: "Flow engine", defaultValue: { summary: "none" } },
+    },
+    sso: {
+      control: "select",
+      options: ["off", "google", "google-github"],
+      description:
+        "Backend-returned identity providers offered on sign-in-capable steps, as `zitadel sso enable <provider>` leaves them: `off` (the shipped default, no providers), `google` (one), or `google-github` (two). Rendered as `<zl-sso-providers>` buttons.",
+      table: { category: "Flow engine", defaultValue: { summary: "off" } },
+    },
+    passkey: {
+      control: "boolean",
+      description:
+        "Backend-returned passkey offer: when on, the identifier step gains a `Sign in with a passkey` action (as a project with passkeys enabled sends). Choosing it advances the flow to the separate `passkey-login` step. Off is the shipped default.",
+      table: { category: "Flow engine", defaultValue: { summary: "false" } },
     },
   },
   beforeEach: ({ args }) => {
     mock.reset();
     clearBranding();
-    applyBranding(brandingPresets[args.branding]);
+    if (args.branding !== "none") applyBranding(brandingPresets[args.branding]);
     clearSsoProviders();
-    if (args.sso) applySsoProviders(SSO_PROVIDERS);
+    const providers = SSO_SETS[args.sso];
+    if (providers.length > 0) applySsoProviders(providers);
+    applyPasskey(args.passkey);
   },
-  render: ({ purpose, theme, previewState }) =>
+  render: ({ purpose, variant, theme, previewState }) =>
     html`<zitadel-login
-      variant="page"
+      variant=${variant}
       .purpose=${purpose}
       theme=${theme}
       preview-state=${previewState}

@@ -29,6 +29,7 @@
 import type { SetupWorker } from "msw/browser";
 
 import { applyBranding, clearBranding } from "./branding.js";
+import { applyPasskey, clearPasskey } from "./passkey.js";
 import { applySsoProviders, clearSsoProviders } from "./sso-providers.js";
 import { setupMockHandlers, type CapturedRequest, type MockHandle } from "./handlers.js";
 
@@ -60,7 +61,15 @@ export function getCapturedRequests(): readonly CapturedRequest[] {
   return _browserHandle?.getCaptured() ?? [];
 }
 
-export { applyBranding, clearBranding, applySsoProviders, clearSsoProviders, setupMockHandlers };
+export {
+  applyBranding,
+  clearBranding,
+  applySsoProviders,
+  clearSsoProviders,
+  applyPasskey,
+  clearPasskey,
+  setupMockHandlers,
+};
 export type { MockSsoProvider } from "./sso-providers.js";
 
 /**

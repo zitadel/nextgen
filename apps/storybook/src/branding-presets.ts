@@ -43,7 +43,9 @@ export const brandingPresets = {
   centered: {
     layout: "centered",
     theme: {
-      mode: "light",
+      // Ships both sides, so the `theme` control actually toggles light/dark on
+      // the default story (`mode: auto` follows the control / the OS).
+      mode: "auto",
       light: {
         logo_url: new URL("./assets/zitadel-logo-dark.svg", import.meta.url).href,
         palette: {
@@ -56,6 +58,20 @@ export const brandingPresets = {
           text: "#0F172A",
           text_muted: "#64748B",
           link: "#2563EB",
+        },
+      },
+      dark: {
+        logo_url: new URL("./assets/zitadel-logo-light.svg", import.meta.url).href,
+        palette: {
+          primary: "#7C9CFF",
+          on_primary: "#0A0A0A",
+          background: "#0A0A0A",
+          surface: "#111111",
+          muted: "#1A1A1A",
+          border: "#262626",
+          text: "#FAFAFA",
+          text_muted: "#A1A1AA",
+          link: "#9DBBFF",
         },
       },
     },
