@@ -60,11 +60,15 @@ function agentTurn(stageFile, message, sessionId) {
     } catch {
       continue;
     }
-    if (e.type === "system" && e.subtype === "init" && e.session_id) sid = e.session_id;
-    else if (e.type === "assistant")
-      for (const b of e.message?.content ?? [])
+    if (e.type === "system" && e.subtype === "init" && e.session_id) {
+      sid = e.session_id;
+    } else if (e.type === "assistant") {
+      for (const b of e.message?.content ?? []) {
         if (b?.type === "text" && (b.text ?? "").trim()) lastText = b.text;
-    else if (e.type === "result") isError = e.is_error ?? isError;
+      }
+    } else if (e.type === "result") {
+      isError = e.is_error ?? isError;
+    }
   }
   return { sessionId: sid, lastText, isError };
 }
