@@ -59,12 +59,13 @@ export const SignUpWithSsoProviders: Story = { args: { sso: "google", purpose: "
  */
 export const RegisterAfterProvider: Story = {
   args: { sso: "google" },
-  render: ({ purpose, variant, theme }) => {
+  render: ({ purpose, variant, theme, previewState }) => {
     const flowId = mock.returnFromProvider({ provider: "google", email: "ada@example.com" });
     return html`<zitadel-login
       variant=${variant}
       .purpose=${purpose}
       theme=${theme}
+      preview-state=${previewState}
       resume-flow-id=${flowId}
     ></zitadel-login>`;
   },
@@ -77,12 +78,13 @@ export const RegisterAfterProvider: Story = {
  */
 export const ConflictAfterProvider: Story = {
   args: { sso: "google" },
-  render: ({ purpose, variant, theme }) => {
+  render: ({ purpose, variant, theme, previewState }) => {
     const flowId = mock.returnFromProvider({ provider: "google", email: "exists@example.com" });
     return html`<zitadel-login
       variant=${variant}
       .purpose=${purpose}
       theme=${theme}
+      preview-state=${previewState}
       resume-flow-id=${flowId}
     ></zitadel-login>`;
   },
