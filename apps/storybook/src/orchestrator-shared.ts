@@ -6,9 +6,14 @@ import {
   clearBranding,
   clearSsoProviders,
   setupMockHandlers,
+  type MockSsoProvider,
 } from "@zitadel/api-mock";
 import { html } from "lit";
-import { LOGIN_PREVIEW_STATES, type LoginPreviewState } from "@zitadel/components";
+import {
+  LOGIN_PREVIEW_STATES,
+  SHIPPED_BRAND_ICON_NAMES,
+  type LoginPreviewState,
+} from "@zitadel/components";
 import { brandingPresets, type BrandingPresetId } from "./branding-presets.js";
 
 /**
@@ -46,28 +51,38 @@ export interface OrchestratorArgs {
   previewState: "" | LoginPreviewState;
 }
 
-/** Which identity providers the mocked flow offers — a scalar so it stays in
+/** Whether the mocked flow offers identity providers — a scalar so it stays in
  * the shareable Storybook URL. */
-export type SsoChoice = "off" | "google" | "google-github";
+export type SsoChoice = "off" | "on";
 
 export const mock = setupMockHandlers();
 
 /**
- * Identity-provider sets the `sso` control can hand to the mock, as
- * `zitadel sso enable <provider>` would leave in the flow. `google-github`
- * adds a second well-known provider so list rendering is visible; a provider
- * whose `template` has no brand mark still gets a labelled button.
- *
- * Keyed by a scalar choice so the control round-trips in the Storybook URL
- * (an editable provider array would not), keeping stories shareable.
+ * The providers the mock offers when `sso` is on, **derived from the component
+ * library** instead of a hard-coded list: every brand mark `@zitadel/components`
+ * ships (`SHIPPED_BRAND_ICON_NAMES`, e.g. `brand-google`) becomes a provider whose
+ * button carries that logo. Add a glyph there and it appears here automatically —
+ * no Google/GitHub to drift out of sync, and no dependency on `@zitadel/config`
+ * (Storybook already depends on `@zitadel/components`, not on config).
  */
-const SSO_SETS: Record<SsoChoice, { id: string; name: string; template: string }[]> = {
+const BRAND_PROVIDERS: MockSsoProvider[] = SHIPPED_BRAND_ICON_NAMES.map((brand) => {
+  const template = brand.replace(/^brand-/, "");
+  return { id: template, name: template.charAt(0).toUpperCase() + template.slice(1), template };
+});
+
+/**
+ * A single synthetic provider the component ships no brand mark for, appended to
+ * the derived set so the stories keep demonstrating the label-only fallback:
+ * `<zl-sso-providers>` renders a provider with no matching glyph as a plain
+ * labelled button. Not a real provider — a deliberate UI-state fixture.
+ */
+const NO_MARK_PROVIDER: MockSsoProvider = { id: "acme", name: "Acme Corp", template: "acme" };
+
+/** Provider set per `sso` choice. `on` = every shipped brand + the no-mark
+ * fallback, so list rendering (and the glyph-less case) are both visible. */
+const SSO_SETS: Record<SsoChoice, readonly MockSsoProvider[]> = {
   off: [],
-  google: [{ id: "google", name: "Google", template: "google" }],
-  "google-github": [
-    { id: "google", name: "Google", template: "google" },
-    { id: "github", name: "GitHub", template: "github" },
-  ],
+  on: [...BRAND_PROVIDERS, NO_MARK_PROVIDER],
 };
 
 /**
@@ -111,7 +126,10 @@ export const orchestratorBase = {
       },
     },
     variant: {
-      control: "inline-radio",
+      control: {
+        type: "inline-radio",
+        labels: { page: "page (full-page)", widget: "widget (embedded)" },
+      },
       options: ["page", "widget"],
       description:
         "Host prop `variant`: how the element fills its container. `page` = fills its box and paints its own background (a full-page login; default theme `dark`). `widget` = shrinks to its content and stays transparent, to embed inside your own page (default theme `auto`).",
@@ -142,24 +160,43 @@ export const orchestratorBase = {
       },
     },
     previewState: {
-      control: "select",
+      control: {
+        type: "select",
+        labels: { "": "unset (run the flow for real)" },
+      },
       options: ["", ...LOGIN_PREVIEW_STATES],
       description:
         "Host prop `preview-state` (operator preview): freeze the current step in a visual state — e.g. `validation_error`, `loading`, `success` — and submit nothing. `unset` runs the flow for real.",
       table: { category: "Component", defaultValue: { summary: "unset" } },
     },
     branding: {
-      control: "select",
+      control: {
+        type: "select",
+        // Surface the single-sided gating at point of use: a preset that ships
+        // both palette sides lets `theme` toggle; a single-sided one forces its
+        // side. Presets not listed here fall back to their raw key.
+        labels: {
+          none: "none (design-system defaults)",
+          centered: "centered (both modes)",
+          "two-sided": "two-sided (both modes)",
+          dark: "dark (single-sided)",
+          "light-only": "light-only (single-sided)",
+          split: "split (single-sided)",
+        },
+      },
       options: ["none", ...Object.keys(brandingPresets)],
       description:
         "Backend-returned branding the mock overlays on every response (the component has no `branding` prop — it renders what the flow engine sends). `none` = no branding, so the component uses its design-system defaults (which ship both light and dark). Presets ending in a single side (`dark`, `light-only`) demonstrate the single-sided gating on `theme`.",
       table: { category: "Flow engine", defaultValue: { summary: "none" } },
     },
     sso: {
-      control: "select",
-      options: ["off", "google", "google-github"],
+      control: {
+        type: "inline-radio",
+        labels: { off: "off (shipped default)", on: "on (every shipped provider)" },
+      },
+      options: ["off", "on"],
       description:
-        "Backend-returned identity providers offered on sign-in-capable steps, as `zitadel sso enable <provider>` leaves them: `off` (the shipped default, no providers), `google` (one), or `google-github` (two). Rendered as `<zl-sso-providers>` buttons.",
+        "Backend-returned identity providers on sign-in-capable steps, as `zitadel sso enable` leaves them. `off` = the shipped default (none). `on` = every provider `@zitadel/components` ships a brand mark for (derived from `SHIPPED_BRAND_ICON_NAMES`) plus one without a mark to show the labelled-button fallback. Rendered as `<zl-sso-providers>`.",
       table: { category: "Flow engine", defaultValue: { summary: "off" } },
     },
     passkey: {
@@ -221,52 +258,6 @@ export async function clickAction(canvasElement: HTMLElement, action: string): P
   );
   const inner = await waitFor(() => (button as HTMLElement).shadowRoot?.querySelector("button"));
   (inner as HTMLButtonElement).click();
-}
-
-/**
- * Freeze the WebAuthn ceremony so a passkey step can be shown in the workbench.
- *
- * `<zl-passkey>` auto-runs a real `navigator.credentials` ceremony the instant it
- * mounts — the OS passkey prompt — which can never complete here. This swaps the
- * two ceremony entry points for a promise that never settles (`Promise.race([])`,
- * the same stub the component's own specs use), so the atom stays `pending` and
- * renders its real "waiting for your passkey" UI instead of raising the platform
- * prompt. It mocks a browser API exactly as `msw` mocks the network. Returns a
- * restore function for Storybook `beforeEach` teardown.
- */
-export function freezePasskeyCeremony(): () => void {
-  const never = (): Promise<Credential | null> => Promise.race<Credential | null>([]);
-  const originalCredentials = Object.getOwnPropertyDescriptor(navigator, "credentials");
-  const originalPublicKeyCredential = Object.getOwnPropertyDescriptor(window, "PublicKeyCredential");
-  // The ceremony guards on `window.PublicKeyCredential` before it starts; only
-  // define a stub when the browser has none, so real Chrome's own class stays.
-  if (!("PublicKeyCredential" in window)) {
-    Object.defineProperty(window, "PublicKeyCredential", {
-      configurable: true,
-      value: class PublicKeyCredentialStub {},
-    });
-  }
-  Object.defineProperty(navigator, "credentials", {
-    configurable: true,
-    value: { get: never, create: never },
-  });
-  return () => {
-    // `navigator.credentials` is normally an accessor on `Navigator.prototype`,
-    // so there is no OWN descriptor to restore — defining the stub created one
-    // that shadows the prototype. Delete it (don't just skip), or the
-    // never-settling stub leaks into every later story. Mirrors
-    // `packages/components/src/atoms/zl-passkey.spec.ts`.
-    if (originalCredentials) {
-      Object.defineProperty(navigator, "credentials", originalCredentials);
-    } else {
-      delete (navigator as unknown as Record<string, unknown>).credentials;
-    }
-    if (originalPublicKeyCredential) {
-      Object.defineProperty(window, "PublicKeyCredential", originalPublicKeyCredential);
-    } else {
-      delete (window as unknown as Record<string, unknown>).PublicKeyCredential;
-    }
-  };
 }
 
 export async function waitFor<T>(probe: () => T | null | undefined, timeout = 4000): Promise<T> {

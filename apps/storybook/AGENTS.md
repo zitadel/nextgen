@@ -83,8 +83,14 @@ controls split in two, grouped with `argTypes.<name>.table.category`:
 - **`branding`** — backend-returned; there is no `branding` prop. The Storybook
   presets (`branding-presets.ts`) are fixtures overlaid via `applyBranding`.
   `none` applies nothing → design-system defaults.
-- **`sso`** — backend overlay via `applySsoProviders` (`off` / `google` /
-  `google-github`). A **scalar** on purpose so it round-trips in the URL.
+- **`sso`** — backend overlay via `applySsoProviders`, a scalar `off` / `on` so
+  it round-trips in the URL. The provider **list is derived**, not hard-coded:
+  `on` offers every brand mark `@zitadel/components` ships
+  (`SHIPPED_BRAND_ICON_NAMES`, mapped `brand-google` → a Google provider) plus one
+  synthetic provider with no mark, to keep showing the labelled-button fallback.
+  Add a glyph in `@zitadel/components` and it appears here automatically — don't
+  re-introduce a hard-coded Google/GitHub list, and don't depend on
+  `@zitadel/config` (Storybook depends on `@zitadel/components`, not config).
 - **`passkey`** — backend overlay via `applyPasskey` (off by default). When on,
   the identifier step gains a "Sign in with a passkey" action. Both overlays are
   off by default so the mock keeps mirroring the shipped flow (and the api-mock
@@ -92,7 +98,7 @@ controls split in two, grouped with `argTypes.<name>.table.category`:
 
 ### Shareable links
 
-Storybook encodes args in the URL (`?path=…&args=branding:dark;sso:google`), so
+Storybook encodes args in the URL (`?path=…&args=branding:dark;sso:on`), so
 every control change is a shareable link. Keep controls **scalar** (enums /
 booleans) so they serialise cleanly; editable object/array controls do **not**
 round-trip and break the shareable-link guarantee.
@@ -115,16 +121,17 @@ the flow to it (via `play`). Covered: `identifier` (SignIn), `register` (SignUp)
 passkey offer (PasskeyOffered), and the passkey ceremony step `passkey-login`
 (PasskeyLogin).
 
-`passkey-login` is special: the step mounts an invisible `<zl-passkey>` that
-auto-runs a real `navigator.credentials.get()` ceremony on mount — the OS passkey
-prompt, which can't complete in the workbench. `freezePasskeyCeremony()`
-(`orchestrator-shared.ts`) stands in for that browser API with a promise that
-never settles (the same `Promise.race([])` stub the component specs use), so the
-atom stays in its `pending` state and renders its real "waiting for your passkey"
-UI instead of raising the prompt. It mocks a browser API the same way `msw` mocks
-the network; the story installs it in `beforeEach` and the returned teardown
-restores `navigator.credentials` so no other story is affected. This is also why
-`<zl-passkey>` still has no atom story — frozen, it only has a pending state.
+`passkey-login` is special: the step mounts `<zl-passkey>`, which would auto-run a
+real `navigator.credentials.get()` ceremony on mount — the OS passkey prompt,
+which can't complete in the workbench. Rather than mock the browser API, the story
+sets the **`manual-ceremony`** host prop on `<zitadel-login>` (a real preview
+capability — see `packages/components`): the orchestrator then renders
+`<zl-passkey manual>`, so the ceremony never auto-starts and no prompt is raised.
+The story shows the passkey screen **at rest** — the "waiting for your passkey"
+in-flight UI is not shown, because nothing is running (manual mode). This replaced
+an earlier `freezePasskeyCeremony()` stub that patched `navigator.credentials`;
+don't bring the stub back — the component flag is the supported way. `<zl-passkey>`
+still has no atom story (its only visible state is the in-flight ceremony).
 
 **Not storied on purpose:** `passkey-setup` / `passkey-upsell` (legacy; the
 default flow no longer routes through them — don't revive them to force a story),
