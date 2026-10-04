@@ -73,6 +73,13 @@ export type LiquidContext = {
   gates: CreateFlow201StepGates;
   sso_providers: readonly CreateFlow201StepSsoProvidersItem[];
   challenge: CreateFlow201StepChallenge | null;
+  /**
+   * Render a WebAuthn challenge inert: `<zl-passkey manual>`, so it does NOT
+   * auto-start the `navigator.credentials` ceremony on mount. Lets a preview or
+   * workbench show the passkey screen without raising the OS prompt (which can't
+   * complete there). The challenge is still passed; only auto-start is off.
+   */
+  manual_ceremony: boolean;
   messages: readonly FlowMessage[];
   identity: FlowIdentity | null;
   errors: readonly FlowError[];

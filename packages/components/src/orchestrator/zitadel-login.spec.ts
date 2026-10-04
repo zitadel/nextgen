@@ -1,6 +1,8 @@
 import {
   applyBranding,
+  applyPasskey,
   clearBranding,
+  clearPasskey,
   PASSWORD_FIELD,
   setupMockHandlers,
   type CapturedRequest,
@@ -50,6 +52,8 @@ beforeEach(() => {
   mock.reset();
   server.resetHandlers(...mock.handlers);
   clearBranding();
+  // Module-level overlay like branding; clear so a test enabling it can't leak.
+  clearPasskey();
 });
 
 afterEach(() => {
@@ -537,6 +541,54 @@ describe("<zitadel-login> against the typed Flow API", () => {
     const passkeyButtons = element.shadowRoot!.querySelectorAll('zl-button[action="passkey"]');
     expect(passkeyButtons).toHaveLength(1);
     expect(passkeyButtons[0]?.getAttribute("hierarchy")).toBe("primary");
+  });
+
+  it("manual-ceremony renders the passkey step inert — no auto-started ceremony", async () => {
+    // With `manual-ceremony`, the passkey step still mounts `<zl-passkey>` (so a
+    // preview can show the screen) but it must NOT fire the WebAuthn ceremony.
+    // Spy on the entry point and assert it is never called.
+    const get = vi.fn(() => Promise.race<Credential | null>([]));
+    const originalCredentials = Object.getOwnPropertyDescriptor(navigator, "credentials");
+    const originalPublicKeyCredential = Object.getOwnPropertyDescriptor(
+      window,
+      "PublicKeyCredential",
+    );
+    Object.defineProperty(window, "PublicKeyCredential", {
+      configurable: true,
+      value: class PublicKeyCredentialStub {},
+    });
+    Object.defineProperty(navigator, "credentials", {
+      configurable: true,
+      value: { get, create: vi.fn() },
+    });
+    applyPasskey(true);
+    server.resetHandlers(...mock.handlers);
+
+    try {
+      const element = attachLogin(host);
+      element.manualCeremony = true;
+      // Identifier offers the passkey action; choosing it routes to passkey-login.
+      await waitFor(() => element.shadowRoot?.querySelector('zl-button[action="passkey"]'));
+      submit(element, "passkey");
+
+      const passkey = await waitFor(() => element.shadowRoot?.querySelector("zl-passkey"));
+      expect(passkey?.hasAttribute("manual")).toBe(true);
+      // Let the atom's connectedCallback run; manual mode must not auto-start.
+      await new Promise((resolve) => setTimeout(resolve, 48));
+      expect(get).not.toHaveBeenCalled();
+    } finally {
+      clearPasskey();
+      if (originalCredentials) {
+        Object.defineProperty(navigator, "credentials", originalCredentials);
+      } else {
+        delete (navigator as unknown as Record<string, unknown>).credentials;
+      }
+      if (originalPublicKeyCredential) {
+        Object.defineProperty(window, "PublicKeyCredential", originalPublicKeyCredential);
+      } else {
+        delete (window as unknown as Record<string, unknown>).PublicKeyCredential;
+      }
+    }
   });
 
   it("auto-submits challenge_response when zl-passkey-result is dispatched", async () => {

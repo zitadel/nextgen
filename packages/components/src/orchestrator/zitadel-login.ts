@@ -253,6 +253,18 @@ export class ZitadelLogin extends ZitadelSurface {
   @property({ type: String, attribute: "preview-success-step" }) accessor previewSuccessStep = "";
 
   /**
+   * Render WebAuthn challenges inert: the `<zl-passkey>` the template mounts gets
+   * `manual`, so it does NOT auto-start the `navigator.credentials` ceremony on
+   * connect. For previews and the workbench (operator console previews, Storybook,
+   * visual tests), where the real platform prompt can't complete — the passkey
+   * screen renders, nothing is submitted, and no OS dialog is raised. A host
+   * concern, not a flow field: the engine says passkey is *offered*; whether the
+   * client *runs* the ceremony during a preview is the embedder's call. Off by
+   * default, so ordinary logins run the ceremony as before.
+   */
+  @property({ type: Boolean, attribute: "manual-ceremony" }) accessor manualCeremony = false;
+
+  /**
    * The preview state in effect: {@link previewState} when it names a known
    * state, otherwise none, so a mistyped attribute leaves a working login
    * rather than one that silently submits nothing.
@@ -998,6 +1010,9 @@ export class ZitadelLogin extends ZitadelSurface {
       // reconnect `<zl-passkey>` and start a second WebAuthn ceremony. A
       // preview renders none at all: the atom starts its ceremony on connect.
       challenge: this.loading || this.preview ? null : (step.challenge ?? null),
+      // Keep the challenge (so `<zl-passkey>` still gets its options) but render
+      // it `manual` — no auto-started ceremony, no OS prompt — for previews.
+      manual_ceremony: this.manualCeremony,
       messages: [],
       identity: this.deriveIdentity(),
       errors,

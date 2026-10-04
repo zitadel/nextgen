@@ -199,6 +199,7 @@
           options='{{ challenge.options | json }}'
           pending-label="{{ 'passkey.pending.status' | t }}"
           cancel-label="{{ 'action.cancel' | t }}"
+          {% if manual_ceremony %}manual{% endif %}
         ></zl-passkey>
       {% endif %}
     {% endif %}
