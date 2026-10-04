@@ -40,9 +40,5 @@
   color: var(--zl-foreground);
 }
 a.zr-pill:hover {
-  background: color-mix(in srgb, var(--zl-secondary) 80%, transparent);
-}
-a.zr-pill:focus-visible {
-  outline: var(--zl-focus-width) solid var(--zl-ring);
-  outline-offset: var(--zl-focus-offset);
+  background: color-mix(in srgb, var(--zl-secondary) 80%, var(--zl-foreground));
 }

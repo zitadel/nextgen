@@ -11,11 +11,15 @@ import "@zitadel/components/atoms";
  * into the document rather than written into a `<style>` element: lit drops
  * bindings inside `<style>`, which silently leaves the mark unstyled.
  * `:host(...)` rules in the sheet simply don't match here and are ignored.
+ * Adopted for this file's stories only and removed when they unmount.
  */
-if (typeof CSSStyleSheet !== "undefined" && "adoptedStyleSheets" in document) {
+function adoptLayoutChrome(): () => void {
   const chrome = new CSSStyleSheet();
   chrome.replaceSync(layoutChromeCss);
   document.adoptedStyleSheets = [...document.adoptedStyleSheets, chrome];
+  return () => {
+    document.adoptedStyleSheets = document.adoptedStyleSheets.filter((sheet) => sheet !== chrome);
+  };
 }
 
 interface PageShellArgs {
@@ -35,6 +39,7 @@ const meta: Meta<PageShellArgs> = {
   title: "Atoms/Page Shell",
   tags: ["autodocs"],
   parameters: { layout: "fullscreen" },
+  beforeEach: adoptLayoutChrome,
   args: {
     heading: "Welcome back",
     body: "This is the centred main region of the page shell.",
@@ -43,7 +48,7 @@ const meta: Meta<PageShellArgs> = {
   argTypes: {
     heading: { control: "text" },
     body: { control: "text" },
-    withFooter: { control: "boolean", description: "Render the footer attribution pill." },
+    withFooter: { control: "boolean", description: "Render the footer trustmark." },
   },
 };
 

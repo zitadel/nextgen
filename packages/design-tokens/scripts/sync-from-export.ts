@@ -590,7 +590,6 @@ async function main(): Promise<void> {
   const out = syncTokens(files);
   await writeFile(TOKENS_FILE, `${JSON.stringify(out, null, 2)}\n`);
   const themedGroups = Object.entries(out.themed).map(([g, e]) => `${g} (${Object.keys(e).length})`);
-  // eslint-disable-next-line no-console
   console.log(
     `design-tokens sync-export: resolved ${out.$source.resolvedLeaves} leaves across ${out.$source.collections.length} collections; ` +
       `surfaced ${Object.keys(out.color).length} colours` +
@@ -599,20 +598,17 @@ async function main(): Promise<void> {
   );
   const { unclassifiedCollections, staleCollectionRoles } = out.$source;
   if (unclassifiedCollections.length > 0) {
-    // eslint-disable-next-line no-console
     console.warn(
       `WARNING: ${unclassifiedCollections.join(", ")} not classified in src/collections.ts — ` +
         `defaulted to registry-only, so they surface nothing. design-tokens:test will fail until classified.`,
     );
   }
   if (staleCollectionRoles.length > 0) {
-    // eslint-disable-next-line no-console
     console.warn(
       `WARNING: src/collections.ts classifies ${staleCollectionRoles.join(", ")}, but no export declares them. ` +
         `Renamed or removed in Figma?`,
     );
   }
-  // eslint-disable-next-line no-console
   console.warn("Now run `moon run design-tokens:generate` and review the tokens.snapshot.spec.ts diff.");
 }
 
@@ -620,7 +616,6 @@ async function main(): Promise<void> {
 // not when imported by the unit test.
 if (argv[1] && import.meta.url === pathToFileURL(argv[1]).href) {
   main().catch((err) => {
-    // eslint-disable-next-line no-console
     console.error(err);
     process.exit(1);
   });

@@ -1,4 +1,4 @@
-import { LitElement, html, nothing, type PropertyValues } from "lit";
+import { html, nothing, type PropertyValues } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import { ifDefined } from "lit/directives/if-defined.js";
@@ -7,9 +7,11 @@ import { live } from "lit/directives/live.js";
 import selectStyles from "./zl-select.css?inline";
 
 import { emit } from "../internal/emit.js";
+import { FormAtom } from "../internal/form-atom.js";
+import { parseJsonAttribute } from "../internal/json-attribute.js";
 import { nextUid } from "../internal/unique-id.js";
 import type { AtomManifest } from "../manifest.js";
-import { baseHostStyles, surfaceStyles } from "../styles/index.js";
+import { baseHostStyles, sharedStyles, surfaceStyles } from "../styles/index.js";
 
 import "./zl-icon.js";
 
@@ -26,7 +28,6 @@ export type ZlSelectChangeDetail = { name: string; value: string };
 /**
  * Atom: `<zl-select>` — a select bound to a single choice.
  *
- *
  * Agent-first contract (see `packages/components/AGENTS.md` → "Input atoms expose
  * a real native control"): the operable, accessible, form-associated, and
  * automatable control is a real native `<select>`. Screen readers, keyboard
@@ -35,7 +36,7 @@ export type ZlSelectChangeDetail = { name: string; value: string };
  * snapshot, the Codex in-app browser) all interact with that native element via
  * the stable `data-testid="zitadel-select-${name}"`.
  *
- * The Figma-styled trigger + popup (`.zr-select__trigger` / `.zr-select__listbox`)
+ * The styled trigger + popup (`.zr-select__trigger` / `.zr-select__listbox`)
  * are a pointer-only **visual** layer: they are `aria-hidden` and never in the
  * tab order, so they don't duplicate the native control in the accessibility
  * tree. A mouse user sees the styled popup; everyone else (keyboard, AT, agents)
@@ -43,38 +44,18 @@ export type ZlSelectChangeDetail = { name: string; value: string };
  * `value`, emit `zl-change`, and mirror `internals.setFormValue()`.
  */
 @customElement("zl-select")
-export class ZlSelect extends LitElement {
-  static formAssociated = true;
-
-  static override shadowRootOptions: ShadowRootInit = {
-    ...LitElement.shadowRootOptions,
-    delegatesFocus: true,
-  };
-
+export class ZlSelect extends FormAtom {
   static override styles = [
     baseHostStyles,
-    ...surfaceStyles(selectStyles),
+    ...surfaceStyles(sharedStyles, selectStyles),
   ];
-
-  /**
-   * Field name — used as the key in form submission and in `zl-change` detail.
-   * Managed manually to avoid clobbering the native form-associated `name`
-   * accessor the browser owns (see `<zl-field>` / `<zl-checkbox>`).
-   */
-  get name(): string {
-    return this.getAttribute("name") ?? "";
-  }
-
-  set name(value: string) {
-    this.setAttribute("name", value);
-  }
 
   @property() accessor label = "";
   @property() accessor value = "";
   @property() accessor placeholder = "Select…";
   /**
-   * Listbox options. Accepts either a JS array (property binding, used by React
-   * and Storybook) or a JSON string (the `options` attribute, used by the
+   * Listbox options. Accepts either a JS array (property binding, used by
+   * framework wrappers and Storybook) or a JSON string (the `options` attribute, used by the
    * orchestrator's Liquid template, which can only emit markup). Mirrors the
    * `<zl-passkey>` options contract.
    */
@@ -82,13 +63,8 @@ export class ZlSelect extends LitElement {
     attribute: "options",
     converter: {
       fromAttribute(value: string | null): ZlSelectOption[] {
-        if (!value) return [];
-        try {
-          const parsed: unknown = JSON.parse(value);
-          return Array.isArray(parsed) ? (parsed as ZlSelectOption[]) : [];
-        } catch {
-          return [];
-        }
+        const parsed = parseJsonAttribute(value);
+        return Array.isArray(parsed) ? (parsed as ZlSelectOption[]) : [];
       },
     },
   })
@@ -106,20 +82,13 @@ export class ZlSelect extends LitElement {
   @property({ type: Boolean, reflect: true }) accessor disabled = false;
   @property({ type: Boolean, reflect: true }) accessor open = false;
   @property({ attribute: "aria-label" }) accessor ariaLabelText: string | undefined = undefined;
-  @property({ attribute: "data-testid" }) accessor testId: string | undefined = undefined;
 
   @state() private accessor activeValue: string | null = null;
 
   @query(".zr-select__native") private accessor nativeEl: HTMLSelectElement | null = null;
 
   private readonly baseId = nextUid("zl-select");
-  private readonly internals: ElementInternals;
   private defaultValue = "";
-
-  constructor() {
-    super();
-    this.internals = this.attachInternals();
-  }
 
   override connectedCallback(): void {
     super.connectedCallback();
@@ -207,7 +176,7 @@ export class ZlSelect extends LitElement {
             class="zr-select__native"
             part="native"
             id=${`${this.baseId}-native`}
-            data-testid=${ifDefined(this.nativeTestId())}
+            data-testid=${ifDefined(this.nativeTestId("select", "native"))}
             aria-labelledby=${this.label ? labelId : nothing}
             aria-label=${ifDefined(this.label ? undefined : this.ariaLabelText)}
             aria-invalid=${this.invalid || showError ? "true" : "false"}
@@ -246,7 +215,7 @@ export class ZlSelect extends LitElement {
           </ul>
         </div>
         <div
-          class="zr-select__error"
+          class="zr-select__error zr-inline-error"
           part="error"
           id=${errorId}
           role="alert"
@@ -360,7 +329,7 @@ export class ZlSelect extends LitElement {
     this.value = next;
     this.syncFormState();
     emit<ZlSelectChangeDetail>(this, "zl-change", { name: this.name, value: this.value });
-    this.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+    this.dispatchNativeChange();
   }
 
   private syncFormState(): void {
@@ -374,16 +343,6 @@ export class ZlSelect extends LitElement {
     } else {
       this.internals.setValidity?.({});
     }
-  }
-
-  private nativeTestId(): string | undefined {
-    if (this.name) {
-      return `zitadel-select-${this.name}`;
-    }
-    if (this.testId) {
-      return `${this.testId}-native`;
-    }
-    return undefined;
   }
 }
 

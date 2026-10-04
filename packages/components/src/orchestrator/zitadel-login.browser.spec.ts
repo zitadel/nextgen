@@ -126,8 +126,7 @@ async function waitFor<T>(probe: () => T | null | undefined, timeout = 1500): Pr
 /**
  * Stubs `globalThis.fetch` to return a queue of pre-built `CreateFlow201`
  * JSON bodies. Each network call (regardless of URL) drains one entry from
- * the queue; the last entry is replayed if the queue is exhausted, matching
- * how the WalkingFixtureTransport used to behave.
+ * the queue; the last entry is replayed if the queue is exhausted.
  */
 function installFlowFetchStub(responses: readonly CreateFlow201[]): {
   calls: { url: string; init: RequestInit | undefined }[];
@@ -383,7 +382,7 @@ describe("<zitadel-login> form + focus (chromium)", () => {
     expect(element.shadowRoot?.activeElement).toBe(primary);
   });
 
-  // Regression: a required <zl-select> must gate submission client-side just
+  // A required <zl-select> must gate submission client-side just
   // like a required <zl-field>. The submit-type <zl-button> delegates to
   // form.requestSubmit() (no parallel `zl-submit`), and the orchestrator
   // blocks the empty required field, surfacing a styled, localised error
@@ -519,7 +518,7 @@ describe("<zitadel-login> form + focus (chromium)", () => {
     expect(root.querySelector('zl-checkbox[name="terms"]')?.getAttribute("error")).toBeFalsy();
   });
 
-  // Regression: frameworks like @lit/react attach the element first and
+  // Frameworks like @lit/react attach the element first and
   // assign object properties (`branding`, `locale`) afterwards. The
   // orchestrator must defer flow-start until properties have been applied.
   it("starts the flow when project is set after attach (React-style)", async () => {

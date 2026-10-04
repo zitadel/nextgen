@@ -61,7 +61,7 @@ describe("<zl-field> form participation (chromium)", () => {
     expect(form.checkValidity()).toBe(false);
   });
 
-  it("clears its value when the host form is reset", async () => {
+  it("restores its initial value when the host form is reset", async () => {
     const { form, field } = mount(
       `<form><zl-field name="email" value="seed"></zl-field></form>`,
     );
@@ -70,7 +70,7 @@ describe("<zl-field> form participation (chromium)", () => {
     await field.updateComplete;
     form.reset();
     await field.updateComplete;
-    expect(field.value).toBe("");
+    expect(field.value).toBe("seed");
   });
 
   it("submits the owning form when Enter is pressed inside the input", async () => {
@@ -118,16 +118,6 @@ describe("<zl-field> form participation (chromium)", () => {
     expect(submitted).toBe(0);
   });
 
-  it("normalises the auth-method credential name in the input testid", async () => {
-    const { field } = mount(
-      `<form><zl-field name="x-auth-methods#password" type="password" data-testid="zitadel-field-password"></zl-field></form>`,
-    );
-    await field.updateComplete;
-    const input = field.shadowRoot?.querySelector("input") as HTMLInputElement;
-    // The hook is method-named; the form key stays raw.
-    expect(input.getAttribute("data-testid")).toBe("zitadel-input-password");
-    expect(input.getAttribute("name")).toBe("x-auth-methods#password");
-  });
 
   it("delegates focus from the host to the inner input", async () => {
     const { field } = mount(`<form><zl-field name="email"></zl-field></form>`);

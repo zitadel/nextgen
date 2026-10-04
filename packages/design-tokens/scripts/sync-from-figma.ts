@@ -84,9 +84,7 @@ async function main(): Promise<void> {
   const collections = indexCollections(published);
   const tokensFile = normalise(published, collections);
   await writeFile(OUT, `${JSON.stringify(tokensFile, null, 2)}\n`);
-  // eslint-disable-next-line no-console
   console.log(`design-tokens sync: wrote ${OUT}`);
-  // eslint-disable-next-line no-console
   console.warn(
     "Remember to bump figma-tokens.lock with the new published version and `pulledAt`/`pulledBy`, then run `moon run design-tokens:generate` and commit the result. CI sync workflow does this automatically; if you ran sync manually, do it now.",
   );
@@ -244,7 +242,6 @@ function rgbaToHex(rgba: { r: number; g: number; b: number; a: number }): string
 }
 
 main().catch((err) => {
-  // eslint-disable-next-line no-console
   console.error(err);
   process.exit(1);
 });

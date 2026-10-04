@@ -8,10 +8,11 @@ import { emit } from "../internal/emit.js";
 import type { AtomManifest } from "../manifest.js";
 import { baseHostStyles, surfaceStyles } from "../styles/index.js";
 
+import type { ZlSubmitDetail } from "./events.js";
 import "./zl-icon.js";
 
 /**
- * Atom: `<zl-button>` — the entire Figma button matrix in a single atom.
+ * Atom: `<zl-button>` — every button variant in a single atom.
  *
  * Variant axes, matching the design system's own:
  *   - hierarchy: primary | secondary | outline | text
@@ -20,36 +21,7 @@ import "./zl-icon.js";
  *                (derived from interaction, not props)
  *   - slots:     `leading` icon, `trailing` icon, default for the label.
  *                When `loading` is set the trailing slot is replaced with a
- *                spinning ring (Figma shows the spinner trailing).
- *
- * Per-state Figma values (resolved from `figma.tokens.json` primitives):
- *
- *   Primary
- *     enabled        bg=#f4f4f6 (surface.default-white)     fg=#0f0f11   border=transparent
- *     hover/pressed  bg=#cfcfde (gray.600)                  fg=#0f0f11   border=1px #252528
- *     focus-visible  bg=#cfcfde + native outline ring
- *     disabled       bg=#f4f4f6                             fg=#686883 (text.disabled)
- *
- *   Secondary
- *     enabled        bg=#252528 (border.default-black)      fg=#f4f4f6 (text.button-invert)
- *     hover/pressed  bg=#484a57 (gray.200)                  fg=#f4f4f6
- *     focus-visible  bg=#252528 + native outline ring       fg=#f4f4f6
- *     disabled       bg=#252528                             fg=#686883
- *
- *   Text
- *     enabled        bg=transparent                         fg=#f4f4f6
- *     hover/pressed  bg=#484a57                             fg=#f4f4f6
- *     focus-visible  bg=#252528 + native outline ring       fg=#f4f4f6
- *     disabled       bg=transparent                         fg=#686883
- *
- *   Common
- *     padding        10px (block) / 16px (inline)            radius=8px
- *     gap            8px between icon/label/icon
- *     font           Arimo SemiBold (600)
- *                    medium: 16/24    small: 14/20
- *     icon          16px at both sizes
- *     focus ring    2px solid #f4f4f6, 2px offset
- *     transition    background-color / color / border-color, fast standard
+ *                spinning ring.
  *
  * Form-associated so it can participate in the orchestrator's `<form>`
  * exactly like a native `<button>`. Setting `type="submit"` triggers
@@ -95,9 +67,8 @@ export class ZlButton extends LitElement {
 
   /**
    * Forces a visual interaction state on the inner button, projected to its
-   * `data-state` attribute. Used by the design playground to capture
-   * hover/pressed/focus states; reactive so toggling the host attribute
-   * re-renders.
+   * `data-state` attribute. Stories only; reactive so toggling the host
+   * attribute re-renders.
    */
   @property({ attribute: "data-state" }) accessor forcedState: string | null = null;
 
@@ -139,7 +110,6 @@ export class ZlButton extends LitElement {
     return html`
       <button
         class=${classMap({
-          root: true,
           "zr-btn": true,
           [`zr-btn--${hierarchy}`]: true,
           [`zr-btn--${size}`]: true,
@@ -156,7 +126,7 @@ export class ZlButton extends LitElement {
         <slot name="leading"></slot>
         ${body}
         ${loading
-          ? html`<span class="spinner" part="spinner"><zl-icon name="spinner" size="16" spin decorative></zl-icon></span>`
+          ? html`<span class="zr-btn__spinner" part="spinner"><zl-icon name="spinner" size="16" spin decorative></zl-icon></span>`
           : html`<slot name="trailing"></slot>`}
       </button>
     `;
@@ -216,7 +186,7 @@ export class ZlButton extends LitElement {
       event.preventDefault();
       form.reset();
     }
-    emit<{ action: string | null }>(this, "zl-submit", { action: action ?? null });
+    emit<ZlSubmitDetail>(this, "zl-submit", { action: action ?? null });
   }
 
   private stringOption(

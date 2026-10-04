@@ -162,7 +162,7 @@ describe("<zitadel-login> host-app customisation (chromium)", () => {
   });
 
   it("the primary button consumes the --zl-primary pair from the host", async () => {
-    // The semantic brand knob: setting the Figma `primary` pair on the host
+    // The semantic brand knob: setting the `primary` pair on the host
     // element restyles the primary CTA through both shadow boundaries.
     const HOST_BLUE = "rgb(0, 0, 255)";
     appStylesheet(
@@ -198,8 +198,7 @@ describe("<zitadel-login> host-app customisation (chromium)", () => {
   });
 
   it("tenant palette.link recolors card links and nothing else", async () => {
-    // Regression for the broken bridge: `palette.link` used to target the
-    // pill token while the links kept a hard-coded purple accent.
+    // `palette.link` sets `--zl-link`; only links take it.
     const linkedStep = {
       ...identifierStep,
       step: {

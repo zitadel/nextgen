@@ -4,6 +4,7 @@ import { customElement, property } from "lit/decorators.js";
 import ssoStyles from "./zl-sso-providers.css?inline";
 
 import { emit } from "../internal/emit.js";
+import { parseJsonAttribute } from "../internal/json-attribute.js";
 import type { AtomManifest } from "../manifest.js";
 import { baseHostStyles, surfaceStyles } from "../styles/index.js";
 
@@ -174,15 +175,8 @@ function stopInnerSubmit(event: Event): void {
  * payload must not take the whole sign-in screen down with it.
  */
 function parseProviders(value: string | null): readonly SsoProvider[] {
-  if (!value) {
-    return [];
-  }
-  try {
-    const parsed: unknown = JSON.parse(value);
-    return Array.isArray(parsed) ? (parsed as SsoProvider[]).filter(isRenderable) : [];
-  } catch {
-    return [];
-  }
+  const parsed = parseJsonAttribute(value);
+  return Array.isArray(parsed) ? (parsed as SsoProvider[]).filter(isRenderable) : [];
 }
 
 /** An entry with no id cannot be submitted, and one with no name has nothing to show. */

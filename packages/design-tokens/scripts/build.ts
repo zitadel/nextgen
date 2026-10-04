@@ -7,12 +7,11 @@
  *
  * Emits four files into `src/generated/`:
  *
- *   tokens.css      — :root + [data-theme="dark"] + reserved
- *                     [data-theme="light"] selectors with `--zl-*` variables.
+ *   tokens.css      — :root + [data-theme="dark"] and [data-theme="light"]
+ *                     selectors with `--zl-*` variables.
  *   tokens.ts       — typed `tokens` const + named groups for JS consumers.
  *   tailwind.css    — Tailwind v4 `@theme` block aliasing `--color-zl-*`,
- *                     `--spacing-zl-*` etc. so React consumers can write
- *                     `text-zl-text-primary` and `bg-zl-surface-black`.
+ *                     `--spacing-zl-*` etc. onto the `--zl-*` variables.
  *   shadcn.css      — Tailwind v4 `@theme inline` mapping the standard shadcn
  *                     utility names (`bg-background`, `rounded-md`, `font-serif`)
  *                     onto `--zl-*`, so shadcn/ui components drop into the console.
@@ -147,9 +146,7 @@ function build(): BuildResult {
   const cssVars: Array<[string, string]> = [];
   /** [zl-var-name, resolved CSS value] tuples that differ under `[data-theme="light"]`. */
   const lightVars: Array<[string, string]> = [];
-  // `theme.*` holds the new shadcn semantic colours; `color.*` stays the legacy
-  // grouped surface so the two never collide (e.g. legacy `color.border.*`
-  // group vs the new flat `theme.border`).
+  // `theme.*` holds the shadcn semantic colours; `color` is emitted empty.
   /** Mirror structure for the typed TS `tokens` export (resolved dark values). */
   const tsTree: Record<string, unknown> = { color: {}, theme: {}, spacing: {}, radius: {}, font: {}, motion: {}, focus: {}, breakpoint: {}, container: {}, layout: {} };
   /** Mirror structure for the `cssVars` export — `var(--zl-…)` strings consumers compose into styles. */
@@ -224,9 +221,7 @@ function build(): BuildResult {
   }
 
   // ---- corner radius (in rem) ----
-  // One scale, the Figma one. The old `s`/`m`/`l` names are gone rather than
-  // aliased: they were sized against a scale the design system no longer draws
-  // with, and two live radius vocabularies is how the two drift apart.
+  // One radius scale, Figma's.
   for (const [name, px] of Object.entries(shadcn.radius)) {
     push(cssVarName("radius", name), pxToRem(px), ["radius", toCamel(name)]);
   }
@@ -523,12 +518,10 @@ async function main(): Promise<void> {
     writeFile(resolve(OUT_DIR, "tailwind.css"), result.tailwind),
     writeFile(resolve(OUT_DIR, "shadcn.css"), result.shadcn),
   ]);
-  // eslint-disable-next-line no-console
   console.log(`design-tokens: wrote tokens.css, tokens.ts, tailwind.css, shadcn.css to ${OUT_DIR}`);
 }
 
 main().catch((err) => {
-  // eslint-disable-next-line no-console
   console.error(err);
   process.exit(1);
 });
