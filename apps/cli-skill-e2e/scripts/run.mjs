@@ -62,7 +62,11 @@ function runConfig(name) {
 
   const install =
     name === "with-skill"
-      ? `npx -y skills@latest add '${REPO}#${BRANCH}' --skill zitadel-cli --agent claude-code -g -y --copy >/out/skill-install.log 2>&1`
+      ? // `--full-depth` is required: the repo now ships a shallow root skill
+        // (`skills/zitadel`, the router) as well as the deeper `zitadel-cli`
+        // (`apps/cli/skills/zitadel-cli`). Without it, `skills add` stops at the
+        // shallowest skill it finds and never discovers `zitadel-cli`.
+        `npx -y skills@latest add '${REPO}#${BRANCH}' --full-depth --skill zitadel-cli --agent claude-code -g -y --copy >/out/skill-install.log 2>&1`
       : `echo 'baseline: no skill'`;
 
   const args = ["run", "--rm"];

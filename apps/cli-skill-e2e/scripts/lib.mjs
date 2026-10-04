@@ -114,8 +114,13 @@ export function gradeStage(rule, cfgDir, parsed, stage1ok) {
       const f = readdirSync(sd).find((n) => /human-user/.test(n) && n.endsWith(".json"));
       if (f) txt = readIf(join(sd, f));
     }
-    if (ok && txt.includes("givenName") && txt.includes("familyName"))
-      return { status: "pass", why: "schema has givenName + familyName; applied" };
+    // The CLI's human-user schema names the first/last name fields
+    // `firstName`/`lastName` (older builds used `givenName`/`familyName`);
+    // accept either so the grade tracks the capability, not one spelling.
+    const hasFirst = /firstName|givenName/.test(txt);
+    const hasLast = /lastName|familyName/.test(txt);
+    if (ok && hasFirst && hasLast)
+      return { status: "pass", why: "schema has first- + last-name fields; applied" };
     return { status: "fail", why: "no project created (couldn't find the CLI, or schema missing fields)" };
   }
 
