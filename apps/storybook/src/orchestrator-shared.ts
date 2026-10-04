@@ -210,6 +210,58 @@ export async function submit(canvasElement: HTMLElement): Promise<void> {
   (form as HTMLFormElement).requestSubmit();
 }
 
+/**
+ * Click a named step action (e.g. `passkey`, `recover`) rather than the primary
+ * submit. The orchestrator renders each action as `<zl-button action="…">`; this
+ * clicks its inner native button, the same path a visitor takes, so the mock
+ * sees a real `SUBMIT` with that action.
+ */
+export async function clickAction(canvasElement: HTMLElement, action: string): Promise<void> {
+  const login = canvasElement.querySelector("zitadel-login");
+  const button = await waitFor(() =>
+    login?.shadowRoot?.querySelector(`zl-button[action="${action}"]`),
+  );
+  const inner = await waitFor(() => (button as HTMLElement).shadowRoot?.querySelector("button"));
+  (inner as HTMLButtonElement).click();
+}
+
+/**
+ * Freeze the WebAuthn ceremony so a passkey step can be shown in the workbench.
+ *
+ * `<zl-passkey>` auto-runs a real `navigator.credentials` ceremony the instant it
+ * mounts — the OS passkey prompt — which can never complete here. This swaps the
+ * two ceremony entry points for a promise that never settles (`Promise.race([])`,
+ * the same stub the component's own specs use), so the atom stays `pending` and
+ * renders its real "waiting for your passkey" UI instead of raising the platform
+ * prompt. It mocks a browser API exactly as `msw` mocks the network. Returns a
+ * restore function for Storybook `beforeEach` teardown.
+ */
+export function freezePasskeyCeremony(): () => void {
+  const never = (): Promise<Credential | null> => Promise.race<Credential | null>([]);
+  const originalCredentials = Object.getOwnPropertyDescriptor(navigator, "credentials");
+  const originalPublicKeyCredential = Object.getOwnPropertyDescriptor(window, "PublicKeyCredential");
+  // The ceremony guards on `window.PublicKeyCredential` before it starts; only
+  // define a stub when the browser has none, so real Chrome's own class stays.
+  if (!("PublicKeyCredential" in window)) {
+    Object.defineProperty(window, "PublicKeyCredential", {
+      configurable: true,
+      value: class PublicKeyCredentialStub {},
+    });
+  }
+  Object.defineProperty(navigator, "credentials", {
+    configurable: true,
+    value: { get: never, create: never },
+  });
+  return () => {
+    if (originalCredentials) Object.defineProperty(navigator, "credentials", originalCredentials);
+    if (originalPublicKeyCredential) {
+      Object.defineProperty(window, "PublicKeyCredential", originalPublicKeyCredential);
+    } else {
+      delete (window as unknown as Record<string, unknown>).PublicKeyCredential;
+    }
+  };
+}
+
 export async function waitFor<T>(probe: () => T | null | undefined, timeout = 4000): Promise<T> {
   const start = Date.now();
   for (;;) {

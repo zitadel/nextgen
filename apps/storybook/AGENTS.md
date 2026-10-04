@@ -109,12 +109,24 @@ step-journey stories, because a backend-driven step can only be shown by driving
 the flow to it (via `play`). Covered: `identifier` (SignIn), `register` (SignUp),
 `password` (PasswordStep), `register-password` (RegisterPasswordStep), `recover`
 (RecoverStep), `done` (SignedIn), `register-sso` (RegisterAfterProvider),
-`sso-conflict` (ConflictAfterProvider), plus identifier + providers / + passkey.
-**Not storied on purpose:** `passkey-login` / `passkey-setup` (an invisible
-`<zl-passkey>` auto-runs a real `navigator.credentials` ceremony on mount that
-can't complete in the workbench — same reason `<zl-passkey>` has no atom story),
-`passkey-upsell` (legacy; the default flow no longer routes it), and
-`sso-redirect` (transient — it navigates away).
+`sso-conflict` (ConflictAfterProvider), identifier + providers, identifier +
+passkey offer (PasskeyOffered), and the passkey ceremony step `passkey-login`
+(PasskeyLogin).
+
+`passkey-login` is special: the step mounts an invisible `<zl-passkey>` that
+auto-runs a real `navigator.credentials.get()` ceremony on mount — the OS passkey
+prompt, which can't complete in the workbench. `freezePasskeyCeremony()`
+(`orchestrator-shared.ts`) stands in for that browser API with a promise that
+never settles (the same `Promise.race([])` stub the component specs use), so the
+atom stays in its `pending` state and renders its real "waiting for your passkey"
+UI instead of raising the prompt. It mocks a browser API the same way `msw` mocks
+the network; the story installs it in `beforeEach` and the returned teardown
+restores `navigator.credentials` so no other story is affected. This is also why
+`<zl-passkey>` still has no atom story — frozen, it only has a pending state.
+
+**Not storied on purpose:** `passkey-setup` / `passkey-upsell` (legacy; the
+default flow no longer routes through them — don't revive them to force a story),
+and `sso-redirect` (transient — it navigates away).
 
 The password field renders with name **`x-auth-methods#password`** (the schema
 pointer, exported as `PASSWORD_FIELD`), not `"password"` — use `PASSWORD_FIELD`

@@ -5,7 +5,9 @@ import { html } from "lit";
 import { mswLoader } from "msw-storybook-addon";
 
 import {
+  clickAction,
   fill,
+  freezePasskeyCeremony,
   mock,
   orchestratorArgTypes,
   orchestratorBeforeEach,
@@ -96,9 +98,33 @@ export const PasswordStep: Story = {
  * Choosing it drives the flow to the dedicated `passkey-login` step, where the
  * WebAuthn ceremony runs via the invisible `<zl-passkey>`. The ceremony itself
  * needs a real authenticator, so this story shows the offer rather than driving
- * into the ceremony — consistent with why `<zl-passkey>` has no atom story.
+ * into the ceremony — see `PasskeyLogin` for the step the choice leads to.
  */
 export const PasskeyOffered: Story = { args: { passkey: true } };
+
+/**
+ * The dedicated passkey sign-in step (`passkey-login`), reached by choosing "Sign
+ * in with a passkey" on the identifier. That step mounts the invisible
+ * `<zl-passkey>`, which fires a real `navigator.credentials.get()` ceremony — the
+ * OS passkey prompt — the moment it renders. `freezePasskeyCeremony` stands in for
+ * that browser API with a promise that never settles, so the step shows its real
+ * in-flight state (the "waiting for your passkey" status + Cancel) instead of
+ * raising a prompt that cannot complete in the workbench. The legacy
+ * `passkey-setup` / `passkey-upsell` pair is deliberately not storied — the
+ * default flow no longer routes through it. See apps/storybook/AGENTS.md.
+ */
+export const PasskeyLogin: Story = {
+  args: { passkey: true },
+  beforeEach: () => freezePasskeyCeremony(),
+  play: async ({ canvasElement }) => {
+    await clickAction(canvasElement, "passkey");
+    await waitFor(() =>
+      canvasElement
+        .querySelector("zitadel-login")
+        ?.shadowRoot?.querySelector('[data-testid="zitadel-passkey-pending"]'),
+    );
+  },
+};
 
 /**
  * Sign-up, second step: set a password — the sibling of `PasswordStep` on the
