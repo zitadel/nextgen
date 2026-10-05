@@ -5,6 +5,8 @@ import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { scopedPath } from "@/lib/project-scope.fixture";
+
 import { THEME_STORAGE_KEY } from "../../theme";
 import { createAppRouter } from "../../router";
 
@@ -27,10 +29,11 @@ vi.mock("@/auth/session", async (importOriginal) => {
  * does not exist". Also covers the theme toggle writing `data-theme` and
  * persisting the preference.
  */
-// The top-level surfaces with a design hand-off, in the order the design puts
-// them. `User schemas` nests beneath `Users` (`Schema directory` frame) rather
-// than adding a second top-level row.
-const NAV_ORDER = ["Projects", "Teams", "Users", "Login flows"];
+// The Projects overview first, then the selected project's contents in the
+// order the design puts them, then the project's own settings. `User schemas`
+// nests beneath `Users` (`Schema directory` frame) rather than adding a second
+// top-level row.
+const NAV_ORDER = ["Projects", "Teams", "Users", "Login flows", "Project settings"];
 const NESTED_NAV = { parent: "Users", label: "User schemas" };
 const NESTED_BRANDING = { parent: "Login flows", label: "Branding" };
 // Absent for two different reasons, both deliberate:
@@ -51,10 +54,18 @@ const NEVER_SHOWN = [
 // `GET /users/me/projects` is the authorized-projects query (#1228): what the
 // signed-in person can act on, read with the session cookie.
 const MY_PROJECTS = "*/api/users/me/projects";
+// `/` lands on Teams, so most tests read it once a project is selected.
+const TEAMS_QUERY = "*/api/teams/query";
+// `/settings` lands on Profile, which reads the signed-in person's own record.
+const MY_USER = "*/api/users/me";
 const server = setupServer(
   http.get(MY_PROJECTS, () =>
     HttpResponse.json({ projects: [{ id: "proj_1", name: "console-dev" }] }),
   ),
+  http.get(MY_USER, () =>
+    HttpResponse.json({ id: "user_1", attributes: { email: "dev@zitadel.local" } }),
+  ),
+  http.post(TEAMS_QUERY, () => HttpResponse.json({ teams: [] })),
 );
 
 beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
@@ -99,7 +110,7 @@ describe("app shell navigation", () => {
     expect(parent).toBeDefined();
     expect(
       within(parent as HTMLElement).getByRole("link", { name: NESTED_NAV.label }),
-    ).toHaveAttribute("href", "/schemas");
+    ).toHaveAttribute("href", scopedPath("/schemas", "proj_1"));
   });
 
   it("nests Branding under Login flows rather than adding a top-level row", async () => {
@@ -115,7 +126,30 @@ describe("app shell navigation", () => {
     expect(parent).toBeDefined();
     expect(
       within(parent as HTMLElement).getByRole("link", { name: NESTED_BRANDING.label }),
-    ).toHaveAttribute("href", "/branding");
+    ).toHaveAttribute("href", scopedPath("/branding", "proj_1"));
+  });
+
+  it("lists only Projects until a project is selected", async () => {
+    // Several to choose from, so `/` lands on Projects with nothing selected.
+    server.use(
+      http.get(MY_PROJECTS, () =>
+        HttpResponse.json({
+          projects: [
+            { id: "proj_1", name: "River" },
+            { id: "proj_2", name: "Delta" },
+          ],
+        }),
+      ),
+    );
+    const router = renderShell();
+    await vi.waitFor(() => expect(router.state.location.pathname).toBe("/projects"));
+    const pill = await screen.findByRole("button", { name: "Switch project" });
+    await vi.waitFor(() => expect(pill).toHaveTextContent("Select a project"));
+
+    const nav = within(screen.getByRole("navigation", { name: "Primary" }));
+    const links = nav.queryAllByRole("link");
+    expect(links.map((link) => link.textContent?.trim())).toEqual(["Projects"]);
+    expect(links[0]).toHaveAttribute("href", "/projects");
   });
 
   it("does not advertise screens that have no endpoint behind them", async () => {
@@ -132,7 +166,7 @@ describe("app shell navigation", () => {
 /**
  * The sidebar has two views and the route picks between them, so a settings URL
  * restores the Settings view rather than dropping the operator back into Portal
- * chrome. The account dropdown is the way in; `Back to app` is the way out.
+ * chrome. The account dropdown is the way in; `Back to dashboard` is the way out.
  */
 describe("settings view", () => {
   it("shows the portal nav and the account dropdown's entry point by default", async () => {
@@ -143,16 +177,21 @@ describe("settings view", () => {
     await userEvent.click(screen.getByRole("button", { name: /^Account:/ }));
     // Log out, not Sign out, and Settings alongside it — both per the design.
     expect(await screen.findByRole("menuitem", { name: "Log out" })).toBeInTheDocument();
+    // The selection rides along, so `Back to dashboard` returns to the same project.
     expect(screen.getByRole("menuitem", { name: "Settings" })).toHaveAttribute(
       "href",
-      "/settings",
+      scopedPath("/settings", "proj_1"),
     );
   });
 
   it("swaps the portal nav for the settings view on a settings URL", async () => {
     renderShell("/settings");
     // The way back out is present...
-    expect(await screen.findByRole("link", { name: "Back to app" })).toHaveAttribute("href", "/");
+    // One project, so it is selected here too, and the way back keeps it.
+    expect(await screen.findByRole("link", { name: "Back to dashboard" })).toHaveAttribute(
+      "href",
+      scopedPath("/", "proj_1"),
+    );
     // ...and the portal list is gone rather than sitting underneath it.
     expect(screen.queryByRole("navigation", { name: "Primary" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /^Users/ })).not.toBeInTheDocument();
@@ -163,7 +202,7 @@ describe("settings view", () => {
     // are portal chrome; the sidebar keeps a trigger of its own, so the
     // collapse is not lost with them.
     renderShell("/settings");
-    await screen.findByRole("link", { name: "Back to app" });
+    await screen.findByRole("link", { name: "Back to dashboard" });
 
     expect(screen.queryByRole("button", { name: "Switch project" })).not.toBeInTheDocument();
     expect(screen.queryByRole("radio", { name: "Dark" })).not.toBeInTheDocument();
@@ -223,7 +262,7 @@ describe("project pill", () => {
     await vi.waitFor(() => expect(pill).toHaveTextContent("Granted to me"));
   });
 
-  it("shows the first of several and lists them all as labels", async () => {
+  it("marks the selected project and lists every one as a way to select it", async () => {
     server.use(
       http.get(MY_PROJECTS, () =>
         HttpResponse.json({
@@ -234,11 +273,11 @@ describe("project pill", () => {
         }),
       ),
     );
-    renderShell();
+    renderShell(scopedPath("/teams", "proj_2"));
 
     const pill = await screen.findByRole("button", { name: "Switch project" });
-    await vi.waitFor(() => expect(pill).toHaveTextContent("River"));
-    expect(pill).not.toHaveTextContent("Delta");
+    await vi.waitFor(() => expect(pill).toHaveTextContent("Delta"));
+    expect(pill).not.toHaveTextContent("River");
 
     await userEvent.click(pill);
     const list = within(await screen.findByRole("list", { name: "Switch project" }));
@@ -246,34 +285,109 @@ describe("project pill", () => {
       "River",
       "Delta",
     ]);
-    // Display only: there is no selected-project state to change, so a row that
-    // looked pressable would promise a switch the console cannot make. Each row
-    // is a link to the project instead — navigation, not selection.
+    // Selecting is navigating — the selection lives in the URL — so the rows
+    // are links, and a scoped list stays where it is under the new project.
     expect(list.queryAllByRole("button")).toEqual([]);
-    expect(list.getByRole("link", { name: "River" })).toHaveAttribute("href", "/projects/proj_1");
-    expect(list.getByRole("link", { name: "Delta" })).toHaveAttribute("href", "/projects/proj_2");
-    expect(list.getByText("River").closest("li")).toHaveAttribute("aria-current", "true");
-    expect(list.getByText("Delta").closest("li")).not.toHaveAttribute("aria-current");
+    expect(list.getByRole("link", { name: "River" })).toHaveAttribute(
+      "href",
+      "/teams?project=proj_1&status=active",
+    );
+    expect(list.getByText("Delta").closest("li")).toHaveAttribute("aria-current", "true");
+    expect(list.getByText("River").closest("li")).not.toHaveAttribute("aria-current");
   });
 
-  it("opens the project and closes the list when a row is followed", async () => {
+  it("keeps the list's filters when switching project", async () => {
     server.use(
       http.get(MY_PROJECTS, () =>
-        HttpResponse.json({ projects: [{ id: "proj_1", name: "River" }] }),
+        HttpResponse.json({
+          projects: [
+            { id: "proj_1", name: "River" },
+            { id: "proj_2", name: "Delta" },
+          ],
+        }),
       ),
     );
-    const router = renderShell();
+    renderShell(scopedPath("/teams?status=deactivated&q=ops", "proj_2"));
+
+    await userEvent.click(await screen.findByRole("button", { name: "Switch project" }));
+    const list = within(await screen.findByRole("list", { name: "Switch project" }));
+    const href = list.getByRole("link", { name: "River" }).getAttribute("href") ?? "";
+    const target = new URL(href, "http://console.invalid");
+    expect(target.pathname).toBe("/teams");
+    expect(Object.fromEntries(target.searchParams)).toEqual({
+      project: "proj_1",
+      status: "deactivated",
+      q: "ops",
+    });
+  });
+
+  it("re-scopes the screen and closes the list when a row is followed", async () => {
+    const queried: string[] = [];
+    server.use(
+      http.get(MY_PROJECTS, () =>
+        HttpResponse.json({
+          projects: [
+            { id: "proj_1", name: "River" },
+            { id: "proj_2", name: "Delta" },
+          ],
+        }),
+      ),
+      http.post(TEAMS_QUERY, ({ request }) => {
+        queried.push(new URL(request.url).searchParams.get("project_id") ?? "");
+        return HttpResponse.json({ teams: [] });
+      }),
+    );
+    const router = renderShell(scopedPath("/teams", "proj_1"));
 
     const pill = await screen.findByRole("button", { name: "Switch project" });
     await vi.waitFor(() => expect(pill).toHaveTextContent("River"));
     await userEvent.click(pill);
     const list = within(await screen.findByRole("list", { name: "Switch project" }));
-    await userEvent.click(list.getByRole("link", { name: "River" }));
+    await userEvent.click(list.getByRole("link", { name: "Delta" }));
 
-    await vi.waitFor(() => expect(router.state.location.pathname).toBe("/projects/proj_1"));
+    await vi.waitFor(() => expect(router.state.location.search).toMatchObject({ project: "proj_2" }));
+    expect(router.state.location.pathname).toBe("/teams");
+    await vi.waitFor(() => expect(pill).toHaveTextContent("Delta"));
     expect(screen.queryByRole("list", { name: "Switch project" })).not.toBeInTheDocument();
-    // Following a row changes the page, not the pill: nothing was selected.
-    expect(pill).toHaveTextContent("River");
+    await vi.waitFor(() => expect(queried).toEqual(["proj_1", "proj_2"]));
+  });
+
+  it("lands on the new project's first screen when selected from an unscoped one", async () => {
+    server.use(
+      http.get(MY_PROJECTS, () =>
+        HttpResponse.json({
+          projects: [
+            { id: "proj_1", name: "River" },
+            { id: "proj_2", name: "Delta" },
+          ],
+        }),
+      ),
+    );
+    const router = renderShell(scopedPath("/projects", "proj_1"));
+
+    const pill = await screen.findByRole("button", { name: "Switch project" });
+    await vi.waitFor(() => expect(pill).toHaveTextContent("River"));
+    await userEvent.click(pill);
+    const list = within(await screen.findByRole("list", { name: "Switch project" }));
+    await userEvent.click(list.getByRole("link", { name: "Delta" }));
+
+    await vi.waitFor(() => expect(router.state.location.pathname).toBe("/teams"));
+    expect(router.state.location.search).toMatchObject({ project: "proj_2" });
+  });
+
+  it("links to the overview of every project beneath the list", async () => {
+    const router = renderShell();
+    const pill = await screen.findByRole("button", { name: "Switch project" });
+    await vi.waitFor(() => expect(pill).toHaveTextContent("console-dev"));
+    await userEvent.click(pill);
+
+    const all = await screen.findByRole("link", { name: "All projects" });
+    // The selection rides along: the overview is a look around, not a reset.
+    expect(all).toHaveAttribute("href", scopedPath("/projects", "proj_1"));
+    await userEvent.click(all);
+
+    await vi.waitFor(() => expect(router.state.location.pathname).toBe("/projects"));
+    expect(screen.queryByRole("list", { name: "Switch project" })).not.toBeInTheDocument();
   });
 
   it("says there are no projects instead of loading forever", async () => {

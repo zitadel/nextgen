@@ -13,8 +13,9 @@ The end-to-end OAuth2/OIDC redirect ceremony progresses through three main
 phases:
 
 ```
-submit { action: "sso", sso_provider_id: "google" }
+submit { action: "sso", sso_provider_id: "google", return_target: "<page hosting the orchestrator>" }
   engine: reject if provider absent from the step's sso_providers
+  engine: fill a ${{ NAME }} client_id from the project's variables
   engine: mint state record, build authorize URL (PKCE), emit sso-redirect step
 browser → provider → user authenticates
 provider → GET {issuer}/__nextgen/idp/callback?code=…&state=…
@@ -63,7 +64,7 @@ The `state` record serves as the server-side, single-use anchor for the attempt:
 | **PKCE Verifier** | Present when the connection enables PKCE (`pkce_enabled`, the default); the challenge is always `S256` when sent. A connection may set `pkce_enabled: false` only for a provider whose token endpoint rejects the parameters ([area 1](1-resource-model.md#the-connection-schema)); binding then rests on `state` and, for OIDC, `nonce`. |
 | **OIDC `nonce`** | Echoed in the `id_token` to bind the issued token strictly to this authorize request. |
 | **Expiry** | Sets a bounded time window for the external leg, inheriting the attempt's overall TTL. |
-| **Return Target** | The browser destination after callback processing, captured at submission time and validated against the environment's declared issuer origin. Never read from callback input: an attacker-supplied target is an open redirect. |
+| **Return Target** | The browser destination after callback processing: the page hosting the orchestrator with `?flow=<id>` set, sent as `return_target` on the submission, where the flow resumes with `GET /flow/{id}`. Its origin must equal the request origin, which stands in for the environment's declared issuer origin until environments exist. Never read from callback input: an attacker-supplied target is an open redirect. |
 
 > **Security Note:** A guessable or reusable `state` parameter introduces
 > classic OAuth CSRF and code-injection vulnerabilities.
@@ -80,13 +81,35 @@ The `state` record serves as the server-side, single-use anchor for the attempt:
   `Strict` would drop the cookie on exactly that navigation and fail every
   attempt.
   The shipped `_zflow` cookie is `Strict`, so its settings cannot be copied.
-- **Development on `http://`:** Safari rejects `Secure` on `http://localhost`
-  (Chrome and Firefox accept it).
-  The shipped `_zflow` cookie lets `Secure` follow the request scheme for that
+- **Development on `http://` loopback:** Safari rejects `Secure` on
+  `http://localhost` (Chrome and Firefox accept it).
+  The shipped `_zflow` cookie drops `Secure` on an http loopback host for that
   reason (`internal/api/flow.go`), which a `__Host-` cookie cannot.
-  On an `http://` development origin the binding cookie therefore drops the
-  `__Host-` prefix and `Secure` and keeps `HttpOnly`, `Path=/`, and
-  `SameSite=Lax`; on every `https://` origin the prefix is required.
+  On an http loopback host the binding cookie therefore drops the `__Host-`
+  prefix and `Secure` and keeps `HttpOnly`, `Path=/`, and `SameSite=Lax`.
+  Every other host keeps the prefix and `Secure`; a non-loopback `http://`
+  deployment is unsupported, the browser discards the cookie there.
+  The callback derives the name from its own request the same way, so a
+  submit and a callback that reach the server over different schemes do not
+  find each other's cookie.
+- **Lifetime:** the record expires with the attempt. The cookie gets the
+  attempt's full TTL at the submission, so it outlives the record by the
+  time spent on the step; a lingering cookie is inert, the record holds only
+  the hash of its nonce.
+  `_zflow` is re-sealed on the redirect response like on every other, so its
+  ten-minute window restarts at the submission; a return after it finds the
+  flow cookie expired while the record is still valid, and the orchestrator
+  starts a new flow when the id in its URL no longer resolves.
+- **One origin:** the API and the page share an origin. The binding cookie
+  is set on the API origin and the callback route and `redirect_uri` are
+  built from the page origin; the `Strict` flow cookie already requires the
+  two to be the same.
+- **Two `Set-Cookie` lines, `_zflow` first:** the flow responses declare the
+  header as a list and the generated server writes one line per cookie
+  (OpenAPI's comma-joined form is invalid for `Set-Cookie`). The order is a
+  contract: the generated Go client reads only the first line, which must
+  stay `_zflow`. For the same reason no cookie may contain a comma, so the
+  cookies use `Max-Age`, never `Expires`.
 
 The engine owns the protocol parameters of the authorize request: `client_id`,
 `redirect_uri`, `response_type`, `scope`, `state`, `nonce`, `code_challenge`,
@@ -206,12 +229,19 @@ Local development instances may relax the loopback rejection so
 
 ## Resolution Branches
 
-A single `transitions.callback` cannot route returning users and new users to
-different locations, so resolution fires one of three outcomes.
-Two are shipped; the third, `identity_unknown`, is new and fires only from
-SSO resolution, never from a typed identifier.
+A single success transition (`transitions.sso_authenticated`) cannot route
+returning users and new users to different locations, so resolution fires one
+of three outcomes.
+The third, `sso_user_not_found`, is new and fires only from SSO resolution,
+never from a typed identifier.
+The two SSO-only keys carry an `sso_` prefix so a flow author and the engine
+can tell them apart from the typed `user_not_found`, while
+`user_already_exists` stays shared because typed and passkey registration raise
+it too.
+`sso_authenticated` names the success branch because every resolution outcome
+follows the provider's return.
 
-**Why `identity_unknown` is needed:**
+**Why `sso_user_not_found` is needed:**
 *   **Why not `user_not_found`:** A shared entry step hosts both the typed
     email field and the SSO buttons, and a transition key allows one target.
     Reusing `user_not_found` for an unknown SSO subject would demand two
@@ -219,7 +249,7 @@ SSO resolution, never from a typed identifier.
     the collection step for SSO.
     The key would have to keep its typed-email target, sending the unknown SSO
     user to the register step to start the ceremony over.
-*   **The split:** `identity_unknown` routes the unknown SSO user straight to
+*   **The split:** `sso_user_not_found` routes the unknown SSO user straight to
     the data collection step, while `user_not_found` keeps its route for typed
     emails.
 *   **Engine behavior:** When it fires, the engine flips `CurrentPurpose` from
@@ -227,7 +257,7 @@ SSO resolution, never from a typed identifier.
     This departs from ADR 017's SSO note
     ([ADR 017](../../adrs/017-flow-engine-auth-attempt-dispatch.md#note-sso)),
     which expected ceremonies to reuse `user_not_found` and to add
-    `user_link_required` for linking; 851 adds `identity_unknown` for the
+    `user_link_required` for linking; 851 adds `sso_user_not_found` for the
     shared-step reason above, and `user_link_required` is not added, since
     linking is out of scope ([area 1](1-resource-model.md#linking-safety)).
     The ADR's deferred passkey outcome (`credential_unknown`) has the same
@@ -246,19 +276,19 @@ transitions route it:
 
 | Resolution State | Outcome Fired | Routing & Engine Behavior |
 | :--- | :--- | :--- |
-| **Known subject** | `callback` | **Targets `done` (Authenticated).** Identity is pinned to `(connection, subject)`, not to claims, so profile edits cannot fork accounts. A sign-in does not update the stored user from fresh claims; that refresh is `is_auto_update`, deferred with its guards ([area 1](1-resource-model.md#deferred-and-cut-fields)). |
-| **Unknown subject** | `identity_unknown` | **Targets the data collection step** ([New Users: Prefill and Confirm](#new-users-prefill-and-confirm); `register-sso` in area 4's scaffold). Under `creation: disabled`, `identity_unknown` is not raised; the unknown subject is an error on the originating step ([Failures and Recovery](#failures-and-recovery)). |
+| **Known subject** | `sso_authenticated` | **Targets `done` (Authenticated).** Identity is pinned to `(connection, subject)`, not to claims, so profile edits cannot fork accounts. A sign-in does not update the stored user from fresh claims; that refresh is `is_auto_update`, deferred with its guards ([area 1](1-resource-model.md#deferred-and-cut-fields)). |
+| **Unknown subject** | `sso_user_not_found` | **Targets the data collection step** ([New Users: Prefill and Confirm](#new-users-prefill-and-confirm); `register-sso` in area 4's scaffold). Under `creation: disabled`, `sso_user_not_found` is not raised; the unknown subject is an error on the originating step ([Failures and Recovery](#failures-and-recovery)). |
 | **Unknown subject with unique-property collision** | `user_already_exists` | **Targets the conflict resolution step** ([Conflict Resolution Flow](#conflict-resolution-flow); `sso-conflict` in area 4's scaffold). The engine binds the attempt to the colliding account, and a correct password or passkey on that step signs that account in. |
 
 ### Creation Without Collection (`creation: auto`)
 
 Under `creation: auto` (the default), the engine **creates the account
-immediately without pausing for collection** and fires `callback` as a newly
-authenticated user, provided the mapped claims supply every required property in
-the schema.
+immediately without pausing for collection** and fires `sso_authenticated` as a
+newly authenticated user, provided the mapped claims supply every required
+property in the schema.
 
 * **Fallback Behavior:** If a required property is missing, execution degrades
-  to `identity_unknown` → data collection, prefilled with what did arrive.
+  to `sso_user_not_found` → data collection, prefilled with what did arrive.
   This is the epic's new-user journey: the user provides only what the provider
   did not return.
 * **Unverified Identifiers:** A required property with a non-empty `x-unique`
@@ -276,7 +306,7 @@ the schema.
     creates the account first, and the victim meets the conflict step at their
     own sign-up.
 * **Disabled:** under `creation: disabled` an unknown subject is an error on
-  the step the user started from; `identity_unknown` is not raised
+  the step the user started from; `sso_user_not_found` is not raised
   ([Failures and Recovery](#failures-and-recovery)).
   The provider signs in existing users only.
   The deferred `auto_only` errors on incomplete claims rather than
@@ -320,10 +350,11 @@ the schema.
   All account-linking semantics are deferred to the dedicated account-linking
   specification.
 - **Validation Rule:** Steps containing `sso_providers` **must** explicitly
-  route all three outcomes (`callback`, `identity_unknown`, and
+  route all three outcomes (`sso_authenticated`, `sso_user_not_found`, and
   `user_already_exists`) to prevent flow dead-ends (validator rule in
-  [`2-auth-method-selection.md`](2-auth-method-selection.md); today only
-  `transitions.callback` is enforced).
+  [`2-auth-method-selection.md`](2-auth-method-selection.md); today only the
+  success key is enforced, as `transitions.callback` on main until #1371
+  renames it to `sso_authenticated`).
 
 ## New Users: Prefill and Confirm
 
@@ -489,7 +520,7 @@ and recovery route without exposing internal technical details to the end user.
 | **Callback Route:** Register route under the server HTTP surface; the scaffolded proxy matcher is already prefix-wide (`/__nextgen/:path*`), so no patcher work remains. | Server |
 | **Localization Keys:** Export conflict-step copy (the account-exists explanation plus its submit, passkey, and sign-in actions), error copy, and provider button labels as `text_key` entries. | Login UI / Locale Work |
 | **UI & Branding Assets:** Add conditional SSO blocks to all five branding `login.liquid` templates and `default.liquid`; add provider glyphs to `zl-icon`. | Branding Defaults / Components |
-| **`<zl-sso-providers>` and `sso-redirect`:** An atom rendering one button per provider (`name` and `template` on the rendered step, filled by the engine from the connection; `template` is the brand hint) that submits `{action: "sso", sso_provider_id}`, and orchestrator navigation when a step carries `redirect_url`. | Components / Orchestrator |
+| **`<zl-sso-providers>` and `sso-redirect`:** An atom rendering one button per provider (`name` and `template` on the rendered step, filled by the engine from the connection; `template` is the brand hint) that submits `{action: "sso", sso_provider_id, return_target}`, and orchestrator navigation when a step carries `redirect_url`. | Components / Orchestrator |
 | **Failure-Details Channel:** Details are written to the server log; tenant-side misconfigurations are hidden from the end user. The log never carries authorization codes, tokens, or secret values; claim values follow `x-audit`'s deny-by-default; access logs redact `code` and `state` from the callback query. | Engine; the login UI shows the generic error |
 
 ## Open Points
@@ -525,24 +556,26 @@ and recovery route without exposing internal technical details to the end user.
   [#534](https://github.com/zitadel/nextgen/issues/534)).
   Until decided, pattern environments render without providers
   ([Constraints & Edge Cases](#constraints--edge-cases)).
-* **State Storage Shape:** Fields on the attempt, or a dedicated table.
-  Consumption must be atomic under concurrent duplicate callbacks (one succeeds,
-  the second gets a reused-state error); `zitadel/zitadel` has no such guard
-  ([`idp_intent.go#L169-L199`](https://github.com/zitadel/zitadel/blob/d488ecb07ffe82d1e5493e9482be48a3e82397cc/internal/command/idp_intent.go#L169-L199))
-  and no TTL on a pending state.
-  Minting is unauthenticated, so the engine caps pending records per flow and
-  rate-limits minting (both 851 requirements); the shape must keep both cheap.
-* **Multi-Tab Behavior:** Defining rules for parallel SSO submissions initiated
-  from a single flow (whether the last-minted state invalidates prior states or
-  both remain valid until consumed).
-  The binding cookie shares this decision: one named `__Host-` cookie holds a
-  single value per host, so a second tab's ceremony overwrites the first tab's
-  nonce and fails it at callback; per-attempt cookie names versus accepting the
-  overwrite must be settled together with the state rule.
-* **`sso-redirect` Step Shape:** Confirming whether `{name, redirect_url}`
-  (sketched in example 4) serves as the official wire contract or if the
-  redirect URL should be folded directly into the submission response payload.
-  The return leg is settled in [The `state` Record](#the-state-record): the
+* **State Storage Shape:** Settled in #1073. The record is a `sso_callback`
+  row in the checks table, one per attempt, so a new submission replaces the
+  pending one. Consumption is one guarded update, so concurrent duplicate
+  callbacks succeed exactly once and the rest get the same opaque error as an
+  unknown or expired state; `zitadel/zitadel` has no such guard
+  ([`idp_intent.go#L169-L199`](https://github.com/zitadel/zitadel/blob/d488ecb07ffe82d1e5493e9482be48a3e82397cc/internal/command/idp_intent.go#L169-L199)).
+  The record inherits the attempt's TTL. Creation caps and rate limits are
+  flow-level, not SSO-specific, and belong to the platform's abuse-prevention
+  design (#351; ADR 041, still in PR #472).
+* **Multi-Tab Behavior:** Settled in #1073. A new record for the same attempt
+  replaces the pending one, so the last submission wins and an earlier tab's
+  callback is refused on consume. The binding cookie agrees with that rule:
+  the one `__Host-` cookie holds the newest nonce, so the earlier tab fails
+  the same way. No per-attempt cookie names.
+* **`sso-redirect` Step Shape:** Settled. The submission returns a
+  non-terminal step `{name: "sso-redirect", texts.title_key, redirect_url}`
+  with no fields or actions (example 4 in
+  [`flow-engine.md`](../flowengine/flow-engine.md#example-4-sso-login-google)),
+  and the flow state stays on the step the provider was picked from. The
+  return leg is settled in [The `state` Record](#the-state-record): the
   record carries the return target and the callback route consumes it, never
   reading a destination from callback input.
 
@@ -557,6 +590,6 @@ and recovery route without exposing internal technical details to the end user.
 - [`../flowengine/flow-engine-nodes.md`](../flowengine/flow-engine-nodes.md)
   (step response shape)
 - [`../flowengine/capabilities.md`](../flowengine/capabilities.md) (what is
-  stubbed)
-- `internal/domain/flow_state_machine.go` (the SSO stub), `flow_on_success.go`
+  implemented)
+- `internal/domain/flow_state_machine.go` (the sso branch), `flow_on_success.go`
   (the `on_success` handler interface `create_user_with_sso` joins)

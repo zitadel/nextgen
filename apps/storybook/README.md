@@ -28,7 +28,7 @@ in the sidebar with no extra per-renderer or `Playground` nesting.
 
 ```sh
 moon run storybook:dev     # http://localhost:6006
-moon run storybook:build   # static build into storybook-static/
+moon run storybook:build   # static build into dist/
 moon run storybook:test    # run every story as a real-browser test
 ```
 

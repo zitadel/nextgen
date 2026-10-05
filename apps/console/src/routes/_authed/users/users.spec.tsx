@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { scopedPath } from "@/lib/project-scope.fixture";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
@@ -26,13 +27,13 @@ afterAll(() => {
   vi.unstubAllEnvs();
 });
 
-async function renderUsers() {
+async function renderUsers(path = scopedPath("/users")) {
   const [{ RouterProvider, createMemoryHistory }, { createAppRouter }] = await Promise.all([
     import("@tanstack/react-router"),
     import("../../../router"),
   ]);
   const router = createAppRouter({
-    history: createMemoryHistory({ initialEntries: ["/users"] }),
+    history: createMemoryHistory({ initialEntries: [path] }),
   });
   render(<RouterProvider router={router} />);
   return router;
@@ -52,6 +53,71 @@ function recordQueries(response: (body: Record<string, unknown>) => Response) {
 }
 
 describe("users screen", () => {
+  it("lists the selected project's users, on every page", async () => {
+    // `project_id` names the target (#1303). Without it the server answers for
+    // the caller's own project (`proj_test`, the session fixture's), which is
+    // not the one selected here.
+    const projects: (string | null)[] = [];
+    server.use(
+      http.post(USERS_QUERY_URL, async ({ request }) => {
+        projects.push(new URL(request.url).searchParams.get("project_id"));
+        const body = (await request.json()) as { page_token?: string };
+        return HttpResponse.json(
+          body.page_token
+            ? { users: [] }
+            : {
+                users: [
+                  {
+                    id: "user_1",
+                    identifier: "maya@acme.com",
+                    identifier_property: "email",
+                    attributes: { email: "maya@acme.com" },
+                  },
+                ],
+                next_page_token: "tok_2",
+              },
+        );
+      }),
+    );
+    await renderUsers(scopedPath("/users", "proj_other"));
+
+    // The address renders twice in the row (User and identifier columns).
+    const table = within(await screen.findByRole("table"));
+    expect(table.getAllByText("maya@acme.com").length).toBeGreaterThan(0);
+    await userEvent.click(screen.getByRole("button", { name: "Load more" }));
+    await waitFor(() => expect(projects).toEqual(["proj_other", "proj_other"]));
+  });
+
+  it("resolves the users' schemas in the selected project, on every page", async () => {
+    // Schema ids are unique per project only, and the server resolves an
+    // ambiguous one in the caller's own project unless `project_id` names it.
+    const schemaProjects: Record<string, string | null> = {};
+    server.use(
+      http.post(USERS_QUERY_URL, async ({ request }) => {
+        const body = (await request.json()) as { page_token?: string };
+        return HttpResponse.json(
+          body.page_token
+            ? { users: [{ id: "user_2", schema: "sch_later", attributes: {} }] }
+            : {
+                users: [{ id: "user_1", schema: "sch_first", attributes: {} }],
+                next_page_token: "tok_2",
+              },
+        );
+      }),
+      http.get(`${SCHEMAS_URL}/:id`, ({ params, request }) => {
+        schemaProjects[params.id as string] = new URL(request.url).searchParams.get("project_id");
+        return HttpResponse.json({ schema: { type: "object", properties: {} } });
+      }),
+    );
+    await renderUsers(scopedPath("/users", "proj_other"));
+
+    await waitFor(() => expect(schemaProjects).toEqual({ sch_first: "proj_other" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Load more" }));
+    await waitFor(() =>
+      expect(schemaProjects).toEqual({ sch_first: "proj_other", sch_later: "proj_other" }),
+    );
+  });
+
   it("renders the page heading and a user row", async () => {
     server.use(
       http.post(USERS_QUERY_URL, () =>
@@ -231,9 +297,9 @@ describe("users screen", () => {
 
   it("renders the not-authorized state on a 401 with a live session (no redirect loop)", async () => {
     // A 401 data call while `GET /sessions/me` still answers with a session
-    // means the operator-plane credential is missing (e.g. no dev-proxy
-    // secret) — the boundary must render copy, not bounce to /login. The
-    // loader error is expected; silence the boundary/router noise.
+    // means the server refused this request's session — the boundary must
+    // render copy, not bounce to /login. The loader error is expected; silence
+    // the boundary/router noise.
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     try {
@@ -445,11 +511,11 @@ describe("users screen", () => {
     // entry carries the id, so this costs no extra read.
     expect(table.getByRole("link", { name: "Acme Web" })).toHaveAttribute(
       "href",
-      "/teams/team_1",
+      scopedPath("/teams/team_1"),
     );
     expect(table.getByRole("link", { name: "Platform" })).toHaveAttribute(
       "href",
-      "/teams/team_2",
+      scopedPath("/teams/team_2"),
     );
     // `[]` is "on no team", which the table draws as an empty cell rather than
     // leaving the row a column short.

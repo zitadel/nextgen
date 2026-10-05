@@ -13,8 +13,8 @@ import { expectNoErrorBoundary, signIn } from "./support";
  * failure mode the mock exists to avoid.
  */
 
-test("previews the project's own login beside the settings", async ({ page, seed }) => {
-  await signIn(page, await seed.user());
+test("previews the project's own login beside the settings", async ({ page, zitadel, seed }) => {
+  await signIn(page, zitadel.handle, await seed.user());
 
   await page.goto("/branding");
 
@@ -30,10 +30,16 @@ test("previews the project's own login beside the settings", async ({ page, seed
   await expectNoErrorBoundary(page);
 });
 
-test("is reached from the sidebar, nested under the flows it brands", async ({ page, seed }) => {
-  await signIn(page, await seed.user());
+test("is reached from the sidebar, nested under the flows it brands", async ({
+  page,
+  zitadel,
+  seed,
+}) => {
+  await signIn(page, zitadel.handle, await seed.user());
 
-  await page.goto("/projects");
+  // The sidebar lists a project's screens once one is selected; `/` selects
+  // this lane's pinned project and lands on its first screen.
+  await page.goto("/");
 
   // Branding is a sub-row of Login flows, as the design nests it: it is how
   // those flows render rather than a destination of its own.
@@ -47,7 +53,7 @@ test("is reached from the sidebar, nested under the flows it brands", async ({ p
   await expect(branding).toBeVisible();
   await branding.click();
 
-  await expect(page).toHaveURL(/\/branding$/);
+  await expect(page).toHaveURL(/\/branding\?project=/);
 
   // The selector lists the project's own flows, so it comes from the instance
   // rather than a fixed set. A real instance is what proves the label is the
@@ -57,8 +63,12 @@ test("is reached from the sidebar, nested under the flows it brands", async ({ p
   await expectNoErrorBoundary(page);
 });
 
-test("shows the branding in use without a control to change it", async ({ page, seed }) => {
-  await signIn(page, await seed.user());
+test("shows the branding in use without a control to change it", async ({
+  page,
+  zitadel,
+  seed,
+}) => {
+  await signIn(page, zitadel.handle, await seed.user());
 
   await page.goto("/branding");
   await expect(page.locator("zitadel-login").getByRole("textbox", { name: "Email" })).toBeVisible();
@@ -74,6 +84,49 @@ test("shows the branding in use without a control to change it", async ({ page, 
   await expect(panel.getByText("Primary", { exact: true }).first().locator("..")).toContainText(
     "#",
   );
+
+  await expectNoErrorBoundary(page);
+});
+
+test("shows the served step in each state without submitting it", async ({
+  page,
+  zitadel,
+  seed,
+}) => {
+  await signIn(page, zitadel.handle, await seed.user());
+
+  await page.goto("/branding");
+  const preview = page.locator("zitadel-login");
+  const email = preview.getByRole("textbox", { name: "Email" });
+  await expect(email).toBeVisible();
+
+  // The state applies to the step the instance served: the error that appears
+  // is the one its required field would carry after an empty submit.
+  await page.getByLabel("Previewed state").click();
+  await page.getByRole("option", { name: "State: Validation errors" }).click();
+  await expect(preview.getByText("Please enter an email address")).toBeVisible();
+
+  await page.getByLabel("Previewed state").click();
+  await page.getByRole("option", { name: "State: Submission error" }).click();
+  await expect(preview.getByText("We couldn't complete your sign in.")).toBeVisible();
+
+  await page.getByLabel("Previewed state").click();
+  await page.getByRole("option", { name: "State: Loading" }).click();
+  await expect(preview).toHaveAttribute("aria-busy", "true");
+
+  await page.getByLabel("Previewed state").click();
+  await page.getByRole("option", { name: "State: Success" }).click();
+  await expect(preview.getByText("You're signed in")).toBeVisible();
+  await expect(email).toHaveCount(0);
+
+  // Back to the served step, and a submit from the preview goes nowhere:
+  // the same step stays on screen with what was typed.
+  await page.getByLabel("Previewed state").click();
+  await page.getByRole("option", { name: "State: Default" }).click();
+  await email.fill("preview@example.com");
+  await email.press("Enter");
+  await expect(email).toHaveValue("preview@example.com");
+  await expect(preview.getByRole("textbox", { name: "Password" })).toHaveCount(0);
 
   await expectNoErrorBoundary(page);
 });

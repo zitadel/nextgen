@@ -196,11 +196,11 @@ export function resolveGates({ mode, files, targets }) {
     journey_testkit: journeyNextScaffold,
     suites_testing_demo: suitesTestingDemo,
     suites_console: suitesConsole,
-    browsers:
-      suitesTestingDemo ||
-      suitesConsole ||
-      anyJourney ||
-      targets.some((t) => t.endsWith(":test-browser")),
+    // Provisions Chromium for the e2e suites and journeys (their steps have no
+    // per-package install-browsers dep). The browser `:test` lanes
+    // (components/api-mock/storybook) install Chromium themselves via a moon dep,
+    // so they don't need this gate.
+    browsers: suitesTestingDemo || suitesConsole || anyJourney,
   };
   const matrix =
     journeyProject || anySdkBuild || MATRIX_TRIGGERS.some((t) => set.has(t)) ? "full" : "single";

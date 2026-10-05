@@ -2,6 +2,8 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { defineConfig, loadEnv } from "vite";
 
+import { baseTest } from "../../vitest.shared.mjs";
+
 const uiBase = "/ui/login/";
 const loginOutDir = "../../internal/staticui/login/dist";
 const defaultDevProxyPath = "/__nextgen";
@@ -12,8 +14,18 @@ export default defineConfig(({ command, mode, isPreview }) => {
     root: import.meta.dirname,
     base: command === "build" || isPreview ? uiBase : "/",
     server: command === "serve" && !isPreview ? devServerConfig(mode) : baseServerConfig(),
-    cacheDir: "../../node_modules/.vite/apps/login-ui",
+    cacheDir: ".vitest",
     resolve: { conditions: ["@zitadel/source"] },
+    test: {
+      ...baseTest,
+      name: "@zitadel/login-ui",
+      environment: "node",
+      // Inherit the shared base's include (both .test/.spec suffixes) so a
+      // future test here is discovered. No unit tests yet (the login flow is
+      // covered in @zitadel/components and the e2e journeys), so this lane is
+      // intentionally allowed to be empty.
+      passWithNoTests: true,
+    },
     plugins: [keepGoEmbedPlaceholder(loginOutDir)],
     build: {
       outDir: loginOutDir,

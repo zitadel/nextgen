@@ -135,6 +135,139 @@ describe("setup command pre-flight", () => {
     ]);
   });
 
+  it("offers an sso retry that can actually be run", async () => {
+    // The retry goes into next_commands, which an agent runs verbatim. With
+    // --sso and --non-interactive the CLI reads the secret from stdin, and a
+    // command handed over as text has none -- so advertising that combination
+    // is advertising a command that fails on sight.
+    const cwd = await makeTempDir();
+    await writeFile(join(cwd, "package.json"), JSON.stringify({ dependencies: { next: "^15" } }));
+    await writeRuntimeMetadata(cwd, runtimeFor(cwd, "http://localhost:9"));
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--framework",
+      "next",
+      "--server",
+      "local",
+      "--sso",
+      "google",
+      "--sso-client-id",
+      "1234-abc.apps.googleusercontent.com",
+      "--non-interactive",
+      "--json",
+    ]);
+
+    const json = parseJson(res.stdout) as { code: string; hint?: string; next_commands?: string[] };
+    expect(json.code).toBe("E_LOCAL_SERVER_NOT_RUNNING");
+    const retry = (json.next_commands ?? []).find((c) => c.includes("setup "));
+    expect(retry).toContain("--sso google");
+    expect(retry).not.toContain("--non-interactive");
+    // And it says why, so the scripted path is still reachable -- naming both
+    // credentials, since the retry carries neither.
+    expect(json.hint).toContain("asks for the client id and secret");
+    expect(json.hint).toContain("--sso-client-id");
+  });
+
+  // Recovery commands configure the project setup was pointed at, not the
+  // shell's own directory, and they carry no `--cwd` -- a path can hold spaces
+  // and metacharacters, and nothing escapes a suggested command for a shell.
+  // So the guidance names the directory instead.
+  it("names the project directory when it is not the shell's own", async () => {
+    const cwd = await makeTempDir();
+    await writeFile(join(cwd, "package.json"), JSON.stringify({ dependencies: { next: "^15" } }));
+    await writeRuntimeMetadata(cwd, runtimeFor(cwd, "http://localhost:9"));
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--framework",
+      "next",
+      "--server",
+      "local",
+      "--json",
+    ]);
+
+    const json = parseJson(res.stdout) as { hint?: string; next_commands?: string[] };
+    expect(json.hint).toContain(cwd);
+    // Named in prose, never as an argument a shell would split.
+    for (const command of json.next_commands ?? []) {
+      expect(command).not.toContain("--cwd");
+    }
+  });
+
+  // The suggested retry carries `--sso` without `--sso-client-id`, since the id
+  // is never put in command text. Following that retry and hitting the same
+  // failure again must not drop the provider from the next suggestion -- the
+  // developer would be told to set up without the provider they asked for.
+  it("keeps the provider in the retry when only --sso was given", async () => {
+    const cwd = await makeTempDir();
+    await writeFile(join(cwd, "package.json"), JSON.stringify({ dependencies: { next: "^15" } }));
+    await writeRuntimeMetadata(cwd, runtimeFor(cwd, "http://localhost:9"));
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--framework",
+      "next",
+      "--server",
+      "local",
+      "--sso",
+      "google",
+      "--json",
+    ]);
+
+    const json = parseJson(res.stdout) as { next_commands?: string[]; hint?: string };
+    const retry = (json.next_commands ?? []).find((c) => c.includes("setup "));
+    expect(retry).toContain("--sso google");
+    // And the scripted route names both flags, because a rerun with --sso and
+    // --non-interactive alone fails on the missing client id before stdin is
+    // ever read.
+    expect(json.hint).toContain("--sso-client-id");
+  });
+
+  // Suggested commands are run verbatim, especially by agents, and nothing
+  // escapes them for a shell. The wizard accepts any non-empty client id, so a
+  // value carrying a space or a metacharacter would split the command or
+  // change what it does. No id is interpolated into command text at all --
+  // the rerun asks for it, as it already does for the secret.
+  it("keeps the client id out of every suggested command", async () => {
+    const cwd = await makeTempDir();
+    await writeFile(join(cwd, "package.json"), JSON.stringify({ dependencies: { next: "^15" } }));
+    await writeRuntimeMetadata(cwd, runtimeFor(cwd, "http://localhost:9"));
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--framework",
+      "next",
+      "--server",
+      "local",
+      "--sso",
+      "google",
+      "--sso-client-id",
+      "id with spaces; echo pwned",
+      "--non-interactive",
+      "--json",
+    ]);
+
+    const json = parseJson(res.stdout) as { next_commands?: string[]; hint?: string };
+    for (const command of json.next_commands ?? []) {
+      expect(command).not.toContain("id with spaces");
+      expect(command).not.toContain("echo pwned");
+    }
+    expect(json.hint ?? "").not.toContain("echo pwned");
+    // The provider still reaches the retry; only the id is withheld.
+    const retry = (json.next_commands ?? []).find((c) => c.includes("setup "));
+    expect(retry).toContain("--sso google");
+    expect(retry).not.toContain("--sso-client-id");
+  });
+
   it("explains non-empty dirs whose framework can't be inferred or scaffolded", async () => {
     const cwd = await makeTempDir();
     // A non-empty dir that isn't a known framework — Orca's detector fails
@@ -368,6 +501,65 @@ describe("setup --design removal (#1039)", () => {
     expect(json.next_commands.join("\n")).toContain("branding eject");
     expect(capture.requests).toEqual([]);
     expect(existsSync(join(cwd, ".zitadel"))).toBe(false);
+  });
+});
+
+describe("setup --sso flags", () => {
+  it("refuses a provider with no client id before touching the directory", async () => {
+    const cwd = await makeTempDir();
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--non-interactive",
+      "--json",
+      "--sso",
+      "google",
+    ]);
+
+    expect(res.exitCode).not.toBe(0);
+    const json = parseJson(res.stdout) as { status: string; code: string; message?: string };
+    expect(json.status).toBe("error");
+    expect(json.code).toBe("E_VALIDATION");
+    expect(json.message).toContain("--sso-client-id");
+  });
+
+  it("refuses a client id with no provider", async () => {
+    const cwd = await makeTempDir();
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--non-interactive",
+      "--json",
+      "--sso-client-id",
+      "1234-abc.apps.googleusercontent.com",
+    ]);
+
+    expect(res.exitCode).not.toBe(0);
+    const json = parseJson(res.stdout) as { status: string; code: string };
+    expect(json.status).toBe("error");
+    expect(json.code).toBe("E_VALIDATION");
+  });
+
+  it("rejects a provider the catalog does not know", async () => {
+    const cwd = await makeTempDir();
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--non-interactive",
+      "--json",
+      "--sso",
+      "myspace",
+      "--sso-client-id",
+      "abc",
+    ]);
+
+    expect(res.exitCode).not.toBe(0);
   });
 });
 

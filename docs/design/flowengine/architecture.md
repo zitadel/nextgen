@@ -146,7 +146,7 @@ Errors that surface from `Process`:
 
 - `ErrInvalidAction` — submitted action not in the step's `Transitions`.
 - `ErrIntegrity` — wiring contract violated (missing definition, missing step, missing dependency).
-- `ErrUnsupported` — feature deferred (cross-flow transitions, SSO submissions, gate proofs).
+- `ErrUnsupported` — feature deferred (cross-flow transitions, gate proofs).
 - `ErrSessionConflict` — reserved; not emitted today.
 
 ### `FlowFieldResolver` (`internal/domain/flow_field_resolver*.go`)

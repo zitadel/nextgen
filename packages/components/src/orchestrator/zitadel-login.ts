@@ -31,7 +31,7 @@ import { resolveLogoUrl } from "./branding.js";
 import type { ResolvedTheme } from "./theme-controller.js";
 import type { Branding } from "./branding.js";
 import { stampExportparts } from "./exportparts.js";
-import { createLiquidEngine, localiseFlowErrorKeys } from "./liquid.js";
+import { createLiquidEngine, localiseFlowErrorKeys, parseSsoError } from "./liquid.js";
 import { en, builtinLocales, type Locale } from "./locales/index.js";
 import { patchMandatoryGates } from "./mandatory-gates.js";
 import { resolveApi, type ProjectAttrs } from "./resolve-api.js";
@@ -50,6 +50,13 @@ import layoutChromeCss from "./templates/layout-chrome.css?inline";
  * change here.
  */
 type FieldAtom = HTMLElement & { formValue: string };
+
+/**
+ * The reserved action that starts an external sign-in, fixed by the flow
+ * submit contract (`flow-submit-request.yaml`): it is the one action name the
+ * engine interprets itself rather than looking up in the step's actions.
+ */
+const SSO_ACTION = "sso";
 
 /** Narrow a rendered named element to the `formValue` field-atom contract. */
 function isFieldAtom(el: Element): el is FieldAtom {
@@ -88,6 +95,49 @@ function isFieldAtom(el: Element): el is FieldAtom {
  * - `docs/design/branding/form-participation.md`
  * - `docs/design/flowengine/template-security.md`
  */
+
+/**
+ * The flow handle a provider callback left in the URL, if any.
+ *
+ * The identity-provider callback finishes by navigating the browser back to
+ * the `return_target` the sso submission sent, which is the page the sign-in
+ * started on with `?flow=<id>` set (see {@link returnTargetFor}) -- a full
+ * page load, so nothing of the previous document survives to carry the
+ * handle. Reading it here means every host page resumes correctly without
+ * code of its own; doing it per framework would mean the same few lines in
+ * each of the scaffolded templates, and a page that forgot them would silently
+ * restart the flow instead of completing the sign-in.
+ *
+ * A handle from the URL is not a capability: `GET /flow/{id}` only answers
+ * when the sealed flow cookie names that same id, so an id someone else put
+ * there resolves to nothing.
+ */
+function flowIdFromLocation(): string {
+  if (typeof window === "undefined") {
+    return "";
+  }
+  try {
+    return new URLSearchParams(window.location.search).get(FLOW_QUERY_PARAM) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+/** The query parameter the orchestrator reads the flow id from after a provider callback. */
+const FLOW_QUERY_PARAM = "flow";
+
+/**
+ * The page URL the callback sends the browser back to, with this flow's id
+ * in the query so the reload resumes the flow (see {@link flowIdFromLocation}).
+ * Set, not appended: a page already carrying `?flow=` from an earlier return
+ * would otherwise send two ids.
+ */
+function returnTargetFor(flowId: string): string {
+  const target = new URL(window.location.href);
+  target.searchParams.set(FLOW_QUERY_PARAM, flowId);
+  return target.toString();
+}
+
 @customElement("zitadel-login")
 export class ZitadelLogin extends ZitadelSurface {
   static override shadowRootOptions: ShadowRootInit = {
@@ -161,9 +211,56 @@ export class ZitadelLogin extends ZitadelSurface {
    * Existing flow handle to resume rather than start a new flow. When set,
    * the orchestrator hits `GET /flow/{id}` instead of `POST /flow` on
    * mount, so a page reload after a network blip can re-render the same
-   * step without losing collected state.
+   * step without losing collected state. A handle that no longer resolves
+   * starts a new flow instead, with a console warning.
+   *
+   * Leaving it empty falls back to the `flow` query parameter, which is how a
+   * provider callback hands the flow back (see {@link flowIdFromLocation}), so
+   * a host page needs no code of its own for external sign-in to finish.
    */
   @property({ type: String, attribute: "resume-flow-id" }) accessor resumeFlowId = "";
+
+  /**
+   * Preview mode, for an operator surface such as the console's branding
+   * screen. Set, the element starts the flow as usual so the step it paints
+   * is the one the project serves, then shows it in the named state and
+   * submits nothing: form submits, actions, back and passkey ceremonies are
+   * dropped, and no completion is acted on. Fields stay editable so focus
+   * and filled styling can be seen. Changing the value re-applies the state
+   * to the step already loaded; it does not start another flow.
+   *
+   * - `default`: the step as a visitor first sees it.
+   * - `validation_error`: every required field flagged, as an empty submit
+   *   would be.
+   * - `submission_error`: the form-level banner a failed submit shows.
+   * - `loading`: the busy treatment of a submit in flight.
+   * - `success`: the terminal screen. It is the step named by
+   *   {@link previewSuccessStep}, since the flow's own terminal step is not
+   *   known until the server walks the flow to it.
+   *
+   * Only the purpose's entry step can be previewed: a later step exists
+   * only once the server has walked the flow to it.
+   */
+  @property({ type: String, attribute: "preview-state" }) accessor previewState:
+    | LoginPreviewState
+    | "" = "";
+
+  /**
+   * The terminal step the `success` preview paints, for a flow definition that
+   * names it differently from the default flow's `done`. Its texts follow the
+   * server's `<step>.title` / `<step>.description` convention.
+   */
+  @property({ type: String, attribute: "preview-success-step" }) accessor previewSuccessStep = "";
+
+  /**
+   * The preview state in effect: {@link previewState} when it names a known
+   * state, otherwise none, so a mistyped attribute leaves a working login
+   * rather than one that silently submits nothing.
+   */
+  private get preview(): LoginPreviewState | "" {
+    const state = this.previewState;
+    return (LOGIN_PREVIEW_STATES as readonly string[]).includes(state) ? state : "";
+  }
 
   /**
    * BCP 47 language tag (e.g. `"de"`, `"en-US"`). The widget resolves this
@@ -201,6 +298,19 @@ export class ZitadelLogin extends ZitadelSurface {
   @state() private accessor startupError: string | null = null;
 
   @state() private accessor formValues: Record<string, string> = {};
+
+  /**
+   * The step the server served, kept while previewing so every preview state
+   * derives from the same response rather than from the last one shown.
+   */
+  private previewBase: CreateFlow201 | null = null;
+
+  /**
+   * Set while the next commit repaints a preview state, so `updated` treats
+   * it like a theme flip (restore typed values, leave focus alone) rather
+   * than a step swap that moves focus into the form. Non-reactive.
+   */
+  private previewRepaint = false;
 
   private engine: Liquid | null = null;
 
@@ -278,6 +388,10 @@ export class ZitadelLogin extends ZitadelSurface {
       // <zl-passkey> emits `zl-passkey-error` when the ceremony fails or is
       // cancelled. Surface the error on the current step.
       root.addEventListener("zl-passkey-error", this.handlePasskeyError as EventListener);
+      // <zl-sso-providers> emits `zl-sso-select` when a provider button is
+      // chosen. The answer is a non-terminal step carrying `redirect_url`,
+      // which `applyResponse` follows on its way out.
+      root.addEventListener("zl-sso-select", this.handleSsoSelect as EventListener);
     }
     return root;
   }
@@ -344,6 +458,25 @@ export class ZitadelLogin extends ZitadelSurface {
     if (!this.engine || changed.has("locales") || changed.has("lang")) {
       this.engine = createLiquidEngine({ locale: this.resolveLocale() });
     }
+    if (changed.has("previewState") && this.previewState && !this.preview) {
+      console.warn(
+        `[zitadel-login] preview-state="${this.previewState}" is not a preview state ` +
+          `(${LOGIN_PREVIEW_STATES.join(", ")}); running the flow for real.`,
+      );
+    }
+    const previewChanged =
+      changed.has("previewState") || (changed.has("previewSuccessStep") && this.preview !== "");
+    if (previewChanged && this.response) {
+      // A flow already on screen becomes the base when preview is switched on
+      // after mount; leaving preview restores it as it was served and lets
+      // the flow run for real from there.
+      this.previewBase ??= this.response;
+      this.applyPreviewState();
+      if (!this.preview) this.previewBase = null;
+      // A preview holds no history entry; a flow resumed from one takes the
+      // entry its step calls for.
+      this.syncBackSentinel(this.preview ? null : this.response.step);
+    }
     this.applySurfaceTheme(this.branding);
     this.setAttribute("aria-busy", this.loading ? "true" : "false");
   }
@@ -366,19 +499,34 @@ export class ZitadelLogin extends ZitadelSurface {
         // CSS-level so it also covers user-ejected templates: the rule in
         // layout-chrome.css hides `.zl-card-title`/`.zl-card-subtitle`
         // visually while keeping the step's accessible name.
-        shell.toggleAttribute("data-suppress-header", this.suppressHeader);
+        // `=== true` because `toggleAttribute`'s `force` is an *optional*
+        // boolean: passing `undefined` (what a framework wrapper sends for an
+        // unset optional prop) is treated as omitted, so it *toggles* instead
+        // of setting — flipping the header on and off on every commit. (Other
+        // non-booleans are coerced to a boolean; only `undefined` toggles.)
+        shell.toggleAttribute("data-suppress-header", this.suppressHeader === true);
       }
       // Stamped on the card too: its header REGION must leave the flex flow
       // (card-host.css) or the card keeps a blank 32px header band — the
       // slotted headings alone going sr-only doesn't collapse the region.
       for (const card of this.shadowRoot.querySelectorAll("zl-card")) {
-        card.toggleAttribute("data-suppress-header", this.suppressHeader);
+        card.toggleAttribute("data-suppress-header", this.suppressHeader === true);
       }
     }
     const previousTheme = this.lastRenderedTheme;
     this.lastRenderedTheme = this.themeController.theme;
 
     const props = changed as Map<string, unknown>;
+    if (props.has("response") && this.previewRepaint) {
+      this.previewRepaint = false;
+      // A preview state is not a step the visitor reached: keep focus where
+      // the operator has it (the state selector) and put typed values back.
+      // Not on the first paint, which focuses as any mount does.
+      if (props.get("response") != null) {
+        void this.restoreValuesAfterRender();
+        return;
+      }
+    }
     if (props.has("response")) {
       // `changed` holds the OLD value: nullish (`null` initializer, or
       // undefined when the property never changed before) means this commit
@@ -511,10 +659,8 @@ export class ZitadelLogin extends ZitadelSurface {
 
   /**
    * "Secured with Zitadel" attribution chrome injected into every
-   * template's page-shell footer slot. Controlled by
-   * `branding.attribution.show_zitadel` — defaults to `true` for
-   * community / OSS deployments. Licensed tenants can suppress the badge
-   * entirely or swap it for a `custom_link` value.
+   * template's page-shell footer slot. Reads `branding.attribution`, which
+   * the wire contract does not carry, so the mark always renders.
    */
   private renderAttributionHtml(placement: "footer" | "inline" = "footer"): string {
     const attribution = this.branding?.attribution;
@@ -556,10 +702,26 @@ export class ZitadelLogin extends ZitadelSurface {
       // `handleTransportError` (rendered as `startupError`) rather than as an
       // unhandled promise rejection from `firstUpdated`'s microtask.
       const { project: cfg, api } = resolveApi(this.project, this.projectAttrs, "<zitadel-login>");
-      let wire: CreateFlow201;
-      if (this.resumeFlowId) {
-        wire = await getCurrentStep(api, this.resumeFlowId);
-      } else {
+      let wire: CreateFlow201 | undefined;
+      const resumeId = this.resumeFlowId || flowIdFromLocation();
+      if (resumeId) {
+        try {
+          wire = await getCurrentStep(api, resumeId);
+        } catch (error) {
+          // A handle can outlive its flow: the cookie window closed during
+          // the external sign-in, so the browser no longer sends the
+          // required cookie (400), the cookie names another flow (404), or
+          // the flow finished in another tab (410). This is still the
+          // sign-in page, and a startup error would leave it with no way
+          // forward, so start over. Logged so a host passing a wrong handle
+          // does not get a silent restart.
+          const gone =
+            error instanceof ApiError && (error.status === 400 || error.status === 404 || error.status === 410);
+          if (!gone) throw error;
+          console.warn(`[zitadel-login] flow ${resumeId} no longer resolves; starting a new flow.`);
+        }
+      }
+      if (!wire) {
         if (!cfg.projectId) {
           throw new Error(
             "<zitadel-login> requires a project id (the `project-id` attribute, " +
@@ -583,6 +745,28 @@ export class ZitadelLogin extends ZitadelSurface {
     } finally {
       this.loading = false;
     }
+    // After `loading` has settled: the `loading` preview holds it back up.
+    if (this.preview) this.applyPreviewState();
+  }
+
+  /**
+   * Derive the shown step from {@link previewBase} for {@link previewState}.
+   * Sets `response` directly, as a passkey error does, rather than through
+   * `applyResponse`: nothing here is a new server step, so history and
+   * completion must not react to it.
+   */
+  private applyPreviewState(): void {
+    const base = this.previewBase;
+    if (!base) return;
+    const state = this.preview;
+    this.stepErrorDismissed = false;
+    this.loading = state === "loading";
+    const next = previewResponse(base, state, this.previewSuccessStep || "done");
+    // Same object for `default` right after the start: no repaint to flag,
+    // and the initial paint keeps its own focus rule.
+    if (next === this.response) return;
+    this.previewRepaint = true;
+    this.response = next;
   }
 
   /**
@@ -616,9 +800,11 @@ export class ZitadelLogin extends ZitadelSurface {
   private applyResponse(wire: CreateFlow201): void {
     // A fresh response carries fresh (or no) errors — un-dismiss.
     this.stepErrorDismissed = false;
+    const preview = this.preview !== "";
     // Decided before the step is assigned: `maybeCompleteFlow` navigates a
-    // turn later, and by then the terminal screen has already painted.
-    this.completing = navigatesOnComplete(wire, this.postSignInUrl);
+    // turn later, and by then the terminal screen has already painted. A
+    // preview navigates nowhere, so it never holds the loader for it.
+    this.completing = !preview && navigatesOnComplete(wire, this.postSignInUrl);
     this.response = wire;
     const { branding, issues } = validateBranding(wire.branding, {
       renderingOrigin: this.ownerDocument.location.origin,
@@ -632,54 +818,96 @@ export class ZitadelLogin extends ZitadelSurface {
     // carry-over from prior steps) win on conflict.
     this.formValues = { ...collectInitialValues(wire.step), ...this.formValues };
 
-    // History API (ADR 022): keep exactly one same-document entry — the
-    // sentinel — on the stack while the current step supports
-    // back-navigation, so the browser's back gesture fires `popstate`
-    // (handled in `onPopState`) instead of leaving the page. Arming only
-    // on the unarmed → armed transition means consecutive back-capable
-    // steps (and re-renders of the same step, e.g. after a failed submit)
-    // never grow the stack. Steps without a `kind: "back"` action retire
-    // the sentinel — the next back press then navigates the host page
-    // (leaves the flow), which is correct.
-    if (typeof window !== "undefined") {
-      const hasBack = Boolean(wire.step.actions?.some((a) => a.kind === "back"));
-      if (hasBack && !this.armed) {
-        // Spread the host's state: vue-router (Nuxt) keeps `position` /
-        // `back` / `forward` here and reads them on popstate. Replacing it
-        // wholesale leaves the sentinel opaque to the host router.
-        history.pushState({ ...history.state, zl: true }, "");
-        this.armed = true;
-      } else if (!hasBack && this.armed) {
-        this.armed = false;
-        // Only traverse while we still own the current entry. If the host
-        // pushed its own entry after we armed, `history.back()` would pop
-        // *that* one and trigger a host back-navigation the user never
-        // asked for. Leaving a stale sentinel behind is the lesser evil —
-        // same tradeoff as disconnect; the popstate handler skips stale
-        // sentinels in one extra hop from either direction.
-        if ((history.state as { zl?: boolean } | null)?.zl === true) {
-          if (this.completing) {
-            // A terminal step that navigates away: retire the sentinel in
-            // place instead of traversing. `history.back()` fires `popstate`
-            // in the host, and a host router that reloads on popstate would
-            // re-read the session `maybeCompleteFlow` is about to establish
-            // and act on it in a document that is already being replaced —
-            // the console claim page spent its single-use challenge that way,
-            // once here and once in the document it navigated to. The
-            // retired entry stays on the stack under the destination (a
-            // same-URL destination, like the claim page, replaces it); a back
-            // press from there lands on the host page signed in, which is the
-            // same stale-sentinel tradeoff as above, one hop at most.
-            history.replaceState({ ...history.state, zl: false }, "");
-          } else {
-            this.ignoreNextPop = true;
-            history.back();
-          }
+    // A preview never leaves the step it shows: it takes no history entry,
+    // makes no trip to a provider, exchanges no handoff and tells no host the
+    // visitor signed in. The served step becomes what its states derive from.
+    if (preview) {
+      this.previewBase = wire;
+      return;
+    }
+
+    this.syncBackSentinel(wire.step);
+
+    if (this.maybeRedirectToProvider(wire)) return;
+    void this.maybeCompleteFlow(wire);
+  }
+
+  /**
+   * History API (ADR 022): keep exactly one same-document entry — the
+   * sentinel — on the stack while the current step supports
+   * back-navigation, so the browser's back gesture fires `popstate`
+   * (handled in `onPopState`) instead of leaving the page. Arming only
+   * on the unarmed → armed transition means consecutive back-capable
+   * steps (and re-renders of the same step, e.g. after a failed submit)
+   * never grow the stack. Steps without a `kind: "back"` action retire
+   * the sentinel — the next back press then navigates the host page
+   * (leaves the flow), which is correct.
+   *
+   * `null` is a step with nothing to go back from: a preview, which takes no
+   * entry and gives back one the flow took before it was switched on.
+   */
+  private syncBackSentinel(step: CreateFlow201Step | null): void {
+    if (typeof window === "undefined") return;
+    const hasBack = Boolean(step?.actions?.some((a) => a.kind === "back"));
+    if (hasBack && !this.armed) {
+      // Spread the host's state: vue-router (Nuxt) keeps `position` /
+      // `back` / `forward` here and reads them on popstate. Replacing it
+      // wholesale leaves the sentinel opaque to the host router.
+      history.pushState({ ...history.state, zl: true }, "");
+      this.armed = true;
+    } else if (!hasBack && this.armed) {
+      this.armed = false;
+      // Only traverse while we still own the current entry. If the host
+      // pushed its own entry after we armed, `history.back()` would pop
+      // *that* one and trigger a host back-navigation the user never
+      // asked for. Leaving a stale sentinel behind is the lesser evil —
+      // same tradeoff as disconnect; the popstate handler skips stale
+      // sentinels in one extra hop from either direction.
+      if ((history.state as { zl?: boolean } | null)?.zl === true) {
+        if (this.completing) {
+          // A terminal step that navigates away: retire the sentinel in
+          // place instead of traversing. `history.back()` fires `popstate`
+          // in the host, and a host router that reloads on popstate would
+          // re-read the session `maybeCompleteFlow` is about to establish
+          // and act on it in a document that is already being replaced —
+          // the console claim page spent its single-use challenge that way,
+          // once here and once in the document it navigated to. The
+          // retired entry stays on the stack under the destination (a
+          // same-URL destination, like the claim page, replaces it); a back
+          // press from there lands on the host page signed in, which is the
+          // same stale-sentinel tradeoff as above, one hop at most.
+          history.replaceState({ ...history.state, zl: false }, "");
+        } else {
+          this.ignoreNextPop = true;
+          history.back();
         }
       }
     }
+  }
 
-    void this.maybeCompleteFlow(wire);
+  /**
+   * Hand the browser to an identity provider.
+   *
+   * `step.redirect_url` is the engine's answer to `action: "sso"`: a full-page
+   * navigation to the provider's authorization endpoint, which is the only way
+   * the user can authenticate there. It is not a completion — the flow resumes
+   * when the provider returns to the callback — so it is deliberately separate
+   * from {@link maybeCompleteFlow} and emits its own event rather than
+   * `zitadel-flow-complete`, which hosts treat as "signed in".
+   *
+   * Returns whether it navigated, so the caller can stop.
+   */
+  private maybeRedirectToProvider(response: CreateFlow201): boolean {
+    const target = response.step.redirect_url;
+    // A terminal step carries `redirect_url` too — the engine copies the
+    // relying party's `redirect_uri` onto it when a sign-in completes
+    // (`terminate()` in flow_state_machine.go). That is a finished sign-in,
+    // not a trip to a provider, and it belongs to `maybeCompleteFlow`.
+    if (!target || response.step.complete) return false;
+    emit(this, "zitadel-flow-redirect", { redirect_url: target, step: response.step });
+    if (typeof window === "undefined") return false;
+    window.location.assign(target);
+    return true;
   }
 
   /**
@@ -741,7 +969,8 @@ export class ZitadelLogin extends ZitadelSurface {
     // localise via the catalog with generic per-rule fallbacks; anything
     // else (outcome names, diagnostics) stays verbatim.
     const rawErrors: FlowError[] = step.error
-      ? (localiseFlowErrorKeys(step.error, {
+      ? (parseSsoError(step.error) ??
+        localiseFlowErrorKeys(step.error, {
           locale: this.resolveLocale(),
           stepName: step.name ?? "",
           // Inline-routed keys downgrade to a banner message when the
@@ -771,8 +1000,9 @@ export class ZitadelLogin extends ZitadelSurface {
       sso_providers: step.sso_providers ?? [],
       // While submitting a passkey proof, `loading` re-renders the current
       // step before the server returns. Re-rendering the same challenge would
-      // reconnect `<zl-passkey>` and start a second WebAuthn ceremony.
-      challenge: this.loading ? null : (step.challenge ?? null),
+      // reconnect `<zl-passkey>` and start a second WebAuthn ceremony. A
+      // preview renders none at all: the atom starts its ceremony on connect.
+      challenge: this.loading || this.preview ? null : (step.challenge ?? null),
       messages: [],
       identity: this.deriveIdentity(),
       errors,
@@ -854,17 +1084,9 @@ export class ZitadelLogin extends ZitadelSurface {
       const name = atom.getAttribute("name");
       if (name) values.set(name, atom.formValue);
     }
-    const missing: string[] = [];
-    for (const field of this.response?.step.fields ?? []) {
-      // A checkbox always submits a real boolean (`false` when unticked), so it
-      // is never "missing"; a must-accept boolean is enforced by the schema
-      // (`const: true`), not this gate.
-      if (field.type === "checkbox") continue;
-      if (field.required && (values.get(field.name) ?? "") === "") {
-        missing.push(field.name);
-      }
-    }
-    return missing;
+    return this.response
+      ? requiredFieldNames(this.response.step).filter((name) => (values.get(name) ?? "") === "")
+      : [];
   }
 
   /**
@@ -1021,6 +1243,21 @@ export class ZitadelLogin extends ZitadelSurface {
     void this.submit(event.detail?.action ?? null);
   };
 
+  /**
+   * A provider was chosen. `sso` is the reserved action the flow contract
+   * defines for this, carrying the connection id the button reported.
+   *
+   * Nothing is released afterwards: submitting re-renders the step, which
+   * replaces the provider atom outright, and a failed submit re-renders it
+   * again with `loading` back to false — so the buttons come back enabled on
+   * their own.
+   */
+  private handleSsoSelect = (event: CustomEvent<{ providerId?: string }>): void => {
+    const providerId = event.detail?.providerId;
+    if (this.loading || !providerId) return;
+    void this.submit(SSO_ACTION, undefined, providerId);
+  };
+
   /** Secondary navigation rows (`data-action` on `.zl-card-nav__link`). */
   private handleDelegatedAction = (event: Event): void => {
     const target = (event.target as HTMLElement | null)?.closest<HTMLElement>("[data-action]");
@@ -1035,7 +1272,9 @@ export class ZitadelLogin extends ZitadelSurface {
     // Always intercept: we own the submit cycle. Without this the page would
     // navigate to whatever `action` URL the form has (none) and lose state.
     event.preventDefault();
-    if (this.loading) return;
+    // Before the required-field gate: a preview shows the state it was asked
+    // for, not the one Enter would produce.
+    if (this.loading || this.preview) return;
     // This is the sole submit path for the primary action (submit-type
     // <zl-button> and Enter both drive `form.requestSubmit()`; the button no
     // longer emits a parallel `zl-submit`). Enforce the step's required fields
@@ -1153,8 +1392,11 @@ export class ZitadelLogin extends ZitadelSurface {
   private async submit(
     action: string | null,
     challengeResponse?: SubmitFlowStepBodyChallengeResponse,
+    ssoProviderId?: string,
   ): Promise<void> {
-    if (!this.response || this.loading) return;
+    // Every other entry point (actions, back, passkey proofs) lands here, so
+    // this one check keeps a preview from ever writing to the flow.
+    if (!this.response || this.loading || this.preview) return;
     const { id, session_token } = this.response;
     this.loading = true;
     try {
@@ -1168,6 +1410,11 @@ export class ZitadelLogin extends ZitadelSurface {
         action: action ?? "submit",
         fields,
         ...(challengeResponse ? { challenge_response: challengeResponse } : {}),
+        // The page the callback brings the browser back to; the engine
+        // refuses a target on another origin.
+        ...(ssoProviderId
+          ? { sso_provider_id: ssoProviderId, return_target: returnTargetFor(id) }
+          : {}),
       };
       const { api } = resolveApi(this.project, this.projectAttrs, "<zitadel-login>");
       const wire = await apiSubmitStep(api, id, body);
@@ -1178,6 +1425,9 @@ export class ZitadelLogin extends ZitadelSurface {
     } finally {
       this.loading = false;
     }
+    // Preview switched on while this submit was in flight: show the step it
+    // landed on in the chosen state.
+    if (this.preview) this.applyPreviewState();
   }
 
   /**
@@ -1256,6 +1506,76 @@ function isAllowedSelectValue(field: CreateFlow201StepFieldsItem, value: string)
   return field.validation?.enum?.includes(value) ?? false;
 }
 
+/** Every state {@link ZitadelLogin.previewState} can show a step in, in order. */
+export const LOGIN_PREVIEW_STATES = [
+  "default",
+  "validation_error",
+  "submission_error",
+  "loading",
+  "success",
+] as const;
+export type LoginPreviewState = (typeof LOGIN_PREVIEW_STATES)[number];
+
+/**
+ * The states that show `step` differently from `default`, for a surface that
+ * offers them. `validation_error` needs a required field to flag; a step
+ * without one renders it as `default`.
+ */
+export function loginPreviewStatesFor(step: CreateFlow201Step): LoginPreviewState[] {
+  const flaggable = requiredFieldNames(step).length > 0;
+  return LOGIN_PREVIEW_STATES.filter((state) => state !== "validation_error" || flaggable);
+}
+
+/** The response {@link ZitadelLogin.previewState} shows for the served one. */
+function previewResponse(
+  base: CreateFlow201,
+  state: LoginPreviewState | "",
+  successStep: string,
+): CreateFlow201 {
+  if (state === "" || state === "default" || state === "loading") return base;
+  if (state === "success") {
+    // The terminal step carries no fields or actions, so its name is all a
+    // client-side stand-in needs: the texts follow the server's
+    // `<step>.title` / `<step>.description` convention.
+    return {
+      ...base,
+      step: {
+        name: successStep,
+        texts: {
+          title_key: `${successStep}.title`,
+          description_key: `${successStep}.description`,
+        },
+        complete: "show",
+        fields: [],
+        actions: [],
+        gates: {},
+      },
+    };
+  }
+  // Step errors in the dialect the template already routes:
+  // `error.<field>_required` per required field (what the server answers an
+  // empty submit with), or the catalog's form-level failure, which paints the
+  // banner.
+  const error =
+    state === "validation_error"
+      ? requiredFieldNames(base.step)
+          .map((name) => `error.${name}_required`)
+          .join("; ")
+      : "error.sign_in_server";
+  return { ...base, step: { ...base.step, error } };
+}
+
+/**
+ * Names of the step's `required` fields. A checkbox always submits a real
+ * boolean (`false` when unticked), so it is never required in this sense; a
+ * must-accept boolean is enforced by the schema (`const: true`), not here.
+ */
+function requiredFieldNames(step: CreateFlow201Step): string[] {
+  return (step.fields ?? [])
+    .filter((field) => field.type !== "checkbox" && field.required)
+    .map((field) => field.name);
+}
+
 /**
  * Whether a terminal step ends in a navigation rather than a screen: a
  * `redirect` with a URI, or a `show` whose handoff the widget exchanges before
@@ -1264,6 +1584,10 @@ function isAllowedSelectValue(field: CreateFlow201StepFieldsItem, value: string)
  * is the flow's own last word — it still renders.
  */
 function navigatesOnComplete(wire: CreateFlow201, postSignInUrl: string | undefined): boolean {
+  // A non-terminal step carrying `redirect_url` hands the browser to an
+  // identity provider mid-flow — the flow is not finished, but this document
+  // is leaving, so the step must not paint either.
+  if (wire.step.redirect_url && !wire.step.complete) return true;
   const behavior = wire.step.complete;
   if (behavior === "redirect") return Boolean(wire.redirect_uri);
   if (behavior === "show") return Boolean(wire.handoff_token && postSignInUrl);

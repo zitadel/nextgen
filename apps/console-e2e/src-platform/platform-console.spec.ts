@@ -7,11 +7,11 @@ import { expect, registerWithPassword, test } from "@zitadel/testing/playwright"
  * is, and granted admin on the instance's customer project by email. Every
  * request the browser makes runs on the session cookie alone.
  *
- * The screens below are scoped to the console's own project — the platform
- * project — until the console can select another one (#1299); the operator
- * holds no grant there, so they list nothing. What this pins is that every
- * one of them answers without an error state, and that the customer project
- * the operator was granted is reachable and writable from its own page.
+ * The customer project is the only one the operator holds a grant on, so the
+ * console selects it on its own (`?project=`, #1299) and every screen below
+ * reads it rather than the platform project the operator signed in to. What
+ * this pins is that each of them answers for the customer project without an
+ * error state, and that the project is writable from its settings page.
  */
 
 const password = "Platform-Operator-Passw0rd!";
@@ -59,6 +59,7 @@ test("a platform operator reaches every management screen without an error", asy
   );
   expect(response.ok, await response.text()).toBe(true);
 
+  const selected = new RegExp(`[?&]project=${zitadel.handle.projectId}(&|$)`);
   for (const [path, heading] of [
     ["users", "Users"],
     ["teams?status=active", "Teams"],
@@ -67,17 +68,41 @@ test("a platform operator reaches every management screen without an error", asy
     ["branding", "Branding"],
   ] as const) {
     await page.goto(`/ui/console/${path}`);
+    // Opened without a selection, so the guard picks the one granted project.
+    await expect(page).toHaveURL(selected);
     // `.first()`: Branding repeats its title on the settings panel.
     await expect(page.getByRole("heading", { name: heading, exact: true }).first()).toBeVisible();
     await expectNoErrorState(page);
   }
 
-  // The granted customer project: listed, and writable from its page.
+  // The branding preview starts its flow in the selected customer project,
+  // not the platform project the operator signed in to. Only here do the two
+  // differ, so the request body is what says which one it ran in.
+  const flowStart = page.waitForRequest(
+    (request) => request.method() === "POST" && new URL(request.url()).pathname.endsWith("/flow"),
+  );
+  await page.goto("/ui/console/branding");
+  expect((await flowStart).postDataJSON()).toMatchObject({
+    project_id: zitadel.handle.projectId,
+  });
+  await expect(
+    page.locator("zitadel-login").getByRole("textbox", { name: "Email" }),
+  ).toBeVisible();
+
+  // The granted customer project: listed on the overview, where a row opens
+  // the project (selects it, lands on Teams); its own page is Project settings.
   await page.goto("/ui/console/projects");
   const projectLink = page.getByRole("table").getByRole("link").first();
   await expect(projectLink).toBeVisible();
   await projectLink.click();
-  await expect(page).toHaveURL(new RegExp(`/projects/${zitadel.handle.projectId}$`));
+  await expect(page).toHaveURL(new RegExp(`/teams\\?.*project=${zitadel.handle.projectId}`));
+  await page
+    .getByRole("navigation", { name: "Primary" })
+    .getByRole("link", { name: "Project settings" })
+    .click();
+  await expect(page).toHaveURL(
+    new RegExp(`/project\\?project=${zitadel.handle.projectId}$`),
+  );
   await expectNoErrorState(page);
 
   const field = page.getByLabel("Project name");

@@ -50,6 +50,7 @@ same TX (shared `request_id`).
 | **Flow definition** | `name`, `status`, `user_schema`, `purposes`, `audience` | Full `steps` graph |
 | **Branding** | `layout`, `logo_url`, `font_url`, `hero_url` | `liquid_template` |
 | **Schema** | `kind`, `object_type` | Schema document body |
+| **IdP connection** | `slug`, `protocol`, `template`, `display_name`, `revision_id` | Connection document body, `client_secret` |
 | **User** | `schema_id`; `attribute_keys[]`; `attributes` map **only** for `x-audit` fields | Non-`x-audit` values; passwords / factors |
 | **Token** | `scopes[]` | Token string / JWE |
 | **Auth check** | `check_id`, `check_type`, `auth_attempt_id` | Challenge/proof JSON |
@@ -106,6 +107,7 @@ tracked below.
 | `DeleteProjectByID` (when a row was deleted) | `project.deleted` | `entity` | `project` | _(empty)_ |
 | `CreateUser` | `user.created` | `entity` | `user` | `schema_id`, `attribute_keys[]`, `attributes` (`x-audit` values only) |
 | Unique violation on create | `user.create.failed` | `entity` | `user` | `key_name` |
+| `PatchUser` (attribute patch) | `user.updated` | `entity` | `user` | `attribute_keys[]`, `attributes` (`x-audit` values only) |
 | `DeleteUserByID` | `user.deleted` | `entity` | `user` | _(empty)_ |
 | `CreateTeam` | `team.created` | `admin` | `team` | `name` |
 | `UpdateTeam` | `team.updated` | `admin` | `team` | delta: `name` |
@@ -125,6 +127,8 @@ tracked below.
 | Branding create | `branding.created` | `admin` | `branding` | `layout`, `logo_url`, `font_url`, `hero_url` |
 | Project create seed `CreateEnvironment` (one per default environment) | `environment.created` | `admin` | `environment` | `name` |
 | ReleaseService create | `release.created` | `admin` | `release` | `content_hash`, `message`, `git_sha`, `git_dirty`, `pointers` |
+| IDPConnectionService create (new slug) | `idp.created` | `admin` | `idp_connection` | `slug`, `protocol`, `template`, `display_name`, `revision_id` |
+| IDPConnectionService revise (existing slug) | `idp.updated` | `admin` | `idp_connection` | `revision_id`; delta: `display_name`, `template` (when changed) |
 | DeploymentService create (deploy, promote and rollback alike; ids not names, so the audit trail survives environment renames and hard deletes — ADR 061) | `deployment.created` | `admin` | `deployment` | `environment_id`, `release_id`, `reason`, `message`, `source_environment_id` |
 | Project create seed `CreateAuthzAssignment` (sk_proj) | `authz.granted` | `admin` | `authz_assignment` | `principal_type`, `principal_id`, `relation` |
 | GrantService create (`CreateAuthzAssignment` for user/team on project.viewer, editor, or admin) | `authz.granted` | `admin` | `authz_assignment` | `principal_type`, `principal_id`, `relation` |
@@ -134,7 +138,8 @@ tracked below.
 
 **Non-events:** pure reads; RSI upserts as create side-effects; crypto/catalog
 internals without a product mutate API; signal category deferred until ADR 019
-writers exist.
+writers exist; issuing a challenge or an sso state record (`IssueChallenge`,
+`IssueSSOState`), which mints the `check_id` the outcome event then carries.
 
 ## Retired
 
@@ -155,7 +160,6 @@ Types planned but not yet emitted by a live producer. Follow-up issues:
 
 | `event_type` | Follow-up |
 |--------------|-----------|
-| `user.updated` | [#877](https://github.com/zitadel/nextgen/issues/877) attribute patch API — payload: keys touched + `x-audit` values (same rule as create) |
 | `user.deactivated` | [#878](https://github.com/zitadel/nextgen/issues/878) per-row emit from team cascade / UserService.Deactivate — `reason` enum; no primary-id echo |
 | `team.membership.updated` | [#879](https://github.com/zitadel/nextgen/issues/879) membership + claim CompleteClaim path — join ids + status |
 | `claim.challenge_created` / `claim.completed` | [#880](https://github.com/zitadel/nextgen/issues/880) claim lifecycle emitters |

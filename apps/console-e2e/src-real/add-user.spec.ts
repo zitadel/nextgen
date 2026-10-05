@@ -24,8 +24,12 @@ test.describe.configure({ mode: "parallel" });
 // them alongside the block and the unit specs when both reasons clear.
 
 /** Signs in, lands on /users and opens the drawer. */
-async function openDrawer(page: Page, user: { email: string; password: string }) {
-  await signIn(page, user);
+async function openDrawer(
+  page: Page,
+  handle: Parameters<typeof signIn>[1],
+  user: Parameters<typeof signIn>[2],
+) {
+  await signIn(page, handle, user);
   await page.goto("/users");
   await expect(page.getByRole("heading", { name: "Users", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Add", exact: true }).click();
@@ -72,7 +76,7 @@ test("renders exactly the properties the API's schema defines", async ({ page, z
   // Asserted against the API rather than hardcoded labels: the field set is
   // schema-driven, so the test has to be too — instances seed different schemas.
   const schema = await projectSchema(zitadel);
-  const drawer = await openDrawer(page, await seed.user());
+  const drawer = await openDrawer(page, zitadel.handle, await seed.user());
 
   // Both loading labels are excluded, not just the empty one: "Loading schemas…"
   // is also `not "Select schema"`, so waiting on that alone let the assertion
@@ -90,7 +94,7 @@ test("renders exactly the properties the API's schema defines", async ({ page, z
 
 test("marks only the properties the schema does not require", async ({ page, zitadel, seed }) => {
   const schema = await projectSchema(zitadel);
-  const drawer = await openDrawer(page, await seed.user());
+  const drawer = await openDrawer(page, zitadel.handle, await seed.user());
 
   for (const property of schema.properties) {
     const field = drawer
@@ -106,7 +110,7 @@ test("keeps submit disabled until every required property has a value", async ({
   seed,
 }) => {
   const schema = await projectSchema(zitadel);
-  const drawer = await openDrawer(page, await seed.user());
+  const drawer = await openDrawer(page, zitadel.handle, await seed.user());
   const submit = drawer.getByRole("button", { name: "Add user", exact: true });
 
   await expect(submit).toBeDisabled();
@@ -121,13 +125,11 @@ test("keeps submit disabled until every required property has a value", async ({
 
 test("creates a user and shows it in the list", async ({ page, zitadel, seed }) => {
   const schema = await projectSchema(zitadel);
-  const drawer = await openDrawer(page, await seed.user());
+  const drawer = await openDrawer(page, zitadel.handle, await seed.user());
   const email = uniqueEmail("created");
 
   for (const property of schema.required) {
-    await drawer
-      .locator(`input[name="${property}"]`)
-      .fill(property === "email" ? email : "value");
+    await drawer.locator(`input[name="${property}"]`).fill(property === "email" ? email : "value");
   }
   await drawer.getByRole("button", { name: "Add user", exact: true }).click();
 
@@ -138,9 +140,13 @@ test("creates a user and shows it in the list", async ({ page, zitadel, seed }) 
   await expectNoErrorBoundary(page);
 });
 
-test("surfaces the API's own message when the email is already taken", async ({ page, seed }) => {
+test("surfaces the API's own message when the email is already taken", async ({
+  page,
+  zitadel,
+  seed,
+}) => {
   const existing = await seed.user();
-  const drawer = await openDrawer(page, existing);
+  const drawer = await openDrawer(page, zitadel.handle, existing);
 
   // `email` is `x-unique: project` in the shipped schema.
   await drawer.getByLabel("Email").fill(existing.email);
@@ -156,9 +162,9 @@ test("surfaces the API's own message when the email is already taken", async ({ 
   await expect(drawer).toBeVisible();
 });
 
-test("discards the draft when cancelled", async ({ page, seed }) => {
+test("discards the draft when cancelled", async ({ page, zitadel, seed }) => {
   const user = await seed.user();
-  const drawer = await openDrawer(page, user);
+  const drawer = await openDrawer(page, zitadel.handle, user);
   const email = uniqueEmail("discarded");
 
   await drawer.getByLabel("Email").fill(email);
@@ -171,8 +177,8 @@ test("discards the draft when cancelled", async ({ page, seed }) => {
   await expect(page.getByRole("dialog", { name: "Add user" }).getByLabel("Email")).toHaveValue("");
 });
 
-test("closes from the header without creating anything", async ({ page, seed }) => {
-  const drawer = await openDrawer(page, await seed.user());
+test("closes from the header without creating anything", async ({ page, zitadel, seed }) => {
+  const drawer = await openDrawer(page, zitadel.handle, await seed.user());
   const email = uniqueEmail("closed");
 
   await drawer.getByLabel("Email").fill(email);
@@ -187,7 +193,7 @@ test("closes from the header without creating anything", async ({ page, seed }) 
 //   zitadel,
 //   seed,
 // }) => {
-//   const drawer = await openDrawer(page, await seed.user());
+//   const drawer = await openDrawer(page, zitadel.handle, await seed.user());
 //
 //   // Roles cannot be reached before a project is chosen.
 //   await expect(drawer.getByRole("combobox", { name: "Select roles" })).toHaveAttribute(
@@ -210,8 +216,8 @@ test("closes from the header without creating anything", async ({ page, seed }) 
 //   expect(zitadel.handle.projectId).toBeTruthy();
 // });
 
-// test("adds and removes a project row", async ({ page, seed }) => {
-//   const drawer = await openDrawer(page, await seed.user());
+// test("adds and removes a project row", async ({ page, zitadel, seed }) => {
+//   const drawer = await openDrawer(page, zitadel.handle, await seed.user());
 //
 //   // `Row · empty` carries no Remove — it appears once the row holds a project.
 //   await expect(drawer.getByRole("button", { name: "Remove", exact: true })).toHaveCount(0);
@@ -229,8 +235,8 @@ test("closes from the header without creating anything", async ({ page, seed }) 
 //   await expect(drawer.getByRole("button", { name: /Add project/ })).toBeVisible();
 // });
 
-// test("sends no project data on create", async ({ page, seed }) => {
-//   const drawer = await openDrawer(page, await seed.user());
+// test("sends no project data on create", async ({ page, zitadel, seed }) => {
+//   const drawer = await openDrawer(page, zitadel.handle, await seed.user());
 //   const email = uniqueEmail("no-grants");
 //
 //   const request = page.waitForRequest(
@@ -277,7 +283,7 @@ async function tabUntil(page: Page, predicate: (label: string) => boolean, limit
 
 test("can be completed with the keyboard alone", async ({ page, zitadel, seed }) => {
   const schema = await projectSchema(zitadel);
-  await signIn(page, await seed.user());
+  await signIn(page, zitadel.handle, await seed.user());
   await page.goto("/users");
   await expect(page.getByRole("heading", { name: "Users", exact: true })).toBeVisible();
 
@@ -302,8 +308,12 @@ test("can be completed with the keyboard alone", async ({ page, zitadel, seed })
   await expect(page.getByRole("link", { name: email, exact: true })).toBeVisible();
 });
 
-test("opens and selects in the schema picker with the keyboard", async ({ page, seed }) => {
-  const drawer = await openDrawer(page, await seed.user());
+test("opens and selects in the schema picker with the keyboard", async ({
+  page,
+  zitadel,
+  seed,
+}) => {
+  const drawer = await openDrawer(page, zitadel.handle, await seed.user());
   const picker = drawer.getByRole("combobox", { name: "User Schema" });
   // The trigger is disabled until the schema list resolves; pressing before then
   // is a race the component correctly ignores.
@@ -321,8 +331,8 @@ test("opens and selects in the schema picker with the keyboard", async ({ page, 
   await expect(picker).not.toContainText("Select schema");
 });
 
-// test("reaches and operates the project picker with the keyboard", async ({ page, seed }) => {
-//   const drawer = await openDrawer(page, await seed.user());
+// test("reaches and operates the project picker with the keyboard", async ({ page, zitadel, seed }) => {
+//   const drawer = await openDrawer(page, zitadel.handle, await seed.user());
 //   const project = drawer.getByRole("combobox", { name: "Select project" });
 //
 //   await project.press("Enter");
@@ -338,8 +348,8 @@ test("opens and selects in the schema picker with the keyboard", async ({ page, 
 //   );
 // });
 
-// test("keeps the disabled roles control out of the tab order", async ({ page, seed }) => {
-//   const drawer = await openDrawer(page, await seed.user());
+// test("keeps the disabled roles control out of the tab order", async ({ page, zitadel, seed }) => {
+//   const drawer = await openDrawer(page, zitadel.handle, await seed.user());
 //   const roles = drawer.getByRole("combobox", { name: "Select roles" });
 //
 //   await expect(roles).toHaveAttribute("aria-disabled", "true");
@@ -352,8 +362,8 @@ test("opens and selects in the schema picker with the keyboard", async ({ page, 
 //   expect(["Cancel", "Add user"]).toContain(landed);
 // });
 
-test("Escape closes the open list first, then the drawer", async ({ page, seed }) => {
-  const drawer = await openDrawer(page, await seed.user());
+test("Escape closes the open list first, then the drawer", async ({ page, zitadel, seed }) => {
+  const drawer = await openDrawer(page, zitadel.handle, await seed.user());
   const picker = drawer.getByRole("combobox", { name: "User Schema" });
   await expect(picker).not.toHaveAttribute("aria-disabled", "true");
 
@@ -368,4 +378,3 @@ test("Escape closes the open list first, then the drawer", async ({ page, seed }
   await page.keyboard.press("Escape");
   await expect(drawer).toBeHidden();
 });
-

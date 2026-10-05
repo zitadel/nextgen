@@ -15,6 +15,7 @@ import * as React from "react";
 
 import type {
   ZitadelFlowCompleteDetail,
+  ZitadelFlowRedirectDetail,
   ZitadelFlowErrorDetail,
   ZitadelFlowInputDetail,
   ZitadelFlowStepDetail,
@@ -66,6 +67,9 @@ const ZitadelLoginElementReact = createComponent({
     onZitadelFlowComplete: "zitadel-flow-complete" as EventName<
       CustomEvent<ZitadelFlowCompleteDetail>
     >,
+    onZitadelFlowRedirect: "zitadel-flow-redirect" as EventName<
+      CustomEvent<ZitadelFlowRedirectDetail>
+    >,
     onZitadelFlowError: "zitadel-flow-error" as EventName<CustomEvent<ZitadelFlowErrorDetail>>,
   },
 });
@@ -102,11 +106,20 @@ const ZitadelSessionElementReact = createComponent({
  * React hosts need them: the widget exposes slots (`attribution-trailing`)
  * that are filled with light-DOM content.
  */
-export type ZitadelLoginReactProps = ZitadelLoginProps & { children?: React.ReactNode };
+export type ZitadelLoginReactProps = ZitadelLoginProps & {
+  children?: React.ReactNode;
+  /**
+   * Preview mode, for an operator surface: the flow starts as usual, then the
+   * element shows the served step in this state and submits nothing.
+   */
+  previewState?: ZitadelLoginElement["previewState"];
+  /** The terminal step the `success` preview paints; the element's `done` when unset. */
+  previewSuccessStep?: string;
+};
 
 export const ZitadelLogin = React.forwardRef<ZitadelLoginElement, ZitadelLoginReactProps>(
   function ZitadelLogin(
-    { purpose, onFlowStep, onFlowInput, onFlowComplete, onFlowError, ...props },
+    { purpose, onFlowStep, onFlowInput, onFlowComplete, onFlowRedirect, onFlowError, ...props },
     ref,
   ) {
     return (
@@ -117,6 +130,7 @@ export const ZitadelLogin = React.forwardRef<ZitadelLoginElement, ZitadelLoginRe
         onZitadelFlowStep={onFlowStep && ((event) => onFlowStep(event.detail))}
         onZitadelFlowInput={onFlowInput && ((event) => onFlowInput(event.detail))}
         onZitadelFlowComplete={onFlowComplete && ((event) => onFlowComplete(event.detail))}
+        onZitadelFlowRedirect={onFlowRedirect && ((event) => onFlowRedirect(event.detail))}
         onZitadelFlowError={onFlowError && ((event) => onFlowError(event.detail))}
       />
     );

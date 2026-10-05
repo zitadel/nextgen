@@ -17,7 +17,7 @@ tasks:
       - "testing:build"
 
   test:
-    command: "corepack pnpm run test"
+    command: "corepack pnpm run test:all"
 
   e2e:
     command: "corepack pnpm run e2e"

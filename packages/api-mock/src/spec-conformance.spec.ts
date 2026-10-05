@@ -34,12 +34,16 @@ import type { Server } from "node:http";
 
 import {
   CompleteClaimResponse,
+  CreateIdpResponse,
   ExchangeHandoffResponse,
   GetClaimStatusResponse,
   GetFlowDefinitionResponse,
+  GetIdpByIdResponse,
   GetMySessionResponse,
   GetProjectResponse,
+  GetVariablesResponse,
   ListFlowDefinitionsResponse,
+  QueryIdpsResponse,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
@@ -226,6 +230,19 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(res.status).toBe(404);
     const body = (await res.json()) as Record<string, unknown>;
     expect(body.code).toBe("session_not_found");
+  });
+
+  test("GET /console/runtime.json names the project the console signs into", async () => {
+    // Not in the OpenAPI spec: the Go server serves it from its root mux
+    // (Console ADR 0004 §3). The console's mock dev loop boots on it, so the
+    // path and both fields are the contract. The platform project, so a
+    // console session can complete a claim (see the claim lifecycle below).
+    const res = await fetch(`${BASE}/console/runtime.json`);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      mode: "standalone",
+      console_project_id: PLATFORM_PROJECT_ID,
+    });
   });
 
   test("POST /projects returns the spec-defined project shape", async () => {
@@ -980,5 +997,362 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     const statusBody = (await status.json()) as Record<string, unknown>;
     expect(statusBody.status).toBe("completed");
     expect(typeof statusBody.team_id).toBe("string");
+  });
+});
+
+/**
+ * The identity provider connection and variable endpoints the CLI's SSO
+ * journey needs. The Go service does not exist yet (#1003), so this mock is
+ * the only place `sso enable` / `plan` / `apply` can be driven end to end.
+ */
+describe("api-mock idp connections and variables", () => {
+  const connection = (over: Record<string, unknown> = {}) => ({
+    slug: "google",
+    protocol: "oidc",
+    template: "google",
+    display_name: "Google",
+    subject_claim: "sub",
+    provisioning: { creation: "auto" },
+    oidc: {
+      issuer: "https://accounts.google.com",
+      scopes: ["openid", "profile", "email"],
+      client_id: "${{ GOOGLE_CLIENT_ID }}",
+      client_secret: "${{ GOOGLE_CLIENT_SECRET }}",
+    },
+    ...over,
+  });
+
+  async function newProject(name: string): Promise<string> {
+    const res = await fetch(`${BASE}/projects`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    return ((await res.json()) as { id: string }).id;
+  }
+
+  async function putIdp(projectId: string, idp: object): Promise<Response> {
+    return fetch(`${BASE}/idps?project_id=${projectId}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ idp }),
+    });
+  }
+
+  test("creates a connection and answers the generated response shape", async () => {
+    const projectId = await newProject("idp-create");
+
+    const res = await putIdp(projectId, connection());
+
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(CreateIdpResponse.safeParse(body).success).toBe(true);
+    expect(body.slug).toBe("google");
+    expect(String(body.id)).toMatch(/^idp_/);
+    expect(String(body.revision_id)).toMatch(/^idprev_/);
+  });
+
+  test("a second write of the same slug revises it under one id", async () => {
+    // This is what keeps `apply` idempotent: the schema and every flow step
+    // reference the slug, so a second connection for it would orphan them.
+    const projectId = await newProject("idp-revise");
+    const first = (await (await putIdp(projectId, connection())).json()) as Record<string, unknown>;
+
+    const second = await putIdp(projectId, connection({ display_name: "Google Workspace" }));
+
+    expect(second.status).toBe(200);
+    const body = (await second.json()) as Record<string, unknown>;
+    expect(body.id).toBe(first.id);
+    expect(body.revision_id).not.toBe(first.revision_id);
+    expect((body.definition as Record<string, unknown>).display_name).toBe("Google Workspace");
+  });
+
+  test("reads one back by id, and 404s an id the project does not own", async () => {
+    const mine = await newProject("idp-read-mine");
+    const other = await newProject("idp-read-other");
+    const created = (await (await putIdp(mine, connection())).json()) as { id: string };
+
+    const ok = await fetch(`${BASE}/idps/${created.id}?project_id=${mine}`);
+    expect(ok.status).toBe(200);
+    expect(GetIdpByIdResponse.safeParse(await ok.json()).success).toBe(true);
+
+    const foreign = await fetch(`${BASE}/idps/${created.id}?project_id=${other}`);
+    expect(foreign.status).toBe(404);
+    expect(((await foreign.json()) as { code: string }).code).toBe("idp.not_found");
+  });
+
+  test("lists only the project's own connections", async () => {
+    const mine = await newProject("idp-list-mine");
+    const other = await newProject("idp-list-other");
+    await putIdp(mine, connection());
+    await putIdp(other, connection({ slug: "github", template: "github" }));
+
+    const res = await fetch(`${BASE}/idps/query?project_id=${mine}`, { method: "POST" });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { idps: { slug: string }[] };
+    expect(QueryIdpsResponse.safeParse(body).success).toBe(true);
+    expect(body.idps.map((i) => i.slug)).toEqual(["google"]);
+  });
+
+  test("stores a variable and reads it back", async () => {
+    const projectId = await newProject("vars-plain");
+
+    const patch = await fetch(`${BASE}/variables?project_id=${projectId}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ GOOGLE_CLIENT_ID: { value: "824.apps.googleusercontent.com", secret: false } }),
+    });
+    // 200 with the addressed owner read back, not 204.
+    expect(patch.status).toBe(200);
+    expect(((await patch.json()) as Record<string, unknown>).GOOGLE_CLIENT_ID).toBe(
+      "824.apps.googleusercontent.com",
+    );
+
+    const res = await fetch(`${BASE}/variables?project_id=${projectId}`);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(GetVariablesResponse.safeParse(body).success).toBe(true);
+    expect(body.GOOGLE_CLIENT_ID).toBe("824.apps.googleusercontent.com");
+  });
+
+  test("reads and deletes one variable by name", async () => {
+    const projectId = await newProject("vars-by-name");
+    await fetch(`${BASE}/variables?project_id=${projectId}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ SESSION_TTL: { value: 900, secret: false } }),
+    });
+
+    const read = await fetch(`${BASE}/variables/SESSION_TTL?project_id=${projectId}`);
+    expect(read.status).toBe(200);
+    expect(await read.json()).toBe(900);
+
+    const removed = await fetch(`${BASE}/variables/SESSION_TTL?project_id=${projectId}`, {
+      method: "DELETE",
+    });
+    expect(removed.status).toBe(204);
+    expect((await fetch(`${BASE}/variables/SESSION_TTL?project_id=${projectId}`)).status).toBe(404);
+  });
+
+  test("answers var.not_found for a name this owner does not hold", async () => {
+    const projectId = await newProject("vars-missing");
+
+    const res = await fetch(`${BASE}/variables/ABSENT?project_id=${projectId}`);
+
+    expect(res.status).toBe(404);
+    expect(((await res.json()) as { code?: string }).code).toBe("var.not_found");
+  });
+
+  test.each([
+    ["a name the schema rejects", "bad-name"],
+    ["a name past the length cap", "N".repeat(256)],
+  ])("refuses %s rather than reporting it missing", async (_label, name) => {
+    // variable-name.yaml allows word characters up to 255, so an unusable name
+    // is a bad request: answering `var.not_found` would tell a caller the name
+    // is free when it could never be used.
+    const projectId = await newProject("vars-invalid-name");
+
+    for (const method of ["GET", "DELETE"]) {
+      const res = await fetch(`${BASE}/variables/${name}?project_id=${projectId}`, { method });
+      expect(res.status, `${method} ${name}`).toBe(400);
+    }
+  });
+
+  test("never reads a secret's value back", async () => {
+    // ADR 062 §7: a secret can be replaced but not read. Returning the value
+    // here would make the encryption it stands for pointless.
+    const projectId = await newProject("vars-secret");
+    await fetch(`${BASE}/variables?project_id=${projectId}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ GOOGLE_CLIENT_SECRET: { value: "GOCSPX-real", secret: true } }),
+    });
+
+    const body = (await (await fetch(`${BASE}/variables?project_id=${projectId}`)).json()) as Record<
+      string,
+      unknown
+    >;
+
+    expect(body.GOOGLE_CLIENT_SECRET).toEqual({ secret: true });
+    expect(JSON.stringify(body)).not.toContain("GOCSPX-real");
+  });
+
+  test("patches rather than replaces, and null removes a name", async () => {
+    const projectId = await newProject("vars-patch");
+    const url = `${BASE}/variables?project_id=${projectId}`;
+    const patch = (payload: object) =>
+      fetch(url, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    await patch({ KEEP: { value: "a", secret: false }, DROP: { value: "b", secret: false } });
+
+    await patch({ DROP: null });
+
+    const body = (await (await fetch(url)).json()) as Record<string, unknown>;
+    expect(body.KEEP).toBe("a");
+    expect(body).not.toHaveProperty("DROP");
+  });
+
+  test("keeps one project's variables out of another's", async () => {
+    const mine = await newProject("vars-mine");
+    const other = await newProject("vars-other");
+    await fetch(`${BASE}/variables?project_id=${mine}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ MINE: { value: "x", secret: false } }),
+    });
+
+    const body = (await (await fetch(`${BASE}/variables?project_id=${other}`)).json()) as object;
+
+    expect(body).toEqual({});
+  });
+});
+
+/** The contract details the first pass of these endpoints got wrong. */
+describe("api-mock idp and variable contract details", () => {
+  const base = {
+    slug: "google",
+    protocol: "oidc",
+    template: "google",
+    display_name: "Google",
+    subject_claim: "sub",
+    provisioning: { creation: "auto" },
+    oidc: {
+      issuer: "https://accounts.google.com",
+      scopes: ["openid"],
+      client_id: "${{ GOOGLE_CLIENT_ID }}",
+      client_secret: "${{ GOOGLE_CLIENT_SECRET }}",
+    },
+  };
+
+  async function newProject(name: string): Promise<string> {
+    const res = await fetch(`${BASE}/projects`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    return ((await res.json()) as { id: string }).id;
+  }
+
+  const putIdp = (projectId: string, idp: object) =>
+    fetch(`${BASE}/idps?project_id=${projectId}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ idp }),
+    });
+
+  const queryIdps = (projectId: string, body: object) =>
+    fetch(`${BASE}/idps/query?project_id=${projectId}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+  test("refuses a revision that changes the connection's identity", async () => {
+    // protocol, subject_claim and the authority decide which provider account a
+    // stored subject belongs to, so changing one repoints existing identities
+    // rather than reconfiguring them.
+    const projectId = await newProject("idp-immutable");
+    await putIdp(projectId, base);
+
+    const repointed = await putIdp(projectId, {
+      ...base,
+      oidc: { ...base.oidc, issuer: "https://login.microsoftonline.com/common/v2.0" },
+    });
+
+    expect(repointed.status).toBe(400);
+    expect(((await repointed.json()) as { code: string }).code).toBe("idp.field_immutable");
+  });
+
+  test("accepts a revision that changes something mutable", async () => {
+    const projectId = await newProject("idp-mutable");
+    await putIdp(projectId, base);
+
+    const revised = await putIdp(projectId, {
+      ...base,
+      oidc: { ...base.oidc, scopes: ["openid", "profile"] },
+    });
+
+    expect(revised.status).toBe(200);
+  });
+
+  test("applies a slug filter instead of returning every connection", async () => {
+    const projectId = await newProject("idp-filter");
+    await putIdp(projectId, base);
+    await putIdp(projectId, { ...base, slug: "acme", template: "oidc-generic" });
+
+    const res = await queryIdps(projectId, {
+      filter: [{ field: "slug", operation: "equals", value: "acme" }],
+    });
+
+    const body = (await res.json()) as { idps: { slug: string }[] };
+    expect(body.idps.map((i) => i.slug)).toEqual(["acme"]);
+  });
+
+  test("honours limit and sort direction", async () => {
+    const projectId = await newProject("idp-sort");
+    await putIdp(projectId, base);
+    await putIdp(projectId, { ...base, slug: "acme", template: "oidc-generic" });
+
+    const res = await queryIdps(projectId, {
+      limit: 1,
+      sorting: { field: "slug", direction: "desc" },
+    });
+
+    const body = (await res.json()) as { idps: { slug: string }[] };
+    expect(body.idps.map((i) => i.slug)).toEqual(["google"]);
+  });
+
+  test("rejects a malformed query body rather than ignoring it", async () => {
+    const projectId = await newProject("idp-badquery");
+
+    const res = await queryIdps(projectId, { limit: "lots" });
+
+    expect(res.status).toBe(400);
+  });
+
+  test("keeps an environment's variables separate from the project's", async () => {
+    // The project level does not see into its environments and an environment
+    // does not inherit the project's: they are distinct owners.
+    const projectId = await newProject("vars-owners");
+    const write = (query: string, payload: object) =>
+      fetch(`${BASE}/variables?${query}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    await write(`project_id=${projectId}`, { SHARED: { value: "project", secret: false } });
+    await write(`project_id=${projectId}&environment_name=production`, {
+      SHARED: { value: "prod", secret: false },
+    });
+
+    const atProject = (await (
+      await fetch(`${BASE}/variables?project_id=${projectId}`)
+    ).json()) as Record<string, unknown>;
+    const atEnv = (await (
+      await fetch(`${BASE}/variables?project_id=${projectId}&environment_name=production`)
+    ).json()) as Record<string, unknown>;
+
+    expect(atProject.SHARED).toBe("project");
+    expect(atEnv.SHARED).toBe("prod");
+  });
+
+  test("reads back what the write did not touch", async () => {
+    const projectId = await newProject("vars-readback");
+    const url = `${BASE}/variables?project_id=${projectId}`;
+    const write = (payload: object) =>
+      fetch(url, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    await write({ FIRST: { value: "a", secret: false } });
+
+    const second = await write({ SECOND: { value: "b", secret: false } });
+
+    const body = (await second.json()) as Record<string, unknown>;
+    expect(body).toEqual({ FIRST: "a", SECOND: "b" });
   });
 });

@@ -7,6 +7,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 
 import { makeTestSession } from "../auth/session.fixture";
 import { createAppRouter } from "../router";
+import { _resetRuntimeForTesting, _setRuntimeForTesting } from "../runtime/runtime";
 import { THEME_STORAGE_KEY } from "../theme";
 
 /**
@@ -53,7 +54,13 @@ vi.mock("@zitadel/sdk-react", () => ({
  * landed. A path pattern rather than an absolute URL: this spec imports the
  * router statically, so `api/zitadel.ts` binds its base before any `stubEnv`.
  */
-const server = setupServer(http.get("*/api/schemas", () => HttpResponse.json({ schemas: [] })));
+// `/schemas` is project-scoped: the guard selects the visitor's only project.
+const server = setupServer(
+  http.get("*/api/schemas", () => HttpResponse.json({ schemas: [] })),
+  http.get("*/api/users/me/projects", () =>
+    HttpResponse.json({ projects: [{ id: "proj_test", name: "Test" }] }),
+  ),
+);
 
 beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
 afterAll(() => server.close());
@@ -68,9 +75,9 @@ beforeEach(() => {
   fetchSession.mockReset();
   signOut.mockClear();
   // The login screen renders the widget only when a project id resolves
-  // (ADR 0004 §§2–3); pin the dev override so guard tests exercise the widget
-  // path. The no-project test below clears it.
-  vi.stubEnv("VITE_CONSOLE_PROJECT_ID", "proj_test");
+  // (ADR 0004 §§2–3); name one in the runtime document so guard tests exercise
+  // the widget path. The no-project test below clears it.
+  _setRuntimeForTesting({ mode: "standalone", console_project_id: "proj_test" });
 });
 
 afterEach(() => {
@@ -136,7 +143,7 @@ describe("authentication guard", () => {
   });
 
   it("shows the setup hint instead of the widget while no project exists", async () => {
-    vi.stubEnv("VITE_CONSOLE_PROJECT_ID", "");
+    _resetRuntimeForTesting();
     fetchSession.mockResolvedValue(null);
     await renderAt("/");
 

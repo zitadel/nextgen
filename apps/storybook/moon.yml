@@ -35,9 +35,10 @@ tasks:
       - "components:build"
       - "design-tokens:build"
     outputs:
-      - "storybook-static/**/*"
-    options:
-      runInCI: false
+      - "dist/**/*"
+    # Runs in CI: the Vercel deploy builds the static site from this task, and
+    # Vercel is a CI environment, so a `runInCI: false` here would make moon
+    # report "no tasks found" for `storybook:build` and fail the deploy.
 
   # Installs the Chromium that @storybook/addon-vitest drives. Mirrors the
   # journey e2e pattern (browsers aren't preinstalled on CI runners).
@@ -50,7 +51,7 @@ tasks:
   # (render smoke + play interactions + a11y). Replaces the old console-e2e
   # visual-parity sweep and runs in CI via `moon ci :test`.
   test:
-    command: "corepack pnpm run test"
+    command: "corepack pnpm run test:all"
     deps:
       - "install-browsers"
       - "api:build"

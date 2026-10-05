@@ -75,6 +75,9 @@ vite.config.*.timestamp*
 vitest.config.*.timestamp*
 test-output
 
+## vitest cache (per-package Vite/Vitest cacheDir)
+.vitest/
+
 ## moon
 .moon/cache
 .moon/docker
@@ -89,9 +92,6 @@ test-output
 ## Docs generated artifacts
 apps/docs/.source/
 apps/docs/.generated/
-
-## Storybook static build
-storybook-static/
 
 ## Go build cache
 .go/

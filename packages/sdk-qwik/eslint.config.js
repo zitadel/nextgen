@@ -10,7 +10,9 @@ import qwikPlugin from "eslint-plugin-qwik";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist/**", "lib/**", "lib-types/**", "node_modules/**"] },
+  // `.vitest/**` holds Vitest's browser-mode optimized-deps cache (pre-bundled
+  // vendor chunks); it is gitignored and must never be linted.
+  { ignores: ["dist/**", "lib/**", "lib-types/**", "node_modules/**", ".vitest/**"] },
   {
     ...eslint.configs.recommended,
     files: ["**/*.{ts,tsx,js,jsx,mjs,cjs}"],

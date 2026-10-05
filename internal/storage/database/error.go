@@ -79,6 +79,10 @@ func ErrMissingFieldCoerce(field any) Error {
 	return NewError("db.missing_field_coerce", "The schema is missing a coerce function for a field.", field, nil)
 }
 
+func ErrFieldNotOrderable(field any) Error {
+	return NewError("db.field_not_orderable", "The field cannot be used to order results.", field, nil)
+}
+
 func ErrCoerceExpectedType(want string, got any) Error {
 	return NewError(
 		"db.coerce_type",

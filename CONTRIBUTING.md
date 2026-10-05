@@ -262,17 +262,20 @@ dependencies, then picks one of two modes via `scripts/ci-mode.mjs`:
 **Full mode** (normal PRs) runs, in order:
 
 - `moon run server:check-generate` — Go generated-file drift check.
-- Playwright Chromium install for `@zitadel/components`.
-- `moon ci :lint :typecheck :build :test :test-browser :check-adrs`.
+- Playwright Chromium install for the `:test` graph, the e2e suites and the
+  journeys. The `components`/`api-mock` browser projects run in CI as part of
+  their `:test` task (via `test:all`), each pulling in Chromium through a moon
+  `install-browsers` dep.
+- `moon ci :lint :typecheck :build :test :check-adrs`.
 - `moon run server:test`, then `moon run server:test-postgres`,
   `moon run server:test-spanner` (Spanner emulator testcontainer), and
   `moon run server:test-sqlite`.
 - `moon run release:snapshot -- --skip-container` — a non-publishing release
   snapshot.
-- The fresh-app consumer journey (`cli-journey-e2e:e2e-local`) with the npm
-  binary runtime against the snapshot's packed tarballs, one passkey-first
-  preset journey run, and the test-kit consumer journey
-  (`cli-journey-e2e:e2e-testkit`).
+- All consumer journey variants in one process (`cli-journey-e2e:e2e-local
+  --ci`): the fresh-app framework matrix, the passkey-first preset, the
+  pre-existing-app posture, and the test-kit consumer suite — run concurrently
+  with the npm binary runtime against the snapshot's packed tarballs.
 - The real-instance suites: `testing:test-integration` with
   `demo-next-e2e:e2e-real`, then `console-e2e:e2e-real`.
 
@@ -281,12 +284,11 @@ by moon's affected task selection (`moon query tasks --affected --downstream
 deep`, computed in `scripts/ci-mode.mjs`): a lane is skipped when the diff
 provably cannot reach its
 tasks — a docs-only PR runs almost nothing, a frontend-only PR skips the Go
-suites, a console-only PR runs the e2e suites but no journeys. The journey
-variants gate per surface (the map lives as task-space constants in
-`scripts/ci-mode.mjs`): the fresh-app journey answers to every SDK plus the
-shared login surface, the passkey-preset and test-kit journeys to the shared
-surface only, and the fresh-app framework matrix collapses to a single
-framework unless an SDK, the CLI, or the journey project itself moved. The
+suites, a console-only PR runs the e2e suites but no journeys. The journeys run
+together in the one `--ci` step, gated on whether any journey surface is
+affected (the map lives as task-space constants in `scripts/ci-mode.mjs`);
+the fresh-app framework matrix still collapses to a single framework unless an
+SDK, the CLI, or the journey project itself moved. The
 snapshot runs iff any journey does — the tarball handoff between them is a
 filesystem contract moon cannot see. The gates fail open: known repo-wide
 files no moon task claims (workflow definitions, `scripts/`, moon config,

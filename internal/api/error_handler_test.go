@@ -2,11 +2,14 @@ package api
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"github.com/ogen-go/ogen/ogenerrors"
+	"github.com/ogen-go/ogen/validate"
 	"github.com/stretchr/testify/require"
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -81,7 +84,8 @@ func TestOgenErrorHandlerNonCredentialCookieDecodeStays400(t *testing.T) {
 	srv := newErrorHandlerTestServer(t, nil)
 
 	// The _zflow cookie is flow state, not a session credential: its absence
-	// must stay a structural 400, not become a 401.
+	// must stay a structural 400, not become a 401. The details name the
+	// missing parameter.
 	req := httptest.NewRequest(http.MethodPost, "/flow/flow_123/submit", strings.NewReader(`{}`))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
@@ -89,7 +93,7 @@ func TestOgenErrorHandlerNonCredentialCookieDecodeStays400(t *testing.T) {
 
 	require.Equal(t, http.StatusBadRequest, rec.Code)
 	require.JSONEq(t,
-		`{"code":"req.invalid","message":"The request is invalid and fails base validation (missing required fields, wrong types, failed regex, etc.). Check the details for more information."}`,
+		`{"code":"req.invalid","message":"The request is invalid and fails base validation (missing required fields, wrong types, failed regex, etc.). Check the details for more information.","details":{"details":{"fields":["_zflow"]}}}`,
 		rec.Body.String(),
 	)
 }
@@ -266,6 +270,7 @@ func TestOgenErrorHandlerDualSchemeInvalidCookieStaysCredentialNeutral(t *testin
 		{"team get", http.MethodGet, "/teams/team_1", ""},
 		{"user create", http.MethodPost, "/users?project_id=proj_1", `{}`},
 		{"user get", http.MethodGet, "/users/user_1", ""},
+		{"user passkeys", http.MethodGet, "/users/user_1/passkeys", ""},
 		{"user delete", http.MethodDelete, "/users/user_1", ""},
 		{"team create", http.MethodPost, "/teams?project_id=proj_1", `{"name":"x"}`},
 		{"team update", http.MethodPatch, "/teams/team_1", `{"name":"x"}`},
@@ -318,6 +323,7 @@ func TestOgenErrorHandlerAnonymousSessionOnDualSchemeStays401(t *testing.T) {
 		{"team get", http.MethodGet, "/teams/team_1", ""},
 		{"user create", http.MethodPost, "/users?project_id=proj_1", `{}`},
 		{"user get", http.MethodGet, "/users/user_1", ""},
+		{"user passkeys", http.MethodGet, "/users/user_1/passkeys", ""},
 		{"user delete", http.MethodDelete, "/users/user_1", ""},
 		{"team create", http.MethodPost, "/teams?project_id=proj_1", `{"name":"x"}`},
 		{"team update", http.MethodPatch, "/teams/team_1", `{"name":"x"}`},
@@ -420,4 +426,23 @@ func TestDomainErrorDetails_fullErrorInResponseComposesWithProducerDetails(t *te
 	require.True(t, details.Details.Set)
 	require.JSONEq(t, `{"field":"age"}`, string(details.Details.Value["details"]))
 	require.Contains(t, string(details.Details.Value["parent"]), "json: cannot unmarshal number")
+}
+
+// validationFieldPaths turns ogen's nested validation failures into the dotted
+// paths the decode error names, without any of the leaf error text.
+func TestValidationFieldPaths(t *testing.T) {
+	t.Parallel()
+
+	nested := &validate.Error{Fields: []validate.FieldError{
+		{Name: "idp", Error: &validate.Error{Fields: []validate.FieldError{
+			{Name: "slug", Error: errors.New("pattern mismatch")},
+			{Name: "oidc", Error: &validate.Error{Fields: []validate.FieldError{
+				{Name: "client_secret", Error: errors.New("secret value leaks here")},
+			}}},
+		}}},
+	}}
+	wrapped := &ogenerrors.DecodeRequestError{Err: fmt.Errorf("validate: %w", nested)}
+
+	require.Equal(t, []string{"idp.slug", "idp.oidc.client_secret"}, validationFieldPaths(wrapped))
+	require.Nil(t, validationFieldPaths(&ogenerrors.DecodeRequestError{Err: errors.New("unexpected end of JSON input")}))
 }

@@ -46,9 +46,11 @@ type Harness struct {
 	brandingService       dependency[*service.BrandingService]
 	environmentService    dependency[*service.EnvironmentService]
 	releaseService        dependency[service.ReleaseService]
+	idpConnectionService  dependency[service.IDPConnectionService]
 	deploymentService     dependency[*service.DeploymentService]
 	eventService          dependency[*service.EventService]
 	keyService            dependency[service.KeyService]
+	variableService       dependency[service.VariableService]
 	tokenService          dependency[service.TokenService]
 
 	schemaStore     dependency[domain.JSONSchemaStore]

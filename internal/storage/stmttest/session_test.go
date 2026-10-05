@@ -291,6 +291,44 @@ func TestSessionStatements_List_LimitBoundsSessions(t *testing.T) {
 	})
 }
 
+// Ordering by a filter-only computed field (has_verified_factors is a
+// correlated EXISTS with no accessor) must be refused with a typed error, not
+// crash during cursor marshaling (#850).
+func TestSessionStatements_List_RejectsOrderByFilterOnlyField(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, _ := ensureUserTestProject(t, d.stmts)
+
+		list := func(cursor []byte) error {
+			_, err := d.stmts.ListSessions(t.Context(), &database.ListOptions[domain.SessionField]{
+				Filter: database.Equal(database.Col(domain.SessionFieldProjectID), projectID),
+				Pagination: database.Page[domain.SessionField]{
+					Limit:  10,
+					Cursor: cursor,
+					OrderBy: database.OrderBy[domain.SessionField]{
+						Columns: []database.Column[domain.SessionField]{
+							database.Col(domain.SessionFieldHasVerifiedFactors),
+						},
+					},
+				},
+			})
+			return err
+		}
+
+		// Runs before cursor decode, so a bad cursor cannot hide the error behind db.invalid_cursor.
+		for name, cursor := range map[string][]byte{
+			"no cursor":        nil,
+			"malformed cursor": []byte("not-a-real-cursor"),
+		} {
+			t.Run(name, func(t *testing.T) {
+				var de database.Error
+				require.ErrorAs(t, list(cursor), &de)
+				assert.Equal(t, database.ErrFieldNotOrderable(nil).Code, de.Code, "typed not-orderable code")
+				assert.Equal(t, domain.SessionFieldHasVerifiedFactors, de.Details, "details identify the offending field")
+			})
+		}
+	})
+}
+
 // TestSessionStatements_List_LimitKeepsFactorsComplete lists a two-check
 // session with limit 1. A limit on joined rows would cut inside the session's
 // check rows and truncate its factor list.

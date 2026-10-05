@@ -85,7 +85,7 @@ func (h *Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest) (a
 
 	resp := h.buildFlowResponse(ctx, result, false)
 	return &api.FlowResponseHeaders{
-		SetCookie: api.NewOptString(flowSetCookie(ctx, cookieValue, false)),
+		SetCookie: []string{flowSetCookie(ctx, cookieValue, false)},
 		Response:  resp,
 	}, nil
 }
@@ -149,10 +149,12 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 	} else if h, ok := requestOriginFromContext(ctx); ok {
 		originStr = h
 	}
+	requestOrigin := ""
 	if originStr != "" {
 		originURL, err := url.Parse(originStr)
 		if err == nil {
 			if rp := passkeyRPFromOrigin(*originURL); rp != nil {
+				requestOrigin = originURL.Scheme + "://" + originURL.Host
 				project, err := h.projectService.Get(ctx, state.ProjectID)
 				if err != nil {
 					// A project lookup failing mid-submit is a server-side
@@ -167,30 +169,76 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 			}
 		}
 	}
+	// An external sign-in is bound to the request origin: the provider sends
+	// the browser back to its callback route, and the page the browser then
+	// returns to must be on it. For a browser the origin header is not
+	// writable, so a page on one origin cannot aim the return at another.
+	// A non-browser client chooses both values, and until environments
+	// declare an issuer origin the guards that hold then are the provider's
+	// registered redirect URI and the Strict flow cookie.
+	// Only the action selects the branch: a provider id on another action
+	// goes through to the engine, which refuses it as an invalid action.
+	if req.Action == domain.FlowActionSSO {
+		if requestOrigin == "" {
+			return nil, domain.ErrRequestInvalid().WithMessage("an sso submission needs a request origin")
+		}
+		rawTarget, ok := req.ReturnTarget.Get()
+		if !ok {
+			return nil, domain.ErrRequestInvalid().WithMessage("return_target is required for action sso")
+		}
+		// Parsed here, not by the generated decoder: a request-URI parse
+		// leaves a fragment in the path, and a hash-routed page needs it
+		// back as a fragment.
+		returnTarget, err := url.Parse(rawTarget)
+		if err != nil {
+			return nil, domain.ErrRequestInvalid().WithMessage(fmt.Sprintf("return_target %q is not a URL", rawTarget))
+		}
+		// No page URL carries userinfo; it is only ever a way to dress a
+		// foreign host up as the origin.
+		if returnTarget.User != nil {
+			return nil, domain.ErrRequestInvalid().WithMessage("return_target must not carry userinfo")
+		}
+		// A relative or scheme-less target fails here too: its origin lacks
+		// a scheme or a host, which the request origin always has.
+		if !strings.EqualFold(returnTarget.Scheme+"://"+returnTarget.Host, requestOrigin) {
+			return nil, domain.ErrRequestInvalid().WithMessage(fmt.Sprintf("return_target %q is not on the request origin %q", rawTarget, requestOrigin))
+		}
+		submitReq.SSOReturn = &domain.FlowSSOReturn{
+			RedirectURI:  requestOrigin + idpCallbackPath,
+			ReturnTarget: returnTarget.String(),
+		}
+	}
 
 	result, err := h.flowService.Submit(ctx, submitReq)
 	if err != nil {
 		return nil, normalizeFlowError(err)
 	}
 
+	terminal := result.Step != nil && result.Step.Complete != nil
+	flowResp := h.buildFlowResponse(ctx, result, terminal)
+
 	cookieValue, err := h.sealState(ctx, result.State)
 	if err != nil {
 		return nil, err
 	}
 
-	terminal := result.Step != nil && result.Step.Complete != nil
-	flowResp := h.buildFlowResponse(ctx, result, terminal)
-
 	// Validation error: state machine keeps the user on the step with Error set.
 	if result.Step != nil && result.Step.Error != nil {
 		return &api.SubmitFlowStepBadRequest{
-			SetCookie: api.NewOptString(flowSetCookie(ctx, cookieValue, false)),
+			SetCookie: []string{flowSetCookie(ctx, cookieValue, false)},
 			Response:  flowResp,
 		}, nil
 	}
 
+	// _zflow stays first: the generated client reads only the first
+	// Set-Cookie line. The redirect step adds the binding cookie the callback
+	// checks.
+	cookies := []string{flowSetCookie(ctx, cookieValue, terminal)}
+	if result.SSOBindingNonce != "" {
+		cookies = append(cookies, ssoBindingSetCookie(ctx, result.SSOBindingNonce))
+	}
 	return &api.SubmitFlowStepOK{
-		SetCookie: api.NewOptString(flowSetCookie(ctx, cookieValue, terminal)),
+		SetCookie: cookies,
 		Response:  flowResp,
 	}, nil
 }
@@ -318,6 +366,9 @@ func toFlowStep(step *domain.FlowStep) api.FlowStep {
 		Actions: toFlowStepActions(step.Actions),
 		Gates:   api.FlowStepGates{},
 	}
+	if len(step.SSOProviders) > 0 {
+		out.SSOProviders = toFlowStepSSOProviders(step.SSOProviders)
+	}
 	if step.Error != nil {
 		out.Error = api.NewOptNilString(*step.Error)
 	}
@@ -331,6 +382,12 @@ func toFlowStep(step *domain.FlowStep) api.FlowStep {
 	}
 	if step.Challenge != nil {
 		out.Challenge = api.NewOptFlowStepChallenge(toFlowStepChallenge(*step.Challenge))
+	}
+	if step.Identifier != nil {
+		out.Identifier = api.NewOptFlowStepIdentifier(api.FlowStepIdentifier{
+			Value:        step.Identifier.Value,
+			Autocomplete: step.Identifier.Autocomplete,
+		})
 	}
 	return out
 }
@@ -421,6 +478,9 @@ func toFlowField(f domain.FlowField) api.Field {
 		TextKey:  f.TextKey,
 		Required: api.NewOptBool(f.Required),
 	}
+	if f.Autocomplete != "" {
+		out.Autocomplete = api.NewOptString(f.Autocomplete)
+	}
 	if f.Value != nil {
 		out.Value = jx.Raw(jsonQuoted(*f.Value))
 	}
@@ -473,6 +533,14 @@ func toFlowStepActions(actions []domain.FlowAction) []api.FlowStepAction {
 			TextKey: api.NewOptString(a.TextKey),
 			Primary: api.NewOptBool(a.Primary),
 		}
+	}
+	return out
+}
+
+func toFlowStepSSOProviders(providers []domain.FlowSSOProvider) []api.SSOProvider {
+	out := make([]api.SSOProvider, len(providers))
+	for i, p := range providers {
+		out[i] = api.SSOProvider{ID: p.ID, Name: p.Name, Template: p.Template}
 	}
 	return out
 }

@@ -40,9 +40,14 @@ import type {
 import {
   CompleteClaimResponse,
   CreateFlowDefinitionBody,
+  CreateIdpBody,
+  CreateIdpQueryParams,
+  CreateIdpResponse,
   CreateProjectBody,
   CreateSchemaBody,
   CreateSchemaQueryParams,
+  DeleteVariableParams,
+  DeleteVariableQueryParams,
   GetClaimStatusParams,
   GetClaimStatusQueryParams,
   GetClaimStatusResponse,
@@ -51,15 +56,29 @@ import {
   GetClaimWindowResponse,
   GetFlowDefinitionParams,
   GetFlowDefinitionResponse,
+  GetIdpByIdParams,
+  GetIdpByIdQueryParams,
+  GetIdpByIdResponse,
   GetProjectParams,
   GetProjectResponse,
   GetSchemaByIdParams,
   GetSchemaByIdQueryParams,
+  GetVariableParams,
+  GetVariableQueryParams,
+  GetVariableResponse,
+  GetVariablesQueryParams,
+  GetVariablesResponse,
   InitClaimParams,
   ListFlowDefinitionsQueryParams,
   ListFlowDefinitionsResponse,
   ListSchemasQueryParams,
+  QueryIdpsBody,
+  QueryIdpsQueryParams,
+  QueryIdpsResponse,
   QueryUsersBody,
+  UpdateVariablesBody,
+  UpdateVariablesQueryParams,
+  UpdateVariablesResponse,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import { validateFlowDefinition } from "@zitadel/config/validate";
 import {
@@ -68,6 +87,10 @@ import {
 } from "@zitadel/config/defaults";
 import { http, HttpResponse } from "msw";
 import type { z } from "zod";
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
 
 function shortId(): string {
   return randomUUID().replaceAll("-", "").slice(0, 12);
@@ -219,10 +242,45 @@ type ClaimRecord = {
   dashboardUrl: string;
 };
 
+/**
+ * One identity provider connection, as the CLI's syncer publishes it.
+ *
+ * Keyed by `id`; `slug` is what dedupes a write. The server files each edit as
+ * a revision beneath one connection id, so a second `POST /idps` carrying a
+ * slug that already exists revises it rather than creating a second row —
+ * which is what keeps the CLI's `plan`/`apply` idempotent.
+ */
+type IdpConnectionRecord = {
+  id: string;
+  revisionId: string;
+  projectId: string;
+  slug: string;
+  createdAt: string;
+  updatedAt: string;
+  seq: number;
+  body: Record<string, unknown>;
+};
+
+/**
+ * One variable at the project level, which is the only owner the API addresses
+ * today. `secret` decides what a read may say: a secret reports that a value is
+ * held and withholds it (ADR 062 §7), so the stored value is only ever resolved
+ * into a connection, never returned.
+ */
+type VariableRecord = { value: string | number | boolean; secret: boolean };
+
 type Store = {
   projects: Map<string, ProjectRecord>;
   schemas: Map<string, SchemaRecord>;
   flowDefinitions: Map<string, FlowDefinitionRecord>;
+  idps: Map<string, IdpConnectionRecord>;
+  /**
+   * Owner key -> variable name -> value. The project level and each
+   * environment are separate owners: the project does not see into its
+   * environments and an environment does not inherit the project's, so they
+   * cannot share a bucket. See {@link variableOwner}.
+   */
+  variables: Map<string, Map<string, VariableRecord>>;
   claimChallenges: Map<string, ClaimChallengeRecord>;
   claims: Map<string, ClaimRecord>;
   // Publication order. `nowIso()` is millisecond-resolution and ids are
@@ -237,6 +295,8 @@ function makeStore(): Store {
     projects: new Map(),
     schemas: new Map(),
     flowDefinitions: new Map(),
+    idps: new Map(),
+    variables: new Map(),
     claimChallenges: new Map(),
     claims: new Map(),
     lastSeq: 0,
@@ -327,6 +387,106 @@ function schemaKind(body: GetSchemaById200Schema): string | undefined {
  * `created_at DESC, id DESC`, the order the server lists in. `seq` stands in
  * for the id tiebreak.
  */
+/**
+ * Whether a connection passes every filter the query carries. Filters are
+ * combined with AND, as the contract states.
+ *
+ * `slug` and `created_at` are the only filterable fields, and the mock supports
+ * the operations the CLI sends. An operation it does not know is reported
+ * rather than silently ignored: a filter that does not narrow looks like data
+ * that is not there.
+ */
+function matchesIdpFilters(
+  record: IdpConnectionRecord,
+  filters: readonly { field: string; operation: string; value?: unknown }[] | undefined,
+): boolean {
+  for (const filter of filters ?? []) {
+    const actual = filter.field === "slug" ? record.slug : record.createdAt;
+    const expected = String(filter.value ?? "");
+    const ok =
+      filter.operation === "equals"
+        ? actual === expected
+        : filter.operation === "contains"
+          ? actual.includes(expected)
+          : filter.operation === "greater_than"
+            ? actual > expected
+            : filter.operation === "less_than"
+              ? actual < expected
+              : undefined;
+    if (ok === undefined) {
+      throw new Error(`api-mock: unsupported idp filter operation ${filter.operation}`);
+    }
+    if (!ok) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Which identity field a revision would change, or `undefined` when none would.
+ *
+ * `protocol`, `subject_claim` and the field naming the authority decide which
+ * provider account a stored subject belongs to, so changing one repoints
+ * existing identities rather than reconfiguring them. The server refuses that
+ * for the life of the connection, and a mock that accepted it would let the CLI
+ * pass a test the real service fails.
+ */
+function immutableFieldClash(before: Record<string, unknown>, after: Record<string, unknown>): string | undefined {
+  for (const field of ["protocol", "subject_claim"] as const) {
+    if (before[field] !== undefined && before[field] !== after[field]) {
+      return field;
+    }
+  }
+  // The authority is the issuer for OIDC, and the token endpoint with the
+  // userinfo endpoint for OAuth 2.0.
+  for (const [block, fields] of [
+    ["oidc", ["issuer"]],
+    ["oauth2", ["token_endpoint", "userinfo_endpoint"]],
+  ] as const) {
+    const was = before[block];
+    const now = after[block];
+    if (!isObject(was) || !isObject(now)) {
+      continue;
+    }
+    for (const field of fields) {
+      if (was[field] !== undefined && was[field] !== now[field]) {
+        return `${block}.${field}`;
+      }
+    }
+  }
+  return undefined;
+}
+
+/**
+ * The owner a variables request addresses. An absent environment is the project
+ * level, which is a different owner from any environment under it.
+ */
+function variableOwner(projectId: string, environmentName?: string): string {
+  return environmentName === undefined ? `project:${projectId}` : `env:${projectId}/${environmentName}`;
+}
+
+/** What a read of one owner says: a value, or that a secret is held. */
+function variablesResponse(owned: Map<string, VariableRecord>): Record<string, unknown> {
+  // A secret says that a value is held and withholds it (ADR 062 §7):
+  // returning the plaintext would defeat the encryption it stands for.
+  return Object.fromEntries(
+    [...owned.entries()].map(([name, held]) => [name, held.secret ? { secret: true } : held.value]),
+  );
+}
+
+/** One connection, in the wire shape every idp endpoint answers with. */
+function idpResponse(record: IdpConnectionRecord): Record<string, unknown> {
+  return {
+    id: record.id,
+    revision_id: record.revisionId,
+    slug: record.slug,
+    definition: record.body,
+    created_at: record.createdAt,
+    updated_at: record.updatedAt,
+  };
+}
+
 function compareNewestFirst(
   a: { createdAt: string; seq: number },
   b: { createdAt: string; seq: number },
@@ -406,11 +566,20 @@ export type PlatformStoreSnapshot = {
   projects: number;
   schemas: number;
   flowDefinitions: number;
+  idps: number;
   claimChallenges: number;
   claims: number;
   projectIds: string[];
   schemaIds: string[];
   flowDefinitionIds: string[];
+  /** Connection slugs, which is what schemas and flows reference. */
+  idpSlugs: string[];
+  /**
+   * Variable names entered at the project, secrets included. Names only: a
+   * secret's value is not readable over the API, and a snapshot that returned
+   * it would be a way around that.
+   */
+  variableNames: string[];
   /**
    * Ids of the live challenges. A caller that drove `claim/init` over HTTP
    * (a CLI under test, say) never sees the response body, so this is the only
@@ -425,11 +594,14 @@ export function snapshotPlatformStore(): PlatformStoreSnapshot {
     projects: store.projects.size,
     schemas: store.schemas.size,
     flowDefinitions: store.flowDefinitions.size,
+    idps: store.idps.size,
     claimChallenges: store.claimChallenges.size,
     claims: store.claims.size,
     projectIds: [...store.projects.keys()],
     schemaIds: [...store.schemas.keys()],
     flowDefinitionIds: [...store.flowDefinitions.keys()],
+    idpSlugs: [...store.idps.values()].map((record) => record.slug),
+    variableNames: [...store.variables.values()].flatMap((owned) => [...owned.keys()]),
     claimChallengeIds: [...store.claimChallenges.keys()],
   };
 }
@@ -1027,6 +1199,236 @@ export function setupPlatformHandlers() {
       }
       const responseBody: GetFlowDefinition200 = flowResponse(record);
       const out = parse(GetFlowDefinitionResponse, responseBody, "mock_response_invalid");
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data);
+    }),
+
+    // --- identity provider connections -----------------------------------
+    // The CLI's connection syncer publishes `.zitadel/idps/*.json` here. The
+    // Go service does not exist yet (#1003), so without these the SSO journey
+    // cannot be exercised end to end at all.
+
+    http.post("*/idps", async ({ request }) => {
+      const query = parse(CreateIdpQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const raw = await readJson(request);
+      if (raw === null) {
+        return HttpResponse.json(INVALID_JSON, { status: 400 });
+      }
+      const body = parse(CreateIdpBody, raw, "invalid_request");
+      if (!body.ok) {
+        return body.response;
+      }
+
+      const definition = body.data.idp as unknown as Record<string, unknown>;
+      const slug = definition.slug as string;
+      const now = nowIso();
+      // A slug that already exists is revised under its own id, so everything
+      // referencing the slug — the user schema, every flow step — keeps
+      // pointing at the same connection.
+      const existing = [...store.idps.values()].find(
+        (record) => record.projectId === query.data.project_id && record.slug === slug,
+      );
+      if (existing) {
+        const clash = immutableFieldClash(existing.body, definition);
+        if (clash) {
+          return HttpResponse.json(
+            errorBody(
+              "idp.field_immutable",
+              "identity provider connection: the field is fixed for the life of the connection",
+            ),
+            { status: 400 },
+          );
+        }
+      }
+      const record: IdpConnectionRecord = existing
+        ? { ...existing, revisionId: `idprev_${shortId()}`, updatedAt: now, seq: ++store.lastSeq, body: definition }
+        : {
+            id: `idp_${shortId()}`,
+            revisionId: `idprev_${shortId()}`,
+            projectId: query.data.project_id,
+            slug,
+            createdAt: now,
+            updatedAt: now,
+            seq: ++store.lastSeq,
+            body: definition,
+          };
+      store.idps.set(record.id, record);
+
+      const responseBody = idpResponse(record);
+      const out = parse(CreateIdpResponse, responseBody, "mock_response_invalid");
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data, { status: existing ? 200 : 201 });
+    }),
+
+    http.post("*/idps/query", async ({ request }) => {
+      const query = parse(QueryIdpsQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      // The body carries filters, sorting and paging. Accepting it unread
+      // would let a CLI slug filter appear to work while returning every
+      // connection in the project.
+      const raw = (await readJson(request)) ?? {};
+      const body = parse(QueryIdpsBody, raw, "invalid_request");
+      if (!body.ok) {
+        return body.response;
+      }
+
+      const ascending = body.data.sorting?.direction !== "desc";
+      const field = body.data.sorting?.field ?? "created_at";
+      const records = [...store.idps.values()]
+        .filter((record) => record.projectId === query.data.project_id)
+        .filter((record) => matchesIdpFilters(record, body.data.filter))
+        .sort((a, b) => {
+          const order =
+            field === "slug" ? a.slug.localeCompare(b.slug) : a.seq - b.seq;
+          // `seq` stands in for created_at; ids break ties either way.
+          return ascending ? order : -order;
+        })
+        .slice(0, body.data.limit ?? undefined);
+      const responseBody = { idps: records.map(idpResponse), next_page_token: null };
+      const out = parse(QueryIdpsResponse, responseBody, "mock_response_invalid");
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data);
+    }),
+
+    http.get("*/idps/:id", ({ params, request }) => {
+      const path = parse(GetIdpByIdParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+      const query = parse(GetIdpByIdQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const record = store.idps.get(path.data.id);
+      if (!record || record.projectId !== query.data.project_id) {
+        return HttpResponse.json(
+          errorBody("idp.not_found", "identity provider connection: not found"),
+          { status: 404 },
+        );
+      }
+      const out = parse(GetIdpByIdResponse, idpResponse(record), "mock_response_invalid");
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data);
+    }),
+
+    // --- variables ---------------------------------------------------------
+    // Where a connection's `${{ NAME }}` references resolve from. The CLI
+    // publishes the client id and secret here, so without them a scaffolded
+    // provider has no credentials and sign-in fails at the token endpoint.
+
+    http.get("*/variables", ({ request }) => {
+      const query = parse(GetVariablesQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const owner = variableOwner(query.data.project_id, query.data.environment_name);
+      const owned = store.variables.get(owner) ?? new Map<string, VariableRecord>();
+      const out = parse(GetVariablesResponse, variablesResponse(owned), "mock_response_invalid");
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data);
+    }),
+
+    // One variable by name, which `variables get` and `variables delete`
+    // address directly. A variable belongs to the owner that entered it, so a
+    // name another owner of the same project holds answers `var.not_found`
+    // and leaves that owner's value standing.
+    http.get("*/variables/:variableName", ({ request, params }) => {
+      const path = parse(
+        GetVariableParams,
+        { variable_name: String(params.variableName) },
+        "invalid_request",
+      );
+      if (!path.ok) {
+        return path.response;
+      }
+      const query = parse(GetVariableQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const owner = variableOwner(query.data.project_id, query.data.environment_name);
+      const held = store.variables.get(owner)?.get(path.data.variable_name);
+      if (held === undefined) {
+        return HttpResponse.json(errorBody("var.not_found", "variable not found"), { status: 404 });
+      }
+      const body = held.secret ? { secret: true } : held.value;
+      const out = parse(GetVariableResponse, body, "mock_response_invalid");
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data);
+    }),
+
+    http.delete("*/variables/:variableName", ({ request, params }) => {
+      const path = parse(
+        DeleteVariableParams,
+        { variable_name: String(params.variableName) },
+        "invalid_request",
+      );
+      if (!path.ok) {
+        return path.response;
+      }
+      const query = parse(DeleteVariableQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const owner = variableOwner(query.data.project_id, query.data.environment_name);
+      const owned = store.variables.get(owner);
+      const name = path.data.variable_name;
+      if (owned?.has(name) !== true) {
+        return HttpResponse.json(errorBody("var.not_found", "variable not found"), { status: 404 });
+      }
+      owned.delete(name);
+      store.variables.set(owner, owned);
+      return new HttpResponse(null, { status: 204 });
+    }),
+
+    http.patch("*/variables", async ({ request }) => {
+      const query = parse(UpdateVariablesQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const raw = await readJson(request);
+      if (raw === null) {
+        return HttpResponse.json(INVALID_JSON, { status: 400 });
+      }
+      const body = parse(UpdateVariablesBody, raw, "invalid_request");
+      if (!body.ok) {
+        return body.response;
+      }
+
+      const owner = variableOwner(query.data.project_id, query.data.environment_name);
+      const owned = store.variables.get(owner) ?? new Map<string, VariableRecord>();
+      // RFC 7386: a name present is written, `null` removes it, and a name
+      // absent is left alone.
+      for (const [name, value] of Object.entries(body.data as Record<string, unknown>)) {
+        if (value === null) {
+          owned.delete(name);
+        } else if (typeof value === "object") {
+          const input = value as { value: string | number | boolean; secret: boolean };
+          owned.set(name, { value: input.value, secret: input.secret });
+        } else {
+          owned.set(name, { value: value as string | number | boolean, secret: false });
+        }
+      }
+      store.variables.set(owner, owned);
+      // 200 with the addressed owner read back, so the response also carries
+      // what that owner held and this write did not touch.
+      const out = parse(UpdateVariablesResponse, variablesResponse(owned), "mock_response_invalid");
       if (!out.ok) {
         return out.response;
       }

@@ -10,9 +10,11 @@ A single `@storybook/web-components-vite` instance that hosts `@zitadel/componen
 see `src/session.stories.ts`) — so atoms can be checked against Figma and the
 orchestrators can be driven against `@zitadel/api-mock`. This is the workbench
 for the **login surface only**; console UI iterates on the console dev server
-(ADR 055). It is a dev tool, not a shipped package
-(`private`, no `dist`, `build` is `runInCI: false`), but `storybook:test` runs
-in CI.
+(ADR 055). It is a dev tool, not a published npm package (`private`): it ships
+no package `dist`. It does build a static site into `dist/` via `storybook:build`
+— deployed to Vercel as a shared preview, and the `dist` output convention is in
+[`apps/AGENTS.md`](../AGENTS.md). That build runs in CI (Vercel is a CI
+environment), as does `storybook:test`.
 
 ## Hard rules
 
@@ -66,8 +68,10 @@ scoped `AGENTS.md` owns the rules — read those rather than rediscovering them.
 6. **Story** (`src/<id>.stories.ts`): one `Default` story under an
    `Atoms/<Name>` title. States are knobs, not extra stories.
 7. **Verify.** Dev loop: `storybook dev -p 6006` (HMR from source). Gate:
-   `moon run components:test` (unit), `moon run storybook:typecheck`, and
-   `moon run storybook:test` (render + a11y + plays in Chromium).
+   `moon run components:test` (unit + browser projects), `moon run
+   storybook:typecheck`, and `moon run storybook:test` (render + a11y + plays in
+   Chromium). For just the fast unit lane while iterating, use
+   `pnpm --filter @zitadel/components test`.
 
 ## Local checks
 
