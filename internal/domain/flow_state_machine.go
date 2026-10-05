@@ -388,12 +388,13 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 	if currentStep.Complete != nil {
 		return FlowStepResult{}, false, nil
 	}
-	parked, err := r.ssoIdentities.LoadParked(ctx, FlowSSOLoadInput{
+	loadInput := FlowSSOLoadInput{
 		ProjectID:       state.ProjectID,
 		AttemptID:       state.AuthAttemptID,
 		UserSchemaURL:   state.UserSchemaURL,
 		ResolvedCheckID: state.SSOResolvedCheckID,
-	})
+	}
+	parked, err := r.ssoIdentities.LoadParked(ctx, loadInput)
 	if err != nil {
 		return FlowStepResult{}, false, fmt.Errorf("flow state machine: load parked sso identity: %w", err)
 	}
@@ -409,14 +410,7 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 		if err != nil {
 			return FlowStepResult{}, false, err
 		}
-		recordResolvedUser(state, parked.BoundUserID)
-		result, err := r.routeOutcome(pc, resolvedFields, FlowImplicitOutcomeSSOAuthenticated, false)
-		if errors.Is(err, ErrAuthAttemptAlreadyHandedOff()) {
-			// A concurrent retry won the handoff. A handed-off attempt restarts
-			// the flow on every later render too, so this one does the same.
-			return FlowStepResult{}, false, ErrFlowRestartRequired()
-		}
-		return result, true, err
+		return r.retrySSOHandoff(pc, resolvedFields, parked.BoundUserID)
 	}
 	if parked == nil {
 		return FlowStepResult{}, false, nil
@@ -464,15 +458,38 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 		LinkID:       parked.Link.LinkID,
 	})
 	if errors.Is(err, ErrSSOStateInvalid()) {
-		// A concurrent request settled the row or a new ceremony replaced it:
-		// the winner already answered, so this render shows the step.
-		return FlowStepResult{}, false, nil
+		// A concurrent request settled the row, or a new ceremony replaced it.
+		// One more read tells which.
+		reread, err := r.ssoIdentities.LoadParked(ctx, loadInput)
+		if err != nil {
+			// Handed off or expired: restart, so this response cannot reseal a
+			// cookie over the winner's. Any other read failure is returned as is.
+			return FlowStepResult{}, false, fmt.Errorf("flow state machine: reload parked sso identity: %w", err)
+		}
+		if reread == nil || reread.BoundUserID == "" {
+			// Replaced: the new ceremony keeps the flow, so render the step.
+			return FlowStepResult{}, false, nil
+		}
+		return r.retrySSOHandoff(pc, resolvedFields, reread.BoundUserID)
 	}
 	if err != nil {
 		return FlowStepResult{}, false, fmt.Errorf("flow state machine: bind sso identity: %w", err)
 	}
 	recordResolvedUser(state, parked.Link.UserID)
 	result, err := r.routeOutcome(pc, resolvedFields, FlowImplicitOutcomeSSOAuthenticated, false)
+	return result, true, err
+}
+
+// retrySSOHandoff raises sso_authenticated for a user an earlier bind recorded
+// on the attempt, which mints the handoff that bind's request did not deliver.
+func (r *FlowStateMachineRuntime) retrySSOHandoff(pc *processCtx, resolvedFields FlowResolvedFields, userID string) (FlowStepResult, bool, error) {
+	recordResolvedUser(pc.state, userID)
+	result, err := r.routeOutcome(pc, resolvedFields, FlowImplicitOutcomeSSOAuthenticated, false)
+	if errors.Is(err, ErrAuthAttemptAlreadyHandedOff()) {
+		// A concurrent retry won the handoff. A handed-off attempt restarts
+		// the flow on every later render too, so this one does the same.
+		return FlowStepResult{}, false, ErrFlowRestartRequired()
+	}
 	return result, true, err
 }
 
