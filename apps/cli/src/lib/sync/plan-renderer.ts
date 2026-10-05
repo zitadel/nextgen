@@ -529,8 +529,8 @@ function renderDiff(
 
   for (const key of allKeys) {
     const pk = fieldLabel(key).padEnd(maxLen);
-    const hasOld = Object.prototype.hasOwnProperty.call(oldObj, key);
-    const hasNew = Object.prototype.hasOwnProperty.call(newObj, key);
+    const hasOld = Object.hasOwn(oldObj, key);
+    const hasNew = Object.hasOwn(newObj, key);
     const oldVal = oldObj[key];
     const newVal = newObj[key];
 

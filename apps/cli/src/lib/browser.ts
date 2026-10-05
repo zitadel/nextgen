@@ -202,7 +202,6 @@ async function lookupPath(command: string, pathEnv: string): Promise<string | un
       await access(candidate, constants.X_OK);
       return candidate;
     } catch {
-      continue;
     }
   }
   return undefined;

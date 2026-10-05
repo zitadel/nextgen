@@ -31,7 +31,7 @@
  *   GET    /flow_definitions/:id      — get flow definition
  */
 import { randomBytes, randomUUID } from "node:crypto";
-import { type Server } from "node:http";
+import type { Server } from "node:http";
 
 import type { ExchangeHandoff200, GetMySession200 } from "@zitadel/api/generated/model";
 import { CompleteClaimBody } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";

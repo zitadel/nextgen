@@ -9,12 +9,6 @@ dependsOn:
   - "design-tokens"
 
 tasks:
-  lint:
-    command: "corepack pnpm exec oxlint ."
-    deps:
-      - "components:build"
-      - "design-tokens:build"
-
   typecheck:
     # Runs `tsc --build`: it compiles the referenced `api`/`api-mock` composite
     # projects (their `dist/*.d.ts` are not produced by their tsdown/no-op

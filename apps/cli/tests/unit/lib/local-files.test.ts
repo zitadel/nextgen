@@ -154,7 +154,7 @@ describe("inlineFileReferences", () => {
       keep: undefined;
       list: Array<string | undefined>;
     };
-    expect(Object.prototype.hasOwnProperty.call(inlined, "keep")).toBe(true);
+    expect(Object.hasOwn(inlined, "keep")).toBe(true);
     expect(inlined.keep).toBeUndefined();
     expect(inlined.list).toEqual([undefined, "<p>template</p>"]);
   });

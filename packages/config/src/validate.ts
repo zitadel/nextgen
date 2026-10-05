@@ -683,7 +683,7 @@ function resolveFieldChallenge(
   // Mirrors walkUserProperty: a nested property is addressed by its
   // dotted path, descending one `properties` level per segment.
   const segments = field.split(".");
-  let property: unknown = undefined;
+  let property: unknown ;
   let level: Record<string, unknown> | undefined = properties;
   for (const [i, segment] of segments.entries()) {
     // Own properties only: Go indexes a map, where an inherited name like

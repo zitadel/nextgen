@@ -1,6 +1,6 @@
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import { type ZitadelProject } from "@zitadel/api/config";
+import type { ZitadelProject } from "@zitadel/api/config";
 
 import { getSession, revokeSession } from "./api-client.js";
 import { applyBaseTokens, applyBrandingTokens } from "./branding-to-tokens.js";

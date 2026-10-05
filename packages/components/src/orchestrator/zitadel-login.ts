@@ -1,4 +1,4 @@
-import { type ZitadelProject } from "@zitadel/api/config";
+import type { ZitadelProject } from "@zitadel/api/config";
 import type {
   CreateFlow201,
   CreateFlow201Step,
