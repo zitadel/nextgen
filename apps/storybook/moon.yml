@@ -57,6 +57,16 @@ tasks:
       - "api:build"
       - "components:build"
       - "design-tokens:build"
+    options:
+      # Absolute backstop: this is a real-browser suite whose Vite dep-optimize +
+      # Chromium startup can be starved when `moon ci` runs the whole affected
+      # graph at once (see vitest.config.ts). If that startup ever wedges, the
+      # task must ABORT, not hang — a hung `storybook:test` blocks the entire
+      # `moon ci` pipeline and burns a full CI run. The suite finishes in well
+      # under a minute even on a loaded runner, so 120s only ever trips on a
+      # genuine hang. The in-suite `browser.connectTimeout` aborts faster in the
+      # common case; this guarantees a bound regardless of what wedges.
+      timeout: 120
 
   dev:
     command: "corepack pnpm run dev"
