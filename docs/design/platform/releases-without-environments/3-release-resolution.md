@@ -16,12 +16,14 @@ Then the release, in three layers:
 
 1. **Gate.** `Origin` present and matching no `allowed_origins` pattern → `403`.
    `Origin` absent falls through; there is nothing to check.
-2. **Route.** An origin row for this exact `Origin` → serve the release the
-   newest deployment row for that origin names. The caller sends nothing and
-   needs to know nothing. This answers almost all browser traffic.
-3. **Fall back.** No origin row. An explicit `X-Zitadel-Release` header wins if
-   present and permitted; otherwise the project default — the newest deployment
-   row with `origin = ""`.
+2. **Route.** A deployment row carrying this exact `Origin` → serve the release
+   the newest such row names. The caller sends nothing and needs to know
+   nothing, and this answers almost all browser traffic. An origin admitted by a
+   `preview` pattern needs a [live lease](1-data-model.md#origin) as well, which
+   is what makes an expired preview URL stop being served.
+3. **Fall back.** Nothing deployed to this origin, or its lease has gone. An
+   explicit `X-Zitadel-Release` header wins if present and permitted; otherwise
+   the project default — the newest deployment row with `origin = ""`.
 
 Layer 3 is not a leftover: layer 2 needs an `Origin` to match, and a server-side
 app sends none. No layer reads a stored pointer; see
@@ -29,8 +31,8 @@ app sends none. No layer reads a stored pointer; see
 
 **Who may use the header.** On a `production` project it requires the publishable
 key or the project secret, so an anonymous pin is refused. On a `sandbox` project
-it is open. A `preview` pattern matched at layer 1 with no row at layer 2 and no
-permitted header is `400` — a preview URL must never silently fall through to
+it is open. A `preview` pattern matched at layer 1 that layer 2 could not answer, with no
+permitted header, is `400` — a preview URL must never silently fall through to
 production configuration.
 
 **Sealing.** The resolved *deployment* id is written into the flow state at the
@@ -45,8 +47,8 @@ cannot drift apart part-way through an attempt.
 **A browser sends nothing new.** `Origin` is set by the user agent, not by the
 page, and the publishable key is already a build constant in the bundle. So the
 first request of a sign-in carries no release identifier and the app holds no
-release state: the origin row answers layer 2 and the browser never learns which
-release it was served. A deploy to that origin changes the answer on the next
+release state: layer 2 answers out of the deployment history and the browser
+never learns which release it was served. A deploy to that origin changes the answer on the next
 page load with no client change.
 
 **A caller with no `Origin` is answered by the project default.** That is
@@ -78,8 +80,8 @@ Two edges follow from it being a real target:
 simply leave the header off, so it is worth being explicit about what that
 reaches: the project default, which is the same configuration any visitor to
 `app.acme.com` is served and public by construction. What it does not reach is a
-**preview release** — layer 2 needs an exact origin row, and on a `production`
-project the header needs a credential.
+**preview release** — layer 2 needs the `Origin` of a leased preview URL, and on
+a `production` project the header needs a credential.
 
 The gate therefore protects the one caller that *cannot* lie about its origin: a
 browser on a page the user did not expect. It was never a defence against a
@@ -114,7 +116,7 @@ All against the project above: `class: production`, primary `app.acme.com` and
 `www.acme.com`, preview patterns `*-acmeinc.vercel.app` and
 `*.preview.acme.com`.
 
-### 1. A browser, on production or on a registered preview
+### 1. A browser, on production or on a leased preview
 
 ```http
 POST /flow HTTP/1.1
@@ -132,10 +134,10 @@ Authorization: Bearer pk_7kR2pXq9vN3wLmYhT4cB8A
 Serves `sha256:4a5b…`, and the client sent no release and knows of none. Change
 only the `Origin` to `https://acme-git-sso-acmeinc.vercel.app` and the same
 request serves that branch's release instead: layer 2 finds the preview's own
-row. Nothing else about the request differs, which is the point of routing on
+deployment. Nothing else about the request differs, which is the point of routing on
 the origin.
 
-### 2. A preview that could not register its origin
+### 2. A preview with no lease
 
 ```http
 POST /flow HTTP/1.1
@@ -149,7 +151,7 @@ X-Zitadel-Release: sha256:81de4c…
 | Layer | Outcome |
 |---|---|
 | 1 gate | matches the preview pattern ✓ |
-| 2 route | no origin row |
+| 2 route | nothing deployed to this host |
 | 3 fall back | header present, publishable key present → `sha256:81de4c…` |
 
 Drop the `Authorization` header and this is `403 rel.pin_not_permitted`; drop
@@ -187,7 +189,7 @@ X-Zitadel-Release: sha256:9f2c1a…
 | Layer | Outcome |
 |---|---|
 | 1 gate | matches the preview pattern ✓ |
-| 2 route | no row for this exact host |
+| 2 route | nothing deployed to this exact host |
 | 3 fall back | header present, **no credential** on a `production` project |
 
 `403 rel.pin_not_permitted`. Knowing the digest bought nothing, which is the
@@ -211,7 +213,7 @@ X-Zitadel-Release: sha256:c3f7a8…
 | Layer | Outcome |
 |---|---|
 | 1 gate | loopback, permitted on `sandbox` ✓ |
-| 2 route | no row — nobody registers localhost |
+| 2 route | nothing deployed — nobody deploys to localhost |
 | 3 fall back | header present, no credential needed → `sha256:c3f7a8…` |
 
 The digest comes from the local runtime document rather than a build constant, so
@@ -222,8 +224,8 @@ a `.zitadel/` edit shows on the next page load.
 | `Origin` | Credential | Header | Answered by | Result |
 |---|---|---|---|---|
 | primary | publishable key | — | layer 2 | production release |
-| registered preview | publishable key | — | layer 2 | branch release |
-| unregistered preview | publishable key | yes | layer 3 | named release |
+| leased preview | publishable key | — | layer 2 | branch release |
+| unleased preview | publishable key | yes | layer 3 | named release |
 | none | project secret | — | layer 3 | project default |
 | unmatched | — | yes | layer 1 | `403 origin_not_allowed` |
 | matched preview | none | yes | layer 3 | `403 pin_not_permitted` |

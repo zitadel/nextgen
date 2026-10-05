@@ -17,7 +17,7 @@ already exist — what changes is the axis they are keyed on.
 | Entity | Old Model | New Model |
 |---|---|---|
 | **Project** | `projects` | kept — `preview_origins` becomes `allowed_origins` with a `kind` per entry, plus `class` and `publishable_key` |
-| **Origin** | — | **new table**, one row per live URL; takes over the routing job environments do |
+| **Origin** | — | **new table**, one row per live *preview* URL — a lease with a term, not a routing index. A primary hostname gets no row |
 | **Environment** | `environments`, seeded per project | **dropped** |
 | **Deployment** | `deployments`, keyed to an environment | kept — `environment_id` becomes a plain `origin` string, plus `deploy_id`. The newest row **is** the pointer; `environments.current_deployment_id` is not carried over |
 | **Release** | `releases` | shape kept — `content_hash` becomes the wire identifier, `revoked_at` is new |
@@ -54,31 +54,46 @@ already exist — what changes is the axis they are keyed on.
 
 ### Origin
 
-One row per live URL, keyed `(project_id, origin)`. Exact strings, no patterns.
-This is what a request routes on: the row says the URL is live and how it is
-treated, never what it serves.
+A **lease** on one exact preview URL, keyed `(project_id, origin)`. Exact
+strings, no patterns. The row says the URL is still live; it never says what the
+URL serves.
 
 ```jsonc
-// NEW TABLE - takes over what an `environments` row did, keyed by an exact
-// origin string instead of an `env_` id - except the pointer.
-{
-  "project_id": "prj_01K9AA9M3K7E2QX8VB4T",
-  "origin":     "https://app.acme.com",
-  "kind":       "primary",
-  "created_at": "2026-04-22T09:17:45Z"
-}
+// NEW TABLE - one row per live preview URL and nothing else, keyed by an exact
+// origin string and carrying a term rather than a pointer.
 {
   "project_id": "prj_01K9AA9M3K7E2QX8VB4T",
   "origin":     "https://acme-git-sso-acmeinc.vercel.app",
-  "kind":       "preview",
-  "expires_at": "2026-10-09T14:10:00Z", // preview rows only; `primary` never expires
+  "expires_at": "2026-10-09T14:10:00Z", // renewed by deploying to it again
   "created_at": "2026-10-02T14:10:00Z"
 }
 ```
 
-`kind` is the switch four separate rules read, and it cannot be derived from the
-shape of the origin — see
-[why an origin has a kind](2-origins.md#why-an-origin-has-a-kind).
+#### Why a primary hostname has no row
+
+`https://app.acme.com` is routed by the newest deployment row carrying it, so a
+row of its own would hold only the string already in that column. Every other
+field is empty or lives elsewhere: a primary never expires, and the
+[kind](2-origins.md#why-an-allowlist-entry-has-a-kind) is a property of the
+pattern that admitted it, held on the project.
+
+- **The project default already proves a target needs no row.** `origin = ""` is
+  a routing target with no entry anywhere, so which targets exist is already the
+  deployment history's question to answer.
+- **A row could only ever appear after a deploy to it** — nothing registers a
+  primary in advance — so the set of primary rows and `DISTINCT origin` over the
+  deployments are the same set, maintained twice.
+- **Layer 2 gets shorter.** The newest deployment for the origin, then the
+  release, instead of the row, the deployment and the release.
+- **Retiring a primary is removing its pattern.** A primary pattern is a
+  literal, so deleting it takes exactly one hostname out of service. A preview
+  pattern is a wildcard covering every URL the platform will ever mint, so
+  deleting it would retire hundreds that are still wanted. That asymmetry is the
+  reason previews need a per-URL row and primaries do not.
+
+What the row is left holding is a lease, which is exactly what a preview needs
+and a primary has no use for: a term pinned when the URL was admitted, and a row
+`zitadel origins rm` can delete to retire one URL early.
 
 So `environments` is **dropped**: the table and its unique name index
 (`000005_environments.sql`), `seedDefaultEnvironments`
@@ -202,17 +217,28 @@ the schema half-admits it already, since the history index carries the comment
 "The first row under this order is the environment's current deployment".
 
 - **It saves no read.** Resolution needs the release, not the deployment id.
-  With a pointer: origin row, the deployment it names, the release. Without:
-  origin row, newest deployment for that origin, the release. Three accesses
-  either way, and the index that makes the seek a single-row hit is already in
-  the schema for the history list.
+  With a pointer: the row, the deployment it names, the release. Without: the
+  newest deployment for that origin, then the release — two accesses against
+  three for a primary, which [has no row](#why-a-primary-hostname-has-no-row).
+  The index that makes the seek a single-row hit is already in the schema for
+  the history list.
 - **"Newest row per group" is already an idiom here** — the latest-revision
   anti-join exists in all three dialects for schemas and flow definitions
   (`internal/storage/dialect/*/json_schema.go`).
-- **Concurrency has a better anchor.** The origin row still exists, for `kind`
-  and `expires_at`, so a deploy locks it, compares the newest deployment against
-  `expected_deployment_id`, and inserts. The project row anchors the
-  `origin = ""` default the same way.
+- **Concurrency has a better anchor.** A preview run locks the lease row it
+  renews, compares the newest deployment against `expected_deployment_id`, and
+  inserts. A `deploy` has no row to lock, so it locks the project row — which
+  matches its grain, since naming `primary` means every one of those origins
+  moves or none does. Previews keep a lock per row precisely where the
+  concurrency is: one run per pull request, many at once, none of them waiting
+  on a production deploy.
+
+**And a pointer is the only thing that would make a primary row pay for
+itself**, which is the argument the other way round. An origin row carrying a
+current deployment, and with it a variable scope and a name to call it by, is an
+`environments` row keyed by a URL instead of by an `env_` id — the resource this
+spike removes, re-created under a different primary key. Appending is what keeps
+the two apart.
 
 Dropping it makes the model append-only in fact rather than in description — a
 deploy over five origins is five inserts and zero updates — and removes a column
@@ -281,7 +307,7 @@ selector, the server expands it, storage keeps one row per target.
 The 17:02 release went bad and was rolled back at 09:30 across all three
 production targets in one operation — one `deploy_id`, three rows, each
 independently rollback-able afterwards. The 09-28 preview has since expired and
-its origin row is gone, yet its deployment row is still here.
+its lease is gone, yet its deployment row is still here.
 
 **Known limitation.** A target's history is its hostname's, so renaming a
 production hostname starts a new one. The fix, if it matters, is a nullable
@@ -311,8 +337,15 @@ without going through it.
    Keeping both — pointer digest on the wire, content digest for CI assertions —
    is probably the answer.
 2. **How strictly a concurrent deploy to one target must serialise.** With no
-   pointer column, two appends both succeed and the later timestamp wins. A row
-   lock on the target plus `expected_deployment_id` makes the conflict explicit;
-   last-write-wins is cheaper and may be enough for a target only CI writes to.
+   pointer column, two appends both succeed and the later timestamp wins. A
+   lock — the project row for a primary, the lease row for a preview — plus
+   `expected_deployment_id` makes the conflict explicit; last-write-wins is
+   cheaper and may be enough for a target only CI writes to.
 3. **Release retention window, and what counts as "cold".** A last-resolved
    timestamp is a write on the hot path; an approximation avoids one.
+4. **Whether the lease belongs on the deployment rather than in its own table.**
+   A preview deployment could carry its own `expires_at`, leaving no Origin
+   table at all; retiring a URL early would then be an append, which is what
+   rollback already is. Against it: the collector wants one row per live URL to
+   sweep rather than a latest-per-group scan, and a retirement row names no
+   release, which weakens "a deployment names the release its target serves".

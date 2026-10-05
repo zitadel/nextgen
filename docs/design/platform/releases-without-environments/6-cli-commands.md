@@ -27,7 +27,9 @@ https://acme-git-sso-acmeinc.vercel.app sha256:9f2c1a7b  10-02 14:10   in 6d
 ```
 
 Drift is one comparison: hash the working copy, compare to what each target
-serves.
+serves. The list is the default and the `primary` origins, plus the preview
+leased to the current branch if there is one; every other live preview is
+`zitadel origins list`.
 
 ## `zitadel deploy`
 
@@ -44,7 +46,7 @@ deploying to 3 targets
   removes: idps/okta   (present in the current release, absent locally)
 
 continue? [y/N] y
-deployed    dpl_01KB3F8N2P9S5WQY   4 deployment records written
+deployed    dpl_01KB3F8N2P9S5WQY   3 deployment records written
 ```
 
 `--origin` narrows this to one `primary` origin, for a project with several
@@ -96,8 +98,8 @@ Authorization: Bearer sk_proj_9f2Hx8LqT4vRmYpN2wCbVa
 The same string therefore arrives by two routes: **declared** at deploy time,
 backed by the project secret, and **attested** at request time by the browser's
 `Origin` header. The allowlist binds them — a declared origin is checked against
-the project's patterns at deploy time, so an origin row can never exist for an
-origin the project does not permit.
+the project's patterns at deploy time, so a lease can never exist for an origin
+the project does not permit.
 
 Origin resolution, highest priority first:
 
@@ -107,12 +109,12 @@ Origin resolution, highest priority first:
 3. Error naming the variables it looked for
 
 Branch-stable, not per-deployment: `VERCEL_URL` and `DEPLOY_URL` change on every
-push, which would write one origin row per push and leave the reviewer's link
-pointing at a row nothing renews.
+push, which would lease a new URL on every push and leave the reviewer's link
+pointing at one nothing renews.
 
-Re-running on the next push renews `expires_at` and moves that origin's pointer,
-so the preview URL is stable across pushes and an abandoned branch's origin
-expires and is collected.
+Re-running on the next push renews `expires_at` and appends a deployment for
+that same origin, so the preview URL is stable across pushes and an abandoned
+branch's lease expires and is collected.
 
 Outside CI there is no preview URL to infer:
 
@@ -150,22 +152,26 @@ full operator authority, so a branch wanting to widen the allowlist would call
 the endpoint directly rather than bother with the CLI. The table above is
 therefore a convention until the server can express it, which needs **a
 credential scoped to preview deploys and nothing else**: create or renew a
-preview origin row, create a release, read the allowlist, and no write to
-patterns or class. ADR 036's `sk_team_` — "anything not listed under MAY is
+preview lease, create a release, read the allowlist, and no write to patterns
+or class. ADR 036's `sk_team_` — "anything not listed under MAY is
 denied" — is the shape to copy. See [Prerequisites](#prerequisites).
 
 ## `zitadel origins`
 
 ```
 $ zitadel origins list
-ORIGIN                                   KIND     SERVING          EXPIRES
-https://app.acme.com                     primary  sha256:4a5b6c7d   —
-https://www.acme.com                     primary  sha256:4a5b6c7d   —
-https://acme-git-sso-acmeinc.vercel.app  preview  sha256:9f2c1a7b   in 6d
+ORIGIN                                   SERVING          EXPIRES
+https://acme-git-sso-acmeinc.vercel.app  sha256:9f2c1a7b  in 6d
+https://acme-git-pw-acmeinc.vercel.app   sha256:81de4c7a  in 2d
 
 $ zitadel origins rm https://acme-git-sso-acmeinc.vercel.app
 removed. 1 deployment record kept.
 ```
+
+Leases, so previews only: a primary hostname
+[holds none](1-data-model.md#why-a-primary-hostname-has-no-row), and `status`
+already shows what each one serves. The split also keeps `status` legible on a
+project with forty open pull requests.
 
 The allowlist is a separate command, because a pattern is project state rather
 than release content and is changed deliberately rather than as a side effect of

@@ -9,47 +9,52 @@ with different jobs; the [shapes](1-data-model.md#project) are in the data
 model, and how a request uses them is
 [release resolution](3-release-resolution.md).
 
-| | **Allowlist** | **Inventory** |
+| | **Allowlist** | **Lease** |
 |---|---|---|
-| What it is | a rule | a fact |
-| Written by | a person holding `project.write`, one pattern at a time | a deploy |
-| Shape | patterns | exact origins |
-| Lifetime | as long as the project | as long as the deployment it records |
-| Answers | may traffic from here be served? | what is this URL serving? |
-| Can route? | no — a pattern matches many hosts | yes |
+| What it is | a rule | a term |
+| Covers | every URL a pattern matches | one exact preview URL |
+| Written by | a person holding `project.write`, one pattern at a time | a preview run |
+| Lifetime | as long as the project | a fixed term, renewed by deploying again |
+| Answers | may traffic from here be served? | is this preview URL still live? |
+
+Neither answers *what* a URL serves. That is the deployment history's job — the
+newest row carrying the origin — which is why a primary hostname appears in the
+allowlist and in the history and
+[nowhere else](1-data-model.md#why-a-primary-hostname-has-no-row).
 
 Matching: `*` matches one or more characters, none of which is `.`. Where a
 request matches more than one pattern, the more specific wins — a literal beats
 a wildcard.
 
-## Why an origin has a kind
+## Why an allowlist entry has a kind
 
-`kind` is the switch four different rules read. Without it each would need its
-own column or its own heuristic.
+`kind` sits on the pattern, and nowhere else. It is the switch four different
+rules read; without it each would need its own column or its own heuristic.
 
 | | `primary` | `preview` |
 |---|---|---|
 | Wildcard pattern | refused on a `production` project | allowed, if [tenant-anchored](#the-tenant-anchor-rule) |
-| Lifetime | never expires | `expires_at`, renewed by deploying again |
+| Lease | none — live as long as something is deployed to it | a term, renewed by deploying again |
 | Written by | `zitadel deploy` | `zitadel preview` |
-| Matched at layer 1, no row at layer 2 | falls through to the project default | `400 rel.required` |
+| Matched at layer 1, unanswered at layer 2 | falls through to the project default | `400 rel.required` |
 
 That last row matters most. A preview URL must fail closed: serving it the
 production configuration would be worse than refusing, since the whole point of
-the URL is that it is *not* production. A primary hostname with no row is just a
-project deployed only to its default, which is fine to serve.
+the URL is that it is *not* production. A primary hostname with nothing of its
+own is just a project deployed only to its default, which is fine to serve.
 
-**It cannot be derived from the shape of the origin.** A registered preview URL —
+**It cannot be derived from the shape of the origin.** A live preview URL —
 `https://acme-git-sso-acmeinc.vercel.app` — is a literal string
 indistinguishable from `https://app.acme.com`, yet the two must behave
 oppositely on expiry and on the fail-closed rule. Wildcards do not settle it
 either: whether one is allowed is a question about the
 [class](#project-class), so a `sandbox` project may hold a wildcard `primary`.
 
-A row records the kind of the pattern that admitted it, at the time it was
-admitted, so re-typing a pattern later cannot silently make live previews
-permanent or retire a hostname serving traffic. The explicit path is
-`zitadel origins rm` and a redeploy.
+Holding it only on the pattern means re-typing one changes who is admitted from
+then on and nothing retroactively: a live preview expires on the `expires_at`
+its lease was given whatever the pattern says afterwards, and a hostname already
+serving traffic keeps serving it. Taking a URL out of service is
+`zitadel origins rm` or removing the pattern, never an edit to it.
 
 ## Managing the allowlist
 
@@ -88,9 +93,9 @@ would make the CLI read the list, edit it and write it back, losing a concurrent
 addition in the window between. One pattern per call has no such window and
 needs no `If-Match`.
 
-The inventory needs no such endpoint. Origin rows are written by deploys and
-collected on expiry, so the only reads are `GET /origins` for `zitadel status`
-and a delete for retiring one early — which is what `zitadel origins rm` calls.
+Leases need no such endpoint. They are written by preview runs and collected on
+expiry, so the only operations are `GET /origins` and a delete for retiring one
+early — which is what `zitadel origins rm` calls.
 
 ## Why the allowlist is not in `zitadel.json`
 
@@ -178,9 +183,9 @@ and is audited.
 
 Permitted, but a preview must name its release, and there are two ways:
 
-- **Preferred — the deploy registers an origin row** for the exact preview URL.
-  Layer 2 answers, the client sends nothing, and a stranger reaching a matching
-  wildcard has no row of their own.
+- **Preferred — the run leases the exact preview URL.** Layer 2 answers, the
+  client sends nothing, and a stranger reaching a matching wildcard holds no
+  lease of their own.
 - **Fallback — the build injects `X-Zitadel-Release`**, for platforms with no
   registration step. Requires the publishable key on a `production` project.
 
