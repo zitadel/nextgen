@@ -21,12 +21,14 @@ let fixtureRoot;
 let releaseSetDir;
 let extraPackageDir;
 let missingPackageDir;
+let cliMissingSkillDir;
 
 beforeAll(async () => {
   fixtureRoot = await mkdtemp(join(tmpdir(), "verify-tarballs-test-"));
   releaseSetDir = join(fixtureRoot, "release-set");
   extraPackageDir = join(fixtureRoot, "extra-package");
   missingPackageDir = join(fixtureRoot, "missing-package");
+  cliMissingSkillDir = join(fixtureRoot, "cli-missing-skill");
   await mkdir(releaseSetDir, { recursive: true });
 
   for (const dir of PUBLIC_PACKAGE_DIRS) {
@@ -36,6 +38,8 @@ beforeAll(async () => {
   await makeTarball(extraPackageDir, "@zitadel/api-mock");
   await cp(releaseSetDir, missingPackageDir, { recursive: true });
   await rm(join(missingPackageDir, "zitadel-testing-1.0.0.tgz"));
+  await cp(releaseSetDir, cliMissingSkillDir, { recursive: true });
+  await makeTarball(cliMissingSkillDir, "@zitadel/cli", { omitCliSkill: true });
 });
 
 afterAll(async () => {
@@ -60,6 +64,12 @@ test("rejects a set missing a public release package", () => {
   assert.match(result.stderr, /missing tarball for @zitadel\/testing/);
 });
 
+test("rejects a @zitadel/cli tarball missing the agent skill bundle", () => {
+  const result = runVerify(cliMissingSkillDir);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /missing CLI agent skill files/);
+});
+
 test("unknown flags are rejected", () => {
   const result = runVerify(releaseSetDir, "--bogus");
   assert.notEqual(result.status, 0);
@@ -75,10 +85,11 @@ async function packageName(dir) {
   return manifest.name;
 }
 
-async function makeTarball(outDir, name) {
+async function makeTarball(outDir, name, { omitCliSkill = false } = {}) {
   const safe = name.replace(/[@/]/g, "-").replace(/^-/, "");
   const stage = join(fixtureRoot, "stage", safe);
   const packageDir = join(stage, "package");
+  await rm(stage, { recursive: true, force: true });
   await mkdir(packageDir, { recursive: true });
   const manifest = { name, version: "1.0.0" };
   if (/^@zitadel\/server-(?:darwin|linux|win32)-/.test(name)) {
@@ -86,6 +97,9 @@ async function makeTarball(outDir, name) {
     manifest.bin = { nextgen: `./${bin}` };
     await mkdir(join(packageDir, "bin"), { recursive: true });
     await writeFile(join(packageDir, bin), "#!/bin/sh\n", { mode: 0o755 });
+  }
+  if (name === "@zitadel/cli" && !omitCliSkill) {
+    await cp(join(repoRoot, "apps/cli/skills"), join(packageDir, "skills"), { recursive: true });
   }
   await writeFile(join(packageDir, "package.json"), JSON.stringify(manifest));
   const tar = spawnSync("tar", ["-czf", join(outDir, `${safe}-1.0.0.tgz`), "-C", stage, "package"], {

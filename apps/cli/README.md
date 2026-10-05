@@ -117,7 +117,7 @@ and agent UIs may display stderr package-manager progress together with stdout.
 - `zitadel start|stop|logs|reset`: manage the local runtime
 
 The full agent-facing contract (JSON envelope, posture rules, claim flow,
-doctor repair) is [`SKILLS.md`](https://github.com/zitadel/nextgen/blob/main/apps/cli/SKILLS.md),
+doctor repair) is [`SKILL.md`](https://github.com/zitadel/nextgen/blob/main/apps/cli/skills/zitadel-cli/SKILL.md),
 which ships in this package.
 
 ## Reference
@@ -1828,7 +1828,7 @@ FLAGS
       Project directory to operate on.
 
   -f, --force
-      Overwrite managed files that already exist.
+      Overwrite managed files that already exist, and scaffold into a non-empty directory.
 
   -n, --non-interactive
       Disable prompts. Required when scripting or running as an agent.

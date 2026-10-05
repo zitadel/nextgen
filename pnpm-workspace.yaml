@@ -78,6 +78,7 @@ catalog:
   lit: ^3.3.2
   lucide: ^1.16.0
   lucide-react: ^1.16.0
+  marked: ^18.0.14
   msw: ^2.14.6
   msw-storybook-addon: ^2.0.7
   nuxt: ^4.5.1
@@ -92,6 +93,7 @@ catalog:
   react-dom: ^19.2.8
   react-server-dom-webpack: 19.2.8
   safe-stable-stringify: ^2.5.0
+  sanitize-html: ^2.18.0
   semver: ^7.7.3
   sharp: ^0.35.3
   shiki: ^4.2.0
