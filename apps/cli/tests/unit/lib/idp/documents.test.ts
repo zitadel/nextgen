@@ -330,6 +330,32 @@ describe("applySsoToFlow", () => {
     expect(legacy).toEqual(before);
   });
 
+  it.each([
+    ["purpose", { purpose: "register" }],
+    ["action", { action: "switch" }],
+  ])("refuses to migrate a legacy outcome that declares %s", (_, extra) => {
+    // Legal on `callback` before the rename; the new key refuses both, and
+    // dropping them would change where the author routed it.
+    const legacy = previousCliFlow();
+    const register = legacy.steps.find((s) => s.name === "register")!;
+    const transitions = register.transitions as Record<string, Record<string, unknown>>;
+    transitions.callback = { ...transitions.callback, ...extra };
+    const before = structuredClone(legacy);
+
+    let caught: unknown;
+    try {
+      applySsoToFlow(legacy, "github", bothMethods);
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(ZitadelError);
+    expect((caught as ZitadelError).code).toBe("E_VALIDATION");
+    expect((caught as ZitadelError).message).toContain("register");
+    expect((caught as ZitadelError).message).toContain("callback");
+    expect(legacy).toEqual(before);
+  });
+
   it("refuses when an action collides with a generated outcome, legacy keys or not", () => {
     // A pre-rename flow could name an action `sso_authenticated`; the provider
     // loop would overwrite its route with the generated SSO target.
