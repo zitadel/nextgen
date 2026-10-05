@@ -363,15 +363,17 @@ class SchemaSyncer implements ResourceSyncer {
 
   /**
    * The id to send to the server for a stored `user_schema` reference, the
-   * inverse of {@link localiseReference}. A bare object-type handle resolves to
-   * its newest revision id so a pulled flow can be published through `apply`
-   * today, without waiting for release-based deploys. A minted id, a `$id`
-   * (URL or URN), a `${VAR}`, or a handle with no current revision is already
-   * what the server expects — or is best surfaced by the server's own error —
-   * and is returned unchanged.
+   * inverse of {@link localiseReference}. A handle-shaped reference is looked
+   * up and resolved to the object type's newest revision id, so a pulled flow
+   * can be published through `apply` today without waiting for release-based
+   * deploys. The lookup falls back to the reference unchanged when no object
+   * type matches — which also covers a minted id (an `objectType` may itself
+   * start with `sch_`, so the prefix is not a safe id signal). A value that is
+   * not handle-shaped — a `$id` URL or URN, a `${VAR}` — is passed through
+   * without a lookup.
    */
   async resolveToId(reference: string): Promise<string> {
-    if (!SchemaSyncer.HANDLE.test(reference) || reference.startsWith("sch_")) {
+    if (!SchemaSyncer.HANDLE.test(reference)) {
       return reference;
     }
     return (await this.newestRevision(reference)) ?? reference;
@@ -430,12 +432,21 @@ class FlowDefinitionSyncer implements ResourceSyncer {
    * now, rather than only through a future release-based deploy.
    */
   async create(data: object): Promise<{ id: string; canonical?: object }> {
+    const original = (data as { user_schema?: unknown }).user_schema;
     const result = (await this.client.createFlowDefinition({
       project_id: this.projectId,
       schema_uri: DEFAULT_FLOW_SCHEMA_URI,
       flow_definition: (await this.withResolvedSchema(data)) as CreateFlowDefinitionBodyFlowDefinition,
     })) as CreateFlowDefinition201;
-    return { id: result.id, canonical: result.flow_definition as object };
+    // The resolved id was only for the wire. The server echoes it back in
+    // `user_schema`, and the loop writes the canonical body to disk — so put
+    // the original local reference (the handle) back, keeping the file portable
+    // while retaining every other field the server canonicalized.
+    const canonical = result.flow_definition as Record<string, unknown>;
+    return {
+      id: result.id,
+      canonical: typeof original === "string" ? { ...canonical, user_schema: original } : canonical,
+    };
   }
 
   /** The body with `user_schema` resolved to a schema id for the wire (a handle → its newest revision). */

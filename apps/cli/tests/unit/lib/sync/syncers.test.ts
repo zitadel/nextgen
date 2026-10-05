@@ -918,7 +918,8 @@ describe("localise", () => {
 describe("FlowDefinitionSyncer.create resolves user_schema", () => {
   const sync = () => makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
 
-  it("resolves a handle to the schema's newest revision id", async () => {
+  it("sends the resolved id on the wire but keeps the handle in the written body", async () => {
+    let posted: { user_schema?: string } = {};
     server.use(
       http.get(`${BASE}/schemas`, ({ request }) => {
         expect(new URL(request.url).searchParams.get("object_type")).toBe("human-user");
@@ -927,7 +928,8 @@ describe("FlowDefinitionSyncer.create resolves user_schema", () => {
         });
       }),
       http.post(`${BASE}/flow_definitions`, async ({ request }) => {
-        const body = (await request.json()) as { flow_definition: unknown };
+        const body = (await request.json()) as { flow_definition: { user_schema?: string } };
+        posted = body.flow_definition;
         return HttpResponse.json({ id: "flowdef_1", flow_definition: body.flow_definition });
       }),
     );
@@ -935,7 +937,9 @@ describe("FlowDefinitionSyncer.create resolves user_schema", () => {
 
     const result = await flow.create({ name: "login", user_schema: "human-user" });
 
-    expect((result.canonical as { user_schema: string }).user_schema).toBe("sch_live");
+    // Wire carries the resolved id; the body written back keeps the handle.
+    expect(posted.user_schema).toBe("sch_live");
+    expect((result.canonical as { user_schema: string }).user_schema).toBe("human-user");
   });
 
   it("sends a non-handle user_schema unchanged, without a schema lookup", async () => {
