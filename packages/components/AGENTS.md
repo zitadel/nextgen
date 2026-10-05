@@ -144,12 +144,14 @@ rather than building attribute selectors with `CSS.escape(value)`.
 
 ### `toggleAttribute` / `classList.toggle` need a real boolean, never a bare prop
 
-`Element.toggleAttribute(name, force)` and `classList.toggle(name, force)` only
-*set* the flag when `force` is a genuine boolean. Pass anything else — crucially
-`undefined` — and the second argument is ignored and the flag *toggles* on every
-call. So stamping a flag once per render as
-`el.toggleAttribute("data-x", this.someFlag)` flips it on and off on each commit
-whenever `someFlag` is `undefined`, which flickers the UI.
+On `Element.toggleAttribute(name, force)` and `classList.toggle(name, force)`,
+`force` is an *optional* boolean. Passing `undefined` is treated as omitting the
+argument, so the flag *toggles* on every call instead of being set — while other
+non-boolean values are Web IDL–coerced to a boolean (`null`/`""`/`0` remove, a
+non-empty string or object add). `undefined` is the dangerous one, because a flag
+stamped once per render as `el.toggleAttribute("data-x", this.someFlag)` then
+flips on and off each commit whenever `someFlag` is `undefined`, which flickers
+the UI.
 
 A boolean reactive property reaches `undefined` more easily than it looks: a
 framework wrapper that binds an unset optional prop (e.g. the Angular SDK's

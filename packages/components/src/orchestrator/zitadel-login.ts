@@ -499,10 +499,11 @@ export class ZitadelLogin extends ZitadelSurface {
         // CSS-level so it also covers user-ejected templates: the rule in
         // layout-chrome.css hides `.zl-card-title`/`.zl-card-subtitle`
         // visually while keeping the step's accessible name.
-        // `=== true` because `toggleAttribute`'s second arg only *sets* for a
-        // real boolean — a non-boolean (e.g. the `undefined` a framework
-        // wrapper passes for an unset optional prop) makes it *toggle*, which
-        // would flip the header on and off on every commit.
+        // `=== true` because `toggleAttribute`'s `force` is an *optional*
+        // boolean: passing `undefined` (what a framework wrapper sends for an
+        // unset optional prop) is treated as omitted, so it *toggles* instead
+        // of setting — flipping the header on and off on every commit. (Other
+        // non-booleans are coerced to a boolean; only `undefined` toggles.)
         shell.toggleAttribute("data-suppress-header", this.suppressHeader === true);
       }
       // Stamped on the card too: its header REGION must leave the flex flow
