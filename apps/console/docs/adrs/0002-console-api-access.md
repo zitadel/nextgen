@@ -171,8 +171,9 @@ responsibilities are deliberately narrow:
   read the session again. Still the same person: it loads a fresh token and the
   write is retried once with it. Someone else, or nobody: the write is not
   retried, so it never runs as another person, and the page starts over. The
-  page's person is fixed by its first session: a session that later belongs to
-  someone else is never adopted in place, wherever it is noticed.
+  page's person is fixed by its first session for the life of the document,
+  even across a lost session: a session that later belongs to someone else is
+  never adopted in place, wherever it is noticed — the page reloads, once.
 - **Error mapping** — non-2xx throws `ApiError`; loaders let it propagate to
   the route `errorComponent`. `ApiError.status` drives status-specific copy
   (e.g. a `401`/`403` "you don't have access" surface once auth lands).

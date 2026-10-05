@@ -1,5 +1,9 @@
 import type { GetMySession200 } from "@zitadel/api/generated/model";
-import { getApiCsrfToken, setApiCsrfRejectionHandler, setApiCsrfToken } from "@zitadel/api/runtime/auth";
+import {
+  getApiCsrfToken,
+  setApiCsrfRejectionHandler,
+  setApiCsrfToken,
+} from "@zitadel/api/runtime/auth";
 import { ApiError } from "@zitadel/api/runtime/fetch";
 
 import { api } from "../api/zitadel";
@@ -34,35 +38,50 @@ let cachedSession: { at: number; session: ConsoleSession } | null = null;
 const SESSION_CACHE_MS = 15_000;
 
 /**
- * The person this page was loaded for: set by the first session it reads, and
- * cleared with everything else when that session is gone (sign-out, a 401, a
- * session that is no longer active). The CSRF token in the shared slot always
- * belongs to this person. A session that turns out to belong to someone else is
- * never adopted in place, because the page may still show the first person's
- * data and forms: it starts over instead.
+ * The person this page was loaded for: set by the first session it reads and
+ * never changed or cleared for the life of the document. One rule follows from
+ * it: a session that belongs to anyone else is never adopted in place, because
+ * the page may still show this person's data and forms; the page reloads
+ * instead, and the new document starts with whoever is signed in then. Losing
+ * the session (sign-out, a 401) does not clear it either: the sign-in widget
+ * ends in a full navigation, and the same person signing in again needs no
+ * reload.
  */
 let pageUserId: string | undefined;
 
+/** Set once the page is reloading: nothing is read or adopted after that. */
+let reloading = false;
+
 /**
- * Drops the cached session (called on sign-out), and with it every read cached
- * for that person (`lib/session-cache.ts`).
+ * Drops the cached session, the CSRF token, and every read cached for the
+ * person (`lib/session-cache.ts`), so the next read goes to the server. This
+ * page's person stays: see `pageUserId`.
  */
 export function invalidateSessionCache(): void {
   cachedSession = null;
-  pageUserId = undefined;
   setApiCsrfToken(undefined);
   clearSessionCaches();
 }
 
 /**
- * Drops everything held for this page's person and reloads it. Returns a
- * promise that never settles, for callers to hand back instead of a session: a
- * caller that got `null` would redirect to /login while the reload is pending.
+ * Reloads the page, once. Returns a promise that never settles, for callers to
+ * hand back instead of a session: a caller that got `null` would redirect to
+ * /login while the reload is pending.
  */
 function startOver(): Promise<never> {
-  invalidateSessionCache();
-  sessionPage.reload();
+  if (!reloading) {
+    reloading = true;
+    invalidateSessionCache();
+    sessionPage.reload();
+  }
   return new Promise<never>(() => undefined);
+}
+
+/** Test seam: a fresh document, with no person and no reload pending. */
+export function _resetSessionForTesting(): void {
+  invalidateSessionCache();
+  pageUserId = undefined;
+  reloading = false;
 }
 
 /**
@@ -85,23 +104,25 @@ export async function fetchSession(): Promise<ConsoleSession | null> {
   // so it costs no extra round trip in sequence. Only the session decides
   // whether someone is signed in, and a failed token read never replaces a
   // token that works.
+  if (reloading) return startOver();
   const early = getApiCsrfToken() ? undefined : readCsrfToken();
   let session: ConsoleSession;
   try {
     session = await api.getMySession(withCredentials);
   } catch (cause) {
-    // The session is gone: so is the person this page was for. A transport
-    // failure says nothing about the session, so it keeps the page's state.
+    // The session is gone, and with it the token and the reads cached for it.
+    // A transport failure says nothing about the session and keeps them.
     if (cause instanceof ApiError && cause.status === 401) invalidateSessionCache();
     return null;
   }
+  if (reloading) return startOver();
   if (session.state !== "active" || !session.user_id) {
     invalidateSessionCache();
     return null;
   }
   if (pageUserId !== undefined && session.user_id !== pageUserId) {
-    // Another tab signed in as someone else. Adopting that session here would
-    // arm this page's open forms to write as them: start over.
+    // Someone else signed in (another tab, or here after a sign-out). Adopting
+    // that session would arm this page's open forms to write as them.
     return startOver();
   }
   pageUserId = session.user_id;
@@ -149,22 +170,17 @@ let recheck: Promise<string | undefined> | undefined;
  *   for the person to retry; a network blip does not cost them their page.
  */
 async function recheckAfterRejection(): Promise<string | undefined> {
-  const person = pageUserId;
-  if (person === undefined) return undefined;
+  if (pageUserId === undefined || reloading) return undefined;
   const token = readCsrfToken();
   let session: ConsoleSession;
   try {
     session = await api.getMySession(withCredentials);
   } catch (cause) {
-    if (cause instanceof ApiError && cause.status === 401 && pageUserId === person) {
-      void startOver();
-    }
+    if (cause instanceof ApiError && cause.status === 401) void startOver();
     return undefined;
   }
-  // Something else (a navigation's fetchSession) already started the page over
-  // while this read was in flight: nothing left to decide here.
-  if (pageUserId !== person) return undefined;
-  if (session.state !== "active" || !session.user_id || session.user_id !== person) {
+  if (reloading) return undefined;
+  if (session.state !== "active" || session.user_id !== pageUserId) {
     void startOver();
     return undefined;
   }
