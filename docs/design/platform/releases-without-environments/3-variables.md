@@ -15,27 +15,49 @@ from one thing trying to be both.
 | | **The store** | **The snapshot** |
 |---|---|---|
 | Table | `variables` | `deployment_variables` |
-| Keyed by | `(project_id, name)` | `(project_id, deployment_id, name)` |
+| Keyed by | `(project_id, name, applies_to)` | `(project_id, deployment_id, name)` |
 | Written by | a person, when they decide a value | a deploy, in the same transaction as the deployment row |
 | Changes later | yes, that is its job | never |
 | Read by | the next deploy | every request |
 
-The store is a flat list of names on the project. No scope, no pattern, no level
-and no inheritance — **a name has one stored value.** Targeting lives in the
-deploy, because the snapshot already records what each target runs and a second
-targeting mechanism in the store would answer the same question twice, with the
-two free to disagree.
+The store is a flat list of names on the project: no patterns, no levels, no
+per-origin targeting. A name carries one value, plus **one optional override for
+previews** — `applies_to` is `all` or `preview`, and there is no third value, so
+two rows per name is the maximum.
+
+That one axis exists because a preview on a production project must not hold the
+production IdP client: the URL is reachable by anyone who can guess it, and the
+whole point of the URL is that it is not production. It is one rule about one
+kind of deploy, not a targeting mechanism — nothing addresses an origin, a
+pattern or a branch.
 
 ```jsonc
 // CHANGED - the `environment_id` column is removed rather than repurposed, and
 // with it the generated `environment_ref` column, its foreign key and the ""
-// convention (internal/domain/variable.go:160, 000008_variables.sql).
+// convention (internal/domain/variable.go:160, 000008_variables.sql). What
+// replaces it is narrower: `applies_to`, over a domain of exactly two.
 { "project_id": "prj_01K9AA9M3K7E2QX8VB4T", "name": "GOOGLE_CLIENT_ID",
-  "value": "prod-abc.apps.googleusercontent.com", "is_secret": false }
+  "applies_to": "all", "value": "prod-abc.apps.googleusercontent.com",
+  "is_secret": false }
 
 { "project_id": "prj_01K9AA9M3K7E2QX8VB4T", "name": "GOOGLE_CLIENT_SECRET",
-  "secret_version": "svs_01KB3F8N2P9S5WQX", "is_secret": true }
+  "applies_to": "all", "secret_version": "svs_01KB3F8N2P9S5WQX",
+  "is_secret": true }
+
+// The override. Read only by `zitadel preview`, and only when it exists.
+{ "project_id": "prj_01K9AA9M3K7E2QX8VB4T", "name": "GOOGLE_CLIENT_SECRET",
+  "applies_to": "preview", "secret_version": "svs_01KB3F8N2P9S5WQY",
+  "is_secret": true }
 ```
+
+`all` is what every deploy reads. `preview` is read by `zitadel preview` in
+preference to it, and a preview with no override row gets the `all` value.
+
+This is not the sentinel that the
+[snapshot](#why-not-one-table-with-a-null-deployment-id) section rules out: both
+rows are store rows with the same columns, the same lifecycle and the same
+mutability, and `applies_to` is never null. That objection was about two kinds
+of record sharing one table.
 
 ```jsonc
 // NEW TABLE - written once, in the transaction that writes the deployment row,
@@ -76,14 +98,14 @@ value: ********
 stored as svs_01KB3F8N2P9S5WQX. not live until the next deploy.
 
 $ zitadel vars list
-NAME                          TYPE    STORED
-GOOGLE_CLIENT_ID              value   prod-abc.apps.googleu…
-GOOGLE_CLIENT_SECRET          secret  svs_01KB…  (set 10-02)
-GOOGLE_CLIENT_ID_PREVIEW      value   preview-xyz.apps.goog…
-GOOGLE_CLIENT_SECRET_PREVIEW  secret  svs_01KB…  (set 09-14)
+NAME                  TYPE    ALL DEPLOYS               PREVIEWS
+GOOGLE_CLIENT_ID      value   prod-abc.apps.googleu…    preview-xyz.apps.goog…
+GOOGLE_CLIENT_SECRET  secret  svs_01KB…WQX  (10-02)     svs_01KB…WQY  (09-14)
+SUPPORT_EMAIL         value   help@acme.com             —
 ```
 
-One list, one value each, answering only "what is stored". What is *running* is
+One row per name, two columns, and `—` reads as "previews get the same value".
+It answers only "what is stored". What is *running* is
 a different question with a different answer per target, so it is a different
 command:
 
@@ -92,41 +114,74 @@ $ zitadel vars resolve --origin https://acme-git-sso-acmeinc.vercel.app
 serving dep_01KB3F8N2P9S5WQZ   deployed 10-02 14:10
 
 NAME                  SERVING NOW                FROM
-GOOGLE_CLIENT_ID      preview-xyz.apps.goog…     bound to GOOGLE_CLIENT_ID_PREVIEW
-GOOGLE_CLIENT_SECRET  svs_01KB…                  bound to GOOGLE_CLIENT_SECRET_PREVIEW
-SUPPORT_EMAIL         help@acme.com              store
+GOOGLE_CLIENT_ID      preview-xyz.apps.goog…     preview override
+GOOGLE_CLIENT_SECRET  svs_01KB…                  preview override
+SUPPORT_EMAIL         help@acme.com              all deploys
 
   SUPPORT_EMAIL changed in the store since this deployment — deploy to apply
 ```
 
 ## How a preview gets different values
 
-A preview on a production project still has to use a different IdP client than
-production. That difference is a property of **the deploy**, not of the project:
-the pipeline creating previews is the thing that knows a preview is being
-created. So the deploy binds a name to a different stored name:
+The value is set once, against the project, and the pipeline is told nothing:
+
+```
+$ zitadel vars set GOOGLE_CLIENT_SECRET --secret --preview
+value: ********
+stored as svs_01KB3F8N2P9S5WQY. applies to previews.
+not live until the next preview deploy.
+```
 
 ```yaml
 - run: zitadel preview --ttl 7d
-         --bind GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID_PREVIEW
-         --bind GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET_PREVIEW
 ```
 
-The snapshot then holds the preview values under the names the release asks for,
-and `app.acme.com` keeps serving the production ones. Same release, same
-project, different credentials.
+The snapshot then holds the preview value under the name the release asks for,
+and `app.acme.com` keeps serving the production one. Same release, same project,
+different credentials.
 
-**A binding names a variable; it never carries a value.** That is what lets the
-narrow preview credential of [Prerequisites](6-cli-commands.md#prerequisites) be
-allowed to bind at all: resolving `GOOGLE_CLIENT_SECRET_PREVIEW` happens
-server-side, so CI never holds the secret and a leaked pipeline token reveals no
-values. A literal override is also allowed, for genuinely per-branch things and
-only for non-secrets: `zitadel preview --var FEATURE_NEW_CONSENT=true`.
+**The deploy request carries no variable names and no values** — a release and
+its targets, nothing else. Every value is resolved server-side, from the store,
+by the verb that asked. Three things follow:
 
-**What this costs.** The mapping repeats in every pipeline that deploys
-previews, where a pattern scope would have stored it once. The trade is one
-authoring model instead of two, visible next to the job that uses it, with no
-server-side rule silently applying to origins nobody is looking at.
+- **There is nothing to forget.** A pipeline cannot deploy a preview carrying
+  production credentials by leaving a flag out, because there is no flag.
+- **The preview credential needs no variable permission at all**, not even the
+  indirection of naming one, so [Prerequisites](6-cli-commands.md#prerequisites)
+  gets narrower rather than wider.
+- **No naming convention.** `GOOGLE_CLIENT_SECRET_PREVIEW` was two names a
+  person had to keep in step; it is one name with two values.
+
+### What this deliberately does not do
+
+- **Per-branch values.** A flag that differs per branch is release content, not
+  a variable: that branch's release already differs, which is where the
+  difference belongs.
+- **Per-origin values.** Two `primary` origins of one project always get the
+  same values. Two hostnames that genuinely need different configuration are two
+  projects — and if that ever stops being true, the answer is a third
+  `applies_to` value, not a flag on the deploy.
+
+### The hole this leaves
+
+Nobody sets an override, so the preview runs the production value and nothing
+says so. That is the one silent failure left, and a line of output closes it
+better than a rule would:
+
+```
+$ zitadel preview --ttl 7d
+origin      https://acme-git-sso-acmeinc.vercel.app
+release     sha256:9f2c1a7b  (exists, reusing)
+
+warning  GOOGLE_CLIENT_SECRET has no preview value — serving the production one
+         set one: zitadel vars set GOOGLE_CLIENT_SECRET --secret --preview
+
+deployed    dep_01KB3F8N2P9S5WQZ
+```
+
+Secrets only. A non-secret falling through to the `all` value is ordinary and
+usually intended; a production client secret reachable from a preview URL is
+worth interrupting a log for.
 
 ## Immutability at runtime
 
@@ -190,6 +245,9 @@ indexes and a JSON column in three dialects does not.
 - **A deploy may carry only a variable change.** Same release, new deployment
   row, so the history shows one digest twice with different snapshots. That is
   the fix for a wrong value: a deploy, not an edit.
+- **Setting an override is the same permission as setting any value.** One
+  table, one `variable.write`; anyone who can write the `all` row can already do
+  worse than write the `preview` one.
 - **Variables never move onto the release.** The same release has to run with
   different values on different origins, which is the preview case above.
 

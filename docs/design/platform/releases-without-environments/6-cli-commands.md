@@ -139,7 +139,7 @@ credential, and that is the part still to solve.
 | Runs in | the production job, after merge | a PR job, unreviewed branch |
 | Allowlist patterns | read-only — `zitadel allowlist` is its own command | read-only |
 | Project class | may change | may not |
-| Variables | may set | may not |
+| Variables | may set | may not — and sends none |
 | Origin rows | `primary` | creates or renews one `preview` row |
 
 So the first preview on a branch needing a brand-new pattern fails with
@@ -202,9 +202,14 @@ running; the transcripts are under
 [Variables](3-variables.md#setting-one). Two commands because they answer two
 questions, and conflating them is how "I set it and nothing happened" happens.
 
+`set --preview` stores the value a preview deploy prefers. That is the only
+targeting the CLI offers, and no deploy command takes a variable flag of any
+kind — [how a preview gets different values](3-variables.md#how-a-preview-gets-different-values).
+
 ```
-$ zitadel vars rm GOOGLE_CLIENT_ID_PREVIEW
-removed from the store. 2 deployments still reference it; they are unaffected.
+$ zitadel vars rm GOOGLE_CLIENT_SECRET --preview
+removed the preview value; previews now serve the production one.
+2 deployments still reference svs_01KB…WQY; they are unaffected.
 ```
 
 Removing from the store never reaches a snapshot, which is the whole point of
