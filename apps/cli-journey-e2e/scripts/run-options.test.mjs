@@ -54,23 +54,20 @@ test("local journey can select one framework and tune concurrency", () => {
 });
 
 test("local journey can scaffold with a sign-in preset", () => {
-  assert.deepEqual(
-    parseLocalJourneyArgs(["--framework", "next", "--preset", "passkey-first"]),
-    {
-      ci: false,
-      concurrency: 5,
-      frameworkIds: ["next"],
-      image: "",
-      keep: false,
-      matrix: "full",
-      preexistingApp: false,
-      preset: "passkey-first",
-      runtime: "binary",
-      suite: "frameworks",
-      tarballsDir: "",
-      workDir: "",
-    },
-  );
+  assert.deepEqual(parseLocalJourneyArgs(["--framework", "next", "--preset", "passkey-first"]), {
+    ci: false,
+    concurrency: 5,
+    frameworkIds: ["next"],
+    image: "",
+    keep: false,
+    matrix: "full",
+    preexistingApp: false,
+    preset: "passkey-first",
+    runtime: "binary",
+    suite: "frameworks",
+    tarballsDir: "",
+    workDir: "",
+  });
   assert.throws(() => parseLocalJourneyArgs(["--preset"]), /requires a value/);
 });
 
@@ -178,6 +175,9 @@ test("local journey rejects invalid options", () => {
   assert.throws(() => parseLocalJourneyArgs(["--image"]), /requires a value/);
   assert.throws(() => parseLocalJourneyArgs(["--tarballs-dir"]), /requires a value/);
   assert.throws(() => parseLocalJourneyArgs(["--runtime", "podman"]), /binary or docker/);
-  assert.throws(() => parseLocalJourneyArgs(["--image", "test", "--runtime", "binary"]), /requires --runtime docker/);
+  assert.throws(
+    () => parseLocalJourneyArgs(["--image", "test", "--runtime", "binary"]),
+    /requires --runtime docker/,
+  );
   assert.throws(() => parseLocalJourneyArgs(["--unknown"]), /unknown argument/);
 });

@@ -192,7 +192,9 @@ describe("bodyFromFlags", () => {
   });
 
   it("allows keys that merely mention a safe word", () => {
-    expect(bodyFromFlags(userFields, { attributes: ["passwordless=true", "tokenizer=v2"] })).toEqual({
+    expect(
+      bodyFromFlags(userFields, { attributes: ["passwordless=true", "tokenizer=v2"] }),
+    ).toEqual({
       attributes: { passwordless: "true", tokenizer: "v2" },
     });
   });

@@ -258,11 +258,7 @@ export abstract class BaseCommand extends Command {
       return false;
     }
     const argv = process.argv;
-    if (
-      argv.includes("--json") ||
-      argv.includes("--non-interactive") ||
-      argv.includes("-n")
-    ) {
+    if (argv.includes("--json") || argv.includes("--non-interactive") || argv.includes("-n")) {
       return false;
     }
     return Boolean(process.stdout.isTTY && process.stdin.isTTY);

@@ -91,9 +91,7 @@ function wrap(
  * caller's business — only {@link passwordStep} and
  * {@link registerPasswordStep} ask.
  */
-function collectedIdentifier(
-  input: StepFixtureInput,
-): CreateFlow201Step["identifier"] | undefined {
+function collectedIdentifier(input: StepFixtureInput): CreateFlow201Step["identifier"] | undefined {
   if (!input.capturedEmail) return undefined;
   return { value: input.capturedEmail, autocomplete: "username" };
 }

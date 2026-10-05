@@ -640,7 +640,9 @@ export function assertEnvelope(result: CliResult, args: string[] = []): void {
  */
 export async function anApp({
   nextVersion = "^16.0.0",
-}: { nextVersion?: string } = {}): Promise<ScaffoldedApp> {
+}: {
+  nextVersion?: string;
+} = {}): Promise<ScaffoldedApp> {
   const path = await mkdtemp(join(tmpdir(), "zitadel-next-"));
   onTestFinished(() => rm(path, { recursive: true, force: true }));
 

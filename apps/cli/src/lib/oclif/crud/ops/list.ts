@@ -88,9 +88,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
       description: `List ${topic}.${spec.drains === true ? " Fetches every page unless --limit or --page-token asks for one." : ""}`,
       examples: [
         `<%= config.bin %> ${topic} list --json`,
-        ...(paged && spec.drains !== true
-          ? [`<%= config.bin %> ${topic} list --all --json`]
-          : []),
+        ...(paged && spec.drains !== true ? [`<%= config.bin %> ${topic} list --all --json`] : []),
         ...(filters[0]
           ? [
               `<%= config.bin %> ${topic} list --filter ${filters[0].field}=${filters[0].operations[0]}:<value>${sorts[0] ? ` --sort ${sorts[0]}:desc` : ""}`,
@@ -194,8 +192,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
         items: spec.items,
         all,
         nextPageToken: wire.nextPageToken,
-        token:
-          paged && typeof flags["page-token"] === "string" ? flags["page-token"] : undefined,
+        token: paged && typeof flags["page-token"] === "string" ? flags["page-token"] : undefined,
       },
     )
       .then((page) => {
@@ -222,9 +219,12 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
       next && !all
         ? [
             publicCliCommand(
-              [`${topic} list`, ...repeatedFlags(flags), `--page-token ${shellArg(next)}`, "--json"].join(
-                " ",
-              ),
+              [
+                `${topic} list`,
+                ...repeatedFlags(flags),
+                `--page-token ${shellArg(next)}`,
+                "--json",
+              ].join(" "),
               meta.cliVersion,
             ),
           ]
@@ -269,8 +269,6 @@ const repeatedFlags = (flags: Json): readonly string[] => {
 const shellArg = (value: string): string =>
   /^[A-Za-z0-9_.:@/=+-]+$/.test(value) ? value : `'${value.replaceAll("'", `'\\''`)}'`;
 
-
-
 /**
  * Parsed filters as the flat query parameters a GET list expects. A field
  * names the parameter each of its operations travels as, and a field whose
@@ -285,6 +283,10 @@ const queryParams = (parsed: readonly ParsedFilter[]): Json =>
     }
     return {
       ...params,
-      [key]: Array.isArray(existing) ? [...existing, value] : existing === undefined ? [value] : [existing, value],
+      [key]: Array.isArray(existing)
+        ? [...existing, value]
+        : existing === undefined
+          ? [value]
+          : [existing, value],
     };
   }, {});

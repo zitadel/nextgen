@@ -147,9 +147,7 @@ describe("flowAction / flowField", () => {
     expect(desc(flowAction(fake.page, "line\nbreak"))).toContain(
       'css:zl-button[action="line\\a break"]',
     );
-    expect(desc(flowAction(fake.page, "nul\0mid"))).toContain(
-      'css:zl-button[action="nul�mid"]',
-    );
+    expect(desc(flowAction(fake.page, "nul\0mid"))).toContain('css:zl-button[action="nul�mid"]');
     expect(desc(flowAction(fake.page, "del\x7Fend"))).toContain(
       'css:zl-button[action="del\\7f end"]',
     );
@@ -243,8 +241,7 @@ describe("registration ceremonies", () => {
     // Password visible on the entry step: submitting would attempt a
     // password sign-in, so the ceremony must use the register navigation.
     const fake = fakePage(
-      (target) =>
-        target.includes("zitadel-input-password") || target.includes("passkey_register"),
+      (target) => target.includes("zitadel-input-password") || target.includes("passkey_register"),
     );
     await registerWithPasskey(fake.page, { email: "new@example.test" });
 
@@ -291,8 +288,8 @@ describe("registration ceremonies", () => {
 
   it("fails loudly when the registration step never renders", async () => {
     const fake = fakePage(() => false);
-    await expect(
-      registerWithPasskey(fake.page, { email: "new@example.test" }),
-    ).rejects.toThrow(/timeout waiting for/);
+    await expect(registerWithPasskey(fake.page, { email: "new@example.test" })).rejects.toThrow(
+      /timeout waiting for/,
+    );
   });
 });

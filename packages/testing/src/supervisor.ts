@@ -8,7 +8,11 @@ import { access, rm } from "node:fs/promises";
 
 import { writeHandshake } from "./handshake";
 import { startLocalZitadel } from "./index";
-import { parseSupervisorConfig, requireHandshakePath, SUPERVISOR_CONFIG_ENV } from "./orchestration";
+import {
+  parseSupervisorConfig,
+  requireHandshakePath,
+  SUPERVISOR_CONFIG_ENV,
+} from "./orchestration";
 import type { LocalZitadel } from "./types";
 
 const LOG = "[zitadel-testing]";

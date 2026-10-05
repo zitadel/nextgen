@@ -20,13 +20,11 @@ describe("parseFilter", () => {
   });
 
   it("splits an explicit operation from the value", () => {
-    expect(parseFilter("created_at=greater_than:2026-01-01T00:00:00Z", FIELDS)).toEqual(
-      {
+    expect(parseFilter("created_at=greater_than:2026-01-01T00:00:00Z", FIELDS)).toEqual({
       field: expect.objectContaining({ field: "created_at" }),
       operation: "greater_than",
       value: "2026-01-01T00:00:00Z",
-    },
-    );
+    });
   });
 
   it("keeps colons inside the value once the operation is consumed", () => {
@@ -103,7 +101,10 @@ describe("parseSort", () => {
 
   it("refuses a trailing segment rather than sorting on a guess", () => {
     expect(() => parseSort("created_at:desc:typo", SORTS)).toThrowError(
-      expect.objectContaining({ code: "E_VALIDATION", message: 'Invalid --sort "created_at:desc:typo"' }),
+      expect.objectContaining({
+        code: "E_VALIDATION",
+        message: 'Invalid --sort "created_at:desc:typo"',
+      }),
     );
   });
 

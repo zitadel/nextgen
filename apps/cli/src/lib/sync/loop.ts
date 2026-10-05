@@ -393,7 +393,12 @@ export async function runSyncLoop(
           hash: await writeBack(action, canonical, fallbackHash),
         });
         consola.info(`Updated the ${action.syncer.kind} on Zitadel from ${action.path}`);
-        applied.push({ kind: action.syncer.kind, action: "update", file: action.path, id: trackedId });
+        applied.push({
+          kind: action.syncer.kind,
+          action: "update",
+          file: action.path,
+          id: trackedId,
+        });
         break;
       }
       case "delete": {
@@ -402,7 +407,12 @@ export async function runSyncLoop(
         consola.info(
           `Deleted the ${action.syncer.kind} on Zitadel because ${action.path} was removed locally`,
         );
-        applied.push({ kind: action.syncer.kind, action: "delete", file: action.path, id: action.id });
+        applied.push({
+          kind: action.syncer.kind,
+          action: "delete",
+          file: action.path,
+          id: action.id,
+        });
         break;
       }
       case "skip": {
@@ -608,10 +618,7 @@ export function hashResourceContent(data: object): string {
  * reordering keys or spelling out a meta-schema default does not read as an
  * edit.
  */
-export function hashForState(
-  syncer: Pick<ResourceSyncer, "normalize">,
-  data: object,
-): string {
+export function hashForState(syncer: Pick<ResourceSyncer, "normalize">, data: object): string {
   const normalized = syncer.normalize?.(data) ?? data;
   return createHash("sha256").update(stableStringify(normalized)).digest("hex");
 }

@@ -32,9 +32,7 @@ const identifierStep: CreateFlow201 = {
   step: {
     name: "identifier",
     texts: { title_key: "identifier.title" },
-    fields: [
-      { name: "email", type: "email", text_key: "identifier.field.email", required: true },
-    ],
+    fields: [{ name: "email", type: "email", text_key: "identifier.field.email", required: true }],
     actions: [{ name: "submit", kind: "submit", text_key: "submit.continue", primary: true }],
     gates: {},
   },
@@ -137,9 +135,7 @@ describe("<zitadel-login> host-app customisation (chromium)", () => {
     const element = await mount(identifierStep);
 
     // On the host element itself.
-    expect(getComputedStyle(element).getPropertyValue("--zl-foreground")).toBe(
-      HOST_RED,
-    );
+    expect(getComputedStyle(element).getPropertyValue("--zl-foreground")).toBe(HOST_RED);
     // Boundary 1: chrome the orchestrator renders in its own shadow root.
     const title = element.shadowRoot?.querySelector(".zl-card-title") as HTMLElement;
     expect(title).toBeTruthy();

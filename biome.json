@@ -12,12 +12,32 @@
       "!**/*.gen.ts",
       "!**/*.d.ts",
       "!**/*.css",
+      "!**/*.json",
+      "!**/*.jsonc",
+      "!**/*.svelte",
+      "!**/*.vue",
       "!**/mockServiceWorker.js",
       "!**/generated",
       "!**/dist",
       "!**/out-tsc",
       "!**/.nuxt-typecheck"
     ]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 100,
+    "lineEnding": "lf"
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "double",
+      "semicolons": "always",
+      "trailingCommas": "all",
+      "bracketSpacing": true,
+      "arrowParentheses": "always"
+    }
   },
   "linter": {
     "enabled": true,
@@ -51,9 +71,6 @@
         "useIterableCallbackReturn": "warn"
       }
     }
-  },
-  "formatter": {
-    "enabled": false
   },
   "assist": {
     "enabled": false

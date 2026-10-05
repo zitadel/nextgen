@@ -42,12 +42,7 @@ import {
   type RuntimeBackend,
   type RuntimeMetadata,
 } from "../lib/local-server/runtime";
-import {
-  BaseCommand,
-  CommandGroups,
-  type JsonEnvelope,
-  nonBlankString,
-} from "../lib/oclif";
+import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../lib/oclif";
 import { listenersForPort, type TcpListener } from "../lib/prober/ports";
 import { publicCliCommand } from "../lib/public-cli";
 
@@ -182,7 +177,12 @@ export default class Start extends BaseCommand {
       await writeRuntimeMetadata(this.meta.cwd, metadata);
       return this.emit({
         status: "ok",
-        data: readyData(metadata, false, this.meta.cliVersion, await consoleLoginFor(serverUrl, local?.admin)),
+        data: readyData(
+          metadata,
+          false,
+          this.meta.cliVersion,
+          await consoleLoginFor(serverUrl, local?.admin),
+        ),
       });
     }
 
@@ -211,7 +211,12 @@ export default class Start extends BaseCommand {
       await writeRuntimeMetadata(this.meta.cwd, metadata);
       return this.emit({
         status: "ok",
-        data: readyData(metadata, true, this.meta.cliVersion, await consoleLoginFor(serverUrl, local?.admin)),
+        data: readyData(
+          metadata,
+          true,
+          this.meta.cliVersion,
+          await consoleLoginFor(serverUrl, local?.admin),
+        ),
       });
     }
 
@@ -248,7 +253,12 @@ export default class Start extends BaseCommand {
     await writeRuntimeMetadata(this.meta.cwd, metadata);
     return this.emit({
       status: "ok",
-      data: readyData(metadata, false, this.meta.cliVersion, await consoleLoginFor(serverUrl, local?.admin)),
+      data: readyData(
+        metadata,
+        false,
+        this.meta.cliVersion,
+        await consoleLoginFor(serverUrl, local?.admin),
+      ),
     });
   }
 }
@@ -464,14 +474,18 @@ async function serverExitedError(
   logPath: string | undefined,
 ): Promise<ZitadelError> {
   const logTail = logPath ? await binaryLogs(logPath, 40) : undefined;
-  return new ZitadelError("E_NETWORK", "Local Zitadel server process exited before becoming healthy", {
-    hint: "Inspect the local runtime logs, then retry after fixing the startup error.",
-    nextCommands: [
-      publicCliCommand("logs", cliVersion),
-      publicCliCommand("reset --force", cliVersion),
-    ],
-    details: { ...details, server_url: serverUrl, ...(logTail ? { log_tail: logTail } : {}) },
-  });
+  return new ZitadelError(
+    "E_NETWORK",
+    "Local Zitadel server process exited before becoming healthy",
+    {
+      hint: "Inspect the local runtime logs, then retry after fixing the startup error.",
+      nextCommands: [
+        publicCliCommand("logs", cliVersion),
+        publicCliCommand("reset --force", cliVersion),
+      ],
+      details: { ...details, server_url: serverUrl, ...(logTail ? { log_tail: logTail } : {}) },
+    },
+  );
 }
 
 function validatePort(port: number): void {

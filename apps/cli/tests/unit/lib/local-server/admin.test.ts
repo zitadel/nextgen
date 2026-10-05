@@ -73,7 +73,13 @@ describe("local admin", () => {
 
     const [, id, rounds, salt, hash] = doc.authenticators.password.encoded_hash.split("$");
     expect(id).toBe("pbkdf2-sha256");
-    const recomputed = pbkdf2Sync(admin.password, ab64Decode(salt ?? ""), Number(rounds), 32, "sha256");
+    const recomputed = pbkdf2Sync(
+      admin.password,
+      ab64Decode(salt ?? ""),
+      Number(rounds),
+      32,
+      "sha256",
+    );
     expect(recomputed.equals(ab64Decode(hash ?? ""))).toBe(true);
     expect(doc.authenticators.password.change_required).toBe(false);
   });
@@ -96,18 +102,21 @@ describe("local admin", () => {
 
   // A credential that exists but cannot be read is still the one the server
   // imported; minting a replacement would split the password in two.
-  it.skipIf(process.getuid?.() === 0)("refuses an unreadable credential instead of replacing it", async () => {
-    const cwd = await tempCwd();
-    const { admin } = await ensureLocalAdmin(cwd);
-    await chmod(join(cwd, LOCAL_ADMIN_FILE), 0o000);
+  it.skipIf(process.getuid?.() === 0)(
+    "refuses an unreadable credential instead of replacing it",
+    async () => {
+      const cwd = await tempCwd();
+      const { admin } = await ensureLocalAdmin(cwd);
+      await chmod(join(cwd, LOCAL_ADMIN_FILE), 0o000);
 
-    try {
-      await expect(ensureLocalAdmin(cwd)).rejects.toThrow(/cannot be read/);
-    } finally {
-      await chmod(join(cwd, LOCAL_ADMIN_FILE), 0o600);
-    }
-    expect(await readLocalAdmin(cwd)).toEqual(admin);
-  });
+      try {
+        await expect(ensureLocalAdmin(cwd)).rejects.toThrow(/cannot be read/);
+      } finally {
+        await chmod(join(cwd, LOCAL_ADMIN_FILE), 0o600);
+      }
+      expect(await readLocalAdmin(cwd)).toEqual(admin);
+    },
+  );
 
   it("names the schema under the server's configured schema base", async () => {
     const cwd = await tempCwd();
@@ -115,7 +124,9 @@ describe("local admin", () => {
     const { userFile } = await ensureLocalAdmin(cwd, "https://schemas.example.test/api/schemas/");
 
     const doc = JSON.parse(await readFile(userFile, "utf8")) as { header: { schema_url: string } };
-    expect(doc.header.schema_url).toBe("https://schemas.example.test/api/schemas/default-human-user.json");
+    expect(doc.header.schema_url).toBe(
+      "https://schemas.example.test/api/schemas/default-human-user.json",
+    );
   });
 
   it("replaces the bootstrap document without leaving a staging file behind", async () => {

@@ -232,20 +232,20 @@ export function queryAffectedTargets(base, spawn = spawnSync) {
       Object.keys(projectTasks).map((task) => `${project}:${task}`),
     );
   } catch {
-    console.error(
-      `# moon query returned non-JSON stdout: ${String(result.stdout).slice(0, 200)}`,
-    );
+    console.error(`# moon query returned non-JSON stdout: ${String(result.stdout).slice(0, 200)}`);
     return null;
   }
 }
 
 function isVersionOutputFile(file) {
-  return file === "pnpm-lock.yaml" ||
+  return (
+    file === "pnpm-lock.yaml" ||
     file === ".changeset/pre.json" ||
     file === ".changeset/config.json" ||
     file.startsWith(".changeset/") ||
     file.endsWith("/package.json") ||
-    file.endsWith("/CHANGELOG.md");
+    file.endsWith("/CHANGELOG.md")
+  );
 }
 
 function main() {

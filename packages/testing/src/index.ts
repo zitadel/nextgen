@@ -7,8 +7,7 @@ import { identity, seedUser, seedUsers } from "./seed";
 import { mintSession } from "./session";
 import type { ConnectedZitadel, InstanceHandle, LocalZitadel } from "./types";
 
-export type StartLocalZitadelOptions = BootServerOptions &
-  Omit<BootstrapProjectOptions, "baseUrl">;
+export type StartLocalZitadelOptions = BootServerOptions & Omit<BootstrapProjectOptions, "baseUrl">;
 
 /**
  * Attach to an already-bootstrapped instance/project. Lifecycle-free on

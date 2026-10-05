@@ -2,12 +2,7 @@ import { createHash } from "node:crypto";
 
 import { escapeControlCharacters } from "../api-client";
 import { stableStringify } from "../json";
-import type {
-  ResourceSyncer,
-  SyncAction,
-  SyncActionWarning,
-  SyncPlanSummary,
-} from "./types.js";
+import type { ResourceSyncer, SyncAction, SyncActionWarning, SyncPlanSummary } from "./types.js";
 
 /**
  * Count the non-`skip` actions in a {@link buildSyncPlan} result. Pure; the
@@ -73,9 +68,7 @@ export type PlanResourceChange = {
  * envelope-ready {@link PlanResourceChange} rows. Pure; the structural
  * counterpart of {@link summarizePlan} — counts and rows always agree.
  */
-export function enumeratePlanResources(
-  actions: ReadonlyArray<SyncAction>,
-): PlanResourceChange[] {
+export function enumeratePlanResources(actions: ReadonlyArray<SyncAction>): PlanResourceChange[] {
   const out: PlanResourceChange[] = [];
   for (const action of actions) {
     switch (action.kind) {
@@ -116,11 +109,7 @@ export function renderPlan(actions: ReadonlyArray<SyncAction>, tty: boolean): st
   const active = actions.filter((a) => a.kind !== "skip");
 
   if (active.length === 0) {
-    return paint(
-      "No changes. Your Zitadel configuration matches the current state.",
-      A.bold,
-      tty,
-    );
+    return paint("No changes. Your Zitadel configuration matches the current state.", A.bold, tty);
   }
 
   const out: string[] = [];

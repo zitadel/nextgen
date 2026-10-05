@@ -39,5 +39,8 @@ const MAX_WRAPPER_DEPTH = 10;
  * the type that decides how the field is rendered rather than the `optional`
  * that happens to enclose it.
  */
-export const unwrap = (schema: ZodLike | undefined, depth = MAX_WRAPPER_DEPTH): ZodLike | undefined =>
+export const unwrap = (
+  schema: ZodLike | undefined,
+  depth = MAX_WRAPPER_DEPTH,
+): ZodLike | undefined =>
   schema?.def?.innerType && depth > 0 ? unwrap(schema.def.innerType, depth - 1) : schema;

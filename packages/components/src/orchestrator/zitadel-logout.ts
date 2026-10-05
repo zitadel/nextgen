@@ -446,8 +446,9 @@ export class ZitadelLogout extends LitElement {
         ${this.initial}
       </button>
 
-      ${this.open
-        ? html`
+      ${
+        this.open
+          ? html`
             <div class="dropdown" role="dialog" aria-label="User menu">
               <div class="preview">
                 <div class="preview-avatar" aria-hidden="true">${this.initial}</div>
@@ -455,9 +456,11 @@ export class ZitadelLogout extends LitElement {
                   <div class="preview-name">
                     ${this.userDisplay || this.userIdentifier || this.userId}
                   </div>
-                  ${this.userDisplay && this.userIdentifier
-                    ? html`<div class="preview-email">${this.userIdentifier}</div>`
-                    : nothing}
+                  ${
+                    this.userDisplay && this.userIdentifier
+                      ? html`<div class="preview-email">${this.userIdentifier}</div>`
+                      : nothing
+                  }
                 </div>
               </div>
 
@@ -468,9 +471,10 @@ export class ZitadelLogout extends LitElement {
                   ?disabled=${this.loading}
                   @click=${this.handleSignOutClick}
                 >
-                  ${this.loading
-                    ? html`<span class="spinner" aria-hidden="true"></span>`
-                    : html`
+                  ${
+                    this.loading
+                      ? html`<span class="spinner" aria-hidden="true"></span>`
+                      : html`
                         <svg
                           width="14"
                           height="14"
@@ -486,17 +490,21 @@ export class ZitadelLogout extends LitElement {
                           <polyline points="16 17 21 12 16 7" />
                           <line x1="21" y1="12" x2="9" y2="12" />
                         </svg>
-                      `}
+                      `
+                  }
                   <span>${this.loading ? "Signing out…" : "Sign out"}</span>
                 </button>
               </div>
 
-              ${this.errorMessage
-                ? html`<div class="error-bar" role="alert">${this.errorMessage}</div>`
-                : nothing}
+              ${
+                this.errorMessage
+                  ? html`<div class="error-bar" role="alert">${this.errorMessage}</div>`
+                  : nothing
+              }
             </div>
           `
-        : nothing}
+          : nothing
+      }
     `;
   }
 }

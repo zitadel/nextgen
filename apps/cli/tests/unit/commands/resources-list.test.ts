@@ -101,9 +101,8 @@ describe("zitadel resources", () => {
     // agent knows `schemas list` is the current schemas rather than every
     // revision.
     expect(
-      resources
-        .find((r) => r.topic === "schemas")
-        ?.filters?.find((f) => f.field === "revisions")?.default,
+      resources.find((r) => r.topic === "schemas")?.filters?.find((f) => f.field === "revisions")
+        ?.default,
     ).toBe("latest");
   });
 

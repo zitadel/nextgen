@@ -31,7 +31,9 @@ export default class Console extends BaseCommand {
   ];
 
   static override flags = {
-    "no-open": Flags.boolean({ description: "Print the sign-in link instead of opening a browser." }),
+    "no-open": Flags.boolean({
+      description: "Print the sign-in link instead of opening a browser.",
+    }),
   };
 
   async run(): Promise<JsonEnvelope> {
@@ -84,9 +86,7 @@ export default class Console extends BaseCommand {
         signed_in_as: admin.email,
         sign_in_url: signInUrl,
         browser_opened: opened,
-        next_actions: [
-          "The link signs you in once. Run `zitadel console` again for a fresh one.",
-        ],
+        next_actions: ["The link signs you in once. Run `zitadel console` again for a fresh one."],
       },
     });
   }

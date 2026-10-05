@@ -200,10 +200,6 @@ export function reportSecretOutcome(
  * A missing one is never "no value yet": the command refuses without a client
  * id, so the only way here is a project it could not reach.
  */
-export function reportClientIdOutcome(
-  name: string,
-  state: PublishState,
-  cliVersion: string,
-): void {
+export function reportClientIdOutcome(name: string, state: PublishState, cliVersion: string): void {
   reportPublished(name, state, republishCommand(name, false, cliVersion), false);
 }

@@ -183,7 +183,10 @@ async function journeyMetadataOrSkip(): Promise<JourneyMetadata & { localRuntime
   const metadata = JSON.parse(
     await readFile(join(requiredEnv("JOURNEY_OUTPUT_DIR"), "metadata.json"), "utf8"),
   ) as JourneyMetadata;
-  test.skip(metadata.framework !== "next", "local ownership is framework-independent; next lane only");
+  test.skip(
+    metadata.framework !== "next",
+    "local ownership is framework-independent; next lane only",
+  );
   test.skip(
     process.env.JOURNEY_PREEXISTING_APP === "1",
     "the fresh-app lane already proves local ownership; keep the preexisting lane lean",

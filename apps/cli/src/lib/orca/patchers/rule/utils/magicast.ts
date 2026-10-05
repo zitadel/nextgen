@@ -37,9 +37,13 @@ export function parseConfigModule(
   // the parsed AST for a real `module.exports`/`exports.x` assignment — scanning
   // raw text would false-positive on the same string in a comment or literal.
   if (hasCommonJsExport(mod)) {
-    throw new ZitadelError("E_VALIDATION", `${filename} is a CommonJS module, which can't be edited`, {
-      hint: `The Zitadel edits use ESM imports. Convert the config to ESM (a .ts/.mts file, or set "type": "module"), or add the Zitadel block manually.`,
-    });
+    throw new ZitadelError(
+      "E_VALIDATION",
+      `${filename} is a CommonJS module, which can't be edited`,
+      {
+        hint: `The Zitadel edits use ESM imports. Convert the config to ESM (a .ts/.mts file, or set "type": "module"), or add the Zitadel block manually.`,
+      },
+    );
   }
   return mod;
 }
@@ -70,7 +74,11 @@ function hasCommonJsExport(mod: any): boolean {
       return true;
     }
     // `module.exports = …`
-    if (object?.type === "Identifier" && object.name === "module" && left.property?.name === "exports") {
+    if (
+      object?.type === "Identifier" &&
+      object.name === "module" &&
+      left.property?.name === "exports"
+    ) {
       return true;
     }
     // `module.exports.x = …`

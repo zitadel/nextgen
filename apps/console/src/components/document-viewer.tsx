@@ -39,9 +39,7 @@ export function DocumentViewer({ document, noun }: { document: unknown; noun: st
 
   const source = useMemo(
     () =>
-      format === "yaml"
-        ? stringifyYaml(document, YAML_OPTIONS)
-        : JSON.stringify(document, null, 2),
+      format === "yaml" ? stringifyYaml(document, YAML_OPTIONS) : JSON.stringify(document, null, 2),
     [document, format],
   );
   const lines = useHighlighted(source, format);

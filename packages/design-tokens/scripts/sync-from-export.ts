@@ -248,7 +248,8 @@ function findMode(c: ParsedCollection, wanted: string): string {
 /** The leaves a collection declared for `wanted` (`"light"`, `"dark"`). */
 function leavesForMode(c: ParsedCollection, wanted: string): Map<string, Raw> {
   const leaves = c.leaves.get(findMode(c, wanted));
-  if (!leaves) throw new Error(`Collection ${c.name} declared a ${wanted} mode but exported no leaves for it`);
+  if (!leaves)
+    throw new Error(`Collection ${c.name} declared a ${wanted} mode but exported no leaves for it`);
   return leaves;
 }
 
@@ -315,7 +316,10 @@ function resolveThemedPairs(
  * `color.<name> = {dark,light}` from the `base` group only, skipping any leaf
  * that does not resolve to a hex colour.
  */
-function buildColorSurface(theme: ParsedCollection, registry: Registry): Record<string, ThemedColor> {
+function buildColorSurface(
+  theme: ParsedCollection,
+  registry: Registry,
+): Record<string, ThemedColor> {
   const paths = [...leavesForMode(theme, "light").keys()].filter((p) => p.startsWith("base."));
   // `base.sidebar-accent` -> `sidebar-accent`; `base.chart-1` -> `chart-1`.
   const entries = paths.map((path) => ({ path, name: kebab(path.split(".").slice(1)) }));
@@ -330,7 +334,10 @@ function buildColorSurface(theme: ParsedCollection, registry: Registry): Record<
  * variable names, so `build.ts` maps the ones we consume onto semantic names of
  * our own. Kept keyed by the raw Figma name here so that mapping is explicit.
  */
-function buildCustomSurface(theme: ParsedCollection, registry: Registry): Record<string, ThemedColor> {
+function buildCustomSurface(
+  theme: ParsedCollection,
+  registry: Registry,
+): Record<string, ThemedColor> {
   const paths = [...leavesForMode(theme, "light").keys()].filter((p) => p.startsWith("custom."));
   const entries = paths.map((path) => ({ path, name: path.slice("custom.".length) }));
   return resolveThemedPairs(theme, registry, entries).pairs;
@@ -371,7 +378,9 @@ function buildThemedGroups(
 
 /** Nest a dotted path into `target`, camel-casing each segment. */
 function setNested(target: Record<string, unknown>, path: string, value: Raw): void {
-  const parts = path.split(".").map((p) => p.replace(/-([a-z0-9])/g, (_, ch: string) => ch.toUpperCase()));
+  const parts = path
+    .split(".")
+    .map((p) => p.replace(/-([a-z0-9])/g, (_, ch: string) => ch.toUpperCase()));
   let cursor = target;
   for (let i = 0; i < parts.length - 1; i += 1) {
     const key = parts[i]!;
@@ -389,7 +398,11 @@ function setNested(target: Record<string, unknown>, path: string, value: Raw): v
  * `15`, indistinguishable from a real `15` step and neighbouring a `16` step
  * worth 4rem. Step names are data here, not identifiers.
  */
-function buildFlatGroup(group: string, source: Map<string, Raw>, registry: Registry): Record<string, unknown> {
+function buildFlatGroup(
+  group: string,
+  source: Map<string, Raw>,
+  registry: Registry,
+): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   const prefix = `${group}.`;
   for (const path of source.keys()) {
@@ -400,7 +413,11 @@ function buildFlatGroup(group: string, source: Map<string, Raw>, registry: Regis
 }
 
 /** Project a single-mode group (e.g. `radius`, `text`) into a resolved tree. */
-function buildGroup(group: string, singleMode: Map<string, Raw>, registry: Registry): Record<string, unknown> {
+function buildGroup(
+  group: string,
+  singleMode: Map<string, Raw>,
+  registry: Registry,
+): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   const prefix = `${group}.`;
   for (const path of singleMode.keys()) {
@@ -503,7 +520,9 @@ export function syncTokens(
     if (Object.keys(groups).length === 0) {
       throw new Error(
         `Themed collection ${c.name} (${c.file}) produced no colours` +
-          (skipped.length > 0 ? `; no leaf resolved to a hex in both modes (${skipped.join(", ")})` : ""),
+          (skipped.length > 0
+            ? `; no leaf resolved to a hex in both modes (${skipped.join(", ")})`
+            : ""),
       );
     }
     for (const [group, entries] of Object.entries(groups)) {
@@ -589,7 +608,9 @@ async function main(): Promise<void> {
 
   const out = syncTokens(files);
   await writeFile(TOKENS_FILE, `${JSON.stringify(out, null, 2)}\n`);
-  const themedGroups = Object.entries(out.themed).map(([g, e]) => `${g} (${Object.keys(e).length})`);
+  const themedGroups = Object.entries(out.themed).map(
+    ([g, e]) => `${g} (${Object.keys(e).length})`,
+  );
   // eslint-disable-next-line no-console
   console.log(
     `design-tokens sync-export: resolved ${out.$source.resolvedLeaves} leaves across ${out.$source.collections.length} collections; ` +
@@ -613,7 +634,9 @@ async function main(): Promise<void> {
     );
   }
   // eslint-disable-next-line no-console
-  console.warn("Now run `moon run design-tokens:generate` and review the tokens.snapshot.spec.ts diff.");
+  console.warn(
+    "Now run `moon run design-tokens:generate` and review the tokens.snapshot.spec.ts diff.",
+  );
 }
 
 // Only run the filesystem sync when invoked directly (`tsx sync-from-export.ts`),

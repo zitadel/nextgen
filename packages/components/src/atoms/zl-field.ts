@@ -53,10 +53,7 @@ export class ZlField extends LitElement {
     delegatesFocus: true,
   };
 
-  static override styles = [
-    baseHostStyles,
-    ...surfaceStyles(fieldStyles),
-  ];
+  static override styles = [baseHostStyles, ...surfaceStyles(fieldStyles)];
 
   /**
    * Field name — used as the key in form submission and in `zl-input` event
@@ -176,8 +173,7 @@ export class ZlField extends LitElement {
       "zr-field--success": showSuccess,
       "zr-field--disabled": this.disabled,
     });
-    const showDefaultTrailing =
-      this.trailingIcon && !this.hasSuffixSlot && !this.disabled;
+    const showDefaultTrailing = this.trailingIcon && !this.hasSuffixSlot && !this.disabled;
     const trailing = showDefaultTrailing ? this.renderTrailingIcon() : null;
     const wrapClass = classMap({
       "zr-field__wrap": true,
@@ -239,9 +235,11 @@ export class ZlField extends LitElement {
         <div class="zr-field__label-row" part="label-row">
           <label class="zr-field__label" part="label" id=${labelId} for=${this.inputId}>
             <span>${this.label}</span>
-            ${this.required
-              ? html`<span class="zr-field__required" aria-hidden="true">*</span>`
-              : null}
+            ${
+              this.required
+                ? html`<span class="zr-field__required" aria-hidden="true">*</span>`
+                : null
+            }
           </label>
           <a
             class="zr-field__link"
@@ -256,9 +254,7 @@ export class ZlField extends LitElement {
     return html`
       <label class="zr-field__label" part="label" id=${labelId} for=${this.inputId}>
         <span>${this.label}</span>
-        ${this.required
-          ? html`<span class="zr-field__required" aria-hidden="true">*</span>`
-          : null}
+        ${this.required ? html`<span class="zr-field__required" aria-hidden="true">*</span>` : null}
       </label>
     `;
   }

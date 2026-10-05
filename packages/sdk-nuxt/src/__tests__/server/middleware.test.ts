@@ -96,7 +96,7 @@ describe("createNextgenMiddleware (H3)", () => {
       }),
     );
 
-    let capturedAuth: unknown ;
+    let capturedAuth: unknown;
     app.use("/", (event) => {
       capturedAuth = event.context.nextgenAuth;
       return { ok: true };
@@ -151,7 +151,7 @@ describe("createNextgenMiddleware (H3)", () => {
       }),
     );
 
-    let capturedAuth: unknown ;
+    let capturedAuth: unknown;
     app.use("/admin", (event) => {
       capturedAuth = event.context.nextgenAuth;
       return { ok: true };
@@ -198,7 +198,7 @@ describe("createNextgenMiddleware (H3)", () => {
       }),
     );
 
-    let capturedAuth: unknown ;
+    let capturedAuth: unknown;
     app.use("/admin", (event) => {
       capturedAuth = event.context.nextgenAuth;
       return { ok: true };
@@ -253,7 +253,7 @@ describe("createNextgenMiddleware (H3)", () => {
       }),
     );
 
-    let capturedAuth: unknown ;
+    let capturedAuth: unknown;
     app.use("/", (event) => {
       capturedAuth = event.context.nextgenAuth;
       return { ok: true };
@@ -293,7 +293,7 @@ describe("createNextgenMiddleware (H3)", () => {
       }),
     );
 
-    let capturedAuth: unknown ;
+    let capturedAuth: unknown;
     app.use("/admin", (event) => {
       capturedAuth = event.context.nextgenAuth;
       return { ok: true };
@@ -323,7 +323,7 @@ describe("createNextgenMiddleware (H3)", () => {
       }),
     );
 
-    let capturedAuth: unknown ;
+    let capturedAuth: unknown;
     app.use("/", (event) => {
       capturedAuth = event.context.nextgenAuth;
       return { ok: true };
@@ -414,7 +414,7 @@ describe("createNextgenMiddleware (H3)", () => {
       }),
     );
 
-    let capturedAuth: unknown ;
+    let capturedAuth: unknown;
     app.use("/admin", (event) => {
       capturedAuth = event.context.nextgenAuth;
       return { ok: true };
@@ -555,7 +555,7 @@ describe("createNextgenMiddleware (H3)", () => {
       }),
     );
 
-    let capturedAuth: unknown ;
+    let capturedAuth: unknown;
     app.use("/", (event) => {
       capturedAuth = event.context.nextgenAuth;
       return { ok: true };
@@ -592,7 +592,7 @@ describe("createNextgenMiddleware (H3)", () => {
       }),
     );
 
-    let capturedAuth: unknown ;
+    let capturedAuth: unknown;
     app.use("/", (event) => {
       capturedAuth = event.context.nextgenAuth;
       return { ok: true };
@@ -620,7 +620,7 @@ describe("createNextgenMiddleware (H3)", () => {
       }),
     );
 
-    let capturedAuth: unknown ;
+    let capturedAuth: unknown;
     app.use("/", (event) => {
       capturedAuth = event.context.nextgenAuth;
       return { ok: true };
