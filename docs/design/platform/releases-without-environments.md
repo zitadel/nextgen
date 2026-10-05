@@ -954,6 +954,47 @@ Four properties, each from a different part of the model:
    single exception and it fails closed — a revoked version refuses, rather than
    quietly resolving to a newer one.
 
+### Why not one table with a null deployment id
+
+The shape is tempting — `variables(project_id, deployment_id, name, …)` where a
+null or empty `deployment_id` is the store and a real one is a snapshot row. It
+is also the pattern this table already uses for environments today, and the scar
+tissue is visible: `000008_variables.sql` carries a generated column,
+`environment_ref AS NULLIF(environment_id, '')`, for no reason other than that a
+composite foreign key is skipped when a column is null, so the project-level rows
+can opt out of a constraint the scoped rows are held to. Mixing two meanings in
+one column is what forced that.
+
+**The sentinel pattern pays off when a read has to fall back from the specific to
+the general in one query.** That is what it was doing for environments, and it is
+exactly what this design no longer needs: a deploy freezes every name, so the
+snapshot is complete and a request reads snapshot rows only. No union, no
+`COALESCE`, no fallback. The benefit is gone and the costs are not:
+
+- **Immutability stops being structural.** "Snapshot rows are never updated"
+  becomes "rows where `deployment_id` is not null are never updated" — an
+  invariant for application code or a trigger to keep, rather than one the schema
+  makes true. Two tables give the snapshot no update path at all. This is the
+  same objection that removed
+  [`current_deployment_id`](#why-there-is-no-pointer-column): a rule nothing but
+  code enforces is a rule that eventually is not true.
+- **The wrong query leaks.** `zitadel variables list` becomes a filtered read
+  that must never forget its filter; forget it once and the listing shows every
+  historical value of every deployment, including superseded secret references.
+  Separate tables make that mistake unexpressible instead of merely unlikely.
+- **Half the columns would be null half the time.** The store holds `is_secret`
+  and `modified_at`, which a frozen row has no use for; the snapshot holds
+  `secret_version`, which a store row does not pin. They are different records
+  that happen to share a name column.
+- **The lifecycles have nothing in common.** The store is tens of rows a person
+  curates and edits. The snapshot is tens of rows per deployment, append-only,
+  retained as long as the deployment is readable and collected with it.
+
+A third shape — store each distinct value once and have deployments reference a
+value id — removes duplication but puts a join on the request path to save
+copying short strings. Secrets are already references, so the only thing it
+would dedup is plaintext. Not worth the join.
+
 ### Why the snapshot is a table and not a document
 
 The deployment row already carries a `metadata` document, so a variables
