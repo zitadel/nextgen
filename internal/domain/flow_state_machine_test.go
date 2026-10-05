@@ -5217,13 +5217,50 @@ func TestFlowStateMachine_Render_SSOBoundAttemptWithRecordedUserRendersStep(t *t
 	assert.Empty(t, result.HandoffToken)
 }
 
-// A concurrent request settled the parked row, or a new ceremony replaced it:
-// the winner already answered, so this render shows the step with no outcome.
-func TestFlowStateMachine_Render_SSOStaleParkedRowRendersStep(t *testing.T) {
-	t.Parallel()
-	w, def, state := ssoRenderWorld(t)
+// expectStaleBind makes the bind of linkedParked find its row gone, and the
+// second read of the attempt hand back parked.
+func (w *flowTestWorld) expectStaleBind(parked *domain.FlowSSOParkedIdentity, err error) {
 	w.expectParked(linkedParked(), nil)
 	w.ssoIdentities.EXPECT().BindLinked(gomock.Any(), gomock.Any()).Return(domain.ErrSSOStateInvalid())
+	w.expectParked(parked, err)
+}
+
+// The winner settled the row and handed off: this response must not reseal a
+// cookie over the winner's.
+func TestFlowStateMachine_Render_SSOStaleBindAfterHandoffRestarts(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoRenderWorld(t)
+	w.expectStaleBind(nil, domain.ErrFlowRestartRequired())
+	w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).Times(0)
+
+	_, err := w.sm.Render(t.Context(), def, state)
+	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
+}
+
+// The winner settled the row but has not handed off yet: this request retries
+// the handoff, so a lost winner response still signs the user in.
+func TestFlowStateMachine_Render_SSOStaleBindBeforeHandoffRetriesHandoff(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoRenderWorld(t)
+	w.expectStaleBind(&domain.FlowSSOParkedIdentity{BoundUserID: "user-1"}, nil)
+	w.authAttemptService.EXPECT().
+		Handoff(gomock.Any(), domain.FlowHandoffInput{ProjectID: testProjectID, AttemptID: "att-1"}).
+		Return(domain.FlowHandoffOutput{Token: "handoff-1", ExpiresAt: time.Unix(1700000060, 0).UTC()}, nil).
+		Times(1)
+
+	result, err := w.sm.Render(t.Context(), def, state)
+	require.NoError(t, err)
+	assert.Equal(t, "done", result.Step.Name)
+	assert.Equal(t, "handoff-1", result.HandoffToken)
+	assert.Equal(t, "user-1", result.State.CollectedData.UserID)
+}
+
+// A new ceremony replaced the row: the step renders, so the flow and its
+// cookie stay usable for that ceremony.
+func TestFlowStateMachine_Render_SSOStaleBindOnReplacedRowRendersStep(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoRenderWorld(t)
+	w.expectStaleBind(nil, nil)
 	w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).Times(0)
 
 	result, err := w.sm.Render(t.Context(), def, state)
