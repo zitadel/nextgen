@@ -111,7 +111,7 @@ today.
 Shipped: the CLI takes an app from zero to working local auth
 ([README.md](README.md)) and speaks agent first — every command supports
 `--non-interactive --json` and returns a structured envelope, with
-[apps/cli/SKILLS.md](apps/cli/SKILLS.md) as the contract agents consume
+[apps/cli/skills/zitadel-cli/SKILL.md](apps/cli/skills/zitadel-cli/SKILL.md) as the contract agents consume
 ([ADR 004](docs/adrs/004-agent-contract-and-agents-md.md)). Framework SDKs
 live under [packages/](packages/). The OpenAPI 3.1 sources under
 [api/openapi/](api/openapi/) are the contract of record, configuration is
