@@ -137,3 +137,64 @@ func TestDoerStoresCookiesInTheJar(t *testing.T) {
 		t.Fatalf("jar does not hold _zflow: %v", vu.State().CookieJar.Cookies(u))
 	}
 }
+
+// TestDoerSendsJarCookiesOnTheNextRequest: what one response set is sent on
+// the next request without the caller naming it, and a cookie the generated
+// client sets explicitly is sent as given, not doubled from the jar.
+func TestDoerSendsJarCookiesOnTheNextRequest(t *testing.T) {
+	var seen []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var got []string
+		for _, c := range r.Cookies() {
+			got = append(got, c.Name+"="+c.Value)
+		}
+		seen = append(seen, strings.Join(got, ";"))
+		http.SetCookie(w, &http.Cookie{Name: "_zflow", Value: "from-server", Path: "/"})
+	}))
+	defer srv.Close()
+	vu, _ := testVU(t)
+	d := &doer{st: vu.State(), ctx: vu.Context, origin: "http://origin.test", lane: "test"}
+	do := func(cookie string) {
+		t.Helper()
+		req, _ := http.NewRequestWithContext(harness.WithOp(t.Context(), harness.OpSubmitIdent), http.MethodPost, srv.URL+"/flow/1/submit", strings.NewReader("{}"))
+		if cookie != "" {
+			req.AddCookie(&http.Cookie{Name: "_zflow", Value: cookie})
+		}
+		if _, err := d.Do(req); err != nil {
+			t.Fatal(err)
+		}
+	}
+	do("")
+	do("")
+	do("explicit")
+	want := []string{"", "_zflow=from-server", "_zflow=explicit"}
+	if fmt.Sprint(seen) != fmt.Sprint(want) {
+		t.Errorf("server saw cookies %q, want %q", seen, want)
+	}
+}
+
+// TestDoerCountsTransportErrorsAsFailed: a request that produced no response
+// is an error for the caller and a failed request for k6 — http_req_failed
+// is 1, not 0 as a `status < 400` callback would make it.
+func TestDoerCountsTransportErrorsAsFailed(t *testing.T) {
+	srv := httptest.NewServer(http.NotFoundHandler())
+	srv.Close()
+	vu, samples := testVU(t)
+	d := &doer{st: vu.State(), ctx: vu.Context, origin: "http://origin.test", lane: "test"}
+	req, _ := http.NewRequestWithContext(harness.WithOp(t.Context(), harness.OpGetUser), http.MethodGet, srv.URL+"/users/u", nil)
+	if _, err := d.Do(req); err == nil {
+		t.Fatal("Do succeeded against a closed server")
+	}
+	close(samples)
+	var failed []float64
+	for sc := range samples {
+		for _, s := range sc.GetSamples() {
+			if s.Metric.Name == "http_req_failed" {
+				failed = append(failed, s.Value)
+			}
+		}
+	}
+	if len(failed) != 1 || failed[0] != 1 {
+		t.Errorf("http_req_failed samples = %v, want [1]", failed)
+	}
+}

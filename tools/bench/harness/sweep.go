@@ -73,6 +73,11 @@ func Sweep(ctx context.Context, cfg SweepConfig) ([]Row, error) {
 				return nil, fmt.Errorf("%s: %w", name, err)
 			}
 			meta.Runs = append(meta.Runs, run)
+			// Persisted after every run, so a later failure or a cancelled
+			// sweep leaves the completed runs summarisable.
+			if err := writeJSON(filepath.Join(cfg.Dir, "runs.json"), meta); err != nil {
+				return nil, err
+			}
 			// Let the server drain before the next run measures it.
 			select {
 			case <-ctx.Done():
@@ -82,9 +87,6 @@ func Sweep(ctx context.Context, cfg SweepConfig) ([]Row, error) {
 		}
 	}
 
-	if err := writeJSON(filepath.Join(cfg.Dir, "runs.json"), meta); err != nil {
-		return nil, err
-	}
 	return WriteSummary(cfg.Dir, meta)
 }
 
@@ -122,17 +124,18 @@ func runK6(ctx context.Context, k6 string, cfg SweepConfig, run RunMeta) error {
 	defer console.Close()
 
 	// k6 aggregates; the sweep only asks for the stats the table shows and
-	// keeps the document k6 would print anyway.
+	// keeps the document k6 would print anyway. Only the run's shape travels
+	// as -e: the target, with its secret, goes through the child process
+	// environment, and --include-system-env-vars=false keeps that
+	// environment out of the script's __ENV.
 	args := []string{
 		"run", "--quiet", "--no-color", "--no-usage-report", "--summary-mode", "compact",
 		"--summary-trend-stats", "avg,min,med,max,p(90),p(95),p(99)",
 		"--summary-export", filepath.Join(cfg.Dir, run.Export),
+		"--include-system-env-vars=false",
 		"-e", "SCEN=" + run.Scenario,
 		"-e", "VUS=" + strconv.Itoa(run.VUs),
 		"-e", "DUR=" + run.Duration,
-	}
-	for k, v := range cfg.Target.Env() {
-		args = append(args, "-e", k+"="+v)
 	}
 	if run.Samples != "" {
 		args = append(args, "--out", "json="+filepath.Join(cfg.Dir, run.Samples))
@@ -140,6 +143,7 @@ func runK6(ctx context.Context, k6 string, cfg SweepConfig, run RunMeta) error {
 	args = append(args, cfg.Script)
 
 	cmd := exec.CommandContext(ctx, k6, args...)
+	cmd.Env = append(os.Environ(), cfg.Target.Env()...)
 	cmd.Stdout = console
 	cmd.Stderr = console
 	if err := cmd.Run(); err != nil {

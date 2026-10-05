@@ -1,6 +1,7 @@
 package harness
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
@@ -72,7 +73,9 @@ type errorDetails interface {
 	GetMessage() string
 }
 
-// statusCoded is the generated wrapper for a documented non-2xx status.
+// statusCoded is the generated wrapper for an operation's default error
+// response: the status it came with and a Response sum type whose variant is
+// the server's error code.
 type statusCoded interface {
 	GetStatusCode() int
 }
@@ -85,8 +88,30 @@ func classifyResponse(op string, status int, res any) *OpError {
 	case errorDetails:
 		return &OpError{Op: op, Status: status, Code: string(r.GetCode()), Err: errors.New(r.GetMessage())}
 	case statusCoded:
+		if d, ok := defaultErrorDetails(res); ok {
+			return &OpError{Op: op, Status: r.GetStatusCode(), Code: string(d.Code), Err: errors.New(d.Message)}
+		}
 		return &OpError{Op: op, Status: r.GetStatusCode(), Code: CodeUnexpectedResponse, Err: fmt.Errorf("%T", res)}
 	default:
 		return &OpError{Op: op, Status: status, Code: CodeUnexpectedResponse, Err: fmt.Errorf("%T", res)}
 	}
+}
+
+// defaultErrorDetails reads the code and message out of a generated default
+// error wrapper. Each operation gets its own sum type for the body, with the
+// server's code as the discriminator and no common accessor; the one thing
+// they share is that the body marshals back to the error-details document,
+// so that is how it is read.
+func defaultErrorDetails(res any) (api.ErrorDetails, bool) {
+	b, err := json.Marshal(res)
+	if err != nil {
+		return api.ErrorDetails{}, false
+	}
+	var w struct {
+		Response api.ErrorDetails `json:"Response"`
+	}
+	if err := json.Unmarshal(b, &w); err != nil || w.Response.Code == "" {
+		return api.ErrorDetails{}, false
+	}
+	return w.Response, true
 }

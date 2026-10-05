@@ -2,6 +2,7 @@ package harness
 
 import (
 	"encoding/json"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -67,6 +68,48 @@ func TestSummarizeMergesRunsPerOperation(t *testing.T) {
 		if got.Waiting != w.Duration {
 			t.Errorf("row %d phases not read: %+v", i, got)
 		}
+	}
+}
+
+// TestSummarizeReadsErrorBreakdownAndSkipsThresholdObjects: the per-class
+// and per-code error sub-metrics the script declares land on the row, and a
+// metric carrying a `thresholds` object — what a non-empty threshold adds to
+// the export — is read for its numbers rather than failing the parse.
+func TestSummarizeReadsErrorBreakdownAndSkipsThresholdObjects(t *testing.T) {
+	dir := t.TempDir()
+	b, _ := json.Marshal(map[string]any{"metrics": map[string]any{
+		"http_reqs{op:get_user}":                                  map[string]any{"count": 10, "rate": 5},
+		"http_req_duration{op:get_user}":                          map[string]any{"med": 1, "p(95)": 2, "p(99)": 3, "thresholds": map[string]any{"p(95)<500": map[string]any{"ok": true}}},
+		"http_req_failed{op:get_user}":                            map[string]any{"passes": 3, "fails": 7},
+		"nextgen_errors{op:get_user}":                             map[string]any{"count": 3, "rate": 1.5},
+		"nextgen_errors{op:get_user,status_class:4xx}":            map[string]any{"count": 2, "rate": 1},
+		"nextgen_errors{op:get_user,status_class:0}":              map[string]any{"count": 1, "rate": 0.5},
+		"nextgen_errors{op:get_user,status_class:5xx}":            map[string]any{"count": 0, "rate": 0},
+		"nextgen_errors{op:get_user,code:user.not_found}":         map[string]any{"count": 2, "rate": 1},
+		"nextgen_errors{op:get_user,code:transport}":              map[string]any{"count": 1, "rate": 0.5},
+		"nextgen_errors{op:get_user,code:user.permission_denied}": map[string]any{"count": 0, "rate": 0},
+	}})
+	if err := os.WriteFile(filepath.Join(dir, "x.json"), b, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	rows, err := Summarize(dir, SweepMeta{Runs: []RunMeta{{Scenario: "getUser", VUs: 1, Export: "x.json"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("rows = %+v", rows)
+	}
+	r := rows[0]
+	if r.N != 10 || r.Failed != 3 || r.Errors != 3 || r.Duration != (Quantiles{1, 2, 3}) {
+		t.Errorf("row = %+v", r)
+	}
+	wantStatus := map[string]int{"4xx": 2, "0": 1}
+	wantCode := map[string]int{"user.not_found": 2, "transport": 1}
+	if !maps.Equal(r.ErrorsByStatus, wantStatus) || !maps.Equal(r.ErrorsByCode, wantCode) {
+		t.Errorf("breakdown = %v / %v, want %v / %v", r.ErrorsByStatus, r.ErrorsByCode, wantStatus, wantCode)
+	}
+	if md := Markdown(SweepMeta{}, rows); !strings.Contains(md, "| 0=1 4xx=2 transport=1 user.not_found=2 |") {
+		t.Errorf("markdown lacks the breakdown:\n%s", md)
 	}
 }
 

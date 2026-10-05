@@ -94,3 +94,39 @@ func TestClassifyTransport(t *testing.T) {
 		t.Errorf("classified as %+v", oe)
 	}
 }
+
+// TestClassifiesDefaultErrorResponse: a status the spec documents only
+// through the default error response — 403 on GET /users/{id}, 500 on POST
+// /flow — keeps the server's code instead of collapsing to
+// unexpected_response.
+func TestClassifiesDefaultErrorResponse(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		status int
+		code   string
+		call   func(c *api.Client) error
+		op     string
+	}{
+		{"get_user 403", 403, "user.permission_denied", func(c *api.Client) error {
+			_, err := GetUser(t.Context(), c, Target{UserID: "user_1"})
+			return err
+		}, OpGetUser},
+		{"create_flow 500", 500, "internal", func(c *api.Client) error {
+			_, err := Login(t.Context(), c, Target{ProjectID: "p"})
+			return err
+		}, OpCreateFlow},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(tc.status)
+				_, _ = w.Write([]byte(`{"code":"` + tc.code + `","message":"nope"}`))
+			}))
+			defer srv.Close()
+			oe := opError(t, tc.call(newClient(t, srv)))
+			if oe.Op != tc.op || oe.Status != tc.status || oe.Code != tc.code || oe.Err == nil || oe.Err.Error() != "nope" {
+				t.Errorf("classified as %+v", oe)
+			}
+		})
+	}
+}

@@ -4,12 +4,14 @@ import (
 	"cmp"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"strings"
 	"time"
+
+	"go.k6.io/k6/v2/metrics"
 )
 
 // MetricErrors is the module's own counter of failed operations, tagged
@@ -19,8 +21,8 @@ const MetricErrors = "nextgen_errors"
 // SummaryMetrics are the metrics the summary reports per operation: k6's
 // built-in per-request metrics and the module's error counter. The entry
 // script declares a `metric{op:<id>}` sub-metric for each of them so k6's
-// own end-of-test summary carries one line per operation; this list and
-// Operations are what it declares them from.
+// own end-of-test summary carries one line per operation; Submetrics lists
+// what it declares.
 var SummaryMetrics = []string{
 	"http_reqs",
 	"http_req_duration",
@@ -43,9 +45,13 @@ type Row struct {
 	RPS      float64 `json:"rps"`
 	// Failed counts non-2xx/3xx responses (k6's http_req_failed); Errors
 	// counts failed operations as the module classified them, which includes
-	// a 200 that re-served a step with an error key.
-	Failed int `json:"failed"`
-	Errors int `json:"errors"`
+	// a 200 that re-served a step with an error key. ErrorsByStatus and
+	// ErrorsByCode break Errors down by the status class and the error code
+	// the module tagged, from the sub-metrics the script declares for them.
+	Failed         int            `json:"failed"`
+	Errors         int            `json:"errors"`
+	ErrorsByStatus map[string]int `json:"errors_by_status,omitempty"`
+	ErrorsByCode   map[string]int `json:"errors_by_code,omitempty"`
 
 	Duration   Quantiles `json:"duration"`
 	Blocked    Quantiles `json:"blocked"`
@@ -93,12 +99,63 @@ type SweepMeta struct {
 }
 
 // summaryExport is the part of k6's --summary-export document the merge
-// reads: metric name (a sub-metric is `name{tag:value}`) to its values.
+// reads: metric name (a sub-metric is `name{tag:value,...}`) to its fields.
+// A metric with a non-empty threshold carries a nested `thresholds` object
+// next to its numbers, so the fields are read raw and only numbers kept.
 type summaryExport struct {
-	Metrics map[string]map[string]float64 `json:"metrics"`
+	Metrics map[string]map[string]json.RawMessage `json:"metrics"`
 }
 
-var subMetric = regexp.MustCompile(`^(\w+)\{op:(\w+)\}$`)
+// Submetrics returns every sub-metric name the entry script declares and
+// the summary reads: each summary metric per operation, and the module's
+// error counter further per status class and per error code, from the
+// bounded vocabularies the module tags with. Declaring them is what makes
+// k6 keep and export the breakdown; nothing here is aggregated in Go.
+func Submetrics() []string {
+	var out []string
+	for _, op := range Operations {
+		for _, m := range SummaryMetrics {
+			out = append(out, fmt.Sprintf("%s{op:%s}", m, op))
+		}
+		for _, class := range StatusClasses {
+			out = append(out, fmt.Sprintf("%s{op:%s,status_class:%s}", MetricErrors, op, class))
+		}
+		for _, code := range ErrorCodes(op) {
+			out = append(out, fmt.Sprintf("%s{op:%s,code:%s}", MetricErrors, op, code))
+		}
+	}
+	return out
+}
+
+// numbers keeps the numeric fields of an exported metric.
+func numbers(raw map[string]json.RawMessage) map[string]float64 {
+	out := make(map[string]float64, len(raw))
+	for k, v := range raw {
+		var f float64
+		if err := json.Unmarshal(v, &f); err == nil {
+			out[k] = f
+		}
+	}
+	return out
+}
+
+// parseSubmetric splits `name{k:v,...}` the way k6 names a sub-metric. The
+// second result is false for a plain metric or anything else.
+func parseSubmetric(name string) (string, map[string]string, bool) {
+	metric, kvs, err := metrics.ParseMetricName(name)
+	if err != nil || len(kvs) == 0 {
+		return "", nil, false
+	}
+	tags := make(map[string]string, len(kvs))
+	for _, kv := range kvs {
+		k, v, ok := strings.Cut(kv, ":")
+		if !ok {
+			return "", nil, false
+		}
+		tags[strings.TrimSpace(k)] = strings.TrimSpace(v)
+	}
+	return metric, tags, true
+}
 
 // Summarize merges the runs of a sweep into one Row per operation per run.
 // Every number comes from k6's own summary; nothing is re-aggregated here.
@@ -127,17 +184,38 @@ func summarizeRun(path string, run RunMeta) ([]Row, error) {
 		return nil, err
 	}
 
-	// metric → op → values
+	// op → metric → values, for the per-operation sub-metrics; the error
+	// breakdowns are collected by op alongside.
 	byOp := map[string]map[string]map[string]float64{}
-	for name, values := range export.Metrics {
-		m := subMetric.FindStringSubmatch(name)
-		if m == nil {
+	errorsByStatus := map[string]map[string]int{}
+	errorsByCode := map[string]map[string]int{}
+	for name, raw := range export.Metrics {
+		metric, tags, ok := parseSubmetric(name)
+		if !ok || tags["op"] == "" {
 			continue
 		}
-		if byOp[m[2]] == nil {
-			byOp[m[2]] = map[string]map[string]float64{}
+		op := tags["op"]
+		values := numbers(raw)
+		switch {
+		case len(tags) == 1:
+			if byOp[op] == nil {
+				byOp[op] = map[string]map[string]float64{}
+			}
+			byOp[op][metric] = values
+		case metric == MetricErrors && len(tags) == 2 && values["count"] > 0:
+			if class, ok := tags["status_class"]; ok {
+				if errorsByStatus[op] == nil {
+					errorsByStatus[op] = map[string]int{}
+				}
+				errorsByStatus[op][class] = int(values["count"])
+			}
+			if code, ok := tags["code"]; ok {
+				if errorsByCode[op] == nil {
+					errorsByCode[op] = map[string]int{}
+				}
+				errorsByCode[op][code] = int(values["count"])
+			}
 		}
-		byOp[m[2]][m[1]] = values
 	}
 
 	rows := make([]Row, 0, len(byOp))
@@ -149,19 +227,21 @@ func summarizeRun(path string, run RunMeta) ([]Row, error) {
 			continue
 		}
 		rows = append(rows, Row{
-			Scenario:   run.Scenario,
-			VUs:        run.VUs,
-			Op:         op,
-			N:          int(reqs["count"]),
-			RPS:        reqs["rate"],
-			Failed:     int(metrics["http_req_failed"]["passes"]),
-			Errors:     int(metrics[MetricErrors]["count"]),
-			Duration:   quantiles(metrics["http_req_duration"]),
-			Blocked:    quantiles(metrics["http_req_blocked"]),
-			Connecting: quantiles(metrics["http_req_connecting"]),
-			Sending:    quantiles(metrics["http_req_sending"]),
-			Waiting:    quantiles(metrics["http_req_waiting"]),
-			Receiving:  quantiles(metrics["http_req_receiving"]),
+			Scenario:       run.Scenario,
+			VUs:            run.VUs,
+			Op:             op,
+			N:              int(reqs["count"]),
+			RPS:            reqs["rate"],
+			Failed:         int(metrics["http_req_failed"]["passes"]),
+			Errors:         int(metrics[MetricErrors]["count"]),
+			ErrorsByStatus: errorsByStatus[op],
+			ErrorsByCode:   errorsByCode[op],
+			Duration:       quantiles(metrics["http_req_duration"]),
+			Blocked:        quantiles(metrics["http_req_blocked"]),
+			Connecting:     quantiles(metrics["http_req_connecting"]),
+			Sending:        quantiles(metrics["http_req_sending"]),
+			Waiting:        quantiles(metrics["http_req_waiting"]),
+			Receiving:      quantiles(metrics["http_req_receiving"]),
 		})
 	}
 	return rows, nil
@@ -179,14 +259,29 @@ func Markdown(meta SweepMeta, rows []Row) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "# Sweep %s\n\n", meta.StartedAt.UTC().Format(time.RFC3339))
 	fmt.Fprintf(&b, "commit `%s` · lane `%s` · host `%s` (%d CPUs) · %s · target `%s`\n\n", meta.Commit, meta.Lane, meta.Host, meta.CPUs, meta.K6Version, meta.Base)
-	b.WriteString("Durations in ms, as k6 reported them per operation.\n\n")
-	b.WriteString("| scenario | op | vus | n | req/s | failed | errors | dur p50 | dur p95 | dur p99 | blocked p95 | connecting p95 | sending p95 | waiting p95 | receiving p95 |\n")
-	b.WriteString("|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n")
+	b.WriteString("Durations in ms, as k6 reported them per operation. Errors are failed operations as the module classified them, broken down by status class and error code.\n\n")
+	b.WriteString("| scenario | op | vus | n | req/s | failed | errors | error breakdown | dur p50 | dur p95 | dur p99 | blocked p95 | connecting p95 | sending p95 | waiting p95 | receiving p95 |\n")
+	b.WriteString("|---|---|---:|---:|---:|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|\n")
 	for _, r := range rows {
-		fmt.Fprintf(&b, "| %s | %s | %d | %d | %.0f | %d | %d | %.2f | %.2f | %.2f | %.3f | %.3f | %.3f | %.2f | %.3f |\n",
-			r.Scenario, r.Op, r.VUs, r.N, r.RPS, r.Failed, r.Errors,
+		fmt.Fprintf(&b, "| %s | %s | %d | %d | %.0f | %d | %d | %s | %.2f | %.2f | %.2f | %.3f | %.3f | %.3f | %.2f | %.3f |\n",
+			r.Scenario, r.Op, r.VUs, r.N, r.RPS, r.Failed, r.Errors, errorBreakdown(r),
 			r.Duration.P50, r.Duration.P95, r.Duration.P99,
 			r.Blocked.P95, r.Connecting.P95, r.Sending.P95, r.Waiting.P95, r.Receiving.P95)
 	}
 	return b.String()
+}
+
+// errorBreakdown renders a row's errors by status class and code, in a
+// stable order, or "-" when there were none.
+func errorBreakdown(r Row) string {
+	if r.Errors == 0 {
+		return "-"
+	}
+	var parts []string
+	for _, m := range []map[string]int{r.ErrorsByStatus, r.ErrorsByCode} {
+		for _, k := range slices.Sorted(maps.Keys(m)) {
+			parts = append(parts, fmt.Sprintf("%s=%d", k, m[k]))
+		}
+	}
+	return strings.Join(parts, " ")
 }

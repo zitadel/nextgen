@@ -21,7 +21,9 @@ import (
 
 // Target is a provisioned server and the one project and user the scenarios
 // run against. Bootstrap writes it as a state file; the sweep hands it to each
-// k6 run as environment; the k6 module reads it back.
+// k6 run through the child process environment — never as -e, which would
+// show the secret in process listings and expose it to scripts as __ENV —
+// and the k6 module reads it back from its own process environment.
 type Target struct {
 	Base          string `json:"base"`
 	Lane          string `json:"lane"`
@@ -46,17 +48,17 @@ const (
 	EnvPassword      = "NEXTGEN_PASSWORD"
 )
 
-// Env renders the target as the environment a k6 run needs.
-func (t Target) Env() map[string]string {
-	return map[string]string{
-		EnvBase:          t.Base,
-		EnvLane:          t.Lane,
-		EnvProjectID:     t.ProjectID,
-		EnvProjectSecret: t.ProjectSecret,
-		EnvOrigin:        t.Origin,
-		EnvUserID:        t.UserID,
-		EnvEmail:         t.Email,
-		EnvPassword:      t.Password,
+// Env renders the target as KEY=value pairs for a child process environment.
+func (t Target) Env() []string {
+	return []string{
+		EnvBase + "=" + t.Base,
+		EnvLane + "=" + t.Lane,
+		EnvProjectID + "=" + t.ProjectID,
+		EnvProjectSecret + "=" + t.ProjectSecret,
+		EnvOrigin + "=" + t.Origin,
+		EnvUserID + "=" + t.UserID,
+		EnvEmail + "=" + t.Email,
+		EnvPassword + "=" + t.Password,
 	}
 }
 
@@ -94,13 +96,26 @@ func TargetFromEnv(lookup func(string) (string, bool)) (Target, error) {
 }
 
 // SaveTarget writes the state file. It holds the project secret, so it is
-// created owner-readable only.
+// owner-readable only — also when the file already exists with a wider mode,
+// which os.WriteFile alone would keep.
 func SaveTarget(path string, t Target) error {
 	b, err := json.MarshalIndent(t, "", "  ")
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, append(b, '\n'), 0o600)
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
+	if err != nil {
+		return err
+	}
+	if err := f.Chmod(0o600); err != nil {
+		_ = f.Close()
+		return err
+	}
+	if _, err := f.Write(append(b, '\n')); err != nil {
+		_ = f.Close()
+		return err
+	}
+	return f.Close()
 }
 
 // LoadTarget reads a state file written by SaveTarget.

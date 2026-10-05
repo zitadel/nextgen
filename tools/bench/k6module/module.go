@@ -6,6 +6,7 @@ package k6module
 import (
 	"context"
 	"errors"
+	"os"
 	"sync"
 	"time"
 
@@ -39,9 +40,13 @@ var _ modules.Module = (*RootModule)(nil)
 func (r *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 	r.once.Do(func() {
 		env := vu.InitEnv()
-		r.target, r.err = harness.TargetFromEnv(env.LookupEnv)
+		// The target is read from this process's environment, not from k6's
+		// __ENV: the sweep puts it there and runs k6 with
+		// --include-system-env-vars=false, so the secret never reaches the
+		// command line or the script.
+		r.target, r.err = harness.TargetFromEnv(os.LookupEnv)
 		if r.err != nil {
-			r.err = errors.Join(errors.New("k6/x/nextgen: run through `k6 x nextgen sweep`, or pass the target as -e"), r.err)
+			r.err = errors.Join(errors.New("k6/x/nextgen: run through `k6 x nextgen sweep`, or export the NEXTGEN_* variables"), r.err)
 		}
 		r.creds = harness.NewCredentials(r.target.ProjectSecret)
 		// Registered once, on the root, and pushed from every VU through its
@@ -116,16 +121,13 @@ func (m *ModuleInstance) fail(op string, err error) error {
 	return oe
 }
 
-// Operations returns the operation ids, for the entry script to declare one
-// sub-metric per operation from the same vocabulary the tags use.
-func (m *ModuleInstance) Operations() []string {
-	return harness.Operations
-}
-
-// Metrics returns the metrics the summary reports per operation: k6's
-// built-in request metrics and the module's nextgen_errors.
-func (m *ModuleInstance) Metrics() []string {
-	return harness.SummaryMetrics
+// Submetrics returns every sub-metric the entry script declares a threshold
+// for: each summary metric per operation, and nextgen_errors per operation
+// and status class and per operation and error code — the vocabularies the
+// module tags with, so the script never spells a tag value the Go side does
+// not know, and k6's own summary carries the breakdown.
+func (m *ModuleInstance) Submetrics() []string {
+	return harness.Submetrics()
 }
 
 // Login runs the whole login journey — POST /flow, submit identifier, submit

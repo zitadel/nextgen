@@ -44,6 +44,11 @@ func (d *doer) Do(r *http.Request) (*http.Response, error) {
 	if err != nil {
 		return nil, err
 	}
+	// MakeRequest stores response cookies in the jar and consults it on
+	// redirects, but leaves the first request as given; k6/http merges the
+	// jar in before calling it, and so does this. A cookie the generated
+	// client set explicitly (the flow's _zflow parameter) wins over the jar.
+	addJarCookies(r, d.st.CookieJar)
 	// Tag cardinality is bounded here, by construction: the name tag is set
 	// to the operation id, and with a manually set name httpext sets the url
 	// system tag to that same value, so neither ever carries a raw path.
@@ -53,13 +58,16 @@ func (d *doer) Do(r *http.Request) (*http.Response, error) {
 	tm.SetTag("lane", d.lane)
 
 	preq := &httpext.ParsedHTTPRequest{
-		URL:              &u,
-		Req:              r,
-		Body:             body,
-		Timeout:          harness.RequestTimeout,
-		Throw:            true,
-		ResponseType:     httpext.ResponseTypeText,
-		ResponseCallback: func(status int) bool { return status < 400 },
+		URL:          &u,
+		Req:          r,
+		Body:         body,
+		Timeout:      harness.RequestTimeout,
+		Throw:        true,
+		ResponseType: httpext.ResponseTypeText,
+		// k6's own default: 2xx and 3xx are expected. Status 0 — a dial
+		// failure, a timeout, a body read error — is not, so http_req_failed
+		// counts an outage instead of hiding it.
+		ResponseCallback: func(status int) bool { return status >= 200 && status < 400 },
 		Redirects:        d.st.Options.MaxRedirects,
 		ActiveJar:        d.st.CookieJar,
 		TagsAndMeta:      tm,
@@ -69,6 +77,23 @@ func (d *doer) Do(r *http.Request) (*http.Response, error) {
 		return nil, err
 	}
 	return toHTTPResponse(resp)
+}
+
+// addJarCookies adds the jar's cookies for the request URL that the request
+// does not already carry by name.
+func addJarCookies(r *http.Request, jar http.CookieJar) {
+	if jar == nil {
+		return
+	}
+	explicit := map[string]struct{}{}
+	for _, c := range r.Cookies() {
+		explicit[c.Name] = struct{}{}
+	}
+	for _, c := range jar.Cookies(r.URL) {
+		if _, ok := explicit[c.Name]; !ok {
+			r.AddCookie(c)
+		}
+	}
 }
 
 // toHTTPResponse rebuilds enough of an *http.Response for the generated

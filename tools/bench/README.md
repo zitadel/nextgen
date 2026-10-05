@@ -13,13 +13,19 @@ module that compiles two things into one k6 binary:
   module's `nextgen_errors` counter, tagged `op`, `lane`, `status_class` and
   the error-details `code` (or `flow.step_error` for a step re-served with an
   error key), so it appears in the summary as a classified error rather than
-  as a log line.
+  as a log line. The module reads its target from the k6 process environment,
+  never from `__ENV`: the sweep passes it to the child process and runs k6
+  with `--include-system-env-vars=false`, so the project secret shows up
+  neither in a process listing nor to the script.
 - `k6 x nextgen` — the command tree: `bootstrap` a target from a fixture
   file, `sweep` every scenario at every VU count, `summarize` a sweep
-  directory k6 does the aggregating: the script declares one
-  `metric{op:<id>}` sub-metric per operation, so k6's own end-of-test summary
-  reports each operation on its own line, and the sweep merges the per-run
-  `--summary-export` documents into one table.
+  directory. k6 does the aggregating: the script declares an empty threshold
+  on every sub-metric the module lists (`nextgen.submetrics()`) — each
+  request metric per operation, and `nextgen_errors` further per status
+  class and per error code, from the vocabularies the module tags with — so
+  k6's own end-of-test summary carries each operation on its own line with
+  its error breakdown, and the sweep merges the per-run `--summary-export`
+  documents into one table.
 
 ## Run it
 
