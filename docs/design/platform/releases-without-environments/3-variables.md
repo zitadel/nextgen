@@ -4,6 +4,11 @@
 > [#1389](https://github.com/zitadel/nextgen/issues/1389). Design only; nothing
 > here is implemented.
 
+**Variables and secrets**, not environment variables: these are values the
+server resolves for a deployment and serves to a flow, and nothing puts them in
+a process environment. The CLI calls them `vars`, leaving `env` to the
+[client-side environment](7-cli-environments.md#environments-pointing-one-repository-at-several-projects).
+
 Two mechanisms, kept apart on purpose. Most of the confusion in this area comes
 from one thing trying to be both.
 
@@ -63,14 +68,14 @@ resources, and which variables share until they are frozen too.
 ## Setting one
 
 ```
-$ zitadel variables set GOOGLE_CLIENT_ID prod-abc.apps.googleusercontent.com
+$ zitadel vars set GOOGLE_CLIENT_ID prod-abc.apps.googleusercontent.com
 stored. not live until the next deploy.
 
-$ zitadel variables set GOOGLE_CLIENT_SECRET --secret
+$ zitadel vars set GOOGLE_CLIENT_SECRET --secret
 value: ********
 stored as svs_01KB3F8N2P9S5WQX. not live until the next deploy.
 
-$ zitadel variables list
+$ zitadel vars list
 NAME                          TYPE    STORED
 GOOGLE_CLIENT_ID              value   prod-abc.apps.googleu…
 GOOGLE_CLIENT_SECRET          secret  svs_01KB…  (set 10-02)
@@ -83,7 +88,7 @@ a different question with a different answer per target, so it is a different
 command:
 
 ```
-$ zitadel variables resolve --origin https://acme-git-sso-acmeinc.vercel.app
+$ zitadel vars resolve --origin https://acme-git-sso-acmeinc.vercel.app
 serving dep_01KB3F8N2P9S5WQZ   deployed 10-02 14:10
 
 NAME                  SERVING NOW                FROM
@@ -130,7 +135,7 @@ Four properties, each from a different part of the model:
 1. **Snapshot rows are written once**, in the transaction that writes the
    deployment, so a deployment is never a partially-rewritten value set.
 2. **Editing the store cannot reach a snapshot.** Different table, no shared row,
-   no cascade. `zitadel variables set` during a sign-in changes nothing that
+   no cascade. `zitadel vars set` during a sign-in changes nothing that
    sign-in can see.
 3. **A flow seals the deployment id, not the release digest.** One pointer pins
    the resources *and* the values, so the two cannot drift apart mid-attempt.
@@ -158,7 +163,7 @@ and the costs are not:
   becomes an invariant application code keeps rather than one the schema makes
   true; two tables give the snapshot no update path at all. Same objection that
   removed [`current_deployment_id`](1-data-model.md#why-there-is-no-pointer-column).
-- **The wrong query leaks.** `zitadel variables list` becomes a filtered read
+- **The wrong query leaks.** `zitadel vars list` becomes a filtered read
   that must never forget its filter; forget it once and it lists every
   historical value, superseded secret references included.
 - **Half the columns would be null half the time**, and the lifecycles differ:

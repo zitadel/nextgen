@@ -193,15 +193,17 @@ error  origin_not_tenant_anchored
        admit every host under evil.com.
 ```
 
-## `zitadel variables`
+## `zitadel vars`
 
-`set` and `list` address the store, `resolve --origin` reads the snapshot a
-target is running — the transcripts are under
-[Variables](3-variables.md#setting-one). Two commands because they answer two questions, and
-conflating them is how "I set it and nothing happened" happens.
+Variables and secrets, which are not process environment variables — `env` names
+the client-side environment and `vars` the values a deployment serves. `set` and
+`list` address the store, `resolve --origin` reads the snapshot a target is
+running; the transcripts are under
+[Variables](3-variables.md#setting-one). Two commands because they answer two
+questions, and conflating them is how "I set it and nothing happened" happens.
 
 ```
-$ zitadel variables rm GOOGLE_CLIENT_ID_PREVIEW
+$ zitadel vars rm GOOGLE_CLIENT_ID_PREVIEW
 removed from the store. 2 deployments still reference it; they are unaffected.
 ```
 
@@ -240,9 +242,13 @@ app      http://project-a.localhost:3000
 
 ## `zitadel env`
 
+Bare, it prints what resolved and from where. `list` and `add` manage the
+bindings themselves, and the transcripts for those are under
+[environments](7-cli-environments.md#environments-pointing-one-repository-at-several-projects).
+
 ```
 $ zitadel env
-stage        production          VERCEL_ENV
+environment  production          VERCEL_ENV
 server       https://api.zit…    ZITADEL_URL (process env)
 project      prj_01K9AA9M3K…     .env.production.local
 token        sk_proj_9f2H…       process env
@@ -250,6 +256,7 @@ release      sha256:9f2c1a7b     (built from working copy, not yet deployed)
 
 consulted, in order:
   --server/--project flags      (not set)
+  --env-file                    (not set)
   process env                   server, token
   .env.production.local         project
   .env.local                    (not present)

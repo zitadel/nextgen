@@ -99,13 +99,13 @@ them would grant every project every origin, which is the opposite of what an
 allowlist is for.
 
 **A committed file could only be per-project if it keyed on something the server
-also knows, and it has nothing to key on.** A stage name is a client-side label
-the server never sees, and
-[CI has no stage at all](7-cli-stages.md#in-ci-there-are-no-files-and-no-stage-either),
+also knows, and it has nothing to key on.** An environment name is a client-side
+label the server never sees, and
+[CI has no environment at all](7-cli-environments.md#in-ci-there-are-no-files-and-no-environment-either),
 so `{"origins": {"production": [...]}}` keys on a word that does not exist in
 the job that would apply it. Keying by project id does work mechanically, at the
 cost of committing a map of ids that goes stale on a fork and has to be edited
-to add a stage — the one thing adding a stage needs no commit for today.
+to add an environment — the one thing that needs no commit today.
 
 | | **In the file** | **On the project** |
 |---|---|---|
@@ -203,7 +203,8 @@ this document matches nothing at all.
    yes), and whether anything else currently claim-gated should move onto the
    class.
 4. **A declarative per-project file.** `zitadel apply project.yaml` — one file
-   per project rather than one shared across stages, outside the release bundle,
+   per project rather than one shared across environments, outside the release
+   bundle,
    never applied by a preview job — would restore review and reconstructibility
    without the keying problem above. It wants a whole-list `PUT`, and a
    `--project` it checks against the file rather than trusting the environment.
