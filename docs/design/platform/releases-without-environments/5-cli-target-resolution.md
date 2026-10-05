@@ -12,7 +12,7 @@ process environment and `.env` files. Nothing here reaches the server.
 Two values per invocation: a server URL and a project id, plus a credential for
 writes. Each resolves independently, highest priority first:
 
-1. `--server`, `--project`
+1. `--server` — where to send, which the credential does not say
 2. `--env-file <path>` — for the keys it defines; no other file is read
 3. `process.env` — so a platform's environment store and CI beat anything on disk
 4. `.env.<environment>.local`
@@ -43,9 +43,24 @@ name never leaves the machine. There is no environment id, no endpoint, and
 nothing server-side keyed on the name — if a `/environments` resource ever
 reappears, that is this design being undone.
 
-The two flags do different jobs: `--env <name>` selects which `.env` files to
-read, while `--project <id>` names a project id directly and overrides whatever
-they say.
+**There is no `--project`.** A project id is not independently selectable,
+because the credential already carries it: a project secret is issued for one
+project, and ADR 036 has the publishable key replace "loose `project_id` request
+fields as the attribution mechanism". So `--project` could only ever name a
+project the resolved credential does not authenticate, which is a `401` at best
+and a silently ignored flag at worst. `--server` survives because it says *where
+to send* rather than *who you are* — `--server local` against a locally running
+server, with the same directory, is the case it exists for, and it is already a
+flag the CLI has.
+
+`--project` does appear in this design, as an argument to
+[`zitadel env add`](7-cli-environments.md#adding-production) meaning "bind this
+existing project". That is a different job from overriding a resolved value, and
+one flag doing both is how it would get confusing.
+
+A genuine one-off against another project is `--env-file ./that.env`, or the
+three variables exported for one command. Both name a coherent triple; a bare
+project id does not.
 
 ### Naming one file instead of the convention
 
@@ -67,10 +82,10 @@ this tool and is not going to be reorganised for it.
 
 Two consequences worth stating, because both are deliberate:
 
-- **It outranks `process.env`.** Typing a path is as explicit as typing
-  `--project`, so an injected `ZITADEL_PROJECT_ID` does not quietly win over a
-  file the operator named. That is the one exception to the rule below, and it
-  exists only for an argument the caller passed on this invocation.
+- **It outranks `process.env`.** A path the caller typed on this invocation is
+  as explicit as `--server`, so an injected `ZITADEL_PROJECT_ID` does not quietly
+  win over a file the operator named. That is the one exception to the rule
+  below.
 - **The environment is named after the file**, and nothing is inferred from
   `NODE_ENV`. The name is used for display and for nothing else, so a file with
   no recognisable name costs nothing.

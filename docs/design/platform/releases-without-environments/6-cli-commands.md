@@ -255,7 +255,7 @@ token        sk_proj_9f2H…       process env
 release      sha256:9f2c1a7b     (built from working copy, not yet deployed)
 
 consulted, in order:
-  --server/--project flags      (not set)
+  --server flag                 (not set)
   --env-file                    (not set)
   process env                   server, token
   .env.production.local         project

@@ -56,7 +56,9 @@ permanent or retire a hostname serving traffic. The explicit path is
 There is no endpoint for this today. `preview_origins` appears in
 `create-project-request.yaml` and `project-response.yaml` but **not** in
 `patch-project-request.yaml`, so origins can be set once, at project creation,
-and never changed.
+and never changed. The scopes are already reserved, though —
+`allowed_origin.read`, `.write` and `.delete` sit in `security/oauth2.yaml`
+marked "endpoints not yet available", so this is a gap someone already saw.
 
 **It is project state, not release content.** It has to be: layer 1 of
 [resolution](4-release-resolution.md#the-three-layers) decides whether to serve
@@ -75,8 +77,8 @@ inside one request body.
 
 | Change | Where |
 |---|---|
-| `POST /projects/{project_id}/allowed_origins` — add one `{pattern, kind}`, `project.write` only, no session fallback | new `endpoints/projects/by_id/allowed_origins/methods.yaml`, registered in `openapi-spec.yaml` |
-| `DELETE /projects/{project_id}/allowed_origins` — remove one, pattern in the body rather than a path segment, since a pattern contains `/` and `*` | the same file |
+| `POST /projects/{project_id}/allowed_origins` — add one `{pattern, kind}` under `allowed_origin.write`, no session fallback | new `endpoints/projects/by_id/allowed_origins/methods.yaml`, registered in `openapi-spec.yaml` |
+| `DELETE /projects/{project_id}/allowed_origins` — remove one under `allowed_origin.delete`, pattern in the body rather than a path segment, since a pattern contains `/` and `*` | the same file |
 | `preview_origins` → `allowed_origins`, entries become `{pattern, kind}` | `create-project-request.yaml` and `project-response.yaml` — the latter also covers `GET /projects/{id}` and `/projects/query`, which `$ref` it |
 | `class` on the project | `project-response.yaml`, plus a promote/demote operation, since a class change revalidates every pattern |
 | Rejections: `origin_not_permitted_for_class`, `origin_not_tenant_anchored`, `origin_host_unknown` | the new operation's error response, and `createProject-error-response.yaml` |

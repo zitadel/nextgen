@@ -37,5 +37,5 @@ scope. Two things take its place:
 | 6 | **CLI: commands**: `status`, `deploy`, `preview`, `origins`, `allowlist`, `vars`, `rollback`, `dev`, `env` | [`6-cli-commands.md`](6-cli-commands.md) |
 | 7 | **CLI: adding a project as an environment**: binding one repository to a second project, and what CI holds instead | [`7-cli-environments.md`](7-cli-environments.md) |
 
-Each document carries its own Prerequisites and Open sections, covering what that
-area needs that does not exist yet.
+Prerequisites and Open sections sit in the document they belong to, covering
+what that area needs that does not exist yet.

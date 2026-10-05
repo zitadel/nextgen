@@ -120,10 +120,36 @@ deployment contract.
 
 ### Discovery is server-side, not repository-side
 
-Since nothing is committed, a teammate who clones the repository cannot see which
-projects exist. That is the right place for the answer not to be: the **server**
-knows. A member of the team can list the projects the team owns, so
-`zitadel env add` offers them rather than asking for an id:
+Since nothing is committed, a teammate who clones the repository cannot see
+which projects exist. The repository is the wrong place for that answer anyway:
+it holds the shape (`.env.example`) and the server holds the inventory, and
+neither needs to hold both.
+
+**What the CLI can do today is narrower than that, and it is worth being exact
+about the gap.** `zitadel env add` has two paths:
+
+```
+$ zitadel env add production
+server?           https://api.zitadel.cloud
+project?          [x] create a new one   [ ] bind an existing one
+```
+
+- **Create a new one** works now. `POST /projects` is public and returns the id,
+  the secret and the publishable key, so no credential is needed to get a
+  project to bind.
+- **Bind an existing one** takes an id, typed or pasted — whoever created it
+  sends it over, the same way the project secret has to be sent over.
+
+Offering a *list* instead needs something the CLI does not have: an identity for
+the person running it. `queryProjects` is gated on `oauth2: [project.write]`,
+while the CLI authenticates with the project secret it reads from
+`.zitadel/secret` — and that secret is issued for one project, so it cannot
+enumerate that project's siblings even in principle. There is no login command,
+no device-code flow and no stored user token anywhere in `apps/cli`.
+
+So the picker below is what this looks like **once a person can authenticate**,
+and it is listed under [Prerequisites](#prerequisites) rather than described as
+available:
 
 ```
 $ zitadel env add production
@@ -134,8 +160,8 @@ project?  2 projects this team owns
           [ ] create a new one
 ```
 
-So the repository holds the shape (`.env.example`) and the server holds the
-inventory. Neither needs to hold both.
+Nothing else in this design waits on it. Typing an id binds an environment just
+as well as picking one from a list; the list only removes a copy-paste.
 
 ### Starting local
 
@@ -171,6 +197,8 @@ and nothing has to be done in a web console first.
 `zitadel env add` binds; `--project prj_...` binds a project that already
 exists, created by a teammate or by `zitadel projects create`. The two steps are
 separable because they are two concepts; offering to create one is only sugar.
+`--project` means "bind this id" here and nowhere else — it is
+[not a resolution override](5-cli-target-resolution.md#target-resolution).
 
 ```
 $ zitadel env list
@@ -242,3 +270,11 @@ class      sandbox -> production
 `promote` is free as a verb because release promotion no longer needs it.
 `zitadel projects demote` is the reverse, and asks for confirmation because it
 re-admits loopback origins to a project holding real users.
+
+## Prerequisites
+
+**A person's identity in the CLI**, for the project picker above and for nothing
+else on this page. It needs a browser or device-code flow, a token stored
+outside the repository, and `queryProjects` scoped to the teams that identity
+belongs to. Until then `zitadel env add` creates a project or takes an id, both
+of which work with what exists.
