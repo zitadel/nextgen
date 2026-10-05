@@ -5406,6 +5406,7 @@ func TestFlowStateMachine_Render_SSOHandoffLostRace(t *testing.T) {
 
 			_, err := w.sm.Render(t.Context(), def, state)
 			require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
+			assert.ErrorIs(t, err, domain.ErrAuthAttemptAlreadyHandedOff())
 		})
 	}
 }
