@@ -74,7 +74,6 @@ catalog:
   oclif: ^4.17.46
   orval: ^8.37.0
   playwright: ^1.60.0
-  prettier: ^3.0.0
   radix-ui: ^1.6.4
   react: ^19.2.8
   react-dom: ^19.2.8

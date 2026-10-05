@@ -216,9 +216,6 @@ catalogs:
     playwright:
       specifier: ^1.60.0
       version: 1.60.0
-    prettier:
-      specifier: ^3.0.0
-      version: 3.8.3
     radix-ui:
       specifier: ^1.6.4
       version: 1.6.4
@@ -349,9 +346,6 @@ importers:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.11(@vitest/browser@4.1.11)(vitest@4.1.11)
-      prettier:
-        specifier: 'catalog:'
-        version: 3.8.3
       sharp:
         specifier: 'catalog:'
         version: 0.35.3(@types/node@25.6.0)
