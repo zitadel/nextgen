@@ -84,7 +84,7 @@ func TestPasswordLoginFlow(t *testing.T) {
 
 	flowID := flowHeaders.Response.ID
 	require.Equal(t, "identifier", flowHeaders.Response.Step.Name)
-	zflow := mustExtractZflow(t, flowHeaders.SetCookie.Value)
+	zflow := mustExtractZflow(t, flowHeaders.SetCookie)
 
 	// Step 1: submit identifier → password step.
 	idResp, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
@@ -100,7 +100,7 @@ func TestPasswordLoginFlow(t *testing.T) {
 	require.IsType(t, &api.SubmitFlowStepOK{}, idResp, helpers.MustMarshal(t, idResp))
 	idOK := idResp.(*api.SubmitFlowStepOK)
 	require.Equal(t, "password", idOK.Response.Step.Name)
-	zflow = mustExtractZflow(t, idOK.SetCookie.Value)
+	zflow = mustExtractZflow(t, idOK.SetCookie)
 
 	// Step 2: submit password → done + handoff token.
 	pwResp, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
@@ -151,7 +151,7 @@ func TestPasswordLoginFlow_UnknownEmail(t *testing.T) {
 	require.IsType(t, &api.FlowResponseHeaders{}, createResp, helpers.MustMarshal(t, createResp))
 	flowHeaders := createResp.(*api.FlowResponseHeaders)
 	flowID := flowHeaders.Response.ID
-	zflow := mustExtractZflow(t, flowHeaders.SetCookie.Value)
+	zflow := mustExtractZflow(t, flowHeaders.SetCookie)
 
 	idResp, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
 		Action: "submit",
@@ -203,7 +203,7 @@ func TestPasswordRegisterFlow(t *testing.T) {
 	flowHeaders := createResp.(*api.FlowResponseHeaders)
 	flowID := flowHeaders.Response.ID
 	require.Equal(t, "signup", flowHeaders.Response.Step.Name)
-	zflow := mustExtractZflow(t, flowHeaders.SetCookie.Value)
+	zflow := mustExtractZflow(t, flowHeaders.SetCookie)
 
 	const (
 		newEmail = "pwregister@example.com"
@@ -289,7 +289,7 @@ func TestPasswordRegisterFlow_DuplicateEmail(t *testing.T) {
 	require.IsType(t, &api.FlowResponseHeaders{}, createResp, helpers.MustMarshal(t, createResp))
 	flowHeaders := createResp.(*api.FlowResponseHeaders)
 	flowID := flowHeaders.Response.ID
-	zflow := mustExtractZflow(t, flowHeaders.SetCookie.Value)
+	zflow := mustExtractZflow(t, flowHeaders.SetCookie)
 
 	submitResp, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
 		Action: "submit",

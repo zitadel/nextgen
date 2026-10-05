@@ -201,6 +201,8 @@ export const en: Record<string, string> = {
   "error.passkey_invalid": "This passkey could not be verified. Please try again.",
   "error.passkey_registration_invalid":
     "The new passkey could not be verified. Please try registering it again.",
+  "error.sso_unavailable":
+    "This sign-in provider is not available right now. Please try another way to sign in.",
 
   // --- Field / form errors (Figma field annotations) ---
   "error.email_required": "Please enter an email address",

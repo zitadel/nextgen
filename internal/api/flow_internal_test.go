@@ -85,6 +85,32 @@ func TestToFlowField_EnumSurfaces(t *testing.T) {
 	require.Equal(t, []string{"Single", "Married", "Divorced", "Widowed"}, got.Validation.Value.Enum)
 }
 
+func TestToFlowField_CarriesAutocompleteWhenSet(t *testing.T) {
+	t.Parallel()
+
+	got := toFlowField(domain.FlowField{
+		Name:         "x-auth-methods#password",
+		Type:         domain.FlowFieldTypePassword,
+		TextKey:      "password.field.password",
+		Autocomplete: domain.AutocompleteCurrentPassword,
+	})
+
+	require.True(t, got.Autocomplete.Set)
+	require.Equal(t, domain.AutocompleteCurrentPassword, got.Autocomplete.Value)
+}
+
+func TestToFlowField_OmitsAutocompleteWhenAbsent(t *testing.T) {
+	t.Parallel()
+
+	got := toFlowField(domain.FlowField{
+		Name:    "given_name",
+		Type:    domain.FlowFieldTypeText,
+		TextKey: "register.field.given_name",
+	})
+
+	require.False(t, got.Autocomplete.Set)
+}
+
 func TestToFlowStep_EmitsSSOProvidersInOrder(t *testing.T) {
 	t.Parallel()
 
@@ -108,6 +134,30 @@ func TestToFlowStep_NoSSOProvidersLeavesListEmpty(t *testing.T) {
 	got := toFlowStep(&domain.FlowStep{Name: "identifier"})
 
 	require.Empty(t, got.SSOProviders)
+}
+
+func TestToFlowStep_CarriesThePairedIdentifier(t *testing.T) {
+	t.Parallel()
+
+	got := toFlowStep(&domain.FlowStep{
+		Name: "password",
+		Identifier: &domain.FlowStepIdentifier{
+			Value:        "alice@example.com",
+			Autocomplete: domain.AutocompleteUsername,
+		},
+	})
+
+	require.True(t, got.Identifier.Set)
+	require.Equal(t, "alice@example.com", got.Identifier.Value.Value)
+	require.Equal(t, domain.AutocompleteUsername, got.Identifier.Value.Autocomplete)
+}
+
+func TestToFlowStep_OmitsThePairedIdentifierWhenAbsent(t *testing.T) {
+	t.Parallel()
+
+	got := toFlowStep(&domain.FlowStep{Name: "identifier"})
+
+	require.False(t, got.Identifier.Set)
 }
 
 func TestValidateOriginAgainstProject(t *testing.T) {

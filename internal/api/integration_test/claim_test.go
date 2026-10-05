@@ -178,7 +178,7 @@ func TestClaimHappyPath(t *testing.T) {
 	require.IsType(t, &api.FlowResponseHeaders{}, createResp, helpers.MustMarshal(t, createResp))
 	flowHeaders := createResp.(*api.FlowResponseHeaders)
 	flowID := flowHeaders.Response.ID
-	zflow := mustExtractZflow(t, flowHeaders.SetCookie.Value)
+	zflow := mustExtractZflow(t, flowHeaders.SetCookie)
 
 	idResp, err := platClient.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
 		Action: "submit",
@@ -190,7 +190,7 @@ func TestClaimHappyPath(t *testing.T) {
 	require.IsType(t, &api.SubmitFlowStepOK{}, idResp, helpers.MustMarshal(t, idResp))
 	idOK := idResp.(*api.SubmitFlowStepOK)
 	require.Equal(t, "password", idOK.Response.Step.Name)
-	zflow = mustExtractZflow(t, idOK.SetCookie.Value)
+	zflow = mustExtractZflow(t, idOK.SetCookie)
 
 	pwResp, err := platClient.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
 		Action: "submit",

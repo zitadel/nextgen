@@ -9,6 +9,16 @@ import (
 
 var variablePlaceholderRegex = regexp.MustCompile(`(?P<placeholder>\$\{\{ *(?P<variableName>\w+) *}})`)
 
+// VariableReferenceName returns the variable name when s is exactly one
+// `${{ NAME }}` reference, the only form a credential field may take.
+func VariableReferenceName(s string) (string, bool) {
+	m := variablePlaceholderRegex.FindStringSubmatch(s)
+	if m == nil || m[0] != s {
+		return "", false
+	}
+	return m[variablePlaceholderRegex.SubexpIndex("variableName")], true
+}
+
 const maxExpansionBytes = 1 << 20 // 1Mb
 const maxDocumentDepth = 20
 

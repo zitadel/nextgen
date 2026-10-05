@@ -171,7 +171,7 @@ func TestPasskeyFlowLogin(t *testing.T) {
 	flowHeaders := createResp.(*api.FlowResponseHeaders)
 
 	flowID := flowHeaders.Response.ID
-	zflow := mustExtractZflow(t, flowHeaders.SetCookie.Value)
+	zflow := mustExtractZflow(t, flowHeaders.SetCookie)
 
 	// --- Issue phase: action=passkey ------------------------------------------
 	issueResp, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
@@ -184,7 +184,7 @@ func TestPasskeyFlowLogin(t *testing.T) {
 	require.NoError(t, err)
 	require.IsType(t, &api.SubmitFlowStepOK{}, issueResp, helpers.MustMarshal(t, issueResp))
 	issueOK := issueResp.(*api.SubmitFlowStepOK)
-	zflow = mustExtractZflow(t, issueOK.SetCookie.Value)
+	zflow = mustExtractZflow(t, issueOK.SetCookie)
 
 	require.True(t, issueOK.Response.Step.Challenge.Set, "expected step.challenge after passkey issue")
 	challenge := issueOK.Response.Step.Challenge.Value
@@ -225,16 +225,17 @@ func TestPasskeyFlowLogin(t *testing.T) {
 	require.NotEmpty(t, handoffToken)
 }
 
-// mustExtractZflow parses a Set-Cookie header value and returns the _zflow
-// cookie value to pass as SubmitFlowStepParams.Zflow on the next request.
-func mustExtractZflow(t *testing.T, setCookieHeader string) string {
+// mustExtractZflow parses the response's Set-Cookie lines and returns the
+// _zflow cookie value to pass as SubmitFlowStepParams.Zflow on the next
+// request.
+func mustExtractZflow(t *testing.T, setCookie []string) string {
 	t.Helper()
-	h := http.Header{"Set-Cookie": []string{setCookieHeader}}
+	h := http.Header{"Set-Cookie": setCookie}
 	for _, c := range (&http.Response{Header: h}).Cookies() {
 		if c.Name == "_zflow" {
 			return c.Value
 		}
 	}
-	t.Fatalf("_zflow cookie not found in Set-Cookie header: %q", setCookieHeader)
+	t.Fatalf("_zflow cookie not found in Set-Cookie header: %q", setCookie)
 	return ""
 }

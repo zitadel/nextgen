@@ -476,3 +476,27 @@ func TestVariableListToMap(t *testing.T) {
 		assert.Equal(t, "env", got["v"].Value)
 	})
 }
+
+func TestVariableReferenceName(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		in   string
+		name string
+		ok   bool
+	}{
+		{in: "${{ GOOGLE_CLIENT_ID }}", name: "GOOGLE_CLIENT_ID", ok: true},
+		{in: "${{GOOGLE_CLIENT_ID}}", name: "GOOGLE_CLIENT_ID", ok: true},
+		{in: "1234-abc.apps.googleusercontent.com", ok: false},
+		{in: "id-${{ TAIL }}", ok: false},
+		{in: "${{ A }}${{ B }}", ok: false},
+		{in: "", ok: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.in, func(t *testing.T) {
+			t.Parallel()
+			name, ok := VariableReferenceName(tt.in)
+			assert.Equal(t, tt.ok, ok)
+			assert.Equal(t, tt.name, name)
+		})
+	}
+}
