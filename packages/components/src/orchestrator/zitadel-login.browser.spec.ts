@@ -32,12 +32,14 @@ const identifierStep: CreateFlow201 = {
         name: "email",
         type: "email",
         text_key: "identifier.field.email",
+        autocomplete: "username",
         required: true,
       },
       {
         name: "password",
         type: "password",
         text_key: "identifier.field.password",
+        autocomplete: "current-password",
         required: true,
       },
     ],
@@ -532,5 +534,210 @@ describe("<zitadel-login> form + focus (chromium)", () => {
     const fields = element.shadowRoot?.querySelectorAll("zl-field");
     expect(fields?.[0]?.getAttribute("name")).toBe("email");
     expect(fields?.[1]?.getAttribute("name")).toBe("password");
+  });
+});
+
+/**
+ * A password step reached from an identifier step: it collects only the
+ * password, so the engine hands back the identifier it already has for the
+ * form to carry beside it.
+ */
+const pairedPasswordStep: CreateFlow201 = {
+  id: "flow_1",
+  session_id: "sess_1",
+  session_token: "tok_1",
+  step: {
+    name: "password",
+    texts: { title_key: "password.title" },
+    fields: [
+      {
+        name: "x-auth-methods#password",
+        type: "password",
+        text_key: "identifier.field.password",
+        autocomplete: "current-password",
+        required: true,
+      },
+    ],
+    identifier: { value: "alice@example.com", autocomplete: "username" },
+    actions: [
+      { name: "submit", kind: "submit", text_key: "submit.signin", primary: true },
+      { name: "back", kind: "back", text_key: "action.back" },
+    ],
+    gates: {},
+  },
+};
+
+/** The same step with nothing collected upstream — no pairing to do. */
+const unpairedPasswordStep: CreateFlow201 = {
+  ...pairedPasswordStep,
+  step: { ...pairedPasswordStep.step, identifier: undefined },
+};
+
+describe("<zitadel-login> paired identifier (chromium)", () => {
+  let host: HTMLDivElement;
+  let stub: ReturnType<typeof installFlowFetchStub>;
+  let testProject: ZitadelProject;
+
+  function setup(responses: readonly CreateFlow201[]): void {
+    _resetConfigForTesting();
+    testProject = configureZitadel({
+      proxyPath: "/__nextgen",
+      projectId: "test-project",
+      url: "http://localhost:4000",
+    });
+    host = document.createElement("div");
+    document.body.appendChild(host);
+    stub = installFlowFetchStub(responses);
+  }
+
+  afterEach(() => {
+    host.remove();
+    stub.restore();
+  });
+
+  async function mount(): Promise<ZitadelLogin> {
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.purpose = "login";
+    element.project = testProject;
+    host.appendChild(element);
+    await waitFor(() => {
+      const root = element.shadowRoot;
+      return root?.querySelector("zl-field") ? root : null;
+    });
+    await waitFor(() => (element.getAttribute("aria-busy") === "false" ? element : null));
+    return element;
+  }
+
+  it("renders it as a nameless read-only control inside the form", async () => {
+    setup([pairedPasswordStep]);
+    const element = await mount();
+    const form = element.shadowRoot?.querySelector("form");
+    const paired = form?.querySelector<HTMLInputElement>('input[autocomplete="username"]');
+
+    expect(paired).toBeTruthy();
+    expect(paired?.value).toBe("alice@example.com");
+    // As an attribute, not just a property: a manager reading the markup has
+    // to find the address there. A `.value` binding leaves it absent.
+    expect(paired?.getAttribute("value")).toBe("alice@example.com");
+    expect(paired?.readOnly).toBe(true);
+    // No name: a nameless control is left out of every submission, which is
+    // what keeps it from reaching the engine as a field the step never declared.
+    expect(paired?.hasAttribute("name")).toBe(false);
+    // A manager has to see a credential-shaped control, so it is clipped rather
+    // than `display:none` or `type="hidden"`.
+    expect(paired?.type).toBe("text");
+    expect(paired?.getAttribute("aria-hidden")).toBe("true");
+    expect(paired?.tabIndex).toBe(-1);
+  });
+
+  it("renders nothing when the step carries no identifier", async () => {
+    setup([unpairedPasswordStep]);
+    const element = await mount();
+    const form = element.shadowRoot?.querySelector("form");
+    expect(form?.querySelector('input[autocomplete="username"]')).toBeNull();
+  });
+
+  it("comes back on a reload, which re-renders the step from flow state", async () => {
+    // A reload loses `formValues` — the widget keeps collected values in memory
+    // only — so the pairing has to survive on what GET /flow/{id} returns.
+    setup([pairedPasswordStep]);
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.purpose = "login";
+    element.project = testProject;
+    element.resumeFlowId = "flow_1";
+    host.appendChild(element);
+    await waitFor(() => {
+      const root = element.shadowRoot;
+      return root?.querySelector("zl-field") ? root : null;
+    });
+
+    const resumed = stub.calls.find((call) => (call.init?.method ?? "GET") === "GET");
+    expect(resumed?.url).toContain("/flow/flow_1");
+    const paired = element.shadowRoot
+      ?.querySelector("form")
+      ?.querySelector<HTMLInputElement>('input[autocomplete="username"]');
+    expect(paired?.getAttribute("value")).toBe("alice@example.com");
+  });
+
+  it("disappears when back lands on a step that collects the identifier itself", async () => {
+    setup([pairedPasswordStep, identifierStep]);
+    const element = await mount();
+    const root = element.shadowRoot!;
+    expect(root.querySelector('input[part="paired-identifier"]')).toBeTruthy();
+
+    root.dispatchEvent(
+      new CustomEvent("zl-submit", {
+        bubbles: true,
+        composed: true,
+        detail: { action: "back" },
+      }),
+    );
+    await waitFor(() =>
+      element.shadowRoot?.querySelectorAll("zl-field").length === 2 ? element : null,
+    );
+    // That step renders the identifier as a real field, so a second copy would
+    // be a duplicate the manager has to choose between.
+    expect(element.shadowRoot?.querySelector('input[part="paired-identifier"]')).toBeNull();
+  });
+
+  it("hands focus to the step's first control when the host is focused", async () => {
+    // It is the shadow root's first focusable element, so `delegatesFocus`
+    // sends host focus to it.
+    setup([pairedPasswordStep]);
+    const element = await mount();
+    (document.activeElement as HTMLElement | null)?.blur();
+
+    element.focus();
+    expect(element.shadowRoot?.activeElement?.tagName).toBe("ZL-FIELD");
+  });
+
+  it("follows the server when a second identifier replaces the first", async () => {
+    // Back, then a different address: the control must not keep the old one.
+    // It reads `step.identifier` rather than the cross-step `formValues` cache,
+    // where earlier entries win on conflict.
+    const second: CreateFlow201 = {
+      ...pairedPasswordStep,
+      step: {
+        ...pairedPasswordStep.step,
+        identifier: { value: "bob@example.com", autocomplete: "username" },
+      },
+    };
+    setup([pairedPasswordStep, second]);
+    const element = await mount();
+    const root = element.shadowRoot!;
+    await fillNativeField(root, "x-auth-methods#password", "hunter2");
+    root.dispatchEvent(
+      new CustomEvent("zl-submit", {
+        bubbles: true,
+        composed: true,
+        detail: { action: "submit" },
+      }),
+    );
+    await waitFor(() => {
+      const paired = element.shadowRoot?.querySelector<HTMLInputElement>(
+        'input[autocomplete="username"]',
+      );
+      return paired?.getAttribute("value") === "bob@example.com" ? paired : null;
+    });
+  });
+
+  it("keeps it out of the submitted fields", async () => {
+    setup([pairedPasswordStep]);
+    const element = await mount();
+    const root = element.shadowRoot!;
+    await fillNativeField(root, "x-auth-methods#password", "hunter2");
+    root.dispatchEvent(
+      new CustomEvent("zl-submit", {
+        bubbles: true,
+        composed: true,
+        detail: { action: "submit" },
+      }),
+    );
+    const submit = await waitFor(() =>
+      stub.calls.find((call) => call.init?.method === "POST" && call.url.includes("/submit")),
+    );
+    const body = JSON.parse(String(submit.init?.body)) as { fields: Record<string, unknown> };
+    expect(body.fields).toHaveProperty("x-auth-methods#password", "hunter2");
+    expect(Object.keys(body.fields)).toEqual(["x-auth-methods#password"]);
   });
 });
