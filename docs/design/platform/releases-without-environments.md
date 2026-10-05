@@ -248,6 +248,25 @@ credential identifies the project — the project secret for a server, the
 publishable key for a shipped app — and layer 3 serves the newest deployment with
 `origin = ""`. To get anything else it must say so with `X-Zitadel-Release`.
 
+The project default is a target like any other, not a fallback computed from the
+origins: `""` is its name in `deployments.origin`, the same convention variables
+use for the project scope. So "which release does a caller with no origin get"
+and "which release does `app.acme.com` get" are the same query against two
+different keys, and `zitadel status` lists `(default)` as its own row for exactly
+that reason.
+
+Two edges follow from it being a real target:
+
+- **Nothing has been deployed yet.** No `origin = ""` row exists, so there is no
+  default to serve and the request is `409 rel.no_default` rather than a guess.
+  The project has origins and an allowlist from the moment it is created, but it
+  serves nothing until a deploy appends a row.
+- **`deploy --origin` leaves the default where it was.** Shipping to one primary
+  hostname appends a row for that origin only, so `app.acme.com` moves and a
+  server-side caller does not. That divergence is intended — it is what targeting
+  one origin means — and `zitadel status` shows it as two different digests on
+  two rows.
+
 **Omitting `Origin` is not a way around the gate.** A non-browser client can
 simply leave the header off, so it is worth being explicit about what that
 reaches: the project default, which is the same configuration any visitor to
@@ -278,6 +297,7 @@ see [Open 6](#open).
 | Body `project_id` disagrees with the credential | 403 | `proj.mismatch` |
 | Header used without a credential on a `production` project | 403 | `rel.pin_not_permitted` |
 | `preview` pattern matched, no row and no permitted header | 400 | `rel.required` |
+| No `Origin`, and the project has never been deployed | 409 | `rel.no_default` |
 | Digest names a release of another project, or none | 404 | `rel.not_found` |
 | Short digest matches more than one release | 400 | `rel.ambiguous` |
 | Release revoked | 409 | `rel.revoked` |
@@ -455,7 +475,7 @@ SELECT * FROM deployments
 
 Supporting index: `(project_id, origin, deployed_at DESC, id DESC)`.
 
-Four rules:
+Five rules:
 
 1. **Rows are never mutated, and nothing points at them.** Deploy, rollback and
    redeploy all append. What a target serves is the newest row carrying it — not
@@ -469,6 +489,12 @@ Four rules:
 4. **Point-in-time is a query, not a column.** "What was `app.acme.com` serving
    on 1 October" is the newest row for that origin with
    `deployed_at <= '2026-10-01'`. No `superseded_at`, no validity ranges.
+5. **Only a deploy to the project default may append an `origin = ""` row.** A
+   `preview` deploy writes its own origin and nothing else. This is the invariant
+   the no-`Origin` path rests on: were a preview allowed to write the default
+   row, every server-side caller would start serving a branch. The CLI enforces
+   it by having [two verbs](#zitadel-preview), but it has to hold server-side
+   too, because the CLI is not the only client.
 
 ### Why there is no pointer column
 
