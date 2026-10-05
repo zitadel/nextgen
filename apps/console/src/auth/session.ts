@@ -1,5 +1,6 @@
 import type { GetMySession200 } from "@zitadel/api/generated/model";
 import { getApiCsrfToken, setApiCsrfRejectionHandler, setApiCsrfToken } from "@zitadel/api/runtime/auth";
+import { ApiError } from "@zitadel/api/runtime/fetch";
 
 import { api } from "../api/zitadel";
 import { clearSessionCaches } from "../lib/session-cache";
@@ -32,8 +33,14 @@ const withCredentials: RequestInit = { credentials: "include" };
 let cachedSession: { at: number; session: ConsoleSession } | null = null;
 const SESSION_CACHE_MS = 15_000;
 
-/** Whose session the CSRF token in the shared slot was loaded for. */
-let tokenUserId: string | undefined;
+/**
+ * The person this page was loaded for: set by the first session it reads, and
+ * cleared only with everything else (sign-out, a lost session). The CSRF token
+ * in the shared slot always belongs to this person. A session that turns out to
+ * belong to someone else is never adopted in place, because the page may still
+ * show the first person's data and forms: it starts over instead.
+ */
+let pageUserId: string | undefined;
 
 /**
  * Drops the cached session (called on sign-out), and with it every read cached
@@ -41,9 +48,15 @@ let tokenUserId: string | undefined;
  */
 export function invalidateSessionCache(): void {
   cachedSession = null;
-  tokenUserId = undefined;
+  pageUserId = undefined;
   setApiCsrfToken(undefined);
   clearSessionCaches();
+}
+
+/** Drops everything held for this page's person and reloads it. */
+function startOver(): void {
+  invalidateSessionCache();
+  sessionPage.reload();
 }
 
 /**
@@ -61,18 +74,23 @@ export async function fetchSession(): Promise<ConsoleSession | null> {
   }
   // Every state-changing management call the cookie authenticates must carry
   // the session's CSRF token (ADR 053 §5). The token is stable for the life of
-  // a cookie, so it is read only when there is none yet (alongside the session,
-  // costing no extra round trip in sequence) or when the session turned out to
-  // belong to someone else. Only the session decides whether someone is signed
-  // in, and a failed token read never replaces a token that works.
+  // a cookie, so it is read only when there is none yet, alongside the session
+  // so it costs no extra round trip in sequence. Only the session decides
+  // whether someone is signed in, and a failed token read never replaces a
+  // token that works.
   const early = getApiCsrfToken() ? undefined : readCsrfToken();
   try {
     const session = await api.getMySession(withCredentials);
     if (session.state !== "active" || !session.user_id) return null;
-    cachedSession = { at: Date.now(), session };
-    if (!getApiCsrfToken() || tokenUserId !== session.user_id) {
-      await loadCsrfToken(session.user_id, early);
+    if (pageUserId !== undefined && session.user_id !== pageUserId) {
+      // Another tab signed in as someone else. Adopting that session here
+      // would arm this page's open forms to write as them: start over.
+      startOver();
+      return null;
     }
+    pageUserId = session.user_id;
+    cachedSession = { at: Date.now(), session };
+    if (!getApiCsrfToken()) await loadCsrfToken(early);
     return session;
   } catch {
     return null;
@@ -88,18 +106,14 @@ function readCsrfToken(): Promise<string | undefined> {
 }
 
 /**
- * Stores the token for `userId`, keeping the current one when the read failed.
- * Returns the token it stored, if any.
+ * Stores the token for this page's person, keeping the current one when the
+ * read failed. Returns the token it stored, if any.
  */
-async function loadCsrfToken(
-  userId: string,
-  pending?: Promise<string | undefined>,
-): Promise<string | undefined> {
+async function loadCsrfToken(pending?: Promise<string | undefined>): Promise<string | undefined> {
   const token = await (pending ?? readCsrfToken());
   if (!token) return undefined;
   // The shared fetch adds it to every unsafe request from here on.
   setApiCsrfToken(token);
-  tokenUserId = userId;
   return token;
 }
 
@@ -110,36 +124,33 @@ let recheck: Promise<string | undefined> | undefined;
 
 /**
  * Runs when a write was refused with `403 auth.csrf_invalid`: the token was
- * stale (another tab replaced the cookie by signing in again) or never loaded.
- * The session is read again:
+ * stale (another tab renewed the cookie) or never loaded. The session is read
+ * again, with the token alongside it:
  *
- * - still the person this page shows: their token is loaded and returned, and
- *   the shared fetch retries the write once with it;
- * - someone else, or nobody: nothing is returned, so the write stays refused
- *   and is never replayed as another person. This page belongs to a session
- *   that is gone, so everything cached for it is dropped and it starts over.
+ * - still this page's person: their token is stored and returned, and the
+ *   shared fetch retries the write once with it;
+ * - someone else, or nobody (401): nothing is returned, so the write stays
+ *   refused and is never replayed as another person, and the page starts over;
+ * - the session read failed for another reason, or this page has no person
+ *   yet: nothing is returned and nothing else changes. The write stays refused
+ *   for the person to retry; a network blip does not cost them their page.
  */
 async function recheckAfterRejection(): Promise<string | undefined> {
-  const shownUserId = tokenUserId ?? cachedSession?.session.user_id;
-  cachedSession = null;
-  let session: ConsoleSession | null;
+  if (pageUserId === undefined) return undefined;
+  const token = readCsrfToken();
+  let session: ConsoleSession;
   try {
     session = await api.getMySession(withCredentials);
-  } catch {
-    session = null;
+  } catch (cause) {
+    if (cause instanceof ApiError && cause.status === 401) startOver();
+    return undefined;
   }
-  if (
-    !session ||
-    session.state !== "active" ||
-    !session.user_id ||
-    (shownUserId !== undefined && session.user_id !== shownUserId)
-  ) {
-    invalidateSessionCache();
-    sessionPage.reload();
+  if (session.state !== "active" || !session.user_id || session.user_id !== pageUserId) {
+    startOver();
     return undefined;
   }
   cachedSession = { at: Date.now(), session };
-  return loadCsrfToken(session.user_id);
+  return loadCsrfToken(token);
 }
 
 // Concurrent refusals share one re-check.
