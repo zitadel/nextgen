@@ -62,7 +62,7 @@ The project default is a target like any other, not a fallback computed from the
 origins: `""` is simply its name in `deployments.origin`. So "which release does
 a caller with no origin get"
 and "which release does `app.acme.com` get" are the same query against two
-different keys, and `zitadel status` lists `(default)` as its own row for exactly
+different keys, and `(default)` is a row of its own in any listing for exactly
 that reason.
 
 Two edges follow from it being a real target:
@@ -74,8 +74,8 @@ Two edges follow from it being a real target:
 - **`deploy --origin` leaves the default where it was.** Shipping to one primary
   hostname appends a row for that origin only, so `app.acme.com` moves and a
   server-side caller does not. That divergence is intended — it is what targeting
-  one origin means — and `zitadel status` shows it as two different digests on
-  two rows.
+  one origin means — and the deployment history shows it as two different
+  digests on two rows.
 
 **Omitting `Origin` is not a way around the gate.** A non-browser client can
 simply leave the header off, so it is worth being explicit about what that
@@ -243,8 +243,8 @@ each with their own `.zitadel/` edits. The origin cannot separate them; the
 release digest can.
 
 1. A developer edits `.zitadel/flows/login.json`.
-2. The dev-server hook **builds a release and does not activate it**. Identical
-   content across two developers reuses one release.
+2. Whatever watches `.zitadel/` locally **builds a release and does not deploy
+   it**. Identical content across two developers reuses one release.
 3. The digest lands in the local runtime document.
 4. The browser sends it as `X-Zitadel-Release`.
 5. The shared project's pointer is never touched.

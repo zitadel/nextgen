@@ -7,30 +7,6 @@
 The command surface under this model. Transcripts are illustrative, not a
 committed surface.
 
-## `zitadel status`
-
-```
-$ zitadel status
-server   https://api.zitadel.cloud          (ZITADEL_URL)
-project  prj_01K9AA9M3K7E2QX8VB4T  acme     (.zitadel/secret)
-class    production
-
-local    sha256:9f2c1a7b  (3 files changed since the last release)
-
-TARGET                                  SERVING          DEPLOYED      EXPIRES
-(default)                               sha256:4a5b6c7d  10-02 09:30
-https://app.acme.com                    sha256:4a5b6c7d  10-02 09:30
-https://www.acme.com                    sha256:4a5b6c7d  10-02 09:30
-https://acme-git-sso-acmeinc.vercel.app sha256:9f2c1a7b  10-02 14:10   in 6d
-
-  local differs from (default) — run `zitadel deploy` to ship it
-```
-
-Drift is one comparison: hash the working copy, compare to what each target
-serves. The list is the targets `deploy` ships to — the default and the `primary`
-origins — plus the preview for the current branch if there is one. Every target
-the project has is `zitadel deployments --live`.
-
 ## `zitadel deploy`
 
 ```
@@ -136,7 +112,7 @@ error  no preview URL found
        looked for: VERCEL_BRANCH_URL, DEPLOY_PRIME_URL, CF_PAGES_URL
 
        `zitadel preview` runs in a deploy pipeline, where the platform
-       publishes the URL. For local work use `zitadel dev`.
+       publishes the URL. Local work needs no preview URL at all.
        To target a URL explicitly: zitadel preview --origin <url>
 ```
 
@@ -304,20 +280,6 @@ production set.
 Rolling back appends — a new row per target, `reason=rollback`, and the
 `deploy_id` it reversed recorded on it — so rolling back and forward leaves a
 trail that reads in both directions.
-
-## `zitadel dev`
-
-```
-$ zitadel dev
-watching .zitadel/
-server   http://localhost:8080  (local)
-project  prj_01KDEV…            class=sandbox
-app      http://project-a.localhost:3000
-
-14:22:01  flows/login.json changed
-14:22:01  release sha256:c3f7a8b2 (new, not activated)
-14:22:01  runtime document updated — reload to see it
-```
 
 ## `zitadel env`
 

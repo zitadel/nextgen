@@ -149,7 +149,7 @@ environment — the one thing that needs no commit today.
 |---|---|---|
 | Changed by | `deploy`, as a side effect of shipping | `zitadel allowlist add`, a call of its own |
 | Guarded by | review of the block, in a PR | `project.write`, the class and anchor rules, and an audit log entry |
-| Costs | either a carve-out in the `zitadel status` drift hash, or an allowlist edit showing up as undeployed code | nothing — `zitadel.json` holds release content only |
+| Costs | either a carve-out in the drift comparison, or an allowlist edit showing up as undeployed code | nothing — `zitadel.json` holds release content only |
 | Can be rebuilt from the repo | yes | no |
 
 **And the review it buys is weaker than it looks**, since a block that CI applies
