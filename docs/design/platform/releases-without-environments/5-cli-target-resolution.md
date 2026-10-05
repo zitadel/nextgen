@@ -24,12 +24,12 @@ writes. Each resolves independently, highest priority first:
 
 `zitadel.json` is **not** in this chain. It describes configuration content, not
 which server to send it to — see
-[stages](5-cli-stages.md#stages-pointing-one-repository-at-several-projects).
+[stages](7-cli-stages.md#stages-pointing-one-repository-at-several-projects).
 
 Stage detection, highest priority first: `--stage`, `ZITADEL_STAGE`, platform
 signals (`VERCEL_ENV`, `NETLIFY_CONTEXT`, `RAILWAY_ENVIRONMENT`), `NODE_ENV`,
 `development`. The stage is local only; it selects which `.env` files to read and
-which [`.env` files](5-cli-stages.md#stages-pointing-one-repository-at-several-projects) to
+which [`.env` files](7-cli-stages.md#stages-pointing-one-repository-at-several-projects) to
 read, and never reaches the server.
 
 **`--stage`, not `--env`.** The selector is deliberately not called `--env`: the

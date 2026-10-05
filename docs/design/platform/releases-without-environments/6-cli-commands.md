@@ -130,7 +130,7 @@ error  no preview URL found
 
 `zitadel preview` runs in a **pull-request** job, from a branch anyone with PR
 access can write. Nothing in that branch reaches the allowlist: patterns are
-project state, [not repository content](1-data-model.md#why-the-allowlist-is-not-in-zitadeljson),
+project state, [not repository content](2-origins.md#why-the-allowlist-is-not-in-zitadeljson),
 so committing `https://*.evil.com` grants nothing. What a PR job does hold is a
 credential, and that is the part still to solve.
 
@@ -173,7 +173,7 @@ The allowlist is a separate command, because a pattern is project state rather
 than release content and is changed deliberately rather than as a side effect of
 shipping. Each line shows the check the pattern passed, which is what has to
 stand in for the PR review the
-[old design assumed](1-data-model.md#why-the-allowlist-is-not-in-zitadeljson):
+[old design assumed](2-origins.md#why-the-allowlist-is-not-in-zitadeljson):
 
 ```
 $ zitadel allowlist
@@ -197,7 +197,7 @@ error  origin_not_tenant_anchored
 
 `set` and `list` address the store, `resolve --origin` reads the snapshot a
 target is running — the transcripts are under
-[Variables](1-data-model.md#setting-one). Two commands because they answer two questions, and
+[Variables](3-variables.md#setting-one). Two commands because they answer two questions, and
 conflating them is how "I set it and nothing happened" happens.
 
 ```
@@ -206,7 +206,7 @@ removed from the store. 2 deployments still reference it; they are unaffected.
 ```
 
 Removing from the store never reaches a snapshot, which is the whole point of
-[runtime immutability](1-data-model.md#immutability-at-runtime) — and the reason the message
+[runtime immutability](3-variables.md#immutability-at-runtime) — and the reason the message
 says so out loud rather than reporting a bare success.
 
 ## `zitadel rollback`

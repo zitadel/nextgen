@@ -67,14 +67,14 @@ Three reasons this beats a block in `zitadel.json`:
   agree.
 - **A platform's environment store cannot write `zitadel.json`.** Vercel and
   Netlify inject `process.env`, which wins at step 2 of
-  [target resolution](3-cli-target-resolution.md#target-resolution). A committed map would therefore be
+  [target resolution](5-cli-target-resolution.md#target-resolution). A committed map would therefore be
   silently overridden in exactly the deployment where being wrong matters most —
   authoritative-looking and inert.
 - **`zitadel.json` stays purely configuration content.** It describes what gets
   built into a release. Connection details are not that, and keeping them out
   means the bundle needs no carve-out for the parts of the file that must not
   ship. The
-  [allowed origins](1-data-model.md#why-the-allowlist-is-not-in-zitadeljson) are
+  [allowed origins](2-origins.md#why-the-allowlist-is-not-in-zitadeljson) are
   out for the same reason and fail the same way: a list that differs per project
   has nothing correct to say in a file every project shares.
 
@@ -103,7 +103,7 @@ store. Those land in `process.env`, which already outranks every file, so no
 ```
 
 The two jobs read correctly without a comment explaining which flag makes one
-safe, which is the [two-verbs argument](4-cli-commands.md#zitadel-preview) paying off in the place
+safe, which is the [two-verbs argument](6-cli-commands.md#zitadel-preview) paying off in the place
 it matters.
 
 This also clarifies what the stage is actually for: **it only matters where
@@ -207,7 +207,7 @@ deployed   dpl_01KC4N8P2S5WQZ   2 deployment records written
 
 The allowlist is read here, never written. `deploy` fans out over the `primary`
 origins the project already admits, so
-[admitting one](1-data-model.md#why-the-allowlist-is-not-in-zitadeljson) is the
+[admitting one](2-origins.md#why-the-allowlist-is-not-in-zitadeljson) is the
 step before this rather than part of it — which is why `zitadel stages add`
 suggests it first.
 

@@ -37,7 +37,7 @@ production configuration.
 first step and reused for the rest of the attempt, so a deploy landing mid
 sign-in cannot change the configuration under the user. Sealing the deployment
 rather than the release pins the resources and the
-[variable snapshot](1-data-model.md#immutability-at-runtime) with one pointer, which is why they
+[variable snapshot](3-variables.md#immutability-at-runtime) with one pointer, which is why they
 cannot drift apart part-way through an attempt.
 
 ### What each kind of caller sends
@@ -155,7 +155,7 @@ Authorization: Bearer pk_7kR2pXq9vN3wLmYhT4cB8A
 Serves the branch's own release. Byte-identical to example 1 except the `Origin`.
 
 Passkey assertion with a production credential fails here — see
-[Passkeys](1-data-model.md#passkeys-and-preview-origins).
+[Passkeys](2-origins.md#passkeys-and-preview-origins).
 
 ### 3. A preview that could not register its origin
 

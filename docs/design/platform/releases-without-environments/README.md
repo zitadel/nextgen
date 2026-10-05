@@ -24,11 +24,13 @@ The server has no environments. Two things take their place:
 
 | # | Area | Doc |
 |---|---|---|
-| 1 | **Project data model**: the entities, the origin inventory that replaces environments, the project class, the deployment log, and the variable store and its per-deployment snapshot | [`1-data-model.md`](1-data-model.md) |
-| 2 | **Release resolution**: the three layers, what each kind of caller sends, worked request examples, and local development | [`2-release-resolution.md`](2-release-resolution.md) |
-| 3 | **CLI: finding the server and project**: the resolution chain across flags, `process.env` and `.env` files | [`3-cli-target-resolution.md`](3-cli-target-resolution.md) |
-| 4 | **CLI: commands**: `status`, `deploy`, `preview`, `origins`, `variables`, `rollback`, `dev`, `env` | [`4-cli-commands.md`](4-cli-commands.md) |
-| 5 | **CLI: adding a project as a stage**: binding one repository to a second project, and what CI holds instead | [`5-cli-stages.md`](5-cli-stages.md) |
+| 1 | **Data model**: the entities, and the append-only deployment log that replaces the environment pointer | [`1-data-model.md`](1-data-model.md) |
+| 2 | **Origins**: the allowlist of patterns, the inventory of live URLs, the tenant-anchor rule and the project class | [`2-origins.md`](2-origins.md) |
+| 3 | **Variables**: the store a person edits, the immutable snapshot a deployment runs, and how a preview gets different values | [`3-variables.md`](3-variables.md) |
+| 4 | **Release resolution**: the three layers, what each kind of caller sends, worked request examples, and local development | [`4-release-resolution.md`](4-release-resolution.md) |
+| 5 | **CLI: finding the server and project**: the resolution chain across flags, `process.env` and `.env` files | [`5-cli-target-resolution.md`](5-cli-target-resolution.md) |
+| 6 | **CLI: commands**: `status`, `deploy`, `preview`, `origins`, `variables`, `rollback`, `dev`, `env` | [`6-cli-commands.md`](6-cli-commands.md) |
+| 7 | **CLI: adding a project as a stage**: binding one repository to a second project, and what CI holds instead | [`7-cli-stages.md`](7-cli-stages.md) |
 
 Each document carries its own Prerequisites and Open sections, covering what that
 area needs that does not exist yet.
