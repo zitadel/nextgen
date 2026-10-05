@@ -475,13 +475,13 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 	if err != nil {
 		return FlowStepResult{}, false, fmt.Errorf("flow state machine: bind sso identity: %w", err)
 	}
-	recordResolvedUser(state, parked.Link.UserID)
-	result, err := r.routeOutcome(pc, resolvedFields, FlowImplicitOutcomeSSOAuthenticated, false)
-	return result, true, err
+	return r.retrySSOHandoff(pc, resolvedFields, parked.Link.UserID)
 }
 
-// retrySSOHandoff raises sso_authenticated for a user an earlier bind recorded
-// on the attempt, which mints the handoff that bind's request did not deliver.
+// retrySSOHandoff raises sso_authenticated for a user bound on the attempt,
+// which mints the handoff. The bind is this request's or an earlier one whose
+// request did not deliver the handoff; either way a concurrent render can win
+// the handoff first.
 func (r *FlowStateMachineRuntime) retrySSOHandoff(pc *processCtx, resolvedFields FlowResolvedFields, userID string) (FlowStepResult, bool, error) {
 	recordResolvedUser(pc.state, userID)
 	result, err := r.routeOutcome(pc, resolvedFields, FlowImplicitOutcomeSSOAuthenticated, false)

@@ -4861,20 +4861,6 @@ func TestFlowStateMachine_Render_SSOBoundAttemptRetriesHandoff(t *testing.T) {
 	assert.Equal(t, "u1", result.State.CollectedData.UserID)
 }
 
-// Two requests retried the same lost handoff and the other one won: the
-// attempt is handed off, so this one restarts, as every later render of this
-// cookie would.
-func TestFlowStateMachine_Render_SSOBoundAttemptRetryLosesRace(t *testing.T) {
-	t.Parallel()
-	w, def, state := ssoRenderWorld(t)
-	w.expectParked(&domain.FlowSSOParkedIdentity{BoundUserID: "u1"}, nil)
-	w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).
-		Return(domain.FlowHandoffOutput{}, domain.ErrAuthAttemptAlreadyHandedOff())
-
-	_, err := w.sm.Render(t.Context(), def, state)
-	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
-}
-
 func TestFlowStateMachine_Render_SSOBoundAttemptWithRecordedUserRendersStep(t *testing.T) {
 	t.Parallel()
 	w, def, state := ssoRenderWorld(t)
@@ -4940,6 +4926,63 @@ func TestFlowStateMachine_Render_SSOStaleBindOnReplacedRowRendersStep(t *testing
 	assert.Nil(t, result.Step.Error)
 	assert.Empty(t, result.State.CollectedData.UserID)
 	assert.Empty(t, result.HandoffToken)
+}
+
+// ssoHandoffPaths are the ways a render reaches the handoff: its own bind, or
+// a bind an earlier request committed.
+var ssoHandoffPaths = []struct {
+	name        string
+	expect      func(w *flowTestWorld)
+	wantCheckID string
+}{
+	{
+		name: "own bind",
+		expect: func(w *flowTestWorld) {
+			w.expectParked(linkedParked(), nil)
+			w.ssoIdentities.EXPECT().
+				BindLinked(gomock.Any(), domain.FlowSSOBindInput{
+					ProjectID:    testProjectID,
+					AttemptID:    "att-1",
+					CheckID:      "ch-1",
+					UserID:       "user-1",
+					ConnectionID: "idp-1",
+					LinkID:       "idplink-1",
+				}).
+				Return(nil)
+		},
+		wantCheckID: "ch-1",
+	},
+	{
+		name: "earlier bind",
+		expect: func(w *flowTestWorld) {
+			w.expectParked(&domain.FlowSSOParkedIdentity{BoundUserID: "user-1"}, nil)
+		},
+	},
+	{
+		name: "stale bind",
+		expect: func(w *flowTestWorld) {
+			w.expectStaleBind(&domain.FlowSSOParkedIdentity{BoundUserID: "user-1"}, nil)
+		},
+		wantCheckID: "ch-1",
+	},
+}
+
+// A concurrent render won the handoff: the attempt is handed off, so this one
+// restarts, as every later render of this cookie would.
+func TestFlowStateMachine_Render_SSOHandoffLostRace(t *testing.T) {
+	t.Parallel()
+	for _, tt := range ssoHandoffPaths {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			w, def, state := ssoRenderWorld(t)
+			tt.expect(w)
+			w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).
+				Return(domain.FlowHandoffOutput{}, domain.ErrAuthAttemptAlreadyHandedOff())
+
+			_, err := w.sm.Render(t.Context(), def, state)
+			require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
+		})
+	}
 }
 
 // A completed flow has handed its attempt off (and the session exchange may
