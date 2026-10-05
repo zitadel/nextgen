@@ -11,6 +11,7 @@ import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { localServerHostsPlatform } from "../../../src/commands/setup";
+import { writeRuntimeMetadata } from "../../../src/lib/local-server/runtime";
 import { parseJson, runCliForTest } from "../../helpers/run-cli";
 
 const tempDirs: string[] = [];
@@ -29,6 +30,22 @@ function setup(cwd: string, extra: string[] = []) {
     "https://api.zitadel.cloud",
     ...extra,
   ]);
+}
+
+/** What `zitadel start` records beside the local admin: which server it started. */
+async function recordStartedServer(dir: string, serverUrl: string): Promise<void> {
+  await writeRuntimeMetadata(dir, {
+    schema_version: 1,
+    backend: "docker",
+    container_name: "zitadel-server-test",
+    container_id: "container-1",
+    image: "ghcr.io/zitadel/nextgen:test",
+    port: Number(new URL(serverUrl).port),
+    server_url: serverUrl,
+    data_dir: join(dir, ".zitadel/local/nextgen-data"),
+    created_at: "2026-06-09T00:00:00.000Z",
+    cli_version: "0.0.0-test",
+  });
 }
 
 /** A minimal detectable Next.js App Router project (no Zitadel files yet). */
@@ -427,6 +444,7 @@ describe("setup command", () => {
         team_id: "team_localadmin",
       }),
     );
+    await recordStartedServer(cwd, "http://localhost:9941");
     server.use(
       http.get("http://localhost:9941/console/runtime.json", () =>
         HttpResponse.json({
@@ -475,28 +493,83 @@ describe("setup command", () => {
       ),
     );
 
-    const res = await runCliForTest([
-      "setup",
-      "--cwd",
-      cwd,
-      "--json",
-      "--server",
-      "http://localhost:9942",
-      "--non-interactive",
-      "--skip-install",
-      "--framework",
-      "next",
-    ]);
+    const res = await runCliForTest(
+      [
+        "setup",
+        "--cwd",
+        cwd,
+        "--json",
+        "--server",
+        "http://localhost:9942",
+        "--non-interactive",
+        "--skip-install",
+        "--framework",
+        "next",
+      ],
+      // The search for local state ends at the home directory; pinning it
+      // keeps the developer's own `~/.zitadel/local` out of the test.
+      { HOME: cwd, USERPROFILE: cwd },
+    );
 
     expect(res.exitCode).toBe(0);
     const json = parseJson(res.stdout) as {
+      warnings: string[];
       data: { next_actions: string[]; next_commands: string[] };
     };
-    const actions = json.data.next_actions.join("\n");
-    expect(actions).toContain(`No local admin in ${cwd} or its parents`);
-    expect(actions).toContain("the directory `zitadel start` ran in, or one inside it");
+    expect(json.warnings).toHaveLength(1);
+    expect(json.warnings[0]).toContain(
+      `No local admin for http://localhost:9942 in ${cwd} or its parents`,
+    );
+    expect(json.warnings[0]).toContain("If `zitadel start` started this server");
+    expect(json.data.next_actions.join("\n")).not.toContain("No local admin");
     // No project to manage there, so the console is not suggested.
     expect(json.data.next_commands.join("\n")).not.toMatch(/ console$/m);
+  });
+
+  it("passes over a local admin that belongs to another server", async () => {
+    const cwd = await makeNextProject();
+    await mkdir(join(cwd, ".zitadel/local"), { recursive: true });
+    await writeFile(
+      join(cwd, ".zitadel/local/admin.json"),
+      JSON.stringify({
+        email: "admin@zitadel.localhost",
+        password: "another-servers-password",
+        user_id: "user_localadmin",
+        team_id: "team_localadmin",
+      }),
+    );
+    await recordStartedServer(cwd, "http://localhost:9999");
+    // No sign-in or claim handlers: a request made with that admin would fail
+    // the test as an unhandled request.
+    server.use(
+      http.get("http://localhost:9944/console/runtime.json", () =>
+        HttpResponse.json({
+          mode: "standalone",
+          console_project_id: "proj_platform",
+          publishable_key: "pk_platform",
+        }),
+      ),
+    );
+
+    const res = await runCliForTest(
+      [
+        "setup",
+        "--cwd",
+        cwd,
+        "--json",
+        "--server",
+        "http://localhost:9944",
+        "--non-interactive",
+        "--skip-install",
+        "--framework",
+        "next",
+      ],
+      { HOME: cwd, USERPROFILE: cwd },
+    );
+
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as { warnings: string[] };
+    expect(json.warnings[0]).toContain("No local admin for http://localhost:9944");
   });
 
   it("attaches the project to a local admin created in a parent directory and offers the console", async () => {
@@ -512,6 +585,7 @@ describe("setup command", () => {
         team_id: "team_localadmin",
       }),
     );
+    await recordStartedServer(parent, "http://localhost:9943");
     const cwd = join(parent, "my-app");
     await mkdir(join(cwd, "app"), { recursive: true });
     await writeFile(

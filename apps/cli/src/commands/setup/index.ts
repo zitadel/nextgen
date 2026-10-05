@@ -45,7 +45,7 @@ import {
   nonBlankString,
 } from "../../lib/oclif";
 import { serverKind } from "../../lib/oclif/server-kind";
-import { findLocalAdminDir, readLocalAdmin } from "../../lib/local-server/admin-credential";
+import { findLocalAdminFor } from "../../lib/local-server/admin-credential";
 import { claimProjectAsAdmin } from "../../lib/local-server/claim-as-admin";
 import { readPlatformRuntime } from "../../lib/local-server/runtime";
 import { readZitadelSecret, writeZitadelSecret } from "../../lib/project";
@@ -545,7 +545,10 @@ export default class Setup extends BaseCommand {
     // stays a cloud journey.
     let ownedByLocalAdmin: { email: string; team_id: string } | undefined;
     let unattachedWarning: string | undefined;
-    if (!dryRun && serverKind.value(answers.server) === "local") {
+    const isLocal = serverKind.value(answers.server) === "local";
+    const hostsPlatform =
+      !dryRun && isLocal ? await localServerHostsPlatform(answers.server) : false;
+    if (hostsPlatform) {
       // The runtime document naming the platform project does not prove a
       // claim can complete (a deployment can pin that project without the
       // platform bootstrap, which leaves the admin without a personal team),
@@ -555,16 +558,15 @@ export default class Setup extends BaseCommand {
       // belongs inside the guard for the same reason — a malformed
       // `admin.json` must not fail a setup that already wrote the app.
       try {
-        const adminDir = await findLocalAdminDir(cwd);
-        const admin = adminDir ? await readLocalAdmin(adminDir) : undefined;
-        const hostsPlatform = await localServerHostsPlatform(answers.server);
-        if (!admin && hostsPlatform) {
+        const admin = await findLocalAdminFor(cwd, answers.server);
+        if (!admin) {
           // The console lists only projects the signed-in person can manage,
-          // so an unattached project is one the local admin never sees.
-          unattachedWarning = `No local admin in ${cwd} or its parents, so the project is not attached to a team and the local console will not list it. Run setup from the directory \`zitadel start\` ran in, or one inside it.`;
+          // so an unattached project is one the local admin never sees. A
+          // server started by hand has no local admin anywhere, hence the "if".
+          unattachedWarning = `No local admin for ${answers.server} in ${cwd} or its parents, so the project is not attached to a team and the local console will not list it. If \`zitadel start\` started this server, run setup from the directory it ran in, or one inside it.`;
           consola.warn(unattachedWarning);
         }
-        if (admin && hostsPlatform) {
+        if (admin) {
           const owner = await claimProjectAsAdmin({
             serverUrl: answers.server,
             projectId: project.id,
@@ -594,8 +596,7 @@ export default class Setup extends BaseCommand {
     const nudgeClaim =
       !ownedByLocalAdmin &&
       (claimState({ secret: {}, server: answers.server }).kind === "detached" ||
-        (serverKind.value(answers.server) === "local" &&
-          (dryRun || (await localServerHostsPlatform(answers.server)))));
+        (isLocal && (dryRun || hostsPlatform)));
     const claimNudge = nudgeClaim
       ? {
           actions: [claimAction(this.meta.cliVersion, deadline)],
@@ -666,6 +667,8 @@ export default class Setup extends BaseCommand {
       // renderer doesn't duplicate the summary on stdout. The JSON envelope
       // still carries the full structured payload.
       pretty: "",
+      // Already shown above through consola; this is the copy a JSON run gets.
+      warnings: unattachedWarning ? [unattachedWarning] : [],
       data: {
         title: "Zitadel is ready.",
         project: { project_id: project.id, issuer },
@@ -713,9 +716,6 @@ export default class Setup extends BaseCommand {
           brandingGuidanceAction(this.meta.cliVersion),
           ...consoleStep.actions,
           ...claimNudge.actions,
-          // A JSON run prints no warnings, so this is where an agent learns
-          // the project went unattached.
-          ...(unattachedWarning ? [unattachedWarning] : []),
         ],
         // A JSON run prints no warnings, so a credential the project never
         // received would otherwise appear only as a `published` status with

@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { access, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { constants } from "node:fs";
+import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
 import { ZitadelError } from "../errors";
@@ -191,22 +192,57 @@ export async function ensureContainerIdentity(
  * when none does. `zitadel start` keeps its state in the directory it ran in,
  * and an app created inside that directory reads it from there. Only readers
  * walk up: commands that write or remove local state act on `cwd` alone.
+ *
+ * The walk ends at `stopAt`, the home directory by default, and skips a file
+ * another user owns: local state names a server to talk to and a credential to
+ * sign in with, so it is only taken from somewhere the developer put it.
  */
-export async function findUpward(cwd: string, file: string): Promise<string | undefined> {
+export async function findUpward(
+  cwd: string,
+  file: string,
+  stopAt: string = homedir(),
+): Promise<string | undefined> {
   for (let dir = cwd; ; dir = dirname(dir)) {
-    try {
-      await access(join(dir, file));
-      return dir;
-    } catch {
-      if (dirname(dir) === dir) return undefined;
-    }
+    if (await isOwnFile(join(dir, file))) return dir;
+    if (dir === stopAt || dirname(dir) === dir) return undefined;
+  }
+}
+
+async function isOwnFile(path: string): Promise<boolean> {
+  try {
+    const { uid } = await stat(path);
+    // Windows reports no uid; existence is all there is to check.
+    return process.getuid === undefined || uid === process.getuid();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Whether two URLs name the same local server. `localhost` and the loopback
+ * addresses are one host here: `start` records `localhost`, and a developer
+ * may pass `--server http://127.0.0.1:8080` for the same process.
+ */
+export function sameLocalServer(a: string, b: string): boolean {
+  const LOOPBACK = new Set(["localhost", "127.0.0.1", "[::1]"]);
+  try {
+    const [left, right] = [new URL(a), new URL(b)];
+    const sameHost =
+      left.hostname === right.hostname ||
+      (LOOPBACK.has(left.hostname) && LOOPBACK.has(right.hostname));
+    return sameHost && left.protocol === right.protocol && left.port === right.port;
+  } catch {
+    return false;
   }
 }
 
 /** Runtime metadata of the server started in `cwd` or the nearest parent with one. */
-async function readNearestRuntimeMetadata(cwd: string): Promise<RuntimeMetadata | undefined> {
+async function readNearestRuntimeMetadata(
+  cwd: string,
+): Promise<{ dir: string; runtime: RuntimeMetadata } | undefined> {
   const dir = await findUpward(cwd, LOCAL_RUNTIME_FILE);
-  return dir ? readRuntimeMetadata(dir) : undefined;
+  const runtime = dir ? await readRuntimeMetadata(dir) : undefined;
+  return dir && runtime ? { dir, runtime } : undefined;
 }
 
 export async function readRuntimeMetadata(cwd: string): Promise<RuntimeMetadata | undefined> {
@@ -262,7 +298,7 @@ export async function checkLocalServerHealth(serverUrl: string, timeoutMs = 1500
 export async function detectHealthyLocalServer(cwd: string): Promise<string | undefined> {
   let runtime: RuntimeMetadata | undefined;
   try {
-    runtime = await readNearestRuntimeMetadata(cwd);
+    runtime = (await readNearestRuntimeMetadata(cwd))?.runtime;
   } catch {
     runtime = undefined;
   }
@@ -277,12 +313,17 @@ export async function detectHealthyLocalServer(cwd: string): Promise<string | un
 }
 
 export async function resolveLocalServer(cwd: string): Promise<string> {
-  const runtime = await readNearestRuntimeMetadata(cwd);
-  if (runtime) {
-    if (await checkLocalServerHealth(runtime.server_url)) {
-      return runtime.server_url;
+  const nearest = await readNearestRuntimeMetadata(cwd);
+  if (nearest) {
+    const { server_url } = nearest.runtime;
+    if (await checkLocalServerHealth(server_url)) {
+      return server_url;
     }
-    throw localServerNotRunning(runtime.server_url);
+    // This directory's own metadata is authoritative. A parent's can outlive
+    // its server (`stop` keeps it), so it does not rule out the default one.
+    if (nearest.dir === cwd || server_url === DEFAULT_LOCAL_SERVER_URL) {
+      throw localServerNotRunning(server_url);
+    }
   }
 
   if (await checkLocalServerHealth(DEFAULT_LOCAL_SERVER_URL)) {

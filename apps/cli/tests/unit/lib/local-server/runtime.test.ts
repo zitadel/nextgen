@@ -9,6 +9,7 @@ import {
   LOCAL_RUNTIME_FILE,
   defaultLocalServerImageForCliVersion,
   detectHealthyLocalServer,
+  findUpward,
   ensureContainerIdentity,
   ensureLocalState,
   localContainerName,
@@ -179,6 +180,29 @@ describe("detectHealthyLocalServer", () => {
 
     await expect(detectHealthyLocalServer(app)).resolves.toBe("http://localhost:8081");
     await expect(resolveLocalServer(app)).resolves.toBe("http://localhost:8081");
+  });
+
+  it("falls back to the default server when a parent's metadata outlived its server", async () => {
+    await writeRuntimeMetadata(cwd, runtimeFor(cwd));
+    healthyOrigins = new Set([DEFAULT_LOCAL_SERVER_URL]);
+    const app = join(cwd, "my-app");
+    await mkdir(app);
+
+    await expect(resolveLocalServer(app)).resolves.toBe(DEFAULT_LOCAL_SERVER_URL);
+    // This directory's own metadata stays authoritative.
+    await expect(resolveLocalServer(cwd)).rejects.toMatchObject({
+      code: "E_LOCAL_SERVER_NOT_RUNNING",
+    });
+  });
+
+  it("stops looking for local state at the boundary it is given", async () => {
+    await writeRuntimeMetadata(cwd, runtimeFor(cwd));
+    const home = join(cwd, "home");
+    const app = join(home, "my-app");
+    await mkdir(app, { recursive: true });
+
+    await expect(findUpward(app, LOCAL_RUNTIME_FILE, home)).resolves.toBeUndefined();
+    await expect(findUpward(app, LOCAL_RUNTIME_FILE, cwd)).resolves.toBe(cwd);
   });
 
   it("falls back to the default URL when the metadata URL is unhealthy", async () => {

@@ -208,10 +208,12 @@ The groups below mirror the ones `zitadel --help` prints.
   returns `status: "skipped"` with `reason: "already-claimed"`. `next_commands`
   then ends with `console`. The local admin and the server's address (`--server local`) are read from
   `.zitadel/local/` in
-  the working directory or the nearest parent that has one, so run setup in
-  the directory `start` ran in or one inside it. When a platform-hosting
-  runtime has no local admin on that path, setup warns, adds the warning to
-  `next_actions`, and leaves the project unattached; the local console then
+  the working directory or the nearest parent that has one, up to the home
+  directory, so run setup in
+  the directory `start` ran in or one inside it. An admin is used only for the
+  server its own `start` recorded beside it. When a platform-hosting
+  runtime has no local admin on that path, setup reports it in the envelope's
+  `warnings` and leaves the project unattached; the local console then
   does not list it. The step is
   best-effort. When the attempt fails on a platform-hosting runtime, setup
   warns and the normal claim nudge applies. When `start` opted out of the

@@ -3,7 +3,7 @@ import { chmod, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "n
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   LOCAL_ADMIN_EMAIL,
@@ -11,12 +11,15 @@ import {
   LOCAL_ADMIN_USER_FILE,
   ensureLocalAdmin,
   findLocalAdminDir,
+  findLocalAdminFor,
   readLocalAdmin,
 } from "../../../../src/lib/local-server/admin-credential";
+import { writeRuntimeMetadata } from "../../../../src/lib/local-server/runtime";
 
 const tempDirs: string[] = [];
 
 afterEach(async () => {
+  vi.unstubAllEnvs();
   while (tempDirs.length > 0) {
     const dir = tempDirs.pop();
     if (dir) await rm(dir, { recursive: true, force: true });
@@ -27,6 +30,22 @@ async function tempCwd(): Promise<string> {
   const cwd = await mkdtemp(join(tmpdir(), "zitadel-admin-"));
   tempDirs.push(cwd);
   return cwd;
+}
+
+/** What `zitadel start` records beside the local admin: which server it started. */
+async function recordStartedServer(dir: string, serverUrl: string): Promise<void> {
+  await writeRuntimeMetadata(dir, {
+    schema_version: 1,
+    backend: "docker",
+    container_name: "zitadel-server-test",
+    container_id: "container-1",
+    image: "ghcr.io/zitadel/nextgen:test",
+    port: Number(new URL(serverUrl).port),
+    server_url: serverUrl,
+    data_dir: join(dir, ".zitadel/local/nextgen-data"),
+    created_at: "2026-06-09T00:00:00.000Z",
+    cli_version: "0.0.0-test",
+  });
 }
 
 /** Decodes passlib's adapted base64 (`.` for `+`, no padding). */
@@ -50,7 +69,46 @@ describe("local admin", () => {
   });
 
   it("finds no admin directory when none of the parents has one", async () => {
-    expect(await findLocalAdminDir(await tempCwd())).toBeUndefined();
+    const cwd = await tempCwd();
+    // The search ends at the home directory; pinning it keeps the developer's
+    // own `~/.zitadel/local` out of the test.
+    vi.stubEnv("HOME", cwd);
+    vi.stubEnv("USERPROFILE", cwd);
+
+    expect(await findLocalAdminDir(cwd)).toBeUndefined();
+  });
+
+  it("gives a server the admin its own start created, under either loopback name", async () => {
+    const cwd = await tempCwd();
+    const { admin } = await ensureLocalAdmin(cwd);
+    await recordStartedServer(cwd, "http://localhost:8081");
+    const app = join(cwd, "my-app");
+    await mkdir(app);
+
+    expect(await findLocalAdminFor(app, "http://localhost:8081")).toEqual(admin);
+    expect(await findLocalAdminFor(app, "http://127.0.0.1:8081")).toEqual(admin);
+  });
+
+  it("gives a server no admin that another server's start created", async () => {
+    const cwd = await tempCwd();
+    vi.stubEnv("HOME", cwd);
+    vi.stubEnv("USERPROFILE", cwd);
+    await ensureLocalAdmin(cwd);
+    await recordStartedServer(cwd, "http://localhost:8081");
+
+    expect(await findLocalAdminFor(cwd, "http://localhost:9000")).toBeUndefined();
+  });
+
+  it("looks past another server's admin to the right one further up", async () => {
+    const outer = await tempCwd();
+    const { admin } = await ensureLocalAdmin(outer);
+    await recordStartedServer(outer, "http://localhost:8081");
+    const inner = join(outer, "sandbox");
+    await mkdir(inner);
+    await ensureLocalAdmin(inner);
+    await recordStartedServer(inner, "http://localhost:9000");
+
+    expect(await findLocalAdminFor(inner, "http://localhost:8081")).toEqual(admin);
   });
 
   it("creates the credential and a bootstrap user document the server can verify", async () => {

@@ -21,7 +21,10 @@ describe("console", () => {
     const cwd = await mkdtemp(join(tmpdir(), "zitadel-console-"));
     tempDirs.push(cwd);
 
-    const res = await runCliForTest(["console", "--cwd", cwd, "--json", "--no-open"]);
+    const res = await runCliForTest(["console", "--cwd", cwd, "--json", "--no-open"], {
+      HOME: cwd,
+      USERPROFILE: cwd,
+    });
 
     expect(res.exitCode).toBe(3);
     const json = parseJson(res.stdout) as {
