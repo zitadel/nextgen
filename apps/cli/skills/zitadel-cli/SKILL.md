@@ -52,6 +52,14 @@ The CLI requires Node.js 24+.
   while a piped or redirected run (or `--plain`) gets one tab-separated record
   per line and nothing else. If you ever read human output, set `NO_COLOR=1`
   once in the environment rather than repeating `--no-color` per command.
+- **Don't truncate `--json` with `head`/`tail`.** The envelope is one bounded
+  object; slicing it with `head -c`/`head -n` yields invalid JSON and silently
+  drops records or fields, so you end up reasoning from partial data. It is
+  finite — read it whole, or narrow it *at the source*: use a `list` verb's
+  `filter_fields` and pagination to fetch fewer records, or pipe to `jq` to pull
+  just what you need (e.g. `… resources --json | jq '.data.resources[].name'`).
+  `--help` output is bounded too — read it in full rather than `head`-ing it, or
+  you will miss flags further down.
 - **Working directory.** Add `--cwd <path>` when operating outside the current
   working directory.
 - **Telemetry.** The CLI sends anonymous usage telemetry by default, and
