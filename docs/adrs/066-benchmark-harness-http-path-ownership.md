@@ -110,8 +110,12 @@ A fixture file declares the project and user a lane needs; `k6 x nextgen
 bootstrap` applies it over the API with the same generated client and proves
 the result by walking one login journey before anything is measured. There
 is no shell in the path: the local sweep (`moon run bench:sweep`) builds the
-server and the k6 binary through Moon and the `sweep` command starts,
-provisions, measures, summarises and stops the server itself.
+k6 binary through Moon and the `sweep` command provisions, measures and
+summarises. A running, healthy server is a prerequisite of the harness,
+never its job: the provisioning tool of each lane starts it — Moon locally
+(`moon run workspace:server`), a container or a cloud deployment on the
+other lanes — and the harness is pointed at it, checking `/healthz` before
+anything else.
 
 ### 6. The harness is a nested Go module under `tools/bench`
 
