@@ -25,14 +25,18 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-/** Answers GET /sessions/me with `user_id`, or with a 401 when it is null. */
-function stubSession(userId: string | null) {
+/**
+ * Answers GET /sessions/me with `user_id`, with a 401 when it is null, or with
+ * a 502 for "unreachable".
+ */
+function stubSession(userId: string | null | "unreachable") {
   server.use(
-    http.get("*/sessions/me", () =>
-      userId
+    http.get("*/sessions/me", () => {
+      if (userId === "unreachable") return HttpResponse.text("bad gateway", { status: 502 });
+      return userId
         ? HttpResponse.json(makeTestSession({ user_id: userId }))
-        : HttpResponse.json({ code: "auth.unauthorized", message: "no" }, { status: 401 }),
-    ),
+        : HttpResponse.json({ code: "auth.unauthorized", message: "no" }, { status: 401 });
+    }),
   );
 }
 
@@ -102,7 +106,9 @@ describe("fetchSession", () => {
     expect(getApiCsrfToken()).toBe("tok");
   });
 
-  it("loads a new token when the session now belongs to someone else", async () => {
+  // Another tab signed in as someone else. Loading their token here would arm
+  // this page's open forms to write as them, so the page starts over instead.
+  it("starts over, without loading the new person's token, when someone else is signed in", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     stubSession("user_a");
     stubCsrf(token("tok_a"));
@@ -110,10 +116,12 @@ describe("fetchSession", () => {
 
     vi.setSystemTime(Date.now() + 60_000);
     stubSession("user_b");
-    stubCsrf(token("tok_b"));
-    await fetchSession();
+    const calls = stubCsrf(token("tok_b"));
+    expect(await fetchSession()).toBeNull();
 
-    expect(getApiCsrfToken()).toBe("tok_b");
+    expect(calls()).toBe(0);
+    expect(getApiCsrfToken()).toBeUndefined();
+    expect(sessionPage.reload).toHaveBeenCalledOnce();
   });
 });
 
@@ -159,5 +167,30 @@ describe("CSRF rejection", () => {
 
     expect(sessionPage.reload).toHaveBeenCalledOnce();
     expect(getApiCsrfToken()).toBeUndefined();
+  });
+
+  // A network blip on the re-check must not cost the person their page: the
+  // write stays refused for them to retry, and nothing else changes.
+  it("keeps the page when the session cannot be read", async () => {
+    stubSession("user_a");
+    stubCsrf(token("tok_a"));
+    await fetchSession();
+
+    stubSession("unreachable");
+    expect(await rejectWrite()).toBeUndefined();
+
+    expect(sessionPage.reload).not.toHaveBeenCalled();
+    expect(getApiCsrfToken()).toBe("tok_a");
+  });
+
+  // Without a recorded person there is nothing to compare the session to, so
+  // no token is handed back and nothing is retried.
+  it("does not retry when this page has no person yet", async () => {
+    stubSession("user_b");
+    stubCsrf(token("tok_b"));
+
+    expect(await rejectWrite()).toBeUndefined();
+    expect(getApiCsrfToken()).toBeUndefined();
+    expect(sessionPage.reload).not.toHaveBeenCalled();
   });
 });
