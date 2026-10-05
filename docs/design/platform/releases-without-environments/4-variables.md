@@ -4,38 +4,70 @@
 > [#1389](https://github.com/zitadel/nextgen/issues/1389). Design only; nothing
 > here is implemented.
 
-**Variables and secrets**, not environment variables: these are values the
-server resolves for a deployment and serves to a flow, and nothing puts them in
-a process environment. The CLI calls them `vars`, leaving `env` to the
-[client-side environment](7-cli-environments.md#environments-pointing-one-repository-at-several-projects).
+A variable belongs to an **owner** today, and an owner is a project or one
+environment of it. Removing environments removes one of the two owners. What
+follows is what that takes away, the one thing the environment scope was doing
+that still has to work, and where a deployment gets its values once no scope
+holds them.
 
-Two mechanisms, kept apart on purpose. Most of the confusion in this area comes
-from one thing trying to be both.
+They are **variables and secrets**, not environment variables — nothing puts
+them in a process environment — so the CLI calls them `vars` and leaves `env` to
+the [client-side environment](7-cli-environments.md#environments-pointing-one-repository-at-several-projects).
 
-| | **The store** | **The snapshot** |
-|---|---|---|
-| Table | `variables` | `deployment_variables` |
-| Keyed by | `(project_id, name, applies_to)` | `(project_id, deployment_id, name)` |
-| Written by | a person, when they decide a value | a deploy, in the same transaction as the deployment row |
-| Changes later | yes, that is its job | never |
-| Read by | the next deploy | every request |
+## The environment scope today
 
-The store is a flat list of names on the project: no patterns, no levels, no
-per-origin targeting. A name carries one value, plus **one optional override for
-previews** — `applies_to` is `all` or `preview`, and there is no third value, so
-two rows per name is the maximum.
+ADR 062 is called *Per-Environment Variables and Secrets*, and the scope is its
+subject: "that scope is composed of the project-ID and the environment-ID", with
+name plus scope unique, so no other identifier is needed. Resolution is an exact
+match on all three — the ADR is explicit that there is no inheritance, and that
+adding levels later is what would raise the question.
 
-That one axis exists because a preview on a production project must not hold the
-production IdP client: the URL is reachable by anyone who can guess it, and the
-whole point of the URL is that it is not production. It is one rule about one
-kind of deploy, not a targeting mechanism — nothing addresses an origin, a
-pattern or a branch.
+| | Where |
+|---|---|
+| Keyed `(name, project_id, environment_id)`, `environment_id` NOT NULL DEFAULT `''` for the project level | `000008_variables.sql` |
+| Generated `environment_ref AS NULLIF(environment_id, '')`, which exists only so the composite foreign key is skipped for project-level rows | the same file |
+| `VariableOwner{ProjectID, EnvironmentID}`, and `HasAccessTo` enforcing that an owner reaches exactly what it entered | `internal/domain/variable.go:150` |
+| `environment_name`, selecting the owner on `getVariables`, `updateVariables`, `getVariable` and `deleteVariable` | `components/parameters/environment-name-query.yaml` |
+
+Two consequences of owners being separate rather than a ladder are worth having
+in front of you, because the first is what removal fixes and the second is what
+removal has to keep:
+
+- **A value that holds everywhere is entered everywhere.** The parameter's own
+  description says so: "A value that has to hold in several environments is
+  entered in each of them." Reading everything a project holds means reading
+  each owner in turn.
+- **A value that must *not* hold everywhere has somewhere to go.** The
+  production IdP client secret can be entered on the production environment and
+  nowhere else.
+
+## What goes
+
+| Today | After |
+|---|---|
+| `environment_id`, `environment_ref`, the foreign key to `environments` and the `''` convention | gone from `variables`; the project foreign key already cascades on its own |
+| `environment_name` on four operations | gone; a project has one list of variables |
+| Reading each owner in turn | one read |
+| Entering the same value in each environment | entered once |
+| `VariableOwner.EnvironmentID` | an owner is a project |
+| ADR 062's scope, and its two-owner model | an amendment: one owner, plus the axis below |
+
+Nothing is migrated: the column is dropped rather than repurposed.
+
+## The one rule that survives
+
+A preview on a production project must not hold the production IdP client. The
+URL is reachable by anyone who can guess it, and the whole point of the URL is
+that it is not production — so this one distinction cannot go with the
+environments.
+
+It becomes a column on the variable, not a scope: `applies_to` is `all` or
+`preview`, there is no third value, and two rows per name is the maximum.
 
 ```jsonc
-// CHANGED - the `environment_id` column is removed rather than repurposed, and
-// with it the generated `environment_ref` column, its foreign key and the ""
-// convention (internal/domain/variable.go:160, 000008_variables.sql). What
-// replaces it is narrower: `applies_to`, over a domain of exactly two.
+// CHANGED - `environment_id` is removed rather than repurposed, and with it the
+// generated `environment_ref` column, its foreign key and the "" convention.
+// What replaces it is narrower: `applies_to`, over a domain of exactly two.
 { "project_id": "prj_01K9AA9M3K7E2QX8VB4T", "name": "GOOGLE_CLIENT_ID",
   "applies_to": "all", "value": "prod-abc.apps.googleusercontent.com",
   "is_secret": false }
@@ -52,49 +84,19 @@ pattern or a branch.
 ```
 
 `all` is what every deploy reads. `preview` is read by `zitadel preview` in
-preference to it, and a preview with no override row gets the `all` value.
+preference to it, and a preview with no override row gets the `all` value. That
+is the only fall-through in the design, it is one level deep, and it is the only
+thing `applies_to` does — nothing addresses an origin, a pattern or a branch.
 
-This is not the sentinel that the
-[snapshot](#why-not-one-table-with-a-null-deployment-id) section rules out: both
-rows are store rows with the same columns, the same lifecycle and the same
-mutability, and `applies_to` is never null. That objection was about two kinds
-of record sharing one table.
+### What this deliberately does not do
 
-```jsonc
-// NEW TABLE - written once, in the transaction that writes the deployment row,
-// and never updated. This is what a request reads; the table above is only what
-// the next deploy will read.
-{
-  "project_id":    "prj_01K9AA9M3K7E2QX8VB4T",
-  "deployment_id": "dep_01KB3F8N2P9S5WQZ",
-  "name":          "GOOGLE_CLIENT_ID",
-  "value":         "preview-xyz.apps.googleusercontent.com"
-}
-{
-  "project_id":    "prj_01K9AA9M3K7E2QX8VB4T",
-  "deployment_id": "dep_01KB3F8N2P9S5WQZ",
-  "name":          "GOOGLE_CLIENT_SECRET",
-  "value":         "<ciphertext>", // copied, like any other value
-  "is_secret":     true
-}
-```
-
-The snapshot carries the same two columns the store does, and a secret is copied
-as the ciphertext it already is. So nothing in this design needs a secret store
-it does not already have: the only new table is the snapshot, and its columns
-are the ones `variables` has today. What copying costs — a leaked value cannot
-be revoked in one place, because every snapshot holding it would have to be
-rewritten — is [Open 2](#open).
-
-## Why a snapshot and not just the store
-
-**Rollback would otherwise lie.** It restores the release and not the values, so
-rolling back to a release that needed last month's IdP client would get this
-month's. Rolling back to a *deployment* restores the pair that was running.
-
-**And a value edit mid sign-in would reshape an attempt underway** — the hazard
-[sealing](3-release-resolution.md#the-three-layers) already removes for
-resources, and which variables share until they are frozen too.
+- **Per-branch values.** A flag that differs per branch is release content, not
+  a variable: that branch's release already differs, which is where the
+  difference belongs.
+- **Per-origin values.** Two production hostnames of one project always get the
+  same values. Two hostnames that genuinely need different configuration are two
+  projects — and if that ever stops being true, the answer is a third
+  `applies_to` value, not a flag on the deploy.
 
 ## Setting one
 
@@ -113,21 +115,8 @@ GOOGLE_CLIENT_SECRET  secret  set 10-02                   set 09-14
 SUPPORT_EMAIL         value   help@acme.com               —
 ```
 
-One row per name, two columns, and `—` reads as "previews get the same value".
-It answers only "what is stored". What is *running* is a different question with
-a different answer per target, so it is a different command:
-
-```
-$ zitadel vars resolve --origin https://acme-git-sso-acmeinc.vercel.app
-serving dep_01KB3F8N2P9S5WQZ   deployed 10-02 14:10
-
-NAME                  SERVING NOW                FROM
-GOOGLE_CLIENT_ID      preview-xyz.apps.goog…     preview override
-GOOGLE_CLIENT_SECRET  (secret, set 09-14)        preview override
-SUPPORT_EMAIL         help@acme.com              all deploys
-
-  SUPPORT_EMAIL changed in the store since this deployment — deploy to apply
-```
+One list, no owner to choose, and `—` reads as "previews get the same value".
+There is no `--env` on any of it.
 
 ## How a preview gets different values
 
@@ -144,13 +133,9 @@ not live until the next preview deploy.
 - run: zitadel preview --ttl 7d
 ```
 
-The snapshot then holds the preview value under the name the release asks for,
-and `app.acme.com` keeps serving the production one. Same release, same project,
-different credentials.
-
 **The deploy request carries no variable names and no values** — a release and
-its targets, nothing else. Every value is resolved server-side, from the store,
-by the verb that asked. Three things follow:
+its targets, nothing else. Every value is resolved server-side by the verb that
+asked, which is what replaces choosing an owner. Three things follow:
 
 - **There is nothing to forget.** A pipeline cannot deploy a preview carrying
   production credentials by leaving a flag out, because there is no flag.
@@ -160,21 +145,11 @@ by the verb that asked. Three things follow:
 - **No naming convention.** `GOOGLE_CLIENT_SECRET_PREVIEW` was two names a
   person had to keep in step; it is one name with two values.
 
-### What this deliberately does not do
-
-- **Per-branch values.** A flag that differs per branch is release content, not
-  a variable: that branch's release already differs, which is where the
-  difference belongs.
-- **Per-origin values.** Two `primary` origins of one project always get the
-  same values. Two hostnames that genuinely need different configuration are two
-  projects — and if that ever stops being true, the answer is a third
-  `applies_to` value, not a flag on the deploy.
-
 ### The hole this leaves
 
 Nobody sets an override, so the preview runs the production value and nothing
-says so. That is the one silent failure left, and a line of output closes it
-better than a rule would:
+says so. Entering it on one environment and not the other was at least visible;
+this is not. A line of output closes it better than a rule would:
 
 ```
 $ zitadel preview --ttl 7d
@@ -191,51 +166,70 @@ Secrets only. A non-secret falling through to the `all` value is ordinary and
 usually intended; a production client secret reachable from a preview URL is
 worth interrupting a log for.
 
-## Immutability at runtime
+## What a deployment runs
 
-Three properties, each from a different part of the model:
+With no environment, there is no scope to read "the environment's current
+values" from, and the deployment history is
+[append-only](1-data-model.md#why-there-is-no-pointer-column). So each
+deployment freezes the values it resolved, in one new table, written in the same
+transaction as the deployment row and never updated:
 
-1. **Snapshot rows are written once**, in the transaction that writes the
-   deployment, so a deployment is never a partially-rewritten value set.
-2. **Editing the store cannot reach a snapshot.** Different table, no shared row,
-   no cascade. `zitadel vars set` during a sign-in changes nothing that
-   sign-in can see.
-3. **A flow seals the deployment id, not the release digest.** One pointer pins
-   the resources *and* the values, so the two cannot drift apart mid-attempt.
-   This replaces sealing the release, and is strictly stronger.
-## Why not one table with a null deployment id
+```jsonc
+// NEW TABLE - keyed (project_id, deployment_id, name). This is what a request
+// reads; `variables` is only what the next deploy will read.
+{
+  "project_id":    "prj_01K9AA9M3K7E2QX8VB4T",
+  "deployment_id": "dep_01KB3F8N2P9S5WQZ",
+  "name":          "GOOGLE_CLIENT_SECRET",
+  "value":         "<ciphertext>", // copied, like any other value
+  "is_secret":     true
+}
+```
 
-Tempting — `variables(project_id, deployment_id, name, …)` where a null
-`deployment_id` is the store. It is also what this table does for environments
-today, and the scar tissue is visible: `000008_variables.sql` carries a generated
-`environment_ref AS NULLIF(environment_id, '')` only because a composite foreign
-key is skipped when a column is null, letting project-level rows opt out of a
-constraint the scoped rows are held to.
+Same columns as the store, so a secret is copied as the ciphertext it already
+is and this design needs no secret store it does not already have.
 
-**The sentinel pays off when a read has to fall back from the specific to the
-general in one query** — exactly what this design no longer needs, since a deploy
-freezes every name and a request reads snapshot rows only. The benefit is gone
-and the costs are not:
+Freezing is not an extra: without it, **rollback would lie**. It restores the
+release and not the values, so rolling back to a release that needed last
+month's IdP client would hand it this month's. Rolling back to a *deployment*
+restores the pair that was running. Inspecting what a target froze takes an
+origin rather than an environment name, since that is what identifies a target
+now:
 
-- **Immutability stops being structural.** "Snapshot rows are never updated"
-  becomes an invariant application code keeps rather than one the schema makes
-  true; two tables give the snapshot no update path at all. Same objection that
-  removed [`current_deployment_id`](1-data-model.md#why-there-is-no-pointer-column).
-- **The wrong query leaks.** `zitadel vars list` becomes a filtered read that
-  must never forget its filter; forget it once and it lists every historical
-  value, superseded secrets included. The lifecycles have nothing in
-  common either — tens of curated rows against tens of frozen rows per
-  deployment.
+```
+$ zitadel vars resolve --origin https://acme-git-sso-acmeinc.vercel.app
+serving dep_01KB3F8N2P9S5WQZ   deployed 10-02 14:10
 
-## What this changes elsewhere
+NAME                  SERVING NOW                FROM
+GOOGLE_CLIENT_ID      preview-xyz.apps.goog…     preview override
+GOOGLE_CLIENT_SECRET  (secret, set 09-14)        preview override
+SUPPORT_EMAIL         help@acme.com              all deploys
 
+  SUPPORT_EMAIL changed in the store since this deployment — deploy to apply
+```
+
+Two properties follow from the table being separate and write-once. Editing the
+store reaches no deployment — `zitadel vars set` during a sign-in changes
+nothing that sign-in can see — and a flow that
+[seals the deployment id](3-release-resolution.md#the-three-layers) pins the
+resources and the values with one pointer, so they cannot drift apart mid
+attempt.
+
+## What changes elsewhere
+
+- **Four operations lose `environment_name`.** `getVariables` and
+  `updateVariables` on `/variables`, `getVariable` and `deleteVariable` on
+  `/variables/{variable_name}`. Their descriptions carry the owner model
+  explicitly — "an environment does not inherit the project's variables and the
+  project does not see its environments'" — and that paragraph goes with the
+  parameter.
 - **`createDeployment`'s idempotency key moves.** It answers `200` and writes
   nothing today when the named release is already running. The key has to become
   the release *and* the resolved value set, or a deploy whose only purpose is a
   changed variable would be silently discarded.
 - **A deploy may carry only a variable change.** Same release, new deployment
-  row, so the history shows one digest twice with different snapshots. That is
-  the fix for a wrong value: a deploy, not an edit.
+  row, so the history shows one digest twice with different frozen values. That
+  is the fix for a wrong value: a deploy, not an edit.
 - **Setting an override is the same permission as setting any value.** One
   table, one `variable.write`; anyone who can write the `all` row can already do
   worse than write the `preview` one.
@@ -250,7 +244,7 @@ and the costs are not:
 2. **Revoking a leaked secret reaches nothing already deployed.** Rotating the
    store changes what the next deploy freezes and nothing that is running, so
    the old value is served until every target is redeployed, and its bytes
-   survive in each historical snapshot until that deployment is collected.
-   Making revocation immediate wants a secret stored once and referenced by the
-   snapshots, which is a versioned secret store — more machinery than removing
+   survive in each frozen set until that deployment is collected. Making
+   revocation immediate wants a secret stored once and referenced rather than
+   copied, which is a versioned secret store — more machinery than removing
    environments needs, and better decided on its own.

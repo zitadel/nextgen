@@ -40,7 +40,7 @@ production configuration.
 first step and reused for the rest of the attempt, so a deploy landing mid
 sign-in cannot change the configuration under the user. Sealing the deployment
 rather than the release pins the resources and the
-[variable snapshot](4-variables.md#immutability-at-runtime) with one pointer, which is why they
+[frozen values](4-variables.md#what-a-deployment-runs) with one pointer, which is why they
 cannot drift apart part-way through an attempt.
 
 ### What each kind of caller sends

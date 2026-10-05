@@ -201,10 +201,10 @@ error  origin_not_tenant_anchored
 
 Variables and secrets, which are not process environment variables — `env` names
 the client-side environment and `vars` the values a deployment serves. `set` and
-`list` address the store, `resolve --origin` reads the snapshot a target is
-running; the transcripts are under
-[Variables](4-variables.md#setting-one). Two commands because they answer two
-questions, and conflating them is how "I set it and nothing happened" happens.
+`list` address [the store](4-variables.md#setting-one), `resolve --origin` reads
+[what a target froze](4-variables.md#what-a-deployment-runs). Two commands
+because they answer two questions, and conflating them is how "I set it and
+nothing happened" happens.
 
 `set --preview` stores the value a preview deploy prefers. That is the only
 targeting the CLI offers, and no deploy command takes a variable flag of any
@@ -217,8 +217,8 @@ removed the preview value; previews now serve the production one.
 ```
 
 Removing from the store never reaches a snapshot, which is the whole point of
-[runtime immutability](4-variables.md#immutability-at-runtime) — and the reason the message
-says so out loud rather than reporting a bare success.
+[what a deployment runs](4-variables.md#what-a-deployment-runs) — and the reason
+the message says so out loud rather than reporting a bare success.
 
 ## `zitadel rollback`
 
