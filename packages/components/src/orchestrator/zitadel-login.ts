@@ -138,6 +138,18 @@ function returnTargetFor(flowId: string): string {
   return target.toString();
 }
 
+/**
+ * Add the `manual` attribute to every `<zl-passkey>` in rendered step markup so
+ * the WebAuthn ceremony never auto-starts on mount. Applied after the template
+ * renders, so it holds for ANY template — the bundled `default.liquid`, a tenant
+ * `liquid_template`, or a legacy design — rather than only templates that opt in.
+ * Idempotent: a tag that already declares `manual` is left untouched. Gated by
+ * the `manual-ceremony` host flag at the call site.
+ */
+function forceManualCeremony(markup: string): string {
+  return markup.replace(/<zl-passkey\b(?![^>]*\smanual[\s>])/g, "<zl-passkey manual");
+}
+
 @customElement("zitadel-login")
 export class ZitadelLogin extends ZitadelSurface {
   static override shadowRootOptions: ShadowRootInit = {
@@ -1010,9 +1022,6 @@ export class ZitadelLogin extends ZitadelSurface {
       // reconnect `<zl-passkey>` and start a second WebAuthn ceremony. A
       // preview renders none at all: the atom starts its ceremony on connect.
       challenge: this.loading || this.preview ? null : (step.challenge ?? null),
-      // Keep the challenge (so `<zl-passkey>` still gets its options) but render
-      // it `manual` — no auto-started ceremony, no OS prompt — for previews.
-      manual_ceremony: this.manualCeremony,
       messages: [],
       identity: this.deriveIdentity(),
       errors,
@@ -1042,7 +1051,12 @@ export class ZitadelLogin extends ZitadelSurface {
     }
 
     const patched = patchMandatoryGates(raw, step, this.resolveLocale());
-    return this.sanitise(patched);
+    const sanitised = this.sanitise(patched);
+    // Enforce `manual-ceremony` AFTER the template renders, so it holds for any
+    // template — the bundled one, a tenant `liquid_template`, or a legacy design
+    // — not just templates that opt in. Without this, a custom template's
+    // `<zl-passkey>` would still auto-start WebAuthn despite the host flag.
+    return this.manualCeremony ? forceManualCeremony(sanitised) : sanitised;
   }
 
   /**

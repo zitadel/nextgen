@@ -591,6 +591,72 @@ describe("<zitadel-login> against the typed Flow API", () => {
     }
   });
 
+  it("manual-ceremony is enforced even for a custom Liquid template", async () => {
+    // Regression for the template-level approach: a tenant `liquid_template` that
+    // renders `<zl-passkey>` without `manual` must still not auto-start WebAuthn.
+    const get = vi.fn(() => Promise.race<Credential | null>([]));
+    const originalCredentials = Object.getOwnPropertyDescriptor(navigator, "credentials");
+    const originalPublicKeyCredential = Object.getOwnPropertyDescriptor(
+      window,
+      "PublicKeyCredential",
+    );
+    Object.defineProperty(window, "PublicKeyCredential", {
+      configurable: true,
+      value: class PublicKeyCredentialStub {},
+    });
+    Object.defineProperty(navigator, "credentials", {
+      configurable: true,
+      value: { get, create: vi.fn() },
+    });
+
+    try {
+      const element = await mount(host);
+      element.manualCeremony = true;
+      // A tenant template that renders the passkey atom WITHOUT `manual`.
+      Reflect.set(element, "branding", {
+        liquid_template:
+          `<zl-passkey ceremony="authenticate" challenge-id="{{ challenge.challenge_id }}"` +
+          ` options='{{ challenge.options | json }}'></zl-passkey>`,
+      });
+      Reflect.set(element, "response", {
+        id: "flow-1",
+        session_id: "sess-1",
+        session_token: "token-1",
+        step: {
+          name: "passkey-login",
+          texts: { title_key: "passkey-login.title" },
+          fields: [],
+          actions: [],
+          gates: {},
+          challenge: {
+            method: "passkey",
+            challenge_id: "ch-1",
+            options: { challenge: "BBBB", rpId: "localhost", userVerification: "preferred" },
+          },
+        },
+        branding: {},
+      });
+      Reflect.set(element, "loading", false);
+      await element.updateComplete;
+
+      const passkey = await waitFor(() => element.shadowRoot?.querySelector("zl-passkey"));
+      expect(passkey?.hasAttribute("manual")).toBe(true);
+      await new Promise((resolve) => setTimeout(resolve, 48));
+      expect(get).not.toHaveBeenCalled();
+    } finally {
+      if (originalCredentials) {
+        Object.defineProperty(navigator, "credentials", originalCredentials);
+      } else {
+        delete (navigator as unknown as Record<string, unknown>).credentials;
+      }
+      if (originalPublicKeyCredential) {
+        Object.defineProperty(window, "PublicKeyCredential", originalPublicKeyCredential);
+      } else {
+        delete (window as unknown as Record<string, unknown>).PublicKeyCredential;
+      }
+    }
+  });
+
   it("auto-submits challenge_response when zl-passkey-result is dispatched", async () => {
     const element = await mount(host);
 
