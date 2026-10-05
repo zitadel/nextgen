@@ -586,9 +586,12 @@ func TestRequireProjectListAccess(t *testing.T) {
 			PrincipalType: domain.AuthzPrincipalTypeUser,
 			PrincipalID:   "user_alice",
 		})
-		ctx, _, err := requireProjectListAccess(foreignHome, narrow, "proj_customer", userAccess, domain.ResourceKindUser)
+		ctx, projectWide, err := requireProjectListAccess(foreignHome, narrow, "proj_customer", userAccess, domain.ResourceKindUser)
 		if err != nil {
 			t.Fatalf("foreign-home Forbidden with foothold should proceed for partial-view lists: %v", err)
+		}
+		if projectWide {
+			t.Fatal("foreign-home Forbidden must not report a project-wide read")
 		}
 		filter, ok := service.AuthzListFilterFromContext(ctx)
 		if !ok {
