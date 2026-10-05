@@ -91,6 +91,7 @@ test("prepares the customer local setup journey in the app root", async () => {
           "local",
           "--dev-port",
           "3010",
+          "--force",
           "--cwd",
           appDir,
           "--non-interactive",

@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -23,13 +23,27 @@ const legacyPatterns = [
   /\/v1\//i,
 ];
 
+const root = join(import.meta.dirname, "../../..");
+const skillDir = join(root, "skills/zitadel-cli");
+
+// README plus every markdown file of the agent skill (SKILL.md and its
+// progressive-disclosure references), so the glossary gate covers the content
+// an agent can load, not just the entry file.
+async function skillMarkdown(): Promise<string[]> {
+  const refs = await readdir(join(skillDir, "references"));
+  return [
+    join(root, "README.md"),
+    join(skillDir, "SKILL.md"),
+    ...refs
+      .filter((name) => name.endsWith(".md"))
+      .map((name) => join(skillDir, "references", name)),
+  ];
+}
+
 describe("public vocabulary", () => {
   it("keeps docs on glossary terms", async () => {
-    const root = join(import.meta.dirname, "../../..");
-    const files = ["README.md", "SKILLS.md"];
-
-    for (const file of files) {
-      const contents = await readFile(join(root, file), "utf8");
+    for (const file of await skillMarkdown()) {
+      const contents = await readFile(file, "utf8");
       for (const pattern of legacyPatterns) {
         expect(contents, `${file} matched ${pattern}`).not.toMatch(pattern);
       }
@@ -38,13 +52,22 @@ describe("public vocabulary", () => {
 });
 
 describe("agent contract", () => {
-  it("SKILLS.md is the canonical agent contract", async () => {
-    const root = join(import.meta.dirname, "../../..");
-    const skills = await readFile(join(root, "SKILLS.md"), "utf8");
-    expect(skills).toContain("name: zitadel-cli");
-    expect(skills).toContain("## Golden path");
-    expect(skills).toContain("--non-interactive --json");
-    expect(skills).toContain("E_PORT_IN_USE");
-    expect(skills).toContain("stop --all");
+  it("SKILL.md carries the invocation contract", async () => {
+    const skill = await readFile(join(skillDir, "SKILL.md"), "utf8");
+    expect(skill).toContain("name: zitadel-cli");
+    expect(skill).toContain("## Golden path");
+    expect(skill).toContain("--non-interactive --json");
+    expect(skill).toContain("E_PORT_IN_USE");
+  });
+
+  it("delegates the command surface to runtime discovery instead of hardcoding it", async () => {
+    const skill = await readFile(join(skillDir, "SKILL.md"), "utf8");
+    // The skill and the installed CLI version move independently, so the skill
+    // must teach discovery rather than enumerate commands that would drift.
+    expect(skill).toContain("## Discovering commands");
+    expect(skill).toContain("<command> --help");
+    expect(skill).toContain("resources --json");
+    // Guard against a regression that re-adds a hardcoded per-command catalog.
+    expect(skill).not.toContain("references/commands.md");
   });
 });

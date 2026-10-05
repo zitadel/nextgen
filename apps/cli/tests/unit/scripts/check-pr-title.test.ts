@@ -87,8 +87,9 @@ describe("isNonShippingFile", () => {
     "apps/cli/src/commands/setup.ts",
     "packages/sdk-react/src/index.ts",
     "packages/sdk-react/README.md",
-    // apps/cli/package.json lists SKILLS.md in `files`, so it installs with the CLI.
-    "apps/cli/SKILLS.md",
+    // apps/cli/package.json lists `skills` in `files`, so the skill installs with the CLI.
+    "apps/cli/skills/zitadel-cli/SKILL.md",
+    "apps/cli/skills/zitadel-cli/references/driving-login-ui.md",
     // Scaffolded into a customer's project, so it is product, not repo docs.
     "packages/config/defaults/README-schemas.md",
     "apps/cli/src/lib/orca/patchers/rule/next/README.md",
@@ -266,12 +267,12 @@ describe("checkPrTitle", () => {
     const { checkPrTitle } = await load();
     const report = checkPrTitle({
       title: "feat(cli): document the JSON envelope",
-      files: ["apps/cli/SKILLS.md"],
+      files: ["apps/cli/skills/zitadel-cli/SKILL.md"],
       config: { ...config, scopes: [...config.scopes, "cli"] },
     });
 
     expect(report.ok).toBe(true);
-    expect(report.shipping).toEqual(["apps/cli/SKILLS.md"]);
+    expect(report.shipping).toEqual(["apps/cli/skills/zitadel-cli/SKILL.md"]);
   });
 
   it("rejects an unknown type and an unknown scope", async () => {

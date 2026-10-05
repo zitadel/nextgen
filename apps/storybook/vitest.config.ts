@@ -24,16 +24,6 @@ export default defineConfig({
   test: {
     ...baseTest,
     name: "@zitadel/storybook",
-    // Run story files one at a time. `@storybook/addon-vitest` runs each story
-    // file in a real Chromium context that dynamically imports the addon's
-    // setup module from the Vitest Vite dev server. When many files start in
-    // parallel on a loaded CI runner, the server is not ready to serve that
-    // module and the browser throws "Failed to fetch dynamically imported
-    // module" (vitest-dev/vitest#9509, storybookjs/storybook#33347). Serializing
-    // the files keeps the dev server responsive to one importer at a time. This
-    // is not `isolate: false` — per-file isolation stays on, so story state
-    // still cannot leak between files.
-    fileParallelism: false,
     projects: [
       {
         extends: true,
@@ -52,6 +42,15 @@ export default defineConfig({
         optimizeDeps: {
           exclude: optimizeDepsExclude,
           include: optimizeDepsInclude,
+          // Forbid on-the-fly discovery: optimize ONLY the `include` list up
+          // front and never re-optimize mid-run. The browser suite's recurring
+          // cold-CI failure ("Failed to fetch dynamically imported module …
+          // setup-file-with-project-annotations.js") is Vite re-optimizing when
+          // it discovers a dep after the browser has started, which invalidates
+          // the in-flight module URLs. With discovery off that race cannot
+          // happen: a missing dep fails deterministically (and reproducibly on
+          // a cold local cache) instead of flaking under CI timing.
+          noDiscovery: true,
         },
         test: {
           name: "storybook",
