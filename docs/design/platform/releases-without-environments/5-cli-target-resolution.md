@@ -27,14 +27,35 @@ writes. Each resolves independently, highest priority first:
 which server to send it to — see
 [environments](7-cli-environments.md#environments-pointing-one-repository-at-several-projects).
 
-Environment detection, highest priority first: `--env`, `ZITADEL_ENV`, platform
-signals (`VERCEL_ENV`, `NETLIFY_CONTEXT`, `RAILWAY_ENVIRONMENT`), `NODE_ENV`,
-`development`. The name is local only: it selects which
+Environment detection, highest priority first: `--env`, `ZITADEL_ENV`, a
+platform signal, else `development`. The name is local only: it selects which
 [`.env` files](7-cli-environments.md#environments-pointing-one-repository-at-several-projects)
-to read, and never reaches the server.
+to read, and never reaches the server. `NODE_ENV` is deliberately not
+consulted: Vercel and Netlify set it to `production` for every build, preview
+builds included, so it says which build mode the framework is in and nothing
+about where the result will be served.
+
+The platform signals, and what each one is worth:
+
+| Platform | Signal | Says |
+|---|---|---|
+| Vercel | `VERCEL_ENV` | `production`, `preview` or `development` |
+| Netlify | `CONTEXT` | `production`, `deploy-preview`, `branch-deploy` or `dev` |
+| Cloudflare Pages | `CF_PAGES=1`, `CF_PAGES_BRANCH` | that it is a Pages build, and the branch — **not** whether it is the production branch |
+| Cloudflare Workers Builds | `WORKERS_CI=1`, `WORKERS_CI_BRANCH` | the same |
+| Railway | `RAILWAY_ENVIRONMENT` | the environment's name |
+
+Cloudflare has no production signal a build can read, so the one recipe that
+works on every platform is to set `ZITADEL_ENV=production` in the platform's
+**production-scoped** environment variables and nothing in the preview scope.
+Every platform here scopes variables by environment, and that scoping is also
+what puts the right credential in the right job —
+[what a platform build holds](7-cli-environments.md#what-a-platform-build-holds).
+Where the platform does say, `VERCEL_ENV` and `CONTEXT` are read as a
+fallback; `ZITADEL_ENV` wins when both are present.
 
 **`--env`, and the server still has none.** The flag is called `--env` because
-everything feeding it already is — `VERCEL_ENV`, `NODE_ENV`,
+everything feeding it already is — `VERCEL_ENV`, `CONTEXT`,
 `.env.production.local`. What the old model got wrong was not the word but the
 location: an environment was a server resource with an id, a unique name index,
 a current deployment and a variable scope, so `GET /environments/{name}` existed
@@ -86,8 +107,8 @@ Two consequences, both deliberate:
   win over a file the operator named. That is the one exception to the rule
   below.
 - **The environment is named after the file**, and nothing is inferred from
-  `NODE_ENV`. The name is used for display and for nothing else, so a file with
-  no recognisable name costs nothing.
+  the platform. The name is used for display and for nothing else, so a file
+  with no recognisable name costs nothing.
 
 Keys the file does not define still fall through — resolution is per value, so a
 file holding only a project id leaves `ZITADEL_URL` to `process.env`.
@@ -102,12 +123,22 @@ or baked into a container image, or a deploy silently talks to the wrong project
 | `ZITADEL_PROJECT_ID` | project — public |
 | `ZITADEL_PUBLISHABLE_KEY` | public-plane bearer — public |
 | `ZITADEL_PROJECT_SECRET` | CLI and server-side SDK — **secret** |
-| `ZITADEL_RELEASE` | set by the build; read by the server-side SDK |
+| `ZITADEL_RELEASE` | set by the build; read by the server-side SDK — optional |
 | `NEXT_PUBLIC_ZITADEL_PROJECT_ID` / `_PUBLISHABLE_KEY` / `_RELEASE`, and the `VITE_…` and `NUXT_PUBLIC_…` equivalents | browser bundle |
 
 No `.env` file is committed, so the public/secret column decides only where a
 value may be *shared* — a publishable key can go in a team chat or a CI variable,
 the project secret only in a secret store.
 
-The release variables are only needed on the fallback path. A browser caller
-answered by layer 2 sends nothing new.
+The release variables are optional. A caller answered by layer 2 sends nothing
+new; a build that sets them [pins](3-release-resolution.md#pinning-a-release)
+the bundle to the release it was built against, which the server honours only
+for a release already deployed to that target. `zitadel deploy` and
+`zitadel preview` print the digest for the build to pick up, and never write
+it to a file — a build that wants the pin reads it from the command's output,
+or from `zitadel env`, which shows what the working copy would build.
+
+`vercel env pull` writes the platform's variables into `.env.local`, which is
+step 5 of the chain. For a Vercel project that is the shortest way to bind a
+laptop to the project the platform deploys: pull, and the CLI resolves the
+same triple the build does.

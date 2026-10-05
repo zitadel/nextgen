@@ -17,7 +17,7 @@ already exist — what changes is the axis they are keyed on.
 | Entity | Old Model | New Model |
 |---|---|---|
 | **Project** | `projects` | kept — `preview_origins` becomes `allowed_origins` with a `kind` per entry, plus `class` and `publishable_key` |
-| **Origin** | — | **new table**, one row per live *preview* URL, with an expiry. Not a routing index, and a primary hostname gets no row |
+| **Origin** | — | **new table**, one row per live *preview* URL, with an expiry. The row is what admits requests from that URL. Not a routing index, and a primary hostname gets no row |
 | **Environment** | `environments`, seeded per project | **dropped** |
 | **Deployment** | `deployments`, keyed to an environment | kept — `environment_id` becomes a plain `origin` string, plus `deploy_id`. The newest row **is** the pointer; `environments.current_deployment_id` is not carried over |
 | **Release** | `releases` | shape kept — `content_hash` becomes the wire identifier, `revoked_at` is new |
@@ -39,7 +39,9 @@ already exist — what changes is the axis they are keyed on.
   // CHANGED - today `preview_origins` is a flat list of exact strings
   // (internal/domain/project.go:68) compared with `allowed == originStr`
   // (internal/api/flow.go:386), serving only the preview secret. Now patterns,
-  // each carrying a `kind`. They authorize; they never route.
+  // each carrying a `kind`. A `primary` pattern admits requests; a `preview`
+  // pattern says which URLs the preview credential may register. Neither
+  // routes.
   "allowed_origins": [
     { "pattern": "https://app.acme.com",         "kind": "primary" },
     { "pattern": "https://*-acmeinc.vercel.app", "kind": "preview" }
@@ -55,8 +57,8 @@ already exist — what changes is the axis they are keyed on.
 ### Origin
 
 One row per live preview URL, keyed `(project_id, origin)`. Exact strings, no
-patterns. The row says the URL is still live; it never says what the URL
-serves.
+patterns. The row says the URL is allowed and still live; it never says what
+the URL serves.
 
 ```jsonc
 // NEW TABLE - one row per live preview URL and nothing else, keyed by an exact
@@ -68,6 +70,25 @@ serves.
   "created_at": "2026-10-02T14:10:00Z"
 }
 ```
+
+A platform mints more than one URL for a deployment — a branch-stable one and
+a per-deployment one, and the per-deployment one is what its bot comment and
+dashboard link to. So one `zitadel preview` run writes one row per URL the
+platform reports, all with the same expiry, and the deployment rows carry
+each of them. Two rows per push is the usual count; see
+[origin resolution](6-cli-commands.md#zitadel-preview).
+
+**The row is the allowlist entry for its URL.** A request from a URL that
+matches a `preview` pattern but has no live row is refused, exactly as if it
+matched nothing. The pattern constrains what the preview credential may write;
+it admits no request by itself. That is what makes a wildcard on a shared host
+safe to hold even where the host lets a stranger mint a hostname that matches
+it — [what a wildcard on a shared host is worth](2-origins.md#what-a-wildcard-on-a-shared-host-is-worth).
+
+It is also why the expiry has a table of its own rather than a column on the
+deployment row. Admission wants one row per live URL to look up and to sweep,
+not a newest-per-origin scan, and retiring a URL early is deleting that row —
+not appending a deployment that names no release.
 
 #### Why a primary hostname has no row
 
@@ -167,9 +188,16 @@ default** — what a caller with no `Origin` gets.
     "created_by": "user_01K8ZQ3K7E5M2P9S"
   },
 
-  "revoked_at": null // NEW
+  "revoked_at": null // NEW - see below
 }
 ```
+
+`revoked_at` is the operator's hard stop. A revoked release is refused on every
+path, including a client that [pins it](3-release-resolution.md#pinning-a-release),
+so a release found to be dangerous can be taken out from under every bundle
+that baked its digest in, at the cost of breaking those bundles until they are
+rebuilt. Rolling back is the soft version — it moves what targets serve and
+leaves pinned clients where they are.
 
 `content_hash` is a SHA-256 over the sorted pointer set with metadata excluded,
 and it is the identifier on the wire. The column is 64 bare hex characters —
@@ -272,7 +300,7 @@ A target is `"default"`, the keyword `"primary"`, or an exact origin. `"primary"
 expands server-side to the project's `primary` entries, so CI does not have to
 read the project first; the response lists the expansion, and
 `GROUP BY deploy_id` reconstructs the blast radius of any past deploy. A
-`preview` run is the same call with one exact origin and a `ttl`, which is why
+`preview` run is the same call with its exact origins and a `ttl`, which is why
 the narrower preview credential can authorise it — naming `default` or `primary`
 requires the project secret.
 
@@ -342,13 +370,25 @@ correlation id. The registry holds `rel` and `dep` but nothing for the set of
 rows one deploy wrote, and the ADR is explicit that prefixes are not added
 without going through it.
 
+**Amendments to ADR 035 and ADR 036.** ADR 035 is built on environments as
+runtime slots; ADR 036 issues publishable keys per environment and ties
+allow-all to non-production environments. Both need a dated amendment pointing
+at the class and the origin, not a rewrite.
+
+**The console.** Every environment screen goes with the entity. What replaces
+it is the deployment log and the allowlist, which the
+[CLI commands](6-cli-commands.md#zitadel-deployments) already describe.
+
 ## Open
 
 1. **Content digest or pointer digest on the wire.** A content digest is
    reproducible across projects, which is what makes promotion checkable; a
-   pointer digest is unguessable, which matters on the fallback-header path.
-   Keeping both — pointer digest on the wire, content digest for CI assertions —
-   is probably the answer.
+   pointer digest is unguessable. Guessability no longer carries any security —
+   a pin may only name a release
+   [already deployed to the target](3-release-resolution.md#pinning-a-release),
+   so a digest is not a capability — which leaves this a question of promotion
+   ergonomics only. Keeping both — pointer digest on the wire, content digest
+   for CI assertions — is probably the answer.
 2. **How strictly a concurrent deploy to one target must serialise.** With no
    pointer column, two appends both succeed and the later timestamp wins. A
    lock — the project row for a primary, the preview row for a preview — plus
@@ -356,10 +396,3 @@ without going through it.
    cheaper and may be enough for a target only CI writes to.
 3. **Release retention window, and what counts as "cold".** A last-resolved
    timestamp is a write on the hot path; an approximation avoids one.
-4. **Whether the expiry belongs on the deployment rather than in its own
-   table.** A preview deployment could carry its own `expires_at`, leaving no
-   Origin table at all, and retiring a URL early would be an append, which is
-   what rollback already is. Against it: whatever deletes expired URLs wants one
-   row per live URL to read rather than a newest-per-origin scan, and a
-   retirement row names no release, which weakens "a deployment names the
-   release its target serves".

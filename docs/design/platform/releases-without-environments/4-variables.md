@@ -113,17 +113,25 @@ a rule would:
 
 ```
 $ zitadel preview --ttl 7d
-origin      https://acme-git-sso-acmeinc.vercel.app
+origins     https://acme-git-sso-acmeinc.vercel.app
+            https://acme-k3x9v2-acmeinc.vercel.app
 release     sha256:9f2c1a7b  (exists, reusing)
 
 warning  GOOGLE_CLIENT_SECRET has no preview value — serving the production one
          set one: zitadel vars set GOOGLE_CLIENT_SECRET --secret --preview
 
-deployed    dep_01KB3F8N2P9S5WQZ
+deployed    dpl_01KB3F8N2P9S5WQZ   2 deployment records written
 ```
 
 Secrets only. A non-secret taking the `all` value is ordinary and usually
 intended.
+
+Worth knowing before investing in overrides: an OAuth client's redirect URI
+cannot be a wildcard at Google or GitHub, and a preview's callback lives on the
+preview URL. So social login on a wildcard preview is limited by the IdP before
+it is limited by which client secret the preview holds. The override matters
+most for IdPs that accept a wildcard, and for anything that is not a redirect
+— SMTP, SMS, webhooks.
 
 ## What a deployment runs
 
@@ -153,6 +161,12 @@ deployment, so `zitadel vars set` during a sign-in changes nothing that sign-in
 can see, and a flow that
 [seals the deployment id](3-release-resolution.md#the-three-layers) pins the
 resources and the values with one pointer.
+
+A client that [pins a release](3-release-resolution.md#pinning-a-release) names
+a release, not a deployment, and the same release may sit on a target twice
+with different frozen values. The pin resolves to the newest deployment of
+that release on the matched target, so a variable-only redeploy reaches pinned
+clients as well as unpinned ones.
 
 Reading it takes an origin rather than an environment name, since that is what
 identifies a target now:

@@ -84,39 +84,83 @@ Three reasons this beats a block in `zitadel.json`:
   out for the same reason and fail the same way: a list that differs per project
   has nothing correct to say in a file every project shares.
 
-### In CI there are no files, and no environment either
+### What a platform build holds
 
-The production job gets `ZITADEL_URL`, `ZITADEL_PROJECT_ID` and
-`ZITADEL_PROJECT_SECRET` injected by the platform or the pipeline's secret
-store. Those land in `process.env`, which already outranks every file found by
-convention, so no `.env` file is read and no `--env` is needed:
+A build gets `ZITADEL_URL`, `ZITADEL_PROJECT_ID`, the publishable key and —
+in the preview scope only — the preview credential, injected by the platform's
+environment store. Those land in `process.env`, which already outranks every
+file found by convention, so no `.env` file is read and no `--env` is needed.
+Every platform here scopes variables by environment, and that scoping is the
+whole of the setup:
+
+| | Production scope | Preview scope |
+|---|---|---|
+| Vercel | Production | Preview, optionally per branch |
+| Netlify | `production` context | `deploy-preview` and `branch-deploy` contexts |
+| Cloudflare Pages | Production | Preview |
+| `ZITADEL_ENV` | `production` (needed on Cloudflare, harmless elsewhere) | unset |
+| Credential | none | `ZITADEL_PREVIEW_TOKEN` |
+
+The project secret is not in the table. **`zitadel deploy` never runs in a
+platform build** — it runs after merge, in a pipeline job or by a person — so
+the build command is the same one line on every branch:
+
+```json
+{ "scripts": { "build": "zitadel preview && next build" } }
+```
+
+In a preview build that registers the URLs and prints the digest for
+`next build` to bake in if the app pins; in a production build it
+[does nothing and says so](6-cli-commands.md#only-preview-runs-in-a-platform-build).
+The build does not decide what it is allowed to do; the scope decided that
+when the credential was placed, and a preview token cannot move production
+whatever the command. This is where the narrower credential of
+[Prerequisites](6-cli-commands.md#prerequisites) stops being a nicety.
+
+The platform's URL variables — `VERCEL_BRANCH_URL`, `DEPLOY_PRIME_URL`,
+`CF_PAGES_BRANCH` — exist **inside the platform's build and nowhere else**. A
+GitHub Actions job does not have them. A pipeline that deploys from Actions
+with `vercel deploy` or `netlify deploy` takes the URL those commands print and
+passes it explicitly; the production job is the same shape on every platform,
+since it needs no platform variable at all:
 
 ```yaml
+# pull-request job on GitHub Actions, deploying with the Vercel CLI
+- run: |
+    url=$(vercel deploy --token "$VERCEL_TOKEN")
+    zitadel preview --ttl 7d --origin "$url"
+  env:
+    ZITADEL_URL:            ${{ vars.ZITADEL_URL }}
+    ZITADEL_PROJECT_ID:     ${{ vars.ZITADEL_PROJECT_ID }}
+    ZITADEL_PREVIEW_TOKEN:  ${{ secrets.ZITADEL_PREVIEW_TOKEN }}
+
 # production job, after merge
 - run: zitadel deploy -m "$MSG"
   env:
     ZITADEL_URL:            ${{ vars.ZITADEL_URL }}
     ZITADEL_PROJECT_ID:     ${{ vars.ZITADEL_PROJECT_ID }}
     ZITADEL_PROJECT_SECRET: ${{ secrets.ZITADEL_PROJECT_SECRET }}
-
-# pull-request job — origin inferred from VERCEL_BRANCH_URL,
-# and a credential that cannot widen the allowlist
-- run: zitadel preview --ttl 7d
-  env:
-    ZITADEL_URL:           ${{ vars.ZITADEL_URL }}
-    ZITADEL_PROJECT_ID:    ${{ vars.ZITADEL_PROJECT_ID }}
-    ZITADEL_DEPLOY_TOKEN:  ${{ secrets.ZITADEL_PREVIEW_DEPLOY_TOKEN }}
 ```
 
-The two jobs read correctly without a comment explaining which flag makes one
-safe, which is the [two-verbs argument](6-cli-commands.md#zitadel-preview)
-paying off in the place it matters.
+Two jobs with two credentials read correctly without a comment explaining
+which flag makes one safe, which is the
+[two-verbs argument](6-cli-commands.md#zitadel-preview) paying off in the
+place it matters.
+
+**When `deploy` runs relative to the app going live is a choice.** A job that
+runs on merge fires while the platform is still building, so the new
+configuration may be live before the new bundle is; a job on
+`deployment_status: success`, or one triggered by a deploy hook, runs after the
+bundle is live and inverts the window. Neither is atomic with the app; nothing
+can be. Previews do not care, and a production app that
+[pins](3-release-resolution.md#pinning-a-release) its release is unaffected
+either way, since the old bundle keeps naming the old release.
 
 This also clarifies what the name is actually for: **it only matters where
-several targets coexist on one machine, which is a developer's laptop.** A CI job
-has exactly one target by construction, injected. The environment is a local
-affordance for switching between dev and prod from one checkout, not part of the
-deployment contract.
+several targets coexist on one machine, which is a developer's laptop.** A
+build has exactly one target by construction, injected. The environment is a
+local affordance for switching between dev and prod from one checkout, not
+part of the deployment contract.
 
 ### Discovery is server-side, not repository-side
 
@@ -189,11 +233,32 @@ next
   zitadel deploy --env production                            ship configuration
   zitadel claim --env production                             attach an owner
   zitadel projects promote --env production                  class=production
+
+platform          the build needs these; nothing on this machine puts them there
+  production scope   ZITADEL_URL, ZITADEL_PROJECT_ID, ZITADEL_PUBLISHABLE_KEY,
+                     ZITADEL_ENV=production
+  preview scope      ZITADEL_URL, ZITADEL_PROJECT_ID, ZITADEL_PUBLISHABLE_KEY,
+                     ZITADEL_PREVIEW_TOKEN
+  zitadel env push --platform vercel     writes both scopes with the vercel CLI
+
+ci                the job that runs `zitadel deploy` after merge needs the
+                  project secret; put it in the pipeline's secret store, not
+                  in the platform
 ```
 
 Creating the project needs no credential — `POST /projects` is public. So the
 whole journey is CLI-driven and nothing has to be done in a web console
 first.
+
+**The laptop and the platform are two places, and the second has to be told.**
+`env add` writes a local file; the platform's environment store is where the
+build reads from, and no file on this machine reaches it. So the command ends
+by listing what each scope needs, and `zitadel env push --platform <vercel |
+netlify | cloudflare>` writes them through the platform's own CLI — public
+values in both scopes, the preview token in the preview scope, and the
+project secret in neither. Without `push`, the list is what to paste. Either
+way the preview token is minted here, since this is the one moment the CLI
+holds the project secret and knows which project the token is for.
 
 `zitadel env add` binds; `--project prj_...` binds a project that already
 exists, created by a teammate or by `zitadel projects create`. The two steps are
@@ -208,7 +273,7 @@ development   local                        prj_01KDEV7T9QX3M2E8      sandbox   �
 production    https://api.zitadel.cloud    prj_01K9AA9M3K7E2QX8VB4T  sandbox   no
 
 resolved now  development
-              (no --env, ZITADEL_ENV unset, NODE_ENV=development)
+              (no --env, ZITADEL_ENV unset, no platform signal)
 ```
 
 Enumeration is a glob over `.env.*.local` for files carrying
@@ -222,6 +287,46 @@ repeats production's project id says plainly that previews run against
 production users, which is the thing worth noticing. Pointing it at a third
 project instead buys user isolation, and costs a project. Nothing is seeded
 either way.
+
+### Staging
+
+The first thing every team asks for, and the model answers it two ways. Which
+one is the right one turns on a single question: should staging share
+production's users?
+
+**Shared users — one project, one more primary.** `staging.acme.com` is a
+`primary` literal in the allowlist, deployed on its own:
+
+```
+$ zitadel allowlist add https://staging.acme.com --kind primary
+$ zitadel deploy --origin https://staging.acme.com -m "try the new flow"
+```
+
+A primary has no expiry, so an idle staging branch does not go dark, and it is
+answered by layer 2 like any production hostname. Promotion is
+`zitadel deploy` with no `--origin`, which moves `(default)` and the rest of
+the primaries to what staging already runs. On the platform, `staging.acme.com`
+is a branch domain on the production project; its build runs
+`zitadel preview` like every other branch and, with `ZITADEL_ENV=staging` set
+on that branch, [does nothing](6-cli-commands.md#only-preview-runs-in-a-platform-build)
+— otherwise it would register the branch's own `*.vercel.app` URL as a preview
+beside the staging domain. Configuration reaches staging the way it reaches
+production:
+`zitadel deploy --origin https://staging.acme.com` from the pipeline job that
+holds the project secret, on push to the `staging` branch. The verb carrying
+the hostname is the point: a staging that can move the default is production
+with a different name.
+
+**Isolated users — a second project.** `zitadel env add staging` creates or
+binds one, and the platform injects its triple for that branch only: Vercel
+scopes preview variables per branch, Netlify has a per-branch
+`[context.staging]`, Cloudflare Pages cannot scope by branch and so wants a
+separate Pages project for staging. Promotion is the
+[digest assertion](1-data-model.md#promotion) between the two projects.
+
+A long-lived `preview` origin is the one shape to avoid for staging: its row
+expires, so a staging that nobody pushed to for a week answers
+`403 proj.preview_not_live` to the first person who tries it.
 
 ### Shipping to it
 
@@ -263,8 +368,8 @@ claimed    team_acme
 
 $ zitadel projects promote --env production
 revalidating 2 origins against the production rules
-  https://app.acme.com           primary   exact origin      ✓
-  https://*-acmeinc.vercel.app   preview   tenant-anchored   ✓
+  https://app.acme.com           primary   exact origin               ✓
+  https://*-acmeinc.vercel.app   preview   bounded by label `-acmeinc` ✓
 class      sandbox -> production
 ```
 

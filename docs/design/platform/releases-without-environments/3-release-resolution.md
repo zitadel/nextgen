@@ -15,33 +15,33 @@ project secret. A body `project_id` that disagrees is `403`.
 Then the release, in three layers:
 
 1. **Gate.** `Origin` present and matching no `allowed_origins` pattern → `403`.
-   `Origin` absent falls through; there is nothing to check.
+   Matching a `preview` pattern with no live
+   [preview row](1-data-model.md#origin) for the exact URL → `403` as well; the
+   row is what admits a preview URL, the pattern only said it could be
+   registered. `Origin` absent falls through; there is nothing to check.
 2. **Route.** A deployment row carrying this exact `Origin` → serve the release
    the newest such row names. The caller sends nothing and needs to know
-   nothing, and this answers almost all browser traffic. A URL allowed by a
-   `preview` pattern needs a live [preview row](1-data-model.md#origin) as well,
-   which is what makes an expired preview URL stop being served.
-3. **Fall back.** Nothing deployed to this origin, or its preview row has gone.
-   An
-   explicit `X-Zitadel-Release` header wins if present and permitted; otherwise
-   the project default — the newest deployment row with `origin = ""`.
+   nothing, and this answers almost all browser traffic.
+3. **Fall back.** No `Origin` → the project default, the newest deployment row
+   with `origin = ""`.
+
+Once a target is found, an `X-Zitadel-Release` header may **select** a release
+that was deployed to that target instead of the newest one —
+[pinning a release](#pinning-a-release). It never admits an origin and never
+serves a release no deploy ever named.
 
 Layer 3 is not a leftover: layer 2 needs an `Origin` to match, and a server-side
 app sends none. No layer reads a stored pointer; see
 [why there is no pointer column](1-data-model.md#why-there-is-no-pointer-column).
-
-**Who may use the header.** On a `production` project it requires the publishable
-key or the project secret, so an anonymous pin is refused. On a `sandbox` project
-it is open. A `preview` pattern matched at layer 1 that layer 2 could not answer, with no
-permitted header, is `400` — a preview URL must never silently fall through to
-production configuration.
 
 **Sealing.** The resolved *deployment* id is written into the flow state at the
 first step and reused for the rest of the attempt, so a deploy landing mid
 sign-in cannot change the configuration under the user. Sealing the deployment
 rather than the release pins the resources and the
 [frozen values](4-variables.md#what-a-deployment-runs) with one pointer, which is why they
-cannot drift apart part-way through an attempt.
+cannot drift apart part-way through an attempt. It is also what lets
+`getFlowStep` be a `GET`: a same-origin `GET` carries no `Origin` header, so
+nothing after the first step could be resolved from one, and nothing has to be.
 
 ### What each kind of caller sends
 
@@ -49,14 +49,19 @@ cannot drift apart part-way through an attempt.
 page, and the publishable key is already a build constant in the bundle. So the
 first request of a sign-in carries no release identifier and the app holds no
 release state: layer 2 answers out of the deployment history and the browser
-never learns which release it was served. A deploy to that origin changes the answer on the next
-page load with no client change.
+never learns which release it was served. A deploy to that origin changes the
+answer on the next page load with no client change — which is also the
+trade-off: rolling the *app* back on the platform does not move the
+configuration, because the bundle never said which one it wanted. A build that
+wants the two to move together bakes the digest in and
+[pins](#pinning-a-release).
 
 **A caller with no `Origin` is answered by the project default.** That is
 server-side rendering, a backend, the CLI, CI, and native or mobile apps. The
 credential identifies the project — the project secret for a server, the
 publishable key for a shipped app — and layer 3 serves the newest deployment with
-`origin = ""`. To get anything else it must say so with `X-Zitadel-Release`.
+`origin = ""`. A server-side app may [pin](#pinning-a-release) among what was
+deployed there; a native app takes the default and nothing else.
 
 The project default is a target like any other, not a fallback computed from the
 origins: `""` is simply its name in `deployments.origin`. So "which release does
@@ -82,30 +87,107 @@ simply leave the header off, so it is worth being explicit about what that
 reaches: the project default, which is the same configuration any visitor to
 `app.acme.com` is served and public by construction. What it does not reach is a
 **preview release** — layer 2 needs the `Origin` of a preview URL whose row is
-still live, and on a `production` project the header needs a credential.
+still live, and a pin cannot name a release that was only ever deployed to a
+preview URL from any other target.
 
 The gate therefore protects the one caller that *cannot* lie about its origin: a
 browser on a page the user did not expect. It was never a defence against a
 client that writes its own headers, and the design does not lean on it as one.
+Nothing a client can write in a header reaches anything an operator did not
+already deploy to the target the request matched.
 
-One consequence worth naming rather than hiding: the publishable key is public,
-so "the header needs a credential" is a weak gate against someone who read the
-bundle. It stops the casual stranger of
-[example 4](#4-a-stranger-who-does-match-the-pattern), not a determined one —
-see [Open](#open).
+### Pinning a release
+
+`X-Zitadel-Release` carries a digest. The one rule: **a pin may choose among
+what was deployed to the matched target; it may never deploy.** The server
+accepts the header only when a deployment row for that target names the
+release, the release is not revoked, and the row is within the pin window —
+the newer of the last `N` deploys to the target and the last `D` days, both
+settable per project. Anything else is `409 rel.not_deployed`, with the
+digest echoed so the build that baked it can be found. The header needs no
+credential of its own: the operation already requires one, and a public
+credential would add nothing to a rule that only admits what was deployed.
+
+Two different things hide behind one header, and the rule keeps them apart:
+
+- **Selection.** The bundle says which of the target's recent releases it was
+  built against. Every pro below is this.
+- **Activation.** The bundle names a release no deploy ever put on this target.
+  Every con below is this, and the rule refuses it outright.
+
+What selection buys, on a platform where a deployment is immutable — Vercel,
+Netlify, Cloudflare:
+
+| | Served by the origin | Pinned by the bundle |
+|---|---|---|
+| Code and configuration move together | no — a `vercel rollback` restores the bundle and leaves the configuration | yes — the digest travels inside the bundle, through every alias and every rollback |
+| Skew window, old bundle still served | sees the new configuration on its next attempt | keeps the configuration it was built against |
+| Configuration hotfix — disable an IdP, tighten a policy | one `zitadel deploy`, live on the next page load, every app at once | one app rebuild per app, until an operator [revokes](1-data-model.md#release) and forces them forward |
+| Three apps on one project | one configuration, by construction | three digests, drifting until each is rebuilt |
+| Incident response | `zitadel rollback`, instant, everyone | `revoked_at`, instant, and every pinned bundle is broken until rebuilt |
+
+So the origin stays authoritative and the pin is an opt-in that costs a
+rebuild to change. The normal case — a bundle built right after
+`zitadel deploy` — pins the newest release and is a no-op. The pin only
+matters during the skew window and after a platform rollback, which is exactly
+when it should.
+
+**Per caller:**
+
+- **Browser, preview.** Optional, and cheap: `zitadel preview` runs in the
+  build and prints the digest for `NEXT_PUBLIC_ZITADEL_RELEASE` or the
+  framework's equivalent. Since the bundle is immutable, the pin follows it
+  through the per-deployment URL, the branch URL and a platform rollback alike.
+- **Browser, production.** Optional, and opt-in. `zitadel deploy` does not run
+  in the build, so the build has to compute the digest of its own checkout —
+  the same commit the merge job deployed — which needs the content digest of
+  [Open 1](1-data-model.md#open).
+- **Server-side app.** Optional, via `ZITADEL_RELEASE`. Same rule against the
+  project default.
+- **Native and mobile.** Never. A digest in a store binary is months stale and
+  cannot be rolled forward without a release through the store. These callers
+  take the project default and nothing else, and the SDKs for them do not
+  expose the header.
+- **CLI, CI.** Not a consumer; they write deployments.
+- **`sandbox` projects.** The rule is lifted, since a draft nobody deployed is
+  the point of [local development](#local-development). The window and the
+  deployed-only check apply from the moment the class becomes `production`.
+
+**Why the rule is a security boundary and not a nicety.** A browser header is
+attacker-controlled and the publishable key is public. If a pin could activate,
+anyone could run the release from before MFA was enforced, before the bot check
+was added, or with the test IdP still enabled — a one-header rollback of
+somebody else's policy. Drafts are worse: a shared `sandbox` project builds a
+release on every local edit, none of them reviewed. With the rule, the worst a
+header can do is pick last week's production configuration on a target that
+served it last week, which an operator already judged fit to serve.
+Unguessability of the digest buys nothing on top of this, and the design does
+not rely on it.
+
+**Release and deployment.** A pin names a release, but the
+[frozen values](4-variables.md#what-a-deployment-runs) hang off a deployment,
+and the same release may have been deployed to a target twice with different
+values. The pin resolves to the newest deployment of that release on the
+matched target, so a variable-only redeploy is honoured by pinned clients too.
 
 ### Errors
 
 | Condition | Status | Code |
 |---|---|---|
 | `Origin` matches no pattern | 403 | `proj.origin_not_allowed` |
+| `Origin` matches a `preview` pattern, no live row | 403 | `proj.preview_not_live` |
 | Body `project_id` disagrees with the credential | 403 | `proj.mismatch` |
-| Header used without a credential on a `production` project | 403 | `rel.pin_not_permitted` |
-| `preview` pattern matched, no row and no permitted header | 400 | `rel.required` |
+| Header names a release never deployed to this target, or outside the pin window | 409 | `rel.not_deployed` |
 | No `Origin`, and the project has never been deployed | 409 | `rel.no_default` |
 | Digest names a release of another project, or none | 404 | `rel.not_found` |
 | Short digest matches more than one release | 400 | `rel.ambiguous` |
 | Release revoked | 409 | `rel.revoked` |
+
+`proj.preview_not_live` and `rel.not_deployed` are the two a reviewer will
+meet, and both need a sentence the login surface can show: *this preview is no
+longer live — push again or run `zitadel preview`*, and *this build pins a
+release this URL no longer serves — redeploy the app*. The others are
+integration mistakes and may stay terse.
 
 Per-request outcomes only. Admitting a pattern has its own rejections, on the
 operation that writes it rather than on this path —
@@ -138,7 +220,12 @@ request serves that branch's release instead: layer 2 finds the preview's own
 deployment. Nothing else about the request differs, which is the point of routing on
 the origin.
 
-### 2. A preview with no row
+### 2. A bundle pinning the release it was built against
+
+The branch was pushed twice. The first push deployed `sha256:81de4c…` to the
+branch URL and built a bundle naming it; the second deployed `sha256:9f2c1a…`.
+Vercel's skew protection is still serving the first bundle to a tab that was
+open before the second push.
 
 ```http
 POST /flow HTTP/1.1
@@ -151,12 +238,13 @@ X-Zitadel-Release: sha256:81de4c…
 
 | Layer | Outcome |
 |---|---|
-| 1 gate | matches the preview pattern ✓ |
-| 2 route | nothing deployed to this host |
-| 3 fall back | header present, publishable key present → `sha256:81de4c…` |
+| 1 gate | matches the preview pattern, row live ✓ |
+| 2 route | newest row → `sha256:9f2c1a…` |
+| pin | `sha256:81de4c…` was deployed to this URL one push ago, inside the window → selected |
 
-Drop the `Authorization` header and this is `403 rel.pin_not_permitted`; drop
-`X-Zitadel-Release` instead and it is `400 rel.required`.
+The old tab keeps the configuration it was built against. Name a digest that
+was never deployed to this URL and it is `409 rel.not_deployed`, whatever
+credential is sent.
 
 ### 3. A server-side app, no `Origin`
 
@@ -174,14 +262,15 @@ Authorization: Bearer sk_proj_9f2Hx8LqT4vRmYpN2wCbVa
 | 3 fall back | no header → newest deployment with `origin = ""` → `sha256:4a5b…` |
 
 This is why the project default exists: the caller has no origin, so there is no
-row to find. Add `X-Zitadel-Release` to pin a release — the project secret
-permits it on any class.
+row to find. Add `X-Zitadel-Release` to select among the releases deployed to
+the default; the deployed-only rule applies here as everywhere.
 
 ### 4. A stranger who does match the pattern
 
 ```http
 POST /flow HTTP/1.1
-Origin: https://acme-git-nonsense-acmeinc.vercel.app
+Origin: https://evil-acmeinc.vercel.app
+Authorization: Bearer pk_7kR2pXq9vN3wLmYhT4cB8A
 X-Zitadel-Release: sha256:9f2c1a…
 
 { "purpose": "login" }
@@ -189,15 +278,14 @@ X-Zitadel-Release: sha256:9f2c1a…
 
 | Layer | Outcome |
 |---|---|
-| 1 gate | matches the preview pattern ✓ |
-| 2 route | nothing deployed to this exact host |
-| 3 fall back | header present, **no credential** on a `production` project |
+| 1 gate | matches the preview pattern — a Vercel project named `evil-acmeinc` is reachable here — but **no live row** |
 
-`403 rel.pin_not_permitted`. Knowing the digest bought nothing, which is the
-point of resolving from the origin rather than from a value the client supplies.
-A stranger on `https://evil-xyz-attacker.vercel.app` never gets this far: the
-pattern requires the `-acmeinc` suffix, so layer 1 answers
-`403 proj.origin_not_allowed` before any release is considered.
+`403 proj.preview_not_live`. The stranger read the publishable key out of the
+bundle and the digest with it, and both bought nothing: the pattern admits no
+request, only the row does, and the row is written by a credential the
+stranger does not hold. A stranger on `https://evil-xyz-attacker.vercel.app`
+is refused one line earlier with `403 proj.origin_not_allowed`; the difference
+is only which message the login surface shows.
 
 ### 5. Local development
 
@@ -225,13 +313,15 @@ a `.zitadel/` edit shows on the next page load.
 | `Origin` | Credential | Header | Answered by | Result |
 |---|---|---|---|---|
 | primary | publishable key | — | layer 2 | production release |
+| primary | publishable key | deployed here, in window | layer 2 + pin | that release |
+| primary | publishable key | never deployed here | layer 2 + pin | `409 rel.not_deployed` |
 | preview, row live | publishable key | — | layer 2 | branch release |
-| preview, no row | publishable key | yes | layer 3 | named release |
+| preview, row live | publishable key | deployed here, in window | layer 2 + pin | that release |
+| preview, no row | any | any | layer 1 | `403 proj.preview_not_live` |
 | none | project secret | — | layer 3 | project default |
-| unmatched | — | yes | layer 1 | `403 origin_not_allowed` |
-| matched preview | none | yes | layer 3 | `403 pin_not_permitted` |
-| loopback (`sandbox`) | — | yes | layer 3 | named release |
-| matched preview | publishable key | — | layer 3 | `400 rel.required` |
+| none | project secret | deployed to default | layer 3 + pin | that release |
+| unmatched | — | yes | layer 1 | `403 proj.origin_not_allowed` |
+| loopback (`sandbox`) | — | any release | layer 3 + pin | named release |
 | none, never deployed | project secret | — | layer 3 | `409 rel.no_default` |
 
 ## Local development
@@ -272,9 +362,15 @@ The one real collision is the cookie jar, which ignores the port: project A on
 so their sessions overwrite each other.
 
 The fix is a hostname per project rather than a port per project. `*.localhost`
-resolves to loopback and counts as a trustworthy origin, so `project-a.localhost`
-separates them with no TLS and no `/etc/hosts` editing. **The CLI should scaffold
-a per-project local hostname rather than a bare port.**
+resolves to loopback in every current browser and counts as a secure context,
+so `project-a.localhost` separates them with no TLS and no `/etc/hosts`
+editing. **The CLI should scaffold a per-project local hostname rather than a
+bare port** — which means the dev server has to be started with it
+(`next dev --hostname project-a.localhost`, and the framework's equivalent
+elsewhere), or the printed URL is still `localhost` and the cookie jar is still
+shared. The operating system's resolver does not know `*.localhost`; that does
+not matter, because the server-side SDK calls `ZITADEL_URL`, never the app's
+own hostname.
 
 Developers sharing a project share its users and sessions. A developer who needs
 isolation uses their own project, which costs a `ZITADEL_PROJECT_ID` in
@@ -288,14 +384,22 @@ an origin-scoped, public-safe bearer that resolves the project server-side
 the SDK already sends it. But there is no `publishableKey` security scheme in
 `api/openapi/security/`, and the flow operations are declared `security: []`, so
 they authenticate nobody. **Every rule here that turns on "does the caller hold a
-credential" depends on this**, including the whole of the project class's effect
-on release pinning. It is the largest prerequisite in this spike.
+credential" depends on this**. It is the largest prerequisite in this spike.
+
+**The deployed-here check for a pin.** One seek on the existing
+`(project_id, origin, deployed_at DESC, id DESC)` index, bounded by the window,
+filtered on `release_id`. Nothing new in storage; a query in the resolver.
 
 ## Open
 
-**Whether a preview may serve a release no target ever activated.** The header
-gate rests on holding a credential, and the publishable key is public, so it
-stops a casual stranger rather than a determined one. Restricting the header to
-releases already activated on some target, or created recently, are both cheap
-narrowings; requiring the project secret for it on a `production` project is the
-strict version, at the cost of example 3.
+1. **The pin window's defaults.** `N` deploys and `D` days both bound how far
+   back a bundle may reach; a platform's skew window is hours, a platform
+   rollback usually reaches one or two deploys back, and a mobile-style
+   long-lived bundle is excluded by rule rather than by window. Something like
+   the last 10 deploys or 14 days, whichever is more generous, with both
+   settable on the project.
+2. **Whether the SDKs should pin by default** when the build has a digest to
+   hand, or only when asked. Pinning by default makes a platform rollback
+   coherent without anyone deciding to; it also makes every configuration
+   hotfix a rebuild until the operator revokes. The framework scaffolds should
+   probably pin previews and leave production opt-in.

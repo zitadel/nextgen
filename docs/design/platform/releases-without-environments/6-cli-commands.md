@@ -44,15 +44,21 @@ refused, and so is `preview --origin https://app.acme.com`.
 
 ```
 $ zitadel preview
-platform    vercel  (VERCEL_BRANCH_URL)
-origin      https://acme-git-sso-acmeinc.vercel.app
-            matches https://*-acmeinc.vercel.app (preview)  ✓
+platform    vercel
+origins     https://acme-git-sso-acmeinc.vercel.app   VERCEL_BRANCH_URL
+            https://acme-k3x9v2-acmeinc.vercel.app    VERCEL_URL
+            both match https://*-acmeinc.vercel.app (preview)  ✓
 
 building    3 changed resources
 release     sha256:9f2c1a7b  (exists, reusing)
-origin      created, expires 2026-10-09T14:10:00Z
-deployed    dep_01KB3F8N2P9S5WQZ
+origins     2 rows written, expire 2026-10-09T14:10:00Z
+deployed    dpl_01KB3F8N2P9S5WQZ   2 deployment records written
+
+NEXT_PUBLIC_ZITADEL_RELEASE=sha256:9f2c1a7b4e83d05f6c2b19ae7d430f821c6b5de90a4f7382
 ```
+
+The last line is for the build that runs next, if it wants to
+[pin](3-release-resolution.md#pinning-a-release); nothing is written to disk.
 
 A preview URL is retired by the same verb that created it:
 
@@ -77,44 +83,72 @@ Authorization: Bearer sk_proj_9f2Hx8LqT4vRmYpN2wCbVa
 
 {
   "release": "sha256:9f2c1a7b4e83d05f6c2b19ae7d430f821c6b5de90a4f7382",
-  "targets": ["https://acme-git-sso-acmeinc.vercel.app"],
+  "targets": [
+    "https://acme-git-sso-acmeinc.vercel.app",
+    "https://acme-k3x9v2-acmeinc.vercel.app"
+  ],
   "reason":  "deploy",
   "ttl":     "7d"
 }
 ```
 
-The same string therefore arrives by two routes: **declared** at deploy time,
-backed by the project secret, and **attested** at request time by the browser's
-`Origin` header. The allowlist binds them — a declared origin is checked against
-the project's patterns at deploy time, so a preview row can never exist for a
-URL the project does not allow.
+The same strings therefore arrive by two routes: **declared** at deploy time,
+backed by the preview credential, and **attested** at request time by the
+browser's `Origin` header. The allowlist binds them — a declared origin is
+checked against the project's `preview` patterns at deploy time, so a preview
+row can never exist for a URL the project does not allow. And since
+[the row is what admits a request](2-origins.md#allowlist-and-preview-rows),
+nothing else can either.
+
+**Every URL the platform reports, not one.** A platform mints a branch-stable
+URL and a per-deployment one, and it is the per-deployment one that its pull
+request comment, its dashboard and its share links point at. A row for the
+branch URL alone leaves the reviewer who clicked the platform's own link at
+`403 proj.preview_not_live`. So the run registers both, with one expiry; a push
+renews the branch row and adds the deployment row, and an abandoned branch's
+rows expire together.
 
 Origin resolution, highest priority first:
 
-1. `--origin <url>`
-2. The platform's **branch-stable** URL — `VERCEL_BRANCH_URL`,
-   `DEPLOY_PRIME_URL`, `CF_PAGES_URL`
+1. `--origin <url>`, repeatable
+2. What the platform reports for this build:
+
+   | Platform | Branch-stable | Per-deployment | Notes |
+   |---|---|---|---|
+   | Vercel | `VERCEL_BRANCH_URL` | `VERCEL_URL` | bare hostnames; the CLI prepends `https://`. Present only when the project exposes system environment variables, which is the default |
+   | Netlify | `DEPLOY_PRIME_URL` | `DEPLOY_URL` | full URLs |
+   | Cloudflare Pages | `https://<branch>.<project>.pages.dev`, built from `CF_PAGES_BRANCH` with the platform's own label sanitising | `CF_PAGES_URL` | the branch alias is not exported; the CLI constructs it |
+   | Cloudflare Workers Builds | — | — | no URL is exported to the build; `--origin` is required |
+
 3. Error naming the variables it looked for
 
-Branch-stable, not per-deployment: `VERCEL_URL` and `DEPLOY_URL` change on every
-push, which would write a new row on every push and leave the reviewer's link
-pointing at one nothing renews.
-
-Re-running on the next push renews `expires_at` and appends a deployment for
-that same origin, so the preview URL is stable across pushes and an abandoned
-branch's row expires and is deleted.
-
-Outside CI there is no preview URL to infer:
+Outside a platform build there is no preview URL to infer:
 
 ```
 $ zitadel preview
 error  no preview URL found
-       looked for: VERCEL_BRANCH_URL, DEPLOY_PRIME_URL, CF_PAGES_URL
+       looked for: VERCEL_BRANCH_URL, DEPLOY_PRIME_URL, CF_PAGES_BRANCH
 
        `zitadel preview` runs in a deploy pipeline, where the platform
        publishes the URL. Local work needs no preview URL at all.
        To target a URL explicitly: zitadel preview --origin <url>
 ```
+
+**A build with no credential does not fail.** Vercel and Netlify withhold
+secrets from a deployment built from a fork, so a pull request from outside
+the repository runs the build with `ZITADEL_PREVIEW_TOKEN` unset. Failing there
+would fail the whole deployment over a login the reviewer may not need.
+Instead:
+
+```
+$ zitadel preview
+warning  no preview credential in the environment — skipping
+         the app will build; sign-in on this preview will answer
+         403 proj.preview_not_live until a credential is present
+```
+
+Exit code zero. `--strict` turns the warning into a failure for pipelines that
+would rather know.
 
 ### `preview` must not be able to widen the allowlist
 
@@ -125,11 +159,11 @@ What a PR job does hold is a credential, and that is the part still to solve.
 
 | | `zitadel deploy` | `zitadel preview` |
 |---|---|---|
-| Runs in | the production job, after merge | a PR job, unreviewed branch |
+| Runs in | a pipeline job after merge, or by a person | a platform build or PR job, unreviewed branch |
 | Allowlist patterns | read-only — `zitadel allowlist` is its own command | read-only |
 | Project class | may change | may not |
 | Variables | may set | may not — and sends none |
-| Origin rows | `primary` | creates or renews one `preview` row |
+| Origin rows | `primary` | creates or renews `preview` rows, one per URL the platform reports |
 
 So the first preview on a branch needing a brand-new pattern fails with
 `proj.origin_not_allowed`, and the fix is for someone holding `project.write` to
@@ -140,9 +174,50 @@ full operator authority, so a branch wanting to widen the allowlist would call
 the endpoint directly rather than bother with the CLI. The table above is
 therefore a convention until the server can express it, which needs **a
 credential scoped to preview deploys and nothing else**: create or renew a
-preview row, create a release, read the allowlist, and no write to patterns or
-class. ADR 036's `sk_team_` — "anything not listed under MAY is
-denied" — is the shape to copy. See [Prerequisites](#prerequisites).
+preview row for a URL matching a `preview` pattern, create a release, read the
+allowlist, and no write to patterns, class, variables, `default` or
+`primary`. ADR 036's `sk_team_` — "anything not listed under MAY is denied" —
+is the shape to copy. See [Prerequisites](#prerequisites).
+
+This matters more on a platform than in a hand-written pipeline. A platform
+build runs with whatever the environment store holds for that scope, and the
+scope is the only thing separating a production build from a preview build.
+Hold only the preview credential there, in the preview scope, and a build
+*cannot* move production whichever command it runs.
+
+### Only `preview` runs in a platform build
+
+Vercel and Cloudflare Pages run one build command for every environment, and
+that command is where `zitadel preview` has to run, since the platform's URL
+variables exist only inside its build. The same string also runs for the
+production branch. Rather than make the command dispatch on the environment —
+`[ "$VERCEL_ENV" = production ] && zitadel deploy || zitadel preview` is the
+one-forgotten-condition risk the two verbs exist to remove — the rule is that
+**`zitadel deploy` never runs in a platform build**. It runs after merge, in a
+pipeline job or by a person, with the project secret, which therefore never
+has to be placed in the platform's environment store at all.
+
+So the build command is `zitadel preview && next build` on every branch, and
+`preview` knows when it is in a production build:
+
+```
+$ zitadel preview
+environment  production   VERCEL_ENV
+nothing to preview — production is deployed by `zitadel deploy`, after merge
+```
+
+Exit code zero, no row written, no release built. `preview` does its work
+when the resolved
+[environment](5-cli-target-resolution.md#target-resolution) is `preview` —
+Vercel's `preview`, Netlify's `deploy-preview` and `branch-deploy` — or
+`development`, which is what a build with no signal and no `ZITADEL_ENV`
+resolves to, and what a laptop with `--origin` resolves to. Any other name,
+`production` or `staging` or whatever a branch was given, is a no-op that says
+which name it saw. On Cloudflare, which has no signal, the production scope
+therefore needs `ZITADEL_ENV=production`; without it a production build
+holding a preview credential would register the production branch's own
+preview URL — harmless, and visible in `zitadel deployments --live`, but the
+one misconfiguration worth a warning in the output.
 
 ## `zitadel deployments`
 
@@ -191,18 +266,27 @@ $ zitadel allowlist
 PATTERN                           KIND
 https://app.acme.com              primary
 https://www.acme.com              primary
-https://*-acmeinc.vercel.app      preview   tenant-anchored on `-acmeinc` ✓
+https://*-acmeinc.vercel.app      preview   bounded by label `-acmeinc` ✓
 https://*.preview.acme.com        preview   domain verified ✓
 
 $ zitadel allowlist add 'https://*--acme-site.netlify.app' --kind preview
-checked   netlify.app  tenant-unique label `acme-site`  ✓
-added     covers every later branch; no deploy needed
+checked   netlify.app  bounded by label `acme-site`  ✓
+added     the preview credential may now register URLs matching it
 
 $ zitadel allowlist add 'https://*.evil.com' --kind preview
-error  origin_not_tenant_anchored
-       `*.evil.com` carries no tenant-unique label, so the wildcard would
-       allow every host under evil.com.
+error  origin_unbounded
+       `*.evil.com` has no literal label on a shared host, so a leaked
+       preview credential could register any URL under evil.com.
+
+$ zitadel allowlist add 'https://*.acme.newhost.dev' --kind preview
+warning  origin_host_unknown
+         newhost.dev is not in the host list; the label could not be checked.
+added
 ```
+
+What the check protects is narrow and worth saying in the output: a pattern
+admits no request, so the lint bounds a *leaked credential*, not a stranger —
+[what a wildcard on a shared host is worth](2-origins.md#what-a-wildcard-on-a-shared-host-is-worth).
 
 ## `zitadel vars`
 
@@ -273,9 +357,9 @@ Three edges, each reported rather than guessed at:
 - **`--origin <url>`** still narrows to one target, for the case where one
   hostname really is the whole intent. It is the exception, not the normal path.
 
-Previews need none of this: `zitadel preview` writes one origin per run and
-`deploy` never writes a preview row, so a deploy's target set is already the
-production set.
+Previews need none of this: `zitadel preview` writes only the URLs of its own
+run and `deploy` never writes a preview row, so a deploy's target set is
+already the production set.
 
 Rolling back appends — a new row per target, `reason=rollback`, and the
 `deploy_id` it reversed recorded on it — so rolling back and forward leaves a
@@ -311,4 +395,7 @@ consulted, in order:
 
 **A preview-deploy credential**, narrower than the project secret, or the
 `deploy`/`preview` trust division on this page stays advisory rather than
-enforced.
+enforced. It has to land before `zitadel preview` does, not after: on a
+platform the credential in the preview scope is the whole boundary, and a
+project secret there is the full operator authority sitting in every pull
+request build.
