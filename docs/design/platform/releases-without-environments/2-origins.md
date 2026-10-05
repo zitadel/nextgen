@@ -183,34 +183,11 @@ Permitted, but a preview must name its release, and there are two ways:
 
 Neither present is `400`, never the project's current release.
 
-### Passkeys and preview origins
-
-The WebAuthn relying-party id is derived from the origin hostname, and a
-credential is only assertable under the RP ID it was registered with. So a
-passkey registered at `app.acme.com` is not offered to a page on
-`acme-git-foo-acmeinc.vercel.app`. The browser enforces this; no server setting
-changes it.
-
-| Preview origin | May name a release | Passkey with production credentials |
-|---|---|---|
-| Own domain, `*.preview.acme.com` | yes | **yes** — if RP ID is a project setting |
-| Shared host, `*-acmeinc.vercel.app` | yes | **no** — `vercel.app` is a public suffix, so no tenant may claim it as an RP ID |
-
-A shared-host preview can therefore exercise password, one-time-code and social
-sign-in against real users, and not passkey assertion.
-
-For own-domain previews to work, **the RP ID has to be a project setting** — the
-registrable domain, `acme.com`, validated as a suffix of every `primary`
-origin — rather than derived per request from the full hostname. Then
-`app.acme.com` and `foo.preview.acme.com` both claim RP ID `acme.com`, and
-credentials are portable between them.
-
 ## Prerequisites
 
-- **A working origin matcher and a preview-host registry.** Matching is exact
-  string equality today, so wildcard patterns match nothing at all.
-- **RP ID as a project setting**, or own-domain previews cannot use production
-  passkeys.
+**A working origin matcher and a preview-host registry.** Matching is exact
+string equality today (`internal/api/flow.go:371`), so every wildcard pattern in
+this document matches nothing at all.
 
 ## Open
 

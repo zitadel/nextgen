@@ -184,7 +184,7 @@ it is not a target this machine can reach.
 **Two stages may point at the same project.** A `.env.preview.local` that
 repeats production's project id says plainly that previews run against
 production users, which is the thing worth noticing. Pointing it at a third
-project instead buys user isolation and its own passkeys, and costs a project.
+project instead buys user isolation, and costs a project.
 Nothing is seeded either way.
 
 ### Shipping to it

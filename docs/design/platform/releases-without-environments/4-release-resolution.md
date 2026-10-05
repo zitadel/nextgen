@@ -80,11 +80,8 @@ reaches: the project default, which is the same configuration any visitor to
 `app.acme.com` is served and public by construction. Two things it does not
 reach:
 
-- **A preview release.** Layer 2 needs an exact origin row, and on a
-  `production` project the header needs a credential.
-- **A passkey ceremony.** The WebAuthn RP ID derives from the origin host, so
-  with no `Origin` there is nothing to derive from and the step cannot be
-  offered — `flow.passkey_rp_unavailable` — until RP ID is a project setting.
+It does not reach a **preview release**: layer 2 needs an exact origin row, and
+on a `production` project the header needs a credential.
 
 The gate therefore protects the one caller that *cannot* lie about its origin: a
 browser on a page the user did not expect. It was never a defence against a
@@ -112,7 +109,6 @@ see [Open](#open).
 | Loopback origin, or a wildcard `primary` entry, on a `production` project | 400 | `proj.origin_not_permitted_for_class` |
 | Shared-host wildcard that is not tenant-anchored | 400 | `proj.origin_not_tenant_anchored` |
 | Shared-host wildcard on an unknown host | 400 | `proj.origin_host_unknown` |
-| Passkey ceremony from an origin whose RP ID cannot match | 400 | `flow.passkey_rp_unavailable` |
 
 ## Worked examples
 
@@ -152,10 +148,8 @@ Authorization: Bearer pk_7kR2pXq9vN3wLmYhT4cB8A
 | 1 gate | matches `https://*-acmeinc.vercel.app` (preview) ✓ |
 | 2 route | row found → `dep_01KB3F8N2P9S5WQZ` → `sha256:9f2c…` |
 
-Serves the branch's own release. Byte-identical to example 1 except the `Origin`.
-
-Passkey assertion with a production credential fails here — see
-[Passkeys](2-origins.md#passkeys-and-preview-origins).
+Serves the branch's own release. Byte-identical to example 1 except the
+`Origin`.
 
 ### 3. A preview that could not register its origin
 
@@ -297,13 +291,13 @@ origin**, so `http://localhost:3000` appearing in two projects' allowlists is no
 ambiguous. A loopback entry in an allowlist authorizes nothing in particular,
 which is why loopback is confined to `sandbox` projects.
 
-The one real collision is WebAuthn: RP ID drops the port, so project A on
-`:3000` and project B on `:3001` both get RP ID `localhost`, and a developer's
-browser accumulates one credential list spanning every project they work on.
+The one real collision is the cookie jar, which ignores the port: project A on
+`:3000` and project B on `:3001` are one origin as far as cookies are concerned,
+so their sessions overwrite each other.
 
-The fix is a hostname per project, not a port per project. `*.localhost` resolves
-to loopback and counts as a trustworthy origin, so `project-a.localhost` gives a
-distinct RP ID with no TLS and no `/etc/hosts` editing. **The CLI should scaffold
+The fix is a hostname per project rather than a port per project. `*.localhost`
+resolves to loopback and counts as a trustworthy origin, so `project-a.localhost`
+separates them with no TLS and no `/etc/hosts` editing. **The CLI should scaffold
 a per-project local hostname rather than a bare port.**
 
 Developers sharing a project share its users and sessions. A developer who needs
