@@ -146,35 +146,32 @@ func boundThroughSSO(attempt *domain.AuthAttempt) *domain.FlowSSOParkedIdentity 
 
 // BindCollision binds the user an SSO claim collided with, by id, so the
 // lookup that found it is not repeated through an unscoped identifier.
+//
+// The collision replaces the parked row by a marker of the bound user (no
+// provider data), so a retry after a lost cookie raises the outcome again.
 func (r *FlowSSOIdentityResolver) BindCollision(ctx context.Context, in domain.FlowSSOBindInput) error {
 	return r.db.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		if err := tx.Statements().MarkSSOCallbackCollision(ctx, in.ProjectID, in.AttemptID, in.CheckID, in.UserID); err != nil {
+			return err
+		}
 		return bindSSOIdentity(ctx, tx.Statements(), in)
 	})
 }
 
 func (r *FlowSSOIdentityResolver) BindLinked(ctx context.Context, in domain.FlowSSOBindInput) error {
 	return r.db.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		if err := tx.Statements().DeleteSSOCallback(ctx, in.ProjectID, in.AttemptID, in.CheckID); err != nil {
+			return err
+		}
 		return bindSSOIdentity(ctx, tx.Statements(), in)
 	})
 }
 
 // bindSSOIdentity records the user factor, plus the sso factor when a link is
-// given, on the attempt. A link settles the parked row, so it is deleted; a
-// collision replaces it by a marker of the bound user (no provider data), so a
-// retry after a lost cookie raises the outcome again. It runs inside the
-// caller's transaction and returns ErrSSOStateInvalid unwrapped when the row
-// was settled or replaced.
+// given, on the attempt. It runs inside the caller's transaction, after the
+// caller settled the exact parked row: the delete or the marker returns
+// ErrSSOStateInvalid when the row was settled or replaced, before any write.
 func bindSSOIdentity(ctx context.Context, stmts AllStatements, in domain.FlowSSOBindInput) error {
-	// The exact parked row goes first: a settled or replaced one aborts before any write.
-	var err error
-	if in.LinkID == "" {
-		err = stmts.MarkSSOCallbackCollision(ctx, in.ProjectID, in.AttemptID, in.CheckID, in.UserID)
-	} else {
-		err = stmts.DeleteSSOCallback(ctx, in.ProjectID, in.AttemptID, in.CheckID)
-	}
-	if err != nil {
-		return err
-	}
 	attempt, err := stmts.GetAuthAttemptByID(ctx, in.ProjectID, in.AttemptID)
 	if err != nil {
 		return fmt.Errorf("bind sso identity: read attempt: %w", err)
@@ -233,23 +230,37 @@ func (r *FlowSSOIdentityResolver) CreateLinked(ctx context.Context, in domain.Fl
 		Attributes: in.Attributes,
 		ID:         userID,
 	}, r.schemaStore)
-	linkAndBind := &ssoLinkAction{
-		subject: in.Subject,
-		bind: domain.FlowSSOBindInput{
-			ProjectID:    in.ProjectID,
-			AttemptID:    in.AttemptID,
-			CheckID:      in.CheckID,
-			UserID:       userID,
-			ConnectionID: in.ConnectionID,
-		},
+	bind := domain.FlowSSOBindInput{
+		ProjectID:    in.ProjectID,
+		AttemptID:    in.AttemptID,
+		CheckID:      in.CheckID,
+		UserID:       userID,
+		ConnectionID: in.ConnectionID,
 	}
-	if err := r.users.ApplyActions(ctx, createUser, linkAndBind); err != nil {
+	// The parked row is claimed before the user is created, so a concurrent
+	// request on the same attempt loses on the row (ErrSSOStateInvalid), not on
+	// a unique value, and is not mistaken for a collision.
+	if err := r.users.ApplyActions(ctx, &ssoClaimAction{bind: bind}, createUser, &ssoLinkAction{subject: in.Subject, bind: bind}); err != nil {
 		// Audited like a create through the user API.
 		emitUserCreateFailedBestEffort(ctx, r.db, createUser, err)
 		return "", err
 	}
 	return userID, nil
 }
+
+// ssoClaimAction deletes the exact parked row at the start of the creation
+// transaction.
+type ssoClaimAction struct {
+	bind domain.FlowSSOBindInput
+}
+
+func (a *ssoClaimAction) Prepare(context.Context) error { return nil }
+
+func (a *ssoClaimAction) Apply(ctx context.Context, stmts AllStatements) error {
+	return stmts.DeleteSSOCallback(ctx, a.bind.ProjectID, a.bind.AttemptID, a.bind.CheckID)
+}
+
+var _ UserAction = (*ssoClaimAction)(nil)
 
 // ssoLinkAction links the subject to the user created in the same
 // transaction, then binds the attempt with the link id the insert minted.

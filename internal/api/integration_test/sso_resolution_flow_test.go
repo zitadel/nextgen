@@ -459,10 +459,13 @@ func TestSSOResolutionAutoCreateRollsBackOnLinkFailure(t *testing.T) {
 	resolver := service.NewFlowSSOIdentityResolver(
 		harness.EnsureServiceDB(t), harness.EnsureIDPConnectionService(t), harness.EnsureUserService(t), harness.EnsureSchemaStore(t),
 	)
+	parked, ok := f.attempt(t, flow).SSOCallback()
+	require.True(t, ok)
 
 	_, err := resolver.CreateLinked(t.Context(), domain.FlowSSOCreateInput{
 		ProjectID:     f.project.ID,
 		AttemptID:     flow.attemptID,
+		CheckID:       parked.ID,
 		UserSchemaURL: defaultSchemaURL(),
 		ConnectionID:  f.connection.ID,
 		Subject:       "sub-taken",
@@ -475,8 +478,9 @@ func TestSSOResolutionAutoCreateRollsBackOnLinkFailure(t *testing.T) {
 	attempt := f.attempt(t, flow)
 	_, bound := domain.CheckAs[*domain.AuthFactorUser](attempt, domain.AuthCheckTypeUser)
 	assert.False(t, bound, "no factor is recorded")
-	_, parked := attempt.SSOCallback()
-	assert.True(t, parked, "the parked row survives the rollback")
+	survived, ok := attempt.SSOCallback()
+	require.True(t, ok, "the parked row survives the rollback")
+	assert.Equal(t, parked.ID, survived.ID)
 }
 
 func TestSSOResolutionMissingRequiredRoutesSSOUserNotFound(t *testing.T) {

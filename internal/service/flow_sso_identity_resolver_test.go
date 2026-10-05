@@ -396,40 +396,42 @@ func createInput() domain.FlowSSOCreateInput {
 }
 
 // expectCreateUser wires the user half of CreateLinked: the minted id, the
-// schema read and the user insert.
-func (f *ssoResolverFixture) expectCreateUser(createErr error) {
+// schema read and the user insert. It returns the insert for ordering.
+func (f *ssoResolverFixture) expectCreateUser(createErr error) *servicemocks.MockAllStatementsCreateUserCall {
 	f.stmts.EXPECT().NewManagedID(string(domain.PrefixUser)).Return("user_new", nil)
 	f.schemaStore.EXPECT().GetJSONSchemaByID(gomock.Any(), ssoProjectID, ssoSchemaURL).
 		Return(&domain.JSONSchema{ProjectID: ssoProjectID, URL: ssoSchemaURL, Schema: []byte(ssoUserSchema)}, nil)
-	f.stmts.EXPECT().CreateUser(gomock.Any(), gomock.Any()).Return(createErr)
+	createUser := f.stmts.EXPECT().CreateUser(gomock.Any(), gomock.Any()).Return(createErr)
 	f.stmts.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, ev *domain.Event) error {
 		f.events = append(f.events, ev)
 		return nil
 	}).AnyTimes()
+	return createUser
 }
 
 func TestFlowSSOIdentityResolver_CreateLinked_AppliesActionsInOneTransaction(t *testing.T) {
 	t.Parallel()
 	f := newSSOResolverFixture(t)
 	f.inTransaction(t)
-	f.expectCreateUser(nil)
 	var created *domain.IDPIdentityLink
-	f.stmts.EXPECT().CreateIDPIdentityLink(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(_ context.Context, link *domain.IDPIdentityLink) error {
-			link.ID = "idplink-new"
-			created = link
-			return nil
-		})
 	f.stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), ssoProjectID, ssoAttemptID).Return(parkedAttempt(parkedResult()), nil)
 	var written []domain.AuthFactor
 	record := func(_ context.Context, _, _ string, factor domain.AuthFactor) (string, error) {
 		written = append(written, factor)
 		return "ch-new", nil
 	}
-	// The exact parked row goes first, then the user factor is added (refused
-	// when one is stored) and the sso factor set.
+	// The exact parked row is claimed before the user insert, so a concurrent
+	// request on the attempt loses on the row. Then the link, the user factor
+	// (refused when one is stored) and the sso factor.
 	gomock.InOrder(
 		f.stmts.EXPECT().DeleteSSOCallback(gomock.Any(), ssoProjectID, ssoAttemptID, "ch-1").Return(nil),
+		f.expectCreateUser(nil),
+		f.stmts.EXPECT().CreateIDPIdentityLink(gomock.Any(), gomock.Any()).
+			DoAndReturn(func(_ context.Context, link *domain.IDPIdentityLink) error {
+				link.ID = "idplink-new"
+				created = link
+				return nil
+			}),
 		f.stmts.EXPECT().AddAuthAttemptFactor(gomock.Any(), ssoProjectID, ssoAttemptID, gomock.Any()).DoAndReturn(record),
 		f.stmts.EXPECT().SetAuthAttemptFactor(gomock.Any(), ssoProjectID, ssoAttemptID, gomock.Any()).DoAndReturn(record),
 	)
@@ -463,7 +465,8 @@ func TestFlowSSOIdentityResolver_CreateLinked_UniqueErrorMapsToUserAlreadyExists
 			wire(f)
 			f.stmts.EXPECT().AddAuthAttemptFactor(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 			f.stmts.EXPECT().SetAuthAttemptFactor(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
-			f.stmts.EXPECT().DeleteSSOCallback(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+			// The claim runs first and rolls back with the transaction.
+			f.stmts.EXPECT().DeleteSSOCallback(gomock.Any(), ssoProjectID, ssoAttemptID, "ch-1").Return(nil)
 
 			_, err := f.resolver.CreateLinked(t.Context(), createInput())
 			require.ErrorIs(t, err, domain.ErrUserAlreadyExists())
@@ -532,11 +535,31 @@ func TestFlowSSOIdentityResolver_CreateLinked_LostRaceEmitsUserCreateFailed(t *t
 	t.Parallel()
 	f := newSSOResolverFixture(t)
 	f.inTransaction(t)
+	f.stmts.EXPECT().DeleteSSOCallback(gomock.Any(), ssoProjectID, ssoAttemptID, "ch-1").Return(nil)
 	f.expectCreateUser(database.NewUniqueError("users", "uq_unique_attributes", nil))
 
 	_, err := f.resolver.CreateLinked(t.Context(), createInput())
 	require.ErrorIs(t, err, domain.ErrUserAlreadyExists())
 	assert.NotNil(t, f.event(domain.EventTypeUserCreateFailed))
+}
+
+// A concurrent request on the same attempt settled the parked row first. The
+// claim refuses before the user insert, so the engine reads the attempt again
+// instead of taking the collision path, and no failed creation is audited.
+func TestFlowSSOIdentityResolver_CreateLinked_SettledRowWritesNothing(t *testing.T) {
+	t.Parallel()
+	f := newSSOResolverFixture(t)
+	f.inTransaction(t)
+	f.stmts.EXPECT().NewManagedID(string(domain.PrefixUser)).Return("user_new", nil)
+	f.schemaStore.EXPECT().GetJSONSchemaByID(gomock.Any(), ssoProjectID, ssoSchemaURL).
+		Return(&domain.JSONSchema{ProjectID: ssoProjectID, URL: ssoSchemaURL, Schema: []byte(ssoUserSchema)}, nil)
+	f.stmts.EXPECT().DeleteSSOCallback(gomock.Any(), ssoProjectID, ssoAttemptID, "ch-1").Return(domain.ErrSSOStateInvalid())
+	f.stmts.EXPECT().CreateUser(gomock.Any(), gomock.Any()).Times(0)
+	f.stmts.EXPECT().CreateIDPIdentityLink(gomock.Any(), gomock.Any()).Times(0)
+	f.stmts.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Times(0)
+
+	_, err := f.resolver.CreateLinked(t.Context(), createInput())
+	require.ErrorIs(t, err, domain.ErrSSOStateInvalid())
 }
 
 func TestFlowSSOIdentityResolver_FindUniqueOwner(t *testing.T) {

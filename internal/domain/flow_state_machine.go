@@ -550,8 +550,9 @@ func (r *FlowStateMachineRuntime) provisionSSOIdentity(ctx context.Context, stat
 		Attributes:    attributes,
 	})
 	if errors.Is(err, ErrUserAlreadyExists()) {
-		// Lost a race since the probe: whoever took the attribute is bound,
-		// and a race lost on the subject alone falls back to collection.
+		// Another flow took a unique value since the probe (a request on this
+		// attempt loses on the parked row instead): whoever took a probed
+		// attribute is bound, and anything else falls back to collection.
 		if bound, err := r.bindSSOCollision(ctx, state, step, parked, probeClaims); err != nil || bound {
 			return FlowImplicitOutcomeUserAlreadyExists, err
 		}
