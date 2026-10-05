@@ -98,7 +98,6 @@ it first; treat the CLI's own output as authoritative over anything you remember
 ```sh
 npx @zitadel/cli@alpha --help               # every command, grouped by purpose
 npx @zitadel/cli@alpha commands             # flat list of all commands
-npx @zitadel/cli@alpha search <query>       # find a command by keyword
 npx @zitadel/cli@alpha <command> --help     # a command's flags, which are required, and examples
 npx @zitadel/cli@alpha resources --json     # the resource surface in one call (see below); contacts no server
 ```

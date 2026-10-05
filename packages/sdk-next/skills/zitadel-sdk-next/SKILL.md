@@ -31,7 +31,8 @@ pnpm add @zitadel/sdk-next
 ```
 
 Peer deps the package expects: `next >=15`, `react >=18`, `react-dom >=18`.
-TypeScript `>=5.7` (the package itself is built against 5.7).
+TypeScript `>=5.0` (the SDK consumer floor; the package is built against a
+newer TypeScript, but that does not raise the floor for your project).
 
 ## Integrate
 
@@ -46,11 +47,20 @@ where the code runs, not the root, from client modules:
 | `@zitadel/sdk-next/session`    | Client Components                 | `getSession()`                     |
 | `@zitadel/sdk-next/client`     | Client boundary                   | `configureZitadel()`, web components |
 
-**1. Middleware proxy.** Create `src/proxy.ts`. It proxies `/__nextgen/*` to the
-auth backend (same-origin), verifies the session JWT via JWKS, and redirects
-unauthenticated users on protected routes:
+**1. Request-boundary proxy.** It proxies `/__nextgen/*` to the auth backend
+(same-origin), verifies the session JWT via JWKS, and redirects unauthenticated
+users on protected routes. **The filename and exported function depend on the
+Next.js major version** — `proxy.ts`/`proxy` is Next 16+, while Next 15 uses the
+request middleware:
+
+- **Next 16+:** create `src/proxy.ts` exporting `proxy`.
+- **Next 15:** create `src/middleware.ts` exporting `middleware`.
+
+The body is the same either way (only the file and function name change):
 
 ```ts
+// Next 16+: src/proxy.ts, exporting `proxy`.
+// Next 15:  src/middleware.ts, exporting `middleware` (rename the function).
 import { nextgenMiddleware } from '@zitadel/sdk-next/middleware';
 import type { NextRequest } from 'next/server';
 
@@ -64,6 +74,9 @@ export function proxy(req: NextRequest) {
 
 export const config = { matcher: ['/__nextgen/:path*', '/admin', '/login'] };
 ```
+
+When unsure which the installed Next.js uses, check the CLI's own output — its
+patcher emits `middleware.ts` for Next 15 and `proxy.ts` for Next 16+.
 
 **2. Read the session server-side** with `auth()` (it re-verifies the tunnelled
 token — the header alone is never trusted):

@@ -64,7 +64,9 @@ flow. Managed files carry a marker comment; `eject` removes only
 files that still carry it, preserving anything the user replaced. For app-local
 development, `--server local` resolves through `.zitadel/local/runtime.json` and
 requires a healthy
-`npx @zitadel/cli@alpha start` runtime. Runtime-only `.zitadel/local/**` state
-does not block fresh same-directory scaffolding. `setup` installs dependencies
+`npx @zitadel/cli@alpha start` runtime. Because `start` writes `.zitadel/local/`
+into the directory, it is no longer empty, so a same-directory `setup` that
+scaffolds must be passed `--force` (this is exactly what the golden path does).
+`setup` installs dependencies
 with the detected package manager by default; pass `--skip-install` when the
 agent or host workflow will install dependencies separately.

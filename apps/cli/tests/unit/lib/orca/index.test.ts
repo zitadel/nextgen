@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { ZitadelError } from "../../../../src/lib/errors";
 import { Orca } from "../../../../src/lib/orca";
 import type { Detector } from "../../../../src/lib/orca";
 import { detectors } from "../../../../src/lib/orca/detectors";
@@ -225,9 +226,40 @@ describe("Orca.scaffold", () => {
     await expect(readFile(join(cwd, ".zitadel/local/runtime.json"), "utf8")).resolves.toContain(
       "localhost",
     );
-    // The scaffold created its own .gitignore, so that one wins over the stashed
-    // copy — restore never clobbers what the scaffold produced.
-    await expect(readFile(join(cwd, ".gitignore"), "utf8")).resolves.toBe("node_modules\n");
+    // The scaffold created its own .gitignore, so its content is kept — but the
+    // stashed ignore rules are merged back in, so `.zitadel/local/` (which keeps
+    // the restored local admin credential out of git) is not silently dropped.
+    await expect(readFile(join(cwd, ".gitignore"), "utf8")).resolves.toBe(
+      "node_modules\n.zitadel/local/\n",
+    );
+  });
+
+  it("with force, a failed scaffold rolls back and restores the originals", async () => {
+    const cwd = await tmpPackageSafe();
+    await writeFile(join(cwd, "keep.txt"), "original");
+    await mkdir(join(cwd, ".zitadel/local"), { recursive: true });
+    await writeFile(join(cwd, ".zitadel/local/runtime.json"), '{"server_url":"http://localhost"}');
+
+    const throwingScaffolder: Scaffolder = {
+      ...fakeScaffolder,
+      async scaffold(scaffoldCwd) {
+        // Write a partial file (even colliding with an original name) then fail.
+        await writeFile(join(scaffoldCwd, "keep.txt"), "partial garbage");
+        await writeFile(join(scaffoldCwd, "half-written.txt"), "junk");
+        throw new ZitadelError("E_VALIDATION", "boom");
+      },
+    };
+    const guardedOrca = new Orca([fakeDetector], [throwingScaffolder], []);
+
+    await expect(guardedOrca.scaffold(cwd, "fake", true)).rejects.toMatchObject({
+      code: "E_VALIDATION",
+    });
+    // Originals are intact and the partial scaffold output is gone.
+    await expect(readFile(join(cwd, "keep.txt"), "utf8")).resolves.toBe("original");
+    await expect(readFile(join(cwd, ".zitadel/local/runtime.json"), "utf8")).resolves.toContain(
+      "localhost",
+    );
+    await expect(stat(join(cwd, "half-written.txt"))).rejects.toMatchObject({ code: "ENOENT" });
   });
 
   it("refuses a non-empty directory without force", async () => {

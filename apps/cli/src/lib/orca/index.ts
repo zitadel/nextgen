@@ -1,4 +1,4 @@
-import { access, mkdir, readdir, rename, rm } from "node:fs/promises";
+import { access, mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 
 import { ZitadelError } from "../errors";
@@ -116,10 +116,12 @@ export class Orca {
     // scaffold into a non-empty one, move the existing entries aside, scaffold,
     // then restore anything the scaffold did not create itself.
     const stash = target.scaffoldable ? undefined : await stashScaffoldDir(cwd, target.entries);
+    let scaffolded = false;
     try {
       await this.scaffolderFor(framework).scaffold(cwd, framework);
+      scaffolded = true;
     } finally {
-      await restoreScaffoldDir(cwd, stash);
+      await restoreScaffoldDir(cwd, stash, scaffolded);
     }
     return this.detect(cwd, framework);
   }
@@ -254,23 +256,59 @@ async function stashScaffoldDir(
   return { root, names };
 }
 
-async function restoreScaffoldDir(cwd: string, stash: ScaffoldStash | undefined): Promise<void> {
+async function restoreScaffoldDir(
+  cwd: string,
+  stash: ScaffoldStash | undefined,
+  succeeded = true,
+): Promise<void> {
   if (!stash) {
     return;
   }
 
   try {
+    if (!succeeded) {
+      // The scaffold threw. The directory was emptied before scaffolding, so
+      // anything in it now is partial output — remove it and put the originals
+      // back, so a failed `setup --force` never destroys pre-existing files.
+      for (const entry of await readdir(cwd)) {
+        await rm(join(cwd, entry), { recursive: true, force: true });
+      }
+      for (const name of stash.names) {
+        await rename(join(stash.root, name), join(cwd, name));
+      }
+      return;
+    }
+
     for (const name of stash.names) {
       const dest = join(cwd, name);
-      // Keep whatever the scaffold itself created at this path; restore the
-      // pre-existing entry only where the scaffold left that name free.
-      if (!(await pathExists(dest))) {
+      if (await pathExists(dest)) {
+        // The scaffold created its own file at a stashed name. For `.gitignore`,
+        // union the stashed rules back in so ignores the pre-existing setup
+        // relied on — notably `.zitadel/local/`, which keeps the local admin
+        // credential out of git — are not silently dropped. Any other collision
+        // keeps the scaffold's version (that is what `--force` is for).
+        if (name === ".gitignore") {
+          await mergeGitignore(join(stash.root, name), dest);
+        }
+      } else {
+        // The scaffold left this name free; restore the pre-existing entry.
         await rename(join(stash.root, name), dest);
       }
     }
   } finally {
     await rm(stash.root, { recursive: true, force: true });
   }
+}
+
+/** Append any lines from the stashed `.gitignore` that the scaffold's own one lacks. */
+async function mergeGitignore(stashed: string, dest: string): Promise<void> {
+  const [from, into] = await Promise.all([readFile(stashed, "utf8"), readFile(dest, "utf8")]);
+  const present = new Set(into.split("\n").map((line) => line.trim()));
+  const missing = from.split("\n").filter((line) => line.trim() && !present.has(line.trim()));
+  if (missing.length === 0) {
+    return;
+  }
+  await writeFile(dest, `${into}${into.endsWith("\n") ? "" : "\n"}${missing.join("\n")}\n`);
 }
 
 async function pathExists(path: string): Promise<boolean> {

@@ -80,8 +80,10 @@ Theming levers (strongest-first resolution, documented in the README):
   chrome keys off the widget's own width (container queries).
 - Server branding payload, and a tenant Liquid template via the payload's
   `liquid_template` field (a declarative `template` attribute is not yet
-  exposed). There is no `suppress-header`-style attribute in the documented
-  surface — control chrome through `variant` and tokens.
+  exposed).
+- **`suppress-header`** (boolean attribute, reflected) hides the widget's own
+  heading — use it when the host page already shows a title and you want to
+  avoid a duplicate. Otherwise control chrome through `variant` and tokens.
 
 Automation hooks (stable `data-testid`s the default template emits): host atoms
 `zitadel-field-email` / `zitadel-field-password` / `zitadel-action-submit`;

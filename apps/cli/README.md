@@ -1828,7 +1828,7 @@ FLAGS
       Project directory to operate on.
 
   -f, --force
-      Overwrite managed files that already exist.
+      Overwrite managed files that already exist, and scaffold into a non-empty directory.
 
   -n, --non-interactive
       Disable prompts. Required when scripting or running as an agent.

@@ -13,7 +13,9 @@ const cfg = JSON.parse(readFileSync(join(root, "journey.config.json"), "utf8"));
 
 const OUT = process.env.OUT || join(root, "out");
 const REPO = process.env.REPO || "zitadel/nextgen";
-const BRANCH = process.env.BRANCH || "feat/cli-installable-agent-skill";
+// Default to the published default branch; override with BRANCH=<name> to
+// validate a skill change pre-merge (e.g. this feature branch).
+const BRANCH = process.env.BRANCH || "main";
 const MODEL = process.env.MODEL || "sonnet";
 const SIM_MODEL = process.env.SIM_MODEL || "haiku";
 const IMAGE = process.env.IMAGE || "node:24";
