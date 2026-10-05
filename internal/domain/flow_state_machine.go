@@ -34,7 +34,8 @@ const (
 	// account on a connection whose provisioning.creation is disabled.
 	FlowStepErrorSSOCreationDisabled = "error.sso_creation_disabled"
 	// FlowStepErrorSSOUnavailable reports a provider the engine could not
-	// start a sign-in with. The user stays on the step.
+	// start a sign-in with, or whose sign-in the current step cannot route.
+	// The user stays on the step.
 	FlowStepErrorSSOUnavailable = "error.sso_unavailable"
 )
 
@@ -443,9 +444,9 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 
 	// The bind cannot be undone, so it runs only when the outcome can route:
 	// a stored definition is validated only on write. Otherwise the step
-	// shows the outcome as an unwired one, and the row stays parked.
+	// shows the provider as unavailable, and the row stays parked.
 	if !ssoAuthenticatedRoutes(currentStep) {
-		msg := FlowImplicitOutcomeSSOAuthenticated
+		msg := FlowStepErrorSSOUnavailable
 		result, err := r.renderStepError(pc, resolvedFields, &msg)
 		return result, true, err
 	}
@@ -487,7 +488,7 @@ func (r *FlowStateMachineRuntime) retrySSOHandoff(pc *processCtx, resolvedFields
 	// definition. Checked before the user is recorded: a purpose would drop
 	// that user and move the flow to a fresh attempt.
 	if !ssoAuthenticatedRoutes(pc.currentStep) {
-		msg := FlowImplicitOutcomeSSOAuthenticated
+		msg := FlowStepErrorSSOUnavailable
 		result, err := r.renderStepError(pc, resolvedFields, &msg)
 		return result, true, err
 	}

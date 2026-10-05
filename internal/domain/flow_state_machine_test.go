@@ -4788,7 +4788,7 @@ func setSSOAuthenticatedTransition(def *domain.FlowDefinition, transition *domai
 
 // A stored definition is validated only on write. When its sso_authenticated
 // transition cannot route, the attempt is not bound: the step shows the
-// unwired outcome, and the guard keeps a reload from repeating it.
+// provider as unavailable, and the guard keeps a reload from repeating it.
 func TestFlowStateMachine_Render_SSOUnroutableTransitionDoesNotBind(t *testing.T) {
 	t.Parallel()
 	for name, transition := range unroutableSSOTransitions() {
@@ -4804,7 +4804,7 @@ func TestFlowStateMachine_Render_SSOUnroutableTransitionDoesNotBind(t *testing.T
 			require.NoError(t, err)
 			assert.Equal(t, "credentials", result.Step.Name)
 			require.NotNil(t, result.Step.Error)
-			assert.Equal(t, domain.FlowImplicitOutcomeSSOAuthenticated, *result.Step.Error)
+			assert.Equal(t, domain.FlowStepErrorSSOUnavailable, *result.Step.Error)
 			assert.Empty(t, result.State.CollectedData.UserID)
 			assert.Equal(t, "ch-1", result.State.SSOResolvedCheckID)
 		})
@@ -4812,7 +4812,8 @@ func TestFlowStateMachine_Render_SSOUnroutableTransitionDoesNotBind(t *testing.T
 }
 
 // An earlier bind committed but the current step cannot take the outcome: the
-// step shows it as unwired, and the attempt keeps its id and its user.
+// step shows the provider as unavailable, and the attempt keeps its id and its
+// user.
 func TestFlowStateMachine_Render_SSOUnroutableTransitionDoesNotRetryHandoff(t *testing.T) {
 	t.Parallel()
 	for name, transition := range unroutableSSOTransitions() {
@@ -4826,7 +4827,7 @@ func TestFlowStateMachine_Render_SSOUnroutableTransitionDoesNotRetryHandoff(t *t
 			require.NoError(t, err)
 			assert.Equal(t, "credentials", result.Step.Name)
 			require.NotNil(t, result.Step.Error)
-			assert.Equal(t, domain.FlowImplicitOutcomeSSOAuthenticated, *result.Step.Error)
+			assert.Equal(t, domain.FlowStepErrorSSOUnavailable, *result.Step.Error)
 			assert.Empty(t, result.State.CollectedData.UserID)
 			assert.Equal(t, "att-1", result.State.AuthAttemptID)
 		})
