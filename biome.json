@@ -10,7 +10,7 @@
     "includes": [
       "**",
       "!**/*.gen.ts",
-      "!**/*.d.ts",
+      "!**/next-env.d.ts",
       "!**/*.css",
       "!**/*.json",
       "!**/*.jsonc",

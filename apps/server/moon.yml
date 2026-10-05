@@ -148,6 +148,11 @@ tasks:
       for tag in postgres_integration spanner_integration sqlite_integration; do
         GOFLAGS="-tags=$tag" go run ./tools/analyzers/cmd/analyzers ./...
       done
+      # This is a Go project, so it inherits no Biome lint task, but it owns a
+      # JavaScript launcher (bin/zitadel-server.js). Lint it here so a change to
+      # it cannot bypass Biome. `bin/**` is already in serverInputs, so this
+      # task is selected when the launcher changes.
+      corepack pnpm exec biome check apps/server/bin --no-errors-on-unmatched
     deps:
       - "check-generate"
       - "console:build"
