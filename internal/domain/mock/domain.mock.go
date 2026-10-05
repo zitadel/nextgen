@@ -921,18 +921,18 @@ func (c *MockFlowSSOIdentityServiceCreateLinkedCall) DoAndReturn(f func(context.
 }
 
 // FindUniqueOwner mocks base method.
-func (m *MockFlowSSOIdentityService) FindUniqueOwner(ctx context.Context, projectID, attribute, value string) (string, error) {
+func (m *MockFlowSSOIdentityService) FindUniqueOwner(ctx context.Context, projectID, userSchemaURL, attribute, value string) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "FindUniqueOwner", ctx, projectID, attribute, value)
+	ret := m.ctrl.Call(m, "FindUniqueOwner", ctx, projectID, userSchemaURL, attribute, value)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // FindUniqueOwner indicates an expected call of FindUniqueOwner.
-func (mr *MockFlowSSOIdentityServiceMockRecorder) FindUniqueOwner(ctx, projectID, attribute, value any) *MockFlowSSOIdentityServiceFindUniqueOwnerCall {
+func (mr *MockFlowSSOIdentityServiceMockRecorder) FindUniqueOwner(ctx, projectID, userSchemaURL, attribute, value any) *MockFlowSSOIdentityServiceFindUniqueOwnerCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindUniqueOwner", reflect.TypeOf((*MockFlowSSOIdentityService)(nil).FindUniqueOwner), ctx, projectID, attribute, value)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindUniqueOwner", reflect.TypeOf((*MockFlowSSOIdentityService)(nil).FindUniqueOwner), ctx, projectID, userSchemaURL, attribute, value)
 	return &MockFlowSSOIdentityServiceFindUniqueOwnerCall{Call: call}
 }
 
@@ -948,13 +948,13 @@ func (c *MockFlowSSOIdentityServiceFindUniqueOwnerCall) Return(userID string, er
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockFlowSSOIdentityServiceFindUniqueOwnerCall) Do(f func(context.Context, string, string, string) (string, error)) *MockFlowSSOIdentityServiceFindUniqueOwnerCall {
+func (c *MockFlowSSOIdentityServiceFindUniqueOwnerCall) Do(f func(context.Context, string, string, string, string) (string, error)) *MockFlowSSOIdentityServiceFindUniqueOwnerCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockFlowSSOIdentityServiceFindUniqueOwnerCall) DoAndReturn(f func(context.Context, string, string, string) (string, error)) *MockFlowSSOIdentityServiceFindUniqueOwnerCall {
+func (c *MockFlowSSOIdentityServiceFindUniqueOwnerCall) DoAndReturn(f func(context.Context, string, string, string, string) (string, error)) *MockFlowSSOIdentityServiceFindUniqueOwnerCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

@@ -91,6 +91,24 @@ func (f *ssoResolutionFixture) createUser(t *testing.T, schemaURL string) string
 	return id
 }
 
+// createStaffSchema adds a second user schema whose email is also
+// project-unique, so its users can hold a value the flow's schema looks up.
+func (f *ssoResolutionFixture) createStaffSchema(t *testing.T) string {
+	t.Helper()
+	return harness.CreateUserSchema(t, f.project, `{
+		"title": "SSOStaffUser",
+		"metaSchema": "https://test.example.schemas.com/schemas/user-schema.json",
+		"$id": "https://sso-staff.example.com/schemas/staff-user.json",
+		"kind": "user-schema",
+		"type": "object",
+		"x-identifier": "email",
+		"x-auth-methods": {"password": {"enabled": true}},
+		"properties": {
+			"email": {"type": "string", "x-unique": "project"}
+		}
+	}`)
+}
+
 // link pins subject on connectionID to userID and returns the link.
 func (f *ssoResolutionFixture) link(t *testing.T, connectionID, subject, userID string) *domain.IDPIdentityLink {
 	t.Helper()
@@ -267,18 +285,7 @@ func TestSSOResolutionStoresNoProviderToken(t *testing.T) {
 
 func TestSSOResolutionOtherSchemaReturns409(t *testing.T) {
 	f := newSSOResolutionFixture(t, helpers.OIDCConnection("google"))
-	staffSchemaURL := harness.CreateUserSchema(t, f.project, `{
-		"title": "SSOStaffUser",
-		"metaSchema": "https://test.example.schemas.com/schemas/user-schema.json",
-		"$id": "https://sso-staff.example.com/schemas/staff-user.json",
-		"kind": "user-schema",
-		"type": "object",
-		"x-identifier": "email",
-		"x-auth-methods": {"password": {"enabled": true}},
-		"properties": {
-			"email": {"type": "string", "x-unique": "project"}
-		}
-	}`)
+	staffSchemaURL := f.createStaffSchema(t)
 	f.link(t, f.connection.ID, "sub-1", f.createUser(t, staffSchemaURL))
 	flow := f.startFlow(t, "")
 	parkSSOResult(t, f.project.ID, flow.attemptID, f.connection.RevisionID, "sub-1", emailClaims(), nil)
@@ -418,6 +425,35 @@ func TestSSOResolutionCollisionBindsAndKeepsParked(t *testing.T) {
 	userFactor, ok = domain.CheckAs[*domain.AuthFactorUser](f.attempt(t, flow), domain.AuthCheckTypeUser)
 	require.True(t, ok)
 	assert.Equal(t, ownerID, userFactor.UserID)
+}
+
+// The registry key has no schema, so a user of another schema can own the
+// claimed value. The flow cannot continue with that user: it restarts, and
+// nothing is bound, linked or created.
+func TestSSOResolutionCollisionWithOtherSchemaOwnerReturns409(t *testing.T) {
+	f := newSSOResolutionFixture(t, helpers.OIDCConnection("google"))
+	staffSchemaURL := f.createStaffSchema(t)
+	email := helpers.RandString(8) + "@example.com"
+	ownerID := "user_" + helpers.RandString(8)
+	createAttemptUser(t, f.project, f.team, staffSchemaURL, ownerID, map[string]string{"email": email})
+	flow := f.startFlow(t, "")
+	parkSSOResult(t, f.project.ID, flow.attemptID, f.connection.RevisionID, "sub-new", map[string]any{"email": email}, map[string]bool{"email": true})
+
+	resp := f.getStep(t, flow)
+	require.IsType(t, &api.GetFlowStepConflict{}, resp, helpers.MustMarshal(t, resp))
+	assert.Equal(t, "flow.restart_required", string(resp.(*api.GetFlowStepConflict).Code))
+	body := helpers.MustMarshal(t, resp)
+	for _, leaked := range []string{staffSchemaURL, ownerID, email, "sub-new"} {
+		assert.False(t, strings.Contains(body, leaked), "the response must not carry %q: %s", leaked, body)
+	}
+
+	_, bound := domain.CheckAs[*domain.AuthFactorUser](f.attempt(t, flow), domain.AuthCheckTypeUser)
+	assert.False(t, bound, "the owner of another schema is not bound")
+	_, err := f.linkFor(t, "sub-new")
+	require.ErrorAs(t, err, new(*database.NoRowFoundError), "nothing is linked")
+	owner, err := f.userByEmail(t, email)
+	require.NoError(t, err)
+	assert.Equal(t, ownerID, owner.ID, "no second user was created")
 }
 
 func TestSSOResolutionAutoCreateCreatesUserAndLinkAtomically(t *testing.T) {

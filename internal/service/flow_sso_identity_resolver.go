@@ -306,7 +306,7 @@ var _ UserAction = (*ssoLinkAction)(nil)
 // unique-attributes registry, without recording anything on the attempt. A
 // team-scoped row for the same value would not collide with the new user, so
 // it does not count.
-func (r *FlowSSOIdentityResolver) FindUniqueOwner(ctx context.Context, projectID, attribute, value string) (string, error) {
+func (r *FlowSSOIdentityResolver) FindUniqueOwner(ctx context.Context, projectID, userSchemaURL, attribute, value string) (string, error) {
 	user, err := r.db.Statements().GetUser(ctx,
 		database.Equal(database.Col(domain.UserFieldProjectID), projectID),
 		UserQueryOptions{
@@ -320,6 +320,18 @@ func (r *FlowSSOIdentityResolver) FindUniqueOwner(ctx context.Context, projectID
 	}
 	if err != nil {
 		return "", fmt.Errorf("find unique owner: %w", err)
+	}
+	// The registry key has no schema, so the owner can be a user of another
+	// schema that also marks the property project-unique. The flow cannot
+	// continue with that user, and creation would collide on the value.
+	if user.SchemaURL != userSchemaURL {
+		getLoggingContext(ctx, "flow").Warn("sso claim is owned by a user of another schema",
+			slog.String("project_id", projectID),
+			slog.String("attribute", attribute),
+			slog.String("flow_schema_url", userSchemaURL),
+			slog.String("user_schema_url", user.SchemaURL),
+		)
+		return "", domain.ErrFlowRestartRequired()
 	}
 	return user.ID, nil
 }

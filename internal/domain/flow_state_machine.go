@@ -658,7 +658,7 @@ func (r *FlowStateMachineRuntime) bindSSOCollision(ctx context.Context, state *F
 		}
 		// A read-only lookup: an identifier submission that misses records a
 		// failed check on the attempt, and a miss here is no sign-in attempt.
-		owner, err := r.ssoIdentities.FindUniqueOwner(ctx, state.ProjectID, name, value)
+		owner, err := r.ssoIdentities.FindUniqueOwner(ctx, state.ProjectID, state.UserSchemaURL, name, value)
 		if err != nil {
 			return false, fmt.Errorf("flow state machine: look up sso claim %q: %w", name, err)
 		}

@@ -566,15 +566,22 @@ func TestFlowSSOIdentityResolver_CreateLinked_SettledRowWritesNothing(t *testing
 
 func TestFlowSSOIdentityResolver_FindUniqueOwner(t *testing.T) {
 	t.Parallel()
+	boom := errors.New("boom")
 	for name, tc := range map[string]struct {
 		user    *domain.User
 		err     error
 		want    string
-		wantErr bool
+		wantErr error
 	}{
-		"hit":   {user: &domain.User{ID: "user-9"}, want: "user-9"},
-		"miss":  {err: database.NewNoRowFoundError(nil)},
-		"error": {err: errors.New("boom"), wantErr: true},
+		"hit":  {user: &domain.User{ID: "user-9", SchemaURL: ssoSchemaURL}, want: "user-9"},
+		"miss": {err: database.NewNoRowFoundError(nil)},
+		// The registry key has no schema: the value can belong to a user of
+		// another schema that also marks the property project-unique.
+		"owner of another schema": {
+			user:    &domain.User{ID: "user-9", SchemaURL: "https://example.test/user/v1/other.user.schema.json"},
+			wantErr: domain.ErrFlowRestartRequired(),
+		},
+		"error": {err: boom, wantErr: boom},
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
@@ -589,9 +596,9 @@ func TestFlowSSOIdentityResolver_FindUniqueOwner(t *testing.T) {
 				}).
 				Return(tc.user, tc.err)
 
-			got, err := f.resolver.FindUniqueOwner(t.Context(), ssoProjectID, "email", "alice@example.com")
-			if tc.wantErr {
-				require.Error(t, err)
+			got, err := f.resolver.FindUniqueOwner(t.Context(), ssoProjectID, ssoSchemaURL, "email", "alice@example.com")
+			if tc.wantErr != nil {
+				require.ErrorIs(t, err, tc.wantErr)
 				return
 			}
 			require.NoError(t, err)

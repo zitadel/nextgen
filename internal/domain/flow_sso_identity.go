@@ -28,8 +28,10 @@ type FlowSSOIdentityService interface {
 	BindCollision(ctx context.Context, in FlowSSOBindInput) error
 	// FindUniqueOwner returns the user owning value in the unique attribute,
 	// or "" with a nil error when nobody does. It only reads: unlike an
-	// identifier submission it records nothing on the attempt.
-	FindUniqueOwner(ctx context.Context, projectID, attribute, value string) (userID string, err error)
+	// identifier submission it records nothing on the attempt. It returns
+	// ErrFlowRestartRequired when the owner is a user of another schema than
+	// the flow's.
+	FindUniqueOwner(ctx context.Context, projectID, userSchemaURL, attribute, value string) (userID string, err error)
 	// CreateLinked creates the user, its identity link and the attempt
 	// factors in one transaction, and returns the new user's id.
 	CreateLinked(ctx context.Context, in FlowSSOCreateInput) (userID string, err error)

@@ -4812,7 +4812,7 @@ func withSSOOutcomeSteps(def *domain.FlowDefinition) *domain.FlowDefinition {
 // expectOwner answers one read-only collision lookup; "" is no owner.
 func (w *flowTestWorld) expectOwner(attribute, value, userID string) *domainmock.MockFlowSSOIdentityServiceFindUniqueOwnerCall {
 	return w.ssoIdentities.EXPECT().
-		FindUniqueOwner(gomock.Any(), testProjectID, attribute, value).
+		FindUniqueOwner(gomock.Any(), testProjectID, defaultSchemaURL, attribute, value).
 		Return(userID, nil)
 }
 
@@ -4873,6 +4873,24 @@ func TestFlowStateMachine_Render_SSOCollisionBindOnDeadAttemptRestarts(t *testin
 	assert.Empty(t, state.CollectedData.UserID)
 }
 
+// The claim belongs to a user of another schema: the flow cannot continue
+// with that user, so it starts over without binding or creating anyone.
+func TestFlowStateMachine_Render_SSOCollisionOwnerOfAnotherSchemaRestarts(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoRenderWorld(t)
+	def = withSSOOutcomeSteps(def)
+	w.expectParked(unlinkedParked(map[string]any{"email": "alice@example.com"}, nil), nil)
+	w.ssoIdentities.EXPECT().
+		FindUniqueOwner(gomock.Any(), testProjectID, defaultSchemaURL, "email", "alice@example.com").
+		Return("", domain.ErrFlowRestartRequired())
+	w.ssoIdentities.EXPECT().BindCollision(gomock.Any(), gomock.Any()).Times(0)
+	w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Times(0)
+
+	_, err := w.sm.Render(t.Context(), def, state)
+	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
+	assert.Empty(t, state.CollectedData.UserID)
+}
+
 // A provider claim that fails the schema (too long, bad format) cannot create
 // a user unattended, so it is collected for the user to fix.
 func TestFlowStateMachine_Render_SSOInvalidClaimRoutesUserNotFound(t *testing.T) {
@@ -4881,7 +4899,7 @@ func TestFlowStateMachine_Render_SSOInvalidClaimRoutesUserNotFound(t *testing.T)
 	def = withSSOOutcomeSteps(def)
 	claims, verified := completeClaims()
 	w.expectParked(unlinkedParked(claims, verified), nil)
-	w.ssoIdentities.EXPECT().FindUniqueOwner(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return("", nil).Times(2)
+	w.ssoIdentities.EXPECT().FindUniqueOwner(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return("", nil).Times(2)
 	w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Return("", domain.ErrUserInvalid())
 
 	result, err := w.sm.Render(t.Context(), def, state)
@@ -4977,7 +4995,7 @@ func TestFlowStateMachine_Render_SSOCreateUniqueRaceWithoutOwnerRoutesUserNotFou
 	def = withSSOOutcomeSteps(def)
 	claims, verified := completeClaims()
 	w.expectParked(unlinkedParked(claims, verified), nil)
-	w.ssoIdentities.EXPECT().FindUniqueOwner(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return("", nil).Times(4)
+	w.ssoIdentities.EXPECT().FindUniqueOwner(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return("", nil).Times(4)
 	w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Return("", domain.ErrUserAlreadyExists())
 
 	result, err := w.sm.Render(t.Context(), def, state)
@@ -5041,7 +5059,7 @@ func TestFlowStateMachine_Render_SSOTeamScopedUniqueClaimIsNotProbed(t *testing.
 	claims, verified := completeClaims()
 	w.expectParked(unlinkedParked(claims, verified), nil)
 	w.ssoIdentities.EXPECT().
-		FindUniqueOwner(gomock.Any(), testProjectID, gomock.Cond(func(attribute string) bool { return attribute != "badge" }), gomock.Any()).
+		FindUniqueOwner(gomock.Any(), testProjectID, defaultSchemaURL, gomock.Cond(func(attribute string) bool { return attribute != "badge" }), gomock.Any()).
 		Return("", nil).
 		Times(4)
 	w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Return("", domain.ErrUserAlreadyExists())
@@ -5261,7 +5279,7 @@ func TestFlowStateMachine_Render_SSOStaleParkedRowProvisioningRendersStep(t *tes
 		"create": func(w *flowTestWorld) {
 			claims, verified := completeClaims()
 			w.expectParked(unlinkedParked(claims, verified), nil)
-			w.ssoIdentities.EXPECT().FindUniqueOwner(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return("", nil).Times(2)
+			w.ssoIdentities.EXPECT().FindUniqueOwner(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return("", nil).Times(2)
 			w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Return("", domain.ErrSSOStateInvalid())
 			w.expectParked(nil, nil)
 		},
@@ -5464,7 +5482,7 @@ func TestFlowStateMachine_Render_SSODottedClaimKeyFallsBackToCollection(t *testi
 	claims["address.email"] = "alice@home.example.com"
 	verified["address.email"] = true
 	w.expectParked(unlinkedParked(claims, verified), nil)
-	w.ssoIdentities.EXPECT().FindUniqueOwner(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return("", nil).Times(2)
+	w.ssoIdentities.EXPECT().FindUniqueOwner(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return("", nil).Times(2)
 	w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Times(0)
 
 	result, err := w.sm.Render(t.Context(), def, state)
@@ -5582,7 +5600,7 @@ func TestFlowStateMachine_Render_SSOUnknownClaimIsNotPersisted(t *testing.T) {
 	withNickname := maps.Clone(claims)
 	withNickname["nickname"] = "ali"
 	w.expectParked(unlinkedParked(withNickname, verified), nil)
-	w.ssoIdentities.EXPECT().FindUniqueOwner(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return("", nil).Times(2)
+	w.ssoIdentities.EXPECT().FindUniqueOwner(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return("", nil).Times(2)
 	w.ssoIdentities.EXPECT().
 		CreateLinked(gomock.Any(), gomock.Cond(func(in domain.FlowSSOCreateInput) bool {
 			_, stored := in.Attributes["nickname"]
