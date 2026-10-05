@@ -68,6 +68,20 @@ describe("pull", () => {
 
         expect((await project.plan()).total).toBe(0);
       });
+
+      it("applies a flow whose user_schema is a handle, resolving it to a revision id", async () => {
+        const project = await aSetUpApp();
+        const objectType = await project.publishedSchemaObjectType();
+        await project.editLoginFlow((flow) => {
+          (flow as unknown as { user_schema: string }).user_schema = objectType;
+        });
+
+        expect(await project.apply()).toSucceed();
+
+        const { user_schema } = (await project.publishedFlow()).flow_definition;
+        expect(user_schema).not.toBe(objectType);
+        expect(user_schema.startsWith("sch_")).toBe(true);
+      });
     });
 
     describe("rendered for a terminal", () => {

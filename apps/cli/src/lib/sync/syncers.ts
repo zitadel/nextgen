@@ -56,12 +56,15 @@ export function makeSyncers(opts: {
    */
   cwd: string;
 }): ReadonlyArray<ResourceSyncer> {
+  // The flow syncer resolves a handle `user_schema` to a schema id on publish,
+  // so it is handed the schema syncer that owns that lookup.
+  const schema = new SchemaSyncer(opts.client, opts.projectId, opts.env);
   return [
-    new SchemaSyncer(opts.client, opts.projectId, opts.env),
+    schema,
     // Before flows: a flow step naming a connection slug is only valid once
     // that connection exists on the platform.
     new IdpConnectionSyncer(opts.client, opts.projectId),
-    new FlowDefinitionSyncer(opts.client, opts.projectId, opts.env),
+    new FlowDefinitionSyncer(opts.client, opts.projectId, opts.env, schema),
     new BrandingSyncer(opts.client, opts.projectId, opts.env, opts.cwd),
   ];
 }
@@ -357,6 +360,24 @@ class SchemaSyncer implements ResourceSyncer {
       throw error;
     }
   }
+
+  /**
+   * The id to send to the server for a stored `user_schema` reference, the
+   * inverse of {@link localiseReference}. A bare object-type handle resolves to
+   * its newest revision id so a pulled flow can be published through `apply`
+   * today, without waiting for release-based deploys. A minted id, a `$id`
+   * (URL or URN), a `${VAR}`, or a handle with no current revision is already
+   * what the server expects — or is best surfaced by the server's own error —
+   * and is returned unchanged.
+   */
+  async resolveToId(reference: string): Promise<string> {
+    if (!SchemaSyncer.HANDLE.test(reference) || reference.startsWith("sch_")) {
+      return reference;
+    }
+    return (await this.newestRevision(reference)) ?? reference;
+  }
+
+  private static readonly HANDLE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 }
 
 /**
@@ -378,6 +399,7 @@ class FlowDefinitionSyncer implements ResourceSyncer {
     private readonly client: ZitadelClient,
     private readonly projectId: string,
     private readonly env: EnvLookup,
+    private readonly schema: SchemaSyncer,
   ) {}
 
   /**
@@ -401,14 +423,29 @@ class FlowDefinitionSyncer implements ResourceSyncer {
    * before sending. The file on disk stays bare so it is human-editable;
    * only the wire request carries `project_id` and the surrounding
    * envelope.
+   *
+   * A pulled flow references its schema by handle; the server wants a concrete
+   * id, so the handle is resolved to the schema's newest revision here (the
+   * file keeps the handle). This lets a pulled flow round-trip through `apply`
+   * now, rather than only through a future release-based deploy.
    */
   async create(data: object): Promise<{ id: string; canonical?: object }> {
     const result = (await this.client.createFlowDefinition({
       project_id: this.projectId,
       schema_uri: DEFAULT_FLOW_SCHEMA_URI,
-      flow_definition: data as CreateFlowDefinitionBodyFlowDefinition,
+      flow_definition: (await this.withResolvedSchema(data)) as CreateFlowDefinitionBodyFlowDefinition,
     })) as CreateFlowDefinition201;
     return { id: result.id, canonical: result.flow_definition as object };
+  }
+
+  /** The body with `user_schema` resolved to a schema id for the wire (a handle → its newest revision). */
+  private async withResolvedSchema(data: object): Promise<object> {
+    const reference = (data as { user_schema?: unknown }).user_schema;
+    if (typeof reference !== "string") {
+      return data;
+    }
+    const resolved = await this.schema.resolveToId(reference);
+    return resolved === reference ? data : { ...data, user_schema: resolved };
   }
 
   async update(_id: string, _data: object): Promise<{ canonical?: object }> {

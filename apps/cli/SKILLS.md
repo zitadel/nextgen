@@ -405,8 +405,10 @@ docker --image <ref>` remains the explicit image override for debugging.
   for the `human-user` schema), else `<handle>.json`; read `data.path` for the
   file it wrote rather than assuming the handle-derived name. It rewrites concrete
   cross-resource ids to handles so the file references its dependencies by name
-  (a flow's `user_schema` `sch_…` becomes the schema's object type) — releases
-  resolve those handles against the revision they carry. A reference whose
+  (a flow's `user_schema` `sch_…` becomes the schema's object type). On publish,
+  `apply` resolves the handle back to the schema's current revision id, so a
+  pulled flow round-trips through `plan`/`apply` today; a release resolves the
+  same handle against the revision the release carries. A reference whose
   revision is gone, or a schema with no object type, keeps the id and is reported
   in the top-level `warnings`. In an already-initialized project the revision is
   recorded in `.zitadel/state.json` so the next `plan` reads in sync; a directory

@@ -908,3 +908,50 @@ describe("localise", () => {
     expect(schema.localise).toBeUndefined();
   });
 });
+
+/**
+ * On publish the flow syncer turns a handle `user_schema` into the schema's
+ * current revision id, so a pulled flow (which references by handle) can go out
+ * through `apply` without waiting for release-based deploys. Non-handle values
+ * (ids, URLs, `${VAR}`) are sent unchanged, with no schema lookup.
+ */
+describe("FlowDefinitionSyncer.create resolves user_schema", () => {
+  const sync = () => makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
+
+  it("resolves a handle to the schema's newest revision id", async () => {
+    server.use(
+      http.get(`${BASE}/schemas`, ({ request }) => {
+        expect(new URL(request.url).searchParams.get("object_type")).toBe("human-user");
+        return HttpResponse.json({
+          schemas: [{ id: "sch_live", schema: { objectType: "human-user" }, metadata: {} }],
+        });
+      }),
+      http.post(`${BASE}/flow_definitions`, async ({ request }) => {
+        const body = (await request.json()) as { flow_definition: unknown };
+        return HttpResponse.json({ id: "flowdef_1", flow_definition: body.flow_definition });
+      }),
+    );
+    const [, , flow] = sync();
+
+    const result = await flow.create({ name: "login", user_schema: "human-user" });
+
+    expect((result.canonical as { user_schema: string }).user_schema).toBe("sch_live");
+  });
+
+  it("sends a non-handle user_schema unchanged, without a schema lookup", async () => {
+    // No `*/schemas` handler: the suite's onUnhandledRequest is `error`, so a
+    // stray lookup would fail this test.
+    server.use(
+      http.post(`${BASE}/flow_definitions`, async ({ request }) => {
+        const body = (await request.json()) as { flow_definition: unknown };
+        return HttpResponse.json({ id: "flowdef_1", flow_definition: body.flow_definition });
+      }),
+    );
+    const [, , flow] = sync();
+    const url = "https://example.test/human-user.yaml";
+
+    const result = await flow.create({ name: "login", user_schema: url });
+
+    expect((result.canonical as { user_schema: string }).user_schema).toBe(url);
+  });
+});
