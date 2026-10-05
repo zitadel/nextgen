@@ -50,6 +50,12 @@ export default defineConfig({
         test: {
           name: "browser",
           globals: true,
+          // Serialize the browser files: parallel Chromium contexts importing
+          // the Vitest browser runtime from the Vite dev server overwhelm it on
+          // a loaded CI runner, which flakes the setup-module fetch
+          // (vitest-dev/vitest#9509). The jsdom `unit` project above is
+          // unaffected and still runs in parallel.
+          fileParallelism: false,
           include: ["src/**/*.browser.spec.ts"],
           browser: {
             enabled: true,

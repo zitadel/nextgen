@@ -24,6 +24,16 @@ export default defineConfig({
   test: {
     ...baseTest,
     name: "@zitadel/storybook",
+    // Run story files one at a time. `@storybook/addon-vitest` runs each story
+    // file in a real Chromium context that dynamically imports the addon's
+    // setup module from the Vitest Vite dev server. When many files start in
+    // parallel on a loaded CI runner, the server is not ready to serve that
+    // module and the browser throws "Failed to fetch dynamically imported
+    // module" (vitest-dev/vitest#9509, storybookjs/storybook#33347). Serializing
+    // the files keeps the dev server responsive to one importer at a time. This
+    // is not `isolate: false` — per-file isolation stays on, so story state
+    // still cannot leak between files.
+    fileParallelism: false,
     projects: [
       {
         extends: true,
