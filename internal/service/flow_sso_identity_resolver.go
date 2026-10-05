@@ -152,7 +152,7 @@ func (r *FlowSSOIdentityResolver) BindLinked(ctx context.Context, in domain.Flow
 			userFactor := &domain.AuthFactorUser{UserID: in.UserID}
 			checkID, err := stmts.AddAuthAttemptFactor(ctx, in.ProjectID, in.AttemptID, userFactor)
 			if _, taken := errors.AsType[*database.UniqueError](err); taken {
-				return domain.ErrFlowRestartRequired()
+				return domain.ErrFlowRestartRequired().WithParent(err)
 			}
 			if err != nil {
 				return fmt.Errorf("bind sso identity: %w", err)
