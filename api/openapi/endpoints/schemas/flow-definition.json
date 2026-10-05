@@ -291,6 +291,79 @@
                 }
               }
             }
+          },
+          {
+            "required": [
+              "transitions"
+            ],
+            "properties": {
+              "transitions": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "sso_authenticated"
+                    ],
+                    "properties": {
+                      "sso_authenticated": {
+                        "anyOf": [
+                          {
+                            "required": [
+                              "purpose"
+                            ],
+                            "properties": {
+                              "purpose": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          {
+                            "required": [
+                              "action"
+                            ],
+                            "properties": {
+                              "action": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "required": [
+                      "sso_user_not_found"
+                    ],
+                    "properties": {
+                      "sso_user_not_found": {
+                        "anyOf": [
+                          {
+                            "required": [
+                              "purpose"
+                            ],
+                            "properties": {
+                              "purpose": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          {
+                            "required": [
+                              "action"
+                            ],
+                            "properties": {
+                              "action": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
+            }
           }
         ]
       },

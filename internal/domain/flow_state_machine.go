@@ -36,7 +36,8 @@ const (
 	// account on a connection whose provisioning.creation is disabled.
 	FlowStepErrorSSOCreationDisabled = "error.sso_creation_disabled"
 	// FlowStepErrorSSOUnavailable reports a provider the engine could not
-	// start a sign-in with. The user stays on the step.
+	// start a sign-in with, or whose sign-in the current step cannot route.
+	// The user stays on the step.
 	FlowStepErrorSSOUnavailable = "error.sso_unavailable"
 )
 
@@ -480,9 +481,9 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 
 	// The bind cannot be undone, so it runs only when the outcome can route:
 	// a stored definition is validated only on write. Otherwise the step
-	// shows the outcome as an unwired one, and the row stays parked.
-	if t, ok := currentStep.Transitions[FlowImplicitOutcomeSSOAuthenticated]; !ok || t.Action != nil || t.Purpose != nil {
-		msg := FlowImplicitOutcomeSSOAuthenticated
+	// shows the provider as unavailable, and the row stays parked.
+	if !ssoAuthenticatedRoutes(currentStep) {
+		msg := FlowStepErrorSSOUnavailable
 		result, err := r.renderStepError(pc, resolvedFields, &msg)
 		return result, true, err
 	}
@@ -500,9 +501,7 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 	if err != nil {
 		return FlowStepResult{}, false, fmt.Errorf("flow state machine: bind sso identity: %w", err)
 	}
-	recordResolvedUser(state, parked.Link.UserID)
-	result, err := r.routeOutcome(pc, resolvedFields, FlowImplicitOutcomeSSOAuthenticated, false)
-	return result, true, err
+	return r.retrySSOHandoff(pc, resolvedFields, parked.Link.UserID)
 }
 
 // provisionSSOIdentity settles an unlinked identity under `creation: auto`
@@ -728,9 +727,19 @@ func (r *FlowStateMachineRuntime) resolveStaleSSOBind(pc *processCtx, resolvedFi
 	return r.retrySSOHandoff(pc, resolvedFields, reread.BoundUserID)
 }
 
-// retrySSOHandoff raises sso_authenticated for a user an earlier bind recorded
-// on the attempt, which mints the handoff that bind's request did not deliver.
+// retrySSOHandoff raises sso_authenticated for a user bound on the attempt,
+// which mints the handoff. The bind is this request's or an earlier one whose
+// request did not deliver the handoff; either way a concurrent render can win
+// the handoff first.
 func (r *FlowStateMachineRuntime) retrySSOHandoff(pc *processCtx, resolvedFields FlowResolvedFields, userID string) (FlowStepResult, bool, error) {
+	// An earlier bind may have run on another step, or under an older
+	// definition. Checked before the user is recorded: a purpose would drop
+	// that user and move the flow to a fresh attempt.
+	if !ssoAuthenticatedRoutes(pc.currentStep) {
+		msg := FlowStepErrorSSOUnavailable
+		result, err := r.renderStepError(pc, resolvedFields, &msg)
+		return result, true, err
+	}
 	recordResolvedUser(pc.state, userID)
 	result, err := r.routeOutcome(pc, resolvedFields, FlowImplicitOutcomeSSOAuthenticated, false)
 	if errors.Is(err, ErrAuthAttemptAlreadyHandedOff()) {
@@ -739,6 +748,13 @@ func (r *FlowStateMachineRuntime) retrySSOHandoff(pc *processCtx, resolvedFields
 		return FlowStepResult{}, false, ErrFlowRestartRequired()
 	}
 	return result, true, err
+}
+
+// ssoAuthenticatedRoutes reports whether step routes sso_authenticated within
+// this flow, keeping the bound user.
+func ssoAuthenticatedRoutes(step *FlowDefinitionStep) bool {
+	t, ok := step.Transitions[FlowImplicitOutcomeSSOAuthenticated]
+	return ok && t.Action == nil && t.Purpose == nil
 }
 
 // processCtx carries the per-submission context threaded through the

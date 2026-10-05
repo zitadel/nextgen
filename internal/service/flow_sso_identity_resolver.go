@@ -197,7 +197,7 @@ func bindSSOIdentity(ctx context.Context, stmts AllStatements, in domain.FlowSSO
 		userFactor := &domain.AuthFactorUser{UserID: in.UserID}
 		checkID, err := stmts.AddAuthAttemptFactor(ctx, in.ProjectID, in.AttemptID, userFactor)
 		if _, taken := errors.AsType[*database.UniqueError](err); taken {
-			return domain.ErrFlowRestartRequired()
+			return domain.ErrFlowRestartRequired().WithParent(err)
 		} else if err != nil {
 			return fmt.Errorf("bind sso identity: %w", err)
 		} else if err := emitDirectAuthFactor(ctx, stmts, attempt, userFactor, checkID); err != nil {

@@ -331,6 +331,8 @@ func TestFlowSSOIdentityResolver_BindLinked_ConcurrentBindRestartsWithoutReread(
 		ProjectID: ssoProjectID, AttemptID: ssoAttemptID, CheckID: "ch-1", UserID: "user-1", ConnectionID: "idp-1", LinkID: "idplink-1",
 	})
 	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
+	var refused *database.UniqueError
+	assert.ErrorAs(t, err, &refused, "the refused add stays in the chain")
 }
 
 // The attempt already carries this user (the identifier step resolved the same

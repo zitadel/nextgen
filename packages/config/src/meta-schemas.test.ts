@@ -213,6 +213,41 @@ describe("meta-schemas", () => {
         },
         true,
       ],
+      [
+        "sso_authenticated with a purpose",
+        {
+          fields: ["email"],
+          transitions: { sso_authenticated: { target: "extra", purpose: "register" } },
+        },
+        false,
+      ],
+      [
+        "sso_user_not_found with an action",
+        {
+          fields: ["email"],
+          transitions: { sso_user_not_found: { target: "extra", action: "switch" } },
+        },
+        false,
+      ],
+      [
+        "sso outcomes with a null purpose and action",
+        {
+          fields: ["email"],
+          transitions: {
+            sso_authenticated: { target: "extra", purpose: null, action: null },
+            sso_user_not_found: { target: "extra", purpose: null, action: null },
+          },
+        },
+        true,
+      ],
+      [
+        "user_already_exists with a purpose",
+        {
+          fields: ["email"],
+          transitions: { user_already_exists: { target: "extra", purpose: "login" } },
+        },
+        true,
+      ],
     ];
     for (const [name, step, valid] of cases) {
       expect(check(withStep(step)), `${name}: ${JSON.stringify(check.errors)}`).toBe(valid);

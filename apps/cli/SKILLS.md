@@ -446,7 +446,9 @@ docker --image <ref>` remains the explicit image override for debugging.
   the connection file. A step edited by hand is left alone and reported. On a
   flow an earlier CLI wrote, the transition keys `callback` and
   `identity_unknown` become `sso_authenticated` and `sso_user_not_found`, except
-  where the key is also an action on that step. If a step the command edits has
+  where the key is also an action on that step. A legacy key that declares
+  `purpose` or `action` stops the command with `E_VALIDATION` naming the step
+  and the key, and changes no file. If a step the command edits has
   an action named like an outcome it writes there, the command stops with
   `E_VALIDATION` naming the step and the action, and changes no file. `setup`
   asks during onboarding too, as a multi-select over the catalog, so a run can

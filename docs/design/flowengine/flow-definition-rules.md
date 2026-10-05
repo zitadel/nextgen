@@ -9,7 +9,7 @@ shape and the rules the engine enforces on top of the JSON schema.
 
 Validation runs in two layers:
 
-1. **Schema**: `api/openapi/components/flows/flow-definition.yaml` states required fields, types, enums, and string patterns, plus the step and transition shapes JSON Schema can express: a terminal step carries nothing else, a non-terminal step does something, `sso_providers` needs `transitions.sso_authenticated`, and a transition never sets both `purpose` and `action`. The generated editor meta-schema enforces all of it; the API's generated request validation ignores the shape rules, which the engine rules below enforce again.
+1. **Schema**: `api/openapi/components/flows/flow-definition.yaml` states required fields, types, enums, and string patterns, plus the step and transition shapes JSON Schema can express: a terminal step carries nothing else, a non-terminal step does something, `sso_providers` needs `transitions.sso_authenticated`, a transition never sets both `purpose` and `action`, and the `sso_authenticated` and `sso_user_not_found` transitions set neither. The generated editor meta-schema enforces all of it; the API's generated request validation ignores the shape rules, which the engine rules below enforce again.
 2. **Engine**: the rules below, applied at write time and (where deferred) at runtime.
 
 ## Definition shape
