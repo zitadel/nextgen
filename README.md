@@ -48,6 +48,18 @@ integrating Zitadel into an app; [AGENTS.md](AGENTS.md) is for agents
 contributing to this repository. The documentation site publishes LLM-friendly
 text at `/llms.txt`, `/llms-full.txt`, and page-level `.md` URLs.
 
+Install the skill into any skills-compatible agent (Claude Code, Cursor,
+Copilot, Codex, and more) straight from this repo:
+
+```sh
+npx skills add zitadel/nextgen --full-depth
+```
+
+`--full-depth` installs the whole set — the `zitadel` router skill, the CLI
+skill, and the per-framework SDK and component skills. Without it, only the
+top-level router skill is installed. The CLI skill also ships inside the
+`@zitadel/cli` package.
+
 ## Customer quick start
 
 ```sh
