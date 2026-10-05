@@ -22,6 +22,18 @@ The server has no environments. Two things take their place:
 
 Field names are proposals, not settled wire contracts.
 
+Most of these tables already exist. What this design moves is the axis they are
+keyed on: from an environment id to an origin string.
+
+| Entity | Today | Here |
+|---|---|---|
+| **Project** | `projects` | kept — `preview_origins` becomes `allowed_origins` with a `kind` per entry, plus `class`, `publishable_key`, `current_deployment_id` |
+| **Origin** | — | **new table**, one row per live URL; takes over the routing job environments do |
+| **Environment** | `environments`, seeded per project | **dropped** |
+| **Deployment** | `deployments`, keyed to an environment | kept — the `environment_id` foreign key becomes a plain `origin` string, plus `deploy_id` |
+| **Release** | `releases` | shape kept — `content_hash` becomes the wire identifier, `revoked_at` is new |
+| **Variable** | `variables`, scoped by `environment_id` | kept — the scope column becomes an allowlist pattern and resolves by override |
+
 ### Project
 
 ```json
@@ -46,6 +58,18 @@ Field names are proposals, not settled wire contracts.
 `allowed_origins` holds **patterns**. They authorize; they never route.
 `current_deployment_id` answers callers that have no `Origin` to route on — a
 server-side app, the CLI, CI.
+
+**Unchanged** — `id`, `name`, `created_at`, and the `updated_at` and
+password-hash-policy fields left out above.
+
+**Changed** — `preview_origins` is today a flat list of exact strings serving
+the preview secret (`internal/domain/project.go:68`, compared with string
+equality at `internal/api/flow.go:371`). It becomes `allowed_origins`: patterns,
+each carrying a `kind`.
+
+**New** — `class`; `publishable_key`, which [ADR 036](../../adrs/036-api-credential-planes.md)
+defines but nothing in `internal/` implements yet; and `current_deployment_id`,
+which exists today as a column on `environments`.
 
 ### Origin
 
@@ -77,6 +101,15 @@ This is what a request routes on.
 again, which keeps a preview URL stable across pushes to a branch. `primary` rows
 do not expire.
 
+**New table**, with no equivalent today. It inherits what
+`environments.current_deployment_id` does — hold the deployment a runtime slot
+serves — keyed by an exact origin string instead of an environment id.
+
+So `environments` is **dropped**: the table and its unique name index
+(`000005_environments.sql`), `seedDefaultEnvironments`
+(`internal/service/project.go:173`), and the name-addressed
+`GET /environments/{name}` surface.
+
 ### Deployment
 
 Immutable, append-only.
@@ -98,6 +131,19 @@ Immutable, append-only.
 `origin` is the history axis. The **empty string means the project default** —
 the target `project.current_deployment_id` points at. `deploy_id` correlates the
 rows one deploy wrote when it touched several origins at once.
+
+**Unchanged** — `project_id`, `id`, `deployed_at`, the release reference, and
+immutability. `reason` and `message` are shown flat for readability; they can
+stay inside the existing `metadata` document.
+
+**Changed** — `environment_id`, today a composite foreign key to `environments`
+that cascades on delete, becomes `origin`: a plain string with no foreign key.
+That is the point, not an oversight — see
+[deployment history](#deployment-history). The release reference also has to stop
+cascading: `000011_deployments.sql` deletes deployments when a release goes, and
+a referenced release must instead be undeletable.
+
+**New** — `deploy_id`.
 
 ### Release
 
@@ -128,6 +174,16 @@ Short forms are accepted down to 12 hex characters; ambiguity is refused.
 Posting the same content twice returns the same release rather than creating a
 second one.
 
+**Unchanged** — the whole shape, including that last sentence: the unique index
+on `(project_id, content_hash)` already makes a repost idempotent
+(`000007_releases.sql`).
+
+**Changed** — `content_hash` is already the dedup key; here it also becomes the
+**wire** identifier, which is what makes short-form resolution and ambiguity
+refusal new behaviour on an existing column.
+
+**New** — `revoked_at`.
+
 ### Variable
 
 Keyed `(name, project_id, scope)`, where `scope` is an allowlist **pattern** and
@@ -139,6 +195,16 @@ the empty string is the project.
   "value": "preview-xyz.apps.googleusercontent.com" }
 { "name": "GOOGLE_CLIENT_SECRET", "scope": "https://*-acmeinc.vercel.app", "secret": true }
 ```
+
+**Unchanged** — `name`, `project_id`, `value`, `is_secret`, the timestamps, and
+the convention that the empty string is an address of its own rather than a
+wildcard (`internal/domain/variable.go:160`).
+
+**Changed** — `environment_id` becomes `scope`, an allowlist pattern, and
+resolution becomes override rather than the exact match with no inheritance that
+[ADR 062](../../adrs/062-per-environment-variables-and-secrets.md) specifies.
+The generated `environment_ref` column and its foreign key
+(`000008_variables.sql`) go with it: a pattern references no row.
 
 ## Resolution
 
