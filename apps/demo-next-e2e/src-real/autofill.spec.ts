@@ -1,4 +1,5 @@
 import type { Locator, Page } from "@playwright/test";
+
 import { expect, test } from "@zitadel/testing/playwright";
 
 /**
