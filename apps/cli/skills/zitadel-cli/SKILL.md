@@ -46,16 +46,20 @@ The CLI requires Node.js 24+.
   naming the flag to pass instead of blocking. Supply each answer as a flag; run
   the command's `--help` to see which flags exist and which are required.
 - **Output modes.** `--json` is the agent contract and is unaffected by the
-  terminal. Human mode adapts to the terminal: a TTY gets aligned tables, while a
-  piped or redirected run (or `--plain`) gets one tab-separated record per line
-  and nothing else. Use `--no-color` to drop ANSI styling from human output.
+  terminal — color and width never apply to it, so you do **not** need
+  `--no-color` or other cosmetic flags when you parse JSON; don't sprinkle them
+  on every call. Human mode adapts to the terminal: a TTY gets aligned tables,
+  while a piped or redirected run (or `--plain`) gets one tab-separated record
+  per line and nothing else. If you ever read human output, set `NO_COLOR=1`
+  once in the environment rather than repeating `--no-color` per command.
 - **Working directory.** Add `--cwd <path>` when operating outside the current
   working directory.
-- **Telemetry.** The CLI sends anonymous usage telemetry by default. For
-  automated/agent runs that should stay silent, disable it with `--no-telemetry`
-  (per invocation) or `ZITADEL_TELEMETRY=0` / `DO_NOT_TRACK=1` (per environment);
-  this also skips the small end-of-command network flush and drops the `ci/` and
-  `host/` tokens from the CLI's HTTP `User-Agent`.
+- **Telemetry.** The CLI sends anonymous usage telemetry by default, and
+  agent-driven runs are exactly the ones worth learning from — leave it on.
+  Don't add `--no-telemetry` to commands. An opt-out exists for users who need
+  it (`ZITADEL_TELEMETRY=0`, or the standard `DO_NOT_TRACK`, in their
+  environment), but that is the user's environment choice, not a flag to attach
+  to every call.
 - **Flag conventions.** Flags follow what a model already expects from curl, ssh
   and wget: `--help`/`-h`, `--version`, `-v`/`--verbose`, kebab-case long flags,
   both `--flag value` and `--flag=value`, and `--no-telemetry`-style negation.
@@ -176,6 +180,21 @@ Skip the questions and proceed with the defaults above — stating the assumptio
 you made so the user can correct them — in exactly two cases: the user already
 told you what they want, or you are running non-interactively (a one-shot/headless
 invocation) or were explicitly told to just set it up.
+
+## Answering the user
+
+Report what changed, in the user's terms — not how you drove the CLI. The
+flags, `--json`, the `plan`/`apply` split, exit codes, and the number of
+commands you ran are your internal business; the user asked for an outcome, not
+a transcript. Say what they got.
+
+- Good: "Added an optional phone number to your user schema and deployed it."
+- Avoid: "I ran `plan` and `apply`, both with `--non-interactive --json`, and
+  both returned ok."
+
+Quote a command or flag only when the user asks *how* something works, or when
+they need to run something themselves. Otherwise keep the mechanics out of the
+answer.
 
 ## Golden path
 
