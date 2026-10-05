@@ -49,7 +49,7 @@ to be a fast answer to "can I build flow X right now?"
 ### SSO redirect
 
 - `{action: "sso", sso_provider_id, return_target}` on a step that offers `sso_providers` pins the connection at its newest revision, issues a single-use state record on the auth attempt and emits the `sso-redirect` step with the provider's authorize URL. The flow state stays on the step the provider was picked from; the response re-seals `_zflow` and adds the browser-binding cookie ([area 3](../idp/3-social-login-flow.md#the-binding-cookie)).
-- A provider the engine cannot start a sign-in with re-renders the step with `error.sso_unavailable`.
+- A provider the engine cannot start a sign-in with re-renders the step with `error.sso_unavailable`, as does a returned identity whose `sso_authenticated` transition the step cannot route (a stored definition that was never validated).
 
 ### Passkey ceremony (two-phase)
 

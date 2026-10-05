@@ -497,7 +497,7 @@ func (r *FlowStateMachineRuntime) retrySSOHandoff(pc *processCtx, resolvedFields
 	if errors.Is(err, ErrAuthAttemptAlreadyHandedOff()) {
 		// A concurrent retry won the handoff. A handed-off attempt restarts
 		// the flow on every later render too, so this one does the same.
-		return FlowStepResult{}, false, ErrFlowRestartRequired()
+		return FlowStepResult{}, false, ErrFlowRestartRequired().WithParent(err)
 	}
 	return result, true, err
 }
