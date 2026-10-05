@@ -380,7 +380,7 @@ img[data-zl-asset-broken] {
   align-items: center;
   justify-content: center;
   gap: var(--zl-spacing-6);
-  padding: var(--zl-spacing-4);
+  padding: 16px;
 }
 /* Condensed brand header inside the form pane. Hidden on wide viewports
    (the full brand pane carries the branding there); shown on narrow ones

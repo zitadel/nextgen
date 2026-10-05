@@ -80,10 +80,15 @@ describe("<zl-select> form participation (chromium)", () => {
     expect(form.checkValidity()).toBe(true);
   });
 
-  it("contributes a native-control change to FormData", async () => {
+  it("contributes a native-control change to FormData and re-dispatches one change", async () => {
     const { form, select } = await mount();
+    let nativeChanges = 0;
+    select.addEventListener("change", () => {
+      nativeChanges += 1;
+    });
     await selectNative(select, "us");
     expect(new FormData(form).get("country")).toBe("us");
+    expect(nativeChanges).toBe(1);
   });
 
   it("contributes nothing to FormData once cleared back to the empty option", async () => {

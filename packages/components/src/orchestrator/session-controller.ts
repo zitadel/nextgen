@@ -59,10 +59,10 @@ export class SessionController implements ReactiveController {
 
   /**
    * Revokes the session with credentials; the server clears the cookie. Fires
-   * `zitadel-signout` and resolves `true` on success; on failure sets
+   * `zitadel-signout` (after `onRevoked`) and resolves `true` on success; on failure sets
    * `errorMessage` and resolves `false`.
    */
-  async signOut(): Promise<boolean> {
+  async signOut(onRevoked?: () => void): Promise<boolean> {
     this.loading = true;
     this.errorMessage = "";
     this.host.requestUpdate();
@@ -79,6 +79,7 @@ export class SessionController implements ReactiveController {
 
     this.loading = false;
     this.host.requestUpdate();
+    onRevoked?.();
     emit(this.host, "zitadel-signout", { display: this.display, identifier: this.identifier });
     return true;
   }

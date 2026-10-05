@@ -168,9 +168,3 @@
   border-color: var(--zl-destructive);
 }
 
-/* Inline error message under the checkbox row (mirrors .zr-field__error). */
-.zr-checkbox__error {
-  font-size: var(--zl-text-sm-size);
-  line-height: var(--zl-text-sm-leading);
-  color: var(--zl-destructive);
-}

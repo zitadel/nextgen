@@ -16,7 +16,7 @@ declare global {
     "zl-submit": CustomEvent<ZlSubmitDetail>;
     "zl-input": CustomEvent<ZlFieldInputDetail>;
     "zl-change": CustomEvent<ZlCheckboxChangeDetail | ZlSelectChangeDetail>;
-    "zl-dismiss": CustomEvent<undefined>;
+    "zl-dismiss": CustomEvent<null>;
     "zl-sso-select": CustomEvent<ZlSsoSelectDetail>;
     "zl-passkey-started": CustomEvent<ZlPasskeyStartedDetail>;
     "zl-passkey-result": CustomEvent<ZlPasskeyResultDetail>;

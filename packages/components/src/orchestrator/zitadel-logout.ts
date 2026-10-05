@@ -296,8 +296,10 @@ export class ZitadelLogout extends ZitadelConfigured {
 
   /** Signs out, closes the menu, then optionally navigates to `postSignOutUrl`. */
   private async doLogout(): Promise<void> {
-    if (!(await this.session.signOut())) return;
-    this.open = false;
+    const closeMenu = () => {
+      this.open = false;
+    };
+    if (!(await this.session.signOut(closeMenu))) return;
     if (this.postSignOutUrl && typeof window !== "undefined") {
       window.location.href = this.postSignOutUrl;
     }

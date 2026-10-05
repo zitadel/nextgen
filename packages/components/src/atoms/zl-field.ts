@@ -91,7 +91,7 @@ export class ZlField extends FormAtom {
 
   override connectedCallback(): void {
     super.connectedCallback();
-    // Reset restores the initial `value` attribute, as a native input does.
+    // Reset restores the `value` attribute the field connected with.
     this.defaultValue = this.getAttribute("value") ?? "";
     this.syncFormState();
   }
