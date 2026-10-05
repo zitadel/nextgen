@@ -444,7 +444,7 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 	// The bind cannot be undone, so it runs only when the outcome can route:
 	// a stored definition is validated only on write. Otherwise the step
 	// shows the outcome as an unwired one, and the row stays parked.
-	if t, ok := currentStep.Transitions[FlowImplicitOutcomeSSOAuthenticated]; !ok || t.Action != nil || t.Purpose != nil {
+	if !ssoAuthenticatedRoutes(currentStep) {
 		msg := FlowImplicitOutcomeSSOAuthenticated
 		result, err := r.renderStepError(pc, resolvedFields, &msg)
 		return result, true, err
@@ -483,6 +483,14 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 // request did not deliver the handoff; either way a concurrent render can win
 // the handoff first.
 func (r *FlowStateMachineRuntime) retrySSOHandoff(pc *processCtx, resolvedFields FlowResolvedFields, userID string) (FlowStepResult, bool, error) {
+	// An earlier bind may have run on another step, or under an older
+	// definition. Checked before the user is recorded: a purpose would drop
+	// that user and move the flow to a fresh attempt.
+	if !ssoAuthenticatedRoutes(pc.currentStep) {
+		msg := FlowImplicitOutcomeSSOAuthenticated
+		result, err := r.renderStepError(pc, resolvedFields, &msg)
+		return result, true, err
+	}
 	recordResolvedUser(pc.state, userID)
 	result, err := r.routeOutcome(pc, resolvedFields, FlowImplicitOutcomeSSOAuthenticated, false)
 	if errors.Is(err, ErrAuthAttemptAlreadyHandedOff()) {
@@ -491,6 +499,13 @@ func (r *FlowStateMachineRuntime) retrySSOHandoff(pc *processCtx, resolvedFields
 		return FlowStepResult{}, false, ErrFlowRestartRequired()
 	}
 	return result, true, err
+}
+
+// ssoAuthenticatedRoutes reports whether step routes sso_authenticated within
+// this flow, keeping the bound user.
+func ssoAuthenticatedRoutes(step *FlowDefinitionStep) bool {
+	t, ok := step.Transitions[FlowImplicitOutcomeSSOAuthenticated]
+	return ok && t.Action == nil && t.Purpose == nil
 }
 
 // processCtx carries the per-submission context threaded through the

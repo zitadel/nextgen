@@ -4766,25 +4766,36 @@ func TestFlowStateMachine_Render_SSOUnlinkedAutoLeavesParkedRow(t *testing.T) {
 	assert.Empty(t, result.State.SSOResolvedCheckID)
 }
 
+// unroutableSSOTransitions are sso_authenticated transitions a stored
+// definition can carry but the engine cannot take with the bound user, keyed
+// by case name. nil removes the transition.
+func unroutableSSOTransitions() map[string]*domain.FlowStepTransition {
+	register := domain.FlowDefinitionPurposeRegister
+	action := domain.Switch
+	return map[string]*domain.FlowStepTransition{
+		"missing":      nil,
+		"with purpose": {Target: "done", Purpose: &register},
+		"with action":  {Target: "other-flow", Action: &action},
+	}
+}
+
+func setSSOAuthenticatedTransition(def *domain.FlowDefinition, transition *domain.FlowStepTransition) {
+	delete(def.Steps[0].Transitions, domain.FlowImplicitOutcomeSSOAuthenticated)
+	if transition != nil {
+		def.Steps[0].Transitions[domain.FlowImplicitOutcomeSSOAuthenticated] = *transition
+	}
+}
+
 // A stored definition is validated only on write. When its sso_authenticated
 // transition cannot route, the attempt is not bound: the step shows the
 // unwired outcome, and the guard keeps a reload from repeating it.
 func TestFlowStateMachine_Render_SSOUnroutableTransitionDoesNotBind(t *testing.T) {
 	t.Parallel()
-	register := domain.FlowDefinitionPurposeRegister
-	action := domain.Switch
-	for name, transition := range map[string]*domain.FlowStepTransition{
-		"missing":      nil,
-		"with purpose": {Target: "done", Purpose: &register},
-		"with action":  {Target: "other-flow", Action: &action},
-	} {
+	for name, transition := range unroutableSSOTransitions() {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			w, def, state := ssoRenderWorld(t)
-			delete(def.Steps[0].Transitions, domain.FlowImplicitOutcomeSSOAuthenticated)
-			if transition != nil {
-				def.Steps[0].Transitions[domain.FlowImplicitOutcomeSSOAuthenticated] = *transition
-			}
+			setSSOAuthenticatedTransition(def, transition)
 			w.expectParked(linkedParked(), nil)
 			w.ssoIdentities.EXPECT().BindLinked(gomock.Any(), gomock.Any()).Times(0)
 			w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).Times(0)
@@ -4796,6 +4807,28 @@ func TestFlowStateMachine_Render_SSOUnroutableTransitionDoesNotBind(t *testing.T
 			assert.Equal(t, domain.FlowImplicitOutcomeSSOAuthenticated, *result.Step.Error)
 			assert.Empty(t, result.State.CollectedData.UserID)
 			assert.Equal(t, "ch-1", result.State.SSOResolvedCheckID)
+		})
+	}
+}
+
+// An earlier bind committed but the current step cannot take the outcome: the
+// step shows it as unwired, and the attempt keeps its id and its user.
+func TestFlowStateMachine_Render_SSOUnroutableTransitionDoesNotRetryHandoff(t *testing.T) {
+	t.Parallel()
+	for name, transition := range unroutableSSOTransitions() {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			w, def, state := ssoRenderWorld(t)
+			setSSOAuthenticatedTransition(def, transition)
+			w.expectParked(&domain.FlowSSOParkedIdentity{BoundUserID: "user-1"}, nil)
+
+			result, err := w.sm.Render(t.Context(), def, state)
+			require.NoError(t, err)
+			assert.Equal(t, "credentials", result.Step.Name)
+			require.NotNil(t, result.Step.Error)
+			assert.Equal(t, domain.FlowImplicitOutcomeSSOAuthenticated, *result.Step.Error)
+			assert.Empty(t, result.State.CollectedData.UserID)
+			assert.Equal(t, "att-1", result.State.AuthAttemptID)
 		})
 	}
 }
