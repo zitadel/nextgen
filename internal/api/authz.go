@@ -511,28 +511,17 @@ func mapAuthzDecision(dec resolver.Decision, res resourceAccess, op accessOp) er
 // requireProjectListAccess gates a management list and attaches the list
 // context: Allow stamps a one-shot EXISTS skip (consumed by the next
 // compileList / ListUsers); Forbidden attaches the EXISTS predicate via
-// the same Resolver used for Check; NotFound 404s.
-func (h *Handler) requireProjectListAccess(ctx context.Context, projectID string, res resourceAccess, kind domain.ResourceKind) (context.Context, error) {
-	ctx, _, err := h.requireProjectListAccessDecision(ctx, projectID, res, kind)
-	return ctx, err
-}
-
-// requireProjectListAccessDecision is requireProjectListAccess that also
-// reports whether the access is project-wide (the read Check allowed the
-// project) rather than partial (a foothold narrowed by a filter).
-func (h *Handler) requireProjectListAccessDecision(ctx context.Context, projectID string, res resourceAccess, kind domain.ResourceKind) (context.Context, bool, error) {
+// the same Resolver used for Check; NotFound 404s. The bool reports whether
+// the access is project-wide (Allow) rather than partial (a foothold narrowed
+// by the filter).
+func (h *Handler) requireProjectListAccess(ctx context.Context, projectID string, res resourceAccess, kind domain.ResourceKind) (context.Context, bool, error) {
 	if h == nil || h.pool == nil {
 		return ctx, false, domain.ErrInternal(errors.New("authz statements not configured"))
 	}
-	return requireProjectListAccessWithDecision(ctx, h.pool.Statements(), projectID, res, kind)
+	return requireProjectListAccess(ctx, h.pool.Statements(), projectID, res, kind)
 }
 
-func requireProjectListAccess(ctx context.Context, stmts service.AuthzResolverStatements, projectID string, res resourceAccess, kind domain.ResourceKind) (context.Context, error) {
-	ctx, _, err := requireProjectListAccessWithDecision(ctx, stmts, projectID, res, kind)
-	return ctx, err
-}
-
-func requireProjectListAccessWithDecision(ctx context.Context, stmts service.AuthzResolverStatements, projectID string, res resourceAccess, kind domain.ResourceKind) (context.Context, bool, error) {
+func requireProjectListAccess(ctx context.Context, stmts service.AuthzResolverStatements, projectID string, res resourceAccess, kind domain.ResourceKind) (context.Context, bool, error) {
 	r := resolver.New()
 	dec, err := checkProjectAccess(ctx, r, stmts, projectID, opRead, nil)
 	if err != nil {

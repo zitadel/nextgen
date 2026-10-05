@@ -102,7 +102,7 @@ func (h *Handler) ListIdpRevisions(ctx context.Context, params api.ListIdpRevisi
 }
 
 func (h *Handler) QueryIdps(ctx context.Context, req *api.QueryIdpsRequest, params api.QueryIdpsParams) (api.QueryIdpsRes, error) {
-	ctx, err := h.requireProjectListAccess(ctx, string(params.ProjectID), idpAccess, domain.ResourceKindIDPConnection)
+	ctx, _, err := h.requireProjectListAccess(ctx, string(params.ProjectID), idpAccess, domain.ResourceKindIDPConnection)
 	if err != nil {
 		return nil, err
 	}
