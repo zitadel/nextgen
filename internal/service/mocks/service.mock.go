@@ -246,6 +246,44 @@ func (c *MockAllStatementsActiveSystemCatalogIDCall) DoAndReturn(f func(context.
 	return c
 }
 
+// AddUserPasswordFailure mocks base method.
+func (m *MockAllStatements) AddUserPasswordFailure(ctx context.Context, projectID, userID string, at, forgetBefore time.Time) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AddUserPasswordFailure", ctx, projectID, userID, at, forgetBefore)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// AddUserPasswordFailure indicates an expected call of AddUserPasswordFailure.
+func (mr *MockAllStatementsMockRecorder) AddUserPasswordFailure(ctx, projectID, userID, at, forgetBefore any) *MockAllStatementsAddUserPasswordFailureCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddUserPasswordFailure", reflect.TypeOf((*MockAllStatements)(nil).AddUserPasswordFailure), ctx, projectID, userID, at, forgetBefore)
+	return &MockAllStatementsAddUserPasswordFailureCall{Call: call}
+}
+
+// MockAllStatementsAddUserPasswordFailureCall wrap *gomock.Call
+type MockAllStatementsAddUserPasswordFailureCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsAddUserPasswordFailureCall) Return(arg0 error) *MockAllStatementsAddUserPasswordFailureCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsAddUserPasswordFailureCall) Do(f func(context.Context, string, string, time.Time, time.Time) error) *MockAllStatementsAddUserPasswordFailureCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsAddUserPasswordFailureCall) DoAndReturn(f func(context.Context, string, string, time.Time, time.Time) error) *MockAllStatementsAddUserPasswordFailureCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // AuthAttemptChallengeFailed mocks base method.
 func (m *MockAllStatements) AuthAttemptChallengeFailed(ctx context.Context, projectID, authAttemptID string, challenge domain.AuthChallenge) error {
 	m.ctrl.T.Helper()
@@ -358,6 +396,44 @@ func (c *MockAllStatementsCheckAuthzCall) Do(f func(context.Context, domain.Auth
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAllStatementsCheckAuthzCall) DoAndReturn(f func(context.Context, domain.AuthzCheckParams) (bool, bool, error)) *MockAllStatementsCheckAuthzCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// ClearUserPasswordFailures mocks base method.
+func (m *MockAllStatements) ClearUserPasswordFailures(ctx context.Context, projectID, userID string, until time.Time) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ClearUserPasswordFailures", ctx, projectID, userID, until)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ClearUserPasswordFailures indicates an expected call of ClearUserPasswordFailures.
+func (mr *MockAllStatementsMockRecorder) ClearUserPasswordFailures(ctx, projectID, userID, until any) *MockAllStatementsClearUserPasswordFailuresCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ClearUserPasswordFailures", reflect.TypeOf((*MockAllStatements)(nil).ClearUserPasswordFailures), ctx, projectID, userID, until)
+	return &MockAllStatementsClearUserPasswordFailuresCall{Call: call}
+}
+
+// MockAllStatementsClearUserPasswordFailuresCall wrap *gomock.Call
+type MockAllStatementsClearUserPasswordFailuresCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsClearUserPasswordFailuresCall) Return(arg0 error) *MockAllStatementsClearUserPasswordFailuresCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsClearUserPasswordFailuresCall) Do(f func(context.Context, string, string, time.Time) error) *MockAllStatementsClearUserPasswordFailuresCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsClearUserPasswordFailuresCall) DoAndReturn(f func(context.Context, string, string, time.Time) error) *MockAllStatementsClearUserPasswordFailuresCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -3484,6 +3560,45 @@ func (c *MockAllStatementsGetUserPasswordCall) DoAndReturn(f func(context.Contex
 	return c
 }
 
+// GetUserPasswordFailures mocks base method.
+func (m *MockAllStatements) GetUserPasswordFailures(ctx context.Context, projectID, userID string, since time.Time) (domain.UserPasswordFailures, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetUserPasswordFailures", ctx, projectID, userID, since)
+	ret0, _ := ret[0].(domain.UserPasswordFailures)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetUserPasswordFailures indicates an expected call of GetUserPasswordFailures.
+func (mr *MockAllStatementsMockRecorder) GetUserPasswordFailures(ctx, projectID, userID, since any) *MockAllStatementsGetUserPasswordFailuresCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUserPasswordFailures", reflect.TypeOf((*MockAllStatements)(nil).GetUserPasswordFailures), ctx, projectID, userID, since)
+	return &MockAllStatementsGetUserPasswordFailuresCall{Call: call}
+}
+
+// MockAllStatementsGetUserPasswordFailuresCall wrap *gomock.Call
+type MockAllStatementsGetUserPasswordFailuresCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsGetUserPasswordFailuresCall) Return(arg0 domain.UserPasswordFailures, arg1 error) *MockAllStatementsGetUserPasswordFailuresCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsGetUserPasswordFailuresCall) Do(f func(context.Context, string, string, time.Time) (domain.UserPasswordFailures, error)) *MockAllStatementsGetUserPasswordFailuresCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsGetUserPasswordFailuresCall) DoAndReturn(f func(context.Context, string, string, time.Time) (domain.UserPasswordFailures, error)) *MockAllStatementsGetUserPasswordFailuresCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // GetUserPasswordHistory mocks base method.
 func (m *MockAllStatements) GetUserPasswordHistory(ctx context.Context, projectID, userID string) ([]*domain.UserPassword, error) {
 	m.ctrl.T.Helper()
@@ -5573,44 +5688,6 @@ func (c *MockAllStatementsUpdateKeyCall) Do(f func(context.Context, string, stri
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAllStatementsUpdateKeyCall) DoAndReturn(f func(context.Context, string, string) error) *MockAllStatementsUpdateKeyCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
-// UpdatePasswordVerificationFailures mocks base method.
-func (m *MockAllStatements) UpdatePasswordVerificationFailures(ctx context.Context, password *domain.UserPassword) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdatePasswordVerificationFailures", ctx, password)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// UpdatePasswordVerificationFailures indicates an expected call of UpdatePasswordVerificationFailures.
-func (mr *MockAllStatementsMockRecorder) UpdatePasswordVerificationFailures(ctx, password any) *MockAllStatementsUpdatePasswordVerificationFailuresCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdatePasswordVerificationFailures", reflect.TypeOf((*MockAllStatements)(nil).UpdatePasswordVerificationFailures), ctx, password)
-	return &MockAllStatementsUpdatePasswordVerificationFailuresCall{Call: call}
-}
-
-// MockAllStatementsUpdatePasswordVerificationFailuresCall wrap *gomock.Call
-type MockAllStatementsUpdatePasswordVerificationFailuresCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockAllStatementsUpdatePasswordVerificationFailuresCall) Return(arg0 error) *MockAllStatementsUpdatePasswordVerificationFailuresCall {
-	c.Call = c.Call.Return(arg0)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsUpdatePasswordVerificationFailuresCall) Do(f func(context.Context, *domain.UserPassword) error) *MockAllStatementsUpdatePasswordVerificationFailuresCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsUpdatePasswordVerificationFailuresCall) DoAndReturn(f func(context.Context, *domain.UserPassword) error) *MockAllStatementsUpdatePasswordVerificationFailuresCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -8983,6 +9060,82 @@ func (m *MockUserPasswordStatements) EXPECT() *MockUserPasswordStatementsMockRec
 	return m.recorder
 }
 
+// AddUserPasswordFailure mocks base method.
+func (m *MockUserPasswordStatements) AddUserPasswordFailure(ctx context.Context, projectID, userID string, at, forgetBefore time.Time) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AddUserPasswordFailure", ctx, projectID, userID, at, forgetBefore)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// AddUserPasswordFailure indicates an expected call of AddUserPasswordFailure.
+func (mr *MockUserPasswordStatementsMockRecorder) AddUserPasswordFailure(ctx, projectID, userID, at, forgetBefore any) *MockUserPasswordStatementsAddUserPasswordFailureCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddUserPasswordFailure", reflect.TypeOf((*MockUserPasswordStatements)(nil).AddUserPasswordFailure), ctx, projectID, userID, at, forgetBefore)
+	return &MockUserPasswordStatementsAddUserPasswordFailureCall{Call: call}
+}
+
+// MockUserPasswordStatementsAddUserPasswordFailureCall wrap *gomock.Call
+type MockUserPasswordStatementsAddUserPasswordFailureCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockUserPasswordStatementsAddUserPasswordFailureCall) Return(arg0 error) *MockUserPasswordStatementsAddUserPasswordFailureCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockUserPasswordStatementsAddUserPasswordFailureCall) Do(f func(context.Context, string, string, time.Time, time.Time) error) *MockUserPasswordStatementsAddUserPasswordFailureCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockUserPasswordStatementsAddUserPasswordFailureCall) DoAndReturn(f func(context.Context, string, string, time.Time, time.Time) error) *MockUserPasswordStatementsAddUserPasswordFailureCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// ClearUserPasswordFailures mocks base method.
+func (m *MockUserPasswordStatements) ClearUserPasswordFailures(ctx context.Context, projectID, userID string, until time.Time) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ClearUserPasswordFailures", ctx, projectID, userID, until)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ClearUserPasswordFailures indicates an expected call of ClearUserPasswordFailures.
+func (mr *MockUserPasswordStatementsMockRecorder) ClearUserPasswordFailures(ctx, projectID, userID, until any) *MockUserPasswordStatementsClearUserPasswordFailuresCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ClearUserPasswordFailures", reflect.TypeOf((*MockUserPasswordStatements)(nil).ClearUserPasswordFailures), ctx, projectID, userID, until)
+	return &MockUserPasswordStatementsClearUserPasswordFailuresCall{Call: call}
+}
+
+// MockUserPasswordStatementsClearUserPasswordFailuresCall wrap *gomock.Call
+type MockUserPasswordStatementsClearUserPasswordFailuresCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockUserPasswordStatementsClearUserPasswordFailuresCall) Return(arg0 error) *MockUserPasswordStatementsClearUserPasswordFailuresCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockUserPasswordStatementsClearUserPasswordFailuresCall) Do(f func(context.Context, string, string, time.Time) error) *MockUserPasswordStatementsClearUserPasswordFailuresCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockUserPasswordStatementsClearUserPasswordFailuresCall) DoAndReturn(f func(context.Context, string, string, time.Time) error) *MockUserPasswordStatementsClearUserPasswordFailuresCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // GetUserPassword mocks base method.
 func (m *MockUserPasswordStatements) GetUserPassword(ctx context.Context, filter database.Filter[domain.UserPasswordField]) (*domain.UserPassword, error) {
 	m.ctrl.T.Helper()
@@ -9018,6 +9171,45 @@ func (c *MockUserPasswordStatementsGetUserPasswordCall) Do(f func(context.Contex
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockUserPasswordStatementsGetUserPasswordCall) DoAndReturn(f func(context.Context, database.Filter[domain.UserPasswordField]) (*domain.UserPassword, error)) *MockUserPasswordStatementsGetUserPasswordCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// GetUserPasswordFailures mocks base method.
+func (m *MockUserPasswordStatements) GetUserPasswordFailures(ctx context.Context, projectID, userID string, since time.Time) (domain.UserPasswordFailures, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetUserPasswordFailures", ctx, projectID, userID, since)
+	ret0, _ := ret[0].(domain.UserPasswordFailures)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetUserPasswordFailures indicates an expected call of GetUserPasswordFailures.
+func (mr *MockUserPasswordStatementsMockRecorder) GetUserPasswordFailures(ctx, projectID, userID, since any) *MockUserPasswordStatementsGetUserPasswordFailuresCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUserPasswordFailures", reflect.TypeOf((*MockUserPasswordStatements)(nil).GetUserPasswordFailures), ctx, projectID, userID, since)
+	return &MockUserPasswordStatementsGetUserPasswordFailuresCall{Call: call}
+}
+
+// MockUserPasswordStatementsGetUserPasswordFailuresCall wrap *gomock.Call
+type MockUserPasswordStatementsGetUserPasswordFailuresCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockUserPasswordStatementsGetUserPasswordFailuresCall) Return(arg0 domain.UserPasswordFailures, arg1 error) *MockUserPasswordStatementsGetUserPasswordFailuresCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockUserPasswordStatementsGetUserPasswordFailuresCall) Do(f func(context.Context, string, string, time.Time) (domain.UserPasswordFailures, error)) *MockUserPasswordStatementsGetUserPasswordFailuresCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockUserPasswordStatementsGetUserPasswordFailuresCall) DoAndReturn(f func(context.Context, string, string, time.Time) (domain.UserPasswordFailures, error)) *MockUserPasswordStatementsGetUserPasswordFailuresCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -9170,44 +9362,6 @@ func (c *MockUserPasswordStatementsSetUserPasswordCall) Do(f func(context.Contex
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockUserPasswordStatementsSetUserPasswordCall) DoAndReturn(f func(context.Context, *domain.SetUserPassword) error) *MockUserPasswordStatementsSetUserPasswordCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
-// UpdatePasswordVerificationFailures mocks base method.
-func (m *MockUserPasswordStatements) UpdatePasswordVerificationFailures(ctx context.Context, password *domain.UserPassword) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdatePasswordVerificationFailures", ctx, password)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// UpdatePasswordVerificationFailures indicates an expected call of UpdatePasswordVerificationFailures.
-func (mr *MockUserPasswordStatementsMockRecorder) UpdatePasswordVerificationFailures(ctx, password any) *MockUserPasswordStatementsUpdatePasswordVerificationFailuresCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdatePasswordVerificationFailures", reflect.TypeOf((*MockUserPasswordStatements)(nil).UpdatePasswordVerificationFailures), ctx, password)
-	return &MockUserPasswordStatementsUpdatePasswordVerificationFailuresCall{Call: call}
-}
-
-// MockUserPasswordStatementsUpdatePasswordVerificationFailuresCall wrap *gomock.Call
-type MockUserPasswordStatementsUpdatePasswordVerificationFailuresCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockUserPasswordStatementsUpdatePasswordVerificationFailuresCall) Return(arg0 error) *MockUserPasswordStatementsUpdatePasswordVerificationFailuresCall {
-	c.Call = c.Call.Return(arg0)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockUserPasswordStatementsUpdatePasswordVerificationFailuresCall) Do(f func(context.Context, *domain.UserPassword) error) *MockUserPasswordStatementsUpdatePasswordVerificationFailuresCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockUserPasswordStatementsUpdatePasswordVerificationFailuresCall) DoAndReturn(f func(context.Context, *domain.UserPassword) error) *MockUserPasswordStatementsUpdatePasswordVerificationFailuresCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

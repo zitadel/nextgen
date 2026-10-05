@@ -18,7 +18,7 @@ const (
 ) VALUES (@p1, @p2, @p3, @p4)
 THEN RETURN id`
 
-	userPasswordColumns = `id, project_id, user_id, encoded_hash, created_at, failed_attempts, last_failed_at`
+	userPasswordColumns = `id, project_id, user_id, encoded_hash, created_at`
 
 	userPasswordQuery = `SELECT ` + userPasswordColumns + `
 FROM user_passwords`
@@ -33,11 +33,6 @@ FROM user_passwords
 WHERE project_id = @p1 AND user_id = @p2
 ORDER BY created_at DESC
 LIMIT @p3 OFFSET 1`
-
-	updatePasswordVerificationFailuresStmt = `UPDATE user_passwords SET
-	failed_attempts = @p3,
-	last_failed_at = @p4
-WHERE project_id = @p1 AND id = @p2`
 )
 
 type userPasswordStatements struct{ statement }
@@ -135,48 +130,16 @@ func (ps userPasswordStatements) GetUserPasswordHistory(ctx context.Context, pro
 	return passwords, wrapError(err)
 }
 
-// UpdatePasswordVerificationFailures implements [service.UserPasswordStatements].
-func (ps userPasswordStatements) UpdatePasswordVerificationFailures(ctx context.Context, pw *domain.UserPassword) error {
-	var lastFailedAt spanner.NullTime
-	if !pw.LastFailedAt.IsZero() {
-		lastFailedAt = spanner.NullTime{Time: pw.LastFailedAt, Valid: true}
-	}
-	stmt := buildStatement(updatePasswordVerificationFailuresStmt,
-		pw.ProjectID,
-		pw.ID,
-		int64(pw.FailedAttemptCount),
-		lastFailedAt,
-	).statement()
-	n, err := ps.db.Update(ctx, stmt)
-	if err != nil {
-		return wrapError(err)
-	}
-	if n == 0 {
-		return wrapError(spanner.ErrRowNotFound)
-	}
-	return nil
-}
-
 func (ps userPasswordStatements) scanUserPassword(row *spanner.Row) (*domain.UserPassword, error) {
 	pw := new(domain.UserPassword)
-	var (
-		failedAttempts int64
-		lastFailedAt   spanner.NullTime
-	)
 	if err := row.Columns(
 		&pw.ID,
 		&pw.ProjectID,
 		&pw.UserID,
 		&pw.EncodedHash,
 		&pw.CreatedAt,
-		&failedAttempts,
-		&lastFailedAt,
 	); err != nil {
 		return nil, err
-	}
-	pw.FailedAttemptCount = int(failedAttempts)
-	if lastFailedAt.Valid {
-		pw.LastFailedAt = lastFailedAt.Time
 	}
 	return pw, nil
 }

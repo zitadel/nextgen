@@ -1,24 +1,29 @@
 -- +goose NO TRANSACTION
 -- +goose Up
 -- +goose StatementBegin
--- Failed password attempts; see the postgres migration.
-ALTER TABLE user_passwords ADD COLUMN failed_attempts INT64 NOT NULL DEFAULT (0)
+-- One row per wrong password; see the postgres migration.
+CREATE TABLE user_password_failures (
+    project_id STRING(MAX) NOT NULL,
+    id         STRING(MAX) NOT NULL,
+    user_id    STRING(MAX) NOT NULL,
+    failed_at  TIMESTAMP   NOT NULL,
+    CONSTRAINT chk_user_password_failures_id CHECK (id <> ''),
+    CONSTRAINT fk_user_password_failures_user
+        FOREIGN KEY (project_id, user_id)
+        REFERENCES users (project_id, id)
+        ON DELETE CASCADE,
+) PRIMARY KEY (project_id, id)
 -- +goose StatementEnd
 -- +goose StatementBegin
-ALTER TABLE user_passwords ADD CONSTRAINT chk_user_passwords_failed_attempts CHECK (failed_attempts >= 0)
--- +goose StatementEnd
--- +goose StatementBegin
-ALTER TABLE user_passwords ADD COLUMN last_failed_at TIMESTAMP
+CREATE INDEX idx_user_password_failures_user_failed_at
+    ON user_password_failures (project_id, user_id, failed_at)
 -- +goose StatementEnd
 
 -- +goose Down
 -- +goose NO TRANSACTION
 -- +goose StatementBegin
-ALTER TABLE user_passwords DROP CONSTRAINT chk_user_passwords_failed_attempts
+DROP INDEX IF EXISTS idx_user_password_failures_user_failed_at
 -- +goose StatementEnd
 -- +goose StatementBegin
-ALTER TABLE user_passwords DROP COLUMN failed_attempts
--- +goose StatementEnd
--- +goose StatementBegin
-ALTER TABLE user_passwords DROP COLUMN last_failed_at
+DROP TABLE IF EXISTS user_password_failures
 -- +goose StatementEnd

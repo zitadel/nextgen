@@ -264,46 +264,94 @@ func TestUserPasswordStatements_HistoryUnderConcurrentChanges(t *testing.T) {
 	})
 }
 
-func TestUserPasswordStatements_UpdatePasswordVerificationFailures(t *testing.T) {
+func TestUserPasswordStatements_Failures(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
 		userID := "user_pw_failures"
+		otherID := "user_pw_failures_other"
 		require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, userID, "pw-failures@example.com", "PW Failures")))
+		require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, otherID, "pw-failures-other@example.com", "PW Failures Other")))
 		setTestUserPassword(t, d, projectID, userID, "hash-1")
 
-		current := func() *domain.UserPassword {
+		start := time.Now().UTC().Truncate(time.Microsecond)
+		failures := func(since time.Time) domain.UserPasswordFailures {
 			t.Helper()
-			pw, err := d.stmts.GetUserPassword(t.Context(), userPasswordByUser(projectID, userID))
+			got, err := d.stmts.GetUserPasswordFailures(t.Context(), projectID, userID, since)
 			require.NoError(t, err)
-			return pw
+			return got
 		}
-		pw := current()
-		assert.Zero(t, pw.FailedAttemptCount, "a new password starts clean")
-		assert.True(t, pw.LastFailedAt.IsZero())
+		add := func(userID string, at, forgetBefore time.Time) {
+			t.Helper()
+			require.NoError(t, d.stmts.AddUserPasswordFailure(t.Context(), projectID, userID, at, forgetBefore))
+		}
+		longAgo := start.Add(-365 * 24 * time.Hour)
 
-		failedAt := time.Now().UTC().Truncate(time.Microsecond)
-		pw.FailedAttemptCount = 3
-		pw.LastFailedAt = failedAt
-		require.NoError(t, d.stmts.UpdatePasswordVerificationFailures(t.Context(), pw))
-		got := current()
-		assert.Equal(t, 3, got.FailedAttemptCount)
-		assert.True(t, failedAt.Equal(got.LastFailedAt), "got %v", got.LastFailedAt)
+		got := failures(longAgo)
+		assert.Zero(t, got.Count, "no failures yet")
+		assert.True(t, got.LastFailedAt.IsZero())
 
-		pw.FailedAttemptCount = 0
-		pw.LastFailedAt = time.Time{}
-		require.NoError(t, d.stmts.UpdatePasswordVerificationFailures(t.Context(), pw))
-		got = current()
-		assert.Zero(t, got.FailedAttemptCount)
-		assert.True(t, got.LastFailedAt.IsZero(), "a zero time clears the column")
+		for i := range 3 {
+			add(userID, start.Add(time.Duration(i)*time.Minute), longAgo)
+		}
+		add(otherID, start.Add(time.Hour), longAgo)
+		got = failures(longAgo)
+		assert.Equal(t, 3, got.Count, "another user's failures do not count")
+		assert.True(t, start.Add(2*time.Minute).Equal(got.LastFailedAt), "got %v", got.LastFailedAt)
+		assert.Equal(t, 2, failures(start).Count, "only failures after since count")
 
-		pw.FailedAttemptCount = 2
-		pw.LastFailedAt = failedAt
-		require.NoError(t, d.stmts.UpdatePasswordVerificationFailures(t.Context(), pw))
 		setTestUserPassword(t, d, projectID, userID, "hash-2")
-		assert.Zero(t, current().FailedAttemptCount, "a new password does not inherit the old one's failures")
+		assert.Equal(t, 3, failures(longAgo).Count, "failures belong to the user, not the password")
 
-		missing := &domain.UserPassword{ProjectID: projectID, ID: "upw_missing", FailedAttemptCount: 1}
-		err := d.stmts.UpdatePasswordVerificationFailures(t.Context(), missing)
-		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+		add(userID, start.Add(3*time.Minute), start.Add(time.Minute))
+		assert.Equal(t, 2, failures(longAgo).Count, "adding drops failures at or before forgetBefore")
+
+		require.NoError(t, d.stmts.ClearUserPasswordFailures(t.Context(), projectID, userID, start.Add(2*time.Minute)))
+		got = failures(longAgo)
+		assert.Equal(t, 1, got.Count, "a clear keeps failures recorded after until")
+		assert.True(t, start.Add(3*time.Minute).Equal(got.LastFailedAt))
+
+		require.NoError(t, d.stmts.ClearUserPasswordFailures(t.Context(), projectID, userID, start.Add(time.Hour)))
+		assert.Zero(t, failures(longAgo).Count)
+
+		add(userID, start, longAgo)
+		require.NoError(t, d.stmts.DeleteUserByID(t.Context(), projectID, userID))
+		assert.Zero(t, failures(longAgo).Count, "failures go with the user")
+		other, err := d.stmts.GetUserPasswordFailures(t.Context(), projectID, otherID, longAgo)
+		require.NoError(t, err)
+		assert.Equal(t, 1, other.Count)
+
+		err = d.stmts.AddUserPasswordFailure(t.Context(), projectID, "missing-user", start, longAgo)
+		assert.ErrorIs(t, err, new(database.ForeignKeyError))
+	})
+}
+
+// Concurrent wrong passwords each add their own row, so all of them count.
+func TestUserPasswordStatements_FailuresUnderConcurrency(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
+		userID := "user_pw_failures_race"
+		require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, userID, "pw-failures-race@example.com", "PW Failures Race")))
+
+		const guesses = 10
+		now := time.Now().UTC().Truncate(time.Microsecond)
+		forgetBefore := now.Add(-time.Hour)
+		var wg sync.WaitGroup
+		errs := make(chan error, guesses)
+		for range guesses {
+			wg.Go(func() {
+				// The same instant on purpose: rows never collide on time.
+				errs <- d.stmts.AddUserPasswordFailure(context.Background(), projectID, userID, now, forgetBefore)
+			})
+		}
+		wg.Wait()
+		close(errs)
+		for err := range errs {
+			require.NoError(t, err)
+		}
+
+		got, err := d.stmts.GetUserPasswordFailures(t.Context(), projectID, userID, forgetBefore)
+		require.NoError(t, err)
+		assert.Equal(t, guesses, got.Count)
+		assert.True(t, now.Equal(got.LastFailedAt))
 	})
 }

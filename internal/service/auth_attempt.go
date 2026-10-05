@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/url"
 	"strings"
 	"time"
@@ -698,16 +699,33 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 			return passwordChallenge, nil, nil, domain.ErrAuthAttemptProofRejected(err)
 		}
 
-		if err := password.VerifyRateLimited(p.Password, s.passwordVerifier); err != nil {
+		now := time.Now()
+		failures, err := s.stmts.Statements().GetUserPasswordFailures(ctx, password.ProjectID, password.UserID, domain.UserPasswordFailuresSince(now))
+		if err != nil {
+			return passwordChallenge, nil, nil, domain.ErrAuthAttemptProofRejected(err)
+		}
+		if err := password.VerifyRateLimited(p.Password, s.passwordVerifier, failures); err != nil {
 			if errors.Is(err, domain.ErrUserPasswordRateLimited()) {
 				return passwordChallenge, nil, nil, domain.ErrAuthAttemptProofRejected(err)
 			}
-			_ = s.stmts.Statements().UpdatePasswordVerificationFailures(ctx, password)
+			failedAt := time.Now()
+			addErr := s.stmts.Statements().AddUserPasswordFailure(ctx, password.ProjectID, password.UserID, failedAt, domain.UserPasswordFailuresSince(failedAt))
+			if addErr != nil {
+				getLoggingContext(ctx, "auth_attempt").Error("failed to record a wrong password for the rate limit",
+					slog.String("project_id", password.ProjectID),
+					slog.String("user_id", password.UserID),
+					slog.Any("error", addErr),
+				)
+			}
 			return passwordChallenge, nil, nil, domain.ErrAuthAttemptProofRejected(err)
 		}
-		return passwordChallenge, attempt.SetPasswordFactor(), func(ctx context.Context, stmts AllStatements) error {
-			return stmts.UpdatePasswordVerificationFailures(ctx, password)
-		}, nil
+		var txExtra func(context.Context, AllStatements) error
+		if failures.Count > 0 {
+			txExtra = func(ctx context.Context, stmts AllStatements) error {
+				return stmts.ClearUserPasswordFailures(ctx, password.ProjectID, password.UserID, now)
+			}
+		}
+		return passwordChallenge, attempt.SetPasswordFactor(), txExtra, nil
 
 	case PasskeyProof:
 		challenge, userFactor, err := attempt.PreparePasskeyVerification(challengeID)

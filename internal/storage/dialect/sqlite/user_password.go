@@ -3,7 +3,6 @@ package sqlite
 import (
 	"context"
 	"database/sql"
-	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
@@ -18,7 +17,7 @@ const (
 ) VALUES (?, ?, ?, ?, ?)
 RETURNING id`
 
-	userPasswordColumns = `id, project_id, user_id, encoded_hash, created_at, failed_attempts, last_failed_at`
+	userPasswordColumns = `id, project_id, user_id, encoded_hash, created_at`
 
 	userPasswordQuery = `SELECT ` + userPasswordColumns + `
 FROM user_passwords`
@@ -33,11 +32,6 @@ FROM user_passwords
 WHERE project_id = ? AND user_id = ?
 ORDER BY created_at DESC
 LIMIT ? OFFSET 1`
-
-	updatePasswordVerificationFailuresStmt = `UPDATE user_passwords SET
-	failed_attempts = ?,
-	last_failed_at = ?
-WHERE project_id = ? AND id = ?`
 )
 
 type userPasswordStatements struct{ statement }
@@ -113,50 +107,19 @@ func (ps userPasswordStatements) GetUserPasswordHistory(ctx context.Context, pro
 	return passwords, wrapError(err)
 }
 
-// UpdatePasswordVerificationFailures implements [service.UserPasswordStatements].
-func (ps userPasswordStatements) UpdatePasswordVerificationFailures(ctx context.Context, pw *domain.UserPassword) error {
-	var lastFailedAt *time.Time
-	if !pw.LastFailedAt.IsZero() {
-		lastFailedAt = &pw.LastFailedAt
-	}
-	n, err := execAffected(ctx, ps.client, updatePasswordVerificationFailuresStmt,
-		int64(pw.FailedAttemptCount),
-		nullUnixNano(lastFailedAt),
-		pw.ProjectID,
-		pw.ID,
-	)
-	if err != nil {
-		return err
-	}
-	if n == 0 {
-		return database.NewNoRowFoundError(nil)
-	}
-	return nil
-}
-
 func scanUserPassword(rows *sql.Rows) (*domain.UserPassword, error) {
 	pw := new(domain.UserPassword)
-	var (
-		createdNano    int64
-		failedAttempts int64
-		lastFailedNano sql.NullInt64
-	)
+	var createdNano int64
 	if err := rows.Scan(
 		&pw.ID,
 		&pw.ProjectID,
 		&pw.UserID,
 		&pw.EncodedHash,
 		&createdNano,
-		&failedAttempts,
-		&lastFailedNano,
 	); err != nil {
 		return nil, err
 	}
 	pw.CreatedAt = timeFromUnixNano(createdNano)
-	pw.FailedAttemptCount = int(failedAttempts)
-	if lastFailedNano.Valid {
-		pw.LastFailedAt = timeFromUnixNano(lastFailedNano.Int64)
-	}
 	return pw, nil
 }
 
