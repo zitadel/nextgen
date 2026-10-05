@@ -46,7 +46,7 @@ zitadel-login::part(button-root)::after {
 }
 ```
 
-The orchestrator additionally exposes its own chrome parts directly: `form`, `attribution`, `attribution-mark`.
+The orchestrator additionally exposes its own chrome parts directly: `form`, `paired-identifier`, `attribution`, `attribution-mark`.
 
 **Directly composed atoms** — a page using atoms without the orchestrator addresses bare part names: `zl-field::part(input)`.
 
