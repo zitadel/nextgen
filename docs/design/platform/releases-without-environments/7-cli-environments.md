@@ -185,7 +185,7 @@ created           prj_01K9AA9M3K7E2QX8VB4T   class=sandbox   unclaimed
 wrote             .env.production.local   URL, PROJECT_ID, PUBLISHABLE_KEY, PROJECT_SECRET
 
 next
-  zitadel allowlist add https://app.acme.com --kind primary  admit the origin
+  zitadel allowlist add https://app.acme.com --kind primary  allow the origin
   zitadel deploy --env production                            ship configuration
   zitadel claim --env production                             attach an owner
   zitadel projects promote --env production                  class=production
@@ -242,8 +242,8 @@ deployed     dpl_01KC4N8P2S5WQZ   2 deployment records written
 ```
 
 The allowlist is read here, never written. `deploy` fans out over the `primary`
-origins the project already admits, so
-[admitting one](2-origins.md#why-the-allowlist-is-not-in-zitadeljson) is the
+origins the project already allows, so
+[allowing one](2-origins.md#why-the-allowlist-is-not-in-zitadeljson) is the
 step before this rather than part of it — which is why `zitadel env add`
 suggests it first.
 
@@ -270,7 +270,7 @@ class      sandbox -> production
 
 `promote` is free as a verb because release promotion no longer needs it.
 `zitadel projects demote` is the reverse, and asks for confirmation because it
-re-admits loopback origins to a project holding real users.
+lets loopback origins back into a project holding real users.
 
 ## Prerequisites
 

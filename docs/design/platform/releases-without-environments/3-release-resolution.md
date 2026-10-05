@@ -18,10 +18,11 @@ Then the release, in three layers:
    `Origin` absent falls through; there is nothing to check.
 2. **Route.** A deployment row carrying this exact `Origin` → serve the release
    the newest such row names. The caller sends nothing and needs to know
-   nothing, and this answers almost all browser traffic. An origin admitted by a
-   `preview` pattern needs a [live lease](1-data-model.md#origin) as well, which
-   is what makes an expired preview URL stop being served.
-3. **Fall back.** Nothing deployed to this origin, or its lease has gone. An
+   nothing, and this answers almost all browser traffic. A URL allowed by a
+   `preview` pattern needs a live [preview row](1-data-model.md#origin) as well,
+   which is what makes an expired preview URL stop being served.
+3. **Fall back.** Nothing deployed to this origin, or its preview row has gone.
+   An
    explicit `X-Zitadel-Release` header wins if present and permitted; otherwise
    the project default — the newest deployment row with `origin = ""`.
 
@@ -80,8 +81,8 @@ Two edges follow from it being a real target:
 simply leave the header off, so it is worth being explicit about what that
 reaches: the project default, which is the same configuration any visitor to
 `app.acme.com` is served and public by construction. What it does not reach is a
-**preview release** — layer 2 needs the `Origin` of a leased preview URL, and on
-a `production` project the header needs a credential.
+**preview release** — layer 2 needs the `Origin` of a preview URL whose row is
+still live, and on a `production` project the header needs a credential.
 
 The gate therefore protects the one caller that *cannot* lie about its origin: a
 browser on a page the user did not expect. It was never a defence against a
@@ -116,7 +117,7 @@ All against the project above: `class: production`, primary `app.acme.com` and
 `www.acme.com`, preview patterns `*-acmeinc.vercel.app` and
 `*.preview.acme.com`.
 
-### 1. A browser, on production or on a leased preview
+### 1. A browser, on production or on a live preview
 
 ```http
 POST /flow HTTP/1.1
@@ -137,7 +138,7 @@ request serves that branch's release instead: layer 2 finds the preview's own
 deployment. Nothing else about the request differs, which is the point of routing on
 the origin.
 
-### 2. A preview with no lease
+### 2. A preview with no row
 
 ```http
 POST /flow HTTP/1.1
@@ -224,8 +225,8 @@ a `.zitadel/` edit shows on the next page load.
 | `Origin` | Credential | Header | Answered by | Result |
 |---|---|---|---|---|
 | primary | publishable key | — | layer 2 | production release |
-| leased preview | publishable key | — | layer 2 | branch release |
-| unleased preview | publishable key | yes | layer 3 | named release |
+| preview, row live | publishable key | — | layer 2 | branch release |
+| preview, no row | publishable key | yes | layer 3 | named release |
 | none | project secret | — | layer 3 | project default |
 | unmatched | — | yes | layer 1 | `403 origin_not_allowed` |
 | matched preview | none | yes | layer 3 | `403 pin_not_permitted` |
