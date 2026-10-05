@@ -105,7 +105,9 @@ give immutability just as well. What it cannot give is revocation: a leaked
 value would live on in every snapshot that had copied it, and removing it would
 mean rewriting rows this design calls immutable. The indirection buys the
 ability to kill a value everywhere at once, and the reverse lookup that says
-which deployments are still serving it.
+which deployments are still serving it — *which deployments reference
+`secver_01KB…`* is a query by secret version, which is also why the snapshot is
+a table and not another document inside the deployment row's `metadata`.
 
 ## Why a snapshot and not just the store
 
@@ -114,7 +116,7 @@ rolling back to a release that needed last month's IdP client would get this
 month's. Rolling back to a *deployment* restores the pair that was running.
 
 **And a value edit mid sign-in would reshape an attempt underway** — the hazard
-[sealing](4-release-resolution.md#the-three-layers) already removes for
+[sealing](3-release-resolution.md#the-three-layers) already removes for
 resources, and which variables share until they are frozen too.
 
 ## Setting one
@@ -247,23 +249,11 @@ and the costs are not:
   becomes an invariant application code keeps rather than one the schema makes
   true; two tables give the snapshot no update path at all. Same objection that
   removed [`current_deployment_id`](1-data-model.md#why-there-is-no-pointer-column).
-- **The wrong query leaks.** `zitadel vars list` becomes a filtered read
-  that must never forget its filter; forget it once and it lists every
-  historical value, superseded secret references included.
-- **Half the columns would be null half the time**, and the lifecycles differ:
-  tens of curated rows against tens of append-only rows per deployment.
-
-A third shape — one row per distinct value, referenced by id — puts a join on the
-request path to save copying short strings. Secrets are already references, so
-the only thing it dedups is plaintext.
-
-## Why the snapshot is a table and not a document
-
-The deployment row already carries a `metadata` document, so a variables
-document would have been idiomatic. But rotation needs the reverse lookup:
-*which deployments still reference `secver_01KB…`*, so the old version can be
-revoked once nothing serves it. That is a query by secret version, which a table
-indexes and a JSON column in three dialects does not.
+- **The wrong query leaks.** `zitadel vars list` becomes a filtered read that
+  must never forget its filter; forget it once and it lists every historical
+  value, superseded secret references included. The lifecycles have nothing in
+  common either — tens of curated rows against tens of frozen rows per
+  deployment.
 
 ## What this changes elsewhere
 

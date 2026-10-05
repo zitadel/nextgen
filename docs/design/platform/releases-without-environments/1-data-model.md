@@ -7,7 +7,7 @@
 The storage shape. A deployment is keyed on an origin string instead of an
 environment id, and the newest row for a target is what that target serves.
 Which URLs are admitted at all is [origins](2-origins.md); the values a
-deployment carries are [variables](3-variables.md).
+deployment carries are [variables](4-variables.md).
 
 ## Entities
 
@@ -21,8 +21,8 @@ already exist — what changes is the axis they are keyed on.
 | **Environment** | `environments`, seeded per project | **dropped** |
 | **Deployment** | `deployments`, keyed to an environment | kept — `environment_id` becomes a plain `origin` string, plus `deploy_id`. The newest row **is** the pointer; `environments.current_deployment_id` is not carried over |
 | **Release** | `releases` | shape kept — `content_hash` becomes the wire identifier, `revoked_at` is new |
-| **Variable** | `variables`, scoped by `environment_id` | kept, the scope column dropped — see [variables](3-variables.md) |
-| **Deployment variable** | — | **new table**, the immutable snapshot one deployment runs — see [variables](3-variables.md) |
+| **Variable** | `variables`, scoped by `environment_id` | kept, the scope column dropped — see [variables](4-variables.md) |
+| **Deployment variable** | — | **new table**, the immutable snapshot one deployment runs — see [variables](4-variables.md) |
 
 ### Project
 
@@ -32,11 +32,13 @@ already exist — what changes is the axis they are keyed on.
   "name": "acme",
 
   "class": "production",                          // NEW - see 2-origins.md
-  "publishable_key": "pk_7kR2pXq9vN3wLmYhT4cB8A", // NEW - ADR 036 defines it, internal/ has none
+  // NEW - ADR 036 defines the credential; internal/ has none, and the `pk_`
+  // spelling here is illustrative since no ADR fixes a format for it.
+  "publishable_key": "pk_7kR2pXq9vN3wLmYhT4cB8A",
 
   // CHANGED - today `preview_origins` is a flat list of exact strings
-  // (internal/domain/project.go:68) compared with string equality
-  // (internal/api/flow.go:371), serving only the preview secret. Now patterns,
+  // (internal/domain/project.go:68) compared with `allowed == originStr`
+  // (internal/api/flow.go:386), serving only the preview secret. Now patterns,
   // each carrying a `kind`. They authorize; they never route.
   "allowed_origins": [
     { "pattern": "https://app.acme.com",         "kind": "primary" },
@@ -80,8 +82,8 @@ shape of the origin — see
 
 So `environments` is **dropped**: the table and its unique name index
 (`000005_environments.sql`), `seedDefaultEnvironments`
-(`internal/service/project.go:173`), and the name-addressed
-`GET /environments/{name}` surface.
+(`internal/service/project.go:173`), the `/environments` and
+`/environments/{name}` paths, and the `environment.read` scope.
 
 ### Deployment
 
@@ -92,16 +94,19 @@ Immutable, append-only.
   "id":         "dep_01KB3F8N2P9S5WQZ",
   "project_id": "prj_01K9AA9M3K7E2QX8VB4T",
 
-  "deploy_id": "dpl_01KB3F8N2P9S5WQY", // NEW - correlates the rows one deploy wrote
+  // NEW - correlates the rows one deploy wrote. `dpl` is not in ADR 047's
+  // prefix registry; see Prerequisites.
+  "deploy_id": "dpl_01KB3F8N2P9S5WQY",
 
   // CHANGED - today `environment_id`, a composite foreign key to `environments`
   // that cascades on delete (000011_deployments.sql). Now a plain string, no
   // foreign key, "" = the project default. Deliberate - see Deployment history.
   "origin": "https://acme-git-sso-acmeinc.vercel.app",
 
-  // CHANGED - not the field, the constraint: the release foreign key cascades
-  // today, so deleting a release deletes its deployments. It must restrict.
-  "release": "sha256:9f2c1a7b4e83d05f6c2b19ae7d430f821c6b5de90a4f7382",
+  // UNCHANGED as a field - `release_id` points at `releases.id`, never at the
+  // digest. What changes is the constraint: the foreign key cascades today, so
+  // deleting a release deletes its deployments. It must restrict.
+  "release_id": "rel_01KB3F8N2P9S5WQV",
 
   // The variables this deployment runs are the `deployment_variables` rows
   // carrying its id - written in this same transaction, never updated.
@@ -126,9 +131,9 @@ default** — what a caller with no `Origin` gets.
 
 ```jsonc
 {
-  // CHANGED - not the column, its job. This is today's `content_hash`, already
-  // the dedup key; here it is also the identifier on the wire.
-  "digest": "sha256:9f2c1a7b4e83d05f6c2b19ae7d430f821c6b5de90a4f7382",
+  // CHANGED - not the column, its job. `content_hash` is already the dedup key;
+  // here it is also the identifier on the wire.
+  "content_hash": "9f2c1a7b4e83d05f6c2b19ae7d430f821c6b5de90a4f7382",
 
   // UNCHANGED from here down - pointers, metadata and the actor fields are
   // exactly what `releases` already stores.
@@ -147,9 +152,12 @@ default** — what a caller with no `Origin` gets.
 }
 ```
 
-`digest` is a SHA-256 over the sorted pointer set with metadata excluded, and it
-is the wire identifier. A minted `rel_<ULID>` stays the storage primary key;
-short forms are accepted down to 12 hex characters, and ambiguity is refused.
+`content_hash` is a SHA-256 over the sorted pointer set with metadata excluded,
+and it is the identifier on the wire. The column is 64 bare hex characters —
+`chk_releases_content_hash` checks exactly that — so the `sha256:` prefix used
+throughout these documents is a wire form, stripped at the edge rather than
+stored. A minted `rel_<ULID>` stays the storage primary key; short forms are
+accepted down to 12 hex characters, and ambiguity is refused.
 Posting the same content twice returns the same release — current behaviour, not
 a proposal: the unique index on `(project_id, content_hash)` already enforces it
 (`000007_releases.sql`).
@@ -189,7 +197,9 @@ Five rules:
 `environments.current_deployment_id` exists today for two stated reasons: reads
 are one row, and the optimistic-concurrency check is one compare. It carries no
 foreign key, because one would be circular with the environment cascade
-(`000024_deployments.sql`). Neither reason survives the move to origins.
+(`000024_deployments.sql`). Neither reason survives the move to origins — and
+the schema half-admits it already, since the history index carries the comment
+"The first row under this order is the environment's current deployment".
 
 - **It saves no read.** Resolution needs the release, not the deployment id.
   With a pointer: origin row, the deployment it names, the release. Without:
@@ -257,7 +267,7 @@ selector, the server expands it, storage keeps one row per target.
 
 ### Example
 
-| `deployed_at` | `origin` | `release` | `reason` | `deploy_id` |
+| `deployed_at` | `origin` | release (digest) | `reason` | `deploy_id` |
 |---|---|---|---|---|
 | 10-02 14:10 | `acme-git-sso…vercel.app` | `sha256:9f2c…` | `deploy` | `dpl_…Y` |
 | 10-02 09:30 | `` (default) | `sha256:4a5b…` | `rollback` | `dpl_…W` |
@@ -285,6 +295,13 @@ and asserts the two digests match; if they differ, the content differed and the
 deploy fails. That needs a digest computed over resource **content** rather than
 over revision ids, which are per-project. `zitadel promote` has no server
 surface — it is `deploy` against the other target with a digest assertion.
+
+## Prerequisites
+
+**A `dpl` prefix registered by an amendment to ADR 047**, for the deploy
+correlation id. The registry holds `rel` and `dep` but nothing for the set of
+rows one deploy wrote, and the ADR is explicit that prefixes are not added
+without going through it.
 
 ## Open
 

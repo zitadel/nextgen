@@ -130,9 +130,8 @@ error  no preview URL found
 
 `zitadel preview` runs in a **pull-request** job, from a branch anyone with PR
 access can write. Nothing in that branch reaches the allowlist: patterns are
-project state, [not repository content](2-origins.md#why-the-allowlist-is-not-in-zitadeljson),
-so committing `https://*.evil.com` grants nothing. What a PR job does hold is a
-credential, and that is the part still to solve.
+project state, [not repository content](2-origins.md#why-the-allowlist-is-not-in-zitadeljson).
+What a PR job does hold is a credential, and that is the part still to solve.
 
 | | `zitadel deploy` | `zitadel preview` |
 |---|---|---|
@@ -146,15 +145,14 @@ So the first preview on a branch needing a brand-new pattern fails with
 `proj.origin_not_allowed`, and the fix is for someone holding `project.write` to
 add it — once, since one pattern covers every later branch.
 
-**A division the CLI enforces is not a boundary.** A PR job needs a credential to
-deploy, and the project secret carries full operator authority — a branch wanting
-to widen the allowlist would call the allowlist endpoint directly rather than
-bother with the CLI. So the table above is a convention until the server can express it,
-which needs **a credential scoped to preview deploys and nothing else**: create
-or renew a preview origin row, create a release, read the allowlist, and no write
-to patterns, class or variables. ADR 036's `sk_team_` — "anything not listed
-under MAY is denied", with lateral movement "mechanically impossible" — is the
-shape to copy, and this is a prerequisite rather than an enhancement.
+**A division the CLI enforces is not a boundary.** The project secret carries
+full operator authority, so a branch wanting to widen the allowlist would call
+the endpoint directly rather than bother with the CLI. The table above is
+therefore a convention until the server can express it, which needs **a
+credential scoped to preview deploys and nothing else**: create or renew a
+preview origin row, create a release, read the allowlist, and no write to
+patterns or class. ADR 036's `sk_team_` — "anything not listed under MAY is
+denied" — is the shape to copy. See [Prerequisites](#prerequisites).
 
 ## `zitadel origins`
 
@@ -199,12 +197,12 @@ Variables and secrets, which are not process environment variables — `env` nam
 the client-side environment and `vars` the values a deployment serves. `set` and
 `list` address the store, `resolve --origin` reads the snapshot a target is
 running; the transcripts are under
-[Variables](3-variables.md#setting-one). Two commands because they answer two
+[Variables](4-variables.md#setting-one). Two commands because they answer two
 questions, and conflating them is how "I set it and nothing happened" happens.
 
 `set --preview` stores the value a preview deploy prefers. That is the only
 targeting the CLI offers, and no deploy command takes a variable flag of any
-kind — [how a preview gets different values](3-variables.md#how-a-preview-gets-different-values).
+kind — [how a preview gets different values](4-variables.md#how-a-preview-gets-different-values).
 
 ```
 $ zitadel vars rm GOOGLE_CLIENT_SECRET --preview
@@ -213,7 +211,7 @@ removed the preview value; previews now serve the production one.
 ```
 
 Removing from the store never reaches a snapshot, which is the whole point of
-[runtime immutability](3-variables.md#immutability-at-runtime) — and the reason the message
+[runtime immutability](4-variables.md#immutability-at-runtime) — and the reason the message
 says so out loud rather than reporting a bare success.
 
 ## `zitadel rollback`

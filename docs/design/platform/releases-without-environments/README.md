@@ -31,8 +31,8 @@ scope. Two things take its place:
 |---|---|---|
 | 1 | **Data model**: the entities, and the append-only deployment log that replaces the environment pointer | [`1-data-model.md`](1-data-model.md) |
 | 2 | **Origins**: the allowlist of patterns, the inventory of live URLs, the tenant-anchor rule and the project class | [`2-origins.md`](2-origins.md) |
-| 3 | **Variables and secrets**: the store a person edits, the immutable snapshot a deployment runs, and how a preview gets different values | [`3-variables.md`](3-variables.md) |
-| 4 | **Release resolution**: the three layers, what each kind of caller sends, worked request examples, and local development | [`4-release-resolution.md`](4-release-resolution.md) |
+| 3 | **Release resolution**: the three layers, what each kind of caller sends, worked request examples, and local development | [`3-release-resolution.md`](3-release-resolution.md) |
+| 4 | **Variables and secrets**: the store a person edits, the immutable snapshot a deployment runs, and how a preview gets different values | [`4-variables.md`](4-variables.md) |
 | 5 | **CLI: finding the server and project**: the resolution chain across flags, `process.env` and `.env` files | [`5-cli-target-resolution.md`](5-cli-target-resolution.md) |
 | 6 | **CLI: commands**: `status`, `deploy`, `preview`, `origins`, `allowlist`, `vars`, `rollback`, `dev`, `env` | [`6-cli-commands.md`](6-cli-commands.md) |
 | 7 | **CLI: adding a project as an environment**: binding one repository to a second project, and what CI holds instead | [`7-cli-environments.md`](7-cli-environments.md) |

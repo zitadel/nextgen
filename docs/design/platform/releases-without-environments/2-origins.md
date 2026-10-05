@@ -7,7 +7,7 @@
 Which URLs a project will serve, and what each is allowed to do. Two records
 with different jobs; the [shapes](1-data-model.md#project) are in the data
 model, and how a request uses them is
-[release resolution](4-release-resolution.md).
+[release resolution](3-release-resolution.md).
 
 | | **Allowlist** | **Inventory** |
 |---|---|---|
@@ -61,7 +61,7 @@ and never changed. The scopes are already reserved, though —
 marked "endpoints not yet available", so this is a gap someone already saw.
 
 **It is project state, not release content.** It has to be: layer 1 of
-[resolution](4-release-resolution.md#the-three-layers) decides whether to serve
+[resolution](3-release-resolution.md#the-three-layers) decides whether to serve
 an origin at all, and runs *before* the release is known — an allowlist inside
 the release would need the release in order to choose the release. So the
 allowlist outlives every release in the project: `zitadel rollback` moves
@@ -116,12 +116,9 @@ to add an environment — the one thing that needs no commit today.
 | Costs | a carve-out in the `zitadel status` drift hash, or an allowlist edit reads as undeployed code | nothing — `zitadel.json` holds release content only |
 | Reconstructible from the repo | yes | no |
 
-**And the review the file buys is weaker than it looks.** A block that CI applies
-with the project secret is reviewed only as well as the branch protection on it,
-and a branch that wants to widen the allowlist can call the endpoint directly —
-the admission the
-[`preview` section](6-cli-commands.md#preview-must-not-be-able-to-widen-the-allowlist)
-has to make anyway. Server-side rules hold whoever the caller is.
+**And the review it buys is weaker than it looks**, since a block CI applies
+with the project secret is reviewed only as well as the branch protection on it.
+Server-side rules hold whoever the caller is; a reviewed file does not.
 
 The cost is real: the list is no longer reconstructible from the repository, and
 bringing up a second project means running a command rather than inheriting a
@@ -163,9 +160,13 @@ project.class: sandbox | production
 | Loopback origins | allowed | rejected at save |
 | Empty allowlist (allow-all) | allowed | rejected; non-empty is mandatory |
 | `primary` entries | any known shape | exact origins only, no wildcards |
-| `preview` entries, own domain | allowed | allowed, domain ownership verified |
-| `preview` entries, shared host | allowed, any known host | allowed, tenant-anchored |
+| `preview` entries | any known shape | own domain verified, shared host [tenant-anchored](#the-tenant-anchor-rule) |
 | Release pinning by header | open | requires the publishable key or project secret |
+
+The first two rows are ADR 036's, which makes a non-empty allowlist mandatory
+for production use and keeps allow-all for development. It ties that distinction
+to per-environment keys, which this spike removes; the class is what carries it
+instead, and a project has one publishable key.
 
 **`sandbox` → `production`** revalidates every stored origin and fails, naming
 each offender, if any violates the `production` column; it requires a claimed
@@ -187,9 +188,9 @@ Neither present is `400`, never the project's current release.
 
 ## Prerequisites
 
-**A working origin matcher and a preview-host registry.** Matching is exact
-string equality today (`internal/api/flow.go:371`), so every wildcard pattern in
-this document matches nothing at all.
+**A working origin matcher and a preview-host registry.** Matching is
+`allowed == originStr` today (`internal/api/flow.go:386`), so every wildcard
+pattern in this document matches nothing at all.
 
 ## Open
 

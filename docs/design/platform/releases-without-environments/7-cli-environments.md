@@ -134,9 +134,10 @@ server?           https://api.zitadel.cloud
 project?          [x] create a new one   [ ] bind an existing one
 ```
 
-- **Create a new one** works now. `POST /projects` is public and returns the id,
-  the secret and the publishable key, so no credential is needed to get a
-  project to bind.
+- **Create a new one** works now. `POST /projects` is `security: []` and returns
+  the id with `project_secret` and `preview_secret`, so no credential is needed
+  to get a project to bind. (The publishable key that replaces `preview_secret`
+  is ADR 036's, and does not exist yet.)
 - **Bind an existing one** takes an id, typed or pasted — whoever created it
   sends it over, the same way the project secret has to be sent over.
 
@@ -190,9 +191,9 @@ next
   zitadel projects promote --env production                  class=production
 ```
 
-Creating the project needs no credential — `POST /projects` is public and returns
-the id, the secret and the publishable key. So the whole journey is CLI-driven
-and nothing has to be done in a web console first.
+Creating the project needs no credential — `POST /projects` is public. So the
+whole journey is CLI-driven and nothing has to be done in a web console
+first.
 
 `zitadel env add` binds; `--project prj_...` binds a project that already
 exists, created by a teammate or by `zitadel projects create`. The two steps are

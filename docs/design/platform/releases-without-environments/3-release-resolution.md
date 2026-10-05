@@ -23,8 +23,8 @@ Then the release, in three layers:
    present and permitted; otherwise the project default — the newest deployment
    row with `origin = ""`.
 
-Both layers are needed: layer 2 requires an `Origin` to match, and a server-side
-app sends none. Neither reads a stored pointer; see
+Layer 3 is not a leftover: layer 2 needs an `Origin` to match, and a server-side
+app sends none. No layer reads a stored pointer; see
 [why there is no pointer column](1-data-model.md#why-there-is-no-pointer-column).
 
 **Who may use the header.** On a `production` project it requires the publishable
@@ -37,7 +37,7 @@ production configuration.
 first step and reused for the rest of the attempt, so a deploy landing mid
 sign-in cannot change the configuration under the user. Sealing the deployment
 rather than the release pins the resources and the
-[variable snapshot](3-variables.md#immutability-at-runtime) with one pointer, which is why they
+[variable snapshot](4-variables.md#immutability-at-runtime) with one pointer, which is why they
 cannot drift apart part-way through an attempt.
 
 ### What each kind of caller sends
@@ -77,11 +77,9 @@ Two edges follow from it being a real target:
 **Omitting `Origin` is not a way around the gate.** A non-browser client can
 simply leave the header off, so it is worth being explicit about what that
 reaches: the project default, which is the same configuration any visitor to
-`app.acme.com` is served and public by construction. Two things it does not
-reach:
-
-It does not reach a **preview release**: layer 2 needs an exact origin row, and
-on a `production` project the header needs a credential.
+`app.acme.com` is served and public by construction. What it does not reach is a
+**preview release** — layer 2 needs an exact origin row, and on a `production`
+project the header needs a credential.
 
 The gate therefore protects the one caller that *cannot* lie about its origin: a
 browser on a page the user did not expect. It was never a defence against a
@@ -90,7 +88,7 @@ client that writes its own headers, and the design does not lean on it as one.
 One consequence worth naming rather than hiding: the publishable key is public,
 so "the header needs a credential" is a weak gate against someone who read the
 bundle. It stops the casual stranger of
-[example 6](#6-a-stranger-who-does-match-the-pattern), not a determined one —
+[example 4](#4-a-stranger-who-does-match-the-pattern), not a determined one —
 see [Open](#open).
 
 ### Errors
@@ -105,10 +103,10 @@ see [Open](#open).
 | Digest names a release of another project, or none | 404 | `rel.not_found` |
 | Short digest matches more than one release | 400 | `rel.ambiguous` |
 | Release revoked | 409 | `rel.revoked` |
-| Revoking a release an origin row serves | 409 | `rel.in_service` |
-| Loopback origin, or a wildcard `primary` entry, on a `production` project | 400 | `proj.origin_not_permitted_for_class` |
-| Shared-host wildcard that is not tenant-anchored | 400 | `proj.origin_not_tenant_anchored` |
-| Shared-host wildcard on an unknown host | 400 | `proj.origin_host_unknown` |
+
+Per-request outcomes only. Admitting a pattern has its own rejections, on the
+operation that writes it rather than on this path —
+[managing the allowlist](2-origins.md#managing-the-allowlist).
 
 ## Worked examples
 
@@ -116,14 +114,14 @@ All against the project above: `class: production`, primary `app.acme.com` and
 `www.acme.com`, preview patterns `*-acmeinc.vercel.app` and
 `*.preview.acme.com`.
 
-### 1. A browser on the production origin
+### 1. A browser, on production or on a registered preview
 
 ```http
 POST /flow HTTP/1.1
 Origin: https://app.acme.com
 Authorization: Bearer pk_7kR2pXq9vN3wLmYhT4cB8A
 
-{ "project_id": "prj_01K9AA9M3K7E2QX8VB4T", "purpose": "login" }
+{ "purpose": "login" }
 ```
 
 | Layer | Outcome |
@@ -131,27 +129,13 @@ Authorization: Bearer pk_7kR2pXq9vN3wLmYhT4cB8A
 | 1 gate | matches `https://app.acme.com` (primary) ✓ |
 | 2 route | row found → `dep_01KA7T9QX3M2E8VB` → `sha256:4a5b…` |
 
-Serves `sha256:4a5b…`. The client sent no release and knows of none.
+Serves `sha256:4a5b…`, and the client sent no release and knows of none. Change
+only the `Origin` to `https://acme-git-sso-acmeinc.vercel.app` and the same
+request serves that branch's release instead: layer 2 finds the preview's own
+row. Nothing else about the request differs, which is the point of routing on
+the origin.
 
-### 2. A preview whose deploy registered its origin
-
-```http
-POST /flow HTTP/1.1
-Origin: https://acme-git-sso-acmeinc.vercel.app
-Authorization: Bearer pk_7kR2pXq9vN3wLmYhT4cB8A
-
-{ "project_id": "prj_01K9AA9M3K7E2QX8VB4T", "purpose": "login" }
-```
-
-| Layer | Outcome |
-|---|---|
-| 1 gate | matches `https://*-acmeinc.vercel.app` (preview) ✓ |
-| 2 route | row found → `dep_01KB3F8N2P9S5WQZ` → `sha256:9f2c…` |
-
-Serves the branch's own release. Byte-identical to example 1 except the
-`Origin`.
-
-### 3. A preview that could not register its origin
+### 2. A preview that could not register its origin
 
 ```http
 POST /flow HTTP/1.1
@@ -159,7 +143,7 @@ Origin: https://acme-git-hotfix-acmeinc.vercel.app
 Authorization: Bearer pk_7kR2pXq9vN3wLmYhT4cB8A
 X-Zitadel-Release: sha256:81de4c…
 
-{ "project_id": "prj_01K9AA9M3K7E2QX8VB4T", "purpose": "login" }
+{ "purpose": "login" }
 ```
 
 | Layer | Outcome |
@@ -171,13 +155,13 @@ X-Zitadel-Release: sha256:81de4c…
 Drop the `Authorization` header and this is `403 rel.pin_not_permitted`; drop
 `X-Zitadel-Release` instead and it is `400 rel.required`.
 
-### 4. A server-side app, no `Origin`
+### 3. A server-side app, no `Origin`
 
 ```http
 POST /flow HTTP/1.1
 Authorization: Bearer sk_proj_9f2Hx8LqT4vRmYpN2wCbVa
 
-{ "project_id": "prj_01K9AA9M3K7E2QX8VB4T", "purpose": "login" }
+{ "purpose": "login" }
 ```
 
 | Layer | Outcome |
@@ -190,30 +174,14 @@ This is why the project default exists: the caller has no origin, so there is no
 row to find. Add `X-Zitadel-Release` to pin a release — the project secret
 permits it on any class.
 
-### 5. A stranger on an unrelated Vercel app
-
-```http
-POST /flow HTTP/1.1
-Origin: https://evil-xyz-attacker.vercel.app
-X-Zitadel-Release: sha256:9f2c1a…
-
-{ "project_id": "prj_01K9AA9M3K7E2QX8VB4T", "purpose": "login" }
-```
-
-| Layer | Outcome |
-|---|---|
-| 1 gate | `*-acmeinc.vercel.app` requires the `-acmeinc` suffix → no match |
-
-`403 proj.origin_not_allowed`, before any release is considered.
-
-### 6. A stranger who does match the pattern
+### 4. A stranger who does match the pattern
 
 ```http
 POST /flow HTTP/1.1
 Origin: https://acme-git-nonsense-acmeinc.vercel.app
 X-Zitadel-Release: sha256:9f2c1a…
 
-{ "project_id": "prj_01K9AA9M3K7E2QX8VB4T", "purpose": "login" }
+{ "purpose": "login" }
 ```
 
 | Layer | Outcome |
@@ -224,8 +192,11 @@ X-Zitadel-Release: sha256:9f2c1a…
 
 `403 rel.pin_not_permitted`. Knowing the digest bought nothing, which is the
 point of resolving from the origin rather than from a value the client supplies.
+A stranger on `https://evil-xyz-attacker.vercel.app` never gets this far: the
+pattern requires the `-acmeinc` suffix, so layer 1 answers
+`403 proj.origin_not_allowed` before any release is considered.
 
-### 7. Local development
+### 5. Local development
 
 Same project but `class: sandbox`, so the header is open.
 
@@ -234,7 +205,7 @@ POST /flow HTTP/1.1
 Origin: http://project-a.localhost:3000
 X-Zitadel-Release: sha256:c3f7a8…
 
-{ "project_id": "prj_01KDEV…", "purpose": "login" }
+{ "purpose": "login" }
 ```
 
 | Layer | Outcome |
@@ -246,17 +217,19 @@ X-Zitadel-Release: sha256:c3f7a8…
 The digest comes from the local runtime document rather than a build constant, so
 a `.zitadel/` edit shows on the next page load.
 
-### Summary
+### Every case, including the ones not shown
 
-| # | `Origin` | Credential | Header | Answered by | Result |
-|---|---|---|---|---|---|
-| 1 | primary | publishable key | — | layer 2 | production release |
-| 2 | registered preview | publishable key | — | layer 2 | branch release |
-| 3 | unregistered preview | publishable key | yes | layer 3 | named release |
-| 4 | none | project secret | — | layer 3 | project default |
-| 5 | unmatched | — | yes | layer 1 | `403 origin_not_allowed` |
-| 6 | matched preview | none | yes | layer 3 | `403 pin_not_permitted` |
-| 7 | loopback (`sandbox`) | — | yes | layer 3 | named release |
+| `Origin` | Credential | Header | Answered by | Result |
+|---|---|---|---|---|
+| primary | publishable key | — | layer 2 | production release |
+| registered preview | publishable key | — | layer 2 | branch release |
+| unregistered preview | publishable key | yes | layer 3 | named release |
+| none | project secret | — | layer 3 | project default |
+| unmatched | — | yes | layer 1 | `403 origin_not_allowed` |
+| matched preview | none | yes | layer 3 | `403 pin_not_permitted` |
+| loopback (`sandbox`) | — | yes | layer 3 | named release |
+| matched preview | publishable key | — | layer 3 | `400 rel.required` |
+| none, never deployed | project secret | — | layer 3 | `409 rel.no_default` |
 
 ## Local development
 

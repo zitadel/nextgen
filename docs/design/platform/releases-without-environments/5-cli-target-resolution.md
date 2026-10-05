@@ -75,12 +75,11 @@ server       https://api.zitadel.cloud   (file)
 project      prj_01KBB2M4P7S9WQZ3F8N     (file)
 ```
 
-It earns its place in three situations the convention does not reach: a monorepo
-where the file does not sit beside the command's working directory, a CI job that
-materialises a file from its secret store, and a repository whose layout predates
-this tool and is not going to be reorganised for it.
+It exists for the layouts the convention does not reach: a monorepo where the
+file does not sit beside the working directory, or a CI job that materialises one
+from its secret store.
 
-Two consequences worth stating, because both are deliberate:
+Two consequences, both deliberate:
 
 - **It outranks `process.env`.** A path the caller typed on this invocation is
   as explicit as `--server`, so an injected `ZITADEL_PROJECT_ID` does not quietly
