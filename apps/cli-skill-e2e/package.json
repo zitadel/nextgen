@@ -10,6 +10,7 @@
     "report": "node scripts/report.mjs"
   },
   "devDependencies": {
+    "marked": "catalog:",
     "vitest": "catalog:"
   }
 }
