@@ -71,18 +71,6 @@ const config: StorybookConfig = {
       ...viteConfig.optimizeDeps,
       exclude: [...(viteConfig.optimizeDeps?.exclude ?? []), ...optimizeDepsExclude],
       include: [...(viteConfig.optimizeDeps?.include ?? []), ...optimizeDepsInclude],
-      // The Vitest browser run drives THIS (Storybook) Vite server, so the
-      // anti-re-optimization settings must live here, not in vitest.config.ts.
-      // `holdUntilCrawlEnd` makes Vite finish discovery before serving, and
-      // `noDiscovery` forbids any late re-optimization — together they remove
-      // the mid-run optimizer bump that invalidates the addon-vitest setup
-      // module's URL ("Failed to fetch dynamically imported module …
-      // setup-file-with-project-annotations.js"), the cold-CI failure. With
-      // discovery off, a missing dep fails deterministically (reproducible on a
-      // cold local cache) instead of flaking, so `include` above must be
-      // complete.
-      holdUntilCrawlEnd: true,
-      noDiscovery: true,
     };
     // Resolve workspace `@zitadel/*` packages that publish a `@zitadel/source`
     // export condition to their TS source, so they run from source in the dev

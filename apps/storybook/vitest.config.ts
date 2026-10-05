@@ -52,41 +52,13 @@ export default defineConfig({
           // a cold local cache) instead of flaking under CI timing.
           noDiscovery: true,
         },
-        // Cap how many story suites boot a browser context at once. `baseTest`
-        // defaults `fileParallelism: true`, which lets Vitest run ~one context
-        // per CPU, and each context re-boots the FULL Storybook preview
-        // (`.storybook/preview.ts`): the MSW service worker, the a11y runtime,
-        // and a cold Vite dep-optimize crawl. On a cold CI runner that startup
-        // burst is already expensive; when this PR edits `.moon/workspace.yml`
-        // moon marks the entire ~140-task graph affected and runs it
-        // concurrently (Go builds, the Spanner emulator JVM, Postgres, every
-        // other package's browser `:test`), so the host is saturated exactly
-        // while Storybook is launching. A dozen heavy contexts racing that
-        // saturated window is what starves the addon-vitest setup module's
-        // request and surfaces as "Failed to fetch dynamically imported module …
-        // setup-file-with-project-annotations.js" — identically on every run of
-        // this branch, and never on lighter branches where only a handful of
-        // tasks are affected. Two contexts keep the peak footprint low while
-        // still running through the worker POOL — important, because a single
-        // worker (`fileParallelism: false`) has no pool-level execution bound,
-        // so a stuck setup-module import hangs forever instead of aborting. The
-        // lighter-weight `@zitadel/components`/`@zitadel/api-mock` browser lanes
-        // run the same way under the same contention and stay green.
         test: {
           name: "storybook",
-          maxWorkers: 2,
-          minWorkers: 1,
           browser: {
             enabled: true,
             provider: playwright(),
             headless: true,
             instances: [{ browser: "chromium" }],
-            // Abort a stuck browser connect FAST (tens of seconds), so a
-            // starved startup fails quickly and visibly rather than hanging —
-            // the whole `moon ci` graph blocks behind this task. Deliberately
-            // short, never minutes. `storybook:test` also carries a hard
-            // `options.timeout` in moon.yml as an absolute backstop.
-            connectTimeout: 30_000,
           },
         },
       },
