@@ -556,12 +556,10 @@ async function main(): Promise<void> {
     writeFile(resolve(OUT_DIR, "tailwind.css"), result.tailwind),
     writeFile(resolve(OUT_DIR, "shadcn.css"), result.shadcn),
   ]);
-  // eslint-disable-next-line no-console
   console.log(`design-tokens: wrote tokens.css, tokens.ts, tailwind.css, shadcn.css to ${OUT_DIR}`);
 }
 
 main().catch((err) => {
-  // eslint-disable-next-line no-console
   console.error(err);
   process.exit(1);
 });

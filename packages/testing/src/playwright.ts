@@ -54,7 +54,6 @@ export const test = base.extend<ZitadelTestFixtures, ZitadelWorkerFixtures>({
   zitadel: [
     // Playwright derives fixture dependencies from the destructuring pattern,
     // so the empty pattern is required here.
-    // oxlint-disable-next-line no-empty-pattern
     async ({}, use) => {
       const handshakePath = process.env.ZITADEL_TESTING_HANDSHAKE;
       if (!handshakePath) {

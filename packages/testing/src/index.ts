@@ -62,7 +62,6 @@ export async function startLocalZitadel(
     } catch (stopError) {
       // Both errors are preserved in AggregateError.errors, which the rule
       // below cannot model.
-      // oxlint-disable-next-line preserve-caught-error
       throw new AggregateError(
         [error, stopError],
         "bootstrap failed, and stopping the booted instance also failed",

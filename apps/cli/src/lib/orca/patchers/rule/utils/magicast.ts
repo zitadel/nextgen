@@ -53,13 +53,11 @@ export function parseConfigModule(
  * `module.exports = …`, `module.exports.x = …`, or `exports.x = …` — read from
  * the parsed AST so comments and string literals can't trigger a false match.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function hasCommonJsExport(mod: any): boolean {
   // magicast's `$ast` may be a babel `File` (with `.program.body`) or the
   // `Program` node itself (`.body`) — handle both.
   const program = mod?.$ast?.program ?? mod?.$ast;
   const body = program?.body ?? [];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return body.some((node: any) => {
     if (node?.type !== "ExpressionStatement" || node.expression?.type !== "AssignmentExpression") {
       return false;
@@ -97,7 +95,6 @@ function hasCommonJsExport(mod: any): boolean {
  * safely edit (function-form, configs built elsewhere) so the caller can fall
  * back to manual steps.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function resolveDefaultExportObject(mod: any, filename: string): any {
   const def = mod.exports?.default;
   const unreachable = () =>
@@ -120,7 +117,6 @@ export function resolveDefaultExportObject(mod: any, filename: string): any {
   throw unreachable();
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function importIsPresent(mod: any, local: string, from?: string): boolean {
   try {
     const items: ReadonlyArray<{ local?: string; from?: string }> = mod.imports?.$items ?? [];
@@ -139,7 +135,6 @@ export function importIsPresent(mod: any, local: string, from?: string): boolean
  * actually added the item, so callers can tell whether the edit changed
  * anything (and skip rewriting an already-complete config).
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function ensureArrayItem(parent: any, key: string, item: string): boolean {
   if (parent[key] === undefined) {
     parent[key] = [item];
@@ -172,7 +167,6 @@ export function ensureArrayItem(parent: any, key: string, item: string): boolean
  * assigning into them otherwise throws a raw proxy `TypeError`. The object
  * sibling of {@link ensureArrayItem}.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function ensureEditableObject(parent: any, key: string): any {
   if (parent[key] === undefined) {
     parent[key] = {};

@@ -124,7 +124,6 @@ if (configuredServerBinary) {
 }
 
 // Signal handlers close over this before the asynchronous boot assigns it.
-// oxlint-disable-next-line prefer-const
 let zitadel: LocalZitadel | undefined;
 let stopping: Promise<void> | undefined;
 

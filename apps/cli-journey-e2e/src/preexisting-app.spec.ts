@@ -1,4 +1,3 @@
-/* oxlint-disable playwright/expect-expect */
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 

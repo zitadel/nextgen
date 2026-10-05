@@ -13,7 +13,6 @@ export const worker: SetupWorker = setupWorker();
 
 export const test = testBase.extend<{ worker: SetupWorker }>({
   worker: [
-    // oxlint-disable-next-line no-empty-pattern
     async ({}, use) => {
       await worker.start({ onUnhandledRequest: "error" });
       await use(worker);

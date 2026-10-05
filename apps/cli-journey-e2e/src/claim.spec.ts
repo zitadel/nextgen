@@ -1,4 +1,3 @@
-/* oxlint-disable playwright/no-conditional-in-test */
 import { execFile } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
