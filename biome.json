@@ -53,9 +53,9 @@
       "correctness": {
         "noEmptyPattern": "warn",
         "noInnerDeclarations": "warn",
-        "noQwikUseVisibleTask": "warn",
         "noUnknownProperty": "warn",
-        "useQwikValidLexicalScope": "warn"
+        "noQwikUseVisibleTask": "off",
+        "useQwikValidLexicalScope": "off"
       },
       "style": {
         "noDescendingSpecificity": "off"
