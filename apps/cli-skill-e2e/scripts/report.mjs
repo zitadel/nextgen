@@ -16,11 +16,75 @@ const CONFIG_LABELS = { "with-skill": "With skill", baseline: "Baseline (no skil
 const esc = (s) =>
   String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
-function fmtMd(s) {
-  return esc(s)
-    .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")
-    .replace(/`([^`]+)`/g, "<code>$1</code>")
-    .replace(/\n/g, "<br>");
+// Inline markdown on already-HTML-escaped text: `code` and **bold**.
+function inlineMd(s) {
+  return s.replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+?)\*\*/g, "<b>$1</b>");
+}
+
+const splitRow = (line) =>
+  line
+    .trim()
+    .replace(/^\||\|$/g, "")
+    .split("|")
+    .map((c) => c.trim());
+
+const isTableSep = (line) => /^\s*\|?[\s:|-]*-[\s:|-]*\|?\s*$/.test(line) && line.includes("|");
+
+// A compact block-level markdown renderer, enough for what the agent emits:
+// fenced code, pipe tables, bullet/numbered lists, headings, bold, inline code,
+// and blank-line paragraphs. Kept dependency-free so the report stays a
+// self-contained, offline HTML file (no CDN, no build-time package).
+function mdToHtml(text) {
+  const lines = esc(text).split("\n");
+  const out = [];
+  let para = [];
+  const flush = () => {
+    if (para.length) out.push(`<p>${para.map(inlineMd).join("<br>")}</p>`);
+    para = [];
+  };
+  for (let i = 0; i < lines.length; ) {
+    const line = lines[i];
+    if (/^\s*```/.test(line)) {
+      flush();
+      const buf = [];
+      for (i++; i < lines.length && !/^\s*```/.test(lines[i]); i++) buf.push(lines[i]);
+      i++;
+      out.push(`<pre><code>${buf.join("\n")}</code></pre>`);
+    } else if (/^\s*\|.*\|\s*$/.test(line) && i + 1 < lines.length && isTableSep(lines[i + 1])) {
+      flush();
+      const head = splitRow(line).map((h) => `<th>${inlineMd(h)}</th>`).join("");
+      const body = [];
+      for (i += 2; i < lines.length && /^\s*\|.*\|\s*$/.test(lines[i]); i++)
+        body.push(`<tr>${splitRow(lines[i]).map((c) => `<td>${inlineMd(c)}</td>`).join("")}</tr>`);
+      out.push(`<table><tr>${head}</tr>${body.join("")}</table>`);
+    } else if (/^\s*[-*]\s+/.test(line) || /^\s*\d+\.\s+/.test(line)) {
+      flush();
+      const ordered = /^\s*\d+\.\s+/.test(line);
+      const re = ordered ? /^\s*\d+\.\s+/ : /^\s*[-*]\s+/;
+      const items = [];
+      for (; i < lines.length && re.test(lines[i]); i++)
+        items.push(`<li>${inlineMd(lines[i].replace(re, ""))}</li>`);
+      out.push(`<${ordered ? "ol" : "ul"}>${items.join("")}</${ordered ? "ol" : "ul"}>`);
+    } else {
+      const h = line.match(/^\s*(#{1,6})\s+(.*)$/);
+      if (h) {
+        flush();
+        // Map to h5/h6 so content headings never collide with the bubble's own
+        // h4 label (PROMPT / AGENT / USER ANSWER).
+        const lvl = Math.min(6, h[1].length + 4);
+        out.push(`<h${lvl}>${inlineMd(h[2])}</h${lvl}>`);
+        i++;
+      } else if (!line.trim()) {
+        flush();
+        i++;
+      } else {
+        para.push(line);
+        i++;
+      }
+    }
+  }
+  flush();
+  return out.join("\n");
 }
 
 function badge(status) {
@@ -41,11 +105,11 @@ function cmdBlock(p) {
 }
 
 function userBubble(text, label) {
-  return `<div class="msg user"><h4>${esc(label)}</h4><div>${fmtMd(text)}</div></div>`;
+  return `<div class="msg user"><h4>${esc(label)}</h4><div>${mdToHtml(text)}</div></div>`;
 }
 
 function agentBubble(text) {
-  return `<div class="msg agent"><h4>AGENT</h4><div>${fmtMd(text)}</div></div>`;
+  return `<div class="msg agent"><h4>AGENT</h4><div>${mdToHtml(text)}</div></div>`;
 }
 
 // Render the whole stage as a conversation, in order: the opening prompt, then
@@ -83,7 +147,15 @@ header{background:#0b0f19;color:#fff;padding:18px 28px}header h1{margin:0;font-s
 .msg h4{margin:0 0 7px;font-size:11px;letter-spacing:.5px;font-weight:800}
 .msg.user{background:#eff6ff;border:1px solid #bfdbfe}.msg.user h4{color:#1d4ed8}
 .msg.agent{background:#fff;border:1px solid #e5e7eb}.msg.agent h4{color:#6b7280}
-.msg code{background:#eef2ff;padding:1px 5px;border-radius:4px;font-size:12px}
+.msg code{background:#eef2ff;padding:1px 5px;border-radius:4px;font:12px ui-monospace,Menlo,monospace}
+.msg p{margin:0 0 8px}.msg p:last-child{margin-bottom:0}
+.msg pre{background:#0b0f19;color:#cbd5e1;padding:10px 12px;border-radius:8px;overflow:auto;margin:0 0 10px;font:11.5px/1.5 ui-monospace,Menlo,monospace}
+.msg pre code{background:none;padding:0;font-size:inherit}
+.msg table{border-collapse:collapse;margin:2px 0 10px;font-size:12.5px;display:block;overflow:auto}
+.msg th,.msg td{border:1px solid #d1d5db;padding:4px 9px;text-align:left;vertical-align:top}
+.msg th{background:#f3f4f6;font-weight:700}
+.msg ul,.msg ol{margin:2px 0 10px;padding-left:22px}.msg li{margin:2px 0}
+.msg h5,.msg h6{margin:10px 0 6px;font-size:13px}
 .muted{color:#9ca3af}`;
 
 const JS = `function show(n){document.querySelectorAll('.stage-panel').forEach(p=>p.style.display='none');document.getElementById('stage-'+n).style.display='block';document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));document.getElementById('tab-'+n).classList.add('active');}
