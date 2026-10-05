@@ -233,6 +233,43 @@ production configuration.
 step and reused for the rest of the attempt, so a deploy landing mid-sign-in
 cannot change the configuration under the user.
 
+### What each kind of caller sends
+
+**A browser sends nothing new.** `Origin` is set by the user agent, not by the
+page, and the publishable key is already a build constant in the bundle. So the
+first request of a sign-in carries no release identifier and the app holds no
+release state: the origin row answers layer 2 and the browser never learns which
+release it was served. A deploy to that origin changes the answer on the next
+page load with no client change.
+
+**A caller with no `Origin` is answered by the project default.** That is
+server-side rendering, a backend, the CLI, CI, and native or mobile apps. The
+credential identifies the project — the project secret for a server, the
+publishable key for a shipped app — and layer 3 serves the newest deployment with
+`origin = ""`. To get anything else it must say so with `X-Zitadel-Release`.
+
+**Omitting `Origin` is not a way around the gate.** A non-browser client can
+simply leave the header off, so it is worth being explicit about what that
+reaches: the project default, which is the same configuration any visitor to
+`app.acme.com` is served and public by construction. Two things it does not
+reach:
+
+- **A preview release.** Layer 2 needs an exact origin row, and on a
+  `production` project the header needs a credential.
+- **A passkey ceremony.** The WebAuthn RP ID derives from the origin host, so
+  with no `Origin` there is nothing to derive from and the step cannot be
+  offered — `flow.passkey_rp_unavailable` — until RP ID is a project setting.
+
+The gate therefore protects the one caller that *cannot* lie about its origin: a
+browser on a page the user did not expect. It was never a defence against a
+client that writes its own headers, and the design does not lean on it as one.
+
+One consequence worth naming rather than hiding: the publishable key is public,
+so "the header needs a credential" is a weak gate against someone who read the
+bundle. It stops the casual stranger of
+[example 6](#6-a-stranger-who-does-match-the-pattern), not a determined one —
+see [Open 6](#open).
+
 ### Errors
 
 | Condition | Status | Code |
@@ -1256,10 +1293,12 @@ Four things this design needs that do not exist yet.
    preview URL at deploy and removes it at teardown, which needs no registry and
    no anchor rule. The cost is origin entries with a TTL and a collector — which
    is what `expires_at` already is.
-6. **Whether a preview may serve a release no target ever activated.** Requiring
-   a row or a header stops a stranger, but not a developer pinning something
-   unreviewed. Restricting previews to releases activated somewhere, or created
-   recently, are both cheap narrowings.
+6. **Whether a preview may serve a release no target ever activated.** The
+   header gate rests on holding a credential, and the publishable key is public,
+   so it stops a casual stranger rather than a determined one. Restricting the
+   header to releases already activated on some target, or created recently, are
+   both cheap narrowings; requiring the project secret for it on a `production`
+   project is the strict version, at the cost of example 3.
 7. **Whether `production` should require a claimed project** (this note says
    yes), and whether anything else currently claim-gated should move onto the
    class.
