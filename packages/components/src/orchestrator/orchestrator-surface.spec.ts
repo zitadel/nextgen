@@ -131,4 +131,24 @@ describe("orchestrator surface contract", () => {
     expect(element.dataset.theme).toBe("dark");
     expect(element.hasAttribute("data-theme-dark")).toBe(true);
   });
+
+  it("<zitadel-login> keeps the header shown and stable when suppressHeader is unset", async () => {
+    const element = await mount<ZitadelLogin>("zitadel-login");
+    // The card paints after the element's first async render, so wait for it.
+    const card = await vi.waitUntil(() => element.shadowRoot?.querySelector("zl-card"));
+
+    // A framework wrapper that binds an unset optional prop (e.g. Angular's
+    // [suppressHeader]) assigns `undefined` to the element through the untyped
+    // DOM boundary. "Unset" must mean "show the header".
+    element.suppressHeader = undefined as unknown as boolean;
+
+    // Re-render twice: the header must stay shown both times, never toggling.
+    element.requestUpdate();
+    await element.updateComplete;
+    expect(card.hasAttribute("data-suppress-header")).toBe(false);
+
+    element.requestUpdate();
+    await element.updateComplete;
+    expect(card.hasAttribute("data-suppress-header")).toBe(false);
+  });
 });

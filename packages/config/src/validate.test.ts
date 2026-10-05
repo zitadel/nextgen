@@ -229,6 +229,16 @@ describe("steps", () => {
     );
   });
 
+  it("rejects a declared action named sso", () => {
+    const def = flow();
+    const s = step(def, "identifier");
+    s.actions.push({ name: "sso", kind: "navigate" });
+    s.transitions.sso = { target: "done" };
+    expect(messages(validateFlowDefinition(def))).toContain(
+      'step "identifier": action name "sso" is reserved for sso submissions',
+    );
+  });
+
   it("rejects a non-terminal step that does nothing", () => {
     const def = flow();
     def.steps.push({ name: "idle", transitions: { user_not_found: { target: "done" } } });
