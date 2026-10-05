@@ -538,6 +538,69 @@ The price is that "what is live on all 40 origins" is a latest-per-group query
 instead of 40 column reads. That is one anti-join, in a shape the dialects
 already implement.
 
+### How one deploy writes several rows
+
+A deploy is one operation against several targets, and the rows it writes share
+a `deploy_id` and a single `deployed_at` stamped once for the whole transaction.
+It is all-or-nothing: a partial deploy that moved two origins and not the third
+is the one outcome worth ruling out at the storage level.
+
+The request names targets rather than origins one at a time:
+
+```http
+POST /deployments HTTP/1.1
+Authorization: Bearer sk_proj_9f2Hx8LqT4vRmYpN2wCbVa
+
+{
+  "release": "sha256:4a5b6c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7e8f90a1b",
+  "targets": ["default", "primary"],
+  "reason":  "deploy",
+  "message": "add phone_number to human-user"
+}
+```
+
+A target is `"default"`, the keyword `"primary"`, or an exact origin. `"primary"`
+expands server-side to the project's `primary` entries, so CI does not have to
+read the project first to know what production is. The response lists what it
+expanded to, and the rows carry it permanently — `GROUP BY deploy_id` reconstructs
+the blast radius of any past deploy.
+
+A `preview` run is the same call with one exact origin and a `ttl`, which is why
+it can be authorised by the narrower preview credential: a request that names
+`default` or `primary` requires the project secret.
+
+**The fan-out is small by construction.** A `primary` entry on a `production`
+project may not be a wildcard, so the primaries are exact URLs already and
+expansion is a list read, not a match. Previews are never fanned out — each is
+written by its own `preview` run. A realistic `deploy` writes two to five rows.
+
+#### Why not one row holding several origins
+
+Because `deployments` is on the read path now. "What does `app.acme.com` serve"
+has to be a seek on `(project_id, origin, deployed_at DESC)`; against a row
+holding `origins: [...]` it becomes an array-containment predicate, which needs a
+different index in each of the three dialects and takes the history list out of
+the keyset-pagination shape the rest of the repo uses. Per-origin rollback would
+also stop being an append and start being a row rewrite.
+
+The duplication is real but it is the cheap kind: the repeated columns are a
+digest and a timestamp, and they buy a uniform `newest row for this key` rule
+that both resolution and history read the same way.
+
+#### Why not a group of origins
+
+Because a named, addressable group of origins that share a release, a variable
+scope and a current deployment is an environment. Giving it a different word
+would reintroduce the thing this note removes, along with naming it, listing it,
+seeding it and keeping membership in sync with the allowlist.
+
+Origins are already grouped, by the allowlist pattern that admitted them — and
+variables are already scoped by that same pattern, so the grouping has one
+definition rather than two. What this design does is keep that grouping at the
+request layer: a deploy names a selector, the server expands it, and storage
+stays one row per target. Nothing has to hold a membership list, because
+membership is recomputed from the patterns every time it is needed.
+
 ### Example
 
 One project, three targets, read as one log.
@@ -560,9 +623,12 @@ its origin row is gone, yet its deployment row is still here.
 
 **Known limitation.** A target's history is its hostname's. Rename a production
 hostname and a new history starts, with the old one readable under the old string
-but not joined to it. If that matters, the fix is a nullable `target_id` grouping
-origins that are "the same place over time" — worth adding only when something
-concrete demands it.
+but not joined to it. If that matters, the fix is a nullable `target_id` joining
+the origins that are "the same place over time" — a different grouping from the
+one [ruled out above](#why-not-a-group-of-origins), which was a set of origins
+sharing a release. This one groups a single target's successive names, carries no
+release and no variables, and is worth adding only when something concrete
+demands it.
 
 ## Origins
 
@@ -1113,7 +1179,7 @@ Authorization: Bearer sk_proj_9f2Hx8LqT4vRmYpN2wCbVa
 
 {
   "release": "sha256:9f2c1a7b4e83d05f6c2b19ae7d430f821c6b5de90a4f7382",
-  "origin":  "https://acme-git-sso-acmeinc.vercel.app",
+  "targets": ["https://acme-git-sso-acmeinc.vercel.app"],
   "reason":  "deploy",
   "ttl":     "7d"
 }
