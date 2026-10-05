@@ -305,6 +305,17 @@ For a foreign human principal, an unknown target and a real but unauthorized
 target must be indistinguishable. The existing operator delete-idempotency
 exception for project secrets does not extend to foreign human sessions.
 
+> **Implementation note (2026-10-05, #1300):** creates keep ADR 033's
+> existing answer for a project without a foothold instead of `404`. Creating
+> a user, a schema, a flow definition or a branding revision in such a project
+> answers `400` with the resource's `*.invalid` code and the detail "project
+> does not exist" (`writeMiss` in `internal/api/authz.go`); teams and grants
+> already answer `404`. The answer is identical for a project that does not
+> exist, so the boundary above holds, and project-secret callers keep the
+> shape they already rely on. `TestConsoleSessionForeignTargetIsIndistinguishable`
+> pins both: every operation the Console calls answers a real foreign target
+> exactly as it answers a missing one.
+
 ### 8. Audit events are written in the protected project
 
 Every allowed cross-project mutation and every security-relevant read produces
