@@ -446,7 +446,15 @@ export function ssoConflictStep(input: StepFixtureInput): CreateFlow201 {
   return wrap(input, {
     name: "sso-conflict",
     texts: { title_key: "sso-conflict.title", description_key: "sso-conflict.description" },
-    fields: [{ name: "password", type: "password", text_key: "password.field.password", required: true }],
+    fields: [
+      {
+        name: "password",
+        type: "password",
+        text_key: "password.field.password",
+        autocomplete: "current-password",
+        required: true,
+      },
+    ],
     actions: [
       { name: "submit", kind: "submit", text_key: "sso-conflict.action.submit", primary: true },
       { name: "passkey", kind: "passkey", text_key: "sso-conflict.action.passkey" },

@@ -32,12 +32,14 @@ const identifierStep: CreateFlow201 = {
         name: "email",
         type: "email",
         text_key: "identifier.field.email",
+        autocomplete: "username",
         required: true,
       },
       {
         name: "password",
         type: "password",
         text_key: "identifier.field.password",
+        autocomplete: "current-password",
         required: true,
       },
     ],
@@ -661,7 +663,7 @@ describe("<zitadel-login> paired identifier (chromium)", () => {
     setup([pairedPasswordStep, identifierStep]);
     const element = await mount();
     const root = element.shadowRoot!;
-    expect(root.querySelector('input[autocomplete="username"]')).toBeTruthy();
+    expect(root.querySelector('input[part="paired-identifier"]')).toBeTruthy();
 
     root.dispatchEvent(
       new CustomEvent("zl-submit", {
@@ -675,7 +677,18 @@ describe("<zitadel-login> paired identifier (chromium)", () => {
     );
     // That step renders the identifier as a real field, so a second copy would
     // be a duplicate the manager has to choose between.
-    expect(element.shadowRoot?.querySelector('input[autocomplete="username"]')).toBeNull();
+    expect(element.shadowRoot?.querySelector('input[part="paired-identifier"]')).toBeNull();
+  });
+
+  it("hands focus to the step's first control when the host is focused", async () => {
+    // It is the shadow root's first focusable element, so `delegatesFocus`
+    // sends host focus to it.
+    setup([pairedPasswordStep]);
+    const element = await mount();
+    (document.activeElement as HTMLElement | null)?.blur();
+
+    element.focus();
+    expect(element.shadowRoot?.activeElement?.tagName).toBe("ZL-FIELD");
   });
 
   it("follows the server when a second identifier replaces the first", async () => {

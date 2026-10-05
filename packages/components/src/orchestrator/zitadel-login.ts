@@ -598,6 +598,10 @@ export class ZitadelLogin extends ZitadelSurface {
    * `value` is the attribute, not a `.value` property binding: a manager
    * reading the markup has to find the address there, and the control is
    * readonly and untabbable, so it can never go dirty and drift from it.
+   *
+   * It precedes the password in the form, where a manager looks for the
+   * username, which also makes it the shadow root's focus delegate. Focus
+   * that lands on it is handed to the step's first control.
    */
   private renderPairedIdentifier() {
     const identifier = this.response?.step.identifier;
@@ -610,6 +614,7 @@ export class ZitadelLogin extends ZitadelSurface {
       aria-hidden="true"
       autocomplete=${identifier.autocomplete}
       value=${identifier.value}
+      @focus=${() => this.moveFocusToFirstField()}
       style="position:absolute;width:1px;height:1px;margin:-1px;padding:0;border:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap"
     />`;
   }
