@@ -932,6 +932,10 @@ func changesState(method string) bool {
 // public code before the response is written.
 var operationExcludedErrors = map[string][]string{
 	"listMyProjects": {"domain.ErrSessionTokenInvalid"},
+	// Both are consumed in the state machine's sso branch: a missing
+	// connection becomes flow.invalid_action, and an unavailable provider
+	// re-renders the step with error.sso_unavailable.
+	"submitFlowStep": {"domain.ErrFlowSSOUnavailable", "domain.ErrIDPConnectionNotFound"},
 }
 
 // methodErrorsFromAnalysis adapts the inferred error sets to the shape the

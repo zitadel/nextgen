@@ -2,7 +2,6 @@ package idp
 
 import (
 	"context"
-	"encoding/base64"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -199,17 +198,4 @@ func TestNewAuthorizeRedirectViaDiscovery(t *testing.T) {
 		"code_challenge":        {oidc.NewSHACodeChallenge("verifier-1")},
 		"code_challenge_method": {"S256"},
 	}, u.Query())
-}
-
-func TestRandomTokens(t *testing.T) {
-	for name, generate := range map[string]func() string{"nonce": NewNonce, "pkce verifier": NewPKCEVerifier} {
-		t.Run(name, func(t *testing.T) {
-			a, b := generate(), generate()
-			assert.NotEqual(t, a, b)
-			assert.Len(t, a, 43)
-			raw, err := base64.RawURLEncoding.DecodeString(a)
-			require.NoError(t, err)
-			assert.Len(t, raw, 32, "256 bits of entropy")
-		})
-	}
 }

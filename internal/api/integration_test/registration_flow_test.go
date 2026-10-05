@@ -142,7 +142,7 @@ func TestPasskeyRegistrationFlow(t *testing.T) {
 	require.IsType(t, &api.FlowResponseHeaders{}, createResp, helpers.MustMarshal(t, createResp))
 	flowHeaders := createResp.(*api.FlowResponseHeaders)
 	flowID := flowHeaders.Response.ID
-	zflow := mustExtractZflow(t, flowHeaders.SetCookie.Value)
+	zflow := mustExtractZflow(t, flowHeaders.SetCookie)
 
 	// --- Auth step: issue passkey challenge ---
 	authIssueResp, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
@@ -155,7 +155,7 @@ func TestPasskeyRegistrationFlow(t *testing.T) {
 	require.NoError(t, err)
 	require.IsType(t, &api.SubmitFlowStepOK{}, authIssueResp, "auth issue failed: %s", helpers.MustMarshal(t, authIssueResp))
 	authIssueOK := authIssueResp.(*api.SubmitFlowStepOK)
-	zflow = mustExtractZflow(t, authIssueOK.SetCookie.Value)
+	zflow = mustExtractZflow(t, authIssueOK.SetCookie)
 
 	authChallenge := authIssueOK.Response.Step.Challenge.Value
 	authChallengeID, _ := authChallenge.ChallengeID.Get()
@@ -184,7 +184,7 @@ func TestPasskeyRegistrationFlow(t *testing.T) {
 	require.IsType(t, &api.SubmitFlowStepOK{}, authVerifyResp, "auth verify failed: %s", helpers.MustMarshal(t, authVerifyResp))
 	authVerifyOK := authVerifyResp.(*api.SubmitFlowStepOK)
 	require.Equal(t, "register-step", authVerifyOK.Response.Step.Name)
-	zflow = mustExtractZflow(t, authVerifyOK.SetCookie.Value)
+	zflow = mustExtractZflow(t, authVerifyOK.SetCookie)
 
 	// --- Register step: issue creation challenge ---
 	regIssueResp, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
@@ -197,7 +197,7 @@ func TestPasskeyRegistrationFlow(t *testing.T) {
 	require.NoError(t, err)
 	require.IsType(t, &api.SubmitFlowStepOK{}, regIssueResp, "registration issue failed: %s", helpers.MustMarshal(t, regIssueResp))
 	regIssueOK := regIssueResp.(*api.SubmitFlowStepOK)
-	zflow = mustExtractZflow(t, regIssueOK.SetCookie.Value)
+	zflow = mustExtractZflow(t, regIssueOK.SetCookie)
 
 	require.True(t, regIssueOK.Response.Step.Challenge.Set, "expected challenge on issue")
 	regChallenge := regIssueOK.Response.Step.Challenge.Value

@@ -730,6 +730,34 @@ func TestFlowService_Submit_PropagatesHandoffToken(t *testing.T) {
 	assert.True(t, res.HandoffTokenExpiresAt.Equal(expiresAt), "HandoffTokenExpiresAt = %v, want %v", res.HandoffTokenExpiresAt, expiresAt)
 }
 
+func TestFlowService_Submit_PropagatesSSOReturnAndBindingNonce(t *testing.T) {
+	def := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
+	repo := stubGetFlowDefinition(t, def)
+	sm := &fakeStateMachine{processResult: domain.FlowStepResult{
+		State:           &domain.FlowState{ID: "flow_1"},
+		Step:            &domain.FlowStep{Name: domain.FlowStepNameSSORedirect},
+		SSOBindingNonce: "nonce-1",
+	}}
+	ssoReturn := &domain.FlowSSOReturn{RedirectURI: "https://login.example.test/__nextgen/idp/callback", ReturnTarget: "https://login.example.test/login"}
+
+	svc := service.NewFlowService(repo, sm)
+
+	res, err := svc.Submit(t.Context(), service.SubmitFlowRequest{
+		State: &domain.FlowState{
+			ID:           "flow_1",
+			ProjectID:    def.ProjectID,
+			FlowProgress: domain.FlowProgress{DefinitionID: def.ID},
+		},
+		Action:        domain.FlowActionSSO,
+		SSOProviderID: new("google"),
+		SSOReturn:     ssoReturn,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, &domain.FlowSSOProviderRef{ID: "google"}, sm.gotSubmitInput.SSOProvider)
+	assert.Equal(t, ssoReturn, sm.gotSubmitInput.SSOReturn)
+	assert.Equal(t, "nonce-1", res.SSOBindingNonce)
+}
+
 func TestFlowService_GetStep_CallsRender(t *testing.T) {
 	def := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
 	repo := stubGetFlowDefinition(t, def)

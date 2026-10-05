@@ -30,6 +30,9 @@ const (
 	// FlowStepErrorPasskeyRegistrationInvalid reports a rejected
 	// passkey registration attestation.
 	FlowStepErrorPasskeyRegistrationInvalid = "error.passkey_registration_invalid"
+	// FlowStepErrorSSOUnavailable reports a provider the engine could not
+	// start a sign-in with. The user stays on the step.
+	FlowStepErrorSSOUnavailable = "error.sso_unavailable"
 )
 
 // FlowStepErrorAllowed reports whether a step error value honors the
@@ -70,13 +73,18 @@ type FlowStartInput struct {
 
 // FlowSubmitInput carries a single client submission.
 //
-// GateProofs and SSOProvider are reserved; the state machine returns
-// [ErrFlowUnsupported] for any flow that exercises them today.
+// GateProofs is reserved; the state machine returns [ErrFlowUnsupported]
+// for any flow that exercises it today.
 type FlowSubmitInput struct {
-	Action      string
-	Fields      map[string]any
-	GateProofs  map[string]string
+	Action     string
+	Fields     map[string]any
+	GateProofs map[string]string
+	// SSOProvider names the provider the user picked. Read only with
+	// [FlowActionSSO]; on any other action it is an invalid submission.
 	SSOProvider *FlowSSOProviderRef
+	// SSOReturn carries the callback route and the return page the API
+	// derived from the request. Required on an sso submission.
+	SSOReturn *FlowSSOReturn
 	// ChallengeResponse carries the client's answer to a pending ceremony
 	// (e.g. a passkey assertion). Present on the verify leg of a two-phase
 	// challenge; nil otherwise.
@@ -106,15 +114,27 @@ type FlowSSOProviderRef struct {
 	ID string
 }
 
+// FlowSSOReturn is the browser-side context of an external sign-in,
+// derived from the HTTP request at the API edge: RedirectURI is the
+// callback route the provider sends the browser to, ReturnTarget the page
+// the callback hands the browser back to.
+type FlowSSOReturn struct {
+	RedirectURI  string
+	ReturnTarget string
+}
+
 // FlowStepResult is what the state machine returns from [Start] and
 // [Process]. Pop is reserved for the deferred pivot stack. HandoffToken
-// + HandoffTokenExpiresAt are populated only on the terminal step.
+// + HandoffTokenExpiresAt are populated only on the terminal step;
+// SSOBindingNonce only on the [FlowStepNameSSORedirect] step, where the
+// handler sets it as the browser-binding cookie.
 type FlowStepResult struct {
 	State                 *FlowState
 	Step                  *FlowStep
 	Pop                   bool
 	HandoffToken          string
 	HandoffTokenExpiresAt time.Time
+	SSOBindingNonce       string
 }
 
 // FlowStep is the capability payload the API surfaces to the client.
@@ -128,10 +148,22 @@ type FlowStep struct {
 	Fields       []FlowField
 	Actions      []FlowAction
 	SSOProviders []FlowSSOProvider
+	// Identifier is set only when the step collects a password without
+	// collecting the identifier. Render-only — see [FlowStepIdentifier].
+	Identifier *FlowStepIdentifier
 	// Challenge is a pending authentication ceremony the client must
 	// satisfy before re-submitting (e.g. a passkey assertion). Nil unless
 	// the engine just issued one.
 	Challenge *FlowStepChallenge
+}
+
+// FlowStepIdentifier mirrors the OpenAPI `flow-step.identifier`: the
+// identifier a password form carries as a hidden control, so a password
+// manager stores the two as one credential. It carries no field name — the
+// control the client renders has none, so it is never submitted.
+type FlowStepIdentifier struct {
+	Value        string
+	Autocomplete string
 }
 
 // FlowStepChallenge mirrors the OpenAPI `flow-step.challenge`: a pending
@@ -173,6 +205,20 @@ const FlowActionPasskey = "passkey"
 // transition fires once the returned attestation verifies.
 const FlowActionPasskeyRegister = "passkey_register"
 
+// FlowActionSSO is the action the client submits with
+// [FlowSubmitInput.SSOProvider] to start an external sign-in. It is not
+// declared on the step: offering sso_providers is what enables it.
+const FlowActionSSO = "sso"
+
+// FlowStepNameSSORedirect is the engine-emitted step that carries the
+// provider's authorize URL. The flow state stays on the step the user
+// picked the provider from; the callback moves it on.
+const FlowStepNameSSORedirect = "sso-redirect"
+
+// flowSSORedirectTitleKey is the step's only text; the client shows it
+// while the browser navigates to the provider.
+const flowSSORedirectTitleKey = "sso.redirect.title"
+
 // flowBackActionName is the name attached to the injected back action.
 const flowBackActionName = "back"
 
@@ -211,6 +257,7 @@ type FlowStateMachineRuntime struct {
 	userCreater  FlowOnSuccessHandler
 	authAttempts FlowAuthAttemptService
 	ssoProviders FlowSSOProviderResolver
+	ssoRedirects FlowSSORedirectIssuer
 	now          func() time.Time
 }
 
@@ -223,6 +270,7 @@ func NewFlowStateMachine(
 	createUser FlowOnSuccessHandler,
 	authAttempts FlowAuthAttemptService,
 	ssoProviders FlowSSOProviderResolver,
+	ssoRedirects FlowSSORedirectIssuer,
 	now func() time.Time,
 ) *FlowStateMachineRuntime {
 	if now == nil {
@@ -235,6 +283,7 @@ func NewFlowStateMachine(
 		userCreater:  createUser,
 		authAttempts: authAttempts,
 		ssoProviders: ssoProviders,
+		ssoRedirects: ssoRedirects,
 		now:          now,
 	}
 }
@@ -326,9 +375,6 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, def *FlowDefiniti
 	if def == nil || state == nil {
 		return FlowStepResult{}, fmt.Errorf("%w: process without definition or state", ErrFlowIntegrity())
 	}
-	if in.SSOProvider != nil {
-		return FlowStepResult{}, fmt.Errorf("%w: sso submissions", ErrFlowUnsupported())
-	}
 	if len(in.GateProofs) > 0 {
 		return FlowStepResult{}, fmt.Errorf("%w: gate proofs", ErrFlowUnsupported())
 	}
@@ -339,6 +385,11 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, def *FlowDefiniti
 	}
 
 	pc := &processCtx{ctx: ctx, def: def, state: state, currentStep: currentStep, in: in}
+	// An external sign-in collects nothing on the step, so it skips the
+	// input pipeline like back and navigate do.
+	if in.Action == FlowActionSSO || in.SSOProvider != nil {
+		return r.processSSO(pc)
+	}
 	actionKind := stepActionKind(currentStep, in.Action)
 
 	// Back and Navigate both skip the input pipeline entirely.
@@ -387,6 +438,57 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, def *FlowDefiniti
 		// user-supplied action lands here too and fails inside routeOutcome.
 		return r.processSubmit(pc, resolved)
 	}
+}
+
+// processSSO starts an external sign-in with a provider the step offers
+// and emits the redirect step. The flow state is left as it is: the user
+// is still on this step until the resolution after the callback routes it.
+// IssuedAt is refreshed like on every other response, so the flow cookie's
+// window restarts at this submission.
+func (r *FlowStateMachineRuntime) processSSO(pc *processCtx) (FlowStepResult, error) {
+	in := pc.in
+	if in.Action != FlowActionSSO || in.SSOProvider == nil {
+		return FlowStepResult{}, fmt.Errorf("%w: %q with sso provider on step %q", ErrFlowInvalidAction(), in.Action, pc.currentStep.Name)
+	}
+	if !slices.Contains(pc.currentStep.SSOProviders, in.SSOProvider.ID) {
+		return FlowStepResult{}, fmt.Errorf("%w: sso provider %q is not offered on step %q", ErrFlowInvalidAction(), in.SSOProvider.ID, pc.currentStep.Name)
+	}
+	if in.SSOReturn == nil {
+		return FlowStepResult{}, fmt.Errorf("%w: sso return params missing", ErrFlowIntegrity())
+	}
+	// Leaving for the provider abandons any pending ceremony; without this
+	// the stale challenge re-attaches on the next render (the mismatch
+	// cleanup in Process never runs on this early-return path).
+	pc.state.ClearPendingChallenge()
+	out, err := r.ssoRedirects.Issue(pc.ctx, FlowIssueSSORedirectInput{
+		ProjectID:     pc.state.ProjectID,
+		AttemptID:     pc.state.AuthAttemptID,
+		ProviderSlug:  in.SSOProvider.ID,
+		FlowSSOReturn: *in.SSOReturn,
+	})
+	switch {
+	case errors.Is(err, ErrIDPConnectionNotFound()):
+		// The render dropped the slug, so the client never offered it.
+		return FlowStepResult{}, fmt.Errorf("%w: sso provider %q on step %q has no connection", ErrFlowInvalidAction(), in.SSOProvider.ID, pc.currentStep.Name)
+	case errors.Is(err, ErrFlowSSOUnavailable(nil)):
+		resolved, err := r.resolveInputs(pc)
+		if err != nil {
+			return FlowStepResult{}, err
+		}
+		return r.renderStepError(pc, resolved, new(FlowStepErrorSSOUnavailable))
+	case err != nil:
+		return FlowStepResult{}, err
+	}
+	pc.state.IssuedAt = r.now()
+	return FlowStepResult{
+		State: pc.state,
+		Step: &FlowStep{
+			Name:        FlowStepNameSSORedirect,
+			Texts:       FlowStepTexts{TitleKey: flowSSORedirectTitleKey},
+			RedirectURL: &out.RedirectURL,
+		},
+		SSOBindingNonce: out.BindingNonce,
+	}, nil
 }
 
 // resolveInputs resolves the step's fields and prefills any values the
@@ -1399,6 +1501,7 @@ func (r *FlowStateMachineRuntime) buildStep(ctx context.Context, state *FlowStat
 			TextKey: step.Name + ".action." + flowBackActionName,
 		})
 	}
+	applyAutocomplete(resolved.Fields, state.CurrentPurpose)
 	return &FlowStep{
 		Name:         step.Name,
 		Texts:        FlowStepTexts{TitleKey: step.Name + ".title", DescriptionKey: step.Name + ".description"},
@@ -1408,7 +1511,48 @@ func (r *FlowStateMachineRuntime) buildStep(ctx context.Context, state *FlowStat
 		Fields:       resolved.Fields,
 		Actions:      actions,
 		SSOProviders: providers,
+		Identifier:   pairedIdentifier(resolved, state.CollectedData.UserData),
 	}, nil
+}
+
+// applyAutocomplete stamps each field's autofill token. The purpose is not
+// known at resolve time — the definition validator resolves without one, and
+// applyOutcomeFlip can change it mid-flow — so the token belongs to a render
+// rather than to the resolved field set.
+func applyAutocomplete(fields []FlowField, purpose FlowDefinitionPurpose) {
+	for i := range fields {
+		fields[i].Autocomplete = AutocompleteForField(fields[i], purpose)
+	}
+}
+
+// pairedIdentifier returns the identifier a password form carries beside
+// the password input so a manager can store the two as one credential.
+// Nil unless the step collects a password, collects no identifier of its
+// own, and the schema designates one a value was collected for.
+func pairedIdentifier(resolved FlowResolvedFields, collected map[string]any) *FlowStepIdentifier {
+	if resolved.IdentifierName == "" {
+		return nil
+	}
+	var holdsPassword bool
+	for _, f := range resolved.Fields {
+		switch f.Challenge {
+		case FlowFieldChallengeIdentifier:
+			return nil
+		case FlowFieldChallengePassword:
+			holdsPassword = true
+		}
+	}
+	if !holdsPassword {
+		return nil
+	}
+	value, ok := collectedString(collected, resolved.IdentifierName)
+	if !ok {
+		return nil
+	}
+	return &FlowStepIdentifier{
+		Value:        value,
+		Autocomplete: AutocompleteUsername,
+	}
 }
 
 // resolveSSOProviders renders the step's connection slugs through the
@@ -1499,11 +1643,26 @@ func prefillFromCollected(resolved *FlowResolvedFields, collected map[string]any
 		if resolved.Fields[i].Value != nil {
 			continue
 		}
-		if v, ok := maputil.GetNested[string](collected, AttributeKey(resolved.Fields[i].Name).Nodes()); ok && v != "" {
+		if v, ok := collectedString(collected, resolved.Fields[i].Name); ok {
 			val := v
 			resolved.Fields[i].Value = &val
 		}
 	}
+}
+
+// collectedString returns the value collected for a dotted property path when
+// one is there and non-empty. A collected-but-empty value is the same as
+// nothing to the callers that re-render it: there is no prefill to make and no
+// identifier to pair.
+//
+// [FindCollectedFieldByChallenge] deliberately does not go through here — it
+// reads a value of any type and asks only whether it is present.
+func collectedString(collected map[string]any, name string) (string, bool) {
+	v, ok := maputil.GetNested[string](collected, AttributeKey(name).Nodes())
+	if !ok || v == "" {
+		return "", false
+	}
+	return v, true
 }
 
 func mergeCollected(state *FlowState, fields map[string]any) error {
