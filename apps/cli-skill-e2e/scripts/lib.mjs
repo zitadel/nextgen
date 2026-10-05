@@ -63,7 +63,15 @@ export function parseStage(file) {
             const c = b.content;
             const out = typeof c === "string" ? c : (c ?? []).map((x) => x?.text ?? "").join("");
             const entry = cmdById.get(b.tool_use_id);
-            if (entry) entry.out = out;
+            if (entry) {
+              entry.out = out;
+              // A failed Bash call comes back with `is_error`; Claude Code puts
+              // the status in the output text ("Exit code N"), so recover the
+              // number when it's there, else mark a non-zero exit we can't name.
+              entry.err = Boolean(b.is_error);
+              const m = /Exit code (\d+)/i.exec(out);
+              entry.exit = m ? Number(m[1]) : b.is_error ? null : 0;
+            }
           }
         }
       }
