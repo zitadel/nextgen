@@ -32,7 +32,8 @@ keyed on: from an environment id to an origin string.
 | **Environment** | `environments`, seeded per project | **dropped** |
 | **Deployment** | `deployments`, keyed to an environment | kept — the `environment_id` foreign key becomes a plain `origin` string, plus `deploy_id`. The newest row **is** the pointer; `environments.current_deployment_id` is not carried over |
 | **Release** | `releases` | shape kept — `content_hash` becomes the wire identifier, `revoked_at` is new |
-| **Variable** | `variables`, scoped by `environment_id` | kept — the scope column becomes an allowlist pattern and resolves by override |
+| **Variable** | `variables`, scoped by `environment_id` | kept — the scope column goes entirely; a variable is a name on the project |
+| **Deployment variable** | — | **new table**, the immutable snapshot one deployment runs |
 
 ### Project
 
@@ -151,12 +152,8 @@ Immutable, append-only.
   // today, so deleting a release deletes its deployments. It must restrict.
   "release": "sha256:9f2c1a7b4e83d05f6c2b19ae7d430f821c6b5de90a4f7382",
 
-  // NEW - the variables resolved for this target, frozen here. Secrets are
-  // referenced, never copied. See Snapshot at deploy.
-  "variables": {
-    "GOOGLE_CLIENT_ID":     { "value": "preview-xyz.apps.googleusercontent.com" },
-    "GOOGLE_CLIENT_SECRET": { "secret_version": "svs_01KB3F8N2P9S5WQX" }
-  },
+  // The variables this deployment runs are the `deployment_variables` rows
+  // carrying its id - written in this same transaction, never updated.
 
   // These three already exist, inside the `metadata` document. Flat here for
   // readability only - nothing requires promoting them to columns.
@@ -216,27 +213,43 @@ second one — which is current behaviour, not a proposal: the unique index on
 
 ### Variable
 
-Keyed `(name, project_id, scope)`, where `scope` is an allowlist **pattern** and
-the empty string is the project.
+Keyed `(project_id, name)`. Nothing else — no scope, no pattern, no level.
 
 ```jsonc
-// CHANGED - one column. `scope` is today `environment_id`: a foreign key to an
-// `environments` row, matched exactly with no inheritance (ADR 062). Now an
-// allowlist pattern, resolved by override. "" keeps its meaning - the project
-// level, an address of its own and not a wildcard
-// (internal/domain/variable.go:160).
+// CHANGED - the `environment_id` column is removed rather than repurposed.
+// A variable is a name on the project, and the only key is the name. With the
+// snapshot below holding what a target runs, a second targeting mechanism in
+// here would do the same job twice.
 //
-// Everything else - name, value, the secret flag, the timestamps - is as stored.
-// These rows are desired state. What a request reads is the snapshot frozen onto
-// the deployment serving it - see Snapshot at deploy.
-{ "name": "GOOGLE_CLIENT_ID", "scope": "", "value": "prod-abc.apps.googleusercontent.com" }
-{ "name": "GOOGLE_CLIENT_ID", "scope": "https://*-acmeinc.vercel.app",
-  "value": "preview-xyz.apps.googleusercontent.com" }
-{ "name": "GOOGLE_CLIENT_SECRET", "scope": "https://*-acmeinc.vercel.app", "secret": true }
+// So the generated `environment_ref` column, its foreign key, and the ""
+// convention (internal/domain/variable.go:160) all go with it
+// (`000008_variables.sql`).
+{ "project_id": "prj_01K9AA9M3K7E2QX8VB4T", "name": "GOOGLE_CLIENT_ID",
+  "value": "prod-abc.apps.googleusercontent.com", "is_secret": false }
+
+{ "project_id": "prj_01K9AA9M3K7E2QX8VB4T", "name": "GOOGLE_CLIENT_SECRET",
+  "secret_version": "svs_01KB3F8N2P9S5WQX", "is_secret": true }
 ```
 
-The generated `environment_ref` column and its foreign key
-(`000008_variables.sql`) go with the old scope: a pattern references no row.
+### Deployment variable
+
+```jsonc
+// NEW TABLE - keyed (project_id, deployment_id, name). Written once, in the
+// transaction that writes the deployment row, and never updated. This is what
+// a request reads; the table above is only what the next deploy will read.
+{
+  "project_id":    "prj_01K9AA9M3K7E2QX8VB4T",
+  "deployment_id": "dep_01KB3F8N2P9S5WQZ",
+  "name":          "GOOGLE_CLIENT_ID",
+  "value":         "preview-xyz.apps.googleusercontent.com"
+}
+{
+  "project_id":     "prj_01K9AA9M3K7E2QX8VB4T",
+  "deployment_id":  "dep_01KB3F8N2P9S5WQZ",
+  "name":           "GOOGLE_CLIENT_SECRET",
+  "secret_version": "svs_01KB3F8N2P9S5WQY" // referenced, never copied
+}
+```
 
 ## Resolution
 
@@ -264,9 +277,12 @@ it is open. A `preview` pattern matched at layer 1 with no row at layer 2 and no
 permitted header is `400` — a preview URL must never silently fall through to
 production configuration.
 
-**Sealing.** The resolved release is written into the flow state at the first
-step and reused for the rest of the attempt, so a deploy landing mid-sign-in
-cannot change the configuration under the user.
+**Sealing.** The resolved *deployment* id is written into the flow state at the
+first step and reused for the rest of the attempt, so a deploy landing mid
+sign-in cannot change the configuration under the user. Sealing the deployment
+rather than the release pins the resources and the
+[variable snapshot](#immutability-at-runtime) with one pointer, which is why they
+cannot drift apart part-way through an attempt.
 
 ### What each kind of caller sends
 
@@ -284,8 +300,8 @@ publishable key for a shipped app — and layer 3 serves the newest deployment w
 `origin = ""`. To get anything else it must say so with `X-Zitadel-Release`.
 
 The project default is a target like any other, not a fallback computed from the
-origins: `""` is its name in `deployments.origin`, the same convention variables
-use for the project scope. So "which release does a caller with no origin get"
+origins: `""` is simply its name in `deployments.origin`. So "which release does
+a caller with no origin get"
 and "which release does `app.acme.com` get" are the same query against two
 different keys, and `zitadel status` lists `(default)` as its own row for exactly
 that reason.
@@ -629,12 +645,11 @@ scope and a current deployment is an environment. Giving it a different word
 would reintroduce the thing this note removes, along with naming it, listing it,
 seeding it and keeping membership in sync with the allowlist.
 
-Origins are already grouped, by the allowlist pattern that admitted them — and
-variables are already scoped by that same pattern, so the grouping has one
-definition rather than two. What this design does is keep that grouping at the
-request layer: a deploy names a selector, the server expands it, and storage
-stays one row per target. Nothing has to hold a membership list, because
-membership is recomputed from the patterns every time it is needed.
+Origins are already grouped, by the allowlist pattern that admitted them, and
+that grouping stays at the request layer: a deploy names a selector, the server
+expands it, and storage stays one row per target. Nothing has to hold a
+membership list, because membership is recomputed from the patterns every time it
+is needed.
 
 ### Example
 
@@ -817,120 +832,148 @@ credentials are portable between them.
 
 ## Variables
 
-A preview on a production project must be able to use a different IdP client than
-production, without being moved off that project.
+Two mechanisms, kept apart on purpose. Most of the confusion in this area comes
+from one thing trying to be both.
 
-```json
-{ "name": "GOOGLE_CLIENT_ID", "scope": "", "value": "prod-abc.apps.googleusercontent.com" }
-{ "name": "GOOGLE_CLIENT_ID", "scope": "https://*-acmeinc.vercel.app",
-  "value": "preview-xyz.apps.googleusercontent.com" }
+| | **The store** | **The snapshot** |
+|---|---|---|
+| Table | `variables` | `deployment_variables` |
+| Keyed by | `(project_id, name)` | `(project_id, deployment_id, name)` |
+| Written by | a person, when they decide a value | a deploy, in the same transaction as the deployment row |
+| Changes later | yes, that is its job | never |
+| Read by | the next deploy | every request |
+
+The store is a flat list of names on the project. There is no scope, no pattern,
+no level and no inheritance — **a name has one stored value.** Targeting lives in
+the deploy, because the snapshot already records what each target runs and a
+second targeting mechanism in the store would answer the same question twice,
+with the two free to disagree.
+
+### Why a snapshot and not just the store
+
+**Rollback would otherwise lie.** It restores the release and not the values, so
+rolling back to a release that needed last month's IdP client would get this
+month's. Rolling back to a *deployment* restores the pair that was running.
+
+**And a value edit mid sign-in would reshape an attempt underway** — the hazard
+[sealing](#resolution) already removes for resources, and which variables share
+until they are frozen too.
+
+A smaller gain: resolution reads one key instead of deciding anything, so there
+is no resolution logic left on the hot path to get wrong.
+
+### Setting one
+
+```
+$ zitadel variables set GOOGLE_CLIENT_ID prod-abc.apps.googleusercontent.com
+stored. not live until the next deploy.
+
+$ zitadel variables set GOOGLE_CLIENT_SECRET --secret
+value: ********
+stored as svs_01KB3F8N2P9S5WQX. not live until the next deploy.
 ```
 
-A flow served at `acme-git-sso-acmeinc.vercel.app` resolves the preview client;
-the same release served at `app.acme.com` resolves the production one. Same
-release, same project, different credentials.
-
-**The pattern is the key, not the origin row.** A preview origin is created per
-branch and collected on expiry; setting a secret on every new branch URL would
-defeat having a wildcard pattern. A pattern is authored once and reviewed.
-
-**Resolution is override, not exact match.** For each `${{ NAME }}`: the value
-scoped to the matching pattern if one exists, otherwise the project's, otherwise
-the placeholder is left as-is. Without override, a preview scope would have to
-redefine every variable rather than the two that differ. This is the inheritance
-model ADR 062 names as its own follow-up under *Resolving variables*.
-
-Two consequences:
-
-- **A preview silently uses production credentials unless told otherwise.** That
-  is the sensible default. A pattern could mark named variables as
-  non-inheritable, failing the flow closed instead.
-- **The allowlist becomes a table rather than a JSON column**, since entries
-  carry a `kind`, a verification state, and now own variables.
-
-### Snapshot at deploy
-
-Resolve the override chain once, at deploy, and freeze the result onto the
-deployment row. A deployment then determines behaviour completely: the release
-says which resources, the snapshot says with which values.
-
-Two things this fixes.
-
-**Rollback currently lies.** It restores the release and not the values, so
-rolling back to a release that needed last month's IdP client gets this month's.
-With a snapshot, rolling back to a deployment restores the pair that was actually
-running.
-
-**Variables have the release's mid-flow problem and none of its protection.**
-The resolved release is already sealed into flow state at the first step so a
-deploy cannot reshape a sign-in underway. A variable edit mid-flow has exactly
-that hazard today — the snapshot removes it, because the value is fixed before
-the flow starts.
-
-It also takes the override walk off the hot path: resolution reads one document
-instead of matching patterns per `${{ NAME }}`.
-
-#### Where a new preview's values come from
-
-There is nothing to clone, because **the scope is a pattern and a pattern exists
-before any origin it admits does.** `https://*-acmeinc.vercel.app` can hold
-values on the day it is authored; the first branch deployed under it resolves
-them. So `zitadel preview` does what `zitadel deploy` does — walk pattern, then
-project, freeze — and needs no special case.
-
-Cloning from the project default would also be the wrong default. A preview is
-the least-trusted surface on the project, and the reason the pattern scope exists
-is that a preview should use a *different* IdP client, not a copy of the
-production one.
-
-What the client may pass is narrower: **per-deploy overrides for non-secret
-values**, for something genuinely branch-specific like a feature flag.
-
-```http
-POST /deployments
-
-{
-  "release":  "sha256:9f2c1a7b…",
-  "targets":  ["https://acme-git-sso-acmeinc.vercel.app"],
-  "variables": { "FEATURE_NEW_CONSENT": "true" },
-  "ttl":      "7d"
-}
+```
+$ zitadel variables list
+NAME                          TYPE    STORED
+GOOGLE_CLIENT_ID              value   prod-abc.apps.googleu…
+GOOGLE_CLIENT_SECRET          secret  svs_01KB…  (set 10-02)
+GOOGLE_CLIENT_ID_PREVIEW      value   preview-xyz.apps.goog…
+GOOGLE_CLIENT_SECRET_PREVIEW  secret  svs_01KB…  (set 09-14)
 ```
 
-They land in that deployment's snapshot and nowhere else — no pattern row is
-written, so the next branch is unaffected. Secrets are never settable this way:
-the preview credential would otherwise become a way to inject credentials into a
-production project, which is the boundary [Prerequisites](#prerequisites) exists
-to draw.
+One list, one value each, and the only question it answers is "what is stored".
+What is *running* is a different question with a different answer per target, so
+it is a different command:
 
-#### Secrets are referenced, not copied
+```
+$ zitadel variables resolve --origin https://acme-git-sso-acmeinc.vercel.app
+serving dep_01KB3F8N2P9S5WQZ   deployed 10-02 14:10
 
-A snapshot holds plain values inline and secrets as a `secret_version`
-reference. Copying the bytes would multiply every secret by the number of
-deployments that ever used it — each copy to encrypt, and each a place a leak
-survives.
+NAME                  SERVING NOW                FROM
+GOOGLE_CLIENT_ID      preview-xyz.apps.goog…     bound to GOOGLE_CLIENT_ID_PREVIEW
+GOOGLE_CLIENT_SECRET  svs_01KB…                  bound to GOOGLE_CLIENT_SECRET_PREVIEW
+SUPPORT_EMAIL         help@acme.com              store
 
-Referencing also keeps revocation possible. An exposed client secret has to stop
-working *now*, not at the next deploy, so a secret version carries a revoked
-state that beats every snapshot pointing at it — the same shape as `revoked_at`
-on a release. Rotation is then: add a version, deploy to pick it up, revoke the
-old one when nothing serves it.
+  SUPPORT_EMAIL changed in the store since this deployment — deploy to apply
+```
 
-#### What this changes elsewhere
+### How a preview gets different values
 
-- **`zitadel variables set` stops taking effect immediately.** It edits desired
-  state; a deploy applies it. `zitadel status` must show the gap — *"2 variables
-  changed since the last deploy to `app.acme.com`"* — or the command looks
-  broken.
-- **A deploy can carry only a variable change.** Same release, new deployment
+A preview on a production project still has to use a different IdP client than
+production. That difference is a property of **the deploy**, not of the project:
+the pipeline that creates previews is the thing that knows a preview is being
+created.
+
+So the deploy binds a name to a different stored name:
+
+```yaml
+- run: zitadel preview --ttl 7d
+         --bind GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID_PREVIEW
+         --bind GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET_PREVIEW
+```
+
+The snapshot then holds the preview values under the names the release asks for,
+and `app.acme.com` keeps serving the production ones. Same release, same project,
+different credentials — which was the requirement.
+
+**A binding names a variable; it never carries a value.** That is what lets the
+narrow preview credential of [Prerequisites](#prerequisites) be allowed to bind
+at all: resolving `GOOGLE_CLIENT_SECRET_PREVIEW` happens server-side, so CI never
+holds the secret and a leaked pipeline token reveals no values. A literal
+override is also allowed for genuinely per-branch things, and only for
+non-secrets:
+
+```
+zitadel preview --ttl 7d --var FEATURE_NEW_CONSENT=true
+```
+
+**What this costs.** The preview mapping lives in the workflow file and is
+repeated in every pipeline that deploys previews, where a pattern scope would
+have stored it once. The trade is deliberate: one authoring model instead of two,
+the mapping visible in a reviewed file next to the job that uses it, and no
+server-side rule that silently applies to a class of origins nobody is looking
+at. If several pipelines end up repeating the same bindings, that is the signal
+to reconsider — not before.
+
+### Immutability at runtime
+
+Four properties, each from a different part of the model:
+
+1. **Snapshot rows are written once**, in the transaction that writes the
+   deployment, and never updated. A deployment is never a partially-rewritten
+   value set.
+2. **Editing the store cannot reach a snapshot.** Different table, no shared row,
+   no cascade. `zitadel variables set` during a sign-in changes nothing that
+   sign-in can see.
+3. **A flow seals the deployment id, not the release digest.** One pointer pins
+   the resources *and* the values, so the two cannot drift apart mid-attempt.
+   This replaces sealing the release, and is strictly stronger.
+4. **Secret versions are immutable.** A rotation mints a new version; the old one
+   keeps its bytes for as long as a deployment references it. Revocation is the
+   single exception and it fails closed — a revoked version refuses, rather than
+   quietly resolving to a newer one.
+
+### Why the snapshot is a table and not a document
+
+The deployment row already carries a `metadata` document, so a variables
+document would have been idiomatic. But rotation needs the reverse lookup:
+*which deployments still reference `svs_01KB…`*, so the old version can be
+revoked once nothing serves it. That is a query by secret version, which a table
+indexes and a JSON column in three dialects does not.
+
+### What this changes elsewhere
+
+- **`createDeployment`'s idempotency key moves.** It answers `200` and writes
+  nothing today when the named release is already running. The key has to become
+  the release *and* the resolved value set, or a deploy whose only purpose is a
+  changed variable would be silently discarded.
+- **A deploy may carry only a variable change.** Same release, new deployment
   row, so the history shows one digest twice with different snapshots. That is
-  the escape hatch for a wrong value, and it is a deploy rather than an edit.
-- **The idempotency rule moves.** `createDeployment` today answers `200` and
-  writes nothing when the named release is already running. The key becomes the
-  pair: same release *and* same resolved snapshot.
-- **Variables stay on the deployment, not the release.** The same release has to
-  run with different values on different origins — that is the whole premise
-  above. Pinning them to the release would make that impossible.
+  the fix for a wrong value: a deploy, not an edit — see [Open 7](#open).
+- **Variables never move onto the release.** The same release has to run with
+  different values on different origins, which is the preview case above.
+  Pinning them to the release would make that impossible.
 
 ## Promotion
 
@@ -1444,29 +1487,19 @@ https://*.preview.acme.com        preview   domain verified ✓
 
 ### `zitadel variables`
 
+`set` and `list` address the store, `resolve --origin` reads the snapshot a
+target is running — the transcripts are under
+[Variables](#setting-one). Two commands because they answer two questions, and
+conflating them is how "I set it and nothing happened" happens.
+
 ```
-$ zitadel variables list
-NAME                  SCOPE                             VALUE
-GOOGLE_CLIENT_ID      (project)                         prod-abc.apps.googleu…
-GOOGLE_CLIENT_SECRET  (project)                         ********
-GOOGLE_CLIENT_ID      https://*-acmeinc.vercel.app      preview-xyz.apps.goog…
-GOOGLE_CLIENT_SECRET  https://*-acmeinc.vercel.app      ********
-
-$ zitadel variables resolve --origin https://acme-git-sso-acmeinc.vercel.app
-matched https://*-acmeinc.vercel.app (preview)
-
-NAME                  SERVING NOW                NEXT DEPLOY        FROM
-GOOGLE_CLIENT_ID      preview-xyz.apps.goog…     preview-xyz.ap…    pattern
-GOOGLE_CLIENT_SECRET  ********                   ********           pattern
-SUPPORT_EMAIL         help@acme.com              hello@acme.com     project (changed)
-
-  1 variable changed since dep_01KB3F8N2P9S5WQZ — run `zitadel deploy` to apply
+$ zitadel variables rm GOOGLE_CLIENT_ID_PREVIEW
+removed from the store. 2 deployments still reference it; they are unaffected.
 ```
 
-Two columns because there are two questions, and
-[snapshotting](#snapshot-at-deploy) separates them: `SERVING NOW` is read from
-the snapshot on the deployment this origin is running, and `NEXT DEPLOY` is what
-the override chain resolves to today. A `set` moves the right-hand column only.
+Removing from the store never reaches a snapshot, which is the whole point of
+[runtime immutability](#immutability-at-runtime) — and the reason the message
+says so out loud rather than reporting a bare success.
 
 ### `zitadel rollback`
 
