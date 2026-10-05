@@ -1,6 +1,8 @@
 // Package harness is the Go side of the benchmark harness: the operations the
 // scenarios drive through the generated client, the fixtures that provision a
-// target, the local server lifecycle, the sweep runner and the summariser.
+// target, the sweep runner and the summariser. A running, healthy server is
+// a prerequisite: whoever provisions a lane (Moon locally, a container or a
+// cloud deployment elsewhere) starts it, and the harness is pointed at it.
 // The k6 JavaScript module (k6module) and the `k6 x nextgen` subcommand tree
 // (k6cmd) are thin layers over it.
 package harness

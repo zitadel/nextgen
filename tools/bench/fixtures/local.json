@@ -1,5 +1,5 @@
 {
-  "$comment": "What `k6 nextgen bootstrap` provisions on a throwaway local server. Nothing here is a secret: the password only ever guards a user on a database the sweep creates and discards.",
+  "$comment": "What `k6 x nextgen bootstrap` provisions on the local lane's server. Nothing here is a secret: the password only ever guards a user on a throwaway local database.",
   "project": {
     "name": "bench-local",
     "preview_origins": ["http://localhost:3000"],

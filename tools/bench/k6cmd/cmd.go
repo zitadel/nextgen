@@ -1,5 +1,9 @@
 // Package k6cmd registers the `k6 x nextgen` subcommand tree: bootstrap a
 // target from a fixture file, run a sweep, summarise a sweep directory.
+//
+// Every command runs against a server somebody else started: Moon on the
+// local lane, a container or a cloud deployment on the others. The harness
+// only checks that it is there and healthy.
 package k6cmd
 
 import (
@@ -31,7 +35,8 @@ func newCommand(gs *state.GlobalState) *cobra.Command {
 		Long: `Benchmark the nextgen API.
 
 The scenarios live in the k6/x/nextgen module compiled into this binary; these
-commands provision what they run against, run them, and summarise the result.`,
+commands provision a running server, run the scenarios against it, and
+summarise the result. Starting the server is the lane's job, not theirs.`,
 		SilenceUsage: true,
 	}
 	root.AddCommand(newBootstrapCommand(gs), newSweepCommand(gs), newSummarizeCommand(gs))
@@ -44,22 +49,15 @@ func newBootstrapCommand(gs *state.GlobalState) *cobra.Command {
 		Use:   "bootstrap",
 		Short: "Provision the project and user a fixture file declares on a running server",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			fx, err := harness.LoadFixture(fixtures)
+			target, err := bootstrap(cmd.Context(), gs, base, lane, fixtures, stateFile)
 			if err != nil {
-				return err
-			}
-			target, err := harness.Bootstrap(cmd.Context(), base, lane, fx)
-			if err != nil {
-				return err
-			}
-			if err := harness.SaveTarget(stateFile, target); err != nil {
 				return err
 			}
 			fmt.Fprintf(gs.Stdout, "project %s user %s → %s\n", target.ProjectID, target.UserID, stateFile)
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&base, "base", "", "Base URL of the server to provision (required)")
+	cmd.Flags().StringVar(&base, "base", "", "Base URL of the running server to provision (required)")
 	cmd.Flags().StringVar(&fixtures, "fixtures", "fixtures/local.json", "Fixture file declaring the project and user")
 	cmd.Flags().StringVar(&stateFile, "state", "out/target.json", "Where to write the provisioned target")
 	cmd.Flags().StringVar(&lane, "lane", "local", "Lane tag recorded on every sample")
@@ -69,20 +67,18 @@ func newBootstrapCommand(gs *state.GlobalState) *cobra.Command {
 
 func newSweepCommand(gs *state.GlobalState) *cobra.Command {
 	var (
-		base, server, fixtures, stateFile, lane, out, script, scenarios, vus string
-		duration                                                             time.Duration
-		port                                                                 int
-		raw                                                                  bool
+		base, fixtures, stateFile, lane, out, script, scenarios, vus string
+		duration                                                     time.Duration
+		raw                                                          bool
 	)
 	cmd := &cobra.Command{
 		Use:   "sweep",
 		Short: "Run every scenario at every VU count, one run at a time, and summarise",
 		Long: `Run every scenario at every VU count, one run at a time, and summarise.
 
-The target is one of, in order of precedence: --state (an already provisioned
-target), --base (a running server, provisioned from --fixtures first), or
---server (a nextgen server binary this command starts on SQLite in a fresh
-data directory, provisions, measures and stops).`,
+The target is --state (a target bootstrap already provisioned) or --base (a
+running server, provisioned from --fixtures first). Either way the server
+must already be up and answering /healthz; the sweep never starts one.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
 			dir := out
@@ -93,11 +89,10 @@ data directory, provisions, measures and stops).`,
 				return err
 			}
 
-			target, stop, err := resolveTarget(ctx, gs, base, server, port, fixtures, stateFile, lane, dir)
+			target, err := resolveTarget(ctx, gs, base, fixtures, stateFile, lane, dir)
 			if err != nil {
 				return err
 			}
-			defer stop()
 
 			scriptPath := script
 			if scriptPath == "" {
@@ -136,9 +131,7 @@ data directory, provisions, measures and stops).`,
 	}
 	cmd.Flags().StringVar(&stateFile, "state", "", "An already provisioned target (written by bootstrap)")
 	cmd.Flags().StringVar(&base, "base", "", "A running server to provision and measure")
-	cmd.Flags().StringVar(&server, "server", "", "A nextgen server binary to start for the sweep")
-	cmd.Flags().IntVar(&port, "port", 0, "Port for --server; 0 picks a free one")
-	cmd.Flags().StringVar(&fixtures, "fixtures", "fixtures/local.json", "Fixture file for --base and --server")
+	cmd.Flags().StringVar(&fixtures, "fixtures", "fixtures/local.json", "Fixture file applied to --base")
 	cmd.Flags().StringVar(&lane, "lane", "local", "Lane tag recorded on every sample")
 	cmd.Flags().StringVar(&out, "out", "", "Output directory (default out/sweep-<timestamp>)")
 	cmd.Flags().StringVar(&script, "script", "", "k6 entry script (default: the embedded bench.js)")
@@ -169,39 +162,27 @@ func newSummarizeCommand(gs *state.GlobalState) *cobra.Command {
 	}
 }
 
-// resolveTarget picks the target the flags describe and returns what to do
-// when the sweep is over.
-func resolveTarget(ctx context.Context, gs *state.GlobalState, base, server string, port int, fixtures, stateFile, lane, dir string) (harness.Target, func(), error) {
-	noop := func() {}
+// resolveTarget picks the target the flags describe and proves the server
+// behind it is up before anything is written or measured.
+func resolveTarget(ctx context.Context, gs *state.GlobalState, base, fixtures, stateFile, lane, dir string) (harness.Target, error) {
 	switch {
 	case stateFile != "":
 		t, err := harness.LoadTarget(stateFile)
-		return t, noop, err
+		if err != nil {
+			return harness.Target{}, err
+		}
+		return t, harness.CheckReady(ctx, t.Base)
 	case base != "":
-		t, err := bootstrap(ctx, gs, base, lane, fixtures, dir)
-		return t, noop, err
-	case server != "":
-		fmt.Fprintf(gs.Stdout, "starting %s\n", server)
-		srv, err := harness.StartServer(ctx, harness.ServerConfig{Binary: server, Dir: filepath.Join(dir, "server"), Port: port})
-		if err != nil {
-			return harness.Target{}, noop, err
-		}
-		t, err := bootstrap(ctx, gs, srv.Base, lane, fixtures, dir)
-		if err != nil {
-			_ = srv.Stop()
-			return harness.Target{}, noop, err
-		}
-		return t, func() {
-			if err := srv.Stop(); err != nil {
-				fmt.Fprintf(gs.Stderr, "stopping server: %v\n", err)
-			}
-		}, nil
+		return bootstrap(ctx, gs, base, lane, fixtures, filepath.Join(dir, "target.json"))
 	default:
-		return harness.Target{}, noop, fmt.Errorf("one of --state, --base or --server is required")
+		return harness.Target{}, fmt.Errorf("one of --state or --base is required")
 	}
 }
 
-func bootstrap(ctx context.Context, gs *state.GlobalState, base, lane, fixtures, dir string) (harness.Target, error) {
+func bootstrap(ctx context.Context, gs *state.GlobalState, base, lane, fixtures, stateFile string) (harness.Target, error) {
+	if err := harness.CheckReady(ctx, base); err != nil {
+		return harness.Target{}, err
+	}
 	fx, err := harness.LoadFixture(fixtures)
 	if err != nil {
 		return harness.Target{}, err
@@ -211,7 +192,7 @@ func bootstrap(ctx context.Context, gs *state.GlobalState, base, lane, fixtures,
 		return harness.Target{}, err
 	}
 	fmt.Fprintf(gs.Stdout, "provisioned project %s user %s on %s\n", t.ProjectID, t.UserID, base)
-	return t, harness.SaveTarget(filepath.Join(dir, "target.json"), t)
+	return t, harness.SaveTarget(stateFile, t)
 }
 
 func parseInts(s string) ([]int, error) {

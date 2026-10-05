@@ -55,30 +55,17 @@ tasks:
     inputs:
       - "@group(benchInputs)"
 
-  # The server the local sweep measures. Built here rather than through
-  # workspace:server so the sweep needs no embedded UI build: the harness
-  # starts it with both UI surfaces disabled.
-  build-server:
-    command: "go build -o tools/bench/out/nextgen-server ."
-    inputs:
-      - "/**/*.go"
-      - "/**/*.sql"
-      - "/go.mod"
-      - "/go.sum"
-    outputs:
-      - "out/nextgen-server"
-    options:
-      runFromWorkspaceRoot: true
-      runInCI: false
-
-  # Local sweep: start a server on SQLite, provision fixtures/local.json,
-  # run every scenario at 1, 5 and 20 VUs, summarise. Pass flags through:
+  # Local sweep against a server that is already running: provision
+  # fixtures/local.json, run every scenario at 1, 5 and 20 VUs, summarise.
+  # The harness never starts a server; locally that is `moon run
+  # workspace:server` in another terminal (default port 8080). Pass flags
+  # through, later flags win:
   #   moon run bench:sweep -- --vus 5 --duration 10s --scenarios getUser
+  #   moon run bench:sweep -- --base http://localhost:9090 --lane postgres
   sweep:
-    command: "out/k6 x nextgen sweep --server out/nextgen-server --fixtures fixtures/local.json"
+    command: "out/k6 x nextgen sweep --base http://localhost:8080 --fixtures fixtures/local.json"
     deps:
       - "build"
-      - "build-server"
     options:
       cache: false
       runInCI: false
