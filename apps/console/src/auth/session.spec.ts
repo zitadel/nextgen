@@ -55,6 +55,9 @@ function stubCsrf(respond: () => Response) {
 const token = (value: string) => () => HttpResponse.json({ csrf_token: value });
 const failing = () => HttpResponse.json({ code: "internal", message: "no" }, { status: 500 });
 
+/** Resolves false after the pending requests had their turn. */
+const pending = () => new Promise<false>((resolve) => setTimeout(() => resolve(false), 50));
+
 /** What customFetch does on a 403 auth.csrf_invalid: ask for a token to retry with. */
 function rejectWrite(): Promise<string | undefined> {
   const onRejected = getApiCsrfRejectionHandler();
@@ -117,11 +120,62 @@ describe("fetchSession", () => {
     vi.setSystemTime(Date.now() + 60_000);
     stubSession("user_b");
     const calls = stubCsrf(token("tok_b"));
-    expect(await fetchSession()).toBeNull();
+    // It never settles: answering null would send the guard to /login while
+    // the reload is pending.
+    const settled = await Promise.race([fetchSession().then(() => true), pending()]);
 
+    expect(settled).toBe(false);
     expect(calls()).toBe(0);
     expect(getApiCsrfToken()).toBeUndefined();
     expect(sessionPage.reload).toHaveBeenCalledOnce();
+  });
+
+  // A lost session takes the person with it, so signing in as someone else
+  // afterwards (/login, a claim page) adopts them without a reload.
+  it.each([
+    ["a 401", null],
+    ["an anonymous session", "anonymous"],
+  ] as const)("forgets the person after %s", async (_, lost) => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    stubSession("user_a");
+    stubCsrf(token("tok_a"));
+    await fetchSession();
+
+    vi.setSystemTime(Date.now() + 60_000);
+    if (lost === "anonymous") {
+      server.use(
+        http.get("*/sessions/me", () =>
+          HttpResponse.json(makeTestSession({ user_id: undefined })),
+        ),
+      );
+    } else {
+      stubSession(null);
+    }
+    expect(await fetchSession()).toBeNull();
+    expect(getApiCsrfToken()).toBeUndefined();
+
+    stubSession("user_b");
+    stubCsrf(token("tok_b"));
+    expect(await fetchSession()).toMatchObject({ user_id: "user_b" });
+
+    expect(getApiCsrfToken()).toBe("tok_b");
+    expect(sessionPage.reload).not.toHaveBeenCalled();
+  });
+
+  it("keeps the person when the session cannot be read", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    stubSession("user_a");
+    stubCsrf(token("tok_a"));
+    await fetchSession();
+
+    vi.setSystemTime(Date.now() + 60_000);
+    stubSession("unreachable");
+    expect(await fetchSession()).toBeNull();
+    expect(getApiCsrfToken()).toBe("tok_a");
+
+    stubSession("user_b");
+    void fetchSession();
+    await vi.waitFor(() => expect(sessionPage.reload).toHaveBeenCalledOnce());
   });
 });
 
@@ -192,5 +246,36 @@ describe("CSRF rejection", () => {
     expect(await rejectWrite()).toBeUndefined();
     expect(getApiCsrfToken()).toBeUndefined();
     expect(sessionPage.reload).not.toHaveBeenCalled();
+  });
+
+  // A navigation's fetchSession can see the other person first and start over
+  // while the re-check is still reading: the page reloads once, not twice.
+  it("leaves a start-over that happened meanwhile alone", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    stubSession("user_a");
+    stubCsrf(token("tok_a"));
+    await fetchSession();
+
+    vi.setSystemTime(Date.now() + 60_000);
+    let answer!: () => void;
+    const held = new Promise<void>((resolve) => (answer = resolve));
+    let reads = 0;
+    server.use(
+      http.get("*/sessions/me", async () => {
+        // The re-check's read is held until fetchSession has started over.
+        if (reads++ === 0) await held;
+        return HttpResponse.json(makeTestSession({ user_id: "user_b" }));
+      }),
+    );
+    stubCsrf(token("tok_b"));
+
+    const rejected = rejectWrite();
+    void fetchSession();
+    await vi.waitFor(() => expect(sessionPage.reload).toHaveBeenCalledOnce());
+    answer();
+
+    expect(await rejected).toBeUndefined();
+    expect(sessionPage.reload).toHaveBeenCalledOnce();
+    expect(getApiCsrfToken()).toBeUndefined();
   });
 });
