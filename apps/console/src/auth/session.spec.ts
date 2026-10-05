@@ -7,7 +7,12 @@ import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { fetchSession, invalidateSessionCache, sessionPage } from "./session";
+import {
+  _resetSessionForTesting,
+  fetchSession,
+  invalidateSessionCache,
+  sessionPage,
+} from "./session";
 import { makeTestSession } from "./session.fixture";
 
 const server = setupServer();
@@ -15,7 +20,7 @@ const server = setupServer();
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterAll(() => server.close());
 beforeEach(() => {
-  invalidateSessionCache();
+  _resetSessionForTesting();
   vi.spyOn(sessionPage, "reload").mockImplementation(() => undefined);
 });
 afterEach(() => {
@@ -38,6 +43,11 @@ function stubSession(userId: string | null | "unreachable") {
         : HttpResponse.json({ code: "auth.unauthorized", message: "no" }, { status: 401 });
     }),
   );
+}
+
+/** Answers GET /sessions/me with a session built from `overrides`. */
+function stubSessionBody(overrides: Parameters<typeof makeTestSession>[0]) {
+  server.use(http.get("*/sessions/me", () => HttpResponse.json(makeTestSession(overrides))));
 }
 
 /** Answers GET /sessions/me/csrf with `respond`; reports how often it was asked. */
@@ -130,36 +140,62 @@ describe("fetchSession", () => {
     expect(sessionPage.reload).toHaveBeenCalledOnce();
   });
 
-  // A lost session takes the person with it, so signing in as someone else
-  // afterwards (/login, a claim page) adopts them without a reload.
-  it.each([
-    ["a 401", null],
-    ["an anonymous session", "anonymous"],
-  ] as const)("forgets the person after %s", async (_, lost) => {
-    vi.useFakeTimers({ toFake: ["Date"] });
+  // The person belongs to the document, so losing the session does not clear
+  // it: the same person signing in again carries on, and anyone else means a
+  // fresh document.
+  describe.each([
+    ["a 401", () => stubSession(null)],
+    ["an anonymous session", () => stubSessionBody({ user_id: undefined })],
+    ["an expired session", () => stubSessionBody({ user_id: "user_a", state: "expired" })],
+  ] as const)("after %s", (_, loseSession) => {
+    async function signInThenLose() {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      stubSession("user_a");
+      stubCsrf(token("tok_a"));
+      await fetchSession();
+
+      vi.setSystemTime(Date.now() + 60_000);
+      loseSession();
+      expect(await fetchSession()).toBeNull();
+      // The token belonged to the lost session.
+      expect(getApiCsrfToken()).toBeUndefined();
+    }
+
+    it("carries on when the same person signs in again", async () => {
+      await signInThenLose();
+      stubSession("user_a");
+      stubCsrf(token("tok_a2"));
+
+      expect(await fetchSession()).toMatchObject({ user_id: "user_a" });
+      expect(getApiCsrfToken()).toBe("tok_a2");
+      expect(sessionPage.reload).not.toHaveBeenCalled();
+    });
+
+    it("starts over when someone else signs in", async () => {
+      await signInThenLose();
+      stubSession("user_b");
+      stubCsrf(token("tok_b"));
+
+      void fetchSession();
+      await vi.waitFor(() => expect(sessionPage.reload).toHaveBeenCalledOnce());
+      // Read alongside the session, but never stored.
+      expect(getApiCsrfToken()).toBeUndefined();
+    });
+  });
+
+  // The 401 boundary drops the cache to read the session afresh; that must not
+  // drop the person with it, or the boundary would adopt someone else in place.
+  it("starts over after a cache drop when someone else is signed in", async () => {
     stubSession("user_a");
     stubCsrf(token("tok_a"));
     await fetchSession();
 
-    vi.setSystemTime(Date.now() + 60_000);
-    if (lost === "anonymous") {
-      server.use(
-        http.get("*/sessions/me", () =>
-          HttpResponse.json(makeTestSession({ user_id: undefined })),
-        ),
-      );
-    } else {
-      stubSession(null);
-    }
-    expect(await fetchSession()).toBeNull();
-    expect(getApiCsrfToken()).toBeUndefined();
-
+    invalidateSessionCache();
     stubSession("user_b");
-    stubCsrf(token("tok_b"));
-    expect(await fetchSession()).toMatchObject({ user_id: "user_b" });
+    void fetchSession();
 
-    expect(getApiCsrfToken()).toBe("tok_b");
-    expect(sessionPage.reload).not.toHaveBeenCalled();
+    await vi.waitFor(() => expect(sessionPage.reload).toHaveBeenCalledOnce());
+    expect(getApiCsrfToken()).toBeUndefined();
   });
 
   it("keeps the person when the session cannot be read", async () => {
