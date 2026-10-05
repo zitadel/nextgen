@@ -93,6 +93,7 @@ catalog:
   react-dom: ^19.2.8
   react-server-dom-webpack: 19.2.8
   safe-stable-stringify: ^2.5.0
+  sanitize-html: ^2.18.0
   semver: ^7.7.3
   sharp: ^0.35.3
   shiki: ^4.2.0

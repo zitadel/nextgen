@@ -27,6 +27,14 @@ export function parseStage(file) {
   const cmdById = new Map();
   let final = "";
   const results = [];
+  // Track the last entry pushed in the current agent turn so we can attribute
+  // that turn's `result.duration_ms` to it (shown per message in the report).
+  let lastInTurn = null;
+  const push = (entry) => {
+    transcript.push(entry);
+    lastInTurn = entry;
+    return entry;
+  };
   for (const line of readFileSync(file, "utf8").split("\n")) {
     if (!line.trim()) continue;
     let e;
@@ -36,16 +44,15 @@ export function parseStage(file) {
       continue;
     }
     if (e.type === "sim_user") {
-      transcript.push({ role: "user", kind: "answer", text: e.text ?? "" });
+      push({ role: "user", kind: "answer", text: e.text ?? "" });
     } else if (e.type === "assistant") {
       for (const b of e.message?.content ?? []) {
         if (b?.type === "tool_use" && b.name === "Bash") {
-          const entry = { role: "agent", kind: "command", cmd: b.input?.command ?? "", out: "" };
+          const entry = push({ role: "agent", kind: "command", cmd: b.input?.command ?? "", out: "" });
           cmdById.set(b.id, entry);
-          transcript.push(entry);
         } else if (b?.type === "text" && (b.text ?? "").trim()) {
           final = b.text ?? "";
-          transcript.push({ role: "agent", kind: "text", text: b.text ?? "" });
+          push({ role: "agent", kind: "text", text: b.text ?? "" });
         }
       }
     } else if (e.type === "user") {
@@ -62,6 +69,8 @@ export function parseStage(file) {
       }
     } else if (e.type === "result") {
       results.push(e);
+      if (lastInTurn && lastInTurn.ms == null) lastInTurn.ms = e.duration_ms ?? null;
+      lastInTurn = null; // next turn attributes to its own last entry
     }
   }
   const pairs = transcript.filter((t) => t.kind === "command").map((t) => ({ cmd: t.cmd, out: t.out }));
@@ -69,19 +78,26 @@ export function parseStage(file) {
   return { pairs, transcript, final, result };
 }
 
-/** Collapse per-turn `result` events into one: last turn's error, summed turns/usage. */
+/** Collapse per-turn `result` events into one: last turn's error, summed turns/usage/time. */
 function aggregateResults(results) {
   if (!results.length) return {};
   const last = results[results.length - 1];
   const usage = {};
   let numTurns = 0;
+  let durationMs = 0;
   for (const r of results) {
     numTurns += r.num_turns ?? 0;
+    durationMs += r.duration_ms ?? 0;
     for (const [k, v] of Object.entries(r.usage ?? {})) {
       if (typeof v === "number") usage[k] = (usage[k] ?? 0) + v;
     }
   }
-  return { is_error: last.is_error ?? false, num_turns: numTurns || last.num_turns, usage };
+  return {
+    is_error: last.is_error ?? false,
+    num_turns: numTurns || last.num_turns,
+    duration_ms: durationMs,
+    usage,
+  };
 }
 
 export function tokens(result) {
@@ -176,6 +192,7 @@ export function gradeConfig(cfgDir, stages) {
       parsed,
       tokens: tokens(parsed.result),
       turns: parsed.result?.num_turns ?? "?",
+      ms: parsed.result?.duration_ms ?? 0,
     };
   });
 }

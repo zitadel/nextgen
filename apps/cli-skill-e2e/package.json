@@ -11,6 +11,7 @@
   },
   "devDependencies": {
     "marked": "catalog:",
+    "sanitize-html": "catalog:",
     "vitest": "catalog:"
   }
 }

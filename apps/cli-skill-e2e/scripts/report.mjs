@@ -1,11 +1,16 @@
-// Renders the journey eval results into a self-contained tabbed HTML page:
-// one tab per stage, each command shown with its real output underneath,
-// with-skill vs baseline, plus per-stage tokens.
-import { readFileSync, writeFileSync, existsSync } from "node:fs";
-import { join, dirname } from "node:path";
+// Renders the journey eval results into a self-contained, offline HTML report:
+// one tab per stage, the full agent↔user conversation with every command and
+// its output, with-skill vs baseline, per-stage and per-turn timings, and
+// run metadata (when, where, which commit). Everything is inlined so the file
+// can be opened from disk or shared as-is.
+import { execSync } from "node:child_process";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { hostname } from "node:os";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { marked } from "marked";
+import sanitizeHtml from "sanitize-html";
 
 import { gradeConfig } from "./lib.mjs";
 
@@ -17,24 +22,66 @@ const stages = cfg.stages;
 const CONFIG_LABELS = { "with-skill": "With skill", baseline: "Baseline (no skill)" };
 
 const esc = (s) =>
-  String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 
-// The agent's answers are GitHub-flavoured markdown (tables, lists, fenced and
-// inline code, bold). Render them with `marked` rather than a hand-rolled
-// parser — it runs here at generation time, so the report stays a
-// self-contained, offline HTML file with no runtime dependency. The source is
-// our own eval transcript (trusted), so marked's default raw-HTML passthrough
-// is fine; swap in a sanitizer here if this ever renders untrusted input.
+// --- Run metadata -----------------------------------------------------------
+const git = (args) => {
+  try {
+    return execSync(`git ${args}`, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+  } catch {
+    return "";
+  }
+};
+const meta = {
+  generatedAt: new Date().toISOString(),
+  host: hostname(),
+  node: process.version,
+  model: process.env.MODEL || "sonnet",
+  simModel: process.env.SIM_MODEL || "haiku",
+  branch: process.env.BRANCH || git("rev-parse --abbrev-ref HEAD"),
+  commit: git("rev-parse --short HEAD"),
+  commitFull: git("rev-parse HEAD"),
+  dirty: Boolean(git("status --porcelain")),
+};
+
+// --- Markdown (sanitised) ----------------------------------------------------
+// Agent/user text is model output, not trusted HTML: `marked` passes raw HTML
+// through, and teardown auto-opens the report, so an unsanitised transcript
+// could execute script in the local file origin. Render markdown, then strip
+// everything that isn't a safe formatting tag.
 marked.setOptions({ gfm: true });
+const SANITIZE = {
+  allowedTags: [
+    "p", "br", "hr", "strong", "em", "b", "i", "s", "del", "code", "pre", "kbd",
+    "blockquote", "a", "ul", "ol", "li", "table", "thead", "tbody", "tr", "th", "td",
+    "h1", "h2", "h3", "h4", "h5", "h6", "span",
+  ],
+  allowedAttributes: { a: ["href", "title"], th: ["align"], td: ["align"] },
+  allowedSchemes: ["http", "https", "mailto"],
+  transformTags: {
+    a: sanitizeHtml.simpleTransform("a", { rel: "noopener noreferrer nofollow", target: "_blank" }),
+  },
+};
+const mdToHtml = (text) => sanitizeHtml(marked.parse(String(text ?? "")), SANITIZE);
 
-function mdToHtml(text) {
-  return marked.parse(String(text ?? ""));
-}
+// --- Timing helpers (server fallback; the browser re-formats with Intl) ------
+const durFallback = (ms) => {
+  if (ms == null) return "";
+  const s = Math.round(ms / 1000);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const r = s % 60;
+  return `${h ? h + "h " : ""}${m ? m + "m " : ""}${r}s`;
+};
+const dur = (ms) =>
+  ms ? `<span class="dur" data-ms="${ms}">${esc(durFallback(ms))}</span>` : "";
+const timeEl = (iso) =>
+  `<time class="ts" datetime="${esc(iso)}" data-iso="${esc(iso)}">${esc(iso)}</time>`;
 
 function badge(status) {
-  const m = { pass: ["ok", "PASS"], fail: ["no", "FAIL"], blocked: ["bl", "BLOCKED"] };
+  const m = { pass: ["ok", "Pass"], fail: ["no", "Fail"], blocked: ["bl", "Blocked"] };
   const [c, t] = m[status] || ["no", "?"];
-  return `<span class="b ${c}">${t}</span>`;
+  return `<span class="b ${c}" role="status">${t}</span>`;
 }
 
 function cmdBlock(p) {
@@ -45,115 +92,240 @@ function cmdBlock(p) {
     o = o.slice(0, 2500);
     trunc = "\n… (truncated)";
   }
-  return `<div class="cmd"><div class="c">${cmd}</div><div class="o">${esc(o)}${esc(trunc)}</div></div>`;
+  return `<div class="cmd"><div class="c"><code>${cmd}</code></div><pre class="o">${esc(o)}${esc(trunc)}</pre></div>`;
 }
 
-function userBubble(text, label) {
-  return `<div class="msg user"><div class="lbl">${esc(label)}</div><div class="md">${mdToHtml(text)}</div></div>`;
+function bubble(kind, label, text, ms) {
+  const time = ms ? `<span class="turn-time" title="agent turn time">${dur(ms)}</span>` : "";
+  return `<div class="msg ${kind}"><div class="lbl">${esc(label)}${time}</div><div class="md">${mdToHtml(text)}</div></div>`;
 }
 
-function agentBubble(text) {
-  return `<div class="msg agent"><div class="lbl">AGENT</div><div class="md">${mdToHtml(text)}</div></div>`;
-}
-
-// Render the whole stage as a conversation, in order: the opening prompt, then
-// each agent message / command and each simulated-user answer as they happened.
-// This is what makes the back-and-forth visible — what the agent asked and what
-// we answered — not just the commands it ended up running.
+// The whole stage as a conversation, in order: opening prompt, then each agent
+// message / command and each simulated-user answer as they happened.
 function convo(prompt, transcript) {
-  const parts = [userBubble(prompt, "PROMPT")];
+  const parts = [bubble("user", "Prompt", prompt)];
   for (const t of transcript) {
     if (t.kind === "command") parts.push(cmdBlock(t));
-    else if (t.kind === "text") parts.push(agentBubble(t.text));
-    else if (t.kind === "answer") parts.push(userBubble(t.text, "USER ANSWER"));
+    else if (t.kind === "text") parts.push(bubble("agent", "Agent", t.text, t.ms));
+    else if (t.kind === "answer") parts.push(bubble("user", "User answer", t.text));
   }
   return parts.join("\n");
 }
 
-const CSS = `*{box-sizing:border-box}body{font:14px/1.55 -apple-system,Segoe UI,sans-serif;margin:0;color:#111;background:#f7f8fa}
-header{background:#0b0f19;color:#fff;padding:18px 28px}header h1{margin:0;font-size:19px}header p{margin:4px 0 0;color:#9aa4b2;font-size:13px}
-.tabs{display:flex;gap:4px;background:#0b0f19;padding:0 28px;flex-wrap:wrap}
-.tab{padding:12px 20px;color:#9aa4b2;cursor:pointer;border-bottom:3px solid transparent;font-weight:600;font-size:13px}
-.tab:hover{color:#fff}.tab.active{color:#fff;border-bottom-color:#6ee7b7}
-.wrap{max-width:1000px;margin:0 auto;padding:24px 28px}
-.stage-panel{display:none}.prompt{color:#555;margin:2px 0 18px;font-size:15px}
-.cfg{margin:18px 0;border:1px solid #e5e7eb;border-radius:12px;background:#fff;overflow:hidden}
-.cfg>summary{list-style:none;padding:12px 16px;font-weight:700;background:#f3f4f6;display:flex;align-items:center;gap:10px;cursor:pointer}
-.cfg>summary::-webkit-details-marker{display:none}.cfg .body{padding:16px}
-.b{font-size:11px;font-weight:800;padding:3px 10px;border-radius:999px;color:#fff;letter-spacing:.3px}
-.b.ok{background:#16a34a}.b.no{background:#dc2626}.b.bl{background:#6b7280}
-.why{color:#6b7280;font-size:12px;font-weight:500;margin-left:auto}
-.cmd{margin:0 0 14px;border-radius:10px;overflow:hidden;border:1px solid #1f2937}
-.cmd .c{background:#111827;color:#e5e7eb;padding:9px 13px;font:12px/1.5 ui-monospace,Menlo,monospace;white-space:pre-wrap;word-break:break-word}
-.cmd .c::before{content:"$ ";color:#6ee7b7;font-weight:700}
-.cmd .o{background:#0b0f19;color:#cbd5e1;padding:11px 13px;font:11.5px/1.5 ui-monospace,Menlo,monospace;white-space:pre-wrap;word-break:break-word;max-height:420px;overflow:auto}
-.msg{border-radius:10px;padding:11px 14px;margin:0 0 12px}
-.msg .lbl{margin:0 0 7px;font-size:11px;letter-spacing:.5px;font-weight:800}
-.msg.user{background:#eff6ff;border:1px solid #bfdbfe}.msg.user .lbl{color:#1d4ed8}
-.msg.agent{background:#fff;border:1px solid #e5e7eb}.msg.agent .lbl{color:#6b7280}
-.md>:first-child{margin-top:0}.md>:last-child{margin-bottom:0}
-.md code{background:#eef2ff;padding:1px 5px;border-radius:4px;font:12px ui-monospace,Menlo,monospace}
-.md p{margin:0 0 8px}
-.md pre{background:#0b0f19;color:#cbd5e1;padding:10px 12px;border-radius:8px;overflow:auto;margin:0 0 10px;font:11.5px/1.5 ui-monospace,Menlo,monospace}
-.md pre code{background:none;padding:0;font-size:inherit;color:inherit}
-.md table{border-collapse:collapse;margin:2px 0 10px;font-size:12.5px;display:block;overflow:auto}
-.md th,.md td{border:1px solid #d1d5db;padding:4px 9px;text-align:left;vertical-align:top}
-.md th{background:#f3f4f6;font-weight:700}
-.md ul,.md ol{margin:2px 0 10px;padding-left:22px}.md li{margin:2px 0}
-.md h1,.md h2,.md h3,.md h4,.md h5,.md h6{font-size:13.5px;font-weight:700;margin:12px 0 6px}
-.md blockquote{margin:0 0 10px;padding-left:12px;border-left:3px solid #d1d5db;color:#4b5563}
-.muted{color:#9ca3af}
-.stage-head{display:none}
-@media print{
-  @page{margin:16mm}
-  html,body{background:#fff}
-  header,.tabs,.prompt{display:none !important}
-  .wrap{max-width:none;margin:0;padding:0}
-  /* Linear layout: every stage prints, each on its own page with a heading. */
-  .stage-panel{display:block !important;break-before:page}
-  .stage-panel:first-of-type{break-before:auto}
-  .stage-head{display:block;font-size:17px;margin:0 0 14px;padding-bottom:8px;border-bottom:2px solid #111}
-  .cfg{break-inside:avoid-page;border:1px solid #bbb}
-  .cfg>summary{background:#eee}
-  .cmd,.msg,table,pre{break-inside:avoid}
-  /* Keep the dark code/table backgrounds when saving to PDF. */
-  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
-}`;
-
-const JS = `var __active=${stages[0].id};
-function show(n){__active=n;document.querySelectorAll('.stage-panel').forEach(p=>p.style.display='none');document.getElementById('stage-'+n).style.display='block';document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));document.getElementById('tab-'+n).classList.add('active');}
-window.addEventListener('DOMContentLoaded',()=>show(__active));
-// Printing / "Save as PDF": lay every stage out linearly and open all the
-// with-skill + baseline sections (a collapsed <details> won't print), then
-// restore the interactive view afterwards.
-window.addEventListener('beforeprint',function(){document.querySelectorAll('.stage-panel').forEach(function(p){p.style.display='block';});document.querySelectorAll('details').forEach(function(d){d.dataset.wo=d.open?'1':'0';d.open=true;});});
-window.addEventListener('afterprint',function(){document.querySelectorAll('details').forEach(function(d){d.open=d.dataset.wo==='1';});show(__active);});`;
-
-// Grade each config once.
+// --- Grade each config once --------------------------------------------------
 const graded = {};
 for (const c of cfg.configs) {
   const dir = join(OUT, c);
   graded[c] = existsSync(dir) ? gradeConfig(dir, stages) : null;
 }
 
-const tabs = stages.map((s) => `<div class="tab" id="tab-${s.id}" onclick="show(${s.id})">Stage ${s.id}</div>`).join("");
+const score = (c) => {
+  const rows = graded[c] || [];
+  return { pass: rows.filter((r) => r.status === "pass").length, total: rows.length };
+};
+
+// --- HTML --------------------------------------------------------------------
+const metaDl = (extra = "") => `<dl class="meta">
+  <div><dt>Generated</dt><dd>${timeEl(meta.generatedAt)}</dd></div>
+  <div><dt>Commit</dt><dd><code>${esc(meta.commit || "—")}</code>${meta.dirty ? ' <span class="warn">(working tree modified)</span>' : ""}</dd></div>
+  <div><dt>Branch</dt><dd><code>${esc(meta.branch || "—")}</code></dd></div>
+  <div><dt>Host</dt><dd>${esc(meta.host)}</dd></div>
+  <div><dt>Agent model</dt><dd>${esc(meta.model)}</dd></div>
+  ${extra}
+</dl>`;
+
+const scoreboard = cfg.configs
+  .map((c) => {
+    const { pass, total } = score(c);
+    return `<span class="score"><b>${esc(CONFIG_LABELS[c] || c)}</b> ${pass}/${total} passed</span>`;
+  })
+  .join("");
+
+const tabs = stages
+  .map(
+    (s, i) =>
+      `<button class="tab" role="tab" id="tab-${s.id}" aria-controls="stage-${s.id}" aria-selected="${i === 0}" tabindex="${i === 0 ? 0 : -1}" onclick="show(${s.id})">Stage ${s.id}</button>`,
+  )
+  .join("");
 
 const panels = stages
-  .map((s) => {
+  .map((s, i) => {
     const cfgHtml = cfg.configs
       .map((c) => {
         const rows = graded[c];
         if (!rows) return "";
         const r = rows.find((x) => x.stage === s.id);
-        const open = c === "with-skill" ? " open" : "";
-        return `<details class="cfg"${open}><summary>${esc(CONFIG_LABELS[c] || c)} ${badge(r.status)}<span class="why">${esc(r.why)} · ${r.turns} turns · <b>${r.tokens.toLocaleString()} tokens</b></span></summary><div class="body">${convo(s.prompt, r.parsed.transcript)}</div></details>`;
+        const t = r.ms ? ` · ${dur(r.ms)}` : "";
+        return `<details class="cfg"${c === "with-skill" ? " open" : ""}><summary>${badge(r.status)}<span class="cfg-name">${esc(CONFIG_LABELS[c] || c)}</span><span class="why">${esc(r.why)}</span><span class="stat">${r.turns} turns · ${r.tokens.toLocaleString()} tokens${t}</span></summary><div class="body">${convo(s.prompt, r.parsed.transcript)}</div></details>`;
       })
       .join("");
-    return `<div class="stage-panel" id="stage-${s.id}"><h2 class="stage-head">Stage ${s.id}: ${esc(s.title)}</h2><div class="prompt">${esc(s.title)}</div>${cfgHtml}</div>`;
+    return `<section class="stage-panel" role="tabpanel" id="stage-${s.id}" aria-labelledby="tab-${s.id}" tabindex="0"${i === 0 ? "" : " hidden"}><h2 class="stage-head">Stage ${s.id}: ${esc(s.title)}</h2>${cfgHtml}</section>`;
   })
   .join("");
 
-const doc = `<!doctype html><html><head><meta charset="utf-8"><title>zitadel-cli journey eval</title><style>${CSS}</style></head><body><header><h1>zitadel-cli skill — multi-stage journey eval</h1><p>One stateful run per config; the same project flows through ${stages.length} stages. Each stage is the full conversation — the prompt, what the agent asked, what the user answered, and every command with its real output.</p></header><div class="tabs">${tabs}</div><div class="wrap">${panels}</div><script>${JS}</script></body></html>`;
+const CSS = `
+:root{
+  --bg:#f6f7f9; --fg:#111827; --muted:#6b7280; --card:#ffffff; --border:#e5e7eb;
+  --chrome:#0b0f19; --chrome-fg:#e5e7eb; --chrome-muted:#9aa4b2; --accent:#34d399;
+  --term-bg:#0b0f19; --term-fg:#cbd5e1; --cmd-bg:#111827; --code-bg:#eef2ff;
+  --user-bg:#eff6ff; --user-border:#bfdbfe; --user-fg:#1d4ed8; --th-bg:#f3f4f6;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0b0f17; --fg:#e5e7eb; --muted:#9aa4b2; --card:#111827; --border:#1f2937;
+  --chrome:#05080f; --code-bg:#1e293b; --user-bg:#0e1b2e; --user-border:#1e3a5f;
+  --user-fg:#93c5fd; --th-bg:#1e293b;
+}}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{font:14px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;margin:0;color:var(--fg);background:var(--bg)}
+a{color:inherit}
+.banner{background:var(--chrome);color:var(--chrome-fg);padding:20px clamp(16px,4vw,32px)}
+.banner h1{margin:0;font-size:clamp(17px,2.5vw,21px);letter-spacing:-.01em}
+.banner .sub{margin:6px 0 0;color:var(--chrome-muted);font-size:13px;max-width:70ch}
+.scoreboard{display:flex;gap:18px;flex-wrap:wrap;margin:14px 0 2px}
+.score{font-size:13px;color:var(--chrome-muted)}.score b{color:#fff;font-weight:700}
+.meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px 22px;margin:14px 0 0;padding:0}
+.meta div{min-width:0}
+.meta dt{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--chrome-muted);margin:0}
+.meta dd{margin:2px 0 0;font-size:13px;color:#fff;word-break:break-word}
+.meta code{font:12px ui-monospace,Menlo,monospace}
+.meta .warn{color:#fca5a5;font-size:11px}
+.tabs{display:flex;gap:2px;background:var(--chrome);padding:0 clamp(16px,4vw,32px);flex-wrap:wrap;position:sticky;top:0;z-index:5}
+.tab{appearance:none;background:none;border:0;border-bottom:3px solid transparent;color:var(--chrome-muted);padding:12px 18px;font:600 13px/1 inherit;cursor:pointer}
+.tab:hover{color:#fff}
+.tab[aria-selected="true"]{color:#fff;border-bottom-color:var(--accent)}
+.tab:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+main{max-width:1000px;margin:0 auto;padding:24px clamp(16px,4vw,32px)}
+.stage-panel:focus-visible{outline:2px solid var(--accent);outline-offset:4px;border-radius:8px}
+.stage-head{font-size:16px;margin:0 0 16px}
+.cfg{margin:0 0 18px;border:1px solid var(--border);border-radius:12px;background:var(--card);overflow:hidden}
+.cfg>summary{list-style:none;padding:12px 16px;display:flex;align-items:center;gap:10px;cursor:pointer;flex-wrap:wrap}
+.cfg>summary::-webkit-details-marker{display:none}
+.cfg>summary:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.cfg-name{font-weight:700}
+.cfg .body{padding:16px;border-top:1px solid var(--border)}
+.b{font-size:11px;font-weight:800;padding:3px 10px;border-radius:999px;color:#fff;letter-spacing:.3px}
+.b.ok{background:#16a34a}.b.no{background:#dc2626}.b.bl{background:#6b7280}
+.why{color:var(--muted);font-size:12.5px}
+.stat{color:var(--muted);font-size:12px;margin-left:auto;white-space:nowrap}
+.dur{font-variant-numeric:tabular-nums}
+.cmd{margin:0 0 14px;border-radius:10px;overflow:hidden;border:1px solid var(--cmd-bg)}
+.cmd .c{background:var(--cmd-bg);color:#e5e7eb;padding:9px 13px;font:12px/1.5 ui-monospace,Menlo,monospace;white-space:pre-wrap;word-break:break-word}
+.cmd .c code{background:none;color:inherit;font:inherit}
+.cmd .c::before{content:"$ ";color:var(--accent);font-weight:700}
+.cmd .o{background:var(--term-bg);color:var(--term-fg);padding:11px 13px;margin:0;font:11.5px/1.5 ui-monospace,Menlo,monospace;white-space:pre-wrap;word-break:break-word;max-height:420px;overflow:auto}
+.msg{border-radius:10px;padding:11px 14px;margin:0 0 12px}
+.msg .lbl{margin:0 0 7px;font-size:11px;letter-spacing:.5px;font-weight:800;text-transform:uppercase;display:flex;align-items:center;gap:8px}
+.msg.user{background:var(--user-bg);border:1px solid var(--user-border)}.msg.user .lbl{color:var(--user-fg)}
+.msg.agent{background:var(--card);border:1px solid var(--border)}.msg.agent .lbl{color:var(--muted)}
+.turn-time{font-weight:600;letter-spacing:0;text-transform:none;color:var(--muted)}
+.md>:first-child{margin-top:0}.md>:last-child{margin-bottom:0}
+.md p{margin:0 0 8px}
+.md code{background:var(--code-bg);padding:1px 5px;border-radius:4px;font:12px ui-monospace,Menlo,monospace}
+.md pre{background:var(--term-bg);color:var(--term-fg);padding:10px 12px;border-radius:8px;overflow:auto;margin:0 0 10px;font:11.5px/1.5 ui-monospace,Menlo,monospace}
+.md pre code{background:none;padding:0;font-size:inherit;color:inherit}
+.md table{border-collapse:collapse;margin:2px 0 10px;font-size:12.5px;display:block;overflow:auto}
+.md th,.md td{border:1px solid var(--border);padding:4px 9px;text-align:left;vertical-align:top}
+.md th{background:var(--th-bg);font-weight:700}
+.md ul,.md ol{margin:2px 0 10px;padding-left:22px}.md li{margin:2px 0}
+.md h1,.md h2,.md h3,.md h4,.md h5,.md h6{font-size:13.5px;font-weight:700;margin:12px 0 6px}
+.md blockquote{margin:0 0 10px;padding-left:12px;border-left:3px solid var(--border);color:var(--muted)}
+.site-foot{max-width:1000px;margin:0 auto;padding:20px clamp(16px,4vw,32px) 40px;color:var(--muted);font-size:12px;border-top:1px solid var(--border)}
+.site-foot .meta dt{color:var(--muted)}.site-foot .meta dd{color:var(--fg)}
+.site-foot .meta{margin-top:0}
+@media print{
+  @page{margin:16mm}
+  :root{--bg:#fff;--card:#fff}
+  html,body{background:#fff;color:#000}
+  .banner{background:#fff;color:#000;border-bottom:2px solid #000;padding-left:0}
+  .banner .sub,.scoreboard{color:#333}.score b,.meta dd{color:#000}
+  .meta dt{color:#444}
+  .tabs{display:none}
+  main{max-width:none;margin:0;padding:0}
+  .stage-panel{display:block !important}
+  .stage-panel[hidden]{display:block !important}
+  .stage-panel+.stage-panel{break-before:page}
+  .stage-head{font-size:17px;margin:14px 0;padding-bottom:8px;border-bottom:2px solid #000}
+  .cfg{break-inside:avoid-page;border:1px solid #bbb}
+  .cmd,.msg,table,pre{break-inside:avoid}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto}}`;
+
+const JS = `(function(){
+  "use strict";
+  var active=${JSON.stringify(stages[0].id)};
+  var tabs=Array.prototype.slice.call(document.querySelectorAll('[role=tab]'));
+  window.show=function(n){
+    active=n;
+    document.querySelectorAll('[role=tabpanel]').forEach(function(p){p.hidden=(p.id!=='stage-'+n);});
+    tabs.forEach(function(t){var on=t.id==='tab-'+n;t.setAttribute('aria-selected',on?'true':'false');t.tabIndex=on?0:-1;});
+  };
+  // Roving-tabindex keyboard support on the tablist (WAI-ARIA Tabs pattern).
+  var list=document.querySelector('[role=tablist]');
+  if(list){list.addEventListener('keydown',function(e){
+    var i=tabs.indexOf(document.activeElement);if(i<0)return;var j=i;
+    if(e.key==='ArrowRight')j=(i+1)%tabs.length;
+    else if(e.key==='ArrowLeft')j=(i-1+tabs.length)%tabs.length;
+    else if(e.key==='Home')j=0;else if(e.key==='End')j=tabs.length-1;else return;
+    e.preventDefault();var id=+tabs[j].id.replace('tab-','');window.show(id);tabs[j].focus();
+  });}
+  // Locale-aware durations (Intl.DurationFormat) and dates (Intl.DateTimeFormat),
+  // formatted in the viewer's browser; server text is the no-JS fallback.
+  function fmt(){
+    var DF=(window.Intl&&Intl.DurationFormat)?new Intl.DurationFormat(undefined,{style:'narrow'}):null;
+    document.querySelectorAll('.dur[data-ms]').forEach(function(el){
+      var ms=+el.getAttribute('data-ms');if(!ms)return;var s=Math.round(ms/1000);
+      var d={hours:Math.floor(s/3600),minutes:Math.floor((s%3600)/60),seconds:s%60};
+      if(DF){try{el.textContent=DF.format(d);return;}catch(_){}}
+    });
+    var DT=window.Intl?new Intl.DateTimeFormat(undefined,{dateStyle:'medium',timeStyle:'short'}):null;
+    document.querySelectorAll('.ts[data-iso]').forEach(function(el){
+      var d=new Date(el.getAttribute('data-iso'));if(isNaN(+d))return;
+      el.textContent=DT?DT.format(d):d.toLocaleString();el.setAttribute('title',d.toISOString());
+    });
+  }
+  window.addEventListener('DOMContentLoaded',function(){window.show(active);fmt();});
+  // Save-as-PDF: lay every stage out linearly and open all sections (a collapsed
+  // <details> or a hidden panel won't print), then restore the interactive view.
+  window.addEventListener('beforeprint',function(){
+    document.querySelectorAll('[role=tabpanel]').forEach(function(p){p.hidden=false;});
+    document.querySelectorAll('details').forEach(function(d){d.dataset.wo=d.open?'1':'0';d.open=true;});
+  });
+  window.addEventListener('afterprint',function(){
+    document.querySelectorAll('details').forEach(function(d){d.open=d.dataset.wo==='1';});
+    window.show(active);
+  });
+})();`;
+
+const subtitle = `One stateful run per config; the same project flows through ${stages.length} stages. Each stage shows the full conversation — the prompt, what the agent asked, what the user answered, and every command with its real output.`;
+
+const doc = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="generator" content="cli-skill-e2e report">
+<title>zitadel-cli journey eval</title>
+<style>${CSS}</style>
+</head>
+<body>
+<header class="banner">
+  <h1>zitadel-cli skill — multi-stage journey eval</h1>
+  <p class="sub">${esc(subtitle)}</p>
+  <div class="scoreboard">${scoreboard}</div>
+  ${metaDl()}
+</header>
+<nav class="tabs" role="tablist" aria-label="Journey stages">${tabs}</nav>
+<main>${panels}</main>
+<footer class="site-foot">
+  <p>zitadel-cli agent-skill eval. The agent drives the CLI non-interactively; a simulated user answers its questions.</p>
+  ${metaDl(`<div><dt>Node</dt><dd>${esc(meta.node)}</dd></div><div><dt>User model</dt><dd>${esc(meta.simModel)}</dd></div>`)}
+</footer>
+<script>${JS}</script>
+</body>
+</html>`;
 
 const dest = join(OUT, "journey.html");
 writeFileSync(dest, doc);
