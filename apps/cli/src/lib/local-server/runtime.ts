@@ -213,8 +213,15 @@ async function isOwnFile(path: string): Promise<boolean> {
     const { uid } = await stat(path);
     // Windows reports no uid; existence is all there is to check.
     return process.getuid === undefined || uid === process.getuid();
-  } catch {
-    return false;
+  } catch (error) {
+    // Only a missing path means "not here". Local state that exists but
+    // cannot be read is still the nearest one, and walking past it would
+    // pick a parent's server or credential instead.
+    if (isErrno(error, "ENOENT") || isErrno(error, "ENOTDIR")) return false;
+    throw new ZitadelError("E_VALIDATION", `${path} cannot be read`, {
+      hint: `Check that ${path} and its directory are readable by you.`,
+      details: { cause: error instanceof Error ? error.message : String(error) },
+    });
   }
 }
 

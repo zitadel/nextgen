@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -194,6 +194,25 @@ describe("detectHealthyLocalServer", () => {
       code: "E_LOCAL_SERVER_NOT_RUNNING",
     });
   });
+
+  // Root reads through any mode, so the unreadable directory proves nothing there.
+  it.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+    "refuses to look past local state it cannot read",
+    async () => {
+      await writeRuntimeMetadata(cwd, runtimeFor(cwd));
+      const app = join(cwd, "my-app");
+      await mkdir(join(app, ".zitadel/local"), { recursive: true });
+      await chmod(join(app, ".zitadel/local"), 0o000);
+
+      try {
+        await expect(findUpward(app, LOCAL_RUNTIME_FILE, cwd)).rejects.toMatchObject({
+          code: "E_VALIDATION",
+        });
+      } finally {
+        await chmod(join(app, ".zitadel/local"), 0o700);
+      }
+    },
+  );
 
   it("stops looking for local state at the boundary it is given", async () => {
     await writeRuntimeMetadata(cwd, runtimeFor(cwd));

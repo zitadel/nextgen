@@ -459,6 +459,9 @@ DESCRIPTION
   Open the local console, signed in as the local admin created by `zitadel
   start`.
 
+  Run it in the directory `zitadel start` ran in, or one inside it: the local
+  admin is read from the nearest `.zitadel/local/` on the way up.
+
 EXAMPLES
   $ zitadel console
 
