@@ -480,6 +480,11 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 		if err != nil {
 			return FlowStepResult{}, false, err
 		}
+		// Creation bound the attempt, so a concurrent render can win the
+		// handoff first, as after the linked bind.
+		if outcome == FlowImplicitOutcomeSSOAuthenticated {
+			return r.retrySSOHandoff(pc, resolvedFields, state.CollectedData.UserID)
+		}
 		result, err := r.routeOutcome(pc, resolvedFields, outcome, false)
 		return result, true, err
 	}

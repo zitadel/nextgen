@@ -5300,8 +5300,8 @@ func TestFlowStateMachine_Render_SSOStaleParkedRowProvisioningRendersStep(t *tes
 	}
 }
 
-// ssoHandoffPaths are the ways a render reaches the handoff: its own bind, or
-// a bind an earlier request committed.
+// ssoHandoffPaths are the ways a render reaches the handoff: its own bind or
+// creation, or a bind an earlier request committed.
 var ssoHandoffPaths = []struct {
 	name        string
 	expect      func(w *flowTestWorld)
@@ -5321,6 +5321,17 @@ var ssoHandoffPaths = []struct {
 					LinkID:       "idplink-1",
 				}).
 				Return(nil)
+		},
+		wantCheckID: "ch-1",
+	},
+	{
+		name: "own creation",
+		expect: func(w *flowTestWorld) {
+			claims, verified := completeClaims()
+			w.expectParked(unlinkedParked(claims, verified), nil)
+			w.expectOwner("email", "alice@example.com", "")
+			w.expectOwner("username", "alice", "")
+			w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Return("user-1", nil)
 		},
 		wantCheckID: "ch-1",
 	},
