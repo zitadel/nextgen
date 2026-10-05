@@ -9,6 +9,37 @@ and neither of them says what a URL serves. The
 [shapes](1-data-model.md#project) are in the data model, and how a request uses
 them is [release resolution](3-release-resolution.md).
 
+## An example
+
+One project, `acme`, class `production`:
+
+```
+allowlist - patterns, on the project, added by a person
+  https://app.acme.com           primary
+  https://www.acme.com           primary
+  https://*-acmeinc.vercel.app   preview
+  https://*.preview.acme.com     preview
+
+preview rows - one per live URL, written by `zitadel preview`
+  https://acme-git-sso-acmeinc.vercel.app   expires 2026-10-09
+```
+
+What that means for a request, by the `Origin` it arrives with:
+
+| `Origin` | Matches | Row | Served |
+|---|---|---|---|
+| `https://app.acme.com` | the `primary` literal | — | the newest deployment to that URL, or the project default if there is none |
+| `https://acme-git-sso-acmeinc.vercel.app` | the `preview` wildcard | yes, live | the newest deployment to that URL |
+| `https://acme-git-old-acmeinc.vercel.app` | the `preview` wildcard | expired, deleted | `400 rel.required` — never what production runs |
+| `https://acme-xyz-attacker.vercel.app` | nothing; the pattern requires the `-acmeinc` ending | — | `403 proj.origin_not_allowed` |
+| absent — a server or the CLI | nothing to check | — | the project default |
+
+The rest of this document is why that table looks the way it does. The full
+requests, headers and all, are in
+[release resolution](3-release-resolution.md#worked-examples).
+
+## Allowlist and preview rows
+
 | | **Allowlist** | **[Preview rows](1-data-model.md#origin)** |
 |---|---|---|
 | What it is | a list of patterns on the project | one row per live preview URL, with an expiry |
