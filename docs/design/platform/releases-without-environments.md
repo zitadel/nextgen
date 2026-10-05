@@ -46,8 +46,8 @@ keyed on: from an environment id to an origin string.
 
   // CHANGED - today `preview_origins`: a flat list of exact strings
   // (internal/domain/project.go:68) compared with string equality
-  // (internal/api/flow.go:371), serving only the preview secret.
-  // Now patterns, each typed.
+  // (internal/api/flow.go:371), serving only the preview secret. Now patterns,
+  // each carrying a `kind` - see Why an origin has a kind for what reads it.
   "allowed_origins": [
     { "pattern": "https://app.acme.com",         "kind": "primary" },
     { "pattern": "https://www.acme.com",         "kind": "primary" },
@@ -96,9 +96,35 @@ This is what a request routes on.
 }
 ```
 
-`expires_at` is preview-only and is renewed by deploying to the same origin
-again, which keeps a preview URL stable across pushes to a branch. `primary` rows
-do not expire.
+#### Why an origin has a kind
+
+`kind` is the switch four different rules read. Without it each of them would
+need its own column or its own heuristic.
+
+| | `primary` | `preview` |
+|---|---|---|
+| Wildcard pattern | refused on a `production` project | allowed, if [tenant-anchored](#the-tenant-anchor-rule) |
+| Lifetime | never expires | `expires_at`, renewed by deploying again |
+| Written by | `zitadel deploy` | `zitadel preview` |
+| Matched at layer 1, no row at layer 2 | falls through to the project default | `400 rel.required` |
+
+That last row is the one that matters most. A preview URL must fail closed: if
+nothing registered it, serving it the production configuration would be worse
+than refusing, because the whole point of the URL is that it is *not*
+production. A primary hostname with no row is just a project that has only been
+deployed to its default, which is fine to serve.
+
+**It cannot be derived from the shape of the origin.** An exact preview URL a CI
+run registered — `https://acme-git-sso-acmeinc.vercel.app` — is a literal string
+indistinguishable from `https://app.acme.com`, and the two must behave
+oppositely on expiry and on the fail-closed rule. Wildcards do not settle it
+either: whether one is allowed is a question about the project's class, not
+about the kind, so a `sandbox` project can hold a wildcard `primary` entry.
+
+A row records the kind of the pattern that admitted it, at the time it was
+admitted. So re-typing a pattern later does not silently make live previews
+permanent, or retire a hostname that is serving traffic; the explicit path is
+`zitadel origins rm` and a redeploy.
 
 So `environments` is **dropped**: the table and its unique name index
 (`000005_environments.sql`), `seedDefaultEnvironments`
