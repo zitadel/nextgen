@@ -5088,8 +5088,8 @@ func TestFlowStateMachine_Render_SSOOutcomeUnwiredRendersOutcomeToken(t *testing
 
 // The validator does not require user_already_exists on a step that offers
 // sso_providers. Without a usable one, the owner the probe found is not
-// bound: the step shows the unwired outcome, the row stays parked, and the
-// guard keeps a reload from repeating it.
+// bound: the step shows the provider as unavailable, the row stays parked,
+// and the guard keeps a reload from repeating it.
 func TestFlowStateMachine_Render_SSOCollisionUnroutableDoesNotBind(t *testing.T) {
 	t.Parallel()
 	action := domain.Switch
@@ -5112,7 +5112,7 @@ func TestFlowStateMachine_Render_SSOCollisionUnroutableDoesNotBind(t *testing.T)
 			require.NoError(t, err)
 			assert.Equal(t, "credentials", result.Step.Name)
 			require.NotNil(t, result.Step.Error)
-			assert.Equal(t, domain.FlowImplicitOutcomeUserAlreadyExists, *result.Step.Error)
+			assert.Equal(t, domain.FlowStepErrorSSOUnavailable, *result.Step.Error)
 			assert.Empty(t, result.State.CollectedData.UserID)
 			assert.Equal(t, "ch-1", result.State.SSOResolvedCheckID)
 		})

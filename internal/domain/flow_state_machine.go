@@ -467,12 +467,7 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 		if errors.Is(err, ErrSSOStateInvalid()) {
 			return r.resolveStaleSSOBind(pc, resolvedFields, loadInput)
 		}
-		if errors.Is(err, errSSOCollisionUnroutable) {
-			msg := FlowImplicitOutcomeUserAlreadyExists
-			result, err := r.renderStepError(pc, resolvedFields, &msg)
-			return result, true, err
-		}
-		if errors.Is(err, errSSOAuthenticatedUnroutable) {
+		if errors.Is(err, errSSOUnroutable) {
 			msg := FlowStepErrorSSOUnavailable
 			result, err := r.renderStepError(pc, resolvedFields, &msg)
 			return result, true, err
@@ -545,7 +540,7 @@ func (r *FlowStateMachineRuntime) provisionSSOIdentity(ctx context.Context, stat
 	// The user and the link cannot be undone, so creation waits until
 	// sso_authenticated can route, as the linked bind does.
 	if !ssoAuthenticatedRoutes(step) {
-		return "", errSSOAuthenticatedUnroutable
+		return "", errSSOUnroutable
 	}
 
 	attributes := map[string]any{}
@@ -638,14 +633,10 @@ func ssoUniqueClaims(schema *jsonschema.Schema, claims map[string]any) (probe, u
 	return probe, unique
 }
 
-// errSSOCollisionUnroutable reports an SSO collision on a step that cannot
-// route user_already_exists; the engine shows the step error instead.
-var errSSOCollisionUnroutable = errors.New("flow state machine: sso collision cannot route user_already_exists")
-
-// errSSOAuthenticatedUnroutable reports complete claims on a step that cannot
-// route sso_authenticated; the engine shows the step error instead of
-// creating the user.
-var errSSOAuthenticatedUnroutable = errors.New("flow state machine: sso creation cannot route sso_authenticated")
+// errSSOUnroutable reports a collision or a creation on a step that cannot
+// route its outcome. Nothing is written: the engine shows the provider as
+// unavailable, as for a linked identity.
+var errSSOUnroutable = errors.New("flow state machine: sso outcome cannot route on this step")
 
 // bindSSOCollision looks up each project-unique claim, verified or not, until
 // one names an existing user, then binds that user by id. Like a typed
@@ -653,7 +644,7 @@ var errSSOAuthenticatedUnroutable = errors.New("flow state machine: sso creation
 // the exact parked row first and replaces it by a marker of that user, so a
 // row another request replaced binds nothing (ErrSSOStateInvalid) and a
 // retry after a lost cookie catches up from the marker. It returns
-// errSSOCollisionUnroutable, before binding, when step cannot route
+// errSSOUnroutable, before binding, when step cannot route
 // user_already_exists.
 func (r *FlowStateMachineRuntime) bindSSOCollision(ctx context.Context, state *FlowState, step *FlowDefinitionStep, parked *FlowSSOParkedIdentity, probeClaims []string) (bool, error) {
 	for _, name := range probeClaims {
@@ -680,7 +671,7 @@ func (r *FlowStateMachineRuntime) bindSSOCollision(ctx context.Context, state *F
 		// until the outcome can route. A declared purpose can: it starts that
 		// purpose fresh, as it does for a typed collision.
 		if t, ok := step.Transitions[FlowImplicitOutcomeUserAlreadyExists]; !ok || t.Action != nil {
-			return false, errSSOCollisionUnroutable
+			return false, errSSOUnroutable
 		}
 		if err := r.ssoIdentities.BindCollision(ctx, FlowSSOBindInput{
 			ProjectID: state.ProjectID,
