@@ -92,11 +92,13 @@ with an error key as a plain 200), and later the credential refresh cost for
 [#1107](https://github.com/zitadel/nextgen/issues/1107). Such a metric is
 registered once on the root module and pushed from each VU through its
 sample channel, so thresholds and the summary treat it like a built-in. Aggregation is
-k6's as well: the entry script declares an empty threshold on
-`metric{op:<id>}` for every operation and request metric, so k6's own
-end-of-test summary reports each operation on its own line, and a sweep is
-merged from the per-run `--summary-export` documents rather than
-re-aggregated from raw samples.
+k6's as well: the entry script declares an empty threshold on every
+sub-metric the module lists — `metric{op:<id>}` for every operation and
+request metric, and `nextgen_errors` further per status class and per error
+code, from the bounded vocabularies the module tags with — so k6's own
+end-of-test summary reports each operation on its own line with its error
+breakdown, and a sweep is merged from the per-run `--summary-export`
+documents rather than re-aggregated from raw samples.
 
 ### 4. The credential cache is the generated client's `SecuritySource`
 
@@ -108,7 +110,11 @@ refreshing session cache of #1107 slots into the same type.
 
 A fixture file declares the project and user a lane needs; `k6 x nextgen
 bootstrap` applies it over the API with the same generated client and proves
-the result by walking one login journey before anything is measured. There
+the result by walking one login journey before anything is measured. The
+provisioned target, with the project secret, reaches a k6 run through the
+child process environment and is read on the Go side; it is never a `-e`
+value, so it appears neither in a process listing nor in the script's
+`__ENV`. There
 is no shell in the path: the local sweep (`moon run bench:sweep`) builds the
 k6 binary through Moon and the `sweep` command provisions, measures and
 summarises. A running, healthy server is a prerequisite of the harness,
