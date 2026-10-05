@@ -15,7 +15,7 @@ touched path** — read those first; the scoped files under
 - Generated files: never ask authors to hand-edit `api/generated/**`,
   package `dist/**`, or `apps/console/src/routeTree.gen.ts`
   ([`AGENTS.md` — Generated Files](../AGENTS.md#generated-files)).
-- CLI contract (JSON envelope, `--silent` capture tip, SKILL.md sync):
+- CLI contract (JSON envelope, `--silent` capture tip, SKILLS.md sync):
   [`AGENTS.md` — CLI Contract](../AGENTS.md#cli-contract) is canonical.
 - The claim lifecycle is shipped
   ([ADR 046](../docs/adrs/046-claim-lifecycle-v2.md)): server claim endpoints
@@ -36,4 +36,4 @@ touched path** — read those first; the scoped files under
   canonical (the project id is `cli-journey-e2e`).
 - Local runtime command changes: verify `.zitadel/local/` state handling,
   `--server local` resolution, and the zero-config smoke paths per
-  [`apps/cli/skills/zitadel-cli/SKILL.md`](../apps/cli/skills/zitadel-cli/SKILL.md).
+  [`apps/cli/SKILLS.md`](../apps/cli/SKILLS.md).

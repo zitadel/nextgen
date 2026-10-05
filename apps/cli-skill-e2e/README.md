@@ -36,13 +36,17 @@ non-deterministic (an LLM drives it). It is intentionally kept **out of CI**
 
 ## Run it
 
+This is a standalone pnpm workspace, not a Moon project (keeping it out of the
+Moon graph means a run here never forces the whole repo's CI graph to rebuild).
+Invoke it with pnpm:
+
 ```sh
 # reuse captured results (instant) — grade + open the report window
-ENV_FILE=./.secret.env moon run cli-skill-e2e:test
+ENV_FILE=./.secret.env pnpm --filter @zitadel/cli-skill-e2e test
 
 # re-run the containers from scratch (tens of minutes), then grade + open
-ENV_FILE=./.secret.env moon run cli-skill-e2e:eval
-# or:  ENV_FILE=./.secret.env FRESH=1 pnpm vitest run
+ENV_FILE=./.secret.env pnpm --filter @zitadel/cli-skill-e2e eval
+# or:  ENV_FILE=./.secret.env FRESH=1 pnpm --filter @zitadel/cli-skill-e2e exec vitest run
 ```
 
 Vitest runs the eval in `globalSetup`, asserts each **with-skill** stage reached
