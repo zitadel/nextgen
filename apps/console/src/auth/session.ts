@@ -95,6 +95,7 @@ export function _resetSessionForTesting(): void {
  * to someone else never resolves: the page reloads instead.
  */
 export async function fetchSession(): Promise<ConsoleSession | null> {
+  if (reloading) return startOver();
   if (cachedSession && Date.now() - cachedSession.at < SESSION_CACHE_MS) {
     return cachedSession.session;
   }
@@ -104,7 +105,6 @@ export async function fetchSession(): Promise<ConsoleSession | null> {
   // so it costs no extra round trip in sequence. Only the session decides
   // whether someone is signed in, and a failed token read never replaces a
   // token that works.
-  if (reloading) return startOver();
   const early = getApiCsrfToken() ? undefined : readCsrfToken();
   let session: ConsoleSession;
   try {
@@ -151,7 +151,7 @@ async function loadCsrfToken(pending?: Promise<string | undefined>): Promise<str
   return token;
 }
 
-/** Test seam: the full reload a rejection ends in when the person changed. */
+/** Test seam: the full reload `startOver` ends in. */
 export const sessionPage = { reload: () => window.location.reload() };
 
 let recheck: Promise<string | undefined> | undefined;
