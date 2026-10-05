@@ -52,13 +52,38 @@ export default defineConfig({
           // a cold local cache) instead of flaking under CI timing.
           noDiscovery: true,
         },
+        // Run the story suites one at a time in a single browser context.
+        // `baseTest` defaults `fileParallelism: true`, which spins up several
+        // Chromium contexts at once, and each one re-boots the FULL Storybook
+        // preview (`.storybook/preview.ts`): the MSW service worker, the a11y
+        // runtime, and a cold Vite dep-optimize crawl. On a cold CI runner that
+        // startup burst is already expensive; when this PR edits
+        // `.moon/workspace.yml` moon marks the entire ~140-task graph affected
+        // and runs it concurrently (Go builds, the Spanner emulator JVM,
+        // Postgres, every other package's browser `:test`), so the host is
+        // saturated exactly while Storybook is launching. Several heavy contexts
+        // racing that saturated window is what starves the addon-vitest setup
+        // module's request and surfaces as "Failed to fetch dynamically imported
+        // module … setup-file-with-project-annotations.js" — identically on
+        // every run of this branch, and never on lighter branches where only a
+        // handful of tasks are affected. One context loads that setup module
+        // once and reuses it for all 13 suites, which keeps the browser
+        // footprint small enough to come up under the contended burst. The
+        // lighter-weight `@zitadel/components`/`@zitadel/api-mock` browser lanes
+        // run the same way under the same contention and stay green.
         test: {
           name: "storybook",
+          fileParallelism: false,
           browser: {
             enabled: true,
             provider: playwright(),
             headless: true,
             instances: [{ browser: "chromium" }],
+            // Launching Chromium and connecting the orchestrator can take far
+            // longer than the default when the CI host is saturated by the
+            // full-graph burst above; be patient rather than aborting the run
+            // mid-startup.
+            connectTimeout: 120_000,
           },
         },
       },
