@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
 
 	"github.com/jackc/pgx/v5"
 
@@ -19,7 +20,7 @@ const (
 FROM (SELECT clock_timestamp() AS at) AS stamp
 RETURNING id`
 
-	userPasswordColumns = `id, project_id, user_id, encoded_hash, created_at`
+	userPasswordColumns = `id, project_id, user_id, encoded_hash, created_at, failed_attempts, last_failed_at`
 
 	userPasswordQuery = `SELECT ` + userPasswordColumns + `
 FROM zitadel_nextgen.user_passwords`
@@ -34,6 +35,11 @@ FROM zitadel_nextgen.user_passwords
 WHERE project_id = $1 AND user_id = $2
 ORDER BY created_at DESC
 LIMIT $3 OFFSET 1`
+
+	updatePasswordVerificationFailuresStmt = `UPDATE zitadel_nextgen.user_passwords SET
+	failed_attempts = $3,
+	last_failed_at = $4
+WHERE project_id = $1 AND id = $2`
 )
 
 type userPasswordStatements struct{ statement }
@@ -116,16 +122,47 @@ func (ps userPasswordStatements) GetUserPasswordHistory(ctx context.Context, pro
 	return passwords, wrapError(err)
 }
 
+// UpdatePasswordVerificationFailures implements [service.UserPasswordStatements].
+func (ps userPasswordStatements) UpdatePasswordVerificationFailures(ctx context.Context, pw *domain.UserPassword) error {
+	var lastFailedAt sql.NullTime
+	if !pw.LastFailedAt.IsZero() {
+		lastFailedAt = sql.NullTime{Time: pw.LastFailedAt, Valid: true}
+	}
+	tag, err := ps.client.Exec(ctx, updatePasswordVerificationFailuresStmt,
+		pw.ProjectID,
+		pw.ID,
+		int16(pw.FailedAttemptCount),
+		lastFailedAt,
+	)
+	if err != nil {
+		return wrapError(err)
+	}
+	if tag.RowsAffected() == 0 {
+		return wrapError(pgx.ErrNoRows)
+	}
+	return nil
+}
+
 func (ps userPasswordStatements) scanUserPassword(row pgx.CollectableRow) (*domain.UserPassword, error) {
 	pw := new(domain.UserPassword)
+	var (
+		failedAttempts int16
+		lastFailedAt   sql.NullTime
+	)
 	if err := row.Scan(
 		&pw.ID,
 		&pw.ProjectID,
 		&pw.UserID,
 		&pw.EncodedHash,
 		&pw.CreatedAt,
+		&failedAttempts,
+		&lastFailedAt,
 	); err != nil {
 		return nil, err
+	}
+	pw.FailedAttemptCount = int(failedAttempts)
+	if lastFailedAt.Valid {
+		pw.LastFailedAt = lastFailedAt.Time
 	}
 	return pw, nil
 }

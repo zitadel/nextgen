@@ -263,3 +263,47 @@ func TestUserPasswordStatements_HistoryUnderConcurrentChanges(t *testing.T) {
 		}
 	})
 }
+
+func TestUserPasswordStatements_UpdatePasswordVerificationFailures(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
+		userID := "user_pw_failures"
+		require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, userID, "pw-failures@example.com", "PW Failures")))
+		setTestUserPassword(t, d, projectID, userID, "hash-1")
+
+		current := func() *domain.UserPassword {
+			t.Helper()
+			pw, err := d.stmts.GetUserPassword(t.Context(), userPasswordByUser(projectID, userID))
+			require.NoError(t, err)
+			return pw
+		}
+		pw := current()
+		assert.Zero(t, pw.FailedAttemptCount, "a new password starts clean")
+		assert.True(t, pw.LastFailedAt.IsZero())
+
+		failedAt := time.Now().UTC().Truncate(time.Microsecond)
+		pw.FailedAttemptCount = 3
+		pw.LastFailedAt = failedAt
+		require.NoError(t, d.stmts.UpdatePasswordVerificationFailures(t.Context(), pw))
+		got := current()
+		assert.Equal(t, 3, got.FailedAttemptCount)
+		assert.True(t, failedAt.Equal(got.LastFailedAt), "got %v", got.LastFailedAt)
+
+		pw.FailedAttemptCount = 0
+		pw.LastFailedAt = time.Time{}
+		require.NoError(t, d.stmts.UpdatePasswordVerificationFailures(t.Context(), pw))
+		got = current()
+		assert.Zero(t, got.FailedAttemptCount)
+		assert.True(t, got.LastFailedAt.IsZero(), "a zero time clears the column")
+
+		pw.FailedAttemptCount = 2
+		pw.LastFailedAt = failedAt
+		require.NoError(t, d.stmts.UpdatePasswordVerificationFailures(t.Context(), pw))
+		setTestUserPassword(t, d, projectID, userID, "hash-2")
+		assert.Zero(t, current().FailedAttemptCount, "a new password does not inherit the old one's failures")
+
+		missing := &domain.UserPassword{ProjectID: projectID, ID: "upw_missing", FailedAttemptCount: 1}
+		err := d.stmts.UpdatePasswordVerificationFailures(t.Context(), missing)
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+	})
+}

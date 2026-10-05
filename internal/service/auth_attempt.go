@@ -697,10 +697,17 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 		if err != nil {
 			return passwordChallenge, nil, nil, domain.ErrAuthAttemptProofRejected(err)
 		}
-		if err := password.Verify(p.Password, s.passwordVerifier); err != nil {
+
+		if err := password.VerifyRateLimited(p.Password, s.passwordVerifier); err != nil {
+			if errors.Is(err, domain.ErrUserPasswordRateLimited()) {
+				return passwordChallenge, nil, nil, domain.ErrAuthAttemptProofRejected(err)
+			}
+			_ = s.stmts.Statements().UpdatePasswordVerificationFailures(ctx, password)
 			return passwordChallenge, nil, nil, domain.ErrAuthAttemptProofRejected(err)
 		}
-		return passwordChallenge, attempt.SetPasswordFactor(), nil, nil
+		return passwordChallenge, attempt.SetPasswordFactor(), func(ctx context.Context, stmts AllStatements) error {
+			return stmts.UpdatePasswordVerificationFailures(ctx, password)
+		}, nil
 
 	case PasskeyProof:
 		challenge, userFactor, err := attempt.PreparePasskeyVerification(challengeID)
