@@ -818,6 +818,23 @@ type Invoker interface {
 	// If a stacked flow (e.g., recovery pivoted from login) finishes, the server
 	// auto-pops to the parent flow and returns the parent's next step — the
 	// frontend never sees a `complete` for intermediate flows.
+	// ## External sign-in
+	// `{action: "sso", sso_provider_id, return_target}` on a step that offers
+	// `sso_providers` returns the engine-emitted `sso-redirect` step, whose
+	// `redirect_url` the frontend navigates to.
+	// - The flow state does not change, but `_zflow` is re-sealed like on
+	// every response, so its ten-minute window restarts at this submission;
+	// the external sign-in and the return must complete within it.
+	// - A second `Set-Cookie` line carries the browser-binding cookie the
+	// callback checks: `HttpOnly`, `Path=/`, `SameSite=Lax`.
+	// - On every host except http loopback it is `__Host-_zsso` with `Secure`.
+	// - When the request host is http loopback (local development, where
+	// Safari rejects `Secure`), it is `_zsso` with no `Secure`; the
+	// `__Host-` prefix is dropped because it requires `Secure`.
+	// A connection whose `client_id` is a `${{ NAME }}` reference has it filled
+	// from the project's variables. A provider the engine cannot start a
+	// sign-in with, including a reference with no variable behind it,
+	// re-renders the step with `error.sso_unavailable`.
 	//
 	// POST /flow/{id}/submit
 	SubmitFlowStep(ctx context.Context, request *FlowSubmitRequest, params SubmitFlowStepParams) (SubmitFlowStepRes, error)
@@ -11954,6 +11971,23 @@ func (c *Client) sendSetUserPassword(ctx context.Context, request *SetUserPasswo
 // If a stacked flow (e.g., recovery pivoted from login) finishes, the server
 // auto-pops to the parent flow and returns the parent's next step — the
 // frontend never sees a `complete` for intermediate flows.
+// ## External sign-in
+// `{action: "sso", sso_provider_id, return_target}` on a step that offers
+// `sso_providers` returns the engine-emitted `sso-redirect` step, whose
+// `redirect_url` the frontend navigates to.
+// - The flow state does not change, but `_zflow` is re-sealed like on
+// every response, so its ten-minute window restarts at this submission;
+// the external sign-in and the return must complete within it.
+// - A second `Set-Cookie` line carries the browser-binding cookie the
+// callback checks: `HttpOnly`, `Path=/`, `SameSite=Lax`.
+// - On every host except http loopback it is `__Host-_zsso` with `Secure`.
+// - When the request host is http loopback (local development, where
+// Safari rejects `Secure`), it is `_zsso` with no `Secure`; the
+// `__Host-` prefix is dropped because it requires `Secure`.
+// A connection whose `client_id` is a `${{ NAME }}` reference has it filled
+// from the project's variables. A provider the engine cannot start a
+// sign-in with, including a reference with no variable behind it,
+// re-renders the step with `error.sso_unavailable`.
 //
 // POST /flow/{id}/submit
 func (c *Client) SubmitFlowStep(ctx context.Context, request *FlowSubmitRequest, params SubmitFlowStepParams) (SubmitFlowStepRes, error) {
@@ -11962,6 +11996,15 @@ func (c *Client) SubmitFlowStep(ctx context.Context, request *FlowSubmitRequest,
 }
 
 func (c *Client) sendSubmitFlowStep(ctx context.Context, request *FlowSubmitRequest, params SubmitFlowStepParams) (res SubmitFlowStepRes, err error) {
+	// Validate request before sending.
+	if err := func() error {
+		if err := request.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return res, errors.Wrap(err, "validate")
+	}
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("submitFlowStep"),
 		semconv.HTTPRequestMethodKey.String("POST"),

@@ -191,6 +191,8 @@ export const de: Locale = {
     "Dieser Passkey konnte nicht bestätigt werden. Bitte versuche es erneut.",
   "error.passkey_registration_invalid":
     "Der neue Passkey konnte nicht bestätigt werden. Bitte registriere ihn erneut.",
+  "error.sso_unavailable":
+    "Dieser Anmeldeanbieter ist gerade nicht verfügbar. Bitte wähle eine andere Anmeldemethode.",
 
   // --- Feld- / Formularfehler ---
   "error.email_required": "Bitte gib eine E-Mail-Adresse ein",
