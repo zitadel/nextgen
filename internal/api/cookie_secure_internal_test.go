@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestCookieSecureFromContext(t *testing.T) {
@@ -154,4 +156,22 @@ func TestWithRequestHostMiddleware_DrivesCookieSecure(t *testing.T) {
 			t.Fatal("expected Secure=true when X-Forwarded-Proto is https")
 		}
 	})
+}
+
+// The generated client splits the first Set-Cookie line on commas, so no
+// cookie this package builds may contain one: Max-Age, never Expires, and
+// values that are base64url or a nonce.
+func TestCookies_HaveNoComma(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.WithValue(context.Background(), requestHostKey{}, "https://app.example.com")
+	for name, cookie := range map[string]string{
+		"flow":          flowSetCookie(ctx, "payload", false),
+		"flow cleared":  flowSetCookie(ctx, "", true),
+		"sso binding":   ssoBindingSetCookie(ctx, "nonce"),
+		"session":       sessionCookie(ctx, "tok", 60),
+		"session clear": deleteSessionCookie(ctx),
+	} {
+		assert.NotContains(t, cookie, ",", "%s cookie", name)
+	}
 }
