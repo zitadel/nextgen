@@ -5271,8 +5271,8 @@ func TestFlowStateMachine_Render_SSOStaleBindOnReplacedRowRendersStep(t *testing
 	assert.Empty(t, result.HandoffToken)
 }
 
-// Under creation auto the create's own delete can find the row settled
-// elsewhere: the render shows the step with no outcome and records no user.
+// Under creation auto the create's own delete can find the row gone. A row a
+// new ceremony replaced shows the step with no outcome and records no user.
 // The collision case is TestFlowStateMachine_Render_SSOCollisionStaleRowBindsNothing.
 func TestFlowStateMachine_Render_SSOStaleParkedRowProvisioningRendersStep(t *testing.T) {
 	t.Parallel()
@@ -5282,6 +5282,7 @@ func TestFlowStateMachine_Render_SSOStaleParkedRowProvisioningRendersStep(t *tes
 			w.expectParked(unlinkedParked(claims, verified), nil)
 			w.ssoIdentities.EXPECT().FindUniqueOwner(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return("", nil).Times(2)
 			w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Return("", domain.ErrSSOStateInvalid())
+			w.expectParked(nil, nil)
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -5309,6 +5310,7 @@ func TestFlowStateMachine_Render_SSOCollisionStaleRowBindsNothing(t *testing.T) 
 	w.expectParked(unlinkedParked(map[string]any{"email": "alice@example.com"}, nil), nil)
 	w.expectOwner("email", "alice@example.com", "user-9")
 	w.expectBindCollision("user-9", domain.ErrSSOStateInvalid())
+	w.expectParked(nil, nil)
 	w.authAttemptService.EXPECT().SubmitIdentifier(gomock.Any(), gomock.Any()).Times(0)
 	w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Times(0)
 
@@ -5317,6 +5319,29 @@ func TestFlowStateMachine_Render_SSOCollisionStaleRowBindsNothing(t *testing.T) 
 	assert.Equal(t, "credentials", result.Step.Name)
 	assert.Nil(t, result.Step.Error)
 	assert.Empty(t, result.State.CollectedData.UserID)
+}
+
+// A concurrent request created the user from the same identity and bound the
+// attempt, so this collision bind finds the row gone: it retries that
+// request's handoff instead of resealing a stale cookie.
+func TestFlowStateMachine_Render_SSOCollisionStaleRowAfterCreationRetriesHandoff(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoRenderWorld(t)
+	def = withSSOOutcomeSteps(def)
+	w.expectParked(unlinkedParked(map[string]any{"email": "alice@example.com"}, nil), nil)
+	w.expectOwner("email", "alice@example.com", "user-9")
+	w.expectBindCollision("user-9", domain.ErrSSOStateInvalid())
+	w.expectParked(&domain.FlowSSOParkedIdentity{BoundUserID: "user-9"}, nil)
+	w.authAttemptService.EXPECT().
+		Handoff(gomock.Any(), domain.FlowHandoffInput{ProjectID: testProjectID, AttemptID: "att-1"}).
+		Return(domain.FlowHandoffOutput{Token: "handoff-1", ExpiresAt: time.Unix(1700000060, 0).UTC()}, nil).
+		Times(1)
+
+	result, err := w.sm.Render(t.Context(), def, state)
+	require.NoError(t, err)
+	assert.Equal(t, "done", result.Step.Name)
+	assert.Equal(t, "handoff-1", result.HandoffToken)
+	assert.Equal(t, "user-9", result.State.CollectedData.UserID)
 }
 
 // still a valid claim: resolution reads x-unique directly and goes on.
