@@ -129,26 +129,27 @@ error  no preview URL found
 ### `preview` must not be able to widen the allowlist
 
 `zitadel preview` runs in a **pull-request** job, from a branch anyone with PR
-access can write — including `zitadel.json`. If it synced the allowlist the way
-`deploy` does, a branch could add `https://*.evil.com` to a production project's
-patterns and deploy an origin row under it.
+access can write. Nothing in that branch reaches the allowlist: patterns are
+project state, [not repository content](1-data-model.md#why-the-allowlist-is-not-in-zitadeljson),
+so committing `https://*.evil.com` grants nothing. What a PR job does hold is a
+credential, and that is the part still to solve.
 
 | | `zitadel deploy` | `zitadel preview` |
 |---|---|---|
 | Runs in | the production job, after merge | a PR job, unreviewed branch |
-| Allowlist patterns | synced from `zitadel.json` | read-only |
+| Allowlist patterns | read-only — `zitadel allowlist` is its own command | read-only |
 | Project class | may change | may not |
 | Variables | may set | may not |
 | Origin rows | `primary` | creates or renews one `preview` row |
 
-So a new preview pattern takes effect only once merged. The first preview on a
-branch needing a brand-new pattern fails with `proj.origin_not_allowed`, and the
-fix is to land the pattern.
+So the first preview on a branch needing a brand-new pattern fails with
+`proj.origin_not_allowed`, and the fix is for someone holding `project.write` to
+add it — once, since one pattern covers every later branch.
 
 **A division the CLI enforces is not a boundary.** A PR job needs a credential to
 deploy, and the project secret carries full operator authority — a branch wanting
-to widen the allowlist would call `PATCH /projects` directly rather than bother
-with the CLI. So the table above is a convention until the server can express it,
+to widen the allowlist would call the allowlist endpoint directly rather than
+bother with the CLI. So the table above is a convention until the server can express it,
 which needs **a credential scoped to preview deploys and nothing else**: create
 or renew a preview origin row, create a release, read the allowlist, and no write
 to patterns, class or variables. ADR 036's `sk_team_` — "anything not listed
@@ -168,8 +169,11 @@ $ zitadel origins rm https://acme-git-sso-acmeinc.vercel.app
 removed. 1 deployment record kept.
 ```
 
-The allowlist is a separate command, because patterns are authored in
-`zitadel.json` and synced rather than managed imperatively:
+The allowlist is a separate command, because a pattern is project state rather
+than release content and is changed deliberately rather than as a side effect of
+shipping. Each line shows the check the pattern passed, which is what has to
+stand in for the PR review the
+[old design assumed](1-data-model.md#why-the-allowlist-is-not-in-zitadeljson):
 
 ```
 $ zitadel allowlist
@@ -178,6 +182,15 @@ https://app.acme.com              primary
 https://www.acme.com              primary
 https://*-acmeinc.vercel.app      preview   tenant-anchored on `-acmeinc` ✓
 https://*.preview.acme.com        preview   domain verified ✓
+
+$ zitadel allowlist add 'https://*--acme-site.netlify.app' --kind preview
+checked   netlify.app  tenant-unique label `acme-site`  ✓
+added     covers every later branch; no deploy needed
+
+$ zitadel allowlist add 'https://*.evil.com' --kind preview
+error  origin_not_tenant_anchored
+       `*.evil.com` carries no tenant-unique label, so the wildcard would
+       admit every host under evil.com.
 ```
 
 ## `zitadel variables`

@@ -247,7 +247,7 @@ Two records with different jobs.
 | | **Allowlist** | **Inventory** |
 |---|---|---|
 | What it is | a rule | a fact |
-| Written by | a human, in `zitadel.json`, reviewed in a PR | a deploy |
+| Written by | a person holding `project.write`, one pattern at a time | a deploy |
 | Shape | patterns | exact origins |
 | Lifetime | as long as the project | as long as the deployment it records |
 | Answers | may traffic from here be served? | what is this URL serving? |
@@ -267,11 +267,10 @@ origins can be set once, at project creation, and never changed afterwards.
 **It is project state, not release content.** It has to be: layer 1 of
 [resolution](2-release-resolution.md#the-three-layers) decides whether to serve this origin at all, and it
 runs *before* the release is known. An allowlist inside the release would need
-the release in order to choose the release. That also settles the lifecycle —
-`zitadel rollback` moves releases and leaves the allowlist alone, and
-`zitadel deploy` makes two calls rather than one: sync the allowlist, then create
-the release and its deployments. The CLI already shows this as a separate
-`origins to sync` line.
+the release in order to choose the release. That also settles the
+lifecycle: the allowlist outlives every release in the project, so
+`zitadel rollback` moves releases and leaves it alone, and `zitadel deploy` never
+touches it.
 
 **Its own sub-resource, not a `patchProject` field.** `patchProject` carries
 `security: [oauth2: [project.write], nextgenSession: []]`, and the session
@@ -285,28 +284,65 @@ inside one request body.
 
 | Change | Where |
 |---|---|
-| `PUT /projects/{project_id}/allowed_origins` — replace the whole list, `project.write` only, no session fallback | new `endpoints/projects/by_id/allowed_origins/methods.yaml`, registered in `openapi-spec.yaml` |
+| `POST /projects/{project_id}/allowed_origins` — add one `{pattern, kind}`, `project.write` only, no session fallback | new `endpoints/projects/by_id/allowed_origins/methods.yaml`, registered in `openapi-spec.yaml` |
+| `DELETE /projects/{project_id}/allowed_origins` — remove one, pattern in the request body rather than a path segment, since a pattern contains `/` and `*` | the same file |
 | `preview_origins` → `allowed_origins`, entries become `{pattern, kind}` | `create-project-request.yaml` and `project-response.yaml` — the latter also covers `GET /projects/{id}` and `/projects/query`, which `$ref` it |
 | `class` on the project | `project-response.yaml`, plus a promote/demote operation, since a class change revalidates every pattern |
 | Rejections: `origin_not_permitted_for_class`, `origin_not_tenant_anchored`, `origin_host_unknown` | the new operation's error response, and `createProject-error-response.yaml` |
 
-**Replace, not add and remove.** The list comes from a reviewed file, so the file
-is the desired state and the call is idempotent — which is what makes `PUT`
-right, and what keeps a `deploy` from needing to diff the remote list first. The
-cost is last-writer-wins between two people editing concurrently; an `If-Match`
-on the project's `updated_at` is the cheap guard if that turns out to matter.
-
-**In `zitadel.json`, but outside the digest.** The patterns are authored in that
-file and reviewed in a PR, which means the file carries two kinds of content:
-resources that get pinned into a release, and project settings that get synced.
-The release digest is over the pointer set, so an allowlist edit cannot change it
-— but the local drift hash behind `zitadel status` must exclude the block too,
-or adding a preview pattern would report the working copy as undeployed and
-invite a release nobody needs.
+**Add and remove, not replace.** With no file acting as desired state, a `PUT`
+would make the CLI read the list, edit it and write it back, losing a concurrent
+addition in the window between. One pattern per call has no such window and needs
+no `If-Match`. A whole-list `PUT` is the right primitive the day a declarative
+file exists, and not before.
 
 The inventory needs no such endpoint. Origin rows are written by deploys and
 collected on expiry, so the only reads are `GET /origins` for `zitadel status`
 and a delete for retiring one early — which is what `zitadel origins rm` calls.
+
+### Why the allowlist is not in `zitadel.json`
+
+One repository addresses several projects — a local one, a staging one, a
+production one — and each needs a different list. `https://app.acme.com` belongs
+to the production project and `http://localhost:3000` to the local one. Syncing
+one shared file into all of them would grant every project every origin, which is
+the opposite of what an allowlist is for.
+
+**A committed file could only be per-project if it keyed on something the server
+also knows, and it has nothing to key on.** A stage name is a client-side label
+the server never sees, and
+[CI has no stage at all](5-cli-stages.md#in-ci-there-are-no-files-and-no-stage-either),
+so `{"origins": {"production": [...]}}` keys on a word that does not exist in the
+job that would apply it. Keying by project id instead does work mechanically —
+the CLI resolves the id from the environment and looks up that block — at the
+cost of committing a map of project ids that goes stale on a fork and has to be
+edited to add a stage, which is the one thing adding a stage needs no commit for
+today.
+
+So the allowlist stays where its subject is: on the project, changed by an
+explicit call.
+
+| | **In the file** | **On the project** |
+|---|---|---|
+| Changed by | `deploy`, as a side effect of shipping | `zitadel allowlist add`, a call of its own |
+| Guarded by | review of the block, in a PR | `project.write`, plus the class and anchor rules, recorded in the audit log |
+| Costs | a carve-out in the `zitadel status` drift hash, or an allowlist edit reads as undeployed code | nothing — `zitadel.json` holds release content only |
+| Reconstructible from the repo | yes | no |
+
+**And the review the file buys is weaker than it looks.** A block that CI applies
+with the project secret is reviewed only as well as the branch protection on it,
+and a branch that wants to widen the allowlist can call the endpoint directly
+rather than bother editing a file — which is the admission the
+[`preview` section](4-cli-commands.md#preview-must-not-be-able-to-widen-the-allowlist)
+has to make anyway. Server-side rules hold whoever the caller is: a `production`
+project refuses a wildcard primary and a loopback origin, and a wildcard preview
+must be tenant-anchored.
+
+The cost is real. The list is no longer reconstructible from the repository, and
+bringing up a second project means running a command rather than inheriting a
+file. `zitadel allowlist` printing the list with the check each pattern passed is
+the mitigation; a declarative file that is *not* `zitadel.json` is
+[Open 8](#open).
 
 ### The tenant-anchor rule
 
@@ -798,3 +834,10 @@ Two things in this document need work that does not exist yet.
 7. **Whether `production` should require a claimed project** (this note says
    yes), and whether anything else currently claim-gated should move onto the
    class.
+8. **A declarative per-project file.** `zitadel apply project.yaml` — one file
+   per project rather than one shared across stages, outside the release bundle,
+   never applied by a preview job — would restore review and reconstructibility
+   without the keying problem above. It wants the whole-list `PUT`, and a
+   `--project` it checks against the file rather than trusting the environment.
+   Worth doing only once someone has more patterns than they can hold in their
+   head.

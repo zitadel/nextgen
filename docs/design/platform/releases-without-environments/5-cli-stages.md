@@ -73,7 +73,10 @@ Three reasons this beats a block in `zitadel.json`:
 - **`zitadel.json` stays purely configuration content.** It describes what gets
   built into a release. Connection details are not that, and keeping them out
   means the bundle needs no carve-out for the parts of the file that must not
-  ship.
+  ship. The
+  [allowed origins](1-data-model.md#why-the-allowlist-is-not-in-zitadeljson) are
+  out for the same reason and fail the same way: a list that differs per project
+  has nothing correct to say in a file every project shares.
 
 ### In CI there are no files, and no stage either
 
@@ -149,9 +152,10 @@ created           prj_01K9AA9M3K7E2QX8VB4T   class=sandbox   unclaimed
 wrote             .env.production.local   URL, PROJECT_ID, PUBLISHABLE_KEY, PROJECT_SECRET
 
 next
-  zitadel deploy --stage production            ship your configuration
-  zitadel claim  --stage production            attach an owner
-  zitadel projects promote --stage production  once its origins are set
+  zitadel allowlist add https://app.acme.com --kind primary  admit the origin
+  zitadel deploy --stage production                          ship configuration
+  zitadel claim --stage production                           attach an owner
+  zitadel projects promote --stage production                class=production
 ```
 
 Creating the project needs no credential — `POST /projects` is public and returns
@@ -195,11 +199,17 @@ building   6 resources
 release    sha256:4a5b6c7d  (new in this project)
 
   no deployment yet — 6 resources will be created
-  origins to sync: https://app.acme.com (primary)
+  targets: (default), https://app.acme.com  (primary, already allowed)
 
 continue? [y/N] y
 deployed   dpl_01KC4N8P2S5WQZ   2 deployment records written
 ```
+
+The allowlist is read here, never written. `deploy` fans out over the `primary`
+origins the project already admits, so
+[admitting one](1-data-model.md#why-the-allowlist-is-not-in-zitadeljson) is the
+step before this rather than part of it — which is why `zitadel stages add`
+suggests it first.
 
 **`new in this project` is the open question made concrete.** The development
 project holds the same content under a different digest, because a pointer
