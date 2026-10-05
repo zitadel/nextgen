@@ -27,8 +27,7 @@
     }
   },
   "files": [
-    "dist",
-    "skills"
+    "dist"
   ],
   "publishConfig": {
     "access": "public"

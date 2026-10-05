@@ -14,8 +14,7 @@
   "license": "MIT",
   "type": "module",
   "files": [
-    "dist",
-    "skills"
+    "dist"
   ],
   "exports": {
     ".": {

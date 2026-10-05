@@ -14,8 +14,7 @@
   "license": "MIT",
   "type": "module",
   "files": [
-    "dist",
-    "skills"
+    "dist"
   ],
   "module": "./dist/index.js",
   "types": "./dist/types/public-api.d.ts",

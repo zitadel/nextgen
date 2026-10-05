@@ -14,8 +14,7 @@
   "license": "MIT",
   "type": "module",
   "files": [
-    "dist",
-    "skills"
+    "dist"
   ],
   "main": "./dist/index.qwik.mjs",
   "qwik": "./dist/index.qwik.mjs",

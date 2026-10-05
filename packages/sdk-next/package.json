@@ -13,8 +13,7 @@
     "directory": "packages/sdk-next"
   },
   "files": [
-    "dist",
-    "skills"
+    "dist"
   ],
   "type": "module",
   "sideEffects": [
