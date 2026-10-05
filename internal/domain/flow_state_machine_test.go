@@ -4920,6 +4920,33 @@ func TestFlowStateMachine_Render_SSOAutoCreateRoutesAuthenticated(t *testing.T) 
 	assert.Equal(t, "user-new", result.State.CollectedData.UserID)
 }
 
+// Complete claims on a step that cannot route sso_authenticated create
+// nothing: the step shows the provider as unavailable, and the row stays
+// parked.
+func TestFlowStateMachine_Render_SSOUnroutableTransitionDoesNotCreate(t *testing.T) {
+	t.Parallel()
+	for name, transition := range unroutableSSOTransitions() {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			w, def, state := ssoRenderWorld(t)
+			setSSOAuthenticatedTransition(def, transition)
+			claims, verified := completeClaims()
+			w.expectParked(unlinkedParked(claims, verified), nil)
+			w.expectOwner("email", "alice@example.com", "")
+			w.expectOwner("username", "alice", "")
+			w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Times(0)
+
+			result, err := w.sm.Render(t.Context(), def, state)
+			require.NoError(t, err)
+			assert.Equal(t, "credentials", result.Step.Name)
+			require.NotNil(t, result.Step.Error)
+			assert.Equal(t, domain.FlowStepErrorSSOUnavailable, *result.Step.Error)
+			assert.Empty(t, result.State.CollectedData.UserID)
+			assert.Equal(t, "ch-1", result.State.SSOResolvedCheckID)
+		})
+	}
+}
+
 // Another sign-in took a unique attribute between the probe and the insert:
 // the probe runs once more and binds the winner.
 func TestFlowStateMachine_Render_SSOCreateUniqueRaceFallsThroughToCollision(t *testing.T) {
