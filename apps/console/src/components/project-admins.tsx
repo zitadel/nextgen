@@ -6,6 +6,7 @@ import { DetailSection } from "@/components/detail-page";
 import { RemoveAdminDialog } from "@/components/remove-admin-dialog";
 import {
   RESOURCE_CELL,
+  RESOURCE_CELL_MUTED,
   ResourceEmptyRow,
   ResourceHeadCell,
   ResourceHeaderRow,
@@ -95,7 +96,7 @@ export function ProjectAdmins({
                 <TableCell className={`${RESOURCE_CELL} text-foreground truncate text-sm`}>
                   {row.name}
                 </TableCell>
-                <TableCell className={`${RESOURCE_CELL} text-muted-foreground text-sm`}>
+                <TableCell className={RESOURCE_CELL_MUTED}>
                   {row.level}
                 </TableCell>
                 <TableCell className={RESOURCE_CELL}>
@@ -173,7 +174,7 @@ function RowActions({
 
   return (
     <>
-      <RowMenu name={row.name} contentClassName="">
+      <RowMenu name={row.name} contentClassName="w-auto">
         <DropdownMenuItem variant="destructive" onSelect={() => setRemoveOpen(true)}>
           {action}
         </DropdownMenuItem>

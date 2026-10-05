@@ -10,14 +10,13 @@ import { useSubmit } from "@/hooks/use-submit";
 /**
  * The `Details` card of a resource whose one editable field is its name.
  *
- * The field follows `value`: a save re-runs the loader and an edit elsewhere
- * invalidates it, so the draft never outlives the record it was typed against.
+ * The field follows `value`: a save re-runs the loader, and the draft resets
+ * when the saved name changes.
  */
 export function RenameCard({
   id,
   label,
   value,
-  record,
   onSave,
   errorFallback,
   className,
@@ -26,8 +25,6 @@ export function RenameCard({
   id: string;
   label: string;
   value: string;
-  /** The loaded record; a new one resets the draft. */
-  record: unknown;
   /** Saves the trimmed name and reloads the record. */
   onSave: (name: string) => Promise<void>;
   errorFallback: string;
@@ -42,7 +39,7 @@ export function RenameCard({
   useEffect(() => {
     setName(value);
     clearError();
-  }, [value, record, clearError]);
+  }, [value, clearError]);
 
   return (
     <DetailSection title="Details" className={className}>

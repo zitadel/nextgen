@@ -183,7 +183,10 @@ function AddUserForm({
       canSubmit={Boolean(selected) && !missingRequired}
       pending={create.pending}
       error={create.error ?? loadError}
-      onSubmit={() => void create.run()}
+      onSubmit={() => {
+        setLoadError(undefined);
+        void create.run();
+      }}
       onClose={onClose}
     >
       <div className={SECTION}>

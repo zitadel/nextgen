@@ -73,7 +73,6 @@ function ProjectDetail() {
         id="project-name"
         label="Project name"
         value={project.name}
-        record={project}
         onSave={async (name) => {
           await api.patchProject(project.id, { name });
           await router.invalidate();

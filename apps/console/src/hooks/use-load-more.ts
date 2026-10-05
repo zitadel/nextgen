@@ -35,6 +35,7 @@ export function useLoadMore<P extends Page>(
     setExtra([]);
     setNextPageToken(loaded.nextPageToken);
     setError(undefined);
+    setLoading(false);
   }, [loaded]);
 
   const loadedRef = useRef(loaded);
@@ -58,7 +59,7 @@ export function useLoadMore<P extends Page>(
       // an event handler's rejection.
       if (loadedRef.current === generation) setError(describeError(cause, errorFallback));
     } finally {
-      setLoading(false);
+      if (loadedRef.current === generation) setLoading(false);
     }
   }
 

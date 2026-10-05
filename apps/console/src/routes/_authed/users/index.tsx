@@ -150,7 +150,7 @@ function UsersScreen() {
               aria-label="Search users"
             />
             <InputGroupAddon align="inline-end">
-              <kbd className="bg-muted text-muted-foreground pointer-events-none flex h-5 items-center gap-0.5 rounded-sm px-1.5 font-sans text-[10px] font-medium">
+              <kbd className="bg-muted text-muted-foreground pointer-events-none flex h-5 items-center gap-0.5 rounded-sm! px-1.5 font-sans text-[10px] font-medium">
                 {findShortcutLabel()}
               </kbd>
             </InputGroupAddon>

@@ -5,8 +5,7 @@ export const PAGE_TITLE = "text-foreground font-serif text-2xl leading-6 trackin
 export const OVERLINE = "font-serif text-xs leading-4 tracking-[0.72px] uppercase";
 
 /** A muted overline: section eyebrows and the label over a meta value. */
-export const EYEBROW =
-  "text-muted-foreground font-serif text-xs leading-4 tracking-[0.72px] uppercase";
+export const EYEBROW = `text-muted-foreground ${OVERLINE}`;
 
 /** Head cell of a table inside a panel card: a muted overline, flush with the content edge. */
 export const PANEL_HEAD_CELL =

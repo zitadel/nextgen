@@ -56,7 +56,7 @@ function Button({
 }: React.ComponentProps<"button"> &
   VariantProps<typeof buttonVariants> & {
     asChild?: boolean
-    /** Shows a leading spinner and disables the button while an action runs. */
+    /** Shows a leading spinner and disables the button while an action runs. Not for `asChild`. */
     loading?: boolean
   }) {
   const Comp = asChild ? Slot.Root : "button"
@@ -67,7 +67,7 @@ function Button({
       data-variant={variant}
       data-size={size}
       className={cn(buttonVariants({ variant, size, className }))}
-      disabled={loading || disabled}
+      disabled={(!asChild && loading) || disabled}
       {...props}
     >
       {asChild ? (

@@ -49,7 +49,6 @@ function TeamDetail() {
         id="team-tenant-name"
         label="Tenant name"
         value={team.name}
-        record={team}
         onSave={async (name) => {
           await api.updateTeam(team.id, { name });
           await router.invalidate();
