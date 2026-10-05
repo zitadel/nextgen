@@ -33,13 +33,20 @@ export default {
   args: { ...orchestratorDefaultArgs, passkey: true },
   argTypes: {
     ...orchestratorArgTypes,
-    // Passkey is offered only on the identifier step, so this whole group is
-    // login-only: lock `purpose` so `register` (which has no passkey action)
-    // can't be selected and silently break these stories.
+    // This group is defined by passkeys being enabled on a login flow, so lock
+    // the two controls that would break it: `purpose` (passkey is offered only
+    // on the identifier step, so `register` has no passkey action) and `passkey`
+    // itself (turning it off removes the action these stories depend on, timing
+    // out PasskeyLogin's play). The rest — variant, theme, branding, sso — stay.
     purpose: {
       ...orchestratorArgTypes.purpose,
       control: false,
       table: { ...orchestratorArgTypes.purpose.table, disable: true },
+    },
+    passkey: {
+      ...orchestratorArgTypes.passkey,
+      control: false,
+      table: { ...orchestratorArgTypes.passkey.table, disable: true },
     },
   },
   beforeEach: orchestratorBeforeEach,
