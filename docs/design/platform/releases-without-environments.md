@@ -25,7 +25,7 @@ Field names are proposals, not settled wire contracts.
 Most of these tables already exist. What this design moves is the axis they are
 keyed on: from an environment id to an origin string.
 
-| Entity | Today | Here |
+| Entity | Old Model | New Model |
 |---|---|---|
 | **Project** | `projects` | kept — `preview_origins` becomes `allowed_origins` with a `kind` per entry, plus `class` and `publishable_key` |
 | **Origin** | — | **new table**, one row per live URL; takes over the routing job environments do |
@@ -646,6 +646,57 @@ Two records with different jobs.
 Matching: `*` matches one or more characters, none of which is `.`. Where a
 request matches more than one pattern, the more specific wins — a literal beats a
 wildcard.
+
+### Managing the allowlist
+
+There is no endpoint for this today. `preview_origins` appears in
+`create-project-request.yaml` and in `project-response.yaml`, but **not** in
+`patch-project-request.yaml`, which carries only `name` and `password_hash`. So
+origins can be set once, at project creation, and never changed afterwards.
+
+**It is project state, not release content.** It has to be: layer 1 of
+[resolution](#resolution) decides whether to serve this origin at all, and it
+runs *before* the release is known. An allowlist inside the release would need
+the release in order to choose the release. That also settles the lifecycle —
+`zitadel rollback` moves releases and leaves the allowlist alone, and
+`zitadel deploy` makes two calls rather than one: sync the allowlist, then create
+the release and its deployments. The CLI already shows this as a separate
+`origins to sync` line.
+
+**Its own sub-resource, not a `patchProject` field.** `patchProject` carries
+`security: [oauth2: [project.write], nextgenSession: []]`, and the session
+alternative is there so "a granted person may rename a project they can act on".
+Renaming is benign; admitting an origin is the security-relevant act in this
+whole design. Putting both behind one operation would let a session-authenticated
+grantee widen the allowlist, which is also precisely what the preview-deploy
+credential of [Prerequisites](#prerequisites) must not be able to do. A separate
+operation lets the two have different security without field-level authorization
+inside one request body.
+
+| Change | Where |
+|---|---|
+| `PUT /projects/{project_id}/allowed_origins` — replace the whole list, `project.write` only, no session fallback | new `endpoints/projects/by_id/allowed_origins/methods.yaml`, registered in `openapi-spec.yaml` |
+| `preview_origins` → `allowed_origins`, entries become `{pattern, kind}` | `create-project-request.yaml` and `project-response.yaml` — the latter also covers `GET /projects/{id}` and `/projects/query`, which `$ref` it |
+| `class` on the project | `project-response.yaml`, plus a promote/demote operation, since a class change revalidates every pattern |
+| Rejections: `origin_not_permitted_for_class`, `origin_not_tenant_anchored`, `origin_host_unknown` | the new operation's error response, and `createProject-error-response.yaml` |
+
+**Replace, not add and remove.** The list comes from a reviewed file, so the file
+is the desired state and the call is idempotent — which is what makes `PUT`
+right, and what keeps a `deploy` from needing to diff the remote list first. The
+cost is last-writer-wins between two people editing concurrently; an `If-Match`
+on the project's `updated_at` is the cheap guard if that turns out to matter.
+
+**In `zitadel.json`, but outside the digest.** The patterns are authored in that
+file and reviewed in a PR, which means the file carries two kinds of content:
+resources that get pinned into a release, and project settings that get synced.
+The release digest is over the pointer set, so an allowlist edit cannot change it
+— but the local drift hash behind `zitadel status` must exclude the block too,
+or adding a preview pattern would report the working copy as undeployed and
+invite a release nobody needs.
+
+The inventory needs no such endpoint. Origin rows are written by deploys and
+collected on expiry, so the only reads are `GET /origins` for `zitadel status`
+and a delete for retiring one early — which is what `zitadel origins rm` calls.
 
 ### The tenant-anchor rule
 
