@@ -209,7 +209,7 @@ kind — [how a preview gets different values](3-variables.md#how-a-preview-gets
 ```
 $ zitadel vars rm GOOGLE_CLIENT_SECRET --preview
 removed the preview value; previews now serve the production one.
-2 deployments still reference svs_01KB…WQY; they are unaffected.
+2 deployments still reference secver_01KB…WQY; they are unaffected.
 ```
 
 Removing from the store never reaches a snapshot, which is the whole point of

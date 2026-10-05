@@ -41,12 +41,12 @@ pattern or a branch.
   "is_secret": false }
 
 { "project_id": "prj_01K9AA9M3K7E2QX8VB4T", "name": "GOOGLE_CLIENT_SECRET",
-  "applies_to": "all", "secret_version": "svs_01KB3F8N2P9S5WQX",
+  "applies_to": "all", "secret_version": "secver_01KB3F8N2P9S5WQX",
   "is_secret": true }
 
 // The override. Read only by `zitadel preview`, and only when it exists.
 { "project_id": "prj_01K9AA9M3K7E2QX8VB4T", "name": "GOOGLE_CLIENT_SECRET",
-  "applies_to": "preview", "secret_version": "svs_01KB3F8N2P9S5WQY",
+  "applies_to": "preview", "secret_version": "secver_01KB3F8N2P9S5WQY",
   "is_secret": true }
 ```
 
@@ -73,9 +73,39 @@ of record sharing one table.
   "project_id":     "prj_01K9AA9M3K7E2QX8VB4T",
   "deployment_id":  "dep_01KB3F8N2P9S5WQZ",
   "name":           "GOOGLE_CLIENT_SECRET",
-  "secret_version": "svs_01KB3F8N2P9S5WQY" // referenced, never copied
+  "secret_version": "secver_01KB3F8N2P9S5WQY" // referenced, never copied
 }
 ```
+
+## What a secret version is
+
+**It does not exist today.** A secret variable is a row in `variables` whose
+`value` column holds the encrypted value: `NewSecretVariable` encrypts with a
+`crypto.Encrypter` and stores the ciphertext in the same column a plain value
+uses (`internal/domain/variable.go:76`, `000008_variables.sql`). One value per
+name, overwritten in place, no version and no separate table.
+
+What this design needs instead is an append-only row per secret *value*:
+
+| | |
+|---|---|
+| Id | `secver_<ULID>` — a prefix ADR 047 does not register yet |
+| Holds | one encrypted value, written once, never updated |
+| Pointed at by | the store row, as its current version |
+| Pinned by | every snapshot row that deployed it |
+| Rotation | appends a version and repoints the store row; nothing already deployed changes |
+| Revocation | marks one version dead, and resolving it fails closed rather than falling forward to a newer one |
+
+So `secret_version` in the entities above is a reference to one of those rows,
+and the bytes of a secret exist in exactly one place.
+
+**Why the snapshot references rather than copies.** Copying the ciphertext into
+`deployment_variables` would be simpler, symmetrical with non-secrets, and would
+give immutability just as well. What it cannot give is revocation: a leaked
+value would live on in every snapshot that had copied it, and removing it would
+mean rewriting rows this design calls immutable. The indirection buys the
+ability to kill a value everywhere at once, and the reverse lookup that says
+which deployments are still serving it.
 
 ## Why a snapshot and not just the store
 
@@ -95,19 +125,18 @@ stored. not live until the next deploy.
 
 $ zitadel vars set GOOGLE_CLIENT_SECRET --secret
 value: ********
-stored as svs_01KB3F8N2P9S5WQX. not live until the next deploy.
+stored as secver_01KB3F8N2P9S5WQX. not live until the next deploy.
 
 $ zitadel vars list
-NAME                  TYPE    ALL DEPLOYS               PREVIEWS
-GOOGLE_CLIENT_ID      value   prod-abc.apps.googleu…    preview-xyz.apps.goog…
-GOOGLE_CLIENT_SECRET  secret  svs_01KB…WQX  (10-02)     svs_01KB…WQY  (09-14)
-SUPPORT_EMAIL         value   help@acme.com             —
+NAME                  TYPE    ALL DEPLOYS                 PREVIEWS
+GOOGLE_CLIENT_ID      value   prod-abc.apps.googleu…      preview-xyz.apps.goog…
+GOOGLE_CLIENT_SECRET  secret  secver_01KB…WQX  (10-02)    secver_01KB…WQY  (09-14)
+SUPPORT_EMAIL         value   help@acme.com               —
 ```
 
 One row per name, two columns, and `—` reads as "previews get the same value".
-It answers only "what is stored". What is *running* is
-a different question with a different answer per target, so it is a different
-command:
+It answers only "what is stored". What is *running* is a different question with
+a different answer per target, so it is a different command:
 
 ```
 $ zitadel vars resolve --origin https://acme-git-sso-acmeinc.vercel.app
@@ -115,7 +144,7 @@ serving dep_01KB3F8N2P9S5WQZ   deployed 10-02 14:10
 
 NAME                  SERVING NOW                FROM
 GOOGLE_CLIENT_ID      preview-xyz.apps.goog…     preview override
-GOOGLE_CLIENT_SECRET  svs_01KB…                  preview override
+GOOGLE_CLIENT_SECRET  secver_01KB…WQY            preview override
 SUPPORT_EMAIL         help@acme.com              all deploys
 
   SUPPORT_EMAIL changed in the store since this deployment — deploy to apply
@@ -128,7 +157,7 @@ The value is set once, against the project, and the pipeline is told nothing:
 ```
 $ zitadel vars set GOOGLE_CLIENT_SECRET --secret --preview
 value: ********
-stored as svs_01KB3F8N2P9S5WQY. applies to previews.
+stored as secver_01KB3F8N2P9S5WQY. applies to previews.
 not live until the next preview deploy.
 ```
 
@@ -195,10 +224,10 @@ Four properties, each from a different part of the model:
 3. **A flow seals the deployment id, not the release digest.** One pointer pins
    the resources *and* the values, so the two cannot drift apart mid-attempt.
    This replaces sealing the release, and is strictly stronger.
-4. **Secret versions are immutable.** A rotation mints a new version; the old
-   keeps its bytes for as long as a deployment references it. Revocation is the
-   single exception and it fails closed — a revoked version refuses, rather than
-   quietly resolving to a newer one.
+4. **[Secret versions](#what-a-secret-version-is) are immutable.** A rotation
+   mints a new version; the old keeps its bytes for as long as a deployment
+   references it. Revocation is the single exception and it fails closed — a
+   revoked version refuses, rather than quietly resolving to a newer one.
 
 ## Why not one table with a null deployment id
 
@@ -232,7 +261,7 @@ the only thing it dedups is plaintext.
 
 The deployment row already carries a `metadata` document, so a variables
 document would have been idiomatic. But rotation needs the reverse lookup:
-*which deployments still reference `svs_01KB…`*, so the old version can be
+*which deployments still reference `secver_01KB…`*, so the old version can be
 revoked once nothing serves it. That is a query by secret version, which a table
 indexes and a JSON column in three dialects does not.
 
@@ -250,6 +279,14 @@ indexes and a JSON column in three dialects does not.
   worse than write the `preview` one.
 - **Variables never move onto the release.** The same release has to run with
   different values on different origins, which is the preview case above.
+
+## Prerequisites
+
+**A versioned secret store.** A secret is a column today, so the rotation and
+revocation properties above have nothing to rest on. It needs the append-only
+table, a `secver` prefix registered by an amendment to ADR 047, and a resolver
+that fails closed on a revoked version. Non-secret variables need none of it —
+they work against the `value` column as it stands.
 
 ## Open
 
