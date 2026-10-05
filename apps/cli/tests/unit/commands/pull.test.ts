@@ -1,4 +1,4 @@
-import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -172,6 +172,20 @@ describe("pull command", () => {
 
     expect(res.exitCode).not.toBe(0);
     await expect(stat(join(cwd, ".zitadel/schemas/human-user.json"))).rejects.toThrow();
+  });
+
+  it("refuses to write through a symlinked destination", async () => {
+    const cwd = await makeCwd();
+    await mkdir(join(cwd, ".zitadel/schemas"), { recursive: true });
+    const outside = join(cwd, "outside.json");
+    await writeFile(outside, "{}");
+    await symlink(outside, join(cwd, ".zitadel/schemas/human-user.json"));
+    const base = await startStub();
+
+    const res = await pull(cwd, base, ["schema", "human-user"]);
+
+    expect((parseJson(res.stdout) as { code: string }).code).toBe("E_VALIDATION");
+    expect(await readFile(outside, "utf8")).toBe("{}");
   });
 
   it("writes nothing under --dry-run", async () => {

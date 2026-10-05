@@ -1182,13 +1182,16 @@ export function setupPlatformHandlers() {
       const mode = query.data.revisions === "latest" ? "latest" : "all";
       let start = 0;
       if (query.data.page_token !== undefined) {
-        const [tokenMode, offset] = query.data.page_token.split(":");
+        const parts = query.data.page_token.split(":");
+        const [tokenMode, offset] = parts;
         start = Number(offset);
-        if (tokenMode !== mode || !Number.isInteger(start) || start < 0) {
+        if (parts.length !== 2 || tokenMode !== mode || !Number.isInteger(start) || start < 0) {
           return HttpResponse.json(errorBody("req.invalid", "invalid page token"), { status: 400 });
         }
       }
-      const size = query.data.limit ?? records.length;
+      // The server applies a default page size of 20 when `limit` is omitted;
+      // matching it keeps a continuation token flowing past 20 rows.
+      const size = query.data.limit ?? 20;
       const page = records.slice(start, start + size);
       const responseBody: ListFlowDefinitions200 = {
         flow_definitions: page.map(flowResponse),

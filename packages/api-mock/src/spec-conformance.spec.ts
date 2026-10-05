@@ -616,10 +616,15 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(token).toBeUndefined();
     expect(gotIds).toEqual(wantIds);
 
-    // A token the mock never minted is rejected, like the real server.
-    const bad = await fetch(`${BASE}/flow_definitions?project_id=proj_flow_paging&page_token=not-a-cursor`);
-    expect(bad.status).toBe(400);
-    expect(((await bad.json()) as { code: string }).code).toBe("req.invalid");
+    // A token the mock never minted is rejected, like the real server — both a
+    // shapeless value and one with extra segments past `<mode>:<offset>`.
+    for (const token of ["not-a-cursor", "all:2:extra"]) {
+      const bad = await fetch(
+        `${BASE}/flow_definitions?project_id=proj_flow_paging&page_token=${token}`,
+      );
+      expect(bad.status).toBe(400);
+      expect(((await bad.json()) as { code: string }).code).toBe("req.invalid");
+    }
 
     // A cursor minted under `all` cannot be replayed under `latest`: the two
     // modes walk different row sets, so the server binds the token to its mode.

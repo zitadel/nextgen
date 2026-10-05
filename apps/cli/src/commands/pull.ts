@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile } from "node:fs/promises";
+import { lstat, mkdir, readdir, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import { Args } from "@oclif/core";
@@ -48,10 +48,17 @@ async function existingFileForHandle(
     if (!entry.endsWith(".json")) {
       continue;
     }
+    const absolute = join(cwd, syncer.directory, entry);
+    // A symlink is never a tracked resource file: following one to match a
+    // handle (and then writing through it) could overwrite a target outside
+    // the resource directory, so it is ignored entirely.
+    if ((await lstat(absolute)).isSymbolicLink()) {
+      continue;
+    }
     // A `.json` that cannot be read or parsed is propagated, not skipped:
     // skipping the file that tracks the handle would write a duplicate and
     // leave the stale file behind.
-    const body = JSON.parse(await readFile(join(cwd, syncer.directory, entry), "utf8")) as object;
+    const body = JSON.parse(await readFile(absolute, "utf8")) as object;
     if (syncer.handleOf?.(body) === handle) {
       return `${syncer.directory}/${entry}`;
     }
@@ -166,6 +173,18 @@ export default class Pull extends BaseCommand {
           next_commands: [publicCliCommand(`pull ${kind} ${handle}`, cliVersion)],
         },
         pretty: `Fetched ${safeId}.\nWould write ${relPath} (dry run).`,
+      });
+    }
+
+    // Never write through a symlink: the destination could resolve outside the
+    // resource directory even though the handle itself is a safe segment.
+    const symlink = await lstat(join(cwd, relPath)).then(
+      (stats) => stats.isSymbolicLink(),
+      () => false,
+    );
+    if (symlink) {
+      throw new ZitadelError("E_VALIDATION", `Refusing to write through the symlink ${relPath}.`, {
+        hint: "Replace the symlink with a regular file before pulling.",
       });
     }
 
