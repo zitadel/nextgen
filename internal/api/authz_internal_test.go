@@ -532,9 +532,12 @@ func TestRequireProjectListAccess(t *testing.T) {
 		PrincipalType: domain.AuthzPrincipalTypeSKProj, PrincipalID: "proj_a",
 	})
 
-	ctx, _, err := requireProjectListAccess(operator, stmts, "proj_a", userAccess, domain.ResourceKindUser)
+	ctx, projectWide, err := requireProjectListAccess(operator, stmts, "proj_a", userAccess, domain.ResourceKindUser)
 	if err != nil {
 		t.Fatalf("project-wide Allow should proceed: %v", err)
+	}
+	if !projectWide {
+		t.Fatal("Allow must report a project-wide read")
 	}
 	if !service.AuthzListSkipOncePending(ctx) {
 		t.Fatal("Allow must stamp a one-shot EXISTS skip")
@@ -549,9 +552,12 @@ func TestRequireProjectListAccess(t *testing.T) {
 	deny := false
 	foothold := true
 	narrow := stubAuthzStmts{allowCheck: &deny, foothold: &foothold}
-	ctx, _, err = requireProjectListAccess(operator, narrow, "proj_a", userAccess, domain.ResourceKindUser)
+	ctx, projectWide, err = requireProjectListAccess(operator, narrow, "proj_a", userAccess, domain.ResourceKindUser)
 	if err != nil {
 		t.Fatalf("Forbidden with foothold should proceed for partial-view lists: %v", err)
+	}
+	if projectWide {
+		t.Fatal("Forbidden must not report a project-wide read")
 	}
 	if service.AuthzListUnrestricted(ctx) {
 		t.Fatal("Forbidden must not mark the list unrestricted")
@@ -616,9 +622,12 @@ func TestRequireProjectListAccess_UserPrincipal(t *testing.T) {
 	t.Run("allow stamps skip", func(t *testing.T) {
 		allow := true
 		foothold := true
-		ctx, _, err := requireProjectListAccess(human, stubAuthzStmts{allowCheck: &allow, foothold: &foothold}, "proj_home", userAccess, domain.ResourceKindUser)
+		ctx, projectWide, err := requireProjectListAccess(human, stubAuthzStmts{allowCheck: &allow, foothold: &foothold}, "proj_home", userAccess, domain.ResourceKindUser)
 		if err != nil {
 			t.Fatalf("session user with Check Allow should proceed: %v", err)
+		}
+		if !projectWide {
+			t.Fatal("Allow must report a project-wide read")
 		}
 		if !service.AuthzListSkipOncePending(ctx) {
 			t.Fatal("Allow must stamp a one-shot EXISTS skip")
@@ -631,9 +640,12 @@ func TestRequireProjectListAccess_UserPrincipal(t *testing.T) {
 	t.Run("foothold without permission is an empty-page filter", func(t *testing.T) {
 		deny := false
 		foothold := true
-		ctx, _, err := requireProjectListAccess(human, stubAuthzStmts{allowCheck: &deny, foothold: &foothold}, "proj_home", userAccess, domain.ResourceKindUser)
+		ctx, projectWide, err := requireProjectListAccess(human, stubAuthzStmts{allowCheck: &deny, foothold: &foothold}, "proj_home", userAccess, domain.ResourceKindUser)
 		if err != nil {
 			t.Fatalf("Forbidden with foothold should proceed for partial-view lists: %v", err)
+		}
+		if projectWide {
+			t.Fatal("Forbidden must not report a project-wide read")
 		}
 		filter, ok := service.AuthzListFilterFromContext(ctx)
 		if !ok {
