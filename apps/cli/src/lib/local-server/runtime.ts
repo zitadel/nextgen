@@ -186,6 +186,29 @@ export async function ensureContainerIdentity(
   };
 }
 
+/**
+ * The nearest directory, from `cwd` upward, that holds `file`, or `undefined`
+ * when none does. `zitadel start` keeps its state in the directory it ran in,
+ * and an app created inside that directory reads it from there. Only readers
+ * walk up: commands that write or remove local state act on `cwd` alone.
+ */
+export async function findUpward(cwd: string, file: string): Promise<string | undefined> {
+  for (let dir = cwd; ; dir = dirname(dir)) {
+    try {
+      await access(join(dir, file));
+      return dir;
+    } catch {
+      if (dirname(dir) === dir) return undefined;
+    }
+  }
+}
+
+/** Runtime metadata of the server started in `cwd` or the nearest parent with one. */
+async function readNearestRuntimeMetadata(cwd: string): Promise<RuntimeMetadata | undefined> {
+  const dir = await findUpward(cwd, LOCAL_RUNTIME_FILE);
+  return dir ? readRuntimeMetadata(dir) : undefined;
+}
+
 export async function readRuntimeMetadata(cwd: string): Promise<RuntimeMetadata | undefined> {
   const paths = localRuntimePaths(cwd);
   let raw: string;
@@ -229,7 +252,8 @@ export async function checkLocalServerHealth(serverUrl: string, timeoutMs = 1500
 /**
  * Best-effort local-server detection for optional UI (the setup wizard's
  * server choice). Same sources as {@link resolveLocalServer} — the runtime
- * metadata written by `zitadel start`, then the default localhost URL — but
+ * metadata written by `zitadel start` in this directory or a parent, then the
+ * default localhost URL — but
  * never throws: a malformed `runtime.json` or an unhealthy server yields
  * `undefined` (doctor owns diagnosing those states), and an unhealthy
  * metadata URL still falls back to the default-port probe so a server
@@ -238,7 +262,7 @@ export async function checkLocalServerHealth(serverUrl: string, timeoutMs = 1500
 export async function detectHealthyLocalServer(cwd: string): Promise<string | undefined> {
   let runtime: RuntimeMetadata | undefined;
   try {
-    runtime = await readRuntimeMetadata(cwd);
+    runtime = await readNearestRuntimeMetadata(cwd);
   } catch {
     runtime = undefined;
   }
@@ -253,7 +277,7 @@ export async function detectHealthyLocalServer(cwd: string): Promise<string | un
 }
 
 export async function resolveLocalServer(cwd: string): Promise<string> {
-  const runtime = await readRuntimeMetadata(cwd);
+  const runtime = await readNearestRuntimeMetadata(cwd);
   if (runtime) {
     if (await checkLocalServerHealth(runtime.server_url)) {
       return runtime.server_url;

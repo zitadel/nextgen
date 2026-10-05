@@ -233,12 +233,15 @@ describe("project admins", () => {
 
   it("says so when nobody has been granted access", async () => {
     // Right after claiming: the owner's access comes through the owning team,
-    // not an admin grant, so their own project lists nobody. That is correct.
+    // not an admin grant, so their own project lists nobody, and the empty
+    // state says who manages it instead.
     stubProject([]);
     await renderProject();
 
     await screen.findByRole("region", { name: "Admins" });
-    expect(admins().getByText("No admins yet.")).toBeInTheDocument();
+    expect(
+      admins().getByText("Managed by the team that owns this project. No additional admins yet."),
+    ).toBeInTheDocument();
     expect(admins().getByRole("button", { name: "Add admin" })).toBeInTheDocument();
   });
 

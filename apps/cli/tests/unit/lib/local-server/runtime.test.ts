@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -15,6 +15,7 @@ import {
   localRuntimePaths,
   readRuntimeMetadata,
   removeLocalData,
+  resolveLocalServer,
   writeRuntimeMetadata,
   type RuntimeMetadata,
 } from "../../../../src/lib/local-server/runtime";
@@ -168,6 +169,16 @@ describe("detectHealthyLocalServer", () => {
     healthyOrigins = new Set(["http://localhost:8081"]);
 
     await expect(detectHealthyLocalServer(cwd)).resolves.toBe("http://localhost:8081");
+  });
+
+  it("finds the server started in a parent directory, on the port it was started on", async () => {
+    await writeRuntimeMetadata(cwd, runtimeFor(cwd));
+    healthyOrigins = new Set(["http://localhost:8081"]);
+    const app = join(cwd, "my-app");
+    await mkdir(app);
+
+    await expect(detectHealthyLocalServer(app)).resolves.toBe("http://localhost:8081");
+    await expect(resolveLocalServer(app)).resolves.toBe("http://localhost:8081");
   });
 
   it("falls back to the default URL when the metadata URL is unhealthy", async () => {

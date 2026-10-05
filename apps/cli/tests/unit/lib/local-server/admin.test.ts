@@ -10,6 +10,7 @@ import {
   LOCAL_ADMIN_FILE,
   LOCAL_ADMIN_USER_FILE,
   ensureLocalAdmin,
+  findLocalAdminDir,
   readLocalAdmin,
 } from "../../../../src/lib/local-server/admin-credential";
 
@@ -36,6 +37,20 @@ function ab64Decode(value: string): Buffer {
 describe("local admin", () => {
   it("has no admin before start creates one", async () => {
     expect(await readLocalAdmin(await tempCwd())).toBeUndefined();
+  });
+
+  it("finds the admin in the directory start ran in, from there or from inside it", async () => {
+    const cwd = await tempCwd();
+    await ensureLocalAdmin(cwd);
+    const nested = join(cwd, "apps", "web");
+    await mkdir(nested, { recursive: true });
+
+    expect(await findLocalAdminDir(cwd)).toBe(cwd);
+    expect(await findLocalAdminDir(nested)).toBe(cwd);
+  });
+
+  it("finds no admin directory when none of the parents has one", async () => {
+    expect(await findLocalAdminDir(await tempCwd())).toBeUndefined();
   });
 
   it("creates the credential and a bootstrap user document the server can verify", async () => {

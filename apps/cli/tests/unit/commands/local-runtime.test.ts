@@ -606,7 +606,7 @@ describe("local runtime commands", () => {
     };
     expect(envelope.status).toBe("ok");
     expect(envelope.data.urls.api).toBe(serverUrl);
-    expect(envelope.data.next_actions.join("\n")).toContain("From your app directory");
+    expect(envelope.data.next_actions.join("\n")).toContain("Run setup in this directory or one inside it");
     expect(envelope.data.next_actions.join("\n")).toContain("Setup installs dependencies");
     // As in the binary case: no platform project on the fake server, so no
     // link and no `console` suggestion.

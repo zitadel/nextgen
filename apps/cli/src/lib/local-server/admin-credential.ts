@@ -6,7 +6,7 @@ import { defaultHumanUserSchemaUrl } from "@zitadel/config";
 
 import { ZitadelError } from "../errors";
 import { isObject } from "../json";
-import { LOCAL_RUNTIME_DIR, PLATFORM_PROJECT_ID } from "./runtime";
+import { findUpward, LOCAL_RUNTIME_DIR, PLATFORM_PROJECT_ID } from "./runtime";
 
 /**
  * The local admin's two files under `.zitadel/local/` (gitignored):
@@ -35,6 +35,11 @@ export type LocalAdmin = {
   user_id: string;
   team_id: string;
 };
+
+/** The directory holding the local admin: `cwd`, or the nearest parent `zitadel start` ran in. */
+export function findLocalAdminDir(cwd: string): Promise<string | undefined> {
+  return findUpward(cwd, LOCAL_ADMIN_FILE);
+}
 
 /** Reads the local admin credential, or `undefined` when `start` never wrote one. */
 export async function readLocalAdmin(cwd: string): Promise<LocalAdmin | undefined> {

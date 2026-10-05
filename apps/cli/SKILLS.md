@@ -205,7 +205,14 @@ The groups below mirror the ones `zitadel --help` prints.
   local admin's team: it writes `team_id` and `claimed_at` into
   `.zitadel/secret` and prints
   `Project owned by admin@zitadel.localhost (team ...)`, so a later `claim`
-  returns `status: "skipped"` with `reason: "already-claimed"`. The step is
+  returns `status: "skipped"` with `reason: "already-claimed"`. `next_commands`
+  then ends with `console`. The local admin and the server's address (`--server local`) are read from
+  `.zitadel/local/` in
+  the working directory or the nearest parent that has one, so run setup in
+  the directory `start` ran in or one inside it. When a platform-hosting
+  runtime has no local admin on that path, setup warns, adds the warning to
+  `next_actions`, and leaves the project unattached; the local console then
+  does not list it. The step is
   best-effort. When the attempt fails on a platform-hosting runtime, setup
   warns and the normal claim nudge applies. When `start` opted out of the
   platform bootstrap there is no local admin and no claim surface, so setup
@@ -377,7 +384,7 @@ The groups below mirror the ones `zitadel --help` prints.
   `data.signed_in_as`, `data.browser_opened`. Each link works once; run the
   command again for a new one. The console honours the link only when it is
   served from loopback, since the token signs in whoever opens it. Fails with `E_VALIDATION` when `start` never
-  created a local admin in this directory. Flags: `--no-open`.
+  created a local admin in this directory or one of its parents. Flags: `--no-open`.
 - `stop` — stop the managed runtime while preserving
   `.zitadel/local/nextgen-data`. Use `stop --all` to sweep all discovered
   host-wide CLI-managed local runtime processes, including healthy runtimes

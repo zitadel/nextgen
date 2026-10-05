@@ -463,6 +463,125 @@ describe("setup command", () => {
     expect(json.data.next_commands.at(-1)).toMatch(/^npx @zitadel\/cli@\S+ claim$/);
   });
 
+  it("says the project went unattached when a local platform server has no local admin here", async () => {
+    const cwd = await makeNextProject();
+    server.use(
+      http.get("http://localhost:9942/console/runtime.json", () =>
+        HttpResponse.json({
+          mode: "standalone",
+          console_project_id: "proj_platform",
+          publishable_key: "pk_platform",
+        }),
+      ),
+    );
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--json",
+      "--server",
+      "http://localhost:9942",
+      "--non-interactive",
+      "--skip-install",
+      "--framework",
+      "next",
+    ]);
+
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as {
+      data: { next_actions: string[]; next_commands: string[] };
+    };
+    const actions = json.data.next_actions.join("\n");
+    expect(actions).toContain(`No local admin in ${cwd} or its parents`);
+    expect(actions).toContain("the directory `zitadel start` ran in, or one inside it");
+    // No project to manage there, so the console is not suggested.
+    expect(json.data.next_commands.join("\n")).not.toMatch(/ console$/m);
+  });
+
+  it("attaches the project to a local admin created in a parent directory and offers the console", async () => {
+    const parent = await mkdtemp(join(tmpdir(), "zitadel-setup-parent-"));
+    tempDirs.push(parent);
+    await mkdir(join(parent, ".zitadel/local"), { recursive: true });
+    await writeFile(
+      join(parent, ".zitadel/local/admin.json"),
+      JSON.stringify({
+        email: "admin@zitadel.localhost",
+        password: "local-admin-password",
+        user_id: "user_localadmin",
+        team_id: "team_localadmin",
+      }),
+    );
+    const cwd = join(parent, "my-app");
+    await mkdir(join(cwd, "app"), { recursive: true });
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({ name: "demo", dependencies: { next: "^15" } }),
+    );
+    await writeFile(join(cwd, "app/layout.tsx"), "export default function L() {}\n");
+    const local = "http://localhost:9943";
+    server.use(
+      http.get(`${local}/console/runtime.json`, () =>
+        HttpResponse.json({
+          mode: "standalone",
+          console_project_id: "proj_platform",
+          publishable_key: "pk_platform",
+        }),
+      ),
+      http.post(`${local}/auth_attempts`, () =>
+        HttpResponse.json({ attempt_id: "att_1" }, { status: 201 }),
+      ),
+      http.post(`${local}/auth_attempts/:attempt/challenges`, () =>
+        HttpResponse.json({ challenge_id: "ch_1" }, { status: 201 }),
+      ),
+      http.post(`${local}/auth_attempts/:attempt/challenges/:challenge/verify`, () =>
+        HttpResponse.json({ attempt_id: "att_1" }),
+      ),
+      http.post(`${local}/auth_attempts/:attempt/handoff`, () =>
+        HttpResponse.json({ handoff_token: "handoff_1" }),
+      ),
+      http.post(
+        `${local}/sessions/exchange`,
+        () =>
+          new HttpResponse(null, {
+            headers: { "set-cookie": "__nextgen_session=admin_session; Path=/; HttpOnly" },
+          }),
+      ),
+      http.post(`${local}/projects/:projectId/claim/init`, () =>
+        HttpResponse.json({ challenge_id: "claim_ch_1" }, { status: 201 }),
+      ),
+      http.post(`${local}/projects/:projectId/claim/complete`, () =>
+        HttpResponse.json({ team_id: "team_localadmin", claimed_at: "2027-01-01T00:00:00Z" }),
+      ),
+    );
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--json",
+      "--server",
+      local,
+      "--non-interactive",
+      "--skip-install",
+      "--framework",
+      "next",
+    ]);
+
+    expect(res.exitCode).toBe(0);
+    const secret = JSON.parse(await readFile(join(cwd, ".zitadel/secret"), "utf8")) as {
+      team_id?: string;
+    };
+    expect(secret.team_id).toBe("team_localadmin");
+    const json = parseJson(res.stdout) as {
+      data: { next_actions: string[]; next_commands: string[] };
+    };
+    expect(json.data.next_commands.at(-1)).toMatch(/^npx @zitadel\/cli@\S+ console$/);
+    expect(json.data.next_actions.join("\n")).toContain(
+      "Manage the project in the local console as admin@zitadel.localhost",
+    );
+  });
+
   it("errors in a non-interactive empty directory without --framework", async () => {
     const cwd = await mkdtemp(join(tmpdir(), "zitadel-setup-empty-"));
     tempDirs.push(cwd);

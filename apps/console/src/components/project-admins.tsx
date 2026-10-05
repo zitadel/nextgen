@@ -35,7 +35,9 @@ type Grant = Awaited<ReturnType<typeof api.queryGrants>>["grants"][number];
  *
  * **The owner is not a row.** Their access comes through the owning team, not
  * an admin grant, so a freshly claimed project lists nobody — and removing the
- * last granted admin just returns it to that state. The owning team keeps the
+ * last granted admin just returns it to that state. The empty state names the
+ * owning team's access, so the list does not read as nobody managing the
+ * project. The owning team keeps the
  * project manageable; deactivating *that* is the lockout path, and #1231 guards
  * it.
  *
@@ -95,7 +97,7 @@ export function ProjectAdmins({
             {rows.length === 0 ? (
               <TableRow className="border-0 hover:bg-transparent">
                 <TableCell colSpan={3} className="text-muted-foreground h-24 text-center">
-                  No admins yet.
+                  Managed by the team that owns this project. No additional admins yet.
                 </TableCell>
               </TableRow>
             ) : (
