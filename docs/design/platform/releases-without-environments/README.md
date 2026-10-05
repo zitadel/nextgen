@@ -34,7 +34,7 @@ scope. Two things take its place:
 | 3 | **Release resolution**: the three layers, what each kind of caller sends, worked request examples, and local development | [`3-release-resolution.md`](3-release-resolution.md) |
 | 4 | **Variables and secrets**: what the environment scope was doing, the one rule that survives it, and the values a deployment freezes | [`4-variables.md`](4-variables.md) |
 | 5 | **CLI: finding the server and project**: the resolution chain across flags, `process.env` and `.env` files | [`5-cli-target-resolution.md`](5-cli-target-resolution.md) |
-| 6 | **CLI: commands**: `status`, `deploy`, `preview`, `origins`, `allowlist`, `vars`, `rollback`, `dev`, `env` | [`6-cli-commands.md`](6-cli-commands.md) |
+| 6 | **CLI: commands**: `status`, `deploy`, `preview`, `deployments`, `allowlist`, `vars`, `rollback`, `dev`, `env` | [`6-cli-commands.md`](6-cli-commands.md) |
 | 7 | **CLI: adding a project as an environment**: binding one repository to a second project, and what CI holds instead | [`7-cli-environments.md`](7-cli-environments.md) |
 
 Prerequisites and Open sections sit in the document they belong to, covering

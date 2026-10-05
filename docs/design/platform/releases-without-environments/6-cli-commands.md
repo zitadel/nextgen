@@ -27,9 +27,9 @@ https://acme-git-sso-acmeinc.vercel.app sha256:9f2c1a7b  10-02 14:10   in 6d
 ```
 
 Drift is one comparison: hash the working copy, compare to what each target
-serves. The list is the default and the `primary` origins, plus the preview
-for the current branch if there is one; every other live preview is
-`zitadel origins list`.
+serves. The list is the targets `deploy` ships to — the default and the `primary`
+origins — plus the preview for the current branch if there is one. Every target
+the project has is `zitadel deployments --live`.
 
 ## `zitadel deploy`
 
@@ -77,6 +77,18 @@ release     sha256:9f2c1a7b  (exists, reusing)
 origin      created, expires 2026-10-09T14:10:00Z
 deployed    dep_01KB3F8N2P9S5WQZ
 ```
+
+A preview URL is retired by the same verb that created it:
+
+```
+$ zitadel preview rm https://acme-git-sso-acmeinc.vercel.app
+removed. the URL stops being served; its deployment records are kept.
+```
+
+Under `preview` rather than a command of its own because a preview URL is the
+only kind the CLI can retire. A production hostname is taken out of service by
+removing its allowlist pattern, since it
+[has no row to delete](1-data-model.md#why-a-primary-hostname-has-no-row).
 
 **The CLI resolves the origin locally and then sends it.** It is explicit data in
 the deploy request; the server never derives it from the connection the request
@@ -156,22 +168,41 @@ preview row, create a release, read the allowlist, and no write to patterns or
 class. ADR 036's `sk_team_` — "anything not listed under MAY is
 denied" — is the shape to copy. See [Prerequisites](#prerequisites).
 
-## `zitadel origins`
+## `zitadel deployments`
+
+Read-only, and the one view that covers every target the same way: the default,
+each production hostname and each live preview URL. There is no `origins`
+command, because a URL is not a thing the CLI manages — what exists is
+deployments to it.
 
 ```
-$ zitadel origins list
-ORIGIN                                   SERVING          EXPIRES
-https://acme-git-sso-acmeinc.vercel.app  sha256:9f2c1a7b  in 6d
-https://acme-git-pw-acmeinc.vercel.app   sha256:81de4c7a  in 2d
-
-$ zitadel origins rm https://acme-git-sso-acmeinc.vercel.app
-removed. 1 deployment record kept.
+$ zitadel deployments --live
+TARGET                                   SERVING          DEPLOYED      EXPIRES
+(default)                                sha256:4a5b6c7d  10-02 09:30
+https://app.acme.com                     sha256:4a5b6c7d  10-02 09:30
+https://www.acme.com                     sha256:4a5b6c7d  10-02 09:30
+https://acme-git-sso-acmeinc.vercel.app  sha256:9f2c1a7b  10-02 14:10   in 6d
+https://acme-git-pw-acmeinc.vercel.app   sha256:81de4c7a  10-01 11:20   in 2d
 ```
 
-Previews only: a primary hostname
-[has no row](1-data-model.md#why-a-primary-hostname-has-no-row), and `status`
-already shows what each one serves. The split also keeps `status` legible on a
-project with forty open pull requests.
+`--live` is the newest row per target, which is
+[what each one serves](1-data-model.md#why-there-is-no-pointer-column). An
+`EXPIRES` column is filled only for a preview URL, because only a preview has a
+row that expires. Bare, the command is the log itself, newest first:
+
+```
+$ zitadel deployments
+DEPLOYED      TARGET                                   RELEASE          REASON    DEPLOY
+10-02 14:10   https://acme-git-sso-acmeinc.vercel.app  sha256:9f2c1a7b  deploy    dpl_01KB…Y
+10-02 09:30   (default)                                sha256:4a5b6c7d  rollback  dpl_01KB…W
+10-02 09:30   https://app.acme.com                     sha256:4a5b6c7d  rollback  dpl_01KB…W
+10-02 09:30   https://www.acme.com                     sha256:4a5b6c7d  rollback  dpl_01KB…W
+10-01 17:02   (default)                                sha256:c3f7a8b2  deploy    dpl_01KB…V
+```
+
+One `DEPLOY` column repeated down three rows is one operation that moved three
+targets, which is what `deploy_id` is for. `--origin <url>` narrows it to a
+single target's history, and `--deploy <dpl_…>` to one operation's rows.
 
 The allowlist is a separate command, because a pattern is project state rather
 than release content and is changed deliberately rather than as a side effect of
@@ -233,7 +264,9 @@ roll back to? [2] 2
 deployed    dep_01KB9X2M4P7S  reason=rollback  release=sha256:4a5b6c7d
 ```
 
-Rollback appends, so rolling back and forward leaves a readable trail.
+The history it prints is `zitadel deployments --origin <url>`; rollback is that
+view plus a write. Rolling back appends, so rolling back and forward leaves a
+readable trail.
 
 ## `zitadel dev`
 

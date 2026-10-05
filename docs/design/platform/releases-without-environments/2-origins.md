@@ -45,7 +45,7 @@ requests, headers and all, are in
 | What it is | a list of patterns on the project | one row per live preview URL, with an expiry |
 | Covers | every URL its patterns match | one exact URL |
 | Written by | a person with `project.write`, one pattern per call | `zitadel preview`, on every run |
-| Goes away | when someone deletes the pattern | when the expiry passes, or on `zitadel origins rm` |
+| Goes away | when someone deletes the pattern | when the expiry passes, or on `zitadel preview rm` |
 | Answers | may traffic from this URL be served at all? | is this preview URL still live? |
 
 What a URL serves is the newest deployment row carrying it. So a production
@@ -86,7 +86,7 @@ Keeping the mark on the pattern and nowhere else means editing a pattern changes
 who is let in from then on and nothing in the past. A live preview still expires
 when its row said it would, and a hostname already serving traffic keeps serving
 it. To take a URL out of service, delete the pattern or run
-`zitadel origins rm` — never retype the pattern and hope.
+`zitadel preview rm` — never retype the pattern and hope.
 
 ## Managing the allowlist
 
@@ -126,7 +126,7 @@ between. One pattern per call has no such gap and needs no `If-Match`.
 
 Preview rows need no endpoint like this. They are written by `zitadel preview`
 and deleted when they expire, so the only operations are `GET /origins` and a
-delete for retiring one early, which is what `zitadel origins rm` calls.
+delete for retiring one early, which is what `zitadel preview rm` calls.
 
 ## Why the allowlist is not in `zitadel.json`
 

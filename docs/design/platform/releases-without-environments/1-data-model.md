@@ -92,7 +92,7 @@ allowed the URL, which is held on the project.
   reason previews need a per-URL row and primaries do not.
 
 What the row is left holding is an expiry — exactly what a preview needs and a
-primary has no use for — and something `zitadel origins rm` can delete to retire
+primary has no use for — and something `zitadel preview rm` can delete to retire
 one URL early.
 
 So `environments` is **dropped**: the table and its unique name index
