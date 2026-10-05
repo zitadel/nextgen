@@ -4679,35 +4679,6 @@ func linkedParked() *domain.FlowSSOParkedIdentity {
 	}
 }
 
-func TestFlowStateMachine_Render_SSOLinkedUserRoutesAuthenticated(t *testing.T) {
-	t.Parallel()
-	w, def, state := ssoRenderWorld(t)
-	w.expectParked(linkedParked(), nil)
-	w.ssoIdentities.EXPECT().
-		BindLinked(gomock.Any(), domain.FlowSSOBindInput{
-			ProjectID:    testProjectID,
-			AttemptID:    "att-1",
-			CheckID:      "ch-1",
-			UserID:       "user-1",
-			ConnectionID: "idp-1",
-			LinkID:       "idplink-1",
-		}).
-		Return(nil).
-		Times(1)
-	w.authAttemptService.EXPECT().
-		Handoff(gomock.Any(), domain.FlowHandoffInput{ProjectID: testProjectID, AttemptID: "att-1"}).
-		Return(domain.FlowHandoffOutput{Token: "handoff-1", ExpiresAt: time.Unix(1700000060, 0).UTC()}, nil).
-		Times(1)
-
-	result, err := w.sm.Render(t.Context(), def, state)
-	require.NoError(t, err)
-	require.Equal(t, "done", result.Step.Name)
-	require.NotNil(t, result.Step.Complete)
-	assert.Equal(t, "handoff-1", result.HandoffToken)
-	assert.Equal(t, "user-1", result.State.CollectedData.UserID)
-	assert.Equal(t, "ch-1", result.State.SSOResolvedCheckID)
-}
-
 func TestFlowStateMachine_Render_SSOReplayGuardSkipsResolution(t *testing.T) {
 	t.Parallel()
 	w, def, state := ssoRenderWorld(t)
@@ -4842,25 +4813,6 @@ func TestFlowStateMachine_Render_SSOBindOnForeignUserRestarts(t *testing.T) {
 	assert.Equal(t, "credentials", state.CurrentStep)
 }
 
-// An earlier request bound the attempt but lost its handoff: the success
-// outcome is raised again, so the handoff is minted on this render.
-func TestFlowStateMachine_Render_SSOBoundAttemptRetriesHandoff(t *testing.T) {
-	t.Parallel()
-	w, def, state := ssoRenderWorld(t)
-	w.expectParked(&domain.FlowSSOParkedIdentity{BoundUserID: "u1"}, nil)
-	w.ssoIdentities.EXPECT().BindLinked(gomock.Any(), gomock.Any()).Times(0)
-	w.authAttemptService.EXPECT().
-		Handoff(gomock.Any(), domain.FlowHandoffInput{ProjectID: testProjectID, AttemptID: "att-1"}).
-		Return(domain.FlowHandoffOutput{Token: "handoff-1", ExpiresAt: time.Unix(1700000060, 0).UTC()}, nil).
-		Times(1)
-
-	result, err := w.sm.Render(t.Context(), def, state)
-	require.NoError(t, err)
-	assert.Equal(t, "done", result.Step.Name)
-	assert.Equal(t, "handoff-1", result.HandoffToken)
-	assert.Equal(t, "u1", result.State.CollectedData.UserID)
-}
-
 func TestFlowStateMachine_Render_SSOBoundAttemptWithRecordedUserRendersStep(t *testing.T) {
 	t.Parallel()
 	w, def, state := ssoRenderWorld(t)
@@ -4892,24 +4844,6 @@ func TestFlowStateMachine_Render_SSOStaleBindAfterHandoffRestarts(t *testing.T) 
 
 	_, err := w.sm.Render(t.Context(), def, state)
 	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
-}
-
-// The winner settled the row but has not handed off yet: this request retries
-// the handoff, so a lost winner response still signs the user in.
-func TestFlowStateMachine_Render_SSOStaleBindBeforeHandoffRetriesHandoff(t *testing.T) {
-	t.Parallel()
-	w, def, state := ssoRenderWorld(t)
-	w.expectStaleBind(&domain.FlowSSOParkedIdentity{BoundUserID: "user-1"}, nil)
-	w.authAttemptService.EXPECT().
-		Handoff(gomock.Any(), domain.FlowHandoffInput{ProjectID: testProjectID, AttemptID: "att-1"}).
-		Return(domain.FlowHandoffOutput{Token: "handoff-1", ExpiresAt: time.Unix(1700000060, 0).UTC()}, nil).
-		Times(1)
-
-	result, err := w.sm.Render(t.Context(), def, state)
-	require.NoError(t, err)
-	assert.Equal(t, "done", result.Step.Name)
-	assert.Equal(t, "handoff-1", result.HandoffToken)
-	assert.Equal(t, "user-1", result.State.CollectedData.UserID)
 }
 
 // A new ceremony replaced the row: the step renders, so the flow and its
@@ -4965,6 +4899,30 @@ var ssoHandoffPaths = []struct {
 		},
 		wantCheckID: "ch-1",
 	},
+}
+
+// Every path mints the handoff on this render, so a lost earlier response
+// still signs the user in.
+func TestFlowStateMachine_Render_SSOHandoff(t *testing.T) {
+	t.Parallel()
+	for _, tt := range ssoHandoffPaths {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			w, def, state := ssoRenderWorld(t)
+			tt.expect(w)
+			w.authAttemptService.EXPECT().
+				Handoff(gomock.Any(), domain.FlowHandoffInput{ProjectID: testProjectID, AttemptID: "att-1"}).
+				Return(domain.FlowHandoffOutput{Token: "handoff-1", ExpiresAt: time.Unix(1700000060, 0).UTC()}, nil)
+
+			result, err := w.sm.Render(t.Context(), def, state)
+			require.NoError(t, err)
+			require.Equal(t, "done", result.Step.Name)
+			require.NotNil(t, result.Step.Complete)
+			assert.Equal(t, "handoff-1", result.HandoffToken)
+			assert.Equal(t, "user-1", result.State.CollectedData.UserID)
+			assert.Equal(t, tt.wantCheckID, result.State.SSOResolvedCheckID)
+		})
+	}
 }
 
 // A concurrent render won the handoff: the attempt is handed off, so this one
