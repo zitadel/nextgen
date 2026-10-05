@@ -499,13 +499,17 @@ export class ZitadelLogin extends ZitadelSurface {
         // CSS-level so it also covers user-ejected templates: the rule in
         // layout-chrome.css hides `.zl-card-title`/`.zl-card-subtitle`
         // visually while keeping the step's accessible name.
-        shell.toggleAttribute("data-suppress-header", this.suppressHeader);
+        // `=== true` because `toggleAttribute`'s second arg only *sets* for a
+        // real boolean — a non-boolean (e.g. the `undefined` a framework
+        // wrapper passes for an unset optional prop) makes it *toggle*, which
+        // would flip the header on and off on every commit.
+        shell.toggleAttribute("data-suppress-header", this.suppressHeader === true);
       }
       // Stamped on the card too: its header REGION must leave the flex flow
       // (card-host.css) or the card keeps a blank 32px header band — the
       // slotted headings alone going sr-only doesn't collapse the region.
       for (const card of this.shadowRoot.querySelectorAll("zl-card")) {
-        card.toggleAttribute("data-suppress-header", this.suppressHeader);
+        card.toggleAttribute("data-suppress-header", this.suppressHeader === true);
       }
     }
     const previousTheme = this.lastRenderedTheme;

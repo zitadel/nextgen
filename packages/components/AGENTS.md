@@ -142,6 +142,32 @@ buttons) and extended to selects.
 on it — query the DOM directly (`querySelectorAll` + `getAttribute` filtering)
 rather than building attribute selectors with `CSS.escape(value)`.
 
+### `toggleAttribute` / `classList.toggle` need a real boolean, never a bare prop
+
+`Element.toggleAttribute(name, force)` and `classList.toggle(name, force)` only
+*set* the flag when `force` is a genuine boolean. Pass anything else — crucially
+`undefined` — and the second argument is ignored and the flag *toggles* on every
+call. So stamping a flag once per render as
+`el.toggleAttribute("data-x", this.someFlag)` flips it on and off on each commit
+whenever `someFlag` is `undefined`, which flickers the UI.
+
+A boolean reactive property reaches `undefined` more easily than it looks: a
+framework wrapper that binds an unset optional prop (e.g. the Angular SDK's
+`[suppressHeader]` from an `@Input() suppressHeader?: boolean`) assigns
+`undefined` to the element. TypeScript does **not** catch this — a custom
+element's property assignment crosses an untyped DOM boundary and is never
+checked against the element's own property types, so the `boolean` type is a
+compile-time promise the runtime can violate.
+
+So always coerce to a real boolean **at the call site**: compute it
+(`variant !== "page"`, `theme === "dark"`) or guard it (`this.suppressHeader ===
+true`). Never hand a bare reactive property straight to a toggle — and in review,
+flag any `toggleAttribute`/`classList.toggle` whose second argument isn't an
+obvious boolean expression. The failure this guards against was a flickering
+card header (`data-suppress-header` flipping every render); the regression test
+is in `orchestrator-surface.spec.ts` ("keeps the header shown and stable when
+suppressHeader is unset").
+
 ### Templates are sanitised
 
 Output from the Liquid pipeline is run through DOMPurify with an allowlist
