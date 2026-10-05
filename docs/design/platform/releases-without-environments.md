@@ -27,22 +27,27 @@ keyed on: from an environment id to an origin string.
 
 | Entity | Today | Here |
 |---|---|---|
-| **Project** | `projects` | kept — `preview_origins` becomes `allowed_origins` with a `kind` per entry, plus `class`, `publishable_key`, `current_deployment_id` |
+| **Project** | `projects` | kept — `preview_origins` becomes `allowed_origins` with a `kind` per entry, plus `class` and `publishable_key` |
 | **Origin** | — | **new table**, one row per live URL; takes over the routing job environments do |
 | **Environment** | `environments`, seeded per project | **dropped** |
-| **Deployment** | `deployments`, keyed to an environment | kept — the `environment_id` foreign key becomes a plain `origin` string, plus `deploy_id` |
+| **Deployment** | `deployments`, keyed to an environment | kept — the `environment_id` foreign key becomes a plain `origin` string, plus `deploy_id`. The newest row **is** the pointer; `environments.current_deployment_id` is not carried over |
 | **Release** | `releases` | shape kept — `content_hash` becomes the wire identifier, `revoked_at` is new |
 | **Variable** | `variables`, scoped by `environment_id` | kept — the scope column becomes an allowlist pattern and resolves by override |
 
 ### Project
 
-```json
+```jsonc
 {
   "id": "prj_01K9AA9M3K7E2QX8VB4T",
   "name": "acme",
-  "class": "production",
-  "publishable_key": "pk_7kR2pXq9vN3wLmYhT4cB8A",
 
+  "class": "production",                          // NEW
+  "publishable_key": "pk_7kR2pXq9vN3wLmYhT4cB8A", // NEW - ADR 036 defines it, internal/ has none
+
+  // CHANGED - today `preview_origins`: a flat list of exact strings
+  // (internal/domain/project.go:68) compared with string equality
+  // (internal/api/flow.go:371), serving only the preview secret.
+  // Now patterns, each typed.
   "allowed_origins": [
     { "pattern": "https://app.acme.com",         "kind": "primary" },
     { "pattern": "https://www.acme.com",         "kind": "primary" },
@@ -50,49 +55,43 @@ keyed on: from an environment id to an origin string.
     { "pattern": "https://*.preview.acme.com",   "kind": "preview" }
   ],
 
-  "current_deployment_id": "dep_01KA7T9QX3M2E8VB",
+  // NOT CARRIED OVER - `environments.current_deployment_id` has no counterpart
+  // here. What a target serves is the newest deployment row for it; the project
+  // default is the newest row with origin "". See Why there is no pointer column.
   "created_at": "2026-04-21T14:03:11Z"
 }
 ```
 
-`allowed_origins` holds **patterns**. They authorize; they never route.
-`current_deployment_id` answers callers that have no `Origin` to route on — a
-server-side app, the CLI, CI.
-
-**Unchanged** — `id`, `name`, `created_at`, and the `updated_at` and
-password-hash-policy fields left out above.
-
-**Changed** — `preview_origins` is today a flat list of exact strings serving
-the preview secret (`internal/domain/project.go:68`, compared with string
-equality at `internal/api/flow.go:371`). It becomes `allowed_origins`: patterns,
-each carrying a `kind`.
-
-**New** — `class`; `publishable_key`, which [ADR 036](../../adrs/036-api-credential-planes.md)
-defines but nothing in `internal/` implements yet; and `current_deployment_id`,
-which exists today as a column on `environments`.
+`allowed_origins` holds **patterns**. They authorize; they never route. Callers
+that have no `Origin` to route on — a server-side app, the CLI, CI — are answered
+by the project default, which is a query rather than a column. `updated_at` and
+the password-hash policy are left out above and unaffected.
 
 ### Origin
 
 One row per live URL, keyed `(project_id, origin)`. Exact strings, no patterns.
 This is what a request routes on.
 
-```json
+```jsonc
+// NEW TABLE - every field is new. It takes over what an `environments` row did,
+// keyed by an exact origin string instead of an `env_` id - except the pointer.
 {
   "project_id": "prj_01K9AA9M3K7E2QX8VB4T",
   "origin": "https://app.acme.com",
   "kind": "primary",
-  "current_deployment_id": "dep_01KA7T9QX3M2E8VB",
   "created_at": "2026-04-22T09:17:45Z"
+
+  // The row says this origin is live and how it is treated. It does not say
+  // what it serves - that is the newest deployment row carrying this origin.
 }
 ```
 
-```json
+```jsonc
 {
   "project_id": "prj_01K9AA9M3K7E2QX8VB4T",
   "origin": "https://acme-git-sso-acmeinc.vercel.app",
   "kind": "preview",
-  "current_deployment_id": "dep_01KB3F8N2P9S5WQZ",
-  "expires_at": "2026-10-09T14:10:00Z",
+  "expires_at": "2026-10-09T14:10:00Z", // preview rows only; `primary` rows never expire
   "created_at": "2026-10-02T14:10:00Z"
 }
 ```
@@ -100,10 +99,6 @@ This is what a request routes on.
 `expires_at` is preview-only and is renewed by deploying to the same origin
 again, which keeps a preview URL stable across pushes to a branch. `primary` rows
 do not expire.
-
-**New table**, with no equivalent today. It inherits what
-`environments.current_deployment_id` does — hold the deployment a runtime slot
-serves — keyed by an exact origin string instead of an environment id.
 
 So `environments` is **dropped**: the table and its unique name index
 (`000005_environments.sql`), `seedDefaultEnvironments`
@@ -114,42 +109,52 @@ So `environments` is **dropped**: the table and its unique name index
 
 Immutable, append-only.
 
-```json
+```jsonc
 {
   "id": "dep_01KB3F8N2P9S5WQZ",
   "project_id": "prj_01K9AA9M3K7E2QX8VB4T",
-  "deploy_id": "dpl_01KB3F8N2P9S5WQY",
+
+  "deploy_id": "dpl_01KB3F8N2P9S5WQY", // NEW - correlates the rows one deploy wrote
+
+  // CHANGED - today `environment_id`, a composite foreign key to `environments`
+  // that cascades on delete (000011_deployments.sql). Now a plain string, no
+  // foreign key, "" = the project default. Deliberate - see Deployment history.
   "origin": "https://acme-git-sso-acmeinc.vercel.app",
+
+  // CHANGED - not the field, the constraint: the release foreign key cascades
+  // today, so deleting a release deletes its deployments. It must restrict.
   "release": "sha256:9f2c1a7b4e83d05f6c2b19ae7d430f821c6b5de90a4f7382",
+
+  // These three already exist, inside the `metadata` document. Flat here for
+  // readability only - nothing requires promoting them to columns.
   "reason": "deploy",
   "message": "add phone_number to human-user",
-  "deployed_at": "2026-10-02T14:10:00Z",
-  "deployed_by": "user_01K8ZQ3K7E5M2P9S"
+  "deployed_by": "user_01K8ZQ3K7E5M2P9S",
+
+  "deployed_at": "2026-10-02T14:10:00Z"
+
+  // DROPPED - metadata's `source_environment_id` and `source_environment_name`,
+  // which recorded where a promotion came from. A promotion source is an origin
+  // now, so those are replaced rather than renamed.
 }
 ```
 
 `origin` is the history axis. The **empty string means the project default** —
-the target `project.current_deployment_id` points at. `deploy_id` correlates the
-rows one deploy wrote when it touched several origins at once.
-
-**Unchanged** — `project_id`, `id`, `deployed_at`, the release reference, and
-immutability. `reason` and `message` are shown flat for readability; they can
-stay inside the existing `metadata` document.
-
-**Changed** — `environment_id`, today a composite foreign key to `environments`
-that cascades on delete, becomes `origin`: a plain string with no foreign key.
-That is the point, not an oversight — see
-[deployment history](#deployment-history). The release reference also has to stop
-cascading: `000011_deployments.sql` deletes deployments when a release goes, and
-a referenced release must instead be undeletable.
-
-**New** — `deploy_id`.
+what a caller with no `Origin` gets. `deploy_id` correlates the
+rows one deploy wrote when it touched several origins at once. Dropping the
+foreign key is the point rather than an oversight — see
+[deployment history](#deployment-history).
 
 ### Release
 
-```json
+```jsonc
 {
+  // CHANGED - not the column, its job. This is today's `content_hash`, already
+  // the dedup key; here it is also the identifier on the wire.
   "digest": "sha256:9f2c1a7b4e83d05f6c2b19ae7d430f821c6b5de90a4f7382",
+
+  // UNCHANGED from here down - pointers, metadata and the actor fields are
+  // exactly what `releases` already stores.
   "project_id": "prj_01K9AA9M3K7E2QX8VB4T",
   "pointers": [
     { "kind": "schema",          "handle": "human-user",    "revision_id": "sch_01KWHF18816ZQE" },
@@ -163,7 +168,8 @@ a referenced release must instead be undeletable.
     "created_by": "user_01K8ZQ3K7E5M2P9S",
     "created_at": "2026-10-02T14:08:55Z"
   },
-  "revoked_at": null
+
+  "revoked_at": null // NEW
 }
 ```
 
@@ -172,39 +178,30 @@ is the wire identifier. A minted `rel_<ULID>` stays as the storage primary key.
 Short forms are accepted down to 12 hex characters; ambiguity is refused.
 
 Posting the same content twice returns the same release rather than creating a
-second one.
-
-**Unchanged** — the whole shape, including that last sentence: the unique index
-on `(project_id, content_hash)` already makes a repost idempotent
-(`000007_releases.sql`).
-
-**Changed** — `content_hash` is already the dedup key; here it also becomes the
-**wire** identifier, which is what makes short-form resolution and ambiguity
-refusal new behaviour on an existing column.
-
-**New** — `revoked_at`.
+second one — which is current behaviour, not a proposal: the unique index on
+`(project_id, content_hash)` already enforces it (`000007_releases.sql`).
 
 ### Variable
 
 Keyed `(name, project_id, scope)`, where `scope` is an allowlist **pattern** and
 the empty string is the project.
 
-```json
+```jsonc
+// CHANGED - one column. `scope` is today `environment_id`: a foreign key to an
+// `environments` row, matched exactly with no inheritance (ADR 062). Now an
+// allowlist pattern, resolved by override. "" keeps its meaning - the project
+// level, an address of its own and not a wildcard
+// (internal/domain/variable.go:160).
+//
+// Everything else - name, value, the secret flag, the timestamps - is as stored.
 { "name": "GOOGLE_CLIENT_ID", "scope": "", "value": "prod-abc.apps.googleusercontent.com" }
 { "name": "GOOGLE_CLIENT_ID", "scope": "https://*-acmeinc.vercel.app",
   "value": "preview-xyz.apps.googleusercontent.com" }
 { "name": "GOOGLE_CLIENT_SECRET", "scope": "https://*-acmeinc.vercel.app", "secret": true }
 ```
 
-**Unchanged** — `name`, `project_id`, `value`, `is_secret`, the timestamps, and
-the convention that the empty string is an address of its own rather than a
-wildcard (`internal/domain/variable.go:160`).
-
-**Changed** — `environment_id` becomes `scope`, an allowlist pattern, and
-resolution becomes override rather than the exact match with no inheritance that
-[ADR 062](../../adrs/062-per-environment-variables-and-secrets.md) specifies.
 The generated `environment_ref` column and its foreign key
-(`000008_variables.sql`) go with it: a pattern references no row.
+(`000008_variables.sql`) go with the old scope: a pattern references no row.
 
 ## Resolution
 
@@ -215,14 +212,16 @@ Then the release, in three layers:
 
 1. **Gate.** `Origin` present and matching no `allowed_origins` pattern → `403`.
    `Origin` absent falls through; there is nothing to check.
-2. **Route.** An origin row for this exact `Origin` → serve the release its
-   `current_deployment_id` points at. The caller sends nothing and needs to know
-   nothing. This answers almost all browser traffic.
+2. **Route.** An origin row for this exact `Origin` → serve the release the
+   newest deployment row for that origin names. The caller sends nothing and
+   needs to know nothing. This answers almost all browser traffic.
 3. **Fall back.** No origin row. An explicit `X-Zitadel-Release` header wins if
-   present and permitted; otherwise `project.current_deployment_id`.
+   present and permitted; otherwise the project default — the newest deployment
+   row with `origin = ""`.
 
-Both pointers are needed: layer 2 requires an `Origin` to match, and a
-server-side app sends none.
+Both layers are needed: layer 2 requires an `Origin` to match, and a server-side
+app sends none. Neither reads a stored pointer; see
+[why there is no pointer column](#why-there-is-no-pointer-column).
 
 **Who may use the header.** On a `production` project it requires the publishable
 key or the project secret, so an anonymous pin is refused. On a `sandbox` project
@@ -327,9 +326,9 @@ Authorization: Bearer sk_proj_9f2Hx8LqT4vRmYpN2wCbVa
 |---|---|
 | 1 gate | no `Origin`, nothing to check |
 | 2 route | nothing to match on |
-| 3 fall back | no header → `project.current_deployment_id` → `sha256:4a5b…` |
+| 3 fall back | no header → newest deployment with `origin = ""` → `sha256:4a5b…` |
 
-This is why the project pointer exists: the caller has no origin, so there is no
+This is why the project default exists: the caller has no origin, so there is no
 row to find. Add `X-Zitadel-Release` to pin a release — the project secret
 permits it on any class.
 
@@ -421,19 +420,60 @@ Supporting index: `(project_id, origin, deployed_at DESC, id DESC)`.
 
 Four rules:
 
-1. **Rows are never mutated; a pointer move is an insert.** Deploy, rollback and
-   redeploy all append. The two `current_deployment_id` columns are denormalised
-   caches of "the newest row for this target", kept so a read is one row and an
-   optimistic-concurrency check is one compare.
+1. **Rows are never mutated, and nothing points at them.** Deploy, rollback and
+   redeploy all append. What a target serves is the newest row carrying it — not
+   a column that has to be moved in step.
 2. **`deployments.origin` is a plain string, not a foreign key.** A preview
    origin can be collected and its history stays. A cascade would delete the
    audit trail of every expired preview.
 3. **A release referenced by any deployment row is never collected.** Only
-   never-deployed releases are collectable. A dangling `current_deployment_id`
-   reads as "nothing running" and repairs on the next deploy.
+   never-deployed releases are collectable, so the newest row for a target can
+   never name a release that has gone.
 4. **Point-in-time is a query, not a column.** "What was `app.acme.com` serving
    on 1 October" is the newest row for that origin with
    `deployed_at <= '2026-10-01'`. No `superseded_at`, no validity ranges.
+
+### Why there is no pointer column
+
+Today `environments.current_deployment_id` holds the live deployment, and the
+migration gives two reasons: reads are one row, and the optimistic-concurrency
+check is one compare. It carries no foreign key, because one would be circular
+with the environment cascade (`000024_deployments.sql`).
+
+Neither reason survives the move to origins.
+
+**It saves no read on the hot path.** Resolution needs the release, not the
+deployment id. With a pointer: read the origin row, read the deployment it names,
+read the release. Without: read the origin row, seek the newest deployment for
+that origin, read the release. Three accesses either way — the seek replaces the
+id lookup. And the index that makes the seek a single-row hit is already in the
+schema for the history list, `(project_id, origin, deployed_at DESC, id DESC)`.
+
+**"Newest row per group" is already an idiom here.** The latest-revision
+anti-join exists in all three dialects for schemas and flow definitions
+(`internal/storage/dialect/*/json_schema.go`), so deriving the live deployment
+reuses a pattern rather than introducing one.
+
+**Concurrency has a better anchor.** The compare-one-column trick needs a column,
+but the origin row still exists — it holds `kind` and `expires_at` — so a deploy
+locks that row, reads the newest deployment, compares it against
+`expected_deployment_id`, and inserts. The project row anchors the `origin = ""`
+default the same way.
+
+What dropping it buys:
+
+- **The model becomes append-only in fact, not just in description.** A deploy
+  touching five origins is five inserts and zero updates. There is no window in
+  which a pointer has moved and its row is missing, or the reverse.
+- **No unconstrainable state.** The column could never carry a foreign key, so
+  nothing but application code kept it true. Derivation cannot drift.
+- **Preview collection stays trivial.** Deleting an origin row removes a live URL
+  and touches no pointer, which is already why `deployments.origin` is not a
+  foreign key.
+
+The price is that "what is live on all 40 origins" is a latest-per-group query
+instead of 40 column reads. That is one anti-join, in a shape the dialects
+already implement.
 
 ### Example
 
@@ -1201,8 +1241,11 @@ Four things this design needs that do not exist yet.
    pointer digest is unguessable, which matters on the fallback-header path.
    Keeping both — pointer digest on the wire, content digest for CI assertions —
    is probably the answer.
-2. **Whether `current_deployment_id` belongs on the project and origin rows** or
-   is derived from the newest deployment.
+2. **How strictly a concurrent deploy to one target must serialise.** With no
+   pointer column, two appends both succeed and the later timestamp wins. Taking
+   a row lock on the target and checking `expected_deployment_id` makes the
+   conflict explicit; last-write-wins is cheaper and may be enough for a target
+   only CI writes to.
 3. **Release retention window, and what counts as "cold".** A last-resolved
    timestamp is a write on the hot path; an approximation avoids one.
 4. **Who maintains the preview-host registry** when a platform changes its URL
