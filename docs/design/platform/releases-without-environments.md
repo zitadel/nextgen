@@ -151,6 +151,13 @@ Immutable, append-only.
   // today, so deleting a release deletes its deployments. It must restrict.
   "release": "sha256:9f2c1a7b4e83d05f6c2b19ae7d430f821c6b5de90a4f7382",
 
+  // NEW - the variables resolved for this target, frozen here. Secrets are
+  // referenced, never copied. See Snapshot at deploy.
+  "variables": {
+    "GOOGLE_CLIENT_ID":     { "value": "preview-xyz.apps.googleusercontent.com" },
+    "GOOGLE_CLIENT_SECRET": { "secret_version": "svs_01KB3F8N2P9S5WQX" }
+  },
+
   // These three already exist, inside the `metadata` document. Flat here for
   // readability only - nothing requires promoting them to columns.
   "reason": "deploy",
@@ -220,6 +227,8 @@ the empty string is the project.
 // (internal/domain/variable.go:160).
 //
 // Everything else - name, value, the secret flag, the timestamps - is as stored.
+// These rows are desired state. What a request reads is the snapshot frozen onto
+// the deployment serving it - see Snapshot at deploy.
 { "name": "GOOGLE_CLIENT_ID", "scope": "", "value": "prod-abc.apps.googleusercontent.com" }
 { "name": "GOOGLE_CLIENT_ID", "scope": "https://*-acmeinc.vercel.app",
   "value": "preview-xyz.apps.googleusercontent.com" }
@@ -839,6 +848,90 @@ Two consequences:
 - **The allowlist becomes a table rather than a JSON column**, since entries
   carry a `kind`, a verification state, and now own variables.
 
+### Snapshot at deploy
+
+Resolve the override chain once, at deploy, and freeze the result onto the
+deployment row. A deployment then determines behaviour completely: the release
+says which resources, the snapshot says with which values.
+
+Two things this fixes.
+
+**Rollback currently lies.** It restores the release and not the values, so
+rolling back to a release that needed last month's IdP client gets this month's.
+With a snapshot, rolling back to a deployment restores the pair that was actually
+running.
+
+**Variables have the release's mid-flow problem and none of its protection.**
+The resolved release is already sealed into flow state at the first step so a
+deploy cannot reshape a sign-in underway. A variable edit mid-flow has exactly
+that hazard today — the snapshot removes it, because the value is fixed before
+the flow starts.
+
+It also takes the override walk off the hot path: resolution reads one document
+instead of matching patterns per `${{ NAME }}`.
+
+#### Where a new preview's values come from
+
+There is nothing to clone, because **the scope is a pattern and a pattern exists
+before any origin it admits does.** `https://*-acmeinc.vercel.app` can hold
+values on the day it is authored; the first branch deployed under it resolves
+them. So `zitadel preview` does what `zitadel deploy` does — walk pattern, then
+project, freeze — and needs no special case.
+
+Cloning from the project default would also be the wrong default. A preview is
+the least-trusted surface on the project, and the reason the pattern scope exists
+is that a preview should use a *different* IdP client, not a copy of the
+production one.
+
+What the client may pass is narrower: **per-deploy overrides for non-secret
+values**, for something genuinely branch-specific like a feature flag.
+
+```http
+POST /deployments
+
+{
+  "release":  "sha256:9f2c1a7b…",
+  "targets":  ["https://acme-git-sso-acmeinc.vercel.app"],
+  "variables": { "FEATURE_NEW_CONSENT": "true" },
+  "ttl":      "7d"
+}
+```
+
+They land in that deployment's snapshot and nowhere else — no pattern row is
+written, so the next branch is unaffected. Secrets are never settable this way:
+the preview credential would otherwise become a way to inject credentials into a
+production project, which is the boundary [Prerequisites](#prerequisites) exists
+to draw.
+
+#### Secrets are referenced, not copied
+
+A snapshot holds plain values inline and secrets as a `secret_version`
+reference. Copying the bytes would multiply every secret by the number of
+deployments that ever used it — each copy to encrypt, and each a place a leak
+survives.
+
+Referencing also keeps revocation possible. An exposed client secret has to stop
+working *now*, not at the next deploy, so a secret version carries a revoked
+state that beats every snapshot pointing at it — the same shape as `revoked_at`
+on a release. Rotation is then: add a version, deploy to pick it up, revoke the
+old one when nothing serves it.
+
+#### What this changes elsewhere
+
+- **`zitadel variables set` stops taking effect immediately.** It edits desired
+  state; a deploy applies it. `zitadel status` must show the gap — *"2 variables
+  changed since the last deploy to `app.acme.com`"* — or the command looks
+  broken.
+- **A deploy can carry only a variable change.** Same release, new deployment
+  row, so the history shows one digest twice with different snapshots. That is
+  the escape hatch for a wrong value, and it is a deploy rather than an edit.
+- **The idempotency rule moves.** `createDeployment` today answers `200` and
+  writes nothing when the named release is already running. The key becomes the
+  pair: same release *and* same resolved snapshot.
+- **Variables stay on the deployment, not the release.** The same release has to
+  run with different values on different origins — that is the whole premise
+  above. Pinning them to the release would make that impossible.
+
 ## Promotion
 
 CI posts the same content to the staging project and then the production project
@@ -1362,14 +1455,18 @@ GOOGLE_CLIENT_SECRET  https://*-acmeinc.vercel.app      ********
 $ zitadel variables resolve --origin https://acme-git-sso-acmeinc.vercel.app
 matched https://*-acmeinc.vercel.app (preview)
 
-NAME                  VALUE                             FROM
-GOOGLE_CLIENT_ID      preview-xyz.apps.googleu…         pattern
-GOOGLE_CLIENT_SECRET  ********                          pattern
-SUPPORT_EMAIL         help@acme.com                     project (inherited)
+NAME                  SERVING NOW                NEXT DEPLOY        FROM
+GOOGLE_CLIENT_ID      preview-xyz.apps.goog…     preview-xyz.ap…    pattern
+GOOGLE_CLIENT_SECRET  ********                   ********           pattern
+SUPPORT_EMAIL         help@acme.com              hello@acme.com     project (changed)
+
+  1 variable changed since dep_01KB3F8N2P9S5WQZ — run `zitadel deploy` to apply
 ```
 
-`resolve` exists because with two scope levels and override, "which value will
-this URL actually get" stops being answerable by reading the config.
+Two columns because there are two questions, and
+[snapshotting](#snapshot-at-deploy) separates them: `SERVING NOW` is read from
+the snapshot on the deployment this origin is running, and `NEXT DEPLOY` is what
+the override chain resolves to today. A `set` moves the right-hand column only.
 
 ### `zitadel rollback`
 
@@ -1468,6 +1565,9 @@ Four things this design needs that do not exist yet.
    header to releases already activated on some target, or created recently, are
    both cheap narrowings; requiring the project secret for it on a `production`
    project is the strict version, at the cost of example 3.
-7. **Whether `production` should require a claimed project** (this note says
+7. **Whether a variable-only deploy should be a distinct `reason`.** Reusing
+   `deploy` keeps the enum small but makes "the release did not change here"
+   something a reader has to notice from the digest rather than read.
+8. **Whether `production` should require a claimed project** (this note says
    yes), and whether anything else currently claim-gated should move onto the
    class.
