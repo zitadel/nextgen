@@ -253,20 +253,57 @@ the message says so out loud rather than reporting a bare success.
 
 ## `zitadel rollback`
 
-```
-$ zitadel rollback --origin https://app.acme.com
-HISTORY for https://app.acme.com
-  1  sha256:9f2c1a7b  10-02 14:52  deploy    (current)
-  2  sha256:4a5b6c7d  10-02 09:30  rollback
-  3  sha256:c3f7a8b2  10-01 17:02  deploy
+**The unit is the deploy, not the URL.** Bare, it undoes the last one — every
+target that deploy moved, in a single operation:
 
-roll back to? [2] 2
-deployed    dep_01KB9X2M4P7S  reason=rollback  release=sha256:4a5b6c7d
+```
+$ zitadel rollback
+undoing  dpl_01KB…Y   10-02 14:52   "add phone_number to human-user"
+
+  (default)              sha256:9f2c1a7b -> sha256:4a5b6c7d
+  https://app.acme.com   sha256:9f2c1a7b -> sha256:4a5b6c7d
+  https://www.acme.com   sha256:9f2c1a7b -> sha256:4a5b6c7d
+
+continue? [y/N] y
+rolled back  dpl_01KB9X2M4P7S   3 deployment records written
 ```
 
-The history it prints is `zitadel deployments --origin <url>`; rollback is that
-view plus a write. Rolling back appends, so rolling back and forward leaves a
-readable trail.
+Nobody is asked to repeat themselves per hostname. One deploy moved three
+targets together under one `deploy_id`, so undoing it moves the same three back
+together, in one transaction, under a new `deploy_id` of its own. Storage keeps
+[a row per origin](1-data-model.md#why-not-one-row-holding-several-origins-or-a-group);
+every command names the group.
+
+`--to <dpl_…>` goes back further, re-applying what that deploy set on each
+target it touched:
+
+```
+$ zitadel rollback --to dpl_01KB…V
+  (default)              sha256:4a5b6c7d -> sha256:c3f7a8b2
+  https://app.acme.com   sha256:4a5b6c7d -> sha256:c3f7a8b2
+  https://www.acme.com   sha256:4a5b6c7d -> sha256:c3f7a8b2
+```
+
+A deploy rather than a release, because a release says nothing about which
+targets were running it — the same digest may have gone to all three hostnames
+or to one. `zitadel deployments` lists the deploys to pick from.
+
+Three edges, each reported rather than guessed at:
+
+- **A target the undone deploy created** has no earlier release, so it is left
+  as it is and named in the output.
+- **A target a later deploy has moved on** is not in the newest `deploy_id`, so
+  bare `rollback` leaves it alone. `--to` is how you reach it.
+- **`--origin <url>`** still narrows to one target, for the case where one
+  hostname really is the whole intent. It is the exception, not the normal path.
+
+Previews need none of this: `zitadel preview` writes one origin per run and
+`deploy` never writes a preview row, so a deploy's target set is already the
+production set.
+
+Rolling back appends — a new row per target, `reason=rollback`, and the
+`deploy_id` it reversed recorded on it — so rolling back and forward leaves a
+trail that reads in both directions.
 
 ## `zitadel dev`
 

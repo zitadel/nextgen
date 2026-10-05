@@ -132,6 +132,10 @@ Immutable, append-only.
   "message":     "add phone_number to human-user",
   "deployed_by": "user_01K8ZQ3K7E5M2P9S",
 
+  // NEW, also in `metadata` - on a rollback, the `deploy_id` it reversed, so
+  // the trail reads forwards and backwards.
+  "rollback_of": null,
+
   "deployed_at": "2026-10-02T14:10:00Z"
 
   // DROPPED - metadata's `source_environment_id` and `source_environment_name`.
@@ -291,6 +295,15 @@ membership upkeep to match. Origins are already grouped by the pattern that
 allowed them, and that grouping stays at the request layer: a deploy names a
 selector, the server expands it, storage keeps one row per target.
 
+**The group a command needs already exists: `deploy_id`.** One row per origin
+does not mean one origin per operation. The rows a deploy wrote share an id, and
+that is what [`zitadel rollback`](6-cli-commands.md#zitadel-rollback) addresses —
+one call, one transaction, a row appended per target and a new `deploy_id` over
+the set. A platform deployment with three domains attached to it is three rows
+here, correlated by that id. What this design refuses is a *named, long-lived*
+group carrying its own current deployment, because that is an environment; a
+correlation id over immutable rows is not.
+
 ### Example
 
 | `deployed_at` | `origin` | release (digest) | `reason` | `deploy_id` |
@@ -305,8 +318,8 @@ selector, the server expands it, storage keeps one row per target.
 | 09-28 11:44 | `acme-git-pw…vercel.app` | `sha256:81de…` | `deploy` | `dpl_…U` |
 
 The 17:02 release went bad and was rolled back at 09:30 across all three
-production targets in one operation — one `deploy_id`, three rows, each
-independently rollback-able afterwards. The 09-28 preview has since expired and
+production targets in one operation: `dpl_…V` went wrong, so `dpl_…W` undid it,
+three rows each. Undoing a deploy is itself a deploy. The 09-28 preview has since expired and
 its row is gone, yet its deployment row is still here.
 
 **Known limitation.** A target's history is its hostname's, so renaming a
