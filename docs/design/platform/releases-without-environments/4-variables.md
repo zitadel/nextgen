@@ -40,14 +40,15 @@ pattern or a branch.
   "applies_to": "all", "value": "prod-abc.apps.googleusercontent.com",
   "is_secret": false }
 
+// UNCHANGED - a secret is its ciphertext in the same `value` column a plain
+// value uses, with `is_secret` set (`NewSecretVariable` encrypts with a
+// `crypto.Encrypter`, internal/domain/variable.go:76).
 { "project_id": "prj_01K9AA9M3K7E2QX8VB4T", "name": "GOOGLE_CLIENT_SECRET",
-  "applies_to": "all", "secret_version": "secver_01KB3F8N2P9S5WQX",
-  "is_secret": true }
+  "applies_to": "all", "value": "<ciphertext>", "is_secret": true }
 
 // The override. Read only by `zitadel preview`, and only when it exists.
 { "project_id": "prj_01K9AA9M3K7E2QX8VB4T", "name": "GOOGLE_CLIENT_SECRET",
-  "applies_to": "preview", "secret_version": "secver_01KB3F8N2P9S5WQY",
-  "is_secret": true }
+  "applies_to": "preview", "value": "<ciphertext>", "is_secret": true }
 ```
 
 `all` is what every deploy reads. `preview` is read by `zitadel preview` in
@@ -70,44 +71,20 @@ of record sharing one table.
   "value":         "preview-xyz.apps.googleusercontent.com"
 }
 {
-  "project_id":     "prj_01K9AA9M3K7E2QX8VB4T",
-  "deployment_id":  "dep_01KB3F8N2P9S5WQZ",
-  "name":           "GOOGLE_CLIENT_SECRET",
-  "secret_version": "secver_01KB3F8N2P9S5WQY" // referenced, never copied
+  "project_id":    "prj_01K9AA9M3K7E2QX8VB4T",
+  "deployment_id": "dep_01KB3F8N2P9S5WQZ",
+  "name":          "GOOGLE_CLIENT_SECRET",
+  "value":         "<ciphertext>", // copied, like any other value
+  "is_secret":     true
 }
 ```
 
-## What a secret version is
-
-**It does not exist today.** A secret variable is a row in `variables` whose
-`value` column holds the encrypted value: `NewSecretVariable` encrypts with a
-`crypto.Encrypter` and stores the ciphertext in the same column a plain value
-uses (`internal/domain/variable.go:76`, `000008_variables.sql`). One value per
-name, overwritten in place, no version and no separate table.
-
-What this design needs instead is an append-only row per secret *value*:
-
-| | |
-|---|---|
-| Id | `secver_<ULID>` — a prefix ADR 047 does not register yet |
-| Holds | one encrypted value, written once, never updated |
-| Pointed at by | the store row, as its current version |
-| Pinned by | every snapshot row that deployed it |
-| Rotation | appends a version and repoints the store row; nothing already deployed changes |
-| Revocation | marks one version dead, and resolving it fails closed rather than falling forward to a newer one |
-
-So `secret_version` in the entities above is a reference to one of those rows,
-and the bytes of a secret exist in exactly one place.
-
-**Why the snapshot references rather than copies.** Copying the ciphertext into
-`deployment_variables` would be simpler, symmetrical with non-secrets, and would
-give immutability just as well. What it cannot give is revocation: a leaked
-value would live on in every snapshot that had copied it, and removing it would
-mean rewriting rows this design calls immutable. The indirection buys the
-ability to kill a value everywhere at once, and the reverse lookup that says
-which deployments are still serving it — *which deployments reference
-`secver_01KB…`* is a query by secret version, which is also why the snapshot is
-a table and not another document inside the deployment row's `metadata`.
+The snapshot carries the same two columns the store does, and a secret is copied
+as the ciphertext it already is. So nothing in this design needs a secret store
+it does not already have: the only new table is the snapshot, and its columns
+are the ones `variables` has today. What copying costs — a leaked value cannot
+be revoked in one place, because every snapshot holding it would have to be
+rewritten — is [Open 2](#open).
 
 ## Why a snapshot and not just the store
 
@@ -127,12 +104,12 @@ stored. not live until the next deploy.
 
 $ zitadel vars set GOOGLE_CLIENT_SECRET --secret
 value: ********
-stored as secver_01KB3F8N2P9S5WQX. not live until the next deploy.
+stored, encrypted. not live until the next deploy.
 
 $ zitadel vars list
 NAME                  TYPE    ALL DEPLOYS                 PREVIEWS
 GOOGLE_CLIENT_ID      value   prod-abc.apps.googleu…      preview-xyz.apps.goog…
-GOOGLE_CLIENT_SECRET  secret  secver_01KB…WQX  (10-02)    secver_01KB…WQY  (09-14)
+GOOGLE_CLIENT_SECRET  secret  set 10-02                   set 09-14
 SUPPORT_EMAIL         value   help@acme.com               —
 ```
 
@@ -146,7 +123,7 @@ serving dep_01KB3F8N2P9S5WQZ   deployed 10-02 14:10
 
 NAME                  SERVING NOW                FROM
 GOOGLE_CLIENT_ID      preview-xyz.apps.goog…     preview override
-GOOGLE_CLIENT_SECRET  secver_01KB…WQY            preview override
+GOOGLE_CLIENT_SECRET  (secret, set 09-14)        preview override
 SUPPORT_EMAIL         help@acme.com              all deploys
 
   SUPPORT_EMAIL changed in the store since this deployment — deploy to apply
@@ -159,7 +136,7 @@ The value is set once, against the project, and the pipeline is told nothing:
 ```
 $ zitadel vars set GOOGLE_CLIENT_SECRET --secret --preview
 value: ********
-stored as secver_01KB3F8N2P9S5WQY. applies to previews.
+stored, encrypted. applies to previews.
 not live until the next preview deploy.
 ```
 
@@ -216,7 +193,7 @@ worth interrupting a log for.
 
 ## Immutability at runtime
 
-Four properties, each from a different part of the model:
+Three properties, each from a different part of the model:
 
 1. **Snapshot rows are written once**, in the transaction that writes the
    deployment, so a deployment is never a partially-rewritten value set.
@@ -226,11 +203,6 @@ Four properties, each from a different part of the model:
 3. **A flow seals the deployment id, not the release digest.** One pointer pins
    the resources *and* the values, so the two cannot drift apart mid-attempt.
    This replaces sealing the release, and is strictly stronger.
-4. **[Secret versions](#what-a-secret-version-is) are immutable.** A rotation
-   mints a new version; the old keeps its bytes for as long as a deployment
-   references it. Revocation is the single exception and it fails closed — a
-   revoked version refuses, rather than quietly resolving to a newer one.
-
 ## Why not one table with a null deployment id
 
 Tempting — `variables(project_id, deployment_id, name, …)` where a null
@@ -251,7 +223,7 @@ and the costs are not:
   removed [`current_deployment_id`](1-data-model.md#why-there-is-no-pointer-column).
 - **The wrong query leaks.** `zitadel vars list` becomes a filtered read that
   must never forget its filter; forget it once and it lists every historical
-  value, superseded secret references included. The lifecycles have nothing in
+  value, superseded secrets included. The lifecycles have nothing in
   common either — tens of curated rows against tens of frozen rows per
   deployment.
 
@@ -270,16 +242,15 @@ and the costs are not:
 - **Variables never move onto the release.** The same release has to run with
   different values on different origins, which is the preview case above.
 
-## Prerequisites
-
-**A versioned secret store.** A secret is a column today, so the rotation and
-revocation properties above have nothing to rest on. It needs the append-only
-table, a `secver` prefix registered by an amendment to ADR 047, and a resolver
-that fails closed on a revoked version. Non-secret variables need none of it —
-they work against the `value` column as it stands.
-
 ## Open
 
-**Whether a variable-only deploy should be a distinct `reason`.** Reusing
-`deploy` keeps the enum small but makes "the release did not change here"
-something a reader has to notice from the digest rather than read.
+1. **Whether a variable-only deploy should be a distinct `reason`.** Reusing
+   `deploy` keeps the enum small but makes "the release did not change here"
+   something a reader has to notice from the digest rather than read.
+2. **Revoking a leaked secret reaches nothing already deployed.** Rotating the
+   store changes what the next deploy freezes and nothing that is running, so
+   the old value is served until every target is redeployed, and its bytes
+   survive in each historical snapshot until that deployment is collected.
+   Making revocation immediate wants a secret stored once and referenced by the
+   snapshots, which is a versioned secret store — more machinery than removing
+   environments needs, and better decided on its own.
