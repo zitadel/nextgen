@@ -37,3 +37,5 @@ touched path** — read those first; the scoped files under
 - Local runtime command changes: verify `.zitadel/local/` state handling,
   `--server local` resolution, and the zero-config smoke paths per
   [`apps/cli/SKILLS.md`](../apps/cli/SKILLS.md).
+
+<!-- spike(#1432): touch a root file to observe moon full-rebuild trigger; revert before merge -->
