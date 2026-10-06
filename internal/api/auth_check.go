@@ -102,3 +102,18 @@ func checkTypeToAPI(check domain.AuthCheckType) api.FactorMethod {
 		return ""
 	}
 }
+
+// checkTypeToChallengeMethod is [checkTypeToAPI] for challenges. An sso check
+// is never an [domain.AuthChallenge], so the challenge enum leaves it out.
+func checkTypeToChallengeMethod(check domain.AuthCheckType) api.ChallengeMethod {
+	switch check.Class() {
+	case domain.AuthCheckTypeUser:
+		return api.ChallengeMethodIdentifier
+	case domain.AuthCheckTypePassword:
+		return api.ChallengeMethodPassword
+	case domain.AuthCheckTypePasskey:
+		return api.ChallengeMethodPasskey
+	default:
+		return ""
+	}
+}

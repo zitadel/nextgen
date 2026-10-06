@@ -42,3 +42,9 @@ func TestFactorToAPI_SSO(t *testing.T) {
 	assert.Equal(t, api.FactorMethodSSO, got.Method)
 	assert.False(t, got.Payload.Set)
 }
+
+func TestCheckTypeToChallengeMethod_LeavesOutSSO(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, api.ChallengeMethodPasskey, checkTypeToChallengeMethod(domain.AuthCheckTypePasskey))
+	assert.Empty(t, checkTypeToChallengeMethod(domain.AuthCheckTypeSSO))
+}

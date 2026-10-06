@@ -4726,6 +4726,7 @@ func TestFlowStateMachine_Render_SSOReplayGuardSkipsResolution(t *testing.T) {
 	assert.Nil(t, result.Step.Error)
 	assert.Empty(t, result.State.CollectedData.UserID)
 	assert.Empty(t, result.HandoffToken)
+	assert.False(t, result.SSOResolved)
 }
 
 func TestFlowStateMachine_Render_NoParkedIdentityRendersStep(t *testing.T) {
@@ -4738,6 +4739,8 @@ func TestFlowStateMachine_Render_NoParkedIdentityRendersStep(t *testing.T) {
 	assert.Equal(t, "credentials", result.Step.Name)
 	assert.Nil(t, result.Step.Error)
 	assert.Empty(t, result.State.SSOResolvedCheckID)
+	assert.False(t, result.SSOResolved)
+	assert.Zero(t, result.State.IssuedAt, "a plain render does not refresh IssuedAt")
 }
 
 func TestFlowStateMachine_Render_SSORestartRequiredPropagates(t *testing.T) {
@@ -4775,6 +4778,7 @@ func TestFlowStateMachine_Render_SSOCreationDisabledRendersStepError(t *testing.
 	assert.True(t, containsFieldName(result.Step.Fields, "email"), "the step keeps its inputs")
 	assert.Empty(t, result.HandoffToken)
 	assert.Equal(t, "ch-1", result.State.SSOResolvedCheckID)
+	assert.True(t, result.SSOResolved)
 }
 
 // unlinkedParked is an identity with no link under `creation: auto`.

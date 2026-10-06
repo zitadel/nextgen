@@ -104,7 +104,7 @@ func (h Handler) CreateHandoff(ctx context.Context, params api.CreateHandoffPara
 
 // challengeRequestToChallenge maps the API oneOf challenge to the service Challenge discriminated union.
 func challengeRequestToChallenge(req *api.IssueChallengeRequest) (service.Challenge, error) {
-	checkType, err := factorMethodToCheckType(req.GetMethod())
+	checkType, err := challengeMethodToCheckType(req.GetMethod())
 	if err != nil {
 		return nil, err
 	}
@@ -160,13 +160,13 @@ func verifyRequestToProof(req *api.VerifyChallengeRequest) (service.Proof, error
 	}
 }
 
-var methodChecks = map[api.FactorMethod]domain.AuthCheckType{
-	api.FactorMethodIdentifier: domain.AuthCheckTypeUser,
-	api.FactorMethodPassword:   domain.AuthCheckTypePassword,
-	api.FactorMethodPasskey:    domain.AuthCheckTypePasskey,
+var methodChecks = map[api.ChallengeMethod]domain.AuthCheckType{
+	api.ChallengeMethodIdentifier: domain.AuthCheckTypeUser,
+	api.ChallengeMethodPassword:   domain.AuthCheckTypePassword,
+	api.ChallengeMethodPasskey:    domain.AuthCheckTypePasskey,
 }
 
-func factorMethodToCheckType(method api.FactorMethod) (domain.AuthCheckType, error) {
+func challengeMethodToCheckType(method api.ChallengeMethod) (domain.AuthCheckType, error) {
 	check, ok := methodChecks[method]
 	if !ok {
 		return domain.AuthCheckTypeUnspecified, domain.ErrAuthAttemptInvalidRequest()
@@ -177,7 +177,7 @@ func factorMethodToCheckType(method api.FactorMethod) (domain.AuthCheckType, err
 func challengeToAPI(challenge domain.AuthChallenge) *api.ChallengeResponse {
 	return &api.ChallengeResponse{
 		ChallengeID: api.ChallengeID(challenge.GetID()),
-		Method:      checkTypeToAPI(challenge.Type()),
+		Method:      checkTypeToChallengeMethod(challenge.Type()),
 		State:       api.ChallengeResponseStatePending,
 		CreatedAt:   challenge.GetLastChallengedAt(),
 		ExpiresAt:   api.OptNilDateTime{},

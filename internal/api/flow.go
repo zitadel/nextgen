@@ -268,20 +268,23 @@ func (h *Handler) GetFlowStep(ctx context.Context, params api.GetFlowStepParams)
 		return mapFlowGetError(domain.ErrFlowCompleted())
 	}
 
-	// A terminal render only clears the cookie, so nothing is sealed: the
-	// handoff it carries is already committed and must reach the client.
-	// Otherwise the render may have changed the state (resolution, IssuedAt),
-	// so it is re-sealed, the same as submit.
-	setCookie := flowSetCookie(ctx, "", true)
-	if !terminal {
+	// Only a render that resolved a parked SSO identity is re-sealed: the
+	// cookie carries no version, so a reload re-sealing it could land after a
+	// submit and roll it back. A terminal render only clears the cookie, so a
+	// failing seal cannot cost the client its committed handoff.
+	var setCookie []string
+	switch {
+	case terminal:
+		setCookie = []string{flowSetCookie(ctx, "", true)}
+	case result.SSOResolved:
 		cookieValue, err := h.sealState(ctx, result.State)
 		if err != nil {
 			return nil, err
 		}
-		setCookie = flowSetCookie(ctx, cookieValue, false)
+		setCookie = []string{flowSetCookie(ctx, cookieValue, false)}
 	}
 	return &api.FlowResponseHeaders{
-		SetCookie:    []string{setCookie},
+		SetCookie:    setCookie,
 		CacheControl: api.NewOptString(sessionStateCacheControl),
 		Response:     h.buildFlowResponse(ctx, result, terminal),
 	}, nil
