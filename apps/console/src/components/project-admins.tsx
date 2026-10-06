@@ -42,8 +42,7 @@ type Grant = Awaited<ReturnType<typeof api.queryGrants>>["grants"][number];
  * **The viewer's own access is a line above the table.** The project resource
  * does not name its owning team (#1462 is the follow-up that shows that access
  * here), so it is inferred: whoever reaches this page can manage the project,
- * and when no grant is theirs, that access is the owning team's. A team grant
- * leaves it open which team admitted them, so the line is held back then.
+ * and when no grant is theirs, that access is the owning team's.
  *
  * **Not an invite flow.** The design draws `Invite`, a `Pending` status and
  * revoke/resend actions, but a grant is only ever created against a person who
@@ -71,8 +70,7 @@ export function ProjectAdmins({
   onChanged: () => void;
 }) {
   const rows = grants.map(toAdminRow);
-  const viewerHoldsGrant = grants.some((grant) => grant.user?.user_id === viewerUserId);
-  const viaOwningTeam = !viewerHoldsGrant && !grants.some((grant) => grant.team);
+  const viaOwningTeam = !grants.some((grant) => grant.user?.user_id === viewerUserId);
   return (
     // Labelled so the section is a landmark assistive tech can jump to.
     <Card className="mt-8 gap-0 rounded-xl py-0" role="region" aria-labelledby="project-admins">

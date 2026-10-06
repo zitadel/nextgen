@@ -264,25 +264,6 @@ describe("project admins", () => {
     expect(admins().queryByText(OWNING_TEAM_LINE)).not.toBeInTheDocument();
   });
 
-  it("holds the line back when a team grant could be the viewer's way in", async () => {
-    stubProject([
-      grant({
-        user: undefined,
-        team: {
-          team_id: "team_1",
-          name: "Platform",
-          status: "active",
-          created_at: "2026-09-01T10:00:00Z",
-          updated_at: "2026-09-01T10:00:00Z",
-        },
-      }),
-    ]);
-    await renderProject();
-
-    await screen.findByRole("region", { name: "Admins" });
-    expect(admins().queryByText(OWNING_TEAM_LINE)).not.toBeInTheDocument();
-  });
-
   it("grants by the address that was typed, on the route's project", async () => {
     stubProject([]);
     const created = stubCreateGrant();
