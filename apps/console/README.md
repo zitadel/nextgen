@@ -69,8 +69,10 @@ empty). Attaching `staticData.nav` to a new route lists it.
 
 The console holds **no long-lived credential in the browser bundle**. It calls a
 same-origin API base (`/api` under the dev server, the origin root when
-embedded). No bearer is attached anywhere: the `__nextgen_session` cookie
-authorizes. See the Vite proxy config and environment variables below.
+embedded). Management requests carry no bearer: the `__nextgen_session` cookie
+authorizes them. Sign-in requests send the runtime publishable key (below).
+The dev proxy injects no credential. See the Vite proxy config and environment
+variables below.
 
 ### Console sign-in (Console ADR 0003)
 

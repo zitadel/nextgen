@@ -87,8 +87,9 @@ test that needs one grants its user access through the API first.
 moon run console-e2e:e2e-platform
 ```
 
-Boots the built Go binary with the platform project bootstrapped (the server
-default). An operator signs up through the console, is granted the harness
+Boots the built Go binary with the platform project bootstrapped: the
+`zitadel start` default, which `@zitadel/testing` uses. The Go binary on its own
+defaults `platform.bootstrap_project` to off. An operator signs up through the console, is granted the harness
 project by email, and uses the screens on the session cookie alone. The console
 selects that project itself (the operator's only grant, as `?project=`), so the
 screens run in a project other than the one the console signs into.

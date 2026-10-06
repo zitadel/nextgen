@@ -135,7 +135,8 @@ instead of writing its own fetch wrapper:
 import { configureZitadel, getApi } from "@zitadel/api/config";
 
 const project = configureZitadel({
-  proxyPath: import.meta.env.VITE_CONSOLE_API_BASE || "/api", // same-origin API base
+  // Same-origin API base: the dev proxy path, or the origin root when embedded.
+  proxyPath: import.meta.env.VITE_CONSOLE_API_BASE || (import.meta.env.DEV ? "/api" : ""),
   projectId: "", // learnt at boot from /console/runtime.json (Console ADR 0004 §3)
 });
 
