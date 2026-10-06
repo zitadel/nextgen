@@ -12,7 +12,7 @@
  */
 import type { CreateFlow201, CreateFlow201Step } from "@zitadel/api/generated/model";
 
-import { signHandoffToken } from "../crypto.js";
+import { signHandoffToken, toBase64url } from "../crypto.js";
 import type { StoredCredential } from "../lib/authn/index.js";
 
 /**
@@ -63,7 +63,7 @@ export type StepFixtureInput = {
  * browser's keychain from conflating credentials belonging to different users.
  */
 function emailToUserHandle(email: string): string {
-  return Buffer.from(email).toString("base64url");
+  return toBase64url(new TextEncoder().encode(email));
 }
 
 /**
@@ -82,6 +82,20 @@ function wrap(
     step,
     ...extras,
   };
+}
+
+/**
+ * `step.identifier` for a step that collects the password on its own: the
+ * address captured earlier, or nothing when the step was reached without one
+ * (an SSO flow that skipped the identifier step). Which steps carry it is the
+ * caller's business — only {@link passwordStep} and
+ * {@link registerPasswordStep} ask.
+ */
+function collectedIdentifier(
+  input: StepFixtureInput,
+): CreateFlow201Step["identifier"] | undefined {
+  if (!input.capturedEmail) return undefined;
+  return { value: input.capturedEmail, autocomplete: "username" };
 }
 
 /**
@@ -110,6 +124,7 @@ export function identifierStep(input: StepFixtureInput): CreateFlow201 {
         name: "email",
         type: "email",
         text_key: "identifier.field.email",
+        autocomplete: "username",
         required: true,
       },
     ],
@@ -132,6 +147,7 @@ export function registerStep(input: StepFixtureInput): CreateFlow201 {
         name: "email",
         type: "email",
         text_key: "register.field.email",
+        autocomplete: "username",
         required: true,
       },
       {
@@ -194,10 +210,12 @@ export function registerPasswordStep(input: StepFixtureInput): CreateFlow201 {
         name: PASSWORD_FIELD,
         type: "password",
         text_key: "register-password.field.password",
+        autocomplete: "new-password",
         required: true,
         validation: { min_length: 8 },
       },
     ],
+    identifier: collectedIdentifier(input),
     actions: [
       {
         name: "submit",
@@ -233,9 +251,11 @@ export function passwordStep(input: StepFixtureInput): CreateFlow201 {
         name: PASSWORD_FIELD,
         type: "password",
         text_key: "password.field.password",
+        autocomplete: "current-password",
         required: true,
       },
     ],
+    identifier: collectedIdentifier(input),
     actions: [
       { name: "submit", kind: "submit", text_key: "password.action.signin", primary: true },
       { name: "back", kind: "back", text_key: "action.back" },
@@ -426,7 +446,15 @@ export function ssoConflictStep(input: StepFixtureInput): CreateFlow201 {
   return wrap(input, {
     name: "sso-conflict",
     texts: { title_key: "sso-conflict.title", description_key: "sso-conflict.description" },
-    fields: [{ name: "password", type: "password", text_key: "password.field.password", required: true }],
+    fields: [
+      {
+        name: "password",
+        type: "password",
+        text_key: "password.field.password",
+        autocomplete: "current-password",
+        required: true,
+      },
+    ],
     actions: [
       { name: "submit", kind: "submit", text_key: "sso-conflict.action.submit", primary: true },
       { name: "passkey", kind: "passkey", text_key: "sso-conflict.action.passkey" },

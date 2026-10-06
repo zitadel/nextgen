@@ -106,12 +106,11 @@ post:
             $ref: ../../../components/flows/flow-response.yaml
     '409':
       description: |
-        Conflict. Either the flow session moved on under another request
-        (`flow.session_conflict`), or the submission (an sso start included)
-        reached an attempt that was already handed off
-        (`att.already_handed_off`). Only a client that kept the flow cookie
-        past the terminal response, or a request racing the one that handed
-        the attempt off, reaches the second case.
+        Conflict. The flow session moved on under another request
+        (`flow.session_conflict`), or the flow's auth attempt expired or was
+        already handed off (`flow.restart_required`): start a new flow. A
+        submission racing the request that hands the attempt off can still
+        fail with `att.already_handed_off`.
       content:
         application/json:
           schema:

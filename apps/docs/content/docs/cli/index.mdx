@@ -20,6 +20,21 @@ For automation:
 npx @zitadel/cli@alpha setup --framework next --server local --non-interactive --json
 ```
 
+## Agent Skills
+
+The CLI ships an [Agent Skill](https://agentskills.io) so a coding agent can
+drive it with always-current guidance. Install it into any skills-compatible
+agent (Claude Code, Cursor, Copilot, Codex, and more) from the repo:
+
+```sh
+npx skills add zitadel/nextgen --full-depth
+```
+
+`--full-depth` installs the whole set — the `zitadel` router skill, the CLI
+skill, and the per-framework SDK and component skills. Without it, only the
+top-level router skill is installed. The CLI skill also ships inside the
+`@zitadel/cli` package.
+
 ## Command groups
 
 - `doctor` checks prerequisites and generated app state.
