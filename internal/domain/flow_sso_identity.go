@@ -68,8 +68,8 @@ type FlowSSOParkedIdentity struct {
 	// CollisionUserID is set when the parked row holds the collision marker
 	// ([SSOCallbackResult.CollisionUserID]) a collision bind wrote with the user
 	// factor, whatever the cookie recorded. The cookie that recorded the bind
-	// may have been lost, so the engine catches the state up. Only
-	// AttemptUserID is set besides it.
+	// may have been lost, so the engine catches the state up. Only CheckID
+	// and AttemptUserID are set besides it.
 	CollisionUserID string
 	// AttemptUserID is the user of the user factor the attempt carries when it
 	// is read, whatever wrote it: a signed-in session copies its user in, a

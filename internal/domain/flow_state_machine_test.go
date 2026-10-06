@@ -5777,7 +5777,7 @@ func TestFlowStateMachine_Render_SSOCollisionReconcilesLostCookieRace(t *testing
 		LoadParked(gomock.Any(), domain.FlowSSOLoadInput{
 			ProjectID: testProjectID, AttemptID: "att-1", UserSchemaURL: defaultSchemaURL, ResolvedCheckID: "ch-1",
 		}).
-		Return(&domain.FlowSSOParkedIdentity{CollisionUserID: "u-b", AttemptUserID: "u-b"}, nil)
+		Return(&domain.FlowSSOParkedIdentity{CheckID: "ch-1", CollisionUserID: "u-b", AttemptUserID: "u-b"}, nil)
 
 	result, err := w.sm.Render(t.Context(), def, state)
 	require.NoError(t, err)
@@ -5804,7 +5804,7 @@ func TestFlowStateMachine_Render_SSOCollisionReconcileUnroutableRendersError(t *
 			}
 			state.SSOResolvedCheckID = "ch-1"
 			w.ssoIdentities.EXPECT().LoadParked(gomock.Any(), gomock.Any()).
-				Return(&domain.FlowSSOParkedIdentity{CollisionUserID: "u-b", AttemptUserID: "u-b"}, nil)
+				Return(&domain.FlowSSOParkedIdentity{CheckID: "ch-1", CollisionUserID: "u-b", AttemptUserID: "u-b"}, nil)
 
 			result, err := w.sm.Render(t.Context(), def, state)
 			require.NoError(t, err)
@@ -5823,7 +5823,7 @@ func TestFlowStateMachine_Render_SSOCollisionReconcileWithRecordedUserRendersSte
 	def = withSSOOutcomeSteps(def)
 	state.SSOResolvedCheckID = "ch-1"
 	state.CollectedData.UserID = "u-b"
-	w.ssoIdentities.EXPECT().LoadParked(gomock.Any(), gomock.Any()).Return(&domain.FlowSSOParkedIdentity{CollisionUserID: "u-b", AttemptUserID: "u-b"}, nil)
+	w.ssoIdentities.EXPECT().LoadParked(gomock.Any(), gomock.Any()).Return(&domain.FlowSSOParkedIdentity{CheckID: "ch-1", CollisionUserID: "u-b", AttemptUserID: "u-b"}, nil)
 
 	result, err := w.sm.Render(t.Context(), def, state)
 	require.NoError(t, err)
@@ -5832,12 +5832,30 @@ func TestFlowStateMachine_Render_SSOCollisionReconcileWithRecordedUserRendersSte
 	assert.False(t, result.Reseal)
 }
 
+// The flow identified u-b before SSO, and the response that routed the
+// collision was lost: the cookie names the user but not the row, so the
+// outcome is raised again.
+func TestFlowStateMachine_Render_SSOCollisionReconcileWithUserIdentifiedBeforeSSORaisesAgain(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoRenderWorld(t)
+	def = withSSOOutcomeSteps(def)
+	state.CollectedData.UserID = "u-b"
+	w.ssoIdentities.EXPECT().LoadParked(gomock.Any(), gomock.Any()).Return(&domain.FlowSSOParkedIdentity{CheckID: "ch-1", CollisionUserID: "u-b", AttemptUserID: "u-b"}, nil)
+
+	result, err := w.sm.Render(t.Context(), def, state)
+	require.NoError(t, err)
+	assert.Equal(t, "sso-conflict", result.Step.Name)
+	assert.Equal(t, "u-b", result.State.CollectedData.UserID)
+	assert.Equal(t, "ch-1", result.State.SSOResolvedCheckID)
+	assert.True(t, result.Reseal)
+}
+
 func TestFlowStateMachine_Render_SSOCollisionReconcileWithOtherUserRestarts(t *testing.T) {
 	t.Parallel()
 	w, def, state := ssoRenderWorld(t)
 	state.SSOResolvedCheckID = "ch-1"
 	state.CollectedData.UserID = "u-a"
-	w.ssoIdentities.EXPECT().LoadParked(gomock.Any(), gomock.Any()).Return(&domain.FlowSSOParkedIdentity{CollisionUserID: "u-b", AttemptUserID: "u-b"}, nil)
+	w.ssoIdentities.EXPECT().LoadParked(gomock.Any(), gomock.Any()).Return(&domain.FlowSSOParkedIdentity{CheckID: "ch-1", CollisionUserID: "u-b", AttemptUserID: "u-b"}, nil)
 
 	_, err := w.sm.Render(t.Context(), def, state)
 	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
@@ -5886,7 +5904,7 @@ func TestFlowStateMachine_Render_SSOCollisionMarkerWithDifferentAttemptUserResta
 	t.Parallel()
 	w, def, state := ssoRenderWorld(t)
 	w.ssoIdentities.EXPECT().LoadParked(gomock.Any(), gomock.Any()).
-		Return(&domain.FlowSSOParkedIdentity{CollisionUserID: "u-a", AttemptUserID: "u-b"}, nil)
+		Return(&domain.FlowSSOParkedIdentity{CheckID: "ch-1", CollisionUserID: "u-a", AttemptUserID: "u-b"}, nil)
 
 	_, err := w.sm.Render(t.Context(), def, state)
 	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())

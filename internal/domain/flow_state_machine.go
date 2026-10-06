@@ -438,7 +438,11 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 		}
 		switch state.CollectedData.UserID {
 		case parked.CollisionUserID:
-			return FlowStepResult{}, false, nil
+			// The user alone is no proof that this cookie recorded the
+			// collision: the flow may have identified that user before SSO.
+			if state.SSOResolvedCheckID == parked.CheckID {
+				return FlowStepResult{}, false, nil
+			}
 		case "":
 		default:
 			return FlowStepResult{}, false, ErrFlowRestartRequired()
@@ -454,6 +458,7 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 			result, err := r.renderStepError(pc, resolvedFields, &msg)
 			return result, false, err
 		}
+		state.SSOResolvedCheckID = parked.CheckID
 		recordResolvedUser(state, parked.CollisionUserID)
 		result, err := r.routeOutcome(pc, resolvedFields, FlowImplicitOutcomeUserAlreadyExists, false)
 		return result, true, err

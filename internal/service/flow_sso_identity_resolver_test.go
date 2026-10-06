@@ -826,7 +826,7 @@ func TestFlowSSOIdentityResolver_LoadParked_ResolvedRowWithCollisionMarkerReport
 	in.ResolvedCheckID = "ch-1"
 	got, err := f.resolver.LoadParked(t.Context(), in)
 	require.NoError(t, err)
-	assert.Equal(t, &domain.FlowSSOParkedIdentity{CollisionUserID: "u-b", AttemptUserID: "u-b"}, got)
+	assert.Equal(t, &domain.FlowSSOParkedIdentity{CheckID: "ch-1", CollisionUserID: "u-b", AttemptUserID: "u-b"}, got)
 }
 
 // A user factor without the marker (an identifier a concurrent request
@@ -875,5 +875,5 @@ func TestFlowSSOIdentityResolver_LoadParked_CollisionMarkerReportedWithoutResolv
 
 	got, err := f.resolver.LoadParked(t.Context(), loadInput())
 	require.NoError(t, err)
-	assert.Equal(t, &domain.FlowSSOParkedIdentity{CollisionUserID: "u-b", AttemptUserID: "u-b"}, got)
+	assert.Equal(t, &domain.FlowSSOParkedIdentity{CheckID: "ch-1", CollisionUserID: "u-b", AttemptUserID: "u-b"}, got)
 }

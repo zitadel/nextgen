@@ -51,7 +51,7 @@ func (r *FlowSSOIdentityResolver) LoadParked(ctx context.Context, in domain.Flow
 		// recorded, so a flow whose cookie lost that bind can catch up. Only
 		// the marker counts: a user factor alone can come from an unrelated
 		// identifier submission. The marker holds nothing else to read.
-		return &domain.FlowSSOParkedIdentity{CollisionUserID: check.Result.CollisionUserID, AttemptUserID: attemptUserID}, nil
+		return &domain.FlowSSOParkedIdentity{CheckID: check.ID, CollisionUserID: check.Result.CollisionUserID, AttemptUserID: attemptUserID}, nil
 	}
 	if !ok || check.Result == nil {
 		if bound := boundThroughSSO(attempt); bound != nil {
