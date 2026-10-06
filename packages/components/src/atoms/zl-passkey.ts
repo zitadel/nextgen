@@ -153,7 +153,7 @@ export class ZlPasskey extends LitElement {
   @property({ type: Boolean }) accessor silent = false;
 
   /** True from ceremony start until it resolves, rejects, or is aborted. */
-  @state() private accessor pending = false;
+  @state() accessor pending = false;
 
   private abortController: AbortController | null = null;
 

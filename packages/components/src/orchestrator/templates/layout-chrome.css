@@ -84,6 +84,10 @@ img[data-zl-asset-broken] {
 /* One focus outline for every link this stylesheet paints. */
 .zl-trustmark__mark:focus-visible,
 .zl-card-nav__link:focus-visible,
+.zl-card-forgot__link:focus-visible {
+  outline: var(--zl-focus-width) solid var(--zl-ring);
+  outline-offset: var(--zl-focus-offset);
+}
 .zl-trustmark__mark:focus-visible {
   border-radius: var(--zl-radius-sm);
 }
@@ -242,10 +246,6 @@ img[data-zl-asset-broken] {
    forgot-password as plain text, and the underline is the hover. */
 .zl-card-forgot__link:hover {
   text-decoration: underline;
-}
-.zl-card-forgot__link:focus-visible {
-  outline: var(--zl-focus-width) solid var(--zl-ring);
-  outline-offset: var(--zl-focus-offset);
 }
 /* Split-design chrome (ADR 040 design catalog: `split` / `split-right`).
    Those designs are retired from the eject catalog (#1039) — page layout

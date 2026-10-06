@@ -7,8 +7,8 @@ The package exports:
 
 - **Atoms** — `<zl-field>`, `<zl-button>`, `<zl-alert>`, `<zl-icon>`,
   `<zl-pill>`, `<zl-card>`, `<zl-checkbox>`, `<zl-select>`,
-  `<zl-page-shell>`, `<zl-sso-providers>`, and `<zl-passkey>` (an invisible WebAuthn ceremony
-  handler — no rendered surface). Form-associated, accessible,
+  `<zl-page-shell>`, `<zl-sso-providers>`, and `<zl-passkey>` (a WebAuthn ceremony
+  handler that renders only its pending status and cancel button). Form-associated, accessible,
   branding-aware Lit elements that map 1:1 to the flow API
   field/action/error primitives and the Figma design system.
 - **Orchestrators** — `<zitadel-login>`, a single drop-in element that calls
