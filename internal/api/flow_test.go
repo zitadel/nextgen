@@ -604,11 +604,28 @@ func TestGetFlowStep_TerminalReturns410(t *testing.T) {
 	}
 }
 
-func TestGetFlowStep_RotatesCookie(t *testing.T) {
+// A reload racing a submit must not roll the cookie back to the step before
+// the submit.
+func TestGetFlowStep_PlainRenderLeavesCookie(t *testing.T) {
 	ts := newTestServer(t)
 	state := &domain.FlowState{ID: "flow_1", ProjectID: "proj_1", IssuedAt: time.Now()}
 	cookieVal := ts.sealCookie(t, state)
 	ts.fake.getResult = domain.FlowStepResult{State: state, Step: &domain.FlowStep{Name: "identify"}}
+
+	resp, body := doRequest(t, http.MethodGet, ts.srv.URL+"/flow/flow_1", nil, cookieVal)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", resp.StatusCode, body)
+	}
+	if got := resp.Header.Values("Set-Cookie"); len(got) != 0 {
+		t.Errorf("expected no Set-Cookie, got %q", got)
+	}
+}
+
+func TestGetFlowStep_SSOResolvedRenderResealsCookie(t *testing.T) {
+	ts := newTestServer(t)
+	state := &domain.FlowState{ID: "flow_1", ProjectID: "proj_1", IssuedAt: time.Now()}
+	cookieVal := ts.sealCookie(t, state)
+	ts.fake.getResult = domain.FlowStepResult{State: state, Step: &domain.FlowStep{Name: "identify"}, SSOResolved: true}
 
 	resp, body := doRequest(t, http.MethodGet, ts.srv.URL+"/flow/flow_1", nil, cookieVal)
 	if resp.StatusCode != http.StatusOK {

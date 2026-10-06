@@ -131,7 +131,9 @@ type FlowSSOReturn struct {
 // [Process]. Pop is reserved for the deferred pivot stack. HandoffToken
 // + HandoffTokenExpiresAt are populated only on the terminal step;
 // SSOBindingNonce only on the [FlowStepNameSSORedirect] step, where the
-// handler sets it as the browser-binding cookie.
+// handler sets it as the browser-binding cookie. SSOResolved is set only by
+// [Render], when it resolved a parked SSO identity: the handler re-seals
+// only such a render.
 type FlowStepResult struct {
 	State                 *FlowState
 	Step                  *FlowStep
@@ -139,6 +141,7 @@ type FlowStepResult struct {
 	HandoffToken          string
 	HandoffTokenExpiresAt time.Time
 	SSOBindingNonce       string
+	SSOResolved           bool
 }
 
 // FlowStep is the capability payload the API surfaces to the client.
@@ -350,13 +353,15 @@ func (r *FlowStateMachineRuntime) Start(ctx context.Context, in FlowStartInput) 
 	return FlowStepResult{State: state, Step: step}, nil
 }
 
-// Render re-emits the current step without advancing. Refreshes IssuedAt
-// so the cookie max-age window slides while the user is on the step.
+// Render re-emits the current step without advancing. It refreshes IssuedAt
+// only when it resolves a parked SSO identity, the one render the handler
+// re-seals.
 func (r *FlowStateMachineRuntime) Render(ctx context.Context, def *FlowDefinition, state *FlowState) (FlowStepResult, error) {
 	if def == nil || state == nil {
 		return FlowStepResult{}, fmt.Errorf("%w: render without definition or state", ErrFlowIntegrity())
 	}
 	if result, resolved, err := r.resolveSSOIdentity(ctx, def, state); err != nil || resolved {
+		result.SSOResolved = resolved
 		return result, err
 	}
 	step, err := r.renderStep(ctx, def, state)
@@ -365,7 +370,6 @@ func (r *FlowStateMachineRuntime) Render(ctx context.Context, def *FlowDefinitio
 	}
 	// Re-emit an in-flight ceremony so a page reload can resume it.
 	attachPendingChallenge(step, state.PendingChallenge)
-	state.IssuedAt = r.now()
 	return FlowStepResult{State: state, Step: step}, nil
 }
 
@@ -593,7 +597,7 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, def *FlowDefiniti
 // processSSO starts an external sign-in with a provider the step offers
 // and emits the redirect step. The flow state is left as it is: the user
 // is still on this step until the resolution after the callback routes it.
-// IssuedAt is refreshed like on every other response, so the flow cookie's
+// IssuedAt is refreshed like on every submit, so the flow cookie's
 // window restarts at this submission.
 func (r *FlowStateMachineRuntime) processSSO(pc *processCtx) (FlowStepResult, error) {
 	in := pc.in

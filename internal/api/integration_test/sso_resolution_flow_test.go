@@ -157,17 +157,16 @@ func requireAuthenticated(t *testing.T, resp api.GetFlowStepRes) *api.FlowRespon
 	return got
 }
 
-func TestGetFlowStepRotatesCookie(t *testing.T) {
+// A reload racing a submit must not roll the cookie back to the step before
+// the submit.
+func TestGetFlowStepWithoutParkedIdentityLeavesCookie(t *testing.T) {
 	t.Parallel()
 	f := newSSOResolutionFixture(t, helpers.OIDCConnection("google"))
 	flow := f.startFlow(t, "")
 
 	resp := f.getStep(t, flow)
 	require.IsType(t, &api.FlowResponseHeaders{}, resp, helpers.MustMarshal(t, resp))
-	cookie := resp.(*api.FlowResponseHeaders).SetCookie
-	require.NotContains(t, strings.Join(cookie, "\n"), "Max-Age=0")
-	rotated := mustExtractZflow(t, cookie)
-	assert.Equal(t, flow.attemptID, openFlowState(t, f.project.ID, rotated).AuthAttemptID)
+	assert.Empty(t, resp.(*api.FlowResponseHeaders).SetCookie)
 }
 
 // A flow that was complete before the request still answers 410: only a
