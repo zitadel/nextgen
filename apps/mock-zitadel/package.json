@@ -17,7 +17,7 @@
   "scripts": {
     "dev": "tsx scripts/local-server.ts",
     "build": "tsdown",
-    "build:vercel": "corepack pnpm --filter @zitadel/api run generate && corepack pnpm --filter @zitadel/api run build && corepack pnpm --filter @zitadel/config run sync-schemas && corepack pnpm --filter @zitadel/config run build && corepack pnpm run build && corepack pnpm exec tsx scripts/generate-wellknown.ts",
+    "build:vercel": "(cd ../../packages/api && node --run generate && node --run build) && (cd ../../packages/config && node --run sync-schemas && node --run build) && tsdown && tsx scripts/generate-wellknown.ts",
     "test": "vitest run",
     "test:all": "vitest run",
     "test:watch": "vitest --watch",
