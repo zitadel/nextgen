@@ -16,8 +16,9 @@ const servers: Server[] = [];
 const VALID_USER_SCHEMA = {
   kind: "user-schema",
   metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
+  "x-identifier": "email",
   "x-auth-methods": { password: { enabled: true } },
-  properties: { email: { type: "string" } },
+  properties: { email: { type: "string", "x-unique": "project" } },
 };
 
 async function doctor(cwd: string, extra: string[] = []) {
