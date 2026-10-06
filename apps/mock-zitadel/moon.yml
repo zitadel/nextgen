@@ -29,14 +29,14 @@ tasks:
       - "api:generate"
 
   # The Vercel build (vercel.json): the bundled function plus the static
-  # discovery document, which needs VERCEL_URL and so only runs there.
+  # discovery document, which needs VERCEL_URL and so only runs there. Vercel
+  # sets CI, so this must stay runnable in CI; GitHub CI never selects it.
   build-vercel:
     command: "corepack pnpm run wellknown"
     deps:
       - "build"
     options:
       cache: false
-      runInCI: false
 
   test:
     command: "corepack pnpm run test"
