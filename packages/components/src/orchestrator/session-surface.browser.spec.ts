@@ -48,7 +48,11 @@ function installSessionFetchStub(): { restore: () => void } {
   );
   const original = globalThis.fetch;
   globalThis.fetch = fetchStub as unknown as typeof fetch;
-  return { restore: () => void (globalThis.fetch = original) };
+  return {
+    restore: () => {
+      globalThis.fetch = original;
+    },
+  };
 }
 
 async function waitFor<T>(probe: () => T | null | undefined, timeout = 3000): Promise<T> {

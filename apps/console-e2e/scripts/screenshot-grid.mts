@@ -185,16 +185,17 @@ async function capture(browser: Browser, urls: Map<Screen, string>, storage: str
 }
 
 function contactSheet(urls: Map<Screen, string>): string {
-  const escape = (text: string) => text.replace(/[&<>"]/g, (char) => `&#${char.charCodeAt(0)};`);
+  const escapeHtml = (text: string) =>
+    text.replace(/[&<>"]/g, (char) => `&#${char.charCodeAt(0)};`);
   const rows = [...urls.keys()]
     .map((screen) => {
       const cells = THEMES.flatMap((theme) =>
         VIEWPORTS.map((viewport) => {
           const file = fileName(screen, theme, viewport.name);
-          return `<figure class="${viewport.name}"><a href="${file}"><img src="${file}" alt="${escape(`${screen.name}, ${theme}, ${viewport.name}`)}" loading="lazy"></a><figcaption>${theme} · ${viewport.name}</figcaption></figure>`;
+          return `<figure class="${viewport.name}"><a href="${file}"><img src="${file}" alt="${escapeHtml(`${screen.name}, ${theme}, ${viewport.name}`)}" loading="lazy"></a><figcaption>${theme} · ${viewport.name}</figcaption></figure>`;
         }),
       ).join("");
-      return `<section><h2>${escape(screen.name)}</h2><div class="row">${cells}</div></section>`;
+      return `<section><h2>${escapeHtml(screen.name)}</h2><div class="row">${cells}</div></section>`;
     })
     .join("\n");
   return `<!doctype html>
@@ -218,7 +219,7 @@ function contactSheet(urls: Map<Screen, string>): string {
   figcaption { color: var(--muted); font-size: 12px; margin-top: 6px; }
 </style>
 <h1>Console screens</h1>
-<p>Captured ${new Date().toISOString().slice(0, 16).replace("T", " ")} UTC from ${escape(origin)}. Light and dark, at 1440px and 390px. Click a shot for full size.</p>
+<p>Captured ${new Date().toISOString().slice(0, 16).replace("T", " ")} UTC from ${escapeHtml(origin)}. Light and dark, at 1440px and 390px. Click a shot for full size.</p>
 ${rows}
 </html>
 `;

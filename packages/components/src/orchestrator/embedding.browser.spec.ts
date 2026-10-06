@@ -254,7 +254,11 @@ function installFlowFetchStub(responses: readonly CreateFlow201[]): { restore: (
   });
   const original = globalThis.fetch;
   globalThis.fetch = fetchStub as unknown as typeof fetch;
-  return { restore: () => void (globalThis.fetch = original) };
+  return {
+    restore: () => {
+      globalThis.fetch = original;
+    },
+  };
 }
 
 function centerX(element: Element): number {

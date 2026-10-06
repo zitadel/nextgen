@@ -330,7 +330,7 @@ test("update path fails loudly when product notes alone exceed the limit", async
     GENERATED_BLOCK_END,
   ].join("\n");
 
-  const fetchImpl = async (url, init = {}) => {
+  const fetchImpl = async (_url, init = {}) => {
     if ((init.method ?? "GET") === "GET") {
       return jsonResponse([{ id: 7, tag_name: TAG, body: existingBody }]);
     }

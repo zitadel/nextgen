@@ -239,8 +239,9 @@ function PaletteRow({
     <div className={COLOUR_ROW}>
       {/* Both sides carry a row called "Primary", so the term carries the
           side for assistive tech: visually the section heading says it. */}
-      <dt className={ROW_LABEL} aria-label={`${PALETTE_LABELS[paletteKey]} (${side} mode)`}>
-        {PALETTE_LABELS[paletteKey]}
+      <dt className={ROW_LABEL}>
+        <span className="sr-only">{`${PALETTE_LABELS[paletteKey]} (${side} mode)`}</span>
+        <span aria-hidden>{PALETTE_LABELS[paletteKey]}</span>
       </dt>
       <dd className={`${ROW_VALUE} gap-1.5`}>
         <span className={SWATCH} style={{ backgroundColor: toHex(value) }} aria-hidden />

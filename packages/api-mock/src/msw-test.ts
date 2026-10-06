@@ -13,6 +13,7 @@ export const worker: SetupWorker = setupWorker();
 
 export const test = testBase.extend<{ worker: SetupWorker }>({
   worker: [
+    // biome-ignore lint/correctness/noEmptyPattern: Playwright/Vitest fixture signature requires the destructuring pattern
     async ({}, use) => {
       await worker.start({ onUnhandledRequest: "error" });
       await use(worker);

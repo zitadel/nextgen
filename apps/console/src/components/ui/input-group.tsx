@@ -21,6 +21,7 @@ import { Textarea } from "@/components/ui/textarea";
  */
 function InputGroup({ className, ...props }: React.ComponentProps<"div">) {
   return (
+    // biome-ignore lint/a11y/useSemanticElements: vendored shadcn/ui primitive; a styled wrapper, not a <fieldset>
     <div
       data-slot="input-group"
       role="group"
@@ -72,6 +73,8 @@ function InputGroupAddon({
   ...props
 }: React.ComponentProps<"div"> & VariantProps<typeof inputGroupAddonVariants>) {
   return (
+    // biome-ignore lint/a11y/useSemanticElements: vendored shadcn/ui primitive; a styled addon wrapper, not a <fieldset>
+    // biome-ignore lint/a11y/useKeyWithClickEvents: vendored shadcn/ui primitive; click only forwards focus to the wrapped input, keyboard users reach the input directly
     <div
       role="group"
       data-slot="input-group-addon"

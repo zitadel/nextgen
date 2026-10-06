@@ -12,6 +12,8 @@
       "!**/*.gen.ts",
       "!**/next-env.d.ts",
       "!**/*.css",
+      "!**/*.svg",
+      "!**/*.html",
       "!**/*.json",
       "!**/*.jsonc",
       "!**/*.svelte",
@@ -44,31 +46,42 @@
     "rules": {
       "recommended": true,
       "a11y": {
-        "noSvgWithoutTitle": "warn",
-        "useAriaPropsSupportedByRole": "warn",
-        "useButtonType": "warn",
-        "useKeyWithClickEvents": "warn",
-        "useSemanticElements": "warn"
+        "noSvgWithoutTitle": "error",
+        "useAriaPropsSupportedByRole": "error",
+        "useButtonType": "error",
+        "useKeyWithClickEvents": "error",
+        "useSemanticElements": "error"
+      },
+      "complexity": {
+        "useOptionalChain": "warn"
       },
       "correctness": {
-        "noEmptyPattern": "warn",
-        "noInnerDeclarations": "warn",
-        "noUnknownProperty": "warn",
+        "noEmptyPattern": "error",
+        "noInnerDeclarations": "error",
+        "noUnknownProperty": "error",
+        "noUnusedFunctionParameters": "error",
+        "noUnusedVariables": "error",
         "noQwikUseVisibleTask": "off",
         "useQwikValidLexicalScope": "off"
       },
+      "performance": {
+        "noAccumulatingSpread": "error"
+      },
       "style": {
-        "noDescendingSpecificity": "off"
+        "noDescendingSpecificity": "off",
+        "noNonNullAssertion": "warn"
       },
       "suspicious": {
-        "noArrayIndexKey": "warn",
-        "noAssignInExpressions": "warn",
-        "noDoubleEquals": "warn",
-        "noImplicitAnyLet": "warn",
-        "noShadowRestrictedNames": "warn",
+        "noArrayIndexKey": "error",
+        "noAssignInExpressions": "error",
+        "noDoubleEquals": "error",
+        "noDocumentCookie": "error",
+        "noExplicitAny": "error",
+        "noImplicitAnyLet": "error",
+        "noShadowRestrictedNames": "error",
         "noTemplateCurlyInString": "off",
-        "noThenProperty": "warn",
-        "useIterableCallbackReturn": "warn"
+        "noThenProperty": "error",
+        "useIterableCallbackReturn": "error"
       }
     }
   },

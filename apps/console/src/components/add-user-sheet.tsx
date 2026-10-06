@@ -242,12 +242,7 @@ function AddUserForm({
             <div className={LABEL_ROW}>
               <FieldLabel className={LABEL}>User Schema</FieldLabel>
             </div>
-            <SchemaPicker
-              id="user-schema"
-              schemas={schemas}
-              selected={selected}
-              onSelect={selectSchema}
-            />
+            <SchemaPicker schemas={schemas} selected={selected} onSelect={selectSchema} />
           </Field>
           <Separator />
           {fields.map((entry) => (
@@ -306,12 +301,10 @@ function AddUserForm({
 
 /** Searchable schema picker, composed from the shared Combobox. */
 function SchemaPicker({
-  id,
   schemas,
   selected,
   onSelect,
 }: {
-  id: string;
   schemas: SchemaOption[] | undefined;
   selected: SchemaOption | undefined;
   onSelect: (id: string) => void;

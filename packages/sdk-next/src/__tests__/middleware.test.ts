@@ -270,7 +270,7 @@ describe("nextgenMiddleware", () => {
 
   it("strips x-nextgen-auth-token from proxied requests", async () => {
     let capturedHeaders: Headers | undefined;
-    const upstreamFetch = vi.fn().mockImplementation((url: string, init: RequestInit) => {
+    const upstreamFetch = vi.fn().mockImplementation((_url: string, init: RequestInit) => {
       capturedHeaders = init.headers as Headers;
       return Promise.resolve(new Response("{}", { status: 200 }));
     });

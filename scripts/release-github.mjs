@@ -193,7 +193,7 @@ export function fitGeneratedReleaseFacts({ metadata, sections, fits }) {
   }
 
   const bySizeDesc = sections
-    .map((section, index) => ({ index, size: rendered[index].length }))
+    .map((_section, index) => ({ index, size: rendered[index].length }))
     .sort((a, b) => b.size - a.size || a.index - b.index);
 
   const omitted = [];

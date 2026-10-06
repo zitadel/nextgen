@@ -79,6 +79,7 @@ function Field({
   ...props
 }: React.ComponentProps<"div"> & VariantProps<typeof fieldVariants>) {
   return (
+    // biome-ignore lint/a11y/useSemanticElements: vendored shadcn/ui primitive wraps arbitrary field content, not a <fieldset>
     <div
       role="group"
       data-slot="field"
@@ -194,13 +195,15 @@ function FieldError({
 
     const uniqueErrors = [...new Map(errors.map((error) => [error?.message, error])).values()];
 
-    if (uniqueErrors?.length == 1) {
+    if (uniqueErrors?.length === 1) {
       return uniqueErrors[0]?.message;
     }
 
     return (
       <ul className="ml-4 flex list-disc flex-col gap-1">
-        {uniqueErrors.map((error, index) => error?.message && <li key={index}>{error.message}</li>)}
+        {uniqueErrors.map(
+          (error) => error?.message && <li key={error.message}>{error.message}</li>,
+        )}
       </ul>
     );
   }, [children, errors]);
