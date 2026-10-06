@@ -5,8 +5,9 @@ stack: "frontend"
 
 tasks:
   generate-openapi:
-    command: "corepack pnpm run generate:openapi"
+    command: "corepack pnpm run generate-openapi"
     inputs:
+      - "package.json"
       - "/api/openapi/**/*.yaml"
       - "scripts/bundle-openapi.mjs"
     outputs:
@@ -15,10 +16,11 @@ tasks:
       - ".generated/openapi.mjs"
 
   generate:
-    command: "corepack pnpm run generate:source"
+    command: "corepack pnpm run generate"
     deps:
       - "generate-openapi"
     inputs:
+      - "package.json"
       - "/api/openapi/**/*.yaml"
       - "content/**/*"
       - "source.config.ts"

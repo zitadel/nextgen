@@ -5,8 +5,8 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "generate:openapi": "node scripts/bundle-openapi.mjs",
-    "generate:source": "fumadocs-mdx",
+    "generate-openapi": "node scripts/bundle-openapi.mjs",
+    "generate": "fumadocs-mdx",
     "dev": "waku dev --port 3003",
     "build": "waku build",
     "preview": "node scripts/preview.mjs",

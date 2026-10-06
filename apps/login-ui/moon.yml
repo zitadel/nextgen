@@ -8,7 +8,7 @@ dependsOn:
 
 tasks:
   lint:
-    command: "corepack pnpm exec oxlint ."
+    command: "corepack pnpm run lint"
     deps:
       - "components:build"
       - "design-tokens:build"

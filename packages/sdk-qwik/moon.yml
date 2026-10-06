@@ -52,7 +52,7 @@ tasks:
   # Chromium for the browser-mode test suite. Self-contained (like components):
   # the `test` task depends on it so `moon ci :test` provisions it in CI.
   install-browsers:
-    command: "corepack pnpm exec playwright install chromium"
+    command: "corepack pnpm run install-browsers"
     options:
       cache: false
 

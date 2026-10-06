@@ -84,7 +84,8 @@
     "test": "vitest run",
     "readme": "oclif readme",
     "prepack": "tsdown && oclif manifest",
-    "postpack": "rm -f oclif.manifest.json"
+    "postpack": "rm -f oclif.manifest.json",
+    "lint": "oxlint ."
   },
   "dependencies": {
     "@clack/prompts": "catalog:",

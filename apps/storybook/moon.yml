@@ -10,7 +10,7 @@ dependsOn:
 
 tasks:
   lint:
-    command: "corepack pnpm exec oxlint ."
+    command: "corepack pnpm run lint"
     deps:
       - "components:build"
       - "design-tokens:build"
@@ -43,7 +43,7 @@ tasks:
   # Installs the Chromium that @storybook/addon-vitest drives. Mirrors the
   # journey e2e pattern (browsers aren't preinstalled on CI runners).
   install-browsers:
-    command: "corepack pnpm exec playwright install chromium"
+    command: "corepack pnpm run install-browsers"
     options:
       cache: false
 

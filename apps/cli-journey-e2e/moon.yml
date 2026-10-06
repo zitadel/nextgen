@@ -8,7 +8,7 @@ dependsOn:
 
 tasks:
   lint:
-    command: "corepack pnpm exec oxlint ."
+    command: "corepack pnpm run lint"
 
   typecheck:
     command: "corepack pnpm run typecheck"
@@ -33,10 +33,8 @@ tasks:
     options:
       runInCI: false
 
-  # Runs the script with node rather than through `pnpm run e2e-local`, so the
-  # tools it starts are not children of a pnpm script (see run-local.mjs).
   e2e-local:
-    command: "node scripts/run-local.mjs"
+    command: "corepack pnpm run e2e-local"
     env:
       ZITADEL_TELEMETRY: "0"
     deps:
@@ -49,7 +47,7 @@ tasks:
   # app, install the kit from the journey registry, and run its withZitadel()
   # suite against the published binary (embedded UIs, no env overrides).
   e2e-testkit:
-    command: "node scripts/run-local.mjs --suite testkit"
+    command: "corepack pnpm run e2e-testkit"
     env:
       ZITADEL_TELEMETRY: "0"
     deps:

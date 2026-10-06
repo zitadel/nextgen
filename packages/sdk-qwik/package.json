@@ -32,7 +32,8 @@
     "build": "vite build --mode lib",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "install-browsers": "playwright install chromium"
   },
   "dependencies": {
     "@zitadel/api": "workspace:*",

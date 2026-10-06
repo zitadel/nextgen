@@ -18,12 +18,12 @@ tasks:
       mutex: "generated-sources"
 
   lint:
-    command: "corepack pnpm exec oxlint ."
+    command: "corepack pnpm run lint"
     deps:
       - "generate"
 
   typecheck:
-    command: "corepack pnpm exec tsc --build tsconfig.json"
+    command: "corepack pnpm run typecheck"
     deps:
       - "generate"
 

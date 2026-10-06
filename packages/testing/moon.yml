@@ -58,7 +58,7 @@ tasks:
   # Boots a real local server (binary runtime + SQLite by default). Kept out
   # of CI and the cache: it spawns OS processes and takes a few seconds per boot.
   test-integration:
-    command: "corepack pnpm run test:integration"
+    command: "corepack pnpm run test-integration"
     deps:
       - "build"
       - "cli:build"

@@ -7,12 +7,13 @@
     "doctor": "node scripts/doctor.mjs",
     "cli": "node scripts/run-cli.mjs",
     "server": "node scripts/run-server.mjs",
-    "docs": "moon run docs:dev",
     "journey": "node scripts/run-journey.mjs",
     "check": "node scripts/check.mjs",
     "test": "node scripts/assert-file.mjs scripts/ci-mode.test.mjs scripts/release-github.test.mjs scripts/generate-meta-schemas.test.ts && vitest run scripts/ci-mode.test.mjs scripts/release-github.test.mjs scripts/generate-meta-schemas.test.ts",
-    "release:snapshot": "moon run release:snapshot",
-    "release:publish": "moon run release:publish"
+    "smoke-container": "node scripts/smoke-container.mjs",
+    "check-typecheck": "node scripts/assert-file.mjs scripts/check-typecheck-programs.test.mjs && vitest run scripts/check-typecheck-programs.test.mjs && node scripts/check-typecheck-programs.mjs",
+    "check-openapi-rules": "node scripts/assert-file.mjs scripts/openapi-casing-rules.test.mjs && vitest run scripts/openapi-casing-rules.test.mjs",
+    "check-adrs": "node scripts/check-adrs-index.mjs"
   },
   "devDependencies": {
     "@changesets/changelog-github": "^0.7.0",

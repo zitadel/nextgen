@@ -10,13 +10,13 @@ dependsOn:
 
 tasks:
   lint:
-    command: "corepack pnpm exec oxlint ."
+    command: "corepack pnpm run lint"
     deps:
       - "api:build"
       - "design-tokens:build"
 
   typecheck:
-    command: "corepack pnpm exec tsc --build tsconfig.json"
+    command: "corepack pnpm run typecheck"
     deps:
       - "api:build"
       - "config:build"
@@ -61,7 +61,7 @@ tasks:
   # Chromium for the browser project. Self-contained (like storybook): the
   # `test` task depends on it so `moon ci :test` provisions it in CI.
   install-browsers:
-    command: "corepack pnpm exec playwright install chromium"
+    command: "corepack pnpm run install-browsers"
     options:
       cache: false
 

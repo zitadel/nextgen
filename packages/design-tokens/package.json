@@ -28,10 +28,12 @@
   },
   "scripts": {
     "sync": "tsx scripts/sync-from-figma.ts",
-    "sync:export": "tsx scripts/sync-from-export.ts",
+    "sync-export": "tsx scripts/sync-from-export.ts",
     "generate": "tsx scripts/build.ts",
     "build": "tsdown",
-    "test": "vitest run"
+    "test": "vitest run",
+    "lint": "oxlint .",
+    "typecheck": "tsc --build tsconfig.json"
   },
   "devDependencies": {
     "tsdown": "catalog:",

@@ -59,7 +59,10 @@
     "build": "tsdown",
     "test": "vitest run --project unit",
     "test:browser": "vitest run --project browser",
-    "test:all": "vitest run"
+    "test:all": "vitest run",
+    "lint": "oxlint .",
+    "typecheck": "tsc --build tsconfig.json",
+    "install-browsers": "playwright install chromium"
   },
   "dependencies": {
     "@zitadel/config": "workspace:*",

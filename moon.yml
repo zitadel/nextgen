@@ -4,8 +4,12 @@ layer: "tool"
 stack: "infrastructure"
 
 tasks:
+  # cli, server, server-debug and check start moon themselves, so moon runs
+  # them with node directly: launched through `pnpm run`, the moon they start
+  # would inherit pnpm's environment and every task under it would warn about
+  # the platform-specific server packages.
   doctor:
-    command: "node scripts/doctor.mjs"
+    command: "corepack pnpm run doctor"
     options:
       cache: false
       runInCI: false
@@ -32,7 +36,7 @@ tasks:
       runInCI: false
 
   journey:
-    command: "node scripts/run-journey.mjs"
+    command: "corepack pnpm run journey"
     options:
       cache: false
       runInCI: false
@@ -43,7 +47,7 @@ tasks:
   # USER it declares. Needs a local Docker daemon and an image built by
   # `node scripts/build-local-runtime-image.mjs`, so it stays out of CI.
   smoke-container:
-    command: "node scripts/smoke-container.mjs"
+    command: "corepack pnpm run smoke-container"
     options:
       cache: false
       runInCI: false
@@ -88,8 +92,9 @@ tasks:
     # file would stop running unnoticed. node:test used to error on a missing
     # file; this restores that fail-loud behavior, cross-platform (POSIX `test`
     # is unavailable on Windows shells).
-    script: "node scripts/assert-file.mjs scripts/check-typecheck-programs.test.mjs && corepack pnpm exec vitest run scripts/check-typecheck-programs.test.mjs && node scripts/check-typecheck-programs.mjs"
+    command: "corepack pnpm run check-typecheck"
     inputs:
+      - "package.json"
       - "scripts/check-typecheck-programs.mjs"
       - "scripts/check-typecheck-programs.test.mjs"
       - "scripts/assert-file.mjs"
@@ -115,8 +120,9 @@ tasks:
     # file would stop running unnoticed. node:test used to error on a missing
     # file; this restores that fail-loud behavior, cross-platform (POSIX `test`
     # is unavailable on Windows shells).
-    script: "node scripts/assert-file.mjs scripts/openapi-casing-rules.test.mjs && corepack pnpm exec vitest run scripts/openapi-casing-rules.test.mjs"
+    command: "corepack pnpm run check-openapi-rules"
     inputs:
+      - "package.json"
       - "scripts/openapi-casing-rules.test.mjs"
       - "scripts/assert-file.mjs"
       - "scripts/testdata/openapi-casing/**"
@@ -131,8 +137,9 @@ tasks:
       runInCI: true
 
   check-adrs:
-    command: "node scripts/check-adrs-index.mjs"
+    command: "corepack pnpm run check-adrs"
     inputs:
+      - "package.json"
       - "docs/adrs/**/*.md"
       - "scripts/check-adrs-index.mjs"
       - "scripts/dev-process.mjs"

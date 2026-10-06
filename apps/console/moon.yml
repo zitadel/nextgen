@@ -9,7 +9,7 @@ dependsOn:
 
 tasks:
   lint:
-    command: "corepack pnpm exec oxlint ."
+    command: "corepack pnpm run lint"
     deps:
       - "api:generate"
       - "design-tokens:build"
@@ -62,7 +62,7 @@ tasks:
   # runs `moon run server:build` itself; a task dep on it here would cycle the
   # project graph, because server:build depends on console:build.
   dev-real:
-    command: "corepack pnpm run dev:real"
+    command: "corepack pnpm run dev-real"
     options:
       persistent: true
       runInCI: false
@@ -72,7 +72,7 @@ tasks:
   # `dev-real` deliberately does not boot. Opt-in for that one screen; every
   # other screen is better served by `dev-real`.
   dev-claim:
-    command: "corepack pnpm run dev:claim"
+    command: "corepack pnpm run dev-claim"
     options:
       persistent: true
       runInCI: false
