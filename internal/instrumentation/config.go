@@ -71,7 +71,7 @@ func (f LogFormat) ErrorHandler(options *slog.HandlerOptions) slog.Handler {
 	var stdErrHandler slog.Handler
 	switch f {
 	case LogFormatUnspecified:
-		return slog.Default().Handler()
+		stdErrHandler = slog.Default().Handler()
 	case LogFormatDisabled:
 		stdErrHandler = slog.DiscardHandler
 	case LogFormatText:
