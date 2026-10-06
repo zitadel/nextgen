@@ -97,6 +97,59 @@ describe("env", () => {
       expect(resolved.data.project_id?.source).toBe(".env.production.local");
     });
 
+    it("allows the origins given on the command line on the project it creates", async () => {
+      const app = await anApp();
+
+      const result = await app.run([
+        "env",
+        "add",
+        "production",
+        "--non-interactive",
+        "--json",
+        "--origin",
+        "https://app.acme.com",
+        "--preview",
+        "https://*-acmeinc.vercel.app",
+      ]);
+
+      expect(result).toSucceed();
+      type Allowed = { pattern: string; kind: string; check: { status: string } };
+      const { data } = app.envelopeOf<{ allowed_origins: Allowed[]; next_commands: string[] }>(result);
+      expect(data.allowed_origins.map((entry) => [entry.pattern, entry.kind, entry.check.status])).toEqual([
+        ["https://app.acme.com", "primary", "ok"],
+        ["https://*-acmeinc.vercel.app", "preview", "ok"],
+      ]);
+      expect(data.next_commands.some((cmd) => cmd.includes("allowlist add"))).toBe(false);
+      const listed = app.envelopeOf<{ allowed_origins: Array<{ pattern: string; kind: string }> }>(
+        await app.run(["allowlist", "--json", "--env", "production"]),
+      );
+      expect(listed.data.allowed_origins).toEqual([
+        { pattern: "https://app.acme.com", kind: "primary" },
+        { pattern: "https://*-acmeinc.vercel.app", kind: "preview" },
+      ]);
+    });
+
+    it("defers the origins when binding an id without a project secret", async () => {
+      const app = await anApp();
+
+      const result = await app.run([
+        "env",
+        "add",
+        "staging",
+        "--non-interactive",
+        "--json",
+        "--project",
+        "proj_staging",
+        "--origin",
+        "https://staging.acme.com",
+      ]);
+
+      expect(result).toSucceed();
+      const { data } = app.envelopeOf<{ allowed_origins: unknown[]; next_commands: string[] }>(result);
+      expect(data.allowed_origins).toEqual([]);
+      expect(data.next_commands[0]).toContain("allowlist add 'https://staging.acme.com' --kind primary");
+    });
+
     it("refuses to overwrite a bound environment without --force", async () => {
       const app = await anApp();
       expect(

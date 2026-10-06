@@ -750,24 +750,27 @@ Bind an environment to a project, creating the project if needed.
 ```
 USAGE
   $ zitadel env add NAME [--json] [-c <value>] [-s <value>] [-e <value>] [--env-file <value>] [-n]
-    [--dry-run] [--verbose] [--debug] [--telemetry] [--project <value>] [--name <value>] [--force]
+    [--dry-run] [--verbose] [--debug] [--telemetry] [--project <value>] [--name <value>] [--origin <value>...]
+    [--preview <value>...] [--force]
 
 ARGUMENTS
   NAME  The environment name, e.g. production.
 
 FLAGS
-  -c, --cwd=<value>       Project directory to operate on.
-  -e, --env=<value>       Environment whose .env.<name>.local file binds the server and project.
-  -n, --non-interactive   Disable prompts. Required when scripting or running as an agent.
-  -s, --server=<value>    Override the resolved server URL.
-      --debug             Debug logging.
-      --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read the server and project from this file instead of the .env convention.
-      --force             Overwrite an existing .env.<name>.local.
-      --name=<value>      The name for a project this command creates.
-      --project=<value>   Bind this existing project instead of creating one.
-      --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
-      --verbose           Verbose logging.
+  -c, --cwd=<value>         Project directory to operate on.
+  -e, --env=<value>         Environment whose .env.<name>.local file binds the server and project.
+  -n, --non-interactive     Disable prompts. Required when scripting or running as an agent.
+  -s, --server=<value>      Override the resolved server URL.
+      --debug               Debug logging.
+      --dry-run             Preview without mutating files or the platform.
+      --env-file=<value>    Read the server and project from this file instead of the .env convention.
+      --force               Overwrite an existing .env.<name>.local.
+      --name=<value>        The name for a project this command creates.
+      --origin=<value>...   A production origin to allow (primary). Repeatable.
+      --preview=<value>...  A pattern the preview credential may register URLs under. Repeatable.
+      --project=<value>     Bind this existing project instead of creating one.
+      --[no-]telemetry      Send anonymous usage analytics. Disable with --no-telemetry.
+      --verbose             Verbose logging.
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -777,6 +780,8 @@ DESCRIPTION
 
 EXAMPLES
   $ zitadel env add production
+
+  $ zitadel env add production --origin https://app.acme.com --preview 'https://*-acmeinc.vercel.app'
 
   $ zitadel env add production --server https://api.zitadel.cloud --project proj_01K9AA9M3K7E2QX8VB4T
 ```

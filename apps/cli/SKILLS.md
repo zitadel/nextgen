@@ -416,8 +416,12 @@ docker --image <ref>` remains the explicit image override for debugging.
   `ZITADEL_PROJECT_ID`, `ZITADEL_PROJECT_SECRET`, `ZITADEL_PREVIEW_TOKEN` and
   `ZITADEL_PUBLISHABLE_KEY`. `env` prints what resolved and from where;
   `env list` the environments bound here; `env add <name>` writes
-  `.env.<name>.local` for a new or existing (`--project <id>`) project. An
-  environment is a client-side label: nothing on the server is keyed on it.
+  `.env.<name>.local` for a new or existing (`--project <id>`) project and
+  allows the origins it will serve (`--origin <url>` for a production
+  hostname, `--preview <pattern>` for what a preview deploy may register;
+  interactively it asks, proposing the preview pattern from the deploy
+  platform's files). An environment is a client-side label: nothing on the
+  server is keyed on it.
 - `deploy` — build a release from `.zitadel/` (the sync loop runs first, so
   unchanged content reuses its revisions) and deploy it to the project default
   and every `primary` origin in one operation (`data.deploy_id`, `dpl_…`).
