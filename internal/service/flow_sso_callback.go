@@ -108,7 +108,6 @@ func (c *FlowSSOCallback) Process(ctx context.Context, in FlowSSOCallbackInput) 
 	result := &domain.SSOCallbackResult{
 		Subject:              identity.Subject,
 		ConnectionRevisionID: identity.RevisionID,
-		ProviderSlug:         pending.ProviderSlug,
 		Claims:               identity.Claims,
 		Verified:             identity.Verified,
 	}
@@ -205,7 +204,7 @@ func (c *FlowSSOCallback) fail(ctx context.Context, projectID string, check *dom
 // park stores an error result on the consumed record and sends the browser
 // back to the return target, where the originating step shows the key.
 func (c *FlowSSOCallback) park(ctx context.Context, projectID string, check *domain.SSOCallbackCheck, key string) (FlowSSOCallbackOutput, error) {
-	result := &domain.SSOCallbackResult{ProviderSlug: check.Pending.ProviderSlug, ErrorKey: key}
+	result := &domain.SSOCallbackResult{ErrorKey: key}
 	if err := c.attempts.SetSSOCallbackResult(ctx, projectID, check, result); err != nil {
 		return FlowSSOCallbackOutput{}, err
 	}

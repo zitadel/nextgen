@@ -104,14 +104,9 @@ func (p SSOStatePayload) LogValue() slog.Value {
 // record (factor_payload). It deliberately carries no token and no
 // authorization code: the exchange is done by the time this is written.
 type SSOCallbackResult struct {
-	Subject              string `json:"subject"`
-	ConnectionRevisionID string `json:"connection_revision_id"`
-	// ProviderSlug is copied from the pending payload when the result is
-	// parked. The step that later loads the result must verify the provider
-	// is one it offers, and by then the pending payload is already cleared,
-	// so the slug is kept here.
-	ProviderSlug string         `json:"provider_slug"`
-	Claims       map[string]any `json:"claims,omitempty"`
+	Subject              string         `json:"subject"`
+	ConnectionRevisionID string         `json:"connection_revision_id"`
+	Claims               map[string]any `json:"claims,omitempty"`
 	// Verified records, per user-schema property, whether the provider asserted
 	// the property's mapped claim as verified (for example email_verified). It
 	// is keyed like Claims, the same as idp.ExternalIdentity.Verified.
@@ -120,8 +115,7 @@ type SSOCallbackResult struct {
 	// [FlowStepErrorSSOCancelled] when the provider reported access_denied,
 	// [FlowStepErrorSSOFailed] for every other failure. The provider's own
 	// error text goes to the server log only, never into the record. An error
-	// result carries only this key and ProviderSlug: no subject, no claims,
-	// no verified map.
+	// result carries only this key: no subject, no claims, no verified map.
 	ErrorKey string `json:"error_key,omitempty"`
 	// CollisionUserID is written by a collision bind in the same transaction as
 	// the user factor, and replaces the whole result: after a collision the row
@@ -141,7 +135,6 @@ func (r SSOCallbackResult) LogValue() slog.Value {
 	return slog.GroupValue(
 		slog.String("subject", r.Subject),
 		slog.String("connection_revision_id", r.ConnectionRevisionID),
-		slog.String("provider_slug", r.ProviderSlug),
 		slog.String("error_key", r.ErrorKey),
 	)
 }

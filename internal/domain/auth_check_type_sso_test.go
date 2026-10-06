@@ -300,10 +300,7 @@ func TestSSOCallbackResult_NoTokenFields(t *testing.T) {
 func TestSSOCallbackResult_IsError(t *testing.T) {
 	t.Parallel()
 	assert.False(t, domain.SSOCallbackResult{Subject: "sub-1"}.IsError())
-	assert.True(t, domain.SSOCallbackResult{
-		ProviderSlug: "google",
-		ErrorKey:     domain.FlowStepErrorSSOCancelled,
-	}.IsError())
+	assert.True(t, domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOCancelled}.IsError())
 }
 
 func TestErrSSOStateInvalid(t *testing.T) {

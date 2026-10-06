@@ -77,17 +77,17 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 		{
 			name:       "access_denied stores the cancelled key",
 			in:         service.FlowSSOCallbackInput{State: ssoCallbackState, Error: "access_denied", ErrorDescription: "the provider's words"},
-			wantResult: &domain.SSOCallbackResult{ProviderSlug: "google", ErrorKey: domain.FlowStepErrorSSOCancelled},
+			wantResult: &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOCancelled},
 		},
 		{
 			name:       "every other provider code stores the failed key",
 			in:         service.FlowSSOCallbackInput{State: ssoCallbackState, Error: "temporarily_unavailable"},
-			wantResult: &domain.SSOCallbackResult{ProviderSlug: "google", ErrorKey: domain.FlowStepErrorSSOFailed},
+			wantResult: &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed},
 		},
 		{
 			name:       "neither code nor error stores the failed key",
 			in:         service.FlowSSOCallbackInput{State: ssoCallbackState},
-			wantResult: &domain.SSOCallbackResult{ProviderSlug: "google", ErrorKey: domain.FlowStepErrorSSOFailed},
+			wantResult: &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed},
 		},
 		{
 			name: "a vanished revision stores the failed key",
@@ -95,7 +95,7 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 			connections: func(m *servicemocks.MockIDPConnectionService) {
 				m.EXPECT().GetRevision(gomock.Any(), "proj-1", "idprev_1").Return(nil, domain.ErrIDPConnectionNotFound())
 			},
-			wantResult: &domain.SSOCallbackResult{ProviderSlug: "google", ErrorKey: domain.FlowStepErrorSSOFailed},
+			wantResult: &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed},
 		},
 		{
 			name: "a missing client_secret variable stores the failed key without a token request",
@@ -107,7 +107,7 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 			variables: func(m *servicemocks.MockVariableService) {
 				m.EXPECT().GetDecryptedVariables(gomock.Any(), domain.VariableOwner{ProjectID: "proj-1"}, "GOOGLE_SECRET").Return(nil, nil)
 			},
-			wantResult: &domain.SSOCallbackResult{ProviderSlug: "google", ErrorKey: domain.FlowStepErrorSSOFailed},
+			wantResult: &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed},
 		},
 		{
 			name: "a client_secret variable not marked secret stores the failed key without a token request",
@@ -120,7 +120,7 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 				m.EXPECT().GetDecryptedVariables(gomock.Any(), domain.VariableOwner{ProjectID: "proj-1"}, "GOOGLE_SECRET").
 					Return([]*domain.Variable{{Name: "GOOGLE_SECRET", Value: "plain", IsSecret: false}}, nil)
 			},
-			wantResult: &domain.SSOCallbackResult{ProviderSlug: "google", ErrorKey: domain.FlowStepErrorSSOFailed},
+			wantResult: &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed},
 		},
 		{
 			name: "a literal client_secret stores the failed key without a token request",
@@ -130,7 +130,7 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 				m.EXPECT().GetRevision(gomock.Any(), "proj-1", "idprev_1").
 					Return(&domain.IDPConnection{Slug: "google", RevisionID: "idprev_1", Document: doc}, nil)
 			},
-			wantResult: &domain.SSOCallbackResult{ProviderSlug: "google", ErrorKey: domain.FlowStepErrorSSOFailed},
+			wantResult: &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed},
 		},
 		{
 			name: "an internal failure is returned and stores nothing",
@@ -145,7 +145,7 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 			in:           service.FlowSSOCallbackInput{State: ssoCallbackState, Error: "access_denied"},
 			setResultErr: domain.ErrSSOStateInvalid(),
 			wantErr:      domain.ErrSSOStateInvalid(),
-			wantResult:   &domain.SSOCallbackResult{ProviderSlug: "google", ErrorKey: domain.FlowStepErrorSSOCancelled},
+			wantResult:   &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOCancelled},
 		},
 	}
 	for _, tt := range tests {
@@ -342,6 +342,5 @@ func TestFlowSSOCallback_Process_StoresTheIdentity(t *testing.T) {
 	require.NotNil(t, attempts.setResult)
 	assert.Equal(t, "user-1", attempts.setResult.Subject)
 	assert.Equal(t, "idprev_1", attempts.setResult.ConnectionRevisionID)
-	assert.Equal(t, "google", attempts.setResult.ProviderSlug)
 	assert.False(t, attempts.setResult.IsError())
 }

@@ -513,17 +513,17 @@ func TestAuthAttemptService_SetSSOCallbackResult(t *testing.T) {
 	}{
 		{
 			name:      "a failed result emits auth.check.failed",
-			result:    &domain.SSOCallbackResult{ProviderSlug: "google", ErrorKey: domain.FlowStepErrorSSOCancelled},
+			result:    &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOCancelled},
 			wantEvent: domain.EventTypeAuthCheckFailed,
 		},
 		{
 			name:      "a successful result emits auth.check.succeeded",
-			result:    &domain.SSOCallbackResult{ProviderSlug: "google", Subject: "sub-1"},
+			result:    &domain.SSOCallbackResult{Subject: "sub-1"},
 			wantEvent: domain.EventTypeAuthCheckSucceeded,
 		},
 		{
 			name:     "a refused write emits nothing",
-			result:   &domain.SSOCallbackResult{ProviderSlug: "google", ErrorKey: domain.FlowStepErrorSSOFailed},
+			result:   &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed},
 			writeErr: domain.ErrSSOStateInvalid(),
 			wantErr:  domain.ErrSSOStateInvalid(),
 		},

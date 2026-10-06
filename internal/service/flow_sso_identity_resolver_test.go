@@ -235,7 +235,7 @@ func TestFlowSSOIdentityResolver_LoadParked_DeadBoundAttemptRestarts(t *testing.
 func TestFlowSSOIdentityResolver_LoadParked_ErrorResultReportsKey(t *testing.T) {
 	t.Parallel()
 	f := newSSOResolverFixture(t)
-	result := &domain.SSOCallbackResult{ProviderSlug: "google", ErrorKey: domain.FlowStepErrorSSOCancelled}
+	result := &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOCancelled}
 	f.expectAttempt(parkedAttempt(result))
 	f.expectNoResolveReads()
 
@@ -628,7 +628,7 @@ func TestFlowSSOIdentityResolver_LoadParked_ResolvedRowIsSkipped(t *testing.T) {
 	t.Parallel()
 	for name, attempt := range map[string]*domain.AuthAttempt{
 		"identity row":          parkedAttempt(parkedResult()),
-		"error row":             parkedAttempt(&domain.SSOCallbackResult{ProviderSlug: "google", ErrorKey: domain.FlowStepErrorSSOFailed}),
+		"error row":             parkedAttempt(&domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed}),
 		"earlier bind":          parkedAttempt(parkedResult(), boundFactors()...),
 		"unrelated user factor": parkedAttempt(parkedResult(), &domain.AuthFactorUser{UserID: "u-x"}),
 	} {
