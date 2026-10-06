@@ -447,9 +447,6 @@ step.
 The complete target, the shipped default plus `google`; diff it against
 `packages/config/defaults/default-login.json` for the delta:
 [`schemas/default-login.scaffold.json`](schemas/default-login.scaffold.json).
-The fixture itself is renamed in #1371 together with the CLI scaffold, because
-a test in `packages/config` ties the two; until then it shows the pre-rename
-keys.
 
 ## Preview and Apply
 

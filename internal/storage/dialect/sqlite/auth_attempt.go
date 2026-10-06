@@ -10,6 +10,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
+	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/dialect/authattempt"
 	v2session "github.com/zitadel/nextgen/internal/storage/session"
 )
@@ -29,7 +30,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`
 
 	deleteAuthAttemptByIDStmt = `DELETE FROM auth_attempts WHERE project_id = ? AND id = ?`
 
-	handoffAuthAttemptStmt = `UPDATE auth_attempts SET handoff_token = ?, handed_off_at = ? WHERE project_id = ? AND id = ? RETURNING handed_off_at`
+	handoffAuthAttemptStmt = `UPDATE auth_attempts SET handoff_token = ?, handed_off_at = ? WHERE project_id = ? AND id = ? AND handed_off_at IS NULL RETURNING handed_off_at`
 
 	setAuthAttemptChallengeStmt = `INSERT INTO checks (project_id, auth_attempt_id, id, type, last_challenged_at, challenge_payload, failure_count, last_failed_at)` +
 		` VALUES (?, ?, ?, ?, ?, ?, 0, NULL) ON CONFLICT (project_id, auth_attempt_id, type)` +
@@ -40,6 +41,15 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`
 		` VALUES (?, ?, ?, ?, ?, ?, 0) ON CONFLICT (project_id, auth_attempt_id, type)` +
 		` DO UPDATE SET last_verified_at = EXCLUDED.last_verified_at, factor_payload = EXCLUDED.factor_payload,` +
 		` challenge_payload = NULL, last_challenged_at = NULL, failure_count = 0, last_failed_at = NULL` +
+		` RETURNING id`
+
+	// addAuthAttemptFactorStmt fills only a row without a verified factor; the
+	// new id makes a challenge issued before this write stale.
+	addAuthAttemptFactorStmt = `INSERT INTO checks (project_id, auth_attempt_id, id, type, last_verified_at, factor_payload, failure_count)` +
+		` VALUES (?, ?, ?, ?, ?, ?, 0) ON CONFLICT (project_id, auth_attempt_id, type)` +
+		` DO UPDATE SET id = EXCLUDED.id, last_verified_at = EXCLUDED.last_verified_at, factor_payload = EXCLUDED.factor_payload,` +
+		` challenge_payload = NULL, last_challenged_at = NULL, failure_count = 0, last_failed_at = NULL` +
+		` WHERE checks.last_verified_at IS NULL` +
 		` RETURNING id`
 
 	authAttemptChallengeSucceededStmt = `UPDATE checks SET last_verified_at = ?, factor_payload = ?, challenge_payload = NULL, last_challenged_at = NULL, failure_count = 0` +
@@ -63,6 +73,8 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`
 	setSSOCallbackResultStmt = `UPDATE checks SET factor_payload = ?` +
 		` WHERE project_id = ? AND lookup_hash = ? AND type = ? AND last_challenged_at IS NULL` +
 		` AND factor_payload IS NULL`
+
+	deleteSSOCallbackStmt = `DELETE FROM checks WHERE project_id = ? AND auth_attempt_id = ? AND type = ? AND id = ?`
 
 	authAttemptChallengeFailedStmt = `UPDATE checks SET last_failed_at = ?, failure_count = failure_count + 1` +
 		` WHERE project_id = ? AND auth_attempt_id = ? AND type = ? AND id = ?` +
@@ -318,12 +330,28 @@ func (as authAttemptStatements) HandoffAuthAttempt(ctx context.Context, attempt 
 	err := as.client.QueryRow(ctx, handoffAuthAttemptStmt,
 		attempt.HandoffToken.TokenHash, now.UnixNano(), attempt.ProjectID, attempt.ID,
 	).Scan(&handedOffNano)
+	if errors.Is(err, sql.ErrNoRows) {
+		return as.handoffRefused(ctx, attempt, fmt.Errorf("failed to handoff auth attempt: %w", wrapError(err)))
+	}
 	if err != nil {
 		return fmt.Errorf("failed to handoff auth attempt: %w", wrapError(err))
 	}
 	handedOffAt := timeFromUnixNano(handedOffNano)
 	attempt.HandedOffAt = &handedOffAt
 	return nil
+}
+
+// handoffRefused explains a handoff that updated no row: the attempt is
+// missing (noRow is returned) or another request already handed it off.
+func (as authAttemptStatements) handoffRefused(ctx context.Context, attempt *domain.AuthAttempt, noRow error) error {
+	_, err := as.GetAuthAttemptByID(ctx, attempt.ProjectID, attempt.ID)
+	if errors.Is(err, domain.ErrAuthAttemptNotFound()) {
+		return noRow
+	}
+	if err != nil {
+		return err
+	}
+	return domain.ErrAuthAttemptAlreadyHandedOff()
 }
 
 // SetAuthAttemptChallenge implements [service.AuthAttemptStatements].
@@ -356,6 +384,19 @@ func (as authAttemptStatements) SetAuthAttemptChallenge(ctx context.Context, pro
 
 // SetAuthAttemptFactor implements [service.AuthAttemptStatements].
 func (as authAttemptStatements) SetAuthAttemptFactor(ctx context.Context, projectID, authAttemptID string, factor domain.AuthFactor) (string, error) {
+	return as.writeAuthAttemptFactor(ctx, setAuthAttemptFactorStmt, projectID, authAttemptID, factor)
+}
+
+// AddAuthAttemptFactor implements [service.AuthAttemptStatements].
+func (as authAttemptStatements) AddAuthAttemptFactor(ctx context.Context, projectID, authAttemptID string, factor domain.AuthFactor) (string, error) {
+	id, err := as.writeAuthAttemptFactor(ctx, addAuthAttemptFactorStmt, projectID, authAttemptID, factor)
+	if _, noRow := errors.AsType[*database.NoRowFoundError](err); noRow {
+		return "", database.NewUniqueError("checks", "", err)
+	}
+	return id, err
+}
+
+func (as authAttemptStatements) writeAuthAttemptFactor(ctx context.Context, stmt, projectID, authAttemptID string, factor domain.AuthFactor) (string, error) {
 	now := time.Now().UTC()
 	payloadStr, err := authattempt.MarshalPayloadString(factor.Payload())
 	if err != nil {
@@ -370,7 +411,7 @@ func (as authAttemptStatements) SetAuthAttemptFactor(ctx context.Context, projec
 		payloadArg = *payloadStr
 	}
 	var returnedID string
-	if err := as.client.QueryRow(ctx, setAuthAttemptFactorStmt,
+	if err := as.client.QueryRow(ctx, stmt,
 		projectID, authAttemptID, checkID, int64(factor.Type()), now.UnixNano(), payloadArg,
 	).Scan(&returnedID); err != nil {
 		return "", fmt.Errorf("failed to set factor: %w", wrapError(err))
@@ -509,6 +550,19 @@ func (as authAttemptStatements) SetSSOCallbackResult(ctx context.Context, projec
 		payloadArg, projectID, stateHash, int64(domain.AuthCheckTypeSSOCallback))
 	if err != nil {
 		return fmt.Errorf("failed to set sso callback result: %w", err)
+	}
+	if n == 0 {
+		return domain.ErrSSOStateInvalid()
+	}
+	return nil
+}
+
+// DeleteSSOCallback implements [service.AuthAttemptStatements].
+func (as authAttemptStatements) DeleteSSOCallback(ctx context.Context, projectID, authAttemptID, checkID string) error {
+	n, err := execAffected(ctx, as.client, deleteSSOCallbackStmt,
+		projectID, authAttemptID, int64(domain.AuthCheckTypeSSOCallback), checkID)
+	if err != nil {
+		return fmt.Errorf("failed to delete sso callback: %w", err)
 	}
 	if n == 0 {
 		return domain.ErrSSOStateInvalid()

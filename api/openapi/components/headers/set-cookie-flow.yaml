@@ -6,9 +6,11 @@ description: |
   concerns server-side and generated non-browser clients only.
 
   The first element is always `_zflow`, the encrypted flow state: HttpOnly,
-  Secure, SameSite=Strict, Path=/, rotated on every response, including
-  validation failures. The `sso-redirect` response appends the
-  browser-binding cookie the callback checks.
+  Secure, SameSite=Strict, Path=/. Starting a flow and every submit
+  response rotate it, including validation failures; `GET /flow/{id}`
+  sets it only when the render resolved a parked SSO identity. The
+  `sso-redirect` response appends the browser-binding cookie the callback
+  checks.
 schema:
   type: array
   items:
