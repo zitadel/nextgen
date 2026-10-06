@@ -215,22 +215,40 @@ function isErrnoException(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && typeof (error as NodeJS.ErrnoException).code === "string";
 }
 
+/**
+ * True when `fetch` never got a response: the connection was refused, reset,
+ * timed out, or the host did not resolve.
+ *
+ * Runtimes word this differently. Undici says "fetch failed" and puts the
+ * errno on `cause` (an `AggregateError` when several addresses were tried);
+ * the WHATWG wording other fetch implementations use — msw's `HttpResponse.error()`
+ * among them — is "Failed to fetch", with no errno at all. Both are the same
+ * failure, so both have to land on `E_NETWORK` rather than the validation
+ * default.
+ */
 function isNetworkError(error: unknown): boolean {
   if (!(error instanceof Error)) {
     return false;
   }
-  if (
-    error.name === "TypeError" &&
-    /fetch failed|network|ECONNREFUSED|ENOTFOUND/i.test(error.message)
-  ) {
+  const networkMessage = /fetch failed|failed to fetch|load failed|network|ECONNREFUSED|ENOTFOUND/i;
+  if (error.name === "TypeError" && networkMessage.test(error.message)) {
     return true;
   }
-  const cause = (error as { cause?: unknown }).cause;
-  if (cause && typeof cause === "object" && "code" in cause) {
-    const code = String((cause as { code: unknown }).code);
-    return /^(ECONNREFUSED|ECONNRESET|ENOTFOUND|ETIMEDOUT|EAI_AGAIN|UND_ERR)/i.test(code);
+  return hasNetworkErrno((error as { cause?: unknown }).cause);
+}
+
+function hasNetworkErrno(cause: unknown): boolean {
+  if (!cause || typeof cause !== "object") {
+    return false;
   }
-  return false;
+  if ("code" in cause) {
+    const code = String((cause as { code: unknown }).code);
+    if (/^(ECONNREFUSED|ECONNRESET|ENOTFOUND|ETIMEDOUT|EAI_AGAIN|UND_ERR)/i.test(code)) {
+      return true;
+    }
+  }
+  const errors = (cause as { errors?: unknown }).errors;
+  return Array.isArray(errors) && errors.some(hasNetworkErrno);
 }
 
 function isZodLikeError(error: unknown): boolean {

@@ -115,6 +115,28 @@ describe("toZitadelError", () => {
     expect(result.message).toBe("connection problem");
   });
 
+  it("wraps the WHATWG 'Failed to fetch' TypeError as E_NETWORK", () => {
+    const result = toZitadelError(new TypeError("Failed to fetch"));
+    expect(result.code).toBe("E_NETWORK");
+    expect(result.exitCode).toBe(4);
+  });
+
+  it("wraps an error whose AggregateError cause holds a refused connection as E_NETWORK", () => {
+    const refused = Object.assign(new Error("connect ECONNREFUSED ::1:8080"), {
+      code: "ECONNREFUSED",
+    });
+    const err = new Error("request failed", {
+      cause: new AggregateError([refused], "all addresses failed"),
+    });
+    const result = toZitadelError(err);
+    expect(result.code).toBe("E_NETWORK");
+  });
+
+  it("leaves an unrelated TypeError as E_VALIDATION", () => {
+    const result = toZitadelError(new TypeError("Cannot read properties of undefined"));
+    expect(result.code).toBe("E_VALIDATION");
+  });
+
   it("wraps a zod-like Error (issues array) as E_VALIDATION", () => {
     // A real ZodError is an Error subclass carrying `.issues`; errorMessage
     // only reads `.message` from genuine Error instances (a plain object

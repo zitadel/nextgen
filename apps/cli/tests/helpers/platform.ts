@@ -32,12 +32,16 @@ export interface PlatformMock {
   isNotZitadel(): void;
 
   /**
-   * Makes every request fail as a platform that is down would, which the CLI
-   * maps to `E_NETWORK`. A synthetic transport error is not used: the CLI's
-   * detector matches undici's "fetch failed", not msw's "Failed to fetch", so
-   * it would surface as a validation failure instead.
+   * Makes every request fail as a platform that is down would: it answers,
+   * but with a 503. The CLI maps that to `E_NETWORK`.
    */
   isUnavailable(): void;
+
+  /**
+   * Makes every request fail before any response arrives, as a closed port or
+   * an unresolvable host would. The CLI maps that to `E_NETWORK` too.
+   */
+  refusesConnections(): void;
 
   /** Drops any arranged failure, so the platform answers normally again. */
   recovers(): void;
@@ -86,6 +90,10 @@ export function usePlatformMock(): PlatformMock {
           HttpResponse.json({ code: "unavailable", message: "down" }, { status: 503 }),
         ),
       );
+    },
+
+    refusesConnections() {
+      server.use(http.all("*", () => HttpResponse.error()));
     },
 
     recovers() {

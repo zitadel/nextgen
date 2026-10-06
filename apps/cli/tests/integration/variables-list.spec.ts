@@ -28,6 +28,17 @@ describe("variables list", () => {
         expect(result).toFailWith("E_NETWORK");
       });
     });
+
+    describe("that refuses connections", () => {
+      it("fails", async () => {
+        const app = await aSetUpApp();
+        platform.refusesConnections();
+
+        const result = await app.run(["variables", "list", "--project-level", "--json"]);
+
+        expect(result).toFailWith("E_NETWORK");
+      });
+    });
   });
 
   describe("against a valid server", () => {
