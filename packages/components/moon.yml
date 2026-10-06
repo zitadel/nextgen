@@ -68,9 +68,10 @@ tasks:
   # Full lane (the CI gate): `test:all` runs the jsdom `unit` project and the
   # real-Chromium `browser` project in one Vitest process, so both land in one
   # aggregated junit.xml. Unlike other packages, this `test` task runs
-  # `test:all`, so CI covers both projects. The fast unit-only lane is `pnpm test` for local iteration;
-  # `pnpm test:browser` runs the browser project alone. The browser project
-  # has a 60-120s Chromium cold start, which this lane pays in CI by design.
+  # `test:all`, so CI covers both projects. The fast unit-only lane is
+  # `pnpm test` for local iteration; `pnpm test:browser` runs the browser
+  # project alone. The browser project has a 60-120s Chromium cold start,
+  # which this lane pays in CI by design.
   test:
     command: "corepack pnpm run test:all"
     deps:

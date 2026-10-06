@@ -67,7 +67,10 @@ export interface WithZitadelOptions {
    * directly.
    */
   app?: {
-    /** Spawn argv (no shell), e.g. ["corepack", "pnpm", "--filter", "my-app", "dev"]. */
+    /**
+     * Spawn argv (no shell), e.g. ["node_modules/.bin/next", "dev"]. Run the dev
+     * server's own binary so the runner's SIGTERM reaches it on teardown.
+     */
     command: string[];
     /** Working directory for the app command. */
     cwd: string;
