@@ -44,6 +44,18 @@ describe("plan", () => {
         expect(result.total).toBeGreaterThan(0);
       });
     });
+
+    describe("that refuses connections", () => {
+      it("still previews the pending edit", async () => {
+        const app = await aSetUpApp();
+        await addCompanyField(app);
+        platform.refusesConnections();
+
+        const result = await app.plan();
+
+        expect(result.total).toBeGreaterThan(0);
+      });
+    });
   });
 
   describe("against a valid server", () => {
