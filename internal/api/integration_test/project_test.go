@@ -79,6 +79,14 @@ func (s *stubAuthAttemptService) IssueSSOState(ctx context.Context, input servic
 	return nil, nil
 }
 
+func (s *stubAuthAttemptService) ConsumeSSOState(ctx context.Context, projectID, state, bindingNonce string) (*domain.SSOCallbackCheck, error) {
+	return nil, nil
+}
+
+func (s *stubAuthAttemptService) SetSSOCallbackResult(ctx context.Context, projectID, state string, result *domain.SSOCallbackResult) error {
+	return nil
+}
+
 // VerifyProof implements [service.AuthAttemptService].
 func (s *stubAuthAttemptService) VerifyProof(ctx context.Context, input service.VerifyProofInput) (*domain.AuthAttempt, error) {
 	return nil, nil
