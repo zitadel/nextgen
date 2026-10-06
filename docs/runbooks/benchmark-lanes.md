@@ -1,7 +1,7 @@
 # Benchmark lanes
 
 How the two benchmark lanes are provisioned, partitioned, measured and torn down
-on the dedicated runner. The decision behind it is
+on a Depot runner (an ephemeral VM per job, root through `sudo`). The decision behind it is
 [ADR 069](../adrs/069-benchmark-runner-cgroup-partition.md); the epic is
 [#1094](https://github.com/zitadel/nextgen/issues/1094) and this is
 [#1097](https://github.com/zitadel/nextgen/issues/1097). The k6 harness that does
@@ -11,10 +11,11 @@ tool it is pointed at.
 
 | Path | What |
 | --- | --- |
-| [`.github/workflows/bench-lanes.yml`](../../.github/workflows/bench-lanes.yml) | `workflow_dispatch` / `workflow_call` on the dedicated runner; a self-test job on pull requests |
+| [`.github/workflows/bench-lanes.yml`](../../.github/workflows/bench-lanes.yml) | the proof on same-repo pull requests (16 vCPU), the measured windows on `workflow_dispatch` / `workflow_call` (32 vCPU), a self-test job |
+| [`.github/actions/bench-lane/`](../../.github/actions/bench-lane/action.yml) | one lane's sequence: up, single-server check, isolation check, measure, validity controls, teardown |
 | [`.github/bench/lanes/`](../../.github/bench/lanes/) | `common.env` (hardware budget, sizing, collector, disk policy), `sqlite.env`, `postgres.env`, `postgres.conf` |
 | [`.github/bench/server.yaml`](../../.github/bench/server.yaml) | the one server configuration of both lanes |
-| [`.github/bench/bin/`](../../.github/bench/bin/) | `bench-lane`, `bench-partition`, `bench-window`, `bench-measure`, `bench-verify-isolation`, `job-completed-hook` |
+| [`.github/bench/bin/`](../../.github/bench/bin/) | `bench-lane`, `bench-partition`, `bench-window`, `bench-measure`, `bench-verify-isolation`, `bench-summary` |
 | [`.github/bench/test/run.sh`](../../.github/bench/test/run.sh) | unprivileged tests against a stand-in for cgroupfs |
 
 ## What a lane is
@@ -36,37 +37,61 @@ deliberately not called `nextgen.yaml`, which the root `.gitignore` ignores.
 
 ## The partition
 
-One cgroup v2 each for the **server**, the **load generator**, the **database**
-(PostgreSQL lane) and the **collector** (when it runs; #1106), plus a **system**
-leaf that holds everything else: the runner agent, the step shells and these
-scripts. Written directly into cgroupfs below the cgroup the job runs in.
+On the VM the scripts run as root (they elevate themselves with `sudo` when
+`BENCH_PARTITION_MODE=host`) and make the lane's cores a **cpuset partition
+root**: the kernel takes them out of every other cgroup, the runner agent and
+the job's shells included, so nothing else on the VM runs on them. Inside it,
+one cgroup v2 each for the **server**, the **load generator**, the **database**
+(PostgreSQL lane) and the **collector** (when it runs; #1106). The server, the
+database and the load generator run as the unprivileged job user.
 
-- **CPU by `cpuset`, whole physical cores.** Both SMT siblings of a core always
-  belong to one role; a core with a sibling outside the available set is not used.
-  There is no `cpu.max` quota and no `cpu.weight`: a quota still lets two processes
-  share a core and adds throttling stalls that read as latency.
+- **CPU by `cpuset`, whole cores of the guest's topology.** Both SMT siblings of a
+  core always belong to one role. There is no `cpu.max` quota and no `cpu.weight`:
+  a quota still lets two processes share a core and adds throttling stalls that
+  read as latency.
 - **Same cores in both lanes.** Roles are carved in a fixed order (system, server,
   database, collector, load generator) whether or not they run. The SQLite lane
   keeps the database's cores reserved and idle, so the server and the load
-  generator get the same cores and memory in both.
+  generator get the same cores and memory in both. "system" is everything outside
+  the partition: whatever cores the roles do not take.
 - **Memory by `memory.max`.** The server's limit is
   `BENCH_SERVER_BASE_MIB + BENCH_LOGIN_CONCURRENCY × argon2id memory` with the memory
   read from `password_hasher.hasher.memory` in `server.yaml` (64 MiB), so login
   concurrency is bounded by that number. With the defaults, `1024 + 32 × 64 = 3072`
-  MiB. Swap is off in every role with a memory limit; the server's and the database's cgroups die as a
+  MiB. Swap is off in every role; the server's and the database's cgroups die as a
   unit on OOM.
 - **The sum of the limits must fit the host** or `bench-partition` refuses.
 
-The figures in [`lanes/common.env`](../../.github/bench/lanes/common.env) are
-**placeholders**: the runner's hardware budget is not known to this repository.
+Sizing is in [`lanes/common.env`](../../.github/bench/lanes/common.env), for the
+32 vCPU size (14 of 16 cores given out); the pull request proof overrides the core
+counts for the 16 vCPU size (8 cores, all given out).
+
+### What the Depot runner exposes
+
+The workflow logs it before anything depends on it, and every lane records it in
+`run-metadata.json` (`host.platform`, `host.threads_per_core`):
+
+- Ubuntu 24.04, cgroup v2, controllers `cpuset cpu memory pids` available and
+  enabled at the root, passwordless `sudo`.
+- **The runner label does not pin the platform.** `depot-ubuntu-24.04-16` has been
+  an AWS `m8i.4xlarge` (Intel, SMT siblings exposed, EBS volume) and a Cloud
+  Hypervisor VM on an AMD EPYC (no SMT visible, paravirtual disks). The 32 vCPU
+  size has been an `m8i.8xlarge`. Compare runs only if their recorded platforms
+  match; the two lanes of one run share a VM and are always comparable.
+- **No disk the guest can tell is local.** EBS or a paravirtual disk. The lane
+  refuses these kinds unless `BENCH_ALLOW_DISK_KINDS` lists them, which the
+  workflow does for both lanes alike, and records the kind.
+- Where the guest sees one thread per core, whether two vCPUs share a physical
+  core on the host is invisible (`partition.core_isolation` says so);
+  `BENCH_REQUIRE_SMT=1` makes the lane refuse such a VM.
 
 ### Not partitioned
 
 The partition does not hold these apart, and every run's metadata lists them under
 `not_partitioned`; state them next to every result: the **last-level cache**,
 **memory bandwidth and controller queues**, **interrupt handling**, **power and
-thermal headroom** shared by the cores, and, unless the node is dedicated,
-**other pods**. Page cache the server reads is charged to its cgroup.
+thermal headroom** shared by the cores, and **whatever runs on the host beneath
+the virtual machine** (hypervisor scheduling, the VM's neighbours). Page cache the server reads is charged to its cgroup.
 
 ## Windows and validity
 
@@ -122,15 +147,18 @@ rechecked at the start and end of every window.
 
 The data directory must be on a local volume; the disk kind (`nvme`, `ssd`, `hdd`,
 `network`, `memory`, `overlay`, `unknown`), filesystem, device and model are
-recorded. A network filesystem is refused; `tmpfs` and `overlay` are refused unless
-named in `BENCH_ALLOW_DISK_KINDS`, because neither says what disk is underneath.
+recorded. A network filesystem is refused; `tmpfs`, `overlay`, `network-block` (a
+cloud block volume such as EBS) and `virtual-disk` are refused unless named in
+`BENCH_ALLOW_DISK_KINDS`, because none of them is a local disk the machine owns.
+The Depot workflow names the last two for both lanes, since that is all the VM has.
 
 ## PostgreSQL lane
 
-The pod needs PostgreSQL binaries **with the contrib extensions** the migrations
-use (`btree_gin`, `pgcrypto`), `psql` and `pg_isready`, and the job must run as an
-unprivileged user (PostgreSQL refuses root). Set `BENCH_PG_BIN` if they are not on
-the path. The cluster is created per run on the lane's local volume with
+The VM needs PostgreSQL binaries **with the contrib extensions** the migrations
+use (`btree_gin`, `pgcrypto`), `psql` and `pg_isready` (the Depot image has PostgreSQL 16; the workflow installs
+it if it is missing and stops the packaged service). PostgreSQL refuses root, so it
+runs as the job user like the server. Set `BENCH_PG_BIN` for another location. The
+cluster is created per run on the lane's volume with
 `initdb`, configured by [`postgres.conf`](../../.github/bench/lanes/postgres.conf),
 listens on loopback TCP only, and is stopped and deleted at teardown. The run
 metadata records `database.postgres.version` and every setting `pg_settings`
@@ -140,69 +168,81 @@ internal overrides.
 ## The run record
 
 `bench-lane up` writes `<run dir>/run-metadata.json` (schema `bench-lane-run/v1`):
-commit and image tag; kernel, CPU model, node, the machine type and node isolation
-the workflow **declared** (marked `declared` or `unknown`, since the repository
-cannot observe them); the full partition (role, cgroup path, cores, cpus, memory);
-the limits not partitioned; the server binary and configuration SHA-256 and the
-memory budget; the collector's configuration SHA-256; the database, its disk, the
-observed dialect, and for PostgreSQL its version and settings; the boot marker;
-and `declare`, the facts in the form the harness takes.
+commit and image tag; kernel, CPU model, threads per core, and the platform as the
+VM reports it (virtualization, hypervisor, instance type) with its isolation note;
+the full partition (mode, role, cgroup path, cores, cpus, memory) and how far
+"whole cores" can be verified; the limits not partitioned; the server binary and
+configuration SHA-256 and the memory budget; the collector's configuration SHA-256;
+the database, its disk, the observed dialect, and for PostgreSQL its version and
+settings; the boot marker; and `declare`, the facts in the `--declare name=value`
+form the harness takes.
 
-The doctor command (`k6 x nextgen doctor`) is in the harness's wave-2 layer
-([#1415](https://github.com/zitadel/nextgen/pull/1415)) and is not on `main`. It
-takes `--declare name=value` for what the server does not report, so the lane hands
-it exactly that:
+The harness's `k6 x nextgen doctor` ([#1105](https://github.com/zitadel/nextgen/issues/1105))
+reads the run's dialect and cgroup allocation from this file; it is not part of this
+change. `bench-lane declare-args` prints exactly what it takes:
 
 ```sh
-mapfile -t declared < <(.github/bench/bin/bench-lane declare-args)
-tools/bench/dist/k6 x nextgen doctor --base http://127.0.0.1:8080 "${declared[@]}"
+mapfile -t declared < <(.github/bench/bin/bench-lane declare-args)   # --declare=dialect=sqlite ...
 ```
 
 `dialect`, `replicas`, `log_level`, `image_tag` and the `cgroup_*` allocation facts
 (`cgroup_server_cpus`, `cgroup_server_memory_max`, `cgroup_loadgen_cpus`, and for
-PostgreSQL `cgroup_db_cpus`, …) are all in `declare`. The workflow runs the doctor
-when the harness has it and prints the same facts when it does not.
-`bench-lane compare A B` checks two runs differ in the database only: the same
-server build, server configuration, collector, hardware and allocation.
+PostgreSQL `cgroup_db_cpus`, ...) are all in `declare`. `bench-measure` passes them to
+`sweep` when it accepts `--declare`. `bench-lane compare A B` checks two runs differ in
+the database only: the same server build, server configuration, collector, hardware
+and allocation. `bench-summary RUN_DIR` renders a run as markdown; the workflow
+writes it to the job summary.
 
 ## Demonstrating the partition
 
 ```sh
-.github/bench/bin/bench-verify-isolation --seconds 8 --out isolation.json
+.github/bench/bin/bench-verify-isolation --seconds 8 --out isolation.json [--negative-controls]
 ```
 
 Inside one window it runs twice as many busy loops in the load generator's cgroup
 as it has CPUs, and one in the server's, then checks that the load generator
 **saturated** its cores, that every busy loop **ran only on its own cgroup's
-CPUs** and the two sets are disjoint (placement), that the server's cgroup
-received a full core (**served**), and that the window verdict is clean
-(**unchanged**: the server's `cpuset.cpus.effective` and `memory.max` did not
-move, `nr_throttled` and `throttled_usec` did not rise, no OOM). Exit 0 passed,
-1 failed, 2 **incomplete**: the cpuset controller is not available, so placement
-cannot be demonstrated and the script says so instead of passing. The workflow
-runs it on every lane before measuring and fails the lane unless it passed.
+CPUs** and the two sets are disjoint (**placement**), that the server's cgroup
+received a full core (**served**), that the processes outside the partition, this
+one among them, can not run on any of its cores (**outside**), and that the window
+verdict is clean (**unchanged**: the server's `cpuset.cpus.effective` and
+`memory.max` did not move, `nr_throttled` and `throttled_usec` did not rise, no OOM).
+Exit 0 passed, 1 failed, 2 **incomplete**: the cpuset controller is not available,
+so placement cannot be demonstrated and the script says so instead of passing.
+
+`--negative-controls` then proves the validity rules fire on the kernel at hand: a
+CPU quota (the one thing the partition never sets) is put on the server's cgroup for
+a few seconds and the window must be invalid for throttling; and, with a lane up, the
+server is restarted inside a window and the boot marker must invalidate it. After the
+restart the lane is not the one the run began against, so the workflow does it last.
 
 ## Running a lane
 
-On the runner: dispatch **bench-lanes** (Actions → bench-lanes → Run workflow),
-choosing the lanes, scenarios, VU counts and duration. The job queues on
-`BENCH_RUNNER_LABELS`, one lane at a time (`max-parallel: 1` plus the
-`bench-dedicated-runner` concurrency group, never cancelled in flight), builds the
-server and the harness, then:
+**Pull requests** that touch `.github/bench/**`, the `bench-lane` action or the
+workflow run the proof on a `depot-ubuntu-24.04-16` VM: both lanes, one after the
+other on the same VM, without `tools/bench`. Fork pull requests never reach a Depot
+runner. **`workflow_dispatch`** (Actions → bench-lanes → Run workflow) and
+**`workflow_call`** run the same on `depot-ubuntu-24.04-32` and, once the harness
+(`tools/bench`, #1413) is on `main`, provision the fixtures and run the measured
+windows as well; until then those steps are skipped with a notice. Each lane:
 
-1. `bench-partition preflight` (first step: the pod can host the partition)
-2. `bench-lane up <lane>`: partition, database (PostgreSQL), the one server,
-   dialect check, boot marker, `run-metadata.json`
-3. `bench-verify-isolation`
-4. provision the fixture through the API, from the load generator's cgroup; the
-   target file carries the project secret and stays out of the uploaded run record
-5. the doctor report (when the harness has it)
+1. `bench-partition preflight` (once, first: the VM can host the partition)
+2. `bench-lane up <lane>`: partition, database (PostgreSQL), the one server, dialect
+   check, boot marker, `run-metadata.json`
+3. `bench-lane assert-single-server`
+4. `bench-verify-isolation`, which must pass
+5. provision the fixture through the API from the load generator's cgroup; the target
+   file carries the project secret and stays out of the uploaded run record
 6. `bench-measure`: one window per scenario and VU count
-7. `bench-lane down` (always), then upload the run directory
-8. the **compare** job: both lanes differ in the database only
+7. `bench-verify-isolation --negative-controls`
+8. `bench-lane down` and `bench-lane assert-clean` (always), then the job summary
+
+then `bench-lane compare` of the two lanes, a final `assert-clean`, and the run
+records are uploaded.
 
 On a plain Linux box, without privileges, for development (the partition is then
-memory-only and every window is invalid, which the record says):
+memory-only, no cores are exclusive and every window is invalid, which the record
+says):
 
 ```sh
 go build -o dist/nextgen-server .
@@ -212,46 +252,28 @@ systemd-run --user --scope -p Delegate=yes env \
   bash -c '.github/bench/bin/bench-lane up sqlite && .github/bench/bin/bench-verify-isolation; .github/bench/bin/bench-lane down'
 ```
 
-`.github/bench/test/run.sh` runs the tooling's tests with no privileges.
+With sudo, `BENCH_PARTITION_MODE=host` does what the workflow does. `.github/bench/test/run.sh`
+runs the tooling's tests with no privileges.
 
 ## Teardown
 
 `bench-lane down` stops the collector, the server (SIGTERM, then the cgroup is
-killed), PostgreSQL (fast shutdown), kills what is left in each role cgroup,
-removes the cgroups, turns the controllers it enabled back off, moves the runner
-back to the cgroup it came from, and deletes the lane's data directories
-(`BENCH_KEEP_DATA=1` keeps them). It is **idempotent**, finds what to undo from
-state it wrote under `BENCH_STATE_DIR` rather than from the shell that started the
-lane, and steps itself and its parent shells out of any role cgroup first, so it
-works when started from inside one.
+killed), PostgreSQL (fast shutdown), kills what is left in each role cgroup, removes
+the cgroups (which returns the cores to every other cgroup), and deletes the lane's
+data directories (`BENCH_KEEP_DATA=1` keeps them). It is **idempotent**, finds what
+to undo from state it wrote under `BENCH_STATE_DIR` rather than from the shell that
+started the lane, and steps itself and its parent shells out of any role cgroup
+first, so it works when started from inside one. `bench-lane assert-clean` then
+fails unless nothing is left: no lane or partition state, no cgroup, no server or
+PostgreSQL process, and the host's `cpuset.cpus.effective` back to every online CPU.
 
 | How the job ended | What tears the lane down |
 | --- | --- |
-| passed or failed | the workflow's `if: always()` step |
+| passed or failed | the action's `if: always()` step |
 | cancelled | the same step: `always()` runs after a cancellation request |
-| the runner process or pod was killed before that step ran | `bench-lane up` on the next job removes the leftover lane first (`a previous lane was not torn down`); and `bin/job-completed-hook`, registered as `ACTIONS_RUNNER_HOOK_JOB_COMPLETED` on the pod (**needs the runner**), runs it when the runner ends a job |
+| the VM died | nothing needs to: the VM is ephemeral and takes the lane with it |
 
-By hand, on the pod: `.github/bench/bin/bench-lane down`; to remove only the
-cgroups, `.github/bench/bin/bench-partition down`.
-
-## What needs the runner
-
-This repository cannot see the runner. Everything below is implemented in the
-repository and not yet exercised on one; none of it is claimed by the pull request
-that added the tooling.
-
-- [ ] Runner pool exists; set `BENCH_RUNNER_LABELS` (JSON array).
-- [ ] The runner container has a **writable cgroup2 mount** with the `cpuset`,
-      `cpu` and `memory` controllers delegated (`bench-partition preflight` passes).
-- [ ] The pod is Guaranteed QoS with whole-CPU requests under the static CPU
-      manager policy, on a node nothing else is scheduled to; set
-      `BENCH_NODE_DEDICATED=true`. Otherwise the budget is a limit and the metadata
-      says so.
-- [ ] Machine type known; set `BENCH_MACHINE_TYPE` and size
-      `BENCH_CORES_*`/`BENCH_MEM_*` in `lanes/common.env` to it.
-- [ ] A local volume for `BENCH_DATA_ROOT`; the recorded disk kind is as expected.
-- [ ] PostgreSQL with contrib on the pod; the job user can run it.
-- [ ] `bench-verify-isolation` **passes** (not "incomplete") on the real cpuset.
-- [ ] `bin/job-completed-hook` registered as the runner's job-completed hook.
-- [ ] The collector (#1106) merged; set `BENCH_COLLECTOR_*` so both lanes run it.
-- [ ] A first dispatched run of both lanes, and the compare job green.
+By hand, on a machine where a lane was left: `.github/bench/bin/bench-lane down`;
+to remove only the cgroups, `.github/bench/bin/bench-partition down`.
+`bench-lane up` also removes a lane a killed run left behind
+(`a previous lane was not torn down`).

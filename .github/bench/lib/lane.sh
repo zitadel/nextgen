@@ -163,11 +163,13 @@ disk_info() {
         done
         dev=$name
         rot=$(cat "/sys/block/$name/queue/rotational" 2>/dev/null || true)
-        model=$(tr -s ' ' <"/sys/block/$name/device/model" 2>/dev/null | tr -d '\n' || true)
+        model=$({ tr -s ' ' <"/sys/block/$name/device/model" | tr -d '\n'; } 2>/dev/null || true)
         if [[ $model == *"Elastic Block Store"* || $model == *"Persistent Disk"* || $model == *PersistentDisk* || $model == *"Virtual Disk"* ]]; then
           # A cloud block volume: a disk to the guest, a network service
           # beneath it. fsync latency is the provider's, not the machine's.
           kind=network-block
+        elif [[ $name == ram* || $name == zram* ]]; then
+          kind=memory
         elif [[ $name == nvme* ]]; then
           kind=nvme
         elif [[ $name == vd* ]]; then
@@ -245,7 +247,7 @@ pg_up() {
   {
     cat "$(bench_home)/lanes/postgres.conf"
     # Loopback TCP only: no Unix socket (its path length is limited and the
-    # server connects over TCP anyway), nothing reachable from outside the pod.
+    # server connects over TCP anyway), nothing reachable from outside the VM.
     printf "port = %s\nlisten_addresses = '127.0.0.1'\nunix_socket_directories = ''\n" "$BENCH_PG_PORT"
   } >"$run_dir/postgres.conf"
   printf "include '%s'\n" "$run_dir/postgres.conf" >>"$pgdata/postgresql.conf"

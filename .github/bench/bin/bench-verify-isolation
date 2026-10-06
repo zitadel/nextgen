@@ -96,14 +96,14 @@ sv_pid=$!
 lg_seen=$(mktemp) sv_seen=$(mktemp)
 trap 'rm -f "$lg_seen" "$sv_seen"; kill "${lg_pids[@]}" "$sv_pid" 2>/dev/null || true' EXIT
 sleep 1
-lg_allowed=''
+# Read while they are certainly still running.
+lg_allowed=$(proc_allowed "${lg_pids[0]}" || true)
+sv_allowed=$(proc_allowed "$sv_pid" || true)
 for ((t = 0; t < (seconds - 2) * 4; t++)); do
   for p in "${lg_pids[@]}"; do proc_cpu "$p" >>"$lg_seen" || true; done
   proc_cpu "$sv_pid" >>"$sv_seen" || true
   sleep 0.25
 done
-lg_allowed=$(proc_allowed "${lg_pids[0]}" || true)
-sv_allowed=$(proc_allowed "$sv_pid" || true)
 wait "${lg_pids[@]}" "$sv_pid" 2>/dev/null || true
 
 # An invalid window is reported as the failed `unchanged` check below.

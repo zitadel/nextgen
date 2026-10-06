@@ -106,7 +106,7 @@ bench_start_ticks() {
 #              root so its cores leave every other cgroup (the runner agent
 #              included); needs root and elevates itself with sudo
 #   delegated  the lane works inside the cgroup it was started in, which must
-#              be delegated to the user (development, or a pod); the runner
+#              be delegated to the user (development); the runner
 #              stays inside it, in a `system` leaf
 # Unset: host when running as root without BENCH_CGROUP_ROOT, else delegated.
 bench_mode() {

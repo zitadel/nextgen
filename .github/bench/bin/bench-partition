@@ -195,6 +195,9 @@ cmd_up() {
   if [[ $mode == host ]]; then avail=$(cg_preflight "$(part_host_root)"); else avail=$(cg_preflight "$root"); fi
   [[ $(jq -r '.available | index("cpuset")' <<<"$avail") != null ]] || cpuset_ok=0
   plan=$(cmd_plan --lane "$lane")
+  if [[ ${BENCH_REQUIRE_SMT:-0} == 1 && $(jq -r .threads_per_core <<<"$plan") -lt 2 ]]; then
+    bench_die "BENCH_REQUIRE_SMT=1 and this machine exposes one thread per core: whole physical cores cannot be verified, so no lane is started"
+  fi
   mkdir -p "$run_dir" "$BENCH_STATE_DIR"
 
   local role dir sys='' host_added_json='[]' added_json='[]' c
