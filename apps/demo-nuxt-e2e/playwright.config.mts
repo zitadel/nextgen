@@ -26,8 +26,10 @@ export default defineConfig({
     trace: "on-first-retry",
   },
   // Boot the mock auth server first so Nitro can proxy to it on the very
-  // first request. Direct pnpm filter commands keep these long-running
-  // processes outside Moon's task graph; Playwright owns their lifecycle.
+  // first request. `node --run` starts each package's own script without a
+  // nested pnpm (which would warn about the platform-specific server
+  // packages), and keeps these long-running processes outside Moon's task
+  // graph; Playwright owns their lifecycle.
   //
   // The api-mock listens on PORT 8081 here so this project can run in
   // parallel with `apps/demo-next-e2e/` (which uses the default 8080).
@@ -36,10 +38,10 @@ export default defineConfig({
   // application code changes.
   webServer: [
     {
-      command: "pnpm --filter @zitadel/api-mock start",
+      command: "node --run start",
       url: "http://localhost:8081/.well-known/jwks.json",
       reuseExistingServer: true,
-      cwd: workspaceRoot,
+      cwd: resolve(workspaceRoot, "packages", "api-mock"),
       stdout: "pipe",
       stderr: "pipe",
       env: {
@@ -47,10 +49,10 @@ export default defineConfig({
       },
     },
     {
-      command: "pnpm --filter @zitadel/demo-nuxt dev",
+      command: "node --run dev",
       url: "http://localhost:3001/login",
       reuseExistingServer: true,
-      cwd: workspaceRoot,
+      cwd: resolve(workspaceRoot, "apps", "demo-nuxt"),
       stdout: "pipe",
       stderr: "pipe",
       timeout: 120_000,

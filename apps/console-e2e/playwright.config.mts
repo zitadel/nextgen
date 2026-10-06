@@ -22,10 +22,12 @@ export default defineConfig({
   },
   /* Run your local dev server before starting the tests */
   webServer: {
-    command: "corepack pnpm --filter @zitadel/console run build && corepack pnpm --filter @zitadel/console run preview",
+    // `node --run` runs the console's own scripts without a nested pnpm,
+    // which would warn about the platform-specific server packages.
+    command: "node --run build && node --run preview",
     url: "http://localhost:4173",
     reuseExistingServer: true,
-    cwd: workspaceRoot,
+    cwd: resolve(workspaceRoot, "apps", "console"),
   },
   projects: [
     {

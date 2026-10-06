@@ -310,13 +310,14 @@ if (seedOnly) {
   // `--port` from the origin: everything else here honours CONSOLE_DEV_ORIGIN,
   // and without this vite stays pinned to its config's 5174 and a second
   // worktree collides with the first. Passed to the `dev` script rather than
-  // around it, so future flags on that script still apply here. No `--`
-  // separator: pnpm swallows the args with one and vite never sees them.
+  // around it, so future flags on that script still apply here. `node --run`
+  // forwards what follows `--` to the script, and avoids a nested pnpm, which
+  // would warn about the platform-specific server packages.
   const consolePort = new URL(consoleOrigin).port;
-  const viteArgs = ["pnpm", "--filter", "@zitadel/console", "dev"];
-  if (consolePort) viteArgs.push("--port", consolePort);
-  const vite = spawn("corepack", viteArgs, {
-    cwd: workspaceRoot,
+  const viteArgs = ["--run", "dev"];
+  if (consolePort) viteArgs.push("--", "--port", consolePort);
+  const vite = spawn("node", viteArgs, {
+    cwd: appDir,
     stdio: "inherit",
     env: {
       ...process.env,

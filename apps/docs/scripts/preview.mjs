@@ -1,10 +1,16 @@
 import { spawn } from "node:child_process";
+import { join } from "node:path";
 
 const env = { ...process.env };
 delete env.VERCEL;
 
-await run("pnpm", ["run", "build"], { env });
-await run("pnpm", ["exec", "waku", "start", "--port", env.PORT || "3003"], { env });
+// `node --run` and the local waku bin rather than `pnpm run`/`pnpm exec`: this
+// helper already runs under `pnpm run preview`, and a nested pnpm warns about
+// the platform-specific server packages.
+const waku = join(import.meta.dirname, "..", "node_modules", ".bin", "waku");
+
+await run("node", ["--run", "build"], { env });
+await run(waku, ["start", "--port", env.PORT || "3003"], { env });
 
 function run(command, args, options) {
   return new Promise((resolve, reject) => {
