@@ -5,6 +5,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
+	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/dialect/postgres/migration"
@@ -13,23 +14,30 @@ import (
 type Pool struct {
 	pool       *pgxpool.Pool
 	isMigrated bool
+	// unregisterStats stops the pool connection gauge from reading pool.
+	unregisterStats func()
 	statements
 }
 
 func newPool(pool *pgxpool.Pool) *Pool {
 	return &Pool{
-		pool:       pool,
-		statements: newStatements(pool),
+		pool: pool,
+		unregisterStats: metrics.Default().RegisterPool(metrics.DialectPostgres, func() metrics.PoolStats {
+			stats := pool.Stat()
+			return metrics.PoolStats{InUse: int(stats.AcquiredConns()), Idle: int(stats.IdleConns())}
+		}),
+		statements: newStatements(meteredPool{pool}),
 	}
 }
 
 // Transaction implements [database.Pool].
 func (p *Pool) Transaction(ctx context.Context, fn func(ctx context.Context, tx service.Statementer[service.AllStatements]) error) error {
-	return executeTransaction(ctx, p.pool, fn)
+	return executeTransaction(ctx, meteredPool{p.pool}, fn)
 }
 
 // Close implements [database.Pool].
 func (p *Pool) Close(ctx context.Context) error {
+	p.unregisterStats()
 	p.pool.Close()
 	return nil
 }
@@ -52,7 +60,7 @@ func (p *Pool) Migrate(ctx context.Context) error {
 }
 
 func (p *Pool) Statements() service.AllStatements {
-	return newStatements(p.pool)
+	return newStatements(meteredPool{p.pool})
 }
 
 var (

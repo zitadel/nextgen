@@ -6,8 +6,16 @@ import (
 
 	"cloud.google.com/go/spanner"
 
+	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
+
+// observe times one executor call as the statement duration metric. Both
+// executors below start it first and finish it last, so the duration covers
+// the whole call: for Query and Write that includes reading the rows.
+func observe(ctx context.Context) database.StatementTimer {
+	return database.ObserveStatement(ctx, metrics.DialectSpanner)
+}
 
 type queryExecutor interface {
 	// Query reads data from the database and calls the consume callback with a RowIterator to process the results.
@@ -36,6 +44,7 @@ func newClientDB(c *spanner.Client) queryExecutor {
 
 // Query implements [queryExecutor].
 func (c client) Query(ctx context.Context, stmt spanner.Statement, consume func(*spanner.RowIterator) error) error {
+	defer observe(ctx).Done()
 	tx := c.client.Single()
 	defer tx.Close()
 	iter := tx.Query(ctx, stmt)
@@ -45,6 +54,7 @@ func (c client) Query(ctx context.Context, stmt spanner.Statement, consume func(
 
 // Write implements [queryExecutor].
 func (c client) Write(ctx context.Context, stmt spanner.Statement, consume func(*spanner.RowIterator) error) error {
+	defer observe(ctx).Done()
 	return returnQueryError(runBounded(ctx, func(ctx context.Context) error {
 		_, err := c.client.ReadWriteTransaction(ctx, func(ctx context.Context, rwt *spanner.ReadWriteTransaction) error {
 			iter := rwt.Query(ctx, stmt)
@@ -57,6 +67,7 @@ func (c client) Write(ctx context.Context, stmt spanner.Statement, consume func(
 
 // Update implements [queryExecutor].
 func (c client) Update(ctx context.Context, stmt spanner.Statement) (rowCount int64, _ error) {
+	defer observe(ctx).Done()
 	err := runBounded(ctx, func(ctx context.Context) error {
 		_, err := c.client.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
 			n, err := txn.Update(ctx, stmt)
@@ -70,6 +81,7 @@ func (c client) Update(ctx context.Context, stmt spanner.Statement) (rowCount in
 
 // BufferWrite implements [queryExecutor].
 func (c client) BufferWrite(ctx context.Context, ms []*spanner.Mutation) error {
+	defer observe(ctx).Done()
 	ctx, cancel := boundRetry(ctx)
 	defer cancel()
 	_, err := c.client.Apply(ctx, ms)
@@ -77,6 +89,7 @@ func (c client) BufferWrite(ctx context.Context, ms []*spanner.Mutation) error {
 }
 
 func (c client) ReadRow(ctx context.Context, table string, key spanner.Key, columns []string) (*spanner.Row, error) {
+	defer observe(ctx).Done()
 	tx := c.client.Single()
 	defer tx.Close()
 	row, err := tx.ReadRow(ctx, table, key, columns)
@@ -93,11 +106,13 @@ func newTxnDB(txn *spanner.ReadWriteTransaction) queryExecutor {
 
 // Query implements [queryExecutor].
 func (t tx) Query(ctx context.Context, stmt spanner.Statement, consume func(*spanner.RowIterator) error) error {
+	defer observe(ctx).Done()
 	return returnQueryError(consume(t.txn.Query(ctx, stmt)))
 }
 
 // Write implements [queryExecutor].
 func (t tx) Write(ctx context.Context, stmt spanner.Statement, consume func(*spanner.RowIterator) error) error {
+	defer observe(ctx).Done()
 	iter := t.txn.Query(ctx, stmt)
 	defer iter.Stop()
 	return returnQueryError(consume(iter))
@@ -105,17 +120,20 @@ func (t tx) Write(ctx context.Context, stmt spanner.Statement, consume func(*spa
 
 // Update implements [queryExecutor].
 func (t tx) Update(ctx context.Context, stmt spanner.Statement) (int64, error) {
+	defer observe(ctx).Done()
 	n, err := t.txn.Update(ctx, stmt)
 	return n, wrapError(err)
 }
 
 // BufferWrite implements [queryExecutor].
 func (t tx) BufferWrite(ctx context.Context, ms []*spanner.Mutation) error {
+	defer observe(ctx).Done()
 	return wrapError(t.txn.BufferWrite(ms))
 }
 
 // ReadRow implements [queryExecutor].
 func (t tx) ReadRow(ctx context.Context, table string, key spanner.Key, columns []string) (*spanner.Row, error) {
+	defer observe(ctx).Done()
 	row, err := t.txn.ReadRow(ctx, table, key, columns)
 	return row, returnQueryError(err)
 }
