@@ -24,9 +24,9 @@ var tracer = otel.Tracer(pkgPath)
 // statement's error to end the span. A missing row is not an error.
 //
 // The span carries no SQL, arguments or error message: driver messages hold
-// user values. Nothing is started when the parent is not sampled.
+// user values. Nothing is started when the parent span is not recording.
 func StartStatementSpan(ctx context.Context, system string) (context.Context, func(err error)) {
-	if !trace.SpanContextFromContext(ctx).IsSampled() {
+	if !trace.SpanFromContext(ctx).IsRecording() {
 		return ctx, func(error) {}
 	}
 	ctx, span := tracer.Start(ctx, statementName(), trace.WithAttributes(semconv.DBSystemNameKey.String(system)))

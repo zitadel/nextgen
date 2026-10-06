@@ -68,7 +68,7 @@ func NewOtelMetrics(ctx context.Context, config MetricsConfig) (*OtelMetrics, er
 
 type OtelMetrics struct {
 	loggerProvider    *logsdk.LoggerProvider
-	tracerProvider    trace.TracerProvider
+	tracerProvider    *tracesdk.TracerProvider
 	meterProvider     *metricsdk.MeterProvider
 	textMapPropagator propagation.TextMapPropagator
 }
@@ -95,8 +95,8 @@ func (m *OtelMetrics) Shutdown(ctx context.Context) error {
 	if m.loggerProvider != nil {
 		errors.Join(err, m.loggerProvider.Shutdown(ctx))
 	}
-	if tp, ok := m.tracerProvider.(*tracesdk.TracerProvider); ok {
-		errors.Join(err, tp.Shutdown(ctx))
+	if m.tracerProvider != nil {
+		errors.Join(err, m.tracerProvider.Shutdown(ctx))
 	}
 	if m.meterProvider != nil {
 		errors.Join(err, m.meterProvider.Shutdown(ctx))

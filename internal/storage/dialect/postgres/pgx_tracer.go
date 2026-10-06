@@ -45,7 +45,7 @@ func (pgxTracer) TraceAcquireEnd(ctx context.Context, _ *pgxpool.Pool, data pgxp
 }
 
 func startPGXSpan(ctx context.Context, name string, kind trace.SpanKind) context.Context {
-	if !trace.SpanContextFromContext(ctx).IsSampled() {
+	if !trace.SpanFromContext(ctx).IsRecording() {
 		return ctx
 	}
 	ctx, _ = tracer.Start(ctx, name, trace.WithSpanKind(kind), trace.WithAttributes(semconv.DBSystemNameKey.String(dbSystem)))
@@ -55,7 +55,7 @@ func startPGXSpan(ctx context.Context, name string, kind trace.SpanKind) context
 func endPGXSpan(ctx context.Context, err error) {
 	span := trace.SpanFromContext(ctx)
 	// Same check as the start: when no span was started, this is the caller's.
-	if !span.SpanContext().IsSampled() {
+	if !span.IsRecording() {
 		return
 	}
 	if err != nil {

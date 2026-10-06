@@ -13,35 +13,34 @@ import (
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
 	trace2 "go.opentelemetry.io/otel/trace"
-	"go.opentelemetry.io/otel/trace/noop"
 )
 
-// NewTracerProvider returns a no-op provider when no exporter is configured,
-// so spans cost nothing when nobody collects them.
-func NewTracerProvider(ctx context.Context, cfg ExporterConfig, traceIDRatio float64, resource *resource.Resource) (trace2.TracerProvider, error) {
+func NewTracerProvider(ctx context.Context, cfg ExporterConfig, traceIDRatio float64, resource *resource.Resource) (*trace.TracerProvider, error) {
 	exporter, err := cfg.tracing(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("trace exporter: %w", err)
 	}
-	if exporter == nil {
-		return noop.NewTracerProvider(), nil
-	}
 
-	// A zero batch timeout makes the batcher spin, so leave the SDK default (5s).
-	var batchOpts []trace.BatchSpanProcessorOption
-	if cfg.BatchDuration > 0 {
-		batchOpts = append(batchOpts, trace.WithBatchTimeout(cfg.BatchDuration))
-	}
-	return trace.NewTracerProvider(
+	fraction := trace.TraceIDRatioBased(traceIDRatio)
+	sampler := trace.ParentBased(
+		spanKindBased(fraction, trace2.SpanKindServer),
+		trace.WithRemoteParentNotSampled(fraction),
+	)
+
+	opts := []trace.TracerProviderOption{
 		trace.WithResource(resource),
-		trace.WithSampler(NewSampler(traceIDRatio)),
-		trace.WithBatcher(exporter, batchOpts...),
-	), nil
+		trace.WithSampler(sampler),
+	}
+	if exporter != nil {
+		opts = append(opts, trace.WithBatcher(exporter, trace.WithBatchTimeout(cfg.BatchDuration)))
+	}
+	tracerProvider := trace.NewTracerProvider(opts...)
+	return tracerProvider, nil
 }
 
-// NewSampler returns the sampler of the production tracer provider. A root
-// span is sampled at fraction only when it is a Server span; a child follows
-// its parent.
+// NewSampler returns the same sampler that [NewTracerProvider] builds, for
+// tests that set up their own provider. A root span is sampled at fraction
+// only when it is a Server span; a child follows its parent.
 func NewSampler(fraction float64) trace.Sampler {
 	ratio := trace.TraceIDRatioBased(fraction)
 	return trace.ParentBased(

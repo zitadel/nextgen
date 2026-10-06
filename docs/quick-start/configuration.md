@@ -121,16 +121,21 @@ instrumentation:
 | `instrumentation.trace.exporter.type`           | `NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_TYPE`           | unset   | Where spans are sent                        |
 | `instrumentation.trace.exporter.endpoint`       | `NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_ENDPOINT`       | unset   | Collector address for `grpc` and `http`     |
 | `instrumentation.trace.exporter.insecure`       | `NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_INSECURE`       | `false` | Plain-text connection for `grpc` and `http` |
-| `instrumentation.trace.exporter.batch_duration` | `NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_BATCH_DURATION` | `5s`    | Longest wait before buffered spans are sent |
+| `instrumentation.trace.exporter.batch_duration` | `NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_BATCH_DURATION` | unset   | Longest wait before buffered spans are sent |
 | `instrumentation.trace.fraction`                | `NEXTGEN_INSTRUMENTATION_TRACE_FRACTION`                | `1.0`   | Share of incoming requests that are traced  |
 
 - `exporter.type`: `none`, `stdout`, `stderr`, `grpc`, `http`, `google` (set
   `exporter.google_project_id`), `auto`.
-- Tracing is off when no exporter type is set, or when it is `none`. It then
-  costs nothing.
+- Spans are exported only when an exporter type is set and is not `none`.
+  Without an exporter, requests are still sampled at `fraction` and get trace
+  and span IDs, so exported log records can still be grouped by request. The
+  spans themselves are dropped.
 - `auto` reads the standard OpenTelemetry environment variables
   (`OTEL_TRACES_EXPORTER`, `OTEL_EXPORTER_OTLP_ENDPOINT`, and the others). When
-  none of them is set, tracing stays off.
+  none of them is set, no spans are exported.
+- Always set `exporter.batch_duration` together with an exporter. Left unset,
+  it is zero, and the exporter keeps one CPU core busy even when the server
+  is idle.
 - A traced request keeps all of its spans, including one span per database
   statement.
 
@@ -142,6 +147,7 @@ instrumentation:
       type: grpc
       endpoint: otel-collector:4317
       insecure: true
+      batch_duration: 5s
 ```
 
 ## Config file search paths
