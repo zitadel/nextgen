@@ -83,17 +83,50 @@ jobs:
         working-directory: tools/bench
         run: go test -count=1 -timeout 5m ./...
 
-      # Starts the server on SQLite, checks it, provisions the smallest
-      # fixture, runs every scenario the harness registers at 5 VUs for 10 s
-      # each, asserts the summary and discards it, cleans up and asserts the
-      # target returned to its starting counts. Scenarios come from the
-      # harness's own registry, never from a list in this file. Nothing is
-      # uploaded: a retained summary from a shared runner is a number somebody
-      # will eventually cite.
+      # The harness never starts a server: this workflow is the lane's
+      # provisioning tool, so it builds the server and runs it on SQLite with
+      # tools/bench/ci/nextgen.yaml, migrated, for the length of the job.
+      - name: Build the server
+        run: go build -o dist/nextgen-server .
+
+      - name: Start the server
+        run: |
+          mkdir -p dist/smoke-server
+          (cd dist/smoke-server && ../nextgen-server -c "$GITHUB_WORKSPACE/tools/bench/ci/nextgen.yaml" --migrate > server.log 2>&1 &
+           echo $! > server.pid)
+          for _ in $(seq 1 60); do
+            if curl -sf -o /dev/null http://localhost:8080/healthz; then exit 0; fi
+            sleep 1
+          done
+          echo "the server did not answer /healthz within 60 s" >&2
+          cat dist/smoke-server/server.log >&2
+          exit 1
+
+      # Checks the server answers, provisions the smallest fixture, runs every
+      # scenario the harness registers at 5 VUs for 10 s each, asserts the
+      # summary and discards it, cleans up and asserts the target returned to
+      # its starting counts. Scenarios come from the harness's own registry,
+      # never from a list in this file. The facts the server does not report
+      # are declared here, by the step that knows them; the doctor report
+      # requires them. Nothing is uploaded: a retained summary from a shared
+      # runner is a number somebody will eventually cite.
       #
       # `env -u CI -u GITHUB_ACTIONS`: in CI mode moon skips tasks marked
       # `runInCI: false`, and this task carries it so `moon ci` never selects
       # it automatically. Running it by name from this workflow is the one
       # place it should run (ci.yml does the same for the journey lanes).
       - name: Run the smoke lane
-        run: env -u CI -u GITHUB_ACTIONS moon run bench:smoke
+        run: >-
+          env -u CI -u GITHUB_ACTIONS moon run bench:smoke --
+          --declare dialect=sqlite
+          --declare image_tag=${{ github.sha }}
+          --declare replicas=1
+          --declare log_level=warn
+
+      - name: Stop the server
+        if: always()
+        run: |
+          if [ -f dist/smoke-server/server.pid ]; then
+            kill "$(cat dist/smoke-server/server.pid)" 2>/dev/null || true
+          fi
+          tail -n 50 dist/smoke-server/server.log 2>/dev/null || true
