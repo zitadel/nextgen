@@ -113,13 +113,17 @@ func TestBuildHTTPMuxDoesNotMountTheAPIUnderAPIPrefix(t *testing.T) {
 
 // The IdP callback is an exact mount ahead of the API catch-all: the provider
 // redirects the browser to it, so it must exist whatever UI surfaces are on.
+// Both spellings are served — the prefixed path when the instance is the
+// browser origin, the stripped one as a scaffolded app's SDK proxy forwards it.
 func TestBuildHTTPMuxMountsTheIDPCallback(t *testing.T) {
 	mux := newTestMux(t, uiConfig(false, false))
 
-	rec := get(t, mux, api.IDPCallbackPath+"?state=s&code=c")
-	assert.Equal(t, "idp-callback", rec.Header().Get("X-Test-Handler"))
-	// A longer path is not the callback and stays with the API namespace.
-	assert.Equal(t, "api", get(t, mux, api.IDPCallbackPath+"/x").Header().Get("X-Test-Handler"))
+	for _, path := range []string{api.IDPCallbackPath, api.IDPCallbackUpstreamPath} {
+		rec := get(t, mux, path+"?state=s&code=c")
+		assert.Equal(t, "idp-callback", rec.Header().Get("X-Test-Handler"), path)
+		// A longer path is not the callback and stays with the API namespace.
+		assert.Equal(t, "api", get(t, mux, path+"/x").Header().Get("X-Test-Handler"), path)
+	}
 }
 
 // The runtime document is not console-only: the hosted login shell resolves

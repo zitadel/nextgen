@@ -739,10 +739,13 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiH
 			func(next http.Handler) http.Handler { return audit.WithRequestEventMiddleware(requestEvents, next) },
 		)
 	}
-	// An exact path, so it wins over the API catch-all. The same chain: the
+	// Exact paths, so they win over the API catch-all. The same chain: the
 	// callback reads its cookie by the request scheme (WithRequestHostMiddleware)
-	// and its log line is where the code/state redaction applies.
+	// and its log line is where the code/state redaction applies. Both spellings
+	// serve one handler: the prefixed path arrives when the instance is the
+	// browser origin, the stripped one through a scaffolded app's SDK proxy.
 	mux.Handle(api.IDPCallbackPath, chain(idpCallbackHandler))
+	mux.Handle(api.IDPCallbackUpstreamPath, chain(idpCallbackHandler))
 	mux.Handle("/", chain(apiHandler))
 	return mux, nil
 }
