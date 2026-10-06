@@ -4944,6 +4944,25 @@ func TestFlowStateMachine_Render_SSOAutoCreateRoutesAuthenticated(t *testing.T) 
 	assert.True(t, result.Reseal)
 }
 
+// As after create_user, the step that created the user offers no back, even
+// when sso_authenticated leads to a non-terminal step.
+func TestFlowStateMachine_Render_SSOAutoCreateClearsBackStack(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoRenderWorld(t)
+	def.Steps[0].Transitions[domain.FlowImplicitOutcomeSSOAuthenticated] = domain.FlowStepTransition{Target: "enroll"}
+	def.Steps = append(def.Steps, domain.FlowDefinitionStep{Name: "enroll", Fields: []domain.Field{"email"}})
+	claims, verified := completeClaims()
+	w.expectParked(unlinkedParked(claims, verified), nil)
+	w.ssoIdentities.EXPECT().FindUniqueOwner(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return("", nil).Times(2)
+	w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Return("user-new", nil)
+
+	result, err := w.sm.Render(t.Context(), def, state)
+	require.NoError(t, err)
+	require.Equal(t, "enroll", result.Step.Name)
+	assert.Equal(t, "user-new", result.State.CollectedData.UserID)
+	assert.Empty(t, result.State.BackStack)
+}
+
 // Complete claims on a step that cannot route sso_authenticated create
 // nothing: the step shows the provider as unavailable, and the row stays
 // parked.

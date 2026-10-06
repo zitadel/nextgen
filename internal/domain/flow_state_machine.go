@@ -426,7 +426,7 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 			result, err := r.renderStepError(pc, resolvedFields, &msg)
 			return result, false, err
 		}
-		return r.retrySSOHandoff(pc, resolvedFields, parked.BoundUserID)
+		return r.retrySSOHandoff(pc, resolvedFields, parked.BoundUserID, false)
 	}
 	// A collision bound a user, but the cookie that recorded it lost the race
 	// to one that recorded this row as collected: catch the state up.
@@ -495,9 +495,10 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 			return FlowStepResult{}, false, err
 		}
 		// Creation bound the attempt, so a concurrent render can win the
-		// handoff first, as after the linked bind.
+		// handoff first, as after the linked bind. As after create_user, the
+		// step that created the user offers no back.
 		if outcome == FlowImplicitOutcomeSSOAuthenticated {
-			return r.retrySSOHandoff(pc, resolvedFields, state.CollectedData.UserID)
+			return r.retrySSOHandoff(pc, resolvedFields, state.CollectedData.UserID, true)
 		}
 		result, err := r.routeOutcome(pc, resolvedFields, outcome, false)
 		return result, true, err
@@ -525,7 +526,7 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 	if err != nil {
 		return FlowStepResult{}, false, fmt.Errorf("flow state machine: bind sso identity: %w", err)
 	}
-	return r.retrySSOHandoff(pc, resolvedFields, parked.Link.UserID)
+	return r.retrySSOHandoff(pc, resolvedFields, parked.Link.UserID, false)
 }
 
 // provisionSSOIdentity settles an unlinked identity under `creation: auto`
@@ -755,14 +756,15 @@ func (r *FlowStateMachineRuntime) resolveStaleSSOBind(pc *processCtx, resolvedFi
 		// reconciles: render the step.
 		return FlowStepResult{}, false, nil
 	}
-	return r.retrySSOHandoff(pc, resolvedFields, reread.BoundUserID)
+	return r.retrySSOHandoff(pc, resolvedFields, reread.BoundUserID, false)
 }
 
 // retrySSOHandoff raises sso_authenticated for a user bound on the attempt,
 // which mints the handoff. The bind is this request's or an earlier one whose
 // request did not deliver the handoff; either way a concurrent render can win
-// the handoff first.
-func (r *FlowStateMachineRuntime) retrySSOHandoff(pc *processCtx, resolvedFields FlowResolvedFields, userID string) (FlowStepResult, bool, error) {
+// the handoff first. irreversible clears the back stack. A retry cannot tell
+// a created user from a linked one, so it passes false.
+func (r *FlowStateMachineRuntime) retrySSOHandoff(pc *processCtx, resolvedFields FlowResolvedFields, userID string, irreversible bool) (FlowStepResult, bool, error) {
 	// An earlier bind may have run on another step, or under an older
 	// definition. Checked before the user is recorded: a purpose would drop
 	// that user and move the flow to a fresh attempt.
@@ -772,7 +774,7 @@ func (r *FlowStateMachineRuntime) retrySSOHandoff(pc *processCtx, resolvedFields
 		return result, true, err
 	}
 	recordResolvedUser(pc.state, userID)
-	result, err := r.routeOutcome(pc, resolvedFields, FlowImplicitOutcomeSSOAuthenticated, false)
+	result, err := r.routeOutcome(pc, resolvedFields, FlowImplicitOutcomeSSOAuthenticated, irreversible)
 	if errors.Is(err, ErrAuthAttemptAlreadyHandedOff()) {
 		// A concurrent retry won the handoff. A handed-off attempt restarts
 		// the flow on every later render too, so this one does the same.
