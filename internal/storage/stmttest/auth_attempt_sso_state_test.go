@@ -397,3 +397,35 @@ func TestAuthAttemptStatements_SSOState(t *testing.T) {
 		})
 	})
 }
+
+// TestAuthAttemptStatements_DeleteSSOCallback covers the cleanup identity
+// resolution runs once the parked result is used: the row goes, the attempt
+// stays, and a second delete is a no-op.
+func TestAuthAttemptStatements_DeleteSSOCallback(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureProject(t, d.stmts)
+		attempt := createBareAttempt(t, d.stmts, projectID)
+		sso := issueSSOState(t, d.stmts, projectID, attempt.ID)
+		_, err := d.stmts.ConsumeSSOState(t.Context(), projectID, sso.Check.StateHash, sso.BindingNonce)
+		require.NoError(t, err)
+		require.NoError(t, d.stmts.SetSSOCallbackResult(t.Context(), projectID, sso.Check.StateHash,
+			&domain.SSOCallbackResult{Subject: "sub-1", ConnectionRevisionID: "idprev_1"}))
+
+		// Another check id is a replaced or foreign row: it stays.
+		require.ErrorIs(t, d.stmts.DeleteSSOCallback(t.Context(), projectID, attempt.ID, "ch_other"), domain.ErrSSOStateInvalid())
+		got, err := d.stmts.GetAuthAttemptByID(t.Context(), projectID, attempt.ID)
+		require.NoError(t, err)
+		_, ok := got.SSOCallback()
+		assert.True(t, ok, "a wrong id leaves the parked row")
+
+		require.NoError(t, d.stmts.DeleteSSOCallback(t.Context(), projectID, attempt.ID, sso.Check.ID))
+
+		got, err = d.stmts.GetAuthAttemptByID(t.Context(), projectID, attempt.ID)
+		require.NoError(t, err)
+		_, ok = got.SSOCallback()
+		assert.False(t, ok, "the parked row is gone")
+
+		// A second settlement of the same row lost the race.
+		require.ErrorIs(t, d.stmts.DeleteSSOCallback(t.Context(), projectID, attempt.ID, sso.Check.ID), domain.ErrSSOStateInvalid())
+	})
+}

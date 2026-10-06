@@ -67,7 +67,7 @@ export type FlowStepName =
  * transition, so the machine takes the answer and routes on it — the same split
  * the engine has.
  */
-export type SsoOutcome = "callback" | "identity_unknown" | "user_already_exists";
+export type SsoOutcome = "sso_authenticated" | "sso_user_not_found" | "user_already_exists";
 
 export type FlowMachineContext = {
   tokenSeq: number;
@@ -314,7 +314,7 @@ export const flowMachine = createMachine({
       on: {
         SUBMIT: [
           {
-            guard: ({ event }) => event.sso_outcome === "identity_unknown",
+            guard: ({ event }) => event.sso_outcome === "sso_user_not_found",
             target: "register-sso",
             actions: [captureFields, rotateToken],
           },
@@ -324,10 +324,10 @@ export const flowMachine = createMachine({
             actions: [captureFields, rotateToken],
           },
           {
-            // `callback`: a subject already linked to an account, so the round
+            // `sso_authenticated`: a subject already linked to an account, so the round
             // trip is the whole sign-in. Guarded, so only this outcome reaches
             // it.
-            guard: ({ event }) => event.sso_outcome === "callback",
+            guard: ({ event }) => event.sso_outcome === "sso_authenticated",
             target: "done",
             actions: [captureFields, rotateToken],
           },

@@ -201,6 +201,18 @@ func DecodeAuthChecks(
 			}
 			checks = append(checks, registrationCheck)
 		}
+	case domain.AuthCheckTypeSSO:
+		// Factor only: the sso factor is written directly, never challenged.
+		if !verifiedAt.IsZero() {
+			ssoFactor := &domain.AuthFactorSSO{}
+			ssoFactor.SetLastVerifiedAt(verifiedAt)
+			if len(factor) > 0 {
+				if err := json.Unmarshal(factor, ssoFactor); err != nil {
+					return nil, fmt.Errorf("failed to unmarshal sso auth check factor payload: %w", err)
+				}
+			}
+			checks = append(checks, ssoFactor)
+		}
 	case domain.AuthCheckTypeSSOCallback:
 		// Never a factor: the record carries its result in factor_payload but
 		// last_verified_at stays NULL, so nothing promotes or completes on it.
