@@ -73,6 +73,14 @@ tasks:
       - "scripts/release-github.mjs"
       - "scripts/release-github.test.mjs"
       - "scripts/release-manifest.mjs"
+      - "scripts/check-package-scripts.mjs"
+      - "scripts/check-package-scripts.test.mjs"
+      # The package-script contract test reads every package's scripts and
+      # moon tasks.
+      - "apps/*/package.json"
+      - "apps/*/moon.yml"
+      - "packages/*/package.json"
+      - "packages/*/moon.yml"
       # The task delegates to the package `test` script and its file-existence
       # guard, so both are behavioral inputs.
       - "package.json"

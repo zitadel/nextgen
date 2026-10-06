@@ -163,6 +163,31 @@ Moon release workflows, or package versioning behavior.
 Prefer Moon project tasks for narrow package work, for example
 `moon run cli:test`.
 
+### Package scripts and Moon tasks
+
+Moon owns the task graph; `package.json` scripts are its leaves.
+
+- Every script has a Moon task of the same name, and that task's command is
+  exactly `corepack pnpm run <name>`. Add the script and the task together.
+- A script is one step (`tsdown`, `vitest run`, `tsc --build tsconfig.json`).
+  It never starts pnpm or another script (`pnpm run`, `pnpm exec`,
+  `pnpm --filter`, `node --run`): a pnpm started from inside a pnpm script
+  re-checks every workspace package and prints "Unsupported platform"
+  warnings for the platform-specific `apps/server-*` packages.
+- Ordering lives in Moon `deps`, never in `pre<name>`/`post<name>` hooks.
+  A direct `pnpm run test` runs only that step; `moon run <project>:test`
+  runs its prerequisites first.
+- Script names are kebab-case (`dev-real`, not `dev:real`): Moon task ids
+  cannot contain `:`.
+- Code that must start a tool from inside a script runs the tool's own binary
+  (`node_modules/.bin/<tool>`), not `pnpm exec`.
+
+`scripts/check-package-scripts.mjs` enforces this in `workspace:test`; its
+exemption lists (the Go server, `build-release`, npm pack hooks, the root
+`cli`/`server`/`server-debug`/`check` orchestrators that start Moon
+themselves, and the `components`/`api-mock` `test:all` lanes) say why each
+exception exists.
+
 Moon manages TypeScript workspace targets, Go checks, and release build tasks.
 Long-running customer-style local orchestration still runs through repository
 scripts so server processes are signaled and cleaned up directly.
