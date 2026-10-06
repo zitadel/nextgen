@@ -2367,6 +2367,19 @@ func (s ChallengeID) Validate() error {
 	return nil
 }
 
+func (s ChallengeMethod) Validate() error {
+	switch s {
+	case "identifier":
+		return nil
+	case "password":
+		return nil
+	case "passkey":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
 func (s *ChallengeResponse) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer

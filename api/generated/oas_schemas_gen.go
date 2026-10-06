@@ -7218,6 +7218,57 @@ func (s *BrandingTypography) SetScale(val OptFloat64) {
 
 type ChallengeID string
 
+// An authentication factor method a client can challenge. It leaves out
+// `sso`: an SSO sign-in starts from a flow step, not from this endpoint.
+// Ref: #
+type ChallengeMethod string
+
+const (
+	ChallengeMethodIdentifier ChallengeMethod = "identifier"
+	ChallengeMethodPassword   ChallengeMethod = "password"
+	ChallengeMethodPasskey    ChallengeMethod = "passkey"
+)
+
+// AllValues returns all ChallengeMethod values.
+func (ChallengeMethod) AllValues() []ChallengeMethod {
+	return []ChallengeMethod{
+		ChallengeMethodIdentifier,
+		ChallengeMethodPassword,
+		ChallengeMethodPasskey,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ChallengeMethod) MarshalText() ([]byte, error) {
+	switch s {
+	case ChallengeMethodIdentifier:
+		return []byte(s), nil
+	case ChallengeMethodPassword:
+		return []byte(s), nil
+	case ChallengeMethodPasskey:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ChallengeMethod) UnmarshalText(data []byte) error {
+	switch ChallengeMethod(data) {
+	case ChallengeMethodIdentifier:
+		*s = ChallengeMethodIdentifier
+		return nil
+	case ChallengeMethodPassword:
+		*s = ChallengeMethodPassword
+		return nil
+	case ChallengeMethodPasskey:
+		*s = ChallengeMethodPasskey
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 type ChallengeNonce string
 
 // A factor challenge issued within an authentication attempt.
@@ -7229,7 +7280,7 @@ type ChallengeResponse struct {
 	ChallengeID ChallengeID `json:"challenge_id"`
 	// The authentication method this challenge represents.
 	// Determines which proof is expected in verify.
-	Method FactorMethod `json:"method"`
+	Method ChallengeMethod `json:"method"`
 	// Current state of this challenge:
 	// - `pending`: awaiting proof submission
 	// - `failed`: proof rejected (invalid credential, wrong code, etc.)
@@ -7252,7 +7303,7 @@ func (s *ChallengeResponse) GetChallengeID() ChallengeID {
 }
 
 // GetMethod returns the value of Method.
-func (s *ChallengeResponse) GetMethod() FactorMethod {
+func (s *ChallengeResponse) GetMethod() ChallengeMethod {
 	return s.Method
 }
 
@@ -7282,7 +7333,7 @@ func (s *ChallengeResponse) SetChallengeID(val ChallengeID) {
 }
 
 // SetMethod sets the value of Method.
-func (s *ChallengeResponse) SetMethod(val FactorMethod) {
+func (s *ChallengeResponse) SetMethod(val ChallengeMethod) {
 	s.Method = val
 }
 
@@ -30381,13 +30432,13 @@ func (*IssueChallengeErrorResponseStatusCode) issueChallengeRes() {}
 // Ref: #
 type IssueChallengeRequest struct {
 	// The authentication factor method to challenge.
-	Method FactorMethod `json:"method"`
+	Method ChallengeMethod `json:"method"`
 	// Optional WebAuthn ceremony options. Only relevant when `method` is `passkey`.
 	PasskeyOptions OptIssueChallengeRequestPasskeyOptions `json:"passkey_options"`
 }
 
 // GetMethod returns the value of Method.
-func (s *IssueChallengeRequest) GetMethod() FactorMethod {
+func (s *IssueChallengeRequest) GetMethod() ChallengeMethod {
 	return s.Method
 }
 
@@ -30397,7 +30448,7 @@ func (s *IssueChallengeRequest) GetPasskeyOptions() OptIssueChallengeRequestPass
 }
 
 // SetMethod sets the value of Method.
-func (s *IssueChallengeRequest) SetMethod(val FactorMethod) {
+func (s *IssueChallengeRequest) SetMethod(val ChallengeMethod) {
 	s.Method = val
 }
 

@@ -11656,6 +11656,48 @@ func (s *ChallengeID) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes ChallengeMethod as json.
+func (s ChallengeMethod) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes ChallengeMethod from json.
+func (s *ChallengeMethod) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ChallengeMethod to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch ChallengeMethod(v) {
+	case ChallengeMethodIdentifier:
+		*s = ChallengeMethodIdentifier
+	case ChallengeMethodPassword:
+		*s = ChallengeMethodPassword
+	case ChallengeMethodPasskey:
+		*s = ChallengeMethodPasskey
+	default:
+		*s = ChallengeMethod(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s ChallengeMethod) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ChallengeMethod) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes ChallengeNonce as json.
 func (s ChallengeNonce) Encode(e *jx.Encoder) {
 	unwrapped := string(s)
