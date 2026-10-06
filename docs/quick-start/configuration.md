@@ -114,6 +114,33 @@ instrumentation:
     streams: [request, service]
 ```
 
+## Tracing
+
+| YAML key                                   | Environment                                        | Default | Description                                                                |
+| ------------------------------------------ | -------------------------------------------------- | ------- | -------------------------------------------------------------------------- |
+| `instrumentation.trace.fraction`           | `NEXTGEN_INSTRUMENTATION_TRACE_FRACTION`           | `1.0`   | Share of requests that are sampled, from `0` to `1`                        |
+| `instrumentation.trace.trust_remote_spans` | `NEXTGEN_INSTRUMENTATION_TRACE_TRUST_REMOTE_SPANS` | `false` | Continue the caller's trace from an incoming `traceparent`; off by default |
+
+With `trust_remote_spans` off (the default), an incoming `traceparent`,
+`tracestate` or `baggage` header is ignored and every request starts a new
+trace, sampled by `fraction`.
+
+With it on, the server span becomes a child of the caller's span and joins the
+caller's trace ID. That also trusts the caller's sampled flag: a caller that
+sends `sampled=1` is recorded and exported **whatever `fraction` says**, and
+so is everything ZITADEL does for that request. A caller that sends
+`sampled=0` is still sampled by `fraction`. Turn it on only when ZITADEL sits
+behind a proxy, gateway or mesh you control that strips or overwrites these
+headers at the edge, never when untrusted callers can reach ZITADEL directly,
+because any of them could force every request to be recorded. The decision is
+recorded in [ADR 068](../adrs/068-incoming-trace-context.md).
+
+```yaml
+instrumentation:
+  trace:
+    trust_remote_spans: true # only behind a trusted proxy or mesh
+```
+
 ## Config file search paths
 
 When `-c` is not passed, the server looks for `nextgen.yaml` in:
