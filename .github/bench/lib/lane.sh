@@ -125,7 +125,8 @@ lane_role_specs() {
 # ---------------------------------------------------------------- the disk
 
 # disk_info PATH: what PATH lives on, as JSON. The kind is what the policy
-# keys on: nvme, ssd, hdd, network, memory, overlay or unknown.
+# keys on: nvme, ssd, hdd (a disk the machine owns), network-block (a cloud
+# block volume), network (a network filesystem), memory, overlay or unknown.
 disk_info() {
   local p=$1 src fstype target name sys kind=unknown rot='' model='' dev=''
   mkdir -p "$p"
@@ -159,7 +160,11 @@ disk_info() {
         dev=$name
         rot=$(cat "/sys/block/$name/queue/rotational" 2>/dev/null || true)
         model=$(tr -s ' ' <"/sys/block/$name/device/model" 2>/dev/null | tr -d '\n' || true)
-        if [[ $name == nvme* ]]; then
+        if [[ $model == *"Elastic Block Store"* || $model == *"Persistent Disk"* || $model == *PersistentDisk* || $model == *"Virtual Disk"* ]]; then
+          # A cloud block volume: a disk to the guest, a network service
+          # beneath it. fsync latency is the provider's, not the machine's.
+          kind=network-block
+        elif [[ $name == nvme* ]]; then
           kind=nvme
         elif [[ $rot == 1 ]]; then
           kind=hdd
@@ -182,9 +187,9 @@ disk_check() {
   kind=$(jq -r .kind <<<"$1")
   case $kind in
     network) bench_die "the data directory is on a network filesystem ($(jq -r .fstype <<<"$1")): fsync would be the measurement. Point BENCH_DATA_ROOT at a local volume" ;;
-    memory | overlay)
+    memory | overlay | network-block)
       [[ " $BENCH_ALLOW_DISK_KINDS " == *" $kind "* ]] ||
-        bench_die "the data directory is on a $kind filesystem, which says nothing about the disk underneath. Use a local volume, or list '$kind' in BENCH_ALLOW_DISK_KINDS to accept it (the run metadata records it either way)"
+        bench_die "the data directory is on a $kind volume, not a local disk (device $(jq -r '.device + " " + .model' <<<"$1")). Use a local volume, or list '$kind' in BENCH_ALLOW_DISK_KINDS to accept it (the run metadata records it either way)"
       ;;
     unknown) bench_warn "could not identify the disk under $(jq -r .path <<<"$1"); the run metadata records it as unknown" ;;
   esac
@@ -204,14 +209,14 @@ pg_bindir() {
 
 # pg_psql ARGS...: psql against the lane's cluster, as the lane's superuser.
 pg_psql() {
-  "$LANE_PG_BIN/psql" -X -q -h 127.0.0.1 -p "$BENCH_PG_PORT" -U bench -v ON_ERROR_STOP=1 "$@"
+  bench_run_as_prefix
+  "${BENCH_AS[@]}" "$LANE_PG_BIN/psql" -X -q -h 127.0.0.1 -p "$BENCH_PG_PORT" -U bench -v ON_ERROR_STOP=1 "$@"
 }
 
 # pg_up RUN_DIR DB_CGROUP: a fresh cluster and a fresh database in the
 # database cgroup. Sets LANE_PG_DSN and LANE_PG_DB.
 pg_up() {
   local run_dir=$1 dbdir=$2 root pgdata
-  [[ $(id -u) != 0 ]] || bench_die "PostgreSQL refuses to run as root; run the lane as an unprivileged user"
   LANE_PG_BIN=$(pg_bindir)
   [[ -x $LANE_PG_BIN/initdb && -x $LANE_PG_BIN/postgres && -x $LANE_PG_BIN/psql ]] ||
     bench_die "PostgreSQL binaries not found (set BENCH_PG_BIN to the directory holding initdb, postgres and psql)"
@@ -221,10 +226,12 @@ pg_up() {
   rm -rf "$root"
   mkdir -p "$pgdata"
   chmod 700 "$pgdata"
+  bench_chown "$root" "$run_dir"
+  bench_run_as_prefix
   # A fresh cluster per run is the strongest form of "fresh database per
   # run": nothing from an earlier run can be in the shared buffers, the WAL
   # or the catalogs. The database inside it is created fresh as well.
-  "$LANE_PG_BIN/initdb" -D "$pgdata" -U bench --auth=trust -E UTF8 --locale=C >"$run_dir/logs/initdb.log" 2>&1 ||
+  "${BENCH_AS[@]}" "$LANE_PG_BIN/initdb" -D "$pgdata" -U bench --auth=trust -E UTF8 --locale=C >"$run_dir/logs/initdb.log" 2>&1 ||
     bench_die "initdb failed (see $run_dir/logs/initdb.log)"
   {
     cat "$(bench_home)/lanes/postgres.conf"
@@ -236,10 +243,10 @@ pg_up() {
   cg_spawn "$dbdir" "$run_dir/logs/postgres.log" "$run_dir/pids/postgres.pid" "$LANE_PG_BIN/postgres" -D "$pgdata"
   local i
   for ((i = 0; i < 120; i++)); do
-    if "$LANE_PG_BIN/pg_isready" -q -h 127.0.0.1 -p "$BENCH_PG_PORT" -U bench; then break; fi
+    if "${BENCH_AS[@]}" "$LANE_PG_BIN/pg_isready" -q -h 127.0.0.1 -p "$BENCH_PG_PORT" -U bench; then break; fi
     sleep 0.5
   done
-  "$LANE_PG_BIN/pg_isready" -q -h 127.0.0.1 -p "$BENCH_PG_PORT" -U bench ||
+  "${BENCH_AS[@]}" "$LANE_PG_BIN/pg_isready" -q -h 127.0.0.1 -p "$BENCH_PG_PORT" -U bench ||
     bench_die "PostgreSQL did not accept connections within 60 s (see $run_dir/logs/postgres.log)"
   LANE_PG_DB="nextgen_$(tr -c 'a-z0-9\n' '_' <<<"${BENCH_RUN_ID,,}")"
   pg_psql -d postgres -c "CREATE DATABASE $LANE_PG_DB" >/dev/null
@@ -268,10 +275,12 @@ lane_unset_db_env() {
   while IFS= read -r v; do printf -- '-u\n%s\n' "$v"; done < <(compgen -e | grep '^NEXTGEN_DATABASE_' || true)
 }
 
-# server_up RUN_DIR SERVER_CGROUP DATADIR: start the one server process in its
-# cgroup, under an exclusive lock on its data directory, and wait for /healthz.
+# server_up RUN_DIR SERVER_CGROUP DATADIR [KEEP]: start the one server process
+# in its cgroup, under an exclusive lock on its data directory, and wait for
+# /healthz. KEEP=1 starts it on the data directory as it is (a restart); the
+# default starts from an empty one.
 server_up() {
-  local run_dir=$1 sdir=$2 datadir=$3 bin=$BENCH_SERVER_BIN i
+  local run_dir=$1 sdir=$2 datadir=$3 keep=${4:-0} bin=$BENCH_SERVER_BIN i
   local -a unset_args=() env_args=()
   [[ -x $bin ]] || bench_die "server binary not found or not executable: $bin (build it: go build -o dist/nextgen-server .)"
   # Whatever already answers on the address would satisfy the health check
@@ -279,8 +288,10 @@ server_up() {
   if curl -fsS --max-time 2 -o /dev/null "http://$BENCH_SERVER_ADDR/healthz" 2>/dev/null; then
     bench_die "something already answers on http://$BENCH_SERVER_ADDR/healthz; a second server process is not allowed. Stop it (bench-lane down) before starting the lane"
   fi
-  rm -rf "$datadir"
+  if [[ $keep != 1 ]]; then rm -rf "$datadir"; fi
   mkdir -p "$datadir"
+  bench_chown "$datadir" "$run_dir"
+  rm -f "$run_dir/pids/server.pid"
   # The server decides its dialect from the environment it is given. Whatever
   # NEXTGEN_DATABASE_* the job inherited is removed so a stray variable cannot
   # make the SQLite lane something else.
@@ -312,7 +323,8 @@ server_up() {
 # lane_exe_count DIR BINARY: processes in the cgroup whose executable is BINARY.
 lane_exe_count() {
   local pid n=0 want
-  want=$(readlink -f "$2")
+  want=$(readlink -f "$2" 2>/dev/null || true)
+  [[ -n $want ]] || { printf '0\n'; return 0; }
   for pid in $(cg_pids "$1"); do
     if [[ $(readlink -f "/proc/$pid/exe" 2>/dev/null) == "$want" ]]; then n=$((n + 1)); fi
   done
@@ -322,7 +334,8 @@ lane_exe_count() {
 # lane_exe_total BINARY: processes anywhere on the host with that executable.
 lane_exe_total() {
   local exe n=0 want
-  want=$(readlink -f "$1")
+  want=$(readlink -f "$1" 2>/dev/null || true)
+  [[ -n $want ]] || { printf '0\n'; return 0; }
   for exe in /proc/[0-9]*/exe; do
     if [[ $(readlink -f "$exe" 2>/dev/null) == "$want" ]]; then n=$((n + 1)); fi
   done

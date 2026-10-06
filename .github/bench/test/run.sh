@@ -9,6 +9,8 @@
 # bin/bench-verify-isolation demonstrates there.
 #
 #   .github/bench/test/run.sh [TEST...]
+# The tests set the environment inside subshells on purpose.
+# shellcheck disable=SC2030,SC2031
 set -uo pipefail
 shopt -s inherit_errexit
 
@@ -132,12 +134,12 @@ t_lanes() {
   export BENCH_STATE_DIR=$w/state
   # Same hardware, same plan: the server and the load generator get identical
   # cores in both lanes, and the database cores stay reserved in SQLite's.
-  fake_sysfs "$w/sysfs" 12 2
+  fake_sysfs "$w/sysfs" 16 2
   export BENCH_SYSFS_CPU=$w/sysfs BENCH_CGROUP_ROOT=$w/cg/pod BENCH_FAKE_CGROUP=1 BENCH_CGROUP_FS=$w/cg
   # The server keeps its computed argon2id budget (asserted below); the others
   # are small so the plan fits any machine's memory.
   export BENCH_MEM_DB_MIB=64 BENCH_MEM_LOADGEN_MIB=64 BENCH_MEM_COLLECTOR_MIB=16
-  fake_cgroups "$w/cg" 0-23
+  fake_cgroups "$w/cg" 0-31
   local sq pg
   sq=$("$HERE/bin/bench-partition" plan --lane sqlite)
   pg=$("$HERE/bin/bench-partition" plan --lane postgres)
@@ -199,6 +201,8 @@ t_disk() {
   refuse "tmpfs is refused by default" disk_check '{"kind":"memory","fstype":"tmpfs","path":"/x"}'
   BENCH_ALLOW_DISK_KINDS="memory" check "tmpfs can be allowed explicitly" disk_check '{"kind":"memory","fstype":"tmpfs","path":"/x"}'
   BENCH_ALLOW_DISK_KINDS="memory" refuse "a network filesystem is refused even when other kinds are allowed" disk_check '{"kind":"network","fstype":"nfs4","path":"/x"}'
+  refuse "a cloud block volume is not a local disk" disk_check '{"kind":"network-block","fstype":"ext4","path":"/x","device":"nvme0n1","model":"Amazon Elastic Block Store"}'
+  BENCH_ALLOW_DISK_KINDS="network-block" check "a cloud block volume can be accepted explicitly" disk_check '{"kind":"network-block","fstype":"ext4","path":"/x"}'
   check "an nvme disk passes" disk_check '{"kind":"nvme","fstype":"ext4","path":"/x"}'
   local info
   info=$(disk_info "$w")
@@ -266,6 +270,49 @@ t_partition() {
     "$HERE/bin/bench-partition" down >/dev/null 2>&1
   )
   eq "the sqlite lane creates no database cgroup" 0 $?
+}
+
+t_host_mode() {
+  local w=$WORK/host
+  mkdir -p "$w"
+  unset BENCH_CGROUP_ROOT BENCH_ALLOWED_CPUS
+  (
+    export BENCH_FAKE_CGROUP=1 BENCH_CGROUP_FS=$w/cg BENCH_SYSFS_CPU=$w/sysfs BENCH_PARTITION_MODE=host
+    export BENCH_STATE_DIR=$w/state BENCH_DATA_ROOT=$w/data
+    export BENCH_CORES_SYSTEM=1 BENCH_CORES_SERVER=1 BENCH_CORES_DB=1 BENCH_CORES_COLLECTOR=0 BENCH_CORES_LOADGEN=1
+    export BENCH_MEM_SERVER_MIB=128 BENCH_MEM_DB_MIB=64 BENCH_MEM_LOADGEN_MIB=64 BENCH_MEM_COLLECTOR_MIB=16
+    fake_sysfs "$w/sysfs" 4 2
+    mkdir -p "$w/cg"
+    cg_fake_populate "$w/cg"
+    rm -f "$w/cg/cpuset.cpus.effective"
+    printf '0-7\n' >"$w/cg/cpuset.cpus.effective"
+    bp="$HERE/bin/bench-partition"
+    "$bp" up --lane postgres --run-dir "$w/run" >"$w/up.log" 2>&1 || { tail -n 5 "$w/up.log" >&2; exit 1; }
+    root=$w/cg/bench-lane
+    # The cores of the roles are one partition root; the runner's cores are the rest.
+    [[ $(<"$root/cpuset.cpus") == 1-3,5-7 ]] || exit 2
+    [[ $(<"$root/cpuset.cpus.partition") == root ]] || exit 3
+    [[ $(<"$root/bench-server/cpuset.cpus") == 1,5 && $(<"$root/bench-loadgen/cpuset.cpus") == 3,7 ]] || exit 4
+    [[ ! -d $root/bench-system ]] || exit 5
+    jq -e '.mode == "host" and .roles.system.outside == true and .roles.system.cpus == "0,4" and .roles.system.cgroup == ""' "$w/run/partition.json" >/dev/null || exit 6
+    jq -e '.bench_cpus == "1-3,5-7"' "$w/run/partition.json" >/dev/null || exit 7
+    # A window works the same, and a bare `exec system` is not in any cgroup.
+    "$HERE/bin/bench-window" run hostwin -- true >"$w/win.log" 2>&1 || { cat "$w/win.log" >&2; exit 8; }
+    # The lane's `assert-clean` fails while it is up and passes after teardown.
+    "$HERE/bin/bench-partition" down >/dev/null 2>&1 || exit 9
+    [[ ! -d $root && ! -e $BENCH_STATE_DIR/partition.json ]] || exit 10
+    "$HERE/bin/bench-partition" down >/dev/null 2>&1 || exit 11
+    "$HERE/bin/bench-lane" assert-clean >"$w/clean.log" 2>&1 || { cat "$w/clean.log" >&2; exit 12; }
+    exit 0
+  )
+  eq "host mode: the roles' cores are one partition root, the runner keeps the rest, teardown removes it" 0 $?
+  (
+    export BENCH_FAKE_CGROUP=1 BENCH_CGROUP_FS=$w/cg BENCH_SYSFS_CPU=$w/sysfs BENCH_PARTITION_MODE=host BENCH_STATE_DIR=$w/state2
+    mkdir -p "$w/cg/bench-lane/x"
+    "$HERE/bin/bench-lane" assert-clean >/dev/null 2>&1 && exit 1
+    exit 0
+  )
+  eq "assert-clean fails while a lane's cgroup is left behind" 0 $?
 }
 
 t_windows() {
@@ -412,7 +459,7 @@ t_workflow_and_scripts() {
   fi
 }
 
-ALL=(cpulists topology lanes replicas disk partition windows boot_marker compare_and_declare workflow_and_scripts)
+ALL=(cpulists topology lanes replicas disk partition host_mode windows boot_marker compare_and_declare workflow_and_scripts)
 if (($#)); then ALL=("$@"); fi
 for t in "${ALL[@]}"; do
   printf '%s\n' "$t"

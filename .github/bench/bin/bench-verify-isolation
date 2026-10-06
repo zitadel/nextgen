@@ -3,7 +3,7 @@
 # allocation and throttling counters unchanged (ADR 069; the acceptance check of
 # the benchmark deployment issue).
 #
-#   bench-verify-isolation [--seconds N] [--out FILE]
+#   bench-verify-isolation [--seconds N] [--out FILE] [--negative-controls]
 #
 # Needs an active partition (`bench-lane up`, or `bench-partition up`). Inside
 # one bench-window it runs twice as many busy loops in the load generator's
@@ -16,9 +16,18 @@
 #               CPU sets are disjoint
 #   served      the server's cgroup received a full core while the load generator
 #               was saturated
+#   outside     (host mode) the processes that are not in the partition, this
+#               one among them, can not run on any of its cores
 #   unchanged   the window verdict: the server's cpuset.cpus.effective and
 #               memory.max did not move, its cpu.stat nr_throttled and
 #               throttled_usec did not rise, no OOM event anywhere
+#
+# With --negative-controls it then proves the validity rules fire on this
+# kernel, which a window that never fails does not: a CPU quota (the one thing
+# the partition never sets) is put on the server's cgroup for a few seconds and
+# the window must be invalid for throttling, and, when a lane is up, the server
+# is restarted inside a window and the boot marker must invalidate it. After
+# the restart the lane is no longer the one the run began against; tear it down.
 #
 # Exit 0: all passed. Exit 1: a check failed. Exit 2: the cpuset partition is not
 # applied (no cpuset controller), so placement cannot be demonstrated and the
@@ -32,12 +41,16 @@ HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 # shellcheck source=../lib/cgroup.sh
 . "$HERE/lib/cgroup.sh"
 
+bench_elevate "$@"
+
 seconds=6
 out=''
+negative=0
 while (($#)); do
   case $1 in
     --seconds) seconds=$2; shift 2 ;;
     --out) out=$2; shift 2 ;;
+    --negative-controls) negative=1; shift ;;
     -h | --help) sed -n '2,/^set -euo/p' "${BASH_SOURCE[0]}" | sed '$d;s/^# \{0,1\}//'; exit 0 ;;
     *) bench_die "unknown argument '$1'" ;;
   esac
@@ -96,13 +109,45 @@ wait "${lg_pids[@]}" "$sv_pid" 2>/dev/null || true
 "$HERE/bin/bench-window" end "$name" || true
 verdict=$(jq -c . "$(jq -r .run_dir "$sf")/windows/$name/verdict.json")
 
+mode=$(jq -r '.mode // "delegated"' "$sf")
+bench_cpus=$(jq -r '.bench_cpus // empty' "$sf")
+my_allowed=$(proc_allowed $$)
+outside=null
+if [[ $mode == host && -n $bench_cpus ]]; then
+  if cpulist_disjoint "$my_allowed" "$bench_cpus"; then outside=true; else outside=false; fi
+fi
+
+# Negative controls: do the rules that invalidate a window fire on this kernel?
+nc='{}'
+if ((negative)); then
+  sdir=$(jq -r .roles.server.cgroup "$sf")
+  run_dir=$(jq -r .run_dir "$sf")
+  throttle_win=control-throttle-$(date -u +%H%M%S)
+  "$HERE/bin/bench-window" begin "$throttle_win"
+  cg_write "$sdir" cpu.max "20000 100000"
+  "$HERE/bin/bench-partition" exec server -- bash -c "$busy" _ 3
+  cg_write "$sdir" cpu.max "max 100000"
+  "$HERE/bin/bench-window" end "$throttle_win" || true
+  nc=$(jq -c --slurpfile v "$run_dir/windows/$throttle_win/verdict.json" \
+    '. + {throttle: {window: $v[0].name, detected: ($v[0].valid == false and ($v[0].reasons | map(test("nr_throttled of server")) | any)), reasons: $v[0].reasons}}' <<<"$nc")
+  if [[ -e $BENCH_STATE_DIR/lane.json ]]; then
+    restart_win=control-restart-$(date -u +%H%M%S)
+    "$HERE/bin/bench-window" begin "$restart_win"
+    "$HERE/bin/bench-lane" restart-server
+    "$HERE/bin/bench-window" end "$restart_win" || true
+    nc=$(jq -c --slurpfile v "$run_dir/windows/$restart_win/verdict.json" \
+      '. + {boot_marker: {window: $v[0].name, detected: ($v[0].valid == false and ($v[0].reasons | map(test("boot marker changed")) | any)), reasons: $v[0].reasons}}' <<<"$nc")
+  fi
+fi
+
 lg_ran=$(sort -n -u "$lg_seen" | cpulist_union)
 sv_ran=$(sort -n -u "$sv_seen" | cpulist_union)
 
 report=$(jq -n --argjson verdict "$verdict" --argjson secs "$seconds" --argjson burners "$burners" \
   --arg loadgen_cpus "$loadgen_cpus" --arg server_cpus "$server_cpus" \
   --arg lg_ran "$lg_ran" --arg sv_ran "$sv_ran" --arg lg_allowed "$lg_allowed" --arg sv_allowed "$sv_allowed" \
-  --argjson applied "$cpuset_applied" --argjson nlg "$n_loadgen" \
+  --argjson applied "$cpuset_applied" --argjson nlg "$n_loadgen" --argjson outside "$outside" --arg my_allowed "$my_allowed" \
+  --arg bench_cpus "$bench_cpus" --argjson nc "$nc" \
   '
   ($verdict.deltas.loadgen.cpu_usage_usec) as $lg_used
   | ($verdict.deltas.server.cpu_usage_usec) as $sv_used
@@ -116,13 +161,16 @@ report=$(jq -n --argjson verdict "$verdict" --argjson secs "$seconds" --argjson 
         unchanged: {pass: ($verdict.reasons | map(select(test("cpuset partition was not applied") | not)) | length == 0),
                     reasons: ($verdict.reasons | map(select(test("cpuset partition was not applied") | not))),
                     server_nr_throttled: $verdict.deltas.server.nr_throttled, server_throttled_usec: $verdict.deltas.server.throttled_usec},
+        outside: (if $outside == null then {pass: null, skipped: "not in host mode: the runner is inside the delegated cgroup"}
+                  else {pass: $outside, this_process_allowed: $my_allowed, partition_cpus: $bench_cpus} end),
         placement: (if $applied then
           {pass: ($lg_allowed == $loadgen_cpus and $sv_allowed == $server_cpus), loadgen_allowed: $lg_allowed, server_allowed: $sv_allowed,
            loadgen_ran_on: $lg_ran, server_ran_on: $sv_ran}
          else {pass: null, skipped: "the cpuset controller is not available, so placement cannot be demonstrated"} end)
-      }
+      },
+      negative_controls: $nc
     }
-  | .status = (if ([.checks[] | .pass] | any(. == false)) then "failed"
+  | .status = (if (([.checks[] | .pass] | any(. == false)) or ([.negative_controls[]? | .detected] | any(. == false))) then "failed"
                elif .checks.placement.pass == null then "incomplete" else "passed" end)')
 if [[ -n $out ]]; then printf '%s\n' "$report" >"$out"; fi
 jq . <<<"$report"

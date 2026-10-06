@@ -26,6 +26,8 @@ HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 # shellcheck source=../lib/lane.sh
 . "$HERE/lib/lane.sh"
 
+bench_elevate "$@"
+
 usage() { sed -n '2,/^set -euo/p' "${BASH_SOURCE[0]}" | sed '$d;s/^# \{0,1\}//'; }
 
 lane_state_file() { printf '%s/lane.json\n' "$BENCH_STATE_DIR"; }
@@ -81,6 +83,7 @@ cmd_up() {
   if [[ -z $run_dir ]]; then run_dir=$BENCH_STATE_DIR/runs/$BENCH_RUN_ID; fi
   mkdir -p "$BENCH_STATE_DIR" "$run_dir"
   run_dir=$(cd "$run_dir" && pwd)
+  bench_chown "$run_dir"
 
   # A job that was killed instead of cancelled never ran its teardown. Whatever
   # it left (cgroups, a server, a database) is removed before this lane starts,
@@ -98,6 +101,7 @@ cmd_up() {
 
   local disk
   disk=$(disk_info "$BENCH_DATA_ROOT")
+  bench_chown "$BENCH_DATA_ROOT"
   disk_check "$disk"
   bench_log "lane $BENCH_LANE (dialect $BENCH_DB_DIALECT), run $BENCH_RUN_ID, data on $(jq -r '"\(.kind) (\(.fstype))"' <<<"$disk")"
 
@@ -120,6 +124,9 @@ cmd_up() {
   if [[ $BENCH_DB_DIALECT == postgres ]]; then
     pg_up "$run_dir" "$(jq -r .roles.db.cgroup "$part")"
     pg_json=$(pg_facts)
+    jq -c --arg dsn "$LANE_PG_DSN" --arg db "$LANE_PG_DB" --arg bin "$LANE_PG_BIN" '. + {pg_dsn: $dsn, pg_db: $db, pg_bin: $bin}' \
+      "$(lane_state_file)" >"$(lane_state_file).tmp"
+    mv "$(lane_state_file).tmp" "$(lane_state_file)"
   fi
   server_up "$run_dir" "$sdir" "$BENCH_DATA_ROOT/server"
 
@@ -151,6 +158,25 @@ cmd_up() {
   write_metadata "$run_dir" "$disk" "$pg_json" "$observed" "$marker" "$servers"
   trap - EXIT
   bench_log "lane $BENCH_LANE is up; run metadata: $run_dir/run-metadata.json"
+}
+
+# host_facts: what the machine says about itself. A virtual machine's vCPUs
+# and sibling threads are what the hypervisor chooses to show; nothing here can
+# see the host beneath.
+host_facts() {
+  local virt prod vendor hyp
+  virt=$(systemd-detect-virt 2>/dev/null || true)
+  prod=$(cat /sys/class/dmi/id/product_name 2>/dev/null || true)
+  vendor=$(cat /sys/class/dmi/id/sys_vendor 2>/dev/null || true)
+  hyp=$(lscpu 2>/dev/null | awk -F: '/Hypervisor vendor/ {gsub(/^ +/, "", $2); print $2}')
+  jq -nc --arg virt "${virt:-none}" --arg prod "$prod" --arg vendor "$vendor" --arg hyp "$hyp" \
+    --argjson mem "$(awk '/^MemTotal:/ {print int($2 / 1024)}' /proc/meminfo)" \
+    --argjson swap "$(awk '/^SwapTotal:/ {print int($2 / 1024)}' /proc/meminfo)" \
+    '{virtualization: $virt, hypervisor: $hyp, sys_vendor: $vendor, product_name: $prod, mem_total_mib: $mem, host_swap_mib: $swap,
+      isolation: (if $virt != "none" then "vm" else "machine" end),
+      isolation_note: (if $virt != "none"
+        then "an ephemeral virtual machine: the vCPUs and their sibling threads are what the hypervisor exposes; hypervisor scheduling, the physical host and its other tenants are neither visible nor partitioned"
+        else "a machine this run could not identify as virtual; whether anything else runs on it is not known" end)}'
 }
 
 # observe_dialect SERVER_PID: what the server is actually talking to, read from
@@ -190,8 +216,7 @@ write_metadata() { # RUN_DIR DISK PG OBSERVED MARKER SERVERS
     --arg run_id "$BENCH_RUN_ID" --arg lane "$BENCH_LANE" --arg now "$(bench_now)" --arg dialect "$BENCH_DB_DIALECT" \
     --arg commit "$commit" --arg tag "$tag" \
     --arg kernel "$(uname -r)" --arg cpu_model "$cpu_model" --arg online "$(<"$BENCH_SYSFS_CPU/online")" \
-    --arg node "${NODE_NAME:-$(uname -n)}" --arg runner "${RUNNER_NAME:-}" \
-    --arg machine "$BENCH_MACHINE_TYPE" --arg dedicated "$BENCH_NODE_DEDICATED" \
+    --arg node "$(uname -n)" --arg runner "${RUNNER_NAME:-}" --argjson platform "$(host_facts)" \
     --argjson part "$part" \
     --arg bin "$BENCH_SERVER_BIN" --arg bin_sha "$bin_sha" --arg cfg "$BENCH_SERVER_CONFIG" --arg cfg_sha "$cfg_sha" \
     --arg addr "$BENCH_SERVER_ADDR" --argjson replicas "$BENCH_SERVER_REPLICAS" --argjson servers "$servers" \
@@ -210,10 +235,10 @@ write_metadata() { # RUN_DIR DISK PG OBSERVED MARKER SERVERS
       host: {
         kernel: $kernel, cpu_model: $cpu_model, cpus_online: $online,
         node: $node, runner: $runner,
-        machine_type: {value: $machine, source: (if $machine == "unknown" then "unknown" else "declared" end)},
-        node_dedicated: {value: $dedicated, source: (if $dedicated == "unknown" then "unknown" else "declared" end)},
-        # With other pods on the node the budget is a limit, not isolation.
-        isolation: (if $dedicated == "true" then "dedicated-node" else "limit" end)
+        machine_type: {value: $platform.product_name, source: "observed"},
+        platform: $platform,
+        threads_per_core: $part.threads_per_core,
+        isolation: $platform.isolation
       },
       partition: $part,
       not_partitioned: $part.not_partitioned,
@@ -232,12 +257,13 @@ write_metadata() { # RUN_DIR DISK PG OBSERVED MARKER SERVERS
       # and `sweep` take them (--declare name=value).
       declare: ({
         dialect: $dialect, image_tag: $tag, replicas: ($replicas | tostring), log_level: $log_level,
-        cgroup_partition: ($part.backend),
+        cgroup_partition: ($part.backend + "/" + $part.mode),
         cgroup_cpuset_applied: ($part.cpuset_applied | tostring),
         cgroup_system_cpus: role_cpus("system"),
         cgroup_server_cpus: role_cpus("server"), cgroup_server_memory_max: role_mem("server"),
         cgroup_loadgen_cpus: role_cpus("loadgen"), cgroup_loadgen_memory_max: role_mem("loadgen"),
-        data_disk_kind: $disk.kind, node_isolation: (if $dedicated == "true" then "dedicated-node" else "limit" end),
+        data_disk_kind: $disk.kind, host_isolation: $platform.isolation, host_machine: $platform.product_name,
+        threads_per_core: ($part.threads_per_core | tostring),
         boot_marker: $marker.digest
       } + (if $part.roles.db.active then
              {cgroup_db_cpus: role_cpus("db"), cgroup_db_memory_max: role_mem("db"), postgres_version: $pg.version}
@@ -338,6 +364,83 @@ cmd_compare() {
   fi
 }
 
+# ------------------------------------------------------------ the checks
+
+cmd_assert_single_server() {
+  [[ -e $(lane_state_file) ]] || bench_die "no lane is active"
+  local sf lane run_dir bin datadir cfg addr port before after rc=0 health out
+  sf=$(lane_state_file)
+  lane=$(jq -r .lane "$sf")
+  lane_load "$lane"
+  run_dir=$(jq -r .run_dir "$sf")
+  bin=$(jq -r .server_binary "$sf")
+  datadir=$(jq -r .data_root "$sf")/server
+  cfg=$BENCH_SERVER_CONFIG
+  addr=$BENCH_SERVER_ADDR
+  port=$((${addr##*:} + 1))
+  before=$(lane_exe_total "$bin")
+  bench_run_as_prefix
+  # The same command the lane starts its server with, pointed at the same data
+  # directory on another port. It has to be refused by the lock, not by the
+  # port: the SQLite lane's failure mode is two servers on divergent data.
+  out=$(timeout 20 "${BENCH_AS[@]}" env "NEXTGEN_SERVER_DATA_DIR=$datadir" "NEXTGEN_SERVER_ADDRESS=127.0.0.1:$port" \
+    flock --no-fork -n -E 75 "$datadir" "$bin" -c "$cfg" 2>&1) || rc=$?
+  after=$(lane_exe_total "$bin")
+  health=$(curl -fsS --max-time 5 -o /dev/null -w '%{http_code}' "http://$addr/healthz" 2>/dev/null || echo 000)
+  jq -nc --argjson rc "$rc" --argjson before "$before" --argjson after "$after" --arg health "$health" --arg out "$out" \
+    '{second_server_exit: $rc, expected_exit: 75, server_processes_before: $before, server_processes_after: $after,
+      healthz: $health, refused: ($rc == 75 and $before == 1 and $after == 1 and $health == "200")}' | tee "$run_dir/single-server.json"
+  [[ $(jq -r .refused "$run_dir/single-server.json") == true ]] || bench_die "the second server on the data directory was not refused"
+}
+
+cmd_restart_server() {
+  [[ -e $(lane_state_file) ]] || bench_die "no lane is active"
+  local sf lane run_dir part sdir pid ticks datadir
+  sf=$(lane_state_file)
+  lane=$(jq -r .lane "$sf")
+  lane_load "$lane"
+  run_dir=$(jq -r .run_dir "$sf")
+  part=$run_dir/partition.json
+  sdir=$(jq -r .roles.server.cgroup "$part")
+  datadir=$(jq -r .data_root "$sf")/server
+  BENCH_SERVER_BIN=$(jq -r .server_binary "$sf")
+  BENCH_DATA_ROOT=$(jq -r .data_root "$sf")
+  LANE_PG_DSN=$(jq -r '.pg_dsn // empty' "$sf")
+  pid=$(<"$run_dir/pids/server.pid")
+  ticks=$(jq -r .server_start_ticks "$run_dir/lane-state.json")
+  stop_pid "$pid" "$ticks" TERM 15 || bench_die "the server did not stop"
+  # The same data directory, a new process: what a crash and restart looks like
+  # to the boot marker. The run's own marker is not rewritten.
+  server_up "$run_dir" "$sdir" "$datadir" 1
+  pid=$(<"$run_dir/pids/server.pid")
+  jq -c --arg p "$pid" --arg t "$(bench_start_ticks "$pid")" '.server_pid = $p | .server_start_ticks = $t' \
+    "$run_dir/lane-state.json" >"$run_dir/lane-state.json.tmp"
+  mv "$run_dir/lane-state.json.tmp" "$run_dir/lane-state.json"
+  bench_log "server restarted (pid $pid)"
+}
+
+cmd_assert_clean() {
+  local fail=0 problems=() root sf bin
+  sf=$(lane_state_file)
+  bin=${BENCH_SERVER_BIN:-$PWD/dist/nextgen-server}
+  [[ ! -e $sf ]] || problems+=("lane state $sf still exists")
+  [[ ! -e $BENCH_STATE_DIR/partition.json ]] || problems+=("partition state still exists")
+  root=${BENCH_CGROUP_ROOT:-${BENCH_CGROUP_FS%/}/bench-lane}
+  [[ ! -d $root ]] || problems+=("cgroup $root still exists")
+  if [[ -e ${BENCH_CGROUP_FS%/}/cpuset.cpus.effective && -r $BENCH_SYSFS_CPU/online ]]; then
+    local eff
+    eff=$(cg_read "${BENCH_CGROUP_FS%/}" cpuset.cpus.effective)
+    [[ $eff == "$(<"$BENCH_SYSFS_CPU/online")" ]] || problems+=("the host's cpuset.cpus.effective is '$eff', not every online CPU: the partition's cores were not returned")
+  fi
+  local n
+  n=$(lane_exe_total "$bin")
+  ((n == 0)) || problems+=("$n server process(es) still run")
+  if pgrep -f "${BENCH_DATA_ROOT:-/nonexistent}/pg" >/dev/null 2>&1; then problems+=("a postgres process of the lane still runs"); fi
+  jq -nc --argjson p "$(printf '%s\n' "${problems[@]:-}" | jq -Rn '[inputs | select(. != "")]')" '{clean: ($p | length == 0), problems: $p}'
+  ((${#problems[@]} == 0)) || fail=1
+  return "$fail"
+}
+
 main() {
   local cmd=${1:-}
   shift || true
@@ -347,6 +450,9 @@ main() {
     status) cmd_status "$@" ;;
     declare-args) cmd_declare_args "$@" ;;
     compare) cmd_compare "$@" ;;
+    assert-single-server) cmd_assert_single_server "$@" ;;
+    restart-server) cmd_restart_server "$@" ;;
+    assert-clean) cmd_assert_clean "$@" ;;
     -h | --help | help | '') usage ;;
     *) bench_die "unknown command '$cmd' (try --help)" ;;
   esac

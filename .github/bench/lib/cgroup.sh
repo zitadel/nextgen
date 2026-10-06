@@ -239,14 +239,16 @@ cg_step_out() {
   done
 }
 
-# cg_run_in DIR CMD...: move this process into DIR, then exec CMD.
+# cg_run_in DIR CMD...: move this process into DIR, then exec CMD (as the lane
+# user when running as root).
 cg_run_in() {
   local dir=$1
   shift
   # shellcheck disable=SC2016  # $$ and $1 are for the inner bash, on purpose
   # The PID is written before exec, so the command is in the cgroup from its
   # first instruction and everything it forks inherits it.
-  exec bash -c 'printf "%s\n" "$$" >"$1/cgroup.procs" || exit 97; shift; exec "$@"' bench-cg "$dir" "$@"
+  bench_run_as_prefix
+  exec bash -c 'printf "%s\n" "$$" >"$1/cgroup.procs" || exit 97; shift; exec "$@"' bench-cg "$dir" "${BENCH_AS[@]}" "$@"
 }
 
 # cg_spawn DIR LOG PIDFILE CMD...: start CMD detached, inside cgroup DIR,
@@ -255,9 +257,10 @@ cg_run_in() {
 cg_spawn() {
   local dir=$1 log=$2 pidfile=$3
   shift 3
+  bench_run_as_prefix
   # shellcheck disable=SC2016  # $$ and $1 are for the inner bash, on purpose
   setsid bash -c 'printf "%s\n" "$$" >"$1/cgroup.procs" || exit 97; printf "%s\n" "$$" >"$2"; shift 2; exec "$@"' \
-    bench-spawn "$dir" "$pidfile" "$@" </dev/null >>"$log" 2>&1 &
+    bench-spawn "$dir" "$pidfile" "${BENCH_AS[@]}" "$@" </dev/null >>"$log" 2>&1 &
 }
 
 # --------------------------------------------------------------- preflight
@@ -272,7 +275,7 @@ cg_preflight() {
   fi
   [[ -d $root ]] || bench_die "cgroup root $root does not exist"
   [[ -w $root/cgroup.procs ]] ||
-    bench_die "cgroup $root is not writable by this user: delegate it (cgroup v2 delegation, ADR 069) or run the job with a writable cgroup2 mount"
+    bench_die "cgroup $root is not writable by this user: run as root (BENCH_PARTITION_MODE=host) or delegate the cgroup to this user (ADR 069)"
   avail=$(cg_read "$root" cgroup.controllers)
   for c in memory cpu; do
     [[ " $avail " == *" $c "* ]] || missing+=("$c")

@@ -106,7 +106,7 @@ win_snapshot() {
   [[ -e $sf ]] || bench_die "no partition is active; run bench-partition up first"
   dir=$(win_dir "$name")
   mkdir -p "$dir"
-  for role in $(jq -r '.roles | to_entries[] | select(.value.active) | .key' "$sf"); do
+  for role in $(jq -r '.roles | to_entries[] | select(.value.active and .value.cgroup != "") | .key' "$sf"); do
     cg=$(jq -r --arg r "$role" '.roles[$r].cgroup' "$sf")
     roles=$(jq -c --arg r "$role" --argjson s "$(cg_snapshot "$cg")" '.[$r] = $s' <<<"$roles")
   done

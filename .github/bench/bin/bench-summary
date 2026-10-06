@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# Markdown summary of one lane's run record, for the job summary and the pull
+# request: what the machine exposed, the allocation, the isolation verdict with
+# the counters before and after, the single-server refusal, and every window's
+# verdict.
+#
+#   bench-summary RUN_DIR
+set -euo pipefail
+shopt -s inherit_errexit
+HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+# shellcheck source=../lib/common.sh
+. "$HERE/lib/common.sh"
+bench_need jq
+
+d=${1:-}
+[[ -r $d/run-metadata.json ]] || bench_die "usage: bench-summary RUN_DIR (with run-metadata.json)"
+m=$d/run-metadata.json
+
+jq -r '
+  "### Lane `\(.lane)` (dialect \(.database.dialect), observed: \(.database.observed.evidence))\n",
+  "- machine: \(.host.platform.product_name) (\(.host.platform.virtualization), hypervisor \(.host.platform.hypervisor)), \(.host.cpu_model), \(.host.threads_per_core) thread(s) per core, kernel \(.host.kernel)",
+  "- isolation: \(.host.platform.isolation_note)",
+  "- partition (\(.partition.mode)): cpuset partition root over `\(.partition.bench_cpus)`, runner and everything else on `\(.partition.roles.system.cpus)`",
+  (.partition.roles | to_entries[] | select(.value.active and (.value.cgroup != "")) |
+     "- `\(.key)`: cpus `\(.value.cpus)` (\(.value.cores) cores), memory.max \(.value.memory_max_bytes / 1048576 | floor) MiB"),
+  "- not partitioned: \(.not_partitioned | join("; "))",
+  "- data disk: \(.database.disk.kind) (\(.database.disk.fstype), \(.database.disk.model))",
+  "- boot marker: `\(.boot_marker.digest)`",
+  (if .database.postgres then "- postgres \(.database.postgres.version), \(.database.postgres.non_default_settings | length) non-default settings recorded" else empty end)
+' "$m"
+
+if [[ -r $d/single-server.json ]]; then
+  jq -r '"- second server on the data directory: exit \(.second_server_exit) (expected \(.expected_exit)), server processes \(.server_processes_before) -> \(.server_processes_after), healthz \(.healthz): refused = \(.refused)"' "$d/single-server.json"
+fi
+
+for f in isolation.json controls.json; do
+  [[ -r $d/$f ]] || continue
+  echo
+  echo "#### \`$f\`"
+  jq -r '"status: **\(.status)**; window `\(.window)`, \(.seconds) s, \(.busy_loops_in_loadgen) busy loops in the load generator (cpus `\(.loadgen_cpus)`), server cpus `\(.server_cpus)`",
+    "- saturated: \(.checks.saturated.pass) (load generator used \(.checks.saturated.loadgen_cpu_usec) us of \(.checks.saturated.available_cpu_usec) available)",
+    "- served: \(.checks.served.pass) (server cgroup used \(.checks.served.server_cpu_usec) us of \(.checks.served.wanted_cpu_usec) wanted)",
+    "- unchanged: \(.checks.unchanged.pass) (server nr_throttled +\(.checks.unchanged.server_nr_throttled), throttled_usec +\(.checks.unchanged.server_throttled_usec))",
+    "- placement: \(.checks.placement.pass) (load generator allowed `\(.checks.placement.loadgen_allowed)` ran on `\(.checks.placement.loadgen_ran_on)`; server allowed `\(.checks.placement.server_allowed)` ran on `\(.checks.placement.server_ran_on)`)",
+    "- outside: \(.checks.outside.pass) (this process may run on `\(.checks.outside.this_process_allowed)`, the partition owns `\(.checks.outside.partition_cpus)`)",
+    (if .negative_controls.throttle then "- control, CPU quota on the server: detected = \(.negative_controls.throttle.detected) (\(.negative_controls.throttle.reasons | join("; ")))" else empty end),
+    (if .negative_controls.boot_marker then "- control, server restart: detected = \(.negative_controls.boot_marker.detected) (\(.negative_controls.boot_marker.reasons | join("; ")))" else empty end)' "$d/$f"
+done
+
+if [[ -d $d/windows ]]; then
+  echo
+  echo "#### windows"
+  for v in "$d"/windows/*/verdict.json; do
+    [[ -r $v ]] || continue
+    jq -r '"- `\(.name)`: \(if .valid then "valid" else "INVALID: " + (.reasons | join("; ")) end) (\(.seconds) s; server cpu \(.deltas.server.cpu_usage_usec) us, nr_throttled +\(.deltas.server.nr_throttled))"' "$v"
+  done
+fi
