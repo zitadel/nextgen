@@ -500,6 +500,76 @@ func TestAuthAttemptService_IssueSSOState(t *testing.T) {
 	})
 }
 
+// The ceremony's outcome is audited with its result, under the SSO check.
+func TestAuthAttemptService_SetSSOCallbackResult(t *testing.T) {
+	sessionID := "sess-1"
+	check := &domain.SSOCallbackCheck{ID: "chk-1", StateHash: "state-hash", AuthAttemptID: "att-1"}
+	tests := []struct {
+		name      string
+		result    *domain.SSOCallbackResult
+		writeErr  error
+		wantErr   error
+		wantEvent domain.EventType
+	}{
+		{
+			name:      "a failed result emits auth.check.failed",
+			result:    &domain.SSOCallbackResult{ProviderSlug: "google", ErrorKey: domain.FlowStepErrorSSOCancelled},
+			wantEvent: domain.EventTypeAuthCheckFailed,
+		},
+		{
+			name:      "a successful result emits auth.check.succeeded",
+			result:    &domain.SSOCallbackResult{ProviderSlug: "google", Subject: "sub-1"},
+			wantEvent: domain.EventTypeAuthCheckSucceeded,
+		},
+		{
+			name:     "a refused write emits nothing",
+			result:   &domain.SSOCallbackResult{ProviderSlug: "google", ErrorKey: domain.FlowStepErrorSSOFailed},
+			writeErr: domain.ErrSSOStateInvalid(),
+			wantErr:  domain.ErrSSOStateInvalid(),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			stmts := mocks.NewMockAllStatements(ctrl)
+			stmts.EXPECT().SetSSOCallbackResult(gomock.Any(), "proj", "state-hash", tt.result).Return(tt.writeErr)
+			var gotEvent *domain.Event
+			if tt.writeErr == nil {
+				stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), "proj", "att-1").Return(&domain.AuthAttempt{ProjectID: "proj", ID: "att-1", SessionID: &sessionID}, nil)
+				stmts.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, ev *domain.Event) error {
+					gotEvent = ev
+					return nil
+				})
+			}
+			pool := mocks.NewMockPool(ctrl)
+			statementer := mocks.NewMockStatementer[service.AllStatements](ctrl)
+			pool.EXPECT().Transaction(gomock.Any(), gomock.Any()).DoAndReturn(
+				func(ctx context.Context, fn func(context.Context, service.Statementer[service.AllStatements]) error) error {
+					return fn(ctx, statementer)
+				},
+			)
+			statementer.EXPECT().Statements().Return(stmts).AnyTimes()
+			svc := service.NewAuthAttemptService(service.NewPool(pool), nil, nil, nil)
+
+			err := svc.SetSSOCallbackResult(t.Context(), "proj", check, tt.result)
+
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			require.NotNil(t, gotEvent)
+			assert.Equal(t, tt.wantEvent, gotEvent.EventType)
+			assert.Equal(t, "proj", gotEvent.ProjectID)
+			require.NotNil(t, gotEvent.EntityID)
+			assert.Equal(t, "chk-1", *gotEvent.EntityID)
+			require.NotNil(t, gotEvent.SessionID)
+			assert.Equal(t, sessionID, *gotEvent.SessionID)
+			assert.JSONEq(t, `{"check_id":"chk-1","check_type":"SSOCallback","auth_attempt_id":"att-1"}`, string(gotEvent.Payload))
+		})
+	}
+}
+
 func TestAuthAttemptService_VerifyProof(t *testing.T) {
 	rejectErr := errors.New("user not found")
 	succeedErr := errors.New("persist succeeded check failed")

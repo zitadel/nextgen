@@ -95,15 +95,15 @@ func (c *FlowSSOCallback) Process(ctx context.Context, in FlowSSOCallbackInput) 
 			slog.String("error_description", in.ErrorDescription),
 			slog.String("error_uri", in.ErrorURI),
 		)
-		return c.park(ctx, projectID, in.State, pending, key)
+		return c.park(ctx, projectID, check, key)
 	}
 	if in.Code == "" {
-		return c.fail(ctx, projectID, in.State, pending, errors.New("the callback carried neither a code nor an error"))
+		return c.fail(ctx, projectID, check, errors.New("the callback carried neither a code nor an error"))
 	}
 
 	identity, err := c.exchange(ctx, projectID, in.Code, pending)
 	if err != nil {
-		return c.fail(ctx, projectID, in.State, pending, err)
+		return c.fail(ctx, projectID, check, err)
 	}
 	result := &domain.SSOCallbackResult{
 		Subject:              identity.Subject,
@@ -112,7 +112,7 @@ func (c *FlowSSOCallback) Process(ctx context.Context, in FlowSSOCallbackInput) 
 		Claims:               identity.Claims,
 		Verified:             identity.Verified,
 	}
-	if err := c.attempts.SetSSOCallbackResult(ctx, projectID, in.State, result); err != nil {
+	if err := c.attempts.SetSSOCallbackResult(ctx, projectID, check, result); err != nil {
 		return FlowSSOCallbackOutput{}, err
 	}
 	return FlowSSOCallbackOutput{ReturnTarget: pending.ReturnTarget}, nil
@@ -186,7 +186,7 @@ func (c *FlowSSOCallback) resolveClientSecret(ctx context.Context, projectID str
 // fail logs the cause the user must not see and stores the generic failure
 // key. An internal error is a bug in this process, not a ceremony outcome,
 // and is returned instead.
-func (c *FlowSSOCallback) fail(ctx context.Context, projectID, state string, pending *domain.SSOStatePayload, cause error) (FlowSSOCallbackOutput, error) {
+func (c *FlowSSOCallback) fail(ctx context.Context, projectID string, check *domain.SSOCallbackCheck, cause error) (FlowSSOCallbackOutput, error) {
 	if errors.Is(cause, domain.ErrInternal(nil)) {
 		return FlowSSOCallbackOutput{}, domain.ErrInternal(cause)
 	}
@@ -195,19 +195,19 @@ func (c *FlowSSOCallback) fail(ctx context.Context, projectID, state string, pen
 	if !errors.Is(ctx.Err(), context.Canceled) {
 		getLoggingContext(ctx, "flow").Warn("sso callback failed",
 			slog.String("project_id", projectID),
-			slog.String("slug", pending.ProviderSlug),
+			slog.String("slug", check.Pending.ProviderSlug),
 			slog.Any("error", cause),
 		)
 	}
-	return c.park(ctx, projectID, state, pending, domain.FlowStepErrorSSOFailed)
+	return c.park(ctx, projectID, check, domain.FlowStepErrorSSOFailed)
 }
 
 // park stores an error result on the consumed record and sends the browser
 // back to the return target, where the originating step shows the key.
-func (c *FlowSSOCallback) park(ctx context.Context, projectID, state string, pending *domain.SSOStatePayload, key string) (FlowSSOCallbackOutput, error) {
-	result := &domain.SSOCallbackResult{ProviderSlug: pending.ProviderSlug, ErrorKey: key}
-	if err := c.attempts.SetSSOCallbackResult(ctx, projectID, state, result); err != nil {
+func (c *FlowSSOCallback) park(ctx context.Context, projectID string, check *domain.SSOCallbackCheck, key string) (FlowSSOCallbackOutput, error) {
+	result := &domain.SSOCallbackResult{ProviderSlug: check.Pending.ProviderSlug, ErrorKey: key}
+	if err := c.attempts.SetSSOCallbackResult(ctx, projectID, check, result); err != nil {
 		return FlowSSOCallbackOutput{}, err
 	}
-	return FlowSSOCallbackOutput{ReturnTarget: pending.ReturnTarget}, nil
+	return FlowSSOCallbackOutput{ReturnTarget: check.Pending.ReturnTarget}, nil
 }

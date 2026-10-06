@@ -67,8 +67,12 @@ type AuthAttemptService interface {
 	// issued state; a second write, or a write after a re-issue, returns
 	// ErrSSOStateInvalid.
 	//
+	// The write emits the ceremony's outcome: auth.check.failed for a result
+	// with an error key, auth.check.succeeded otherwise. The bind later emits
+	// its own event for the user factor it adds.
+	//
 	// errors: domain.ErrSSOStateInvalid, domain.ErrInternal
-	SetSSOCallbackResult(ctx context.Context, projectID, state string, result *domain.SSOCallbackResult) error
+	SetSSOCallbackResult(ctx context.Context, projectID string, check *domain.SSOCallbackCheck, result *domain.SSOCallbackResult) error
 
 	// VerifyProof verifies the submitted proof against the challenge identified by ChallengeID.
 	//
@@ -440,9 +444,36 @@ func (s *authAttemptService) ConsumeSSOState(ctx context.Context, projectID, sta
 	return s.stmts.Statements().ConsumeSSOState(ctx, projectID, domain.HashSecret(state), bindingNonce)
 }
 
-// SetSSOCallbackResult implements [AuthAttemptService].
-func (s *authAttemptService) SetSSOCallbackResult(ctx context.Context, projectID, state string, result *domain.SSOCallbackResult) error {
-	return s.stmts.Statements().SetSSOCallbackResult(ctx, projectID, domain.HashSecret(state), result)
+// SetSSOCallbackResult implements [AuthAttemptService]. check is the record
+// ConsumeSSOState returned.
+func (s *authAttemptService) SetSSOCallbackResult(ctx context.Context, projectID string, check *domain.SSOCallbackCheck, result *domain.SSOCallbackResult) error {
+	return s.stmts.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		if err := tx.Statements().SetSSOCallbackResult(ctx, projectID, check.StateHash, result); err != nil {
+			return err
+		}
+		// The session the event carries lives on the attempt.
+		attempt, err := tx.Statements().GetAuthAttemptByID(ctx, projectID, check.AuthAttemptID)
+		if err != nil {
+			return err
+		}
+		eventType := domain.EventTypeAuthCheckSucceeded
+		if result.ErrorKey != "" {
+			eventType = domain.EventTypeAuthCheckFailed
+		}
+		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
+			Type:       eventType,
+			Category:   domain.EventCategoryAuth,
+			ProjectID:  projectID,
+			EntityType: "check",
+			EntityID:   check.ID,
+			SessionID:  attempt.SessionID,
+			Payload: domain.AuthCheckPayload{
+				CheckID:       check.ID,
+				CheckType:     check.Type().String(),
+				AuthAttemptID: check.AuthAttemptID,
+			},
+		})
+	})
 }
 
 // VerifyProof verifies the submitted proof against the challenge identified by ChallengeID.

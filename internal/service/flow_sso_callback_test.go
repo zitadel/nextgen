@@ -176,7 +176,7 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 			}
 			require.NoError(t, err)
 			assert.Equal(t, "https://app.example.com/login?flow=flow-1", out.ReturnTarget)
-			assert.Equal(t, ssoCallbackState, attempts.setResultState)
+			assert.Same(t, attempts.consumeCheck, attempts.setResultCheck)
 		})
 	}
 }

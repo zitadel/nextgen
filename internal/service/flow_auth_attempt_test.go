@@ -36,7 +36,7 @@ type fakeAuthAttempts struct {
 	consumeNonce     string
 	consumeCheck     *domain.SSOCallbackCheck
 	consumeErr       error
-	setResultState   string
+	setResultCheck   *domain.SSOCallbackCheck
 	setResult        *domain.SSOCallbackResult
 	setResultErr     error
 }
@@ -76,8 +76,8 @@ func (f *fakeAuthAttempts) ConsumeSSOState(_ context.Context, _, state, bindingN
 	return f.consumeCheck, f.consumeErr
 }
 
-func (f *fakeAuthAttempts) SetSSOCallbackResult(_ context.Context, _, state string, result *domain.SSOCallbackResult) error {
-	f.setResultState, f.setResult = state, result
+func (f *fakeAuthAttempts) SetSSOCallbackResult(_ context.Context, _ string, check *domain.SSOCallbackCheck, result *domain.SSOCallbackResult) error {
+	f.setResultCheck, f.setResult = check, result
 	return f.setResultErr
 }
 
