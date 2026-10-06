@@ -37,7 +37,12 @@ jobs:
       # See ci.yml: names failed tasks in plain text and replays their output.
       MOON_SUMMARY: detailed
     steps:
+      # Full history, same as ci.yml: in CI, `moon run` loads changed files
+      # against `main` before running anything, and fails outright on a shallow
+      # clone where that ref does not exist.
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-go@v6
         with:
