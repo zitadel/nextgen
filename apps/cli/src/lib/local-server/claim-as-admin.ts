@@ -1,4 +1,5 @@
-import { createZitadelClient } from "../api-client";
+import { createZitadelClient } from "@zitadel/api/client";
+
 import type { LocalAdmin } from "./admin-credential";
 import { adminSessionCookie, localAdminRequest } from "./sign-in";
 

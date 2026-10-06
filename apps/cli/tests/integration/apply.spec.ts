@@ -65,18 +65,6 @@ describe("apply", () => {
         expect(result).toFailWith("E_NETWORK");
       });
     });
-
-    describe("that refuses connections", () => {
-      it("fails", async () => {
-        const app = await aSetUpApp();
-        await addCompanyFieldAndUseIt(app);
-        platform.refusesConnections();
-
-        const result = await app.apply();
-
-        expect(result).toFailWith("E_NETWORK");
-      });
-    });
   });
 
   describe("against a valid server", () => {

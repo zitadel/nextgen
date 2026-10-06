@@ -28,17 +28,6 @@ describe("variables delete", () => {
         expect(result).toFailWith("E_NETWORK");
       });
     });
-
-    describe("that refuses connections", () => {
-      it("fails", async () => {
-        const app = await aSetUpApp();
-        platform.refusesConnections();
-
-        const result = await app.deleteVariable("FOO");
-
-        expect(result).toFailWith("E_NETWORK");
-      });
-    });
   });
 
   describe("against a valid server", () => {

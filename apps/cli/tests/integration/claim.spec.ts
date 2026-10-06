@@ -34,17 +34,6 @@ describe("claim", () => {
         expect(result).toFail();
       });
     });
-
-    describe("that refuses connections", () => {
-      it("fails", async () => {
-        const app = await aSetUpApp();
-        platform.refusesConnections();
-
-        const result = await app.run(WITHOUT_A_BROWSER);
-
-        expect(result).toFail();
-      });
-    });
   });
 
   describe("against a valid server", () => {

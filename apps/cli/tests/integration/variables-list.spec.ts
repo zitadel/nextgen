@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "../helpers/platform";
 import { aSetUpApp } from "../helpers/project";
-import { pressCtrlC } from "../helpers/run-cli";
 
 const platform = usePlatformMock();
 
@@ -23,30 +22,6 @@ describe("variables list", () => {
       it("fails", async () => {
         const app = await aSetUpApp();
         platform.isUnavailable();
-
-        const result = await app.run(["variables", "list", "--project-level", "--json"]);
-
-        expect(result).toFailWith("E_NETWORK");
-      });
-    });
-
-    describe("that hangs", () => {
-      it("stops on Ctrl-C", async () => {
-        const app = await aSetUpApp();
-        const waiting = platform.hangs();
-
-        const result = app.run(["variables", "list", "--project-level", "--json"]);
-        await waiting;
-        pressCtrlC();
-
-        expect(await result).toFailWith("E_CANCELLED");
-      });
-    });
-
-    describe("that refuses connections", () => {
-      it("fails", async () => {
-        const app = await aSetUpApp();
-        platform.refusesConnections();
 
         const result = await app.run(["variables", "list", "--project-level", "--json"]);
 

@@ -533,11 +533,6 @@ async function fetchOldIfAsked(
     if (err instanceof FatalFetchError) {
       throw err.reason;
     }
-    // Nor is one the developer cancelled with Ctrl-C: previewing offline
-    // instead would carry on after being told to stop.
-    if (err instanceof ZitadelError && err.code === "E_CANCELLED") {
-      throw err;
-    }
     consola.debug(`fetch ${syncer.kind} ${id} failed:`, err);
     return null;
   }

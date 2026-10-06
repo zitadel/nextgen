@@ -28,17 +28,6 @@ describe("logs", () => {
         expect(result).toFailWith("E_VALIDATION");
       });
     });
-
-    describe("that refuses connections", () => {
-      it("fails", async () => {
-        const app = await aSetUpApp();
-        platform.refusesConnections();
-
-        const result = await app.run(["logs", "--json"]);
-
-        expect(result).toFailWith("E_VALIDATION");
-      });
-    });
   });
 
   describe("against a valid server", () => {

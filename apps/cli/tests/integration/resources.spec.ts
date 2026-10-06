@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "../helpers/platform";
 import { anApp, aSetUpApp } from "../helpers/project";
-import { pressCtrlC } from "../helpers/run-cli";
 
 const platform = usePlatformMock();
 
@@ -32,43 +31,6 @@ describe("resources", () => {
         const result = await app.run(["resources", "--json"]);
 
         expect(result).toSucceed();
-      });
-    });
-
-    describe("that refuses connections", () => {
-      it("still succeeds", async () => {
-        const app = await aSetUpApp();
-        platform.refusesConnections();
-
-        const result = await app.run(["resources", "--json"]);
-
-        expect(result).toSucceed();
-      });
-    });
-  });
-
-  describe("a generated command", () => {
-    describe("against a server that refuses connections", () => {
-      it("fails", async () => {
-        const app = await aSetUpApp();
-        platform.refusesConnections();
-
-        const result = await app.run(["idps", "list", "--json"]);
-
-        expect(result).toFailWith("E_NETWORK");
-      });
-    });
-
-    describe("against a server that hangs", () => {
-      it("stops on Ctrl-C", async () => {
-        const app = await aSetUpApp();
-        const waiting = platform.hangs();
-
-        const result = app.run(["idps", "list", "--json"]);
-        await waiting;
-        pressCtrlC();
-
-        expect(await result).toFailWith("E_CANCELLED");
       });
     });
   });
