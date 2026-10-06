@@ -178,7 +178,9 @@ cg_rmdir() {
   fi
 }
 
-cg_pids() { [[ -r $1/cgroup.procs ]] && grep -E '^[0-9]+$' "$1/cgroup.procs" || true; }
+cg_pids() {
+  if [[ -r $1/cgroup.procs ]]; then grep -E '^[0-9]+$' "$1/cgroup.procs" || true; fi
+}
 
 # cg_move_pid PID DIR: put a process in a cgroup.
 cg_move_pid() {

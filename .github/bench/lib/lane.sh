@@ -336,9 +336,11 @@ lane_exe_total() {
 lane_boot_marker() {
   local run_dir=$1 spid sticks ppid pticks dbfile='' dbid=''
   spid=$(cat "$run_dir/pids/server.pid" 2>/dev/null || true)
-  sticks=$([[ -n $spid ]] && bench_start_ticks "$spid" || true)
+  sticks=''
+  if [[ -n $spid ]]; then sticks=$(bench_start_ticks "$spid" || true); fi
   ppid=$(cat "$run_dir/pids/postgres.pid" 2>/dev/null || true)
-  pticks=$([[ -n $ppid ]] && bench_start_ticks "$ppid" || true)
+  pticks=''
+  if [[ -n $ppid ]]; then pticks=$(bench_start_ticks "$ppid" || true); fi
   if [[ $BENCH_DB_DIALECT == sqlite ]]; then
     dbfile=$BENCH_DATA_ROOT/server/zitadel.db
     dbid=$(stat -c '%d:%i' "$dbfile" 2>/dev/null || true)

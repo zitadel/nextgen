@@ -163,9 +163,9 @@ t_replicas() {
   local w=$WORK/replicas
   mkdir -p "$w"
   export BENCH_STATE_DIR=$w/state
-  # shellcheck disable=SC2329  # called through check/refuse
+  # shellcheck disable=SC2329,SC2317  # called through check/refuse
   two_replicas() { lane_load "$1"; BENCH_SERVER_REPLICAS=2; lane_validate; }
-  # shellcheck disable=SC2329  # called through check/refuse
+  # shellcheck disable=SC2329,SC2317  # called through check/refuse
   lane_file_wins() {
     # The environment cannot reconfigure a lane: the lane file is sourced last.
     export BENCH_SERVER_REPLICAS=3 BENCH_DB_DIALECT=postgres BENCH_DB_ROLE=1
