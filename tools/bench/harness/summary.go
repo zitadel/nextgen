@@ -95,7 +95,10 @@ type SweepMeta struct {
 	K6Version      string    `json:"k6_version"`
 	StartedAt      time.Time `json:"started_at"`
 	Base           string    `json:"base"`
-	Runs           []RunMeta `json:"runs"`
+	// Doctor is the check of the target taken before the first run: what it
+	// was, and which of that was observed rather than declared.
+	Doctor *DoctorReport `json:"doctor,omitzero"`
+	Runs   []RunMeta     `json:"runs"`
 }
 
 // summaryExport is the part of k6's --summary-export document the merge
@@ -259,6 +262,11 @@ func Markdown(meta SweepMeta, rows []Row) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "# Sweep %s\n\n", meta.StartedAt.UTC().Format(time.RFC3339))
 	fmt.Fprintf(&b, "commit `%s` · lane `%s` · host `%s` (%d CPUs) · %s · target `%s`\n\n", meta.Commit, meta.Lane, meta.Host, meta.CPUs, meta.K6Version, meta.Base)
+	if meta.Doctor != nil {
+		b.WriteString("Target, as checked before the first run:\n\n```\n")
+		b.WriteString(meta.Doctor.Format())
+		b.WriteString("```\n\n")
+	}
 	b.WriteString("Durations in ms, as k6 reported them per operation. Errors are failed operations as the module classified them, broken down by status class and error code.\n\n")
 	b.WriteString("| scenario | op | vus | n | req/s | failed | errors | error breakdown | dur p50 | dur p95 | dur p99 | blocked p95 | connecting p95 | sending p95 | waiting p95 | receiving p95 |\n")
 	b.WriteString("|---|---|---:|---:|---:|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|\n")
