@@ -299,10 +299,10 @@ describe("scaffolded flow (schemas/default-login.scaffold.json)", () => {
     const ssoSteps = flow.steps.filter((s) => s.sso_providers);
     expect(ssoSteps.map((s) => s.name)).toEqual(["identifier", "register", "sso-conflict"]);
     for (const step of ssoSteps) {
-      for (const outcome of ["callback", "identity_unknown", "user_already_exists"]) {
+      for (const outcome of ["sso_authenticated", "sso_user_not_found", "user_already_exists"]) {
         expect(step.transitions?.[outcome], `${step.name} routes ${outcome}`).toBeDefined();
       }
-      expect(step.transitions!["identity_unknown"]!.target).toBe("register-sso");
+      expect(step.transitions!["sso_user_not_found"]!.target).toBe("register-sso");
     }
     // user_not_found stays the typed-email outcome with the shipped target.
     expect(ssoSteps[0]!.transitions!["user_not_found"]).toEqual({ target: "register" });
@@ -348,7 +348,7 @@ describe("scaffolded flow (schemas/default-login.scaffold.json)", () => {
     for (const step of stripped.steps) delete step.sso_providers;
     const byName = new Map(stripped.steps.map((s) => [s.name, s]));
     for (const name of ["identifier", "register"]) {
-      for (const outcome of ["callback", "identity_unknown", "user_already_exists"]) {
+      for (const outcome of ["sso_authenticated", "sso_user_not_found", "user_already_exists"]) {
         delete byName.get(name)!.transitions![outcome];
       }
     }

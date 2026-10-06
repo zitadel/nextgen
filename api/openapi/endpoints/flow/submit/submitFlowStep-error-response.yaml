@@ -20,6 +20,7 @@ content:
         - $ref: '../../../components/schemas/errors/flow-integrity.yaml'
         - $ref: '../../../components/schemas/errors/flow-invalid_action.yaml'
         - $ref: '../../../components/schemas/errors/flow-not_found.yaml'
+        - $ref: '../../../components/schemas/errors/flow-restart_required.yaml'
         - $ref: '../../../components/schemas/errors/flow-unsupported.yaml'
         - $ref: '../../../components/schemas/errors/internal.yaml'
         - $ref: '../../../components/schemas/errors/tkn-invalid.yaml'
@@ -49,6 +50,7 @@ content:
           flow.integrity: '../../../components/schemas/errors/flow-integrity.yaml'
           flow.invalid_action: '../../../components/schemas/errors/flow-invalid_action.yaml'
           flow.not_found: '../../../components/schemas/errors/flow-not_found.yaml'
+          flow.restart_required: '../../../components/schemas/errors/flow-restart_required.yaml'
           flow.unsupported: '../../../components/schemas/errors/flow-unsupported.yaml'
           internal: '../../../components/schemas/errors/internal.yaml'
           tkn.invalid: '../../../components/schemas/errors/tkn-invalid.yaml'
@@ -140,6 +142,11 @@ content:
         value:
           code: flow.not_found
           message: 'flow not found'
+      flow.restart_required:
+        summary: flow.restart_required
+        value:
+          code: flow.restart_required
+          message: 'the flow must be restarted'
       flow.unsupported:
         summary: flow.unsupported
         value:

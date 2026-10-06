@@ -287,7 +287,7 @@ describe("setup", () => {
         );
         for (const step of offering) {
           expect(step.sso_providers, step.name).toEqual(["google"]);
-          expect(Object.keys(step.transitions ?? {}), step.name).toContain("callback");
+          expect(Object.keys(step.transitions ?? {}), step.name).toContain("sso_authenticated");
         }
       });
 
