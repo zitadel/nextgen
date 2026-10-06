@@ -133,7 +133,7 @@ describe("sso enable", () => {
     const result = await enable(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
     expect(result.exitCode).toBe(0);
 
-    const payload = parseJson(result.stdout) as { data: Record<string, any> };
+    const payload = parseJson(result.stdout) as { data: Record<string, unknown> };
     expect(payload.data.connection).toMatchObject({
       action: "create",
       slug: "google",
@@ -158,7 +158,7 @@ describe("sso enable", () => {
     const before = await readFile(join(cwd, ".zitadel/idps/google.json"), "utf8");
 
     const result = await enable(cwd);
-    const payload = parseJson(result.stdout) as { data: Record<string, any> };
+    const payload = parseJson(result.stdout) as { data: { connection: { action: string } } };
     expect(payload.data.connection.action).toBe("reuse");
     expect(await readFile(join(cwd, ".zitadel/idps/google.json"), "utf8")).toBe(before);
   });
@@ -201,7 +201,7 @@ describe("sso enable", () => {
       "--client-id",
       "1234-abc.apps.googleusercontent.com",
     );
-    const payload = parseJson(result.stdout) as { data: Record<string, any> };
+    const payload = parseJson(result.stdout) as { data: Record<string, unknown> };
     expect(payload.data.schema).toBe("employees");
   });
 
@@ -225,12 +225,12 @@ describe("sso enable", () => {
   it("names the project it changed in both output modes", async () => {
     const cwd = await makeProject();
     const done = await enable(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
-    expect((parseJson(done.stdout) as { data: Record<string, any> }).data.project_id).toBe(
+    expect((parseJson(done.stdout) as { data: Record<string, unknown> }).data.project_id).toBe(
       "proj_01TEST",
     );
 
     const preview = await enable(cwd, "--client-id", "abc", "--dry-run");
-    expect((parseJson(preview.stdout) as { data: Record<string, any> }).data.project_id).toBe(
+    expect((parseJson(preview.stdout) as { data: Record<string, unknown> }).data.project_id).toBe(
       "proj_01TEST",
     );
   });

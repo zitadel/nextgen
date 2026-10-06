@@ -95,9 +95,6 @@
       "includes": ["**/*.{test,spec}.{ts,tsx,mts,cts}", "**/__tests__/**", "**/tests/**"],
       "linter": {
         "rules": {
-          "suspicious": {
-            "noExplicitAny": "off"
-          },
           "style": {
             "noNonNullAssertion": "off"
           }
