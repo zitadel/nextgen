@@ -56,12 +56,15 @@ func TestUserPassword_Verify(t *testing.T) {
 
 func TestUserPasswordFailures_CheckRateLimit(t *testing.T) {
 	now := time.Now()
-	assert.NoError(t, UserPasswordFailures{}.CheckRateLimit(now))
-	assert.NoError(t, UserPasswordFailures{Count: UserPasswordFreeFailures, LastFailedAt: now}.CheckRateLimit(now),
+	assert.NoError(t, UserPasswordFailures{}.CheckRateLimit())
+	assert.NoError(t, UserPasswordFailures{Count: UserPasswordFreeFailures, LastFailedAt: now}.CheckRateLimit(),
 		"the free failures hold nothing back")
 
-	restricted := UserPasswordFailures{Count: UserPasswordFreeFailures + 1, LastFailedAt: now}
-	assert.ErrorIs(t, restricted.CheckRateLimit(now), ErrUserPasswordRateLimited())
-	assert.ErrorIs(t, restricted.CheckRateLimit(now.Add(UserPasswordBackoffBase-time.Nanosecond)), ErrUserPasswordRateLimited())
-	assert.NoError(t, restricted.CheckRateLimit(now.Add(UserPasswordBackoffBase)), "the restriction lifts after the wait")
+	restricted := func(lastFailedAt time.Time) UserPasswordFailures {
+		return UserPasswordFailures{Count: UserPasswordFreeFailures + 1, LastFailedAt: lastFailedAt}
+	}
+	assert.ErrorIs(t, restricted(now).CheckRateLimit(), ErrUserPasswordRateLimited())
+	assert.ErrorIs(t, restricted(now.Add(-UserPasswordBackoffBase+10*time.Second)).CheckRateLimit(), ErrUserPasswordRateLimited(),
+		"still within the wait")
+	assert.NoError(t, restricted(now.Add(-UserPasswordBackoffBase)).CheckRateLimit(), "the restriction lifts after the wait")
 }
