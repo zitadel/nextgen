@@ -134,10 +134,13 @@ func (s *Shipper) loop() {
 }
 
 func (s *Shipper) shipOnce() {
-	ctx, cancel := context.WithTimeout(context.Background(), shipListTimeout)
-	projects, err := s.src.ListClaimedProjectIDs(ctx)
+	ctx, span := startJobSpan("audit.ShipEvents")
+	defer span.End()
+	listCtx, cancel := context.WithTimeout(ctx, shipListTimeout)
+	projects, err := s.src.ListClaimedProjectIDs(listCtx)
 	cancel()
 	if err != nil {
+		failJobSpan(ctx, err)
 		slog.Error("event shipper: list claimed projects failed",
 			slog.String("error", err.Error()),
 		)
@@ -145,13 +148,13 @@ func (s *Shipper) shipOnce() {
 	}
 	for _, sink := range s.sinks {
 		for _, projectID := range projects {
-			s.shipProject(sink, projectID)
+			s.shipProject(ctx, sink, projectID)
 		}
 	}
 }
 
-func (s *Shipper) shipProject(sink *domain.EventSink, projectID string) {
-	ctx, cancel := context.WithTimeout(context.Background(), shipProjectTimeout)
+func (s *Shipper) shipProject(ctx context.Context, sink *domain.EventSink, projectID string) {
+	ctx, cancel := context.WithTimeout(ctx, shipProjectTimeout)
 	defer cancel()
 
 	cursor, err := s.src.GetEventSinkCursor(ctx, sink.ID, projectID)
