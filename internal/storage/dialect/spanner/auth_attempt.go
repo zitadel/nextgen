@@ -25,7 +25,7 @@ const (
 	createAuthAttemptStmt     = `INSERT INTO auth_attempts (project_id, id, required_checks, time_to_live, session_id, created_at, internal) VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7)`
 	createAuthCheckStmt       = `INSERT INTO checks (project_id, auth_attempt_id, id, type, last_challenged_at, last_verified_at, challenge_payload, factor_payload, failure_count) VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, 0)`
 	deleteAuthAttemptByIDStmt = `DELETE FROM auth_attempts WHERE project_id = @p1 AND id = @p2`
-	handoffAuthAttemptStmt    = `UPDATE auth_attempts SET handoff_token = @p1, handed_off_at = @p2 WHERE project_id = @p3 AND id = @p4 THEN RETURN handed_off_at`
+	handoffAuthAttemptStmt    = `UPDATE auth_attempts SET handoff_token = @p1, handed_off_at = @p2 WHERE project_id = @p3 AND id = @p4 AND handed_off_at IS NULL THEN RETURN handed_off_at`
 	// Spanner rejects a NULL_FILTERED unique index as ON CONFLICT arbiter
 	// ("Unimplemented"), so the challenge upsert is update-then-insert inside
 	// withTransaction instead of INSERT ... ON CONFLICT.
@@ -41,13 +41,17 @@ const (
 	insertAuthAttemptFactorStmt = `INSERT INTO checks (project_id, auth_attempt_id, type, id, last_verified_at, factor_payload, failure_count)` +
 		` VALUES (@p1, @p2, @p3, @p4, @p5, @p6, 0)` +
 		` THEN RETURN id`
+	// The check id is part of the primary key, so AddAuthAttemptFactor cannot
+	// give a pending row a new id in place: it deletes the row and inserts.
+	deletePendingAuthAttemptCheckStmt = `DELETE FROM checks WHERE project_id = @p1 AND auth_attempt_id = @p2 AND type = @p3 AND last_verified_at IS NULL`
 	authAttemptChallengeSucceededStmt = `UPDATE checks SET last_verified_at = @p1, factor_payload = @p2, challenge_payload = NULL, last_challenged_at = NULL, failure_count = 0` +
 		` WHERE project_id = @p3 AND auth_attempt_id = @p4 AND type = @p5 AND id = @p6`
 	// Spanner DML cannot update a primary-key column, and a re-issue mints a
 	// fresh check id so a stale one cannot match, so the issue deletes the
 	// attempt's row and inserts the new one inside withTransaction.
-	deleteSSOStateStmt = `DELETE FROM checks WHERE project_id = @p1 AND auth_attempt_id = @p2 AND type = @p3`
-	insertSSOStateStmt = `INSERT INTO checks (project_id, auth_attempt_id, type, id, last_challenged_at, challenge_payload, lookup_hash, failure_count)` +
+	deleteSSOStateStmt    = `DELETE FROM checks WHERE project_id = @p1 AND auth_attempt_id = @p2 AND type = @p3`
+	deleteSSOCallbackStmt = `DELETE FROM checks WHERE project_id = @p1 AND auth_attempt_id = @p2 AND type = @p3 AND id = @p4`
+	insertSSOStateStmt    = `INSERT INTO checks (project_id, auth_attempt_id, type, id, last_challenged_at, challenge_payload, lookup_hash, failure_count)` +
 		` VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, 0)`
 	selectPendingSSOStateStmt = `SELECT c.id, c.auth_attempt_id, c.challenge_payload, aa.created_at, aa.time_to_live` +
 		` FROM checks c` +
@@ -303,11 +307,27 @@ func (as authAttemptStatements) HandoffAuthAttempt(ctx context.Context, attempt 
 		})
 		return err
 	})
+	if _, noRow := errors.AsType[*database.NoRowFoundError](err); noRow {
+		return as.handoffRefused(ctx, attempt, fmt.Errorf("failed to handoff auth attempt: %w", err))
+	}
 	if err != nil {
 		return fmt.Errorf("failed to handoff auth attempt: %w", err)
 	}
 	attempt.HandedOffAt = &handedOffAt
 	return nil
+}
+
+// handoffRefused explains a handoff that updated no row: the attempt is
+// missing (noRow is returned) or another request already handed it off.
+func (as authAttemptStatements) handoffRefused(ctx context.Context, attempt *domain.AuthAttempt, noRow error) error {
+	_, err := as.GetAuthAttemptByID(ctx, attempt.ProjectID, attempt.ID)
+	if errors.Is(err, domain.ErrAuthAttemptNotFound()) {
+		return noRow
+	}
+	if err != nil {
+		return err
+	}
+	return domain.ErrAuthAttemptAlreadyHandedOff()
 }
 
 // SetAuthAttemptChallenge implements [service.AuthAttemptStatements].
@@ -393,6 +413,40 @@ func (as authAttemptStatements) SetAuthAttemptFactor(ctx context.Context, projec
 	}
 	factor.SetLastVerifiedAt(now)
 	return returnedID, nil
+}
+
+// AddAuthAttemptFactor implements [service.AuthAttemptStatements]. The insert
+// hits the unique (project_id, auth_attempt_id, type) index when a verified
+// factor is still stored, which surfaces as a [database.UniqueError].
+func (as authAttemptStatements) AddAuthAttemptFactor(ctx context.Context, projectID, authAttemptID string, factor domain.AuthFactor) (string, error) {
+	now := time.Now().UTC()
+	payloadStr, err := authattempt.MarshalPayloadString(factor.Payload())
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal factor payload: %w", err)
+	}
+	checkID := ""
+	if err := ensureManagedID(&checkID, domain.PrefixChallenge); err != nil {
+		return "", err
+	}
+	err = withTransaction(ctx, as.db, func(ctx context.Context, tx queryExecutor) error {
+		deletePending := buildStatement(deletePendingAuthAttemptCheckStmt, projectID, authAttemptID, int64(factor.Type())).statement()
+		if _, err := tx.Update(ctx, deletePending); err != nil {
+			return err
+		}
+		insert := buildStatement(insertAuthAttemptFactorStmt,
+			projectID, authAttemptID, int64(factor.Type()), checkID, now, encodeSpannerJSONPtr(payloadStr)).statement()
+		return tx.Write(ctx, insert, func(iter *spanner.RowIterator) error {
+			_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
+				return struct{}{}, row.Columns(&checkID)
+			})
+			return err
+		})
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to add factor: %w", err)
+	}
+	factor.SetLastVerifiedAt(now)
+	return checkID, nil
 }
 
 // AuthAttemptChallengeSucceeded implements [service.AuthAttemptStatements].
@@ -540,6 +594,20 @@ func (as authAttemptStatements) SetSSOCallbackResult(ctx context.Context, projec
 	n, err := as.db.Update(ctx, stmt)
 	if err != nil {
 		return fmt.Errorf("failed to set sso callback result: %w", err)
+	}
+	if n == 0 {
+		return domain.ErrSSOStateInvalid()
+	}
+	return nil
+}
+
+// DeleteSSOCallback implements [service.AuthAttemptStatements].
+func (as authAttemptStatements) DeleteSSOCallback(ctx context.Context, projectID, authAttemptID, checkID string) error {
+	stmt := buildStatement(deleteSSOCallbackStmt,
+		projectID, authAttemptID, int64(domain.AuthCheckTypeSSOCallback), checkID).statement()
+	n, err := as.db.Update(ctx, stmt)
+	if err != nil {
+		return fmt.Errorf("failed to delete sso callback: %w", err)
 	}
 	if n == 0 {
 		return domain.ErrSSOStateInvalid()

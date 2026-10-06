@@ -37,6 +37,17 @@ describe("setup", () => {
         expect(result).toFailWith("E_NETWORK");
       });
     });
+
+    describe("that refuses connections", () => {
+      it("fails", async () => {
+        const app = await anApp();
+        platform.refusesConnections();
+
+        const result = await app.setup();
+
+        expect(result).toFailWith("E_NETWORK");
+      });
+    });
   });
 
   describe("against a valid server", () => {
@@ -276,7 +287,7 @@ describe("setup", () => {
         );
         for (const step of offering) {
           expect(step.sso_providers, step.name).toEqual(["google"]);
-          expect(Object.keys(step.transitions ?? {}), step.name).toContain("callback");
+          expect(Object.keys(step.transitions ?? {}), step.name).toContain("sso_authenticated");
         }
       });
 

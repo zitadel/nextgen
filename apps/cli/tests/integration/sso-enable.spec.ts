@@ -54,6 +54,20 @@ describe("sso enable", () => {
         );
       });
     });
+
+    describe("that refuses connections", () => {
+      it("still writes the provider into the project", async () => {
+        const app = await aSetUpApp();
+        platform.refusesConnections();
+
+        const result = await app.enableSso(GOOGLE, CREDENTIALS);
+
+        expect(result).toSucceed();
+        expect((await app.committed.idpConnection(GOOGLE)).oidc.client_id).toBe(
+          "${{ GOOGLE_CLIENT_ID }}",
+        );
+      });
+    });
   });
 
   describe("against a valid server", () => {
@@ -174,7 +188,7 @@ describe("sso enable", () => {
           const offering = await app.stepsOfferingSso();
 
           for (const step of offering) {
-            expect(Object.keys(step.transitions ?? {}), step.name).toContain("callback");
+            expect(Object.keys(step.transitions ?? {}), step.name).toContain("sso_authenticated");
           }
         });
 

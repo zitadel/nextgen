@@ -7,13 +7,9 @@ A flow definition is a directed graph of steps stored as an API resource and
 executed by the [flow engine](architecture.md). This document describes the
 shape and the rules the engine enforces on top of the JSON schema.
 
-The SSO outcome keys below (`sso_authenticated`, `sso_user_not_found`) are the
-names the engine adopts in #1371. Until that PR merges, the shipped schema and
-validator still accept `callback` and `identity_unknown`.
-
 Validation runs in two layers:
 
-1. **Schema**: `api/openapi/components/flows/flow-definition.yaml` states required fields, types, enums, and string patterns, plus the step and transition shapes JSON Schema can express: a terminal step carries nothing else, a non-terminal step does something, `sso_providers` needs `transitions.sso_authenticated`, and a transition never sets both `purpose` and `action`. The generated editor meta-schema enforces all of it; the API's generated request validation ignores the shape rules, which the engine rules below enforce again.
+1. **Schema**: `api/openapi/components/flows/flow-definition.yaml` states required fields, types, enums, and string patterns, plus the step and transition shapes JSON Schema can express: a terminal step carries nothing else, a non-terminal step does something, `sso_providers` needs `transitions.sso_authenticated`, a transition never sets both `purpose` and `action`, and the `sso_authenticated` and `sso_user_not_found` transitions set neither. The generated editor meta-schema enforces all of it; the API's generated request validation ignores the shape rules, which the engine rules below enforce again.
 2. **Engine**: the rules below, applied at write time and (where deferred) at runtime.
 
 ## Definition shape
@@ -85,6 +81,7 @@ Transition values:
 - Every key in `transitions` is either an action name declared in this step's `actions` or a reserved engine-emitted outcome.
 - **`back` is a reserved action name.** The engine injects a `back` action on rendered responses when there's a step to return to (non-empty back stack on a non-terminal step). Authors must not declare an action named `back`, regardless of `kind`.
 - When `sso_providers` is non-empty, `transitions.sso_authenticated` is defined. The `sso` action itself is engine-handled and never appears in `transitions`.
+- The `sso_authenticated` and `sso_user_not_found` transitions declare neither `purpose` nor `action`: they carry the user the engine just bound or the provider's parked claims, which a re-purpose would drop and another flow cannot receive. The shared `user_already_exists` is not restricted.
 - Every entry in `fields` resolves to a property in the referenced `user_schema`.
 - A step with an identifier-shaped field (schema property with non-empty `x-unique`) may declare a `user_not_found` transition; absence of the transition means the engine errors on lookup failure rather than routing. See [ADR 017](../../adrs/017-flow-engine-auth-attempt-dispatch.md) for the direction this is heading.
 

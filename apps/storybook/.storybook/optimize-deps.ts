@@ -30,9 +30,16 @@ export const optimizeDepsInclude = [
   "lit/decorators.js",
   "lit/directives/class-map.js",
   "lit/directives/if-defined.js",
+  "lit/directives/keyed.js",
   "lit/directives/live.js",
   "lit/directives/unsafe-html.js",
   "lit/directives/unsafe-svg.js",
+  // Imported by `.storybook/preview.ts`, which the Vitest addon loads as its
+  // setup file. Un-prebundled, the browser discovers it mid-setup and Vite
+  // re-optimizes, invalidating the in-flight setup-file URL — the "Failed to
+  // fetch dynamically imported module" that fails cold CI runs of the story
+  // tests (passes on a warm local cache, same as the excluded-dep case above).
+  "msw-storybook-addon",
   "dompurify",
   "liquidjs",
   "lucide",

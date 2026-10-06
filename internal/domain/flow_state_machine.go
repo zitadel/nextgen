@@ -30,8 +30,12 @@ const (
 	// FlowStepErrorPasskeyRegistrationInvalid reports a rejected
 	// passkey registration attestation.
 	FlowStepErrorPasskeyRegistrationInvalid = "error.passkey_registration_invalid"
+	// FlowStepErrorSSOCreationDisabled reports a provider identity with no
+	// account on a connection whose provisioning.creation is disabled.
+	FlowStepErrorSSOCreationDisabled = "error.sso_creation_disabled"
 	// FlowStepErrorSSOUnavailable reports a provider the engine could not
-	// start a sign-in with. The user stays on the step.
+	// start a sign-in with, or whose sign-in the current step cannot route.
+	// The user stays on the step.
 	FlowStepErrorSSOUnavailable = "error.sso_unavailable"
 )
 
@@ -127,7 +131,9 @@ type FlowSSOReturn struct {
 // [Process]. Pop is reserved for the deferred pivot stack. HandoffToken
 // + HandoffTokenExpiresAt are populated only on the terminal step;
 // SSOBindingNonce only on the [FlowStepNameSSORedirect] step, where the
-// handler sets it as the browser-binding cookie.
+// handler sets it as the browser-binding cookie. SSOResolved is set only by
+// [Render], when it resolved a parked SSO identity: the handler re-seals
+// only such a render.
 type FlowStepResult struct {
 	State                 *FlowState
 	Step                  *FlowStep
@@ -135,6 +141,7 @@ type FlowStepResult struct {
 	HandoffToken          string
 	HandoffTokenExpiresAt time.Time
 	SSOBindingNonce       string
+	SSOResolved           bool
 }
 
 // FlowStep is the capability payload the API surfaces to the client.
@@ -251,14 +258,15 @@ type FlowAuthRequestRef struct {
 
 // FlowStateMachineRuntime is the production [FlowStateMachine].
 type FlowStateMachineRuntime struct {
-	schemas      SchemaResolver
-	schemaStore  JSONSchemaStore
-	fields       FlowFieldResolver
-	userCreater  FlowOnSuccessHandler
-	authAttempts FlowAuthAttemptService
-	ssoProviders FlowSSOProviderResolver
-	ssoRedirects FlowSSORedirectIssuer
-	now          func() time.Time
+	schemas       SchemaResolver
+	schemaStore   JSONSchemaStore
+	fields        FlowFieldResolver
+	userCreater   FlowOnSuccessHandler
+	authAttempts  FlowAuthAttemptService
+	ssoProviders  FlowSSOProviderResolver
+	ssoIdentities FlowSSOIdentityService
+	ssoRedirects  FlowSSORedirectIssuer
+	now           func() time.Time
 }
 
 // NewFlowStateMachine wires the runtime. The now hook is injectable so
@@ -270,6 +278,7 @@ func NewFlowStateMachine(
 	createUser FlowOnSuccessHandler,
 	authAttempts FlowAuthAttemptService,
 	ssoProviders FlowSSOProviderResolver,
+	ssoIdentities FlowSSOIdentityService,
 	ssoRedirects FlowSSORedirectIssuer,
 	now func() time.Time,
 ) *FlowStateMachineRuntime {
@@ -277,14 +286,15 @@ func NewFlowStateMachine(
 		now = time.Now
 	}
 	return &FlowStateMachineRuntime{
-		schemas:      schemas,
-		schemaStore:  schemaStore,
-		fields:       fields,
-		userCreater:  createUser,
-		authAttempts: authAttempts,
-		ssoProviders: ssoProviders,
-		ssoRedirects: ssoRedirects,
-		now:          now,
+		schemas:       schemas,
+		schemaStore:   schemaStore,
+		fields:        fields,
+		userCreater:   createUser,
+		authAttempts:  authAttempts,
+		ssoProviders:  ssoProviders,
+		ssoIdentities: ssoIdentities,
+		ssoRedirects:  ssoRedirects,
+		now:           now,
 	}
 }
 
@@ -343,11 +353,16 @@ func (r *FlowStateMachineRuntime) Start(ctx context.Context, in FlowStartInput) 
 	return FlowStepResult{State: state, Step: step}, nil
 }
 
-// Render re-emits the current step without advancing. Refreshes IssuedAt
-// so the cookie max-age window slides while the user is on the step.
+// Render re-emits the current step without advancing. It refreshes IssuedAt
+// only when it resolves a parked SSO identity, the one render the handler
+// re-seals.
 func (r *FlowStateMachineRuntime) Render(ctx context.Context, def *FlowDefinition, state *FlowState) (FlowStepResult, error) {
 	if def == nil || state == nil {
 		return FlowStepResult{}, fmt.Errorf("%w: render without definition or state", ErrFlowIntegrity())
+	}
+	if result, resolved, err := r.resolveSSOIdentity(ctx, def, state); err != nil || resolved {
+		result.SSOResolved = resolved
+		return result, err
 	}
 	step, err := r.renderStep(ctx, def, state)
 	if err != nil {
@@ -355,8 +370,147 @@ func (r *FlowStateMachineRuntime) Render(ctx context.Context, def *FlowDefinitio
 	}
 	// Re-emit an in-flight ceremony so a page reload can resume it.
 	attachPendingChallenge(step, state.PendingChallenge)
-	state.IssuedAt = r.now()
 	return FlowStepResult{State: state, Step: step}, nil
+}
+
+// resolveSSOIdentity turns an external identity an SSO callback parked on the
+// attempt into an outcome on the current step. resolved reports that it
+// produced the result; otherwise Render goes on to render the step as usual.
+//
+// It runs on every render, so every GET /flow/{id} pays one attempt read even
+// without SSO. The read is not only for SSO: LoadParked also restarts any flow
+// whose attempt expired or was handed off. Do not limit it to steps that offer
+// sso_providers.
+//
+// The outcome is raised with an empty action, so an unwired transition
+// degrades to the step-error re-render, as a handler diversion does.
+func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *FlowDefinition, state *FlowState) (FlowStepResult, bool, error) {
+	currentStep, ok := def.FindStep(state.CurrentStep)
+	if !ok {
+		return FlowStepResult{}, false, fmt.Errorf("%w: current step %q missing from definition", ErrFlowIntegrity(), state.CurrentStep)
+	}
+	// A completed flow handed its attempt off; there is nothing to resolve.
+	if currentStep.Complete != nil {
+		return FlowStepResult{}, false, nil
+	}
+	loadInput := FlowSSOLoadInput{
+		ProjectID:       state.ProjectID,
+		AttemptID:       state.AuthAttemptID,
+		UserSchemaURL:   state.UserSchemaURL,
+		ResolvedCheckID: state.SSOResolvedCheckID,
+	}
+	parked, err := r.ssoIdentities.LoadParked(ctx, loadInput)
+	if err != nil {
+		return FlowStepResult{}, false, fmt.Errorf("flow state machine: load parked sso identity: %w", err)
+	}
+	// An earlier request bound the attempt but its handoff failed, and the
+	// parked row is gone: raise the success outcome again, which mints the
+	// handoff. A state that already carries a user has nothing to retry.
+	if parked != nil && parked.BoundUserID != "" {
+		if state.CollectedData.UserID != "" {
+			return FlowStepResult{}, false, nil
+		}
+		pc := &processCtx{ctx: ctx, def: def, state: state, currentStep: currentStep}
+		resolvedFields, err := r.resolveInputs(pc)
+		if err != nil {
+			return FlowStepResult{}, false, err
+		}
+		return r.retrySSOHandoff(pc, resolvedFields, parked.BoundUserID)
+	}
+	if parked == nil {
+		return FlowStepResult{}, false, nil
+	}
+	// Creation under `auto` (create or collide) is not resolved yet: the row
+	// stays parked, and no guard is recorded, so a later render can resolve it.
+	if parked.Link == nil && !parked.CreationDisabled {
+		return FlowStepResult{}, false, nil
+	}
+
+	pc := &processCtx{ctx: ctx, def: def, state: state, currentStep: currentStep}
+	resolvedFields, err := r.resolveInputs(pc)
+	if err != nil {
+		return FlowStepResult{}, false, err
+	}
+	// Recorded before the branch work, so a failed branch is not retried on
+	// every reload.
+	state.SSOResolvedCheckID = parked.CheckID
+
+	if parked.Link == nil {
+		// provisioning.creation is disabled: the identity has no account and
+		// will not get one. The row stays parked, so a failed render or seal
+		// re-runs this branch and shows the error again; the replay guard in
+		// the sealed cookie keeps later reloads from repeating it. The row
+		// expires with the attempt or is replaced by the next ceremony.
+		msg := FlowStepErrorSSOCreationDisabled
+		result, err := r.renderStepError(pc, resolvedFields, &msg)
+		return result, true, err
+	}
+
+	// The bind cannot be undone, so it runs only when the outcome can route:
+	// a stored definition is validated only on write. Otherwise the step
+	// shows the provider as unavailable, and the row stays parked.
+	if !ssoAuthenticatedRoutes(currentStep) {
+		msg := FlowStepErrorSSOUnavailable
+		result, err := r.renderStepError(pc, resolvedFields, &msg)
+		return result, true, err
+	}
+	err = r.ssoIdentities.BindLinked(ctx, FlowSSOBindInput{
+		ProjectID:    state.ProjectID,
+		AttemptID:    state.AuthAttemptID,
+		CheckID:      parked.CheckID,
+		UserID:       parked.Link.UserID,
+		ConnectionID: parked.ConnectionID,
+		LinkID:       parked.Link.LinkID,
+	})
+	if errors.Is(err, ErrSSOStateInvalid()) {
+		// A concurrent request settled the row, or a new ceremony replaced it.
+		// One more read tells which.
+		reread, err := r.ssoIdentities.LoadParked(ctx, loadInput)
+		if err != nil {
+			// Handed off or expired: restart, so this response cannot reseal a
+			// cookie over the winner's. Any other read failure is returned as is.
+			return FlowStepResult{}, false, fmt.Errorf("flow state machine: reload parked sso identity: %w", err)
+		}
+		if reread == nil || reread.BoundUserID == "" {
+			// Replaced: the new ceremony keeps the flow, so render the step.
+			return FlowStepResult{}, false, nil
+		}
+		return r.retrySSOHandoff(pc, resolvedFields, reread.BoundUserID)
+	}
+	if err != nil {
+		return FlowStepResult{}, false, fmt.Errorf("flow state machine: bind sso identity: %w", err)
+	}
+	return r.retrySSOHandoff(pc, resolvedFields, parked.Link.UserID)
+}
+
+// retrySSOHandoff raises sso_authenticated for a user bound on the attempt,
+// which mints the handoff. The bind is this request's or an earlier one whose
+// request did not deliver the handoff; either way a concurrent render can win
+// the handoff first.
+func (r *FlowStateMachineRuntime) retrySSOHandoff(pc *processCtx, resolvedFields FlowResolvedFields, userID string) (FlowStepResult, bool, error) {
+	// An earlier bind may have run on another step, or under an older
+	// definition. Checked before the user is recorded: a purpose would drop
+	// that user and move the flow to a fresh attempt.
+	if !ssoAuthenticatedRoutes(pc.currentStep) {
+		msg := FlowStepErrorSSOUnavailable
+		result, err := r.renderStepError(pc, resolvedFields, &msg)
+		return result, true, err
+	}
+	recordResolvedUser(pc.state, userID)
+	result, err := r.routeOutcome(pc, resolvedFields, FlowImplicitOutcomeSSOAuthenticated, false)
+	if errors.Is(err, ErrAuthAttemptAlreadyHandedOff()) {
+		// A concurrent retry won the handoff. A handed-off attempt restarts
+		// the flow on every later render too, so this one does the same.
+		return FlowStepResult{}, false, ErrFlowRestartRequired().WithParent(err)
+	}
+	return result, true, err
+}
+
+// ssoAuthenticatedRoutes reports whether step routes sso_authenticated within
+// this flow, keeping the bound user.
+func ssoAuthenticatedRoutes(step *FlowDefinitionStep) bool {
+	t, ok := step.Transitions[FlowImplicitOutcomeSSOAuthenticated]
+	return ok && t.Action == nil && t.Purpose == nil
 }
 
 // processCtx carries the per-submission context threaded through the
@@ -443,7 +597,7 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, def *FlowDefiniti
 // processSSO starts an external sign-in with a provider the step offers
 // and emits the redirect step. The flow state is left as it is: the user
 // is still on this step until the resolution after the callback routes it.
-// IssuedAt is refreshed like on every other response, so the flow cookie's
+// IssuedAt is refreshed like on every submit, so the flow cookie's
 // window restarts at this submission.
 func (r *FlowStateMachineRuntime) processSSO(pc *processCtx) (FlowStepResult, error) {
 	in := pc.in
@@ -830,12 +984,12 @@ func identifierFieldsOnly(resolved FlowResolvedFields, values map[string]any) ma
 }
 
 // applyOutcomeFlip flips CurrentPurpose on resolution outcomes:
-// login + user_not_found → register; login + identity_unknown → register;
-// register + user_already_exists → login. Recovery never flips.
+// login + user_not_found → register; login + sso_user_not_found → register;
+// register + user_already_exists → login, typed or SSO. Recovery never flips.
 func applyOutcomeFlip(state *FlowState, outcome string) {
 	switch {
 	case state.CurrentPurpose == FlowDefinitionPurposeLogin &&
-		(outcome == FlowImplicitOutcomeUserNotFound || outcome == FlowImplicitOutcomeIdentityUnknown):
+		(outcome == FlowImplicitOutcomeUserNotFound || outcome == FlowImplicitOutcomeSSOUserNotFound):
 		state.CurrentPurpose = FlowDefinitionPurposeRegister
 	case state.CurrentPurpose == FlowDefinitionPurposeRegister && outcome == FlowImplicitOutcomeUserAlreadyExists:
 		state.CurrentPurpose = FlowDefinitionPurposeLogin
@@ -1405,7 +1559,9 @@ func (r *FlowStateMachineRuntime) renderStep(ctx context.Context, def *FlowDefin
 		return nil, err
 	}
 	prefillFromCollected(&resolved, state.CollectedData.UserData)
-	return r.buildStep(ctx, state, step, resolved, nil, nil, nil)
+	// A terminal step renders as complete, so a re-render of a finished flow
+	// says so (GET /flow/{id} answers 410 on it).
+	return r.buildStep(ctx, state, step, resolved, nil, step.Complete, nil)
 }
 
 func (r *FlowStateMachineRuntime) resolveStepFields(ctx context.Context, state *FlowState, step *FlowDefinitionStep) (FlowResolvedFields, error) {

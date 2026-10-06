@@ -5,6 +5,15 @@ import {
 } from "@zitadel/api/client";
 import { ApiError } from "@zitadel/api/runtime/fetch";
 
+import { interruptSignal } from "./interrupt";
+
+/**
+ * How long one platform request may take, response body included, before it
+ * fails as `E_NETWORK`. Without it a server that accepts the connection and
+ * never answers holds the command for the runtime's own limit — minutes.
+ */
+export const REQUEST_TIMEOUT_MS = 30_000;
+
 /**
  * Characters that can drive a terminal rather than print on it: the C0
  * controls (ESC among them), DEL and the C1 controls (`\p{Cc}`), the format
@@ -156,13 +165,17 @@ export type SanitizeOptions = {
  * {@link SanitizeOptions.verbatim} bodies escapes for itself. The shared
  * package is left raw: the console renders into a DOM, which does not
  * interpret escape codes.
+ *
+ * Every request is also bounded by {@link REQUEST_TIMEOUT_MS} and cancelled by
+ * Ctrl-C (see `./interrupt`), unless the caller sets its own `signal` or
+ * `timeoutMs`.
  */
 export function createZitadelClient(
   opts: ZitadelClientOptions,
   sanitize: SanitizeOptions = {},
 ): ZitadelClient {
   const onResolve = sanitize.verbatim ? <T>(value: T): T => value : sanitizeResponse;
-  const client = createRawClient(opts);
+  const client = createRawClient({ signal: interruptSignal(), timeoutMs: REQUEST_TIMEOUT_MS, ...opts });
   return new Proxy(client, {
     get(target, prop, receiver) {
       const value = Reflect.get(target, prop, receiver);

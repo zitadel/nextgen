@@ -11,7 +11,7 @@ import type {
 import { ApiError, apiErrorMessage } from "@zitadel/api/runtime/fetch";
 import { zitadelTrustmarkInnerHtml } from "../internal/attribution-markup.js";
 import type { Liquid, Template } from "liquidjs";
-import { css, html, LitElement, type PropertyValues } from "lit";
+import { css, html, LitElement, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 
 import "../atoms/index.js";
@@ -148,6 +148,27 @@ function returnTargetFor(flowId: string): string {
  */
 function forceManualCeremony(markup: string): string {
   return markup.replace(/<zl-passkey\b(?![^>]*\smanual[\s>])/g, "<zl-passkey manual");
+}
+
+/**
+ * Drop the `flow` handle from the URL, keeping every other parameter and the
+ * hash, so a reload does not resume a flow the server refused to continue.
+ */
+function clearFlowIdFromLocation(): void {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has(FLOW_QUERY_PARAM)) return;
+  url.searchParams.delete(FLOW_QUERY_PARAM);
+  history.replaceState(history.state, "", url);
+}
+
+/** The `code` of a Flow API error envelope, or "" for anything else. */
+function apiErrorCode(error: unknown): string {
+  if (!(error instanceof ApiError)) return "";
+  const { body } = error;
+  return typeof body === "object" && body !== null && "code" in body
+    ? String((body as { code: unknown }).code)
+    : "";
 }
 
 @customElement("zitadel-login")
@@ -630,8 +651,39 @@ export class ZitadelLogin extends ZitadelSurface {
       novalidate
       aria-busy=${this.loading ? "true" : "false"}
     >
-      ${unsafeHTML(rendered)}
+      ${this.renderPairedIdentifier()}${unsafeHTML(rendered)}
     </form>`;
+  }
+
+  /**
+   * Renders `step.identifier` as the control a password manager pairs with the
+   * password input. No `name` keeps it out of every submission; clipping it
+   * rather than `display:none` or `type="hidden"` keeps a manager able to see
+   * it. It lives here and not in the template because the sanitiser drops a
+   * raw `<input>` from template output, so ejected templates get it for free.
+   *
+   * `value` is the attribute, not a `.value` property binding: a manager
+   * reading the markup has to find the address there, and the control is
+   * readonly and untabbable, so it can never go dirty and drift from it.
+   *
+   * It precedes the password in the form, where a manager looks for the
+   * username, which also makes it the shadow root's focus delegate. Focus
+   * that lands on it is handed to the step's first control.
+   */
+  private renderPairedIdentifier() {
+    const identifier = this.response?.step.identifier;
+    if (!identifier?.value) return nothing;
+    return html`<input
+      type="text"
+      part="paired-identifier"
+      readonly
+      tabindex="-1"
+      aria-hidden="true"
+      autocomplete=${identifier.autocomplete}
+      value=${identifier.value}
+      @focus=${() => this.moveFocusToFirstField()}
+      style="position:absolute;width:1px;height:1px;margin:-1px;padding:0;border:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap"
+    />`;
   }
 
   /**
@@ -718,6 +770,14 @@ export class ZitadelLogin extends ZitadelSurface {
     return { projectId: this.projectId, proxyPath: this.proxyPath, url: this.url };
   }
 
+  /**
+   * Set while a fresh flow replaces one the server refused to continue
+   * (`flow.restart_required`). It bypasses the resume handle, puts the notice
+   * on the new first step, and refuses a second restart until a step renders,
+   * so a server that keeps refusing cannot loop the widget.
+   */
+  private restarting = false;
+
   private async startFlow(): Promise<void> {
     this.loading = true;
     this.startupError = null;
@@ -727,7 +787,7 @@ export class ZitadelLogin extends ZitadelSurface {
       // unhandled promise rejection from `firstUpdated`'s microtask.
       const { project: cfg, api } = resolveApi(this.project, this.projectAttrs, "<zitadel-login>");
       let wire: CreateFlow201 | undefined;
-      const resumeId = this.resumeFlowId || flowIdFromLocation();
+      const resumeId = this.restarting ? "" : this.resumeFlowId || flowIdFromLocation();
       if (resumeId) {
         try {
           wire = await getCurrentStep(api, resumeId);
@@ -758,6 +818,9 @@ export class ZitadelLogin extends ZitadelSurface {
           ...(this.flowName ? { flow_definition_name: this.flowName } : {}),
         });
       }
+      if (this.restarting) {
+        wire = { ...wire, step: { ...wire.step, error: "error.flow_restart_required" } };
+      }
       this.applyResponse(wire);
       // Symmetric with `submit()`: every applied step announces itself, the
       // first one included. A host app driving its own chrome from the step
@@ -765,6 +828,7 @@ export class ZitadelLogin extends ZitadelSurface {
       // after the visitor's first submit.
       emit(this, "zitadel-flow-step", { step: wire.step });
     } catch (error) {
+      if (await this.restartIfRequired(error)) return;
       this.handleTransportError(this.describeFlowSelectionError(error));
     } finally {
       this.loading = false;
@@ -794,17 +858,32 @@ export class ZitadelLogin extends ZitadelSurface {
   }
 
   /**
+   * Start a fresh flow when the server says this one cannot continue (a
+   * parked identity whose connection or schema no longer fits). Returns
+   * whether it did; a second refusal before any step rendered is reported as
+   * an ordinary error instead.
+   */
+  private async restartIfRequired(error: unknown): Promise<boolean> {
+    if (this.restarting || apiErrorCode(error) !== "flow.restart_required") return false;
+    this.restarting = true;
+    this.resumeFlowId = "";
+    // Values typed into the refused flow (a password included) must not be
+    // merged into the fresh step and submitted on a new attempt.
+    this.formValues = {};
+    clearFlowIdFromLocation();
+    await this.startFlow();
+    return true;
+  }
+
+  /**
    * When a `flow-name` lookup fails, the server's envelope only says
    * "not found" / "purpose mismatch" — it cannot know the name came from
    * an attribute. Rewrap those two codes with the attribute and the fix;
    * every other error passes through untouched.
    */
   private describeFlowSelectionError(error: unknown): unknown {
-    if (!this.flowName || !(error instanceof ApiError)) return error;
-    const code =
-      typeof error.body === "object" && error.body !== null && "code" in error.body
-        ? String((error.body as { code: unknown }).code)
-        : "";
+    if (!this.flowName) return error;
+    const code = apiErrorCode(error);
     if (code === "flowdef.not_found") {
       return new Error(
         `<zitadel-login> flow-name="${this.flowName}" does not match any active flow ` +
@@ -822,6 +901,7 @@ export class ZitadelLogin extends ZitadelSurface {
   }
 
   private applyResponse(wire: CreateFlow201): void {
+    this.restarting = false;
     // A fresh response carries fresh (or no) errors — un-dismiss.
     this.stepErrorDismissed = false;
     const preview = this.preview !== "";
@@ -1450,6 +1530,7 @@ export class ZitadelLogin extends ZitadelSurface {
       this.applyResponse(wire);
       emit(this, "zitadel-flow-step", { step: wire.step });
     } catch (error) {
+      if (await this.restartIfRequired(error)) return;
       this.handleTransportError(error);
     } finally {
       this.loading = false;

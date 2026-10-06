@@ -14,7 +14,7 @@ told three different stories about who owns those files afterwards:
 - The managed-file marker (`// zitadel-cli: managed-file v1`) implied
   "CLI-owned until the user removes the marker" — that is `eject`'s semantic,
   which preserves marker-less files.
-- `apps/cli/SKILLS.md` claimed `doctor` verifies "generated app files" and
+- `apps/cli/skills/zitadel-cli/SKILL.md` claimed `doctor` verifies "generated app files" and
   `doctor --fix` "re-applies missing managed files".
 - The implementation did neither: no doctor check looked at scaffolded app
   files, and `doctor --fix` passed with `proxy.ts` — the file that makes

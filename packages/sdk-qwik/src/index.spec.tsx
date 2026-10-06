@@ -11,7 +11,7 @@ import {
   ZITADEL_LOGOUT_EVENT_HANDLERS,
   ZITADEL_SESSION_EVENT_HANDLERS,
 } from "@zitadel/sdk-core/types";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { businessLocales, ZitadelLogin, ZitadelLogout, ZitadelSession } from "./index";
 
@@ -42,8 +42,8 @@ async function renderWidget(jsx: Parameters<typeof render>[1]): Promise<HTMLElem
  * deadline. CustomEvents do not replay, so dispatching only after the listener
  * exists is essential — re-dispatching makes that deterministic without guessing
  * the timing. Matching by identity (not "something arrived") keeps the check
- * robust when the live widget emits its own event of the same name — e.g. a
- * `zitadel-flow-error` from the stubbed network — alongside our probe.
+ * robust when the live widget emits its own event of the same name — e.g. the
+ * `zitadel-flow-step` it fires when the mock API answers — alongside our probe.
  */
 async function dispatchUntilForwarded(
   el: Element,
@@ -63,13 +63,6 @@ async function dispatchUntilForwarded(
     await macrotask();
   }
 }
-
-beforeEach(() => {
-  vi.stubGlobal(
-    "fetch",
-    vi.fn(() => Promise.reject(new Error("no network"))),
-  );
-});
 
 describe("ZitadelLogin", () => {
   it("binds the project handle as a property", async () => {
