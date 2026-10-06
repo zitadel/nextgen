@@ -6,7 +6,7 @@ import { nonBlankString } from "./flags";
 import consola from "consola";
 
 import { toZitadelError, type ZitadelError } from "../errors";
-import { resetInterrupt } from "../interrupt";
+import { listenForInterrupt, stopListeningForInterrupt } from "../interrupt";
 import { isObject } from "../json";
 import { resolveCwd } from "../paths";
 import { normalizePublicCliCommand, normalizePublicCliCommands } from "../public-cli";
@@ -132,7 +132,7 @@ export abstract class BaseCommand extends Command {
    */
   protected override async init(): Promise<void> {
     await super.init();
-    resetInterrupt();
+    listenForInterrupt();
     const telemetryFlag = this.argv.includes("--no-telemetry") ? false : undefined;
     installUserAgent(buildUserAgent(processUserAgentFacts(this.config.version, telemetryFlag)));
   }
@@ -345,6 +345,7 @@ export abstract class BaseCommand extends Command {
    * the grace, it force-exits with the resolved code.
    */
   protected override async finally(error: Error | undefined): Promise<void> {
+    stopListeningForInterrupt();
     await this.telemetry?.shutdown(1000);
     if (this.telemetry?.enabled) {
       setTimeout(() => process.exit(process.exitCode ?? 0), 250).unref();

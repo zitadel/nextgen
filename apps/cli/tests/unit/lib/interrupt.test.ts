@@ -1,62 +1,83 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import {
+  interruptSignal,
+  listenForInterrupt,
+  stopListeningForInterrupt,
+} from "../../../src/lib/interrupt";
+
 afterEach(() => {
-  vi.resetModules();
+  stopListeningForInterrupt();
+  vi.useRealTimers();
+  vi.restoreAllMocks();
 });
 
-/** A fresh copy of the module, so one test's Ctrl-C does not leak into the next. */
-async function load() {
-  return import("../../../src/lib/interrupt");
+function pressCtrlC(): void {
+  process.emit("SIGINT", "SIGINT");
 }
 
-describe("interruptible", () => {
-  it("listens for Ctrl-C only while work is in flight", async () => {
-    const { interruptible } = await load();
-    const before = process.listenerCount("SIGINT");
+describe("listenForInterrupt", () => {
+  it("holds one listener for the command, however often it starts", () => {
+    const idle = process.listenerCount("SIGINT");
 
-    let during = 0;
-    await interruptible(async () => {
-      during = process.listenerCount("SIGINT");
-    });
+    listenForInterrupt();
+    listenForInterrupt();
 
-    expect(during).toBe(before + 1);
-    expect(process.listenerCount("SIGINT")).toBe(before);
+    expect(process.listenerCount("SIGINT")).toBe(idle + 1);
+    stopListeningForInterrupt();
+    expect(process.listenerCount("SIGINT")).toBe(idle);
   });
 
-  it("holds one listener however many requests overlap", async () => {
-    const { interruptible } = await load();
-    const before = process.listenerCount("SIGINT");
-    let release!: () => void;
-    const gate = new Promise<void>((done) => (release = done));
+  it("aborts the command's signal with E_CANCELLED on Ctrl-C", () => {
+    vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
+    listenForInterrupt();
 
-    const first = interruptible(() => gate);
-    const second = interruptible(() => gate);
-    expect(process.listenerCount("SIGINT")).toBe(before + 1);
-
-    release();
-    await Promise.all([first, second]);
-    expect(process.listenerCount("SIGINT")).toBe(before);
-  });
-
-  it("aborts the command's signal with E_CANCELLED on Ctrl-C, and keeps it aborted", async () => {
-    const { interruptible, interruptSignal } = await load();
-
-    await interruptible(async () => {
-      process.emit("SIGINT", "SIGINT");
-    });
-    await interruptible(() => Promise.resolve());
+    pressCtrlC();
 
     expect(interruptSignal().aborted).toBe(true);
     expect(interruptSignal().reason).toMatchObject({ code: "E_CANCELLED", exitCode: 130 });
   });
 
-  it("gives the next command a signal of its own", async () => {
-    const { interruptible, interruptSignal, resetInterrupt } = await load();
-    await interruptible(async () => {
-      process.emit("SIGINT", "SIGINT");
-    });
+  it("exits 130 when the command is still running after the grace", () => {
+    vi.useFakeTimers();
+    const exit = vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
+    listenForInterrupt();
 
-    resetInterrupt();
+    pressCtrlC();
+    expect(exit).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1_000);
+
+    expect(exit).toHaveBeenCalledWith(130);
+  });
+
+  it("exits 130 at once on a second Ctrl-C", () => {
+    const exit = vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
+    listenForInterrupt();
+
+    pressCtrlC();
+    pressCtrlC();
+
+    expect(exit).toHaveBeenCalledWith(130);
+  });
+
+  it("disarms the grace when the command finishes inside it", () => {
+    vi.useFakeTimers();
+    const exit = vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
+    listenForInterrupt();
+
+    pressCtrlC();
+    stopListeningForInterrupt();
+    vi.advanceTimersByTime(1_000);
+
+    expect(exit).not.toHaveBeenCalled();
+  });
+
+  it("gives the next command a signal of its own", () => {
+    vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
+    listenForInterrupt();
+    pressCtrlC();
+
+    listenForInterrupt();
 
     expect(interruptSignal().aborted).toBe(false);
   });

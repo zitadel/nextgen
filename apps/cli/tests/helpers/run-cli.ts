@@ -102,20 +102,9 @@ export function expectedPublicCliCommand(args: string): string {
 }
 
 /**
- * Runs a command and presses Ctrl-C once it is waiting on the platform, which
- * is when the CLI starts listening for it. Emitting the signal rather than
+ * Presses Ctrl-C in the running command. Emitting the signal rather than
  * sending it keeps the keypress inside this process, where the command runs.
  */
-export async function pressingCtrlC<T>(run: () => Promise<T>): Promise<T> {
-  const idle = process.listenerCount("SIGINT");
-  const pending = run();
-  const deadline = Date.now() + 5_000;
-  while (process.listenerCount("SIGINT") === idle) {
-    if (Date.now() > deadline) {
-      throw new Error("the command never started waiting on the platform");
-    }
-    await new Promise((resolve) => setTimeout(resolve, 5));
-  }
+export function pressCtrlC(): void {
   process.emit("SIGINT", "SIGINT");
-  return pending;
 }

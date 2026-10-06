@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "../helpers/platform";
 import { aSetUpApp } from "../helpers/project";
-import { pressingCtrlC } from "../helpers/run-cli";
+import { pressCtrlC } from "../helpers/run-cli";
 
 const platform = usePlatformMock();
 
@@ -33,13 +33,13 @@ describe("variables list", () => {
     describe("that hangs", () => {
       it("stops on Ctrl-C", async () => {
         const app = await aSetUpApp();
-        platform.hangs();
+        const waiting = platform.hangs();
 
-        const result = await pressingCtrlC(() =>
-          app.run(["variables", "list", "--project-level", "--json"]),
-        );
+        const result = app.run(["variables", "list", "--project-level", "--json"]);
+        await waiting;
+        pressCtrlC();
 
-        expect(result).toFailWith("E_CANCELLED");
+        expect(await result).toFailWith("E_CANCELLED");
       });
     });
 

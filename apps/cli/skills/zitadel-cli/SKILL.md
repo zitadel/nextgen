@@ -161,9 +161,9 @@ API directly with the project secret.
 Exit codes mirror the error class (3 = validation, 4 = network or not-found,
 5 = conflict, 1 = auth, 2 = not-implemented, 130 = cancelled). `E_NETWORK`
 covers a server that answered 5xx and one that never answered — refused,
-unresolvable, or silent past the 30-second request deadline. `E_CANCELLED`
-means Ctrl-C stopped the command while it waited on the server; nothing
-after that request ran. An unknown command is handled by the CLI's help
+unresolvable, or silent past the 30-second request deadline. Ctrl-C exits
+130: a command waiting on the server stops at once with `E_CANCELLED`, and
+any other command exits within a second, possibly without an envelope. An unknown command is handled by the CLI's help
 layer, not the envelope.
 
 ## Clarify before you configure

@@ -45,9 +45,11 @@ export interface PlatformMock {
 
   /**
    * Accepts every request and never answers, as a wedged server or a proxy
-   * holding the connection open would. Settles when the request is aborted.
+   * holding the connection open would; a request settles only when aborted.
+   * Resolves once the first request is being held, so a spec can act while
+   * the command is waiting.
    */
-  hangs(): void;
+  hangs(): Promise<void>;
 
   /** Drops any arranged failure, so the platform answers normally again. */
   recovers(): void;
@@ -103,15 +105,16 @@ export function usePlatformMock(): PlatformMock {
     },
 
     hangs() {
-      server.use(
-        http.all(
-          "*",
-          ({ request }) =>
-            new Promise<never>((_, reject) => {
+      return new Promise<void>((waiting) => {
+        server.use(
+          http.all("*", ({ request }) => {
+            waiting();
+            return new Promise<never>((_, reject) => {
               request.signal.addEventListener("abort", () => reject(request.signal.reason));
-            }),
-        ),
-      );
+            });
+          }),
+        );
+      });
     },
 
     recovers() {

@@ -5,7 +5,7 @@ import {
 } from "@zitadel/api/client";
 import { ApiError } from "@zitadel/api/runtime/fetch";
 
-import { interruptSignal, interruptible } from "./interrupt";
+import { interruptSignal } from "./interrupt";
 
 /**
  * How long one platform request may take, response body included, before it
@@ -184,9 +184,7 @@ export function createZitadelClient(
       }
       return (...args: unknown[]) => {
         const result = (value as (...a: unknown[]) => unknown)(...args);
-        return result instanceof Promise
-          ? interruptible(() => result).then(onResolve, sanitizeRejection)
-          : result;
+        return result instanceof Promise ? result.then(onResolve, sanitizeRejection) : result;
       };
     },
   });
