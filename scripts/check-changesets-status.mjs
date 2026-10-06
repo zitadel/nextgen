@@ -462,13 +462,13 @@ async function readChangesetSources(root, files) {
 async function readChangesetStatus({ repoRoot: root, base, pending }) {
   const dir = await mkdtemp(join(tmpdir(), "zitadel-changesets-"));
   const output = join(dir, "status.json");
-  const args = ["pnpm", "exec", "changeset", "status"];
+  const args = ["exec", "changeset", "status"];
   if (!pending) {
     args.push("--since", base);
   }
   args.push("--output", output);
   try {
-    await runCapture("corepack", args, { cwd: root });
+    await runCapture("pnpm", args, { cwd: root });
     return JSON.parse(await readFile(output, "utf8"));
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
@@ -505,7 +505,7 @@ function groupPublishableEntries(entries) {
 
 function nextAction({ analysis, errors, changesetStatus, pending, parsedChangesets }) {
   if (errors.some((error) => error.code === "missing-changeset")) {
-    return "Add a real changeset with `corepack pnpm changeset`, or rarely add an empty changeset if no published behavior changes.";
+    return "Add a real changeset with `pnpm changeset`, or rarely add an empty changeset if no published behavior changes.";
   }
   if (errors.some((error) => error.code === "invalid-changeset-package")) {
     return "Edit the changeset frontmatter so it names only public publishable packages from `.changeset/README.md`.";

@@ -80,14 +80,14 @@ jobs:
 
       - name: Install dependencies
         if: ${{ github.event_name == 'push' && steps.release-publish.outputs.should_run != 'true' }}
-        run: corepack pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Open or update version PR
         if: ${{ github.event_name == 'push' && steps.release-publish.outputs.should_run != 'true' }}
         uses: changesets/action@v1
         with:
           github-token: ${{ steps.app-token.outputs.token }}
-          version: corepack pnpm exec changeset version
+          version: pnpm exec changeset version
           title: "build: version packages"
           commit: "build: version packages"
           createGithubReleases: false
@@ -131,7 +131,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install dependencies
-        run: corepack pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       # Bare `moon` below is the workspace's own pinned @moonrepo/cli, so CI
       # runs the exact version the lockfile resolves — same as local dev.

@@ -17,7 +17,7 @@
  * So `dev-real` must be up:
  *
  *   moon run console:dev-real                              # terminal 1
- *   corepack pnpm --filter @zitadel/console exec tsx \
+ *   pnpm --filter @zitadel/console exec tsx \
  *     scripts/dev-real-add-project.mts --name Beacon       # terminal 2
  *
  * Then reload the console. The instance is ephemeral, so the project is gone

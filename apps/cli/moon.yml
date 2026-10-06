@@ -10,21 +10,21 @@ dependsOn:
 
 tasks:
   lint:
-    command: "corepack pnpm exec oxlint ."
+    command: "pnpm exec oxlint ."
     deps:
       - "api:build"
       - "config:build"
       - "sdk-next:build"
 
   typecheck:
-    command: "corepack pnpm run typecheck"
+    command: "pnpm run typecheck"
     deps:
       - "api:build"
       - "config:build"
       - "sdk-next:build"
 
   build:
-    command: "corepack pnpm run build"
+    command: "pnpm run build"
     deps:
       - "api:build"
       - "config:build"
@@ -41,7 +41,7 @@ tasks:
   build-release:
     script: |
       node ../../scripts/release-clean.mjs local-dist
-      corepack pnpm run build
+      pnpm run build
     env:
       ZITADEL_TELEMETRY_BUILD_CHANNEL: "production"
     deps:
@@ -65,7 +65,7 @@ tasks:
       runInCI: false
 
   test:
-    command: "corepack pnpm run test:all"
+    command: "pnpm run test:all"
     deps:
       - "build"
       - "api-mock:build"
@@ -79,7 +79,7 @@ tasks:
       mutex: "public-dist"
 
   readme:
-    command: "corepack pnpm run readme"
+    command: "pnpm run readme"
     deps:
       - "build"
     options:

@@ -31,7 +31,7 @@ describe("parseSupervisorConfig", () => {
 describe("parseAppRunnerConfig", () => {
   it("round-trips a serialized config", () => {
     const config = {
-      command: ["corepack", "pnpm", "dev"],
+      command: ["pnpm", "dev"],
       cwd: "/repo",
       env: { MY_URL: "baseUrl" },
       handshakeTimeoutMs: 1_000,

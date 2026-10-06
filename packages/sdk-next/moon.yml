@@ -9,21 +9,21 @@ dependsOn:
 
 tasks:
   lint:
-    command: "corepack pnpm run lint"
+    command: "pnpm run lint"
     deps:
       - "api:build"
       - "components:build"
       - "sdk-core:build"
 
   typecheck:
-    command: "corepack pnpm run typecheck"
+    command: "pnpm run typecheck"
     deps:
       - "api:build"
       - "components:build"
       - "sdk-core:build"
 
   build:
-    command: "corepack pnpm run build"
+    command: "pnpm run build"
     deps:
       - "api:build"
       - "components:build"
@@ -34,7 +34,7 @@ tasks:
   build-release:
     script: |
       node ../../scripts/release-clean.mjs local-dist
-      corepack pnpm run build
+      pnpm run build
     deps:
       - "api:build-release"
       - "components:build-release"
@@ -54,6 +54,6 @@ tasks:
       mutex: "public-dist"
 
   test:
-    command: "corepack pnpm run test:all"
+    command: "pnpm run test:all"
     deps:
       - "build"

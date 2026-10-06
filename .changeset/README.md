@@ -59,7 +59,7 @@ under `internal/` still ships a server version, and stays `refactor`.
 
 ## How to add a changeset
 
-Humans run `corepack pnpm changeset` and pick the packages, bump type, and a
+Humans run `pnpm changeset` and pick the packages, bump type, and a
 one-line summary. Agents write `.changeset/<slug>.md` directly — don't rely on
 the interactive prompt:
 
@@ -73,7 +73,7 @@ One-line, user-facing summary.
 
 Use [public package names](#publishable-npm-packages) and `patch` / `minor` /
 `major`. For the rare empty changeset (publishable path, nothing ships):
-`corepack pnpm changeset --empty`.
+`pnpm changeset --empty`.
 
 ### The summary is the release note
 
@@ -102,7 +102,7 @@ keep validating and are rehashed on the next successful sign-in; set
 ## Verify locally
 
 ```sh
-corepack pnpm exec changeset status --since origin/main
+pnpm exec changeset status --since origin/main
 ```
 
 Confirm the planned bumps, then state the [decision-table](#decision-table)
@@ -121,8 +121,8 @@ The repo is in changesets prerelease mode, tag `alpha` (`.changeset/pre.json`):
 Leave alpha for a stable `latest` release:
 
 ```sh
-corepack pnpm changeset pre exit
-corepack pnpm changeset version   # strips -alpha
+pnpm changeset pre exit
+pnpm changeset version   # strips -alpha
 ```
 
 ## Publishing

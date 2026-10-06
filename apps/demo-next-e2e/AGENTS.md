@@ -44,7 +44,7 @@ this project.
 ## Running
 
 ```sh
-corepack pnpm exec playwright install        # one-time, browsers
+pnpm exec playwright install        # one-time, browsers
 moon run demo-next-e2e:e2e                   # mock lane
 moon run demo-next-e2e:e2e-real              # real-instance lane (@zitadel/testing)
 ```

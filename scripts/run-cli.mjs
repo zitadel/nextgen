@@ -108,7 +108,7 @@ export async function assertFreshInstall(root = repoRoot, statFn = stat) {
   const installed = await statIfExists(join(root, "node_modules", ".pnpm", "lock.yaml"));
   if (!installed || installed.mtimeMs < lockfile.mtimeMs) {
     throw new Error(
-      "workspace dependencies are missing or older than pnpm-lock.yaml. Run: corepack pnpm install --frozen-lockfile",
+      "workspace dependencies are missing or older than pnpm-lock.yaml. Run: pnpm install --frozen-lockfile",
     );
   }
 }

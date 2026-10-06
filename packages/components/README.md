@@ -35,7 +35,7 @@ for the form-association / accessibility decisions baked into every input atom.
 ## Install
 
 ```sh
-corepack pnpm add @zitadel/components
+pnpm add @zitadel/components
 ```
 
 `lit`, `liquidjs`, and `dompurify` are peer/runtime deps and are intentionally
@@ -389,7 +389,7 @@ documented path.
 
 ```sh
 # install once at the repo root
-corepack pnpm install
+pnpm install
 
 # --- Workbench ---
 

@@ -10,14 +10,14 @@ tasks:
   # tsdown.config.ts). The deployed entry imports this, not the workspace
   # TypeScript source.
   build:
-    command: "corepack pnpm run build"
+    command: "pnpm run build"
     deps:
       - "api-mock:build"
     outputs:
       - "dist/**"
 
   lint:
-    command: "corepack pnpm run lint"
+    command: "pnpm run lint"
     deps:
       - "api-mock:build"
 
@@ -26,9 +26,9 @@ tasks:
   # whether run via Moon or standalone (e.g. the Vercel "TypeCheck"
   # deployment check, which runs the npm script in a sandbox without Moon).
   typecheck:
-    command: "corepack pnpm run typecheck"
+    command: "pnpm run typecheck"
 
   test:
-    command: "corepack pnpm run test:all"
+    command: "pnpm run test:all"
     deps:
       - "api-mock:build"

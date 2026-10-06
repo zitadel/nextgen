@@ -40,7 +40,7 @@ async function checkPnpm() {
   const manifest = JSON.parse(readText("package.json"));
   const expected = manifest.packageManager?.match(/^pnpm@([^+]+)/)?.[1];
   try {
-    const { stdout } = await runCapture("corepack", ["pnpm", "--version"], {
+    const { stdout } = await runCapture("pnpm", ["--version"], {
       cwd: repoRoot,
     });
     const actual = stdout.trim();
@@ -50,10 +50,10 @@ async function checkPnpm() {
     }
     fail(
       `pnpm ${actual} does not match packageManager (${expected})`,
-      "Run: corepack enable && corepack pnpm install --frozen-lockfile",
+      "Run: devbox shell (or install pnpm 10), then pnpm install --frozen-lockfile",
     );
   } catch {
-    fail("corepack/pnpm is not available", "Run: corepack enable");
+    fail("pnpm is not available", "Run: devbox shell (or install pnpm 10)");
   }
 }
 
@@ -62,7 +62,7 @@ function checkNodeModules() {
     pass("workspace dependencies are installed");
     return;
   }
-  fail("workspace dependencies are not installed", "Run: corepack pnpm install --frozen-lockfile");
+  fail("workspace dependencies are not installed", "Run: pnpm install --frozen-lockfile");
 }
 
 async function checkGo() {
@@ -102,7 +102,7 @@ async function checkPlaywright() {
   if (!playwrightInfo) {
     warn(
       "Playwright package metadata is unavailable",
-      "Run: corepack pnpm install --frozen-lockfile",
+      "Run: pnpm install --frozen-lockfile",
     );
     return;
   }
@@ -119,7 +119,7 @@ async function checkPlaywright() {
 
   warn(
     `Playwright browsers missing: ${missing.join(", ")}`,
-    "Run: corepack pnpm --filter @zitadel/cli-journey-e2e exec playwright install chromium",
+    "Run: pnpm --filter @zitadel/cli-journey-e2e exec playwright install chromium",
   );
 }
 
@@ -141,7 +141,7 @@ async function checkMoon() {
   } catch {
     fail(
       "Moon is not available; local checks and release tasks need it",
-      "Run: corepack pnpm install --frozen-lockfile",
+      "Run: pnpm install --frozen-lockfile",
     );
     return;
   }

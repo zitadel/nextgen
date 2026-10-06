@@ -5,15 +5,15 @@ stack: "frontend"
 
 tasks:
   sync:
-    command: "corepack pnpm run sync"
+    command: "pnpm run sync"
     options:
       runInCI: false
 
   sync-export:
-    command: "corepack pnpm run sync:export"
+    command: "pnpm run sync:export"
 
   generate:
-    command: "corepack pnpm run generate"
+    command: "pnpm run generate"
     outputs:
       - "src/generated/tokens.css"
       - "src/generated/tokens.ts"
@@ -21,24 +21,24 @@ tasks:
       - "src/generated/shadcn.css"
 
   lint:
-    command: "corepack pnpm exec oxlint ."
+    command: "pnpm exec oxlint ."
     deps:
       - "generate"
 
   typecheck:
-    command: "corepack pnpm exec tsc --build tsconfig.json"
+    command: "pnpm exec tsc --build tsconfig.json"
     deps:
       - "generate"
 
   build:
-    command: "corepack pnpm run build"
+    command: "pnpm run build"
     deps:
       - "generate"
     outputs:
       - "dist/**/*"
 
   test:
-    command: "corepack pnpm run test:all"
+    command: "pnpm run test:all"
     deps:
       - "generate"
 

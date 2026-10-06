@@ -8,19 +8,19 @@ dependsOn:
 
 tasks:
   lint:
-    command: "corepack pnpm exec oxlint ."
+    command: "pnpm exec oxlint ."
 
   typecheck:
-    command: "corepack pnpm run typecheck"
+    command: "pnpm run typecheck"
     deps:
       # The journey spec imports the kit's Playwright entry.
       - "testing:build"
 
   test:
-    command: "corepack pnpm run test:all"
+    command: "pnpm run test:all"
 
   e2e:
-    command: "corepack pnpm run e2e"
+    command: "pnpm run e2e"
     env:
       # Our own e2e harness drives the real CLI binary (not under Vitest), so
       # disable telemetry to keep CI traffic out of the Mixpanel project and off

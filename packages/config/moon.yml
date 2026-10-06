@@ -11,7 +11,7 @@ tasks:
   # exists for cache invalidation: it names the upstream files as inputs, and
   # every task that reads the copy depends on it.
   sync-schemas:
-    command: "corepack pnpm run sync-schemas"
+    command: "pnpm run sync-schemas"
     inputs:
       - "/api/openapi/endpoints/schemas/*.json"
       - "scripts/sync-meta-schemas.mjs"
@@ -23,18 +23,18 @@ tasks:
       mutex: "generated-sources"
 
   lint:
-    command: "corepack pnpm run lint"
+    command: "pnpm run lint"
     deps:
       - "api:build"
 
   typecheck:
-    command: "corepack pnpm run typecheck"
+    command: "pnpm run typecheck"
     deps:
       - "api:build"
       - "sync-schemas"
 
   build:
-    command: "corepack pnpm run build"
+    command: "pnpm run build"
     deps:
       - "api:build"
       - "sync-schemas"
@@ -44,7 +44,7 @@ tasks:
   build-release:
     script: |
       node ../../scripts/release-clean.mjs local-dist
-      corepack pnpm run build
+      pnpm run build
     deps:
       - "api:build-release"
     outputs:
@@ -64,7 +64,7 @@ tasks:
       mutex: "public-dist"
 
   test:
-    command: "corepack pnpm run test:all"
+    command: "pnpm run test:all"
     deps:
       - "build"
       - "sync-schemas"

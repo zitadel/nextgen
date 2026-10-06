@@ -145,7 +145,7 @@ async function commandPublish(options) {
   }
 
   await commandSnapshot({ skipContainer: true });
-  await run("corepack", ["pnpm", "exec", "changeset", "publish"], {
+  await run("pnpm", ["exec", "changeset", "publish"], {
     cwd: repoRoot,
     env: releasePublishEnv(),
   });

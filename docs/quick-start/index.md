@@ -40,7 +40,7 @@ register a user -> log out -> log in with the same user -> profile shows Signed 
 ```
 
 For deterministic automated proof from this repository, run
-`corepack pnpm run journey`; it exercises fresh-app setup plus registration,
+`pnpm run journey`; it exercises fresh-app setup plus registration,
 logout, and login across the supported frameworks.
 
 The managed local Zitadel server listens on http://localhost:8080 by default.

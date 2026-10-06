@@ -134,7 +134,7 @@ jobs:
         # Filtered installs still include the workspace root's devDependencies,
         # so node_modules/.bin/moon is present for the moon steps below.
         run: >-
-          corepack pnpm install --frozen-lockfile
+          pnpm install --frozen-lockfile
           --filter @zitadel/design-tokens...
           --loglevel error
 

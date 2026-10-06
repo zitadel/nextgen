@@ -4,7 +4,7 @@ A minimal Nuxt application demonstrating [Nextgen Auth](../../packages/sdk-nuxt)
 
 ## Running locally
 
-Use **Moon** from the repo root (`corepack pnpm install` first).
+Use **Moon** from the repo root (`pnpm install` first).
 
 Build the SDK (and its transitive dependencies) once before the first run:
 

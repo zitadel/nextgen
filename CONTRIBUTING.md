@@ -13,7 +13,7 @@ If you want to add Zitadel to your own app rather than contribute here, see the
 
 - Go version from [`go.mod`](go.mod)
 - Node.js from [`.nvmrc`](.nvmrc)
-- pnpm 10 from [`package.json`](package.json) (`corepack enable`)
+- pnpm 10 (provided by `devbox`; it switches to the version pinned in [`package.json`](package.json))
 - [Moon](https://moonrepo.dev/moon)
 
 ### Using the devcontainer
@@ -40,7 +40,7 @@ For changes to the Go server, APIs, or database layer.
 
 | I want to...                                          | Run                                        |
 | ----------------------------------------------------- | ------------------------------------------ |
-| Install dependencies                                  | `corepack pnpm install --frozen-lockfile`  |
+| Install dependencies                                  | `pnpm install --frozen-lockfile`  |
 | Verify my toolchain                                   | `moon run workspace:doctor`                |
 | Start the server (builds console + login-ui, then Go) | `moon run workspace:server`                |
 | Start the server (skip UI builds)                     | `go run . server --migrate`                |
@@ -48,9 +48,9 @@ For changes to the Go server, APIs, or database layer.
 | Regenerate Go/OpenAPI artifacts                       | `moon run server:generate`                 |
 | Verify committed generated output                     | `moon run server:check-generate`           |
 | Run lint, type checks, and tests                      | `moon ci :lint :typecheck :build :test`    |
-| Preview planned Changesets bumps                      | `corepack pnpm exec changeset status --since origin/main` |
+| Preview planned Changesets bumps                      | `pnpm exec changeset status --since origin/main` |
 
-Run `corepack pnpm install --frozen-lockfile` first — Moon does not install
+Run `pnpm install --frozen-lockfile` first — Moon does not install
 node_modules automatically (`.moon/workspace.yml` sets `installDependencies: false`).
 
 ### Starting the server from source
@@ -140,7 +140,7 @@ the two SPAs bundled directly into the server binary.
 
 | I want to...                                 | Run                                        |
 | -------------------------------------------- | ------------------------------------------ |
-| Install dependencies                         | `corepack pnpm install --frozen-lockfile`  |
+| Install dependencies                         | `pnpm install --frozen-lockfile`  |
 | Verify my toolchain                          | `moon run workspace:doctor`                |
 | Open the component workbench (Storybook)     | `moon run storybook:dev` → http://localhost:6006 |
 | Start the console dev server                 | `moon run console:dev` → http://localhost:5174 |
@@ -148,7 +148,7 @@ the two SPAs bundled directly into the server binary.
 | Build both apps and test with the Go server  | `moon run console:build login-ui:build` then `go run . server --migrate` |
 | Run lint, type checks, and tests             | `moon ci :lint :typecheck :build :test`    |
 
-Run `corepack pnpm install --frozen-lockfile` first.
+Run `pnpm install --frozen-lockfile` first.
 
 The console dev server uses in-browser API mocking, so you do not need a running
 backend to iterate on the console. The login-UI dev server renders the real
@@ -231,7 +231,7 @@ moon task cli:test
 
 Moon task targets use the `<project>:<task>` form, for example `moon run cli:test`.
 
-Use `corepack pnpm exec changeset status --since origin/main` when you want to
+Use `pnpm exec changeset status --since origin/main` when you want to
 preview the package bumps Changesets will plan from your PR. Pull requests also
 get an informational Changesets comment; maintainers use that and the
 [changeset decision table](.changeset/README.md#decision-table) to review release
@@ -401,7 +401,7 @@ These tests start real servers and require a browser install, so they are opt-in
 locally. The demo suites exercise the checked-in framework demos:
 
 ```sh
-corepack pnpm --filter @zitadel/demo-next-e2e exec playwright install
+pnpm --filter @zitadel/demo-next-e2e exec playwright install
 moon run demo-next-e2e:e2e
 moon run demo-nuxt-e2e:e2e
 ```

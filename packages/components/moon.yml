@@ -10,20 +10,20 @@ dependsOn:
 
 tasks:
   lint:
-    command: "corepack pnpm exec oxlint ."
+    command: "pnpm exec oxlint ."
     deps:
       - "api:build"
       - "design-tokens:build"
 
   typecheck:
-    command: "corepack pnpm exec tsc --build tsconfig.json"
+    command: "pnpm exec tsc --build tsconfig.json"
     deps:
       - "api:build"
       - "config:build"
       - "design-tokens:build"
 
   build:
-    command: "corepack pnpm run build"
+    command: "pnpm run build"
     deps:
       - "api:build"
       # The standalone bundle inlines @zitadel/config/template (see
@@ -38,7 +38,7 @@ tasks:
   build-release:
     script: |
       node ../../scripts/release-clean.mjs local-dist
-      corepack pnpm run build
+      pnpm run build
       node scripts/check-standalone-artifact.mjs
     deps:
       - "api:build-release"
@@ -61,7 +61,7 @@ tasks:
   # Chromium for the browser project. Self-contained (like storybook): the
   # `test` task depends on it so `moon ci :test` provisions it in CI.
   install-browsers:
-    command: "corepack pnpm exec playwright install chromium"
+    command: "pnpm exec playwright install chromium"
     options:
       cache: false
 
@@ -72,7 +72,7 @@ tasks:
   # `pnpm test:browser` runs the browser project alone. The browser project
   # has a 60-120s Chromium cold start, which this lane pays in CI by design.
   test:
-    command: "corepack pnpm run test:all"
+    command: "pnpm run test:all"
     deps:
       - "install-browsers"
       - "api:build"

@@ -10,14 +10,14 @@ dependsOn:
 
 tasks:
   lint:
-    command: "corepack pnpm run lint"
+    command: "pnpm run lint"
     deps:
       - "api:build"
       - "components:build"
       - "sdk-core:build"
 
   typecheck:
-    command: "corepack pnpm run typecheck"
+    command: "pnpm run typecheck"
     deps:
       # The spec program resolves @zitadel/api-mock (src/test-setup.ts) through
       # its project reference, i.e. the declarations its `tsc --build` emits.
@@ -27,7 +27,7 @@ tasks:
       - "sdk-core:build"
 
   build:
-    command: "corepack pnpm run build"
+    command: "pnpm run build"
     deps:
       - "api:build"
       - "components:build"
@@ -38,7 +38,7 @@ tasks:
   build-release:
     script: |
       node ../../scripts/release-clean.mjs local-dist
-      corepack pnpm run build
+      pnpm run build
     deps:
       - "api:build-release"
       - "components:build-release"
@@ -53,7 +53,7 @@ tasks:
       runInCI: false
 
   test:
-    command: "corepack pnpm run test:all"
+    command: "pnpm run test:all"
     deps:
       # api-mock serves the Flow API to the specs (test-setup.ts); its no-op
       # build is the edge that re-runs this when api-mock source changes.
