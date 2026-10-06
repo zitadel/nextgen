@@ -172,10 +172,10 @@ func ErrIDPOAuth2Unsupported() Error {
 }
 
 // ErrIDPStrategyPointerUnsupported refuses an oidc connection whose
-// verified_claims entry points at the supplementary_fetch strategy: only the
-// oauth2 block selects one. property is the verified_claims key.
-func ErrIDPStrategyPointerUnsupported(property string) Error {
-	return newError(PrefixIDPConnection.ErrorCodePrefix("strategy_pointer_unsupported"), "identity provider connection: an oidc connection cannot verify a property by strategy", map[string]any{"property": property}, fmt.Errorf("%s points at a strategy", property))
+// verified_claims entries point at the supplementary_fetch strategy: only the
+// oauth2 block selects one. properties are the verified_claims keys.
+func ErrIDPStrategyPointerUnsupported(properties []string) Error {
+	return newError(PrefixIDPConnection.ErrorCodePrefix("strategy_pointer_unsupported"), "identity provider connection: an oidc connection cannot verify a property by strategy", map[string]any{"properties": properties}, fmt.Errorf("verified by a strategy: %s", strings.Join(properties, ", ")))
 }
 
 // ErrIDPExchangeFailed reports that the code exchange yielded no token. One

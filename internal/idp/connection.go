@@ -125,10 +125,15 @@ func ParseConnection(revisionID string, body []byte) (Connection, error) {
 	// selects no strategy, so it can never resolve. Refusing it here stops
 	// the submit before the redirect instead of failing the callback after
 	// the user consented. The write-time check is #1029.
+	var strategyProperties []string
 	for property, source := range verifiedClaims {
 		if source.Kind == VerifyByStrategy {
-			return Connection{}, domain.ErrIDPStrategyPointerUnsupported(property)
+			strategyProperties = append(strategyProperties, property)
 		}
+	}
+	if len(strategyProperties) > 0 {
+		slices.Sort(strategyProperties)
+		return Connection{}, domain.ErrIDPStrategyPointerUnsupported(strategyProperties)
 	}
 
 	conn := Connection{

@@ -306,7 +306,8 @@ func (c *OIDCClient) extractClaims(ctx context.Context, token *oauth2.Token, idT
 
 // requireStrategy fails when a verified_claims entry points at the strategy
 // and none is passed. ParseConnection refuses such an entry on an oidc
-// connection, so this is a lookup fault, not an unverified claim.
+// connection, so this guards a connection built by hand and the oauth2
+// path (#1066).
 func requireStrategy(conn Connection, strategy SupplementaryFetch) error {
 	if strategy != nil {
 		return nil

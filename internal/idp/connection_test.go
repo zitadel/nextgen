@@ -255,13 +255,13 @@ func TestParseConnection(t *testing.T) {
 			wantErr: new(domain.ErrIDPOAuth2Unsupported()),
 		},
 		{
-			name: "a strategy pointer on an oidc body is refused",
+			name: "strategy pointers on an oidc body are refused, all of them in order",
 			body: `{
 				"slug": "google",
 				"protocol": "oidc",
 				"display_name": "Google",
-				"claim_mapping": {"email": "email"},
-				"verified_claims": {"email": "$supplementary_fetch"},
+				"claim_mapping": {"email": "email", "phone": "phone_number"},
+				"verified_claims": {"phone": "$supplementary_fetch", "email": "$supplementary_fetch"},
 				"oidc": {
 					"issuer": "https://accounts.example.test",
 					"client_id": "client",
@@ -269,8 +269,8 @@ func TestParseConnection(t *testing.T) {
 					"scopes": ["openid", "email"]
 				}
 			}`,
-			wantErr:      new(domain.ErrIDPStrategyPointerUnsupported("email")),
-			wantCauseMsg: "email points at a strategy",
+			wantErr:      new(domain.ErrIDPStrategyPointerUnsupported([]string{"email", "phone"})),
+			wantCauseMsg: "verified by a strategy: email, phone",
 		},
 		{
 			name:         "an undecodable body is an internal error",
