@@ -104,6 +104,7 @@ cmd_up() {
   disk=$(disk_info "$BENCH_DATA_ROOT")
   bench_chown "$BENCH_DATA_ROOT"
   disk_check "$disk"
+  disk=$(jq -c --argjson us "$(disk_fsync_probe "$BENCH_DATA_ROOT")" '. + {fsync_4k_us: $us}' <<<"$disk")
   bench_log "lane $BENCH_LANE (dialect $BENCH_DB_DIALECT), run $BENCH_RUN_ID, data on $(jq -r '"\(.kind) (\(.fstype))"' <<<"$disk")"
 
   jq -nc --arg run_dir "$run_dir" --arg lane "$BENCH_LANE" --arg data_root "$BENCH_DATA_ROOT" \

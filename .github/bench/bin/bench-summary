@@ -25,7 +25,7 @@ jq -r '
      "- `\(.key)`: cpus `\(.value.cpus)` (\(.value.cores) cores), memory.max \(.value.memory_max_bytes / 1048576 | floor) MiB"),
   "- cores: \(.partition.core_isolation)",
   "- not partitioned: \(.not_partitioned | join("; "))",
-  "- data disk: \(.database.disk.kind) (\(.database.disk.fstype), \(.database.disk.model))",
+  "- data disk: \(.database.disk.kind) (\(.database.disk.fstype), device \(.database.disk.device) \(.database.disk.model)); a 4 KiB synchronous write takes \(.database.disk.fsync_4k_us) us",
   "- boot marker: `\(.boot_marker.digest)`",
   (if .database.postgres then "- postgres \(.database.postgres.version), \(.database.postgres.non_default_settings | length) non-default settings recorded" else empty end)
 ' "$m"

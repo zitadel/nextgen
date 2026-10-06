@@ -126,10 +126,10 @@ lane_role_specs() {
 
 # disk_info PATH: what PATH lives on, as JSON. The kind is what the policy
 # keys on: nvme, ssd, hdd (a disk the machine owns), network-block (a cloud
-# block volume), virtual-disk (a paravirtual disk whose backing is not visible),
+# block volume), memory-cached (RAM in front of the volume), virtual-disk (a paravirtual disk whose backing is not visible),
 # network (a network filesystem), memory, overlay or unknown.
 disk_info() {
-  local p=$1 src fstype target name sys kind=unknown rot='' model='' dev='' majmin
+  local p=$1 src fstype target name sys kind=unknown rot='' model='' dev='' majmin ramleaf=0
   mkdir -p "$p"
   src=$(findmnt -n -o SOURCE -T "$p" 2>/dev/null || true)
   fstype=$(findmnt -n -o FSTYPE -T "$p" 2>/dev/null || true)
@@ -142,29 +142,43 @@ disk_info() {
     *)
       if [[ $src == /dev/* && -e /sys/dev/block/$majmin ]]; then
         # The device behind the mount, from its major:minor (a mapper node need
-        # not be a symlink to the kernel name).
+        # not be a symlink to the kernel name), then every device under it:
+        # device-mapper members, and partitions up to their disk. A volume can
+        # have several (an LVM cache in RAM in front of a network disk).
         name=$(basename "$(readlink -f "/sys/dev/block/$majmin")")
-        # Follow device-mapper stacks down to their first member, then up from
-        # a partition to the disk that holds it.
-        local n=0 member
-        while ((n < 8)); do
+        local -a queue=("$name") leaves=()
+        local n=0 member cur
+        while ((${#queue[@]} > 0 && n < 32)); do
           n=$((n + 1))
-          sys=/sys/class/block/$name
-          member=$(find "/sys/block/$name/slaves" -mindepth 1 -maxdepth 1 -printf '%f\n' 2>/dev/null | sort | head -n 1 || true)
+          cur=${queue[0]}
+          queue=("${queue[@]:1}")
+          sys=/sys/class/block/$cur
+          member=$(find "/sys/block/$cur/slaves" -mindepth 1 -maxdepth 1 -printf '%f\n' 2>/dev/null | sort | tr '\n' ' ' || true)
           if [[ -n $member ]]; then
-            name=$member
-            continue
+            # shellcheck disable=SC2206
+            queue+=($member)
+          elif [[ -e $sys/partition ]]; then
+            queue+=("$(basename "$(dirname "$(readlink -f "$sys")")")")
+          else
+            leaves+=("$cur")
           fi
-          if [[ -e $sys/partition ]]; then
-            name=$(basename "$(dirname "$(readlink -f "$sys")")")
-            continue
-          fi
-          break
+        done
+        # The leaf that is not RAM names the disk; any RAM leaf is reported.
+        name=${leaves[0]:-$name}
+        for member in "${leaves[@]}"; do
+          if [[ $member != ram* && $member != zram* ]]; then name=$member; break; fi
+        done
+        for member in "${leaves[@]}"; do
+          if [[ $member == ram* || $member == zram* ]]; then ramleaf=1; fi
         done
         dev=$name
         rot=$(cat "/sys/block/$name/queue/rotational" 2>/dev/null || true)
         model=$({ tr -s ' ' <"/sys/block/$name/device/model" | tr -d '\n'; } 2>/dev/null || true)
-        if [[ $model == *"Elastic Block Store"* || $model == *"Persistent Disk"* || $model == *PersistentDisk* || $model == *"Virtual Disk"* ]]; then
+        if ((ramleaf)); then
+          # Writes can be absorbed by RAM in front of the volume: fsync does not
+          # measure the disk, and what it measures can change between runs.
+          kind=memory-cached
+        elif [[ $model == *"Elastic Block Store"* || $model == *"Persistent Disk"* || $model == *PersistentDisk* || $model == *"Virtual Disk"* ]]; then
           # A cloud block volume: a disk to the guest, a network service
           # beneath it. fsync latency is the provider's, not the machine's.
           kind=network-block
@@ -198,7 +212,7 @@ disk_check() {
   kind=$(jq -r .kind <<<"$1")
   case $kind in
     network) bench_die "the data directory is on a network filesystem ($(jq -r .fstype <<<"$1")): fsync would be the measurement. Point BENCH_DATA_ROOT at a local volume" ;;
-    memory | overlay | network-block | virtual-disk)
+    memory | memory-cached | overlay | network-block | virtual-disk)
       [[ " $BENCH_ALLOW_DISK_KINDS " == *" $kind "* ]] ||
         bench_die "the data directory is on a $kind volume, not a local disk (device $(jq -r '.device + " " + .model' <<<"$1")). Use a local volume, or list '$kind' in BENCH_ALLOW_DISK_KINDS to accept it (the run metadata records it either way)"
       ;;
@@ -379,4 +393,17 @@ lane_boot_marker() {
       sqlite_file: (if $dbfile == "" then null else {path: $dbfile, dev_inode: $dbid} end)}')
   digest=$(jq -cS . <<<"$body" | sha256sum | awk '{print $1}')
   jq -c --arg d "$digest" '. + {digest: $d}' <<<"$body"
+}
+
+# disk_fsync_probe PATH: microseconds per 4 KiB write that is forced to stable
+# storage, measured on the volume the data will live on. The disk kind says what
+# the disk is called; this says what it costs, which is what a lane's fsync-bound
+# result depends on.
+disk_fsync_probe() {
+  local f=$1/.fsync-probe n=200 t0 t1
+  t0=$(date +%s%N)
+  dd if=/dev/zero of="$f" bs=4k count=$n oflag=dsync status=none 2>/dev/null || true
+  t1=$(date +%s%N)
+  rm -f "$f"
+  printf '%s\n' "$(((t1 - t0) / n / 1000))"
 }
