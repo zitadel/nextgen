@@ -38,6 +38,10 @@ type ProjectService interface {
 	// Returns [database.NoRowFoundError] when no project with the given ID exists.
 	Get(ctx context.Context, id string) (*domain.Project, error)
 
+	// OwningTeamID returns the id of the team that owns the project (ADR 054
+	// §2), or "" when no team owns it, for example before it is claimed.
+	OwningTeamID(ctx context.Context, projectID string) (string, error)
+
 	// DefaultProject resolves the transitional standalone default retained by
 	// Console ADR 0004 §2's bootstrap cutover rule: the configured project when
 	// cfgProjectID is set — which must exist; a missing configured project is a
@@ -306,6 +310,17 @@ func (s *projectService) Get(ctx context.Context, id string) (*domain.Project, e
 	logger.Info("getting project", slog.String("project_id", id))
 	project, err := s.v2Pool.Statements().GetProjectByID(ctx, id)
 	return project, mapStorageError(err)
+}
+
+func (s *projectService) OwningTeamID(ctx context.Context, projectID string) (string, error) {
+	grant, err := s.v2Pool.Statements().GetActiveOwningTeamGrant(ctx, projectID)
+	if err != nil {
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+			return "", nil
+		}
+		return "", domain.ErrInternal(err).WithMessage("failed to load the project's owning team")
+	}
+	return grant.PrincipalID, nil
 }
 
 func (s *projectService) DefaultProject(ctx context.Context, cfgProjectID string) (*domain.Project, error) {

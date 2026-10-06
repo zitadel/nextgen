@@ -31,6 +31,9 @@ func (s stubProjectService) CreateWithID(context.Context, string, string, []stri
 func (stubProjectService) Get(context.Context, string) (*domain.Project, error) {
 	return nil, domain.ErrProjectNotFound()
 }
+func (stubProjectService) OwningTeamID(context.Context, string) (string, error) {
+	return "", nil
+}
 func (stubProjectService) DefaultProject(context.Context, string) (*domain.Project, error) {
 	return nil, nil
 }

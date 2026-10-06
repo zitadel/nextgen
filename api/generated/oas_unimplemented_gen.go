@@ -795,6 +795,33 @@ func (UnimplementedHandler) ListMyProjects(ctx context.Context, params ListMyPro
 	return r, ht.ErrNotImplemented
 }
 
+// ListProjectAdmins implements listProjectAdmins operation.
+//
+// Lists the people who can administer the project, and how each of them
+// gets that access. A person appears once, with one entry in `sources` per
+// way they hold it:
+// - `owning_team`: an active member of the team that owns the project
+// (ADR 054 §2). Removing a grant does not remove this access; it ends
+// only when the person leaves the team or the project changes owner.
+// - `grant`: an unexpired `admin` grant on the project, either to the
+// person (`grant_id` only) or to a team they are an active member of
+// (`grant_id` and `team`). Revoking that grant removes this source.
+// Only access that authorizes today is listed: grants that expired or
+// carry a lower role, and team members who are not active, are left out. A
+// person whose only access is a `viewer` or `editor` grant is not an admin
+// and is not listed. A grant to a person is listed whatever the person's
+// status, as `POST /grants/query` lists it.
+// Ordered by `user_id`. The list is not paginated, an exception to ADR 027:
+// it merges grants and team memberships, so it cannot be paged in the
+// database, and the people who administer one project are few.
+// Accepts either a project secret (`oauth2`) or a user-bound Console
+// session cookie (`nextgenSession`) that can read the project.
+//
+// GET /projects/{project_id}/admins
+func (UnimplementedHandler) ListProjectAdmins(ctx context.Context, params ListProjectAdminsParams) (r ListProjectAdminsRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // ListReleases implements listReleases operation.
 //
 // Lists the project's releases, newest first.

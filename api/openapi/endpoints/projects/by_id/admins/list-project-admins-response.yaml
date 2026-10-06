@@ -1,0 +1,9 @@
+type: object
+description: The people who administer a project.
+required:
+  - admins
+properties:
+  admins:
+    type: array
+    items:
+      $ref: project-admin.yaml

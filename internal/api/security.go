@@ -116,16 +116,17 @@ var sessionCookieOperations = map[api.OperationName]bool{
 // session-only operation nothing else can satisfy, so the skip becomes the 401
 // the contract declares.
 var userBoundSessionOperations = map[api.OperationName]bool{
-	api.CreateGrantOperation:    true,
-	api.GetGrantOperation:       true,
-	api.DeleteGrantOperation:    true,
-	api.QueryGrantsOperation:    true,
-	api.QueryUsersOperation:     true,
-	api.QueryTeamsOperation:     true,
-	api.GetTeamOperation:        true,
-	api.ListMyProjectsOperation: true,
-	api.GetProjectOperation:     true,
-	api.PatchProjectOperation:   true,
+	api.CreateGrantOperation:       true,
+	api.GetGrantOperation:          true,
+	api.DeleteGrantOperation:       true,
+	api.QueryGrantsOperation:       true,
+	api.QueryUsersOperation:        true,
+	api.QueryTeamsOperation:        true,
+	api.GetTeamOperation:           true,
+	api.ListMyProjectsOperation:    true,
+	api.GetProjectOperation:        true,
+	api.PatchProjectOperation:      true,
+	api.ListProjectAdminsOperation: true,
 	// Console management screens (#1300 §1). CSRF for the writes is #1140.
 	api.CreateUserOperation:          true,
 	api.GetUserByIDOperation:         true,

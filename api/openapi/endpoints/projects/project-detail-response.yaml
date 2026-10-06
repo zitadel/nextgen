@@ -1,0 +1,19 @@
+description: |
+  The current state of a project, as returned for that one project. It adds
+  the owning team to the fields every project listing carries.
+allOf:
+  - $ref: project-response.yaml
+  - type: object
+    properties:
+      owning_team_id:
+        description: |
+          The team that owns the project (ADR 054 §2), which is how its
+          members administer it. Null when no team owns the project, for
+          example before it is claimed. The server always sends the field.
+
+          The team lives in the platform project, so its id is an opaque
+          reference here. `GET /projects/{project_id}/admins` lists the
+          people who administer the project through it.
+        oneOf:
+          - $ref: ../../components/schemas/team-id.yaml
+          - type: 'null'

@@ -15,9 +15,9 @@ import (
 )
 
 var allowedGrantRelations = map[string]struct{}{
-	"viewer": {},
-	"editor": {},
-	"admin":  {},
+	"viewer":                  {},
+	"editor":                  {},
+	domain.AuthzRelationAdmin: {},
 }
 
 // isManagedGrant is the class this HTTP API may Get or Revoke: the system

@@ -10,6 +10,11 @@ const (
 	SystemCatalogOwnerID = "system"
 )
 
+// AuthzRelationAdmin is the system catalog's project administrator relation.
+// It closes to editor and viewer (ADR 054 §5), so an admin assignment passes
+// every project check.
+const AuthzRelationAdmin = "admin"
+
 // PrefixAuthzAssignment is the dialect-minted ID prefix for authz_assignments (asgn_<opaque>).
 const PrefixAuthzAssignment ResourcePrefix = "asgn"
 
@@ -308,7 +313,7 @@ func NewSKProjProjectSetupAssignment(projectID string) *AuthzAssignment {
 		PrincipalType: AuthzPrincipalTypeSKProj,
 		PrincipalID:   projectID,
 		ObjectType:    "project",
-		Relation:      "admin",
+		Relation:      AuthzRelationAdmin,
 	}
 	a.ApplyScope(NewProjectAssignmentScope())
 	return a

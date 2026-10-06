@@ -56,7 +56,7 @@ func (h *Handler) GetProject(ctx context.Context, params api.GetProjectParams) (
 		}
 		return nil, err
 	}
-	return projectResponse(project), nil
+	return h.projectDetailResponse(ctx, project)
 }
 
 func (h *Handler) PatchProject(ctx context.Context, req *api.PatchProjectRequest, params api.PatchProjectParams) (api.PatchProjectRes, error) {
@@ -81,7 +81,7 @@ func (h *Handler) PatchProject(ctx context.Context, req *api.PatchProjectRequest
 	if err != nil {
 		return nil, err
 	}
-	return projectResponse(project), nil
+	return h.projectDetailResponse(ctx, project)
 }
 
 // QueryProjects has no project parameter: results are restricted to the
@@ -252,6 +252,28 @@ func projectResponse(project *domain.Project) *api.ProjectResponse {
 		CreatedAt:      project.CreatedAt,
 		UpdatedAt:      project.UpdatedAt,
 	}
+}
+
+func (h *Handler) projectDetailResponse(ctx context.Context, project *domain.Project) (*api.ProjectDetailResponse, error) {
+	owningTeamID, err := h.projectService.OwningTeamID(ctx, project.ID)
+	if err != nil {
+		return nil, err
+	}
+	base := projectResponse(project)
+	resp := &api.ProjectDetailResponse{
+		ID:             base.ID,
+		Name:           base.Name,
+		PreviewOrigins: base.PreviewOrigins,
+		PasswordHash:   base.PasswordHash,
+		CreatedAt:      base.CreatedAt,
+		UpdatedAt:      base.UpdatedAt,
+	}
+	if owningTeamID != "" {
+		resp.OwningTeamID = api.NewOptNilTeamID(api.TeamID(owningTeamID))
+	} else {
+		resp.OwningTeamID.SetToNull()
+	}
+	return resp, nil
 }
 
 // ------------------ Errors ---------------

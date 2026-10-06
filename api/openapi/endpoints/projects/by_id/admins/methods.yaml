@@ -1,0 +1,69 @@
+get:
+  operationId: listProjectAdmins
+  summary: List project admins
+  description: |
+    Lists the people who can administer the project, and how each of them
+    gets that access. A person appears once, with one entry in `sources` per
+    way they hold it:
+
+    - `owning_team`: an active member of the team that owns the project
+      (ADR 054 §2). Removing a grant does not remove this access; it ends
+      only when the person leaves the team or the project changes owner.
+    - `grant`: an unexpired `admin` grant on the project, either to the
+      person (`grant_id` only) or to a team they are an active member of
+      (`grant_id` and `team`). Revoking that grant removes this source.
+
+    Only access that authorizes today is listed: grants that expired or
+    carry a lower role, and team members who are not active, are left out. A
+    person whose only access is a `viewer` or `editor` grant is not an admin
+    and is not listed. A grant to a person is listed whatever the person's
+    status, as `POST /grants/query` lists it.
+
+    Ordered by `user_id`. The list is not paginated, an exception to ADR 027:
+    it merges grants and team memberships, so it cannot be paged in the
+    database, and the people who administer one project are few.
+
+    Accepts either a project secret (`oauth2`) or a user-bound Console
+    session cookie (`nextgenSession`) that can read the project.
+  tags:
+    - Projects
+  parameters:
+    - name: project_id
+      in: path
+      required: true
+      schema:
+        $ref: ../../../../components/schemas/project-id.yaml
+  security:
+    - oauth2:
+        # project.write, not project.read: project.read is carried by the
+        # browser-plane preview secret, which must not list the people who
+        # administer the project (same reasoning as getProject).
+        - project.write
+    - nextgenSession: []
+  responses:
+    '200':
+      description: The admins of the project were returned.
+      content:
+        application/json:
+          schema:
+            $ref: list-project-admins-response.yaml
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
+    '403':
+      description: The caller cannot read the project's admins.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
+    '404':
+      description: Project not found.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
+    default:
+      $ref: listProjectAdmins-error-response.yaml

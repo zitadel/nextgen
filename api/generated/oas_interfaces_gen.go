@@ -225,6 +225,10 @@ type ListMyProjectsRes interface {
 	listMyProjectsRes()
 }
 
+type ListProjectAdminsRes interface {
+	listProjectAdminsRes()
+}
+
 type ListReleasesRes interface {
 	listReleasesRes()
 }

@@ -13893,6 +13893,45 @@ func (c *MockProjectServiceListAuthorizedCall) DoAndReturn(f func(context.Contex
 	return c
 }
 
+// OwningTeamID mocks base method.
+func (m *MockProjectService) OwningTeamID(ctx context.Context, projectID string) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "OwningTeamID", ctx, projectID)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// OwningTeamID indicates an expected call of OwningTeamID.
+func (mr *MockProjectServiceMockRecorder) OwningTeamID(ctx, projectID any) *MockProjectServiceOwningTeamIDCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OwningTeamID", reflect.TypeOf((*MockProjectService)(nil).OwningTeamID), ctx, projectID)
+	return &MockProjectServiceOwningTeamIDCall{Call: call}
+}
+
+// MockProjectServiceOwningTeamIDCall wrap *gomock.Call
+type MockProjectServiceOwningTeamIDCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockProjectServiceOwningTeamIDCall) Return(arg0 string, arg1 error) *MockProjectServiceOwningTeamIDCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockProjectServiceOwningTeamIDCall) Do(f func(context.Context, string) (string, error)) *MockProjectServiceOwningTeamIDCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockProjectServiceOwningTeamIDCall) DoAndReturn(f func(context.Context, string) (string, error)) *MockProjectServiceOwningTeamIDCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // Update mocks base method.
 func (m *MockProjectService) Update(ctx context.Context, req service.UpdateProjectRequest) (*domain.Project, error) {
 	m.ctrl.T.Helper()
