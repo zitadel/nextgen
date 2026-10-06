@@ -1,4 +1,4 @@
-import { ApiError, apiErrorMessage } from "@zitadel/api/runtime/fetch";
+import { ApiError, apiErrorMessage, NetworkError } from "@zitadel/api/runtime/fetch";
 
 /**
  * Closed set of failure categories the CLI can surface. Every error the
@@ -17,7 +17,8 @@ export type ZitadelErrorCode =
   | "E_NOT_FOUND"
   | "E_PORT_IN_USE"
   | "E_VALIDATION"
-  | "E_NOT_IMPLEMENTED";
+  | "E_NOT_IMPLEMENTED"
+  | "E_CANCELLED";
 
 /**
  * Maps each {@link ZitadelErrorCode} to the process exit code the CLI
@@ -36,6 +37,8 @@ export const EXIT_CODES: Record<ZitadelErrorCode, number> = {
   E_PORT_IN_USE: 5,
   E_VALIDATION: 3,
   E_NOT_IMPLEMENTED: 2,
+  // 128 + SIGINT, what a shell reports for a command stopped by Ctrl-C.
+  E_CANCELLED: 130,
 };
 
 /**
@@ -78,9 +81,11 @@ export class ZitadelError extends Error {
 
 /**
  * Normalises any thrown value into a {@link ZitadelError}. Inspection is
- * ordered most-specific-first (already-normalised, then errno/filesystem,
- * network, Zod-like, generic `Error`, then a catch-all) so the most
- * actionable category and hint win. This is the boundary that lets the rest
+ * ordered most-specific-first (already-normalised, HTTP status, then
+ * errno/filesystem, no response, Zod-like, generic `Error`, then a
+ * catch-all) so the most actionable category and hint win. A cancelled
+ * request arrives already normalised, as the `E_CANCELLED` error that
+ * `./interrupt` aborts it with. This is the boundary that lets the rest
  * of the CLI `throw` plain errors yet still produce consistent, categorised
  * output. The original error shape is preserved under `details` for
  * debugging without leaking it into the user-facing message.
@@ -148,10 +153,13 @@ export function toZitadelError(error: unknown): ZitadelError {
     }
   }
 
-  if (isNetworkError(error)) {
-    return new ZitadelError("E_NETWORK", errorMessage(error), {
-      hint: "Check your connection, ZITADEL_API_BASE, or the configured server URL.",
-      details: { original: pickErrorShape(error as Error) },
+  if (error instanceof NetworkError) {
+    return new ZitadelError("E_NETWORK", error.message, {
+      hint:
+        error.reason === "timeout"
+          ? "The server accepted the connection but did not answer in time. Check that it is healthy, then retry."
+          : "Check your connection, ZITADEL_API_BASE, or the configured server URL.",
+      details: { url: error.url, reason: error.reason },
     });
   }
 
@@ -213,42 +221,6 @@ function isPlatformErrorEnvelope(body: unknown): boolean {
 
 function isErrnoException(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && typeof (error as NodeJS.ErrnoException).code === "string";
-}
-
-/**
- * True when `fetch` never got a response: the connection was refused, reset,
- * timed out, or the host did not resolve.
- *
- * Runtimes word this differently. Undici says "fetch failed" and puts the
- * errno on `cause` (an `AggregateError` when several addresses were tried);
- * the WHATWG wording other fetch implementations use — msw's `HttpResponse.error()`
- * among them — is "Failed to fetch", with no errno at all. Both are the same
- * failure, so both have to land on `E_NETWORK` rather than the validation
- * default.
- */
-function isNetworkError(error: unknown): boolean {
-  if (!(error instanceof Error)) {
-    return false;
-  }
-  const networkMessage = /fetch failed|failed to fetch|load failed|network|ECONNREFUSED|ENOTFOUND/i;
-  if (error.name === "TypeError" && networkMessage.test(error.message)) {
-    return true;
-  }
-  return hasNetworkErrno((error as { cause?: unknown }).cause);
-}
-
-function hasNetworkErrno(cause: unknown): boolean {
-  if (!cause || typeof cause !== "object") {
-    return false;
-  }
-  if ("code" in cause) {
-    const code = String((cause as { code: unknown }).code);
-    if (/^(ECONNREFUSED|ECONNRESET|ENOTFOUND|ETIMEDOUT|EAI_AGAIN|UND_ERR)/i.test(code)) {
-      return true;
-    }
-  }
-  const errors = (cause as { errors?: unknown }).errors;
-  return Array.isArray(errors) && errors.some(hasNetworkErrno);
 }
 
 function isZodLikeError(error: unknown): boolean {

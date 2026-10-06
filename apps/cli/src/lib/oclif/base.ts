@@ -6,6 +6,7 @@ import { nonBlankString } from "./flags";
 import consola from "consola";
 
 import { toZitadelError, type ZitadelError } from "../errors";
+import { resetInterrupt } from "../interrupt";
 import { isObject } from "../json";
 import { resolveCwd } from "../paths";
 import { normalizePublicCliCommand, normalizePublicCliCommands } from "../public-cli";
@@ -131,6 +132,7 @@ export abstract class BaseCommand extends Command {
    */
   protected override async init(): Promise<void> {
     await super.init();
+    resetInterrupt();
     const telemetryFlag = this.argv.includes("--no-telemetry") ? false : undefined;
     installUserAgent(buildUserAgent(processUserAgentFacts(this.config.version, telemetryFlag)));
   }

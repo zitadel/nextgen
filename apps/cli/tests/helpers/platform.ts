@@ -43,6 +43,12 @@ export interface PlatformMock {
    */
   refusesConnections(): void;
 
+  /**
+   * Accepts every request and never answers, as a wedged server or a proxy
+   * holding the connection open would. Settles when the request is aborted.
+   */
+  hangs(): void;
+
   /** Drops any arranged failure, so the platform answers normally again. */
   recovers(): void;
 
@@ -94,6 +100,18 @@ export function usePlatformMock(): PlatformMock {
 
     refusesConnections() {
       server.use(http.all("*", () => HttpResponse.error()));
+    },
+
+    hangs() {
+      server.use(
+        http.all(
+          "*",
+          ({ request }) =>
+            new Promise<never>((_, reject) => {
+              request.signal.addEventListener("abort", () => reject(request.signal.reason));
+            }),
+        ),
+      );
     },
 
     recovers() {
