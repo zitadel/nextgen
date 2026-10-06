@@ -33,6 +33,17 @@ describe("resources", () => {
         expect(result).toSucceed();
       });
     });
+
+    describe("that refuses connections", () => {
+      it("still succeeds", async () => {
+        const app = await aSetUpApp();
+        platform.refusesConnections();
+
+        const result = await app.run(["resources", "--json"]);
+
+        expect(result).toSucceed();
+      });
+    });
   });
 
   describe("against a valid server", () => {
