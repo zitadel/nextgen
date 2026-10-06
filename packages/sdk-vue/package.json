@@ -42,7 +42,9 @@
   "devDependencies": {
     "@testing-library/vue": "^8.1.0",
     "@vitest/coverage-v8": "catalog:",
+    "@zitadel/api-mock": "workspace:*",
     "jsdom": "catalog:",
+    "msw": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vite-plugin-dts": "catalog:",

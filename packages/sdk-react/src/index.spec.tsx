@@ -47,11 +47,11 @@ describe("ZitadelLogin", () => {
 
   it("forwards the preview props to the widget", () => {
     const { container } = render(
-      <ZitadelLogin project={project} previewState="success" previewSuccessStep="welcome" />,
+      <ZitadelLogin project={project} previewState="success" previewSuccessStep="done" />,
     );
     const el = container.querySelector<ZitadelLoginElement>("zitadel-login");
     expect(el!.previewState).toBe("success");
-    expect(el!.previewSuccessStep).toBe("welcome");
+    expect(el!.previewSuccessStep).toBe("done");
   });
 
   it.each(Object.entries(ZITADEL_LOGIN_EVENT_HANDLERS))(

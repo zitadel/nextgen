@@ -62,6 +62,7 @@ export default defineConfig([
     },
     outDir: "dist",
     format: ["esm"],
+    failOnWarn: true,
     tsconfig: "tsconfig.lib.json",
     dts: true,
     sourcemap: true,
@@ -79,8 +80,10 @@ export default defineConfig([
     // until a full `git clean`.
     clean: false,
     target: "es2022",
-    external: [...THIRD_PARTY, "@zitadel/api-mock"],
-    noExternal: INLINE_INTERNAL,
+    deps: {
+      neverBundle: [...THIRD_PARTY, "@zitadel/api-mock"],
+      alwaysBundle: INLINE_INTERNAL,
+    },
   },
 
   /**
@@ -100,6 +103,7 @@ export default defineConfig([
     entry: { standalone: "src/index.ts" },
     outDir: "dist",
     format: ["esm"],
+    failOnWarn: true,
     platform: "browser",
     // `platform: "browser"` would otherwise emit `standalone.js`; force `.mjs`
     // so the `unpkg`/`jsdelivr`/`./standalone` paths in package.json still match.
@@ -109,7 +113,9 @@ export default defineConfig([
     sourcemap: false,
     clean: false,
     target: "es2022",
-    external: ["@zitadel/api-mock"],
-    noExternal: [...INLINE_INTERNAL, ...INLINE_STANDALONE_ONLY, ...THIRD_PARTY],
+    deps: {
+      neverBundle: ["@zitadel/api-mock"],
+      alwaysBundle: [...INLINE_INTERNAL, ...INLINE_STANDALONE_ONLY, ...THIRD_PARTY],
+    },
   },
 ]);
