@@ -37,6 +37,17 @@ const (
 	// start a sign-in with, or whose sign-in the current step cannot route.
 	// The user stays on the step.
 	FlowStepErrorSSOUnavailable = "error.sso_unavailable"
+	// FlowStepErrorSSOCancelled reports a provider callback carrying
+	// access_denied (RFC 6749 §4.1.2.1): the person declined at the provider,
+	// or it refused the request. The one provider error with its own key,
+	// because telling someone the sign-in failed when they cancelled it sends
+	// them hunting for a mistake they never made.
+	FlowStepErrorSSOCancelled = "error.sso_cancelled"
+	// FlowStepErrorSSOFailed reports every other failure after the provider
+	// redirected back: another provider error code, a failed code exchange or
+	// id_token validation, or a configuration failure. The cause goes to the
+	// server log only; the step error stays generic.
+	FlowStepErrorSSOFailed = "error.sso_failed"
 )
 
 // FlowStepErrorAllowed reports whether a step error value honors the

@@ -29,7 +29,7 @@ func TestNewSSOState(t *testing.T) {
 	crypter := &crypto.InverseCrypter{}
 
 	t.Run("mints every secret, leaves the id for storage and hashes the state into StateHash", func(t *testing.T) {
-		sso, err := domain.NewSSOState("google", "idprev_1", "https://auth.example.com/__nextgen/idp/callback", "/after-login", crypter)
+		sso, err := domain.NewSSOState("proj_1", "google", "idprev_1", "https://auth.example.com/__nextgen/idp/callback", "/after-login", crypter)
 		require.NoError(t, err)
 		require.NotNil(t, sso)
 		check := sso.Check
@@ -55,14 +55,42 @@ func TestNewSSOState(t *testing.T) {
 			require.NoError(t, err)
 			return len(raw)
 		}
-		assert.Equal(t, 16, decodedLen(t, sso.State))
+		random, found := strings.CutPrefix(sso.State, "proj_1.")
+		require.True(t, found, "the state must carry the project prefix, got %q", sso.State)
+		assert.Equal(t, 16, decodedLen(t, random))
 		assert.Equal(t, 16, decodedLen(t, sso.BindingNonce))
 		assert.Equal(t, 16, decodedLen(t, sso.OIDCNonce))
 		assert.Equal(t, 32, decodedLen(t, sso.PKCEVerifier))
+
+		projectID, ok := domain.SSOStateProjectID(sso.State)
+		require.True(t, ok)
+		assert.Equal(t, "proj_1", projectID)
+	})
+
+	t.Run("an empty project id is refused", func(t *testing.T) {
+		_, err := domain.NewSSOState("", "google", "idprev_1", "https://auth.example.com/__nextgen/idp/callback", "/after-login", crypter)
+		assert.Error(t, err)
+	})
+
+	t.Run("a separator in the project id is stripped, so the parse stays exact", func(t *testing.T) {
+		sso, err := domain.NewSSOState("proj.1", "google", "idprev_1", "https://auth.example.com/__nextgen/idp/callback", "/after-login", crypter)
+		require.NoError(t, err)
+		projectID, ok := domain.SSOStateProjectID(sso.State)
+		require.True(t, ok)
+		assert.Equal(t, "proj1", projectID)
+	})
+
+	t.Run("the hash covers the project prefix", func(t *testing.T) {
+		sso, err := domain.NewSSOState("proj_1", "google", "idprev_1", "https://auth.example.com/__nextgen/idp/callback", "/after-login", crypter)
+		require.NoError(t, err)
+		// A captured state rewritten to another project must resolve nothing:
+		// the lookup hash of the rewritten string differs from the stored one.
+		rewritten := "proj_2." + strings.TrimPrefix(sso.State, "proj_1.")
+		assert.NotEqual(t, sso.Check.StateHash, domain.HashSecret(rewritten))
 	})
 
 	t.Run("the verifier is stored encrypted and round-trips", func(t *testing.T) {
-		sso, err := domain.NewSSOState("google", "idprev_1", "https://auth.example.com/__nextgen/idp/callback", "/after-login", crypter)
+		sso, err := domain.NewSSOState("proj_1", "google", "idprev_1", "https://auth.example.com/__nextgen/idp/callback", "/after-login", crypter)
 		require.NoError(t, err)
 
 		stored := sso.Check.Pending.EncryptedPKCEVerifier
@@ -79,7 +107,7 @@ func TestNewSSOState(t *testing.T) {
 	})
 
 	t.Run("the binding nonce is stored only as its hash", func(t *testing.T) {
-		sso, err := domain.NewSSOState("google", "idprev_1", "https://auth.example.com/__nextgen/idp/callback", "/after-login", crypter)
+		sso, err := domain.NewSSOState("proj_1", "google", "idprev_1", "https://auth.example.com/__nextgen/idp/callback", "/after-login", crypter)
 		require.NoError(t, err)
 
 		stored := sso.Check.Pending.BindingNonceHash
@@ -93,7 +121,7 @@ func TestNewSSOState(t *testing.T) {
 	})
 
 	t.Run("the oidc nonce is stored as issued", func(t *testing.T) {
-		sso, err := domain.NewSSOState("google", "idprev_1", "https://auth.example.com/__nextgen/idp/callback", "/after-login", crypter)
+		sso, err := domain.NewSSOState("proj_1", "google", "idprev_1", "https://auth.example.com/__nextgen/idp/callback", "/after-login", crypter)
 		require.NoError(t, err)
 		// The callback hands this value to the id_token verifier, so a hash
 		// would be of no use to it.
@@ -102,9 +130,9 @@ func TestNewSSOState(t *testing.T) {
 	})
 
 	t.Run("two calls share no secret", func(t *testing.T) {
-		first, err := domain.NewSSOState("google", "idprev_1", "https://auth.example.com/__nextgen/idp/callback", "/after-login", crypter)
+		first, err := domain.NewSSOState("proj_1", "google", "idprev_1", "https://auth.example.com/__nextgen/idp/callback", "/after-login", crypter)
 		require.NoError(t, err)
-		second, err := domain.NewSSOState("google", "idprev_1", "https://auth.example.com/__nextgen/idp/callback", "/after-login", crypter)
+		second, err := domain.NewSSOState("proj_1", "google", "idprev_1", "https://auth.example.com/__nextgen/idp/callback", "/after-login", crypter)
 		require.NoError(t, err)
 
 		assert.NotEqual(t, first.State, second.State)
@@ -118,7 +146,7 @@ func TestNewSSOState(t *testing.T) {
 	})
 
 	t.Run("no encrypter means no pkce", func(t *testing.T) {
-		sso, err := domain.NewSSOState("github", "idprev_2", "", "", nil)
+		sso, err := domain.NewSSOState("proj_1", "github", "idprev_2", "", "", nil)
 		require.NoError(t, err)
 		assert.Empty(t, sso.PKCEVerifier)
 		assert.Empty(t, sso.Check.Pending.EncryptedPKCEVerifier)
@@ -129,6 +157,34 @@ func TestNewSSOState(t *testing.T) {
 		require.NoError(t, err)
 		assert.Empty(t, decrypted)
 	})
+}
+
+// TestSSOStateProjectID feeds the parser what a callback can actually receive:
+// the state query value is attacker-controlled, and every malformed shape must
+// read as not-ok, which the handler treats like an unknown state.
+func TestSSOStateProjectID(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name      string
+		state     string
+		projectID string
+		ok        bool
+	}{
+		{name: "minted state", state: "proj_1.abcDEF123-_", projectID: "proj_1", ok: true},
+		{name: "separator in the random part cuts at the first", state: "proj_1.abc.def", projectID: "proj_1", ok: true},
+		{name: "no separator", state: "proj_1abcdef"},
+		{name: "empty project", state: ".abcdef"},
+		{name: "empty random part", state: "proj_1."},
+		{name: "only the separator", state: "."},
+		{name: "empty state", state: ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			projectID, ok := domain.SSOStateProjectID(tt.state)
+			assert.Equal(t, tt.ok, ok)
+			assert.Equal(t, tt.projectID, projectID)
+		})
+	}
 }
 
 // keyedCrypter stands in for one project secret key. Its ciphertext names the
@@ -156,7 +212,7 @@ func TestSSOStatePayload_DecryptPKCEVerifierResolvesTheWritingKey(t *testing.T) 
 	issuing := keyedCrypter{keyID: "key-1"}
 	rotated := keyedCrypter{keyID: "key-2"}
 
-	sso, err := domain.NewSSOState("google", "idprev_1", "https://auth.example.com/__nextgen/idp/callback", "/after-login", issuing)
+	sso, err := domain.NewSSOState("proj_1", "google", "idprev_1", "https://auth.example.com/__nextgen/idp/callback", "/after-login", issuing)
 	require.NoError(t, err)
 
 	// The active key rotated while the ceremony was in flight.
@@ -193,7 +249,7 @@ func TestPKCEChallenge(t *testing.T) {
 func TestSSOState_LogValueOmitsSecrets(t *testing.T) {
 	t.Parallel()
 	crypter := &crypto.InverseCrypter{}
-	sso, err := domain.NewSSOState("google", "idprev_1", "https://auth.example.com/__nextgen/idp/callback", "/after-login", crypter)
+	sso, err := domain.NewSSOState("proj_1", "google", "idprev_1", "https://auth.example.com/__nextgen/idp/callback", "/after-login", crypter)
 	require.NoError(t, err)
 	check := sso.Check
 	// The storage layer would have stamped these two.
@@ -246,6 +302,15 @@ func TestSSOCallbackResult_NoTokenFields(t *testing.T) {
 	for i := range typ.NumField() {
 		assert.NotRegexp(t, forbidden, typ.Field(i).Name)
 	}
+}
+
+func TestSSOCallbackResult_IsError(t *testing.T) {
+	t.Parallel()
+	assert.False(t, domain.SSOCallbackResult{Subject: "sub-1"}.IsError())
+	assert.True(t, domain.SSOCallbackResult{
+		ProviderSlug: "google",
+		ErrorKey:     domain.FlowStepErrorSSOCancelled,
+	}.IsError())
 }
 
 func TestErrSSOStateInvalid(t *testing.T) {

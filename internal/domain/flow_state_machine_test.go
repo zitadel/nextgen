@@ -3529,6 +3529,8 @@ func TestFlowStepErrorContract(t *testing.T) {
 		domain.FlowStepErrorPasskeyRegistrationInvalid,
 		domain.FlowStepErrorSSOCreationDisabled,
 		domain.FlowStepErrorSSOUnavailable,
+		domain.FlowStepErrorSSOCancelled,
+		domain.FlowStepErrorSSOFailed,
 	}
 	for _, key := range stepErrorConsts {
 		assert.True(t, domain.FlowStepErrorAllowed(key), "step-error const %q must honor the contract", key)

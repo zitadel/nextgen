@@ -5,11 +5,18 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
+	"errors"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/zitadel/nextgen/internal/crypto"
 )
+
+// ssoStateSeparator splits the project id from the random part of a state.
+// Both sides keep it out of their own alphabet: resource ids are
+// prefix-underscore-body (resource.go) and the random part is base64url.
+const ssoStateSeparator = "."
 
 // ErrSSOStateInvalid covers every way a presented SSO state fails to resolve:
 // unknown, already consumed, superseded by a re-issue, or belonging to an
@@ -97,22 +104,39 @@ func (p SSOStatePayload) LogValue() slog.Value {
 // record (factor_payload). It deliberately carries no token and no
 // authorization code: the exchange is done by the time this is written.
 type SSOCallbackResult struct {
-	Subject              string         `json:"subject"`
-	ConnectionRevisionID string         `json:"connection_revision_id"`
-	Claims               map[string]any `json:"claims,omitempty"`
+	Subject              string `json:"subject"`
+	ConnectionRevisionID string `json:"connection_revision_id"`
+	// ProviderSlug is copied from the pending payload when the result is
+	// parked. The step that later loads the result must verify the provider
+	// is one it offers, and by then the pending payload is already cleared,
+	// so the slug is kept here.
+	ProviderSlug string         `json:"provider_slug"`
+	Claims       map[string]any `json:"claims,omitempty"`
 	// Verified records, per user-schema property, whether the provider asserted
 	// the property's mapped claim as verified (for example email_verified). It
 	// is keyed like Claims, the same as idp.ExternalIdentity.Verified.
 	Verified map[string]bool `json:"verified,omitempty"`
+	// ErrorKey is set when the ceremony failed after the state was consumed:
+	// [FlowStepErrorSSOCancelled] when the provider reported access_denied,
+	// [FlowStepErrorSSOFailed] for every other failure. The provider's own
+	// error text goes to the server log only, never into the record. An error
+	// result carries only this key and ProviderSlug: no subject, no claims,
+	// no verified map.
+	ErrorKey string `json:"error_key,omitempty"`
 }
 
+// IsError reports whether the ceremony failed; see [SSOCallbackResult.ErrorKey].
+func (r SSOCallbackResult) IsError() bool { return r.ErrorKey != "" }
+
 // LogValue implements [slog.LogValuer]. Claims may hold personal data, so the
-// log carries only the subject and the connection revision. Value receiver for
-// the reason given on [SSOStatePayload.LogValue].
+// log carries only the subject and the non-personal routing fields. Value
+// receiver for the reason given on [SSOStatePayload.LogValue].
 func (r SSOCallbackResult) LogValue() slog.Value {
 	return slog.GroupValue(
 		slog.String("subject", r.Subject),
 		slog.String("connection_revision_id", r.ConnectionRevisionID),
+		slog.String("provider_slug", r.ProviderSlug),
+		slog.String("error_key", r.ErrorKey),
 	)
 }
 
@@ -205,12 +229,13 @@ func (s SSOState) LogValue() slog.Value {
 	)
 }
 
-// NewSSOState mints the secrets. Every value is crypto/rand and base64url: the
-// state (16 bytes), the binding nonce (16 bytes), the OIDC nonce (16 bytes) and
-// the PKCE verifier (32 bytes, the 43-character form RFC 7636 §4.1 recommends).
-// State and the binding nonce reach the record only as their HashSecret
-// digests. The OIDC nonce is stored as issued. The record's own id is left to
-// the storage layer (ADR 047).
+// NewSSOState mints the state "<projectID>.<random>" and the other secrets.
+// Every secret is crypto/rand and base64url: the state's random part (16
+// bytes), the binding nonce (16 bytes), the OIDC nonce (16 bytes) and the PKCE
+// verifier (32 bytes, the 43-character form RFC 7636 §4.1 recommends). State
+// and the binding nonce reach the record only as their HashSecret digests. The
+// OIDC nonce is stored as issued. The record's own id is left to the storage
+// layer (ADR 047).
 //
 // pkceEncrypter nil means PKCE is disabled for this connection: no verifier is
 // minted. Otherwise the verifier is encrypted with it before it is placed on
@@ -220,14 +245,24 @@ func (s SSOState) LogValue() slog.Value {
 // crypter secret variables use. Its ciphertext is a compact JWE carrying the
 // writing key's id, which is what lets the callback decrypt after a rotation
 // (see [SSOStatePayload.DecryptPKCEVerifier]).
-//
-// Only the state's hash is stored, so the plaintext is the single thing that can
-// find the record again.
-func NewSSOState(providerSlug, connectionRevisionID, redirectURI, returnTarget string, pkceEncrypter crypto.Encrypter) (*SSOState, error) {
-	state, err := randomSecret(16)
+func NewSSOState(projectID, providerSlug, connectionRevisionID, redirectURI, returnTarget string, pkceEncrypter crypto.Encrypter) (*SSOState, error) {
+	if projectID == "" {
+		return nil, ErrInternal(errors.New("sso state: project id is empty"))
+	}
+	random, err := randomSecret(16)
 	if err != nil {
 		return nil, err
 	}
+	// The [SSOCallbackCheck] row is found by (project_id, lookup_hash), and the
+	// provider's redirect is the one request with no other project source: the
+	// flow cookie is SameSite=Strict and is not sent on a cross-site
+	// navigation, and there is no project header or body. The state is the only
+	// value the provider echoes back, so the project rides in it, read out
+	// again by [SSOStateProjectID]. The project id is not a secret (the client
+	// sends it in CreateFlow), and the random part keeps its full entropy.
+	// Resource ids never hold the separator (resource.go); stripping it keeps
+	// the parse exact rather than truncated if that ever changes.
+	state := strings.ReplaceAll(projectID, ssoStateSeparator, "") + ssoStateSeparator + random
 	bindingNonce, err := randomSecret(16)
 	if err != nil {
 		return nil, err
@@ -251,6 +286,8 @@ func NewSSOState(providerSlug, connectionRevisionID, redirectURI, returnTarget s
 		BindingNonce: bindingNonce,
 		OIDCNonce:    oidcNonce,
 		Check: &SSOCallbackCheck{
+			// The hash is over the full state, prefix included: a state with
+			// a swapped project prefix matches no stored hash.
 			StateHash: HashSecret(state),
 			Pending: &SSOStatePayload{
 				ProviderSlug:          providerSlug,
@@ -263,6 +300,19 @@ func NewSSOState(providerSlug, connectionRevisionID, redirectURI, returnTarget s
 			},
 		},
 	}, nil
+}
+
+// SSOStateProjectID reads the project id back out of a presented state, so the
+// callback can scope its lookup. The input is attacker-controlled: a state
+// without the separator, or with an empty part, reports false, and the caller
+// treats it exactly like an unknown state. The project id is only a routing
+// hint until ConsumeSSOState matches the full string's hash.
+func SSOStateProjectID(state string) (string, bool) {
+	projectID, random, ok := strings.Cut(state, ssoStateSeparator)
+	if !ok || projectID == "" || random == "" {
+		return "", false
+	}
+	return projectID, true
 }
 
 // PKCEChallenge derives the S256 code challenge from a verifier
