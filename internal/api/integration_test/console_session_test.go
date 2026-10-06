@@ -590,6 +590,77 @@ func TestConsoleSessionByIDTeamFilterNeedsProjectRead(t *testing.T) {
 	assert.True(t, refused.Response.IsUserPermissionDenied(), helpers.MustMarshal(t, byTeam))
 }
 
+// TestConsoleSessionProjectViewerReadsMemberships is the allowed side of the
+// two refusals above: read on the whole project, the plain viewer grant and the
+// least the rule asks for, is enough for every membership read a session can
+// make. TestConsoleSessionExpandsUserTeams shows the same with an admin grant.
+func TestConsoleSessionProjectViewerReadsMemberships(t *testing.T) {
+	t.Parallel()
+
+	_, operatorID, cookie := ownSessionUser(t)
+	customer, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	memberID, teamID := harness.CreateUserOwnedByTeam(t, customer.ID)
+	_, otherTeamID := harness.CreateUserOwnedByTeam(t, customer.ID)
+	harness.SeedProjectViewer(t, customer.ID, operatorID)
+
+	session, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	session.SetSessionToken(cookie.Value)
+	params := api.QueryUsersParams{ProjectID: api.NewOptProjectID(api.ProjectID(customer.ID))}
+
+	t.Run("expansions", func(t *testing.T) {
+		resp, err := session.QueryUsers(t.Context(), &api.QueryUsersRequest{
+			Expand: []api.UserExpand{api.UserExpandTeams, api.UserExpandLifecycleOwnerTeam},
+		}, params)
+		require.NoError(t, err)
+		listed, ok := resp.(*api.QueryUsersResponse)
+		require.True(t, ok, helpers.MustMarshal(t, resp))
+		idx := slices.IndexFunc(listed.Users, func(u api.User) bool { return userID(t, u) == memberID })
+		require.GreaterOrEqual(t, idx, 0, helpers.MustMarshal(t, listed))
+		member := listed.Users[idx]
+		assert.True(t, slices.ContainsFunc(member.Teams, func(team api.UserTeam) bool { return team.ID == teamID }),
+			"expand teams must embed the member's team: %s", helpers.MustMarshal(t, member))
+		owner, ok := member.Metadata.LifecycleOwnerTeam.Get()
+		require.True(t, ok, "expand lifecycle_owner_team must embed the owner: %s", helpers.MustMarshal(t, member))
+		assert.Equal(t, teamID, owner.ID)
+	})
+
+	t.Run("team_id filter", func(t *testing.T) {
+		byTeam := &api.QueryUsersRequest{}
+		require.NoError(t, byTeam.UnmarshalJSON([]byte(`{"filter":[{"field":"team_id","operation":"equals","value":"`+teamID+`"}]}`)))
+		resp, err := session.QueryUsers(t.Context(), byTeam, params)
+		require.NoError(t, err)
+		listed, ok := resp.(*api.QueryUsersResponse)
+		require.True(t, ok, helpers.MustMarshal(t, resp))
+		ids := make([]string, 0, len(listed.Users))
+		for _, u := range listed.Users {
+			ids = append(ids, userID(t, u))
+		}
+		assert.Equal(t, []string{memberID}, ids)
+	})
+
+	t.Run("by id with team_id", func(t *testing.T) {
+		read, err := session.GetUserByID(t.Context(), api.GetUserByIDParams{
+			UserID: api.UserID(memberID),
+			TeamID: api.NewOptTeamID(api.TeamID(teamID)),
+		})
+		require.NoError(t, err)
+		user, ok := read.(*api.User)
+		require.True(t, ok, helpers.MustMarshal(t, read))
+		assert.Equal(t, memberID, userID(t, *user))
+
+		// Past the gate, the parameter answers the membership question: not a
+		// member of that team is 404, not 403.
+		miss, err := session.GetUserByID(t.Context(), api.GetUserByIDParams{
+			UserID: api.UserID(memberID),
+			TeamID: api.NewOptTeamID(api.TeamID(otherTeamID)),
+		})
+		require.NoError(t, err)
+		require.IsType(t, &api.GetUserByIDNotFound{}, miss, helpers.MustMarshal(t, miss))
+	})
+}
+
 // TestConsoleManagementBearerIgnoresStaleCookie pins the dual-scheme
 // precedence: a valid project secret authorizes the request even when a stale
 // or malformed session cookie rides along, instead of the cookie's failure
