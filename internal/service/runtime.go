@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"errors"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -14,10 +16,41 @@ import (
 // a sandbox project that has deployed nothing yet, where the request falls
 // back to the newest revisions.
 type RuntimeResolution struct {
-	Project    *domain.Project
-	Target     string
+	Project *domain.Project
+	// Origin is the browser origin the gate admitted, "" when the request
+	// carried none.
+	Origin string
+	Target string
+	// Source says which layer answered: "origin" (a deployment to the exact
+	// origin), "default" (the project default), "pin" (the header selected
+	// among what was deployed to the target) or "none" (a sandbox project
+	// with nothing deployed).
+	Source     string
 	Deployment *domain.Deployment
 	Release    *domain.Release
+}
+
+func (res *RuntimeResolution) logAttrs() []any {
+	attrs := []any{
+		slog.String("class", res.Project.Class.String()),
+		slog.String("matched_origin", res.Origin),
+		slog.String("target", res.Target),
+		slog.String("source", res.Source),
+	}
+	if res.Deployment != nil {
+		attrs = append(attrs,
+			slog.String("deployment_id", res.Deployment.ID),
+			slog.String("deploy_id", res.Deployment.DeployID),
+			slog.Time("deployed_at", res.Deployment.DeployedAt),
+		)
+	}
+	if res.Release != nil {
+		attrs = append(attrs,
+			slog.String("release_id", res.Release.ID),
+			slog.String("release_digest", res.Release.ContentHash),
+		)
+	}
+	return attrs
 }
 
 // RuntimeResolver answers which release serves a public request of a project.
@@ -36,6 +69,26 @@ func NewRuntimeResolver(v2Pool *DB, releases ReleaseService) *RuntimeResolver {
 // origin, and the fallback serves the project default. A pin may then select
 // among what was deployed to the matched target; it never activates.
 func (r *RuntimeResolver) Resolve(ctx context.Context, projectID, origin, pin string) (*RuntimeResolution, error) {
+	logger := getLoggingContext(ctx, "runtime").With(
+		slog.String("project_id", projectID),
+		slog.String("origin", strings.TrimSpace(origin)),
+		slog.String("requested_release", strings.TrimSpace(pin)),
+	)
+	resolution, err := r.resolve(ctx, projectID, origin, pin)
+	if err != nil {
+		attrs := []any{slog.Any("error", err)}
+		var de domain.Error
+		if errors.As(err, &de) {
+			attrs = append(attrs, slog.String("code", de.Code))
+		}
+		logger.Warn("runtime resolution refused", attrs...)
+		return nil, err
+	}
+	logger.Info("runtime resolved", resolution.logAttrs()...)
+	return resolution, nil
+}
+
+func (r *RuntimeResolver) resolve(ctx context.Context, projectID, origin, pin string) (*RuntimeResolution, error) {
 	stmts := r.v2Pool.Statements()
 	project, err := stmts.GetProjectByID(ctx, projectID)
 	if err != nil {
@@ -52,10 +105,12 @@ func (r *RuntimeResolver) Resolve(ctx context.Context, projectID, origin, pin st
 	}
 
 	if matched != nil {
+		resolution.Origin = matched.origin
 		dep, err := stmts.NewestDeployment(ctx, projectID, matched.origin)
 		switch {
 		case err == nil:
 			resolution.Target = matched.origin
+			resolution.Source = "origin"
 			resolution.Deployment = dep
 		case !isNoRow(err):
 			return nil, domain.ErrInternal(err).WithMessage("failed to read the origin's newest deployment")
@@ -67,6 +122,7 @@ func (r *RuntimeResolver) Resolve(ctx context.Context, projectID, origin, pin st
 		dep, err := stmts.NewestDeployment(ctx, projectID, "")
 		switch {
 		case err == nil:
+			resolution.Source = "default"
 			resolution.Deployment = dep
 		case !isNoRow(err):
 			return nil, domain.ErrInternal(err).WithMessage("failed to read the project default deployment")
@@ -94,11 +150,13 @@ func (r *RuntimeResolver) Resolve(ctx context.Context, projectID, origin, pin st
 		default:
 			resolution.Deployment = nil
 		}
+		resolution.Source = "pin"
 		resolution.Release = release
 		return resolution, nil
 	}
 
 	if resolution.Deployment == nil {
+		resolution.Source = "none"
 		return resolution, nil
 	}
 	release, err := r.releases.Get(ctx, projectID, resolution.Deployment.ReleaseID)
