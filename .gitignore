@@ -98,6 +98,9 @@ apps/docs/.generated/
 
 ## Local runtime config
 nextgen.yaml
+# The config the bench-smoke workflow starts the server with is source, not local
+# runtime config.
+!/tools/bench/ci/nextgen.yaml
 /nextgen
 nextgen-data/
 .zitadel/local/
