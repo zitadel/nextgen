@@ -23606,36 +23606,37 @@ func (*GetFlowStepConflict) getFlowStepRes() {}
 
 // GetFlowStepErrorResponse represents sum type.
 type GetFlowStepErrorResponse struct {
-	Type                    GetFlowStepErrorResponseType // switch on this field
-	AttAlreadyHandedOff     AttAlreadyHandedOff
-	AttInvalidRequest       AttInvalidRequest
-	AttInvalidState         AttInvalidState
-	AttNotCompleted         AttNotCompleted
-	AttNotFound             AttNotFound
-	EncKeyDecryptFailed     EncKeyDecryptFailed
-	EncKeyEncryptFailed     EncKeyEncryptFailed
-	EncKeyNotFound          EncKeyNotFound
-	EvtInvalid              EvtInvalid
-	FlowCompleted           FlowCompleted
-	FlowCookieExpired       FlowCookieExpired
-	FlowCookieInvalid       FlowCookieInvalid
-	FlowIntegrity           FlowIntegrity
-	FlowInvalidAction       FlowInvalidAction
-	FlowNotFound            FlowNotFound
-	FlowRestartRequired     FlowRestartRequired
-	FlowUnsupported         FlowUnsupported
-	IdpNotFound             IdpNotFound
-	IdpEndpointCleartext    IdpEndpointCleartext
-	IdpEndpointsPartial     IdpEndpointsPartial
-	IdpOAuth2Unsupported    IdpOAuth2Unsupported
-	IdpProtocolBlockMissing IdpProtocolBlockMissing
-	IdpScopesMissingOpenid  IdpScopesMissingOpenid
-	Internal                Internal
-	TknInvalid              TknInvalid
-	ReqInvalid              ReqInvalid
-	EncKeyUnknownAlg        EncKeyUnknownAlg
-	UserAlreadyExists       UserAlreadyExists
-	UserInvalid             UserInvalid
+	Type                          GetFlowStepErrorResponseType // switch on this field
+	AttAlreadyHandedOff           AttAlreadyHandedOff
+	AttInvalidRequest             AttInvalidRequest
+	AttInvalidState               AttInvalidState
+	AttNotCompleted               AttNotCompleted
+	AttNotFound                   AttNotFound
+	EncKeyDecryptFailed           EncKeyDecryptFailed
+	EncKeyEncryptFailed           EncKeyEncryptFailed
+	EncKeyNotFound                EncKeyNotFound
+	EvtInvalid                    EvtInvalid
+	FlowCompleted                 FlowCompleted
+	FlowCookieExpired             FlowCookieExpired
+	FlowCookieInvalid             FlowCookieInvalid
+	FlowIntegrity                 FlowIntegrity
+	FlowInvalidAction             FlowInvalidAction
+	FlowNotFound                  FlowNotFound
+	FlowRestartRequired           FlowRestartRequired
+	FlowUnsupported               FlowUnsupported
+	IdpNotFound                   IdpNotFound
+	IdpEndpointCleartext          IdpEndpointCleartext
+	IdpEndpointsPartial           IdpEndpointsPartial
+	IdpOAuth2Unsupported          IdpOAuth2Unsupported
+	IdpProtocolBlockMissing       IdpProtocolBlockMissing
+	IdpScopesMissingOpenid        IdpScopesMissingOpenid
+	IdpStrategyPointerUnsupported IdpStrategyPointerUnsupported
+	Internal                      Internal
+	TknInvalid                    TknInvalid
+	ReqInvalid                    ReqInvalid
+	EncKeyUnknownAlg              EncKeyUnknownAlg
+	UserAlreadyExists             UserAlreadyExists
+	UserInvalid                   UserInvalid
 }
 
 // GetFlowStepErrorResponseType is oneOf type of GetFlowStepErrorResponse.
@@ -23643,35 +23644,36 @@ type GetFlowStepErrorResponseType string
 
 // Possible values for GetFlowStepErrorResponseType.
 const (
-	AttAlreadyHandedOffGetFlowStepErrorResponse     GetFlowStepErrorResponseType = "att.already_handed_off"
-	AttInvalidRequestGetFlowStepErrorResponse       GetFlowStepErrorResponseType = "att.invalid_request"
-	AttInvalidStateGetFlowStepErrorResponse         GetFlowStepErrorResponseType = "att.invalid_state"
-	AttNotCompletedGetFlowStepErrorResponse         GetFlowStepErrorResponseType = "att.not_completed"
-	AttNotFoundGetFlowStepErrorResponse             GetFlowStepErrorResponseType = "att.not_found"
-	EncKeyDecryptFailedGetFlowStepErrorResponse     GetFlowStepErrorResponseType = "enc_key.decrypt_failed"
-	EncKeyEncryptFailedGetFlowStepErrorResponse     GetFlowStepErrorResponseType = "enc_key.encrypt_failed"
-	EncKeyNotFoundGetFlowStepErrorResponse          GetFlowStepErrorResponseType = "enc_key.not_found"
-	EvtInvalidGetFlowStepErrorResponse              GetFlowStepErrorResponseType = "evt.invalid"
-	FlowCompletedGetFlowStepErrorResponse           GetFlowStepErrorResponseType = "flow.completed"
-	FlowCookieExpiredGetFlowStepErrorResponse       GetFlowStepErrorResponseType = "flow.cookie_expired"
-	FlowCookieInvalidGetFlowStepErrorResponse       GetFlowStepErrorResponseType = "flow.cookie_invalid"
-	FlowIntegrityGetFlowStepErrorResponse           GetFlowStepErrorResponseType = "flow.integrity"
-	FlowInvalidActionGetFlowStepErrorResponse       GetFlowStepErrorResponseType = "flow.invalid_action"
-	FlowNotFoundGetFlowStepErrorResponse            GetFlowStepErrorResponseType = "flow.not_found"
-	FlowRestartRequiredGetFlowStepErrorResponse     GetFlowStepErrorResponseType = "flow.restart_required"
-	FlowUnsupportedGetFlowStepErrorResponse         GetFlowStepErrorResponseType = "flow.unsupported"
-	IdpNotFoundGetFlowStepErrorResponse             GetFlowStepErrorResponseType = "idp.not_found"
-	IdpEndpointCleartextGetFlowStepErrorResponse    GetFlowStepErrorResponseType = "idp.endpoint_cleartext"
-	IdpEndpointsPartialGetFlowStepErrorResponse     GetFlowStepErrorResponseType = "idp.endpoints_partial"
-	IdpOAuth2UnsupportedGetFlowStepErrorResponse    GetFlowStepErrorResponseType = "idp.oauth2_unsupported"
-	IdpProtocolBlockMissingGetFlowStepErrorResponse GetFlowStepErrorResponseType = "idp.protocol_block_missing"
-	IdpScopesMissingOpenidGetFlowStepErrorResponse  GetFlowStepErrorResponseType = "idp.scopes_missing_openid"
-	InternalGetFlowStepErrorResponse                GetFlowStepErrorResponseType = "internal"
-	TknInvalidGetFlowStepErrorResponse              GetFlowStepErrorResponseType = "tkn.invalid"
-	ReqInvalidGetFlowStepErrorResponse              GetFlowStepErrorResponseType = "req.invalid"
-	EncKeyUnknownAlgGetFlowStepErrorResponse        GetFlowStepErrorResponseType = "enc_key.unknown_alg"
-	UserAlreadyExistsGetFlowStepErrorResponse       GetFlowStepErrorResponseType = "user.already_exists"
-	UserInvalidGetFlowStepErrorResponse             GetFlowStepErrorResponseType = "user.invalid"
+	AttAlreadyHandedOffGetFlowStepErrorResponse           GetFlowStepErrorResponseType = "att.already_handed_off"
+	AttInvalidRequestGetFlowStepErrorResponse             GetFlowStepErrorResponseType = "att.invalid_request"
+	AttInvalidStateGetFlowStepErrorResponse               GetFlowStepErrorResponseType = "att.invalid_state"
+	AttNotCompletedGetFlowStepErrorResponse               GetFlowStepErrorResponseType = "att.not_completed"
+	AttNotFoundGetFlowStepErrorResponse                   GetFlowStepErrorResponseType = "att.not_found"
+	EncKeyDecryptFailedGetFlowStepErrorResponse           GetFlowStepErrorResponseType = "enc_key.decrypt_failed"
+	EncKeyEncryptFailedGetFlowStepErrorResponse           GetFlowStepErrorResponseType = "enc_key.encrypt_failed"
+	EncKeyNotFoundGetFlowStepErrorResponse                GetFlowStepErrorResponseType = "enc_key.not_found"
+	EvtInvalidGetFlowStepErrorResponse                    GetFlowStepErrorResponseType = "evt.invalid"
+	FlowCompletedGetFlowStepErrorResponse                 GetFlowStepErrorResponseType = "flow.completed"
+	FlowCookieExpiredGetFlowStepErrorResponse             GetFlowStepErrorResponseType = "flow.cookie_expired"
+	FlowCookieInvalidGetFlowStepErrorResponse             GetFlowStepErrorResponseType = "flow.cookie_invalid"
+	FlowIntegrityGetFlowStepErrorResponse                 GetFlowStepErrorResponseType = "flow.integrity"
+	FlowInvalidActionGetFlowStepErrorResponse             GetFlowStepErrorResponseType = "flow.invalid_action"
+	FlowNotFoundGetFlowStepErrorResponse                  GetFlowStepErrorResponseType = "flow.not_found"
+	FlowRestartRequiredGetFlowStepErrorResponse           GetFlowStepErrorResponseType = "flow.restart_required"
+	FlowUnsupportedGetFlowStepErrorResponse               GetFlowStepErrorResponseType = "flow.unsupported"
+	IdpNotFoundGetFlowStepErrorResponse                   GetFlowStepErrorResponseType = "idp.not_found"
+	IdpEndpointCleartextGetFlowStepErrorResponse          GetFlowStepErrorResponseType = "idp.endpoint_cleartext"
+	IdpEndpointsPartialGetFlowStepErrorResponse           GetFlowStepErrorResponseType = "idp.endpoints_partial"
+	IdpOAuth2UnsupportedGetFlowStepErrorResponse          GetFlowStepErrorResponseType = "idp.oauth2_unsupported"
+	IdpProtocolBlockMissingGetFlowStepErrorResponse       GetFlowStepErrorResponseType = "idp.protocol_block_missing"
+	IdpScopesMissingOpenidGetFlowStepErrorResponse        GetFlowStepErrorResponseType = "idp.scopes_missing_openid"
+	IdpStrategyPointerUnsupportedGetFlowStepErrorResponse GetFlowStepErrorResponseType = "idp.strategy_pointer_unsupported"
+	InternalGetFlowStepErrorResponse                      GetFlowStepErrorResponseType = "internal"
+	TknInvalidGetFlowStepErrorResponse                    GetFlowStepErrorResponseType = "tkn.invalid"
+	ReqInvalidGetFlowStepErrorResponse                    GetFlowStepErrorResponseType = "req.invalid"
+	EncKeyUnknownAlgGetFlowStepErrorResponse              GetFlowStepErrorResponseType = "enc_key.unknown_alg"
+	UserAlreadyExistsGetFlowStepErrorResponse             GetFlowStepErrorResponseType = "user.already_exists"
+	UserInvalidGetFlowStepErrorResponse                   GetFlowStepErrorResponseType = "user.invalid"
 )
 
 // IsAttAlreadyHandedOff reports whether GetFlowStepErrorResponse is AttAlreadyHandedOff.
@@ -23787,6 +23789,11 @@ func (s GetFlowStepErrorResponse) IsIdpProtocolBlockMissing() bool {
 // IsIdpScopesMissingOpenid reports whether GetFlowStepErrorResponse is IdpScopesMissingOpenid.
 func (s GetFlowStepErrorResponse) IsIdpScopesMissingOpenid() bool {
 	return s.Type == IdpScopesMissingOpenidGetFlowStepErrorResponse
+}
+
+// IsIdpStrategyPointerUnsupported reports whether GetFlowStepErrorResponse is IdpStrategyPointerUnsupported.
+func (s GetFlowStepErrorResponse) IsIdpStrategyPointerUnsupported() bool {
+	return s.Type == IdpStrategyPointerUnsupportedGetFlowStepErrorResponse
 }
 
 // IsInternal reports whether GetFlowStepErrorResponse is Internal.
@@ -24299,6 +24306,27 @@ func (s GetFlowStepErrorResponse) GetIdpScopesMissingOpenid() (v IdpScopesMissin
 func NewIdpScopesMissingOpenidGetFlowStepErrorResponse(v IdpScopesMissingOpenid) GetFlowStepErrorResponse {
 	var s GetFlowStepErrorResponse
 	s.SetIdpScopesMissingOpenid(v)
+	return s
+}
+
+// SetIdpStrategyPointerUnsupported sets GetFlowStepErrorResponse to IdpStrategyPointerUnsupported.
+func (s *GetFlowStepErrorResponse) SetIdpStrategyPointerUnsupported(v IdpStrategyPointerUnsupported) {
+	s.Type = IdpStrategyPointerUnsupportedGetFlowStepErrorResponse
+	s.IdpStrategyPointerUnsupported = v
+}
+
+// GetIdpStrategyPointerUnsupported returns IdpStrategyPointerUnsupported and true boolean if GetFlowStepErrorResponse is IdpStrategyPointerUnsupported.
+func (s GetFlowStepErrorResponse) GetIdpStrategyPointerUnsupported() (v IdpStrategyPointerUnsupported, ok bool) {
+	if !s.IsIdpStrategyPointerUnsupported() {
+		return v, false
+	}
+	return s.IdpStrategyPointerUnsupported, true
+}
+
+// NewIdpStrategyPointerUnsupportedGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from IdpStrategyPointerUnsupported.
+func NewIdpStrategyPointerUnsupportedGetFlowStepErrorResponse(v IdpStrategyPointerUnsupported) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetIdpStrategyPointerUnsupported(v)
 	return s
 }
 
@@ -30198,6 +30226,59 @@ func (s *IdpScopesMissingOpenid) SetDetails(val OptIdpScopesMissingOpenidDetails
 type IdpScopesMissingOpenidDetails map[string]jx.Raw
 
 func (s *IdpScopesMissingOpenidDetails) init() IdpScopesMissingOpenidDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type IdpStrategyPointerUnsupported struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptIdpStrategyPointerUnsupportedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *IdpStrategyPointerUnsupported) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *IdpStrategyPointerUnsupported) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *IdpStrategyPointerUnsupported) GetDetails() OptIdpStrategyPointerUnsupportedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *IdpStrategyPointerUnsupported) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *IdpStrategyPointerUnsupported) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *IdpStrategyPointerUnsupported) SetDetails(val OptIdpStrategyPointerUnsupportedDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type IdpStrategyPointerUnsupportedDetails map[string]jx.Raw
+
+func (s *IdpStrategyPointerUnsupportedDetails) init() IdpStrategyPointerUnsupportedDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}
@@ -39727,6 +39808,52 @@ func (o OptIdpScopesMissingOpenidDetails) Get() (v IdpScopesMissingOpenidDetails
 
 // Or returns value if set, or given parameter if does not.
 func (o OptIdpScopesMissingOpenidDetails) Or(d IdpScopesMissingOpenidDetails) IdpScopesMissingOpenidDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptIdpStrategyPointerUnsupportedDetails returns new OptIdpStrategyPointerUnsupportedDetails with value set to v.
+func NewOptIdpStrategyPointerUnsupportedDetails(v IdpStrategyPointerUnsupportedDetails) OptIdpStrategyPointerUnsupportedDetails {
+	return OptIdpStrategyPointerUnsupportedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptIdpStrategyPointerUnsupportedDetails is optional IdpStrategyPointerUnsupportedDetails.
+type OptIdpStrategyPointerUnsupportedDetails struct {
+	Value IdpStrategyPointerUnsupportedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptIdpStrategyPointerUnsupportedDetails was set.
+func (o OptIdpStrategyPointerUnsupportedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptIdpStrategyPointerUnsupportedDetails) Reset() {
+	var v IdpStrategyPointerUnsupportedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptIdpStrategyPointerUnsupportedDetails) SetTo(v IdpStrategyPointerUnsupportedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptIdpStrategyPointerUnsupportedDetails) Get() (v IdpStrategyPointerUnsupportedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptIdpStrategyPointerUnsupportedDetails) Or(d IdpStrategyPointerUnsupportedDetails) IdpStrategyPointerUnsupportedDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}

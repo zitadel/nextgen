@@ -54,7 +54,7 @@ func TestParseConnection(t *testing.T) {
 				"display_name": "Entra",
 				"subject_claim": "oid",
 				"claim_mapping": {"email": "email", "givenName": "name"},
-				"verified_claims": {"email": "email_verified", "givenName": true, "phone": "$supplementary_fetch", "familyName": false, "picture": "$typo"},
+				"verified_claims": {"email": "email_verified", "givenName": true, "familyName": false, "picture": "$typo"},
 				"oidc": {
 					"issuer": "https://accounts.example.test",
 					"jwks_uri": "https://accounts.example.test/keys",
@@ -77,7 +77,6 @@ func TestParseConnection(t *testing.T) {
 				VerifiedClaims: map[string]VerificationSource{
 					"email":     {Kind: VerifyByClaim, Claim: "email_verified"},
 					"givenName": {Kind: VerifyByTrust},
-					"phone":     {Kind: VerifyByStrategy},
 				},
 				OIDC: OIDCConnection{
 					Issuer:                    "https://accounts.example.test",
@@ -254,6 +253,24 @@ func TestParseConnection(t *testing.T) {
 				}
 			}`,
 			wantErr: new(domain.ErrIDPOAuth2Unsupported()),
+		},
+		{
+			name: "a strategy pointer on an oidc body is refused",
+			body: `{
+				"slug": "google",
+				"protocol": "oidc",
+				"display_name": "Google",
+				"claim_mapping": {"email": "email"},
+				"verified_claims": {"email": "$supplementary_fetch"},
+				"oidc": {
+					"issuer": "https://accounts.example.test",
+					"client_id": "client",
+					"client_secret": "${{ GOOGLE_SECRET }}",
+					"scopes": ["openid", "email"]
+				}
+			}`,
+			wantErr:      new(domain.ErrIDPStrategyPointerUnsupported("email")),
+			wantCauseMsg: "email points at a strategy",
 		},
 		{
 			name:         "an undecodable body is an internal error",

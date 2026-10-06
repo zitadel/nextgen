@@ -120,13 +120,23 @@ func ParseConnection(revisionID string, body []byte) (Connection, error) {
 	if err := requireAllOrNoEndpoints(oidc); err != nil {
 		return Connection{}, err
 	}
+	verifiedClaims := parseVerifiedClaims(stored.VerifiedClaims)
+	// The schema accepts the pointer on any protocol, but the oidc block
+	// selects no strategy, so it can never resolve. Refusing it here stops
+	// the submit before the redirect instead of failing the callback after
+	// the user consented. The write-time check is #1029.
+	for property, source := range verifiedClaims {
+		if source.Kind == VerifyByStrategy {
+			return Connection{}, domain.ErrIDPStrategyPointerUnsupported(property)
+		}
+	}
 
 	conn := Connection{
 		RevisionID:       revisionID,
 		CreationDisabled: stored.Provisioning.Creation == "disabled",
 		SubjectClaim:     stored.SubjectClaim,
 		ClaimMapping:     stored.ClaimMapping,
-		VerifiedClaims:   parseVerifiedClaims(stored.VerifiedClaims),
+		VerifiedClaims:   verifiedClaims,
 		OIDC: OIDCConnection{
 			Issuer:                    oidc.Issuer,
 			ClientID:                  oidc.ClientID,
