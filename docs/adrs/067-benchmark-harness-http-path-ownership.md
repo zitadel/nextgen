@@ -1,4 +1,4 @@
-# ADR 066: Benchmark Harness — the Go Module Owns the Typed Call Path, k6 Performs the Request
+# ADR 067: Benchmark Harness — the Go Module Owns the Typed Call Path, k6 Performs the Request
 
 > **Status:** Accepted
 > **Date:** 2026-10-03

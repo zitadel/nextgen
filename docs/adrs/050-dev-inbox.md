@@ -284,7 +284,7 @@ silent empty wait. Ordinary inbox *listing* pages with ADR 027 tokens as
 usual; the high-water token is the one additional type this ADR defines.
 
 **The CLI is the agent front door.** Same API, JSON envelope per the CLI's
-agent contract (`apps/cli/SKILLS.md`): `zitadel dev-inbox cursor` and
+agent contract (`apps/cli/skills/zitadel-cli/SKILL.md`): `zitadel dev-inbox cursor` and
 `zitadel dev-inbox wait --after … --to … --purpose … --timeout 30s`, both
 `--non-interactive --json`, with the message under `data.message`. The
 environment resolves deterministically — explicit `--env` wins, else the

@@ -11,7 +11,7 @@ import {
   ZITADEL_LOGOUT_EVENT_HANDLERS,
   ZITADEL_SESSION_EVENT_HANDLERS,
 } from "@zitadel/sdk-core/types";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { businessLocales } from "../public-api";
 import { ZitadelLoginComponent } from "./zitadel-login.component";
@@ -38,13 +38,6 @@ const outputOf = (instance: object, event: string): SubscribableOutput => {
   if (!output) throw new Error(`component has no @Output() "${name}"`);
   return output;
 };
-
-beforeEach(() => {
-  vi.stubGlobal(
-    "fetch",
-    vi.fn(() => Promise.reject(new Error("no network"))),
-  );
-});
 
 afterEach(() => {
   vi.unstubAllGlobals();

@@ -12,7 +12,7 @@
  */
 import type { CreateFlow201, CreateFlow201Step } from "@zitadel/api/generated/model";
 
-import { signHandoffToken } from "../crypto.js";
+import { signHandoffToken, toBase64url } from "../crypto.js";
 import type { StoredCredential } from "../lib/authn/index.js";
 
 /**
@@ -63,7 +63,7 @@ export type StepFixtureInput = {
  * browser's keychain from conflating credentials belonging to different users.
  */
 function emailToUserHandle(email: string): string {
-  return Buffer.from(email).toString("base64url");
+  return toBase64url(new TextEncoder().encode(email));
 }
 
 /**

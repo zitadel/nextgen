@@ -35,11 +35,11 @@ func TestAuthAttemptPasswordLogin(t *testing.T) {
 	attemptID := newAttempt(t, client, project)
 
 	// The default schema designates `email`, so the bare value identifies them.
-	identified := verifyAttemptProof(t, client, attemptID, api.FactorMethodIdentifier, identifierProof(userEmail))
+	identified := verifyAttemptProof(t, client, attemptID, api.ChallengeMethodIdentifier, identifierProof(userEmail))
 	require.Contains(t, completedMethods(identified), api.FactorMethodIdentifier)
 	require.Equal(t, userID, identifiedUser(t, identified), "identified the wrong user")
 
-	passworded := verifyAttemptProof(t, client, attemptID, api.FactorMethodPassword,
+	passworded := verifyAttemptProof(t, client, attemptID, api.ChallengeMethodPassword,
 		&api.VerifyChallengeRequest{
 			OneOf: api.NewPasswordProofVerifyChallengeRequestSum(api.PasswordProof{Password: userPass}),
 		})
@@ -67,7 +67,7 @@ func TestAuthAttemptIdentifier_UndesignatedPropertyDoesNotIdentify(t *testing.T)
 	requireProofRejected(t, client, newAttempt(t, client, project), identifierProof("E-1001"))
 	// The same user is found by the property the schema does designate, so the
 	// rejection above is the designation at work, not a broken endpoint.
-	verifyAttemptProof(t, client, newAttempt(t, client, project), api.FactorMethodIdentifier,
+	verifyAttemptProof(t, client, newAttempt(t, client, project), api.ChallengeMethodIdentifier,
 		identifierProof("undesignated@example.com"))
 }
 
@@ -163,7 +163,7 @@ func verifyAttemptProof(
 	t *testing.T,
 	client *helpers.ApiClient,
 	attemptID api.AttemptID,
-	method api.FactorMethod,
+	method api.ChallengeMethod,
 	proof *api.VerifyChallengeRequest,
 ) *api.AuthAttemptResponse {
 	t.Helper()
@@ -181,7 +181,7 @@ func verifyAttemptProof(
 // broken endpoint or a validation error must not pass for a correct refusal.
 func requireProofRejected(t *testing.T, client *helpers.ApiClient, attemptID api.AttemptID, proof *api.VerifyChallengeRequest) {
 	t.Helper()
-	challengeID := issueAttemptChallenge(t, client, attemptID, api.FactorMethodIdentifier)
+	challengeID := issueAttemptChallenge(t, client, attemptID, api.ChallengeMethodIdentifier)
 	verifyResp, err := client.VerifyChallengeProof(t.Context(), proof, api.VerifyChallengeProofParams{
 		AttemptID:   attemptID,
 		ChallengeID: challengeID,
@@ -193,7 +193,7 @@ func requireProofRejected(t *testing.T, client *helpers.ApiClient, attemptID api
 	require.Equal(t, api.AttProofRejectedVerifyChallengeProofErrorResponse, rejected.Response.Type, helpers.MustMarshal(t, rejected))
 }
 
-func issueAttemptChallenge(t *testing.T, client *helpers.ApiClient, attemptID api.AttemptID, method api.FactorMethod) api.ChallengeID {
+func issueAttemptChallenge(t *testing.T, client *helpers.ApiClient, attemptID api.AttemptID, method api.ChallengeMethod) api.ChallengeID {
 	t.Helper()
 	resp, err := client.IssueChallenge(t.Context(), &api.IssueChallengeRequest{Method: method}, api.IssueChallengeParams{AttemptID: attemptID})
 	require.NoError(t, err)
