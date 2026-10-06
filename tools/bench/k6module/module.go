@@ -223,6 +223,16 @@ func (m *ModuleInstance) GetMySession(vuID int) (string, error) {
 	return id, nil
 }
 
+// Scenarios returns the registry — name and whether the scenario takes
+// sessions — for the entry script to build its scenario table from.
+func (m *ModuleInstance) Scenarios() []map[string]any {
+	out := make([]map[string]any, len(harness.Scenarios))
+	for i, s := range harness.Scenarios {
+		out[i] = map[string]any{"name": s.Name, "sessions": s.UsesSessions}
+	}
+	return out
+}
+
 // SessionMetrics returns the session cache's metrics, which the summary
 // reports on their own rather than per operation.
 func (m *ModuleInstance) SessionMetrics() []string {

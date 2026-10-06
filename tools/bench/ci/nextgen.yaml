@@ -1,0 +1,21 @@
+# The server the bench-smoke workflow measures: SQLite, migrated on start, both
+# embedded UIs off, and the request log stream off. The default request logging
+# is a throughput cost and is not what the lane is there to exercise. The
+# workflow runs it from dist/smoke-server, so the data directory is created
+# there and discarded with the runner. Nothing in this file is a secret.
+#
+# The facts the server does not report (dialect, replicas, log level) are
+# declared by the workflow next to the step that starts it; keep the two in
+# step.
+server:
+  address: ":8080"
+  data_dir: ./data
+  console_enabled: false
+  login_enabled: false
+platform:
+  bootstrap_project: true
+instrumentation:
+  log:
+    level: warn
+    add_source: false
+    streams: [runtime, ready]

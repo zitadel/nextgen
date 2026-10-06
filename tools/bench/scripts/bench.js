@@ -9,6 +9,11 @@ import exec from 'k6/execution';
 
 const shape = { executor: 'constant-vus', vus: Number(__ENV.VUS || 1), duration: __ENV.DUR || '10s', gracefulStop: '5s' };
 
+// The scenario table comes from the module's registry, never from a list in
+// this script: a scenario registered in Go is runnable here, and one that is
+// registered without an exported function of its name fails the run.
+const registry = nextgen.scenarios();
+
 // An empty threshold on a sub-metric makes k6 keep and report it in its own
 // end-of-test summary: every metric per operation, and the error counter
 // further per status class and per error code. The vocabulary comes from the
@@ -20,11 +25,7 @@ for (const name of nextgen.submetrics()) thresholds[name] = [];
 for (const name of nextgen.sessionMetrics()) thresholds[name] = [];
 
 export const options = {
-  scenarios: {
-    login: { ...shape, exec: 'login' },
-    getUser: { ...shape, exec: 'getUser' },
-    getMySession: { ...shape, exec: 'getMySession' },
-  },
+  scenarios: Object.fromEntries(registry.map((s) => [s.name, { ...shape, exec: s.name }])),
   thresholds,
 };
 
@@ -40,9 +41,9 @@ export function getUser() {
 // iteration never pays for a login; a miss on the measured path is counted
 // (nextgen_session_cache_miss) and invalidates the window. `--scenario`
 // leaves only the selected scenario in the options, so this warms nothing
-// for a run that measures no sessions.
+// for a run whose scenario takes no sessions.
 export function setup() {
-  if ('getMySession' in exec.test.options.scenarios) nextgen.warmSessions(Number(__ENV.VUS || 1));
+  if (registry.some((s) => s.sessions && s.name in exec.test.options.scenarios)) nextgen.warmSessions(Number(__ENV.VUS || 1));
 }
 
 export function getMySession() {

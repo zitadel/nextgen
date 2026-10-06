@@ -92,9 +92,17 @@ jobs:
           commit: "build: version packages"
           createGithubReleases: false
 
-  publish:
+  # The harness must still run before a release goes out (#1108). It measures
+  # nothing; it only proves the benchmark harness has not rotted since the last
+  # time anyone needed a number.
+  bench-smoke:
     needs: changesets
     if: ${{ github.event_name == 'workflow_dispatch' || needs.changesets.outputs.publish_should_run == 'true' }}
+    uses: ./.github/workflows/bench-smoke.yml
+
+  publish:
+    needs: [changesets, bench-smoke]
+    if: ${{ !cancelled() && needs.bench-smoke.result == 'success' && (github.event_name == 'workflow_dispatch' || needs.changesets.outputs.publish_should_run == 'true') }}
     runs-on: depot-ubuntu-24.04-16
     timeout-minutes: 90
     steps:
