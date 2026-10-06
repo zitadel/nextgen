@@ -276,7 +276,7 @@ func (h *Handler) GetFlowStep(ctx context.Context, params api.GetFlowStepParams)
 	switch {
 	case terminal:
 		setCookie = []string{flowSetCookie(ctx, "", true)}
-	case result.SSOResolved:
+	case result.Reseal:
 		cookieValue, err := h.sealState(ctx, result.State)
 		if err != nil {
 			return nil, err

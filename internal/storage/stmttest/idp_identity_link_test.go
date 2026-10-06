@@ -224,3 +224,43 @@ func TestIDPIdentityLinkStatements_LinkCommitsWithTheUser(t *testing.T) {
 		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 	})
 }
+
+// Automatic SSO creation can lose a race on the subject: the user insert
+// succeeds, then the link insert trips the pair index. The whole transaction
+// must roll back, so no user is left that nothing links to.
+func TestIDPIdentityLinkStatements_CreateInsideUserTransactionRollsBackTogether(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		f := newIDPIdentityLinkFixture(t, d.stmts)
+		require.NoError(t, d.stmts.CreateIDPIdentityLink(t.Context(), f.link("subject-1")))
+
+		user := newTestUser(t, f.projectID, f.schemaURL, "", "racer@example.com", "racer")
+		err := d.pool.Transaction(t.Context(), func(ctx context.Context, tx service.Statementer[service.AllStatements]) error {
+			// A retry replays the closure, so the user id is minted afresh
+			// each attempt.
+			user.ID = ""
+			if err := tx.Statements().CreateUser(ctx, user); err != nil {
+				return err
+			}
+			return tx.Statements().CreateIDPIdentityLink(ctx, &domain.IDPIdentityLink{
+				ProjectID:    f.projectID,
+				ConnectionID: f.connectionID,
+				Subject:      "subject-1",
+				UserID:       user.ID,
+			})
+		})
+		require.ErrorAs(t, err, new(*database.UniqueError))
+
+		_, err = d.stmts.GetUser(t.Context(),
+			database.And(
+				database.Equal(database.Col(domain.UserFieldProjectID), f.projectID),
+				database.Equal(database.Col(domain.UserFieldID), user.ID),
+			),
+			service.UserQueryOptions{},
+		)
+		assert.ErrorIs(t, err, new(database.NoRowFoundError), "the user rolls back with the link")
+
+		got, err := d.stmts.GetIDPIdentityLink(t.Context(), idpIdentityLinkByPair(f.projectID, f.connectionID, "subject-1"))
+		require.NoError(t, err)
+		assert.Equal(t, f.userID, got.UserID, "the existing link is untouched")
+	})
+}
