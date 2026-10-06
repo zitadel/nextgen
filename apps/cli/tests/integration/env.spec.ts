@@ -82,7 +82,7 @@ describe("env", () => {
     });
 
     it("creates a project and writes its credentials", async () => {
-      const app = await anApp();
+      const app = await aSetUpApp();
 
       const result = await app.run(["env", "add", "production", "--non-interactive", "--json"]);
 
@@ -90,6 +90,9 @@ describe("env", () => {
       const file = await readFile(join(app.path, ".env.production.local"), "utf8");
       expect(file).toContain("ZITADEL_PROJECT_SECRET=");
       expect(file).toContain("ZITADEL_PREVIEW_TOKEN=");
+      // The app's client code reads the id under the framework's public alias.
+      const projectId = app.envelopeOf<{ project_id: string }>(result).data.project_id;
+      expect(file).toContain(`NEXT_PUBLIC_ZITADEL_PROJECT_ID=${projectId}`);
       const resolved = app.envelopeOf<Resolved>(
         await app.run(["env", "--env", "production", "--json"]),
       );

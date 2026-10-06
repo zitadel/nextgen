@@ -1,5 +1,6 @@
-import { writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { parseEnv } from "node:util";
 
 import { Flags } from "@oclif/core";
 import { cancel, confirm, isCancel, select, text } from "@clack/prompts";
@@ -121,6 +122,10 @@ export default class EnvAdd extends BaseCommand {
         ZITADEL_PROJECT_SECRET: created.project_secret,
         ZITADEL_PREVIEW_TOKEN: created.preview_token,
       };
+    }
+
+    for (const key of await publicProjectIdKeys(cwd)) {
+      values[key] = projectId;
     }
 
     const allowed: AllowedEntry[] = [];
@@ -269,4 +274,27 @@ async function ask<T>(answer: Promise<T | symbol>): Promise<T> {
     throw new ZitadelError("E_VALIDATION", "env add cancelled by user");
   }
   return value as T;
+}
+
+/**
+ * The names the app's client code reads the project id under, such as
+ * `NEXT_PUBLIC_ZITADEL_PROJECT_ID` or `VITE_ZITADEL_PROJECT_ID`. Setup wrote
+ * the framework's alias into `.env.local` and `.env.example`; whichever of
+ * them exists says what this environment's file has to carry as well.
+ */
+async function publicProjectIdKeys(cwd: string): Promise<string[]> {
+  for (const file of [".env.local", ".env.example"]) {
+    let contents: string;
+    try {
+      contents = await readFile(join(cwd, file), "utf8");
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") continue;
+      throw error;
+    }
+    const keys = Object.keys(parseEnv(contents)).filter(
+      (key) => key.endsWith("_ZITADEL_PROJECT_ID") && key !== "ZITADEL_PROJECT_ID",
+    );
+    if (keys.length > 0) return keys;
+  }
+  return [];
 }
