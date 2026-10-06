@@ -44,7 +44,7 @@
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": true,
+      "preset": "recommended",
       "a11y": {
         "noSvgWithoutTitle": "error",
         "useAriaPropsSupportedByRole": "error",
@@ -53,7 +53,8 @@
         "useSemanticElements": "error"
       },
       "complexity": {
-        "useOptionalChain": "warn"
+        "useLiteralKeys": "error",
+        "useOptionalChain": "off"
       },
       "correctness": {
         "noEmptyPattern": "error",
@@ -69,7 +70,8 @@
       },
       "style": {
         "noDescendingSpecificity": "off",
-        "noNonNullAssertion": "warn"
+        "noNonNullAssertion": "error",
+        "useTemplate": "error"
       },
       "suspicious": {
         "noArrayIndexKey": "error",

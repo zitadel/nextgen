@@ -712,7 +712,7 @@ function decodeEntities(value: string): string {
 }
 
 describe("parseSsoError", () => {
-  const tag = (obj: Record<string, string>) => "sso_error:" + btoa(JSON.stringify(obj));
+  const tag = (obj: Record<string, string>) => `sso_error:${btoa(JSON.stringify(obj))}`;
 
   it("returns null for a payload without the tag, so the catalog path handles it", () => {
     expect(parseSsoError("error.invalid_credentials")).toBeNull();
@@ -751,7 +751,7 @@ describe("parseSsoError", () => {
     // `atob` alone gives one character per byte, so the provider's own words
     // arrive as mojibake -- which is most providers, in most languages.
     const utf8Tag = (obj: Record<string, string>) =>
-      "sso_error:" + btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(obj))));
+      `sso_error:${btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(obj))))}`;
 
     const errors = parseSsoError(
       utf8Tag({ code: "access_denied", description: "Anmeldung abgebrochen — über Google" }),

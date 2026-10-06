@@ -200,11 +200,11 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
 
   async function renderCurrentStep(): Promise<CreateFlow201> {
     const snapshot = actor.getSnapshot();
-    const userHandle = snapshot.context.capturedFields["email"] ?? "";
+    const userHandle = snapshot.context.capturedFields.email ?? "";
     const input = {
       flowId: FLOW_ID,
       sessionToken: snapshot.context.sessionToken,
-      capturedEmail: snapshot.context.capturedFields["email"],
+      capturedEmail: snapshot.context.capturedFields.email,
       registeredCredentials: authn.getByUser(userHandle),
       iss,
     };

@@ -5,8 +5,8 @@
   "linter": {
     "rules": {
       "correctness": {
-        "noQwikUseVisibleTask": "warn",
-        "useQwikValidLexicalScope": "warn"
+        "noQwikUseVisibleTask": "error",
+        "useQwikValidLexicalScope": "off"
       }
     }
   }

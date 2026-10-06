@@ -105,7 +105,7 @@ const durFallback = (ms) => {
   const h = Math.floor(s / 3600);
   const m = Math.floor((s % 3600) / 60);
   const r = s % 60;
-  return `${h ? h + "h " : ""}${m ? m + "m " : ""}${r}s`;
+  return `${h ? `${h}h ` : ""}${m ? `${m}m ` : ""}${r}s`;
 };
 const dur = (ms) => (ms ? `<span class="dur" data-ms="${ms}">${esc(durFallback(ms))}</span>` : "");
 const timeEl = (iso) =>

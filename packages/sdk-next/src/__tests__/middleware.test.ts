@@ -34,8 +34,8 @@ function makeJwt(
 
 function makeRequest(url: string, cookie?: string, authorization?: string): NextRequest {
   const headers: Record<string, string> = {};
-  if (cookie) headers["cookie"] = cookie;
-  if (authorization) headers["authorization"] = authorization;
+  if (cookie) headers.cookie = cookie;
+  if (authorization) headers.authorization = authorization;
   return new NextRequest(url, { headers });
 }
 

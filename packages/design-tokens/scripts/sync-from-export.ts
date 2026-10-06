@@ -162,9 +162,14 @@ class Registry {
   private lookup(path: string, mode: string): Raw {
     const byMode = this.index.get(path);
     if (!byMode) throw new Error(`Unresolved reference: {${path}}`);
-    if (byMode.has(mode)) return byMode.get(mode)!;
-    if (byMode.has(NO_MODE)) return byMode.get(NO_MODE)!;
-    if (byMode.size === 1) return [...byMode.values()][0]!;
+    // `Raw` never includes `undefined`, so a present key is exactly a
+    // non-`undefined` `get`: the mode's own value wins, then the modeless one.
+    const direct = byMode.get(mode) ?? byMode.get(NO_MODE);
+    if (direct !== undefined) return direct;
+    if (byMode.size === 1) {
+      const [only] = byMode.values();
+      if (only !== undefined) return only;
+    }
     throw new Error(
       `Ambiguous reference {${path}} in mode ${mode}: defined for modes [${[...byMode.keys()].join(", ")}]`,
     );
@@ -178,8 +183,8 @@ class Registry {
     seen.add(key);
     const raw = this.lookup(path, mode);
     if (typeof raw === "string") {
-      const match = raw.match(ALIAS);
-      if (match) return this.resolve(match[1]!.trim(), mode, seen);
+      const alias = raw.match(ALIAS)?.[1];
+      if (alias) return this.resolve(alias.trim(), mode, seen);
     }
     return raw;
   }
@@ -230,13 +235,14 @@ function withRole(
 /** The single collection that owns `color.*`. */
 function semanticCollection(assigned: Map<ParsedCollection, CollectionRole>): ParsedCollection {
   const found = withRole(assigned, "semantic");
-  if (found.length !== 1) {
+  const [only, ...rest] = found;
+  if (!only || rest.length > 0) {
     throw new Error(
       `Exactly one collection must have role "semantic" (found ${found.length}` +
         `${found.length > 0 ? `: ${found.map((c) => c.name).join(", ")}` : ""}). See src/collections.ts.`,
     );
   }
-  return found[0]!;
+  return only;
 }
 
 function findMode(c: ParsedCollection, wanted: string): string {
@@ -356,11 +362,11 @@ function buildThemedGroups(
 ): { groups: Record<string, Record<string, ThemedColor>>; skipped: string[] } {
   const byGroup = new Map<string, Array<{ path: string; name: string }>>();
   for (const path of leavesForMode(c, "light").keys()) {
-    const parts = path.split(".");
+    const [head, ...tail] = path.split(".");
     // A leaf sitting at the collection root has no group of its own; fall back
     // to the collection name so it still gets a namespace of its own.
-    const group = parts.length > 1 ? kebab([parts[0]!]) : kebab([c.name]);
-    const name = kebab(parts.length > 1 ? parts.slice(1) : parts);
+    const group = tail.length > 0 ? kebab([head ?? ""]) : kebab([c.name]);
+    const name = kebab(tail.length > 0 ? tail : [head ?? ""]);
     const bucket = byGroup.get(group);
     if (bucket) bucket.push({ path, name });
     else byGroup.set(group, [{ path, name }]);
@@ -381,13 +387,14 @@ function setNested(target: Record<string, unknown>, path: string, value: Raw): v
   const parts = path
     .split(".")
     .map((p) => p.replace(/-([a-z0-9])/g, (_, ch: string) => ch.toUpperCase()));
+  const leaf = parts.at(-1);
+  if (leaf === undefined) throw new Error("setNested received an empty path");
   let cursor = target;
-  for (let i = 0; i < parts.length - 1; i += 1) {
-    const key = parts[i]!;
+  for (const key of parts.slice(0, -1)) {
     if (typeof cursor[key] !== "object" || cursor[key] === null) cursor[key] = {};
     cursor = cursor[key] as Record<string, unknown>;
   }
-  cursor[parts[parts.length - 1]!] = value;
+  cursor[leaf] = value;
 }
 
 /**

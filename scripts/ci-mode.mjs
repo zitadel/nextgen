@@ -276,7 +276,7 @@ function main() {
     console.log(`# gating: full run (${reason})`);
   }
   if (process.env.GITHUB_OUTPUT) {
-    appendFileSync(process.env.GITHUB_OUTPUT, lines.join("\n") + "\n");
+    appendFileSync(process.env.GITHUB_OUTPUT, `${lines.join("\n")}\n`);
   }
   const skipped = ALL_GATES.filter((g) => !gates[g]);
   if (process.env.GITHUB_STEP_SUMMARY && mode === "full") {
@@ -285,7 +285,7 @@ function main() {
       : skipped.length === 0
         ? `CI gating: all lanes affected (journey matrix: ${matrix}).`
         : `CI gating: skipped by affected-selection: ${skipped.join(", ")} (journey matrix: ${matrix}).`;
-    appendFileSync(process.env.GITHUB_STEP_SUMMARY, note + "\n");
+    appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${note}\n`);
   }
 }
 

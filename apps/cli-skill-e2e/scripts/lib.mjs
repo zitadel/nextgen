@@ -136,7 +136,7 @@ function readIf(path) {
 export function gradeStage(rule, cfgDir, parsed, stage1ok) {
   const { pairs, final, result } = parsed;
   const ok = !(result?.is_error ?? true);
-  const blob = pairs.map((p) => `${p.cmd} ${p.out}`).join(" ") + " " + final;
+  const blob = `${pairs.map((p) => `${p.cmd} ${p.out}`).join(" ")} ${final}`;
 
   if (rule === "setup") {
     const sd = join(cfgDir, "artifacts/.zitadel/schemas");

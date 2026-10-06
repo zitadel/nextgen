@@ -76,7 +76,7 @@ const lock = JSON.parse(
 ) as FigmaTokensLock;
 
 async function main(): Promise<void> {
-  const token = process.env["FIGMA_TOKEN"];
+  const token = process.env.FIGMA_TOKEN;
   if (!token) {
     throw new Error(
       "FIGMA_TOKEN env var is required. Generate at https://www.figma.com/developers/api#access-tokens and add it to repo secrets for CI.",
