@@ -129,6 +129,26 @@ describe("env", () => {
       ]);
     });
 
+    it("steers the resource commands at the bound project", async () => {
+      const app = await aSetUpApp();
+      expect(
+        await app.run(["env", "add", "production", "--non-interactive", "--json"]),
+      ).toSucceed();
+      const production = app.envelopeOf<Resolved>(
+        await app.run(["env", "--env", "production", "--json"]),
+      ).data.project_id?.value;
+      const development = app.envelopeOf<Resolved>(await app.run(["env", "--json"])).data
+        .project_id?.value;
+      expect(production).toBeDefined();
+      expect(production).not.toBe(development);
+
+      const listed = await app.run(["projects", "get", production!, "--json", "--env", "production"]);
+
+      expect(listed).toSucceed();
+      expect(app.envelopeOf<{ id: string }>(listed).data.id).toBe(production);
+      expect(await app.run(["users", "list", "--json", "--env", "production"])).toSucceed();
+    });
+
     it("defers the origins when binding an id without a project secret", async () => {
       const app = await anApp();
 

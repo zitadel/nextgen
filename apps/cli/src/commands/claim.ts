@@ -4,14 +4,15 @@ import { Flags } from "@oclif/core";
 import { ApiError } from "@zitadel/api/runtime/fetch";
 import consola from "consola";
 
-import { createZitadelClient } from "../lib/api-client";
+import { type ZitadelClient } from "../lib/api-client";
 import { wrapForBox } from "../lib/box";
 import { openInBrowser } from "../lib/browser";
 import { CLAIM_WINDOW_DAYS, isAttached } from "../lib/claim-state";
 import { ZitadelError } from "../lib/errors";
 import { isObject } from "../lib/json";
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
-import { readZitadelSecret, writeZitadelSecret, type ZitadelSecret } from "../lib/project";
+import { hasZitadelSecret, readZitadelSecret, writeZitadelSecret, type ZitadelSecret } from "../lib/project";
+import { connectTarget } from "../lib/target";
 
 /**
  * Poll cadence while a human completes the browser step. Starts responsive so
@@ -96,17 +97,25 @@ export default class Claim extends BaseCommand {
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(Claim);
     await this.toMeta(flags);
-    const { cwd, dryRun, nonInteractive } = this.meta;
+    const { cwd, dryRun, nonInteractive, env, serverFlag, envName, envFile } = this.meta;
 
-    const secret = await readZitadelSecret(cwd);
-    // The local record is authoritative enough to skip the round trip: the
-    // platform enforces first-claim-wins anyway, so re-asking could only ever
-    // return the same answer at the cost of a request.
-    if (isAttached(secret)) {
+    const { client, projectId, server } = await connectTarget({
+      cwd,
+      env,
+      serverFlag,
+      envName,
+      envFile,
+    });
+    // `.zitadel/secret` caches the claim for the project it names. When it
+    // names this one, the local record is authoritative enough to skip the
+    // round trip: the platform enforces first-claim-wins anyway, so re-asking
+    // could only ever return the same answer at the cost of a request.
+    const cached = await cachedSecretFor(cwd, projectId);
+    if (cached && isAttached(cached)) {
       return this.alreadyClaimed({
-        project_id: secret.project_id,
-        team_id: secret.team_id,
-        claimed_at: secret.claimed_at,
+        project_id: projectId,
+        team_id: cached.team_id,
+        claimed_at: cached.claimed_at,
       });
     }
 
@@ -124,25 +133,20 @@ export default class Claim extends BaseCommand {
         reason: "dry-run",
         data: {
           title: "Zitadel claim was not started.",
-          project_id: secret.project_id,
+          project_id: projectId,
           would: "Open a browser to claim this project, then record the owning team in .zitadel/secret.",
         },
         nextCommands: ["zitadel claim"],
       });
     }
 
-    const client = createZitadelClient({
-      baseUrl: this.meta.source,
-      token: secret.project_secret,
-    });
-
     let challenge;
     try {
-      challenge = await client.initClaim(secret.project_id);
+      challenge = await client.initClaim(projectId);
     } catch (error) {
       const claimed = alreadyClaimedDetails(error);
       if (claimed) {
-        return this.alreadyClaimed({ project_id: secret.project_id, ...claimed });
+        return this.alreadyClaimed({ project_id: projectId, ...claimed });
       }
       if (isClaimWindowExpired(error)) {
         this.recordTelemetry({ claim_outcome: "window_expired" });
@@ -161,9 +165,9 @@ export default class Claim extends BaseCommand {
     // on a remote origin — the exact confusion this warning names. Cloud
     // servers legitimately use a console origin different from the API one,
     // so only a loopback API paired with a non-loopback claim page warns.
-    if (isLoopbackUrl(this.meta.source) && !isLoopbackUrl(challenge.claim_url)) {
+    if (isLoopbackUrl(server) && !isLoopbackUrl(challenge.claim_url)) {
       consola.warn(
-        `The server at ${this.meta.source} advertised a claim page on ${new URL(challenge.claim_url).origin}. ` +
+        `The server at ${server} advertised a claim page on ${new URL(challenge.claim_url).origin}. ` +
           "If you started that server yourself, set NEXTGEN_SERVER_PUBLIC_BASE to its reachable origin (e.g. http://localhost:8080).",
       );
     }
@@ -194,17 +198,18 @@ export default class Claim extends BaseCommand {
     }
     consola.start("Waiting for the browser step to finish");
 
-    const completed = await this.poll(client, secret.project_id, challenge.challenge_id, deadline);
+    const completed = await this.poll(client, projectId, challenge.challenge_id, deadline);
 
-    const next: ZitadelSecret = {
-      ...secret,
-      claimed_at: completed.claimed_at,
-      team_id: completed.team_id,
-    };
-    // Unconditional: `--dry-run` never reaches here (it returns above), so a
-    // claim that got this far really happened on the platform and the local
-    // record must follow it.
-    await writeZitadelSecret(cwd, next);
+    // `--dry-run` never reaches here (it returns above), so a claim that got
+    // this far really happened on the platform and the local record, where
+    // there is one for this project, must follow it.
+    if (cached) {
+      await writeZitadelSecret(cwd, {
+        ...cached,
+        claimed_at: completed.claimed_at,
+        team_id: completed.team_id,
+      });
+    }
     // The team id stays out of the human output by design (it lives in the
     // envelope and .zitadel/secret); the user-facing outcome is permanence.
     consola.success("Project claimed");
@@ -214,7 +219,7 @@ export default class Claim extends BaseCommand {
       status: "ok",
       data: {
         title: "Your Project is now permanent.",
-        project_id: secret.project_id,
+        project_id: projectId,
         team_id: completed.team_id,
         claimed_at: completed.claimed_at,
         dashboard_url: completed.dashboard_url,
@@ -236,7 +241,7 @@ export default class Claim extends BaseCommand {
    * we stopped waiting first.
    */
   private async poll(
-    client: ReturnType<typeof createZitadelClient>,
+    client: ZitadelClient,
     projectId: string,
     challengeId: string,
     deadline: number,
@@ -379,4 +384,13 @@ function isLoopbackUrl(value: string): boolean {
   } catch {
     return false;
   }
+}
+
+/** The `.zitadel/secret` record, when it names the project the command targets. */
+async function cachedSecretFor(cwd: string, projectId: string): Promise<ZitadelSecret | undefined> {
+  if (!(await hasZitadelSecret(cwd))) {
+    return undefined;
+  }
+  const secret = await readZitadelSecret(cwd);
+  return secret.project_id === projectId ? secret : undefined;
 }

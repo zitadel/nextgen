@@ -1,7 +1,7 @@
 import { consola } from "consola";
 
-import { createZitadelClient } from "../lib/api-client";
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
+import { connectTarget } from "../lib/target";
 import {
   buildSyncPlan,
   collectPlanWarnings,
@@ -11,7 +11,6 @@ import {
   runSyncLoop,
   summarizePlan,
 } from "../lib/sync";
-import { readZitadelSecret } from "../lib/project";
 import { publicCliCommand } from "../lib/public-cli";
 
 /**
@@ -31,19 +30,18 @@ export default class Apply extends BaseCommand {
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(Apply);
     await this.toMeta(flags);
-    const { cwd, source, env, dryRun, isTTY } = this.meta;
+    const { cwd, env, dryRun, isTTY, serverFlag, envName, envFile } = this.meta;
 
-    const secret = await readZitadelSecret(cwd);
-    consola.info(`Project   ${secret.project_id}`);
-    consola.info(`Server    ${source}`);
     // Verbatim: the sync loop diffs and writes back what it reads.
-    const client = createZitadelClient(
-      { baseUrl: source, token: secret.project_secret },
+    const { client, projectId, server } = await connectTarget(
+      { cwd, env, serverFlag, envName, envFile },
       { verbatim: true },
     );
+    consola.info(`Project   ${projectId}`);
+    consola.info(`Server    ${server}`);
     const syncers = makeSyncers({
       client,
-      projectId: secret.project_id,
+      projectId,
       env,
       cwd,
     });

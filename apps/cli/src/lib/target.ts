@@ -235,6 +235,12 @@ export function requireValue(target: Target, key: TargetKey): string {
     `${key} is not set for environment ${target.environment.value}`,
     {
       hint: `Set ${key} in .env.${target.environment.value}.local or the process environment, or run \`zitadel env add ${target.environment.value}\`.\nconsulted, in order:\n${looked}`,
+      // A development environment with nothing bound is a directory `setup`
+      // has not run in; any other name is bound with `env add`.
+      nextCommands: [
+        ...(target.environment.value === "development" ? ["zitadel setup"] : []),
+        `zitadel env add ${target.environment.value}`,
+      ],
     },
   );
 }
@@ -254,7 +260,10 @@ export type Connected = Readonly<{
  */
 export async function connectTarget(
   input: ResolveTargetInput,
-  { credential = "project" }: { credential?: "project" | "preview" } = {},
+  {
+    credential = "project",
+    verbatim = false,
+  }: { credential?: "project" | "preview"; verbatim?: boolean } = {},
 ): Promise<Connected & { credentialSource: TargetKey }> {
   const target = await resolveTarget(input);
   const server = requireValue(target, "ZITADEL_URL");
@@ -265,7 +274,7 @@ export async function connectTarget(
       : "ZITADEL_PROJECT_SECRET";
   const token = requireValue(target, preferred);
   return {
-    client: createZitadelClient({ baseUrl: server, token }),
+    client: createZitadelClient({ baseUrl: server, token }, { verbatim }),
     projectId,
     server,
     target,

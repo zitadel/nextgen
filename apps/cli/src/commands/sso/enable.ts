@@ -7,7 +7,6 @@ import { consola } from "consola";
 
 import { credentialVariables, idpProvider, IDP_PROVIDERS } from "@zitadel/config/idp";
 
-import { createZitadelClient } from "../../lib/api-client";
 import { isDevelopmentBuild } from "../../lib/build-channel";
 import { isErrno, ZitadelError } from "../../lib/errors";
 import { publicCliCommand } from "../../lib/public-cli";
@@ -48,12 +47,9 @@ import {
   type JsonEnvelope,
   nonBlankString,
 } from "../../lib/oclif";
-import {
-  readDevelopmentIssuer,
-  readZitadelSecret,
-  type ZitadelSecret,
-} from "../../lib/project";
+import { readDevelopmentIssuer } from "../../lib/project";
 import { readState } from "../../lib/sync/state";
+import { connectTarget, type Connected } from "../../lib/target";
 import { readStdin } from "../../lib/variables";
 
 /**
@@ -95,7 +91,7 @@ export default class SsoEnable extends BaseCommand {
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(SsoEnable);
     await this.toMeta(flags);
-    const { cwd, nonInteractive, dryRun } = this.meta;
+    const { cwd, nonInteractive, dryRun, env, serverFlag, envName, envFile } = this.meta;
 
     const provider = flags.provider;
     if (provider === undefined) {
@@ -108,9 +104,14 @@ export default class SsoEnable extends BaseCommand {
     }
     const entry = idpProvider(provider);
 
-    // The Project is read before anything is asked for: being turned away
-    // after typing a secret would mean typing it again.
-    const secretFile = await readZitadelSecret(cwd);
+    // The target is resolved before anything is asked for: being turned away
+    // after typing a secret would mean typing it again. `--source mock`
+    // answers from fixtures and has no project behind it.
+    const connected =
+      this.meta.source === "mock"
+        ? undefined
+        : await connectTarget({ cwd, env, serverFlag, envName, envFile });
+    const projectId = connected?.projectId ?? "mock";
     const schema = selectSchema(await readSchemaFiles(cwd), flags.schema);
     const connections = await readConnectionFiles(cwd);
     // `nonBlankString` has already refused a blank one and trimmed the rest.
@@ -148,7 +149,7 @@ export default class SsoEnable extends BaseCommand {
     }
     const callbackUri = callbackUriFor(issuer);
 
-    consola.info(`Project   ${secretFile.project_id}`);
+    consola.info(`Project   ${projectId}`);
     consola.info(`Schema    ${schema.path}${schema.methods.length > 0 ? ` (${schema.methods.join(", ")})` : ""}`);
 
     if (dryRun) {
@@ -156,7 +157,7 @@ export default class SsoEnable extends BaseCommand {
         status: "skipped",
         reason: "dry-run",
         data: this.payload({
-          projectId: secretFile.project_id,
+          projectId: projectId,
           provider,
           schema: schema.name,
           plan,
@@ -186,7 +187,7 @@ export default class SsoEnable extends BaseCommand {
       // rerunning with a changed client id now takes effect instead of being
       // silently ignored. Nothing is prompted for: an unattended rerun should
       // not start asking for credentials the project already has.
-      const publish = this.publisher(secretFile);
+      const publish = this.publisher(connected);
       if (clientIdFlag !== undefined) {
         if (idVariable === undefined) {
           consola.warn(
@@ -228,7 +229,7 @@ export default class SsoEnable extends BaseCommand {
         clientIdFlag ?? (await this.askClientId(entry.displayName, nonInteractive));
       const secretValue = await this.askClientSecret(scaffolded.clientSecret, nonInteractive);
 
-      const publish = this.publisher(secretFile);
+      const publish = this.publisher(connected);
       const connection = entry.connection({
         slug: plan.slug,
         schemaProperties: schema.properties,
@@ -285,7 +286,7 @@ export default class SsoEnable extends BaseCommand {
       status: "ok",
       data: {
         ...this.payload({
-          projectId: secretFile.project_id,
+          projectId: projectId,
           provider,
           schema: schema.name,
           plan,
@@ -319,22 +320,19 @@ export default class SsoEnable extends BaseCommand {
   }
 
   /**
-   * How the connection's credentials reach the project, or `undefined` when there is
-   * no project behind this run: `--source mock` answers from fixtures and has
-   * no variables to write. The connection is built here rather than taken from
-   * `OwnerCommand.connect` because this command addresses the local Project it
-   * was pointed at, not an owner the developer named.
+   * How the connection's credentials reach the project, or `undefined` when
+   * there is no project behind this run (`--source mock` answers from
+   * fixtures and has no variables to write).
    */
-  private publisher(secret: ZitadelSecret): SecretPublisher | undefined {
-    const { source } = this.meta;
-    if (source === "mock") {
+  private publisher(connected: Connected | undefined): SecretPublisher | undefined {
+    if (connected === undefined) {
       return undefined;
     }
-    const client = createZitadelClient({ baseUrl: source, token: secret.project_secret });
+    const { client, projectId } = connected;
     return async (name, value, { secret: isSecret }) => {
       await client.updateVariables(
         { [name]: { value, secret: isSecret } },
-        { project_id: secret.project_id },
+        { project_id: projectId },
       );
     };
   }

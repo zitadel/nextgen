@@ -39,9 +39,10 @@ import {
 import { ApiError } from "@zitadel/api/runtime/fetch";
 import { consola } from "consola";
 
-import { createZitadelClient, type ZitadelClient } from "../lib/api-client";
+import { type ZitadelClient } from "../lib/api-client";
 import { CommandGroups } from "../lib/oclif/groups";
 import { ZitadelError } from "../lib/errors";
+import { connectTarget } from "../lib/target";
 import {
   buildResourceCommands,
   type CreateSpec,
@@ -50,7 +51,6 @@ import {
   type Schema,
   type UpdateSpec,
 } from "../lib/oclif/crud";
-import { readZitadelSecret } from "../lib/project";
 
 /**
  * The platform connection every resource verb calls through: the typed
@@ -519,14 +519,20 @@ export const RESOURCES = {
 
 /**
  * The `<resource> <verb>` commands, ready for the explicit command table.
- * Connecting mirrors `schemas list` and `apply`: the project secret from
- * `.zitadel/secret` becomes the bearer, so a missing secret fails the same
- * way (`E_VALIDATION` pointing at `zitadel setup`).
+ * Connecting resolves the target like `deploy` does, so `--env production`
+ * lists production's users and a missing credential fails naming the file
+ * that should hold it.
  */
 export const RESOURCE_COMMANDS = buildResourceCommands<Platform>(RESOURCES, {
   operations: FILTER_OPERATIONS,
-  connect: async ({ cwd, source }) => {
-    const secret = await readZitadelSecret(cwd);
+  connect: async ({ cwd, env, serverFlag, envName, envFile }) => {
+    const { client, projectId, server } = await connectTarget({
+      cwd,
+      env,
+      serverFlag,
+      envName,
+      envFile,
+    });
     // Which project and server a verb is about is worth stating to a human, and
     // is the "make boundary-crossing visible" rule from the CLI guidelines. It
     // shares stdout with the result, though, so a piped run would feed those
@@ -534,12 +540,9 @@ export const RESOURCE_COMMANDS = buildResourceCommands<Platform>(RESOURCES, {
     // them counted as rows by `wc -l`. On a pipe the result travels alone;
     // `--json` silences them either way.
     if (process.stdout.isTTY) {
-      consola.info(`Project   ${secret.project_id}`);
-      consola.info(`Server    ${source}`);
+      consola.info(`Project   ${projectId}`);
+      consola.info(`Server    ${server}`);
     }
-    return {
-      client: createZitadelClient({ baseUrl: source, token: secret.project_secret }),
-      projectId: secret.project_id,
-    };
+    return { client, projectId };
   },
 });
