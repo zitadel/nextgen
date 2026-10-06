@@ -4845,6 +4845,7 @@ func TestFlowStateMachine_Render_SSOCollisionRoutesUserAlreadyExists(t *testing.
 	assert.Equal(t, "sso-conflict", result.Step.Name)
 	assert.Equal(t, "user-9", result.State.CollectedData.UserID)
 	assert.Equal(t, "ch-1", result.State.SSOResolvedCheckID)
+	assert.True(t, result.SSOResolved)
 }
 
 func TestFlowStateMachine_Render_SSOCollisionFlipsRegisterToLogin(t *testing.T) {
@@ -4940,6 +4941,7 @@ func TestFlowStateMachine_Render_SSOAutoCreateRoutesAuthenticated(t *testing.T) 
 	require.Equal(t, "done", result.Step.Name)
 	assert.Equal(t, "handoff-1", result.HandoffToken)
 	assert.Equal(t, "user-new", result.State.CollectedData.UserID)
+	assert.True(t, result.SSOResolved)
 }
 
 // Complete claims on a step that cannot route sso_authenticated create
@@ -4965,6 +4967,7 @@ func TestFlowStateMachine_Render_SSOUnroutableTransitionDoesNotCreate(t *testing
 			assert.Equal(t, domain.FlowStepErrorSSOUnavailable, *result.Step.Error)
 			assert.Empty(t, result.State.CollectedData.UserID)
 			assert.Equal(t, "ch-1", result.State.SSOResolvedCheckID)
+			assert.True(t, result.SSOResolved)
 		})
 	}
 }
@@ -5026,6 +5029,7 @@ func TestFlowStateMachine_Render_SSOMissingRequiredRoutesUserNotFound(t *testing
 	assert.Equal(t, domain.FlowDefinitionPurposeRegister, result.State.CurrentPurpose)
 	assert.Empty(t, result.State.CollectedData.UserID)
 	assert.Equal(t, "ch-1", result.State.SSOResolvedCheckID, "the row stays, so the guard keeps it from resolving again")
+	assert.True(t, result.SSOResolved, "the guard reaches the cookie only through a re-seal")
 }
 
 // A required unique claim the provider did not verify could take over
@@ -5300,6 +5304,7 @@ func TestFlowStateMachine_Render_SSOStaleParkedRowProvisioningRendersStep(t *tes
 			assert.Equal(t, "credentials", result.Step.Name)
 			assert.Nil(t, result.Step.Error)
 			assert.Empty(t, result.State.CollectedData.UserID)
+			assert.False(t, result.SSOResolved)
 		})
 	}
 }
@@ -5747,6 +5752,7 @@ func TestFlowStateMachine_Render_SSOCollisionReconcilesLostCookieRace(t *testing
 	require.NoError(t, err)
 	assert.Equal(t, "sso-conflict", result.Step.Name)
 	assert.Equal(t, "u-b", result.State.CollectedData.UserID)
+	assert.True(t, result.SSOResolved)
 }
 
 func TestFlowStateMachine_Render_SSOCollisionReconcileWithRecordedUserRendersStep(t *testing.T) {
@@ -5761,6 +5767,7 @@ func TestFlowStateMachine_Render_SSOCollisionReconcileWithRecordedUserRendersSte
 	require.NoError(t, err)
 	assert.Equal(t, "credentials", result.Step.Name)
 	assert.Nil(t, result.Step.Error)
+	assert.False(t, result.SSOResolved)
 }
 
 func TestFlowStateMachine_Render_SSOCollisionReconcileWithOtherUserRestarts(t *testing.T) {
