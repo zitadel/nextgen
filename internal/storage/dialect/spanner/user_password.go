@@ -33,6 +33,10 @@ FROM user_passwords
 WHERE project_id = @p1 AND user_id = @p2
 ORDER BY created_at DESC
 LIMIT @p3 OFFSET 1`
+
+	lockUserPasswordStmt = userPasswordQuery + `
+WHERE project_id = @p1 AND user_id = @p2 AND ` + currentUserPassword + `
+FOR UPDATE`
 )
 
 type userPasswordStatements struct{ statement }
@@ -128,6 +132,22 @@ func (ps userPasswordStatements) GetUserPasswordHistory(ctx context.Context, pro
 		return err
 	})
 	return passwords, wrapError(err)
+}
+
+// LockUserPassword implements [service.UserPasswordStatements].
+func (ps userPasswordStatements) LockUserPassword(ctx context.Context, projectID, userID string) (*domain.UserPassword, error) {
+	var pw *domain.UserPassword
+	stmt := buildStatement(lockUserPasswordStmt, projectID, userID).statement()
+	// FOR UPDATE needs a read-write transaction: this joins the caller's, or
+	// opens one for the read alone.
+	err := withTransaction(ctx, ps.db, func(ctx context.Context, tx queryExecutor) error {
+		return tx.Query(ctx, stmt, func(iter *spanner.RowIterator) error {
+			var err error
+			pw, err = collectOneRow(iter, ps.scanUserPassword)
+			return err
+		})
+	})
+	return pw, wrapError(err)
 }
 
 func (ps userPasswordStatements) scanUserPassword(row *spanner.Row) (*domain.UserPassword, error) {

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/url"
 	"strings"
 	"time"
@@ -691,41 +690,17 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 		if err != nil {
 			return nil, nil, nil, err
 		}
-		password, err := s.stmts.Statements().GetUserPassword(ctx, database.And(
-			database.Equal(database.Col(domain.UserPasswordFieldProjectID), attempt.ProjectID),
-			database.Equal(database.Col(domain.UserPasswordFieldUserID), userFactor.UserID),
-		))
+		password, admittedAt, err := s.admitPasswordCheck(ctx, attempt.ProjectID, userFactor.UserID)
 		if err != nil {
 			return passwordChallenge, nil, nil, domain.ErrAuthAttemptProofRejected(err)
 		}
-
-		now := time.Now()
-		failures, err := s.stmts.Statements().GetUserPasswordFailures(ctx, password.ProjectID, password.UserID, domain.UserPasswordFailuresSince(now))
-		if err != nil {
+		if err := password.Verify(p.Password, s.passwordVerifier); err != nil {
+			// The failure admission recorded stands.
 			return passwordChallenge, nil, nil, domain.ErrAuthAttemptProofRejected(err)
 		}
-		if err := password.VerifyRateLimited(p.Password, s.passwordVerifier, failures); err != nil {
-			if errors.Is(err, domain.ErrUserPasswordRateLimited()) {
-				return passwordChallenge, nil, nil, domain.ErrAuthAttemptProofRejected(err)
-			}
-			failedAt := time.Now()
-			addErr := s.stmts.Statements().AddUserPasswordFailure(ctx, password.ProjectID, password.UserID, failedAt, domain.UserPasswordFailuresSince(failedAt))
-			if addErr != nil {
-				getLoggingContext(ctx, "auth_attempt").Error("failed to record a wrong password for the rate limit",
-					slog.String("project_id", password.ProjectID),
-					slog.String("user_id", password.UserID),
-					slog.Any("error", addErr),
-				)
-			}
-			return passwordChallenge, nil, nil, domain.ErrAuthAttemptProofRejected(err)
-		}
-		var txExtra func(context.Context, AllStatements) error
-		if failures.Count > 0 {
-			txExtra = func(ctx context.Context, stmts AllStatements) error {
-				return stmts.ClearUserPasswordFailures(ctx, password.ProjectID, password.UserID, now)
-			}
-		}
-		return passwordChallenge, attempt.SetPasswordFactor(), txExtra, nil
+		return passwordChallenge, attempt.SetPasswordFactor(), func(ctx context.Context, stmts AllStatements) error {
+			return stmts.ClearUserPasswordFailures(ctx, password.ProjectID, password.UserID, admittedAt)
+		}, nil
 
 	case PasskeyProof:
 		challenge, userFactor, err := attempt.PreparePasskeyVerification(challengeID)
@@ -858,6 +833,37 @@ func (s *authAttemptService) recordProofFailure(ctx context.Context, attempt *do
 		}
 		return emitAuthCheck(ctx, tx.Statements(), attempt, challenge, false)
 	})
+}
+
+// admitPasswordCheck decides whether the user's password may be checked now.
+// It runs under a lock on the user's password row, so concurrent checks are
+// admitted one at a time, and records an admitted check as a failure up
+// front: each check in a burst sees the ones before it, and a correct
+// password clears the failure afterwards. The password itself is checked
+// after the lock is released, as hashing is slow by design.
+func (s *authAttemptService) admitPasswordCheck(ctx context.Context, projectID, userID string) (password *domain.UserPassword, admittedAt time.Time, err error) {
+	err = s.stmts.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		stmts := tx.Statements()
+		pw, err := stmts.LockUserPassword(ctx, projectID, userID)
+		if err != nil {
+			return err
+		}
+		now := time.Now()
+		since := domain.UserPasswordFailuresSince(now)
+		failures, err := stmts.GetUserPasswordFailures(ctx, projectID, userID, since)
+		if err != nil {
+			return err
+		}
+		if err := failures.CheckRateLimit(); err != nil {
+			return err
+		}
+		if err := stmts.AddUserPasswordFailure(ctx, projectID, userID, now, since); err != nil {
+			return err
+		}
+		password, admittedAt = pw, now
+		return nil
+	})
+	return password, admittedAt, err
 }
 
 // BeginPasskeyEnrollment starts a management-plane enrollment ceremony on an

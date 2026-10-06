@@ -5196,6 +5196,45 @@ func (c *MockAllStatementsLockIDPConnectionCall) DoAndReturn(f func(context.Cont
 	return c
 }
 
+// LockUserPassword mocks base method.
+func (m *MockAllStatements) LockUserPassword(ctx context.Context, projectID, userID string) (*domain.UserPassword, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "LockUserPassword", ctx, projectID, userID)
+	ret0, _ := ret[0].(*domain.UserPassword)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// LockUserPassword indicates an expected call of LockUserPassword.
+func (mr *MockAllStatementsMockRecorder) LockUserPassword(ctx, projectID, userID any) *MockAllStatementsLockUserPasswordCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LockUserPassword", reflect.TypeOf((*MockAllStatements)(nil).LockUserPassword), ctx, projectID, userID)
+	return &MockAllStatementsLockUserPasswordCall{Call: call}
+}
+
+// MockAllStatementsLockUserPasswordCall wrap *gomock.Call
+type MockAllStatementsLockUserPasswordCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsLockUserPasswordCall) Return(arg0 *domain.UserPassword, arg1 error) *MockAllStatementsLockUserPasswordCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsLockUserPasswordCall) Do(f func(context.Context, string, string) (*domain.UserPassword, error)) *MockAllStatementsLockUserPasswordCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsLockUserPasswordCall) DoAndReturn(f func(context.Context, string, string) (*domain.UserPassword, error)) *MockAllStatementsLockUserPasswordCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // MarkChallengeCompleted mocks base method.
 func (m *MockAllStatements) MarkChallengeCompleted(ctx context.Context, projectID, id string) error {
 	m.ctrl.T.Helper()
@@ -9324,6 +9363,45 @@ func (c *MockUserPasswordStatementsListUserPasswordsCall) Do(f func(context.Cont
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockUserPasswordStatementsListUserPasswordsCall) DoAndReturn(f func(context.Context, *database.ListOptions[domain.UserPasswordField]) (*database.ListResult[*domain.UserPassword], error)) *MockUserPasswordStatementsListUserPasswordsCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// LockUserPassword mocks base method.
+func (m *MockUserPasswordStatements) LockUserPassword(ctx context.Context, projectID, userID string) (*domain.UserPassword, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "LockUserPassword", ctx, projectID, userID)
+	ret0, _ := ret[0].(*domain.UserPassword)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// LockUserPassword indicates an expected call of LockUserPassword.
+func (mr *MockUserPasswordStatementsMockRecorder) LockUserPassword(ctx, projectID, userID any) *MockUserPasswordStatementsLockUserPasswordCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LockUserPassword", reflect.TypeOf((*MockUserPasswordStatements)(nil).LockUserPassword), ctx, projectID, userID)
+	return &MockUserPasswordStatementsLockUserPasswordCall{Call: call}
+}
+
+// MockUserPasswordStatementsLockUserPasswordCall wrap *gomock.Call
+type MockUserPasswordStatementsLockUserPasswordCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockUserPasswordStatementsLockUserPasswordCall) Return(arg0 *domain.UserPassword, arg1 error) *MockUserPasswordStatementsLockUserPasswordCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockUserPasswordStatementsLockUserPasswordCall) Do(f func(context.Context, string, string) (*domain.UserPassword, error)) *MockUserPasswordStatementsLockUserPasswordCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockUserPasswordStatementsLockUserPasswordCall) DoAndReturn(f func(context.Context, string, string) (*domain.UserPassword, error)) *MockUserPasswordStatementsLockUserPasswordCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

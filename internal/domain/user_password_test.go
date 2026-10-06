@@ -48,34 +48,20 @@ func (f *fakeVerifier) VerifyHash(string, string) error {
 	return f.err
 }
 
-func TestUserPassword_VerifyRateLimited(t *testing.T) {
+func TestUserPassword_Verify(t *testing.T) {
 	pw := &UserPassword{EncodedHash: "encoded"}
+	assert.NoError(t, pw.Verify("secret", &fakeVerifier{}))
+	assert.ErrorIs(t, pw.Verify("wrong", &fakeVerifier{err: errors.New("mismatch")}), ErrUserPasswordInvalid())
+}
 
-	t.Run("correct password", func(t *testing.T) {
-		failures := UserPasswordFailures{Count: 3, LastFailedAt: time.Now()}
-		assert.NoError(t, pw.VerifyRateLimited("secret", &fakeVerifier{}, failures))
-	})
+func TestUserPasswordFailures_CheckRateLimit(t *testing.T) {
+	now := time.Now()
+	assert.NoError(t, UserPasswordFailures{}.CheckRateLimit(now))
+	assert.NoError(t, UserPasswordFailures{Count: UserPasswordFreeFailures, LastFailedAt: now}.CheckRateLimit(now),
+		"the free failures hold nothing back")
 
-	t.Run("wrong password", func(t *testing.T) {
-		err := pw.VerifyRateLimited("wrong", &fakeVerifier{err: errors.New("mismatch")}, UserPasswordFailures{})
-		assert.ErrorIs(t, err, ErrUserPasswordInvalid())
-	})
-
-	t.Run("restricted password is not checked", func(t *testing.T) {
-		failures := UserPasswordFailures{Count: UserPasswordFreeFailures + 1, LastFailedAt: time.Now()}
-		verifier := &fakeVerifier{}
-		err := pw.VerifyRateLimited("secret", verifier, failures)
-		assert.ErrorIs(t, err, ErrUserPasswordRateLimited())
-		assert.False(t, verifier.called)
-	})
-
-	t.Run("restriction lifts after the wait", func(t *testing.T) {
-		failures := UserPasswordFailures{
-			Count:        UserPasswordFreeFailures + 1,
-			LastFailedAt: time.Now().Add(-UserPasswordBackoffBase - time.Second),
-		}
-		verifier := &fakeVerifier{}
-		assert.NoError(t, pw.VerifyRateLimited("secret", verifier, failures))
-		assert.True(t, verifier.called)
-	})
+	restricted := UserPasswordFailures{Count: UserPasswordFreeFailures + 1, LastFailedAt: now}
+	assert.ErrorIs(t, restricted.CheckRateLimit(now), ErrUserPasswordRateLimited())
+	assert.ErrorIs(t, restricted.CheckRateLimit(now.Add(UserPasswordBackoffBase-time.Nanosecond)), ErrUserPasswordRateLimited())
+	assert.NoError(t, restricted.CheckRateLimit(now.Add(UserPasswordBackoffBase)), "the restriction lifts after the wait")
 }

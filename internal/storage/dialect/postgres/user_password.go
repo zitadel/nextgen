@@ -34,6 +34,10 @@ FROM zitadel_nextgen.user_passwords
 WHERE project_id = $1 AND user_id = $2
 ORDER BY created_at DESC
 LIMIT $3 OFFSET 1`
+
+	lockUserPasswordStmt = userPasswordQuery + `
+WHERE project_id = $1 AND user_id = $2 AND ` + currentUserPassword + `
+FOR UPDATE`
 )
 
 type userPasswordStatements struct{ statement }
@@ -114,6 +118,16 @@ func (ps userPasswordStatements) GetUserPasswordHistory(ctx context.Context, pro
 	}
 	passwords, err := pgx.CollectRows(rows, ps.scanUserPassword)
 	return passwords, wrapError(err)
+}
+
+// LockUserPassword implements [service.UserPasswordStatements].
+func (ps userPasswordStatements) LockUserPassword(ctx context.Context, projectID, userID string) (*domain.UserPassword, error) {
+	rows, err := ps.client.Query(ctx, lockUserPasswordStmt, projectID, userID)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	pw, err := pgx.CollectExactlyOneRow(rows, ps.scanUserPassword)
+	return pw, wrapError(err)
 }
 
 func (ps userPasswordStatements) scanUserPassword(row pgx.CollectableRow) (*domain.UserPassword, error) {

@@ -36,6 +36,13 @@ type UserPasswordFailures struct {
 	LastFailedAt time.Time
 }
 
+func (f UserPasswordFailures) CheckRateLimit() error {
+	if f.NextRetryTime().After(time.Now()) {
+		return ErrUserPasswordRateLimited()
+	}
+	return nil
+}
+
 func (f UserPasswordFailures) NextRetryTime() time.Time {
 	penalizedFailures := int64(f.Count - UserPasswordFreeFailures)
 	if penalizedFailures <= 0 || f.LastFailedAt.IsZero() {
@@ -67,10 +74,7 @@ type UserPassword struct {
 	CreatedAt   time.Time
 }
 
-func (u *UserPassword) VerifyRateLimited(password string, verifier crypto.HashVerifier, failures UserPasswordFailures) error {
-	if failures.NextRetryTime().After(time.Now()) {
-		return ErrUserPasswordRateLimited()
-	}
+func (u *UserPassword) Verify(password string, verifier crypto.HashVerifier) error {
 	if err := verifier.VerifyHash(u.EncodedHash, password); err != nil {
 		return ErrUserPasswordInvalid()
 	}

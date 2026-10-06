@@ -17,6 +17,7 @@ content:
         - $ref: '../../../../../../components/schemas/errors/req-invalid.yaml'
         - $ref: '../../../../../../components/schemas/errors/user-invalid.yaml'
         - $ref: '../../../../../../components/schemas/errors/user-not_found.yaml'
+        - $ref: '../../../../../../components/schemas/errors/user-password_rate_limited.yaml'
         - $ref: '../../../../../../components/schemas/errors/user-permission_denied.yaml'
       discriminator:
         propertyName: code
@@ -34,6 +35,7 @@ content:
           req.invalid: '../../../../../../components/schemas/errors/req-invalid.yaml'
           user.invalid: '../../../../../../components/schemas/errors/user-invalid.yaml'
           user.not_found: '../../../../../../components/schemas/errors/user-not_found.yaml'
+          user.password_rate_limited: '../../../../../../components/schemas/errors/user-password_rate_limited.yaml'
           user.permission_denied: '../../../../../../components/schemas/errors/user-permission_denied.yaml'
     examples:
       att.already_handed_off:
@@ -101,6 +103,11 @@ content:
         value:
           code: user.not_found
           message: 'user not found'
+      user.password_rate_limited:
+        summary: user.password_rate_limited
+        value:
+          code: user.password_rate_limited
+          message: 'Too many failed password attempts, try again later.'
       user.permission_denied:
         summary: user.permission_denied
         value:
