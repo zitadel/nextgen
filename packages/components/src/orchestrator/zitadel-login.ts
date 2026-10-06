@@ -11,7 +11,7 @@ import type {
 import { ApiError, apiErrorMessage } from "@zitadel/api/runtime/fetch";
 import { zitadelTrustmarkInnerHtml } from "../internal/attribution-markup.js";
 import type { Liquid, Template } from "liquidjs";
-import { css, html, LitElement, type PropertyValues } from "lit";
+import { css, html, LitElement, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 
 import "../atoms/index.js";
@@ -520,13 +520,18 @@ export class ZitadelLogin extends ZitadelSurface {
         // CSS-level so it also covers user-ejected templates: the rule in
         // layout-chrome.css hides `.zl-card-title`/`.zl-card-subtitle`
         // visually while keeping the step's accessible name.
-        shell.toggleAttribute("data-suppress-header", this.suppressHeader);
+        // `=== true` because `toggleAttribute`'s `force` is an *optional*
+        // boolean: passing `undefined` (what a framework wrapper sends for an
+        // unset optional prop) is treated as omitted, so it *toggles* instead
+        // of setting — flipping the header on and off on every commit. (Other
+        // non-booleans are coerced to a boolean; only `undefined` toggles.)
+        shell.toggleAttribute("data-suppress-header", this.suppressHeader === true);
       }
       // Stamped on the card too: its header REGION must leave the flex flow
       // (card-host.css) or the card keeps a blank 32px header band — the
       // slotted headings alone going sr-only doesn't collapse the region.
       for (const card of this.shadowRoot.querySelectorAll("zl-card")) {
-        card.toggleAttribute("data-suppress-header", this.suppressHeader);
+        card.toggleAttribute("data-suppress-header", this.suppressHeader === true);
       }
     }
     const previousTheme = this.lastRenderedTheme;
@@ -622,8 +627,39 @@ export class ZitadelLogin extends ZitadelSurface {
       novalidate
       aria-busy=${this.loading ? "true" : "false"}
     >
-      ${unsafeHTML(rendered)}
+      ${this.renderPairedIdentifier()}${unsafeHTML(rendered)}
     </form>`;
+  }
+
+  /**
+   * Renders `step.identifier` as the control a password manager pairs with the
+   * password input. No `name` keeps it out of every submission; clipping it
+   * rather than `display:none` or `type="hidden"` keeps a manager able to see
+   * it. It lives here and not in the template because the sanitiser drops a
+   * raw `<input>` from template output, so ejected templates get it for free.
+   *
+   * `value` is the attribute, not a `.value` property binding: a manager
+   * reading the markup has to find the address there, and the control is
+   * readonly and untabbable, so it can never go dirty and drift from it.
+   *
+   * It precedes the password in the form, where a manager looks for the
+   * username, which also makes it the shadow root's focus delegate. Focus
+   * that lands on it is handed to the step's first control.
+   */
+  private renderPairedIdentifier() {
+    const identifier = this.response?.step.identifier;
+    if (!identifier?.value) return nothing;
+    return html`<input
+      type="text"
+      part="paired-identifier"
+      readonly
+      tabindex="-1"
+      aria-hidden="true"
+      autocomplete=${identifier.autocomplete}
+      value=${identifier.value}
+      @focus=${() => this.moveFocusToFirstField()}
+      style="position:absolute;width:1px;height:1px;margin:-1px;padding:0;border:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap"
+    />`;
   }
 
   /**

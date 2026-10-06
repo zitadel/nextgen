@@ -43,10 +43,22 @@ or a source checkout. Docker remains available with
 
 The CLI is the agent-facing surface today: every command supports
 `--non-interactive --json` and returns a structured envelope.
-[apps/cli/SKILLS.md](apps/cli/SKILLS.md) is the canonical contract for agents
+[apps/cli/skills/zitadel-cli/SKILL.md](apps/cli/skills/zitadel-cli/SKILL.md) is the canonical contract for agents
 integrating Zitadel into an app; [AGENTS.md](AGENTS.md) is for agents
 contributing to this repository. The documentation site publishes LLM-friendly
 text at `/llms.txt`, `/llms-full.txt`, and page-level `.md` URLs.
+
+Install the skill into any skills-compatible agent (Claude Code, Cursor,
+Copilot, Codex, and more) straight from this repo:
+
+```sh
+npx skills add zitadel/nextgen --full-depth
+```
+
+`--full-depth` installs the whole set — the `zitadel` router skill, the CLI
+skill, and the per-framework SDK and component skills. Without it, only the
+top-level router skill is installed. The CLI skill also ships inside the
+`@zitadel/cli` package.
 
 ## Customer quick start
 
@@ -88,7 +100,7 @@ npx @zitadel/cli@alpha console
 The console shows your project and lets you add colleagues as project admins
 by their email address. Pass `--no-open` to print the link instead of opening
 a browser. For the admin credential file, how its password is handled, and
-how to turn the local admin off, see [apps/cli/SKILLS.md](apps/cli/SKILLS.md).
+how to turn the local admin off, see [apps/cli/skills/zitadel-cli/SKILL.md](apps/cli/skills/zitadel-cli/SKILL.md).
 
 Open http://localhost:3000/login and register your first user. That user is
 an end user of your app, a different identity from the console admin above.
