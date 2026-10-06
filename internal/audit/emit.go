@@ -2,8 +2,10 @@ package audit
 
 import (
 	"context"
+	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
 )
 
 // EmitSpec is one Path B wide-event emission (ADR 048).
@@ -52,5 +54,12 @@ func Insert(ctx context.Context, stmts EventInserter, ev *domain.Event) error {
 	if ev == nil || ev.ProjectID == "" {
 		return nil
 	}
-	return stmts.InsertEvent(ctx, ev)
+	start := time.Now()
+	err := stmts.InsertEvent(ctx, ev)
+	app := metrics.Default()
+	app.RecordAuditInsert(ctx, metrics.AuditEvent, time.Since(start))
+	if err == nil {
+		app.RecordAuditEvents(ctx, string(ev.EventType), 1)
+	}
+	return err
 }

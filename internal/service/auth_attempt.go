@@ -11,6 +11,7 @@ import (
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
@@ -426,6 +427,11 @@ func (s *authAttemptService) VerifyProof(ctx context.Context, input VerifyProofI
 	if err != nil {
 		return nil, err
 	}
+
+	// err is the named result, so this sees the outcome of every return below.
+	defer func() {
+		metrics.Default().RecordAuthOutcome(ctx, authCheckOf(input.Proof), authResultOf(err))
+	}()
 
 	challenge, factor, txExtra, err := s.verify(ctx, attempt, input.Proof, input.ChallengeID)
 	if err != nil {
