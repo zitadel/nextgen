@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/go-faster/jx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -209,6 +210,27 @@ func TestSSOResolutionExistingLinkRoutesAuthenticated(t *testing.T) {
 	after, err := harness.EnsureUserFixture(t).GetByID(t.Context(), f.project.ID, userID)
 	require.NoError(t, err)
 	assert.Equal(t, before.Attributes, after.Attributes, "resolution does not touch the user")
+}
+
+// A submit with the cookie from before the handoff restarts the flow too, so
+// the login UI starts over instead of showing the startup error.
+func TestSSOResolutionSubmitAfterHandoffReturns409(t *testing.T) {
+	t.Parallel()
+	f := newSSOResolutionFixture(t, helpers.OIDCConnection("google"))
+	f.link(t, f.connection.ID, "sub-1", f.createUser(t, defaultSchemaURL()))
+	flow := f.startFlow(t, "")
+	parkSSOResult(t, f.project.ID, flow.attemptID, f.connection.RevisionID, "sub-1", emailClaims(), map[string]bool{"email": true})
+	requireAuthenticated(t, f.getStep(t, flow))
+
+	resp, err := f.client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
+		Action: "submit",
+		Fields: api.NewOptFlowSubmitRequestFields(api.FlowSubmitRequestFields{
+			"email": jx.Raw(`"alice@example.com"`),
+		}),
+	}, api.SubmitFlowStepParams{ID: flow.id, Zflow: flow.zflow})
+	require.NoError(t, err)
+	require.IsType(t, &api.ErrorDetails{}, resp, helpers.MustMarshal(t, resp))
+	assert.Equal(t, "flow.restart_required", string(resp.(*api.ErrorDetails).Code))
 }
 
 func TestSSOResolutionLaterRevisionResolvesSameLink(t *testing.T) {
