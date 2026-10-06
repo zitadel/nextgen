@@ -4783,6 +4783,24 @@ func TestFlowStateMachine_Render_SSOCreationDisabledRendersStepError(t *testing.
 	assert.True(t, result.Reseal)
 }
 
+func TestFlowStateMachine_Render_SSOParkedErrorRendersStepError(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoRenderWorld(t)
+	w.expectParked(&domain.FlowSSOParkedIdentity{CheckID: "ch-1", ErrorKey: domain.FlowStepErrorSSOCancelled}, nil)
+	w.ssoIdentities.EXPECT().BindLinked(gomock.Any(), gomock.Any()).Times(0)
+	w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).Times(0)
+
+	result, err := w.sm.Render(t.Context(), def, state)
+	require.NoError(t, err)
+	assert.Equal(t, "credentials", result.Step.Name)
+	require.NotNil(t, result.Step.Error)
+	assert.Equal(t, domain.FlowStepErrorSSOCancelled, *result.Step.Error)
+	assert.True(t, containsFieldName(result.Step.Fields, "email"), "the step keeps its inputs")
+	assert.Empty(t, result.HandoffToken)
+	assert.Equal(t, "ch-1", result.State.SSOResolvedCheckID)
+	assert.True(t, result.Reseal)
+}
+
 // unlinkedParked is an identity with no link under `creation: auto`.
 func unlinkedParked(claims map[string]any, verified map[string]bool) *domain.FlowSSOParkedIdentity {
 	return &domain.FlowSSOParkedIdentity{CheckID: "ch-1", ConnectionID: "idp-1", Subject: "sub-1", Claims: claims, Verified: verified}

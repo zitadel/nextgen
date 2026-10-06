@@ -201,6 +201,36 @@ func TestFlowSSOIdentityResolver_LoadParked_DeadBoundAttemptRestarts(t *testing.
 	}
 }
 
+// An error result carries no identity: the key is reported as it is, and the
+// pinned revision is never read.
+func TestFlowSSOIdentityResolver_LoadParked_ErrorResultReportsKey(t *testing.T) {
+	t.Parallel()
+	f := newSSOResolverFixture(t)
+	result := &domain.SSOCallbackResult{ProviderSlug: "google", ErrorKey: domain.FlowStepErrorSSOCancelled}
+	f.stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), ssoProjectID, ssoAttemptID).Return(parkedAttempt(result), nil)
+	f.connections.EXPECT().GetRevision(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+	f.stmts.EXPECT().GetIDPIdentityLink(gomock.Any(), gomock.Any()).Times(0)
+
+	got, err := f.resolver.LoadParked(t.Context(), loadInput())
+	require.NoError(t, err)
+	assert.Equal(t, &domain.FlowSSOParkedIdentity{CheckID: "ch-1", ErrorKey: domain.FlowStepErrorSSOCancelled}, got)
+}
+
+// An error row already resolved by this cookie is skipped like any other
+// resolved row, so a reload does not repeat the step error.
+func TestFlowSSOIdentityResolver_LoadParked_ResolvedErrorRowIsSkipped(t *testing.T) {
+	t.Parallel()
+	f := newSSOResolverFixture(t)
+	result := &domain.SSOCallbackResult{ProviderSlug: "google", ErrorKey: domain.FlowStepErrorSSOFailed}
+	f.stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), ssoProjectID, ssoAttemptID).Return(parkedAttempt(result), nil)
+
+	in := loadInput()
+	in.ResolvedCheckID = "ch-1"
+	got, err := f.resolver.LoadParked(t.Context(), in)
+	require.NoError(t, err)
+	assert.Nil(t, got)
+}
+
 func TestFlowSSOIdentityResolver_LoadParked_LinkFound(t *testing.T) {
 	t.Parallel()
 	f := newSSOResolverFixture(t)

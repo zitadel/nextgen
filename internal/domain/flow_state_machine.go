@@ -487,6 +487,12 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 	// every reload, and a row left parked for collection is not resolved twice.
 	state.SSOResolvedCheckID = parked.CheckID
 
+	// The ceremony failed at the provider or in the callback; the key is the
+	// step error. The row stays parked, as under creation disabled.
+	if parked.ErrorKey != "" {
+		result, err := r.renderStepError(pc, resolvedFields, &parked.ErrorKey)
+		return result, true, err
+	}
 	if parked.Link == nil && parked.CreationDisabled {
 		// The identity has no account and will not get one. The row stays
 		// parked, so a failed render or seal re-runs this branch and shows the
