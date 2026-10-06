@@ -13,13 +13,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
-var (
-	tracer = otel.Tracer("github.com/zitadel/nextgen/internal/service")
-
-	// Domain codes that mean the server failed, not the client.
-	internalCode    = domain.ErrInternal(nil).Code
-	unavailableCode = domain.ErrUnavailable().Code
-)
+var tracer = otel.Tracer("github.com/zitadel/nextgen/internal/service")
 
 // startSpan starts the span of a service operation, named "<Service>.<Method>".
 // Use the returned context for the rest of the method and end the span with
@@ -30,10 +24,10 @@ var (
 //
 // On error the span gets the domain error code (or the Go type) as error.type,
 // never the message: messages carry user values. The status is Error only for
-// a real failure: an error that is not a domain error, or an internal or
-// unavailable one. A not found, a validation error or a wrong password is an
-// outcome of the operation and keeps the status unset. Nothing is started
-// when the parent is not sampled.
+// a [domain.IsServerFault] error, the same test that gives the HTTP response a
+// 5xx. A not found, a validation error or a wrong password is an outcome of
+// the operation and keeps the status unset. Nothing is started when the parent
+// is not sampled.
 func startSpan(ctx context.Context, name string) (context.Context, func(*error)) {
 	if !trace.SpanContextFromContext(ctx).IsSampled() {
 		return ctx, func(*error) {}
@@ -46,7 +40,7 @@ func startSpan(ctx context.Context, name string) (context.Context, func(*error))
 			if !ok {
 				errType = fmt.Sprintf("%T", err)
 			}
-			if !ok || de.Code == internalCode || de.Code == unavailableCode {
+			if domain.IsServerFault(err) {
 				span.SetStatus(codes.Error, "")
 			}
 			span.SetAttributes(semconv.ErrorTypeKey.String(errType))

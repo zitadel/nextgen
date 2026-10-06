@@ -129,6 +129,38 @@ func ErrRequestInvalid() Error {
 	return newError("req.invalid", "The request is invalid and fails base validation (missing required fields, wrong types, failed regex, etc.). Check the details for more information.", nil, nil)
 }
 
+// serverFaultCodes are the codes that mean the server, or a system it depends
+// on, failed to do its part, rather than the client asking for something it
+// cannot have. A code that can also be caused by client input, such as an
+// encryption key ID read from a presented token, is not listed.
+var serverFaultCodes = map[string]bool{
+	ErrInternal(nil).Code:                    true,
+	ErrUnavailable().Code:                    true,
+	ErrNotImplemented().Code:                 true,
+	ErrEncryptionFailed(nil).Code:            true,
+	ErrDecryptionFailed(nil).Code:            true,
+	ErrSupportedEncryptionAlgorithm("").Code: true,
+	ErrSigningKeyNotFound().Code:             true,
+	ErrFailedToDecryptVariable(nil).Code:     true,
+	ErrSessionTokenCreationFailed().Code:     true,
+	ErrFlowIntegrity().Code:                  true,
+	ErrFlowSSOUnavailable(nil).Code:          true,
+	ErrSchemaFetchFailed(nil, nil).Code:      true,
+	ErrIDPDiscoveryFailed(nil).Code:          true,
+	ErrIDPExchangeFailed(nil).Code:           true,
+	ErrIDPUserinfoFailed(nil).Code:           true,
+	ErrIDPSupplementaryFetchFailed(nil).Code: true,
+}
+
+// IsServerFault reports whether err means the server failed rather than the
+// client: an error that is not a domain [Error], or one whose code is a server
+// fault. The HTTP layer answers a server fault with a 5xx, and a service span
+// ends with status Error for one, so both read it from here.
+func IsServerFault(err error) bool {
+	e, ok := errors.AsType[Error](err)
+	return !ok || serverFaultCodes[e.Code]
+}
+
 // RequestInvalidFieldDetails names a request field that failed validation.
 // Producers must attach only the field path — never parser text or payload
 // fragments (ADR 030 Decision 4 + 6).

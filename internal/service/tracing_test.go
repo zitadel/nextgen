@@ -35,6 +35,7 @@ func TestStartSpan(t *testing.T) {
 	clientErr := domain.ErrAuthAttemptNotFound()
 	internalErr := domain.ErrInternal(errors.New("x@y"))
 	unavailableErr := domain.ErrUnavailable()
+	decryptErr := domain.ErrFailedToDecryptVariable(errors.New("x@y"))
 	for _, tt := range []struct {
 		name       string
 		err        error
@@ -45,6 +46,7 @@ func TestStartSpan(t *testing.T) {
 		{name: "domain client error gives its code and no error status", err: fmt.Errorf("lookup: %w", clientErr), wantType: clientErr.Code},
 		{name: "internal domain error is a failure", err: fmt.Errorf("lookup: %w", internalErr), wantType: internalErr.Code, wantStatus: codes.Error},
 		{name: "unavailable domain error is a failure", err: unavailableErr, wantType: unavailableErr.Code, wantStatus: codes.Error},
+		{name: "other server-fault domain error is a failure", err: decryptErr, wantType: decryptErr.Code, wantStatus: codes.Error},
 		{name: "plain error gives its type and is a failure", err: errors.New("x@y"), wantType: "*errors.errorString", wantStatus: codes.Error},
 	} {
 		t.Run(tt.name, func(t *testing.T) {

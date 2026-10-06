@@ -257,8 +257,6 @@ func variableErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		domain.ErrVariableExpansionTooLarge().Code:
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
 	default:
-		// var.decryption_failed included: a value this server encrypted and
-		// cannot read back is a server fault, not a bad request.
 		return internalErrorResponse(err)
 	}
 }
