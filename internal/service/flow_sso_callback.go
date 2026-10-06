@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/idp"
 )
@@ -73,6 +74,9 @@ func (c *FlowSSOCallback) Process(ctx context.Context, in FlowSSOCallbackInput) 
 	if err != nil {
 		return FlowSSOCallbackOutput{}, err
 	}
+	// Bound only after the consume: until a record matches, the project
+	// comes from the query alone.
+	audit.BindPublicRequest(ctx, projectID, "", "")
 	pending := check.Pending
 
 	if in.Error != "" {

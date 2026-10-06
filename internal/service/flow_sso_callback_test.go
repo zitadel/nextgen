@@ -19,6 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
+	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/service"
@@ -224,6 +225,38 @@ func TestFlowSSOCallback_Process_WarnsUnlessCancelled(t *testing.T) {
 			_, err := svc.Process(ctx, service.FlowSSOCallbackInput{State: ssoCallbackState, Code: "the-code"})
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantWarn, bytes.Contains(logs.Bytes(), []byte("sso callback failed")))
+		})
+	}
+}
+
+// The request is attributed to the project only once a record is consumed:
+// until then, the project comes from the state's prefix alone.
+func TestFlowSSOCallback_Process_BindsTheProjectAfterConsume(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name        string
+		consumeErr  error
+		wantProject string
+	}{
+		{name: "consumed", wantProject: "proj-1"},
+		{name: "not consumed", consumeErr: domain.ErrSSOStateInvalid()},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctx := audit.WithActorSlot(t.Context())
+			ctrl := gomock.NewController(t)
+			attempts := &fakeAuthAttempts{
+				consumeCheck: &domain.SSOCallbackCheck{Pending: ssoCallbackPending()},
+				consumeErr:   tt.consumeErr,
+			}
+			svc := service.NewFlowSSOCallback(servicemocks.NewMockIDPConnectionService(ctrl), attempts, servicemocks.NewMockKeyService(ctrl), servicemocks.NewMockVariableService(ctrl), &http.Client{Transport: tripwireTransport{t}})
+
+			_, _ = svc.Process(ctx, service.FlowSSOCallbackInput{State: ssoCallbackState, Error: "access_denied"})
+
+			slot, ok := audit.ActorSlotFromContext(ctx)
+			require.True(t, ok)
+			assert.Equal(t, tt.wantProject, slot.ProjectID)
 		})
 	}
 }
