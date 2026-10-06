@@ -87,13 +87,9 @@
   },
   "scripts": {
     "sync-schemas": "node scripts/sync-meta-schemas.mjs",
-    "prebuild": "node scripts/sync-meta-schemas.mjs",
     "build": "tsdown",
-    "pretypecheck": "node scripts/sync-meta-schemas.mjs",
     "typecheck": "tsc --build tsconfig.json",
-    "pretest": "node scripts/sync-meta-schemas.mjs",
     "test": "vitest run",
-    "test:all": "node scripts/sync-meta-schemas.mjs && vitest run",
     "lint": "oxlint ."
   },
   "dependencies": {

@@ -58,7 +58,7 @@ tasks:
   # affected-gate and release-body logic never become test files nothing
   # executes.
   test:
-    command: "corepack pnpm run test:all"
+    command: "corepack pnpm run test"
     inputs:
       - "scripts/ci-mode.mjs"
       - "scripts/ci-mode.test.mjs"

@@ -31,8 +31,7 @@
     "sync:export": "tsx scripts/sync-from-export.ts",
     "generate": "tsx scripts/build.ts",
     "build": "tsdown",
-    "test": "vitest run",
-    "test:all": "vitest run"
+    "test": "vitest run"
   },
   "devDependencies": {
     "tsdown": "catalog:",

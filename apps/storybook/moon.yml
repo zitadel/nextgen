@@ -51,7 +51,7 @@ tasks:
   # (render smoke + play interactions + a11y). Replaces the old console-e2e
   # visual-parity sweep and runs in CI via `moon ci :test`.
   test:
-    command: "corepack pnpm run test:all"
+    command: "corepack pnpm run test"
     deps:
       - "install-browsers"
       - "api:build"

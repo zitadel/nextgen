@@ -15,7 +15,9 @@ tasks:
       - ".generated/openapi.mjs"
 
   generate:
-    command: "corepack pnpm run generate"
+    command: "corepack pnpm run generate:source"
+    deps:
+      - "generate-openapi"
     inputs:
       - "/api/openapi/**/*.yaml"
       - "content/**/*"
@@ -28,19 +30,19 @@ tasks:
       - ".source/**/*"
 
   typecheck:
-    command: "corepack pnpm exec tsc --noEmit -p tsconfig.json"
+    command: "corepack pnpm run typecheck"
     deps:
       - "generate"
 
   build:
-    command: "corepack pnpm exec waku build"
+    command: "corepack pnpm run build"
     deps:
       - "generate"
     outputs:
       - "dist/**/*"
 
   dev:
-    command: "corepack pnpm exec waku dev --port 3003"
+    command: "corepack pnpm run dev"
     deps:
       - "generate"
     options:

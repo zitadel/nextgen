@@ -11,7 +11,6 @@
     "journey": "node scripts/run-journey.mjs",
     "check": "node scripts/check.mjs",
     "test": "node scripts/assert-file.mjs scripts/ci-mode.test.mjs scripts/release-github.test.mjs scripts/generate-meta-schemas.test.ts && vitest run scripts/ci-mode.test.mjs scripts/release-github.test.mjs scripts/generate-meta-schemas.test.ts",
-    "test:all": "node scripts/assert-file.mjs scripts/ci-mode.test.mjs scripts/release-github.test.mjs scripts/generate-meta-schemas.test.ts && vitest run scripts/ci-mode.test.mjs scripts/release-github.test.mjs scripts/generate-meta-schemas.test.ts",
     "release:snapshot": "moon run release:snapshot",
     "release:publish": "moon run release:publish"
   },

@@ -7,8 +7,7 @@
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
     "typecheck": "tsc --noEmit -p tsconfig.app.json",
-    "test": "vitest run",
-    "test:all": "vitest run"
+    "test": "vitest run"
   },
   "dependencies": {
     "@zitadel/components": "workspace:*",

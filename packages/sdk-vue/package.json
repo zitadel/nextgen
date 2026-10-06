@@ -29,7 +29,6 @@
     "build": "vite build",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
-    "test:all": "vitest run",
     "lint": "eslint ."
   },
   "dependencies": {

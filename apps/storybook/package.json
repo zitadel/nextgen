@@ -8,8 +8,7 @@
     "dev": "storybook dev -p 6006 --no-open",
     "build": "storybook build --output-dir dist",
     "typecheck": "tsc --build tsconfig.json",
-    "test": "vitest run --project=storybook",
-    "test:all": "vitest run --project=storybook"
+    "test": "vitest run --project=storybook"
   },
   "dependencies": {
     "@zitadel/api": "workspace:*",

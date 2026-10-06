@@ -17,12 +17,11 @@
   "scripts": {
     "dev": "tsx scripts/local-server.ts",
     "build": "tsdown",
-    "build:vercel": "(cd ../../packages/api && node --run generate && node --run build) && (cd ../../packages/config && node --run sync-schemas && node --run build) && tsdown && tsx scripts/generate-wellknown.ts",
     "test": "vitest run",
-    "test:all": "vitest run",
     "test:watch": "vitest --watch",
-    "typecheck": "(cd ../../packages/api && node --run generate) && tsc --noEmit",
-    "lint": "eslint ."
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "wellknown": "tsx scripts/generate-wellknown.ts"
   },
   "dependencies": {
     "@zitadel/api-mock": "workspace:*"

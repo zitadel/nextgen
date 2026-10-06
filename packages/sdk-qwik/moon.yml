@@ -60,7 +60,7 @@ tasks:
   # client render and the wrapped Lit web components need a real DOM. The
   # browser project pays a Chromium cold start, which this lane covers in CI.
   test:
-    command: "corepack pnpm run test:all"
+    command: "corepack pnpm run test"
     deps:
       # api-mock serves the Flow API to the specs (test-setup.ts); its no-op
       # build is the edge that re-runs this when api-mock source changes.

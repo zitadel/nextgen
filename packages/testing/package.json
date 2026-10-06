@@ -40,7 +40,6 @@
     "build": "tsdown",
     "typecheck": "tsc --build tsconfig.json",
     "test": "vitest run",
-    "test:all": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "lint": "oxlint ."
   },

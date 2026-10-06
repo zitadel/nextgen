@@ -21,14 +21,24 @@ tasks:
     deps:
       - "api-mock:build"
 
-  # The `typecheck` script generates @zitadel/api first (its source is
-  # gitignored and produced by orval), so it is self-contained — it passes
-  # whether run via Moon or standalone (e.g. the Vercel "TypeCheck"
-  # deployment check, which runs the npm script in a sandbox without Moon).
+  # @zitadel/api's source is gitignored and produced by orval, so it is
+  # generated first.
   typecheck:
     command: "corepack pnpm run typecheck"
+    deps:
+      - "api:generate"
+
+  # The Vercel build (vercel.json): the bundled function plus the static
+  # discovery document, which needs VERCEL_URL and so only runs there.
+  build-vercel:
+    command: "corepack pnpm run wellknown"
+    deps:
+      - "build"
+    options:
+      cache: false
+      runInCI: false
 
   test:
-    command: "corepack pnpm run test:all"
+    command: "corepack pnpm run test"
     deps:
       - "api-mock:build"

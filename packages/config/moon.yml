@@ -64,7 +64,7 @@ tasks:
       mutex: "public-dist"
 
   test:
-    command: "corepack pnpm run test:all"
+    command: "corepack pnpm run test"
     deps:
       - "build"
       - "sync-schemas"

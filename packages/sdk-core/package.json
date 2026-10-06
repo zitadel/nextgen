@@ -20,7 +20,6 @@
     "build": "tsc -p tsconfig.lib.json",
     "typecheck": "tsc --build tsconfig.json",
     "test": "vitest run",
-    "test:all": "vitest run",
     "lint": "eslint ."
   },
   "exports": {
