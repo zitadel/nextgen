@@ -35,7 +35,7 @@ type Application struct {
 
 	statementDuration  metric.Float64Histogram
 	credentialDuration metric.Float64Histogram
-	passwordDuration   metric.Float64Histogram
+	hashVerifyDuration   metric.Float64Histogram
 	keyChainDuration   metric.Float64Histogram
 	auditDuration      metric.Float64Histogram
 	authOutcomes       metric.Int64Counter
@@ -89,7 +89,7 @@ func NewApplication(opts ...Option) (*Application, error) {
 	if a.credentialDuration, err = duration(CredentialValidationDuration, described[CredentialValidationDuration]); err != nil {
 		return nil, err
 	}
-	if a.passwordDuration, err = duration(PasswordVerificationDuration, described[PasswordVerificationDuration]); err != nil {
+	if a.hashVerifyDuration, err = duration(PasswordVerificationDuration, described[PasswordVerificationDuration]); err != nil {
 		return nil, err
 	}
 	if a.keyChainDuration, err = duration(KeyChainResolutionDuration, described[KeyChainResolutionDuration]); err != nil {
@@ -185,7 +185,7 @@ func (a *Application) RecordPasswordVerification(ctx context.Context, result Pas
 	if !a.Enabled() {
 		return
 	}
-	a.passwordDuration.Record(ctx, d.Seconds(), metric.WithAttributes(
+	a.hashVerifyDuration.Record(ctx, d.Seconds(), metric.WithAttributes(
 		ResultKey.String(closed(result, PasswordMatch, PasswordMismatch, PasswordError)),
 	))
 }
