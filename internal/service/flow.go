@@ -40,6 +40,9 @@ type SubmitFlowRequest struct {
 	Fields        map[string]any
 	GateProofs    map[string]string
 	SSOProviderID *string
+	// SSOReturn is the browser-side context of an external sign-in the API
+	// derived from the request. Set on an sso submission.
+	SSOReturn *domain.FlowSSOReturn
 	// ChallengeResponse carries the client's answer to a pending ceremony
 	// (e.g. a passkey assertion). Nil unless the step issued a challenge.
 	ChallengeResponse *domain.FlowChallengeResponse
@@ -274,6 +277,7 @@ func (s *flowService) Submit(ctx context.Context, req SubmitFlowRequest) (domain
 	if req.SSOProviderID != nil {
 		in.SSOProvider = &domain.FlowSSOProviderRef{ID: *req.SSOProviderID}
 	}
+	in.SSOReturn = req.SSOReturn
 	result, err := s.stateMachine.Process(ctx, def, req.State, in)
 	if err != nil {
 		return domain.FlowStepResult{}, err
@@ -283,6 +287,7 @@ func (s *flowService) Submit(ctx context.Context, req SubmitFlowRequest) (domain
 		Step:                  result.Step,
 		HandoffToken:          result.HandoffToken,
 		HandoffTokenExpiresAt: result.HandoffTokenExpiresAt,
+		SSOBindingNonce:       result.SSOBindingNonce,
 	}, nil
 }
 

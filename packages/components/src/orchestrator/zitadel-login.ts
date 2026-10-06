@@ -11,7 +11,7 @@ import type {
 import { ApiError, apiErrorMessage } from "@zitadel/api/runtime/fetch";
 import { zitadelTrustmarkInnerHtml } from "../internal/attribution-markup.js";
 import type { Liquid, Template } from "liquidjs";
-import { css, html, LitElement, type PropertyValues } from "lit";
+import { css, html, LitElement, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 
 import "../atoms/index.js";
@@ -100,12 +100,13 @@ function isFieldAtom(el: Element): el is FieldAtom {
  * The flow handle a provider callback left in the URL, if any.
  *
  * The identity-provider callback finishes by navigating the browser back to
- * the page the sign-in started on with `?flow=<id>` appended -- a full page
- * load, so nothing of the previous document survives to carry the handle.
- * Reading it here means every host page resumes correctly without code of its
- * own; doing it per framework would mean the same few lines in each of the
- * scaffolded templates, and a page that forgot them would silently restart the
- * flow instead of completing the sign-in.
+ * the `return_target` the sso submission sent, which is the page the sign-in
+ * started on with `?flow=<id>` set (see {@link returnTargetFor}) -- a full
+ * page load, so nothing of the previous document survives to carry the
+ * handle. Reading it here means every host page resumes correctly without
+ * code of its own; doing it per framework would mean the same few lines in
+ * each of the scaffolded templates, and a page that forgot them would silently
+ * restart the flow instead of completing the sign-in.
  *
  * A handle from the URL is not a capability: `GET /flow/{id}` only answers
  * when the sealed flow cookie names that same id, so an id someone else put
@@ -116,10 +117,25 @@ function flowIdFromLocation(): string {
     return "";
   }
   try {
-    return new URLSearchParams(window.location.search).get("flow") ?? "";
+    return new URLSearchParams(window.location.search).get(FLOW_QUERY_PARAM) ?? "";
   } catch {
     return "";
   }
+}
+
+/** The query parameter the orchestrator reads the flow id from after a provider callback. */
+const FLOW_QUERY_PARAM = "flow";
+
+/**
+ * The page URL the callback sends the browser back to, with this flow's id
+ * in the query so the reload resumes the flow (see {@link flowIdFromLocation}).
+ * Set, not appended: a page already carrying `?flow=` from an earlier return
+ * would otherwise send two ids.
+ */
+function returnTargetFor(flowId: string): string {
+  const target = new URL(window.location.href);
+  target.searchParams.set(FLOW_QUERY_PARAM, flowId);
+  return target.toString();
 }
 
 @customElement("zitadel-login")
@@ -195,7 +211,8 @@ export class ZitadelLogin extends ZitadelSurface {
    * Existing flow handle to resume rather than start a new flow. When set,
    * the orchestrator hits `GET /flow/{id}` instead of `POST /flow` on
    * mount, so a page reload after a network blip can re-render the same
-   * step without losing collected state.
+   * step without losing collected state. A handle that no longer resolves
+   * starts a new flow instead, with a console warning.
    *
    * Leaving it empty falls back to the `flow` query parameter, which is how a
    * provider callback hands the flow back (see {@link flowIdFromLocation}), so
@@ -482,13 +499,18 @@ export class ZitadelLogin extends ZitadelSurface {
         // CSS-level so it also covers user-ejected templates: the rule in
         // layout-chrome.css hides `.zl-card-title`/`.zl-card-subtitle`
         // visually while keeping the step's accessible name.
-        shell.toggleAttribute("data-suppress-header", this.suppressHeader);
+        // `=== true` because `toggleAttribute`'s `force` is an *optional*
+        // boolean: passing `undefined` (what a framework wrapper sends for an
+        // unset optional prop) is treated as omitted, so it *toggles* instead
+        // of setting — flipping the header on and off on every commit. (Other
+        // non-booleans are coerced to a boolean; only `undefined` toggles.)
+        shell.toggleAttribute("data-suppress-header", this.suppressHeader === true);
       }
       // Stamped on the card too: its header REGION must leave the flex flow
       // (card-host.css) or the card keeps a blank 32px header band — the
       // slotted headings alone going sr-only doesn't collapse the region.
       for (const card of this.shadowRoot.querySelectorAll("zl-card")) {
-        card.toggleAttribute("data-suppress-header", this.suppressHeader);
+        card.toggleAttribute("data-suppress-header", this.suppressHeader === true);
       }
     }
     const previousTheme = this.lastRenderedTheme;
@@ -584,8 +606,39 @@ export class ZitadelLogin extends ZitadelSurface {
       novalidate
       aria-busy=${this.loading ? "true" : "false"}
     >
-      ${unsafeHTML(rendered)}
+      ${this.renderPairedIdentifier()}${unsafeHTML(rendered)}
     </form>`;
+  }
+
+  /**
+   * Renders `step.identifier` as the control a password manager pairs with the
+   * password input. No `name` keeps it out of every submission; clipping it
+   * rather than `display:none` or `type="hidden"` keeps a manager able to see
+   * it. It lives here and not in the template because the sanitiser drops a
+   * raw `<input>` from template output, so ejected templates get it for free.
+   *
+   * `value` is the attribute, not a `.value` property binding: a manager
+   * reading the markup has to find the address there, and the control is
+   * readonly and untabbable, so it can never go dirty and drift from it.
+   *
+   * It precedes the password in the form, where a manager looks for the
+   * username, which also makes it the shadow root's focus delegate. Focus
+   * that lands on it is handed to the step's first control.
+   */
+  private renderPairedIdentifier() {
+    const identifier = this.response?.step.identifier;
+    if (!identifier?.value) return nothing;
+    return html`<input
+      type="text"
+      part="paired-identifier"
+      readonly
+      tabindex="-1"
+      aria-hidden="true"
+      autocomplete=${identifier.autocomplete}
+      value=${identifier.value}
+      @focus=${() => this.moveFocusToFirstField()}
+      style="position:absolute;width:1px;height:1px;margin:-1px;padding:0;border:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap"
+    />`;
   }
 
   /**
@@ -680,11 +733,26 @@ export class ZitadelLogin extends ZitadelSurface {
       // `handleTransportError` (rendered as `startupError`) rather than as an
       // unhandled promise rejection from `firstUpdated`'s microtask.
       const { project: cfg, api } = resolveApi(this.project, this.projectAttrs, "<zitadel-login>");
-      let wire: CreateFlow201;
+      let wire: CreateFlow201 | undefined;
       const resumeId = this.resumeFlowId || flowIdFromLocation();
       if (resumeId) {
-        wire = await getCurrentStep(api, resumeId);
-      } else {
+        try {
+          wire = await getCurrentStep(api, resumeId);
+        } catch (error) {
+          // A handle can outlive its flow: the cookie window closed during
+          // the external sign-in, so the browser no longer sends the
+          // required cookie (400), the cookie names another flow (404), or
+          // the flow finished in another tab (410). This is still the
+          // sign-in page, and a startup error would leave it with no way
+          // forward, so start over. Logged so a host passing a wrong handle
+          // does not get a silent restart.
+          const gone =
+            error instanceof ApiError && (error.status === 400 || error.status === 404 || error.status === 410);
+          if (!gone) throw error;
+          console.warn(`[zitadel-login] flow ${resumeId} no longer resolves; starting a new flow.`);
+        }
+      }
+      if (!wire) {
         if (!cfg.projectId) {
           throw new Error(
             "<zitadel-login> requires a project id (the `project-id` attribute, " +
@@ -1373,7 +1441,11 @@ export class ZitadelLogin extends ZitadelSurface {
         action: action ?? "submit",
         fields,
         ...(challengeResponse ? { challenge_response: challengeResponse } : {}),
-        ...(ssoProviderId ? { sso_provider_id: ssoProviderId } : {}),
+        // The page the callback brings the browser back to; the engine
+        // refuses a target on another origin.
+        ...(ssoProviderId
+          ? { sso_provider_id: ssoProviderId, return_target: returnTargetFor(id) }
+          : {}),
       };
       const { api } = resolveApi(this.project, this.projectAttrs, "<zitadel-login>");
       const wire = await apiSubmitStep(api, id, body);

@@ -46,6 +46,11 @@ to be a fast answer to "can I build flow X right now?"
 - Terminal-step handoff: when a user has been resolved, calls `auth-attempt.Handoff` and returns the token + expiry on `FlowStepResult`.
 - Field pre-fill: `CollectedData` is propagated into resolved fields before every step render so re-renders carry the user's previous input.
 
+### SSO redirect
+
+- `{action: "sso", sso_provider_id, return_target}` on a step that offers `sso_providers` pins the connection at its newest revision, issues a single-use state record on the auth attempt and emits the `sso-redirect` step with the provider's authorize URL. The flow state stays on the step the provider was picked from; the response re-seals `_zflow` and adds the browser-binding cookie ([area 3](../idp/3-social-login-flow.md#the-binding-cookie)).
+- A provider the engine cannot start a sign-in with re-renders the step with `error.sso_unavailable`.
+
 ### Passkey ceremony (two-phase)
 
 - `passkey` (login) and `passkey_register` (signup) actions trigger an **issue → client signs → verify** ceremony that short-circuits the field-shaped dispatch.
@@ -59,14 +64,14 @@ to be a fast answer to "can I build flow X right now?"
 - `fields` **ordered array** of entries carrying `name`, `type`, `text_key`, `required`, optional `value`, optional `validation` ([ADR 021](../../adrs/021-ordered-arrays-for-step-fields-actions-gates.md)).
 - `actions` **ordered array** of entries carrying `name`, `kind`, `text_key`, and a `primary` flag. The LiquidJS template iterates the arrays in order and builds name-keyed indexes locally for lookup.
 - `challenge` populated on the issue leg of a two-phase ceremony (passkey today): `method`, `challenge_id`, ceremony-specific `options`.
-- `gates` and `sso_providers` are part of the contract but not yet emitted with content (see below).
+- `sso_providers` carries `{id, name, template}` per connection the step names, resolved on every render.
+- `gates` is part of the contract but not yet emitted with content (see below).
 
 ## Stubbed (returns `ErrUnsupported`)
 
 These contracts exist on the wire and in the state machine but reject at runtime:
 
 - **Cross-flow transitions.** `transitions.target` with `action: "pivot"` or `action: "switch"` is rejected. `PivotStack` is defined on `FlowState` but never pushed.
-- **SSO submissions.** Submitting an action with an `sso_provider_id` is rejected.
 - **Gate proofs.** Submitting a `gate_proofs` map is rejected.
 
 `ErrFlowUnsupported` maps to HTTP 400 with `code: "flow.unsupported"`.
@@ -79,7 +84,7 @@ Not implemented at any layer:
 
 - Magic-link, email OTP, SMS OTP challenges.
 - TOTP enrollment and verification.
-- SSO redirect, callback handling, and identity linking.
+- SSO callback handling and identity linking.
 - Recovery (`on_success: reset_credential`).
 
 ### State machine

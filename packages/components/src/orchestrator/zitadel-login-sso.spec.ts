@@ -6,6 +6,7 @@ import {
   type MockHandle,
 } from "@zitadel/api-mock";
 import { configureZitadel, _resetConfigForTesting } from "@zitadel/api/config";
+import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -141,6 +142,38 @@ describe("<zitadel-login> with identity providers", () => {
     expect(submits[0]?.body.sso_provider_id).toBe(GOOGLE.id);
   });
 
+  it("sends the page URL with this flow's id as the return target", async () => {
+    const { href } = window.location;
+    window.history.replaceState(null, "", "/login?tab=sso#top");
+    try {
+      const element = await mountLogin();
+      const atom = providerAtom(element);
+      await atom.updateComplete;
+
+      await withStubbedNavigation(async () => {
+        atom.shadowRoot?.querySelectorAll("zl-button")[0]?.dispatchEvent(
+          new MouseEvent("click", { bubbles: true, composed: true }),
+        );
+        await waitFor(() =>
+          mock.getCaptured().some((entry) => entry.kind === "submitFlowStep") ? true : null,
+        );
+      });
+
+      const submit = mock
+        .getCaptured()
+        .find((entry): entry is Extract<typeof entry, { kind: "submitFlowStep" }> =>
+          entry.kind === "submitFlowStep",
+        );
+      const target = new URL(submit?.body.return_target ?? "");
+      expect(target.searchParams.get("flow")).toBe(submit?.flowId);
+      expect(target.origin + target.pathname).toBe(`${window.location.origin}/login`);
+      expect(target.searchParams.get("tab")).toBe("sso");
+      expect(target.hash).toBe("#top");
+    } finally {
+      window.history.replaceState(null, "", href);
+    }
+  });
+
   it("hands the browser to the provider's authorize URL", async () => {
     const element = await mountLogin();
     const atom = providerAtom(element);
@@ -262,6 +295,61 @@ describe("<zitadel-login> with identity providers", () => {
 
     expect(seen).toContain("GET /flow/flow_mock");
     expect(seen).not.toContain("POST /flow");
+  });
+
+  const notFound = { code: "flow.not_found", message: "flow not found" };
+  // What the server answers when the required cookie is absent: the
+  // parameter decoder refuses the request before the handler runs.
+  const missingCookie = {
+    code: "req.invalid",
+    message: "The request is invalid and fails base validation.",
+    details: { details: { fields: ["_zflow"] } },
+  };
+
+  it.each([
+    { source: "the URL", status: 400, body: missingCookie, mount: (el: ZitadelLogin) => el },
+    { source: "the URL", status: 404, body: notFound, mount: (el: ZitadelLogin) => el },
+    { source: "the URL", status: 410, body: notFound, mount: (el: ZitadelLogin) => el },
+    {
+      source: "resume-flow-id",
+      status: 404,
+      body: notFound,
+      mount: (el: ZitadelLogin) => {
+        el.resumeFlowId = "flow_stale";
+        return el;
+      },
+    },
+  ])("starts over when the flow from $source answers $status", async ({ source, status, body, mount }) => {
+    // The cookie window can close during the external sign-in, and a flow
+    // can finish in another tab. The handle then names nothing, and a page
+    // stuck on a startup error has no way forward.
+    const seen: string[] = [];
+    const record = ({ request }: { request: Request }) => {
+      seen.push(`${request.method} ${new URL(request.url).pathname}`);
+    };
+    server.events.on("request:start", record);
+    server.use(http.get("*/flow/:id", () => HttpResponse.json(body, { status })));
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const original = window.location.href;
+    if (source === "the URL") window.history.replaceState({}, "", "/login?flow=flow_stale");
+
+    let warned: string[];
+    try {
+      const element = mount(document.createElement("zitadel-login") as ZitadelLogin);
+      element.purpose = "login";
+      element.project = testProject;
+      host.appendChild(element);
+      await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
+    } finally {
+      window.history.replaceState({}, "", original);
+      server.events.removeListener("request:start", record);
+      warned = warn.mock.calls.map((call) => String(call[0]));
+      warn.mockRestore();
+    }
+
+    expect(seen).toContain("GET /flow/flow_stale");
+    expect(seen).toContain("POST /flow");
+    expect(warned).toEqual([expect.stringContaining("flow_stale")]);
   });
 
   it("offers no providers when the project has enabled none", async () => {

@@ -1,4 +1,4 @@
-# ADR 066: Settings
+# ADR 067: Settings
 
 > **Status:** Proposed
 > **Date:** 2026-09-30
