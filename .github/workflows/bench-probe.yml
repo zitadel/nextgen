@@ -1,0 +1,46 @@
+name: bench-probe
+# TEMPORARY: reads what a Depot runner exposes. Removed before merge.
+on:
+  pull_request:
+    paths: [".github/workflows/bench-probe.yml"]
+permissions:
+  contents: read
+jobs:
+  probe:
+    if: ${{ !github.event.pull_request.head.repo.fork }}
+    runs-on: depot-ubuntu-24.04-16
+    timeout-minutes: 10
+    steps:
+      - name: Facts
+        run: |
+          set +e
+          echo "== user: $(id)"; sudo -n true && echo "sudo: ok" || echo "sudo: NO"
+          echo "== kernel: $(uname -r)"; echo "cgroup fs: $(stat -fc %T /sys/fs/cgroup)"
+          echo "root controllers: $(cat /sys/fs/cgroup/cgroup.controllers)"
+          echo "root subtree_control: $(cat /sys/fs/cgroup/cgroup.subtree_control)"
+          echo "own cgroup: $(cat /proc/self/cgroup)"
+          echo "root cpuset.cpus.effective: $(cat /sys/fs/cgroup/cpuset.cpus.effective 2>&1)"
+          echo "== cpu"; lscpu | grep -E "Model name|Thread|Core|Socket|^CPU\(s\)|Hypervisor|Virtualization|L3|NUMA node\(s\)|Vendor"
+          echo "online: $(cat /sys/devices/system/cpu/online)"
+          for c in $(seq 0 $(( $(nproc) - 1 ))); do echo "cpu$c siblings=$(cat /sys/devices/system/cpu/cpu$c/topology/thread_siblings_list) core_id=$(cat /sys/devices/system/cpu/cpu$c/topology/core_id) pkg=$(cat /sys/devices/system/cpu/cpu$c/topology/physical_package_id)"; done
+          echo "== mem: $(grep MemTotal /proc/meminfo)"; echo "swap: $(grep SwapTotal /proc/meminfo)"
+          echo "== virt: $(systemd-detect-virt 2>&1)"; echo "dmi: $(cat /sys/class/dmi/id/sys_vendor /sys/class/dmi/id/product_name 2>&1 | tr '\n' ' ')"
+          echo "imds type: $(curl -s -m 2 http://169.254.169.254/latest/meta-data/instance-type 2>&1 | head -c 100)"
+          echo "== pids max/ systemd: $(ps -p 1 -o comm=)"
+          echo "== tools: jq=$(command -v jq) flock=$(command -v flock) setpriv=$(command -v setpriv) findmnt=$(command -v findmnt) psql=$(command -v psql) pg_ctlcluster=$(command -v pg_ctlcluster) shellcheck=$(command -v shellcheck) go=$(command -v go)"
+          ls /usr/lib/postgresql 2>&1; systemctl is-active postgresql 2>&1
+          echo "== disk"; df -T / /tmp /home /mnt 2>&1; lsblk -o NAME,ROTA,TYPE,SIZE,MODEL,MOUNTPOINT 2>&1 | head -20
+          echo "== runner procs cgroup"; ps -eo pid,comm,cgroup | grep -iE "Runner|runsvc|node" | head
+      - name: Partition-root experiment (root)
+        run: |
+          set +e
+          cd /sys/fs/cgroup
+          echo "before root eff: $(sudo cat cpuset.cpus.effective 2>&1)"
+          echo "+cpuset +cpu +memory" | sudo tee cgroup.subtree_control; echo "rc=$? subtree: $(cat cgroup.subtree_control)"
+          sudo mkdir bench-x && echo mkdir-ok; cat bench-x/cgroup.controllers
+          echo "4-7,12-15" | sudo tee bench-x/cpuset.cpus; echo "rc=$?"
+          echo root | sudo tee bench-x/cpuset.cpus.partition; echo "rc=$? partition=$(cat bench-x/cpuset.cpus.partition) eff=$(cat bench-x/cpuset.cpus.effective)"
+          echo "root eff after: $(cat cpuset.cpus.effective)"
+          echo "this shell allowed: $(grep Cpus_allowed_list /proc/self/status)"
+          echo "runner worker allowed: $(for p in $(pgrep -f Runner.Worker | head -1); do grep Cpus_allowed_list /proc/$p/status; done)"
+          sudo rmdir bench-x; echo "rmdir rc=$?; root eff: $(cat cpuset.cpus.effective)"
