@@ -1,0 +1,32 @@
+title: Deploy
+type: object
+description: |
+  The rows one deploy wrote, correlated by `deploy_id`. `targets` lists the
+  expansion the server applied (`primary` becomes each primary origin).
+required:
+  - deploy_id
+  - release_id
+  - targets
+  - deployments
+properties:
+  deploy_id:
+    type: string
+    example: dpl_01KX3RG8A7F0N9WD3P2E4YM5C1
+  release_id:
+    $ref: ../../components/schemas/release-id.yaml
+  targets:
+    type: array
+    items:
+      type: string
+    description: The origins this deploy addressed, `""` being the default.
+  deployments:
+    type: array
+    items:
+      $ref: deployment.yaml
+  warnings:
+    type: array
+    description: |
+      Non-fatal notes, such as a secret with no preview value on a preview
+      deploy. Each is a short sentence the CLI prints verbatim.
+    items:
+      type: string

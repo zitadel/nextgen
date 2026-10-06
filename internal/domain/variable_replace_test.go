@@ -22,7 +22,7 @@ func decodeDoc(t *testing.T, payload string) map[string]any {
 
 func plainVar(t *testing.T, name string, value any) *Variable {
 	t.Helper()
-	v, err := NewVariable(name, VariableOwner{ProjectID: "p"}, value)
+	v, err := NewVariable(name, VariableOwner{ProjectID: "p"}, VariableAppliesToAll, value)
 	require.NoError(t, err)
 	return v
 }
@@ -265,7 +265,7 @@ func TestReplaceVariablesInDocument(t *testing.T) {
 		t.Parallel()
 
 		crypter := &crypto.InverseCrypter{}
-		secret, err := NewSecretVariable("token", VariableOwner{ProjectID: "p"}, "s3cret", crypter)
+		secret, err := NewSecretVariable("token", VariableOwner{ProjectID: "p"}, VariableAppliesToAll, "s3cret", crypter)
 		require.NoError(t, err)
 		require.NotEqual(t, "s3cret", secret.Value)
 
@@ -301,7 +301,7 @@ func TestReplaceVariablesInDocument(t *testing.T) {
 		t.Parallel()
 
 		crypter := &crypto.InverseCrypter{}
-		secret, err := NewSecretVariable("token", VariableOwner{ProjectID: "p"}, "s3cret", crypter)
+		secret, err := NewSecretVariable("token", VariableOwner{ProjectID: "p"}, VariableAppliesToAll, "s3cret", crypter)
 		require.NoError(t, err)
 
 		for name, payload := range map[string]string{
@@ -329,7 +329,7 @@ func TestReplaceVariablesInDocument(t *testing.T) {
 		t.Parallel()
 
 		crypter := &crypto.InverseCrypter{}
-		secret, err := NewSecretVariable("token", VariableOwner{ProjectID: "p"}, "s3cret", crypter)
+		secret, err := NewSecretVariable("token", VariableOwner{ProjectID: "p"}, VariableAppliesToAll, "s3cret", crypter)
 		require.NoError(t, err)
 
 		doc := decodeDoc(t, `{"token":"${{ token }}","callback":"https://${{ host }}/callback"}`)
@@ -435,7 +435,6 @@ func TestVariableListToMap(t *testing.T) {
 	t.Parallel()
 
 	project := VariableOwner{ProjectID: "p"}
-	env := VariableOwner{ProjectID: "p", EnvironmentID: "e"}
 
 	// A read admits one owner and the primary key is name plus owner, so the
 	// list this collapses never holds two rows under one name. There is no
@@ -461,8 +460,8 @@ func TestVariableListToMap(t *testing.T) {
 		assert.Empty(t, got)
 	})
 
-	// Owners are not a ladder: a name entered on the project and again on an
-	// environment is two variables, and no read returns both. Should one ever
+	// A name with an all value and a preview value is two rows, and no deploy
+	// read returns both. Should one ever
 	// arrive here anyway, the last row wins -- stated so the behaviour is pinned
 	// rather than incidental.
 	t.Run("two rows under one name are not ranked", func(t *testing.T) {
@@ -470,7 +469,7 @@ func TestVariableListToMap(t *testing.T) {
 
 		got := VariableListToMap([]*Variable{
 			{Name: "v", Owner: project, Value: "project"},
-			{Name: "v", Owner: env, Value: "env"},
+			{Name: "v", Owner: project, AppliesTo: VariableAppliesToPreview, Value: "env"},
 		})
 		require.Len(t, got, 1)
 		assert.Equal(t, "env", got["v"].Value)

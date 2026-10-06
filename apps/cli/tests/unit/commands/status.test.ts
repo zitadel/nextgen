@@ -26,7 +26,7 @@ const SECRET = {
   project_id: "proj-001",
   project_secret: "sk_proj_test",
   preview_secret: "sk_proj_preview",
-  preview_origins: [],
+  preview_token: "sk_proj_preview_token",
   // Recent, so the claim window reads as open; the closed-window test writes
   // its own stale timestamp.
   created_at: new Date(Date.now() - 60_000).toISOString(),
@@ -62,8 +62,11 @@ async function configuredProject(): Promise<string> {
     JSON.stringify({
       project: "proj-001",
       server: "https://api.zitadel.cloud",
-      environments: { development: { issuer: "http://localhost:3000" } },
     }),
+  );
+  await writeFile(
+    join(cwd, ".zitadel/state.json"),
+    JSON.stringify({ framework: "next", resources: {}, scaffold: { files: {}, dev_port: 3000 } }),
   );
   await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify(SECRET));
   return cwd;

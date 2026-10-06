@@ -6,6 +6,7 @@ CREATE TYPE zitadel_nextgen.token_types AS ENUM (
     , 'personal_access_token'
     , 'project_token'
     , 'project_preview'
+    , 'project_preview_deploy'
 );
 
 CREATE TABLE zitadel_nextgen.tokens (
@@ -40,7 +41,8 @@ CREATE TABLE zitadel_nextgen.tokens (
             AND session_id IS NULL AND oidc_session_id IS NULL AND saml_session_id IS NULL)
         OR (token_type IN (
                 'project_token'::zitadel_nextgen.token_types,
-                'project_preview'::zitadel_nextgen.token_types)
+                'project_preview'::zitadel_nextgen.token_types,
+                'project_preview_deploy'::zitadel_nextgen.token_types)
             AND user_id IS NULL
             AND session_id IS NULL AND oidc_session_id IS NULL AND saml_session_id IS NULL)
     )

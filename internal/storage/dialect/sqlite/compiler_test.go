@@ -12,9 +12,10 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/dialect/authz"
+	"github.com/zitadel/nextgen/internal/storage/flowdefinition"
 )
 
-const testProjectQuery = "SELECT id, name, preview_origins, created_at, updated_at FROM projects"
+const testProjectQuery = "SELECT id, name, allowed_origins, class, created_at, updated_at FROM projects"
 
 func compileProjectRead(t *testing.T, opts *database.ListOptions[domain.ProjectField]) (string, []any) {
 	t.Helper()
@@ -64,16 +65,17 @@ func TestWriteArgCoercesTimeAndDuration(t *testing.T) {
 func TestCompileArrayContainsUsesJSONEach(t *testing.T) {
 	t.Parallel()
 
-	sql, args := compileProjectRead(t, &database.ListOptions[domain.ProjectField]{
-		Filter: database.ArrayContains(database.Col(domain.ProjectFieldPreviewOrigins), "https://app.example"),
-	})
+	var compiler statementCompiler
+	require.NoError(t, compileRead(&compiler, flowDefinitionQuery, &database.ListOptions[domain.FlowDefinitionField]{
+		Filter: database.ArrayContains(database.Col(domain.FlowDefinitionFieldPurposes), "login"),
+	}, flowdefinition.Schema))
 
 	assert.Equal(t,
-		testProjectQuery+` WHERE EXISTS (SELECT 1 FROM json_each(preview_origins) WHERE value = ?)`,
-		sql,
+		flowDefinitionQuery+` WHERE EXISTS (SELECT 1 FROM json_each(purposes) WHERE value = ?)`,
+		compiler.String(),
 	)
-	require.Len(t, args, 1)
-	assert.Equal(t, "https://app.example", args[0])
+	require.Len(t, compiler.args, 1)
+	assert.Equal(t, "login", compiler.args[0])
 }
 
 func TestCompileStringFilterIgnoreCase(t *testing.T) {

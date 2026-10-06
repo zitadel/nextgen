@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"strings"
 
 	"github.com/ianlancetaylor/jsonschema"
@@ -26,13 +27,24 @@ type ProjectService interface {
 	// If seedDefaults is true, server fallback schema and flow resources are
 	// created with the project for non-CLI creation paths.
 	// Returns the stored project including timestamps.
-	Create(ctx context.Context, name string, previewOrigins []string, seedDefaults bool) (*domain.Project, error)
+	Create(ctx context.Context, name string, allowedOrigins []domain.AllowedOrigin, seedDefaults bool) (*domain.Project, error)
 
 	// CreateWithID is Create under a caller-supplied id, for the one project
 	// whose id the server owns rather than mints: the platform project
 	// (domain.PlatformProjectID). Reports the same already-exists error as
 	// Create when the id is taken.
-	CreateWithID(ctx context.Context, id, name string, previewOrigins []string, seedDefaults bool) (*domain.Project, error)
+	CreateWithID(ctx context.Context, id, name string, allowedOrigins []domain.AllowedOrigin, seedDefaults bool) (*domain.Project, error)
+
+	// AddAllowedOrigin appends one pattern to the allowlist after linting it
+	// against the project's class. The warning, when set, is a note the
+	// pattern was accepted with.
+	AddAllowedOrigin(ctx context.Context, projectID string, entry domain.AllowedOrigin) (*domain.OriginLintWarning, error)
+	// RemoveAllowedOrigin drops one pattern. Returns domain.ErrOriginNotFound
+	// when the allowlist does not hold it.
+	RemoveAllowedOrigin(ctx context.Context, projectID, pattern string) error
+	// SetClass promotes or demotes the project. Promotion re-lints every
+	// pattern against the production rules; demotion needs confirm.
+	SetClass(ctx context.Context, projectID string, class domain.ProjectClass, confirm bool) (*domain.Project, error)
 
 	// Get retrieves a project by ID.
 	// Returns [database.NoRowFoundError] when no project with the given ID exists.
@@ -104,8 +116,8 @@ type projectService struct {
 
 var _ ProjectService = (*projectService)(nil)
 
-func (s *projectService) Create(ctx context.Context, name string, previewOrigins []string, seedDefaults bool) (*domain.Project, error) {
-	project, err := domain.NewProject(name, previewOrigins)
+func (s *projectService) Create(ctx context.Context, name string, allowedOrigins []domain.AllowedOrigin, seedDefaults bool) (*domain.Project, error) {
+	project, err := domain.NewProject(name, allowedOrigins)
 	if err != nil {
 		return nil, err
 	}
@@ -117,8 +129,8 @@ func (s *projectService) Create(ctx context.Context, name string, previewOrigins
 // needs this: its id is well-known (domain.PlatformProjectID) so that every
 // deployment can address the same project, which is the whole point of a
 // bootstrap. Everything else must keep taking a minted id.
-func (s *projectService) CreateWithID(ctx context.Context, id, name string, previewOrigins []string, seedDefaults bool) (*domain.Project, error) {
-	project, err := domain.NewProject(name, previewOrigins)
+func (s *projectService) CreateWithID(ctx context.Context, id, name string, allowedOrigins []domain.AllowedOrigin, seedDefaults bool) (*domain.Project, error) {
+	project, err := domain.NewProject(name, allowedOrigins)
 	if err != nil {
 		return nil, err
 	}
@@ -167,10 +179,6 @@ func (s *projectService) create(ctx context.Context, project *domain.Project, se
 			return domain.ErrInternal(err).WithMessage("failed to seed project secret authz assignment")
 		}
 		if err := emitAuthzGranted(ctx, tx.Statements(), asgn); err != nil {
-			return err
-		}
-
-		if err := seedDefaultEnvironments(ctx, tx.Statements(), project.ID); err != nil {
 			return err
 		}
 
@@ -259,7 +267,8 @@ func emitProjectCreated(ctx context.Context, stmts EventStatements, project *dom
 		EntityID:   project.ID,
 		Payload: domain.ProjectPayload{
 			Name:           project.Name,
-			PreviewOrigins: project.PreviewOrigins,
+			AllowedOrigins: allowedOriginPatterns(project.AllowedOrigins),
+			Class:          project.Class.String(),
 		},
 	})
 }
@@ -439,6 +448,125 @@ func (s *projectService) Update(ctx context.Context, req UpdateProjectRequest) (
 	}
 
 	return project, nil
+}
+
+func (s *projectService) AddAllowedOrigin(ctx context.Context, projectID string, entry domain.AllowedOrigin) (*domain.OriginLintWarning, error) {
+	pattern, err := domain.NormalizeOrigin(entry.Pattern)
+	if err != nil {
+		return nil, err
+	}
+	if !entry.Kind.IsAOriginKind() {
+		return nil, domain.ErrOriginInvalid(map[string]string{"pattern": entry.Pattern, "reason": "unknown kind"})
+	}
+	entry.Pattern = pattern
+
+	var warning *domain.OriginLintWarning
+	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		project, err := tx.Statements().GetProjectByID(ctx, projectID)
+		if err != nil {
+			return err
+		}
+		for _, existing := range project.AllowedOrigins {
+			if existing.Pattern == pattern {
+				return domain.ErrOriginInvalid(map[string]string{"pattern": pattern, "reason": "already allowed"})
+			}
+		}
+		warning, err = domain.LintOriginPattern(project.Class, entry)
+		if err != nil {
+			return err
+		}
+		origins := append(slices.Clone(project.AllowedOrigins), entry)
+		if err := tx.Statements().UpdateProjectAllowedOrigins(ctx, projectID, origins); err != nil {
+			return err
+		}
+		return emitProjectUpdated(ctx, tx.Statements(), projectID, domain.ProjectUpdatedPayload{
+			AllowedOrigins: allowedOriginPatterns(origins),
+		})
+	})
+	if err != nil {
+		return nil, s.mapUpdateError(err)
+	}
+	return warning, nil
+}
+
+func (s *projectService) RemoveAllowedOrigin(ctx context.Context, projectID, pattern string) error {
+	normalized, err := domain.NormalizeOrigin(pattern)
+	if err != nil {
+		return err
+	}
+	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		project, err := tx.Statements().GetProjectByID(ctx, projectID)
+		if err != nil {
+			return err
+		}
+		origins := slices.DeleteFunc(slices.Clone(project.AllowedOrigins), func(entry domain.AllowedOrigin) bool {
+			return entry.Pattern == normalized
+		})
+		if len(origins) == len(project.AllowedOrigins) {
+			return domain.ErrOriginNotFound()
+		}
+		if err := tx.Statements().UpdateProjectAllowedOrigins(ctx, projectID, origins); err != nil {
+			return err
+		}
+		return emitProjectUpdated(ctx, tx.Statements(), projectID, domain.ProjectUpdatedPayload{
+			AllowedOrigins: allowedOriginPatterns(origins),
+		})
+	})
+	return s.mapUpdateError(err)
+}
+
+// SetClass changes what the allowlist accepts. Promotion checks every
+// pattern against the production rules first and names each offender;
+// demotion lets loopback origins back in and so needs confirm.
+func (s *projectService) SetClass(ctx context.Context, projectID string, class domain.ProjectClass, confirm bool) (*domain.Project, error) {
+	if !class.IsAProjectClass() {
+		return nil, domain.ErrProjectClassChangeRefused(map[string]string{"reason": "unknown class"})
+	}
+	var project *domain.Project
+	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		current, err := tx.Statements().GetProjectByID(ctx, projectID)
+		if err != nil {
+			return err
+		}
+		if current.Class == class {
+			project = current
+			return nil
+		}
+		switch class {
+		case domain.ProjectClassProduction:
+			var offenders []map[string]string
+			for _, entry := range current.AllowedOrigins {
+				if _, err := domain.LintOriginPattern(class, entry); err != nil {
+					offenders = append(offenders, map[string]string{"pattern": entry.Pattern, "kind": entry.Kind.String()})
+				}
+			}
+			if len(offenders) > 0 {
+				return domain.ErrProjectClassChangeRefused(map[string]any{"reason": "patterns break the production rules", "patterns": offenders})
+			}
+		case domain.ProjectClassSandbox:
+			if !confirm {
+				return domain.ErrProjectClassChangeRefused(map[string]string{"reason": "demoting to sandbox lets loopback origins in; confirm it"})
+			}
+		}
+		if err := tx.Statements().UpdateProjectClass(ctx, projectID, class); err != nil {
+			return err
+		}
+		current.Class = class
+		project = current
+		return emitProjectUpdated(ctx, tx.Statements(), projectID, domain.ProjectUpdatedPayload{Class: class.String()})
+	})
+	if err != nil {
+		return nil, s.mapUpdateError(err)
+	}
+	return project, nil
+}
+
+func allowedOriginPatterns(origins []domain.AllowedOrigin) []string {
+	patterns := make([]string, len(origins))
+	for i, entry := range origins {
+		patterns[i] = entry.Kind.String() + " " + entry.Pattern
+	}
+	return patterns
 }
 
 func (s *projectService) mapUpdateError(err error) error {

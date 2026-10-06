@@ -22,7 +22,7 @@ type Handler struct {
 	flowDefinitionService service.FlowDefinitionService
 	teamService           *service.TeamService
 	brandingService       *service.BrandingService
-	environmentService    *service.EnvironmentService
+	runtime               *service.RuntimeResolver
 	releaseService        service.ReleaseService
 	idpConnectionService  service.IDPConnectionService
 	deploymentService     *service.DeploymentService
@@ -53,7 +53,7 @@ func NewHandler(
 	flowDefinitionService service.FlowDefinitionService,
 	teamService *service.TeamService,
 	brandingService *service.BrandingService,
-	environmentService *service.EnvironmentService,
+	runtime *service.RuntimeResolver,
 	releaseService service.ReleaseService,
 	idpConnectionService service.IDPConnectionService,
 	deploymentService *service.DeploymentService,
@@ -76,7 +76,7 @@ func NewHandler(
 		flowDefinitionService: flowDefinitionService,
 		teamService:           teamService,
 		brandingService:       brandingService,
-		environmentService:    environmentService,
+		runtime:               runtime,
 		releaseService:        releaseService,
 		idpConnectionService:  idpConnectionService,
 		deploymentService:     deploymentService,

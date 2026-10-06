@@ -16,6 +16,15 @@ content:
         - $ref: '../../components/schemas/errors/internal.yaml'
         - $ref: '../../components/schemas/errors/tkn-invalid.yaml'
         - $ref: '../../components/schemas/errors/tkn-invalid_tknid.yaml'
+        - $ref: '../../components/schemas/errors/proj-not_found.yaml'
+        - $ref: '../../components/schemas/errors/proj-origin_not_allowed.yaml'
+        - $ref: '../../components/schemas/errors/proj-preview_not_live.yaml'
+        - $ref: '../../components/schemas/errors/rel-ambiguous.yaml'
+        - $ref: '../../components/schemas/errors/rel-invalid.yaml'
+        - $ref: '../../components/schemas/errors/rel-no_default.yaml'
+        - $ref: '../../components/schemas/errors/rel-not_deployed.yaml'
+        - $ref: '../../components/schemas/errors/rel-not_found.yaml'
+        - $ref: '../../components/schemas/errors/rel-revoked.yaml'
         - $ref: '../../components/schemas/errors/req-invalid.yaml'
         - $ref: '../../components/schemas/errors/enc_key-unknown_alg.yaml'
       discriminator:
@@ -33,6 +42,15 @@ content:
           internal: '../../components/schemas/errors/internal.yaml'
           tkn.invalid: '../../components/schemas/errors/tkn-invalid.yaml'
           tkn.invalid_tknid: '../../components/schemas/errors/tkn-invalid_tknid.yaml'
+          proj.not_found: '../../components/schemas/errors/proj-not_found.yaml'
+          proj.origin_not_allowed: '../../components/schemas/errors/proj-origin_not_allowed.yaml'
+          proj.preview_not_live: '../../components/schemas/errors/proj-preview_not_live.yaml'
+          rel.ambiguous: '../../components/schemas/errors/rel-ambiguous.yaml'
+          rel.invalid: '../../components/schemas/errors/rel-invalid.yaml'
+          rel.no_default: '../../components/schemas/errors/rel-no_default.yaml'
+          rel.not_deployed: '../../components/schemas/errors/rel-not_deployed.yaml'
+          rel.not_found: '../../components/schemas/errors/rel-not_found.yaml'
+          rel.revoked: '../../components/schemas/errors/rel-revoked.yaml'
           req.invalid: '../../components/schemas/errors/req-invalid.yaml'
           enc_key.unknown_alg: '../../components/schemas/errors/enc_key-unknown_alg.yaml'
     examples:
@@ -96,6 +114,51 @@ content:
         value:
           code: tkn.invalid_tknid
           message: 'token identifiers do not match token type'
+      proj.not_found:
+        summary: proj.not_found
+        value:
+          code: proj.not_found
+          message: 'project not found'
+      proj.origin_not_allowed:
+        summary: proj.origin_not_allowed
+        value:
+          code: proj.origin_not_allowed
+          message: 'the request origin matches no allowed origin of this project'
+      proj.preview_not_live:
+        summary: proj.preview_not_live
+        value:
+          code: proj.preview_not_live
+          message: 'this preview is no longer live; push again or run zitadel preview'
+      rel.ambiguous:
+        summary: rel.ambiguous
+        value:
+          code: rel.ambiguous
+          message: 'release: the digest prefix matches more than one release'
+      rel.invalid:
+        summary: rel.invalid
+        value:
+          code: rel.invalid
+          message: 'release: invalid'
+      rel.no_default:
+        summary: rel.no_default
+        value:
+          code: rel.no_default
+          message: 'release: nothing has been deployed to this project yet'
+      rel.not_deployed:
+        summary: rel.not_deployed
+        value:
+          code: rel.not_deployed
+          message: 'release: this build pins a release this target does not serve; redeploy the app'
+      rel.not_found:
+        summary: rel.not_found
+        value:
+          code: rel.not_found
+          message: 'release: not found'
+      rel.revoked:
+        summary: rel.revoked
+        value:
+          code: rel.revoked
+          message: 'release: revoked'
       req.invalid:
         summary: req.invalid
         value:

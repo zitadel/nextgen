@@ -20,7 +20,7 @@
  *   afterAll(() => server.close());
  *   afterEach(() => { server.resetHandlers(); resetPlatformStore(); });
  */
-import { randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 
 import type {
   CompleteClaim200,
@@ -38,12 +38,21 @@ import type {
   ListSchemas200,
 } from "@zitadel/api/generated/model";
 import {
+  AddAllowedOriginBody,
+  AddAllowedOriginParams,
+  AddAllowedOriginResponse,
   CompleteClaimResponse,
+  CreateDeploymentBody,
+  CreateDeploymentQueryParams,
+  CreateDeploymentResponse,
   CreateFlowDefinitionBody,
   CreateIdpBody,
   CreateIdpQueryParams,
   CreateIdpResponse,
   CreateProjectBody,
+  CreateReleaseBody,
+  CreateReleaseQueryParams,
+  CreateReleaseResponse,
   CreateSchemaBody,
   CreateSchemaQueryParams,
   DeleteVariableParams,
@@ -54,6 +63,12 @@ import {
   GetClaimWindowParams,
   GetClaimWindowQueryParams,
   GetClaimWindowResponse,
+  GetDeploymentByIdParams,
+  GetDeploymentByIdQueryParams,
+  GetDeploymentByIdResponse,
+  GetDeploymentVariablesParams,
+  GetDeploymentVariablesQueryParams,
+  GetDeploymentVariablesResponse,
   GetFlowDefinitionParams,
   GetFlowDefinitionResponse,
   GetIdpByIdParams,
@@ -61,6 +76,9 @@ import {
   GetIdpByIdResponse,
   GetProjectParams,
   GetProjectResponse,
+  GetReleaseByIdParams,
+  GetReleaseByIdQueryParams,
+  GetReleaseByIdResponse,
   GetSchemaByIdParams,
   GetSchemaByIdQueryParams,
   GetVariableParams,
@@ -69,13 +87,32 @@ import {
   GetVariablesQueryParams,
   GetVariablesResponse,
   InitClaimParams,
+  ListDeploymentsQueryParams,
+  ListDeploymentsResponse,
   ListFlowDefinitionsQueryParams,
   ListFlowDefinitionsResponse,
+  ListOriginsQueryParams,
+  ListOriginsResponse,
+  ListReleasesQueryParams,
+  ListReleasesResponse,
   ListSchemasQueryParams,
   QueryIdpsBody,
   QueryIdpsQueryParams,
   QueryIdpsResponse,
   QueryUsersBody,
+  RemoveAllowedOriginBody,
+  RemoveAllowedOriginParams,
+  RemoveOriginBody,
+  RemoveOriginQueryParams,
+  RevokeReleaseParams,
+  RevokeReleaseQueryParams,
+  RevokeReleaseResponse,
+  RollbackDeploymentBody,
+  RollbackDeploymentQueryParams,
+  RollbackDeploymentResponse,
+  SetProjectClassBody,
+  SetProjectClassParams,
+  SetProjectClassResponse,
   UpdateVariablesBody,
   UpdateVariablesQueryParams,
   UpdateVariablesResponse,
@@ -182,12 +219,56 @@ function queryRecord(request: Request): Record<string, string> {
 type ProjectRecord = {
   id: string;
   name: string;
+  class: ProjectClass;
   projectSecret: string;
   previewSecret: string;
-  previewOrigins: string[];
+  previewToken: string;
+  allowedOrigins: AllowedOriginRecord[];
   createdAt: string;
   updatedAt: string;
 };
+
+type ProjectClass = "sandbox" | "production";
+type OriginKind = "primary" | "preview";
+
+/** One allowlist entry. A `primary` admits requests; a `preview` only bounds what a preview deploy may register. */
+type AllowedOriginRecord = { pattern: string; kind: OriginKind };
+
+/** An immutable snapshot of revisions, keyed per project by its content hash. */
+type ReleaseRecord = {
+  id: string;
+  projectId: string;
+  contentHash: string;
+  pointers: { kind: "schema" | "flow_definition" | "branding"; handle: string; revision_id: string }[];
+  message?: string;
+  gitSha?: string;
+  gitDirty: boolean;
+  createdAt: string;
+  seq: number;
+  revokedAt?: string;
+};
+
+/**
+ * One row of the deployment log: a release made live on one target. `""` is
+ * the project default. The variables the row runs are frozen on it, so an
+ * edit of the store reaches nothing already deployed.
+ */
+type DeploymentRecord = {
+  id: string;
+  projectId: string;
+  deployId: string;
+  origin: string;
+  releaseId: string;
+  reason: "deploy" | "promote" | "rollback";
+  message?: string;
+  rollbackOf?: string;
+  deployedAt: string;
+  seq: number;
+  variables: Map<string, VariableRecord>;
+};
+
+/** The row that admits requests from one live preview URL. */
+type OriginRecord = { projectId: string; origin: string; expiresAt: string; createdAt: string };
 
 /**
  * Server-side metadata wrapped around the flow body so the mock can answer
@@ -262,10 +343,9 @@ type IdpConnectionRecord = {
 };
 
 /**
- * One variable at the project level, which is the only owner the API addresses
- * today. `secret` decides what a read may say: a secret reports that a value is
- * held and withholds it (ADR 062 §7), so the stored value is only ever resolved
- * into a connection, never returned.
+ * One variable value. `secret` decides what a read may say: a secret reports
+ * that a value is held and withholds it (ADR 062 §7), so the stored value is
+ * only ever resolved into a connection, never returned.
  */
 type VariableRecord = { value: string | number | boolean; secret: boolean };
 
@@ -275,12 +355,15 @@ type Store = {
   flowDefinitions: Map<string, FlowDefinitionRecord>;
   idps: Map<string, IdpConnectionRecord>;
   /**
-   * Owner key -> variable name -> value. The project level and each
-   * environment are separate owners: the project does not see into its
-   * environments and an environment does not inherit the project's, so they
-   * cannot share a bucket. See {@link variableOwner}.
+   * `applies_to` bucket -> variable name -> value. `all` is what every deploy
+   * freezes; `preview` overrides it on a preview deploy. See
+   * {@link variableOwner}.
    */
   variables: Map<string, Map<string, VariableRecord>>;
+  releases: Map<string, ReleaseRecord>;
+  deployments: Map<string, DeploymentRecord>;
+  /** Keyed by {@link originKey}. */
+  origins: Map<string, OriginRecord>;
   claimChallenges: Map<string, ClaimChallengeRecord>;
   claims: Map<string, ClaimRecord>;
   // Publication order. `nowIso()` is millisecond-resolution and ids are
@@ -297,6 +380,9 @@ function makeStore(): Store {
     flowDefinitions: new Map(),
     idps: new Map(),
     variables: new Map(),
+    releases: new Map(),
+    deployments: new Map(),
+    origins: new Map(),
     claimChallenges: new Map(),
     claims: new Map(),
     lastSeq: 0,
@@ -458,12 +544,390 @@ function immutableFieldClash(before: Record<string, unknown>, after: Record<stri
   return undefined;
 }
 
+/** The bucket a variables request addresses: the project's `all` or `preview` values. */
+function variableOwner(projectId: string, appliesTo: "all" | "preview"): string {
+  return `${projectId}:${appliesTo}`;
+}
+
+function originKey(projectId: string, origin: string): string {
+  return `${projectId}\u0000${origin.toLowerCase()}`;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** `*` matches one or more characters, none of them a dot; everything else is literal. */
+function patternMatches(pattern: string, origin: string): boolean {
+  const source = pattern.toLowerCase().split("*").map(escapeRegExp).join("[^.]+");
+  return new RegExp(`^${source}$`).test(origin.toLowerCase());
+}
+
+/** The entry admitting `origin`, a literal beating a wildcard. */
+function matchAllowedOrigin(
+  allowed: AllowedOriginRecord[],
+  origin: string,
+): AllowedOriginRecord | undefined {
+  const literal = allowed.find(
+    (entry) => !entry.pattern.includes("*") && entry.pattern.toLowerCase() === origin.toLowerCase(),
+  );
+  if (literal) {
+    return literal;
+  }
+  return allowed.find((entry) => entry.pattern.includes("*") && patternMatches(entry.pattern, origin));
+}
+
+const LOOPBACK_ORIGIN = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i;
+const ORIGIN_SHAPE = /^https?:\/\/[^/?#\s]+$/i;
+/** Hosts where anyone can mint a hostname, so a wildcard needs a tenant-unique label beside it. */
+const SHARED_HOSTS = ["vercel.app", "netlify.app", "pages.dev", "workers.dev"];
+
+type PatternCheck =
+  | { ok: true; check: { status: "ok" | "warning"; code?: string; message: string } }
+  | { ok: false; code: string; message: string };
+
 /**
- * The owner a variables request addresses. An absent environment is the project
- * level, which is a different owner from any environment under it.
+ * The lint a pattern passes when it is saved. Rejections apply to a
+ * `production` project; a wildcard on a host the mock does not know is
+ * accepted with a warning on either class.
  */
-function variableOwner(projectId: string, environmentName?: string): string {
-  return environmentName === undefined ? `project:${projectId}` : `env:${projectId}/${environmentName}`;
+function lintPattern(cls: ProjectClass, kind: OriginKind, pattern: string): PatternCheck {
+  if (!ORIGIN_SHAPE.test(pattern)) {
+    return { ok: false, code: "req.invalid", message: "pattern must be scheme://host[:port]" };
+  }
+  const wildcard = pattern.includes("*");
+  if (cls === "production") {
+    if (LOOPBACK_ORIGIN.test(pattern)) {
+      return {
+        ok: false,
+        code: "proj.origin_not_permitted_for_class",
+        message: "a production project does not serve loopback origins",
+      };
+    }
+    if (kind === "primary" && wildcard) {
+      return {
+        ok: false,
+        code: "proj.origin_not_permitted_for_class",
+        message: "a primary pattern on a production project must be an exact origin",
+      };
+    }
+  }
+  if (!wildcard) {
+    return { ok: true, check: { status: "ok", message: "exact origin" } };
+  }
+  const host = pattern.replace(/^https?:\/\//i, "").replace(/:\d+$/, "");
+  const shared = SHARED_HOSTS.find((suffix) => host.toLowerCase().endsWith(`.${suffix}`));
+  if (!shared) {
+    return {
+      ok: true,
+      check: {
+        status: "warning",
+        code: "origin_host_unknown",
+        message: `${host.replace(/^[^.]*\./, "")} is not in the host list; the label could not be checked`,
+      },
+    };
+  }
+  const label = host.slice(0, -(shared.length + 1)).replaceAll("*", "").replace(/^[.-]+|[.-]+$/g, "");
+  if (label === "") {
+    if (cls === "production") {
+      return {
+        ok: false,
+        code: "proj.origin_unbounded",
+        message: `${host} has no literal label on a shared host, so a leaked preview credential could register any URL under ${shared}`,
+      };
+    }
+    return { ok: true, check: { status: "warning", code: "origin_unbounded", message: `${host} has no literal label on ${shared}` } };
+  }
+  return { ok: true, check: { status: "ok", message: `bounded by label \`${label}\`` } };
+}
+
+/** Every pattern of the project that would fail the lint under `cls`. */
+function patternsFailing(project: ProjectRecord, cls: ProjectClass): string[] {
+  return project.allowedOrigins
+    .filter((entry) => !lintPattern(cls, entry.kind, entry.pattern).ok)
+    .map((entry) => entry.pattern);
+}
+
+function contentHash(pointers: { kind: string; revision_id: string }[]): string {
+  const pairs = pointers.map((p) => `${p.kind}:${p.revision_id}`).sort();
+  return createHash("sha256").update(pairs.join("\n")).digest("hex");
+}
+
+/** The handle a revision is pinned under: the resource's own identifying field. */
+function pointerHandle(kind: string, revisionId: string): string {
+  if (kind === "schema") {
+    return store.schemas.get(revisionId)?.objectType ?? revisionId;
+  }
+  if (kind === "flow_definition") {
+    const name = store.flowDefinitions.get(revisionId)?.body.name;
+    return typeof name === "string" ? name : revisionId;
+  }
+  return "default";
+}
+
+function releaseResponse(release: ReleaseRecord): Record<string, unknown> {
+  return {
+    id: release.id,
+    project_id: release.projectId,
+    content_hash: release.contentHash,
+    metadata: {
+      message: release.message ?? null,
+      git_sha: release.gitSha ?? null,
+      git_dirty: release.gitDirty,
+      created_at: release.createdAt,
+      created_by: null,
+      created_by_type: null,
+    },
+    pointers: release.pointers,
+    revoked_at: release.revokedAt ?? null,
+  };
+}
+
+/**
+ * The release a `rel_` id or a `sha256:` / bare hex digest prefix names.
+ * An ambiguous short digest is refused, as the server does.
+ */
+function resolveRelease(
+  projectId: string,
+  ref: string,
+): { ok: true; release: ReleaseRecord } | { ok: false; response: HttpResponse<ErrorBody> } {
+  const inProject = [...store.releases.values()].filter((r) => r.projectId === projectId);
+  if (ref.startsWith("rel_")) {
+    const release = inProject.find((r) => r.id === ref);
+    return release
+      ? { ok: true, release }
+      : { ok: false, response: HttpResponse.json(errorBody("rel.not_found", "release not found"), { status: 404 }) };
+  }
+  const digest = ref.replace(/^sha256:/, "").toLowerCase();
+  if (digest.length < 12 || !/^[0-9a-f]+$/.test(digest)) {
+    return { ok: false, response: HttpResponse.json(errorBody("rel.not_found", "release not found"), { status: 404 }) };
+  }
+  const matches = inProject.filter((r) => r.contentHash.startsWith(digest));
+  if (matches.length > 1) {
+    return {
+      ok: false,
+      response: HttpResponse.json(errorBody("rel.ambiguous", "the digest matches more than one release"), { status: 400 }),
+    };
+  }
+  const [match] = matches;
+  return match
+    ? { ok: true, release: match }
+    : { ok: false, response: HttpResponse.json(errorBody("rel.not_found", "release not found"), { status: 404 }) };
+}
+
+function liveOrigin(projectId: string, origin: string): OriginRecord | undefined {
+  const row = store.origins.get(originKey(projectId, origin));
+  if (!row || new Date(row.expiresAt).getTime() <= Date.now()) {
+    return undefined;
+  }
+  return row;
+}
+
+/** The newest row for one target, or undefined when nothing was deployed there. */
+function newestDeployment(projectId: string, origin: string): DeploymentRecord | undefined {
+  let newest: DeploymentRecord | undefined;
+  for (const row of store.deployments.values()) {
+    if (row.projectId === projectId && row.origin === origin && (!newest || row.seq > newest.seq)) {
+      newest = row;
+    }
+  }
+  return newest;
+}
+
+/** Every row of the project, newest first. */
+function deploymentHistory(projectId: string): DeploymentRecord[] {
+  return [...store.deployments.values()]
+    .filter((row) => row.projectId === projectId)
+    .sort((a, b) => b.seq - a.seq);
+}
+
+/**
+ * The values a deploy freezes: the `all` bucket, overlaid by `preview` values
+ * when every target is a preview origin. A secret with no preview value on a
+ * preview deploy is served the production one, which is worth a warning.
+ */
+function frozenVariables(
+  projectId: string,
+  preview: boolean,
+): { values: Map<string, VariableRecord>; warnings: string[] } {
+  const values = new Map(store.variables.get(variableOwner(projectId, "all")) ?? []);
+  const warnings: string[] = [];
+  if (!preview) {
+    return { values, warnings };
+  }
+  const overrides = store.variables.get(variableOwner(projectId, "preview")) ?? new Map<string, VariableRecord>();
+  for (const [name, held] of values) {
+    if (held.secret && !overrides.has(name)) {
+      warnings.push(`${name} has no preview value — serving the production one`);
+    }
+  }
+  for (const [name, held] of overrides) {
+    values.set(name, held);
+  }
+  return { values, warnings };
+}
+
+function sameVariables(a: Map<string, VariableRecord>, b: Map<string, VariableRecord>): boolean {
+  const serialise = (m: Map<string, VariableRecord>) =>
+    JSON.stringify([...m.entries()].sort(([x], [y]) => (x < y ? -1 : x > y ? 1 : 0)));
+  return serialise(a) === serialise(b);
+}
+
+function deploymentResponse(
+  row: DeploymentRecord,
+  options: { live?: boolean; expandRelease?: boolean } = {},
+): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    id: row.id,
+    project_id: row.projectId,
+    deploy_id: row.deployId,
+    origin: row.origin,
+    release_id: row.releaseId,
+    deployed_at: row.deployedAt,
+    metadata: {
+      reason: row.reason,
+      message: row.message ?? null,
+      rollback_of: row.rollbackOf ?? null,
+      deployed_by: null,
+      deployed_by_type: null,
+    },
+  };
+  if (options.live && row.origin !== "") {
+    body.expires_at = liveOrigin(row.projectId, row.origin)?.expiresAt ?? null;
+  }
+  if (options.expandRelease) {
+    const release = store.releases.get(row.releaseId);
+    if (release) {
+      body.release = releaseResponse(release);
+    }
+  }
+  return body;
+}
+
+function appendDeployment(input: {
+  projectId: string;
+  deployId: string;
+  origin: string;
+  releaseId: string;
+  reason: DeploymentRecord["reason"];
+  message?: string;
+  rollbackOf?: string;
+  variables: Map<string, VariableRecord>;
+}): DeploymentRecord {
+  const row: DeploymentRecord = {
+    id: `dep_${shortId()}`,
+    projectId: input.projectId,
+    deployId: input.deployId,
+    origin: input.origin,
+    releaseId: input.releaseId,
+    reason: input.reason,
+    message: input.message,
+    rollbackOf: input.rollbackOf,
+    deployedAt: nowIso(),
+    seq: ++store.lastSeq,
+    variables: new Map(input.variables),
+  };
+  store.deployments.set(row.id, row);
+  return row;
+}
+
+function deployResponse(
+  deployId: string,
+  releaseId: string,
+  rows: DeploymentRecord[],
+  warnings: string[],
+): Record<string, unknown> {
+  return {
+    deploy_id: deployId,
+    release_id: releaseId,
+    targets: rows.map((row) => row.origin),
+    deployments: rows.map((row) => deploymentResponse(row)),
+    warnings,
+  };
+}
+
+function projectResponse(project: ProjectRecord): GetProject200 {
+  return {
+    id: project.id,
+    name: project.name,
+    class: project.class,
+    allowed_origins: project.allowedOrigins,
+    created_at: project.createdAt,
+    updated_at: project.updatedAt,
+  };
+}
+
+/** A refusal from {@link admitFlow}: the status and the spec error envelope. */
+export type FlowRefusal = { status: number; body: ErrorBody };
+
+/**
+ * The gate every flow start passes on the server, run against the platform
+ * store: the request's `Origin` must match an allowlist pattern (a `preview`
+ * match also needs a live row), and an `X-Zitadel-Release` pin may only
+ * select a release already deployed to the matched target on a `production`
+ * project. A project the store does not hold is not gated — the browser
+ * fixtures run without one.
+ */
+export function admitFlow(input: {
+  projectId: string;
+  origin: string | null;
+  release: string | null;
+}): FlowRefusal | null {
+  const project = store.projects.get(input.projectId);
+  if (!project) {
+    return null;
+  }
+  const origin = (input.origin ?? "").trim();
+  if (origin !== "" && origin !== "null" && project.allowedOrigins.length > 0) {
+    const matched = matchAllowedOrigin(project.allowedOrigins, origin);
+    if (!matched) {
+      return {
+        status: 403,
+        body: errorBody("proj.origin_not_allowed", "the request origin is not allowed for this project", { origin }),
+      };
+    }
+    if (matched.kind === "preview" && !liveOrigin(project.id, origin)) {
+      return {
+        status: 403,
+        body: errorBody(
+          "proj.preview_not_live",
+          "this preview is no longer live — push the branch again or run `zitadel preview`",
+          { origin },
+        ),
+      };
+    }
+  }
+  const pin = (input.release ?? "").trim();
+  if (pin === "") {
+    return null;
+  }
+  const resolved = resolveRelease(project.id, pin);
+  if (!resolved.ok) {
+    return pin.startsWith("rel_") || !/^(sha256:)?[0-9a-f]{12,}$/i.test(pin)
+      ? { status: 404, body: errorBody("rel.not_found", "release not found", { release: pin }) }
+      : { status: 400, body: errorBody("rel.ambiguous", "the digest matches more than one release", { release: pin }) };
+  }
+  if (resolved.release.revokedAt) {
+    return { status: 409, body: errorBody("rel.revoked", "the release is revoked", { release: pin }) };
+  }
+  if (project.class !== "production") {
+    return null;
+  }
+  const target = origin === "" || origin === "null" ? "" : origin;
+  const deployedHere = [...store.deployments.values()].some(
+    (row) => row.projectId === project.id && row.origin === target && row.releaseId === resolved.release.id,
+  );
+  if (!deployedHere) {
+    return {
+      status: 409,
+      body: errorBody(
+        "rel.not_deployed",
+        "this build pins a release this target no longer serves — redeploy the app",
+        { release: pin, origin: target },
+      ),
+    };
+  }
+  return null;
 }
 
 /** What a read of one owner says: a value, or that a secret is held. */
@@ -751,9 +1215,11 @@ export function setupPlatformHandlers() {
       const project: ProjectRecord = {
         id,
         name: body.data.name,
+        class: "sandbox",
         projectSecret: `sk_proj_${id.replaceAll("-", "")}_full`,
         previewSecret: `sk_proj_${id.replaceAll("-", "")}_preview`,
-        previewOrigins: body.data.preview_origins ?? [],
+        previewToken: `sk_preview_${id.replaceAll("-", "")}`,
+        allowedOrigins: body.data.allowed_origins ?? [],
         createdAt,
         updatedAt: createdAt,
       };
@@ -764,9 +1230,11 @@ export function setupPlatformHandlers() {
       const responseBody: CreateProject201 = {
         id: project.id,
         name: project.name,
+        class: project.class,
         project_secret: project.projectSecret,
         preview_secret: project.previewSecret,
-        preview_origins: project.previewOrigins,
+        preview_token: project.previewToken,
+        allowed_origins: project.allowedOrigins,
         created_at: project.createdAt,
       };
       return HttpResponse.json(responseBody, { status: 201 });
@@ -782,13 +1250,121 @@ export function setupPlatformHandlers() {
       if (!project) {
         return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
       }
-      const responseBody: GetProject200 = {
-        id: project.id,
-        name: project.name,
-        created_at: project.createdAt,
-        updated_at: project.updatedAt,
-      };
-      const out = parse(GetProjectResponse, responseBody, "mock_response_invalid");
+      const out = parse(GetProjectResponse, projectResponse(project), "mock_response_invalid");
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data);
+    }),
+
+    // --- allowlist and class -----------------------------------------------
+    // Patterns are project state, changed deliberately rather than as a side
+    // effect of shipping, and the one write a preview credential must never
+    // be able to make.
+
+    http.post("*/projects/:project_id/allowed_origins", async ({ params, request }) => {
+      const path = parse(AddAllowedOriginParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+      const raw = await readJson(request);
+      if (raw === null) {
+        return HttpResponse.json(INVALID_JSON, { status: 400 });
+      }
+      const body = parse(AddAllowedOriginBody, raw, "invalid_request");
+      if (!body.ok) {
+        return body.response;
+      }
+      const project = store.projects.get(path.data.project_id);
+      if (!project) {
+        return HttpResponse.json(errorBody("proj.not_found", "project not found"), { status: 404 });
+      }
+      if (project.allowedOrigins.some((entry) => entry.pattern === body.data.pattern)) {
+        return HttpResponse.json(errorBody("req.invalid", "the pattern is already allowed"), { status: 400 });
+      }
+      const lint = lintPattern(project.class, body.data.kind, body.data.pattern);
+      if (!lint.ok) {
+        return HttpResponse.json(errorBody(lint.code, lint.message, { pattern: body.data.pattern }), {
+          status: 400,
+        });
+      }
+      project.allowedOrigins.push({ pattern: body.data.pattern, kind: body.data.kind });
+      project.updatedAt = nowIso();
+      const out = parse(
+        AddAllowedOriginResponse,
+        { pattern: body.data.pattern, kind: body.data.kind, check: lint.check },
+        "mock_response_invalid",
+      );
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data, { status: 201 });
+    }),
+
+    http.post("*/projects/:project_id/allowed_origins/remove", async ({ params, request }) => {
+      const path = parse(RemoveAllowedOriginParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+      const raw = await readJson(request);
+      if (raw === null) {
+        return HttpResponse.json(INVALID_JSON, { status: 400 });
+      }
+      const body = parse(RemoveAllowedOriginBody, raw, "invalid_request");
+      if (!body.ok) {
+        return body.response;
+      }
+      const project = store.projects.get(path.data.project_id);
+      if (!project) {
+        return HttpResponse.json(errorBody("proj.not_found", "project not found"), { status: 404 });
+      }
+      const index = project.allowedOrigins.findIndex((entry) => entry.pattern === body.data.pattern);
+      if (index < 0) {
+        return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
+      }
+      project.allowedOrigins.splice(index, 1);
+      project.updatedAt = nowIso();
+      return new HttpResponse(null, { status: 204 });
+    }),
+
+    http.post("*/projects/:project_id/class", async ({ params, request }) => {
+      const path = parse(SetProjectClassParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+      const raw = await readJson(request);
+      if (raw === null) {
+        return HttpResponse.json(INVALID_JSON, { status: 400 });
+      }
+      const body = parse(SetProjectClassBody, raw, "invalid_request");
+      if (!body.ok) {
+        return body.response;
+      }
+      const project = store.projects.get(path.data.project_id);
+      if (!project) {
+        return HttpResponse.json(errorBody("proj.not_found", "project not found"), { status: 404 });
+      }
+      if (body.data.class === "production") {
+        // Promotion re-checks every pattern: what sandbox tolerated has to
+        // pass the production rules before real users can be behind it.
+        const offenders = patternsFailing(project, "production");
+        if (offenders.length > 0) {
+          return HttpResponse.json(
+            errorBody("proj.origin_not_permitted_for_class", "patterns do not pass the production rules", {
+              patterns: offenders,
+            }),
+            { status: 400 },
+          );
+        }
+      } else if (project.class === "production" && !body.data.confirm) {
+        return HttpResponse.json(
+          errorBody("req.invalid", "demoting a production project lets loopback origins back in; confirm it"),
+          { status: 400 },
+        );
+      }
+      project.class = body.data.class;
+      project.updatedAt = nowIso();
+      const out = parse(SetProjectClassResponse, projectResponse(project), "mock_response_invalid");
       if (!out.ok) {
         return out.response;
       }
@@ -1324,6 +1900,442 @@ export function setupPlatformHandlers() {
       return HttpResponse.json(out.data);
     }),
 
+    // --- releases ------------------------------------------------------------
+    // What `zitadel deploy` builds from `.zitadel/` before it deploys.
+
+    http.post("*/releases", async ({ request }) => {
+      const query = parse(CreateReleaseQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const raw = await readJson(request);
+      if (raw === null) {
+        return HttpResponse.json(INVALID_JSON, { status: 400 });
+      }
+      const body = parse(CreateReleaseBody, raw, "invalid_request");
+      if (!body.ok) {
+        return body.response;
+      }
+      const pointers = body.data.pointers.map((p) => ({
+        kind: p.kind,
+        handle: pointerHandle(p.kind, p.revision_id),
+        revision_id: p.revision_id,
+      }));
+      const seen = new Set<string>();
+      for (const pointer of pointers) {
+        const key = `${pointer.kind}/${pointer.handle}`;
+        if (seen.has(key)) {
+          return HttpResponse.json(
+            errorBody("rel.invalid", `a release pins one revision of ${pointer.handle}, not two`),
+            { status: 400 },
+          );
+        }
+        seen.add(key);
+      }
+      const hash = contentHash(pointers);
+      const existing = [...store.releases.values()].find(
+        (r) => r.projectId === query.data.project_id && r.contentHash === hash,
+      );
+      if (existing) {
+        const out = parse(CreateReleaseResponse, releaseResponse(existing), "mock_response_invalid");
+        return out.ok ? HttpResponse.json(out.data, { status: 200 }) : out.response;
+      }
+      const release: ReleaseRecord = {
+        id: `rel_${shortId()}`,
+        projectId: query.data.project_id,
+        contentHash: hash,
+        pointers,
+        message: body.data.message,
+        gitSha: body.data.git_sha,
+        gitDirty: body.data.git_dirty,
+        createdAt: nowIso(),
+        seq: ++store.lastSeq,
+      };
+      store.releases.set(release.id, release);
+      const out = parse(CreateReleaseResponse, releaseResponse(release), "mock_response_invalid");
+      return out.ok ? HttpResponse.json(out.data, { status: 201 }) : out.response;
+    }),
+
+    http.get("*/releases", ({ request }) => {
+      const { limit, ...rest } = queryRecord(request);
+      const query = parse(
+        ListReleasesQueryParams,
+        { ...rest, ...(limit === undefined ? {} : { limit: Number(limit) }) },
+        "invalid_query",
+      );
+      if (!query.ok) {
+        return query.response;
+      }
+      const releases = [...store.releases.values()]
+        .filter((r) => r.projectId === query.data.project_id)
+        .sort((a, b) => b.seq - a.seq)
+        .slice(0, query.data.limit)
+        .map((r) => {
+          const { pointers: _pointers, ...summary } = releaseResponse(r);
+          return summary;
+        });
+      const out = parse(ListReleasesResponse, { releases, next_page_token: null }, "mock_response_invalid");
+      return out.ok ? HttpResponse.json(out.data) : out.response;
+    }),
+
+    http.get("*/releases/:release_id", ({ params, request }) => {
+      const path = parse(GetReleaseByIdParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+      const query = parse(GetReleaseByIdQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const release = store.releases.get(path.data.release_id);
+      if (!release || release.projectId !== query.data.project_id) {
+        return HttpResponse.json(errorBody("rel.not_found", "release not found"), { status: 404 });
+      }
+      const out = parse(GetReleaseByIdResponse, releaseResponse(release), "mock_response_invalid");
+      return out.ok ? HttpResponse.json(out.data) : out.response;
+    }),
+
+    http.post("*/releases/:release_id/revoke", ({ params, request }) => {
+      const path = parse(RevokeReleaseParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+      const query = parse(RevokeReleaseQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const release = store.releases.get(path.data.release_id);
+      if (!release || release.projectId !== query.data.project_id) {
+        return HttpResponse.json(errorBody("rel.not_found", "release not found"), { status: 404 });
+      }
+      release.revokedAt ??= nowIso();
+      const out = parse(RevokeReleaseResponse, releaseResponse(release), "mock_response_invalid");
+      return out.ok ? HttpResponse.json(out.data) : out.response;
+    }),
+
+    // --- deployments ---------------------------------------------------------
+    // Append-only. What a target serves is its newest row; a deploy writes
+    // one row per target under one deploy id, and rolling back appends too.
+
+    http.post("*/deployments/rollback", async ({ request }) => {
+      const query = parse(RollbackDeploymentQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const raw = (await readJson(request)) ?? {};
+      const body = parse(RollbackDeploymentBody, raw, "invalid_request");
+      if (!body.ok) {
+        return body.response;
+      }
+      const projectId = query.data.project_id;
+      if (!store.projects.has(projectId)) {
+        return HttpResponse.json(errorBody("proj.not_found", "project not found"), { status: 404 });
+      }
+      const history = deploymentHistory(projectId);
+      const undoneId = body.data.deploy_id ?? history[0]?.deployId;
+      if (!undoneId) {
+        return HttpResponse.json(errorBody("dep.not_found", "nothing has been deployed"), { status: 404 });
+      }
+      const undone = history
+        .filter(
+          (row) =>
+            row.deployId === undoneId &&
+            (body.data.origin === undefined || body.data.origin === null || row.origin === body.data.origin),
+        )
+        .sort((a, b) => a.seq - b.seq);
+      if (undone.length === 0) {
+        return HttpResponse.json(errorBody("dep.not_found", "deployment not found"), { status: 404 });
+      }
+      const deployId = `dpl_${shortId()}`;
+      const warnings: string[] = [];
+      const rows: DeploymentRecord[] = [];
+      for (const row of undone) {
+        // The release the target served before this deploy: the newest
+        // earlier row naming a different release, values and all.
+        const previous = history.find(
+          (candidate) =>
+            candidate.origin === row.origin && candidate.seq < row.seq && candidate.releaseId !== row.releaseId,
+        );
+        if (!previous) {
+          warnings.push(`${row.origin || "(default)"} has no earlier release and was left as it is`);
+          continue;
+        }
+        rows.push(
+          appendDeployment({
+            projectId,
+            deployId,
+            origin: row.origin,
+            releaseId: previous.releaseId,
+            reason: "rollback",
+            message: body.data.message,
+            rollbackOf: undoneId,
+            variables: previous.variables,
+          }),
+        );
+      }
+      const out = parse(
+        RollbackDeploymentResponse,
+        deployResponse(deployId, rows[0]?.releaseId ?? undone[0]?.releaseId ?? "", rows, warnings),
+        "mock_response_invalid",
+      );
+      return out.ok ? HttpResponse.json(out.data, { status: 201 }) : out.response;
+    }),
+
+    http.post("*/deployments", async ({ request }) => {
+      const query = parse(CreateDeploymentQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const raw = await readJson(request);
+      if (raw === null) {
+        return HttpResponse.json(INVALID_JSON, { status: 400 });
+      }
+      const body = parse(CreateDeploymentBody, raw, "invalid_request");
+      if (!body.ok) {
+        return body.response;
+      }
+      const project = store.projects.get(query.data.project_id);
+      if (!project) {
+        return HttpResponse.json(errorBody("proj.not_found", "project not found"), { status: 404 });
+      }
+      const resolved = resolveRelease(project.id, body.data.release);
+      if (!resolved.ok) {
+        return resolved.response;
+      }
+      const release = resolved.release;
+      if (release.revokedAt) {
+        return HttpResponse.json(errorBody("rel.revoked", "the release is revoked"), { status: 409 });
+      }
+
+      // Expansion: `default` is "", `primary` is every literal primary
+      // pattern, and an exact origin has to be admitted by a pattern. Which
+      // kind admitted it decides the verb: a preview run writes rows for
+      // preview URLs only, and nothing else writes one.
+      const targets: string[] = [];
+      let preview = false;
+      let production = false;
+      for (const target of body.data.targets) {
+        if (target === "default") {
+          targets.push("");
+          production = true;
+          continue;
+        }
+        if (target === "primary") {
+          for (const entry of project.allowedOrigins) {
+            if (entry.kind === "primary" && !entry.pattern.includes("*")) {
+              targets.push(entry.pattern);
+            }
+          }
+          production = true;
+          continue;
+        }
+        const matched = matchAllowedOrigin(project.allowedOrigins, target);
+        if (!matched && !(project.class === "sandbox" && project.allowedOrigins.length === 0)) {
+          return HttpResponse.json(
+            errorBody("proj.origin_not_allowed", "the origin matches no allowed pattern", { origin: target }),
+            { status: 403 },
+          );
+        }
+        if (matched?.kind === "preview") {
+          preview = true;
+        } else {
+          production = true;
+        }
+        targets.push(target);
+      }
+      if (preview && production) {
+        return HttpResponse.json(
+          errorBody("dep.invalid", "a preview deploy may not also move the default or a primary origin"),
+          { status: 400 },
+        );
+      }
+      if (preview && body.data.ttl_seconds === undefined) {
+        return HttpResponse.json(errorBody("dep.invalid", "a preview target needs ttl_seconds"), { status: 400 });
+      }
+      if (!preview && body.data.ttl_seconds !== undefined) {
+        return HttpResponse.json(
+          errorBody("dep.invalid", "ttl_seconds only applies to preview targets"),
+          { status: 400 },
+        );
+      }
+      const unique = [...new Set(targets)];
+
+      const expected = body.data.expected_deployment_id;
+      if (expected) {
+        const current = newestDeployment(project.id, unique[0] ?? "");
+        if (current?.id !== expected) {
+          return HttpResponse.json(
+            errorBody("dep.conflict", "the target's newest deployment is not the expected one", {
+              current_deployment_id: current?.id ?? "",
+              current_release_id: current?.releaseId ?? "",
+            }),
+            { status: 409 },
+          );
+        }
+      }
+
+      const frozen = frozenVariables(project.id, preview);
+      const current = unique.map((origin) => newestDeployment(project.id, origin));
+      const unchanged = current.every(
+        (row) => row !== undefined && row.releaseId === release.id && sameVariables(row.variables, frozen.values),
+      );
+      if (unchanged) {
+        const rows = current as DeploymentRecord[];
+        const out = parse(
+          CreateDeploymentResponse,
+          deployResponse(rows[0]?.deployId ?? "", release.id, rows, frozen.warnings),
+          "mock_response_invalid",
+        );
+        return out.ok ? HttpResponse.json(out.data, { status: 200 }) : out.response;
+      }
+
+      const deployId = `dpl_${shortId()}`;
+      const rows = unique.map((origin) =>
+        appendDeployment({
+          projectId: project.id,
+          deployId,
+          origin,
+          releaseId: release.id,
+          reason: body.data.reason ?? "deploy",
+          message: body.data.message,
+          variables: frozen.values,
+        }),
+      );
+      if (preview) {
+        const expiresAt = new Date(Date.now() + (body.data.ttl_seconds ?? 0) * 1000).toISOString();
+        for (const origin of unique) {
+          const key = originKey(project.id, origin);
+          const createdAt = store.origins.get(key)?.createdAt ?? nowIso();
+          store.origins.set(key, { projectId: project.id, origin, expiresAt, createdAt });
+        }
+      }
+      const out = parse(
+        CreateDeploymentResponse,
+        deployResponse(deployId, release.id, rows, frozen.warnings),
+        "mock_response_invalid",
+      );
+      return out.ok ? HttpResponse.json(out.data, { status: 201 }) : out.response;
+    }),
+
+    http.get("*/deployments", ({ request }) => {
+      const { limit, live, expand, ...rest } = queryRecord(request);
+      const query = parse(
+        ListDeploymentsQueryParams,
+        {
+          ...rest,
+          ...(limit === undefined ? {} : { limit: Number(limit) }),
+          ...(live === undefined ? {} : { live: live === "true" }),
+          ...(expand === undefined ? {} : { expand: expand.split(",") }),
+        },
+        "invalid_query",
+      );
+      if (!query.ok) {
+        return query.response;
+      }
+      let rows = deploymentHistory(query.data.project_id);
+      if (query.data.origin !== undefined) {
+        rows = rows.filter((row) => row.origin === query.data.origin);
+      }
+      if (query.data.deploy_id !== undefined) {
+        rows = rows.filter((row) => row.deployId === query.data.deploy_id);
+      }
+      if (query.data.live) {
+        const seen = new Set<string>();
+        rows = rows.filter((row) => {
+          if (seen.has(row.origin)) {
+            return false;
+          }
+          seen.add(row.origin);
+          return true;
+        });
+      }
+      const expandRelease = query.data.expand?.includes("release") ?? false;
+      const start = query.data.page_token === undefined ? 0 : Number(query.data.page_token);
+      if (!Number.isInteger(start) || start < 0) {
+        return HttpResponse.json(errorBody("req.invalid", "invalid page token"), { status: 400 });
+      }
+      const page = rows.slice(start, start + query.data.limit);
+      const next = start + query.data.limit < rows.length ? String(start + query.data.limit) : null;
+      const out = parse(
+        ListDeploymentsResponse,
+        {
+          deployments: page.map((row) => deploymentResponse(row, { live: query.data.live, expandRelease })),
+          next_page_token: next,
+        },
+        "mock_response_invalid",
+      );
+      return out.ok ? HttpResponse.json(out.data) : out.response;
+    }),
+
+    http.get("*/deployments/:deployment_id/variables", ({ params, request }) => {
+      const path = parse(GetDeploymentVariablesParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+      const query = parse(GetDeploymentVariablesQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const row = store.deployments.get(path.data.deployment_id);
+      if (!row || row.projectId !== query.data.project_id) {
+        return HttpResponse.json(errorBody("dep.not_found", "deployment not found"), { status: 404 });
+      }
+      const out = parse(GetDeploymentVariablesResponse, variablesResponse(row.variables), "mock_response_invalid");
+      return out.ok ? HttpResponse.json(out.data) : out.response;
+    }),
+
+    http.get("*/deployments/:deployment_id", ({ params, request }) => {
+      const path = parse(GetDeploymentByIdParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+      const query = parse(GetDeploymentByIdQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const row = store.deployments.get(path.data.deployment_id);
+      if (!row || row.projectId !== query.data.project_id) {
+        return HttpResponse.json(errorBody("dep.not_found", "deployment not found"), { status: 404 });
+      }
+      const out = parse(GetDeploymentByIdResponse, deploymentResponse(row), "mock_response_invalid");
+      return out.ok ? HttpResponse.json(out.data) : out.response;
+    }),
+
+    // --- live preview origins ----------------------------------------------
+
+    http.get("*/origins", ({ request }) => {
+      const query = parse(ListOriginsQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const now = Date.now();
+      const origins = [...store.origins.values()]
+        .filter((row) => row.projectId === query.data.project_id && new Date(row.expiresAt).getTime() > now)
+        .map((row) => ({ origin: row.origin, expires_at: row.expiresAt, created_at: row.createdAt }));
+      const out = parse(ListOriginsResponse, { origins }, "mock_response_invalid");
+      return out.ok ? HttpResponse.json(out.data) : out.response;
+    }),
+
+    http.post("*/origins/remove", async ({ request }) => {
+      const query = parse(RemoveOriginQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const raw = await readJson(request);
+      if (raw === null) {
+        return HttpResponse.json(INVALID_JSON, { status: 400 });
+      }
+      const body = parse(RemoveOriginBody, raw, "invalid_request");
+      if (!body.ok) {
+        return body.response;
+      }
+      const key = originKey(query.data.project_id, body.data.origin);
+      if (!store.origins.has(key)) {
+        return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
+      }
+      store.origins.delete(key);
+      return new HttpResponse(null, { status: 204 });
+    }),
     // --- variables ---------------------------------------------------------
     // Where a connection's `${{ NAME }}` references resolve from. The CLI
     // publishes the client id and secret here, so without them a scaffolded
@@ -1334,7 +2346,7 @@ export function setupPlatformHandlers() {
       if (!query.ok) {
         return query.response;
       }
-      const owner = variableOwner(query.data.project_id, query.data.environment_name);
+      const owner = variableOwner(query.data.project_id, query.data.applies_to);
       const owned = store.variables.get(owner) ?? new Map<string, VariableRecord>();
       const out = parse(GetVariablesResponse, variablesResponse(owned), "mock_response_invalid");
       if (!out.ok) {
@@ -1343,10 +2355,9 @@ export function setupPlatformHandlers() {
       return HttpResponse.json(out.data);
     }),
 
-    // One variable by name, which `variables get` and `variables delete`
-    // address directly. A variable belongs to the owner that entered it, so a
-    // name another owner of the same project holds answers `var.not_found`
-    // and leaves that owner's value standing.
+    // One variable by name, which `vars get` and `vars rm` address directly.
+    // A name with no value in the addressed bucket answers `var.not_found`
+    // and leaves the other bucket's value standing.
     http.get("*/variables/:variableName", ({ request, params }) => {
       const path = parse(
         GetVariableParams,
@@ -1360,7 +2371,7 @@ export function setupPlatformHandlers() {
       if (!query.ok) {
         return query.response;
       }
-      const owner = variableOwner(query.data.project_id, query.data.environment_name);
+      const owner = variableOwner(query.data.project_id, query.data.applies_to);
       const held = store.variables.get(owner)?.get(path.data.variable_name);
       if (held === undefined) {
         return HttpResponse.json(errorBody("var.not_found", "variable not found"), { status: 404 });
@@ -1386,7 +2397,7 @@ export function setupPlatformHandlers() {
       if (!query.ok) {
         return query.response;
       }
-      const owner = variableOwner(query.data.project_id, query.data.environment_name);
+      const owner = variableOwner(query.data.project_id, query.data.applies_to);
       const owned = store.variables.get(owner);
       const name = path.data.variable_name;
       if (owned?.has(name) !== true) {
@@ -1411,7 +2422,7 @@ export function setupPlatformHandlers() {
         return body.response;
       }
 
-      const owner = variableOwner(query.data.project_id, query.data.environment_name);
+      const owner = variableOwner(query.data.project_id, query.data.applies_to);
       const owned = store.variables.get(owner) ?? new Map<string, VariableRecord>();
       // RFC 7386: a name present is written, `null` removes it, and a name
       // absent is left alone.
@@ -1426,13 +2437,14 @@ export function setupPlatformHandlers() {
         }
       }
       store.variables.set(owner, owned);
-      // 200 with the addressed owner read back, so the response also carries
-      // what that owner held and this write did not touch.
+      // 200 with the addressed bucket read back, so the response also carries
+      // what it held and this write did not touch.
       const out = parse(UpdateVariablesResponse, variablesResponse(owned), "mock_response_invalid");
       if (!out.ok) {
         return out.response;
       }
       return HttpResponse.json(out.data);
     }),
+
   ];
 }

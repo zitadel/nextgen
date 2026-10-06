@@ -3,6 +3,7 @@ import { join } from "node:path";
 
 import { ZitadelError } from "./errors";
 import { isObject, parseJsonObject, stableStringify } from "./json";
+import { readScaffoldManifest } from "./scaffold-manifest";
 import { DEFAULT_SERVER } from "./server";
 
 /**
@@ -41,8 +42,10 @@ async function exists(path: string): Promise<boolean> {
 export type ZitadelSecret = {
   project_id: string;
   project_secret: string;
-  preview_secret: string;
-  preview_origins: string[];
+  /** The publishable key a browser bundle ships with. */
+  preview_secret?: string;
+  /** The credential a pull-request build deploys previews with. */
+  preview_token?: string;
   created_at: string;
   /**
    * When the project was attached to an owning team, recorded by
@@ -87,12 +90,7 @@ export async function readZitadelSecret(cwd: string): Promise<ZitadelSecret> {
       await readFile(join(cwd, ".zitadel/secret"), "utf8"),
       ".zitadel/secret",
     );
-    if (
-      typeof secret.project_id !== "string" ||
-      typeof secret.project_secret !== "string" ||
-      typeof secret.preview_secret !== "string" ||
-      !Array.isArray(secret.preview_origins)
-    ) {
+    if (typeof secret.project_id !== "string" || typeof secret.project_secret !== "string") {
       throw new Error(".zitadel/secret is missing required fields");
     }
     return secret as ZitadelSecret;
@@ -173,13 +171,13 @@ export function readProjectServer(config: Record<string, unknown>): string {
   return typeof config.server === "string" ? config.server : DEFAULT_SERVER;
 }
 
-/** Reads `environments.development.issuer` from a parsed `zitadel.json`, if present. */
-export function readDevelopmentIssuer(config: Record<string, unknown>): string | undefined {
-  if (isObject(config.environments) && isObject(config.environments.development)) {
-    const issuer = config.environments.development.issuer;
-    return typeof issuer === "string" ? issuer : undefined;
-  }
-  return undefined;
+/**
+ * The origin the scaffolded app runs on locally, from the dev port the
+ * scaffold manifest recorded. Undefined for a project set up without one.
+ */
+export async function readDevelopmentIssuer(cwd: string): Promise<string | undefined> {
+  const scaffold = await readScaffoldManifest(cwd);
+  return typeof scaffold?.dev_port === "number" ? `http://localhost:${scaffold.dev_port}` : undefined;
 }
 
 function isNotFound(error: unknown): boolean {

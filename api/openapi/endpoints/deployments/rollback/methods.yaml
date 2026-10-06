@@ -1,0 +1,35 @@
+post:
+  operationId: rollbackDeployment
+  summary: Roll a deploy back
+  description: |
+    Undoes one deploy: for every target that deploy moved, appends a row
+    naming the release that target served before it, under a new `deploy_id`
+    with `reason: rollback` and `rollback_of` set. Bare, it undoes the newest
+    deploy of the project; `deploy_id` names an earlier one to re-apply, and
+    `origin` narrows the undo to one target.
+
+    A target the undone deploy created has no earlier release and is left as
+    it is; it is named in `warnings`. The frozen values of the restored
+    deployment travel with it.
+  tags:
+    - Deployments
+  parameters:
+    - $ref: ../../../components/parameters/project-id.yaml
+  security:
+    - oauth2:
+        - deployment.write
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: rollback-request.yaml
+  responses:
+    '201':
+      description: The rollback rows were written.
+      content:
+        application/json:
+          schema:
+            $ref: ../deploy-response.yaml
+    default:
+      $ref: rollbackDeployment-error-response.yaml

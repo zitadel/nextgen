@@ -41,7 +41,7 @@ const SECRET = {
   project_id: "proj-001",
   project_secret: "sk_proj_test",
   preview_secret: "sk_proj_preview",
-  preview_origins: [],
+  preview_token: "sk_proj_preview_token",
   // Recent, so the claim window reads as open; the closed-window test writes
   // its own stale timestamp.
   created_at: new Date(Date.now() - 60_000).toISOString(),
@@ -77,7 +77,7 @@ async function makeProject(): Promise<string> {
   await writeFile(join(cwd, ".gitignore"), [".zitadel/secret", ".env*", "!.env.example"].join("\n"));
   await writeFile(
     join(cwd, ".env.example"),
-    ["ZITADEL_PROJECT_ID=", "ZITADEL_ENVIRONMENT=", "ZITADEL_ISSUER="].join("\n"),
+    ["ZITADEL_URL=", "ZITADEL_PROJECT_ID=", "ZITADEL_PUBLISHABLE_KEY="].join("\n"),
   );
   await writeFile(join(cwd, ".zitadel/schemas/user.json"), JSON.stringify(VALID_USER_SCHEMA));
   await writeFile(join(cwd, "app/login/page.tsx"), `${MANAGED_MARKER}\nexport default function L() {}\n`);
@@ -286,7 +286,7 @@ describe("EnvExampleCheck", () => {
 
     expect((await check.run(ctxFor(cwd))).status).toBe("pass");
     const contents = await readFile(join(cwd, ".env.example"), "utf8");
-    expect(contents).toContain("ZITADEL_ISSUER=");
+    expect(contents).toContain("ZITADEL_PUBLISHABLE_KEY=");
   });
 
   it("fix is a no-op under dryRun", async () => {
@@ -648,17 +648,7 @@ describe("ManagedFilesCheck", () => {
       join(cwd, "package.json"),
       JSON.stringify({ ...pkg, scripts: { dev: devScript } }),
     );
-    const config = JSON.parse(await readFile(join(cwd, "zitadel.json"), "utf8")) as Record<
-      string,
-      unknown
-    >;
-    await writeFile(
-      join(cwd, "zitadel.json"),
-      JSON.stringify({
-        ...config,
-        environments: { development: { issuer: `http://localhost:${String(issuerPort)}` } },
-      }),
-    );
+    await writeScaffoldState(cwd, { files: {}, dev_port: issuerPort });
     return cwd;
   }
 
@@ -1125,8 +1115,7 @@ describe("loadPatchContext", () => {
     expect(ctx.preset).toBe("passkey-first");
     expect(ctx.useCase).toBe("consumer");
     expect(ctx.scaffoldedFramework).toBe(true);
-    // The config issuer still wins over the manifest port.
-    expect(ctx.issuer).toBe("http://localhost:3000");
+    expect(ctx.issuer).toBe("http://localhost:3005");
   });
 
   it("falls back to the manifest dev_port for the issuer", async () => {

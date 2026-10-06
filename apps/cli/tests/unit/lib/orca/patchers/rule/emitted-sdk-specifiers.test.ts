@@ -55,7 +55,7 @@ function baseContext(frameworkId: string, overrides: Partial<PatchContext> = {})
       id: "proj-1",
       project_secret: "sk_full",
       preview_secret: "sk_preview",
-      preview_origins: [],
+      preview_token: "sk_proj_preview_token",
       created_at: "2026-01-01T00:00:00.000Z",
     },
     issuer: "http://localhost:3000",

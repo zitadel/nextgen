@@ -24,9 +24,12 @@ const (
 	TokenTypeJWTProfile
 	// TokenTypeProjectToken is the confidential-plane project secret (ADR 036)
 	TokenTypeProjectToken
-	// TokenTypeProjectPreview is the read-only preview credential issued
-	// alongside the project secret.
+	// TokenTypeProjectPreview is the publishable key: the read-only public
+	// credential issued alongside the project secret.
 	TokenTypeProjectPreview
+	// TokenTypeProjectPreviewDeploy is the credential a pull-request build
+	// holds: releases and preview deploys only.
+	TokenTypeProjectPreviewDeploy
 )
 
 // Persistable reports whether t may be written to the tokens table.
@@ -50,6 +53,8 @@ func (t TokenType) Persistable() bool {
 		return true
 	case TokenTypeProjectPreview:
 		return true
+	case TokenTypeProjectPreviewDeploy:
+		return true
 	default:
 		return false
 	}
@@ -59,7 +64,7 @@ func (t TokenType) Persistable() bool {
 // TokenTypeJWTProfile may be presented as a bearer (see its const comment) but
 // is not a project secret and must not take that path.
 func (t TokenType) IsProjectSecret() bool {
-	return t == TokenTypeProjectToken || t == TokenTypeProjectPreview
+	return t == TokenTypeProjectToken || t == TokenTypeProjectPreview || t == TokenTypeProjectPreviewDeploy
 }
 
 func (t TokenType) Value() (driver.Value, error) {

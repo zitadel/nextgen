@@ -8,45 +8,51 @@ import (
 )
 
 func TestNewDeploymentValidates(t *testing.T) {
-	t.Run("deploy", func(t *testing.T) {
-		entity, err := NewDeployment("proj_1", "env_1", "rel_1", DeploymentMetadata{Reason: DeploymentReasonDeploy, SourceEnvironmentID: nil})
+	t.Run("deploy to the project default", func(t *testing.T) {
+		entity, err := NewDeployment("proj_1", "", "rel_1", DeploymentMetadata{Reason: DeploymentReasonDeploy})
 		require.NoError(t, err)
 		assert.Empty(t, entity.ID, "the id is the dialect's to mint")
+		assert.Empty(t, entity.Origin)
 		assert.True(t, entity.DeployedAt.IsZero(), "deployed_at is the insert's to stamp")
 	})
 
-	t.Run("promote requires a source", func(t *testing.T) {
-		_, err := NewDeployment("proj_1", "env_1", "rel_1", DeploymentMetadata{Reason: DeploymentReasonPromote, SourceEnvironmentID: nil})
-		assertDeploymentInvalid(t, err)
-
-		_, err = NewDeployment("proj_1", "env_1", "rel_1", DeploymentMetadata{Reason: DeploymentReasonPromote, SourceEnvironmentID: new(" ")})
-		assertDeploymentInvalid(t, err)
-
-		entity, err := NewDeployment("proj_1", "env_1", "rel_1", DeploymentMetadata{Reason: DeploymentReasonPromote, SourceEnvironmentID: new("env_2")})
+	t.Run("deploy to an origin normalises it", func(t *testing.T) {
+		entity, err := NewDeployment("proj_1", "HTTPS://App.Acme.com", "rel_1", DeploymentMetadata{})
 		require.NoError(t, err)
-		assert.Equal(t, "env_2", *entity.Metadata.SourceEnvironmentID)
+		assert.Equal(t, "https://app.acme.com", entity.Origin)
 	})
 
-	// The field means "where it was promoted from", so a non-promotion
+	t.Run("an origin that is not one is rejected", func(t *testing.T) {
+		_, err := NewDeployment("proj_1", "app.acme.com/login", "rel_1", DeploymentMetadata{})
+		assertDeploymentInvalid(t, err)
+	})
+
+	t.Run("rollback requires rollback_of", func(t *testing.T) {
+		_, err := NewDeployment("proj_1", "", "rel_1", DeploymentMetadata{Reason: DeploymentReasonRollback})
+		assertDeploymentInvalid(t, err)
+
+		_, err = NewDeployment("proj_1", "", "rel_1", DeploymentMetadata{Reason: DeploymentReasonRollback, RollbackOf: new(" ")})
+		assertDeploymentInvalid(t, err)
+
+		entity, err := NewDeployment("proj_1", "", "rel_1", DeploymentMetadata{Reason: DeploymentReasonRollback, RollbackOf: new("dpl_2")})
+		require.NoError(t, err)
+		assert.Equal(t, "dpl_2", *entity.Metadata.RollbackOf)
+	})
+
+	// The field means "the deploy this one reversed", so a non-rollback
 	// carrying one is rejected rather than silently dropped.
-	t.Run("deploy and rollback reject a source", func(t *testing.T) {
-		_, err := NewDeployment("proj_1", "env_1", "rel_1", DeploymentMetadata{Reason: DeploymentReasonDeploy, SourceEnvironmentID: new("env_2")})
-		assertDeploymentInvalid(t, err)
-
-		_, err = NewDeployment("proj_1", "env_1", "rel_1", DeploymentMetadata{Reason: DeploymentReasonRollback, SourceEnvironmentID: new("env_2")})
+	t.Run("deploy rejects rollback_of", func(t *testing.T) {
+		_, err := NewDeployment("proj_1", "", "rel_1", DeploymentMetadata{Reason: DeploymentReasonDeploy, RollbackOf: new("dpl_2")})
 		assertDeploymentInvalid(t, err)
 	})
 
-	t.Run("missing references", func(t *testing.T) {
-		_, err := NewDeployment("proj_1", "", "rel_1", DeploymentMetadata{Reason: DeploymentReasonDeploy, SourceEnvironmentID: nil})
-		assertDeploymentInvalid(t, err)
-
-		_, err = NewDeployment("proj_1", "env_1", " ", DeploymentMetadata{Reason: DeploymentReasonDeploy, SourceEnvironmentID: nil})
+	t.Run("missing release", func(t *testing.T) {
+		_, err := NewDeployment("proj_1", "", " ", DeploymentMetadata{Reason: DeploymentReasonDeploy})
 		assertDeploymentInvalid(t, err)
 	})
 
 	t.Run("unknown reason", func(t *testing.T) {
-		_, err := NewDeployment("proj_1", "env_1", "rel_1", DeploymentMetadata{Reason: DeploymentReason(99), SourceEnvironmentID: nil})
+		_, err := NewDeployment("proj_1", "", "rel_1", DeploymentMetadata{Reason: DeploymentReason(99)})
 		assertDeploymentInvalid(t, err)
 	})
 }

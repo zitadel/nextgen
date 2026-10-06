@@ -1,0 +1,118 @@
+-- +goose Up
+-- Deployments key on an origin string rather than on an environment row, and
+-- the newest row per origin is what that target serves. Nothing points at a
+-- deployment, so the environments table and its pointer column go.
+DROP TABLE IF EXISTS zitadel_nextgen.deployments;
+DROP TABLE IF EXISTS zitadel_nextgen.variables;
+DROP TABLE IF EXISTS zitadel_nextgen.environments;
+
+-- The origin allowlist: patterns with a kind. A primary pattern admits
+-- requests; a preview pattern only bounds what a preview deploy may register.
+-- The class decides which patterns the list accepts.
+ALTER TABLE zitadel_nextgen.projects DROP COLUMN IF EXISTS preview_origins;
+ALTER TABLE zitadel_nextgen.projects ADD COLUMN allowed_origins JSONB NOT NULL DEFAULT '[]'::jsonb
+    CHECK (jsonb_typeof(allowed_origins) = 'array');
+ALTER TABLE zitadel_nextgen.projects ADD COLUMN class TEXT COLLATE "C" NOT NULL DEFAULT 'sandbox'
+    CHECK (class IN ('sandbox', 'production'));
+
+-- The operator's hard stop: a revoked release is refused on every path.
+ALTER TABLE zitadel_nextgen.releases ADD COLUMN revoked_at TIMESTAMPTZ;
+
+-- One row per live preview URL. The row is what admits a request from the
+-- URL; a primary hostname has no row, since the pattern admits it and the
+-- deployment history already says what it serves.
+CREATE TABLE zitadel_nextgen.origins (
+    project_id TEXT COLLATE "C" NOT NULL
+        REFERENCES zitadel_nextgen.projects (id) ON DELETE CASCADE
+    , origin TEXT COLLATE "C" NOT NULL CHECK (origin <> '')
+    , expires_at TIMESTAMPTZ NOT NULL
+    , created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+
+    , PRIMARY KEY (project_id, origin)
+);
+
+CREATE INDEX idx_origins_expires_at ON zitadel_nextgen.origins (expires_at);
+
+-- Append-only: deploy and rollback both insert, nothing updates. origin is a
+-- plain string with no foreign key, so a retired preview keeps its history;
+-- '' is the project default. deploy_id correlates the rows one deploy wrote.
+CREATE TABLE zitadel_nextgen.deployments (
+    project_id TEXT COLLATE "C" NOT NULL
+        REFERENCES zitadel_nextgen.projects (id) ON DELETE CASCADE
+    , id TEXT COLLATE "C" NOT NULL CHECK (id <> '')
+    , deploy_id TEXT COLLATE "C" NOT NULL CHECK (deploy_id <> '')
+    , origin TEXT COLLATE "C" NOT NULL DEFAULT ''
+    , release_id TEXT COLLATE "C" NOT NULL
+    , metadata JSONB NOT NULL
+        CHECK (jsonb_typeof(metadata) = 'object')
+    -- clock_timestamp() rather than now(): now() is fixed at transaction
+    -- start, and the deploy's transaction can begin before it waits on the
+    -- project row lock.
+    , deployed_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
+
+    , PRIMARY KEY (project_id, id)
+    -- NO ACTION rather than CASCADE: a release named by any deployment row
+    -- must not be collected, so the newest row for a target can never name a
+    -- release that has gone. NO ACTION is checked at the end of the whole
+    -- statement, so a project delete that removes both still passes.
+    , FOREIGN KEY (project_id, release_id)
+        REFERENCES zitadel_nextgen.releases (project_id, id) ON DELETE NO ACTION
+);
+
+-- A target's history lists newest-first by keyset; id breaks deployed_at
+-- ties. The first row under this order is what the target serves.
+CREATE INDEX idx_deployments_project_origin_deployed_at
+    ON zitadel_nextgen.deployments (project_id, origin, deployed_at DESC, id DESC);
+
+CREATE INDEX idx_deployments_project_deploy_id
+    ON zitadel_nextgen.deployments (project_id, deploy_id);
+
+-- The unfiltered project-wide audit list.
+CREATE INDEX idx_deployments_project_deployed_at
+    ON zitadel_nextgen.deployments (project_id, deployed_at DESC, id DESC);
+
+-- One row per variable value. applies_to says whether the value is for every
+-- deploy or the override a preview deploy prefers; two rows per name is the
+-- maximum.
+CREATE TABLE zitadel_nextgen.variables (
+    project_id TEXT NOT NULL CHECK (project_id <> '')
+        REFERENCES zitadel_nextgen.projects (id) ON DELETE CASCADE
+    , name TEXT NOT NULL CHECK (name <> '')
+    , applies_to TEXT COLLATE "C" NOT NULL DEFAULT 'all'
+        CHECK (applies_to IN ('all', 'preview'))
+    , value JSONB NOT NULL
+    , is_secret BOOLEAN NOT NULL DEFAULT FALSE
+    , created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    , modified_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+
+    , PRIMARY KEY (project_id, name, applies_to)
+);
+
+-- The values one deployment runs, frozen when the row was written and never
+-- updated. Same columns as the store, so a secret is copied as the
+-- ciphertext it already is.
+CREATE TABLE zitadel_nextgen.deployment_variables (
+    project_id TEXT COLLATE "C" NOT NULL
+    , deployment_id TEXT COLLATE "C" NOT NULL
+    , name TEXT NOT NULL CHECK (name <> '')
+    , value JSONB NOT NULL
+    , is_secret BOOLEAN NOT NULL DEFAULT FALSE
+
+    , PRIMARY KEY (project_id, deployment_id, name)
+    , FOREIGN KEY (project_id, deployment_id)
+        REFERENCES zitadel_nextgen.deployments (project_id, id) ON DELETE CASCADE
+);
+
+-- +goose Down
+DROP TABLE IF EXISTS zitadel_nextgen.deployment_variables;
+DROP TABLE IF EXISTS zitadel_nextgen.variables;
+DROP INDEX IF EXISTS zitadel_nextgen.idx_deployments_project_deployed_at;
+DROP INDEX IF EXISTS zitadel_nextgen.idx_deployments_project_deploy_id;
+DROP INDEX IF EXISTS zitadel_nextgen.idx_deployments_project_origin_deployed_at;
+DROP TABLE IF EXISTS zitadel_nextgen.deployments;
+DROP INDEX IF EXISTS zitadel_nextgen.idx_origins_expires_at;
+DROP TABLE IF EXISTS zitadel_nextgen.origins;
+ALTER TABLE zitadel_nextgen.releases DROP COLUMN IF EXISTS revoked_at;
+ALTER TABLE zitadel_nextgen.projects DROP COLUMN IF EXISTS class;
+ALTER TABLE zitadel_nextgen.projects DROP COLUMN IF EXISTS allowed_origins;
+ALTER TABLE zitadel_nextgen.projects ADD COLUMN preview_origins TEXT[] NOT NULL DEFAULT '{}';

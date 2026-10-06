@@ -182,6 +182,14 @@ export class ZitadelLogin extends ZitadelSurface {
   @property({ type: String }) accessor url = "";
 
   /**
+   * The release this bundle was built against, sent as `X-Zitadel-Release`
+   * when the flow starts. The server selects it among the releases already
+   * deployed to this page's origin; it never deploys one. Optional — unset,
+   * the origin's newest deployment is served.
+   */
+  @property({ type: String }) accessor release = "";
+
+  /**
    * URL to navigate to after a successful embedded sign-in. When set, the
    * orchestrator exchanges the terminal `handoff_token` via the generated
    * API client (setting the session cookie) and then performs a full
@@ -669,7 +677,12 @@ export class ZitadelLogin extends ZitadelSurface {
 
   /** Declarative config read from this element's attributes. */
   private get projectAttrs(): ProjectAttrs {
-    return { projectId: this.projectId, proxyPath: this.proxyPath, url: this.url };
+    return {
+      projectId: this.projectId,
+      proxyPath: this.proxyPath,
+      url: this.url,
+      release: this.release,
+    };
   }
 
   private async startFlow(): Promise<void> {
@@ -691,11 +704,15 @@ export class ZitadelLogin extends ZitadelSurface {
               "`configureZitadel({ projectId })`, or a `project` handle) to start a flow.",
           );
         }
-        wire = await apiStartFlow(api, {
-          project_id: cfg.projectId,
-          purpose: this.purpose,
-          ...(this.flowName ? { flow_definition_name: this.flowName } : {}),
-        });
+        wire = await apiStartFlow(
+          api,
+          {
+            project_id: cfg.projectId,
+            purpose: this.purpose,
+            ...(this.flowName ? { flow_definition_name: this.flowName } : {}),
+          },
+          cfg.release,
+        );
       }
       this.applyResponse(wire);
       // Symmetric with `submit()`: every applied step announces itself, the

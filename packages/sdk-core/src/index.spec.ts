@@ -3,16 +3,14 @@ import { describe, expect, it } from "vitest";
 import { resolveZitadelRuntime, resolveZitadelRuntimeEnv } from "./index.js";
 
 describe("resolveZitadelRuntimeEnv", () => {
-  it("uses public project metadata in development", () => {
+  it("uses public project metadata", () => {
     const runtime = resolveZitadelRuntimeEnv({
       ZITADEL_PROJECT_ID: "proj_123",
-      ZITADEL_ENVIRONMENT: "development",
       ZITADEL_ISSUER: "http://localhost:3000",
     });
 
     expect(runtime).toEqual({
       projectId: "proj_123",
-      environment: "development",
       issuer: "http://localhost:3000",
     });
   });
@@ -21,31 +19,28 @@ describe("resolveZitadelRuntimeEnv", () => {
     const runtime = resolveZitadelRuntimeEnv({
       ZITADEL_PROJECT_ID: "server-side",
       NEXT_PUBLIC_ZITADEL_PROJECT_ID: "browser-safe",
-      NEXT_PUBLIC_ZITADEL_ENVIRONMENT: "preview",
-      NEXT_PUBLIC_ZITADEL_ISSUER: "https://preview.example",
+      ZITADEL_RELEASE: "rel_server",
+      NEXT_PUBLIC_ZITADEL_RELEASE: "sha256:9f2c1a7b4e83",
     });
 
     expect(runtime).toEqual({
       projectId: "browser-safe",
-      environment: "preview",
-      issuer: "https://preview.example",
+      release: "sha256:9f2c1a7b4e83",
     });
     expect("secret" in runtime).toBe(false);
   });
 
-  it("requires an issuer for production", () => {
-    expect(() =>
-      resolveZitadelRuntime({
-        projectId: "proj_123",
-        environment: "production",
-      }),
-    ).toThrow("ZITADEL_ISSUER");
+  it("carries the release a build pins when the env names one", () => {
+    expect(resolveZitadelRuntime({ projectId: "proj_123", release: "rel_01" })).toEqual({
+      projectId: "proj_123",
+      release: "rel_01",
+    });
+    expect(resolveZitadelRuntime({ projectId: "proj_123" })).toEqual({ projectId: "proj_123" });
   });
 
   it("requires project metadata without accepting browser secrets", () => {
     expect(() =>
       resolveZitadelRuntimeEnv({
-        NEXT_PUBLIC_ZITADEL_ENVIRONMENT: "preview",
         ZITADEL_PREVIEW_SECRET: "sk_proj_preview",
       }),
     ).toThrow("ZITADEL_PROJECT_ID");

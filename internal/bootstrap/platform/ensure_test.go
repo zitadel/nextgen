@@ -16,7 +16,7 @@ import (
 // else, so a deployment that bootstrapped one could not serve a registration.
 func expectCreate(projects *servicemocks.MockProjectService) *servicemocks.MockProjectServiceCreateWithIDCall {
 	return projects.EXPECT().CreateWithID(
-		gomock.Any(), domain.PlatformProjectID, "Platform", []string{}, true,
+		gomock.Any(), domain.PlatformProjectID, "Platform", gomock.Nil(), true,
 	)
 }
 

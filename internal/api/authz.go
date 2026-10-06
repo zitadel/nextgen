@@ -62,7 +62,14 @@ type resourceAccess struct {
 	readMiss  func() domain.Error
 	writeMiss func() domain.Error
 	denied    func() domain.Error
+	// previewDeploy says which ops the preview-deploy credential may reach on
+	// this resource; the handler then checks the granular scope. Nil denies
+	// it the way the browser-plane preview secret is denied.
+	previewDeploy func(op accessOp) bool
 }
+
+func previewDeployReads(op accessOp) bool  { return op == opRead }
+func previewDeployWrites(op accessOp) bool { return op == opRead || op == opWrite }
 
 func (res resourceAccess) miss(op accessOp) error {
 	if op == opWrite {
@@ -118,17 +125,6 @@ var brandingAccess = resourceAccess{
 	denied:    domain.ErrBrandingPermissionDenied,
 }
 
-// environmentAccess gates the project's runtime slots (ADR 035, #534).
-// Reads are project-scoped: the list carries a project_id and the get
-// addresses an environment by name, so no route resolves a path id through
-// RSI and the kind is only used to narrow a partial-access list.
-var environmentAccess = resourceAccess{
-	kind:      domain.ResourceKindEnvironment,
-	readMiss:  domain.ErrEnvironmentNotFound,
-	writeMiss: domain.ErrEnvironmentProjectNotFound,
-	denied:    domain.ErrEnvironmentPermissionDenied,
-}
-
 // variableAccess gates the project's variables and secrets (ADR 062). Like
 // grants and events, a variable has no minted id and no resource_scope_index
 // row — it is addressed by name under the project_id the request carries — so
@@ -144,10 +140,11 @@ var variableAccess = resourceAccess{
 // filters its lookup by it, so no route resolves a path id through RSI and the
 // kind is only used to narrow a partial-access list.
 var releaseAccess = resourceAccess{
-	kind:      domain.ResourceKindRelease,
-	readMiss:  domain.ErrReleaseNotFound,
-	writeMiss: domain.ErrReleaseProjectNotFound,
-	denied:    domain.ErrReleasePermissionDenied,
+	kind:          domain.ResourceKindRelease,
+	readMiss:      domain.ErrReleaseNotFound,
+	writeMiss:     domain.ErrReleaseProjectNotFound,
+	denied:        domain.ErrReleasePermissionDenied,
+	previewDeploy: previewDeployWrites,
 }
 
 // idpAccess guards the project's identity provider connections (#1003). Every
@@ -169,10 +166,11 @@ var idpAccess = resourceAccess{
 // path id through RSI and the kind is only used to narrow a partial-access
 // list.
 var deploymentAccess = resourceAccess{
-	kind:      domain.ResourceKindDeployment,
-	readMiss:  domain.ErrDeploymentNotFound,
-	writeMiss: domain.ErrEnvironmentProjectNotFound,
-	denied:    domain.ErrDeploymentPermissionDenied,
+	kind:          domain.ResourceKindDeployment,
+	readMiss:      domain.ErrDeploymentNotFound,
+	writeMiss:     func() domain.Error { return domain.ErrDeploymentInvalid("project does not exist", nil) },
+	denied:        domain.ErrDeploymentPermissionDenied,
+	previewDeploy: previewDeployWrites,
 }
 
 // eventsAccess gates the operator audit stream (ADR 049). List/get are
@@ -193,10 +191,11 @@ var grantAccess = resourceAccess{
 }
 
 var projectAccess = resourceAccess{
-	kind:      domain.ResourceKindProject,
-	readMiss:  domain.ErrProjectNotFound,
-	writeMiss: domain.ErrProjectNotFound,
-	denied:    domain.ErrProjectPermissionDenied,
+	kind:          domain.ResourceKindProject,
+	readMiss:      domain.ErrProjectNotFound,
+	writeMiss:     domain.ErrProjectNotFound,
+	denied:        domain.ErrProjectPermissionDenied,
+	previewDeploy: previewDeployReads,
 }
 
 // resourceAccessStmts is the statement surface requireResourceAccess needs.
@@ -331,7 +330,7 @@ func requireProjectAccessAfterRSI(ctx context.Context, stmts service.AuthzResolv
 }
 
 func requireProjectAccessMapped(ctx context.Context, stmts service.AuthzResolverStatements, projectID string, res resourceAccess, op accessOp, rsi *domain.ResourceScope) error {
-	dec, err := checkProjectAccess(ctx, resolver.New(), stmts, projectID, op, rsi)
+	dec, err := checkProjectAccess(ctx, resolver.New(), stmts, projectID, op, rsi, res.previewDeploy != nil && res.previewDeploy(op))
 	if err != nil {
 		return mapCeilingError(err, res, op, rsi)
 	}
@@ -382,12 +381,12 @@ func projectCheckRequest(scope ScopeContext, projectID string, op accessOp, rsi 
 // checkProjectAccess runs the credential ceiling then resolver.Check.
 // Ceiling failures are errAuthzNoScope / errAuthzPreviewDenied; Check
 // failures are already domain.ErrInternal.
-func checkProjectAccess(ctx context.Context, r *resolver.Resolver, stmts service.AuthzResolverStatements, projectID string, op accessOp, rsi *domain.ResourceScope) (resolver.Decision, error) {
+func checkProjectAccess(ctx context.Context, r *resolver.Resolver, stmts service.AuthzResolverStatements, projectID string, op accessOp, rsi *domain.ResourceScope, previewDeployAllowed bool) (resolver.Decision, error) {
 	scope, ok := GetScopeContext(ctx)
 	if !ok || scope.PrincipalType == "" || scope.PrincipalID == "" {
 		return resolver.DecisionUnspecified, errAuthzNoScope
 	}
-	if err := credentialCeiling(scope, projectID); err != nil {
+	if err := credentialCeiling(scope, projectID, previewDeployAllowed); err != nil {
 		return resolver.DecisionUnspecified, err
 	}
 	dec, err := r.Check(ctx, stmts, projectCheckRequest(scope, projectID, op, rsi))
@@ -399,8 +398,9 @@ func checkProjectAccess(ctx context.Context, r *resolver.Resolver, stmts service
 
 // credentialCeiling is the pre-resolver gate on the credential plane.
 // Empty home fails closed. Users skip the secret write ceiling; secrets
-// still need project.write (ADR 053 §5).
-func credentialCeiling(scope ScopeContext, targetProjectID string) error {
+// still need project.write (ADR 053 §5), except the preview-deploy
+// credential on the few resources it holds scopes for.
+func credentialCeiling(scope ScopeContext, targetProjectID string, previewDeployAllowed bool) error {
 	if scope.ProjectID == "" {
 		return errAuthzNoScope
 	}
@@ -413,7 +413,16 @@ func credentialCeiling(scope ScopeContext, targetProjectID string) error {
 	if scope.ProjectID != targetProjectID {
 		return errAuthzNoScope
 	}
+	if previewDeployAllowed && isPreviewDeployCredential(scope.Scope) {
+		return nil
+	}
 	return errAuthzPreviewDenied
+}
+
+// isPreviewDeployCredential recognises the credential a pull-request build
+// holds by the one scope only it carries.
+func isPreviewDeployCredential(granted []string) bool {
+	return slices.Contains(granted, "deployment.preview")
 }
 
 // hasOperatorProjectWrite is the credential-plane ceiling: only the full
@@ -458,11 +467,6 @@ func requireReleaseRead(ctx context.Context) error {
 		"expanding a deployment's release requires release.read")
 }
 
-func requireEnvironmentRead(ctx context.Context) error {
-	return requireExpandScope(ctx, "environment.read", domain.ErrDeploymentPermissionDenied,
-		"filtering deployments by environment name requires environment.read")
-}
-
 func mapAuthzDecision(dec resolver.Decision, res resourceAccess, op accessOp) error {
 	switch dec {
 	case resolver.DecisionAllow:
@@ -489,7 +493,7 @@ func (h *Handler) requireProjectListAccess(ctx context.Context, projectID string
 
 func requireProjectListAccess(ctx context.Context, stmts service.AuthzResolverStatements, projectID string, res resourceAccess, kind domain.ResourceKind) (context.Context, error) {
 	r := resolver.New()
-	dec, err := checkProjectAccess(ctx, r, stmts, projectID, opRead, nil)
+	dec, err := checkProjectAccess(ctx, r, stmts, projectID, opRead, nil, res.previewDeploy != nil && res.previewDeploy(opRead))
 	if err != nil {
 		return ctx, mapCeilingError(err, res, opRead, nil)
 	}

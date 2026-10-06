@@ -164,7 +164,7 @@ class IdpConnectionSyncer implements ResourceSyncer {
         : "Connection file is not a valid identity provider connection",
       {
         hint: literalSecret
-          ? 'Use "client_secret": "${{ NAME }}" and publish the value with `variables set NAME --secret`.'
+          ? 'Use "client_secret": "${{ NAME }}" and publish the value with `vars set NAME --secret`.'
           : undefined,
         details: { issues: result.error.issues },
       },

@@ -9,6 +9,7 @@ type: object
 required:
   - id
   - project_id
+  - content_hash
   - metadata
 properties:
   id:
@@ -19,6 +20,13 @@ properties:
     readOnly: true
     description: The project this release belongs to.
     $ref: ../../components/schemas/project-id.yaml
+  content_hash:
+    readOnly: true
+    type: string
+    description: |
+      SHA-256 over the sorted pointer set, 64 hex characters. The digest a
+      build pins with `X-Zitadel-Release`, prefixed `sha256:` on the wire.
+    example: 9f2c1a7b4e83d05f6c2b19ae7d430f821c6b5de90a4f73829f2c1a7b4e83d05f
   metadata:
     readOnly: true
     $ref: release-metadata.yaml

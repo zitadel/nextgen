@@ -8,6 +8,16 @@ import (
 
 // Handler handles operations described by OpenAPI v3 specification.
 type Handler interface {
+	// AddAllowedOrigin implements addAllowedOrigin operation.
+	//
+	// Adds one `{pattern, kind}` to the project's allowlist. The pattern is
+	// checked against the project's class: a `production` project refuses
+	// loopback hosts, a `*` in a `primary` pattern, and a `preview` wildcard on
+	// a shared host that carries no tenant-unique label. A host the server does
+	// not know is accepted with a warning naming what it could not check.
+	//
+	// POST /projects/{project_id}/allowed_origins
+	AddAllowedOrigin(ctx context.Context, req *AllowedOrigin, params AddAllowedOriginParams) (AddAllowedOriginRes, error)
 	// BeginUserPasskeyRegistration implements beginUserPasskeyRegistration operation.
 	//
 	// Starts a WebAuthn registration ceremony for the user and returns the
@@ -51,25 +61,16 @@ type Handler interface {
 	CreateBranding(ctx context.Context, req *Branding, params CreateBrandingParams) (CreateBrandingRes, error)
 	// CreateDeployment implements createDeployment operation.
 	//
-	// Makes a release live on an environment by recording a deployment. The two
-	// happen atomically: when the call returns, the environment runs the named
-	// release and the record exists; on any failure the environment keeps
-	// running what it ran and no record is written.
-	// Deploying, promoting and rolling back are all this call — `reason` says
-	// which. None of them assembles a release: the release must already exist,
-	// and rolling back means deploying a release the environment ran earlier,
-	// chosen from its deployment history.
-	// Idempotent on the running release: deploying the release the environment
-	// already runs changes nothing and answers `200` with the deployment that
-	// made it live, so a re-run of `zitadel deploy` on unchanged content is a
-	// no-op end to end — matching `POST /releases`, which resolves the same
-	// content to the same release first. Anything else writes a new record,
-	// including the same release returning after something else ran in between:
-	// the log is append-only, and each row is one act of making a release live.
-	// `expected_current_deployment_id` guards against racing another deploy:
-	// when present, the swap only happens if the environment's current
-	// deployment still is the one named, and a mismatch answers `409` with the
-	// actual `current_deployment_id` and `current_release_id` in the details.
+	// Makes a release live on one or more targets by appending a deployment row
+	// per target, all in one transaction under one `deploy_id`. What a target
+	// serves is its newest row, so nothing else moves.
+	// The variables each row runs are frozen at this moment: the project's
+	// variable store is resolved (`preview` values overriding `all` values when
+	// every target is a preview origin) and copied onto the deployment, so a
+	// later edit of the store reaches no deployment until the next deploy.
+	// Idempotent on release and values: when every target's newest row already
+	// names this release with the same frozen values, nothing is written and the
+	// answer is `200` with those rows.
 	//
 	// POST /deployments
 	CreateDeployment(ctx context.Context, req *CreateDeploymentRequest, params CreateDeploymentParams) (CreateDeploymentRes, error)
@@ -86,7 +87,7 @@ type Handler interface {
 	// cookie. The browser sends it automatically on subsequent requests.
 	//
 	// POST /flow
-	CreateFlow(ctx context.Context, req *CreateFlowRequest) (CreateFlowRes, error)
+	CreateFlow(ctx context.Context, req *CreateFlowRequest, params CreateFlowParams) (CreateFlowRes, error)
 	// CreateFlowDefinition implements createFlowDefinition operation.
 	//
 	// Publishes a new flow definition revision.
@@ -352,14 +353,14 @@ type Handler interface {
 	//
 	// GET /deployments/{deployment_id}
 	GetDeploymentById(ctx context.Context, params GetDeploymentByIdParams) (GetDeploymentByIdRes, error)
-	// GetEnvironmentByName implements getEnvironmentByName operation.
+	// GetDeploymentVariables implements getDeploymentVariables operation.
 	//
-	// Reads one environment of the project by its name.
-	// The lookup is scoped to the project in `project_id`: a name that exists in
-	// another project answers `env.not_found` exactly as an unused name does.
+	// The values frozen onto the deployment when it was written — what the
+	// target serves, not what the store holds now. Secrets are reported as held
+	// and never disclosed.
 	//
-	// GET /environments/{name}
-	GetEnvironmentByName(ctx context.Context, params GetEnvironmentByNameParams) (GetEnvironmentByNameRes, error)
+	// GET /deployments/{deployment_id}/variables
+	GetDeploymentVariables(ctx context.Context, params GetDeploymentVariablesParams) (GetDeploymentVariablesRes, error)
 	// GetEvent implements getEvent operation.
 	//
 	// Loads a single event by `(project_id, id)`. Requires `events.read`.
@@ -509,23 +510,16 @@ type Handler interface {
 	GetUserByID(ctx context.Context, params GetUserByIDParams) (GetUserByIDRes, error)
 	// GetVariable implements getVariable operation.
 	//
-	// Reads one variable by name from the owner this request addresses — one
-	// environment of the project with `environment_name`, the project level
-	// itself without it.
-	// A name that owner has not entered answers `var.not_found`, even when
-	// another owner of the same project holds it: nothing is inherited. A secret
-	// is found but not disclosed: the response is `{"secret": true}`.
+	// Reads one variable by name for the value `applies_to` selects. A name
+	// with no such value answers `var.not_found`. A secret is found but not
+	// disclosed: the response is `{"secret": true}`.
 	//
 	// GET /variables/{variable_name}
 	GetVariable(ctx context.Context, params GetVariableParams) (GetVariableRes, error)
 	// GetVariables implements getVariables operation.
 	//
-	// Returns the variables entered at the owner this request addresses, keyed by
-	// name — one environment of the project with `environment_name`, the project
-	// level itself without it.
-	// Owners are separate, not a ladder: an environment does not inherit the
-	// project's variables and the project does not see its environments'. Reading
-	// everything a project holds therefore means reading each owner in turn.
+	// Returns the project's variables keyed by name, for the value `applies_to`
+	// selects: `all` (default) or the `preview` override.
 	// Secret values are not returned. A secret appears as `{"secret": true}`,
 	// which says a value is held without disclosing it.
 	//
@@ -563,24 +557,15 @@ type Handler interface {
 	ListBranding(ctx context.Context, params ListBrandingParams) (ListBrandingRes, error)
 	// ListDeployments implements listDeployments operation.
 	//
-	// Lists deployments newest first: what ran where, and when.
-	// With `environment_name`, the list is that environment's history and its
-	// first row is the environment's current deployment. Without it, the list
-	// interleaves every environment of the project — a project-wide audit view
-	// in which the first row is only the most recent deployment anywhere.
-	// `expand: ["release"]` embeds the release each deployment made live, so a
-	// history renders with each entry's content without resolving `release_id`
-	// one by one. Expanding requires `release.read` and does not affect the
-	// ordering or the page tokens.
+	// Lists deployments newest first. Bare, it is the project-wide log. `origin`
+	// narrows it to one target's history (`""` for the default), `deploy_id` to
+	// the rows one deploy wrote, and `live=true` to the newest row per target —
+	// what each one serves right now, with `expires_at` filled for previews.
+	// `expand: ["release"]` embeds the release each row made live; it requires
+	// `release.read`.
 	//
 	// GET /deployments
 	ListDeployments(ctx context.Context, params ListDeploymentsParams) (ListDeploymentsRes, error)
-	// ListEnvironments implements listEnvironments operation.
-	//
-	// Lists the project's environments ordered by name.
-	//
-	// GET /environments
-	ListEnvironments(ctx context.Context, params ListEnvironmentsParams) (ListEnvironmentsRes, error)
 	// ListEvents implements listEvents operation.
 	//
 	// Returns project-scoped audit events, newest-first by keyset on
@@ -622,6 +607,15 @@ type Handler interface {
 	//
 	// GET /users/me/projects
 	ListMyProjects(ctx context.Context, params ListMyProjectsParams) (ListMyProjectsRes, error)
+	// ListOrigins implements listOrigins operation.
+	//
+	// One row per live preview URL of the project, with its expiry. The row is
+	// what admits a request from that URL: a URL matching a `preview` pattern
+	// but holding no row is refused. Rows are written by deploying to a preview
+	// target and go away when they expire or are removed.
+	//
+	// GET /origins
+	ListOrigins(ctx context.Context, params ListOriginsParams) (ListOriginsRes, error)
 	// ListReleases implements listReleases operation.
 	//
 	// Lists the project's releases, newest first.
@@ -735,6 +729,22 @@ type Handler interface {
 	//
 	// POST /users/query
 	QueryUsers(ctx context.Context, req *QueryUsersRequest, params QueryUsersParams) (QueryUsersRes, error)
+	// RemoveAllowedOrigin implements removeAllowedOrigin operation.
+	//
+	// Removes one pattern from the project's allowlist. Requests from URLs only
+	// that pattern admitted are refused from now on; live preview rows and
+	// deployment history are untouched.
+	//
+	// POST /projects/{project_id}/allowed_origins/remove
+	RemoveAllowedOrigin(ctx context.Context, req *RemoveAllowedOriginReq, params RemoveAllowedOriginParams) (RemoveAllowedOriginRes, error)
+	// RemoveOrigin implements removeOrigin operation.
+	//
+	// Deletes the live row behind one preview URL, so requests from it are
+	// refused from now on. The URL's deployment rows are kept. A URL with no
+	// row answers not found.
+	//
+	// POST /origins/remove
+	RemoveOrigin(ctx context.Context, req *RemoveOriginReq, params RemoveOriginParams) (RemoveOriginRes, error)
 	// RevokeMySession implements revokeMySession operation.
 	//
 	// Logs out by permanently deleting the session.
@@ -745,6 +755,15 @@ type Handler interface {
 	//
 	// DELETE /sessions/me
 	RevokeMySession(ctx context.Context) (RevokeMySessionRes, error)
+	// RevokeRelease implements revokeRelease operation.
+	//
+	// Marks the release revoked. A revoked release is refused on every path,
+	// including a client that pins it, and can no longer be deployed. Rows
+	// already naming it stay in the history; the targets they serve answer
+	// `rel.revoked` until something else is deployed there.
+	//
+	// POST /releases/{release_id}/revoke
+	RevokeRelease(ctx context.Context, params RevokeReleaseParams) (RevokeReleaseRes, error)
 	// RevokeSession implements revokeSession operation.
 	//
 	// Permanently deletes the session, terminating it immediately.
@@ -757,6 +776,28 @@ type Handler interface {
 	//
 	// DELETE /sessions/{session_id}
 	RevokeSession(ctx context.Context, params RevokeSessionParams) (RevokeSessionRes, error)
+	// RollbackDeployment implements rollbackDeployment operation.
+	//
+	// Undoes one deploy: for every target that deploy moved, appends a row
+	// naming the release that target served before it, under a new `deploy_id`
+	// with `reason: rollback` and `rollback_of` set. Bare, it undoes the newest
+	// deploy of the project; `deploy_id` names an earlier one to re-apply, and
+	// `origin` narrows the undo to one target.
+	// A target the undone deploy created has no earlier release and is left as
+	// it is; it is named in `warnings`. The frozen values of the restored
+	// deployment travel with it.
+	//
+	// POST /deployments/rollback
+	RollbackDeployment(ctx context.Context, req *RollbackRequest, params RollbackDeploymentParams) (RollbackDeploymentRes, error)
+	// SetProjectClass implements setProjectClass operation.
+	//
+	// Sets the project's class. `sandbox` → `production` re-checks every
+	// allowlist pattern against the production rules and fails naming each
+	// offender; it requires a claimed project. `production` → `sandbox` lets
+	// loopback origins back in and needs `confirm: true`.
+	//
+	// POST /projects/{project_id}/class
+	SetProjectClass(ctx context.Context, req *SetProjectClassReq, params SetProjectClassParams) (SetProjectClassRes, error)
 	// SetUserPassword implements setUserPassword operation.
 	//
 	// Set user password.
@@ -797,11 +838,9 @@ type Handler interface {
 	UpdateTeam(ctx context.Context, req *UpdateTeamRequest, params UpdateTeamParams) (UpdateTeamRes, error)
 	// UpdateVariables implements updateVariables operation.
 	//
-	// Enters, replaces and removes variables at the owner this request
-	// addresses.
-	// Every name in the body is applied at exactly that owner — the project, or
-	// the environment named by `environment_name` — and reaches no other. Names
-	// not in the body are untouched.
+	// Enters, replaces and removes variables for the value `applies_to`
+	// selects. Names not in the body are untouched. Nothing here reaches a
+	// deployment already written: values are frozen per deploy.
 	// A bare scalar enters a non-secret value. `{"value": …, "secret": true}`
 	// stores the value encrypted under the project's active `secret` key, after
 	// which it can be referenced but not read back. `null` removes the name from

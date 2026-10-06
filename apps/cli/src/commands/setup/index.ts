@@ -66,6 +66,7 @@ import { hasZitadelConfig, hasZitadelSecret } from "../../lib/project";
 import { publicCliCommand } from "../../lib/public-cli";
 import { derivePosture } from "../../lib/orca/patchers/posture";
 import { writeScaffoldManifest } from "../../lib/scaffold-manifest";
+import { buildRelease } from "../../lib/release";
 import { readStdin } from "../../lib/variables";
 import {
   materializeSetupResources,
@@ -426,6 +427,34 @@ export default class Setup extends BaseCommand {
       const sentence = describeWrittenFile(relativeDisplay(cwd, file), dryRun);
       if (sentence) consola.info(sentence);
     }
+    // The server serves nothing until a deploy appends a row for the project
+    // default, so the first release goes live here; without it every sign-in
+    // answers rel.no_default.
+    if (!dryRun && answers.server !== "mock") {
+      try {
+        const client = createZitadelClient(
+          { baseUrl: answers.server, token: project.project_secret },
+          { verbatim: true },
+        );
+        const release = await buildRelease({ cwd, client, projectId: project.id, env: this.meta.env });
+        await client.createDeployment(
+          { release: release.id, targets: ["default"], message: "initial release" },
+          { project_id: project.id },
+        );
+        consola.success(`Deployed release ${release.id} to the project default`);
+      } catch (error) {
+        await rm(join(cwd, "zitadel.json"), { force: true });
+        await rm(join(cwd, ".zitadel/secret"), { force: true });
+        const cause = toZitadelError(error);
+        throw new ZitadelError(cause.code, `First deploy failed: ${cause.message}`, {
+          hint:
+            cause.hint ??
+            "The project was created but its first release did not go live. Re-run `zitadel setup`.",
+          nextCommands: cause.nextCommands ?? ["zitadel setup --force"],
+          details: cause.details,
+        });
+      }
+    }
     const allFilesWritten = [...result.filesWritten, ...resourceResult.filesWritten];
     consola.success(
       `Patched ${allFilesWritten.length} file${allFilesWritten.length === 1 ? "" : "s"}` +
@@ -443,7 +472,7 @@ export default class Setup extends BaseCommand {
     // where the engine resolves the connection's `${{ NAME }}` from, against
     // Zitadel Cloud as much as against a local server. A refusal is reported
     // rather than failing setup: everything else is already provisioned, and
-    // `variables set` publishes it later.
+    // `vars set` publishes it later.
     // One outcome per provider, keyed by slug: the summary reports each
     // separately, because one provider's publish can land while another's does
     // not, and telling the developer "the secret did not reach the project"
@@ -774,9 +803,11 @@ function dryRunProject(issuer: string): CreateProject201 {
   return {
     id: "dry-run-0000",
     name: "dry-run",
+    class: "sandbox",
     project_secret: "sk_proj_dry_run_full",
     preview_secret: "sk_proj_dry_run_preview",
-    preview_origins: [issuer],
+    preview_token: "sk_proj_dry_run_preview_token",
+    allowed_origins: [{ pattern: issuer, kind: "primary" }],
     created_at: "2026-04-21T14:03:11.000Z",
   };
 }
@@ -789,7 +820,7 @@ function dryRunProject(issuer: string): CreateProject201 {
  * a run that named a provider on the command line is scripted, and stopping
  * to ask would hang it.
  *
- * The secret is never a flag, following `variables set`: it cannot reach
+ * The secret is never a flag, following `vars set`: it cannot reach
  * shell history, a process listing or a CI log. Only a scripted run reads it
  * from stdin — an interactive one is asked, and consuming stdin there would
  * leave the wizard's own prompts reading a stream already at EOF. A terminal
@@ -1026,7 +1057,7 @@ function ssoRecovery(
     // for the secret, which was never put in command text for the same
     // reason.
     // `--server local`, as the setup retry pins it. Server resolution prefers
-    // `ZITADEL_API_BASE` over the project's own `zitadel.json`, so an
+    // `ZITADEL_URL` over the project's own `zitadel.json`, so an
     // unpinned `sso enable` run with that variable set would publish the
     // client id and secret to whatever it names, using the local project's
     // token -- leaving the local provider unconfigured and the credentials
@@ -1050,16 +1081,13 @@ async function createProjectWithLocalHint(
   retry: SetupRetryOptions,
 ): Promise<CreateProject201> {
   try {
-    // API contract requires a project name; generated TS models may lag
-    // briefly until `packages/api` regeneration catches up.
-    const payload = { name: projectName, preview_origins: [issuer], seed_defaults: false } as {
-      name: string;
-      preview_origins: string[];
-      seed_defaults: false;
-    };
     // Register the app's own origin so the backend's origin check allows the
     // requests the dev proxy forwards from it.
-    return await client.createProject(payload as Parameters<typeof client.createProject>[0]);
+    return await client.createProject({
+      name: projectName,
+      allowed_origins: [{ pattern: issuer, kind: "primary" }],
+      seed_defaults: false,
+    });
   } catch (error) {
     const normalized = toZitadelError(error);
     const retryFlags = setupRetryFlags(retry);

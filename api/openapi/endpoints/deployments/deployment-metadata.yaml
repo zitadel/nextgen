@@ -2,47 +2,29 @@ title: DeploymentMetadata
 type: object
 description: |
   Why the release went live here and who made it happen. Set when the
-  deployment is created and never mutated afterwards — enrichment of the
-  record, while the ids and timestamp on the deployment itself say what ran
-  where and when. Every field is optional; a sparse object is a deployment
-  that simply was not annotated further.
+  deployment is created and never mutated afterwards.
 properties:
   reason:
     $ref: ../../components/schemas/deployment-reason.yaml
   message:
-    description: |
-      The caller-supplied summary of why this deployment happened, analogous
-      to a git commit message.
+    description: The caller-supplied summary of why this deployment happened.
     oneOf:
       - type: string
         maxLength: 1024
       - type: 'null'
     example: hotfix for the login outage
-  source_environment_id:
+  rollback_of:
     description: |
-      The environment the release was promoted from. Set exactly when
-      `reason` is `promote`.
-
-      Recorded as it stood at deployment time: it is not re-resolved later,
-      so it may name an environment that has since been deleted.
+      On a rollback, the `deploy_id` this row reversed, so the trail reads
+      forwards and backwards.
     oneOf:
       - type: string
       - type: 'null'
-    example: env_01KX2QF7Z6D0F0N9WD3P2E4YM4
-  source_environment_name:
-    description: |
-      The name the source environment had at deployment time, set exactly
-      when `source_environment_id` is. A snapshot for reading the history,
-      not an address: a later rename does not update it, and the id is what
-      identifies the environment.
-    oneOf:
-      - $ref: ../../components/schemas/environment-name.yaml
-      - type: 'null'
+    example: dpl_01KX3RG8A7F0N9WD3P2E4YM5C1
   deployed_by:
     description: |
       The identity that created the deployment. Absent when the caller is a
-      machine principal carrying no user identity, which is the common case
-      for deployments made from CI.
+      machine principal carrying no user identity.
     oneOf:
       - type: string
       - type: 'null'

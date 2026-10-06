@@ -1,0 +1,30 @@
+type: object
+required:
+  - pattern
+  - kind
+  - check
+properties:
+  pattern:
+    type: string
+  kind:
+    type: string
+    enum:
+      - primary
+      - preview
+  check:
+    type: object
+    description: What the lint found. `ok` passed; `warning` passed with a note.
+    required:
+      - status
+      - message
+    properties:
+      status:
+        type: string
+        enum:
+          - ok
+          - warning
+      code:
+        type: string
+        description: Set with `warning`, for example `origin_host_unknown`.
+      message:
+        type: string

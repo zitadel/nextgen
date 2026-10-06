@@ -2,7 +2,6 @@ package spanner
 
 import (
 	"context"
-	"encoding/json"
 
 	"cloud.google.com/go/spanner"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -14,16 +13,19 @@ import (
 
 const (
 	projectsTable         = "projects"
-	createProjectStmt     = `INSERT INTO projects (id, name, preview_origins, password_hash_policy) VALUES (@p1, @p2, @p3, @p4) THEN RETURN id, created_at, updated_at`
-	updateProjectStmt     = `UPDATE projects SET name = @p2, updated_at = CURRENT_TIMESTAMP() WHERE id = @p1 THEN RETURN id, name, preview_origins, password_hash_policy, created_at, updated_at`
+	createProjectStmt     = `INSERT INTO projects (id, name, allowed_origins, class, password_hash_policy) VALUES (@p1, @p2, @p3, @p4, @p5) THEN RETURN id, created_at, updated_at`
+	updateProjectStmt     = `UPDATE projects SET name = @p2, updated_at = CURRENT_TIMESTAMP() WHERE id = @p1 THEN RETURN id, name, allowed_origins, class, password_hash_policy, created_at, updated_at`
 	deleteByIDProjectStmt = `DELETE FROM projects WHERE id = @p1`
-	projectQuery          = "SELECT id, name, preview_origins, password_hash_policy, created_at, updated_at FROM projects"
+	projectQuery          = "SELECT id, name, allowed_origins, class, password_hash_policy, created_at, updated_at FROM projects"
+
+	updateProjectAllowedOriginsStmt = `UPDATE projects SET allowed_origins = @p2, updated_at = CURRENT_TIMESTAMP() WHERE id = @p1 THEN RETURN id`
+	updateProjectClassStmt          = `UPDATE projects SET class = @p2, updated_at = CURRENT_TIMESTAMP() WHERE id = @p1 THEN RETURN id`
 
 	setProjectPasswordHashPolicyStmt = `UPDATE projects SET password_hash_policy = @p2, updated_at = CURRENT_TIMESTAMP() WHERE id = @p1 THEN RETURN id`
 )
 
 var projectColumns = []string{
-	"id", "name", "preview_origins", "password_hash_policy", "created_at", "updated_at",
+	"id", "name", "allowed_origins", "class", "password_hash_policy", "created_at", "updated_at",
 }
 
 type projectStatements struct{ statement }
@@ -41,7 +43,7 @@ func (ps projectStatements) CreateProject(ctx context.Context, project *domain.P
 	if err := ensureManagedID(&project.ID, domain.PrefixProject); err != nil {
 		return err
 	}
-	previewOrigins, err := encodePreviewOrigins(project.PreviewOrigins)
+	origins, err := encodeAllowedOrigins(project.AllowedOrigins)
 	if err != nil {
 		return wrapError(err)
 	}
@@ -50,7 +52,7 @@ func (ps projectStatements) CreateProject(ctx context.Context, project *domain.P
 		return wrapError(err)
 	}
 	return withTransaction(ctx, ps.db, func(ctx context.Context, tx queryExecutor) error {
-		stmt := buildStatement(createProjectStmt, project.ID, project.Name, previewOrigins, policy).statement()
+		stmt := buildStatement(createProjectStmt, project.ID, project.Name, origins, project.Class.String(), policy).statement()
 		if err := tx.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
 			_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
 				return struct{}{}, row.Columns(&project.ID, &project.CreatedAt, &project.UpdatedAt)
@@ -95,6 +97,30 @@ func (ps projectStatements) UpdateProject(ctx context.Context, project *domain.P
 		}
 		*project = *updated
 		return nil
+	})
+}
+
+// UpdateProjectAllowedOrigins implements [service.ProjectStatements].
+func (ps projectStatements) UpdateProjectAllowedOrigins(ctx context.Context, projectID string, origins []domain.AllowedOrigin) error {
+	encoded, err := encodeAllowedOrigins(origins)
+	if err != nil {
+		return wrapError(err)
+	}
+	return ps.returnOne(ctx, buildStatement(updateProjectAllowedOriginsStmt, projectID, encoded).statement())
+}
+
+// UpdateProjectClass implements [service.ProjectStatements].
+func (ps projectStatements) UpdateProjectClass(ctx context.Context, projectID string, class domain.ProjectClass) error {
+	return ps.returnOne(ctx, buildStatement(updateProjectClassStmt, projectID, class.String()).statement())
+}
+
+func (ps projectStatements) returnOne(ctx context.Context, stmt spanner.Statement) error {
+	return ps.db.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
+		_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
+			var id string
+			return struct{}{}, row.Columns(&id)
+		})
+		return err
 	})
 }
 
@@ -149,13 +175,22 @@ func (ps projectStatements) ListProjects(ctx context.Context, filter *database.L
 func (ps projectStatements) scanProject(row *spanner.Row) (*domain.Project, error) {
 	project := new(domain.Project)
 	var (
-		previewOriginsJSON string
-		policyJSON         spanner.NullJSON
+		originsJSON spanner.NullJSON
+		class       string
+		policyJSON  spanner.NullJSON
 	)
-	if err := row.Columns(&project.ID, &project.Name, &previewOriginsJSON, &policyJSON, &project.CreatedAt, &project.UpdatedAt); err != nil {
+	if err := row.Columns(&project.ID, &project.Name, &originsJSON, &class, &policyJSON, &project.CreatedAt, &project.UpdatedAt); err != nil {
 		return nil, err
 	}
-	origins, err := decodePreviewOrigins(previewOriginsJSON)
+	rawOrigins, err := decodeNullJSON(originsJSON)
+	if err != nil {
+		return nil, err
+	}
+	origins, err := storageproject.UnmarshalAllowedOrigins(rawOrigins)
+	if err != nil {
+		return nil, err
+	}
+	parsedClass, err := domain.ProjectClassString(class)
 	if err != nil {
 		return nil, err
 	}
@@ -163,7 +198,8 @@ func (ps projectStatements) scanProject(row *spanner.Row) (*domain.Project, erro
 	if err != nil {
 		return nil, err
 	}
-	project.PreviewOrigins = origins
+	project.AllowedOrigins = origins
+	project.Class = parsedClass
 	project.PasswordHashPolicy = policy
 	return project, nil
 }
@@ -187,26 +223,14 @@ func decodePasswordHashPolicy(value spanner.NullJSON) (*domain.PasswordHashPolic
 	return storageproject.UnmarshalPasswordHashPolicy(raw)
 }
 
-func encodePreviewOrigins(origins []string) (string, error) {
-	if origins == nil {
-		origins = []string{}
-	}
-	data, err := json.Marshal(origins)
+// encodeAllowedOrigins binds the allowlist as spanner.NullJSON; a plain
+// string cannot be bound to a Spanner JSON column.
+func encodeAllowedOrigins(origins []domain.AllowedOrigin) (spanner.NullJSON, error) {
+	raw, err := storageproject.MarshalAllowedOrigins(origins)
 	if err != nil {
-		return "", err
+		return spanner.NullJSON{}, err
 	}
-	return string(data), nil
-}
-
-func decodePreviewOrigins(value string) ([]string, error) {
-	if value == "" {
-		return []string{}, nil
-	}
-	var origins []string
-	if err := json.Unmarshal([]byte(value), &origins); err != nil {
-		return nil, err
-	}
-	return origins, nil
+	return encodeNullJSON(raw)
 }
 
 var _ service.ProjectStatements = (*projectStatements)(nil)
@@ -232,9 +256,9 @@ var projectSchema = database.NewSchema(map[domain.ProjectField]database.FieldBin
 		Accessor: func(p *domain.Project) any { return p.UpdatedAt },
 		Coerce:   database.CoerceTime,
 	},
-	domain.ProjectFieldPreviewOrigins: {
-		SQLName:  "preview_origins",
-		Accessor: func(p *domain.Project) any { return p.PreviewOrigins },
-		Coerce:   database.CoerceSliceAsAny(database.CoerceStringValue),
+	domain.ProjectFieldClass: {
+		SQLName:  "class",
+		Accessor: func(p *domain.Project) any { return p.Class.String() },
+		Coerce:   database.CoerceString,
 	},
 })

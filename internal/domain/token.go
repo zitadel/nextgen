@@ -102,7 +102,7 @@ func (t *Token) ValidatePersisted() error {
 		if t.SessionID != nil || t.OIDCSessionID != nil || t.SAMLSessionID != nil {
 			return ErrInvalidTokenIdentifiers()
 		}
-	case TokenTypeProjectToken, TokenTypeProjectPreview:
+	case TokenTypeProjectToken, TokenTypeProjectPreview, TokenTypeProjectPreviewDeploy:
 		// A project credential authenticates software, not a user, so it
 		// carries neither a user nor any session identifier.
 		if t.SessionID != nil || t.OIDCSessionID != nil || t.SAMLSessionID != nil {

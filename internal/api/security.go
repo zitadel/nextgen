@@ -170,6 +170,10 @@ type contextKey struct{}
 // do not send the Origin header, so the handler falls back to this value.
 type requestHostKey struct{}
 
+// browserOriginKey is a context key for the browser origin of the request:
+// the Origin header, else the Referer's origin, else nothing.
+type browserOriginKey struct{}
+
 // WithRequestHostMiddleware injects the effective request proto+host into the
 // context so handlers can derive a WebAuthn RPID even when the browser omits
 // the Origin header (same-origin fetches).
@@ -187,17 +191,26 @@ func WithRequestHostMiddleware(next http.Handler) http.Handler {
 		if host == "" {
 			host = r.Host
 		}
+		ctx := r.Context()
 		if host != "" {
-			ctx := context.WithValue(r.Context(), requestHostKey{}, proto+"://"+host)
-			next.ServeHTTP(w, r.WithContext(ctx))
-			return
+			ctx = context.WithValue(ctx, requestHostKey{}, proto+"://"+host)
 		}
-		next.ServeHTTP(w, r)
+		if origin := middleware.RequestOrigin(r); origin != "" {
+			ctx = context.WithValue(ctx, browserOriginKey{}, origin)
+		}
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
 func requestOriginFromContext(ctx context.Context) (string, bool) {
 	v, ok := ctx.Value(requestHostKey{}).(string)
+	return v, ok && v != ""
+}
+
+// browserOriginFromContext is the origin the browser attested, stashed by
+// WithRequestHostMiddleware. Absent for a server-to-server request.
+func browserOriginFromContext(ctx context.Context) (string, bool) {
+	v, ok := ctx.Value(browserOriginKey{}).(string)
 	return v, ok && v != ""
 }
 

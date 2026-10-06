@@ -50,7 +50,6 @@ import {
 } from "../../lib/oclif";
 import {
   readDevelopmentIssuer,
-  readZitadelConfig,
   readZitadelSecret,
   type ZitadelSecret,
 } from "../../lib/project";
@@ -65,7 +64,7 @@ import { readStdin } from "../../lib/variables";
  * written. It works on the local Project `zitadel setup` created and does not
  * require claiming, because this is the local development path.
  *
- * The client secret never comes from a flag, following `variables set`: it is
+ * The client secret never comes from a flag, following `vars set`: it is
  * prompted for, or read from stdin when scripting, so it cannot land in shell
  * history, a process listing, or CI logs.
  */
@@ -111,16 +110,7 @@ export default class SsoEnable extends BaseCommand {
 
     // The Project is read before anything is asked for: being turned away
     // after typing a secret would mean typing it again.
-    const config = await readZitadelConfig(cwd);
     const secretFile = await readZitadelSecret(cwd);
-    const issuer = readDevelopmentIssuer(config);
-    if (issuer === undefined) {
-      throw new ZitadelError("E_VALIDATION", "This Project has no development issuer", {
-        hint: "Run `zitadel setup` first, or add environments.development.issuer to zitadel.json.",
-      });
-    }
-    const callbackUri = callbackUriFor(issuer);
-
     const schema = selectSchema(await readSchemaFiles(cwd), flags.schema);
     const connections = await readConnectionFiles(cwd);
     // `nonBlankString` has already refused a blank one and trimmed the rest.
@@ -150,6 +140,13 @@ export default class SsoEnable extends BaseCommand {
     // another schema must fail identically either way, or the preview says
     // "would create" for a run that cannot succeed.
     const flows = await this.targetFlows(cwd, schema);
+    const issuer = await readDevelopmentIssuer(cwd);
+    if (issuer === undefined) {
+      throw new ZitadelError("E_VALIDATION", "This Project has no development issuer", {
+        hint: "Run `zitadel setup` first; it records the dev port the issuer derives from.",
+      });
+    }
+    const callbackUri = callbackUriFor(issuer);
 
     consola.info(`Project   ${secretFile.project_id}`);
     consola.info(`Schema    ${schema.path}${schema.methods.length > 0 ? ` (${schema.methods.join(", ")})` : ""}`);
@@ -299,7 +296,7 @@ export default class SsoEnable extends BaseCommand {
           changed: edits.written,
           skipped: edits.skipped,
         }),
-        // `variables set` only when the secret did not reach the project:
+        // `vars set` only when the secret did not reach the project:
         // the connection references it as `${{ NAME }}` and the engine
         // resolves that from the project's variables, so a button whose
         // credential never arrived fails at token exchange. An ok result

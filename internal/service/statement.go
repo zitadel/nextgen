@@ -29,8 +29,8 @@ type AllStatements interface {
 	FlowDefinitionStatements
 	CryptoKeyStatements
 	JSONSchemaStatements
-	EnvironmentStatements
 	ReleaseStatements
+	OriginStatements
 	IDPConnectionStatements
 	IDPIdentityLinkStatements
 	DeploymentStatements
@@ -72,6 +72,11 @@ type ProjectStatements interface {
 	// the project to the deployment default. Returns a [database.NoRowFoundError]
 	// when no project carries the id.
 	SetProjectPasswordHashPolicy(ctx context.Context, projectID string, policy *domain.PasswordHashPolicy) error
+	// UpdateProjectAllowedOrigins replaces the allowlist whole; the caller
+	// has normalised and linted it. Returns a [database.NoRowFoundError]
+	// when no project carries the id.
+	UpdateProjectAllowedOrigins(ctx context.Context, projectID string, origins []domain.AllowedOrigin) error
+	UpdateProjectClass(ctx context.Context, projectID string, class domain.ProjectClass) error
 	ListProjects(ctx context.Context, filter *database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error)
 	// DeleteProjectByID removes the project. changed is false when no row matched.
 	DeleteProjectByID(ctx context.Context, id string) (changed bool, err error)
@@ -132,19 +137,6 @@ type JSONSchemaStatements interface {
 }
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
-// type EnvironmentPool interface {
-// 	Statementer[EnvironmentStatements]
-// 	Transactioner[EnvironmentStatements]
-// }
-
-type EnvironmentStatements interface {
-	Statements
-	CreateEnvironment(ctx context.Context, entity *domain.Environment) error
-	GetEnvironmentByName(ctx context.Context, projectID, name string) (*domain.Environment, error)
-	ListEnvironments(ctx context.Context, filter *database.ListOptions[domain.EnvironmentField]) (*database.ListResult[*domain.Environment], error)
-}
-
-// TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
 // type ReleasePool interface {
 // 	Statementer[ReleaseStatements]
 // 	Transactioner[ReleaseStatements]
@@ -162,7 +154,33 @@ type ReleaseStatements interface {
 	// hydrating an expanded deployment list (ADR 059). Unknown ids are simply
 	// absent from the result, not an error.
 	GetReleasesByIDs(ctx context.Context, projectID string, ids []string) ([]*domain.Release, error)
+	// ListReleasesByContentHashPrefix reads every release whose digest starts
+	// with prefix, for resolving a short digest named on the wire. More than
+	// one row means the prefix is ambiguous.
+	ListReleasesByContentHashPrefix(ctx context.Context, projectID, prefix string) ([]*domain.Release, error)
+	// RevokeRelease stamps revoked_at. An unknown release is a
+	// [database.NoRowFoundError]; revoking twice keeps the first stamp.
+	RevokeRelease(ctx context.Context, projectID, id string, at time.Time) error
 	ListReleases(ctx context.Context, filter *database.ListOptions[domain.ReleaseField]) (*database.ListResult[*domain.Release], error)
+}
+
+// OriginStatements keeps one row per live preview URL. The row is what admits
+// a request from the URL; a URL with no row, or an expired one, is refused.
+type OriginStatements interface {
+	Statements
+	// UpsertOrigin inserts the row or renews its expiry, and sets CreatedAt on
+	// entity to the row's original creation time.
+	UpsertOrigin(ctx context.Context, entity *domain.Origin) error
+	// GetOrigin reads one row, expired or not. Absent is a
+	// [database.NoRowFoundError].
+	GetOrigin(ctx context.Context, projectID, origin string) (*domain.Origin, error)
+	// ListOrigins reads every row of the project, origin ASC, expired or not.
+	ListOrigins(ctx context.Context, projectID string) ([]*domain.Origin, error)
+	// DeleteOrigin retires one URL. Absent is a [database.NoRowFoundError].
+	DeleteOrigin(ctx context.Context, projectID, origin string) error
+	// DeleteExpiredOrigins sweeps every row whose expiry is at or before now
+	// and reports how many went.
+	DeleteExpiredOrigins(ctx context.Context, now time.Time) (int64, error)
 }
 
 // IDPConnectionStatements persists identity provider connections and their
@@ -228,23 +246,40 @@ type IDPIdentityLinkStatements interface {
 
 type DeploymentStatements interface {
 	Statements
-	// CreateDeployment inserts the deployment and points the environment's
-	// current_deployment_id at it, atomically. A non-nil
-	// expectedCurrentDeploymentID makes the swap conditional: when the
-	// environment's current deployment is not exactly that one, nothing is
-	// written and domain.ErrDeploymentConflict reports what actually runs.
-	// An environment that does not exist is a NoRowFoundError.
-	//
-	// Idempotent on the running release: when the environment's current
-	// deployment already points at entity's release, nothing is written,
-	// entity is overwritten with that existing record, and created is false.
-	CreateDeployment(ctx context.Context, entity *domain.Deployment, expectedCurrentDeploymentID *string) (created bool, err error)
+	// CreateDeployments appends one row per entity. Every row's ID is minted
+	// here; DeployID is the caller's and shared across the set; one
+	// deployed_at is stamped for the whole set and written back onto each
+	// entity. The caller runs this inside a transaction together with the
+	// lock and the frozen variables, so a deploy that moved two targets and
+	// not the third cannot happen. An unknown release is a
+	// [database.ForeignKeyError].
+	CreateDeployments(ctx context.Context, rows []*domain.Deployment) error
 	GetDeploymentByID(ctx context.Context, projectID, id string) (*domain.Deployment, error)
-	// GetDeploymentsByIDs reads the named deployments in one round trip, for
-	// hydrating current_deployment on environment reads. Unknown ids are
-	// simply absent from the result, not an error.
+	// GetDeploymentsByIDs reads the named deployments in one round trip.
+	// Unknown ids are simply absent from the result, not an error.
 	GetDeploymentsByIDs(ctx context.Context, projectID string, ids []string) ([]*domain.Deployment, error)
 	ListDeployments(ctx context.Context, filter *database.ListOptions[domain.DeploymentField]) (*database.ListResult[*domain.Deployment], error)
+	// ListLiveDeployments reads the newest row per origin of the project,
+	// origin ASC: what every target serves right now.
+	ListLiveDeployments(ctx context.Context, projectID string) ([]*domain.Deployment, error)
+	// NewestDeployment reads what one target serves. Nothing deployed there is
+	// a [database.NoRowFoundError].
+	NewestDeployment(ctx context.Context, projectID, origin string) (*domain.Deployment, error)
+	// NewestDeploymentOfRelease reads the newest row of one target naming
+	// releaseID, for honouring a pin. Never deployed there is a
+	// [database.NoRowFoundError].
+	NewestDeploymentOfRelease(ctx context.Context, projectID, origin, releaseID string) (*domain.Deployment, error)
+	// LockProject takes the project row's write lock for the rest of the
+	// transaction, so concurrent deploys to the default and primary origins
+	// serialize. It must be called inside a transaction. An unknown project
+	// is a [database.NoRowFoundError].
+	LockProject(ctx context.Context, projectID string) error
+	// CreateDeploymentVariables writes the values a deployment runs, in the
+	// deployment's transaction. Rows are never updated afterwards.
+	CreateDeploymentVariables(ctx context.Context, rows []*domain.DeploymentVariable) error
+	// GetDeploymentVariables reads the frozen values of one deployment, name
+	// ASC. A deployment that froze nothing reads as empty, not as an error.
+	GetDeploymentVariables(ctx context.Context, projectID, deploymentID string) ([]*domain.DeploymentVariable, error)
 }
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
@@ -504,27 +539,17 @@ type BrandingStatements interface {
 
 type VariableStatements interface {
 	Statements
-	// GetVariables returns the variables owner entered, for the given names (all
-	// names when none are given), ordered by name. Every owner column is matched
-	// exactly, so a name owner has not entered is absent even when another owner
-	// of the same project holds it -- nothing is inherited. This is the only
-	// place the owner predicate is enforced, so a caller never sees a variable
-	// entered elsewhere.
-	//
-	// The primary key is the name plus the owner, so at most one variable comes
-	// back per name and the caller has nothing to choose between.
-	GetVariables(ctx context.Context, owner domain.VariableOwner, names ...string) ([]*domain.Variable, error)
-	// SetVariable writes variable under its own name and owner, replacing the
-	// value and IsSecret flag of an existing variable with the same name and
-	// owner. The environment is optional -- unset addresses the project level --
-	// but the project is not, and one that is missing or names no existing
-	// project is rejected by the table.
+	// GetVariables returns the project's variables for the given names (all
+	// names when none are given), ordered by name then applies_to. A nil
+	// appliesTo reads both values of every name; a set one reads that value
+	// only, so at most one variable comes back per name.
+	GetVariables(ctx context.Context, projectID string, appliesTo *domain.VariableAppliesTo, names ...string) ([]*domain.Variable, error)
+	// SetVariable writes variable under its name and applies_to, replacing
+	// the value and IsSecret flag of an existing one. The project must exist.
 	SetVariable(ctx context.Context, variable *domain.Variable) error
-	// DeleteVariable removes the variable owner entered under name. Removing one
-	// that is not there returns NoRowFoundError; it never deletes a variable
-	// with a different owner, since every owner column must match exactly, so
-	// one owner cannot remove what another entered.
-	DeleteVariable(ctx context.Context, owner domain.VariableOwner, name string) error
+	// DeleteVariable removes one value of one name. Removing one that is not
+	// there returns NoRowFoundError.
+	DeleteVariable(ctx context.Context, projectID string, appliesTo domain.VariableAppliesTo, name string) error
 }
 
 type ClaimStatements interface {

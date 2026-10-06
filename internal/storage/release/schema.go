@@ -31,4 +31,15 @@ var Schema = database.NewSchema(map[domain.ReleaseField]database.FieldBinding[do
 		Accessor: func(r *domain.Release) any { return r.CreatedAt },
 		Coerce:   database.CoerceTime,
 	},
+	domain.ReleaseFieldRevokedAt: {
+		SQLName: "revoked_at",
+		Accessor: func(r *domain.Release) any {
+			if r.RevokedAt == nil {
+				return nil
+			}
+			return *r.RevokedAt
+		},
+		Coerce:   database.CoerceTime,
+		Nullable: true,
+	},
 })

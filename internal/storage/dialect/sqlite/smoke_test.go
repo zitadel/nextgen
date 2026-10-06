@@ -20,7 +20,7 @@ func TestZeroConfigStyleConnectMigrateCRUD(t *testing.T) {
 	require.NoError(t, pool.Migrate(t.Context()))
 
 	p := pool.(*sqlite.Pool)
-	project := &domain.Project{ID: "proj-smoke", Name: "Smoke", PreviewOrigins: []string{}}
+	project := &domain.Project{ID: "proj-smoke", Name: "Smoke", AllowedOrigins: []domain.AllowedOrigin{}}
 	require.NoError(t, p.CreateProject(t.Context(), project))
 	got, err := p.GetProjectByID(t.Context(), "proj-smoke")
 	require.NoError(t, err)

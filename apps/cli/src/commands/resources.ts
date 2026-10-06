@@ -13,7 +13,6 @@ import {
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import {
   GetBrandingByIdResponse,
-  GetEnvironmentByNameResponse,
   GetFlowDefinitionResponse,
   CreateIdpBody,
   GetGrantResponse,
@@ -25,7 +24,6 @@ import {
   GetTeamResponse,
   GetUserByIDResponse,
   ListBrandingResponse,
-  ListEnvironmentsResponse,
   ListEventsResponse,
   ListFlowDefinitionsResponse,
   ListReleasesResponse,
@@ -335,9 +333,9 @@ export const RESOURCES = {
     group: CommandGroups.resources,
     singular: "project",
     idField: "id",
-    columns: ["id", "name", "created_at"],
+    columns: ["id", "name", "class", "created_at"],
     heading: "name",
-    detail: ["id", "preview_origins", "created_at", "updated_at"],
+    detail: ["id", "class", "allowed_origins", "created_at", "updated_at"],
     list: list({
       items: "projects",
       body: QueryProjectsBody,
@@ -419,29 +417,6 @@ export const RESOURCES = {
         }
         return current;
       },
-    },
-  },
-
-  environments: {
-    group: CommandGroups.configuration,
-    singular: "environment",
-    idField: "id",
-    // Addressed by its public handle: `GET /environments/{name}`, and the name
-    // is what a deploy target is called everywhere else in the CLI.
-    idArg: "name",
-    columns: ["name", "id", "created_at"],
-    heading: "name",
-    detail: ["name", "id", "project_id", "created_at"],
-    list: {
-      items: "environments",
-      response: ListEnvironmentsResponse,
-      call: ({ client, projectId }, params) =>
-        client.listEnvironments({ ...params, project_id: projectId }),
-    },
-    get: {
-      call: ({ client, projectId }, name) =>
-        client.getEnvironmentByName(name, { project_id: projectId }),
-      response: GetEnvironmentByNameResponse,
     },
   },
 

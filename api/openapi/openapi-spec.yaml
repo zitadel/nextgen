@@ -53,12 +53,12 @@ tags:
       never resource content, which stays with the per-kind endpoints.
 
       Assembling a release does not deploy it: the same release can later be
-      run on any number of environments unchanged.
-  - name: Environments
+      run on any number of targets unchanged.
+  - name: Origins
     description: |
-      Endpoints for a project's runtime slots (ADR 035). Identity only:
-      the release an environment runs and its deployment history arrive with
-      the deployments endpoints, and environment lifecycle with its own ADR.
+      The live preview URLs of a project. A row per URL admits requests from
+      it until it expires; patterns on the project only bound what a preview
+      deploy may register.
   - name: Grants
     description: |
       Collaboration grants that bind a user or team to project.viewer,
@@ -73,9 +73,10 @@ tags:
   - name: Variables
     description: |
       Named values a project enters and references from configuration documents
-      as `${{ NAME }}` (ADR 062). A variable belongs to the project or to one of
-      its environments, which is how a value that must differ per environment
-      reaches a release that is promoted between them unchanged.
+      as `${{ NAME }}` (ADR 062). A variable belongs to the project; a `preview`
+      value may override the `all` value for preview deploys. Each deployment
+      freezes the values it resolved.
+
 
       Those owners are separate rather than a hierarchy: a variable is read,
       written and deleted at exactly the owner a request addresses, and nothing
@@ -134,6 +135,12 @@ paths:
     $ref: endpoints/projects/query/methods.yaml
   /projects/{project_id}:
     $ref: endpoints/projects/by_id/methods.yaml
+  /projects/{project_id}/allowed_origins:
+    $ref: endpoints/projects/by_id/allowed_origins/methods.yaml
+  /projects/{project_id}/allowed_origins/remove:
+    $ref: endpoints/projects/by_id/allowed_origins/remove/methods.yaml
+  /projects/{project_id}/class:
+    $ref: endpoints/projects/by_id/class/methods.yaml
   /projects/{project_id}/claim/init:
     $ref: endpoints/projects/by_id/claim/init/methods.yaml
   /projects/{project_id}/claim/status:
@@ -166,10 +173,10 @@ paths:
     $ref: endpoints/teams/query/methods.yaml
   /teams/{team_id}:
     $ref: endpoints/teams/by_id/methods.yaml
-  /environments:
-    $ref: endpoints/environments/methods.yaml
-  /environments/{name}:
-    $ref: endpoints/environments/by_name/methods.yaml
+  /origins:
+    $ref: endpoints/origins/methods.yaml
+  /origins/remove:
+    $ref: endpoints/origins/remove/methods.yaml
   /branding:
     $ref: endpoints/branding/methods.yaml
   /branding/{id}:
@@ -188,6 +195,8 @@ paths:
     $ref: endpoints/releases/methods.yaml
   /releases/{release_id}:
     $ref: endpoints/releases/by_id/methods.yaml
+  /releases/{release_id}/revoke:
+    $ref: endpoints/releases/by_id/revoke/methods.yaml
   /grants:
     $ref: endpoints/grants/methods.yaml
   /grants/query:
@@ -206,6 +215,10 @@ paths:
     $ref: endpoints/deployments/methods.yaml
   /deployments/{deployment_id}:
     $ref: endpoints/deployments/by_id/methods.yaml
+  /deployments/{deployment_id}/variables:
+    $ref: endpoints/deployments/by_id/variables/methods.yaml
+  /deployments/rollback:
+    $ref: endpoints/deployments/rollback/methods.yaml
 
 components:
   securitySchemes:

@@ -43,6 +43,7 @@ type Row struct {
 	Pointers    []byte
 	Metadata    []byte
 	CreatedAt   time.Time
+	RevokedAt   *time.Time
 }
 
 // MarshalPointers converts the pinned set into JSON for the pointers column.
@@ -124,5 +125,14 @@ func ToDomain(row Row) (*domain.Release, error) {
 		},
 		// Spanner returns UTC while pgx defaults to local; normalize.
 		CreatedAt: row.CreatedAt.UTC(),
+		RevokedAt: utcPointer(row.RevokedAt),
 	}, nil
+}
+
+func utcPointer(t *time.Time) *time.Time {
+	if t == nil {
+		return nil
+	}
+	u := t.UTC()
+	return &u
 }

@@ -34,6 +34,7 @@ declare module "react" {
         "project-id"?: string;
         "proxy-path"?: string;
         url?: string;
+        release?: string;
         "post-sign-in-url"?: string;
         "resume-flow-id"?: string;
         "preview-state"?: ZitadelLogin["previewState"];

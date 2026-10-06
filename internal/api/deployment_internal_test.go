@@ -63,7 +63,7 @@ func TestDeploymentAccessRow(t *testing.T) {
 	require.NoError(t, requireProjectAccess(operator, stmts, "proj_a", deploymentAccess, opRead))
 
 	assertDomainCode(t, requireProjectAccess(operator, stmts, "proj_b", deploymentAccess, opWrite),
-		domain.ErrEnvironmentProjectNotFound().Code)
+		domain.ErrDeploymentInvalid(nil, nil).Code)
 	assertDomainCode(t, requireProjectAccess(operator, stmts, "proj_b", deploymentAccess, opRead),
 		domain.ErrDeploymentNotFound().Code)
 }

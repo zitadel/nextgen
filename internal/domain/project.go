@@ -65,29 +65,64 @@ type Project struct {
 	Name      string
 	CreatedAt time.Time
 	UpdatedAt time.Time
-	// PreviewOrigins are the allowed origins for the preview secret.
-	// Callers must set this field before the project is persisted.
-	PreviewOrigins []string
+	// AllowedOrigins is the origin allowlist: patterns with a kind. Nothing
+	// here routes; a primary pattern admits requests and a preview pattern
+	// bounds what a preview deploy may register.
+	AllowedOrigins []AllowedOrigin
+	// Class decides which patterns the allowlist accepts and whether a pinned
+	// release must already be deployed to the matched target.
+	Class ProjectClass
 	// PasswordHashPolicy is the hashing method this project's passwords are
 	// written with. Nil means the deployment default, which is what a project
 	// runs on until an admin chooses otherwise. See [PasswordHashPolicy].
 	PasswordHashPolicy *PasswordHashPolicy
 }
 
-func NewProject(name string, previewOrigins []string) (*Project, error) {
+// NewProject validates the name and normalises every allowlist pattern
+// against the sandbox rules, which is the class a project starts in.
+func NewProject(name string, allowedOrigins []AllowedOrigin) (*Project, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return nil, ErrProjectNameInvalid()
 	}
 
-	if previewOrigins == nil {
-		previewOrigins = []string{}
+	origins, err := NormalizeAllowedOrigins(ProjectClassSandbox, allowedOrigins)
+	if err != nil {
+		return nil, err
 	}
 
 	return &Project{
 		Name:           name,
-		PreviewOrigins: previewOrigins,
+		AllowedOrigins: origins,
+		Class:          ProjectClassSandbox,
 	}, nil
+}
+
+// NormalizeAllowedOrigins normalises and lints every entry for class, in
+// order, and rejects a pattern listed twice. Never nil, so an empty allowlist
+// is stored as an empty list.
+func NormalizeAllowedOrigins(class ProjectClass, entries []AllowedOrigin) ([]AllowedOrigin, error) {
+	origins := make([]AllowedOrigin, 0, len(entries))
+	seen := make(map[string]bool, len(entries))
+	for _, entry := range entries {
+		pattern, err := NormalizeOrigin(entry.Pattern)
+		if err != nil {
+			return nil, err
+		}
+		if !entry.Kind.IsAOriginKind() {
+			return nil, ErrOriginInvalid(map[string]string{"pattern": entry.Pattern, "reason": "unknown kind"})
+		}
+		entry.Pattern = pattern
+		if _, err := LintOriginPattern(class, entry); err != nil {
+			return nil, err
+		}
+		if seen[pattern] {
+			return nil, ErrOriginInvalid(map[string]string{"pattern": pattern, "reason": "listed twice"})
+		}
+		seen[pattern] = true
+		origins = append(origins, entry)
+	}
+	return origins, nil
 }
 
 func (p *Project) Token() *Token {
@@ -98,11 +133,23 @@ func (p *Project) Token() *Token {
 	}
 }
 
+// PreviewToken is the publishable key: the public-plane credential a browser
+// bundle ships with.
 func (p *Project) PreviewToken() *Token {
 	return &Token{
 		ProjectID: p.ID,
 		Type:      TokenTypeProjectPreview,
 		Scope:     []string{"project.read"},
+	}
+}
+
+// PreviewDeployToken is the credential a pull-request build holds: it may
+// create releases and deploy to preview origins, and nothing else.
+func (p *Project) PreviewDeployToken() *Token {
+	return &Token{
+		ProjectID: p.ID,
+		Type:      TokenTypeProjectPreviewDeploy,
+		Scope:     []string{"release.write", "release.read", "deployment.preview", "deployment.read", "allowed_origin.read", "project.read"},
 	}
 }
 
@@ -163,7 +210,8 @@ const (
 	ProjectFieldName
 	ProjectFieldCreatedAt
 	ProjectFieldUpdatedAt
-	ProjectFieldPreviewOrigins
+	ProjectFieldAllowedOrigins
+	ProjectFieldClass
 )
 
 type ProjectKeySet struct {

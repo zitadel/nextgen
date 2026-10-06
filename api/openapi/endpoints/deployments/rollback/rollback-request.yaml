@@ -1,0 +1,17 @@
+type: object
+properties:
+  deploy_id:
+    description: |
+      The deploy to go back to. Omitted, the newest deploy is undone; given,
+      what that deploy set is re-applied on every target it touched.
+    oneOf:
+      - type: string
+      - type: 'null'
+  origin:
+    description: Narrow the rollback to one target. `""` is the project default.
+    oneOf:
+      - type: string
+      - type: 'null'
+  message:
+    type: string
+    maxLength: 1024

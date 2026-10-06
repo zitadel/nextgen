@@ -22,10 +22,10 @@ type stubProjectService struct {
 	created *domain.Project
 }
 
-func (s stubProjectService) Create(context.Context, string, []string, bool) (*domain.Project, error) {
+func (s stubProjectService) Create(context.Context, string, []domain.AllowedOrigin, bool) (*domain.Project, error) {
 	return s.created, nil
 }
-func (s stubProjectService) CreateWithID(context.Context, string, string, []string, bool) (*domain.Project, error) {
+func (s stubProjectService) CreateWithID(context.Context, string, string, []domain.AllowedOrigin, bool) (*domain.Project, error) {
 	return s.created, nil
 }
 func (stubProjectService) Get(context.Context, string) (*domain.Project, error) {
@@ -44,6 +44,15 @@ func (stubProjectService) ListAuthorized(context.Context, service.ListAuthorized
 	return nil, domain.ErrSessionTokenInvalid()
 }
 func (stubProjectService) Delete(context.Context, string) error { return nil }
+func (stubProjectService) AddAllowedOrigin(context.Context, string, domain.AllowedOrigin) (*domain.OriginLintWarning, error) {
+	return nil, domain.ErrProjectNotFound()
+}
+func (stubProjectService) RemoveAllowedOrigin(context.Context, string, string) error {
+	return domain.ErrProjectNotFound()
+}
+func (stubProjectService) SetClass(context.Context, string, domain.ProjectClass, bool) (*domain.Project, error) {
+	return nil, domain.ErrProjectNotFound()
+}
 
 var _ service.ProjectService = stubProjectService{}
 
@@ -63,6 +72,9 @@ func TestProjectErrorResponse(t *testing.T) {
 		{"already_claimed", domain.ErrProjectAlreadyClaimed(), http.StatusConflict},
 		{"claim_expired", domain.ErrProjectClaimExpired(), http.StatusGone},
 		{"claim_window_expired", domain.ErrProjectClaimWindowExpired(), http.StatusGone},
+		{"origin_not_allowed", domain.ErrProjectOriginNotAllowed(nil), http.StatusForbidden},
+		{"preview_not_live", domain.ErrProjectPreviewNotLive(nil), http.StatusForbidden},
+		{"class_change_refused", domain.ErrProjectClassChangeRefused(nil), http.StatusBadRequest},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -79,6 +91,7 @@ func TestCreateProject_StampsActorSlot(t *testing.T) {
 	now := time.Now().UTC()
 	tokens.EXPECT().GenerateJWE(gomock.Any(), gomock.Any()).Return("jwe_proj", nil)
 	tokens.EXPECT().GenerateJWE(gomock.Any(), gomock.Any()).Return("jwe_prev", nil)
+	tokens.EXPECT().GenerateJWE(gomock.Any(), gomock.Any()).Return("jwe_preview_deploy", nil)
 
 	h := Handler{
 		projectService: stubProjectService{created: &domain.Project{

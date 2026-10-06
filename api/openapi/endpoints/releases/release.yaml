@@ -8,12 +8,13 @@ description: |
   `revision_id` through the per-kind read endpoints (`GET /schemas/{id}`,
   `GET /flow_definitions/{id}`, …).
 
-  A release exists on its own and is not tied to an environment. Deploying it
-  is a separate call.
+  A release exists on its own and is not tied to a target. Deploying it is a
+  separate call.
 type: object
 required:
   - id
   - project_id
+  - content_hash
   - metadata
   - pointers
 properties:
@@ -25,9 +26,25 @@ properties:
     readOnly: true
     description: The project this release belongs to.
     $ref: ../../components/schemas/project-id.yaml
+  content_hash:
+    readOnly: true
+    type: string
+    description: |
+      SHA-256 over the sorted pointer set, 64 hex characters. The digest a
+      build pins with `X-Zitadel-Release`, prefixed `sha256:` on the wire.
+    example: 9f2c1a7b4e83d05f6c2b19ae7d430f821c6b5de90a4f73829f2c1a7b4e83d05f
   metadata:
     readOnly: true
     $ref: release-metadata.yaml
+  revoked_at:
+    readOnly: true
+    description: |
+      When the release was revoked. A revoked release is refused on every
+      path, including a client that pins it.
+    oneOf:
+      - type: string
+        format: date-time
+      - type: 'null'
   pointers:
     readOnly: true
     type: array

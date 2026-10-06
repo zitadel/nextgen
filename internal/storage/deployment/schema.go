@@ -6,9 +6,8 @@ import (
 )
 
 // Schema binds deployment list/filter/order fields for all dialects. The
-// actor pair (deployed_by, deployed_by_type) and source_environment_id are
-// read straight off the row and never filtered on, so only the columns lists
-// order or filter by are bound.
+// metadata document is read straight off the row and never filtered on, so
+// only the columns lists order or filter by are bound.
 var Schema = database.NewSchema(map[domain.DeploymentField]database.FieldBinding[domain.Deployment]{
 	domain.DeploymentFieldProjectID: {
 		SQLName:  "project_id",
@@ -20,9 +19,14 @@ var Schema = database.NewSchema(map[domain.DeploymentField]database.FieldBinding
 		Accessor: func(d *domain.Deployment) any { return d.ID },
 		Coerce:   database.CoerceString,
 	},
-	domain.DeploymentFieldEnvironmentID: {
-		SQLName:  "environment_id",
-		Accessor: func(d *domain.Deployment) any { return d.EnvironmentID },
+	domain.DeploymentFieldDeployID: {
+		SQLName:  "deploy_id",
+		Accessor: func(d *domain.Deployment) any { return d.DeployID },
+		Coerce:   database.CoerceString,
+	},
+	domain.DeploymentFieldOrigin: {
+		SQLName:  "origin",
+		Accessor: func(d *domain.Deployment) any { return d.Origin },
 		Coerce:   database.CoerceString,
 	},
 	domain.DeploymentFieldReleaseID: {

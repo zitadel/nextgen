@@ -1,6 +1,6 @@
 // Package deployment holds shared helpers for the deployments table used by
-// v2 dialect statements: list options, the create-time guard, and the
-// encoding of the metadata JSON column.
+// v2 dialect statements: list options and the encoding of the metadata JSON
+// column.
 package deployment
 
 import (
@@ -20,22 +20,22 @@ import (
 // than its numeric value, so inserting a reason ahead of an existing one in
 // the enum cannot reinterpret rows already written.
 type metadata struct {
-	Reason                string  `json:"reason,omitempty"`
-	Message               *string `json:"message,omitempty"`
-	SourceEnvironmentID   *string `json:"source_environment_id,omitempty"`
-	SourceEnvironmentName *string `json:"source_environment_name,omitempty"`
-	DeployedBy            *string `json:"deployed_by,omitempty"`
-	DeployedByType        *string `json:"deployed_by_type,omitempty"`
+	Reason         string  `json:"reason,omitempty"`
+	Message        *string `json:"message,omitempty"`
+	RollbackOf     *string `json:"rollback_of,omitempty"`
+	DeployedBy     *string `json:"deployed_by,omitempty"`
+	DeployedByType *string `json:"deployed_by_type,omitempty"`
 }
 
 // Row carries the scanned columns of one deployments row.
 type Row struct {
-	ProjectID     string
-	ID            string
-	EnvironmentID string
-	ReleaseID     string
-	Metadata      []byte
-	DeployedAt    time.Time
+	ProjectID  string
+	ID         string
+	DeployID   string
+	Origin     string
+	ReleaseID  string
+	Metadata   []byte
+	DeployedAt time.Time
 }
 
 // MarshalMetadata converts the deployment metadata into JSON for the metadata
@@ -44,11 +44,10 @@ type Row struct {
 // reason.
 func MarshalMetadata(m domain.DeploymentMetadata) ([]byte, error) {
 	encoded := metadata{
-		Reason:                m.Reason.String(),
-		Message:               m.Message,
-		SourceEnvironmentID:   m.SourceEnvironmentID,
-		SourceEnvironmentName: m.SourceEnvironmentName,
-		DeployedBy:            m.DeployedBy,
+		Reason:     m.Reason.String(),
+		Message:    m.Message,
+		RollbackOf: m.RollbackOf,
+		DeployedBy: m.DeployedBy,
 	}
 	if m.DeployedByType != nil {
 		encoded.DeployedByType = new(string(*m.DeployedByType))
@@ -81,17 +80,17 @@ func ToDomain(row Row) (*domain.Deployment, error) {
 	}
 
 	return &domain.Deployment{
-		ProjectID:     row.ProjectID,
-		ID:            row.ID,
-		EnvironmentID: row.EnvironmentID,
-		ReleaseID:     row.ReleaseID,
+		ProjectID: row.ProjectID,
+		ID:        row.ID,
+		DeployID:  row.DeployID,
+		Origin:    row.Origin,
+		ReleaseID: row.ReleaseID,
 		Metadata: domain.DeploymentMetadata{
-			Reason:                reason,
-			Message:               encoded.Message,
-			SourceEnvironmentID:   encoded.SourceEnvironmentID,
-			SourceEnvironmentName: encoded.SourceEnvironmentName,
-			DeployedBy:            encoded.DeployedBy,
-			DeployedByType:        actorType,
+			Reason:         reason,
+			Message:        encoded.Message,
+			RollbackOf:     encoded.RollbackOf,
+			DeployedBy:     encoded.DeployedBy,
+			DeployedByType: actorType,
 		},
 		// Spanner returns UTC while pgx defaults to local; normalize.
 		DeployedAt: row.DeployedAt.UTC(),

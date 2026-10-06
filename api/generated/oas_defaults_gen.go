@@ -143,6 +143,14 @@ func (s *ReleaseMetadata) setDefaults() {
 }
 
 // setDefaults set default value of fields.
+func (s *SetProjectClassReq) setDefaults() {
+	{
+		val := bool(false)
+		s.Confirm.SetTo(val)
+	}
+}
+
+// setDefaults set default value of fields.
 func (s *StepAction) setDefaults() {
 	{
 		val := bool(false)

@@ -1,0 +1,5 @@
+type: string
+enum:
+  - all
+  - preview
+default: all

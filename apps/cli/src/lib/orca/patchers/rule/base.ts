@@ -239,7 +239,7 @@ export abstract class AbstractRulePatcher implements Patcher {
           project_id: ctx.project.id,
           project_secret: ctx.project.project_secret,
           preview_secret: ctx.project.preview_secret,
-          preview_origins: ctx.project.preview_origins,
+          preview_token: ctx.project.preview_token,
           created_at: ctx.project.created_at,
         })}\n`,
       },
@@ -249,11 +249,10 @@ export abstract class AbstractRulePatcher implements Patcher {
         path: ".env.example",
         comment: LOCAL_SERVER_ENV_COMMENT,
         entries: {
-          ZITADEL_PROJECT_ID: "",
-          ZITADEL_PROJECT_SECRET: "",
-          ZITADEL_ENVIRONMENT: "",
-          ZITADEL_ISSUER: "",
           ZITADEL_URL: "",
+          ZITADEL_PROJECT_ID: "",
+          ZITADEL_PUBLISHABLE_KEY: "",
+          ZITADEL_PROJECT_SECRET: "",
         },
       },
       {
@@ -261,11 +260,10 @@ export abstract class AbstractRulePatcher implements Patcher {
         path: ".env.local",
         comment: LOCAL_SERVER_ENV_COMMENT,
         entries: {
-          ZITADEL_PROJECT_ID: ctx.project.id,
-          ZITADEL_PROJECT_SECRET: ctx.project.project_secret,
-          ZITADEL_ENVIRONMENT: "development",
-          ZITADEL_ISSUER: ctx.issuer,
           ZITADEL_URL: ctx.server,
+          ZITADEL_PROJECT_ID: ctx.project.id,
+          ZITADEL_PUBLISHABLE_KEY: ctx.project.preview_secret,
+          ZITADEL_PROJECT_SECRET: ctx.project.project_secret,
         },
       },
       {
@@ -327,21 +325,12 @@ async function readTextIfExists(path: string): Promise<string | undefined> {
 
 /** Builds the `zitadel.json` body persisted at the project root. */
 function projectConfig(ctx: PatchContext): Record<string, unknown> {
-  const environments: Record<string, unknown> = { development: { issuer: ctx.issuer } };
-  if (ctx.project.preview_origins.length > 0) {
-    // preview_origins are already full origins (scheme://host[:port]); don't
-    // prepend a scheme or it doubles up (https://http://localhost:3000).
-    environments.preview = {
-      issuer_pattern: [...ctx.project.preview_origins],
-    };
-  }
   return {
     $schema: "https://schemas.zitadel.com/v2/project.schema.json",
     project: ctx.project.id,
     server: resolveServerOrigin(ctx.server),
     framework: { id: ctx.framework.id },
     branding: { renderer: ctx.rendererId, attribution: "visible" },
-    environments,
     ...(ctx.preset === undefined ? {} : { preset: ctx.preset }),
     ...(ctx.useCase === undefined ? {} : { useCase: ctx.useCase }),
   };

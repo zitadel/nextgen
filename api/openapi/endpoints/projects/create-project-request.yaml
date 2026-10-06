@@ -5,12 +5,13 @@ properties:
   name:
     type: string
     description: The name of the project.
-  preview_origins:
+  allowed_origins:
     type: array
     items:
-      type: string
+      $ref: allowed-origin.yaml
     description: |
-      Origins which are allowed for previewing and testing the project.
+      The origin allowlist the project starts with. Empty means every origin
+      is served, which only a `sandbox` project may keep.
   seed_defaults:
     type: boolean
     default: true

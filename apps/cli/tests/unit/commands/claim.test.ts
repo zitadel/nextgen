@@ -70,7 +70,8 @@ async function makeProject(overrides: Record<string, unknown> = {}): Promise<{
   const response = await fetch(`${SERVER}/projects`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ name: "demo", preview_origins: [] }),
+    body: JSON.stringify({ name: "demo", preview_token: "sk_proj_preview_token",
+ }),
   });
   const project = (await response.json()) as Project;
   // Fail loudly rather than writing `undefined` into the secret: a renamed
@@ -85,7 +86,7 @@ async function makeProject(overrides: Record<string, unknown> = {}): Promise<{
     project_id: project.id,
     project_secret: project.project_secret,
     preview_secret: "sk_preview_test",
-    preview_origins: [],
+    preview_token: "sk_proj_preview_token",
     created_at: "2026-01-01T00:00:00.000Z",
     ...overrides,
   });
@@ -196,7 +197,7 @@ describe("claim", () => {
       project_id: "proj-local",
       project_secret: "sk_proj_local",
       preview_secret: "sk_preview_local",
-      preview_origins: [],
+      preview_token: "sk_proj_preview_token",
       created_at: "2026-01-01T00:00:00.000Z",
       claimed_at: "2026-02-02T00:00:00.000Z",
       team_id: "team-local",

@@ -14,7 +14,7 @@ import { describe, expect, it } from "vitest";
  * is *called*, which is the part that reaches Mixpanel and cannot be renamed
  * later without breaking saved reports.
  */
-const commandsDir = join(import.meta.dirname, "../../../../src/commands/variables");
+const commandsDir = join(import.meta.dirname, "../../../../src/commands/vars");
 const agentsDoc = join(import.meta.dirname, "../../../../AGENTS.md");
 
 /** The dimension names each command passes to `recordTelemetry`. */
@@ -37,7 +37,7 @@ describe("variables telemetry dimensions", () => {
   it("records only dimensions the tracking plan documents", async () => {
     const documented = (await readFile(agentsDoc, "utf8"))
       .split("\n")
-      .find((line) => line.startsWith("- **variables**"));
+      .find((line) => line.startsWith("- **vars**"));
     expect(documented, "AGENTS.md has no variables entry in the tracking plan").toBeDefined();
 
     for (const [file, keys] of await recordedDimensions()) {
@@ -84,11 +84,11 @@ describe("variables telemetry dimensions", () => {
 
   it("covers every variables command that has a dimension to record", async () => {
     const recorded = await recordedDimensions();
-    expect([...recorded.keys()].sort()).toEqual(["delete.ts", "get.ts", "list.ts", "set.ts"]);
-    // `delete` records none: with one owner and no per-command shape to report,
-    // the lifecycle events already carry everything true of the run.
-    expect(recorded.get("delete.ts")).toEqual([]);
-    for (const command of ["get.ts", "list.ts", "set.ts"]) {
+    expect([...recorded.keys()].sort()).toEqual(["get.ts", "list.ts", "resolve.ts", "rm.ts", "set.ts"]);
+    // `rm` records none: the lifecycle events already carry everything true
+    // of the run.
+    expect(recorded.get("rm.ts")).toEqual([]);
+    for (const command of ["get.ts", "list.ts", "resolve.ts", "set.ts"]) {
       expect(recorded.get(command)?.length, `${command} records no dimensions`).toBeGreaterThan(0);
     }
   });

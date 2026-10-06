@@ -12,21 +12,18 @@ import (
 )
 
 const (
-	variablesQuery = `SELECT name, project_id, environment_id, value, is_secret, created_at, modified_at
+	variablesQuery = `SELECT name, project_id, applies_to, value, is_secret, created_at, modified_at
 FROM variables`
 
-	// The conflict target is the natural key, so a rewrite at the same owner and
-	// name replaces the value instead of adding a second variable there.
-	setVariableStmt = `INSERT INTO variables (name, project_id, environment_id, value, is_secret, created_at, modified_at)
+	// The conflict target is the primary key, so a rewrite of the same name
+	// and applies_to replaces the value instead of adding a second row.
+	setVariableStmt = `INSERT INTO variables (name, project_id, applies_to, value, is_secret, created_at, modified_at)
 VALUES (?, ?, ?, ?, ?, ?, ?)
-ON CONFLICT (name, project_id, environment_id)
+ON CONFLICT (project_id, name, applies_to)
 DO UPDATE SET value = excluded.value, is_secret = excluded.is_secret, modified_at = excluded.modified_at`
 
-	// Both owner columns are matched exactly, which is the primary key minus
-	// the name -- so this addresses exactly one row, and an owner cannot remove
-	// a variable another one entered.
 	deleteVariableStmt = `DELETE FROM variables
-WHERE name = ? AND project_id = ? AND environment_id = ?`
+WHERE name = ? AND project_id = ? AND applies_to = ?`
 )
 
 type variableStatements struct{ statement }
@@ -36,9 +33,9 @@ func newVariableStatements(client queryExecutor) variableStatements {
 }
 
 // GetVariables implements [service.VariableStatements].
-func (s variableStatements) GetVariables(ctx context.Context, owner domain.VariableOwner, names ...string) ([]*domain.Variable, error) {
+func (s variableStatements) GetVariables(ctx context.Context, projectID string, appliesTo *domain.VariableAppliesTo, names ...string) ([]*domain.Variable, error) {
 	var compiler statementCompiler
-	if err := compileRead(&compiler, variablesQuery, variable.VisibleTo(owner, names...), variable.Schema); err != nil {
+	if err := compileRead(&compiler, variablesQuery, variable.VisibleTo(projectID, appliesTo, names...), variable.Schema); err != nil {
 		return nil, err
 	}
 
@@ -46,11 +43,12 @@ func (s variableStatements) GetVariables(ctx context.Context, owner domain.Varia
 	if err != nil {
 		return nil, wrapError(err)
 	}
+	defer rows.Close()
 	items, err := collectRows(rows, scanVariable)
 	if err != nil {
 		return nil, wrapError(err)
 	}
-	return variable.ToDomain(items), nil
+	return variable.ToDomain(items)
 }
 
 // SetVariable implements [service.VariableStatements].
@@ -61,17 +59,15 @@ func (s variableStatements) SetVariable(ctx context.Context, v *domain.Variable)
 	}
 	now := nowUnixNano()
 	_, err = execAffected(ctx, s.client, setVariableStmt,
-		v.Name, v.Owner.ProjectID, v.Owner.EnvironmentID,
+		v.Name, v.Owner.ProjectID, v.AppliesTo.String(),
 		string(encoded), v.IsSecret, now, now,
 	)
 	return err
 }
 
 // DeleteVariable implements [service.VariableStatements].
-func (s variableStatements) DeleteVariable(ctx context.Context, owner domain.VariableOwner, name string) error {
-	n, err := execAffected(ctx, s.client, deleteVariableStmt,
-		name, owner.ProjectID, owner.EnvironmentID,
-	)
+func (s variableStatements) DeleteVariable(ctx context.Context, projectID string, appliesTo domain.VariableAppliesTo, name string) error {
+	n, err := execAffected(ctx, s.client, deleteVariableStmt, name, projectID, appliesTo.String())
 	if err != nil {
 		return err
 	}
@@ -89,7 +85,7 @@ func scanVariable(rows *sql.Rows) (*variable.VariableStorage, error) {
 		modifiedNano int64
 	)
 	if err := rows.Scan(
-		&row.Name, &row.ProjectID, &row.EnvironmentID,
+		&row.Name, &row.ProjectID, &row.AppliesTo,
 		&encoded, &row.IsSecret, &createdNano, &modifiedNano,
 	); err != nil {
 		return nil, err

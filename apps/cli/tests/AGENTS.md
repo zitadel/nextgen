@@ -28,7 +28,7 @@ A spec drives the built CLI through `runCliForTest` against
 observe afterwards.
 
 **One spec file per command, named after the command.** `setup.spec.ts`,
-`plan.spec.ts`, `sso-enable.spec.ts`, `variables-set.spec.ts`. A command's spec is
+`plan.spec.ts`, `sso-enable.spec.ts`, `vars-set.spec.ts`. A command's spec is
 the only spec that drives that command as its subject. There are no
 cross-command spec files, no "contract" files and no "round-trip" files.
 
@@ -39,8 +39,8 @@ regression fails inside the spec of the command that broke. A dedicated
 contract suite only ever covers the commands somebody remembered to list, and
 reports the failure far from its cause.
 
-A topic's commands are separate commands: `variables set` is
-`variables-set.spec.ts`, not a suite inside a shared file, so coverage is
+A topic's commands are separate commands: `vars set` is
+`vars-set.spec.ts`, not a suite inside a shared file, so coverage is
 discoverable by filename. The binary's own behaviour — an unknown command,
 which server it resolves — is `cli.spec.ts`.
 
@@ -74,7 +74,7 @@ Three rules make that shape hold:
 2. **Observe by running a command.** A spec's subject is how the CLI behaves,
    not how it stores things, so what a command did is checked by running
    another one: `idps list`, `schemas list`, `flow-definitions list`,
-   `variables list --project-level`, `plan`. Never `.zitadel/state.json` and
+   `vars list`, `deployments --live`, `plan`. Never `.zitadel/state.json` and
    never the mock's own store — a corrupt file matters only insofar as a later
    command surfaces it, and that surfacing is the assertion.
 

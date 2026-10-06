@@ -24,11 +24,19 @@ const (
 	flowCookieMaxAgeSeconds = 600
 )
 
-func (h *Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest) (api.CreateFlowRes, error) {
+func (h *Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest, params api.CreateFlowParams) (api.CreateFlowRes, error) {
 	audit.BindPublicRequest(ctx, string(req.ProjectID), "", "")
 	purpose, err := domain.FlowDefinitionPurposeString(string(req.Purpose))
 	if err != nil {
 		return nil, domain.ErrFlowInvalidPurpose().WithMessage(fmt.Sprintf("unknown purpose %q", req.Purpose))
+	}
+
+	// Which release serves the attempt is decided here, once, from the origin
+	// the request arrived on and the release it may pin; the answer is sealed
+	// into the flow state so later steps read the same configuration.
+	ctx, err = h.resolveRuntime(ctx, string(req.ProjectID), params.XZitadelRelease.Or(""))
+	if err != nil {
+		return nil, err
 	}
 
 	resolveReq := service.ResolveFlowRequest{
@@ -139,10 +147,16 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 			Proof:       proof,
 		}
 	}
-	// The browser Origin header drives the WebAuthn relying-party params when a
-	// step issues or verifies a passkey challenge. Same-origin browser fetches may
-	// not include Origin; fall back to the effective request host injected by the
-	// WithRequestHostMiddleware (X-Forwarded-Host or r.Host).
+	// A browser request is gated on its Origin the same way the first step
+	// was; the matched origin also drives the WebAuthn relying-party params
+	// when a step issues or verifies a passkey challenge. Same-origin browser
+	// fetches may not include Origin; fall back to the effective request host
+	// injected by WithRequestHostMiddleware (X-Forwarded-Host or r.Host).
+	if origin, ok := params.Origin.Get(); ok {
+		if err := h.gateOrigin(ctx, state.ProjectID, origin.String()); err != nil {
+			return nil, err
+		}
+	}
 	originStr := ""
 	if origin, ok := params.Origin.Get(); ok {
 		originStr = origin.String()
@@ -150,23 +164,13 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 		originStr = h
 	}
 	if originStr != "" {
-		originURL, err := url.Parse(originStr)
-		if err == nil {
+		if originURL, err := url.Parse(originStr); err == nil {
 			if rp := passkeyRPFromOrigin(*originURL); rp != nil {
-				project, err := h.projectService.Get(ctx, state.ProjectID)
-				if err != nil {
-					// A project lookup failing mid-submit is a server-side
-					// fault, not client input: keep it a 500 rather than
-					// letting proj.not_found surface as a 404 here.
-					return nil, domain.ErrInternal(err)
-				}
-				if err := validateOriginAgainstProject(originStr, project); err != nil {
-					return nil, domain.ErrRequestInvalid().WithMessage(err.Error())
-				}
 				submitReq.PasskeyRP = rp
 			}
 		}
 	}
+	ctx = h.withSealedRelease(ctx, state)
 
 	result, err := h.flowService.Submit(ctx, submitReq)
 	if err != nil {
@@ -205,6 +209,7 @@ func (h *Handler) GetFlowStep(ctx context.Context, params api.GetFlowStepParams)
 		return mapFlowGetError(domain.ErrFlowNotFound())
 	}
 
+	ctx = h.withSealedRelease(ctx, state)
 	result, err := h.flowService.GetStep(ctx, service.GetFlowStepRequest{State: state})
 	if err != nil {
 		return nil, err
@@ -293,7 +298,7 @@ func (h *Handler) buildFlowResponse(ctx context.Context, result domain.FlowStepR
 		ID:        result.State.ID,
 		SessionID: result.State.SessionID,
 		Step:      toFlowStep(result.Step),
-		Branding:  api.NewOptBranding(h.resolveBranding(ctx, result.State.ProjectID)),
+		Branding:  api.NewOptBranding(h.resolveBranding(ctx, result.State)),
 	}
 	if terminal && result.State.RedirectURI != nil {
 		if u, err := parseURI(*result.State.RedirectURI); err == nil {
@@ -373,22 +378,49 @@ func toFlowStepChallenge(c domain.FlowStepChallenge) api.FlowStepChallenge {
 // project's PreviewOrigins allowlist. An empty allowlist means allow all
 // (development/test mode).
 //
-// Matching is deliberately exact — no loopback aliasing between localhost,
-// 127.0.0.1, and [::1]. The WebAuthn RP ID derives from the origin hostname
-// (passkeyRPFromOrigin), so a passkey registered under one loopback spelling
-// can never assert under another; aliasing here would replace this clear 400
-// with a confusing "no passkey found" during the ceremony.
-func validateOriginAgainstProject(originStr string, project *domain.Project) error {
-	if len(project.PreviewOrigins) == 0 {
+// resolveRuntime decides which release serves the attempt from the browser
+// origin the request carries and the release it may pin, and puts the answer
+// on the context. A request without an origin is not a browser and is served
+// the project default.
+func (h *Handler) resolveRuntime(ctx context.Context, projectID, pin string) (context.Context, error) {
+	if h.runtime == nil {
+		return ctx, nil
+	}
+	origin, _ := browserOriginFromContext(ctx)
+	resolution, err := h.runtime.Resolve(ctx, projectID, origin, pin)
+	if err != nil {
+		return ctx, err
+	}
+	return service.WithRuntimeResolution(ctx, resolution), nil
+}
+
+// gateOrigin refuses a later step from an origin the project does not admit.
+func (h *Handler) gateOrigin(ctx context.Context, projectID, origin string) error {
+	if h.runtime == nil {
 		return nil
 	}
-	for _, allowed := range project.PreviewOrigins {
-		if allowed == originStr {
-			return nil
-		}
+	project, err := h.projectService.Get(ctx, projectID)
+	if err != nil {
+		// A project lookup failing mid-submit is a server-side fault, not
+		// client input: keep it a 500 rather than letting proj.not_found
+		// surface as a 404 here.
+		return domain.ErrInternal(err)
 	}
-	return fmt.Errorf("origin %q is not allowed for this project (allowed: %s)",
-		originStr, strings.Join(project.PreviewOrigins, ", "))
+	_, err = h.runtime.Gate(ctx, project, origin)
+	return err
+}
+
+// withSealedRelease puts the release the attempt started on back on the
+// context, so the steps after the first resolve configuration from it.
+func (h *Handler) withSealedRelease(ctx context.Context, state *domain.FlowState) context.Context {
+	if state == nil || state.ReleaseID == "" || h.releaseService == nil {
+		return ctx
+	}
+	release, err := h.releaseService.Get(ctx, state.ProjectID, state.ReleaseID)
+	if err != nil {
+		return ctx
+	}
+	return service.WithRelease(ctx, release)
 }
 
 // passkeyRPFromOrigin derives the WebAuthn relying-party id (the origin host,

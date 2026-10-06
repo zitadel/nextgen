@@ -10,8 +10,8 @@ the session server-side — here through the `@zitadel/sdk-nuxt` module.
 - `plugins/zitadel-components.client.ts`, `plugins/auth.server.ts` — widget + session plugins
 - `nuxt.config.*` — registers `@zitadel/sdk-nuxt/module`, sets the backend URL, login path, and `/profile` as a protected route, seeds `runtimeConfig` (backend URL, proxy path, project id), and adds the components to `build.transpile` (edits the first matching `nuxt.config.{ts,mts,js,mjs}`)
 - `.env.example`, `.env.local` — `NUXT_PUBLIC_ZITADEL_PROJECT_ID` (client-exposed),
-  plus the shared `ZITADEL_*` keys the base patcher writes (`ZITADEL_PROJECT_ID`,
-  `ZITADEL_ISSUER`, `ZITADEL_URL`, `ZITADEL_ENVIRONMENT`) — the Nuxt config reads
+  plus the shared `ZITADEL_*` keys the base patcher writes (`ZITADEL_URL`,
+  `ZITADEL_PROJECT_ID`, `ZITADEL_PUBLISHABLE_KEY`, `ZITADEL_PROJECT_SECRET`) — the Nuxt config reads
   `ZITADEL_URL`
 - `package.json` — adds `@zitadel/sdk-nuxt`
 

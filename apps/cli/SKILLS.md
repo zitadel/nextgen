@@ -407,11 +407,46 @@ docker --image <ref>` remains the explicit image override for debugging.
   `liquid_template`) renders as `(<n> lines, sha256:…)` when it is created or
   unchanged, and as a changed-line diff when it moved — not as one escaped
   line. Read the file itself for full content.
-- No command takes `--environment` (`-e`, `--env`). `plan`, `apply` and the
-  resource commands work on the project's resources and never selected an
-  environment; `variables` names its owner with `--project-level`. The flag
-  returns when the platform's environments settle, and `deploy` (ADR 035) is
-  what will put config onto one.
+- Every command resolves its server, project and credential per value, from
+  the first source that supplies it: `--server`, `--env-file <path>` (only
+  that file), the process environment, `.env.<env>.local`, `.env.local`,
+  `.env.<env>`, `.env`, then `.zitadel/secret`. The environment is `--env`,
+  `ZITADEL_ENV`, a platform signal (`VERCEL_ENV`, Netlify `CONTEXT`), else
+  `development`; `NODE_ENV` is ignored. The keys are `ZITADEL_URL`,
+  `ZITADEL_PROJECT_ID`, `ZITADEL_PROJECT_SECRET`, `ZITADEL_PREVIEW_TOKEN` and
+  `ZITADEL_PUBLISHABLE_KEY`. `env` prints what resolved and from where;
+  `env list` the environments bound here; `env add <name>` writes
+  `.env.<name>.local` for a new or existing (`--project <id>`) project. An
+  environment is a client-side label: nothing on the server is keyed on it.
+- `deploy` — build a release from `.zitadel/` (the sync loop runs first, so
+  unchanged content reuses its revisions) and deploy it to the project default
+  and every `primary` origin in one operation (`data.deploy_id`, `dpl_…`).
+  `--origin <url>` narrows it to one primary origin and refuses a preview URL.
+  The last line printed is `NEXT_PUBLIC_ZITADEL_RELEASE=sha256:<digest>` for a
+  build that pins the release. Authenticates with the project secret.
+- `preview` — the same for a pull-request build: deploys the release to the
+  URLs the platform reports (`VERCEL_BRANCH_URL`/`VERCEL_URL`,
+  `DEPLOY_PRIME_URL`/`DEPLOY_URL`, `CF_PAGES_URL`) or `--origin <url>`, each
+  for `--ttl` (default `7d`), renewed on every run. Each URL must match a
+  `preview` pattern of the allowlist. Outside a `preview`/`development`
+  environment it is a `skipped` no-op, so `zitadel preview && next build` is
+  the build command on every branch. With no `ZITADEL_PREVIEW_TOKEN` it warns
+  and exits 0 (`--strict` fails). `preview rm <url>` retires one URL early.
+- `deployments` — the log newest first (`--origin`, `--deploy <dpl_…>`), or
+  `--live` for the newest row per target with `expires_at` on previews.
+  `(default)` is the empty origin, what a caller with no `Origin` is served.
+- `rollback` — undo the newest deploy on every target it moved, or `--to
+  <dpl_…>`; `--origin` narrows to one target. Needs `--force` when
+  non-interactive. Targets the undone deploy created are left as they are and
+  named in `data.warnings`.
+- `allowlist` — the project's origin patterns with their kind; `allowlist add
+  <pattern> --kind primary|preview` reports the check the pattern passed
+  (`data.check`), `allowlist rm <pattern>` removes one. A `primary` pattern
+  admits requests; a `preview` pattern only bounds what `preview` may
+  register, and a request from such a URL is admitted by the live row alone.
+- `projects promote` / `projects demote --confirm` — set the project class
+  (`sandbox` or `production`). `releases revoke <id>` — refuse a release on
+  every path, pinned or not.
 - `schemas list` — inspect the revision history of a user-schema, filtered by
   `--object-type` (e.g. `human-user`). Non-interactive/`--json` prints one row
   per revision (newest first); interactive adds a picker that fetches and
@@ -432,7 +467,7 @@ docker --image <ref>` remains the explicit image override for debugging.
   file — a hand-written connection holding a real id rather than the scaffolded
   `${{ NAME }}` reference. The client secret is
   never a flag — it is prompted for, or read from stdin on a non-interactive
-  run, as `variables set` does — and only its `${{ NAME }}` reference reaches
+  run, as `vars set` does — and only its `${{ NAME }}` reference reaches
   the connection file. A step edited by hand is left alone and reported. `setup`
   asks during onboarding too, as a multi-select over the catalog, so a run can
   enable several providers at once; its `data.sso` is a **list**, one entry per
@@ -447,26 +482,22 @@ docker --image <ref>` remains the explicit image override for debugging.
   template) from a shipped design, `--design centered|minimal` (the default card, or
   the same form without card chrome) or an interactive picker on a TTY. `plan`/`apply` then publish every edit as
   a new branding revision.
-- `variables list|get|set|delete` — manage the variables and secrets a
-  configuration document references as `${{ NAME }}`. Every command addresses
-  one owner, and `--project-level` is the only one the CLI can name today, so it
-  is **required**: a run without it fails with `E_VALIDATION`, on a terminal as
-  in a script. The platform also keeps variables per environment, but the CLI
-  cannot address those until the platform's environments settle; `--environment`
-  returns then, and every command written today keeps its meaning because the
-  owner was named rather than assumed. Owners do not inherit from one another —
-  a value entered at the project level is **not** seen by an environment
-  (ADR 062 §4). `set` takes its value from a prompt or from stdin and never from
+- `vars list|get|set|rm|resolve` — manage the variables and secrets a
+  configuration document references as `${{ NAME }}`. A variable belongs to the
+  project; `--preview` on `get`, `set` and `rm` addresses the value preview
+  deploys prefer, and `list` shows both columns. Nothing here is live until
+  the next deploy: every deployment freezes the values it resolved, and
+  `vars resolve [--origin <url>]` reads what a target is serving from its
+  deployment. `set` takes its value from a prompt or from stdin and never from
   a flag, so a credential never reaches `argv`; `--secret` stores it encrypted,
   after which it can be replaced but never read back (`list` reports it as held,
   and `--json` omits the value key entirely). `set --as number|boolean` stores a
   JSON number or boolean instead of a string, so a whole-field `${{ NAME }}`
   reference resolves to that type; it is refused with `--secret`, and an integer
-  too large to store exactly is refused rather than rounded. Output follows the
-  resource commands: on a pipe, `list` prints tab-separated `name`/`value` rows
-  (a secret's value is `(secret)`) and `get` prints the whole record as JSON,
-  which carries no `value` key for a secret. There is no `pull` and no bulk
-  import. `set` and `delete` honour `--dry-run` and make no change; `delete`
+  too large to store exactly is refused rather than rounded. On a pipe, `list`
+  prints tab-separated rows (a secret's value is `(secret)`, a missing preview
+  value `—`) and `get` prints the whole record as JSON, which carries no `value`
+  key for a secret. `set` and `rm` honour `--dry-run` and make no change; `rm`
   needs `--force` when non-interactive.
 
 ## Golden path
@@ -477,7 +508,7 @@ npx @zitadel/cli@alpha start --non-interactive --json
 npx @zitadel/cli@alpha setup --framework next --server local --non-interactive --json
 npx @zitadel/cli@alpha doctor --non-interactive --json
 npx @zitadel/cli@alpha plan --non-interactive --json
-npx @zitadel/cli@alpha apply --non-interactive --json
+npx @zitadel/cli@alpha deploy --non-interactive --json
 ```
 
 Exact alpha train invocation:

@@ -17,11 +17,14 @@ const (
 	releaseTable      = "releases"
 	createReleaseStmt = `INSERT INTO releases (project_id, id, content_hash, pointers, metadata)` +
 		` VALUES (@p1, @p2, @p3, @p4, @p5) THEN RETURN created_at`
-	releaseQuery = `SELECT project_id, id, content_hash, pointers, metadata, created_at FROM releases`
+	releaseQuery = `SELECT project_id, id, content_hash, pointers, metadata, created_at, revoked_at FROM releases`
+	// Revoking twice keeps the first stamp.
+	revokeReleaseStmt        = `UPDATE releases SET revoked_at = COALESCE(revoked_at, @p3) WHERE project_id = @p1 AND id = @p2`
+	releasesByHashPrefixStmt = releaseQuery + ` WHERE project_id = @p1 AND STARTS_WITH(content_hash, @p2) ORDER BY created_at DESC, id DESC`
 )
 
 var releaseColumns = []string{
-	"project_id", "id", "content_hash", "pointers", "metadata", "created_at",
+	"project_id", "id", "content_hash", "pointers", "metadata", "created_at", "revoked_at",
 }
 
 type releaseStatements struct{ statement }
@@ -112,6 +115,31 @@ func (rs releaseStatements) GetReleaseByContentHash(ctx context.Context, project
 	return entity, nil
 }
 
+// ListReleasesByContentHashPrefix implements [service.ReleaseStatements].
+func (rs releaseStatements) ListReleasesByContentHashPrefix(ctx context.Context, projectID, prefix string) ([]*domain.Release, error) {
+	var items []*domain.Release
+	if err := rs.db.Query(ctx, buildStatement(releasesByHashPrefixStmt, projectID, prefix).statement(), func(iter *spanner.RowIterator) error {
+		var err error
+		items, err = collectRows(iter, rs.scanRelease)
+		return err
+	}); err != nil {
+		return nil, returnQueryError(err)
+	}
+	return items, nil
+}
+
+// RevokeRelease implements [service.ReleaseStatements].
+func (rs releaseStatements) RevokeRelease(ctx context.Context, projectID, id string, at time.Time) error {
+	n, err := rs.db.Update(ctx, buildStatement(revokeReleaseStmt, projectID, id, at.UTC()).statement())
+	if err != nil {
+		return wrapError(err)
+	}
+	if n == 0 {
+		return database.NewNoRowFoundError(nil)
+	}
+	return nil
+}
+
 // GetReleasesByIDs implements [service.ReleaseStatements].
 func (rs releaseStatements) GetReleasesByIDs(ctx context.Context, projectID string, ids []string) ([]*domain.Release, error) {
 	if len(ids) == 0 {
@@ -167,6 +195,7 @@ func (rs releaseStatements) scanRelease(row *spanner.Row) (*domain.Release, erro
 		pointersJSON spanner.NullJSON
 		metadataJSON spanner.NullJSON
 		createdAt    time.Time
+		revokedAt    spanner.NullTime
 	)
 	if err := row.Columns(
 		&scanned.ProjectID,
@@ -175,8 +204,12 @@ func (rs releaseStatements) scanRelease(row *spanner.Row) (*domain.Release, erro
 		&pointersJSON,
 		&metadataJSON,
 		&createdAt,
+		&revokedAt,
 	); err != nil {
 		return nil, err
+	}
+	if revokedAt.Valid {
+		scanned.RevokedAt = &revokedAt.Time
 	}
 
 	rawPointers, err := decodeNullJSON(pointersJSON)

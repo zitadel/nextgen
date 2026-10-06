@@ -109,6 +109,17 @@ func (h *Harness) SetScopedTokenOnApiClient(t *testing.T, client *ApiClient, pro
 	client.SetToken(secret)
 }
 
+// SetPreviewDeployTokenOnApiClient mints the credential a pull-request build
+// holds: release writes and preview deploys, nothing else.
+func (h *Harness) SetPreviewDeployTokenOnApiClient(t *testing.T, client *ApiClient, project *domain.Project) {
+	t.Helper()
+
+	secret, err := h.EnsureTokenService(t).GenerateJWE(t.Context(), project.PreviewDeployToken())
+	require.NoError(t, err)
+
+	client.SetToken(secret)
+}
+
 func (h *Harness) SetPreviewSecretOnApiClient(t *testing.T, client *ApiClient, project *domain.Project) {
 	t.Helper()
 

@@ -7,7 +7,7 @@ import (
 
 // NewestFirst is deployed_at DESC, id DESC. id breaks deployed_at ties
 // deterministically when two deployments share a timestamp. Filtered to one
-// environment, the first row under this order is its current deployment.
+// origin, the first row under this order is what that target serves.
 func NewestFirst() database.OrderBy[domain.DeploymentField] {
 	return database.OrderBy[domain.DeploymentField]{
 		Columns: []database.Column[domain.DeploymentField]{
@@ -20,8 +20,7 @@ func NewestFirst() database.OrderBy[domain.DeploymentField] {
 
 // ByIDs matches the named deployments of one project. An OR of equals rather
 // than an IN clause, because IN is not in the shared filter vocabulary and
-// the id sets here are small — the current-deployment pointers of one page of
-// environments.
+// the id sets here are small.
 func ByIDs(projectID string, ids []string) database.Filter[domain.DeploymentField] {
 	matches := make([]database.Filter[domain.DeploymentField], len(ids))
 	for i, id := range ids {
@@ -34,19 +33,21 @@ func ByIDs(projectID string, ids []string) database.Filter[domain.DeploymentFiel
 }
 
 // ListOptions returns options for listing a project's deployments, newest
-// first, capped at limit. A non-nil environmentID narrows the list to that
-// environment's history.
-func ListOptions(projectID string, environmentID *string, limit uint32) *database.ListOptions[domain.DeploymentField] {
-	filter := database.Filter[domain.DeploymentField](
-		database.Equal(database.Col(domain.DeploymentFieldProjectID), projectID))
-	if environmentID != nil {
-		filter = database.And(
-			filter,
-			database.Equal(database.Col(domain.DeploymentFieldEnvironmentID), *environmentID),
-		)
+// first, capped at limit. A non-nil origin narrows the list to that target's
+// history (the empty string being the project default); a non-nil deployID
+// to the rows one deploy wrote.
+func ListOptions(projectID string, origin, deployID *string, limit uint32) *database.ListOptions[domain.DeploymentField] {
+	filters := []database.Filter[domain.DeploymentField]{
+		database.Equal(database.Col(domain.DeploymentFieldProjectID), projectID),
+	}
+	if origin != nil {
+		filters = append(filters, database.Equal(database.Col(domain.DeploymentFieldOrigin), *origin))
+	}
+	if deployID != nil {
+		filters = append(filters, database.Equal(database.Col(domain.DeploymentFieldDeployID), *deployID))
 	}
 	return &database.ListOptions[domain.DeploymentField]{
-		Filter: filter,
+		Filter: database.And(filters...),
 		Pagination: database.Page[domain.DeploymentField]{
 			Limit:   limit,
 			OrderBy: NewestFirst(),
@@ -54,18 +55,21 @@ func ListOptions(projectID string, environmentID *string, limit uint32) *databas
 	}
 }
 
-// CheckExpectedCurrent enforces the optimistic-concurrency guard on create.
-// current is the environment's current deployment, nil when nothing runs; on
-// a mismatch the conflict error carries what actually runs, read by the
-// dialect because only its transaction sees the locked state.
-func CheckExpectedCurrent(current *domain.Deployment, expected *string) error {
-	if expected == nil || (current != nil && current.ID == *expected) {
-		return nil
+// NewestOf returns options reading the newest row of one target, optionally
+// narrowed to one release.
+func NewestOf(projectID, origin string, releaseID *string) *database.ListOptions[domain.DeploymentField] {
+	filters := []database.Filter[domain.DeploymentField]{
+		database.Equal(database.Col(domain.DeploymentFieldProjectID), projectID),
+		database.Equal(database.Col(domain.DeploymentFieldOrigin), origin),
 	}
-	details := domain.DeploymentConflictDetails{}
-	if current != nil {
-		details.CurrentDeploymentID = current.ID
-		details.CurrentReleaseID = current.ReleaseID
+	if releaseID != nil {
+		filters = append(filters, database.Equal(database.Col(domain.DeploymentFieldReleaseID), *releaseID))
 	}
-	return domain.ErrDeploymentConflict(details)
+	return &database.ListOptions[domain.DeploymentField]{
+		Filter: database.And(filters...),
+		Pagination: database.Page[domain.DeploymentField]{
+			Limit:   1,
+			OrderBy: NewestFirst(),
+		},
+	}
 }

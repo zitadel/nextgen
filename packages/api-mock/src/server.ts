@@ -20,6 +20,9 @@
  * Platform routes (mounted via setupPlatformHandlers):
  *   POST   /projects                  — create project
  *   GET    /projects/:id              — fetch project
+ *   POST   /projects/:id/allowed_origins        — add an allowlist pattern
+ *   POST   /projects/:id/allowed_origins/remove — remove one
+ *   POST   /projects/:id/class        — promote or demote the project
  *   POST   /projects/:id/claim/init   — mint a claim challenge
  *   GET    /projects/:id/claim/status — poll a claim challenge
  *   POST   /schemas                   — create user schema
@@ -29,6 +32,16 @@
  *   POST   /flow_definitions          — create flow definition
  *   GET    /flow_definitions          — list flow definitions
  *   GET    /flow_definitions/:id      — get flow definition
+ *   POST   /releases, GET /releases, GET /releases/:id, POST /releases/:id/revoke
+ *   POST   /deployments               — deploy a release to targets
+ *   GET    /deployments               — the log (origin, deploy_id, live filters)
+ *   GET    /deployments/:id, GET /deployments/:id/variables
+ *   POST   /deployments/rollback      — undo a deploy
+ *   GET    /origins, POST /origins/remove — live preview URLs
+ *   GET/PATCH /variables, GET/DELETE /variables/:name — by applies_to
+ *
+ * `POST /flow` runs the platform store's origin gate and release pin check
+ * (`admitFlow`) for projects the store holds.
  */
 import { randomBytes, randomUUID } from "node:crypto";
 import { type Server } from "node:http";
@@ -44,7 +57,12 @@ import { HandoffError, JWK, verifyHandoffToken } from "./crypto.js";
 import { defaultDevBranding } from "./default-dev-branding.js";
 import { setupMockHandlers } from "./handlers.js";
 import { buildOpenIdConfiguration } from "./openid-configuration.js";
-import { completeClaimChallenge, errorBody, setupPlatformHandlers } from "./platform-handlers.js";
+import {
+  admitFlow,
+  completeClaimChallenge,
+  errorBody,
+  setupPlatformHandlers,
+} from "./platform-handlers.js";
 
 const SESSION_TTL_SECONDS = 3600;
 
@@ -147,7 +165,10 @@ export function createMockApp(options: { issuer: string }): express.Express {
     }
     if (req.method === "OPTIONS") {
       res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
-      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Idempotency-Key");
+      res.setHeader(
+        "Access-Control-Allow-Headers",
+        "Content-Type, Idempotency-Key, X-Zitadel-Release",
+      );
       res.status(204).end();
       return;
     }
@@ -422,7 +443,9 @@ export function createMockApp(options: { issuer: string }): express.Express {
     res.status(204).end();
   });
 
-  app.use(createMiddleware(...setupMockHandlers({ iss }).handlers, ...setupPlatformHandlers()));
+  app.use(
+    createMiddleware(...setupMockHandlers({ iss, admitFlow }).handlers, ...setupPlatformHandlers()),
+  );
 
   return app;
 }

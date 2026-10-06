@@ -39,6 +39,11 @@ describe("configureZitadel", () => {
     expect(p1).toBe(p2);
   });
 
+  test("carries the release a build pins", () => {
+    const project = configureZitadel({ projectId: "proj_1", release: "rel_01" });
+    expect(project.release).toBe("rel_01");
+  });
+
   test("different-value re-call warns and is ignored", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(vi.fn());
     const p1 = configureZitadel({ proxyPath: "/__nextgen", projectId: "proj_1" });

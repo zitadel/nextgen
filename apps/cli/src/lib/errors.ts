@@ -150,7 +150,7 @@ export function toZitadelError(error: unknown): ZitadelError {
 
   if (isNetworkError(error)) {
     return new ZitadelError("E_NETWORK", errorMessage(error), {
-      hint: "Check your connection, ZITADEL_API_BASE, or the configured server URL.",
+      hint: "Check your connection, ZITADEL_URL, or the configured server URL.",
       details: { original: pickErrorShape(error as Error) },
     });
   }

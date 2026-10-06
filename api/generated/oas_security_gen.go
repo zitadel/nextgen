@@ -91,6 +91,9 @@ func GetRolesForNextgenSession(operation string) []string {
 
 // oauth2ScopesOAuth2 is a private map storing OAuth2 scopes per operation.
 var oauth2ScopesOAuth2 = map[string][]string{
+	AddAllowedOriginOperation: []string{
+		"allowed_origin.write",
+	},
 	BeginUserPasskeyRegistrationOperation: []string{
 		"user.write",
 	},
@@ -102,6 +105,7 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	CreateDeploymentOperation: []string{
 		"deployment.write",
+		"deployment.preview",
 	},
 	CreateFlowDefinitionOperation: []string{
 		"flow_definition.write",
@@ -160,8 +164,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	GetDeploymentByIdOperation: []string{
 		"deployment.read",
 	},
-	GetEnvironmentByNameOperation: []string{
-		"environment.read",
+	GetDeploymentVariablesOperation: []string{
+		"deployment.read",
+		"variable.read",
 	},
 	GetEventOperation: []string{
 		"events.read",
@@ -214,9 +219,6 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	ListDeploymentsOperation: []string{
 		"deployment.read",
 	},
-	ListEnvironmentsOperation: []string{
-		"environment.read",
-	},
 	ListEventsOperation: []string{
 		"events.read",
 	},
@@ -225,6 +227,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	ListIdpRevisionsOperation: []string{
 		"idp.read",
+	},
+	ListOriginsOperation: []string{
+		"origin.read",
 	},
 	ListReleasesOperation: []string{
 		"release.read",
@@ -263,8 +268,23 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	QueryUsersOperation: []string{
 		"user.read",
 	},
+	RemoveAllowedOriginOperation: []string{
+		"allowed_origin.delete",
+	},
+	RemoveOriginOperation: []string{
+		"origin.delete",
+	},
+	RevokeReleaseOperation: []string{
+		"release.write",
+	},
 	RevokeSessionOperation: []string{
 		"session.delete",
+	},
+	RollbackDeploymentOperation: []string{
+		"deployment.write",
+	},
+	SetProjectClassOperation: []string{
+		"project.write",
 	},
 	SetUserPasswordOperation: []string{
 		"user.write",

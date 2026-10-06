@@ -19,7 +19,7 @@ import (
 
 // ProjectCreator is the slice of [service.ProjectService] the bootstrap needs.
 type ProjectCreator interface {
-	CreateWithID(ctx context.Context, id, name string, previewOrigins []string, seedDefaults bool) (*domain.Project, error)
+	CreateWithID(ctx context.Context, id, name string, allowedOrigins []domain.AllowedOrigin, seedDefaults bool) (*domain.Project, error)
 }
 
 // Ensure idempotently creates the platform project when enabled, with the
@@ -37,7 +37,7 @@ func Ensure(ctx context.Context, projects ProjectCreator, pool service.Statement
 		return nil
 	}
 
-	_, err := projects.CreateWithID(ctx, domain.PlatformProjectID, "Platform", []string{}, true)
+	_, err := projects.CreateWithID(ctx, domain.PlatformProjectID, "Platform", nil, true)
 	if err != nil {
 		// A duplicate primary key means another replica (or a previous start)
 		// already created the project. The project service wraps the failure as

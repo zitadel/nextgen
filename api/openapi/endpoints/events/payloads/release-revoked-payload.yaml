@@ -1,0 +1,9 @@
+title: ReleaseRevokedPayload
+type: object
+description: |
+  Allowlisted fields for `release.revoked`. The release id is the event's
+  `entity_id`.
+properties:
+  revoked_at:
+    type: string
+    format: date-time

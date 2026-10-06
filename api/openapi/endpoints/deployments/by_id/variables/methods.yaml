@@ -1,0 +1,25 @@
+get:
+  operationId: getDeploymentVariables
+  summary: Get the variables a deployment runs
+  description: |
+    The values frozen onto the deployment when it was written — what the
+    target serves, not what the store holds now. Secrets are reported as held
+    and never disclosed.
+  tags:
+    - Deployments
+  security:
+    - oauth2:
+        - deployment.read
+        - variable.read
+  parameters:
+    - $ref: ../../../../components/parameters/project-id.yaml
+    - $ref: ../../../../components/parameters/deployment-id.yaml
+  responses:
+    '200':
+      description: The frozen variables.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../variables/variables.yaml
+    default:
+      $ref: getDeploymentVariables-error-response.yaml

@@ -14,9 +14,9 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
-// TestVariables covers the variables surface (ADR 062): that an owner reads and
-// writes only what it entered itself, that a secret is held but never handed
-// back, and that an owner can only delete its own.
+// TestVariables covers the variables surface (ADR 062): that the two values a
+// name may hold are read and written separately, that a secret is held but
+// never handed back, and that a delete addresses one value.
 func TestVariables(t *testing.T) {
 	t.Parallel()
 
@@ -28,22 +28,22 @@ func TestVariables(t *testing.T) {
 	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	projectID := api.ProjectID(project.ID)
-	prod := api.NewOptEnvironmentName("prod")
+	prod := api.NewOptVariableAppliesTo(api.VariableAppliesToPreview)
 
-	update := func(t *testing.T, env api.OptEnvironmentName, body api.UpdateVariablesRequest) api.UpdateVariablesRes {
+	update := func(t *testing.T, appliesTo api.OptVariableAppliesTo, body api.UpdateVariablesRequest) api.UpdateVariablesRes {
 		t.Helper()
 		res, err := client.UpdateVariables(t.Context(), body, api.UpdateVariablesParams{
-			ProjectID:       projectID,
-			EnvironmentName: env,
+			ProjectID: projectID,
+			AppliesTo: appliesTo,
 		})
 		require.NoError(t, err)
 		return res
 	}
-	get := func(t *testing.T, env api.OptEnvironmentName) api.Variables {
+	get := func(t *testing.T, appliesTo api.OptVariableAppliesTo) api.Variables {
 		t.Helper()
 		res, err := client.GetVariables(t.Context(), api.GetVariablesParams{
-			ProjectID:       projectID,
-			EnvironmentName: env,
+			ProjectID: projectID,
+			AppliesTo: appliesTo,
 		})
 		require.NoError(t, err)
 		require.IsType(t, &api.Variables{}, res, helpers.MustMarshal(t, res))
@@ -51,14 +51,14 @@ func TestVariables(t *testing.T) {
 	}
 
 	t.Run("a bare scalar keeps its JSON type", func(t *testing.T) {
-		res := update(t, api.OptEnvironmentName{}, api.UpdateVariablesRequest{
+		res := update(t, api.OptVariableAppliesTo{}, api.UpdateVariablesRequest{
 			"HOST":        api.NewVariableScalarVariableInput(api.NewStringVariableScalar("example.com")),
 			"RETRY_COUNT": api.NewVariableScalarVariableInput(api.NewFloat64VariableScalar(10)),
 			"VERBOSE":     api.NewVariableScalarVariableInput(api.NewBoolVariableScalar(true)),
 		})
 		require.IsType(t, &api.Variables{}, res, helpers.MustMarshal(t, res))
 
-		vars := get(t, api.OptEnvironmentName{})
+		vars := get(t, api.OptVariableAppliesTo{})
 		assert.Equal(t, api.NewVariableScalarVariable(api.NewStringVariableScalar("example.com")), vars["HOST"])
 		assert.Equal(t, api.NewVariableScalarVariable(api.NewFloat64VariableScalar(10)), vars["RETRY_COUNT"])
 		assert.Equal(t, api.NewVariableScalarVariable(api.NewBoolVariableScalar(true)), vars["VERBOSE"])
@@ -76,7 +76,7 @@ func TestVariables(t *testing.T) {
 			get(t, prod)["HOST"])
 		assert.Equal(t,
 			api.NewVariableScalarVariable(api.NewStringVariableScalar("example.com")),
-			get(t, api.OptEnvironmentName{})["HOST"])
+			get(t, api.OptVariableAppliesTo{})["HOST"])
 	})
 
 	// Nothing is inherited: a value entered once on the project does not turn
@@ -89,10 +89,6 @@ func TestVariables(t *testing.T) {
 		vars := get(t, prod)
 		assert.NotContains(t, vars, "RETRY_COUNT")
 		assert.NotContains(t, vars, "VERBOSE")
-
-		// And a sibling environment sees neither the project's nor prod's.
-		staging := api.NewOptEnvironmentName("staging")
-		assert.NotContains(t, get(t, staging), "HOST")
 	})
 
 	t.Run("a secret is reported as held and never returned", func(t *testing.T) {
@@ -108,9 +104,9 @@ func TestVariables(t *testing.T) {
 
 		// The ciphertext must not leak through the single-variable read either.
 		res, err := client.GetVariable(t.Context(), api.GetVariableParams{
-			ProjectID:       projectID,
-			VariableName:    "GITHUB_CLIENT_SECRET",
-			EnvironmentName: prod,
+			ProjectID:    projectID,
+			VariableName: "GITHUB_CLIENT_SECRET",
+			AppliesTo:    prod,
 		})
 		require.NoError(t, err)
 		require.IsType(t, &api.Variable{}, res, helpers.MustMarshal(t, res))
@@ -122,9 +118,9 @@ func TestVariables(t *testing.T) {
 	// never disagree about which value a name holds.
 	t.Run("get by name reads the addressed owner", func(t *testing.T) {
 		res, err := client.GetVariable(t.Context(), api.GetVariableParams{
-			ProjectID:       projectID,
-			VariableName:    "HOST",
-			EnvironmentName: prod,
+			ProjectID:    projectID,
+			VariableName: "HOST",
+			AppliesTo:    prod,
 		})
 		require.NoError(t, err)
 		require.IsType(t, &api.Variable{}, res, helpers.MustMarshal(t, res))
@@ -148,9 +144,9 @@ func TestVariables(t *testing.T) {
 	// half of what the delete case below proves for writes.
 	t.Run("a name another owner holds is a 404 here", func(t *testing.T) {
 		res, err := client.GetVariable(t.Context(), api.GetVariableParams{
-			ProjectID:       projectID,
-			VariableName:    "RETRY_COUNT",
-			EnvironmentName: prod,
+			ProjectID:    projectID,
+			VariableName: "RETRY_COUNT",
+			AppliesTo:    prod,
 		})
 		require.NoError(t, err)
 		status, code, _, ok := errorResponseParts(t, res)
@@ -175,9 +171,9 @@ func TestVariables(t *testing.T) {
 	// remove -- and the project's value is left standing.
 	t.Run("an owner cannot delete a name another owner entered", func(t *testing.T) {
 		res, err := client.DeleteVariable(t.Context(), api.DeleteVariableParams{
-			ProjectID:       projectID,
-			VariableName:    "RETRY_COUNT",
-			EnvironmentName: prod,
+			ProjectID:    projectID,
+			VariableName: "RETRY_COUNT",
+			AppliesTo:    prod,
 		})
 		require.NoError(t, err)
 		status, code, _, ok := errorResponseParts(t, res)
@@ -187,14 +183,14 @@ func TestVariables(t *testing.T) {
 
 		assert.Equal(t,
 			api.NewVariableScalarVariable(api.NewFloat64VariableScalar(10)),
-			get(t, api.OptEnvironmentName{})["RETRY_COUNT"])
+			get(t, api.OptVariableAppliesTo{})["RETRY_COUNT"])
 	})
 
 	t.Run("deleting an owner's own entry leaves the other owner's alone", func(t *testing.T) {
 		res, err := client.DeleteVariable(t.Context(), api.DeleteVariableParams{
-			ProjectID:       projectID,
-			VariableName:    "HOST",
-			EnvironmentName: prod,
+			ProjectID:    projectID,
+			VariableName: "HOST",
+			AppliesTo:    prod,
 		})
 		require.NoError(t, err)
 		require.IsType(t, &api.DeleteVariableNoContent{}, res, helpers.MustMarshal(t, res))
@@ -202,7 +198,7 @@ func TestVariables(t *testing.T) {
 		assert.NotContains(t, get(t, prod), "HOST")
 		assert.Equal(t,
 			api.NewVariableScalarVariable(api.NewStringVariableScalar("example.com")),
-			get(t, api.OptEnvironmentName{})["HOST"],
+			get(t, api.OptVariableAppliesTo{})["HOST"],
 			"the project's value is untouched by an environment's delete")
 	})
 
@@ -211,7 +207,7 @@ func TestVariables(t *testing.T) {
 	// 200 and change nothing — telling a client its update landed when it sent
 	// none.
 	t.Run("an empty body is rejected rather than silently doing nothing", func(t *testing.T) {
-		res := update(t, api.OptEnvironmentName{}, api.UpdateVariablesRequest{})
+		res := update(t, api.OptVariableAppliesTo{}, api.UpdateVariablesRequest{})
 		status, code, _, ok := errorResponseParts(t, res)
 		require.True(t, ok, "unexpected response shape: %s", helpers.MustMarshal(t, res))
 		assert.Equal(t, http.StatusBadRequest, status)
@@ -224,7 +220,7 @@ func TestVariables(t *testing.T) {
 	// body is applied whole or not at all, so the valid entry beside it must not
 	// survive.
 	t.Run("a malformed name is rejected and takes the whole body with it", func(t *testing.T) {
-		res := update(t, api.OptEnvironmentName{}, api.UpdateVariablesRequest{
+		res := update(t, api.OptVariableAppliesTo{}, api.UpdateVariablesRequest{
 			"WOULD_HAVE_WORKED": api.NewVariableScalarVariableInput(api.NewStringVariableScalar("x")),
 			"not a name":        api.NewVariableScalarVariableInput(api.NewStringVariableScalar("x")),
 		})
@@ -233,7 +229,7 @@ func TestVariables(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, status)
 		assert.Equal(t, domain.ErrInvalidVariableName().Code, code)
 
-		vars := get(t, api.OptEnvironmentName{})
+		vars := get(t, api.OptVariableAppliesTo{})
 		assert.NotContains(t, vars, "not a name")
 		assert.NotContains(t, vars, "WOULD_HAVE_WORKED",
 			"a rejected body must leave the owner exactly as it was")
@@ -244,13 +240,13 @@ func TestVariables(t *testing.T) {
 	// The reason null-as-removal exists: several names go in one request, so a
 	// caller tidying up does not have to walk them one DELETE at a time.
 	t.Run("nulls remove several names in one request", func(t *testing.T) {
-		update(t, api.OptEnvironmentName{}, api.UpdateVariablesRequest{
+		update(t, api.OptVariableAppliesTo{}, api.UpdateVariablesRequest{
 			"BULK_A": api.NewVariableScalarVariableInput(api.NewStringVariableScalar("a")),
 			"BULK_B": api.NewVariableScalarVariableInput(api.NewStringVariableScalar("b")),
 			"BULK_C": api.NewVariableScalarVariableInput(api.NewStringVariableScalar("c")),
 		})
 
-		res := update(t, api.OptEnvironmentName{}, api.UpdateVariablesRequest{
+		res := update(t, api.OptVariableAppliesTo{}, api.UpdateVariablesRequest{
 			"BULK_A": null,
 			"BULK_B": null,
 		})
@@ -258,7 +254,7 @@ func TestVariables(t *testing.T) {
 		// The response is the owner read back, so it already shows the removal.
 		assert.NotContains(t, *res.(*api.Variables), "BULK_A")
 
-		vars := get(t, api.OptEnvironmentName{})
+		vars := get(t, api.OptVariableAppliesTo{})
 		assert.NotContains(t, vars, "BULK_A")
 		assert.NotContains(t, vars, "BULK_B")
 		assert.Equal(t,
@@ -270,18 +266,18 @@ func TestVariables(t *testing.T) {
 	// One body, three fates: entered, replaced, removed. They share a
 	// transaction, so this is one step for the caller rather than three.
 	t.Run("one body enters, replaces and removes", func(t *testing.T) {
-		update(t, api.OptEnvironmentName{}, api.UpdateVariablesRequest{
+		update(t, api.OptVariableAppliesTo{}, api.UpdateVariablesRequest{
 			"MIX_OLD":      api.NewVariableScalarVariableInput(api.NewStringVariableScalar("old")),
 			"MIX_REPLACED": api.NewVariableScalarVariableInput(api.NewStringVariableScalar("before")),
 		})
 
-		update(t, api.OptEnvironmentName{}, api.UpdateVariablesRequest{
+		update(t, api.OptVariableAppliesTo{}, api.UpdateVariablesRequest{
 			"MIX_NEW":      api.NewVariableScalarVariableInput(api.NewStringVariableScalar("new")),
 			"MIX_REPLACED": api.NewVariableScalarVariableInput(api.NewStringVariableScalar("after")),
 			"MIX_OLD":      null,
 		})
 
-		vars := get(t, api.OptEnvironmentName{})
+		vars := get(t, api.OptVariableAppliesTo{})
 		assert.Equal(t, api.NewVariableScalarVariable(api.NewStringVariableScalar("new")), vars["MIX_NEW"])
 		assert.Equal(t, api.NewVariableScalarVariable(api.NewStringVariableScalar("after")), vars["MIX_REPLACED"])
 		assert.NotContains(t, vars, "MIX_OLD")
@@ -292,7 +288,7 @@ func TestVariables(t *testing.T) {
 	// and a name that was never there already satisfies that. It is also what
 	// makes a retry of the request above safe.
 	t.Run("a null on a name the owner does not hold is not an error", func(t *testing.T) {
-		res := update(t, api.OptEnvironmentName{}, api.UpdateVariablesRequest{
+		res := update(t, api.OptVariableAppliesTo{}, api.UpdateVariablesRequest{
 			"NEVER_ENTERED": null,
 		})
 		require.IsType(t, &api.Variables{}, res, helpers.MustMarshal(t, res))
@@ -304,7 +300,7 @@ func TestVariables(t *testing.T) {
 		shared := api.UpdateVariablesRequest{
 			"SHARED_NAME": api.NewVariableScalarVariableInput(api.NewStringVariableScalar("kept")),
 		}
-		update(t, api.OptEnvironmentName{}, shared)
+		update(t, api.OptVariableAppliesTo{}, shared)
 		update(t, prod, shared)
 
 		update(t, prod, api.UpdateVariablesRequest{"SHARED_NAME": null})
@@ -312,7 +308,7 @@ func TestVariables(t *testing.T) {
 		assert.NotContains(t, get(t, prod), "SHARED_NAME")
 		assert.Equal(t,
 			api.NewVariableScalarVariable(api.NewStringVariableScalar("kept")),
-			get(t, api.OptEnvironmentName{})["SHARED_NAME"],
+			get(t, api.OptVariableAppliesTo{})["SHARED_NAME"],
 			"the project's value is untouched by an environment's removal")
 	})
 
@@ -335,7 +331,7 @@ func TestVariables(t *testing.T) {
 	// A removal is spelled with a name like any other entry, so it is held to
 	// the same grammar -- and the body still lands whole or not at all.
 	t.Run("a malformed name is rejected even when it is a removal", func(t *testing.T) {
-		res := update(t, api.OptEnvironmentName{}, api.UpdateVariablesRequest{
+		res := update(t, api.OptVariableAppliesTo{}, api.UpdateVariablesRequest{
 			"WOULD_HAVE_WORKED_TOO": api.NewVariableScalarVariableInput(api.NewStringVariableScalar("x")),
 			"not a name":            null,
 		})
@@ -344,47 +340,19 @@ func TestVariables(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, status)
 		assert.Equal(t, domain.ErrInvalidVariableName().Code, code)
 
-		assert.NotContains(t, get(t, api.OptEnvironmentName{}), "WOULD_HAVE_WORKED_TOO")
+		assert.NotContains(t, get(t, api.OptVariableAppliesTo{}), "WOULD_HAVE_WORKED_TOO")
 	})
 
 	// A body of nothing but nulls is still a body: minProperties: 1 is about
 	// the request naming something, not about it writing something.
 	t.Run("a body of only nulls is accepted", func(t *testing.T) {
-		update(t, api.OptEnvironmentName{}, api.UpdateVariablesRequest{
+		update(t, api.OptVariableAppliesTo{}, api.UpdateVariablesRequest{
 			"BULK_C": api.NewVariableScalarVariableInput(api.NewStringVariableScalar("c")),
 		})
 
-		res := update(t, api.OptEnvironmentName{}, api.UpdateVariablesRequest{"BULK_C": null})
+		res := update(t, api.OptVariableAppliesTo{}, api.UpdateVariablesRequest{"BULK_C": null})
 		require.IsType(t, &api.Variables{}, res, helpers.MustMarshal(t, res))
-		assert.NotContains(t, get(t, api.OptEnvironmentName{}), "BULK_C")
+		assert.NotContains(t, get(t, api.OptVariableAppliesTo{}), "BULK_C")
 	})
 
-	// The name addresses the environment on the wire, but the row is keyed on
-	// its id, so the name is resolved before anything is read or written. A
-	// name no environment answers to is therefore the environment reporting
-	// itself absent, not an owner that holds nothing: with nothing inherited,
-	// an empty read would say the project's variables are gone instead.
-	t.Run("an environment name nothing answers to is not found", func(t *testing.T) {
-		missing := api.NewOptEnvironmentName("nope")
-
-		read, err := client.GetVariables(t.Context(), api.GetVariablesParams{
-			ProjectID:       projectID,
-			EnvironmentName: missing,
-		})
-		require.NoError(t, err)
-		status, code, _, ok := errorResponseParts(t, read)
-		require.True(t, ok, "unexpected response shape: %s", helpers.MustMarshal(t, read))
-		assert.Equal(t, http.StatusNotFound, status)
-		assert.Equal(t, domain.ErrEnvironmentNotFound().Code, code)
-
-		// The write half: an owner that does not exist takes nothing with it.
-		written := update(t, missing, api.UpdateVariablesRequest{
-			"NEVER_LANDS": api.NewVariableScalarVariableInput(api.NewStringVariableScalar("x")),
-		})
-		status, code, _, ok = errorResponseParts(t, written)
-		require.True(t, ok, "unexpected response shape: %s", helpers.MustMarshal(t, written))
-		assert.Equal(t, http.StatusNotFound, status)
-		assert.Equal(t, domain.ErrEnvironmentNotFound().Code, code)
-		assert.NotContains(t, get(t, api.OptEnvironmentName{}), "NEVER_LANDS")
-	})
 }

@@ -63,14 +63,22 @@ func (h *Handler) ListBranding(ctx context.Context, params api.ListBrandingParam
 }
 
 // resolveBranding resolves the branding a flow response should carry: the
-// latest stored revision for the project, or the built-in default (ADR 040).
-// Resolution failures degrade to the default on purpose — a broken branding
-// lookup must never take the login down.
-func (h *Handler) resolveBranding(ctx context.Context, projectID string) api.Branding {
-	if h.brandingService == nil || projectID == "" {
+// revision pinned by the release the attempt runs on, else the latest stored
+// revision for the project, else the built-in default (ADR 040). Resolution
+// failures degrade to the default on purpose — a broken branding lookup must
+// never take the login down.
+func (h *Handler) resolveBranding(ctx context.Context, state *domain.FlowState) api.Branding {
+	if h.brandingService == nil || state == nil || state.ProjectID == "" {
 		return defaultBranding()
 	}
-	branding, err := h.brandingService.GetLatest(ctx, projectID)
+	projectID := state.ProjectID
+	branding, pinnedByRelease, err := h.pinnedBranding(ctx, state)
+	// A release is a complete snapshot: one that pins no branding means the
+	// built-in default, never the newest revision. Only an attempt with no
+	// release at all reads the newest.
+	if err == nil && branding == nil && !pinnedByRelease {
+		branding, err = h.brandingService.GetLatest(ctx, projectID)
+	}
 	if err != nil {
 		// Deliberate degrade, but never a silent one: without this line a
 		// flaky lookup presents as "my branding intermittently disappears"
@@ -86,6 +94,31 @@ func (h *Handler) resolveBranding(ctx context.Context, projectID string) api.Bra
 		return defaultBranding()
 	}
 	return toAPIBranding(branding)
+}
+
+// pinnedBranding reads the branding revision the attempt's release pins.
+// The boolean reports whether a release governs the attempt at all: nil
+// branding with true means the release pins none (serve the default), with
+// false means there is no release (serve the newest revision).
+func (h *Handler) pinnedBranding(ctx context.Context, state *domain.FlowState) (*domain.Branding, bool, error) {
+	release := service.ReleaseFromContext(ctx)
+	if release == nil && state.ReleaseID != "" && h.releaseService != nil {
+		loaded, err := h.releaseService.Get(ctx, state.ProjectID, state.ReleaseID)
+		if err != nil {
+			return nil, true, err
+		}
+		release = loaded
+	}
+	if release == nil {
+		return nil, false, nil
+	}
+	pinned := service.PinnedRevisions(release, domain.ReleasePointerKindBranding)
+	revisionID, ok := pinned[domain.ReleaseBrandingHandle]
+	if !ok {
+		return nil, true, nil
+	}
+	branding, err := h.brandingService.Get(ctx, state.ProjectID, revisionID)
+	return branding, true, err
 }
 
 // defaultBranding is the fallback when a project has no stored branding

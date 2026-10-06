@@ -46,6 +46,26 @@ func ErrReleaseProjectNotFound() Error {
 	return newError(PrefixRelease.ErrorCodePrefix("project_not_found"), "release: project not found", nil, nil)
 }
 
+func ErrReleaseRevoked() Error {
+	return newError(PrefixRelease.ErrorCodePrefix("revoked"), "release: revoked", nil, nil)
+}
+
+// ErrReleaseNotDeployed reports a pinned release that was never deployed to
+// the target the request matched, or whose deployment is outside the pin
+// window. The detail echoes the digest so the build that baked it can be
+// found.
+func ErrReleaseNotDeployed(details any) Error {
+	return newError(PrefixRelease.ErrorCodePrefix("not_deployed"), "release: this build pins a release this target does not serve; redeploy the app", details, nil)
+}
+
+func ErrReleaseNoDefault() Error {
+	return newError(PrefixRelease.ErrorCodePrefix("no_default"), "release: nothing has been deployed to this project yet", nil, nil)
+}
+
+func ErrReleaseAmbiguous(details any) Error {
+	return newError(PrefixRelease.ErrorCodePrefix("ambiguous"), "release: the digest prefix matches more than one release", details, nil)
+}
+
 func ErrReleasePermissionDenied() Error {
 	return newError(PrefixRelease.ErrorCodePrefix("permission_denied"), "release: requires an operator-grade token bound to the project (project.write or a release.* scope)", nil, nil)
 }
@@ -98,6 +118,43 @@ type Release struct {
 	Pointers    []ReleasePointer
 	Metadata    ReleaseMetadata
 	CreatedAt   time.Time
+	// RevokedAt is the operator's hard stop: a revoked release is refused on
+	// every path, including a client that pins it.
+	RevokedAt *time.Time
+}
+
+func (r *Release) Revoked() bool {
+	return r.RevokedAt != nil
+}
+
+// ReleaseRef is a release named on the wire: by id, or by a prefix of its
+// content digest. Exactly one field is set.
+type ReleaseRef struct {
+	ID         string
+	HashPrefix string
+}
+
+// MinReleaseHashPrefix is the shortest digest prefix accepted on the wire.
+const MinReleaseHashPrefix = 12
+
+// ParseReleaseRef reads a release reference: `rel_…` is an id; `sha256:<hex>`
+// or bare hex of at least MinReleaseHashPrefix characters is a digest prefix,
+// lowercased.
+func ParseReleaseRef(ref string) (ReleaseRef, error) {
+	ref = strings.TrimSpace(ref)
+	if PrefixRelease.Matches(ref) {
+		return ReleaseRef{ID: ref}, nil
+	}
+	digest := strings.TrimPrefix(strings.ToLower(ref), "sha256:")
+	if len(digest) < MinReleaseHashPrefix || len(digest) > 64 {
+		return ReleaseRef{}, ErrReleaseInvalid(map[string]string{"release": ref, "reason": "name a release by id or by at least 12 hex characters of its digest"}, nil)
+	}
+	for _, r := range digest {
+		if (r < '0' || r > '9') && (r < 'a' || r > 'f') {
+			return ReleaseRef{}, ErrReleaseInvalid(map[string]string{"release": ref, "reason": "a digest is hex"}, nil)
+		}
+	}
+	return ReleaseRef{HashPrefix: digest}, nil
 }
 
 // ReleaseField enumerates the fields of Release which can be used for
@@ -111,6 +168,7 @@ const (
 	ReleaseFieldID
 	ReleaseFieldContentHash
 	ReleaseFieldCreatedAt
+	ReleaseFieldRevokedAt
 )
 
 // NewRelease validates the pinned set, orders it canonically and derives its

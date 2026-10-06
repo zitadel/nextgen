@@ -19,7 +19,7 @@ func ensureProject(t *testing.T, projectID string) {
 	err := pool.Statements().CreateProject(t.Context(), &domain.Project{
 		ID:             projectID,
 		Name:           "project-" + projectID,
-		PreviewOrigins: []string{},
+		AllowedOrigins: []domain.AllowedOrigin{},
 	})
 	if err != nil {
 		if _, ok := errors.AsType[*database.UniqueError](err); ok {

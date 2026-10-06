@@ -21,8 +21,8 @@ func SeedProjectsTiedAt(ctx context.Context, pool database.Pool, ids []string, c
 	db := newClientDB(c.client)
 	for _, id := range ids {
 		_, err := db.Update(ctx, buildStatement(
-			`INSERT INTO projects (id, name, preview_origins, created_at, updated_at) VALUES (@p1, @p2, @p3, @p4, @p4)`,
-			id, "project-"+id, "[]", createdAt,
+			`INSERT INTO projects (id, name, created_at, updated_at) VALUES (@p1, @p2, @p3, @p3)`,
+			id, "project-"+id, createdAt,
 		).statement())
 		if err != nil {
 			return err

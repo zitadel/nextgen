@@ -32,7 +32,7 @@ async function makeProject(): Promise<string> {
       project_id: "proj_test",
       project_secret: "sk_proj_test_full",
       preview_secret: "sk_proj_test_preview",
-      preview_origins: [],
+      preview_token: "sk_proj_preview_token",
       created_at: "2026-01-01T00:00:00Z",
     }),
   );
@@ -70,35 +70,6 @@ describe("resource registry", () => {
       const deleteVerb = resource.delete?.verb ?? "delete";
       expect(Boolean(COMMANDS[`${topic}:${deleteVerb}`])).toBe(Boolean(resource.delete));
     }
-  });
-
-  it("gives no generated command an --environment flag, since none addresses one", () => {
-    const generated = Object.entries(COMMANDS).filter(([id]) => id.split(":")[0] in RESOURCES);
-    expect(generated.length).toBeGreaterThan(0);
-    for (const [id, command] of generated) {
-      const flags = { ...command.baseFlags, ...command.flags };
-      expect(Object.keys(flags), id).not.toContain("environment");
-      expect(
-        Object.values(flags).map((flag) => flag.char),
-        id,
-      ).not.toContain("e");
-    }
-  });
-
-  // A read and a write verb, since the flag reached both through the generated
-  // command's own flags and the base flags it inherits.
-  it.each([
-    ["a read verb", ["users", "list", "-e", "prod"]],
-    ["a write verb", ["teams", "create", "--name", "t", "--environment", "production"]],
-  ])("refuses the environment flag on %s before any request", async (_case, argv) => {
-    const cwd = await makeProject();
-
-    const res = await run(cwd, argv);
-
-    expect(res.exitCode).toBe(3);
-    const json = parseJson(res.stdout) as { code: string; message: string };
-    expect(json.code).toBe("E_VALIDATION");
-    expect(json.message).toContain("Nonexistent flag");
   });
 
   it("advertises only filter and sort fields the generated query schemas accept", () => {
@@ -1138,7 +1109,7 @@ describe("other resources", () => {
 
 describe("configuration resources are read-only", () => {
   it("exposes only list and get for every configuration topic", () => {
-    for (const topic of ["schemas", "environments", "releases", "flow-definitions", "branding"]) {
+    for (const topic of ["schemas", "releases", "flow-definitions", "branding"]) {
       const resource = RESOURCES[topic as keyof typeof RESOURCES];
       expect(resource, topic).toBeDefined();
       expect(Object.keys(resource!), topic).toEqual(
@@ -1178,26 +1149,6 @@ describe("configuration resources are read-only", () => {
     expect(url?.searchParams.get("limit")).toBe("5");
     const json = parseJson(res.stdout) as { data: { items: Array<{ id: string }> } };
     expect(json.data.items.map((s) => s.id)).toEqual(["sch_1"]);
-  });
-
-  it("addresses an environment by name rather than by id", async () => {
-    const cwd = await makeProject();
-    server.use(
-      http.get(`${SERVER}/environments/staging`, () =>
-        HttpResponse.json({
-          id: "env_1",
-          project_id: "proj_test",
-          name: "staging",
-          created_at: "2026-01-01T00:00:00Z",
-        }),
-      ),
-    );
-
-    const res = await run(cwd, ["environments", "get", "staging"]);
-
-    expect(res.exitCode).toBe(0);
-    const json = parseJson(res.stdout) as { data: { name: string } };
-    expect(json.data.name).toBe("staging");
   });
 
   it("offers no paging flags for an unpaginated collection and reads the bare array", async () => {

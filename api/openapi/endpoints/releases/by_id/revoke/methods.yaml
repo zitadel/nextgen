@@ -1,0 +1,25 @@
+post:
+  operationId: revokeRelease
+  summary: Revoke a release
+  description: |
+    Marks the release revoked. A revoked release is refused on every path,
+    including a client that pins it, and can no longer be deployed. Rows
+    already naming it stay in the history; the targets they serve answer
+    `rel.revoked` until something else is deployed there.
+  tags:
+    - Releases
+  security:
+    - oauth2:
+        - release.write
+  parameters:
+    - $ref: ../../../../components/parameters/project-id.yaml
+    - $ref: ../../../../components/parameters/release-id.yaml
+  responses:
+    '200':
+      description: The release is revoked.
+      content:
+        application/json:
+          schema:
+            $ref: ../../release.yaml
+    default:
+      $ref: revokeRelease-error-response.yaml

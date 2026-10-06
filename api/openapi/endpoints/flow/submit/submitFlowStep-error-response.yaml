@@ -24,6 +24,8 @@ content:
         - $ref: '../../../components/schemas/errors/internal.yaml'
         - $ref: '../../../components/schemas/errors/tkn-invalid.yaml'
         - $ref: '../../../components/schemas/errors/not_implemented.yaml'
+        - $ref: '../../../components/schemas/errors/proj-origin_not_allowed.yaml'
+        - $ref: '../../../components/schemas/errors/proj-preview_not_live.yaml'
         - $ref: '../../../components/schemas/errors/req-invalid.yaml'
         - $ref: '../../../components/schemas/errors/enc_key-unknown_alg.yaml'
         - $ref: '../../../components/schemas/errors/unavailable.yaml'
@@ -53,6 +55,8 @@ content:
           internal: '../../../components/schemas/errors/internal.yaml'
           tkn.invalid: '../../../components/schemas/errors/tkn-invalid.yaml'
           not_implemented: '../../../components/schemas/errors/not_implemented.yaml'
+          proj.origin_not_allowed: '../../../components/schemas/errors/proj-origin_not_allowed.yaml'
+          proj.preview_not_live: '../../../components/schemas/errors/proj-preview_not_live.yaml'
           req.invalid: '../../../components/schemas/errors/req-invalid.yaml'
           enc_key.unknown_alg: '../../../components/schemas/errors/enc_key-unknown_alg.yaml'
           unavailable: '../../../components/schemas/errors/unavailable.yaml'
@@ -160,6 +164,16 @@ content:
         value:
           code: not_implemented
           message: 'This feature is not implemented yet.'
+      proj.origin_not_allowed:
+        summary: proj.origin_not_allowed
+        value:
+          code: proj.origin_not_allowed
+          message: 'the request origin matches no allowed origin of this project'
+      proj.preview_not_live:
+        summary: proj.preview_not_live
+        value:
+          code: proj.preview_not_live
+          message: 'this preview is no longer live; push again or run zitadel preview'
       req.invalid:
         summary: req.invalid
         value:

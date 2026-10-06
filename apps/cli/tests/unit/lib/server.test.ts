@@ -37,17 +37,17 @@ describe("resolveServer", () => {
     await writeConfig({ server: "https://config.example.com" });
     const resolved = await resolveServer({
       cwd: dir,
-      env: { ZITADEL_API_BASE: "https://env.example.com" },
+      env: { ZITADEL_URL: "https://env.example.com" },
       serverFlag: "https://flag.example.com",
     });
     expect(resolved).toEqual({ value: "https://flag.example.com", origin: "flag" });
   });
 
-  it("uses ZITADEL_API_BASE env when no flag is given", async () => {
+  it("uses ZITADEL_URL env when no flag is given", async () => {
     await writeConfig({ server: "https://config.example.com" });
     const resolved = await resolveServer({
       cwd: dir,
-      env: { ZITADEL_API_BASE: "https://env.example.com" },
+      env: { ZITADEL_URL: "https://env.example.com" },
     });
     expect(resolved).toEqual({ value: "https://env.example.com", origin: "env" });
   });

@@ -17,7 +17,7 @@ import (
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
 )
 
-func TestProjectCreate_EventPayloadIncludesPreviewOrigins(t *testing.T) {
+func TestProjectCreate_EventPayloadIncludesAllowedOrigins(t *testing.T) {
 	t.Parallel()
 	ctrl := gomock.NewController(t)
 	pool := servicemocks.NewMockPool(ctrl)
@@ -55,7 +55,6 @@ func TestProjectCreate_EventPayloadIncludesPreviewOrigins(t *testing.T) {
 	statements.EXPECT().CreateEncryptionKey(gomock.Any(), gomock.Any()).Times(4)
 	statements.EXPECT().CreateSigningKey(gomock.Any(), gomock.Any()).Times(1)
 	statements.EXPECT().CreateAuthzAssignment(gomock.Any(), gomock.Any())
-	statements.EXPECT().CreateEnvironment(gomock.Any(), gomock.Any()).Times(len(domain.DefaultEnvironmentNames))
 	statements.EXPECT().CreateJSONSchema(gomock.Any(), gomock.Any())
 	statements.EXPECT().CreateFlowDefinition(gomock.Any(), gomock.Any())
 
@@ -65,7 +64,7 @@ func TestProjectCreate_EventPayloadIncludesPreviewOrigins(t *testing.T) {
 	svc := service.NewProjectService(service.NewPool(pool), baseURL, schemaValidator, keyService, testHasherFactory(t))
 
 	ctx := middleware.WithRequestIDContext(t.Context(), "req_create")
-	got, err := svc.Create(ctx, "Acme", []string{"*.vercel.app"}, true)
+	got, err := svc.Create(ctx, "Acme", []domain.AllowedOrigin{{Pattern: "https://*-acme.vercel.app", Kind: domain.OriginKindPreview}}, true)
 	require.NoError(t, err)
 	require.NotNil(t, got)
 
@@ -86,7 +85,8 @@ func TestProjectCreate_EventPayloadIncludesPreviewOrigins(t *testing.T) {
 	var payload domain.ProjectPayload
 	require.NoError(t, json.Unmarshal(created.Payload, &payload))
 	assert.Equal(t, "Acme", payload.Name)
-	assert.Equal(t, []string{"*.vercel.app"}, payload.PreviewOrigins)
+	assert.Equal(t, []string{"preview https://*-acme.vercel.app"}, payload.AllowedOrigins)
+	assert.Equal(t, "sandbox", payload.Class)
 }
 
 func TestProjectUpdate_EventPayloadNameDelta(t *testing.T) {
@@ -128,7 +128,7 @@ func TestProjectUpdate_EventPayloadNameDelta(t *testing.T) {
 	var payload domain.ProjectPayload
 	require.NoError(t, json.Unmarshal(gotEvent.Payload, &payload))
 	assert.Equal(t, "renamed", payload.Name)
-	assert.Nil(t, payload.PreviewOrigins)
+	assert.Nil(t, payload.AllowedOrigins)
 	assert.Nil(t, payload.PasswordHashAlgorithm, "a rename says nothing about hashing")
 }
 
@@ -559,7 +559,6 @@ func TestProjectCreate_SchemaCreatedPayloadCarriesKind(t *testing.T) {
 	statements.EXPECT().CreateEncryptionKey(gomock.Any(), gomock.Any()).Times(4)
 	statements.EXPECT().CreateSigningKey(gomock.Any(), gomock.Any()).Times(1)
 	statements.EXPECT().CreateAuthzAssignment(gomock.Any(), gomock.Any())
-	statements.EXPECT().CreateEnvironment(gomock.Any(), gomock.Any()).Times(len(domain.DefaultEnvironmentNames))
 	statements.EXPECT().CreateJSONSchema(gomock.Any(), gomock.Any())
 	statements.EXPECT().CreateFlowDefinition(gomock.Any(), gomock.Any())
 

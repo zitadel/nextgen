@@ -14,14 +14,19 @@
  *
  * Endpoints covered by zod here:
  *   - POST /sessions/exchange           → ExchangeHandoffResponse
+ *   - POST /projects                    → CreateProjectResponse
  *   - GET  /projects/:id                → GetProjectResponse
  *   - GET  /flow_definitions            → ListFlowDefinitionsResponse
  *   - GET  /flow_definitions/:id        → GetFlowDefinitionResponse
+ *   - POST /deployments                 → CreateDeploymentResponse
+ *   - GET  /deployments                 → ListDeploymentsResponse
+ *   (`platform-deployments.spec.ts` covers the rest of the deployment,
+ *   origin, allowlist and release surface against the same zod on the way
+ *   out of every handler.)
  *
  * Endpoints covered structurally (orval emits no `*Response` zod for these
  * because they have no static response schema — POSTs that return only an
  * `id`, or out-of-spec routes):
- *   - POST /projects                    → { id, project_secret, … }
  *   - POST /schemas                     → { id }
  *   - POST /flow_definitions            → flow-definition-response envelope
  *
@@ -34,7 +39,9 @@ import type { Server } from "node:http";
 
 import {
   CompleteClaimResponse,
+  CreateDeploymentResponse,
   CreateIdpResponse,
+  CreateProjectResponse,
   ExchangeHandoffResponse,
   GetClaimStatusResponse,
   GetFlowDefinitionResponse,
@@ -42,6 +49,7 @@ import {
   GetMySessionResponse,
   GetProjectResponse,
   GetVariablesResponse,
+  ListDeploymentsResponse,
   ListFlowDefinitionsResponse,
   QueryIdpsResponse,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
@@ -251,20 +259,18 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         name: "conformance-app",
-        preview_origins: ["http://localhost:3000"],
+        allowed_origins: [{ pattern: "http://localhost:3000", kind: "primary" }],
         seed_defaults: false,
       }),
     });
     expect(res.status).toBe(201);
-    const body = (await res.json()) as Record<string, unknown>;
-    // No CreateProjectResponse zod schema is emitted by orval. Validate
-    // structurally against the fields create-project-response.yaml requires.
-    expect(typeof body.id).toBe("string");
-    expect(body.name).toBe("conformance-app");
-    expect(typeof body.project_secret).toBe("string");
-    expect(typeof body.preview_secret).toBe("string");
-    expect(Array.isArray(body.preview_origins)).toBe(true);
-    expect(typeof body.created_at).toBe("string");
+    const body = await res.json();
+    expect(() => CreateProjectResponse.parse(body)).not.toThrow();
+    const parsed = CreateProjectResponse.parse(body);
+    expect(parsed.name).toBe("conformance-app");
+    expect(parsed.class).toBe("sandbox");
+    expect(parsed.allowed_origins).toEqual([{ pattern: "http://localhost:3000", kind: "primary" }]);
+    expect(typeof parsed.preview_token).toBe("string");
   });
 
   test("GET /projects/:id matches GetProjectResponse", async () => {
@@ -1313,30 +1319,52 @@ describe("api-mock idp and variable contract details", () => {
     expect(res.status).toBe(400);
   });
 
-  test("keeps an environment's variables separate from the project's", async () => {
-    // The project level does not see into its environments and an environment
-    // does not inherit the project's: they are distinct owners.
-    const projectId = await newProject("vars-owners");
+  test("keeps the preview value of a variable apart from the all value", async () => {
+    const projectId = await newProject("vars-applies-to");
     const write = (query: string, payload: object) =>
       fetch(`${BASE}/variables?${query}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(payload),
       });
-    await write(`project_id=${projectId}`, { SHARED: { value: "project", secret: false } });
-    await write(`project_id=${projectId}&environment_name=production`, {
-      SHARED: { value: "prod", secret: false },
+    await write(`project_id=${projectId}`, { SHARED: { value: "all", secret: false } });
+    await write(`project_id=${projectId}&applies_to=preview`, {
+      SHARED: { value: "preview", secret: false },
     });
 
-    const atProject = (await (
+    const forAll = (await (
       await fetch(`${BASE}/variables?project_id=${projectId}`)
     ).json()) as Record<string, unknown>;
-    const atEnv = (await (
-      await fetch(`${BASE}/variables?project_id=${projectId}&environment_name=production`)
+    const forPreview = (await (
+      await fetch(`${BASE}/variables?project_id=${projectId}&applies_to=preview`)
     ).json()) as Record<string, unknown>;
 
-    expect(atProject.SHARED).toBe("project");
-    expect(atEnv.SHARED).toBe("prod");
+    expect(forAll.SHARED).toBe("all");
+    expect(forPreview.SHARED).toBe("preview");
+  });
+
+  test("GET /deployments?live=true matches ListDeploymentsResponse", async () => {
+    const projectId = await newProject("deployments-live");
+    const release = await fetch(`${BASE}/releases?project_id=${projectId}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ pointers: [{ kind: "schema", revision_id: "sch_conformance" }] }),
+    });
+    const { id: releaseId } = (await release.json()) as { id: string };
+    const deployed = await fetch(`${BASE}/deployments?project_id=${projectId}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ release: releaseId, targets: ["default"] }),
+    });
+    const deployedBody = await deployed.json();
+    expect(deployed.status).toBe(201);
+    expect(() => CreateDeploymentResponse.parse(deployedBody)).not.toThrow();
+
+    const res = await fetch(`${BASE}/deployments?project_id=${projectId}&live=true`);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(() => ListDeploymentsResponse.parse(body)).not.toThrow();
+    expect(ListDeploymentsResponse.parse(body).deployments.map((row) => row.origin)).toEqual([""]);
   });
 
   test("reads back what the write did not touch", async () => {

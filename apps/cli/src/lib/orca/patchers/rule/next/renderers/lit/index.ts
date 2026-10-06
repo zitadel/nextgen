@@ -26,17 +26,11 @@ export const litRenderer: RendererSpec = {
 // intended integration point. See docs/design/cli/bdui-renderer.md.
 import "@zitadel/ui-lit";
 
-const environment =
-  process.env.ZITADEL_ENVIRONMENT ??
-  (process.env.NODE_ENV === "production" ? "production" : "development");
-
 export default function ${mode === "login" ? "LoginPage" : "RegisterPage"}() {
   return (
     <zitadel-flow
       purpose="${purpose}"
       project-id={process.env.ZITADEL_PROJECT_ID}
-      issuer={process.env.ZITADEL_ISSUER}
-      environment={environment}
     />
   );
 }

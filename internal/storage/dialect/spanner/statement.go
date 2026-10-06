@@ -9,8 +9,8 @@ type statements struct {
 	flowDefinitionStatements
 	cryptoKeyStatements
 	jsonSchemaStatements
-	environmentStatements
 	releaseStatements
+	originStatements
 	idpConnectionStatements
 	idpIdentityLinkStatements
 	deploymentStatements
@@ -48,8 +48,8 @@ func newStatements(db queryExecutor) statements {
 		flowDefinitionStatements:      newFlowDefinitionStatements(db),
 		cryptoKeyStatements:           newCryptoKeyStatements(db),
 		jsonSchemaStatements:          newJSONSchemaStatements(db),
-		environmentStatements:         newEnvironmentStatements(db),
 		releaseStatements:             newReleaseStatements(db),
+		originStatements:              newOriginStatements(db),
 		idpConnectionStatements:       newIDPConnectionStatements(db),
 		idpIdentityLinkStatements:     newIDPIdentityLinkStatements(db),
 		deploymentStatements:          newDeploymentStatements(db),

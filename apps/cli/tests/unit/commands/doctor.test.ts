@@ -80,7 +80,7 @@ async function makeHealthyProject(): Promise<string> {
       project_id: "proj-001",
       project_secret: "sk_proj_test",
       preview_secret: "sk_proj_preview",
-      preview_origins: [],
+      preview_token: "sk_proj_preview_token",
       created_at: "2026-01-01T00:00:00.000Z",
       claimed_at: "2026-01-02T00:00:00.000Z",
       team_id: "team-001",
@@ -93,7 +93,7 @@ async function makeHealthyProject(): Promise<string> {
   );
   await writeFile(
     join(cwd, ".env.example"),
-    ["ZITADEL_PROJECT_ID=", "ZITADEL_ENVIRONMENT=", "ZITADEL_ISSUER="].join("\n"),
+    ["ZITADEL_URL=", "ZITADEL_PROJECT_ID=", "ZITADEL_PUBLISHABLE_KEY="].join("\n"),
   );
   await writeFile(join(cwd, ".zitadel/schemas/user.json"), JSON.stringify(VALID_USER_SCHEMA));
   await writeFile(
@@ -131,7 +131,7 @@ async function writeDetachedSecret(
       project_id: "proj-001",
       project_secret: "sk_proj_test",
       preview_secret: "sk_proj_preview",
-      preview_origins: [],
+      preview_token: "sk_proj_preview_token",
       created_at: createdAt,
     }),
   );
@@ -392,7 +392,7 @@ console.log(["p4242", "cnode", "n127.0.0.1:" + process.env.LSOF_FIXTURE_PORT].jo
         project_id: "different-id",
         project_secret: "sk_proj_test",
         preview_secret: "sk_proj_preview",
-        preview_origins: [],
+        preview_token: "sk_proj_preview_token",
         created_at: "2026-01-01T00:00:00.000Z",
       }),
     );
@@ -433,7 +433,7 @@ console.log(["p4242", "cnode", "n127.0.0.1:" + process.env.LSOF_FIXTURE_PORT].jo
         project_id: "mismatch",
         project_secret: "sk_proj_test",
         preview_secret: "sk_proj_preview",
-        preview_origins: [],
+        preview_token: "sk_proj_preview_token",
       }),
     );
     await chmod(join(cwd, ".zitadel/secret"), 0o600);

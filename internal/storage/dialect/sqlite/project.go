@@ -13,18 +13,21 @@ import (
 )
 
 const (
-	createProjectStmt = `INSERT INTO projects (id, name, preview_origins, password_hash_policy, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?) RETURNING id, created_at, updated_at`
+	createProjectStmt = `INSERT INTO projects (id, name, allowed_origins, class, password_hash_policy, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id, created_at, updated_at`
+
+	updateProjectAllowedOriginsStmt = `UPDATE projects SET allowed_origins = ?, updated_at = ? WHERE id = ? RETURNING id`
+	updateProjectClassStmt          = `UPDATE projects SET class = ?, updated_at = ? WHERE id = ? RETURNING id`
 
 	deleteByIDProjectStmt = `DELETE FROM projects WHERE id = ?`
 
 	updateProjectStmt = `UPDATE projects SET name = ?, updated_at = ? WHERE id = ?
-RETURNING id, name, preview_origins, password_hash_policy, created_at, updated_at`
+RETURNING id, name, allowed_origins, class, password_hash_policy, created_at, updated_at`
 
 	setProjectPasswordHashPolicyStmt = `UPDATE projects SET password_hash_policy = ?, updated_at = ? WHERE id = ?
 RETURNING id`
 
-	projectQuery = `SELECT id, name, preview_origins, password_hash_policy, created_at, updated_at FROM projects`
+	projectQuery = `SELECT id, name, allowed_origins, class, password_hash_policy, created_at, updated_at FROM projects`
 )
 
 type projectStatements struct{ statement }
@@ -38,7 +41,7 @@ func (ps projectStatements) CreateProject(ctx context.Context, project *domain.P
 	if err := ensureManagedID(&project.ID, domain.PrefixProject); err != nil {
 		return err
 	}
-	origins, err := encodeJSON(project.PreviewOrigins)
+	origins, err := storageproject.MarshalAllowedOrigins(project.AllowedOrigins)
 	if err != nil {
 		return wrapError(err)
 	}
@@ -50,7 +53,7 @@ func (ps projectStatements) CreateProject(ctx context.Context, project *domain.P
 	return withTransaction(ctx, ps.client, func(ctx context.Context, tx queryExecutor) error {
 		var createdNano, updatedNano int64
 		if err := tx.QueryRow(ctx, createProjectStmt,
-			project.ID, project.Name, origins, nullBytesArg(policy), now, now,
+			project.ID, project.Name, string(origins), project.Class.String(), nullBytesArg(policy), now, now,
 		).Scan(&project.ID, &createdNano, &updatedNano); err != nil {
 			return wrapError(err)
 		}
@@ -101,6 +104,22 @@ func (ps projectStatements) UpdateProject(ctx context.Context, project *domain.P
 	return wrapError(ps.scanProjectRow(row, project))
 }
 
+// UpdateProjectAllowedOrigins implements [service.ProjectStatements].
+func (ps projectStatements) UpdateProjectAllowedOrigins(ctx context.Context, projectID string, origins []domain.AllowedOrigin) error {
+	encoded, err := storageproject.MarshalAllowedOrigins(origins)
+	if err != nil {
+		return wrapError(err)
+	}
+	var id string
+	return wrapError(ps.client.QueryRow(ctx, updateProjectAllowedOriginsStmt, string(encoded), nowUnixNano(), projectID).Scan(&id))
+}
+
+// UpdateProjectClass implements [service.ProjectStatements].
+func (ps projectStatements) UpdateProjectClass(ctx context.Context, projectID string, class domain.ProjectClass) error {
+	var id string
+	return wrapError(ps.client.QueryRow(ctx, updateProjectClassStmt, class.String(), nowUnixNano(), projectID).Scan(&id))
+}
+
 // SetProjectPasswordHashPolicy implements [service.ProjectStatements].
 // A nil policy writes NULL, which hands the project back to the deployment
 // default.
@@ -116,13 +135,18 @@ func (ps projectStatements) SetProjectPasswordHashPolicy(ctx context.Context, pr
 func (ps projectStatements) scanProjectRow(row *sql.Row, project *domain.Project) error {
 	var (
 		originsStr           string
+		classStr             string
 		policyStr            sql.NullString
 		createdNano, updNano int64
 	)
-	if err := row.Scan(&project.ID, &project.Name, &originsStr, &policyStr, &createdNano, &updNano); err != nil {
+	if err := row.Scan(&project.ID, &project.Name, &originsStr, &classStr, &policyStr, &createdNano, &updNano); err != nil {
 		return err
 	}
-	origins, err := decodeJSONStrings(originsStr)
+	origins, err := storageproject.UnmarshalAllowedOrigins([]byte(originsStr))
+	if err != nil {
+		return err
+	}
+	class, err := domain.ProjectClassString(classStr)
 	if err != nil {
 		return err
 	}
@@ -130,7 +154,8 @@ func (ps projectStatements) scanProjectRow(row *sql.Row, project *domain.Project
 	if err != nil {
 		return err
 	}
-	project.PreviewOrigins = origins
+	project.AllowedOrigins = origins
+	project.Class = class
 	project.PasswordHashPolicy = policy
 	project.CreatedAt = timeFromUnixNano(createdNano)
 	project.UpdatedAt = timeFromUnixNano(updNano)
@@ -165,21 +190,27 @@ func scanProject(rows *sql.Rows) (*domain.Project, error) {
 	project := new(domain.Project)
 	var (
 		originsStr           string
+		classStr             string
 		policyStr            sql.NullString
 		createdNano, updNano int64
 	)
-	if err := rows.Scan(&project.ID, &project.Name, &originsStr, &policyStr, &createdNano, &updNano); err != nil {
+	if err := rows.Scan(&project.ID, &project.Name, &originsStr, &classStr, &policyStr, &createdNano, &updNano); err != nil {
 		return nil, err
 	}
-	origins, err := decodeJSONStrings(originsStr)
+	origins, err := storageproject.UnmarshalAllowedOrigins([]byte(originsStr))
 	if err != nil {
-		return nil, fmt.Errorf("decode preview_origins: %w", err)
+		return nil, fmt.Errorf("decode allowed_origins: %w", err)
+	}
+	class, err := domain.ProjectClassString(classStr)
+	if err != nil {
+		return nil, fmt.Errorf("decode class: %w", err)
 	}
 	policy, err := storageproject.UnmarshalPasswordHashPolicy([]byte(policyStr.String))
 	if err != nil {
 		return nil, fmt.Errorf("decode password_hash_policy: %w", err)
 	}
-	project.PreviewOrigins = origins
+	project.AllowedOrigins = origins
+	project.Class = class
 	project.PasswordHashPolicy = policy
 	project.CreatedAt = timeFromUnixNano(createdNano)
 	project.UpdatedAt = timeFromUnixNano(updNano)
@@ -209,9 +240,9 @@ var projectSchema = database.NewSchema(map[domain.ProjectField]database.FieldBin
 		Accessor: func(p *domain.Project) any { return p.UpdatedAt },
 		Coerce:   database.CoerceTime,
 	},
-	domain.ProjectFieldPreviewOrigins: {
-		SQLName:  "preview_origins",
-		Accessor: func(p *domain.Project) any { return p.PreviewOrigins },
-		Coerce:   database.CoerceSliceAsAny(database.CoerceStringValue),
+	domain.ProjectFieldClass: {
+		SQLName:  "class",
+		Accessor: func(p *domain.Project) any { return p.Class.String() },
+		Coerce:   database.CoerceString,
 	},
 })

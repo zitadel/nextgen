@@ -31,7 +31,7 @@ func ensureProject(ctx context.Context, stmts service.AllStatements, projectID s
 	err := stmts.CreateProject(ctx, &domain.Project{
 		ID:             projectID,
 		Name:           "project-" + projectID,
-		PreviewOrigins: []string{},
+		AllowedOrigins: []domain.AllowedOrigin{},
 	})
 	if err != nil {
 		if _, ok := errors.AsType[*database.UniqueError](err); ok {

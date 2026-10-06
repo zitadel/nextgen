@@ -25,7 +25,7 @@ const VALID_SECRET = {
   project_id: "proj-001",
   project_secret: "sk_proj_test",
   preview_secret: "sk_proj_preview",
-  preview_origins: ["https://example.test"],
+  preview_token: "sk_proj_preview_token",
   created_at: "2026-01-01T00:00:00.000Z",
 };
 
@@ -123,19 +123,6 @@ describe("readZitadelSecret", () => {
     await mkdir(join(cwd, ".zitadel"), { recursive: true });
     const { project_secret: _omit, ...partial } = VALID_SECRET;
     await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify(partial));
-
-    await expect(readZitadelSecret(cwd)).rejects.toThrow(
-      ".zitadel/secret is missing required fields",
-    );
-  });
-
-  it("throws when preview_origins is not an array", async () => {
-    const cwd = await makeTempDir();
-    await mkdir(join(cwd, ".zitadel"), { recursive: true });
-    await writeFile(
-      join(cwd, ".zitadel/secret"),
-      JSON.stringify({ ...VALID_SECRET, preview_origins: "nope" }),
-    );
 
     await expect(readZitadelSecret(cwd)).rejects.toThrow(
       ".zitadel/secret is missing required fields",

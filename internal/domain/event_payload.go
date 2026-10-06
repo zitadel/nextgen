@@ -1,6 +1,9 @@
 package domain
 
-import "cmp"
+import (
+	"cmp"
+	"time"
+)
 
 // Typed event payloads (deny-by-default allowlists). Keep in sync with
 // docs/design/api/events-catalog.md and OpenAPI Event discriminator schemas.
@@ -17,7 +20,8 @@ type RequestAPIPayload struct {
 // project.updated (delta: only changed fields set).
 type ProjectPayload struct {
 	Name           string   `json:"name,omitempty"`
-	PreviewOrigins []string `json:"preview_origins,omitempty"`
+	AllowedOrigins []string `json:"allowed_origins,omitempty"`
+	Class          string   `json:"class,omitempty"`
 	// PasswordHashAlgorithm records a change to the method the project's
 	// passwords are hashed with (ADR 029 §Hashing). It is a pointer so the
 	// delta can tell "not touched" (absent) from "handed back to the deployment
@@ -191,12 +195,6 @@ type BrandingPayload struct {
 // BrandingCreatedPayload is an alias for branding.created.
 type BrandingCreatedPayload = BrandingPayload
 
-type EnvironmentPayload struct {
-	Name string `json:"name,omitempty"`
-}
-
-type EnvironmentCreatedPayload = EnvironmentPayload
-
 // ReleasePayload records what a release pinned, so the audit stream answers
 // "what changed" without a join back to the releases table. ContentHash
 // identifies the pinned set; Pointers spell it out.
@@ -247,19 +245,24 @@ func ReleasePayloadSnapshot(rel *Release) ReleasePayload {
 	return payload
 }
 
-// DeploymentPayload records what went live where. It carries ids, not names:
-// the ids survive environment renames and, unlike the deployments table, this
-// event has no foreign key — so the audit trail of a deleted environment
-// lives on here (ADR 061).
+// DeploymentPayload records what went live where. Unlike the deployments
+// table, this event has no foreign key, so the audit trail of a retired
+// preview origin lives on here (ADR 061).
 type DeploymentPayload struct {
-	EnvironmentID       string `json:"environment_id,omitempty"`
-	ReleaseID           string `json:"release_id,omitempty"`
-	Reason              string `json:"reason,omitempty"`
-	Message             string `json:"message,omitempty"`
-	SourceEnvironmentID string `json:"source_environment_id,omitempty"`
+	Origin     string `json:"origin,omitempty"`
+	DeployID   string `json:"deploy_id,omitempty"`
+	ReleaseID  string `json:"release_id,omitempty"`
+	Reason     string `json:"reason,omitempty"`
+	Message    string `json:"message,omitempty"`
+	RollbackOf string `json:"rollback_of,omitempty"`
 }
 
 type DeploymentCreatedPayload = DeploymentPayload
+
+// ReleaseRevokedPayload records when a release was taken out of service.
+type ReleaseRevokedPayload struct {
+	RevokedAt time.Time `json:"revoked_at"`
+}
 
 // DeploymentPayloadSnapshot is the allowlisted create snapshot for deployment
 // events.
@@ -268,15 +271,16 @@ func DeploymentPayloadSnapshot(dep *Deployment) DeploymentPayload {
 		return DeploymentPayload{}
 	}
 	payload := DeploymentPayload{
-		EnvironmentID: dep.EnvironmentID,
-		ReleaseID:     dep.ReleaseID,
-		Reason:        dep.Metadata.Reason.String(),
+		Origin:    dep.Origin,
+		DeployID:  dep.DeployID,
+		ReleaseID: dep.ReleaseID,
+		Reason:    dep.Metadata.Reason.String(),
 	}
 	if dep.Metadata.Message != nil {
 		payload.Message = *dep.Metadata.Message
 	}
-	if dep.Metadata.SourceEnvironmentID != nil {
-		payload.SourceEnvironmentID = *dep.Metadata.SourceEnvironmentID
+	if dep.Metadata.RollbackOf != nil {
+		payload.RollbackOf = *dep.Metadata.RollbackOf
 	}
 	return payload
 }

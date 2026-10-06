@@ -159,11 +159,11 @@ type fakeProjectService struct {
 
 var _ service.ProjectService = (*fakeProjectService)(nil)
 
-func (f *fakeProjectService) Create(context.Context, string, []string, bool) (*domain.Project, error) {
+func (f *fakeProjectService) Create(context.Context, string, []domain.AllowedOrigin, bool) (*domain.Project, error) {
 	panic("unused")
 }
 
-func (f *fakeProjectService) CreateWithID(context.Context, string, string, []string, bool) (*domain.Project, error) {
+func (f *fakeProjectService) CreateWithID(context.Context, string, string, []domain.AllowedOrigin, bool) (*domain.Project, error) {
 	panic("unused")
 }
 
@@ -189,6 +189,18 @@ func (f *fakeProjectService) Delete(context.Context, string) error {
 
 func (f *fakeProjectService) DefaultProject(context.Context, string) (*domain.Project, error) {
 	return f.project, f.err
+}
+
+func (f *fakeProjectService) AddAllowedOrigin(context.Context, string, domain.AllowedOrigin) (*domain.OriginLintWarning, error) {
+	panic("unused")
+}
+
+func (f *fakeProjectService) RemoveAllowedOrigin(context.Context, string, string) error {
+	panic("unused")
+}
+
+func (f *fakeProjectService) SetClass(context.Context, string, domain.ProjectClass, bool) (*domain.Project, error) {
+	panic("unused")
 }
 
 func TestStandaloneRuntimeResolverWithoutProject(t *testing.T) {

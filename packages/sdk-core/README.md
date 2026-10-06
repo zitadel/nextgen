@@ -17,8 +17,8 @@ building your own middleware or need the types without a framework wrapper.
 | `@zitadel/sdk-core/middleware` | The middleware layer: `NextgenSession`, `AuthResult`, `NextgenMiddlewareOptions`, route matching (`matchesRoutes`), response-header filtering (`filterResponseHeaders`, `HOP_BY_HOP`) |
 
 It also exports `resolveZitadelRuntime` / `resolveZitadelRuntimeEnv` and
-`ZitadelRuntimeError` for resolving the runtime environment
-(`development` / `preview` / `production`).
+`ZitadelRuntimeError` for resolving the project id, the issuer and the
+release a build pins (`ZITADEL_RELEASE`, sent as `X-Zitadel-Release`).
 
 ## How JWT verification works
 

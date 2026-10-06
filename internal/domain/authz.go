@@ -24,7 +24,6 @@ const (
 	ResourceKindBranding       ResourceKind = "branding"
 	ResourceKindFlowDefinition ResourceKind = "flow_definition"
 	ResourceKindSession        ResourceKind = "session"
-	ResourceKindEnvironment    ResourceKind = "environment"
 	ResourceKindRelease        ResourceKind = "release"
 	ResourceKindIDPConnection  ResourceKind = "idp_connection"
 	ResourceKindDeployment     ResourceKind = "deployment"

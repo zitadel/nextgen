@@ -20,7 +20,7 @@ function ctxFor(
       id: "proj-1",
       project_secret: "sk_proj_full",
       preview_secret: "sk_proj_preview",
-      preview_origins: [],
+      preview_token: "sk_proj_preview_token",
       created_at: "2026-01-01T00:00:00.000Z",
     },
     issuer: "http://localhost:3000",
@@ -172,20 +172,6 @@ describe("NextPatcher.plan", () => {
     const plan = new NextPatcher().plan(ctxFor("app"));
     expect(writeContents(plan, ".zitadel/schemas/user.json")).toBeUndefined();
     expect(writeContents(plan, ".zitadel/flows/default.json")).toBeUndefined();
-  });
-
-  it("writes preview issuer_pattern as the raw origins, not a doubled scheme", () => {
-    const base = ctxFor("app");
-    const ctx = {
-      ...base,
-      project: { ...base.project, preview_origins: ["https://nextgen.dev.mrida.ng"] },
-    };
-    const zitadelJson = JSON.parse(
-      writeContents(new NextPatcher().plan(ctx), "zitadel.json") ?? "{}",
-    );
-    expect(zitadelJson.environments.preview.issuer_pattern).toEqual([
-      "https://nextgen.dev.mrida.ng",
-    ]);
   });
 
   it("honors the src/app directory", () => {

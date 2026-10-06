@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -50,6 +51,11 @@ type ListReleasesOutput struct {
 type ReleaseService interface {
 	Create(ctx context.Context, input CreateReleaseInput) (*CreateReleaseOutput, error)
 	Get(ctx context.Context, projectID, id string) (*domain.Release, error)
+	// GetByRef resolves a release named by id or by a prefix of its content
+	// digest. A prefix matching several releases is refused as ambiguous.
+	GetByRef(ctx context.Context, projectID, ref string) (*domain.Release, error)
+	// Revoke marks the release refused on every path, pinned or deployed.
+	Revoke(ctx context.Context, projectID, id string) (*domain.Release, error)
 	List(ctx context.Context, input ListReleasesInput) (*ListReleasesOutput, error)
 }
 
@@ -147,6 +153,59 @@ func (s *releaseService) Get(ctx context.Context, projectID, id string) (*domain
 		return nil, domain.ErrInternal(err).WithMessage("failed to get release from database")
 	}
 	return entity, nil
+}
+
+func (s *releaseService) GetByRef(ctx context.Context, projectID, ref string) (*domain.Release, error) {
+	parsed, err := domain.ParseReleaseRef(ref)
+	if err != nil {
+		return nil, err
+	}
+	if parsed.ID != "" {
+		return s.Get(ctx, projectID, parsed.ID)
+	}
+	matches, err := s.v2Pool.Statements().ListReleasesByContentHashPrefix(ctx, projectID, parsed.HashPrefix)
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to look up release by digest")
+	}
+	switch len(matches) {
+	case 0:
+		return nil, domain.ErrReleaseNotFound()
+	case 1:
+		return matches[0], nil
+	default:
+		ids := make([]string, len(matches))
+		for i, match := range matches {
+			ids[i] = match.ID
+		}
+		return nil, domain.ErrReleaseAmbiguous(map[string]any{"release": ref, "matches": ids})
+	}
+}
+
+func (s *releaseService) Revoke(ctx context.Context, projectID, id string) (*domain.Release, error) {
+	at := time.Now().UTC()
+	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		if err := tx.Statements().RevokeRelease(ctx, projectID, id, at); err != nil {
+			return err
+		}
+		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
+			Type:       domain.EventTypeReleaseRevoked,
+			Category:   domain.EventCategoryAdmin,
+			ProjectID:  projectID,
+			EntityType: "release",
+			EntityID:   id,
+			Payload:    domain.ReleaseRevokedPayload{RevokedAt: at},
+		})
+	})
+	if err != nil {
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+			return nil, domain.ErrReleaseNotFound()
+		}
+		if de, ok := errors.AsType[domain.Error](err); ok {
+			return nil, de
+		}
+		return nil, domain.ErrInternal(err).WithMessage("failed to revoke release")
+	}
+	return s.Get(ctx, projectID, id)
 }
 
 func (s *releaseService) List(ctx context.Context, input ListReleasesInput) (*ListReleasesOutput, error) {

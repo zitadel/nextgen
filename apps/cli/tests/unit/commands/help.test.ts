@@ -23,6 +23,9 @@ Project commands
   claim:                 Claim this project to make it permanent
   doctor:                Verify local runtime and project state
   eject:                 Remove managed files and local Zitadel state
+  env:                   Show which server and project this directory resolves to, and from where
+  env add:               Bind an environment to a project, creating the project if needed
+  env list:              List the environments bound in this directory's .env files
 
 Local server commands
   start:                 Start a local Zitadel server
@@ -35,22 +38,30 @@ Local server commands
 Configuration commands
   plan:                  Validate config without mutation and preview the sync diff
   apply:                 Validate and upload repo config to the platform
+  deploy:                Build a release from .zitadel/ and deploy it to the project default and primary origins
   branding eject:        Take ownership of the login template
+  preview:               Build a release and deploy it to this build's preview URLs, for a limited time
+  deployments:           List the deployment log, or what every target serves with --live
+  rollback:              Undo the newest deploy, or go back to an earlier one with --to
+  allowlist:             List the project's allowed origin patterns
+  vars list:             List the project's variables and secrets
+  allowlist add:         Add an allowed origin pattern to the project
+  allowlist rm:          Remove an allowed origin pattern from the project
   branding get:          Get one branding revision by id
   branding list:         List branding
-  environments get:      Get one environment by id
-  environments list:     List environments
   flow-definitions get:  Get one flow definition by id
   flow-definitions list: List flow-definitions
+  preview rm:            Retire a preview URL; its deployment records are kept
   releases get:          Get one release by id
   releases list:         List releases
+  releases revoke:       Revoke a release so nothing serves it, pinned or not
   schemas get:           Get one schema by id
   schemas list:          List schemas
   sso enable:            Enable an identity provider for a user schema
-  variables delete:      Delete one variable from the project
-  variables get:         Get one variable from the project
-  variables list:        List the variables entered on the project
-  variables set:         Set one variable on the project
+  vars get:              Get one variable from the project
+  vars resolve:          Show the variables a target is serving, frozen on its deployment
+  vars rm:               Remove one variable from the project
+  vars set:              Set one variable on the project
 
 Resource commands
   resources:             List the resources this CLI manages and what can be done to each
@@ -63,8 +74,10 @@ Resource commands
   idps create:           Create an identity provider connection
   idps get:              Get one identity provider connection by id
   idps list:             List idps
+  projects demote:       Demote the project to class sandbox
   projects get:          Get one project by id
   projects list:         List projects
+  projects promote:      Promote the project to class production
   projects update:       Update a project by id
   sessions get:          Get one session by id
   sessions list:         List sessions

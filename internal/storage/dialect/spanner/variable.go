@@ -14,20 +14,16 @@ import (
 )
 
 const (
-	variablesQuery = `SELECT name, project_id, environment_id, value, is_secret, created_at, modified_at
+	variablesQuery = `SELECT name, project_id, applies_to, value, is_secret, created_at, modified_at
 FROM variables`
 
-	// INSERT OR UPDATE keys on the primary key, which is the natural key here,
-	// so a rewrite at the same owner and name replaces the value instead of
-	// adding a second variable there.
-	setVariableStmt = `INSERT OR UPDATE INTO variables (name, project_id, environment_id, value, is_secret, modified_at)
+	// INSERT OR UPDATE keys on the primary key, so a rewrite of the same name
+	// and applies_to replaces the value instead of adding a second row.
+	setVariableStmt = `INSERT OR UPDATE INTO variables (name, project_id, applies_to, value, is_secret, modified_at)
 VALUES (@p1, @p2, @p3, @p4, @p5, CURRENT_TIMESTAMP())`
 
-	// Both owner columns are matched exactly, which is the primary key minus
-	// the name -- so this addresses exactly one row, and an owner cannot remove
-	// a variable another one entered.
 	deleteVariableStmt = `DELETE FROM variables
-WHERE name = @p1 AND project_id = @p2 AND environment_id = @p3`
+WHERE name = @p1 AND project_id = @p2 AND applies_to = @p3`
 )
 
 type variableStatements struct{ statement }
@@ -37,9 +33,9 @@ func newVariableStatements(db queryExecutor) variableStatements {
 }
 
 // GetVariables implements [service.VariableStatements].
-func (s variableStatements) GetVariables(ctx context.Context, owner domain.VariableOwner, names ...string) ([]*domain.Variable, error) {
+func (s variableStatements) GetVariables(ctx context.Context, projectID string, appliesTo *domain.VariableAppliesTo, names ...string) ([]*domain.Variable, error) {
 	var compiler statementCompiler
-	if err := compileRead(&compiler, variablesQuery, variable.VisibleTo(owner, names...), variable.Schema); err != nil {
+	if err := compileRead(&compiler, variablesQuery, variable.VisibleTo(projectID, appliesTo, names...), variable.Schema); err != nil {
 		return nil, err
 	}
 
@@ -51,7 +47,7 @@ func (s variableStatements) GetVariables(ctx context.Context, owner domain.Varia
 	}); err != nil {
 		return nil, returnQueryError(err)
 	}
-	return variable.ToDomain(items), nil
+	return variable.ToDomain(items)
 }
 
 // SetVariable implements [service.VariableStatements].
@@ -61,7 +57,7 @@ func (s variableStatements) SetVariable(ctx context.Context, v *domain.Variable)
 		return err
 	}
 	stmt := buildStatement(setVariableStmt,
-		v.Name, v.Owner.ProjectID, v.Owner.EnvironmentID,
+		v.Name, v.Owner.ProjectID, v.AppliesTo.String(),
 		spanner.NullJSON{Value: json.RawMessage(encoded), Valid: true}, v.IsSecret,
 	).statement()
 	if _, err := s.db.Update(ctx, stmt); err != nil {
@@ -71,10 +67,8 @@ func (s variableStatements) SetVariable(ctx context.Context, v *domain.Variable)
 }
 
 // DeleteVariable implements [service.VariableStatements].
-func (s variableStatements) DeleteVariable(ctx context.Context, owner domain.VariableOwner, name string) error {
-	stmt := buildStatement(deleteVariableStmt,
-		name, owner.ProjectID, owner.EnvironmentID,
-	).statement()
+func (s variableStatements) DeleteVariable(ctx context.Context, projectID string, appliesTo domain.VariableAppliesTo, name string) error {
+	stmt := buildStatement(deleteVariableStmt, name, projectID, appliesTo.String()).statement()
 	n, err := s.db.Update(ctx, stmt)
 	if err != nil {
 		return wrapError(err)
@@ -93,7 +87,7 @@ func scanVariable(row *spanner.Row) (*variable.VariableStorage, error) {
 		modifiedAt time.Time
 	)
 	if err := row.Columns(
-		&stored.Name, &stored.ProjectID, &stored.EnvironmentID,
+		&stored.Name, &stored.ProjectID, &stored.AppliesTo,
 		&encoded, &stored.IsSecret, &createdAt, &modifiedAt,
 	); err != nil {
 		return nil, err

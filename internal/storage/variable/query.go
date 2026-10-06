@@ -5,22 +5,19 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-// VisibleTo restricts the variables table to the rows owner entered, optionally
-// narrowed to names. It is [domain.VariableOwner.HasAccessTo] pushed into SQL:
-// every owner column has to match exactly.
+// VisibleTo restricts the variables table to one project's rows, optionally
+// narrowed to one applies_to and to names. It is
+// [domain.VariableOwner.HasAccessTo] pushed into SQL.
 //
-// Equality, not the "unset means inherited" form: an owner is an address, not a
-// position in a ladder, so a name at an owner is one row rather than a set to
-// rank (ADR 062 §4).
-//
-// Filtering here rather than after the scan is what keeps another environment's
-// variable out of a read. The domain predicate is not applied a second time, so
-// unlike the settings ladder this replaced, an unfiltered caller is not safe --
-// every read goes through here.
-func VisibleTo(owner domain.VariableOwner, names ...string) *database.ListOptions[VariableStorageField] {
+// Filtering here rather than after the scan is what keeps another project's
+// variable out of a read. The domain predicate is not applied a second time,
+// so an unfiltered caller is not safe -- every read goes through here.
+func VisibleTo(projectID string, appliesTo *domain.VariableAppliesTo, names ...string) *database.ListOptions[VariableStorageField] {
 	filters := []database.Filter[VariableStorageField]{
-		database.Equal(database.Col(VariableStorageFieldProjectID), owner.ProjectID),
-		database.Equal(database.Col(VariableStorageFieldEnvironmentID), owner.EnvironmentID),
+		database.Equal(database.Col(VariableStorageFieldProjectID), projectID),
+	}
+	if appliesTo != nil {
+		filters = append(filters, database.Equal(database.Col(VariableStorageFieldAppliesTo), appliesTo.String()))
 	}
 	if len(names) > 0 {
 		filters = append(filters, anyName(names))
@@ -33,13 +30,13 @@ func VisibleTo(owner domain.VariableOwner, names ...string) *database.ListOption
 }
 
 // ByName gives the read a total order that does not depend on physical row
-// order, so the same owner reading the same table twice gets the same slice.
-// Name alone is enough to be total: the read admits one owner, and the primary
-// key makes a name unique within it.
+// order: name, then applies_to, which together with the project is the
+// primary key.
 func ByName() database.OrderBy[VariableStorageField] {
 	return database.OrderBy[VariableStorageField]{
 		Columns: []database.Column[VariableStorageField]{
 			database.Col(VariableStorageFieldName),
+			database.Col(VariableStorageFieldAppliesTo),
 		},
 		Direction: database.OrderAsc,
 	}
@@ -55,23 +52,29 @@ func anyName(names []string) database.Filter[VariableStorageField] {
 }
 
 // ToDomain converts scanned rows, preserving the order they were scanned in.
-func ToDomain(rows []*VariableStorage) []*domain.Variable {
+func ToDomain(rows []*VariableStorage) ([]*domain.Variable, error) {
 	variables := make([]*domain.Variable, 0, len(rows))
 	for _, row := range rows {
-		variables = append(variables, RowToDomain(row))
+		v, err := RowToDomain(row)
+		if err != nil {
+			return nil, err
+		}
+		variables = append(variables, v)
 	}
-	return variables
+	return variables, nil
 }
 
 // RowToDomain converts one row into the domain variable.
-func RowToDomain(row *VariableStorage) *domain.Variable {
-	return &domain.Variable{
-		Name: row.Name,
-		Owner: domain.VariableOwner{
-			ProjectID:     row.ProjectID,
-			EnvironmentID: row.EnvironmentID,
-		},
-		Value:    row.Value,
-		IsSecret: row.IsSecret,
+func RowToDomain(row *VariableStorage) (*domain.Variable, error) {
+	appliesTo, err := domain.VariableAppliesToString(row.AppliesTo)
+	if err != nil {
+		return nil, err
 	}
+	return &domain.Variable{
+		Name:      row.Name,
+		Owner:     domain.VariableOwner{ProjectID: row.ProjectID},
+		AppliesTo: appliesTo,
+		Value:     row.Value,
+		IsSecret:  row.IsSecret,
+	}, nil
 }

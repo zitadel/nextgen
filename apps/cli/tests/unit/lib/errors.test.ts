@@ -99,7 +99,7 @@ describe("toZitadelError", () => {
     expect(result.code).toBe("E_NETWORK");
     expect(result.message).toBe("fetch failed");
     expect(result.hint).toBe(
-      "Check your connection, ZITADEL_API_BASE, or the configured server URL.",
+      "Check your connection, ZITADEL_URL, or the configured server URL.",
     );
     expect(result.details).toEqual({
       original: { name: "TypeError", message: "fetch failed", code: undefined },

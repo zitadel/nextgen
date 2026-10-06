@@ -2,6 +2,8 @@ package postgres
 
 import (
 	"context"
+	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -15,7 +17,12 @@ import (
 const (
 	createReleaseStmt = `INSERT INTO zitadel_nextgen.releases (project_id, id, content_hash, pointers, metadata)` +
 		` VALUES ($1, $2, $3, $4, $5) RETURNING created_at`
-	releaseQuery = `SELECT project_id, id, content_hash, pointers, metadata, created_at FROM zitadel_nextgen.releases`
+	releaseQuery = `SELECT project_id, id, content_hash, pointers, metadata, created_at, revoked_at FROM zitadel_nextgen.releases`
+	// Revoking twice keeps the first stamp: the earlier date is the one the
+	// audit trail wants.
+	revokeReleaseStmt = `UPDATE zitadel_nextgen.releases SET revoked_at = COALESCE(revoked_at, $3)` +
+		` WHERE project_id = $1 AND id = $2`
+	releasesByHashPrefixStmt = releaseQuery + ` WHERE project_id = $1 AND content_hash LIKE $2 ORDER BY created_at DESC, id DESC`
 )
 
 type releaseStatements struct{ statement }
@@ -88,6 +95,36 @@ func (rs releaseStatements) getOne(ctx context.Context, filter database.Filter[d
 	return entity, nil
 }
 
+// ListReleasesByContentHashPrefix implements [service.ReleaseStatements].
+func (rs releaseStatements) ListReleasesByContentHashPrefix(ctx context.Context, projectID, prefix string) ([]*domain.Release, error) {
+	rows, err := rs.client.Query(ctx, releasesByHashPrefixStmt, projectID, escapeLike(prefix)+"%")
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	items, err := pgx.CollectRows(rows, scanRelease)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	return items, nil
+}
+
+// RevokeRelease implements [service.ReleaseStatements].
+func (rs releaseStatements) RevokeRelease(ctx context.Context, projectID, id string, at time.Time) error {
+	tag, err := rs.client.Exec(ctx, revokeReleaseStmt, projectID, id, at)
+	if err != nil {
+		return wrapError(err)
+	}
+	if tag.RowsAffected() == 0 {
+		return database.NewNoRowFoundError(nil)
+	}
+	return nil
+}
+
+// escapeLike quotes the LIKE metacharacters in a literal prefix.
+func escapeLike(s string) string {
+	return strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(s)
+}
+
 // GetReleasesByIDs implements [service.ReleaseStatements].
 func (rs releaseStatements) GetReleasesByIDs(ctx context.Context, projectID string, ids []string) ([]*domain.Release, error) {
 	if len(ids) == 0 {
@@ -147,6 +184,7 @@ func scanRelease(row pgx.CollectableRow) (*domain.Release, error) {
 		&scanned.Pointers,
 		&scanned.Metadata,
 		&scanned.CreatedAt,
+		&scanned.RevokedAt,
 	); err != nil {
 		return nil, err
 	}

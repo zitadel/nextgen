@@ -8,11 +8,11 @@ import (
 	"strings"
 )
 
-const _TokenTypeName = "unspecifiedsession_tokenoidc_access_tokensaml_assertionpersonal_access_tokenflowjwt_profileproject_tokenproject_preview"
+const _TokenTypeName = "unspecifiedsession_tokenoidc_access_tokensaml_assertionpersonal_access_tokenflowjwt_profileproject_tokenproject_previewproject_preview_deploy"
 
-var _TokenTypeIndex = [...]uint8{0, 11, 24, 41, 55, 76, 80, 91, 104, 119}
+var _TokenTypeIndex = [...]uint8{0, 11, 24, 41, 55, 76, 80, 91, 104, 119, 141}
 
-const _TokenTypeLowerName = "unspecifiedsession_tokenoidc_access_tokensaml_assertionpersonal_access_tokenflowjwt_profileproject_tokenproject_preview"
+const _TokenTypeLowerName = "unspecifiedsession_tokenoidc_access_tokensaml_assertionpersonal_access_tokenflowjwt_profileproject_tokenproject_previewproject_preview_deploy"
 
 func (i TokenType) String() string {
 	if i >= TokenType(len(_TokenTypeIndex)-1) {
@@ -34,9 +34,10 @@ func _TokenTypeNoOp() {
 	_ = x[TokenTypeJWTProfile-(6)]
 	_ = x[TokenTypeProjectToken-(7)]
 	_ = x[TokenTypeProjectPreview-(8)]
+	_ = x[TokenTypeProjectPreviewDeploy-(9)]
 }
 
-var _TokenTypeValues = []TokenType{TokenTypeUnspecified, TokenTypeSessionToken, TokenTypeOIDCAccessToken, TokenTypeSAMLAssertion, TokenTypePersonalAccessToken, TokenTypeFlow, TokenTypeJWTProfile, TokenTypeProjectToken, TokenTypeProjectPreview}
+var _TokenTypeValues = []TokenType{TokenTypeUnspecified, TokenTypeSessionToken, TokenTypeOIDCAccessToken, TokenTypeSAMLAssertion, TokenTypePersonalAccessToken, TokenTypeFlow, TokenTypeJWTProfile, TokenTypeProjectToken, TokenTypeProjectPreview, TokenTypeProjectPreviewDeploy}
 
 var _TokenTypeNameToValueMap = map[string]TokenType{
 	_TokenTypeName[0:11]:         TokenTypeUnspecified,
@@ -57,6 +58,8 @@ var _TokenTypeNameToValueMap = map[string]TokenType{
 	_TokenTypeLowerName[91:104]:  TokenTypeProjectToken,
 	_TokenTypeName[104:119]:      TokenTypeProjectPreview,
 	_TokenTypeLowerName[104:119]: TokenTypeProjectPreview,
+	_TokenTypeName[119:141]:      TokenTypeProjectPreviewDeploy,
+	_TokenTypeLowerName[119:141]: TokenTypeProjectPreviewDeploy,
 }
 
 var _TokenTypeNames = []string{
@@ -69,6 +72,7 @@ var _TokenTypeNames = []string{
 	_TokenTypeName[80:91],
 	_TokenTypeName[91:104],
 	_TokenTypeName[104:119],
+	_TokenTypeName[119:141],
 }
 
 // TokenTypeString retrieves an enum value from the enum constants string name.

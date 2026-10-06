@@ -74,6 +74,21 @@ func (h *Handler) GetReleaseById(ctx context.Context, params api.GetReleaseByIdP
 	return &release, nil
 }
 
+func (h *Handler) RevokeRelease(ctx context.Context, params api.RevokeReleaseParams) (api.RevokeReleaseRes, error) {
+	if err := h.requireProjectAccess(ctx, string(params.ProjectID), releaseAccess, opWrite); err != nil {
+		return nil, err
+	}
+	if !hasOperatorProjectWrite(scopeOf(ctx)) {
+		return nil, domain.ErrReleasePermissionDenied().WithMessage("revoking a release requires the project secret")
+	}
+	entity, err := h.releaseService.Revoke(ctx, string(params.ProjectID), string(params.ReleaseID))
+	if err != nil {
+		return nil, err
+	}
+	release := toAPIRelease(entity)
+	return &release, nil
+}
+
 func (h *Handler) ListReleases(ctx context.Context, params api.ListReleasesParams) (api.ListReleasesRes, error) {
 	ctx, err := h.requireProjectListAccess(ctx, string(params.ProjectID), releaseAccess, domain.ResourceKindRelease)
 	if err != nil {
@@ -92,9 +107,10 @@ func (h *Handler) ListReleases(ctx context.Context, params api.ListReleasesParam
 	resp := api.ListReleasesResponse{Releases: make([]api.ReleaseSummary, len(result.Items))}
 	for i, entity := range result.Items {
 		resp.Releases[i] = api.ReleaseSummary{
-			ID:        api.ReleaseID(entity.ID),
-			ProjectID: api.ProjectID(entity.ProjectID),
-			Metadata:  toAPIReleaseMetadata(entity),
+			ID:          api.ReleaseID(entity.ID),
+			ProjectID:   api.ProjectID(entity.ProjectID),
+			ContentHash: entity.ContentHash,
+			Metadata:    toAPIReleaseMetadata(entity),
 		}
 	}
 	if result.NextPageToken != "" {
@@ -114,12 +130,19 @@ func toAPIRelease(entity *domain.Release) api.Release {
 			RevisionID: pointer.RevisionID,
 		}
 	}
-	return api.Release{
-		ID:        api.ReleaseID(entity.ID),
-		ProjectID: api.ProjectID(entity.ProjectID),
-		Metadata:  toAPIReleaseMetadata(entity),
-		Pointers:  pointers,
+	release := api.Release{
+		ID:          api.ReleaseID(entity.ID),
+		ProjectID:   api.ProjectID(entity.ProjectID),
+		ContentHash: entity.ContentHash,
+		Metadata:    toAPIReleaseMetadata(entity),
+		Pointers:    pointers,
 	}
+	if entity.RevokedAt != nil {
+		release.RevokedAt.SetTo(*entity.RevokedAt)
+	} else {
+		release.RevokedAt.SetToNull()
+	}
+	return release
 }
 
 // toAPIReleaseMetadata writes absent fields as explicit nulls rather than
@@ -167,6 +190,12 @@ func releaseErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
 	case domain.ErrReleasePermissionDenied().Code:
 		return errorResponseWithStatusCode(http.StatusForbidden, err)
+	case domain.ErrReleaseRevoked().Code,
+		domain.ErrReleaseNotDeployed(nil).Code,
+		domain.ErrReleaseNoDefault().Code:
+		return errorResponseWithStatusCode(http.StatusConflict, err)
+	case domain.ErrReleaseAmbiguous(nil).Code:
+		return errorResponseWithStatusCode(http.StatusBadRequest, err)
 	default:
 		return internalErrorResponse(err)
 	}

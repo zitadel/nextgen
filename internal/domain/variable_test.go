@@ -16,8 +16,7 @@ import (
 )
 
 var variableOwner = domain.VariableOwner{
-	ProjectID:     "project-1",
-	EnvironmentID: "env_1",
+	ProjectID: "project-1",
 }
 
 func TestVariableName_Bounds(t *testing.T) {
@@ -32,7 +31,7 @@ func TestVariableName_Bounds(t *testing.T) {
 		tooLong := strings.Repeat("a", domain.MaxVariableNameLength+1)
 		require.Regexp(t, domain.NameRegex, tooLong, "the name is only invalid for its length")
 
-		_, err := domain.NewVariable(tooLong, variableOwner, "v")
+		_, err := domain.NewVariable(tooLong, variableOwner, domain.VariableAppliesToAll, "v")
 		require.Error(t, err)
 		assert.ErrorIs(t, err, domain.ErrInvalidVariableName())
 	})
@@ -40,7 +39,7 @@ func TestVariableName_Bounds(t *testing.T) {
 	t.Run("accepts a name at the limit", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := domain.NewVariable(strings.Repeat("a", domain.MaxVariableNameLength), variableOwner, "v")
+		_, err := domain.NewVariable(strings.Repeat("a", domain.MaxVariableNameLength), variableOwner, domain.VariableAppliesToAll, "v")
 		require.NoError(t, err)
 	})
 
@@ -51,7 +50,7 @@ func TestVariableName_Bounds(t *testing.T) {
 		// No EXPECT: the name is rejected before anything reaches the crypter.
 		encrypter := cryptomock.NewMockEncrypter(gomock.NewController(t))
 
-		_, err := domain.NewSecretVariable(strings.Repeat("a", domain.MaxVariableNameLength+1), variableOwner, "v", encrypter)
+		_, err := domain.NewSecretVariable(strings.Repeat("a", domain.MaxVariableNameLength+1), variableOwner, domain.VariableAppliesToAll, "v", encrypter)
 		require.Error(t, err)
 		assert.ErrorIs(t, err, domain.ErrInvalidVariableName())
 	})
@@ -63,7 +62,7 @@ func TestNewVariable(t *testing.T) {
 	t.Run("keeps a valid scalar as-is", func(t *testing.T) {
 		t.Parallel()
 
-		v, err := domain.NewVariable("theme", variableOwner, "dark")
+		v, err := domain.NewVariable("theme", variableOwner, domain.VariableAppliesToAll, "dark")
 		require.NoError(t, err)
 		assert.Equal(t, "theme", v.Name)
 		assert.Equal(t, variableOwner, v.Owner)
@@ -74,7 +73,7 @@ func TestNewVariable(t *testing.T) {
 	t.Run("requires an owning project", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := domain.NewVariable("theme", domain.VariableOwner{}, "dark")
+		_, err := domain.NewVariable("theme", domain.VariableOwner{}, domain.VariableAppliesToAll, "dark")
 		require.Error(t, err)
 		assert.ErrorIs(t, err, domain.ErrNoVariableOwnerProjectID())
 	})
@@ -85,7 +84,7 @@ func TestNewVariable(t *testing.T) {
 		// The placeholder body is \w+, so a name outside that could be stored
 		// but never referenced.
 		for _, name := range []string{"", "with space", "dotted.name", "dash-ed", "${{x}}"} {
-			_, err := domain.NewVariable(name, variableOwner, "v")
+			_, err := domain.NewVariable(name, variableOwner, domain.VariableAppliesToAll, "v")
 			require.Error(t, err, "name %q", name)
 			assert.ErrorIs(t, err, domain.ErrInvalidVariableName())
 		}
@@ -104,7 +103,7 @@ func TestNewVariable(t *testing.T) {
 			"float":  1.5,
 		} {
 			t.Run(name, func(t *testing.T) {
-				v, err := domain.NewVariable("v", variableOwner, value)
+				v, err := domain.NewVariable("v", variableOwner, domain.VariableAppliesToAll, value)
 				require.NoError(t, err)
 				assert.Equal(t, value, v.Value)
 			})
@@ -124,7 +123,7 @@ func TestNewVariable(t *testing.T) {
 			"timeCopy": &time.Time{},
 		} {
 			t.Run(name, func(t *testing.T) {
-				_, err := domain.NewVariable("v", variableOwner, value)
+				_, err := domain.NewVariable("v", variableOwner, domain.VariableAppliesToAll, value)
 				require.Error(t, err)
 				assert.ErrorIs(t, err, domain.ErrInvalidVariableValue())
 			})
@@ -134,11 +133,11 @@ func TestNewVariable(t *testing.T) {
 	t.Run("rejects a string past the size cap", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := domain.NewVariable("v", variableOwner, strings.Repeat("A", domain.MaxVariableStringLength+1))
+		_, err := domain.NewVariable("v", variableOwner, domain.VariableAppliesToAll, strings.Repeat("A", domain.MaxVariableStringLength+1))
 		require.Error(t, err)
 		assert.ErrorIs(t, err, domain.ErrInvalidVariableValue())
 
-		_, err = domain.NewVariable("v", variableOwner, strings.Repeat("A", domain.MaxVariableStringLength))
+		_, err = domain.NewVariable("v", variableOwner, domain.VariableAppliesToAll, strings.Repeat("A", domain.MaxVariableStringLength))
 		require.NoError(t, err, "exactly at the cap is allowed")
 	})
 }
@@ -154,7 +153,7 @@ func TestNewSecretVariable(t *testing.T) {
 		// return the original type rather than text.
 		encrypter.EXPECT().Encrypt(`"s3cret"`).Return("ciphertext", nil)
 
-		v, err := domain.NewSecretVariable("token", variableOwner, "s3cret", encrypter)
+		v, err := domain.NewSecretVariable("token", variableOwner, domain.VariableAppliesToAll, "s3cret", encrypter)
 		require.NoError(t, err)
 		assert.True(t, v.IsSecret)
 		assert.Equal(t, "ciphertext", v.Value, "the plaintext must not survive into the row")
@@ -165,13 +164,13 @@ func TestNewSecretVariable(t *testing.T) {
 		// No EXPECT: an invalid variable must never reach the crypter.
 		encrypter := cryptomock.NewMockEncrypter(gomock.NewController(t))
 
-		_, err := domain.NewSecretVariable("bad name", variableOwner, "s3cret", encrypter)
+		_, err := domain.NewSecretVariable("bad name", variableOwner, domain.VariableAppliesToAll, "s3cret", encrypter)
 		require.Error(t, err)
 
-		_, err = domain.NewSecretVariable("token", domain.VariableOwner{}, "s3cret", encrypter)
+		_, err = domain.NewSecretVariable("token", domain.VariableOwner{}, domain.VariableAppliesToAll, "s3cret", encrypter)
 		require.Error(t, err)
 
-		_, err = domain.NewSecretVariable("token", variableOwner, map[string]any{"a": 1}, encrypter)
+		_, err = domain.NewSecretVariable("token", variableOwner, domain.VariableAppliesToAll, map[string]any{"a": 1}, encrypter)
 		require.Error(t, err)
 	})
 
@@ -182,7 +181,7 @@ func TestNewSecretVariable(t *testing.T) {
 		sentinel := errors.New("no key")
 		encrypter.EXPECT().Encrypt(gomock.Any()).Return("", sentinel)
 
-		_, err := domain.NewSecretVariable("token", variableOwner, "s3cret", encrypter)
+		_, err := domain.NewSecretVariable("token", variableOwner, domain.VariableAppliesToAll, "s3cret", encrypter)
 		require.Error(t, err)
 		assert.ErrorIs(t, err, sentinel, "the cause must stay in the chain")
 	})
@@ -196,7 +195,7 @@ func TestVariableGetDecryptedValue(t *testing.T) {
 		// No EXPECT: a variable that is not secret must not reach the decrypter.
 		decrypter := cryptomock.NewMockDecrypter(gomock.NewController(t))
 
-		v, err := domain.NewVariable("theme", variableOwner, "dark")
+		v, err := domain.NewVariable("theme", variableOwner, domain.VariableAppliesToAll, "dark")
 		require.NoError(t, err)
 
 		got, err := v.GetDecryptedValue(decrypter)
@@ -215,7 +214,7 @@ func TestVariableGetDecryptedValue(t *testing.T) {
 			return "ciphertext", nil
 		})
 
-		v, err := domain.NewSecretVariable("token", variableOwner, "s3cret", crypter)
+		v, err := domain.NewSecretVariable("token", variableOwner, domain.VariableAppliesToAll, "s3cret", crypter)
 		require.NoError(t, err)
 
 		got, err := v.GetDecryptedValue(crypter)
@@ -235,7 +234,7 @@ func TestVariableGetDecryptedValue(t *testing.T) {
 			return "ciphertext", nil
 		})
 
-		v, err := domain.NewSecretVariable("port", variableOwner, 8080, crypter)
+		v, err := domain.NewSecretVariable("port", variableOwner, domain.VariableAppliesToAll, 8080, crypter)
 		require.NoError(t, err)
 
 		got, err := v.GetDecryptedValue(crypter)
@@ -290,9 +289,9 @@ func TestVariablesDecryptAll(t *testing.T) {
 		t.Parallel()
 		crypter := &crypto.InverseCrypter{}
 
-		secret, err := domain.NewSecretVariable("token", variableOwner, "s3cret", crypter)
+		secret, err := domain.NewSecretVariable("token", variableOwner, domain.VariableAppliesToAll, "s3cret", crypter)
 		require.NoError(t, err)
-		plain, err := domain.NewVariable("theme", variableOwner, "dark")
+		plain, err := domain.NewVariable("theme", variableOwner, domain.VariableAppliesToAll, "dark")
 		require.NoError(t, err)
 
 		vars := domain.Variables{"token": secret, "theme": plain}
@@ -307,7 +306,7 @@ func TestVariablesDecryptAll(t *testing.T) {
 		t.Parallel()
 		crypter := &crypto.InverseCrypter{}
 
-		secret, err := domain.NewSecretVariable("token", variableOwner, "s3cret", crypter)
+		secret, err := domain.NewSecretVariable("token", variableOwner, domain.VariableAppliesToAll, "s3cret", crypter)
 		require.NoError(t, err)
 		ciphertext := secret.Value
 

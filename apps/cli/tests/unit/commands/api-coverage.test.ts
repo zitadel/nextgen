@@ -52,6 +52,7 @@ const NOT_RESOURCES: Readonly<Record<string, string>> = {
   // history is that command's to read. Registry CRUD would offer a `create`
   // that skips the release construction the command exists to do.
   deployments: "created and read through `zitadel deploy` orchestration, not registry CRUD (#529)",
+  origins: "live preview rows are written by `zitadel preview` and retired by `zitadel preview rm`",
 };
 
 /**
@@ -75,10 +76,10 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   createSchema: "configuration is written from .zitadel/ by the declarative path (deploy, ADR 035)",
   createBranding:
     "configuration is written from .zitadel/ by the declarative path (deploy, ADR 035)",
-  createRelease: "a release is constructed by `zitadel deploy` (ADR 035)",
-  createDeployment: "a release goes live through `zitadel deploy` orchestration (ADR 035, #529)",
-  getDeploymentById: "deployment history reads arrive with the `zitadel deploy` surface (#529)",
-  listDeployments: "deployment history reads arrive with the `zitadel deploy` surface (#529)",
+  createRelease: "a release is constructed by lib/release.ts for `zitadel deploy` and `zitadel preview`",
+  getDeploymentById: "the log is read whole by `zitadel deployments`; no command addresses one row",
+  listDeployments: "called from lib/deployments.ts by `zitadel deployments`, `deploy` and `rollback`",
+  listOrigins: "live preview rows show in `zitadel deployments --live`; no separate listing",
   createFlowDefinition:
     "configuration is written from .zitadel/ by the declarative path (deploy, ADR 035)",
 
@@ -160,7 +161,13 @@ const REFS = ["ID", "sch_1", "flowdef_1", "https://example.com/schema.json"] as 
  * than create and update, as `gh variable set` does (ADR 062, ADR 064).
  */
 const STANDALONE: Readonly<Record<string, readonly string[]>> = {
-  variables: ["variables/list", "variables/get", "variables/set", "variables/delete"],
+  variables: ["vars/list", "vars/get", "vars/set", "vars/rm", "vars/resolve"],
+  deployments: ["deploy", "preview/index", "deployments", "rollback"],
+  origins: ["preview/rm"],
+  // Project state the registry's CRUD grammar does not reach: the allowlist,
+  // the class, and revoking a release.
+  projects: ["allowlist/index", "allowlist/add", "allowlist/rm", "projects/promote", "projects/demote"],
+  releases: ["releases/revoke"],
 };
 
 /**

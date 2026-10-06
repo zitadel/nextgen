@@ -1,21 +1,17 @@
 title: Deployment
 description: |
-  An immutable record of a release being made live on an environment.
+  An immutable record of a release being made live on one target.
 
-  Deploying, promoting and rolling back all create a deployment. The record
-  is what ran where and when — the ids and the timestamp — plus metadata
-  saying why and who. It is append-only: written once when the environment
-  starts running the release and never changed afterwards, so the deployment
-  log is the audit trail of what ran where.
-
-  Environments are referenced by id, not name. Names are resolved when the
-  deployment is created, so renaming an environment later does not reattach
-  its history.
+  Deploying and rolling back both append rows. A target is an origin string:
+  the empty string is the project default, anything else is a production
+  hostname or a live preview URL. What a target serves is its newest row;
+  nothing points at a deployment and nothing updates one.
 type: object
 required:
   - id
   - project_id
-  - environment_id
+  - deploy_id
+  - origin
   - release_id
   - deployed_at
   - metadata
@@ -28,11 +24,19 @@ properties:
     readOnly: true
     description: The project this deployment belongs to.
     $ref: ../../components/schemas/project-id.yaml
-  environment_id:
+  deploy_id:
     readOnly: true
     type: string
-    description: The environment this deployment made the release live on.
-    example: env_01KX3RG8A7F0N9WD3P2E4YM5C1
+    description: |
+      Correlates the rows one deploy wrote. Rolling a deploy back addresses
+      this id and writes a new set under a new one.
+    example: dpl_01KX3RG8A7F0N9WD3P2E4YM5C1
+  origin:
+    readOnly: true
+    type: string
+    description: |
+      The target: `""` for the project default, otherwise an exact origin.
+    example: https://app.acme.com
   release_id:
     readOnly: true
     description: The release this deployment made live.
@@ -43,6 +47,15 @@ properties:
     format: date-time
     description: When the deployment was created.
     example: '2026-07-14T09:11:00Z'
+  expires_at:
+    readOnly: true
+    description: |
+      When the preview row behind this origin stops admitting requests. Only
+      set in the live view (`live=true`) and only for a preview origin.
+    oneOf:
+      - type: string
+        format: date-time
+      - type: 'null'
   metadata:
     readOnly: true
     $ref: deployment-metadata.yaml
@@ -50,6 +63,5 @@ properties:
     readOnly: true
     description: |
       The release named by `release_id`, present only when the request asked
-      for it with `expand: ["release"]` — the same representation
-      `GET /releases/{release_id}` serves. Absent means it was not requested.
+      for it with `expand: ["release"]`.
     $ref: ../releases/release.yaml

@@ -1,0 +1,31 @@
+post:
+  operationId: removeOrigin
+  summary: Retire a preview origin
+  description: |
+    Deletes the live row behind one preview URL, so requests from it are
+    refused from now on. The URL's deployment rows are kept. A URL with no
+    row answers not found.
+  tags:
+    - Origins
+  parameters:
+    - $ref: ../../../components/parameters/project-id.yaml
+  security:
+    - oauth2:
+        - origin.delete
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          required:
+            - origin
+          properties:
+            origin:
+              type: string
+              example: https://acme-git-sso-acmeinc.vercel.app
+  responses:
+    '204':
+      description: The origin was retired.
+    default:
+      $ref: removeOrigin-error-response.yaml

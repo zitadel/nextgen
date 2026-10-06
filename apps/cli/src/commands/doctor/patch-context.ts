@@ -1,7 +1,6 @@
 import { issuerFromPort, type FrameworkFacts, type Orca } from "../../lib/orca";
 import type { PatchContext } from "../../lib/orca/patchers/types";
 import {
-  readDevelopmentIssuer,
   readPreset,
   readRendererId,
   readUseCase,
@@ -33,7 +32,7 @@ export async function loadPatchContext(
   return {
     framework,
     rendererId: readRendererId(config),
-    issuer: await resolveIssuer(cwd, config, framework),
+    issuer: await resolveIssuer(cwd, framework),
     server: typeof config.server === "string" ? config.server : "",
     cliVersion,
     scaffoldedFramework: scaffold?.scaffolded_framework,
@@ -46,22 +45,14 @@ export async function loadPatchContext(
     project: {
       id: secret.project_id,
       project_secret: secret.project_secret,
-      preview_secret: secret.preview_secret,
-      preview_origins: secret.preview_origins,
+      preview_secret: secret.preview_secret ?? "",
+      preview_token: secret.preview_token ?? "",
       created_at: secret.created_at,
     },
   };
 }
 
-async function resolveIssuer(
-  cwd: string,
-  config: Record<string, unknown>,
-  facts: FrameworkFacts,
-): Promise<string> {
-  const fromConfig = readDevelopmentIssuer(config);
-  if (fromConfig && fromConfig.length > 0) {
-    return fromConfig;
-  }
+async function resolveIssuer(cwd: string, facts: FrameworkFacts): Promise<string> {
   const scaffold = await readScaffoldManifest(cwd);
   if (typeof scaffold?.dev_port === "number") {
     return issuerFromPort(scaffold.dev_port);

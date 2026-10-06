@@ -15,9 +15,10 @@ async function makeProject(schemas: Record<string, unknown> = {}): Promise<strin
   const cwd = await mkdtemp(join(tmpdir(), "zitadel-sso-enable-"));
   tempDirs.push(cwd);
   await mkdir(join(cwd, ".zitadel/schemas"), { recursive: true });
+  await writeFile(join(cwd, "zitadel.json"), `${JSON.stringify({ version: "0.0.1" })}\n`);
   await writeFile(
-    join(cwd, "zitadel.json"),
-    `${JSON.stringify({ version: "0.0.1", environments: { development: { issuer: "http://localhost:3000" } } })}\n`,
+    join(cwd, ".zitadel/state.json"),
+    `${JSON.stringify({ framework: "next", resources: {}, scaffold: { files: {}, dev_port: 3000 } })}\n`,
   );
   await writeFile(
     join(cwd, ".zitadel/secret"),
@@ -25,7 +26,7 @@ async function makeProject(schemas: Record<string, unknown> = {}): Promise<strin
       project_id: "proj_01TEST",
       project_secret: "s",
       preview_secret: "s",
-      preview_origins: [],
+      preview_token: "sk_proj_preview_token",
       created_at: new Date().toISOString(),
     })}\n`,
   );
@@ -398,7 +399,7 @@ describe("sso enable secret handling", () => {
     });
     // Rendered as a command an agent can run, like every other result's.
     expect(json.data.next_commands).toEqual(
-      expect.arrayContaining([expect.stringContaining("variables set GOOGLE_CLIENT_SECRET --project-level --secret")]),
+      expect.arrayContaining([expect.stringContaining("vars set GOOGLE_CLIENT_SECRET --secret")]),
     );
     expect(json.data.next_commands.every((command) => command.startsWith("npx "))).toBe(true);
   });

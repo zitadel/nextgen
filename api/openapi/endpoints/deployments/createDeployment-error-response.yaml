@@ -9,10 +9,14 @@ content:
         - $ref: '../../components/schemas/errors/dep-invalid.yaml'
         - $ref: '../../components/schemas/errors/dep-not_found.yaml'
         - $ref: '../../components/schemas/errors/dep-permission_denied.yaml'
-        - $ref: '../../components/schemas/errors/env-not_found.yaml'
-        - $ref: '../../components/schemas/errors/env-project_not_found.yaml'
         - $ref: '../../components/schemas/errors/evt-invalid.yaml'
         - $ref: '../../components/schemas/errors/internal.yaml'
+        - $ref: '../../components/schemas/errors/proj-not_found.yaml'
+        - $ref: '../../components/schemas/errors/proj-origin_not_allowed.yaml'
+        - $ref: '../../components/schemas/errors/rel-ambiguous.yaml'
+        - $ref: '../../components/schemas/errors/rel-invalid.yaml'
+        - $ref: '../../components/schemas/errors/rel-not_found.yaml'
+        - $ref: '../../components/schemas/errors/rel-revoked.yaml'
         - $ref: '../../components/schemas/errors/req-invalid.yaml'
       discriminator:
         propertyName: code
@@ -22,10 +26,14 @@ content:
           dep.invalid: '../../components/schemas/errors/dep-invalid.yaml'
           dep.not_found: '../../components/schemas/errors/dep-not_found.yaml'
           dep.permission_denied: '../../components/schemas/errors/dep-permission_denied.yaml'
-          env.not_found: '../../components/schemas/errors/env-not_found.yaml'
-          env.project_not_found: '../../components/schemas/errors/env-project_not_found.yaml'
           evt.invalid: '../../components/schemas/errors/evt-invalid.yaml'
           internal: '../../components/schemas/errors/internal.yaml'
+          proj.not_found: '../../components/schemas/errors/proj-not_found.yaml'
+          proj.origin_not_allowed: '../../components/schemas/errors/proj-origin_not_allowed.yaml'
+          rel.ambiguous: '../../components/schemas/errors/rel-ambiguous.yaml'
+          rel.invalid: '../../components/schemas/errors/rel-invalid.yaml'
+          rel.not_found: '../../components/schemas/errors/rel-not_found.yaml'
+          rel.revoked: '../../components/schemas/errors/rel-revoked.yaml'
           req.invalid: '../../components/schemas/errors/req-invalid.yaml'
     examples:
       auth.unauthorized:
@@ -37,7 +45,7 @@ content:
         summary: dep.conflict
         value:
           code: dep.conflict
-          message: 'deployment: the environment''s current deployment does not match expected_current_deployment_id'
+          message: 'deployment: the target''s newest deployment does not match expected_deployment_id'
       dep.invalid:
         summary: dep.invalid
         value:
@@ -53,16 +61,6 @@ content:
         value:
           code: dep.permission_denied
           message: 'deployment: requires an operator-grade token bound to the project (project.write or a deployment.* scope)'
-      env.not_found:
-        summary: env.not_found
-        value:
-          code: env.not_found
-          message: 'environment not found'
-      env.project_not_found:
-        summary: env.project_not_found
-        value:
-          code: env.project_not_found
-          message: 'project not found'
       evt.invalid:
         summary: evt.invalid
         value:
@@ -73,6 +71,36 @@ content:
         value:
           code: internal
           message: 'An unexpected error occurred.'
+      proj.not_found:
+        summary: proj.not_found
+        value:
+          code: proj.not_found
+          message: 'project not found'
+      proj.origin_not_allowed:
+        summary: proj.origin_not_allowed
+        value:
+          code: proj.origin_not_allowed
+          message: 'the request origin matches no allowed origin of this project'
+      rel.ambiguous:
+        summary: rel.ambiguous
+        value:
+          code: rel.ambiguous
+          message: 'release: the digest prefix matches more than one release'
+      rel.invalid:
+        summary: rel.invalid
+        value:
+          code: rel.invalid
+          message: 'release: invalid'
+      rel.not_found:
+        summary: rel.not_found
+        value:
+          code: rel.not_found
+          message: 'release: not found'
+      rel.revoked:
+        summary: rel.revoked
+        value:
+          code: rel.revoked
+          message: 'release: revoked'
       req.invalid:
         summary: req.invalid
         value:

@@ -12,6 +12,7 @@ content:
         - $ref: '../../components/schemas/errors/tkn-invalid_tknid.yaml'
         - $ref: '../../components/schemas/errors/sch-invalid_request.yaml'
         - $ref: '../../components/schemas/errors/not_implemented.yaml'
+        - $ref: '../../components/schemas/errors/origin-invalid.yaml'
         - $ref: '../../components/schemas/errors/proj-name_invalid.yaml'
         - $ref: '../../components/schemas/errors/req-invalid.yaml'
         - $ref: '../../components/schemas/errors/enc_key-unknown_alg.yaml'
@@ -27,6 +28,7 @@ content:
           tkn.invalid_tknid: '../../components/schemas/errors/tkn-invalid_tknid.yaml'
           sch.invalid_request: '../../components/schemas/errors/sch-invalid_request.yaml'
           not_implemented: '../../components/schemas/errors/not_implemented.yaml'
+          origin.invalid: '../../components/schemas/errors/origin-invalid.yaml'
           proj.name_invalid: '../../components/schemas/errors/proj-name_invalid.yaml'
           req.invalid: '../../components/schemas/errors/req-invalid.yaml'
           enc_key.unknown_alg: '../../components/schemas/errors/enc_key-unknown_alg.yaml'
@@ -72,6 +74,11 @@ content:
         value:
           code: not_implemented
           message: 'This feature is not implemented yet.'
+      origin.invalid:
+        summary: origin.invalid
+        value:
+          code: origin.invalid
+          message: 'origin: must be scheme://host[:port], lowercase, with no path'
       proj.name_invalid:
         summary: proj.name_invalid
         value:

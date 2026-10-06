@@ -28,7 +28,7 @@ import type {
   ExchangeHandoffBody,
   SubmitFlowStepBody,
 } from "@zitadel/api/generated/model";
-import type { RequestHandler } from "msw";
+import { http, HttpResponse, type RequestHandler } from "msw";
 
 import { withBranding } from "./branding.js";
 import { withSsoProviders } from "./sso-providers.js";
@@ -60,6 +60,18 @@ export type CapturedRequest =
   | { kind: "submitFlowStep"; flowId: string; body: SubmitFlowStepBody }
   | { kind: "getFlowStep"; flowId: string }
   | { kind: "exchangeHandoff"; body: ExchangeHandoffBody; projectId?: string };
+
+/**
+ * What `POST /flow` consults before starting a flow: the project's origin
+ * allowlist and a pinned release. `null` admits the request; anything else
+ * is answered as is. Supplied by the platform store when one is mounted
+ * (the standalone server); the browser fixtures run without a gate.
+ */
+export type FlowAdmission = (input: {
+  projectId: string;
+  origin: string | null;
+  release: string | null;
+}) => { status: number; body: { code: string; message: string; details?: Record<string, unknown> } } | null;
 
 export type MockHandle = {
   handlers: RequestHandler[];
@@ -110,7 +122,9 @@ const FLOW_ID = "flow_mock";
  *   `"http://localhost:4000"`). Pass the server's own origin so that
  *   `verifyHandoffToken` can enforce issuer consistency.
  */
-export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
+export function setupMockHandlers(
+  options: { iss?: string; admitFlow?: FlowAdmission } = {},
+): MockHandle {
   const iss = options.iss ?? "http://localhost:8080";
   let actor: FlowActor = startFlowActor();
   let captured: CapturedRequest[] = [];
@@ -239,6 +253,21 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
   }
 
   const handlers: RequestHandler[] = [
+    // The gate runs ahead of the generated handler, which always answers
+    // 201: a refusal is returned here, and an admitted request falls
+    // through to it.
+    http.post("*/flow", async ({ request }) => {
+      if (!options.admitFlow) {
+        return undefined;
+      }
+      const body = (await request.clone().json()) as CreateFlowBody;
+      const refused = options.admitFlow({
+        projectId: body.project_id,
+        origin: request.headers.get("origin"),
+        release: request.headers.get("x-zitadel-release"),
+      });
+      return refused ? HttpResponse.json(refused.body, { status: refused.status }) : undefined;
+    }),
     getCreateFlowMockHandler(async ({ request }) => {
       const body = (await request.clone().json()) as CreateFlowBody;
       captured.push({ kind: "createFlow", body });

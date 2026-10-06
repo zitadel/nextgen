@@ -21,7 +21,7 @@ func uniqueProjectID(t *testing.T) string {
 }
 
 func newTestProject(id string) *domain.Project {
-	return &domain.Project{ID: id, Name: "project-" + rand.Text(), PreviewOrigins: []string{}}
+	return &domain.Project{ID: id, Name: "project-" + rand.Text(), AllowedOrigins: []domain.AllowedOrigin{}}
 }
 
 func newTestTeam(projectID, id string) *domain.Team {

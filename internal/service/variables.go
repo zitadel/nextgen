@@ -16,20 +16,25 @@ type VariableToSet struct {
 	IsSecret bool
 }
 
-// VariableService reads and writes the variables one owner entered (ADR 062).
-//
-// The owner is an address, not a position in a ladder: nothing is inherited
-// from the project by its environments, or seen by the project in them. Storage
-// matches every owner column exactly, so a value entered at another owner can
-// never reach a caller here -- and, since the primary key is the name plus that
-// owner, a read yields at most one variable per name and there is nothing to
-// choose between.
+// VariableService reads and writes a project's variables (ADR 062). A name
+// holds at most two values: the one every deploy freezes (applies_to all)
+// and an optional override a preview deploy prefers.
 type VariableService interface {
-	GetVariables(ctx context.Context, owner domain.VariableOwner, names ...string) ([]*domain.Variable, error)
-	GetDecryptedVariables(ctx context.Context, owner domain.VariableOwner, names ...string) ([]*domain.Variable, error)
-	SetVariables(ctx context.Context, owner domain.VariableOwner, variablesToSet []VariableToSet) error
-	DeleteVariable(ctx context.Context, owner domain.VariableOwner, name string) error
-	ReplaceVariablesInPlace(ctx context.Context, owner domain.VariableOwner, doc map[string]any) error
+	// GetVariables reads the project's variables, for the given names (all
+	// names when none are given). A nil appliesTo reads both values of a
+	// name; otherwise only that one.
+	GetVariables(ctx context.Context, projectID string, appliesTo *domain.VariableAppliesTo, names ...string) ([]*domain.Variable, error)
+	GetDecryptedVariables(ctx context.Context, projectID string, appliesTo *domain.VariableAppliesTo, names ...string) ([]*domain.Variable, error)
+	SetVariables(ctx context.Context, projectID string, appliesTo domain.VariableAppliesTo, variablesToSet []VariableToSet) error
+	DeleteVariable(ctx context.Context, projectID string, appliesTo domain.VariableAppliesTo, name string) error
+	// ResolveForDeploy picks the value each name runs under for a deploy:
+	// the preview override where one exists and preview is set, else the
+	// value for every deploy. The warnings name each secret that has no
+	// preview value on a preview deploy, so the caller can say so.
+	ResolveForDeploy(ctx context.Context, projectID string, preview bool) ([]*domain.Variable, []string, error)
+	// ReplaceVariablesInPlace substitutes every `${{ NAME }}` in doc with the
+	// value vars holds under that name, decrypting secrets.
+	ReplaceVariablesInPlace(ctx context.Context, vars []*domain.Variable, doc map[string]any) error
 }
 
 type variableService struct {
@@ -47,19 +52,23 @@ func NewVariableService(
 	}
 }
 
-func (s *variableService) GetVariables(ctx context.Context, owner domain.VariableOwner, names ...string) ([]*domain.Variable, error) {
-	variables, err := s.v2Pool.Statements().GetVariables(ctx, owner, names...)
+func (s *variableService) GetVariables(ctx context.Context, projectID string, appliesTo *domain.VariableAppliesTo, names ...string) ([]*domain.Variable, error) {
+	variables, err := s.v2Pool.Statements().GetVariables(ctx, projectID, appliesTo, names...)
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to get variables from database")
 	}
 	return variables, nil
 }
 
-func (s *variableService) GetDecryptedVariables(ctx context.Context, owner domain.VariableOwner, names ...string) ([]*domain.Variable, error) {
-	variables, err := s.GetVariables(ctx, owner, names...)
+func (s *variableService) GetDecryptedVariables(ctx context.Context, projectID string, appliesTo *domain.VariableAppliesTo, names ...string) ([]*domain.Variable, error) {
+	variables, err := s.GetVariables(ctx, projectID, appliesTo, names...)
 	if err != nil {
 		return nil, err
 	}
+	return s.decryptAll(ctx, variables)
+}
+
+func (s *variableService) decryptAll(ctx context.Context, variables []*domain.Variable) ([]*domain.Variable, error) {
 
 	// Built once and shared, so several secrets under one key cost one lookup;
 	// built lazily, so a read holding no secret never reaches the key service.
@@ -79,19 +88,21 @@ func (s *variableService) GetDecryptedVariables(ctx context.Context, owner domai
 			return nil, domain.ErrFailedToDecryptVariable(err).WithDetails(map[string]any{"name": variable.Name})
 		}
 		decrypted = append(decrypted, &domain.Variable{
-			Name:     variable.Name,
-			Owner:    variable.Owner,
-			Value:    value,
-			IsSecret: true,
+			Name:      variable.Name,
+			Owner:     variable.Owner,
+			AppliesTo: variable.AppliesTo,
+			Value:     value,
+			IsSecret:  true,
 		})
 	}
 	return decrypted, nil
 }
 
-func (s *variableService) SetVariables(ctx context.Context, owner domain.VariableOwner, variablesToSet []VariableToSet) error {
+func (s *variableService) SetVariables(ctx context.Context, projectID string, appliesTo domain.VariableAppliesTo, variablesToSet []VariableToSet) error {
 	if len(variablesToSet) == 0 {
 		return nil
 	}
+	owner := domain.VariableOwner{ProjectID: projectID}
 
 	var crypter crypto.Crypter
 	var err error
@@ -114,13 +125,13 @@ func (s *variableService) SetVariables(ctx context.Context, owner domain.Variabl
 			continue
 		}
 		if varToSet.IsSecret {
-			v, err := domain.NewSecretVariable(varToSet.Name, owner, varToSet.Value, crypter)
+			v, err := domain.NewSecretVariable(varToSet.Name, owner, appliesTo, varToSet.Value, crypter)
 			if err != nil {
 				return err
 			}
 			varsToWrite = append(varsToWrite, v)
 		} else {
-			v, err := domain.NewVariable(varToSet.Name, owner, varToSet.Value)
+			v, err := domain.NewVariable(varToSet.Name, owner, appliesTo, varToSet.Value)
 			if err != nil {
 				return err
 			}
@@ -141,7 +152,7 @@ func (s *variableService) SetVariables(ctx context.Context, owner domain.Variabl
 
 	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		for _, name := range varsToDelete {
-			err := tx.Statements().DeleteVariable(ctx, owner, name)
+			err := tx.Statements().DeleteVariable(ctx, projectID, appliesTo, name)
 			// Not DeleteVariable's "not found": a body states what the owner
 			// holds afterwards, and a name it never held already satisfies
 			// that. It is also what makes the request safe to retry.
@@ -167,28 +178,21 @@ func (s *variableService) SetVariables(ctx context.Context, owner domain.Variabl
 	return nil
 }
 
-// setVariableError names the one write failure a caller can act on. The
-// variables table references (project_id, id) on environments, so a write
-// naming an environment that does not exist is refused by the database rather
-// than stored where nothing would ever read it -- which, with no inheritance to
-// fall back on, would read as empty rather than as the project's value.
-//
-// The edge resolves the environment name to that id before the write, so the
-// constraint is reached only when the environment is deleted between the two.
-// The project reference fails the same way and is likewise resolved from the
-// request before a variable is built.
+// setVariableError names the one write failure a caller can act on: the
+// project reference, reached only when the project is deleted between the
+// request being resolved and the write.
 func setVariableError(err error) error {
 	if de, ok := errors.AsType[domain.Error](err); ok {
 		return de
 	}
 	if _, ok := errors.AsType[*database.ForeignKeyError](err); ok {
-		return domain.ErrEnvironmentNotFound().WithParent(err)
+		return domain.ErrProjectNotFound().WithParent(err)
 	}
 	return domain.ErrInternal(err).WithMessage("failed to write variable to database")
 }
 
-func (s *variableService) DeleteVariable(ctx context.Context, owner domain.VariableOwner, name string) error {
-	if err := s.v2Pool.Statements().DeleteVariable(ctx, owner, name); err != nil {
+func (s *variableService) DeleteVariable(ctx context.Context, projectID string, appliesTo domain.VariableAppliesTo, name string) error {
+	if err := s.v2Pool.Statements().DeleteVariable(ctx, projectID, appliesTo, name); err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return domain.ErrVariableNotFound().WithParent(err)
 		}
@@ -197,7 +201,24 @@ func (s *variableService) DeleteVariable(ctx context.Context, owner domain.Varia
 	return nil
 }
 
-func (s *variableService) ReplaceVariablesInPlace(ctx context.Context, owner domain.VariableOwner, doc map[string]any) error {
+func (s *variableService) ResolveForDeploy(ctx context.Context, projectID string, preview bool) ([]*domain.Variable, []string, error) {
+	all, err := s.GetVariables(ctx, projectID, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+	resolved := domain.ResolveVariablesForDeploy(all, preview)
+	var warnings []string
+	if preview {
+		for _, v := range resolved {
+			if v.IsSecret && v.AppliesTo != domain.VariableAppliesToPreview {
+				warnings = append(warnings, v.Name+" has no preview value; serving the production one. Set one: zitadel vars set "+v.Name+" --secret --preview")
+			}
+		}
+	}
+	return resolved, warnings, nil
+}
+
+func (s *variableService) ReplaceVariablesInPlace(ctx context.Context, vars []*domain.Variable, doc map[string]any) error {
 	placeholders, err := domain.ScanDocumentForVariables(doc)
 	if err != nil {
 		return err
@@ -206,22 +227,7 @@ func (s *variableService) ReplaceVariablesInPlace(ctx context.Context, owner dom
 		return nil
 	}
 
-	// One name per query term, however many placeholders reference it.
-	variableNames := make([]string, 0, len(placeholders))
-	seen := make(map[string]bool, len(placeholders))
-	for _, placeholder := range placeholders {
-		if seen[placeholder.VariableName] {
-			continue
-		}
-		seen[placeholder.VariableName] = true
-		variableNames = append(variableNames, placeholder.VariableName)
-	}
-
-	varList, err := s.v2Pool.Statements().GetVariables(ctx, owner, variableNames...)
-	if err != nil {
-		return domain.ErrInternal(err).WithMessage("failed to get variables from database")
-	}
-	varMap := domain.VariableListToMap(varList)
+	varMap := domain.VariableListToMap(vars)
 
 	if err := domain.ValidateSecretPlaceholders(placeholders, varMap); err != nil {
 		return err

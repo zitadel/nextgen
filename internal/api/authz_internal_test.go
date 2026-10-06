@@ -457,7 +457,7 @@ func TestCredentialCeiling(t *testing.T) {
 			ProjectID:     "proj_platform",
 			PrincipalType: domain.AuthzPrincipalTypeUser,
 			PrincipalID:   "user_alice",
-		}, "proj_customer")
+		}, "proj_customer", false)
 		if err != nil {
 			t.Fatalf("unexpected: %v", err)
 		}
@@ -467,7 +467,7 @@ func TestCredentialCeiling(t *testing.T) {
 		err := credentialCeiling(ScopeContext{
 			PrincipalType: domain.AuthzPrincipalTypeUser,
 			PrincipalID:   "user_alice",
-		}, "proj_customer")
+		}, "proj_customer", false)
 		if !errors.Is(err, errAuthzNoScope) {
 			t.Fatalf("got %v, want no scope", err)
 		}
@@ -475,7 +475,7 @@ func TestCredentialCeiling(t *testing.T) {
 			Scope:         []string{"project.write", "project.read"},
 			PrincipalType: domain.AuthzPrincipalTypeSKProj,
 			PrincipalID:   "proj_a",
-		}, "proj_a")
+		}, "proj_a", false)
 		if !errors.Is(err, errAuthzNoScope) {
 			t.Fatalf("got %v, want no scope", err)
 		}
@@ -487,7 +487,7 @@ func TestCredentialCeiling(t *testing.T) {
 			Scope:         []string{"project.read"},
 			PrincipalType: domain.AuthzPrincipalTypeSKProj,
 			PrincipalID:   "proj_a",
-		}, "proj_a")
+		}, "proj_a", false)
 		if !errors.Is(err, errAuthzPreviewDenied) {
 			t.Fatalf("got %v, want preview denied", err)
 		}
@@ -500,10 +500,10 @@ func TestCredentialCeiling(t *testing.T) {
 			PrincipalType: domain.AuthzPrincipalTypeSKProj,
 			PrincipalID:   "proj_a",
 		}
-		if err := credentialCeiling(scope, "proj_a"); err != nil {
+		if err := credentialCeiling(scope, "proj_a", false); err != nil {
 			t.Fatalf("own project: %v", err)
 		}
-		if err := credentialCeiling(scope, "proj_b"); err != nil {
+		if err := credentialCeiling(scope, "proj_b", false); err != nil {
 			t.Fatalf("foreign project: %v", err)
 		}
 	})
@@ -514,7 +514,7 @@ func TestCredentialCeiling(t *testing.T) {
 			Scope:         []string{"project.read"},
 			PrincipalType: domain.AuthzPrincipalTypeSKProj,
 			PrincipalID:   "proj_a",
-		}, "proj_b")
+		}, "proj_b", false)
 		if !errors.Is(err, errAuthzNoScope) {
 			t.Fatalf("got %v, want no scope", err)
 		}

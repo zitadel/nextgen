@@ -35,7 +35,7 @@ export type ResolveServerInput = {
 
 /**
  * Resolves which server the CLI should target, applying a fixed
- * precedence: explicit `--server` flag, then `ZITADEL_API_BASE`, then the
+ * precedence: explicit `--server` flag, then `ZITADEL_URL`, then the
  * `server` in `zitadel.json`, falling back to {@link DEFAULT_SERVER}. Every
  * candidate is validated to a normalised origin; an invalid URL throws a
  * `ZitadelError` rather than silently falling through.
@@ -44,7 +44,7 @@ export async function resolveServer(input: ResolveServerInput): Promise<Resolved
   if (input.serverFlag) {
     return validate(input.cwd, { value: input.serverFlag, origin: "flag" });
   }
-  const envValue = input.env.ZITADEL_API_BASE;
+  const envValue = input.env.ZITADEL_URL;
   if (envValue) {
     return validate(input.cwd, { value: envValue, origin: "env" });
   }

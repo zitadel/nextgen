@@ -10,12 +10,13 @@ const DEFAULT_PROXY_PATH = "/__nextgen";
 
 /**
  * Declarative configuration read from an element's HTML attributes
- * (`project-id` / `proxy-path` / `url`). Empty strings mean "unset".
+ * (`project-id` / `proxy-path` / `url` / `release`). Empty strings mean "unset".
  */
 export interface ProjectAttrs {
   readonly projectId: string;
   readonly proxyPath: string;
   readonly url: string;
+  readonly release?: string;
 }
 
 /**
@@ -36,14 +37,25 @@ const syntheticProjects = new Map<string, ZitadelProject>();
  * `configureZitadel()`'s proxy-path defaulting so the two config paths are
  * interchangeable.
  */
-function projectFromAttrs({ projectId, proxyPath, url }: ProjectAttrs): ZitadelProject | undefined {
+function projectFromAttrs({
+  projectId,
+  proxyPath,
+  url,
+  release,
+}: ProjectAttrs): ZitadelProject | undefined {
   if (!projectId) return undefined;
   const resolvedProxyPath = proxyPath || DEFAULT_PROXY_PATH;
   const resolvedUrl = url || undefined;
-  const key = JSON.stringify([projectId, resolvedProxyPath, resolvedUrl ?? ""]);
+  const resolvedRelease = release || undefined;
+  const key = JSON.stringify([projectId, resolvedProxyPath, resolvedUrl ?? "", resolvedRelease ?? ""]);
   let project = syntheticProjects.get(key);
   if (!project) {
-    project = Object.freeze({ projectId, proxyPath: resolvedProxyPath, url: resolvedUrl });
+    project = Object.freeze({
+      projectId,
+      proxyPath: resolvedProxyPath,
+      url: resolvedUrl,
+      release: resolvedRelease,
+    });
     if (syntheticProjects.size >= MAX_SYNTHETIC_PROJECTS) {
       const oldest = syntheticProjects.keys().next().value;
       if (oldest !== undefined) {

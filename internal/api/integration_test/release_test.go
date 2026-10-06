@@ -23,17 +23,25 @@ import (
 // seeded project already holds the default human-user schema and the default
 // login flow definitions, so only branding has to be published.
 type releaseFixture struct {
-	project    string
-	client     *helpers.ApiClient
-	schemaURL  string
-	flowdefID  string
-	brandingID string
+	project       string
+	projectEntity *domain.Project
+	client        *helpers.ApiClient
+	schemaURL     string
+	flowdefID     string
+	brandingID    string
 }
 
 func newReleaseFixture(t *testing.T) releaseFixture {
 	t.Helper()
+	return newReleaseFixtureWithOrigins(t, nil)
+}
 
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+// newReleaseFixtureWithOrigins is newReleaseFixture on a project created
+// with the given allowlist.
+func newReleaseFixtureWithOrigins(t *testing.T, origins []domain.AllowedOrigin) releaseFixture {
+	t.Helper()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), origins, true)
 	require.NoError(t, err)
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
@@ -49,11 +57,12 @@ func newReleaseFixture(t *testing.T) releaseFixture {
 	require.NotEmpty(t, definitions, "a seeded project should hold at least one flow definition")
 
 	return releaseFixture{
-		project:    project.ID,
-		client:     client,
-		schemaURL:  apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL),
-		flowdefID:  definitions[0].ID,
-		brandingID: publishBranding(t, client, project.ID, `<zl-page-shell>{% mandatory_gates %}</zl-page-shell>`),
+		project:       project.ID,
+		projectEntity: project,
+		client:        client,
+		schemaURL:     apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL),
+		flowdefID:     definitions[0].ID,
+		brandingID:    publishBranding(t, client, project.ID, `<zl-page-shell>{% mandatory_gates %}</zl-page-shell>`),
 	}
 }
 

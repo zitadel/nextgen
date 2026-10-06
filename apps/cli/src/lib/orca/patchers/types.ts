@@ -29,7 +29,10 @@ export type PatchContext = PatchView &
      * `.zitadel/secret`, which records the project's ids and secrets but not
      * its name, and no patcher needs the name to fill a file.
      */
-    project: Omit<CreateProject201, "name">;
+    project: Pick<
+      CreateProject201,
+      "id" | "project_secret" | "preview_secret" | "preview_token" | "created_at"
+    >;
     issuer: string;
     server: string;
     cliVersion: string;

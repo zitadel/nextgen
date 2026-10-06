@@ -5,7 +5,7 @@ import { Command, Flags } from "@oclif/core";
 import { nonBlankString } from "./flags";
 import consola from "consola";
 
-import { toZitadelError, type ZitadelError } from "../errors";
+import { toZitadelError, ZitadelError } from "../errors";
 import { isObject } from "../json";
 import { resolveCwd } from "../paths";
 import { normalizePublicCliCommand, normalizePublicCliCommands } from "../public-cli";
@@ -63,6 +63,13 @@ export abstract class BaseCommand extends Command {
   static override baseFlags = {
     cwd: nonBlankString({ char: "c", description: "Project directory to operate on." }),
     server: nonBlankString({ char: "s", description: "Override the resolved server URL." }),
+    env: nonBlankString({
+      char: "e",
+      description: "Environment whose .env.<name>.local file binds the server and project.",
+    }),
+    "env-file": nonBlankString({
+      description: "Read the server and project from this file instead of the .env convention.",
+    }),
     "non-interactive": Flags.boolean({
       char: "n",
       description: "Disable prompts. Required when scripting or running as an agent.",
@@ -142,6 +149,13 @@ export abstract class BaseCommand extends Command {
   ): Promise<GlobalOptions> {
     const cwd = resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined);
     const serverFlag = typeof flags.server === "string" ? flags.server : undefined;
+    const envName = typeof flags.env === "string" ? flags.env : undefined;
+    const envFile = typeof flags["env-file"] === "string" ? flags["env-file"] : undefined;
+    if (envName && envFile) {
+      throw new ZitadelError("E_VALIDATION", "--env and --env-file are mutually exclusive", {
+        hint: "--env picks files by the .env.<name>.local convention; --env-file names one file outright.",
+      });
+    }
     const source =
       options.resolveServer === false
         ? { value: options.source ?? "", origin: "default" as const }
@@ -175,6 +189,8 @@ export abstract class BaseCommand extends Command {
       cliVersion: this.config.version,
       source: source.value,
       serverFlag,
+      envName,
+      envFile,
       verbose,
       debug,
       env: process.env,

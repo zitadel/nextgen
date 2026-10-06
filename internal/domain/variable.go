@@ -48,16 +48,32 @@ func ErrFailedToDecryptVariable(parent error) Error {
 
 var NameRegex = regexp.MustCompile(`^\w+$`)
 
+// VariableAppliesTo says which deploys a value is for: every deploy, or the
+// override a preview deploy prefers where one exists. Two values per name is
+// the maximum.
+//
+//go:generate go tool enumer -type VariableAppliesTo -transform snake -trimprefix VariableAppliesTo -sql
+type VariableAppliesTo uint8
+
+const (
+	VariableAppliesToAll VariableAppliesTo = iota
+	VariableAppliesToPreview
+)
+
 type Variable struct {
-	Name     string
-	Owner    VariableOwner
-	Value    any
-	IsSecret bool
+	Name      string
+	Owner     VariableOwner
+	AppliesTo VariableAppliesTo
+	Value     any
+	IsSecret  bool
 }
 
-func NewVariable(name string, owner VariableOwner, value any) (*Variable, error) {
+func NewVariable(name string, owner VariableOwner, appliesTo VariableAppliesTo, value any) (*Variable, error) {
 	if owner.ProjectID == "" {
 		return nil, ErrNoVariableOwnerProjectID()
+	}
+	if !appliesTo.IsAVariableAppliesTo() {
+		return nil, ErrInvalidVariableValue().WithDetails(map[string]string{"reason": "unknown applies_to"})
 	}
 	if err := validateVariableValue(value); err != nil {
 		return nil, err
@@ -66,16 +82,20 @@ func NewVariable(name string, owner VariableOwner, value any) (*Variable, error)
 		return nil, err
 	}
 	return &Variable{
-		Name:     name,
-		Owner:    owner,
-		Value:    value,
-		IsSecret: false,
+		Name:      name,
+		Owner:     owner,
+		AppliesTo: appliesTo,
+		Value:     value,
+		IsSecret:  false,
 	}, nil
 }
 
-func NewSecretVariable(name string, owner VariableOwner, value any, encrypter crypto.Encrypter) (*Variable, error) {
+func NewSecretVariable(name string, owner VariableOwner, appliesTo VariableAppliesTo, value any, encrypter crypto.Encrypter) (*Variable, error) {
 	if owner.ProjectID == "" {
 		return nil, ErrNoVariableOwnerProjectID()
+	}
+	if !appliesTo.IsAVariableAppliesTo() {
+		return nil, ErrInvalidVariableValue().WithDetails(map[string]string{"reason": "unknown applies_to"})
 	}
 	if err := validateVariableValue(value); err != nil {
 		return nil, err
@@ -92,10 +112,11 @@ func NewSecretVariable(name string, owner VariableOwner, value any, encrypter cr
 		return nil, ErrInternal(err).WithMessage("failed to encrypt the variable")
 	}
 	return &Variable{
-		Name:     name,
-		Owner:    owner,
-		Value:    encrypted,
-		IsSecret: true,
+		Name:      name,
+		Owner:     owner,
+		AppliesTo: appliesTo,
+		Value:     encrypted,
+		IsSecret:  true,
 	}, nil
 }
 
@@ -147,39 +168,81 @@ func (v *Variable) GetDecryptedValue(decrypter crypto.Decrypter) (any, error) {
 	return value, nil
 }
 
+// VariableOwner is the project a variable belongs to.
 type VariableOwner struct {
 	ProjectID string
-	// EnvironmentID identifies the environment of the project the variable
-	// belongs to, by id rather than by name. A name is what a request carries
-	// and what the wire addresses, but it is not identity: an environment that
-	// is renamed is still the same environment, and rows keyed on its name
-	// would either have to be rewritten with it or block the rename outright
-	// (#965 owns that decision). The id is resolved from the name once, at the
-	// edge, and everything below this point addresses the environment by it.
-	//
-	// The empty string means "not scoped to an environment" -- the project
-	// level, an address of its own rather than a wildcard. Anything else has to
-	// identify an environment that exists: the table carries a foreign key onto
-	// (project_id, id), reached through a generated column so that the empty
-	// string can stay an address while the reference is still enforced by the
-	// database. Deleting an environment takes its variables with it.
-	EnvironmentID string
 }
 
-// HasAccessTo reports whether variable belongs to owner. An owner reaches
-// exactly what it entered itself: nothing is inherited from a broader owner,
-// and nothing is visible from a narrower one (ADR 062 §4).
-//
-// The owner is an address, not a position in a ladder, which is what keeps one
-// name at one owner to one variable -- a read never has two rows to choose
-// between, so no caller needs a rule for picking one. A value that should hold
-// everywhere is entered at the project and read from the project; an
-// environment that wants it has to enter it.
+// HasAccessTo reports whether variable belongs to owner.
 //
 // This is the predicate [github.com/zitadel/nextgen/internal/storage/variable.VisibleTo]
 // compiles into SQL, and the two are proven equal there.
 func (owner *VariableOwner) HasAccessTo(variable *Variable) bool {
 	return variable.Owner == *owner
+}
+
+// ResolveVariablesForDeploy picks the value each name runs under: for a
+// preview deploy the preview override where one exists, else the value for
+// every deploy; for any other deploy the value for every deploy only. The
+// result holds at most one variable per name, in the order names first
+// appeared.
+func ResolveVariablesForDeploy(vars []*Variable, preview bool) []*Variable {
+	byName := make(map[string]*Variable, len(vars))
+	var order []string
+	for _, v := range vars {
+		if v.AppliesTo == VariableAppliesToPreview && !preview {
+			continue
+		}
+		current, seen := byName[v.Name]
+		if !seen {
+			order = append(order, v.Name)
+		}
+		if !seen || (v.AppliesTo == VariableAppliesToPreview && current.AppliesTo == VariableAppliesToAll) {
+			byName[v.Name] = v
+		}
+	}
+	resolved := make([]*Variable, 0, len(order))
+	for _, name := range order {
+		resolved = append(resolved, byName[name])
+	}
+	return resolved
+}
+
+// DeploymentVariable is one value frozen onto a deployment: the same
+// columns as the store, written in the deployment's transaction and never
+// updated, so a secret is copied as the ciphertext it already is.
+type DeploymentVariable struct {
+	ProjectID    string
+	DeploymentID string
+	Name         string
+	Value        any
+	IsSecret     bool
+}
+
+// FreezeVariables copies resolved variables onto a deployment.
+func FreezeVariables(deploymentID string, vars []*Variable) []*DeploymentVariable {
+	frozen := make([]*DeploymentVariable, 0, len(vars))
+	for _, v := range vars {
+		frozen = append(frozen, &DeploymentVariable{
+			ProjectID:    v.Owner.ProjectID,
+			DeploymentID: deploymentID,
+			Name:         v.Name,
+			Value:        v.Value,
+			IsSecret:     v.IsSecret,
+		})
+	}
+	return frozen
+}
+
+// Thaw turns frozen values back into variables, for the resolver that
+// substitutes placeholders.
+func (d *DeploymentVariable) Thaw() *Variable {
+	return &Variable{
+		Name:     d.Name,
+		Owner:    VariableOwner{ProjectID: d.ProjectID},
+		Value:    d.Value,
+		IsSecret: d.IsSecret,
+	}
 }
 
 // VariableListToMap keys a read by name. The primary key is name plus owner and
@@ -205,9 +268,10 @@ func (vs Variables) DecryptAll(decrypter crypto.Decrypter) (Variables, error) {
 			return nil, ErrFailedToDecryptVariable(err).WithDetails(map[string]any{"name": v.Name})
 		}
 		ret[name] = &Variable{
-			Name:  v.Name,
-			Owner: v.Owner,
-			Value: value,
+			Name:      v.Name,
+			Owner:     v.Owner,
+			AppliesTo: v.AppliesTo,
+			Value:     value,
 		}
 	}
 	return ret, nil

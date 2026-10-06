@@ -53,10 +53,10 @@ func TestWrapErrorConstraintMapping(t *testing.T) {
 	require.NoError(t, pool.Migrate(ctx))
 
 	p := pool.(*Pool)
-	require.NoError(t, p.CreateProject(ctx, &domain.Project{ID: "proj-1", Name: "one", PreviewOrigins: []string{}}))
+	require.NoError(t, p.CreateProject(ctx, &domain.Project{ID: "proj-1", Name: "one", AllowedOrigins: []domain.AllowedOrigin{}}))
 
 	t.Run("primary key maps to UniqueError", func(t *testing.T) {
-		err := p.CreateProject(ctx, &domain.Project{ID: "proj-1", Name: "dup", PreviewOrigins: []string{}})
+		err := p.CreateProject(ctx, &domain.Project{ID: "proj-1", Name: "dup", AllowedOrigins: []domain.AllowedOrigin{}})
 		require.Error(t, err)
 		assert.ErrorIs(t, err, new(database.UniqueError))
 	})

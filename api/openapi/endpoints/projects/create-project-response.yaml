@@ -2,9 +2,11 @@ type: object
 required:
   - id
   - name
+  - class
   - project_secret
   - preview_secret
-  - preview_origins
+  - preview_token
+  - allowed_origins
   - created_at
 properties:
   id:
@@ -13,6 +15,8 @@ properties:
   name:
     type: string
     description: The name of the project.
+  class:
+    $ref: project-class.yaml
   project_secret:
     type: string
     description: |
@@ -20,13 +24,19 @@ properties:
   preview_secret:
     type: string
     description: |
-      Secret which can be used for previewing and testing the project.
-  preview_origins:
+      The public-plane credential a browser bundle ships with (the
+      publishable key). Safe to publish.
+  preview_token:
+    type: string
+    description: |
+      The credential a pull-request build holds. It may create releases and
+      deploy to preview origins matching a `preview` pattern, and nothing
+      else: no allowlist, class or variable writes, and no deploy to the
+      default or a primary origin.
+  allowed_origins:
     type: array
     items:
-      type: string
-    description: |
-      Origins which are allowed for previewing and testing the project.
+      $ref: allowed-origin.yaml
   created_at:
     type: string
     format: date-time

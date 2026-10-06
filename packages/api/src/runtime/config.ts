@@ -28,6 +28,14 @@ export interface ZitadelConfig {
    * proxy instead.
    */
   publishableKey?: string;
+
+  /**
+   * The release this build was made against (`rel_…` or `sha256:…`), sent
+   * as `X-Zitadel-Release` when a flow starts. The server selects it among
+   * the releases already deployed to the request's target; it never deploys
+   * one. Optional — omitted, the target's newest deployment is served.
+   */
+  release?: string;
 }
 
 /**
@@ -46,6 +54,9 @@ export interface ZitadelProject {
 
   /** The project's publishable key (ADR 036), sent as the bearer when set. */
   readonly publishableKey?: string;
+
+  /** The release a flow start pins, sent as `X-Zitadel-Release` when set. */
+  readonly release?: string;
 }
 
 export type { ZitadelApi };
@@ -101,7 +112,8 @@ export function configureZitadel(config: ZitadelConfig): ZitadelProject {
       existing.proxyPath === resolvedProxyPath &&
       existing.projectId === config.projectId &&
       existing.url === config.url &&
-      existing.publishableKey === config.publishableKey
+      existing.publishableKey === config.publishableKey &&
+      existing.release === config.release
     ) {
       setProxyPath(resolvedProxyPath);
       return existing;
@@ -119,6 +131,7 @@ export function configureZitadel(config: ZitadelConfig): ZitadelProject {
     projectId: config.projectId,
     url: config.url,
     publishableKey: config.publishableKey,
+    release: config.release,
   });
   writeSlot(project);
   setProxyPath(resolvedProxyPath);

@@ -16,6 +16,18 @@ post:
   tags:
     - Flows
   security: []
+  parameters:
+    - name: X-Zitadel-Release
+      in: header
+      required: false
+      description: |
+        Pins the attempt to a release: its id or content digest. Selection
+        only — the release must already be deployed to the target the request
+        matched (the origin, or the project default) and not revoked, or the
+        request answers `409 rel.not_deployed`. A `sandbox` project lifts the
+        deployed-here rule.
+      schema:
+        type: string
   requestBody:
     required: true
     content:

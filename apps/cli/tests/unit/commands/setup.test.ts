@@ -386,14 +386,28 @@ describe("setup command", () => {
           {
             id: "proj-test",
             name: "demo",
+            class: "sandbox",
             project_secret: "sk_proj_test_full",
             preview_secret: "sk_proj_test_preview",
-            preview_origins: ["http://localhost:3000"],
+            preview_token: "sk_proj_preview_token",
+            allowed_origins: [{ pattern: "http://localhost:3000", kind: "primary" }],
             created_at: "2026-04-21T14:03:11.000Z",
           },
           { status: 201 },
         );
       }),
+      http.post("*/releases", () =>
+        HttpResponse.json(
+          { id: "rel_test", content_hash: "a".repeat(64), project_id: "proj-test", metadata: {}, pointers: [] },
+          { status: 201 },
+        ),
+      ),
+      http.post("*/deployments", () =>
+        HttpResponse.json(
+          { deploy_id: "dpl_test", release_id: "rel_test", targets: [""], deployments: [] },
+          { status: 201 },
+        ),
+      ),
     );
 
     const res = await setup(cwd, ["--non-interactive", "--skip-install", "--framework", "next"]);
@@ -401,7 +415,7 @@ describe("setup command", () => {
     expect(res.exitCode).toBe(0);
     expect(createProjectBody).toMatchObject({
       name: expect.any(String),
-      preview_origins: expect.arrayContaining(["http://localhost:3000"]),
+      allowed_origins: [{ pattern: "http://localhost:3000", kind: "primary" }],
       seed_defaults: false,
     });
     const projectName = (createProjectBody as { name?: unknown }).name;

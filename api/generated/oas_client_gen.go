@@ -28,6 +28,16 @@ func trimTrailingSlashes(u *url.URL) {
 
 // Invoker invokes operations described by OpenAPI v3 specification.
 type Invoker interface {
+	// AddAllowedOrigin invokes addAllowedOrigin operation.
+	//
+	// Adds one `{pattern, kind}` to the project's allowlist. The pattern is
+	// checked against the project's class: a `production` project refuses
+	// loopback hosts, a `*` in a `primary` pattern, and a `preview` wildcard on
+	// a shared host that carries no tenant-unique label. A host the server does
+	// not know is accepted with a warning naming what it could not check.
+	//
+	// POST /projects/{project_id}/allowed_origins
+	AddAllowedOrigin(ctx context.Context, request *AllowedOrigin, params AddAllowedOriginParams) (AddAllowedOriginRes, error)
 	// BeginUserPasskeyRegistration invokes beginUserPasskeyRegistration operation.
 	//
 	// Starts a WebAuthn registration ceremony for the user and returns the
@@ -71,25 +81,16 @@ type Invoker interface {
 	CreateBranding(ctx context.Context, request *Branding, params CreateBrandingParams) (CreateBrandingRes, error)
 	// CreateDeployment invokes createDeployment operation.
 	//
-	// Makes a release live on an environment by recording a deployment. The two
-	// happen atomically: when the call returns, the environment runs the named
-	// release and the record exists; on any failure the environment keeps
-	// running what it ran and no record is written.
-	// Deploying, promoting and rolling back are all this call — `reason` says
-	// which. None of them assembles a release: the release must already exist,
-	// and rolling back means deploying a release the environment ran earlier,
-	// chosen from its deployment history.
-	// Idempotent on the running release: deploying the release the environment
-	// already runs changes nothing and answers `200` with the deployment that
-	// made it live, so a re-run of `zitadel deploy` on unchanged content is a
-	// no-op end to end — matching `POST /releases`, which resolves the same
-	// content to the same release first. Anything else writes a new record,
-	// including the same release returning after something else ran in between:
-	// the log is append-only, and each row is one act of making a release live.
-	// `expected_current_deployment_id` guards against racing another deploy:
-	// when present, the swap only happens if the environment's current
-	// deployment still is the one named, and a mismatch answers `409` with the
-	// actual `current_deployment_id` and `current_release_id` in the details.
+	// Makes a release live on one or more targets by appending a deployment row
+	// per target, all in one transaction under one `deploy_id`. What a target
+	// serves is its newest row, so nothing else moves.
+	// The variables each row runs are frozen at this moment: the project's
+	// variable store is resolved (`preview` values overriding `all` values when
+	// every target is a preview origin) and copied onto the deployment, so a
+	// later edit of the store reaches no deployment until the next deploy.
+	// Idempotent on release and values: when every target's newest row already
+	// names this release with the same frozen values, nothing is written and the
+	// answer is `200` with those rows.
 	//
 	// POST /deployments
 	CreateDeployment(ctx context.Context, request *CreateDeploymentRequest, params CreateDeploymentParams) (CreateDeploymentRes, error)
@@ -106,7 +107,7 @@ type Invoker interface {
 	// cookie. The browser sends it automatically on subsequent requests.
 	//
 	// POST /flow
-	CreateFlow(ctx context.Context, request *CreateFlowRequest) (CreateFlowRes, error)
+	CreateFlow(ctx context.Context, request *CreateFlowRequest, params CreateFlowParams) (CreateFlowRes, error)
 	// CreateFlowDefinition invokes createFlowDefinition operation.
 	//
 	// Publishes a new flow definition revision.
@@ -372,14 +373,14 @@ type Invoker interface {
 	//
 	// GET /deployments/{deployment_id}
 	GetDeploymentById(ctx context.Context, params GetDeploymentByIdParams) (GetDeploymentByIdRes, error)
-	// GetEnvironmentByName invokes getEnvironmentByName operation.
+	// GetDeploymentVariables invokes getDeploymentVariables operation.
 	//
-	// Reads one environment of the project by its name.
-	// The lookup is scoped to the project in `project_id`: a name that exists in
-	// another project answers `env.not_found` exactly as an unused name does.
+	// The values frozen onto the deployment when it was written — what the
+	// target serves, not what the store holds now. Secrets are reported as held
+	// and never disclosed.
 	//
-	// GET /environments/{name}
-	GetEnvironmentByName(ctx context.Context, params GetEnvironmentByNameParams) (GetEnvironmentByNameRes, error)
+	// GET /deployments/{deployment_id}/variables
+	GetDeploymentVariables(ctx context.Context, params GetDeploymentVariablesParams) (GetDeploymentVariablesRes, error)
 	// GetEvent invokes getEvent operation.
 	//
 	// Loads a single event by `(project_id, id)`. Requires `events.read`.
@@ -529,23 +530,16 @@ type Invoker interface {
 	GetUserByID(ctx context.Context, params GetUserByIDParams) (GetUserByIDRes, error)
 	// GetVariable invokes getVariable operation.
 	//
-	// Reads one variable by name from the owner this request addresses — one
-	// environment of the project with `environment_name`, the project level
-	// itself without it.
-	// A name that owner has not entered answers `var.not_found`, even when
-	// another owner of the same project holds it: nothing is inherited. A secret
-	// is found but not disclosed: the response is `{"secret": true}`.
+	// Reads one variable by name for the value `applies_to` selects. A name
+	// with no such value answers `var.not_found`. A secret is found but not
+	// disclosed: the response is `{"secret": true}`.
 	//
 	// GET /variables/{variable_name}
 	GetVariable(ctx context.Context, params GetVariableParams) (GetVariableRes, error)
 	// GetVariables invokes getVariables operation.
 	//
-	// Returns the variables entered at the owner this request addresses, keyed by
-	// name — one environment of the project with `environment_name`, the project
-	// level itself without it.
-	// Owners are separate, not a ladder: an environment does not inherit the
-	// project's variables and the project does not see its environments'. Reading
-	// everything a project holds therefore means reading each owner in turn.
+	// Returns the project's variables keyed by name, for the value `applies_to`
+	// selects: `all` (default) or the `preview` override.
 	// Secret values are not returned. A secret appears as `{"secret": true}`,
 	// which says a value is held without disclosing it.
 	//
@@ -583,24 +577,15 @@ type Invoker interface {
 	ListBranding(ctx context.Context, params ListBrandingParams) (ListBrandingRes, error)
 	// ListDeployments invokes listDeployments operation.
 	//
-	// Lists deployments newest first: what ran where, and when.
-	// With `environment_name`, the list is that environment's history and its
-	// first row is the environment's current deployment. Without it, the list
-	// interleaves every environment of the project — a project-wide audit view
-	// in which the first row is only the most recent deployment anywhere.
-	// `expand: ["release"]` embeds the release each deployment made live, so a
-	// history renders with each entry's content without resolving `release_id`
-	// one by one. Expanding requires `release.read` and does not affect the
-	// ordering or the page tokens.
+	// Lists deployments newest first. Bare, it is the project-wide log. `origin`
+	// narrows it to one target's history (`""` for the default), `deploy_id` to
+	// the rows one deploy wrote, and `live=true` to the newest row per target —
+	// what each one serves right now, with `expires_at` filled for previews.
+	// `expand: ["release"]` embeds the release each row made live; it requires
+	// `release.read`.
 	//
 	// GET /deployments
 	ListDeployments(ctx context.Context, params ListDeploymentsParams) (ListDeploymentsRes, error)
-	// ListEnvironments invokes listEnvironments operation.
-	//
-	// Lists the project's environments ordered by name.
-	//
-	// GET /environments
-	ListEnvironments(ctx context.Context, params ListEnvironmentsParams) (ListEnvironmentsRes, error)
 	// ListEvents invokes listEvents operation.
 	//
 	// Returns project-scoped audit events, newest-first by keyset on
@@ -642,6 +627,15 @@ type Invoker interface {
 	//
 	// GET /users/me/projects
 	ListMyProjects(ctx context.Context, params ListMyProjectsParams) (ListMyProjectsRes, error)
+	// ListOrigins invokes listOrigins operation.
+	//
+	// One row per live preview URL of the project, with its expiry. The row is
+	// what admits a request from that URL: a URL matching a `preview` pattern
+	// but holding no row is refused. Rows are written by deploying to a preview
+	// target and go away when they expire or are removed.
+	//
+	// GET /origins
+	ListOrigins(ctx context.Context, params ListOriginsParams) (ListOriginsRes, error)
 	// ListReleases invokes listReleases operation.
 	//
 	// Lists the project's releases, newest first.
@@ -755,6 +749,22 @@ type Invoker interface {
 	//
 	// POST /users/query
 	QueryUsers(ctx context.Context, request *QueryUsersRequest, params QueryUsersParams) (QueryUsersRes, error)
+	// RemoveAllowedOrigin invokes removeAllowedOrigin operation.
+	//
+	// Removes one pattern from the project's allowlist. Requests from URLs only
+	// that pattern admitted are refused from now on; live preview rows and
+	// deployment history are untouched.
+	//
+	// POST /projects/{project_id}/allowed_origins/remove
+	RemoveAllowedOrigin(ctx context.Context, request *RemoveAllowedOriginReq, params RemoveAllowedOriginParams) (RemoveAllowedOriginRes, error)
+	// RemoveOrigin invokes removeOrigin operation.
+	//
+	// Deletes the live row behind one preview URL, so requests from it are
+	// refused from now on. The URL's deployment rows are kept. A URL with no
+	// row answers not found.
+	//
+	// POST /origins/remove
+	RemoveOrigin(ctx context.Context, request *RemoveOriginReq, params RemoveOriginParams) (RemoveOriginRes, error)
 	// RevokeMySession invokes revokeMySession operation.
 	//
 	// Logs out by permanently deleting the session.
@@ -765,6 +775,15 @@ type Invoker interface {
 	//
 	// DELETE /sessions/me
 	RevokeMySession(ctx context.Context) (RevokeMySessionRes, error)
+	// RevokeRelease invokes revokeRelease operation.
+	//
+	// Marks the release revoked. A revoked release is refused on every path,
+	// including a client that pins it, and can no longer be deployed. Rows
+	// already naming it stay in the history; the targets they serve answer
+	// `rel.revoked` until something else is deployed there.
+	//
+	// POST /releases/{release_id}/revoke
+	RevokeRelease(ctx context.Context, params RevokeReleaseParams) (RevokeReleaseRes, error)
 	// RevokeSession invokes revokeSession operation.
 	//
 	// Permanently deletes the session, terminating it immediately.
@@ -777,6 +796,28 @@ type Invoker interface {
 	//
 	// DELETE /sessions/{session_id}
 	RevokeSession(ctx context.Context, params RevokeSessionParams) (RevokeSessionRes, error)
+	// RollbackDeployment invokes rollbackDeployment operation.
+	//
+	// Undoes one deploy: for every target that deploy moved, appends a row
+	// naming the release that target served before it, under a new `deploy_id`
+	// with `reason: rollback` and `rollback_of` set. Bare, it undoes the newest
+	// deploy of the project; `deploy_id` names an earlier one to re-apply, and
+	// `origin` narrows the undo to one target.
+	// A target the undone deploy created has no earlier release and is left as
+	// it is; it is named in `warnings`. The frozen values of the restored
+	// deployment travel with it.
+	//
+	// POST /deployments/rollback
+	RollbackDeployment(ctx context.Context, request *RollbackRequest, params RollbackDeploymentParams) (RollbackDeploymentRes, error)
+	// SetProjectClass invokes setProjectClass operation.
+	//
+	// Sets the project's class. `sandbox` → `production` re-checks every
+	// allowlist pattern against the production rules and fails naming each
+	// offender; it requires a claimed project. `production` → `sandbox` lets
+	// loopback origins back in and needs `confirm: true`.
+	//
+	// POST /projects/{project_id}/class
+	SetProjectClass(ctx context.Context, request *SetProjectClassReq, params SetProjectClassParams) (SetProjectClassRes, error)
 	// SetUserPassword invokes setUserPassword operation.
 	//
 	// Set user password.
@@ -817,11 +858,9 @@ type Invoker interface {
 	UpdateTeam(ctx context.Context, request *UpdateTeamRequest, params UpdateTeamParams) (UpdateTeamRes, error)
 	// UpdateVariables invokes updateVariables operation.
 	//
-	// Enters, replaces and removes variables at the owner this request
-	// addresses.
-	// Every name in the body is applied at exactly that owner — the project, or
-	// the environment named by `environment_name` — and reaches no other. Names
-	// not in the body are untouched.
+	// Enters, replaces and removes variables for the value `applies_to`
+	// selects. Names not in the body are untouched. Nothing here reaches a
+	// deployment already written: values are frozen per deploy.
 	// A bare scalar enters a non-secret value. `{"value": …, "secret": true}`
 	// stores the value encrypted under the project's active `secret` key, after
 	// which it can be referenced but not read back. `null` removes the name from
@@ -888,6 +927,151 @@ func (c *Client) requestURL(ctx context.Context) *url.URL {
 		return c.serverURL
 	}
 	return u
+}
+
+// AddAllowedOrigin invokes addAllowedOrigin operation.
+//
+// Adds one `{pattern, kind}` to the project's allowlist. The pattern is
+// checked against the project's class: a `production` project refuses
+// loopback hosts, a `*` in a `primary` pattern, and a `preview` wildcard on
+// a shared host that carries no tenant-unique label. A host the server does
+// not know is accepted with a warning naming what it could not check.
+//
+// POST /projects/{project_id}/allowed_origins
+func (c *Client) AddAllowedOrigin(ctx context.Context, request *AllowedOrigin, params AddAllowedOriginParams) (AddAllowedOriginRes, error) {
+	res, err := c.sendAddAllowedOrigin(ctx, request, params)
+	return res, err
+}
+
+func (c *Client) sendAddAllowedOrigin(ctx context.Context, request *AllowedOrigin, params AddAllowedOriginParams) (res AddAllowedOriginRes, err error) {
+	// Validate request before sending.
+	if err := func() error {
+		if err := request.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return res, errors.Wrap(err, "validate")
+	}
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("addAllowedOrigin"),
+		semconv.HTTPRequestMethodKey.String("POST"),
+		semconv.URLTemplateKey.String("/projects/{project_id}/allowed_origins"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, AddAllowedOriginOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [3]string
+	pathParts[0] = "/projects/"
+	{
+		// Encode "project_id" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "project_id",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	pathParts[2] = "/allowed_origins"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "POST", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+	if err := encodeAddAllowedOriginRequest(request, r); err != nil {
+		return res, errors.Wrap(err, "encode request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, AddAllowedOriginOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeAddAllowedOriginResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
 }
 
 // BeginUserPasskeyRegistration invokes beginUserPasskeyRegistration operation.
@@ -1450,25 +1634,16 @@ func (c *Client) sendCreateBranding(ctx context.Context, request *Branding, para
 
 // CreateDeployment invokes createDeployment operation.
 //
-// Makes a release live on an environment by recording a deployment. The two
-// happen atomically: when the call returns, the environment runs the named
-// release and the record exists; on any failure the environment keeps
-// running what it ran and no record is written.
-// Deploying, promoting and rolling back are all this call — `reason` says
-// which. None of them assembles a release: the release must already exist,
-// and rolling back means deploying a release the environment ran earlier,
-// chosen from its deployment history.
-// Idempotent on the running release: deploying the release the environment
-// already runs changes nothing and answers `200` with the deployment that
-// made it live, so a re-run of `zitadel deploy` on unchanged content is a
-// no-op end to end — matching `POST /releases`, which resolves the same
-// content to the same release first. Anything else writes a new record,
-// including the same release returning after something else ran in between:
-// the log is append-only, and each row is one act of making a release live.
-// `expected_current_deployment_id` guards against racing another deploy:
-// when present, the swap only happens if the environment's current
-// deployment still is the one named, and a mismatch answers `409` with the
-// actual `current_deployment_id` and `current_release_id` in the details.
+// Makes a release live on one or more targets by appending a deployment row
+// per target, all in one transaction under one `deploy_id`. What a target
+// serves is its newest row, so nothing else moves.
+// The variables each row runs are frozen at this moment: the project's
+// variable store is resolved (`preview` values overriding `all` values when
+// every target is a preview origin) and copied onto the deployment, so a
+// later edit of the store reaches no deployment until the next deploy.
+// Idempotent on release and values: when every target's newest row already
+// names this release with the same frozen values, nothing is written and the
+// answer is `200` with those rows.
 //
 // POST /deployments
 func (c *Client) CreateDeployment(ctx context.Context, request *CreateDeploymentRequest, params CreateDeploymentParams) (CreateDeploymentRes, error) {
@@ -1575,6 +1750,7 @@ func (c *Client) sendCreateDeployment(ctx context.Context, request *CreateDeploy
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000001},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -1619,12 +1795,12 @@ func (c *Client) sendCreateDeployment(ctx context.Context, request *CreateDeploy
 // cookie. The browser sends it automatically on subsequent requests.
 //
 // POST /flow
-func (c *Client) CreateFlow(ctx context.Context, request *CreateFlowRequest) (CreateFlowRes, error) {
-	res, err := c.sendCreateFlow(ctx, request)
+func (c *Client) CreateFlow(ctx context.Context, request *CreateFlowRequest, params CreateFlowParams) (CreateFlowRes, error) {
+	res, err := c.sendCreateFlow(ctx, request, params)
 	return res, err
 }
 
-func (c *Client) sendCreateFlow(ctx context.Context, request *CreateFlowRequest) (res CreateFlowRes, err error) {
+func (c *Client) sendCreateFlow(ctx context.Context, request *CreateFlowRequest, params CreateFlowParams) (res CreateFlowRes, err error) {
 	// Validate request before sending.
 	if err := func() error {
 		if err := request.Validate(); err != nil {
@@ -1681,6 +1857,23 @@ func (c *Client) sendCreateFlow(ctx context.Context, request *CreateFlowRequest)
 	}
 	if err := encodeCreateFlowRequest(request, r); err != nil {
 		return res, errors.Wrap(err, "encode request")
+	}
+
+	stage = "EncodeHeaderParams"
+	h := uri.NewHeaderEncoder(r.Header)
+	{
+		cfg := uri.HeaderParameterEncodingConfig{
+			Name:    "X-Zitadel-Release",
+			Explode: false,
+		}
+		if err := h.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.XZitadelRelease.Get(); ok {
+				return e.EncodeValue(conv.StringToString(val))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode header")
+		}
 	}
 
 	stage = "SendRequest"
@@ -2317,6 +2510,15 @@ func (c *Client) CreateProject(ctx context.Context, request *CreateProjectReques
 }
 
 func (c *Client) sendCreateProject(ctx context.Context, request *CreateProjectRequest) (res CreateProjectRes, err error) {
+	// Validate request before sending.
+	if err := func() error {
+		if err := request.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return res, errors.Wrap(err, "validate")
+	}
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("createProject"),
 		semconv.HTTPRequestMethodKey.String("POST"),
@@ -3696,19 +3898,16 @@ func (c *Client) sendDeleteVariable(ctx context.Context, params DeleteVariablePa
 		}
 	}
 	{
-		// Encode "environment_name" parameter.
+		// Encode "applies_to" parameter.
 		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "environment_name",
+			Name:    "applies_to",
 			Style:   uri.QueryStyleForm,
 			Explode: true,
 		}
 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if val, ok := params.EnvironmentName.Get(); ok {
-				if unwrapped := string(val); true {
-					return e.EncodeValue(conv.StringToString(unwrapped))
-				}
-				return nil
+			if val, ok := params.AppliesTo.Get(); ok {
+				return e.EncodeValue(conv.StringToString(string(val)))
 			}
 			return nil
 		}); err != nil {
@@ -4790,23 +4989,23 @@ func (c *Client) sendGetDeploymentById(ctx context.Context, params GetDeployment
 	return result, nil
 }
 
-// GetEnvironmentByName invokes getEnvironmentByName operation.
+// GetDeploymentVariables invokes getDeploymentVariables operation.
 //
-// Reads one environment of the project by its name.
-// The lookup is scoped to the project in `project_id`: a name that exists in
-// another project answers `env.not_found` exactly as an unused name does.
+// The values frozen onto the deployment when it was written — what the
+// target serves, not what the store holds now. Secrets are reported as held
+// and never disclosed.
 //
-// GET /environments/{name}
-func (c *Client) GetEnvironmentByName(ctx context.Context, params GetEnvironmentByNameParams) (GetEnvironmentByNameRes, error) {
-	res, err := c.sendGetEnvironmentByName(ctx, params)
+// GET /deployments/{deployment_id}/variables
+func (c *Client) GetDeploymentVariables(ctx context.Context, params GetDeploymentVariablesParams) (GetDeploymentVariablesRes, error) {
+	res, err := c.sendGetDeploymentVariables(ctx, params)
 	return res, err
 }
 
-func (c *Client) sendGetEnvironmentByName(ctx context.Context, params GetEnvironmentByNameParams) (res GetEnvironmentByNameRes, err error) {
+func (c *Client) sendGetDeploymentVariables(ctx context.Context, params GetDeploymentVariablesParams) (res GetDeploymentVariablesRes, err error) {
 	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("getEnvironmentByName"),
+		otelogen.OperationID("getDeploymentVariables"),
 		semconv.HTTPRequestMethodKey.String("GET"),
-		semconv.URLTemplateKey.String("/environments/{name}"),
+		semconv.URLTemplateKey.String("/deployments/{deployment_id}/variables"),
 	}
 	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
 
@@ -4822,7 +5021,7 @@ func (c *Client) sendGetEnvironmentByName(ctx context.Context, params GetEnviron
 	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
 
 	// Start a span for this request.
-	ctx, span := c.cfg.Tracer.Start(ctx, GetEnvironmentByNameOperation,
+	ctx, span := c.cfg.Tracer.Start(ctx, GetDeploymentVariablesOperation,
 		trace.WithAttributes(otelAttrs...),
 		clientSpanKind,
 	)
@@ -4839,17 +5038,17 @@ func (c *Client) sendGetEnvironmentByName(ctx context.Context, params GetEnviron
 
 	stage = "BuildURL"
 	u := uri.Clone(c.requestURL(ctx))
-	var pathParts [2]string
-	pathParts[0] = "/environments/"
+	var pathParts [3]string
+	pathParts[0] = "/deployments/"
 	{
-		// Encode "name" parameter.
+		// Encode "deployment_id" parameter.
 		e := uri.NewPathEncoder(uri.PathEncoderConfig{
-			Param:   "name",
+			Param:   "deployment_id",
 			Style:   uri.PathStyleSimple,
 			Explode: false,
 		})
 		if err := func() error {
-			if unwrapped := string(params.Name); true {
+			if unwrapped := string(params.DeploymentID); true {
 				return e.EncodeValue(conv.StringToString(unwrapped))
 			}
 			return nil
@@ -4862,6 +5061,7 @@ func (c *Client) sendGetEnvironmentByName(ctx context.Context, params GetEnviron
 		}
 		pathParts[1] = encoded
 	}
+	pathParts[2] = "/variables"
 	uri.AddPathParts(u, pathParts[:]...)
 
 	stage = "EncodeQueryParams"
@@ -4896,7 +5096,7 @@ func (c *Client) sendGetEnvironmentByName(ctx context.Context, params GetEnviron
 		var satisfied bitset
 		{
 			stage = "Security:OAuth2"
-			switch err := c.securityOAuth2(ctx, GetEnvironmentByNameOperation, r); {
+			switch err := c.securityOAuth2(ctx, GetDeploymentVariablesOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 0
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
@@ -4933,7 +5133,7 @@ func (c *Client) sendGetEnvironmentByName(ctx context.Context, params GetEnviron
 	defer body.Close()
 
 	stage = "DecodeResponse"
-	result, err := decodeGetEnvironmentByNameResponse(resp)
+	result, err := decodeGetDeploymentVariablesResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}
@@ -7193,12 +7393,9 @@ func (c *Client) sendGetUserByID(ctx context.Context, params GetUserByIDParams) 
 
 // GetVariable invokes getVariable operation.
 //
-// Reads one variable by name from the owner this request addresses — one
-// environment of the project with `environment_name`, the project level
-// itself without it.
-// A name that owner has not entered answers `var.not_found`, even when
-// another owner of the same project holds it: nothing is inherited. A secret
-// is found but not disclosed: the response is `{"secret": true}`.
+// Reads one variable by name for the value `applies_to` selects. A name
+// with no such value answers `var.not_found`. A secret is found but not
+// disclosed: the response is `{"secret": true}`.
 //
 // GET /variables/{variable_name}
 func (c *Client) GetVariable(ctx context.Context, params GetVariableParams) (GetVariableRes, error) {
@@ -7288,19 +7485,16 @@ func (c *Client) sendGetVariable(ctx context.Context, params GetVariableParams) 
 		}
 	}
 	{
-		// Encode "environment_name" parameter.
+		// Encode "applies_to" parameter.
 		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "environment_name",
+			Name:    "applies_to",
 			Style:   uri.QueryStyleForm,
 			Explode: true,
 		}
 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if val, ok := params.EnvironmentName.Get(); ok {
-				if unwrapped := string(val); true {
-					return e.EncodeValue(conv.StringToString(unwrapped))
-				}
-				return nil
+			if val, ok := params.AppliesTo.Get(); ok {
+				return e.EncodeValue(conv.StringToString(string(val)))
 			}
 			return nil
 		}); err != nil {
@@ -7367,12 +7561,8 @@ func (c *Client) sendGetVariable(ctx context.Context, params GetVariableParams) 
 
 // GetVariables invokes getVariables operation.
 //
-// Returns the variables entered at the owner this request addresses, keyed by
-// name — one environment of the project with `environment_name`, the project
-// level itself without it.
-// Owners are separate, not a ladder: an environment does not inherit the
-// project's variables and the project does not see its environments'. Reading
-// everything a project holds therefore means reading each owner in turn.
+// Returns the project's variables keyed by name, for the value `applies_to`
+// selects: `all` (default) or the `preview` override.
 // Secret values are not returned. A secret appears as `{"secret": true}`,
 // which says a value is held without disclosing it.
 //
@@ -7443,19 +7633,16 @@ func (c *Client) sendGetVariables(ctx context.Context, params GetVariablesParams
 		}
 	}
 	{
-		// Encode "environment_name" parameter.
+		// Encode "applies_to" parameter.
 		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "environment_name",
+			Name:    "applies_to",
 			Style:   uri.QueryStyleForm,
 			Explode: true,
 		}
 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if val, ok := params.EnvironmentName.Get(); ok {
-				if unwrapped := string(val); true {
-					return e.EncodeValue(conv.StringToString(unwrapped))
-				}
-				return nil
+			if val, ok := params.AppliesTo.Get(); ok {
+				return e.EncodeValue(conv.StringToString(string(val)))
 			}
 			return nil
 		}); err != nil {
@@ -7944,15 +8131,12 @@ func (c *Client) sendListBranding(ctx context.Context, params ListBrandingParams
 
 // ListDeployments invokes listDeployments operation.
 //
-// Lists deployments newest first: what ran where, and when.
-// With `environment_name`, the list is that environment's history and its
-// first row is the environment's current deployment. Without it, the list
-// interleaves every environment of the project — a project-wide audit view
-// in which the first row is only the most recent deployment anywhere.
-// `expand: ["release"]` embeds the release each deployment made live, so a
-// history renders with each entry's content without resolving `release_id`
-// one by one. Expanding requires `release.read` and does not affect the
-// ordering or the page tokens.
+// Lists deployments newest first. Bare, it is the project-wide log. `origin`
+// narrows it to one target's history (`""` for the default), `deploy_id` to
+// the rows one deploy wrote, and `live=true` to the newest row per target —
+// what each one serves right now, with `expires_at` filled for previews.
+// `expand: ["release"]` embeds the release each row made live; it requires
+// `release.read`.
 //
 // GET /deployments
 func (c *Client) ListDeployments(ctx context.Context, params ListDeploymentsParams) (ListDeploymentsRes, error) {
@@ -8021,19 +8205,50 @@ func (c *Client) sendListDeployments(ctx context.Context, params ListDeployments
 		}
 	}
 	{
-		// Encode "environment_name" parameter.
+		// Encode "origin" parameter.
 		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "environment_name",
+			Name:    "origin",
 			Style:   uri.QueryStyleForm,
 			Explode: true,
 		}
 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if val, ok := params.EnvironmentName.Get(); ok {
-				if unwrapped := string(val); true {
-					return e.EncodeValue(conv.StringToString(unwrapped))
-				}
-				return nil
+			if val, ok := params.Origin.Get(); ok {
+				return e.EncodeValue(conv.StringToString(val))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "deploy_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "deploy_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.DeployID.Get(); ok {
+				return e.EncodeValue(conv.StringToString(val))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "live" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "live",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.Live.Get(); ok {
+				return e.EncodeValue(conv.BoolToString(val))
 			}
 			return nil
 		}); err != nil {
@@ -8157,174 +8372,6 @@ func (c *Client) sendListDeployments(ctx context.Context, params ListDeployments
 
 	stage = "DecodeResponse"
 	result, err := decodeListDeploymentsResponse(resp)
-	if err != nil {
-		return res, errors.Wrap(err, "decode response")
-	}
-
-	return result, nil
-}
-
-// ListEnvironments invokes listEnvironments operation.
-//
-// Lists the project's environments ordered by name.
-//
-// GET /environments
-func (c *Client) ListEnvironments(ctx context.Context, params ListEnvironmentsParams) (ListEnvironmentsRes, error) {
-	res, err := c.sendListEnvironments(ctx, params)
-	return res, err
-}
-
-func (c *Client) sendListEnvironments(ctx context.Context, params ListEnvironmentsParams) (res ListEnvironmentsRes, err error) {
-	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("listEnvironments"),
-		semconv.HTTPRequestMethodKey.String("GET"),
-		semconv.URLTemplateKey.String("/environments"),
-	}
-	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
-
-	// Run stopwatch.
-	startTime := time.Now()
-	defer func() {
-		// Use floating point division here for higher precision (instead of Millisecond method).
-		elapsedDuration := time.Since(startTime)
-		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
-	}()
-
-	// Increment request counter.
-	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
-
-	// Start a span for this request.
-	ctx, span := c.cfg.Tracer.Start(ctx, ListEnvironmentsOperation,
-		trace.WithAttributes(otelAttrs...),
-		clientSpanKind,
-	)
-	// Track stage for error reporting.
-	var stage string
-	defer func() {
-		if err != nil {
-			span.RecordError(err)
-			span.SetStatus(codes.Error, stage)
-			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
-		}
-		span.End()
-	}()
-
-	stage = "BuildURL"
-	u := uri.Clone(c.requestURL(ctx))
-	var pathParts [1]string
-	pathParts[0] = "/environments"
-	uri.AddPathParts(u, pathParts[:]...)
-
-	stage = "EncodeQueryParams"
-	q := uri.NewQueryEncoder()
-	{
-		// Encode "project_id" parameter.
-		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "project_id",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if unwrapped := string(params.ProjectID); true {
-				return e.EncodeValue(conv.StringToString(unwrapped))
-			}
-			return nil
-		}); err != nil {
-			return res, errors.Wrap(err, "encode query")
-		}
-	}
-	{
-		// Encode "limit" parameter.
-		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "limit",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if val, ok := params.Limit.Get(); ok {
-				if unwrapped := int(val); true {
-					return e.EncodeValue(conv.IntToString(unwrapped))
-				}
-				return nil
-			}
-			return nil
-		}); err != nil {
-			return res, errors.Wrap(err, "encode query")
-		}
-	}
-	{
-		// Encode "page_token" parameter.
-		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "page_token",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if val, ok := params.PageToken.Get(); ok {
-				if unwrapped := string(val); true {
-					return e.EncodeValue(conv.StringToString(unwrapped))
-				}
-				return nil
-			}
-			return nil
-		}); err != nil {
-			return res, errors.Wrap(err, "encode query")
-		}
-	}
-	u.RawQuery = q.Values().Encode()
-
-	stage = "EncodeRequest"
-	r, err := ht.NewRequest(ctx, "GET", u)
-	if err != nil {
-		return res, errors.Wrap(err, "create request")
-	}
-
-	{
-		type bitset = [1]uint8
-		var satisfied bitset
-		{
-			stage = "Security:OAuth2"
-			switch err := c.securityOAuth2(ctx, ListEnvironmentsOperation, r); {
-			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
-			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
-				// Skip this security.
-			default:
-				return res, errors.Wrap(err, "security \"OAuth2\"")
-			}
-		}
-
-		if ok := func() bool {
-		nextRequirement:
-			for _, requirement := range []bitset{
-				{0b00000001},
-			} {
-				for i, mask := range requirement {
-					if satisfied[i]&mask != mask {
-						continue nextRequirement
-					}
-				}
-				return true
-			}
-			return false
-		}(); !ok {
-			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
-		}
-	}
-
-	stage = "SendRequest"
-	resp, err := c.cfg.Client.Do(r)
-	if err != nil {
-		return res, errors.Wrap(err, "do request")
-	}
-	body := resp.Body
-	defer body.Close()
-
-	stage = "DecodeResponse"
-	result, err := decodeListEnvironmentsResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}
@@ -9361,6 +9408,137 @@ func (c *Client) sendListMyProjects(ctx context.Context, params ListMyProjectsPa
 
 	stage = "DecodeResponse"
 	result, err := decodeListMyProjectsResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// ListOrigins invokes listOrigins operation.
+//
+// One row per live preview URL of the project, with its expiry. The row is
+// what admits a request from that URL: a URL matching a `preview` pattern
+// but holding no row is refused. Rows are written by deploying to a preview
+// target and go away when they expire or are removed.
+//
+// GET /origins
+func (c *Client) ListOrigins(ctx context.Context, params ListOriginsParams) (ListOriginsRes, error) {
+	res, err := c.sendListOrigins(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendListOrigins(ctx context.Context, params ListOriginsParams) (res ListOriginsRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("listOrigins"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.URLTemplateKey.String("/origins"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, ListOriginsOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [1]string
+	pathParts[0] = "/origins"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "GET", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, ListOriginsOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeListOriginsResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}
@@ -11429,6 +11607,273 @@ func (c *Client) sendQueryUsers(ctx context.Context, request *QueryUsersRequest,
 	return result, nil
 }
 
+// RemoveAllowedOrigin invokes removeAllowedOrigin operation.
+//
+// Removes one pattern from the project's allowlist. Requests from URLs only
+// that pattern admitted are refused from now on; live preview rows and
+// deployment history are untouched.
+//
+// POST /projects/{project_id}/allowed_origins/remove
+func (c *Client) RemoveAllowedOrigin(ctx context.Context, request *RemoveAllowedOriginReq, params RemoveAllowedOriginParams) (RemoveAllowedOriginRes, error) {
+	res, err := c.sendRemoveAllowedOrigin(ctx, request, params)
+	return res, err
+}
+
+func (c *Client) sendRemoveAllowedOrigin(ctx context.Context, request *RemoveAllowedOriginReq, params RemoveAllowedOriginParams) (res RemoveAllowedOriginRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("removeAllowedOrigin"),
+		semconv.HTTPRequestMethodKey.String("POST"),
+		semconv.URLTemplateKey.String("/projects/{project_id}/allowed_origins/remove"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, RemoveAllowedOriginOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [3]string
+	pathParts[0] = "/projects/"
+	{
+		// Encode "project_id" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "project_id",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	pathParts[2] = "/allowed_origins/remove"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "POST", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+	if err := encodeRemoveAllowedOriginRequest(request, r); err != nil {
+		return res, errors.Wrap(err, "encode request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, RemoveAllowedOriginOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeRemoveAllowedOriginResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// RemoveOrigin invokes removeOrigin operation.
+//
+// Deletes the live row behind one preview URL, so requests from it are
+// refused from now on. The URL's deployment rows are kept. A URL with no
+// row answers not found.
+//
+// POST /origins/remove
+func (c *Client) RemoveOrigin(ctx context.Context, request *RemoveOriginReq, params RemoveOriginParams) (RemoveOriginRes, error) {
+	res, err := c.sendRemoveOrigin(ctx, request, params)
+	return res, err
+}
+
+func (c *Client) sendRemoveOrigin(ctx context.Context, request *RemoveOriginReq, params RemoveOriginParams) (res RemoveOriginRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("removeOrigin"),
+		semconv.HTTPRequestMethodKey.String("POST"),
+		semconv.URLTemplateKey.String("/origins/remove"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, RemoveOriginOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [1]string
+	pathParts[0] = "/origins/remove"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "POST", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+	if err := encodeRemoveOriginRequest(request, r); err != nil {
+		return res, errors.Wrap(err, "encode request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, RemoveOriginOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeRemoveOriginResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
 // RevokeMySession invokes revokeMySession operation.
 //
 // Logs out by permanently deleting the session.
@@ -11533,6 +11978,159 @@ func (c *Client) sendRevokeMySession(ctx context.Context) (res RevokeMySessionRe
 
 	stage = "DecodeResponse"
 	result, err := decodeRevokeMySessionResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// RevokeRelease invokes revokeRelease operation.
+//
+// Marks the release revoked. A revoked release is refused on every path,
+// including a client that pins it, and can no longer be deployed. Rows
+// already naming it stay in the history; the targets they serve answer
+// `rel.revoked` until something else is deployed there.
+//
+// POST /releases/{release_id}/revoke
+func (c *Client) RevokeRelease(ctx context.Context, params RevokeReleaseParams) (RevokeReleaseRes, error) {
+	res, err := c.sendRevokeRelease(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendRevokeRelease(ctx context.Context, params RevokeReleaseParams) (res RevokeReleaseRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("revokeRelease"),
+		semconv.HTTPRequestMethodKey.String("POST"),
+		semconv.URLTemplateKey.String("/releases/{release_id}/revoke"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, RevokeReleaseOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [3]string
+	pathParts[0] = "/releases/"
+	{
+		// Encode "release_id" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "release_id",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			if unwrapped := string(params.ReleaseID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	pathParts[2] = "/revoke"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "POST", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, RevokeReleaseOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeRevokeReleaseResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}
@@ -11667,6 +12265,297 @@ func (c *Client) sendRevokeSession(ctx context.Context, params RevokeSessionPara
 
 	stage = "DecodeResponse"
 	result, err := decodeRevokeSessionResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// RollbackDeployment invokes rollbackDeployment operation.
+//
+// Undoes one deploy: for every target that deploy moved, appends a row
+// naming the release that target served before it, under a new `deploy_id`
+// with `reason: rollback` and `rollback_of` set. Bare, it undoes the newest
+// deploy of the project; `deploy_id` names an earlier one to re-apply, and
+// `origin` narrows the undo to one target.
+// A target the undone deploy created has no earlier release and is left as
+// it is; it is named in `warnings`. The frozen values of the restored
+// deployment travel with it.
+//
+// POST /deployments/rollback
+func (c *Client) RollbackDeployment(ctx context.Context, request *RollbackRequest, params RollbackDeploymentParams) (RollbackDeploymentRes, error) {
+	res, err := c.sendRollbackDeployment(ctx, request, params)
+	return res, err
+}
+
+func (c *Client) sendRollbackDeployment(ctx context.Context, request *RollbackRequest, params RollbackDeploymentParams) (res RollbackDeploymentRes, err error) {
+	// Validate request before sending.
+	if err := func() error {
+		if err := request.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return res, errors.Wrap(err, "validate")
+	}
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("rollbackDeployment"),
+		semconv.HTTPRequestMethodKey.String("POST"),
+		semconv.URLTemplateKey.String("/deployments/rollback"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, RollbackDeploymentOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [1]string
+	pathParts[0] = "/deployments/rollback"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "POST", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+	if err := encodeRollbackDeploymentRequest(request, r); err != nil {
+		return res, errors.Wrap(err, "encode request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, RollbackDeploymentOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeRollbackDeploymentResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// SetProjectClass invokes setProjectClass operation.
+//
+// Sets the project's class. `sandbox` → `production` re-checks every
+// allowlist pattern against the production rules and fails naming each
+// offender; it requires a claimed project. `production` → `sandbox` lets
+// loopback origins back in and needs `confirm: true`.
+//
+// POST /projects/{project_id}/class
+func (c *Client) SetProjectClass(ctx context.Context, request *SetProjectClassReq, params SetProjectClassParams) (SetProjectClassRes, error) {
+	res, err := c.sendSetProjectClass(ctx, request, params)
+	return res, err
+}
+
+func (c *Client) sendSetProjectClass(ctx context.Context, request *SetProjectClassReq, params SetProjectClassParams) (res SetProjectClassRes, err error) {
+	// Validate request before sending.
+	if err := func() error {
+		if err := request.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return res, errors.Wrap(err, "validate")
+	}
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("setProjectClass"),
+		semconv.HTTPRequestMethodKey.String("POST"),
+		semconv.URLTemplateKey.String("/projects/{project_id}/class"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, SetProjectClassOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [3]string
+	pathParts[0] = "/projects/"
+	{
+		// Encode "project_id" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "project_id",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	pathParts[2] = "/class"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "POST", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+	if err := encodeSetProjectClassRequest(request, r); err != nil {
+		return res, errors.Wrap(err, "encode request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, SetProjectClassOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeSetProjectClassResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}
@@ -12109,11 +12998,9 @@ func (c *Client) sendUpdateTeam(ctx context.Context, request *UpdateTeamRequest,
 
 // UpdateVariables invokes updateVariables operation.
 //
-// Enters, replaces and removes variables at the owner this request
-// addresses.
-// Every name in the body is applied at exactly that owner — the project, or
-// the environment named by `environment_name` — and reaches no other. Names
-// not in the body are untouched.
+// Enters, replaces and removes variables for the value `applies_to`
+// selects. Names not in the body are untouched. Nothing here reaches a
+// deployment already written: values are frozen per deploy.
 // A bare scalar enters a non-secret value. `{"value": …, "secret": true}`
 // stores the value encrypted under the project's active `secret` key, after
 // which it can be referenced but not read back. `null` removes the name from
@@ -12200,19 +13087,16 @@ func (c *Client) sendUpdateVariables(ctx context.Context, request UpdateVariable
 		}
 	}
 	{
-		// Encode "environment_name" parameter.
+		// Encode "applies_to" parameter.
 		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "environment_name",
+			Name:    "applies_to",
 			Style:   uri.QueryStyleForm,
 			Explode: true,
 		}
 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if val, ok := params.EnvironmentName.Get(); ok {
-				if unwrapped := string(val); true {
-					return e.EncodeValue(conv.StringToString(unwrapped))
-				}
-				return nil
+			if val, ok := params.AppliesTo.Get(); ok {
+				return e.EncodeValue(conv.StringToString(string(val)))
 			}
 			return nil
 		}); err != nil {

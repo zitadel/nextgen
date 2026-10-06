@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { AbstractSanityCheck, type CheckContext } from "./types";
 
 /** The keys `.env.example` must document for a Zitadel-managed project. */
-const REQUIRED_KEYS = ["ZITADEL_PROJECT_ID", "ZITADEL_ENVIRONMENT", "ZITADEL_ISSUER"];
+const REQUIRED_KEYS = ["ZITADEL_URL", "ZITADEL_PROJECT_ID", "ZITADEL_PUBLISHABLE_KEY"];
 
 /** Verifies `.env.example` documents the required Zitadel keys; appends any missing. */
 export class EnvExampleCheck extends AbstractSanityCheck {

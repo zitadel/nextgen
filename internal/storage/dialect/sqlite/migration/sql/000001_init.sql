@@ -228,7 +228,7 @@ CREATE TABLE tokens (
             AND session_id IS NULL AND oidc_session_id IS NULL)
         OR (token_type = 'personal_access_token'
             AND session_id IS NULL AND oidc_session_id IS NULL AND saml_session_id IS NULL)
-        OR (token_type IN ('project_token', 'project_preview')
+        OR (token_type IN ('project_token', 'project_preview', 'project_preview_deploy')
             AND user_id IS NULL
             AND session_id IS NULL AND oidc_session_id IS NULL AND saml_session_id IS NULL)
     )

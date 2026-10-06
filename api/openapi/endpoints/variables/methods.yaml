@@ -2,13 +2,8 @@ get:
   operationId: getVariables
   summary: Get variables
   description: |
-    Returns the variables entered at the owner this request addresses, keyed by
-    name — one environment of the project with `environment_name`, the project
-    level itself without it.
-
-    Owners are separate, not a ladder: an environment does not inherit the
-    project's variables and the project does not see its environments'. Reading
-    everything a project holds therefore means reading each owner in turn.
+    Returns the project's variables keyed by name, for the value `applies_to`
+    selects: `all` (default) or the `preview` override.
 
     Secret values are not returned. A secret appears as `{"secret": true}`,
     which says a value is held without disclosing it.
@@ -16,7 +11,7 @@ get:
     - Variables
   parameters:
     - $ref: ../../components/parameters/project-id.yaml
-    - $ref: ../../components/parameters/environment-name-query.yaml
+    - $ref: ../../components/parameters/applies-to.yaml
   security:
     - oauth2:
         - variable.read
@@ -34,12 +29,9 @@ patch:
   operationId: updateVariables
   summary: Update variables
   description: |
-    Enters, replaces and removes variables at the owner this request
-    addresses.
-
-    Every name in the body is applied at exactly that owner — the project, or
-    the environment named by `environment_name` — and reaches no other. Names
-    not in the body are untouched.
+    Enters, replaces and removes variables for the value `applies_to`
+    selects. Names not in the body are untouched. Nothing here reaches a
+    deployment already written: values are frozen per deploy.
 
     A bare scalar enters a non-secret value. `{"value": …, "secret": true}`
     stores the value encrypted under the project's active `secret` key, after
@@ -55,7 +47,7 @@ patch:
     - Variables
   parameters:
     - $ref: ../../components/parameters/project-id.yaml
-    - $ref: ../../components/parameters/environment-name-query.yaml
+    - $ref: ../../components/parameters/applies-to.yaml
   security:
     - oauth2:
         - variable.write

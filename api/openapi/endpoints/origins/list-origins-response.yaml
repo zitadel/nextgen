@@ -1,0 +1,8 @@
+type: object
+required:
+  - origins
+properties:
+  origins:
+    type: array
+    items:
+      $ref: origin.yaml

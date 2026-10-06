@@ -176,7 +176,7 @@ async function projectStatus(cwd: string): Promise<ProjectStatus> {
   return {
     lifecycle: "configured",
     project_id: String(config.project ?? secret.project_id ?? ""),
-    issuer: readDevelopmentIssuer(config),
+    issuer: await readDevelopmentIssuer(cwd),
     ...(claim.kind === "not-applicable" ? {} : { claim }),
   };
 }

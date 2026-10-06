@@ -141,6 +141,64 @@ func TestReleaseStatements_GetByContentHash(t *testing.T) {
 	})
 }
 
+// A short digest names a release on the wire; the prefix read resolves it and
+// reports ambiguity by returning more than one row.
+func TestReleaseStatements_ListByContentHashPrefix(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureReleaseProject(t, d.stmts)
+		otherProject := ensureReleaseProject(t, d.stmts)
+		entity := createRelease(t, d.stmts, projectID, "0001", domain.ReleaseMetadata{})
+		createRelease(t, d.stmts, projectID, "0002", domain.ReleaseMetadata{})
+		createRelease(t, d.stmts, otherProject, "0001", domain.ReleaseMetadata{})
+
+		got, err := d.stmts.ListReleasesByContentHashPrefix(t.Context(), projectID, entity.ContentHash[:12])
+		require.NoError(t, err)
+		require.Len(t, got, 1, "the other project's identical digest is not visible")
+		assert.Equal(t, entity.ID, got[0].ID)
+
+		got, err = d.stmts.ListReleasesByContentHashPrefix(t.Context(), projectID, entity.ContentHash)
+		require.NoError(t, err)
+		assert.Len(t, got, 1)
+
+		got, err = d.stmts.ListReleasesByContentHashPrefix(t.Context(), projectID, "")
+		require.NoError(t, err)
+		assert.Len(t, got, 2, "an empty prefix matches every release; the caller refuses one that short")
+
+		// LIKE metacharacters in the prefix are literal.
+		got, err = d.stmts.ListReleasesByContentHashPrefix(t.Context(), projectID, "%")
+		require.NoError(t, err)
+		assert.Empty(t, got)
+	})
+}
+
+// Revocation is a stamp that never moves: the first revoke's time is the one
+// the audit trail keeps.
+func TestReleaseStatements_Revoke(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureReleaseProject(t, d.stmts)
+		entity := createRelease(t, d.stmts, projectID, "0001", domain.ReleaseMetadata{})
+		assert.Nil(t, entity.RevokedAt)
+
+		got, err := d.stmts.GetReleaseByID(t.Context(), projectID, entity.ID)
+		require.NoError(t, err)
+		assert.Nil(t, got.RevokedAt)
+		assert.False(t, got.Revoked())
+
+		first := time.Now().Add(-time.Hour).Truncate(time.Second)
+		require.NoError(t, d.stmts.RevokeRelease(t.Context(), projectID, entity.ID, first))
+		require.NoError(t, d.stmts.RevokeRelease(t.Context(), projectID, entity.ID, first.Add(time.Hour)))
+
+		got, err = d.stmts.GetReleaseByID(t.Context(), projectID, entity.ID)
+		require.NoError(t, err)
+		require.NotNil(t, got.RevokedAt)
+		assert.Equal(t, first.UTC(), *got.RevokedAt)
+		assert.True(t, got.Revoked())
+
+		err = d.stmts.RevokeRelease(t.Context(), projectID, "rel_does_not_exist", first)
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+	})
+}
+
 // The unique index on (project_id, content_hash) is what makes assembling a
 // release idempotent under concurrency, rather than only in the
 // read-then-insert happy path.

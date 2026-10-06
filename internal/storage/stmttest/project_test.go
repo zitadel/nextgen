@@ -38,7 +38,7 @@ func TestProjectStatements_Create(t *testing.T) {
 		})
 
 		t.Run("empty id is assigned by dialect", func(t *testing.T) {
-			project := &domain.Project{Name: "project-" + uniqueSuffix(t), PreviewOrigins: []string{}}
+			project := &domain.Project{Name: "project-" + uniqueSuffix(t), AllowedOrigins: []domain.AllowedOrigin{}}
 			require.NoError(t, d.stmts.CreateProject(t.Context(), project))
 			t.Cleanup(func() { _, _ = d.stmts.DeleteProjectByID(context.Background(), project.ID) })
 
@@ -65,7 +65,10 @@ func TestProjectStatements_Update(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		t.Run("updates name and refreshes updated_at", func(t *testing.T) {
 			project := newTestProject(uniqueProjectID(t))
-			project.PreviewOrigins = []string{"*.example.com", "localhost:3000"}
+			project.AllowedOrigins = []domain.AllowedOrigin{
+				{Pattern: "https://*.example.com", Kind: domain.OriginKindPreview},
+				{Pattern: "http://localhost:3000", Kind: domain.OriginKindPrimary},
+			}
 			t.Cleanup(func() { _, _ = d.stmts.DeleteProjectByID(context.Background(), project.ID) })
 			require.NoError(t, d.stmts.CreateProject(t.Context(), project))
 			createdUpdatedAt := project.UpdatedAt
@@ -76,7 +79,11 @@ func TestProjectStatements_Update(t *testing.T) {
 			require.NoError(t, d.stmts.UpdateProject(t.Context(), project))
 			assert.True(t, project.UpdatedAt.After(createdUpdatedAt))
 			assert.Equal(t, createdAt.UTC(), project.CreatedAt.UTC())
-			assert.Equal(t, []string{"*.example.com", "localhost:3000"}, project.PreviewOrigins)
+			assert.Equal(t, []domain.AllowedOrigin{
+				{Pattern: "https://*.example.com", Kind: domain.OriginKindPreview},
+				{Pattern: "http://localhost:3000", Kind: domain.OriginKindPrimary},
+			}, project.AllowedOrigins)
+			assert.Equal(t, domain.ProjectClassSandbox, project.Class)
 
 			stored, err := d.stmts.GetProjectByID(t.Context(), project.ID)
 			require.NoError(t, err)
@@ -89,6 +96,39 @@ func TestProjectStatements_Update(t *testing.T) {
 			err := d.stmts.UpdateProject(t.Context(), project)
 			assert.ErrorIs(t, err, new(database.NoRowFoundError))
 		})
+	})
+}
+
+func TestProjectStatements_AllowedOriginsAndClass(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		project := newTestProject(uniqueProjectID(t))
+		t.Cleanup(func() { _, _ = d.stmts.DeleteProjectByID(context.Background(), project.ID) })
+		require.NoError(t, d.stmts.CreateProject(t.Context(), project))
+
+		stored, err := d.stmts.GetProjectByID(t.Context(), project.ID)
+		require.NoError(t, err)
+		assert.Empty(t, stored.AllowedOrigins)
+		assert.NotNil(t, stored.AllowedOrigins, "an empty allowlist reads as an empty list, never nil")
+		assert.Equal(t, domain.ProjectClassSandbox, stored.Class)
+
+		origins := []domain.AllowedOrigin{
+			{Pattern: "https://app.acme.com", Kind: domain.OriginKindPrimary},
+			{Pattern: "https://*-acmeinc.vercel.app", Kind: domain.OriginKindPreview},
+		}
+		require.NoError(t, d.stmts.UpdateProjectAllowedOrigins(t.Context(), project.ID, origins))
+		require.NoError(t, d.stmts.UpdateProjectClass(t.Context(), project.ID, domain.ProjectClassProduction))
+
+		stored, err = d.stmts.GetProjectByID(t.Context(), project.ID)
+		require.NoError(t, err)
+		assert.Equal(t, origins, stored.AllowedOrigins)
+		assert.Equal(t, domain.ProjectClassProduction, stored.Class)
+		assert.True(t, stored.UpdatedAt.After(project.CreatedAt) || stored.UpdatedAt.Equal(project.CreatedAt))
+
+		// A project that is not there is reported, not silently skipped.
+		err = d.stmts.UpdateProjectAllowedOrigins(t.Context(), project.ID+"-missing", origins)
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+		err = d.stmts.UpdateProjectClass(t.Context(), project.ID+"-missing", domain.ProjectClassSandbox)
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 	})
 }
 

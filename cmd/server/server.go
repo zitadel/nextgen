@@ -280,11 +280,11 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	claimService := service.NewClaimService(serviceDBPool, consoleBase, cfg.Platform.ResolvedProjectID())
 	grantService := service.NewGrantService(serviceDBPool, userRefs, cfg.Platform.ResolvedProjectID())
 	brandingService := service.NewBrandingService(serviceDBPool)
-	environmentService := service.NewEnvironmentService(serviceDBPool)
 	variableService := service.NewVariableService(serviceDBPool, keyService)
 	releaseService := service.NewReleaseService(serviceDBPool)
+	runtimeResolver := service.NewRuntimeResolver(serviceDBPool, releaseService)
 	idpConnectionService := service.NewIDPConnectionService(serviceDBPool, schemaValidator)
-	deploymentService := service.NewDeploymentService(serviceDBPool)
+	deploymentService := service.NewDeploymentService(serviceDBPool, releaseService, variableService)
 	eventService := service.NewEventService(serviceDBPool)
 	projectHashers := service.NewProjectHasherResolver(serviceDBPool, hasherFactory)
 	userService := service.NewUserService(
@@ -376,7 +376,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 			flowDefinitionSvc,
 			teamService,
 			brandingService,
-			environmentService,
+			runtimeResolver,
 			releaseService,
 			idpConnectionService,
 			deploymentService,

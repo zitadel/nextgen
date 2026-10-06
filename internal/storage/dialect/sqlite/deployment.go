@@ -3,7 +3,7 @@ package sqlite
 import (
 	"context"
 	"database/sql"
-	"errors"
+	"encoding/json"
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
@@ -14,14 +14,23 @@ import (
 
 const (
 	// No FOR UPDATE: SQLite has one writer, so the transaction itself
-	// serializes concurrent deploys to the same environment.
-	environmentCurrentDeploymentStmt = `SELECT current_deployment_id FROM environments WHERE project_id = ? AND id = ?`
-	createDeploymentStmt             = `INSERT INTO deployments` +
-		` (project_id, id, environment_id, release_id, metadata, deployed_at)` +
-		` VALUES (?, ?, ?, ?, ?, ?) RETURNING deployed_at`
-	setEnvironmentCurrentDeploymentStmt = `UPDATE environments SET current_deployment_id = ? WHERE project_id = ? AND id = ?`
-	deploymentQuery                     = `SELECT project_id, id, environment_id, release_id, metadata, deployed_at` +
+	// serializes concurrent deploys. The read still answers whether the
+	// project exists.
+	lockProjectStmt      = `SELECT id FROM projects WHERE id = ?`
+	createDeploymentStmt = `INSERT INTO deployments` +
+		` (project_id, id, deploy_id, origin, release_id, metadata, deployed_at)` +
+		` VALUES (?, ?, ?, ?, ?, ?, ?)`
+	deploymentQuery = `SELECT project_id, id, deploy_id, origin, release_id, metadata, deployed_at` +
 		` FROM deployments`
+	newestPerOrigin = `NOT EXISTS (SELECT 1 FROM deployments AS newer` +
+		` WHERE newer.project_id = deployments.project_id` +
+		` AND newer.origin = deployments.origin` +
+		` AND (newer.deployed_at > deployments.deployed_at` +
+		` OR (newer.deployed_at = deployments.deployed_at AND newer.id > deployments.id)))`
+	createDeploymentVariableStmt = `INSERT INTO deployment_variables` +
+		` (project_id, deployment_id, name, value, is_secret) VALUES (?, ?, ?, ?, ?)`
+	deploymentVariablesQuery = `SELECT project_id, deployment_id, name, value, is_secret` +
+		` FROM deployment_variables WHERE project_id = ? AND deployment_id = ? ORDER BY name`
 )
 
 type deploymentStatements struct{ statement }
@@ -30,119 +39,69 @@ func newDeploymentStatements(client queryExecutor) deploymentStatements {
 	return deploymentStatements{statement: statement{client: client}}
 }
 
-// CreateDeployment implements [service.DeploymentStatements].
-func (ds deploymentStatements) CreateDeployment(ctx context.Context, entity *domain.Deployment, expectedCurrentDeploymentID *string) (created bool, err error) {
-	if err := ensureManagedID(&entity.ID, domain.PrefixDeployment); err != nil {
-		return false, err
-	}
-	metadata, err := deployment.MarshalMetadata(entity.Metadata)
-	if err != nil {
-		return false, err
-	}
-	// The idempotent answer is staged here and copied onto the entity only
-	// after the transaction commits: the callback must stay replayable, and
-	// overwriting the entity inside an attempt that later aborts would make
-	// the retry compare — and insert — with another deployment's values.
-	var existing *domain.Deployment
-	err = withTransaction(ctx, ds.client, func(ctx context.Context, tx queryExecutor) error {
-		// Reset per attempt: a retried transaction that finds the release
-		// already current takes the idempotent branch and must not report
-		// the aborted attempt's insert.
-		created = false
-		existing = nil
-		// Stamped inside the transaction: _txlock=immediate takes the write
-		// lock at BEGIN, so a deploy that waited for another cannot stamp a
-		// time older than the deploy it waited for — which would order the
-		// current deployment behind the one it replaced.
-		now := nowUnixNano()
-		var currentID sql.NullString
-		if err := tx.QueryRow(ctx, environmentCurrentDeploymentStmt, entity.ProjectID, entity.EnvironmentID).
-			Scan(&currentID); err != nil {
-			return wrapError(err)
-		}
-		// The current row is read whole because both branches below need it:
-		// the guard's conflict details, and the idempotent answer's record.
-		// A pointer whose row is gone — a release delete cascaded the
-		// deployment away — reads as nothing running, so the environment
-		// heals on the next deploy instead of wedging on a hard error.
-		var current *domain.Deployment
-		if currentID.Valid {
-			row, err := ds.getInTx(ctx, tx, entity.ProjectID, currentID.String)
-			if err != nil {
-				if _, ok := errors.AsType[*database.NoRowFoundError](err); !ok {
-					return err
-				}
-			} else {
-				current = row
-			}
-		}
-		if err := deployment.CheckExpectedCurrent(current, expectedCurrentDeploymentID); err != nil {
-			return err
-		}
-		// Idempotent on the running release: deploying what already runs is
-		// answered with the deployment that made it live, and nothing is
-		// written.
-		if current != nil && current.ReleaseID == entity.ReleaseID {
-			existing = current
-			return nil
-		}
-		var deployedNano int64
-		if err := tx.QueryRow(ctx, createDeploymentStmt,
-			entity.ProjectID,
-			entity.ID,
-			entity.EnvironmentID,
-			entity.ReleaseID,
-			string(metadata),
-			now,
-		).Scan(&deployedNano); err != nil {
-			return wrapError(err)
-		}
-		entity.DeployedAt = timeFromUnixNano(deployedNano)
-		if _, err := tx.Exec(ctx, setEnvironmentCurrentDeploymentStmt,
-			entity.ID, entity.ProjectID, entity.EnvironmentID); err != nil {
-			return wrapError(err)
-		}
-		created = true
-		rsi := newResourceScopeStatements(tx)
-		return rsi.UpsertResourceScope(ctx, domain.NewResourceScope(domain.ResourceKindDeployment, entity.ProjectID, entity.ID))
-	})
-	if err == nil && existing != nil {
-		*entity = *existing
-	}
-	return created, err
+// LockProject implements [service.DeploymentStatements].
+func (ds deploymentStatements) LockProject(ctx context.Context, projectID string) error {
+	var locked string
+	return wrapError(ds.client.QueryRow(ctx, lockProjectStmt, projectID).Scan(&locked))
 }
 
-func (ds deploymentStatements) getInTx(ctx context.Context, tx queryExecutor, projectID, id string) (*domain.Deployment, error) {
-	var compiler statementCompiler
-	if err := compileRead(&compiler, deploymentQuery, &database.ListOptions[domain.DeploymentField]{
-		Filter: database.And(
-			database.Equal(database.Col(domain.DeploymentFieldProjectID), projectID),
-			database.Equal(database.Col(domain.DeploymentFieldID), id),
-		),
-	}, deployment.Schema); err != nil {
-		return nil, err
+// CreateDeployments implements [service.DeploymentStatements].
+//
+// Stamped inside the transaction: _txlock=immediate takes the write lock at
+// BEGIN, so a deploy that waited for another cannot stamp a time older than
+// the deploy it waited for.
+func (ds deploymentStatements) CreateDeployments(ctx context.Context, rows []*domain.Deployment) error {
+	if len(rows) == 0 {
+		return nil
 	}
-	rows, err := tx.Query(ctx, compiler.String(), compiler.args...)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-	defer rows.Close()
-	item, err := collectExactlyOneRow(rows, scanDeployment)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-	return item, nil
+	return withTransaction(ctx, ds.client, func(ctx context.Context, tx queryExecutor) error {
+		now := nowUnixNano()
+		rsi := newResourceScopeStatements(tx)
+		for _, entity := range rows {
+			if err := ensureManagedID(&entity.ID, domain.PrefixDeployment); err != nil {
+				return err
+			}
+			metadata, err := deployment.MarshalMetadata(entity.Metadata)
+			if err != nil {
+				return err
+			}
+			if _, err := execAffected(ctx, tx, createDeploymentStmt,
+				entity.ProjectID, entity.ID, entity.DeployID, entity.Origin, entity.ReleaseID, string(metadata), now,
+			); err != nil {
+				return err
+			}
+			entity.DeployedAt = timeFromUnixNano(now)
+			if err := rsi.UpsertResourceScope(ctx, domain.NewResourceScope(domain.ResourceKindDeployment, entity.ProjectID, entity.ID)); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 // GetDeploymentByID implements [service.DeploymentStatements].
 func (ds deploymentStatements) GetDeploymentByID(ctx context.Context, projectID, id string) (*domain.Deployment, error) {
-	var compiler statementCompiler
-	if err := compileRead(&compiler, deploymentQuery, &database.ListOptions[domain.DeploymentField]{
+	return ds.getOne(ctx, &database.ListOptions[domain.DeploymentField]{
 		Filter: database.And(
 			database.Equal(database.Col(domain.DeploymentFieldProjectID), projectID),
 			database.Equal(database.Col(domain.DeploymentFieldID), id),
 		),
-	}, deployment.Schema); err != nil {
+	})
+}
+
+// NewestDeployment implements [service.DeploymentStatements].
+func (ds deploymentStatements) NewestDeployment(ctx context.Context, projectID, origin string) (*domain.Deployment, error) {
+	return ds.getOne(ctx, deployment.NewestOf(projectID, origin, nil))
+}
+
+// NewestDeploymentOfRelease implements [service.DeploymentStatements].
+func (ds deploymentStatements) NewestDeploymentOfRelease(ctx context.Context, projectID, origin, releaseID string) (*domain.Deployment, error) {
+	return ds.getOne(ctx, deployment.NewestOf(projectID, origin, &releaseID))
+}
+
+func (ds deploymentStatements) getOne(ctx context.Context, opts *database.ListOptions[domain.DeploymentField]) (*domain.Deployment, error) {
+	var compiler statementCompiler
+	if err := compileRead(&compiler, deploymentQuery, opts, deployment.Schema); err != nil {
 		return nil, err
 	}
 	rows, err := ds.client.Query(ctx, compiler.String(), compiler.args...)
@@ -166,6 +125,32 @@ func (ds deploymentStatements) GetDeploymentsByIDs(ctx context.Context, projectI
 	if err := compileRead(&compiler, deploymentQuery, &database.ListOptions[domain.DeploymentField]{
 		Filter: deployment.ByIDs(projectID, ids),
 	}, deployment.Schema); err != nil {
+		return nil, err
+	}
+	rows, err := ds.client.Query(ctx, compiler.String(), compiler.args...)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	defer rows.Close()
+	items, err := collectRows(rows, scanDeployment)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	return items, nil
+}
+
+// ListLiveDeployments implements [service.DeploymentStatements].
+func (ds deploymentStatements) ListLiveDeployments(ctx context.Context, projectID string) ([]*domain.Deployment, error) {
+	var compiler statementCompiler
+	if err := compileRead(&compiler, deploymentQuery, &database.ListOptions[domain.DeploymentField]{
+		Filter: database.Equal(database.Col(domain.DeploymentFieldProjectID), projectID),
+		Pagination: database.Page[domain.DeploymentField]{
+			OrderBy: database.OrderBy[domain.DeploymentField]{
+				Columns:   []database.Column[domain.DeploymentField]{database.Col(domain.DeploymentFieldOrigin)},
+				Direction: database.OrderAsc,
+			},
+		},
+	}, deployment.Schema, newestPerOrigin); err != nil {
 		return nil, err
 	}
 	rows, err := ds.client.Query(ctx, compiler.String(), compiler.args...)
@@ -208,6 +193,48 @@ func (ds deploymentStatements) ListDeployments(ctx context.Context, filter *data
 	return &database.ListResult[*domain.Deployment]{Items: items, NextCursor: nextCursor}, nil
 }
 
+// CreateDeploymentVariables implements [service.DeploymentStatements].
+func (ds deploymentStatements) CreateDeploymentVariables(ctx context.Context, rows []*domain.DeploymentVariable) error {
+	for _, row := range rows {
+		encoded, err := json.Marshal(row.Value)
+		if err != nil {
+			return err
+		}
+		if _, err := execAffected(ctx, ds.client, createDeploymentVariableStmt,
+			row.ProjectID, row.DeploymentID, row.Name, string(encoded), row.IsSecret,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// GetDeploymentVariables implements [service.DeploymentStatements].
+func (ds deploymentStatements) GetDeploymentVariables(ctx context.Context, projectID, deploymentID string) ([]*domain.DeploymentVariable, error) {
+	rows, err := ds.client.Query(ctx, deploymentVariablesQuery, projectID, deploymentID)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	defer rows.Close()
+	items, err := collectRows(rows, func(rows *sql.Rows) (*domain.DeploymentVariable, error) {
+		var (
+			item    domain.DeploymentVariable
+			encoded string
+		)
+		if err := rows.Scan(&item.ProjectID, &item.DeploymentID, &item.Name, &encoded, &item.IsSecret); err != nil {
+			return nil, err
+		}
+		if err := json.Unmarshal([]byte(encoded), &item.Value); err != nil {
+			return nil, err
+		}
+		return &item, nil
+	})
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	return items, nil
+}
+
 func scanDeployment(rows *sql.Rows) (*domain.Deployment, error) {
 	var scanned deployment.Row
 	var metadata string
@@ -215,7 +242,8 @@ func scanDeployment(rows *sql.Rows) (*domain.Deployment, error) {
 	if err := rows.Scan(
 		&scanned.ProjectID,
 		&scanned.ID,
-		&scanned.EnvironmentID,
+		&scanned.DeployID,
+		&scanned.Origin,
 		&scanned.ReleaseID,
 		&metadata,
 		&deployedNano,

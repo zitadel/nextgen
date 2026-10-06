@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/audit"
@@ -13,7 +14,7 @@ import (
 )
 
 func (h *Handler) CreateProject(ctx context.Context, req *api.CreateProjectRequest) (api.CreateProjectRes, error) {
-	project, err := h.projectService.Create(ctx, req.Name, req.PreviewOrigins, req.SeedDefaults.Or(true))
+	project, err := h.projectService.Create(ctx, req.Name, allowedOriginsToDomain(req.AllowedOrigins), req.SeedDefaults.Or(true))
 	if err != nil {
 		return nil, err
 	}
@@ -29,15 +30,97 @@ func (h *Handler) CreateProject(ctx context.Context, req *api.CreateProjectReque
 	if err != nil {
 		return nil, err
 	}
+	previewToken, err := h.tokenService.GenerateJWE(ctx, project.PreviewDeployToken())
+	if err != nil {
+		return nil, err
+	}
 
 	return &api.CreateProjectResponse{
 		ID:             project.ID,
 		Name:           project.Name,
+		Class:          api.ProjectClass(project.Class.String()),
 		ProjectSecret:  projectSecret,
 		PreviewSecret:  previewSecret,
-		PreviewOrigins: project.PreviewOrigins,
+		PreviewToken:   previewToken,
+		AllowedOrigins: allowedOriginsToAPI(project.AllowedOrigins),
 		CreatedAt:      project.CreatedAt,
 	}, nil
+}
+
+func (h *Handler) AddAllowedOrigin(ctx context.Context, req *api.AllowedOrigin, params api.AddAllowedOriginParams) (api.AddAllowedOriginRes, error) {
+	projectID := string(params.ProjectID)
+	if err := h.requireProjectAccess(ctx, projectID, projectAccess, opWrite); err != nil {
+		return nil, err
+	}
+	if !hasGranularOrOperator(ctx, "allowed_origin.write") {
+		return nil, domain.ErrOriginPermissionDenied()
+	}
+	kind, err := domain.OriginKindString(string(req.Kind))
+	if err != nil {
+		return nil, domain.ErrOriginInvalid(map[string]string{"pattern": req.Pattern, "reason": "unknown kind"})
+	}
+	warning, err := h.projectService.AddAllowedOrigin(ctx, projectID, domain.AllowedOrigin{Pattern: req.Pattern, Kind: kind})
+	if err != nil {
+		return nil, err
+	}
+	resp := api.AddAllowedOriginResponse{
+		Pattern: strings.ToLower(strings.TrimSpace(req.Pattern)),
+		Kind:    api.AddAllowedOriginResponseKind(kind.String()),
+		Check: api.AddAllowedOriginResponseCheck{
+			Status:  api.AddAllowedOriginResponseCheckStatusOk,
+			Message: "the pattern passed every check for the project's class",
+		},
+	}
+	if warning != nil {
+		resp.Check = api.AddAllowedOriginResponseCheck{
+			Status:  api.AddAllowedOriginResponseCheckStatusWarning,
+			Code:    api.NewOptString(warning.Code),
+			Message: warning.Message,
+		}
+	}
+	return &resp, nil
+}
+
+func (h *Handler) RemoveAllowedOrigin(ctx context.Context, req *api.RemoveAllowedOriginReq, params api.RemoveAllowedOriginParams) (api.RemoveAllowedOriginRes, error) {
+	projectID := string(params.ProjectID)
+	if err := h.requireProjectAccess(ctx, projectID, projectAccess, opWrite); err != nil {
+		return nil, err
+	}
+	if !hasGranularOrOperator(ctx, "allowed_origin.delete") {
+		return nil, domain.ErrOriginPermissionDenied()
+	}
+	if err := h.projectService.RemoveAllowedOrigin(ctx, projectID, req.Pattern); err != nil {
+		return nil, err
+	}
+	return &api.RemoveAllowedOriginNoContent{}, nil
+}
+
+func (h *Handler) SetProjectClass(ctx context.Context, req *api.SetProjectClassReq, params api.SetProjectClassParams) (api.SetProjectClassRes, error) {
+	projectID := string(params.ProjectID)
+	if err := h.requireProjectAccess(ctx, projectID, projectAccess, opWrite); err != nil {
+		return nil, err
+	}
+	if !hasOperatorProjectWrite(scopeOf(ctx)) {
+		return nil, domain.ErrProjectPermissionDenied()
+	}
+	class, err := domain.ProjectClassString(string(req.Class))
+	if err != nil {
+		return nil, domain.ErrProjectClassChangeRefused(map[string]string{"reason": "unknown class"})
+	}
+	project, err := h.projectService.SetClass(ctx, projectID, class, req.Confirm.Or(false))
+	if err != nil {
+		return nil, err
+	}
+	return projectResponse(project), nil
+}
+
+// scopeOf is the caller's minted scopes, empty without a credential.
+func scopeOf(ctx context.Context) []string {
+	sc, ok := GetScopeContext(ctx)
+	if !ok {
+		return nil
+	}
+	return sc.Scope
 }
 
 func (h *Handler) GetProject(ctx context.Context, params api.GetProjectParams) (api.GetProjectRes, error) {
@@ -247,11 +330,34 @@ func projectResponse(project *domain.Project) *api.ProjectResponse {
 	return &api.ProjectResponse{
 		ID:             project.ID,
 		Name:           project.Name,
-		PreviewOrigins: project.PreviewOrigins,
+		Class:          api.ProjectClass(project.Class.String()),
+		AllowedOrigins: allowedOriginsToAPI(project.AllowedOrigins),
 		PasswordHash:   passwordHashPolicyResponse(project.PasswordHashPolicy),
 		CreatedAt:      project.CreatedAt,
 		UpdatedAt:      project.UpdatedAt,
 	}
+}
+
+func allowedOriginsToAPI(origins []domain.AllowedOrigin) []api.AllowedOrigin {
+	out := make([]api.AllowedOrigin, len(origins))
+	for i, entry := range origins {
+		out[i] = api.AllowedOrigin{Pattern: entry.Pattern, Kind: api.AllowedOriginKind(entry.Kind.String())}
+	}
+	return out
+}
+
+// allowedOriginsToDomain carries the wire entries over unchecked: the kind
+// enum is closed by the decoder and the pattern is normalised by the domain.
+func allowedOriginsToDomain(origins []api.AllowedOrigin) []domain.AllowedOrigin {
+	out := make([]domain.AllowedOrigin, 0, len(origins))
+	for _, entry := range origins {
+		kind, err := domain.OriginKindString(string(entry.Kind))
+		if err != nil {
+			kind = domain.OriginKindPrimary
+		}
+		out = append(out, domain.AllowedOrigin{Pattern: entry.Pattern, Kind: kind})
+	}
+	return out
 }
 
 // ------------------ Errors ---------------
@@ -267,6 +373,12 @@ func projectErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
 	case domain.ErrProjectAlreadyClaimed().Code:
 		return errorResponseWithStatusCode(http.StatusConflict, err)
+	case domain.ErrProjectOriginNotAllowed(nil).Code,
+		domain.ErrProjectPreviewNotLive(nil).Code,
+		domain.ErrProjectMismatch().Code:
+		return errorResponseWithStatusCode(http.StatusForbidden, err)
+	case domain.ErrProjectClassChangeRefused(nil).Code:
+		return errorResponseWithStatusCode(http.StatusBadRequest, err)
 	case domain.ErrProjectClaimExpired().Code:
 		return errorResponseWithStatusCode(http.StatusGone, err)
 	case domain.ErrProjectClaimWindowExpired().Code:

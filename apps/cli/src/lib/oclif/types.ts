@@ -67,6 +67,10 @@ export type GlobalOptions = {
   cliVersion: string;
   source: string;
   serverFlag?: string;
+  /** `--env`: the environment whose `.env` files are read. */
+  envName?: string;
+  /** `--env-file`: one file read in place of the convention. */
+  envFile?: string;
   verbose: boolean;
   debug: boolean;
   env: NodeJS.ProcessEnv;
