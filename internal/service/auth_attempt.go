@@ -408,7 +408,10 @@ func (s *authAttemptService) IssueChallenge(ctx context.Context, input IssueChal
 // IssueSSOState mints the state record on an existing attempt. The attempt
 // is guarded the way a challenge issue is: expired or handed off attempts
 // cannot start an external sign-in.
-func (s *authAttemptService) IssueSSOState(ctx context.Context, input IssueSSOStateInput) (*domain.SSOState, error) {
+func (s *authAttemptService) IssueSSOState(ctx context.Context, input IssueSSOStateInput) (res *domain.SSOState, err error) {
+	ctx, end := startSpan(ctx, "AuthAttemptService.IssueSSOState")
+	defer end(&err)
+
 	attempt, err := s.stmts.Statements().GetAuthAttemptByID(ctx, input.ProjectID, input.AttemptID)
 	if err != nil {
 		return nil, err
