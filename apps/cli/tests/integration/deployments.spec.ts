@@ -15,8 +15,11 @@ describe("deployments", () => {
 
     expect(result).toSucceed();
     const { data } = app.envelopeOf<{ deployments: Row[]; count: number }>(result);
-    expect(data.count).toBeGreaterThanOrEqual(1);
-    expect(data.deployments[0]?.origin).toBe("");
+    expect(data.count).toBeGreaterThanOrEqual(2);
+    // Setup's first deploy covers the default and the local origin in one deploy.
+    const first = data.deployments.slice(0, 2);
+    expect(first.map((row) => row.origin).sort()).toEqual(["", "http://localhost:3000"]);
+    expect(new Set(first.map((row) => row.deploy_id)).size).toBe(1);
   });
 
   it("shows one row per target with --live", async () => {
