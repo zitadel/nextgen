@@ -680,14 +680,17 @@ async function startCreateProjectCaptureServer(): Promise<{
       );
       return;
     }
-    if (req.method === "POST" && path === "/releases") {
+    if (req.method === "POST" && path === "/configuration-releases") {
       res.writeHead(201, { "content-type": "application/json" }).end(
         JSON.stringify({
-          id: "rel_test",
-          content_hash: "a".repeat(64),
-          project_id: "proj_test",
-          metadata: {},
-          pointers: [],
+          release: {
+            id: "rel_test",
+            content_hash: "a".repeat(64),
+            project_id: "proj_test",
+            metadata: {},
+            pointers: [{ kind: "schema", handle: "user", revision_id: "sch_test" }],
+          },
+          revisions: [{ kind: "schema", handle: "user", revision_id: "sch_test", created: true }],
         }),
       );
       return;

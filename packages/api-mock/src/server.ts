@@ -33,6 +33,7 @@
  *   GET    /flow_definitions          — list flow definitions
  *   GET    /flow_definitions/:id      — get flow definition
  *   POST   /releases, GET /releases, GET /releases/:id, POST /releases/:id/revoke
+ *   POST   /configuration-releases    — a .zitadel/ bundle turned into a release
  *   POST   /deployments               — deploy a release to targets
  *   GET    /deployments               — the log (origin, deploy_id, live filters)
  *   GET    /deployments/:id, GET /deployments/:id/variables

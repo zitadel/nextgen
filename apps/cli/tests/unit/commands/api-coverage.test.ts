@@ -45,6 +45,8 @@ const NOT_RESOURCES: Readonly<Record<string, string>> = {
   healthz: "liveness probe, not a resource",
   livez: "liveness probe, not a resource",
   readyz: "readiness probe, not a resource",
+  "configuration-releases":
+    "the bundle constructor behind `zitadel deploy`, `preview` and `setup`; not a collection to list or get",
   flow: "the runtime login flow protocol, driven by the login UI and the SDKs",
   auth_attempts: "the runtime authentication protocol, driven by the login UI and the SDKs",
   // Deployments are acts, not files: creating one is `zitadel deploy`'s
@@ -76,7 +78,10 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   createSchema: "configuration is written from .zitadel/ by the declarative path (deploy, ADR 035)",
   createBranding:
     "configuration is written from .zitadel/ by the declarative path (deploy, ADR 035)",
-  createRelease: "a release is constructed by lib/release.ts for `zitadel deploy` and `zitadel preview`",
+  createRelease:
+    "the CLI builds releases from `.zitadel/` through createConfigurationRelease; posting pointers is for API clients that already hold revision ids",
+  createConfigurationRelease:
+    "called from lib/release.ts for `zitadel deploy`, `zitadel preview` and `zitadel setup`",
   getDeploymentById: "the log is read whole by `zitadel deployments`; no command addresses one row",
   listDeployments: "called from lib/deployments.ts by `zitadel deployments`, `deploy` and `rollback`",
   listOrigins: "live preview rows show in `zitadel deployments --live`; no separate listing",

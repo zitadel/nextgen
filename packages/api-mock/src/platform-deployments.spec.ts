@@ -391,3 +391,90 @@ describe("variables by applies_to", () => {
     expect((await call("GET", `/variables?project_id=${projectId}`)).body).toEqual({ SHARED: "all" });
   });
 });
+
+describe("configuration releases", () => {
+  type Revision = { kind: string; handle: string; revision_id: string; created: boolean };
+
+  /** The seeded schema and flow of a fresh project, as a `.zitadel/` bundle would carry them. */
+  async function seededBundle(projectId: string) {
+    const schemas = (await call("GET", `/schemas?project_id=${projectId}&revisions=latest`)).body
+      .schemas as Json[];
+    const flows = (await call("GET", `/flow_definitions?project_id=${projectId}`)).body
+      .flow_definitions as Json[];
+    const schema = schemas[0]!.schema as Json;
+    const flow = flows[0]!.flow_definition as Json;
+    const { $id: _id, ...schemaBody } = schema;
+    void _id;
+    return {
+      schemas: [schemaBody],
+      flow_definitions: [{ ...flow, user_schema: schema.objectType }],
+    };
+  }
+
+  test("an unchanged bundle reuses every revision, and twice reuses the release", async () => {
+    const projectId = await newProject(ACME);
+    const bundle = await seededBundle(projectId);
+
+    const first = await call("POST", `/configuration-releases?project_id=${projectId}`, bundle);
+    const second = await call("POST", `/configuration-releases?project_id=${projectId}`, bundle);
+
+    expect(first.status).toBe(201);
+    expect((first.body.revisions as Revision[]).map((r) => [r.kind, r.created])).toEqual([
+      ["schema", false],
+      ["flow_definition", false],
+    ]);
+    expect(second.status).toBe(200);
+    expect((second.body.release as Json).id).toBe((first.body.release as Json).id);
+    expect((second.body.revisions as Revision[]).every((r) => !r.created)).toBe(true);
+  });
+
+  test("a changed flow mints one flow revision and reuses the schema", async () => {
+    const projectId = await newProject(ACME);
+    const bundle = await seededBundle(projectId);
+    const base = await call("POST", `/configuration-releases?project_id=${projectId}`, bundle);
+    const renamed = { ...bundle.flow_definitions[0]!, name: "b2b-login" };
+
+    const { status, body } = await call("POST", `/configuration-releases?project_id=${projectId}`, {
+      ...bundle,
+      flow_definitions: [renamed],
+    });
+
+    expect(status).toBe(201);
+    expect((body.release as Json).id).not.toBe((base.body.release as Json).id);
+    const revisions = body.revisions as Revision[];
+    expect(revisions.map((r) => [r.kind, r.handle, r.created])).toEqual([
+      ["schema", bundle.schemas[0]!.objectType, false],
+      ["flow_definition", "b2b-login", true],
+    ]);
+  });
+
+  test("a flow names its schema by objectType and pins the bundled schema's revision", async () => {
+    const projectId = await newProject(ACME);
+    const bundle = await seededBundle(projectId);
+    const changedSchema = {
+      ...bundle.schemas[0]!,
+      properties: { ...(bundle.schemas[0]!.properties as Json), nickname: { type: "string" } },
+    };
+
+    const { status, body } = await call("POST", `/configuration-releases?project_id=${projectId}`, {
+      ...bundle,
+      schemas: [changedSchema],
+    });
+
+    expect(status).toBe(201);
+    const [schema, flow] = body.revisions as Revision[];
+    expect(schema!.created).toBe(true);
+    expect(flow!.created).toBe(true);
+    const stored = await call("GET", `/flow_definitions/${flow!.revision_id}?project_id=${projectId}`);
+    expect((stored.body.flow_definition as Json).user_schema).toBe(schema!.revision_id);
+  });
+
+  test("an empty bundle is refused", async () => {
+    const projectId = await newProject(ACME);
+
+    const { status, body } = await call("POST", `/configuration-releases?project_id=${projectId}`, {});
+
+    expect(status).toBe(400);
+    expect(body.code).toBe("rel.invalid");
+  });
+});

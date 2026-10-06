@@ -50,6 +50,9 @@ import {
   CreateIdpQueryParams,
   CreateIdpResponse,
   CreateProjectBody,
+  CreateConfigurationReleaseBody,
+  CreateConfigurationReleaseQueryParams,
+  CreateConfigurationReleaseResponse,
   CreateReleaseBody,
   CreateReleaseQueryParams,
   CreateReleaseResponse,
@@ -349,10 +352,20 @@ type IdpConnectionRecord = {
  */
 type VariableRecord = { value: string | number | boolean; secret: boolean };
 
+/** A branding revision a bundle pinned; the mock serves no branding reads. */
+type BrandingRecord = {
+  id: string;
+  projectId: string;
+  createdAt: string;
+  seq: number;
+  body: Record<string, unknown>;
+};
+
 type Store = {
   projects: Map<string, ProjectRecord>;
   schemas: Map<string, SchemaRecord>;
   flowDefinitions: Map<string, FlowDefinitionRecord>;
+  brandings: Map<string, BrandingRecord>;
   idps: Map<string, IdpConnectionRecord>;
   /**
    * `applies_to` bucket -> variable name -> value. `all` is what every deploy
@@ -378,6 +391,7 @@ function makeStore(): Store {
     projects: new Map(),
     schemas: new Map(),
     flowDefinitions: new Map(),
+    brandings: new Map(),
     idps: new Map(),
     variables: new Map(),
     releases: new Map(),
@@ -681,6 +695,83 @@ function releaseResponse(release: ReleaseRecord): Record<string, unknown> {
     pointers: release.pointers,
     revoked_at: release.revokedAt ?? null,
   };
+}
+
+/**
+ * Structural equality after dropping the named top-level keys and, at every
+ * depth, keys holding a zero value (`false`, `null`, `{}`, `[]`): the server
+ * echoes omitted booleans as false and omitted objects as empty, and an
+ * author's file leaves them out. Neither spelling is a change.
+ */
+function sameJson(a: unknown, b: unknown, ignore: string[] = []): boolean {
+  const strip = (value: unknown): unknown => {
+    if (Array.isArray(value)) {
+      return value.map(strip);
+    }
+    if (value !== null && typeof value === "object") {
+      const out: Record<string, unknown> = {};
+      for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
+        const cleaned = strip(nested);
+        if (!isZeroJson(cleaned)) {
+          out[key] = cleaned;
+        }
+      }
+      return out;
+    }
+    return value;
+  };
+  const top = (value: unknown): unknown => {
+    if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+      const copy = { ...(value as Record<string, unknown>) };
+      for (const key of ignore) {
+        delete copy[key];
+      }
+      return copy;
+    }
+    return value;
+  };
+  return JSON.stringify(sortKeys(strip(top(a)))) === JSON.stringify(sortKeys(strip(top(b))));
+}
+
+function isZeroJson(value: unknown): boolean {
+  if (value === null || value === false) {
+    return true;
+  }
+  if (Array.isArray(value)) {
+    return value.length === 0;
+  }
+  if (typeof value === "object") {
+    return Object.keys(value as object).length === 0;
+  }
+  return false;
+}
+
+function sortKeys(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(sortKeys);
+  }
+  if (value !== null && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const key of Object.keys(value as object).sort()) {
+      out[key] = sortKeys((value as Record<string, unknown>)[key]);
+    }
+    return out;
+  }
+  return value;
+}
+
+/** The project's newest schema revision of an object type, if any. */
+function newestSchemaOf(projectId: string, objectType: string): SchemaRecord | undefined {
+  return [...store.schemas.values()]
+    .filter((r) => r.projectId === projectId && r.objectType === objectType)
+    .sort(compareNewestFirst)[0];
+}
+
+/** The project's newest revision of a flow name, if any. */
+function newestFlowOf(projectId: string, name: string): FlowDefinitionRecord | undefined {
+  return [...store.flowDefinitions.values()]
+    .filter((r) => r.projectId === projectId && r.body.name === name)
+    .sort(compareNewestFirst)[0];
 }
 
 /**
@@ -1954,6 +2045,173 @@ export function setupPlatformHandlers() {
       store.releases.set(release.id, release);
       const out = parse(CreateReleaseResponse, releaseResponse(release), "mock_response_invalid");
       return out.ok ? HttpResponse.json(out.data, { status: 201 }) : out.response;
+    }),
+
+    // The CLI's entry point: `.zitadel/` as authored, turned into a release.
+    // Each resource reuses the project's newest revision of its handle when
+    // the content matches, else a new revision is minted the way its own
+    // create endpoint would; the pointers then go through the release path.
+    http.post("*/configuration-releases", async ({ request }) => {
+      const query = parse(
+        CreateConfigurationReleaseQueryParams,
+        queryRecord(request),
+        "invalid_query",
+      );
+      if (!query.ok) {
+        return query.response;
+      }
+      const raw = await readJson(request);
+      if (raw === null) {
+        return HttpResponse.json(INVALID_JSON, { status: 400 });
+      }
+      const body = parse(CreateConfigurationReleaseBody, raw, "invalid_request");
+      if (!body.ok) {
+        return body.response;
+      }
+      const projectId = query.data.project_id;
+      const bundle = raw as {
+        schemas?: Record<string, unknown>[];
+        flow_definitions?: Record<string, unknown>[];
+        brandings?: Record<string, unknown>[];
+        message?: string;
+        git_sha?: string;
+        git_dirty?: boolean;
+      };
+      const schemas = bundle.schemas ?? [];
+      const flows = bundle.flow_definitions ?? [];
+      const brandings = bundle.brandings ?? [];
+      if (schemas.length + flows.length + brandings.length === 0) {
+        return HttpResponse.json(errorBody("rel.invalid", "the bundle is empty"), { status: 400 });
+      }
+
+      const revisions: {
+        kind: "schema" | "flow_definition" | "branding";
+        handle: string;
+        revision_id: string;
+        created: boolean;
+      }[] = [];
+      const schemaIdByHandle = new Map<string, string>();
+      for (const schema of schemas) {
+        const handle = schemaObjectType(schema as unknown as GetSchemaById200Schema);
+        if (!handle) {
+          return HttpResponse.json(
+            errorBody("rel.invalid", "every bundled schema needs an objectType"),
+            { status: 400 },
+          );
+        }
+        const newest = newestSchemaOf(projectId, handle);
+        let id: string;
+        let created = false;
+        if (newest && sameJson(newest.body, schema, ["$id"])) {
+          id = newest.id;
+        } else {
+          id = `sch_${shortId()}`;
+          store.schemas.set(id, {
+            id,
+            projectId,
+            objectType: handle,
+            createdAt: nowIso(),
+            seq: ++store.lastSeq,
+            body: schema as unknown as GetSchemaById200Schema,
+          });
+          created = true;
+        }
+        schemaIdByHandle.set(handle, id);
+        revisions.push({ kind: "schema", handle, revision_id: id, created });
+      }
+
+      for (const flow of flows) {
+        const name = flow.name;
+        if (typeof name !== "string" || name === "") {
+          return HttpResponse.json(
+            errorBody("rel.invalid", "every bundled flow definition needs a name"),
+            { status: 400 },
+          );
+        }
+        const wire: Record<string, unknown> = { ...flow };
+        if (typeof wire.user_schema === "string") {
+          const handle = wire.user_schema;
+          wire.user_schema =
+            schemaIdByHandle.get(handle) ?? newestSchemaOf(projectId, handle)?.id ?? handle;
+        }
+        const invalid = invalidFlowDefinitionResponse(wire);
+        if (invalid) {
+          return invalid;
+        }
+        const newest = newestFlowOf(projectId, name);
+        let id: string;
+        let created = false;
+        if (newest && sameJson(newest.body, wire, ["$schema"])) {
+          id = newest.id;
+        } else {
+          id = `flowdef_${shortId()}`;
+          const now = nowIso();
+          store.flowDefinitions.set(id, {
+            id,
+            projectId,
+            status: "active",
+            createdAt: now,
+            updatedAt: now,
+            seq: ++store.lastSeq,
+            body: wire,
+          });
+          created = true;
+        }
+        revisions.push({ kind: "flow_definition", handle: name, revision_id: id, created });
+      }
+
+      for (const branding of brandings) {
+        const newest = [...store.brandings.values()]
+          .filter((r) => r.projectId === projectId)
+          .sort(compareNewestFirst)[0];
+        let id: string;
+        let created = false;
+        if (newest && sameJson(newest.body, branding)) {
+          id = newest.id;
+        } else {
+          id = `brnd_${shortId()}`;
+          store.brandings.set(id, {
+            id,
+            projectId,
+            createdAt: nowIso(),
+            seq: ++store.lastSeq,
+            body: branding,
+          });
+          created = true;
+        }
+        revisions.push({ kind: "branding", handle: "default", revision_id: id, created });
+      }
+
+      const pointers = revisions.map(({ kind, handle, revision_id }) => ({
+        kind,
+        handle,
+        revision_id,
+      }));
+      const hash = contentHash(pointers);
+      let release = [...store.releases.values()].find(
+        (r) => r.projectId === projectId && r.contentHash === hash,
+      );
+      const reused = release !== undefined;
+      if (!release) {
+        release = {
+          id: `rel_${shortId()}`,
+          projectId,
+          contentHash: hash,
+          pointers,
+          message: bundle.message,
+          gitSha: bundle.git_sha,
+          gitDirty: bundle.git_dirty ?? false,
+          createdAt: nowIso(),
+          seq: ++store.lastSeq,
+        };
+        store.releases.set(release.id, release);
+      }
+      const out = parse(
+        CreateConfigurationReleaseResponse,
+        { release: releaseResponse(release), revisions },
+        "mock_response_invalid",
+      );
+      return out.ok ? HttpResponse.json(out.data, { status: reused ? 200 : 201 }) : out.response;
     }),
 
     http.get("*/releases", ({ request }) => {

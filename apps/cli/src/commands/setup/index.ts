@@ -436,7 +436,7 @@ export default class Setup extends BaseCommand {
           { baseUrl: answers.server, token: project.project_secret },
           { verbatim: true },
         );
-        const release = await buildRelease({ cwd, client, projectId: project.id, env: this.meta.env });
+        const release = await buildRelease({ cwd, client, projectId: project.id });
         await client.createDeployment(
           { release: release.id, targets: ["default"], message: "initial release" },
           { project_id: project.id },

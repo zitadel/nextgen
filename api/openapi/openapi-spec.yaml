@@ -197,6 +197,8 @@ paths:
     $ref: endpoints/releases/by_id/methods.yaml
   /releases/{release_id}/revoke:
     $ref: endpoints/releases/by_id/revoke/methods.yaml
+  /configuration-releases:
+    $ref: endpoints/configuration_releases/methods.yaml
   /grants:
     $ref: endpoints/grants/methods.yaml
   /grants/query:

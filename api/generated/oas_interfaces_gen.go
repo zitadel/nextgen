@@ -21,6 +21,10 @@ type CreateBrandingRes interface {
 	createBrandingRes()
 }
 
+type CreateConfigurationReleaseRes interface {
+	createConfigurationReleaseRes()
+}
+
 type CreateDeploymentRes interface {
 	createDeploymentRes()
 }

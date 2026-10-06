@@ -11,6 +11,7 @@ const (
 	CompleteClaimOperation                 OperationName = "CompleteClaim"
 	CreateAuthAttemptOperation             OperationName = "CreateAuthAttempt"
 	CreateBrandingOperation                OperationName = "CreateBranding"
+	CreateConfigurationReleaseOperation    OperationName = "CreateConfigurationRelease"
 	CreateDeploymentOperation              OperationName = "CreateDeployment"
 	CreateFlowOperation                    OperationName = "CreateFlow"
 	CreateFlowDefinitionOperation          OperationName = "CreateFlowDefinition"

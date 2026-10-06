@@ -38,6 +38,34 @@ describe("deploy", () => {
       expect(data.release.content_hash).toMatch(/^[0-9a-f]{64}$/);
     });
 
+    it("deploys the same .zitadel/ to a second project without local state", async () => {
+      const app = await aSetUpApp();
+      expect(
+        await app.run([
+          "env",
+          "add",
+          "production",
+          "--non-interactive",
+          "--json",
+          "--origin",
+          "https://app.acme.com",
+        ]),
+      ).toSucceed();
+
+      const result = await app.run(["deploy", "--non-interactive", "--json", "--env", "production"]);
+
+      expect(result).toSucceed();
+      const { data } = app.envelopeOf<Deploy>(result);
+      expect(data.targets).toEqual(expect.arrayContaining(["", "https://app.acme.com"]));
+      // The development project was set up first, so the content is already
+      // released there; the production project had never seen it and got its
+      // own release of the same content.
+      const again = app.envelopeOf<Deploy>(
+        await app.run(["deploy", "--non-interactive", "--json", "--env", "production"]),
+      );
+      expect(again.data.release.id).toBe(data.release.id);
+    });
+
     it("prints the digest a build pins", async () => {
       const app = await aSetUpApp();
 

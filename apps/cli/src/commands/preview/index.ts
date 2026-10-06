@@ -122,7 +122,7 @@ export default class Preview extends BaseCommand {
     }
 
     consola.start("Building the release");
-    const release = await buildRelease({ cwd, client, projectId, env, message: flags.message });
+    const release = await buildRelease({ cwd, client, projectId, message: flags.message });
     const deploy = await client.createDeployment(
       {
         release: release.id,

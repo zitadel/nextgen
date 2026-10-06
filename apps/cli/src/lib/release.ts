@@ -1,12 +1,8 @@
-import type { CreateReleaseBodyPointersItem } from "@zitadel/api/generated/model";
+import type { CreateConfigurationRelease201 } from "@zitadel/api/generated/model";
 import { consola } from "consola";
 
 import type { ZitadelClient } from "./api-client";
-import { BRANDING_DIR } from "./branding";
-import { FLOWS_DIR } from "./flows";
-import { makeSyncers, runSyncLoop } from "./sync";
-import { readState } from "./sync/state";
-import { SCHEMAS_DIR } from "./user-schema";
+import { buildConfigurationBundle } from "./bundle";
 
 export type BuiltRelease = Readonly<{
   id: string;
@@ -14,65 +10,42 @@ export type BuiltRelease = Readonly<{
   content_hash: string;
   /** False when the server already held a release of this content. */
   created: boolean;
-  pointers: readonly CreateReleaseBodyPointersItem[];
-  /** The resources the sync loop uploaded or revised on the way. */
+  /** One entry per bundled resource: the revision pinned, and whether this call allocated it. */
+  revisions: CreateConfigurationRelease201["revisions"];
+  /** How many revisions this call allocated. */
   changed: number;
 }>;
 
-/** The release pointer kind a `.zitadel/` directory's files are pinned under. */
-const KIND_BY_DIR: ReadonlyArray<[string, CreateReleaseBodyPointersItem["kind"]]> = [
-  [SCHEMAS_DIR, "schema"],
-  [FLOWS_DIR, "flow_definition"],
-  [BRANDING_DIR, "branding"],
-];
-
 /**
- * Builds a release from `.zitadel/`: the sync loop puts every resource on the
- * server (reusing what is unchanged), then the revision ids it recorded in
- * `.zitadel/state.json` become the release's pointers. Identical content
- * resolves to the release that already holds it.
+ * Builds a release from `.zitadel/` on the target project: the files go up as
+ * a bundle and the server reuses every revision whose content it already
+ * holds, so identical content resolves to the release that already pins it.
+ * No local state is read or written.
  */
 export async function buildRelease(opts: {
   cwd: string;
   client: ZitadelClient;
   projectId: string;
-  env: NodeJS.ProcessEnv;
   message?: string;
 }): Promise<BuiltRelease> {
-  const syncers = makeSyncers({
-    client: opts.client,
-    projectId: opts.projectId,
-    env: opts.env,
-    cwd: opts.cwd,
-  });
-  const { applied } = await runSyncLoop(opts.cwd, syncers);
-  const pointers = await pointersFromState(opts.cwd);
-  if (pointers.length === 0) {
-    throw new Error("nothing to release: .zitadel/ holds no synced resource");
+  const { body, resources } = await buildConfigurationBundle(opts.cwd);
+  if (resources.length === 0) {
+    throw new Error("nothing to release: .zitadel/ holds no schema, flow or branding");
   }
-  const release = await opts.client.createRelease(
-    { pointers, ...(opts.message ? { message: opts.message } : {}) },
+  const result = (await opts.client.createConfigurationRelease(
+    { ...body, ...(opts.message ? { message: opts.message } : {}) },
     { project_id: opts.projectId },
-  );
+  )) as CreateConfigurationRelease201;
   // The client cannot see the status code; a release the server already held
-  // echoes an id the state file did not just mint, which is the only thing a
-  // caller uses `created` for.
-  const created = applied.length > 0;
-  consola.success(`Release ${release.id}${created ? "" : " (exists, reusing)"}`);
-  return { id: release.id, content_hash: release.content_hash, created, pointers, changed: applied.length };
-}
-
-async function pointersFromState(cwd: string): Promise<CreateReleaseBodyPointersItem[]> {
-  const state = await readState(cwd);
-  const pointers: CreateReleaseBodyPointersItem[] = [];
-  for (const [path, entry] of Object.entries(state.resources)) {
-    if (!entry.id) {
-      continue;
-    }
-    const kind = KIND_BY_DIR.find(([dir]) => path.startsWith(`${dir}/`))?.[1];
-    if (kind) {
-      pointers.push({ kind, revision_id: entry.id });
-    }
-  }
-  return pointers;
+  // allocated no revision, which is the only thing a caller uses `created` for.
+  const changed = result.revisions.filter((revision) => revision.created).length;
+  const created = changed > 0;
+  consola.success(`Release ${result.release.id}${created ? "" : " (exists, reusing)"}`);
+  return {
+    id: result.release.id,
+    content_hash: result.release.content_hash,
+    created,
+    revisions: result.revisions,
+    changed,
+  };
 }
