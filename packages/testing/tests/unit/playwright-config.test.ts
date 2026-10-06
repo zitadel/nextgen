@@ -21,7 +21,7 @@ const options = (): OptionsWithApp => ({
     serverBinaryHint: "run `moon run server:build` first.",
   },
   app: {
-    command: ["pnpm", "--filter", "my-app", "dev"],
+    command: ["corepack", "pnpm", "--filter", "my-app", "dev"],
     cwd: "/repo",
     readyPath: "/login",
     env: nextAppEnv,
@@ -63,7 +63,7 @@ describe("withZitadel", () => {
     expect(supervisor.serverBinary).toBe("/repo/dist/server/nextgen");
     expect(supervisor.serverBinaryHint).toMatch(/server:build/);
     const runner = parseAppRunnerConfig(app.env?.ZITADEL_TESTING_APP_RUNNER);
-    expect(runner.command).toEqual(["pnpm", "--filter", "my-app", "dev"]);
+    expect(runner.command).toEqual(["corepack", "pnpm", "--filter", "my-app", "dev"]);
     expect(runner.cwd).toBe("/repo");
     expect(runner.env).toEqual(nextAppEnv);
     expect(runner.handshakeTimeoutMs).toBe(180_000);

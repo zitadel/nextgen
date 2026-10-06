@@ -182,7 +182,7 @@ interaction is in
 [CONTRIBUTING.md](CONTRIBUTING.md#running-integration-and-end-to-end-tests)):
 
 ```sh
-pnpm --filter @zitadel/demo-next-e2e exec playwright install
+corepack pnpm --filter @zitadel/demo-next-e2e exec playwright install
 moon run demo-next-e2e:e2e
 moon run demo-nuxt-e2e:e2e
 ```
@@ -363,7 +363,7 @@ reference for consuming it. Preserve the JSON envelope contract:
 `cli_version`, `command`, `source`, and `status`, and avoid stray stdout text.
 Agent scripts should pass `--non-interactive --json` and prefer structured
 `next_commands` over prose hints. When invoking the local root wrapper for JSON
-capture, use `pnpm --silent run cli -- ... --json`; plain `pnpm run`
+capture, use `corepack pnpm --silent run cli -- ... --json`; plain `pnpm run`
 prints its own script prelude before the CLI output.
 
 For customer-local runtime workflows, agents should prefer
@@ -393,7 +393,7 @@ The changeset decision — including when a Go-only change needs one — lives i
 [`.changeset/README.md`](.changeset/README.md); follow its
 [decision table](.changeset/README.md#decision-table). Agents write the
 `.changeset/*.md` file directly rather than using the interactive prompt, then
-verify with `pnpm exec changeset status --since origin/main`.
+verify with `corepack pnpm exec changeset status --since origin/main`.
 
 - npm packages under `apps/cli/` and `packages/*` must stay MIT-licensed.
 - Server npm packages under `apps/server/` and `apps/server-*/` and console
@@ -421,7 +421,7 @@ is tool-specific.
 
 The repo requires the Node.js version from `.nvmrc`; sandbox images often
 ship an older default. Ensure the `.nvmrc` version is first on `$PATH` (for
-example via nvm) before running any `pnpm` command.
+example via nvm) before running any `corepack` or `pnpm` command.
 
 ### Playwright browser install gotcha
 

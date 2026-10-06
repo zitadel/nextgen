@@ -58,7 +58,7 @@ tasks:
   # affected-gate and release-body logic never become test files nothing
   # executes.
   test:
-    command: "pnpm run test:all"
+    command: "corepack pnpm run test:all"
     inputs:
       - "scripts/ci-mode.mjs"
       - "scripts/ci-mode.test.mjs"
@@ -88,7 +88,7 @@ tasks:
     # file would stop running unnoticed. node:test used to error on a missing
     # file; this restores that fail-loud behavior, cross-platform (POSIX `test`
     # is unavailable on Windows shells).
-    script: "node scripts/assert-file.mjs scripts/check-typecheck-programs.test.mjs && pnpm exec vitest run scripts/check-typecheck-programs.test.mjs && node scripts/check-typecheck-programs.mjs"
+    script: "node scripts/assert-file.mjs scripts/check-typecheck-programs.test.mjs && corepack pnpm exec vitest run scripts/check-typecheck-programs.test.mjs && node scripts/check-typecheck-programs.mjs"
     inputs:
       - "scripts/check-typecheck-programs.mjs"
       - "scripts/check-typecheck-programs.test.mjs"
@@ -115,7 +115,7 @@ tasks:
     # file would stop running unnoticed. node:test used to error on a missing
     # file; this restores that fail-loud behavior, cross-platform (POSIX `test`
     # is unavailable on Windows shells).
-    script: "node scripts/assert-file.mjs scripts/openapi-casing-rules.test.mjs && pnpm exec vitest run scripts/openapi-casing-rules.test.mjs"
+    script: "node scripts/assert-file.mjs scripts/openapi-casing-rules.test.mjs && corepack pnpm exec vitest run scripts/openapi-casing-rules.test.mjs"
     inputs:
       - "scripts/openapi-casing-rules.test.mjs"
       - "scripts/assert-file.mjs"

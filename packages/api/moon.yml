@@ -5,7 +5,7 @@ stack: "frontend"
 
 tasks:
   generate:
-    command: "pnpm run generate"
+    command: "corepack pnpm run generate"
     inputs:
       - "/api/openapi/**/*.yaml"
       - "orval.config.ts"
@@ -18,17 +18,17 @@ tasks:
       mutex: "generated-sources"
 
   lint:
-    command: "pnpm exec oxlint ."
+    command: "corepack pnpm exec oxlint ."
     deps:
       - "generate"
 
   typecheck:
-    command: "pnpm exec tsc --build tsconfig.json"
+    command: "corepack pnpm exec tsc --build tsconfig.json"
     deps:
       - "generate"
 
   build:
-    command: "pnpm run build"
+    command: "corepack pnpm run build"
     deps:
       - "generate"
     outputs:
@@ -37,7 +37,7 @@ tasks:
   build-release:
     script: |
       node ../../scripts/release-clean.mjs local-dist
-      pnpm run build
+      corepack pnpm run build
     deps:
       - "generate"
     outputs:
@@ -55,6 +55,6 @@ tasks:
       mutex: "public-dist"
 
   test:
-    command: "pnpm run test:all"
+    command: "corepack pnpm run test:all"
     deps:
       - "generate"

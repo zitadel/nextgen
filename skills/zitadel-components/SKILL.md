@@ -28,7 +28,7 @@ is the component itself: attributes, tokens, parts, events, shadow-DOM hooks.
 ## Install / use
 
 ```sh
-pnpm add @zitadel/components
+corepack pnpm add @zitadel/components
 ```
 
 `lit`, `liquidjs`, `dompurify` are externalised peer/runtime deps (consumers

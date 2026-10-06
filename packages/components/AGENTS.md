@@ -236,10 +236,10 @@ What actually makes it look stuck, and how to avoid it:
 - **Run it directly and patiently**, expecting a slow first run then fast reruns:
 
   ```sh
-  pnpm --filter @zitadel/components test:browser
+  corepack pnpm --filter @zitadel/components test:browser
   ```
 
-- For a single file: `pnpm --filter @zitadel/components exec vitest run --project browser <name>`.
+- For a single file: `corepack pnpm --filter @zitadel/components exec vitest run --project browser <name>`.
 
 `vitest run` exits non-zero on any failure, so a `0` exit is authoritative even
 when the non-TTY summary line doesn't flush to a redirected log.

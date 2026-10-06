@@ -8,25 +8,25 @@ dependsOn:
 
 tasks:
   lint:
-    command: "pnpm exec oxlint ."
+    command: "corepack pnpm exec oxlint ."
     deps:
       - "components:build"
       - "design-tokens:build"
 
   typecheck:
-    command: "pnpm run typecheck"
+    command: "corepack pnpm run typecheck"
     deps:
       - "components:build"
       - "design-tokens:build"
 
   test:
-    command: "pnpm run test:all"
+    command: "corepack pnpm run test:all"
     deps:
       - "components:build"
       - "design-tokens:build"
 
   build:
-    command: "pnpm run build"
+    command: "corepack pnpm run build"
     deps:
       - "components:build"
       - "design-tokens:build"
@@ -34,7 +34,7 @@ tasks:
       - "/internal/staticui/login/dist/**/*"
 
   build-release:
-    command: "pnpm run build"
+    command: "corepack pnpm run build"
     deps:
       - "components:build-release"
       - "design-tokens:build"
@@ -47,13 +47,13 @@ tasks:
       runInCI: false
 
   dev:
-    command: "pnpm run dev"
+    command: "corepack pnpm run dev"
     options:
       persistent: true
       runInCI: false
 
   preview:
-    command: "pnpm run preview"
+    command: "corepack pnpm run preview"
     deps:
       - "build"
     options:

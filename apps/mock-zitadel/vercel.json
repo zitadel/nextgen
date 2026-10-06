@@ -1,8 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
-  "installCommand": "cd ../.. && pnpm install --filter @zitadel/mock-zitadel... --frozen-lockfile --prod=false",
-  "buildCommand": "pnpm run build:vercel",
+  "installCommand": "cd ../.. && corepack pnpm install --filter @zitadel/mock-zitadel... --frozen-lockfile --prod=false",
+  "buildCommand": "corepack pnpm run build:vercel",
   "rewrites": [{ "source": "/(.*)", "destination": "/api" }],
   "headers": [
     {

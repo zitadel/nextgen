@@ -150,7 +150,7 @@ describe("run-cli wrapper", () => {
     };
     const lockfile = "/repo/pnpm-lock.yaml";
     const installed = "/repo/node_modules/.pnpm/lock.yaml";
-    const remedy = "pnpm install --frozen-lockfile";
+    const remedy = "corepack pnpm install --frozen-lockfile";
 
     await expect(
       runCli.assertFreshInstall("/repo", statFor({ [lockfile]: 2000, [installed]: 1000 })),
@@ -177,12 +177,12 @@ describe("run-cli wrapper", () => {
         args: ["doctor"],
         env: { PATH: "/bin" },
         assertFreshInstall: async () => {
-          throw new Error("Run: pnpm install --frozen-lockfile");
+          throw new Error("Run: corepack pnpm install --frozen-lockfile");
         },
         buildCli,
         run: vi.fn(noop),
       }),
-    ).rejects.toThrow("pnpm install --frozen-lockfile");
+    ).rejects.toThrow("corepack pnpm install --frozen-lockfile");
     expect(buildCli).not.toHaveBeenCalled();
   });
 

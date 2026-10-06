@@ -49,7 +49,7 @@ jobs:
           cache: pnpm
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: corepack pnpm install --frozen-lockfile
 
       # Bare `moon` below is the workspace's own pinned @moonrepo/cli, so CI
       # runs the exact version the lockfile resolves — same as local dev.
@@ -97,7 +97,7 @@ jobs:
       - name: Install Playwright Chromium
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.browsers == 'true' }}
         working-directory: packages/components
-        run: pnpm exec playwright install chromium
+        run: corepack pnpm exec playwright install chromium
 
       - name: Run Moon build and test graph
         id: moon-ci

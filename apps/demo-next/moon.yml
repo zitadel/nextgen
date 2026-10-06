@@ -10,19 +10,19 @@ dependsOn:
 
 tasks:
   lint:
-    command: "pnpm exec oxlint ."
+    command: "corepack pnpm exec oxlint ."
     deps:
       - "api:build"
       - "sdk-next:build"
 
   typecheck:
-    command: "pnpm run typecheck"
+    command: "corepack pnpm run typecheck"
     deps:
       - "api:build"
       - "sdk-next:build"
 
   build:
-    command: "pnpm run build"
+    command: "corepack pnpm run build"
     deps:
       - "api:build"
       - "sdk-next:build"
@@ -30,7 +30,7 @@ tasks:
       - ".next/**/*"
 
   dev:
-    command: "pnpm run dev"
+    command: "corepack pnpm run dev"
     deps:
       - "api:build"
       - "sdk-next:build"
@@ -39,7 +39,7 @@ tasks:
       runInCI: false
 
   start:
-    command: "pnpm run start"
+    command: "corepack pnpm run start"
     deps:
       - "build"
     options:

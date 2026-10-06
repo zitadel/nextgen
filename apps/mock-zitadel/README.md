@@ -88,8 +88,8 @@ overkill for a mock.
 
 ```sh
 # from the repo root, inside devbox
-devbox run -- pnpm --filter @zitadel/mock-zitadel dev    # node on :8080
-devbox run -- pnpm --filter @zitadel/mock-zitadel test   # vitest
+devbox run -- corepack pnpm --filter @zitadel/mock-zitadel dev    # node on :8080
+devbox run -- corepack pnpm --filter @zitadel/mock-zitadel test   # vitest
 ```
 
 `dev` runs [`scripts/local-server.ts`](scripts/local-server.ts), which

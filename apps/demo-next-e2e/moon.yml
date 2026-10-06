@@ -9,17 +9,17 @@ dependsOn:
 
 tasks:
   lint:
-    command: "pnpm exec oxlint ."
+    command: "corepack pnpm exec oxlint ."
 
   typecheck:
-    command: "pnpm run typecheck"
+    command: "corepack pnpm run typecheck"
     deps:
       # The real-instance config and src-real specs import
       # @zitadel/testing/playwright.
       - "testing:build"
 
   e2e:
-    command: "pnpm exec playwright test"
+    command: "corepack pnpm exec playwright test"
     deps:
       - "api-mock:build"
       - "demo-next:build"
@@ -29,7 +29,7 @@ tasks:
   # Same sign-in journey against a real ephemeral instance seeded via
   # @zitadel/testing instead of api-mock. Boots a server + SQLite local default.
   e2e-real:
-    command: "pnpm exec playwright test --config playwright.real.config.mts"
+    command: "corepack pnpm exec playwright test --config playwright.real.config.mts"
     deps:
       - "testing:build"
       - "cli:build"

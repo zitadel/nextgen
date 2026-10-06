@@ -8,19 +8,19 @@ dependsOn:
 
 tasks:
   lint:
-    command: "pnpm exec oxlint ."
+    command: "corepack pnpm exec oxlint ."
 
   # The e2e tasks themselves are opt-in (`runInCI: false`), which would leave
   # the specs entirely outside CI's type surface — API contract drift in a
   # spec would only surface when someone next ran the suite. Typechecking is
   # cheap, so it runs in CI even though the suite does not.
   typecheck:
-    command: "pnpm run typecheck"
+    command: "corepack pnpm run typecheck"
     deps:
       - "testing:build"
 
   e2e:
-    command: "pnpm exec playwright test"
+    command: "corepack pnpm exec playwright test"
     deps:
       - "console:build"
     options:
@@ -29,7 +29,7 @@ tasks:
   # Live console resource coverage through the Vite server-side API proxy.
   # Boots one ephemeral real Zitadel instance shared by Playwright workers.
   e2e-real:
-    command: "pnpm exec playwright test --config playwright.real.config.mts"
+    command: "corepack pnpm exec playwright test --config playwright.real.config.mts"
     deps:
       - "testing:build"
       - "cli:build"
@@ -76,7 +76,7 @@ tasks:
   # /api -> /. This is the only lane where the console's API base and the Go
   # mux's routing table have to agree (Console ADR 0002 §4).
   e2e-embedded:
-    command: "pnpm exec playwright test --config playwright.embedded.config.mts"
+    command: "corepack pnpm exec playwright test --config playwright.embedded.config.mts"
     deps:
       - "testing:build"
       - "cli:build"
@@ -107,7 +107,7 @@ tasks:
   # switches the platform project off to sign its seeded users into the
   # harness's own project.
   e2e-platform:
-    command: "pnpm exec playwright test --config playwright.platform.config.mts"
+    command: "corepack pnpm exec playwright test --config playwright.platform.config.mts"
     deps:
       - "testing:build"
       - "cli:build"

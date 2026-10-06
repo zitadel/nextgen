@@ -2,7 +2,7 @@
  * Generates the JSON meta-schemas under `api/openapi/endpoints/schemas/` from
  * the OpenAPI YAML that already describes the same shapes.
  *
- *   pnpm exec tsx scripts/generate-meta-schemas.ts
+ *   corepack pnpm exec tsx scripts/generate-meta-schemas.ts
  *
  * The YAML is the single source, and it declares what gets generated: a
  * schema file carrying `x-meta-schema` is emitted as `<same name>.json`. The

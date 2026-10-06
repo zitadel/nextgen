@@ -48,7 +48,7 @@ test("plain tsc against real configs passes, in and out of chains", () => {
 
 test("non-tsc segments and tool-owned programs are not tsc programs", () => {
   assert.deepEqual(
-    vacuousTscTargets("pnpm --filter @zitadel/api run generate && tsc --noEmit -p tsconfig.app.json", solutionIsDefault),
+    vacuousTscTargets("corepack pnpm --filter @zitadel/api run generate && tsc --noEmit -p tsconfig.app.json", solutionIsDefault),
     [],
   );
   assert.deepEqual(vacuousTscTargets("svelte-check --tsconfig ./tsconfig.json", solutionIsDefault), []);

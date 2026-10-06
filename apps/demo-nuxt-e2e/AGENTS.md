@@ -39,7 +39,7 @@ belong in this project.
 ## Running
 
 ```sh
-pnpm exec playwright install        # one-time, browsers
+corepack pnpm exec playwright install        # one-time, browsers
 moon run demo-nuxt-e2e:e2e
 ```
 

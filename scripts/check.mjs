@@ -100,12 +100,13 @@ async function phaseGoSpanner() {
 }
 
 async function phaseNode() {
-  await run("pnpm", ["install", "--frozen-lockfile"]);
+  await run("corepack", ["pnpm", "install", "--frozen-lockfile"]);
   await run("moon", ["ci", ":lint", ":typecheck", ":build", ":test"]);
 }
 
 async function phaseNodeE2e() {
-  await run("pnpm", [
+  await run("corepack", [
+    "pnpm",
     "--filter",
     "@zitadel/demo-next-e2e",
     "exec",

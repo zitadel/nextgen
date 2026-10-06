@@ -67,7 +67,7 @@ export interface WithZitadelOptions {
    * directly.
    */
   app?: {
-    /** Spawn argv (no shell), e.g. ["pnpm", "--filter", "my-app", "dev"]. */
+    /** Spawn argv (no shell), e.g. ["corepack", "pnpm", "--filter", "my-app", "dev"]. */
     command: string[];
     /** Working directory for the app command. */
     cwd: string;

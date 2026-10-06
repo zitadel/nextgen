@@ -9,17 +9,17 @@ dependsOn:
 
 tasks:
   lint:
-    command: "pnpm exec oxlint ."
+    command: "corepack pnpm exec oxlint ."
     deps:
       - "sdk-nuxt:build"
 
   typecheck:
-    command: "pnpm run typecheck"
+    command: "corepack pnpm run typecheck"
     deps:
       - "sdk-nuxt:build"
 
   build:
-    command: "pnpm run build"
+    command: "corepack pnpm run build"
     deps:
       - "sdk-nuxt:build"
     outputs:
@@ -31,7 +31,7 @@ tasks:
       mutex: "sdk-nuxt-dist"
 
   dev:
-    command: "pnpm run dev"
+    command: "corepack pnpm run dev"
     deps:
       - "sdk-nuxt:build"
     options:
@@ -39,7 +39,7 @@ tasks:
       runInCI: false
 
   start:
-    command: "pnpm run start"
+    command: "corepack pnpm run start"
     deps:
       - "build"
     options:

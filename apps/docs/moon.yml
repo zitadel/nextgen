@@ -5,7 +5,7 @@ stack: "frontend"
 
 tasks:
   generate-openapi:
-    command: "pnpm run generate:openapi"
+    command: "corepack pnpm run generate:openapi"
     inputs:
       - "/api/openapi/**/*.yaml"
       - "scripts/bundle-openapi.mjs"
@@ -15,7 +15,7 @@ tasks:
       - ".generated/openapi.mjs"
 
   generate:
-    command: "pnpm run generate"
+    command: "corepack pnpm run generate"
     inputs:
       - "/api/openapi/**/*.yaml"
       - "content/**/*"
@@ -28,19 +28,19 @@ tasks:
       - ".source/**/*"
 
   typecheck:
-    command: "pnpm exec tsc --noEmit -p tsconfig.json"
+    command: "corepack pnpm exec tsc --noEmit -p tsconfig.json"
     deps:
       - "generate"
 
   build:
-    command: "pnpm exec waku build"
+    command: "corepack pnpm exec waku build"
     deps:
       - "generate"
     outputs:
       - "dist/**/*"
 
   dev:
-    command: "pnpm exec waku dev --port 3003"
+    command: "corepack pnpm exec waku dev --port 3003"
     deps:
       - "generate"
     options:
@@ -48,7 +48,7 @@ tasks:
       runInCI: false
 
   preview:
-    command: "pnpm run preview"
+    command: "corepack pnpm run preview"
     deps:
       - "build"
     options:

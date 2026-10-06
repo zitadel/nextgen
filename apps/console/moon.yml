@@ -9,21 +9,21 @@ dependsOn:
 
 tasks:
   lint:
-    command: "pnpm exec oxlint ."
+    command: "corepack pnpm exec oxlint ."
     deps:
       - "api:generate"
       - "design-tokens:build"
       - "sdk-react:build"
 
   typecheck:
-    command: "pnpm run typecheck"
+    command: "corepack pnpm run typecheck"
     deps:
       - "api:build"
       - "design-tokens:build"
       - "sdk-react:build"
 
   build:
-    command: "pnpm run build"
+    command: "corepack pnpm run build"
     deps:
       - "api:build"
       - "design-tokens:build"
@@ -32,7 +32,7 @@ tasks:
       - "/internal/staticui/console/dist/**/*"
 
   build-release:
-    command: "pnpm run build"
+    command: "corepack pnpm run build"
     deps:
       - "api:build-release"
       - "design-tokens:build"
@@ -46,12 +46,12 @@ tasks:
       runInCI: false
 
   test:
-    command: "pnpm run test:all"
+    command: "corepack pnpm run test:all"
     deps:
       - "build"
 
   dev:
-    command: "pnpm run dev"
+    command: "corepack pnpm run dev"
     options:
       persistent: true
       runInCI: false
@@ -62,7 +62,7 @@ tasks:
   # runs `moon run server:build` itself; a task dep on it here would cycle the
   # project graph, because server:build depends on console:build.
   dev-real:
-    command: "pnpm run dev:real"
+    command: "corepack pnpm run dev:real"
     options:
       persistent: true
       runInCI: false
@@ -72,13 +72,13 @@ tasks:
   # `dev-real` deliberately does not boot. Opt-in for that one screen; every
   # other screen is better served by `dev-real`.
   dev-claim:
-    command: "pnpm run dev:claim"
+    command: "corepack pnpm run dev:claim"
     options:
       persistent: true
       runInCI: false
 
   preview:
-    command: "pnpm run preview"
+    command: "corepack pnpm run preview"
     deps:
       - "build"
     options:

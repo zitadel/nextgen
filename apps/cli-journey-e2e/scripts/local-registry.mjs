@@ -110,8 +110,9 @@ export async function startLocalRegistry(input) {
   const logFile = await open(input.paths.registryLogPath, "a", 0o600);
   try {
     const child = spawn(
-      "pnpm",
+      "corepack",
       [
+        "pnpm",
         "exec",
         "verdaccio",
         "--config",

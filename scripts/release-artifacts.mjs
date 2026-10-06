@@ -229,7 +229,7 @@ export async function packPublicPackages(options = {}) {
       dir === "apps/cli"
         ? { ...process.env, ZITADEL_TELEMETRY_BUILD_CHANNEL: "production" }
         : process.env;
-    await runFn("pnpm", ["--dir", dir, "pack", "--pack-destination", tarballsDir], {
+    await runFn("corepack", ["pnpm", "--dir", dir, "pack", "--pack-destination", tarballsDir], {
       cwd: repoRoot,
       env,
     });
