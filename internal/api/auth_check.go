@@ -71,6 +71,9 @@ func factorPayloadToAPI(factor domain.AuthFactor) api.OptCompletedFactorPayload 
 				AuthenticatorAttachment: api.OptPasskeyFactorPayloadAuthenticatorAttachment{},
 			},
 		})
+	case *domain.AuthFactorSSO:
+		// No payload: the connection and link ids stay server-side.
+		return api.OptCompletedFactorPayload{}
 	}
 	return api.OptCompletedFactorPayload{}
 }
@@ -93,6 +96,23 @@ func checkTypeToAPI(check domain.AuthCheckType) api.FactorMethod {
 		return api.FactorMethodPassword
 	case domain.AuthCheckTypePasskey:
 		return api.FactorMethodPasskey
+	case domain.AuthCheckTypeSSO:
+		return api.FactorMethodSSO
+	default:
+		return ""
+	}
+}
+
+// checkTypeToChallengeMethod is [checkTypeToAPI] for challenges. An sso check
+// is never an [domain.AuthChallenge], so the challenge enum leaves it out.
+func checkTypeToChallengeMethod(check domain.AuthCheckType) api.ChallengeMethod {
+	switch check.Class() {
+	case domain.AuthCheckTypeUser:
+		return api.ChallengeMethodIdentifier
+	case domain.AuthCheckTypePassword:
+		return api.ChallengeMethodPassword
+	case domain.AuthCheckTypePasskey:
+		return api.ChallengeMethodPasskey
 	default:
 		return ""
 	}

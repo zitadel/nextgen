@@ -282,3 +282,38 @@ func TestParseConnection(t *testing.T) {
 		})
 	}
 }
+
+// provisioningBody is a minimal valid connection with the given provisioning
+// block spliced in ("" leaves it out).
+func provisioningBody(provisioning string) []byte {
+	block := ""
+	if provisioning != "" {
+		block = `"provisioning": ` + provisioning + `,`
+	}
+	return []byte(`{
+		"slug": "google",
+		"protocol": "oidc",
+		"display_name": "Google",
+		` + block + `
+		"oidc": {
+			"issuer": "https://accounts.example.test",
+			"client_id": "client",
+			"client_secret": "${{ GOOGLE_SECRET }}",
+			"scopes": ["openid"]
+		}
+	}`)
+}
+
+func TestParseConnection_ProvisioningCreationDefaultsToAuto(t *testing.T) {
+	for _, provisioning := range []string{"", `{}`, `{"creation": "auto"}`} {
+		conn, err := ParseConnection("idprev_1", provisioningBody(provisioning))
+		require.NoError(t, err)
+		assert.False(t, conn.CreationDisabled, "provisioning %q", provisioning)
+	}
+}
+
+func TestParseConnection_ProvisioningCreationDisabled(t *testing.T) {
+	conn, err := ParseConnection("idprev_1", provisioningBody(`{"creation": "disabled"}`))
+	require.NoError(t, err)
+	assert.True(t, conn.CreationDisabled)
+}
