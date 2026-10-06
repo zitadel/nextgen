@@ -123,6 +123,12 @@ type SSOCallbackResult struct {
 	// result carries only this key and ProviderSlug: no subject, no claims,
 	// no verified map.
 	ErrorKey string `json:"error_key,omitempty"`
+	// CollisionUserID is written by a collision bind in the same transaction as
+	// the user factor, and replaces the whole result: after a collision the row
+	// holds only this marker, and the provider's subject and claims are gone.
+	// It is the only signal a later render reconciles a lost collision cookie
+	// from.
+	CollisionUserID string `json:"collision_user_id,omitempty"`
 }
 
 // IsError reports whether the ceremony failed; see [SSOCallbackResult.ErrorKey].

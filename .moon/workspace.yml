@@ -3,6 +3,7 @@ projects:
     server: "apps/server"
     workspace: "."
     release: "tools/release"
+    bench: "tools/bench"
     cli: "apps/cli"
     cli-journey-e2e: "apps/cli-journey-e2e"
     console: "apps/console"
