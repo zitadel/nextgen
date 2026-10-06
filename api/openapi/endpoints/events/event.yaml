@@ -20,6 +20,7 @@ oneOf:
   - $ref: types/flowdef-deleted-event.yaml
   - $ref: types/flowdef-updated-event.yaml
   - $ref: types/idp-created-event.yaml
+  - $ref: types/idp-identity_link-created-event.yaml
   - $ref: types/idp-updated-event.yaml
   - $ref: types/project-created-event.yaml
   - $ref: types/project-deleted-event.yaml
@@ -56,6 +57,7 @@ discriminator:
     flowdef.deleted: types/flowdef-deleted-event.yaml
     flowdef.updated: types/flowdef-updated-event.yaml
     idp.created: types/idp-created-event.yaml
+    idp.identity_link.created: types/idp-identity_link-created-event.yaml
     idp.updated: types/idp-updated-event.yaml
     project.created: types/project-created-event.yaml
     project.deleted: types/project-deleted-event.yaml

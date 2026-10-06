@@ -100,9 +100,16 @@ type SSOCallbackResult struct {
 	Subject              string         `json:"subject"`
 	ConnectionRevisionID string         `json:"connection_revision_id"`
 	Claims               map[string]any `json:"claims,omitempty"`
-	// Verified records, per mapped claim name, whether the provider asserted it
-	// as verified (for example email_verified).
+	// Verified records, per user-schema property, whether the provider asserted
+	// the property's mapped claim as verified (for example email_verified). It
+	// is keyed like Claims, the same as idp.ExternalIdentity.Verified.
 	Verified map[string]bool `json:"verified,omitempty"`
+	// CollisionUserID is written by a collision bind in the same transaction as
+	// the user factor, and replaces the whole result: after a collision the row
+	// holds only this marker, and the provider's subject and claims are gone.
+	// It is the only signal a later render reconciles a lost collision cookie
+	// from.
+	CollisionUserID string `json:"collision_user_id,omitempty"`
 }
 
 // LogValue implements [slog.LogValuer]. Claims may hold personal data, so the
@@ -161,6 +168,26 @@ func (c SSOCallbackCheck) LogValue() slog.Value {
 
 // Deliberately not an AuthFactor and not an AuthChallenge.
 var _ AuthCheck = (*SSOCallbackCheck)(nil)
+
+// AuthFactorSSO records that the attempt was authenticated through an identity
+// provider: which connection, and which identity link resolved the user. It
+// carries no subject, no claims and no provider token, so promoting it into a
+// session copies nothing the provider asserted.
+type AuthFactorSSO struct {
+	ConnectionID string `json:"connection_id"`
+	LinkID       string `json:"link_id"`
+	// AttemptID is the attempt that wrote the factor; a copy promoted through a
+	// session keeps the original id, so only this attempt's own bind counts as
+	// a retry marker.
+	AttemptID string `json:"attempt_id"`
+	authFactor
+}
+
+func (a *AuthFactorSSO) Type() AuthCheckType { return AuthCheckTypeSSO }
+
+func (a *AuthFactorSSO) Payload() any { return a }
+
+var _ AuthFactor = (*AuthFactorSSO)(nil)
 
 // SSOState is what NewSSOState hands the submit step: the four plaintext
 // secrets it needs and the record to persist. The state becomes the record's

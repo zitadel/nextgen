@@ -125,7 +125,7 @@ func TestContent_SSOProvidersRoundTrip_StoresSlugs(t *testing.T) {
 				Name:         "identifier",
 				SSOProviders: []string{"google", "corp_idp"},
 				Transitions: map[string]domain.FlowStepTransition{
-					"callback": {Target: "done"},
+					"sso_authenticated": {Target: "done"},
 				},
 			},
 			{Name: "done", Complete: gu.Ptr(domain.FlowStepCompleteRedirect)},
@@ -159,7 +159,7 @@ func TestContent_LegacySSOProviderObjectsDecodeAsSlugs(t *testing.T) {
 				{"id": "google", "name": "Google", "template": "google"},
 				"corp_idp"
 			],
-			"transitions": {"callback": {"target": "identifier"}}
+			"transitions": {"sso_authenticated": {"target": "identifier"}}
 		}]
 	}`)
 

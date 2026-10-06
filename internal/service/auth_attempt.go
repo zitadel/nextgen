@@ -507,7 +507,13 @@ func recordDirectAuthFactor(ctx context.Context, stmts AllStatements, attempt *d
 	if err != nil {
 		return "", err
 	}
-	return checkID, audit.Emit(ctx, stmts, audit.EmitSpec{
+	return checkID, emitDirectAuthFactor(ctx, stmts, attempt, factor, checkID)
+}
+
+// emitDirectAuthFactor records the audit event for a factor written without a
+// challenge/proof cycle.
+func emitDirectAuthFactor(ctx context.Context, stmts EventStatements, attempt *domain.AuthAttempt, factor domain.AuthFactor, checkID string) error {
+	return audit.Emit(ctx, stmts, audit.EmitSpec{
 		Type:       domain.EventTypeAuthCheckSucceeded,
 		Category:   domain.EventCategoryAuth,
 		ProjectID:  attempt.ProjectID,

@@ -673,3 +673,46 @@ func TestUserStatements_UniqueAttributes_CaseInsensitive(t *testing.T) {
 		assert.Equal(t, owner.ID, got.ID)
 	})
 }
+
+// A team-scoped registry row for the same value is legal next to a
+// project-scoped one (the registry key includes team_id), so a lookup for a
+// project-scoped owner must not see it.
+func TestUserStatements_GetUser_UniqueTeamIDFiltersRegistryRows(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
+
+		owner := newTestUser(t, projectID, schemaURL, "user_scope_owner", "scoped@example.com", "Owner")
+		require.NoError(t, d.stmts.CreateUser(t.Context(), owner))
+
+		team := newTestTeam(projectID, "team_scope_other")
+		require.NoError(t, d.stmts.CreateTeam(t.Context(), team))
+		teamEmail, err := domain.NewCreateAttribute("email", "scoped@example.com", domain.AttributeUniquenessTeam)
+		require.NoError(t, err)
+		teamUser := &domain.CreateUser{
+			ProjectID:               projectID,
+			SchemaURL:               schemaURL,
+			ID:                      "user_scope_team",
+			InitialMembershipTeamID: &team.ID,
+			Attributes:              domain.CreateAttributes{*teamEmail},
+		}
+		require.NoError(t, d.stmts.CreateUser(t.Context(), teamUser))
+
+		attrs := []domain.Attribute{{Key: "email", Value: "scoped@example.com"}}
+		projectFilter := database.Equal(database.Col(domain.UserFieldProjectID), projectID)
+
+		_, err = d.stmts.GetUser(t.Context(), projectFilter, service.UserQueryOptions{
+			Attributes:           attrs,
+			UniqueAttributesOnly: true,
+		})
+		require.Error(t, err, "without a team filter both registry rows match")
+
+		projectScope := ""
+		got, err := d.stmts.GetUser(t.Context(), projectFilter, service.UserQueryOptions{
+			Attributes:           attrs,
+			UniqueAttributesOnly: true,
+			UniqueTeamID:         &projectScope,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, owner.ID, got.ID)
+	})
+}

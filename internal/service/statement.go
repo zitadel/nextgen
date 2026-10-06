@@ -334,6 +334,10 @@ type AuthAttemptStatements interface {
 	GetAuthAttemptByID(ctx context.Context, projectID, authAttemptID string) (*domain.AuthAttempt, error)
 	GetAuthAttemptByHandoffToken(ctx context.Context, projectID string, handoffToken []byte) (*domain.AuthAttempt, error)
 	DeleteAuthAttemptByID(ctx context.Context, projectID, authAttemptID string) error
+	// HandoffAuthAttempt stores the handoff token only on an attempt that was not
+	// handed off yet, so two concurrent handoffs cannot both return a token. The
+	// loser gets ErrAuthAttemptAlreadyHandedOff; a missing attempt still gets a
+	// NoRowFoundError.
 	HandoffAuthAttempt(ctx context.Context, attempt *domain.AuthAttempt) error
 	SetAuthAttemptChallenge(ctx context.Context, projectID, authAttemptID string, challenge domain.AuthChallenge) error
 	// SetAuthAttemptFactor upserts a verified factor directly, without a
@@ -342,6 +346,13 @@ type AuthAttemptStatements interface {
 	// An existing check row of the same type is overwritten and its challenge
 	// state cleared. Returns the check row's id for audit emits.
 	SetAuthAttemptFactor(ctx context.Context, projectID, authAttemptID string, factor domain.AuthFactor) (checkID string, err error)
+	// AddAuthAttemptFactor writes a verified factor like SetAuthAttemptFactor, but
+	// returns a [*database.UniqueError] when a verified factor of that type is
+	// already stored, and gives the row a new check id. It exists so the SSO bind
+	// cannot overwrite a competing user factor, and so a challenge issued before
+	// the bind can no longer succeed. After a refusal the caller must not use the
+	// transaction again: on Spanner the refused insert has already ended it.
+	AddAuthAttemptFactor(ctx context.Context, projectID, authAttemptID string, factor domain.AuthFactor) (checkID string, err error)
 	AuthAttemptChallengeSucceeded(ctx context.Context, projectID, authAttemptID string, factor domain.AuthFactor, challengeID string) error
 	AuthAttemptChallengeFailed(ctx context.Context, projectID, authAttemptID string, challenge domain.AuthChallenge) error
 	// IssueSSOState upserts the attempt's single sso_callback row. It mints the check
@@ -365,6 +376,19 @@ type AuthAttemptStatements interface {
 	// longer matches). The write is once only: a second write on the same consumed
 	// row returns ErrSSOStateInvalid. Never sets last_verified_at.
 	SetSSOCallbackResult(ctx context.Context, projectID, stateHash string, result *domain.SSOCallbackResult) error
+	// DeleteSSOCallback removes the attempt's sso_callback row with the given
+	// check id, pending or consumed. Identity resolution calls it to settle the
+	// parked result it read. It returns ErrSSOStateInvalid when no row matched:
+	// a concurrent request settled it, or a new ceremony replaced it.
+	DeleteSSOCallback(ctx context.Context, projectID, authAttemptID, checkID string) error
+	// MarkSSOCallbackCollision replaces the parked result on the attempt's
+	// sso_callback row with the given check id by the collision marker alone
+	// (collision_user_id = userID): the provider's subject and claims are gone.
+	// The write holds the row until the transaction ends.
+	// A collision bind takes it in place of the delete, so the row stays for a
+	// retry and a later render can tell the collision from an unrelated user
+	// factor. It returns ErrSSOStateInvalid when no row matched.
+	MarkSSOCallbackCollision(ctx context.Context, projectID, authAttemptID, checkID, userID string) error
 }
 
 // UserQueryOptions carries EAV match/hydrate options for GetUser / ListUsers.
@@ -379,6 +403,10 @@ type UserQueryOptions struct {
 	// equal value in a non-unique property of another user (for example a
 	// notification address) cannot make the lookup ambiguous.
 	UniqueAttributesOnly bool
+	// UniqueTeamID, with UniqueAttributesOnly, restricts the registry match
+	// to rows of one team scope; "" means project-scoped rows only. Nil
+	// matches rows of every scope.
+	UniqueTeamID *string
 	// MembershipTeamID, when set, requires an active team membership.
 	MembershipTeamID *string
 	// IncludeTeams hydrates each user's team memberships (ADR 059). The list is loaded
