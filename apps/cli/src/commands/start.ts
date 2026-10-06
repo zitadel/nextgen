@@ -389,7 +389,7 @@ function readyData(
       ...(console?.sign_in_url
         ? [`Console: you are ${console.signed_in_as}. Open ${console.sign_in_url} (works once).`]
         : []),
-      "From your app directory, run setup; the CLI will detect the framework or ask when needed.",
+      "Run setup in this directory or one inside it, so it finds this server's local admin; the CLI will detect the framework or ask when needed.",
       "Setup installs dependencies when needed; then start your app dev server.",
     ],
     next_commands: [

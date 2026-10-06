@@ -128,6 +128,8 @@ export function readmeGuidanceSection(ctx: PatchContext): string {
 
 Login for this app is managed by [Zitadel](https://zitadel.com). Try it: start the dev server, open ${ctx.issuer}/login (use this exact origin — passkeys are bound to it), register a user, sign out, and sign in again.
 
+The dev server keeps its terminal busy, so run the commands below from a second terminal in this directory.
+
 To change what the login collects or how sign-in works, edit the files under \`.zitadel/schemas/\` and \`.zitadel/flows/\` (each folder has a README), then:
 
 \`\`\`sh

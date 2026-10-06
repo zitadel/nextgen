@@ -228,6 +228,16 @@ asks for `--force` — which the golden path passes because `start` has already
 written `.zitadel/local` into the directory. If you run `setup` before `start`,
 in a truly empty directory, `--force` is not needed.
 
+The app may also live in a subdirectory of the one `start` ran in: `setup`,
+`console` and `--server local` read `.zitadel/local/` from the working
+directory or the nearest parent that has it (up to the home directory), so
+`mkdir my-app && cd my-app` after `start` works without `--force`. On a local
+server that hosts the platform project, `setup` attaches the project to the
+local admin's team and ends `data.next_commands` with `console`; when it finds
+no local admin for that server on the way up, it says so in the envelope's
+`warnings` and the project stays unattached, so the local console does not
+list it.
+
 After `setup`, follow `data.next_commands` to start the app. Prove the generated
 auth flow in a visible browser by registering a unique user, logging out, logging
 back in with the same email/password, and ending on the signed-in profile page.
