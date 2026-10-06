@@ -5212,6 +5212,7 @@ func TestFlowStateMachine_Render_SSOUnroutableTransitionDoesNotRetryHandoff(t *t
 			assert.Equal(t, domain.FlowStepErrorSSOUnavailable, *result.Step.Error)
 			assert.Empty(t, result.State.CollectedData.UserID)
 			assert.Equal(t, "att-1", result.State.AuthAttemptID)
+			assert.False(t, result.SSOResolved)
 		})
 	}
 }
@@ -5792,6 +5793,7 @@ func TestFlowStateMachine_Render_SSOCollisionReconcileUnroutableRendersError(t *
 			require.NotNil(t, result.Step.Error)
 			assert.Equal(t, domain.FlowStepErrorSSOUnavailable, *result.Step.Error)
 			assert.Empty(t, result.State.CollectedData.UserID)
+			assert.False(t, result.SSOResolved)
 		})
 	}
 }

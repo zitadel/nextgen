@@ -134,8 +134,8 @@ type FlowSSOReturn struct {
 // + HandoffTokenExpiresAt are populated only on the terminal step;
 // SSOBindingNonce only on the [FlowStepNameSSORedirect] step, where the
 // handler sets it as the browser-binding cookie. SSOResolved is set only by
-// [Render], when it resolved a parked SSO identity: the handler re-seals
-// only such a render.
+// [Render], when resolving a parked SSO identity changed the state: the
+// handler re-seals only such a render.
 type FlowStepResult struct {
 	State                 *FlowState
 	Step                  *FlowStep
@@ -362,8 +362,8 @@ func (r *FlowStateMachineRuntime) Render(ctx context.Context, def *FlowDefinitio
 	if def == nil || state == nil {
 		return FlowStepResult{}, fmt.Errorf("%w: render without definition or state", ErrFlowIntegrity())
 	}
-	if result, resolved, err := r.resolveSSOIdentity(ctx, def, state); err != nil || resolved {
-		result.SSOResolved = resolved
+	if result, reseal, err := r.resolveSSOIdentity(ctx, def, state); err != nil || result.Step != nil {
+		result.SSOResolved = reseal
 		return result, err
 	}
 	step, err := r.renderStep(ctx, def, state)
@@ -376,8 +376,10 @@ func (r *FlowStateMachineRuntime) Render(ctx context.Context, def *FlowDefinitio
 }
 
 // resolveSSOIdentity turns an external identity an SSO callback parked on the
-// attempt into an outcome on the current step. resolved reports that it
-// produced the result; otherwise Render goes on to render the step as usual.
+// attempt into an outcome on the current step. A branch that produces the
+// result always returns a step, and Render relies on that: a result without
+// one goes on to render the step as usual. The bool reports that the state
+// changed and the handler must re-seal it.
 //
 // It runs on every render, so every GET /flow/{id} pays one attempt read even
 // without SSO. The read is not only for SSO: LoadParked also restarts any flow
@@ -417,6 +419,13 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 		if err != nil {
 			return FlowStepResult{}, false, err
 		}
+		// Checked here as well, so the error render leaves the cookie alone:
+		// the state does not change, and a reload shows the error again.
+		if !ssoAuthenticatedRoutes(currentStep) {
+			msg := FlowStepErrorSSOUnavailable
+			result, err := r.renderStepError(pc, resolvedFields, &msg)
+			return result, false, err
+		}
 		return r.retrySSOHandoff(pc, resolvedFields, parked.BoundUserID)
 	}
 	// A collision bound a user, but the cookie that recorded it lost the race
@@ -443,7 +452,7 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 		if !userAlreadyExistsRoutes(currentStep) {
 			msg := FlowStepErrorSSOUnavailable
 			result, err := r.renderStepError(pc, resolvedFields, &msg)
-			return result, true, err
+			return result, false, err
 		}
 		recordResolvedUser(state, parked.CollisionUserID)
 		result, err := r.routeOutcome(pc, resolvedFields, FlowImplicitOutcomeUserAlreadyExists, false)
