@@ -19,6 +19,11 @@ export default defineConfig({
     ...baseTest,
     name: "@zitadel/sdk-angular",
     environment: "jsdom",
+    // The analog plugin defaults the pool to `vmThreads`, whose jsdom context
+    // lacks web-stream globals (`TransformStream`) that MSW needs to serve the
+    // mock Flow API. The suite is zoneless, so Vitest's default `forks` pool
+    // runs it as-is.
+    pool: "forks",
     setupFiles: ["src/test-setup.ts"],
   },
 });
