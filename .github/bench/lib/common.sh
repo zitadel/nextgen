@@ -1,6 +1,9 @@
 # shellcheck shell=bash
 # Shared helpers for the benchmark lane tooling (ADR 069). Sourced, never run.
 
+# BENCH_TRACE=1 traces every script (set -x), including after sudo.
+if [[ ${BENCH_TRACE:-0} == 1 ]]; then set -x; fi
+
 bench_log() { printf 'bench: %s\n' "$*" >&2; }
 bench_warn() { printf 'bench: warning: %s\n' "$*" >&2; }
 bench_die() {
