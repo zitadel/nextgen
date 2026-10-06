@@ -20,9 +20,9 @@ jq -r '
   "### Lane `\(.lane)` (dialect \(.database.dialect), observed: \(.database.observed.evidence))\n",
   "- machine: \(.host.platform.product_name) (\(.host.platform.virtualization), hypervisor \(.host.platform.hypervisor)), \(.host.cpu_model), \(.host.threads_per_core) thread(s) per core, kernel \(.host.kernel)",
   "- isolation: \(.host.platform.isolation_note)",
-  "- partition (\(.partition.mode)): cpuset partition root over `\(.partition.bench_cpus)`, runner and everything else on `\(.partition.roles.system.cpus)`",
+  "- partition (\(.partition.mode)): \(if .partition.mode == "host" then "cpuset partition root over `\(.partition.bench_cpus)` (removed from every other cgroup), runner and everything else on `\(.partition.roles.system.cpus)`" else "disjoint cpusets inside the delegated cgroup, runner in its own leaf" end)",
   (.partition.roles | to_entries[] | select(.value.active and (.value.cgroup != "")) |
-     "- `\(.key)`: cpus `\(.value.cpus)` (\(.value.cores) cores), memory.max \(.value.memory_max_bytes / 1048576 | floor) MiB"),
+     "- `\(.key)`: cpus `\(.value.cpus)` (\(.value.cores) cores), memory.max \(if .value.memory_max_bytes then "\(.value.memory_max_bytes / 1048576 | floor) MiB" else "none" end)"),
   "- cores: \(.partition.core_isolation)",
   "- not partitioned: \(.not_partitioned | join("; "))",
   "- data disk: \(.database.disk.kind) (\(.database.disk.fstype), device \(.database.disk.device) \(.database.disk.model)); a 4 KiB synchronous write takes \(.database.disk.fsync_4k_us) us",
@@ -54,5 +54,10 @@ if [[ -d $d/windows ]]; then
   for v in "$d"/windows/*/verdict.json; do
     [[ -r $v ]] || continue
     jq -r '"- `\(.name)`: \(if .valid then "valid" else "INVALID: " + (.reasons | join("; ")) end) (\(.seconds) s; server cpu \(.deltas.server.cpu_usage_usec) us, nr_throttled +\(.deltas.server.nr_throttled))"' "$v"
+    w=$(dirname "$v")
+    if [[ -r $w/start.json && -r $w/end.json ]]; then
+      jq -rn --slurpfile s "$w/start.json" --slurpfile e "$w/end.json" \
+        '["server", "loadgen"] | map(. as $r | "\($r) cpuset.cpus.effective `\($s[0].roles[$r]["cpuset.cpus.effective"])` -> `\($e[0].roles[$r]["cpuset.cpus.effective"])`, memory.max \($s[0].roles[$r]["memory.max"]) -> \($e[0].roles[$r]["memory.max"]), nr_throttled \($s[0].roles[$r]["cpu.stat"].nr_throttled) -> \($e[0].roles[$r]["cpu.stat"].nr_throttled)") | "  - " + join("\n  - ")'
+    fi
   done
 fi
