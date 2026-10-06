@@ -58614,6 +58614,7 @@ type SubmitFlowStepErrorResponse struct {
 	FlowIntegrity       FlowIntegrity
 	FlowInvalidAction   FlowInvalidAction
 	FlowNotFound        FlowNotFound
+	FlowRestartRequired FlowRestartRequired
 	FlowUnsupported     FlowUnsupported
 	Internal            Internal
 	TknInvalid          TknInvalid
@@ -58647,6 +58648,7 @@ const (
 	FlowIntegritySubmitFlowStepErrorResponse       SubmitFlowStepErrorResponseType = "flow.integrity"
 	FlowInvalidActionSubmitFlowStepErrorResponse   SubmitFlowStepErrorResponseType = "flow.invalid_action"
 	FlowNotFoundSubmitFlowStepErrorResponse        SubmitFlowStepErrorResponseType = "flow.not_found"
+	FlowRestartRequiredSubmitFlowStepErrorResponse SubmitFlowStepErrorResponseType = "flow.restart_required"
 	FlowUnsupportedSubmitFlowStepErrorResponse     SubmitFlowStepErrorResponseType = "flow.unsupported"
 	InternalSubmitFlowStepErrorResponse            SubmitFlowStepErrorResponseType = "internal"
 	TknInvalidSubmitFlowStepErrorResponse          SubmitFlowStepErrorResponseType = "tkn.invalid"
@@ -58737,6 +58739,11 @@ func (s SubmitFlowStepErrorResponse) IsFlowInvalidAction() bool {
 // IsFlowNotFound reports whether SubmitFlowStepErrorResponse is FlowNotFound.
 func (s SubmitFlowStepErrorResponse) IsFlowNotFound() bool {
 	return s.Type == FlowNotFoundSubmitFlowStepErrorResponse
+}
+
+// IsFlowRestartRequired reports whether SubmitFlowStepErrorResponse is FlowRestartRequired.
+func (s SubmitFlowStepErrorResponse) IsFlowRestartRequired() bool {
+	return s.Type == FlowRestartRequiredSubmitFlowStepErrorResponse
 }
 
 // IsFlowUnsupported reports whether SubmitFlowStepErrorResponse is FlowUnsupported.
@@ -59122,6 +59129,27 @@ func (s SubmitFlowStepErrorResponse) GetFlowNotFound() (v FlowNotFound, ok bool)
 func NewFlowNotFoundSubmitFlowStepErrorResponse(v FlowNotFound) SubmitFlowStepErrorResponse {
 	var s SubmitFlowStepErrorResponse
 	s.SetFlowNotFound(v)
+	return s
+}
+
+// SetFlowRestartRequired sets SubmitFlowStepErrorResponse to FlowRestartRequired.
+func (s *SubmitFlowStepErrorResponse) SetFlowRestartRequired(v FlowRestartRequired) {
+	s.Type = FlowRestartRequiredSubmitFlowStepErrorResponse
+	s.FlowRestartRequired = v
+}
+
+// GetFlowRestartRequired returns FlowRestartRequired and true boolean if SubmitFlowStepErrorResponse is FlowRestartRequired.
+func (s SubmitFlowStepErrorResponse) GetFlowRestartRequired() (v FlowRestartRequired, ok bool) {
+	if !s.IsFlowRestartRequired() {
+		return v, false
+	}
+	return s.FlowRestartRequired, true
+}
+
+// NewFlowRestartRequiredSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from FlowRestartRequired.
+func NewFlowRestartRequiredSubmitFlowStepErrorResponse(v FlowRestartRequired) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetFlowRestartRequired(v)
 	return s
 }
 

@@ -91746,6 +91746,22 @@ func (s SubmitFlowStepErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case FlowRestartRequiredSubmitFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("flow.restart_required")
+		{
+			s := s.FlowRestartRequired
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case FlowUnsupportedSubmitFlowStepErrorResponse:
 		e.FieldStart("code")
 		e.Str("flow.unsupported")
@@ -91980,6 +91996,9 @@ func (s *SubmitFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 				case "flow.not_found":
 					s.Type = FlowNotFoundSubmitFlowStepErrorResponse
 					found = true
+				case "flow.restart_required":
+					s.Type = FlowRestartRequiredSubmitFlowStepErrorResponse
+					found = true
 				case "flow.unsupported":
 					s.Type = FlowUnsupportedSubmitFlowStepErrorResponse
 					found = true
@@ -92086,6 +92105,10 @@ func (s *SubmitFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case FlowNotFoundSubmitFlowStepErrorResponse:
 		if err := s.FlowNotFound.Decode(d); err != nil {
+			return err
+		}
+	case FlowRestartRequiredSubmitFlowStepErrorResponse:
+		if err := s.FlowRestartRequired.Decode(d); err != nil {
 			return err
 		}
 	case FlowUnsupportedSubmitFlowStepErrorResponse:
