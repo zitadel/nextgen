@@ -23,6 +23,7 @@ jq -r '
   "- partition (\(.partition.mode)): cpuset partition root over `\(.partition.bench_cpus)`, runner and everything else on `\(.partition.roles.system.cpus)`",
   (.partition.roles | to_entries[] | select(.value.active and (.value.cgroup != "")) |
      "- `\(.key)`: cpus `\(.value.cpus)` (\(.value.cores) cores), memory.max \(.value.memory_max_bytes / 1048576 | floor) MiB"),
+  "- cores: \(.partition.core_isolation)",
   "- not partitioned: \(.not_partitioned | join("; "))",
   "- data disk: \(.database.disk.kind) (\(.database.disk.fstype), \(.database.disk.model))",
   "- boot marker: `\(.boot_marker.digest)`",

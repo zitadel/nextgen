@@ -6,6 +6,8 @@
 # Called by the commands in bin/, not by the tests that source these libraries.
 bench_on_error() {
   local rc=$?
+  # A deliberate non-zero return is not an unexpected failure.
+  [[ $BASH_COMMAND == return* ]] && return 0
   printf 'bench: unexpected failure (exit %s) at %s:%s: %s\n' "$rc" "${BASH_SOURCE[1]:-?}" "${BASH_LINENO[0]:-?}" "$BASH_COMMAND" >&2
 }
 bench_trap_errors() {

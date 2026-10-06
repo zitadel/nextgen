@@ -118,6 +118,8 @@ part_plan_json() {
     '{schema: "bench-partition/v1", lane: $lane, mode: $mode, backend: "cgroupfs", cgroup_root: $root,
       allowed_cpus: $allowed, bench_cpus: $bench, threads_per_core: $tpc, roles: $roles, unassigned_cpus: $un,
       # Named in every run record: the partition cannot hold these apart.
+      core_isolation: (if $tpc > 1 then "sibling threads are exposed and never split between roles"
+                       else "the guest sees one thread per core: whether its vCPUs share a physical core on the host is not visible, so whole physical cores cannot be verified" end),
       not_partitioned: ["last-level cache", "memory bandwidth and memory controller queues", "interrupt handling",
                         "power and thermal headroom shared by the cores",
                         "whatever runs on the host beneath a virtual machine, or on a shared node"]}'
