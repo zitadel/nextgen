@@ -115,6 +115,13 @@ type testServer struct {
 // a test that asserts the http loopback shape passes it as middleware.
 func newTestServer(t *testing.T, middleware ...func(http.Handler) http.Handler) *testServer {
 	t.Helper()
+	return newTestServerSealing(t, nil, middleware...)
+}
+
+// newTestServerSealing lets a test make sealing a new cookie fail with
+// sealErr while opening the presented one still works.
+func newTestServerSealing(t *testing.T, sealErr error, middleware ...func(http.Handler) http.Handler) *testServer {
+	t.Helper()
 
 	crypter := op.NewAES256GCMCrypto(fixedKey, "")
 
@@ -122,7 +129,11 @@ func newTestServer(t *testing.T, middleware ...func(http.Handler) http.Handler) 
 	tokenService := mocks.NewMockTokenService(mock)
 	keyService := mocks.NewMockKeyService(mock)
 	keyService.EXPECT().GetCrypter(gomock.Any(), gomock.Any(), gomock.Any()).Return(crypter, nil).AnyTimes()
-	keyService.EXPECT().GetProjectCrypter(gomock.Any(), gomock.Any(), gomock.Any()).Return(crypter, nil).AnyTimes()
+	if sealErr != nil {
+		keyService.EXPECT().GetProjectCrypter(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, sealErr).AnyTimes()
+	} else {
+		keyService.EXPECT().GetProjectCrypter(gomock.Any(), gomock.Any(), gomock.Any()).Return(crypter, nil).AnyTimes()
+	}
 
 	fake := &fakeFlowSvc{}
 	// The release service is a mock rather than nil so a test that reaches a
@@ -590,5 +601,140 @@ func TestGetFlowStep_TerminalReturns410(t *testing.T) {
 	resp, _ := doRequest(t, http.MethodGet, ts.srv.URL+"/flow/flow_1", nil, cookieVal)
 	if resp.StatusCode != http.StatusGone {
 		t.Fatalf("status = %d, want 410", resp.StatusCode)
+	}
+}
+
+// A reload racing a submit must not roll the cookie back to the step before
+// the submit.
+func TestGetFlowStep_PlainRenderLeavesCookie(t *testing.T) {
+	ts := newTestServer(t)
+	state := &domain.FlowState{ID: "flow_1", ProjectID: "proj_1", IssuedAt: time.Now()}
+	cookieVal := ts.sealCookie(t, state)
+	ts.fake.getResult = domain.FlowStepResult{State: state, Step: &domain.FlowStep{Name: "identify"}}
+
+	resp, body := doRequest(t, http.MethodGet, ts.srv.URL+"/flow/flow_1", nil, cookieVal)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", resp.StatusCode, body)
+	}
+	if got := resp.Header.Values("Set-Cookie"); len(got) != 0 {
+		t.Errorf("expected no Set-Cookie, got %q", got)
+	}
+}
+
+func TestGetFlowStep_SSOResolvedRenderResealsCookie(t *testing.T) {
+	ts := newTestServer(t)
+	state := &domain.FlowState{ID: "flow_1", ProjectID: "proj_1", IssuedAt: time.Now()}
+	cookieVal := ts.sealCookie(t, state)
+	ts.fake.getResult = domain.FlowStepResult{State: state, Step: &domain.FlowStep{Name: "identify"}, SSOResolved: true}
+
+	resp, body := doRequest(t, http.MethodGet, ts.srv.URL+"/flow/flow_1", nil, cookieVal)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", resp.StatusCode, body)
+	}
+	got := resp.Header.Get("Set-Cookie")
+	if !strings.Contains(got, "_zflow=") || strings.Contains(got, "Max-Age=0") {
+		t.Errorf("expected a re-sealed _zflow cookie, got %q", got)
+	}
+}
+
+// A render that resolved a parked SSO identity into a sign-in lands on the
+// terminal step with a handoff token: that is a 200 with the terminal cookie,
+// not the 410 a flow completed before this request gets.
+func TestGetFlowStep_ResolvedHandoffReturns200WithTerminalCookie(t *testing.T) {
+	ts := newTestServer(t)
+	state := &domain.FlowState{ID: "flow_1", ProjectID: "proj_1", IssuedAt: time.Now()}
+	cookieVal := ts.sealCookie(t, state)
+
+	complete := domain.FlowStepCompleteShow
+	ts.fake.getResult = domain.FlowStepResult{
+		State:                 state,
+		Step:                  &domain.FlowStep{Name: "done", Complete: &complete},
+		HandoffToken:          "ht_abc",
+		HandoffTokenExpiresAt: time.Now().Add(time.Minute),
+	}
+
+	resp, body := doRequest(t, http.MethodGet, ts.srv.URL+"/flow/flow_1", nil, cookieVal)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", resp.StatusCode, body)
+	}
+	if got := resp.Header.Get("Set-Cookie"); !strings.Contains(got, "Max-Age=0") {
+		t.Errorf("expected the terminal cookie, got %q", got)
+	}
+	// The handoff token is a single-use credential: never stored.
+	if got := resp.Header.Get("Cache-Control"); got != "private, no-store" {
+		t.Errorf("Cache-Control = %q, want private, no-store", got)
+	}
+	var fr gen.FlowResponse
+	if err := json.Unmarshal(body, &fr); err != nil {
+		t.Fatalf("unmarshal: %v (body=%s)", err, body)
+	}
+	if got, ok := fr.HandoffToken.Get(); !ok || got != "ht_abc" {
+		t.Errorf("handoff_token = %v (set=%t), want ht_abc", got, ok)
+	}
+}
+
+// The handoff is already committed and single use, and the terminal cookie
+// only clears: a failing seal must not cost the client its handoff token.
+func TestGetFlowStep_ResolvedHandoffSurvivesSealFailure(t *testing.T) {
+	ts := newTestServerSealing(t, domain.ErrInternal(errors.New("key service down")))
+	state := &domain.FlowState{ID: "flow_1", ProjectID: "proj_1", IssuedAt: time.Now()}
+	cookieVal := ts.sealCookie(t, state)
+
+	complete := domain.FlowStepCompleteShow
+	ts.fake.getResult = domain.FlowStepResult{
+		State:                 state,
+		Step:                  &domain.FlowStep{Name: "done", Complete: &complete},
+		HandoffToken:          "ht_abc",
+		HandoffTokenExpiresAt: time.Now().Add(time.Minute),
+	}
+
+	resp, body := doRequest(t, http.MethodGet, ts.srv.URL+"/flow/flow_1", nil, cookieVal)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", resp.StatusCode, body)
+	}
+	if got := resp.Header.Get("Set-Cookie"); !strings.Contains(got, "Max-Age=0") {
+		t.Errorf("expected the terminal cookie, got %q", got)
+	}
+	var fr gen.FlowResponse
+	if err := json.Unmarshal(body, &fr); err != nil {
+		t.Fatalf("unmarshal: %v (body=%s)", err, body)
+	}
+	if got, ok := fr.HandoffToken.Get(); !ok || got != "ht_abc" {
+		t.Errorf("handoff_token = %v (set=%t), want ht_abc", got, ok)
+	}
+}
+
+func TestGetFlowStep_RestartRequiredReturns409(t *testing.T) {
+	ts := newTestServer(t)
+	state := &domain.FlowState{ID: "flow_1", ProjectID: "proj_1", IssuedAt: time.Now()}
+	cookieVal := ts.sealCookie(t, state)
+	ts.fake.getErr = domain.ErrFlowRestartRequired()
+
+	resp, body := doRequest(t, http.MethodGet, ts.srv.URL+"/flow/flow_1", nil, cookieVal)
+	if resp.StatusCode != http.StatusConflict {
+		t.Fatalf("status = %d, want 409 (body = %s)", resp.StatusCode, body)
+	}
+	if !strings.Contains(string(body), "flow.restart_required") {
+		t.Errorf("expected the restart code, got %s", body)
+	}
+}
+
+// A submit on an attempt another request already handed off is a conflict,
+// as on the attempt endpoints, not an internal error.
+func TestSubmitFlowStep_HandedOffAttemptReturns409(t *testing.T) {
+	ts := newTestServer(t)
+	state := &domain.FlowState{ID: "flow_1", ProjectID: "proj_1", SessionID: "sess_1", IssuedAt: time.Now()}
+	cookieVal := ts.sealCookie(t, state)
+	ts.fake.submitErr = domain.ErrAuthAttemptAlreadyHandedOff()
+
+	resp, body := doRequest(t, http.MethodPost, ts.srv.URL+"/flow/flow_1/submit", map[string]any{
+		"action": "submit",
+		"fields": map[string]any{"identifier": "alice@example.com"},
+	}, cookieVal)
+	if resp.StatusCode != http.StatusConflict {
+		t.Fatalf("status = %d, want 409 (body = %s)", resp.StatusCode, body)
+	}
+	if !strings.Contains(string(body), "att.already_handed_off") {
+		t.Errorf("expected the handed-off code, got %s", body)
 	}
 }

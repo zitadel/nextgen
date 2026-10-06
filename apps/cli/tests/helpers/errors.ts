@@ -19,6 +19,7 @@ export const EXIT_CODE_FOR = {
   E_NOT_FOUND: 4,
   E_CONFLICT: 5,
   E_PORT_IN_USE: 5,
+  E_CANCELLED: 130,
 } as const;
 
 export type ErrorCode = keyof typeof EXIT_CODE_FOR;

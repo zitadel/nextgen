@@ -16,10 +16,11 @@ export default defineConfig({
   },
   outDir: "dist",
   format: ["esm"],
+  failOnWarn: true,
   tsconfig: "tsconfig.lib.json",
   dts: true,
   sourcemap: true,
   clean: true,
   target: "es2022",
-  external: ["@zitadel/api"],
+  deps: { neverBundle: ["@zitadel/api"] },
 });

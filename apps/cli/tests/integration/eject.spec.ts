@@ -36,6 +36,17 @@ describe("eject", () => {
         expect(result).toSucceed();
       });
     });
+
+    describe("that refuses connections", () => {
+      it("still succeeds", async () => {
+        const app = await aPatchedApp();
+        platform.refusesConnections();
+
+        const result = await app.run(["eject", "--force", "--json"]);
+
+        expect(result).toSucceed();
+      });
+    });
   });
 
   describe("against a valid server", () => {

@@ -19,10 +19,11 @@ var (
 
 // Connection is the engine's view of a pinned connection revision: the body
 // decoded, defaults applied, and the rules an attempt relies on re-checked.
-// Provisioning is read by identity resolution and is not part of this view
-// yet.
 type Connection struct {
 	RevisionID string
+	// CreationDisabled is provisioning.creation == "disabled": a subject with
+	// no account is not created. The default, "auto", leaves it false.
+	CreationDisabled bool
 	// SubjectClaim names the claim carrying the provider's stable subject.
 	// Defaults to sub for OIDC.
 	SubjectClaim string
@@ -70,7 +71,10 @@ type connectionBody struct {
 	SubjectClaim   string            `json:"subject_claim"`
 	ClaimMapping   map[string]string `json:"claim_mapping"`
 	VerifiedClaims map[string]any    `json:"verified_claims"`
-	OIDC           *oidcBody         `json:"oidc"`
+	Provisioning   struct {
+		Creation string `json:"creation"`
+	} `json:"provisioning"`
+	OIDC *oidcBody `json:"oidc"`
 }
 
 type oidcBody struct {
@@ -118,10 +122,11 @@ func ParseConnection(revisionID string, body []byte) (Connection, error) {
 	}
 
 	conn := Connection{
-		RevisionID:     revisionID,
-		SubjectClaim:   stored.SubjectClaim,
-		ClaimMapping:   stored.ClaimMapping,
-		VerifiedClaims: parseVerifiedClaims(stored.VerifiedClaims),
+		RevisionID:       revisionID,
+		CreationDisabled: stored.Provisioning.Creation == "disabled",
+		SubjectClaim:     stored.SubjectClaim,
+		ClaimMapping:     stored.ClaimMapping,
+		VerifiedClaims:   parseVerifiedClaims(stored.VerifiedClaims),
 		OIDC: OIDCConnection{
 			Issuer:                    oidc.Issuer,
 			ClientID:                  oidc.ClientID,
