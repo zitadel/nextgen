@@ -395,8 +395,10 @@ const LEGACY_OUTCOMES: ReadonlyArray<readonly [string, string]> = [
  * rejects the old keys, so leaving them would make `sso enable` write an
  * invalid flow. Where a step already has the new key, that one wins. A key
  * that is also one of the step's action names is the action's transition and
- * stays. A legacy key with `purpose` or `action` is refused: the new keys may
- * declare neither, and dropping them would change the author's routing.
+ * stays. A new key that is an action name is refused: the old route would be
+ * dropped for the action's. A legacy key with `purpose` or `action` is
+ * refused: the new keys may declare neither, and dropping them would change
+ * the author's routing.
  */
 function migrateLegacyOutcomes(document: Json): boolean {
   let changed = false;
@@ -410,6 +412,16 @@ function migrateLegacyOutcomes(document: Json): boolean {
     for (const [old, next] of LEGACY_OUTCOMES) {
       if (!(old in transitions) || actionNames.has(old)) {
         continue;
+      }
+      if (actionNames.has(next)) {
+        throw new ZitadelError(
+          "E_VALIDATION",
+          `steps.${String(step.name)}: transition "${old}" is renamed to "${next}", which is an action on this step`,
+          {
+            hint: `Rename the action "${next}" on step "${String(step.name)}" (and its transition), then run sso enable again.`,
+            details: { step: step.name, action: next },
+          },
+        );
       }
       if (!(next in transitions)) {
         const transition = transitions[old];

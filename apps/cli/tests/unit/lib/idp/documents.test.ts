@@ -331,6 +331,35 @@ describe("applySsoToFlow", () => {
   });
 
   it.each([
+    ["callback", "sso_authenticated"],
+    ["identity_unknown", "sso_user_not_found"],
+  ])("refuses to migrate %s onto an action named %s on a step sso enable does not write", (old, next) => {
+    // The collision check covers only the steps sso enable writes. Elsewhere
+    // the rename would drop the legacy key and leave the outcome on the action's route.
+    const legacy = previousCliFlow();
+    legacy.steps.push({
+      name: "custom",
+      fields: ["email"],
+      actions: [{ name: next, kind: "submit" }],
+      transitions: { [old]: { target: "done" }, [next]: { target: "register" } },
+    });
+    const before = structuredClone(legacy);
+
+    let caught: unknown;
+    try {
+      applySsoToFlow(legacy, "github", bothMethods);
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(ZitadelError);
+    expect((caught as ZitadelError).code).toBe("E_VALIDATION");
+    expect((caught as ZitadelError).message).toContain("custom");
+    expect((caught as ZitadelError).message).toContain(next);
+    expect(legacy).toEqual(before);
+  });
+
+  it.each([
     ["purpose", { purpose: "register" }],
     ["action", { action: "switch" }],
   ])("refuses to migrate a legacy outcome that declares %s", (_, extra) => {
