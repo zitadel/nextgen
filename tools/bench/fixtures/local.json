@@ -1,0 +1,12 @@
+{
+  "$comment": "What `k6 x nextgen bootstrap` provisions on the local lane's server. Nothing here is a secret: the password only ever guards a user on a throwaway local database.",
+  "project": {
+    "name": "bench-local",
+    "preview_origins": ["http://localhost:3000"],
+    "seed_defaults": true
+  },
+  "user": {
+    "email": "bench@bench.local",
+    "password": "Bench-1095-Pass!"
+  }
+}
