@@ -43,6 +43,68 @@ func attrString(t *testing.T, r slog.Record, key string) (string, bool) {
 	return value, found
 }
 
+// The IdP callback's code is a credential and its state is single-use: a log
+// line carrying either could replay a sign-in, so both are redacted wherever
+// they appear.
+func TestWithLogging_redactsCodeAndStateQueryValues(t *testing.T) {
+	var handler recordHandler
+	logger := slog.New(&handler)
+	ctx := zlog.WithLoggingContext(context.Background(), logger)
+
+	mw := middleware.WithLogging(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/__nextgen/idp/callback?code=the-code&state=proj-1.the-state&error=x", nil).WithContext(ctx)
+	rec := httptest.NewRecorder()
+	mw.ServeHTTP(rec, req)
+
+	var handling *slog.Record
+	for i := range handler.records {
+		if handler.records[i].Message == "handling request" {
+			handling = &handler.records[i]
+			break
+		}
+	}
+	require.NotNil(t, handling)
+	for _, key := range []string{"url", "uri"} {
+		value, ok := attrString(t, *handling, key)
+		require.True(t, ok)
+		assert.NotContains(t, value, "the-code", key)
+		assert.NotContains(t, value, "the-state", key)
+		assert.Contains(t, value, "code=redacted", key)
+		assert.Contains(t, value, "state=redacted", key)
+		assert.Contains(t, value, "error=x", key, "params that carry no secret stay readable")
+	}
+}
+
+// A URL without the secret-carrying params is logged as received.
+func TestWithLogging_logsPlainURLsUnchanged(t *testing.T) {
+	var handler recordHandler
+	logger := slog.New(&handler)
+	ctx := zlog.WithLoggingContext(context.Background(), logger)
+
+	mw := middleware.WithLogging(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/users?limit=10", nil).WithContext(ctx)
+	rec := httptest.NewRecorder()
+	mw.ServeHTTP(rec, req)
+
+	var handling *slog.Record
+	for i := range handler.records {
+		if handler.records[i].Message == "handling request" {
+			handling = &handler.records[i]
+			break
+		}
+	}
+	require.NotNil(t, handling)
+	uri, ok := attrString(t, *handling, "uri")
+	require.True(t, ok)
+	assert.Equal(t, "/users?limit=10", uri)
+}
+
 func TestWithLogging_clientErrorLogsWarnWithoutBody(t *testing.T) {
 	var handler recordHandler
 	logger := slog.New(&handler)

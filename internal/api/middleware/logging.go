@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
@@ -29,10 +30,14 @@ func WithLogging(next http.Handler) http.Handler {
 		r = r.WithContext(ctx)
 
 		logger = getLoggingContext(ctx)
+		urlValue, uriValue := r.URL.String(), r.RequestURI
+		if redacted, ok := redactedQueryURL(r.URL); ok {
+			urlValue, uriValue = redacted, redacted
+		}
 		logger.Info("handling request",
 			slog.String("method", r.Method),
-			slog.String("url", r.URL.String()),
-			slog.String("uri", r.RequestURI),
+			slog.String("url", urlValue),
+			slog.String("uri", uriValue),
 		)
 
 		start := time.Now()
@@ -98,6 +103,28 @@ func extractWireErrorCode(body []byte) string {
 		return ""
 	}
 	return envelope.Code
+}
+
+// redactedQueryURL hides the values of the query parameters that carry
+// secrets: the IdP callback's code is a credential and its state is
+// single-use, so a request log line must not be able to replay a sign-in.
+// It reports false when the URL carries neither, and the caller logs the
+// request line as received.
+func redactedQueryURL(u *url.URL) (string, bool) {
+	query := u.Query()
+	redacted := false
+	for _, name := range []string{"code", "state"} {
+		if _, ok := query[name]; ok {
+			query.Set(name, "redacted")
+			redacted = true
+		}
+	}
+	if !redacted {
+		return "", false
+	}
+	clone := *u
+	clone.RawQuery = query.Encode()
+	return clone.String(), true
 }
 
 // ---------------------- LOGGING RESPONSE WRITER -----------------------------

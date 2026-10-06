@@ -7,10 +7,11 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
-// idpCallbackPath is the route the provider sends the browser back to,
+// IDPCallbackPath is the route the provider sends the browser back to,
 // under the request origin. The `/__nextgen` prefix is the client-side proxy
-// prefix a scaffolded app strips before forwarding.
-const idpCallbackPath = "/__nextgen/idp/callback"
+// prefix a scaffolded app strips before forwarding. Exported for the mux,
+// which mounts [IDPCallbackHandler] on it ahead of the API catch-all.
+const IDPCallbackPath = "/__nextgen/idp/callback"
 
 // ssoBindingCookieName is the browser-binding cookie's name. The `__Host-`
 // prefix requires Secure, so an http loopback host, where Secure is dropped
