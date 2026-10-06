@@ -381,6 +381,14 @@ type AuthAttemptStatements interface {
 	// parked result it read. It returns ErrSSOStateInvalid when no row matched:
 	// a concurrent request settled it, or a new ceremony replaced it.
 	DeleteSSOCallback(ctx context.Context, projectID, authAttemptID, checkID string) error
+	// MarkSSOCallbackCollision replaces the parked result on the attempt's
+	// sso_callback row with the given check id by the collision marker alone
+	// (collision_user_id = userID): the provider's subject and claims are gone.
+	// The write holds the row until the transaction ends.
+	// A collision bind takes it in place of the delete, so the row stays for a
+	// retry and a later render can tell the collision from an unrelated user
+	// factor. It returns ErrSSOStateInvalid when no row matched.
+	MarkSSOCallbackCollision(ctx context.Context, projectID, authAttemptID, checkID, userID string) error
 }
 
 // UserQueryOptions carries EAV match/hydrate options for GetUser / ListUsers.
@@ -395,6 +403,10 @@ type UserQueryOptions struct {
 	// equal value in a non-unique property of another user (for example a
 	// notification address) cannot make the lookup ambiguous.
 	UniqueAttributesOnly bool
+	// UniqueTeamID, with UniqueAttributesOnly, restricts the registry match
+	// to rows of one team scope; "" means project-scoped rows only. Nil
+	// matches rows of every scope.
+	UniqueTeamID *string
 	// MembershipTeamID, when set, requires an active team membership.
 	MembershipTeamID *string
 	// IncludeTeams hydrates each user's team memberships (ADR 059). The list is loaded
