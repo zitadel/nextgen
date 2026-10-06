@@ -1,8 +1,9 @@
-import { createZitadelClient } from "@zitadel/api/client";
 import type { VerifyChallengeProofBody } from "@zitadel/api/generated/model";
-import { ApiError } from "@zitadel/api/runtime/fetch";
+import { ApiError, request } from "@zitadel/api/runtime/fetch";
 
+import { createZitadelClient } from "../api-client";
 import { ZitadelError } from "../errors";
+import { interruptSignal } from "../interrupt";
 import { isObject } from "../json";
 import type { LocalAdmin } from "./admin-credential";
 import { PLATFORM_PROJECT_ID, readPlatformRuntime } from "./runtime";
@@ -52,9 +53,10 @@ export async function consoleSignInUrl(serverUrl: string, admin: LocalAdmin): Pr
 export async function adminSessionCookie(serverUrl: string, admin: LocalAdmin): Promise<string> {
   const { handoffToken, publishableKey } = await signIn(serverUrl, admin);
 
-  // The one call made with fetch directly: the session comes back only as a
-  // Set-Cookie header, which the generated client does not expose.
-  const res = await fetch(
+  // The one call made without the generated client: the session comes back
+  // only as a Set-Cookie header, which that client does not expose. `request`
+  // still types its failures and honours Ctrl-C the way the client does.
+  const { res } = await request(
     `${serverUrl}/sessions/exchange?project_id=${encodeURIComponent(PLATFORM_PROJECT_ID)}`,
     {
       ...localAdminRequest(serverUrl, {
@@ -64,6 +66,7 @@ export async function adminSessionCookie(serverUrl: string, admin: LocalAdmin): 
       method: "POST",
       body: JSON.stringify({ handoff_token: handoffToken }),
     },
+    { signal: interruptSignal() },
   );
   const cookie = res.headers
     .getSetCookie()
