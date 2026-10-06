@@ -138,7 +138,11 @@ export default class Setup extends BaseCommand {
     "<%= config.bin %> setup --framework react --dev-port 3000",
   ];
   static override flags = {
-    force: Flags.boolean({ char: "f", description: "Overwrite managed files that already exist." }),
+    force: Flags.boolean({
+      char: "f",
+      description:
+        "Overwrite managed files that already exist, and scaffold into a non-empty directory.",
+    }),
     framework: Flags.string({ description: "Framework to target.", options: FRAMEWORK_OPTIONS }),
     renderer: Flags.string({
       description: RENDERER_FLAG_DESCRIPTION,
@@ -219,13 +223,18 @@ export default class Setup extends BaseCommand {
         error.code === "E_FRAMEWORK_NOT_DETECTED"
       ) {
         const target = await inspectScaffoldTarget(cwd);
-        if (!target.scaffoldable) {
+        if (!target.scaffoldable && !force) {
           throw frameworkDetectionWithScaffoldTarget(error, cwd, target);
         }
-        consola.info("Fresh app directory — scaffolding a fresh project");
+        consola.info(
+          target.scaffoldable
+            ? "Fresh app directory — scaffolding a fresh project"
+            : "Non-empty directory with --force — scaffolding a fresh project",
+        );
         framework = await orca.scaffold(
           cwd,
           await resolveScaffoldFramework(flags.framework, nonInteractive, orca),
+          force,
         );
         scaffoldedFramework = true;
         consola.success(`Scaffolded ${framework.id} skeleton`);
@@ -755,11 +764,11 @@ function frameworkDetectionWithScaffoldTarget(
 ): ZitadelError {
   return new ZitadelError(
     error.code,
-    "Could not detect a supported app framework, and this directory is not a fresh scaffold target",
+    "Could not detect a supported app framework, and this directory is not empty",
     {
       hint:
         `${target.reason ?? "Directory is not empty."} ` +
-        "Run setup from an empty directory to scaffold a new app, or run setup from an existing supported app project.",
+        "Pass --force to scaffold into this non-empty directory, run setup from an empty directory, or run setup from an existing supported app project.",
       details: { cwd, entries: target.entries, reason: target.reason },
     },
   );

@@ -12,6 +12,9 @@ for the typed `@zitadel/api` Flow API. Consumers:
   through `msw-storybook-addon`.
 - `packages/components/src/orchestrator/zitadel-login.spec.ts` — feeds
   the handlers into `msw/node`'s `setupServer`.
+- The widget SDKs (`packages/sdk-{angular,qwik,react,solid,svelte,vue}`) —
+  their `test-setup.ts` calls `serveMockFlowApi()` from the test-only
+  `./vitest` (`msw/node`) or `./vitest-browser` (`msw/browser`) entry point.
 - `apps/demo-next/` and `apps/demo-nuxt/` — hit the standalone TCP server
   started by `pnpm --filter @zitadel/api-mock start` (not an
   in-browser worker).
@@ -155,8 +158,8 @@ handlers.
 - Don't introduce shadow types for step / field / branding shapes. Use
   orval's `CreateFlow201*` aliases directly.
 - Don't depend on `msw/browser` from anything other than the
-  `setupMock(worker)` entry point — the same handlers must work in
-  node.
+  `setupMock(worker)` entry point and the test-only `./vitest-browser`
+  harness — the same handlers must work in node.
 - Don't ship a build artifact. Consumers import source via the workspace
   export map; the Moon build task is intentionally a no-op.
 - Don't invent a step shape to make a test or a design convenient. The flow

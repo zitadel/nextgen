@@ -1,0 +1,17 @@
+{
+  "name": "@zitadel/cli-skill-e2e",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Agent eval for the zitadel-cli Agent Skill: runs Claude headless against the real CLI across a stateful journey and reports how sanely it answers common questions. Manual, not CI.",
+  "scripts": {
+    "test": "vitest run",
+    "eval": "FRESH=1 vitest run",
+    "report": "node scripts/report.mjs"
+  },
+  "devDependencies": {
+    "marked": "catalog:",
+    "sanitize-html": "catalog:",
+    "vitest": "catalog:"
+  }
+}

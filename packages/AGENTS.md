@@ -42,6 +42,16 @@ change needs a changeset, and the whole train versions together.
   proxy. Production SPA deployment guidance is tracked in
   [issue #560](https://github.com/zitadel/nextgen/issues/560) — READMEs link
   this section instead of restating the caveat twelve times.
+- **Agent Skill per SDK**: every framework SDK (not `sdk-core`) ships an Agent
+  Skill at `<pkg>/skills/<name>/SKILL.md`, and `@zitadel/components` ships one
+  too; the top-level `skills/zitadel` skill routes to them. Adding a framework
+  SDK means adding its skill, and all of them stay in harmony — same sections
+  and structure. They are **discover-first**: a skill teaches the integration
+  *pattern* and points at the package's own README and TypeScript types for the
+  exact props, exports, and APIs — it never enumerates them. So adding or
+  removing a property means updating the README/types, **not** the skill (the
+  skill reads them at runtime and cannot drift); edit a skill only when the
+  integration pattern itself changes.
 
 ## `packages/api`
 
