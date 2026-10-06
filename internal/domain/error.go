@@ -150,6 +150,8 @@ var serverFaultCodes = map[string]bool{
 	ErrIDPExchangeFailed(nil).Code:           true,
 	ErrIDPUserinfoFailed(nil).Code:           true,
 	ErrIDPSupplementaryFetchFailed(nil).Code: true,
+	ErrIDPIDTokenInvalid(nil).Code:           true,
+	ErrIDPSubjectInvalid(nil).Code:           true,
 }
 
 // IsServerFault reports whether err means the server failed rather than the
