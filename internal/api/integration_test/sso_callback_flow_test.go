@@ -280,6 +280,27 @@ func TestSSOCallbackWithoutTheBindingCookieLeavesTheStateUsable(t *testing.T) {
 	assert.Equal(t, http.StatusSeeOther, withCookie.StatusCode)
 }
 
+// A second submission replaces the record, so the first submission's callback
+// fails like a reused state while the second one finishes the sign-in.
+func TestSSOCallbackForAReplacedStateFailsLikeAReusedOne(t *testing.T) {
+	f := newSSOCallbackFixture(t)
+	userID := f.createUser(t, defaultSchemaURL())
+	f.link(t, f.connection.ID, "sub-1", userID)
+	flow := f.startFlow(t, "")
+	first, firstCookie := f.submitSSO(t, flow)
+	second, secondCookie := f.submitSSO(t, flow)
+
+	stale := f.callback(t, iapi.IDPCallbackPath,
+		"state="+url.QueryEscape(first.Query().Get("state"))+"&code=the-code", firstCookie)
+	assert.Equal(t, http.StatusBadRequest, stale.StatusCode)
+	assert.Equal(t, 0, f.provider.tokenCalls)
+
+	resp := f.callback(t, iapi.IDPCallbackPath,
+		"state="+url.QueryEscape(second.Query().Get("state"))+"&code=the-code", secondCookie)
+	assert.Equal(t, http.StatusSeeOther, resp.StatusCode)
+	requireAuthenticated(t, f.getStep(t, flow))
+}
+
 // Every failure shape answers the same page: a state of another shape, an
 // unknown state and a replayed one must be indistinguishable, so none of them
 // confirms what exists.
@@ -330,6 +351,13 @@ func TestSSOCallbackLeaksNoSecretIntoResponsesOrLog(t *testing.T) {
 	for name, surface := range map[string]string{"response body": string(body), "response headers": headers} {
 		assert.NotContains(t, surface, ssoTestClientSecret, name)
 	}
+
+	check, parked := f.attempt(t, flow).SSOCallback()
+	require.True(t, parked)
+	stored, err := json.Marshal(check)
+	require.NoError(t, err)
+	assert.NotContains(t, string(stored), ssoTestClientSecret, "the parked payload must not carry the secret")
+	assert.NotContains(t, string(stored), "the-access-token", "provider tokens are not stored")
 
 	logged := harness.ServerLog()
 	// The positive control: the callback request was logged, with its code and
