@@ -6,7 +6,7 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 )
 
-func (h *Harness) EnsureVariableService(t *testing.T) service.VariableService {
+func (h *Harness) EnsureVariableService(t testing.TB) service.VariableService {
 	t.Helper()
 	h.variableService.mutex.Lock()
 	defer h.variableService.mutex.Unlock()
