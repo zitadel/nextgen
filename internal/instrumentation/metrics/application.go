@@ -35,7 +35,7 @@ type Application struct {
 
 	statementDuration  metric.Float64Histogram
 	credentialDuration metric.Float64Histogram
-	hashVerifyDuration   metric.Float64Histogram
+	hashVerifyDuration metric.Float64Histogram
 	keyChainDuration   metric.Float64Histogram
 	auditDuration      metric.Float64Histogram
 	authOutcomes       metric.Int64Counter
