@@ -20,7 +20,7 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "build-vercel": "tsx scripts/generate-wellknown.ts"
+    "generate-wellknown": "tsx scripts/generate-wellknown.ts"
   },
   "dependencies": {
     "@zitadel/api-mock": "workspace:*"

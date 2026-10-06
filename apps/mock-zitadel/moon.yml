@@ -28,12 +28,12 @@ tasks:
     deps:
       - "api:generate"
 
-  # The Vercel build: the bundled function plus the static discovery document,
-  # which needs VERCEL_URL and so only runs there. Kept out of CI; vercel.json
-  # unsets Vercel's CI markers to run it, as the CI workflow does for its own
-  # runInCI: false tasks.
-  build-vercel:
-    command: "corepack pnpm run build-vercel"
+  # The static discovery document the Vercel deploy serves, written after the
+  # function bundle is built. It needs VERCEL_URL and so only runs there. Kept
+  # out of CI; vercel.json unsets Vercel's CI markers to run it, as the CI
+  # workflow does for its own runInCI: false tasks.
+  generate-wellknown:
+    command: "corepack pnpm run generate-wellknown"
     deps:
       - "build"
     options:
