@@ -92,8 +92,8 @@ func (i *FlowSSORedirectIssuer) Issue(ctx context.Context, in domain.FlowIssueSS
 // project's variables (ADR 062). A literal client_id is left as it is. A
 // variable marked secret is refused rather than decrypted: the value goes
 // into a URL the browser sees. The redirect issuer and the callback both
-// resolve through this, so the exchange runs with the client_id the
-// authorize request was built with.
+// resolve through this, so both read the client_id the same way; a variable
+// changed in between fails the exchange, as a changed secret would.
 func resolveSSOClientID(ctx context.Context, variables VariableService, projectID string, conn *idp.Connection) error {
 	name, ok := domain.VariableReferenceName(conn.OIDC.ClientID)
 	if !ok {
