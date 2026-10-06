@@ -74,6 +74,9 @@
       },
       "sso": {
         "description": "Manage the identity providers users can sign in with."
+      },
+      "auth": {
+        "description": "Turn password and passkey sign-in on or off."
       }
     }
   },

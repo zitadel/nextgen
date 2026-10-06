@@ -1,6 +1,8 @@
 import type { Command } from "@oclif/core";
 
 import Apply from "./commands/apply";
+import AuthDisable from "./commands/auth/disable";
+import AuthEnable from "./commands/auth/enable";
 import BrandingEject from "./commands/branding/eject";
 import Claim from "./commands/claim";
 import Console from "./commands/console";
@@ -44,6 +46,8 @@ export const COMMANDS: Record<string, typeof Command> = {
   start: Start,
   status: Status,
   stop: Stop,
+  "auth:enable": AuthEnable,
+  "auth:disable": AuthDisable,
   "branding:eject": BrandingEject,
   "sso:enable": SsoEnable,
   "variables:list": VariablesList,

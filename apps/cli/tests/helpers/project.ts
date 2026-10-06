@@ -256,6 +256,30 @@ export class ScaffoldedApp {
     );
   }
 
+  /** `auth enable`, one `--mode` per method. */
+  enableAuth(modes: string[], extraArgs: string[] = []): Promise<CliResult> {
+    return this.cli([
+      "auth",
+      "enable",
+      "--non-interactive",
+      "--json",
+      ...modeFlags(modes),
+      ...extraArgs,
+    ]);
+  }
+
+  /** `auth disable`, one `--mode` per method. */
+  disableAuth(modes: string[], extraArgs: string[] = []): Promise<CliResult> {
+    return this.cli([
+      "auth",
+      "disable",
+      "--non-interactive",
+      "--json",
+      ...modeFlags(modes),
+      ...extraArgs,
+    ]);
+  }
+
   /** Runs `doctor` against a fake docker on PATH and a port from this worker. */
   async doctor(extraArgs: string[] = []): Promise<CliResult> {
     const docker = await fakeDocker();
@@ -663,6 +687,10 @@ export async function anApp({
     "export default function RootLayout({ children }: { children: React.ReactNode }) { return <html><body>{children}</body></html>; }\n",
   );
   return new ScaffoldedApp(path);
+}
+
+function modeFlags(modes: string[]): string[] {
+  return modes.flatMap((mode) => ["--mode", mode]);
 }
 
 /** An app already through `setup`, for specs about the commands after it. */
