@@ -100,3 +100,11 @@ export function stripAnsi(text: string): string {
 export function expectedPublicCliCommand(args: string): string {
   return publicCliCommand(args, cliVersion.version);
 }
+
+/**
+ * Presses Ctrl-C in the running command. Emitting the signal rather than
+ * sending it keeps the keypress inside this process, where the command runs.
+ */
+export function pressCtrlC(): void {
+  process.emit("SIGINT", "SIGINT");
+}
