@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { join } from "node:path";
 
+// Without VERCEL, waku serves the local build instead of expecting Vercel's.
 const env = { ...process.env };
 delete env.VERCEL;
 

@@ -299,7 +299,7 @@ if (seedOnly) {
       "  point a console dev server at it:",
       "",
       `    CONSOLE_BACKEND_URL=${baseUrl} \\`,
-      "    corepack pnpm --filter @zitadel/console dev",
+      "    moon run console:dev",
       "",
     ].join("\n"),
   );

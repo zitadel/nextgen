@@ -4,16 +4,16 @@ layer: "tool"
 stack: "infrastructure"
 
 tasks:
-  # cli, server, server-debug and check start moon themselves, so moon runs
-  # them with node directly: launched through `pnpm run`, the moon they start
-  # would inherit pnpm's environment and every task under it would warn about
-  # the platform-specific server packages.
   doctor:
     command: "corepack pnpm run doctor"
     options:
       cache: false
       runInCI: false
 
+  # cli, server, server-debug and check start moon themselves, so moon runs
+  # them with node directly: launched through `pnpm run`, the moon they start
+  # would inherit pnpm's environment and every task under it would warn about
+  # the platform-specific server packages.
   cli:
     command: "node scripts/run-cli.mjs"
     options:

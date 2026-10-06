@@ -31,9 +31,9 @@ const targetDir = join(packageRoot, "meta-schemas");
 
 /**
  * Perform the copy. There is no Vitest global setup: this runs ahead of build,
- * typecheck and test through the package's `pre*` lifecycle hooks (which invoke
- * this file's CLI below) and through the moon `sync-schemas` task, which holds
- * the `generated-sources` mutex so it never reads a half-generated source tree.
+ * typecheck and test through the moon `sync-schemas` task (which invokes this
+ * file's CLI below), holding the `generated-sources` mutex so it never reads a
+ * half-generated source tree.
  */
 function syncMetaSchemas() {
   const files = readdirSync(sourceDir).filter((name) => name.endsWith(".json")).sort();
