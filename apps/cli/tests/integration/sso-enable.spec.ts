@@ -188,7 +188,7 @@ describe("sso enable", () => {
           const offering = await app.stepsOfferingSso();
 
           for (const step of offering) {
-            expect(Object.keys(step.transitions ?? {}), step.name).toContain("callback");
+            expect(Object.keys(step.transitions ?? {}), step.name).toContain("sso_authenticated");
           }
         });
 

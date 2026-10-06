@@ -12,6 +12,8 @@
  * rewriting it would discard deliberate work.
  */
 
+import { ZitadelError } from "../errors";
+
 /**
  * Steps a flow starts at, by purpose, plus the steps that collect an
  * identifier. The provider button belongs on all of them: a developer landing
@@ -66,8 +68,8 @@ const SSO_CONFLICT = "sso-conflict";
 /** Outcomes the engine fires after a provider returns, and where they go. */
 function providerOutcomes(terminal: string): Record<string, string> {
   return {
-    callback: terminal,
-    identity_unknown: REGISTER_SSO,
+    sso_authenticated: terminal,
+    sso_user_not_found: REGISTER_SSO,
     user_already_exists: SSO_CONFLICT,
   };
 }
@@ -333,12 +335,12 @@ function ssoConflictStep(
   if (methods.passkey) {
     transitions.passkey = { target: terminal };
   }
-  transitions.callback = { target: terminal };
+  transitions.sso_authenticated = { target: terminal };
   transitions.user_already_exists = { target: SSO_CONFLICT };
   if (loginStep !== undefined) {
     transitions.sign_in = { target: loginStep, purpose: "login" };
   }
-  transitions.identity_unknown = { target: REGISTER_SSO };
+  transitions.sso_user_not_found = { target: REGISTER_SSO };
 
   return { name: SSO_CONFLICT, fields, actions, sso_providers: [slug], transitions };
 }
@@ -395,6 +397,108 @@ function sortKeys(value: unknown): unknown {
   return value;
 }
 
+/** Outcome keys the previous CLI wrote, and the names the engine now raises. */
+const LEGACY_OUTCOMES: ReadonlyArray<readonly [string, string]> = [
+  ["callback", "sso_authenticated"],
+  ["identity_unknown", "sso_user_not_found"],
+];
+
+/**
+ * Rename the previous outcome keys on every step, in place. The validator
+ * rejects the old keys, so leaving them would make `sso enable` write an
+ * invalid flow. Where a step already has the new key, that one wins. A key
+ * that is also one of the step's action names is the action's transition and
+ * stays. A new key that is an action name is refused: the old route would be
+ * dropped for the action's. A legacy key with `purpose` or `action` is
+ * refused: the new keys may declare neither, and dropping them would change
+ * the author's routing.
+ */
+function migrateLegacyOutcomes(document: Json): boolean {
+  let changed = false;
+  for (const step of steps(document)) {
+    if (!isObject(step.transitions)) {
+      continue;
+    }
+    const transitions = step.transitions;
+    const actions = Array.isArray(step.actions) ? step.actions : [];
+    const actionNames = new Set(
+      actions.map((action) => (isObject(action) ? action.name : undefined)),
+    );
+    for (const [old, next] of LEGACY_OUTCOMES) {
+      if (!(old in transitions) || actionNames.has(old)) {
+        continue;
+      }
+      if (actionNames.has(next)) {
+        throw new ZitadelError(
+          "E_VALIDATION",
+          `steps.${String(step.name)}: transition "${old}" is renamed to "${next}", which is an action on this step`,
+          {
+            hint: `Rename the action "${next}" on step "${String(step.name)}" (and its transition), then run sso enable again.`,
+            details: { step: step.name, action: next },
+          },
+        );
+      }
+      if (!(next in transitions)) {
+        const transition = transitions[old];
+        if (
+          isObject(transition) &&
+          ((transition.purpose ?? null) !== null || (transition.action ?? null) !== null)
+        ) {
+          throw new ZitadelError(
+            "E_VALIDATION",
+            `steps.${String(step.name)}: transition "${old}" declares purpose or action, which "${next}" cannot`,
+            {
+              hint: `Remove purpose and action from the transition "${old}" on step "${String(step.name)}", then run sso enable again.`,
+              details: { step: step.name, transition: old },
+            },
+          );
+        }
+        transitions[next] = transition;
+      }
+      delete transitions[old];
+      changed = true;
+    }
+  }
+  return changed;
+}
+
+/**
+ * Refuse a flow where a step this command writes declares an action named like
+ * an outcome key the generator writes on that step. Those names were free
+ * before the rename; the generated route would silently replace the action's.
+ */
+function refuseOutcomeActionCollision(document: Json): void {
+  const outcomes = ["sso_authenticated", "sso_user_not_found", "user_already_exists"];
+  const entries: Array<[string, string[]]> = [
+    ...providerSteps(document).map((name) => [name, outcomes] as [string, string[]]),
+    [SSO_CONFLICT, outcomes],
+    [REGISTER_SSO, ["user_already_exists"]],
+    ["register-password", ["user_already_exists"]],
+  ];
+  // A step can be listed twice (a provider step named `register-password`), so
+  // its keys are the union of every entry, never just the last one.
+  const written = new Map<string, Set<string>>();
+  for (const [name, keys] of entries) {
+    written.set(name, new Set([...(written.get(name) ?? []), ...keys]));
+  }
+  for (const [name, keys] of written) {
+    const step = stepNamed(document, name);
+    const actions = step !== undefined && Array.isArray(step.actions) ? step.actions : [];
+    for (const action of actions) {
+      if (isObject(action) && typeof action.name === "string" && keys.has(action.name)) {
+        throw new ZitadelError(
+          "E_VALIDATION",
+          `steps.${name}: action "${action.name}" uses a name sso enable writes as an outcome on this step`,
+          {
+            hint: `Rename the action "${action.name}" on step "${name}" (and its transition), then run sso enable again.`,
+            details: { step: name, action: action.name },
+          },
+        );
+      }
+    }
+  }
+}
+
 /**
  * Add the provider to a login flow.
  *
@@ -407,11 +511,17 @@ export function applySsoToFlow(
   enabled: { password: boolean; passkey: boolean },
 ): SsoResult<object> {
   const document = clone(flow) as Json;
+  // Before any rewrite, so a refused flow is never half edited.
+  refuseOutcomeActionCollision(document);
   const skipped: SsoSkipped[] = [];
   let changed = false;
   // `ssoEditRefusal` has already refused a flow with no terminal to route to,
   // so the caller never reaches here without one.
   const terminal = terminalStep(document) ?? "done";
+  // First, so a step the previous CLI wrote matches today's template below.
+  if (migrateLegacyOutcomes(document)) {
+    changed = true;
+  }
 
   for (const name of providerSteps(document)) {
     const step = stepNamed(document, name);

@@ -30,7 +30,7 @@ steps:
       submit: { target: authenticate }
       user_not_found: { target: register, action: switch }
       forgot_password: { target: recovery, action: pivot }
-      callback: { target: done }
+      sso_authenticated: { target: done }
 
   - name: authenticate
     fields: [password]

@@ -292,11 +292,15 @@ const FlowImplicitOutcomeUserNotFound = "user_not_found"
 // FlowImplicitOutcomeUserAlreadyExists drives the register → login flip.
 const FlowImplicitOutcomeUserAlreadyExists = "user_already_exists"
 
-// FlowImplicitOutcomeIdentityUnknown drives the login → register flip when
+// FlowImplicitOutcomeSSOUserNotFound drives the login → register flip when
 // SSO resolution finds no user for the provider's subject. Raised only by
-// ceremony resolution, never by a typed identifier, so a shared entry step
-// can route the two apart.
-const FlowImplicitOutcomeIdentityUnknown = "identity_unknown"
+// SSO resolution, never by a typed identifier, so a shared entry step can
+// route the two apart.
+const FlowImplicitOutcomeSSOUserNotFound = "sso_user_not_found"
+
+// FlowImplicitOutcomeSSOAuthenticated is raised when SSO resolution binds the
+// attempt to a user. A step offering sso_providers must route it.
+const FlowImplicitOutcomeSSOAuthenticated = "sso_authenticated"
 
 // implicitOutcomesByChallenge lists the transition outcomes a field
 // contributes by virtue of its [FlowFieldChallenge]. New mappings
