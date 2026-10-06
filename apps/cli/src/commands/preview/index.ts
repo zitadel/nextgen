@@ -14,14 +14,16 @@ import { publicCliCommand } from "../../lib/public-cli";
 import { buildRelease } from "../../lib/release";
 import { connectTarget, resolveTarget } from "../../lib/target";
 
-/** The environments a preview run does its work in; anything else is a no-op. */
+/** The environments a platform build previews in; any other build is a no-op. */
 const PREVIEW_ENVIRONMENTS = new Set(["preview", "development"]);
 
 /**
  * `zitadel preview` — build a release and deploy it to the preview URLs the
  * platform reports for this build, each for a limited time. Runs in every
  * platform build (`zitadel preview && next build`); a production build does
- * nothing and says so, since production is `zitadel deploy` after merge.
+ * nothing and says so, since production is `zitadel deploy` after merge. A
+ * person naming the URL with `--origin` is not a build: `--env` then only
+ * picks the project whose preview pattern must cover it.
  */
 export default class Preview extends BaseCommand {
   static override description =
@@ -47,7 +49,8 @@ export default class Preview extends BaseCommand {
 
     const target = await resolveTarget({ cwd, env, serverFlag, envName, envFile });
     const environment = target.environment.value;
-    if (!PREVIEW_ENVIRONMENTS.has(environment)) {
+    const explicit = normalizeOrigins(flags.origin ?? []);
+    if (explicit.length === 0 && !PREVIEW_ENVIRONMENTS.has(environment)) {
       return this.emit({
         status: "skipped",
         reason: "not-a-preview",
@@ -56,7 +59,6 @@ export default class Preview extends BaseCommand {
       });
     }
 
-    const explicit = normalizeOrigins(flags.origin ?? []);
     const platform = explicit.length > 0 ? undefined : platformPreviewOrigins(env);
     const origins = explicit.length > 0 ? explicit : normalizeOrigins((platform?.origins ?? []).map((o) => o.url));
     if (origins.length === 0) {

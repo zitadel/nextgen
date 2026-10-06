@@ -59,6 +59,39 @@ describe("preview", () => {
     expect(app.envelopeOf(result).status).toBe("skipped");
   });
 
+  it("previews on the project an explicit --env names", async () => {
+    const app = await aSetUpApp();
+    expect(
+      await app.run([
+        "env",
+        "add",
+        "production",
+        "--non-interactive",
+        "--json",
+        "--origin",
+        "https://app.acme.com",
+        "--preview",
+        PATTERN,
+      ]),
+    ).toSucceed();
+
+    const result = await app.run([
+      "preview",
+      "--non-interactive",
+      "--json",
+      "--env",
+      "production",
+      "--origin",
+      BRANCH_URL,
+    ]);
+
+    expect(result).toSucceed();
+    expect(app.envelopeOf<Preview>(result).data.origins).toEqual([BRANCH_URL]);
+    const live = await app.run(["deployments", "--live", "--json", "--env", "production"]);
+    const rows = app.envelopeOf<{ deployments: Array<{ origin: string }> }>(live).data.deployments;
+    expect(rows.map((row) => row.origin)).toContain(BRANCH_URL);
+  });
+
   it("refuses a URL no preview pattern covers", async () => {
     const app = await aSetUpApp();
 
