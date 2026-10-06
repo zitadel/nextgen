@@ -39,7 +39,7 @@ jobs:
       - name: Tear the lane down (always)
         if: ${{ always() }}
         run: |
-          echo "TEARDOWN STEP RAN (cancelled=${{ cancelled() }})"
+          echo "TEARDOWN STEP RAN"
           .github/bench/bin/bench-lane down
           .github/bench/bin/bench-lane assert-clean
           echo "processes left:"; ps -eo pid,user,comm,cgroup | grep -E "nextgen-server|postgres" | grep -v grep || echo none
