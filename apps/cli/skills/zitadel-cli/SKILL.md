@@ -163,8 +163,8 @@ Exit codes mirror the error class (3 = validation, 4 = network or not-found,
 covers a server that answered 5xx and one that never answered — refused,
 unresolvable, or silent past the 30-second request deadline. Ctrl-C exits
 130: a command waiting on the server stops at once with `E_CANCELLED`, and
-any other command exits within a second, possibly without an envelope. An unknown command is handled by the CLI's help
-layer, not the envelope.
+any other command exits within a second, possibly without an envelope. An
+unknown command is handled by the CLI's help layer, not the envelope.
 
 ## Clarify before you configure
 
