@@ -26,6 +26,7 @@ HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 # shellcheck source=../lib/lane.sh
 . "$HERE/lib/lane.sh"
 
+bench_trap_errors
 bench_elevate "$@"
 
 usage() { sed -n '2,/^set -euo/p' "${BASH_SOURCE[0]}" | sed '$d;s/^# \{0,1\}//'; }

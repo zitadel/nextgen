@@ -25,6 +25,7 @@ HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 # shellcheck source=../lib/common.sh
 . "$HERE/lib/common.sh"
 
+bench_trap_errors
 bench_elevate "$@"
 
 k6='' state='' lane='' out='' scenarios='login,getUser' vus='1,5,20' duration='20s'

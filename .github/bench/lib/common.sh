@@ -1,6 +1,18 @@
 # shellcheck shell=bash
 # Shared helpers for the benchmark lane tooling (ADR 069). Sourced, never run.
 
+# bench_trap_errors: a failure the scripts did not anticipate names the line
+# instead of ending silently, also inside functions and command substitutions.
+# Called by the commands in bin/, not by the tests that source these libraries.
+bench_on_error() {
+  local rc=$?
+  printf 'bench: unexpected failure (exit %s) at %s:%s: %s\n' "$rc" "${BASH_SOURCE[1]:-?}" "${BASH_LINENO[0]:-?}" "$BASH_COMMAND" >&2
+}
+bench_trap_errors() {
+  set -o errtrace
+  trap bench_on_error ERR
+}
+
 # BENCH_TRACE=1 traces every script (set -x), including after sudo.
 if [[ ${BENCH_TRACE:-0} == 1 ]]; then set -x; fi
 

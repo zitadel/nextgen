@@ -25,7 +25,7 @@ runs:
       shell: bash
       run: |
         echo "BENCH_RUN_DIR=$GITHUB_WORKSPACE/dist/bench-run/${{ inputs.lane }}" >> "$GITHUB_ENV"
-        BENCH_TRACE=1 BENCH_RUN_DIR="$GITHUB_WORKSPACE/dist/bench-run/${{ inputs.lane }}" .github/bench/bin/bench-lane up "${{ inputs.lane }}"
+        BENCH_RUN_DIR="$GITHUB_WORKSPACE/dist/bench-run/${{ inputs.lane }}" .github/bench/bin/bench-lane up "${{ inputs.lane }}"
 
     # A second server on the data directory is refused by the lock, and the one
     # server still answers.

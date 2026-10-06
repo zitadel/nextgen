@@ -126,27 +126,31 @@ lane_role_specs() {
 
 # disk_info PATH: what PATH lives on, as JSON. The kind is what the policy
 # keys on: nvme, ssd, hdd (a disk the machine owns), network-block (a cloud
-# block volume), network (a network filesystem), memory, overlay or unknown.
+# block volume), virtual-disk (a paravirtual disk whose backing is not visible),
+# network (a network filesystem), memory, overlay or unknown.
 disk_info() {
-  local p=$1 src fstype target name sys kind=unknown rot='' model='' dev=''
+  local p=$1 src fstype target name sys kind=unknown rot='' model='' dev='' majmin
   mkdir -p "$p"
   src=$(findmnt -n -o SOURCE -T "$p" 2>/dev/null || true)
   fstype=$(findmnt -n -o FSTYPE -T "$p" 2>/dev/null || true)
   target=$(findmnt -n -o TARGET -T "$p" 2>/dev/null || true)
+  majmin=$(findmnt -n -o MAJ:MIN -T "$p" 2>/dev/null | tr -d ' ' || true)
   case $fstype in
     nfs | nfs4 | cifs | smb3 | smbfs | ceph | glusterfs | lustre | afs | 9p | virtiofs | beegfs | gpfs | fuse | fuse.*) kind=network ;;
     tmpfs | ramfs) kind=memory ;;
     overlay) kind=overlay ;;
     *)
-      if [[ $src == /dev/* ]]; then
-        name=$(basename "$(readlink -f "$src")")
+      if [[ $src == /dev/* && -e /sys/dev/block/$majmin ]]; then
+        # The device behind the mount, from its major:minor (a mapper node need
+        # not be a symlink to the kernel name).
+        name=$(basename "$(readlink -f "/sys/dev/block/$majmin")")
         # Follow device-mapper stacks down to their first member, then up from
         # a partition to the disk that holds it.
         local n=0 member
         while ((n < 8)); do
           n=$((n + 1))
           sys=/sys/class/block/$name
-          member=$(find "/sys/block/$name/slaves" -mindepth 1 -maxdepth 1 -printf '%f\n' 2>/dev/null | sort | head -n 1)
+          member=$(find "/sys/block/$name/slaves" -mindepth 1 -maxdepth 1 -printf '%f\n' 2>/dev/null | sort | head -n 1 || true)
           if [[ -n $member ]]; then
             name=$member
             continue
@@ -166,6 +170,11 @@ disk_info() {
           kind=network-block
         elif [[ $name == nvme* ]]; then
           kind=nvme
+        elif [[ $name == vd* ]]; then
+          # A paravirtual disk: what is behind it (local NVMe, a network
+          # volume) is not visible from the guest, and the guest's rotational
+          # flag is not a measurement.
+          kind=virtual-disk
         elif [[ $rot == 1 ]]; then
           kind=hdd
         elif [[ $rot == 0 ]]; then
@@ -187,7 +196,7 @@ disk_check() {
   kind=$(jq -r .kind <<<"$1")
   case $kind in
     network) bench_die "the data directory is on a network filesystem ($(jq -r .fstype <<<"$1")): fsync would be the measurement. Point BENCH_DATA_ROOT at a local volume" ;;
-    memory | overlay | network-block)
+    memory | overlay | network-block | virtual-disk)
       [[ " $BENCH_ALLOW_DISK_KINDS " == *" $kind "* ]] ||
         bench_die "the data directory is on a $kind volume, not a local disk (device $(jq -r '.device + " " + .model' <<<"$1")). Use a local volume, or list '$kind' in BENCH_ALLOW_DISK_KINDS to accept it (the run metadata records it either way)"
       ;;
