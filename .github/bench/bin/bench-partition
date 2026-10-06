@@ -1,0 +1,280 @@
+#!/usr/bin/env bash
+# Partition the runner between the database, the API server, the load
+# generator and the collector with cgroup v2 (ADR 069).
+#
+#   bench-partition plan      [--lane L]            print the allocation, change nothing
+#   bench-partition preflight                       check the cgroup can host the partition
+#   bench-partition up        [--lane L] --run-dir D  create the cgroups and apply the limits
+#   bench-partition down                            kill what runs in them and remove them
+#   bench-partition exec ROLE -- CMD...             run CMD inside a role's cgroup
+#   bench-partition status                          print the active partition
+#
+# Writes cgroupfs directly into the cgroup this process was started in, which
+# must be delegated to the user (a pod with a writable cgroup2 mount, or a
+# `systemd-run --scope -p Delegate=yes` scope). `down` is idempotent and is
+# what the workflow runs from `if: always()`.
+set -euo pipefail
+shopt -s inherit_errexit
+
+HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+# shellcheck source=../lib/common.sh
+. "$HERE/lib/common.sh"
+# shellcheck source=../lib/cgroup.sh
+. "$HERE/lib/cgroup.sh"
+# shellcheck source=../lib/lane.sh
+. "$HERE/lib/lane.sh"
+
+state_file() { printf '%s/partition.json\n' "$BENCH_STATE_DIR"; }
+
+usage() { sed -n '2,/^set -euo/p' "${BASH_SOURCE[0]}" | sed '$d;s/^# \{0,1\}//'; }
+
+part_root() { printf '%s\n' "${BENCH_CGROUP_ROOT:-$(cg_self_dir)}"; }
+
+part_allowed_cpus() {
+  local root=$1 a
+  if [[ -r $root/cpuset.cpus.effective ]]; then
+    a=$(cg_read "$root" cpuset.cpus.effective)
+  fi
+  if [[ -z ${a:-} ]]; then
+    a=${BENCH_ALLOWED_CPUS:-$(<"$BENCH_SYSFS_CPU/online")}
+  fi
+  printf '%s\n' "$a"
+}
+
+# part_plan_json ROOT: the allocation as JSON (nothing is written).
+part_plan_json() {
+  local root=$1 allowed role cpus active
+  local -a specs=()
+  local spec_lines plan_lines
+  allowed=$(part_allowed_cpus "$root")
+  spec_lines=$(lane_role_specs)
+  mapfile -t specs <<<"$spec_lines"
+  # Planned before the loop reads it: a failure inside a process substitution
+  # would not stop this shell.
+  plan_lines=$(cpu_plan "$allowed" "${specs[@]}")
+  local roles='{}' assigned=''
+  while IFS='|' read -r role cpus active; do
+    local mem bytes=null
+    mem=$(lane_mem_mib "$role")
+    [[ $mem == max ]] || bytes=$((mem * 1024 * 1024))
+    roles=$(jq -c --arg r "$role" --arg c "$cpus" --argjson a "$active" --argjson b "$bytes" \
+      --argjson n "$(lane_cores "$role")" --arg d "$(cg_role_dir "$root" "$role")" \
+      '.[$r] = {cgroup: $d, cores: $n, cpus: $c, active: ($a == 1), memory_max_bytes: $b}' <<<"$roles")
+    assigned+="$cpus"$'\n'
+  done <<<"$plan_lines"
+  local used unassigned=''
+  used=$(cpulist_union <<<"$assigned")
+  # CPUs of the allowed set no role owns. Cores that are not whole (a sibling
+  # outside the allowed set) land here too.
+  unassigned=$(comm -23 <(cpulist_expand "$allowed" | sort) <(cpulist_expand "$used" | sort) | sort -n | cpulist_union)
+  local tpc
+  tpc=$(cpulist_count "$(cpu_usable_cores "$allowed" | head -n 1)")
+  jq -nc --arg lane "$BENCH_LANE" --arg root "$root" --arg allowed "$allowed" --arg un "$unassigned" \
+    --argjson roles "$roles" --argjson tpc "${tpc:-1}" \
+    '{schema: "bench-partition/v1", lane: $lane, backend: "cgroupfs", cgroup_root: $root,
+      allowed_cpus: $allowed, threads_per_core: $tpc, roles: $roles, unassigned_cpus: $un,
+      # Named in every run record: the partition cannot hold these apart.
+      not_partitioned: ["last-level cache", "memory bandwidth", "memory controller queues", "interrupt handling", "shared SMT-sibling-free power and thermal budget"]}'
+}
+
+cmd_plan() {
+  local lane=sqlite
+  while (($#)); do
+    case $1 in
+      --lane) lane=$2; shift 2 ;;
+      *) bench_die "plan: unknown argument '$1'" ;;
+    esac
+  done
+  bench_need jq
+  lane_load "$lane"
+  local root plan mem_total need=0 role
+  root=$(part_root)
+  plan=$(part_plan_json "$root")
+  # The sum of the memory limits must fit the pod, or the limits are a
+  # fiction: the kernel's OOM killer would pick the victim, not the cgroup.
+  mem_total=$(awk '/^MemTotal:/ {print int($2 / 1024)}' /proc/meminfo)
+  need=$(jq '[.roles[] | select(.active and .memory_max_bytes != null) | .memory_max_bytes] | add // 0 | . / 1048576 | floor' <<<"$plan")
+  if ((need > mem_total)); then
+    bench_die "the memory limits add up to $need MiB but the host has $mem_total MiB: lower BENCH_MEM_*_MIB or BENCH_LOGIN_CONCURRENCY"
+  fi
+  printf '%s\n' "$plan"
+}
+
+cmd_preflight() {
+  bench_need jq
+  local root
+  root=$(part_root)
+  cg_preflight "$root"
+}
+
+part_rollback() {
+  bench_log "partition up failed; rolling back"
+  cmd_down || true
+}
+
+cmd_up() {
+  local lane=sqlite run_dir=${BENCH_RUN_DIR:-}
+  while (($#)); do
+    case $1 in
+      --lane) lane=$2; shift 2 ;;
+      --run-dir) run_dir=$2; shift 2 ;;
+      *) bench_die "up: unknown argument '$1'" ;;
+    esac
+  done
+  [[ -n $run_dir ]] || bench_die "up: --run-dir (or BENCH_RUN_DIR) is required"
+  bench_need jq
+  lane_load "$lane"
+  [[ ! -e $(state_file) ]] || bench_die "a partition is already active ($(state_file)); run 'bench-partition down' first"
+  local root plan avail cpuset_ok=1
+  root=$(part_root)
+  avail=$(cg_preflight "$root")
+  [[ $(jq -r '.available | index("cpuset")' <<<"$avail") != null ]] || cpuset_ok=0
+  plan=$(cmd_plan --lane "$lane")
+  mkdir -p "$run_dir" "$BENCH_STATE_DIR"
+
+  local role dir sys added=() c
+  sys=$(cg_role_dir "$root" system)
+  # Record what is about to be created before creating it, so a failure in the
+  # middle can be torn down by the same code as a finished run.
+  jq -c --arg sys "$sys" --argjson ok "$cpuset_ok" --arg run_dir "$run_dir" \
+    '. + {system_cgroup: $sys, cpuset_applied: ($ok == 1), added_controllers: [], run_dir: $run_dir}' <<<"$plan" >"$(state_file)"
+  trap part_rollback EXIT
+
+  for role in "${LANE_ROLES[@]}"; do
+    [[ $(jq -r --arg r "$role" '.roles[$r].active' <<<"$plan") == true ]] || continue
+    cg_mkdir "$(cg_role_dir "$root" "$role")"
+  done
+
+  # cgroup v2's "no internal processes" rule: a cgroup that hands controllers
+  # to its children holds no processes of its own. Everything that runs in the
+  # delegated cgroup now (the runner agent, this shell) moves to the system
+  # leaf first, and the controllers are enabled afterwards.
+  cg_move_all "$root" "$sys"
+  local have
+  have=$(cg_read "$root" cgroup.subtree_control)
+  for c in cpuset cpu memory pids; do
+    [[ " $(jq -r '.available | join(" ")' <<<"$avail") " == *" $c "* ]] || continue
+    [[ " $have " == *" $c "* ]] && continue
+    cg_write "$root" cgroup.subtree_control "+$c" || true
+    added+=("$c")
+  done
+  jq -c --argjson a "$(printf '%s\n' "${added[@]:-}" | jq -Rn '[inputs | select(. != "")]')" \
+    '.added_controllers = $a' "$(state_file)" >"$(state_file).tmp"
+  mv "$(state_file).tmp" "$(state_file)"
+
+  local cpus mem part=${BENCH_CPUSET_PARTITION}
+  for role in "${LANE_ROLES[@]}"; do
+    [[ $(jq -r --arg r "$role" '.roles[$r].active' <<<"$plan") == true ]] || continue
+    dir=$(cg_role_dir "$root" "$role")
+    cpus=$(jq -r --arg r "$role" '.roles[$r].cpus' <<<"$plan")
+    if ((cpuset_ok)); then
+      cg_write "$dir" cpuset.cpus "$cpus"
+      if [[ $part == root ]]; then
+        cg_write "$dir" cpuset.cpus.partition root
+        [[ $(cg_read "$dir" cpuset.cpus.partition) == root ]] ||
+          bench_die "cpuset.cpus.partition of $dir is '$(cg_read "$dir" cpuset.cpus.partition)', not root: the delegated cgroup must itself be a partition root"
+      fi
+      [[ $(cpulist_normalize "$(cg_read "$dir" cpuset.cpus.effective)") == "$cpus" ]] ||
+        bench_die "the kernel applied cpuset '$(cg_read "$dir" cpuset.cpus.effective)' to $dir instead of '$cpus'"
+    fi
+    mem=$(jq -r --arg r "$role" '.roles[$r].memory_max_bytes // empty' <<<"$plan")
+    if [[ -n $mem ]]; then
+      cg_write "$dir" memory.max "$mem"
+      # Swap would hide memory pressure as latency instead of an OOM event.
+      cg_write "$dir" memory.swap.max 0 2>/dev/null || true
+      # The whole cgroup dies together: a half-killed server or a postmaster
+      # that restarts after a crash is a different run, not a slow one.
+      if [[ $role == server || $role == db ]]; then cg_write "$dir" memory.oom.group 1 || true; fi
+    fi
+    # No CPU quota, deliberately. cpu.max stays "max": a quota still lets two
+    # processes share a core and adds throttling stalls that read as latency.
+  done
+  if ((!cpuset_ok)); then
+    bench_warn "cpuset is not available in $root: the partition is memory-only and the run is NOT valid for publication"
+  fi
+
+  jq -c --argjson ok "$cpuset_ok" --arg part "$part" \
+    '. + {cpuset_applied: ($ok == 1), cpuset_partition_requested: $part}
+     | .roles |= with_entries(.value.cgroup_snapshot_file = "memory.events cpu.stat cpuset.cpus.effective memory.max")' \
+    "$(state_file)" >"$(state_file).tmp"
+  mv "$(state_file).tmp" "$(state_file)"
+  mkdir -p "$run_dir"
+  cp "$(state_file)" "$run_dir/partition.json"
+  trap - EXIT
+  bench_log "partition up: $(jq -r '[.roles | to_entries[] | select(.value.active) | "\(.key)=\(.value.cpus)"] | join(" ")' "$(state_file)")"
+}
+
+cmd_down() {
+  local sf
+  sf=$(state_file)
+  if [[ ! -e $sf ]]; then
+    bench_log "no partition is active; nothing to tear down"
+    return 0
+  fi
+  bench_need jq
+  local root sys role dir c
+  root=$(jq -r .cgroup_root "$sf")
+  sys=$(jq -r .system_cgroup "$sf")
+  # This process may itself be inside a role cgroup (a cleanup step started
+  # from one): step out before killing what is in it.
+  cg_step_out "$sf"
+  for role in collector loadgen server db; do
+    dir=$(jq -r --arg r "$role" '.roles[$r].cgroup // empty' "$sf")
+    [[ -n $dir && -d $dir ]] || continue
+    cg_kill_all "$dir" || bench_warn "processes remain in $dir"
+    cg_rmdir "$dir" || bench_warn "could not remove $dir"
+  done
+  # Hand the cgroup back as it was found: controllers off again, then the
+  # processes (the runner agent among them) back to where they came from.
+  local n
+  for c in $(jq -r '.added_controllers[]' "$sf"); do
+    for ((n = 0; n < 50; n++)); do
+      if { printf -- '-%s\n' "$c" >"$root/cgroup.subtree_control"; } 2>/dev/null; then break; fi
+      sleep 0.1
+    done
+  done
+  if [[ -d $sys ]]; then
+    cg_move_all "$sys" "$root"
+    cg_rmdir "$sys" || bench_warn "could not remove $sys"
+  fi
+  rm -f "$sf"
+  bench_log "partition removed"
+}
+
+cmd_exec() {
+  local role=${1:-}
+  shift || true
+  [[ ${1:-} == -- ]] && shift
+  [[ -n $role && $# -gt 0 ]] || bench_die "usage: bench-partition exec ROLE -- CMD..."
+  [[ -e $(state_file) ]] || bench_die "no partition is active; run 'bench-partition up' first"
+  local dir
+  if [[ $role == system ]]; then
+    dir=$(jq -r .system_cgroup "$(state_file)")
+  else
+    dir=$(jq -r --arg r "$role" '.roles[$r] | select(.active) | .cgroup // empty' "$(state_file)")
+  fi
+  [[ -n $dir ]] || bench_die "role '$role' is not part of the active partition"
+  cg_run_in "$dir" "$@"
+}
+
+cmd_status() {
+  [[ -e $(state_file) ]] || bench_die "no partition is active"
+  jq . "$(state_file)"
+}
+
+main() {
+  local cmd=${1:-}
+  shift || true
+  case $cmd in
+    plan) cmd_plan "$@" ;;
+    preflight) cmd_preflight "$@" ;;
+    up) cmd_up "$@" ;;
+    down) cmd_down "$@" ;;
+    exec) cmd_exec "$@" ;;
+    status) cmd_status "$@" ;;
+    -h | --help | help | '') usage ;;
+    *) bench_die "unknown command '$cmd' (try --help)" ;;
+  esac
+}
+
+main "$@"

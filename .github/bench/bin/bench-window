@@ -1,0 +1,193 @@
+#!/usr/bin/env bash
+# Record the partition at the start and end of a measurement window and decide
+# whether the window is valid (ADR 069).
+#
+#   bench-window begin NAME                 snapshot every role, the boot marker, the server count
+#   bench-window end NAME                   snapshot again, write the verdict, exit 3 if invalid
+#   bench-window run NAME -- CMD...         begin, run CMD, end (CMD's own status is kept)
+#   bench-window verdict START END          compare two snapshot files (used by `end`)
+#
+# A window is invalid when, between begin and end, the cpuset of any role
+# changed or is not what was planned, memory.max changed, any cgroup logged an
+# OOM event, the server's or the database's cgroup was throttled, the boot
+# marker changed (a restart, a replaced database), or the number of server
+# processes is not the lane's replica count. Records go to
+# <run-dir>/windows/NAME/{start,end,verdict}.json.
+set -euo pipefail
+shopt -s inherit_errexit
+
+HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+# shellcheck source=../lib/common.sh
+. "$HERE/lib/common.sh"
+# shellcheck source=../lib/cgroup.sh
+. "$HERE/lib/cgroup.sh"
+# shellcheck source=../lib/lane.sh
+. "$HERE/lib/lane.sh"
+
+usage() { sed -n '2,/^set -euo/p' "${BASH_SOURCE[0]}" | sed '$d;s/^# \{0,1\}//'; }
+
+state_file() { printf '%s/partition.json\n' "$BENCH_STATE_DIR"; }
+
+# The jq program that decides validity. Kept as data so the tests can feed it
+# hand-made snapshots.
+# shellcheck disable=SC2016  # jq variables, not shell ones
+VERDICT_JQ='
+def n($o; $path): ($o | getpath($path) // 0);
+def role_names: ($end.roles | keys);
+def moved($r; $key): ($start.roles[$r][$key] // "") != ($end.roles[$r][$key] // "");
+def delta($r; $f; $k): n($end.roles[$r]; [$f, $k]) - n($start.roles[$r]; [$f, $k]);
+def planned($r): ($plan.roles[$r] // {});
+[
+  (if ($plan.cpuset_applied | not) then
+     "the cpuset partition was not applied (the cpuset controller is unavailable), so cores were not exclusive"
+   else empty end),
+  (role_names[] as $r |
+     (if moved($r; "cpuset.cpus.effective") then
+        "cpuset.cpus.effective of \($r) changed from \($start.roles[$r]["cpuset.cpus.effective"]) to \($end.roles[$r]["cpuset.cpus.effective"])"
+      else empty end),
+     (if ($plan.cpuset_applied and ($end.roles[$r]["cpuset.cpus.effective"] != planned($r).cpus)) then
+        "cpuset.cpus.effective of \($r) is \($end.roles[$r]["cpuset.cpus.effective"]), the plan said \(planned($r).cpus)"
+      else empty end),
+     (if moved($r; "memory.max") then
+        "memory.max of \($r) changed from \($start.roles[$r]["memory.max"]) to \($end.roles[$r]["memory.max"])"
+      else empty end),
+     (if (planned($r).memory_max_bytes != null and (($end.roles[$r]["memory.max"]) != (planned($r).memory_max_bytes | tostring))) then
+        "memory.max of \($r) is \($end.roles[$r]["memory.max"]), the plan said \(planned($r).memory_max_bytes)"
+      else empty end),
+     (("oom", "oom_kill", "oom_group_kill") as $k |
+        if delta($r; "memory.events"; $k) > 0 then
+          "memory.events \($k) of \($r) rose by \(delta($r; "memory.events"; $k))"
+        else empty end)),
+  (("server", "db") as $r | select($end.roles[$r] != null) |
+     (("nr_throttled", "throttled_usec") as $k |
+        if delta($r; "cpu.stat"; $k) > 0 then
+          "cpu.stat \($k) of \($r) rose by \(delta($r; "cpu.stat"; $k)): the cgroup was throttled"
+        else empty end)),
+  (if ($start.boot_marker != null and $end.boot_marker != null and $start.boot_marker.digest != $end.boot_marker.digest) then
+     "the boot marker changed: the server or the database restarted, or the database was replaced, during the window"
+   elif ($start.boot_marker != null and $end.boot_marker == null) then
+     "the boot marker could not be read at the end of the window"
+   else empty end),
+  (if $start.servers != null then
+     (([["start", $start.servers], ["end", $end.servers]][]) as [$when, $s] |
+        if $s.in_cgroup != $s.expected or $s.total != $s.expected then
+          "\($s.total) server process(es) at the \($when) of the window (\($s.in_cgroup) in the server cgroup), expected exactly \($s.expected)"
+        else empty end)
+   else empty end)
+] as $reasons
+| [
+  (("server", "db") as $r | select($end.roles[$r] != null) |
+     (("max", "high") as $k |
+        if delta($r; "memory.events"; $k) > 0 then
+          "memory.events \($k) of \($r) rose by \(delta($r; "memory.events"; $k)): the cgroup hit its memory limit and reclaimed"
+        else empty end))
+] as $warnings
+| {name: $end.name, valid: ($reasons | length == 0), reasons: $reasons, warnings: $warnings,
+   started_at: $start.at, ended_at: $end.at,
+   seconds: (($end.uptime | tonumber) - ($start.uptime | tonumber)),
+   deltas: (role_names | map({key: ., value: {
+      cpu_usage_usec: delta(.; "cpu.stat"; "usage_usec"),
+      nr_throttled: delta(.; "cpu.stat"; "nr_throttled"),
+      throttled_usec: delta(.; "cpu.stat"; "throttled_usec"),
+      oom_kill: delta(.; "memory.events"; "oom_kill"),
+      memory_max_events: delta(.; "memory.events"; "max")}}) | from_entries)}
+'
+
+win_dir() {
+  local run_dir
+  run_dir=$(jq -r .run_dir "$(state_file)")
+  printf '%s/windows/%s\n' "$run_dir" "$1"
+}
+
+# win_snapshot NAME WHEN: write <window>/WHEN.json.
+win_snapshot() {
+  local name=$1 when=$2 sf dir roles='{}' role cg lane_state servers=null marker=null
+  sf=$(state_file)
+  [[ -e $sf ]] || bench_die "no partition is active; run bench-partition up first"
+  dir=$(win_dir "$name")
+  mkdir -p "$dir"
+  for role in $(jq -r '.roles | to_entries[] | select(.value.active) | .key' "$sf"); do
+    cg=$(jq -r --arg r "$role" '.roles[$r].cgroup' "$sf")
+    roles=$(jq -c --arg r "$role" --argjson s "$(cg_snapshot "$cg")" '.[$r] = $s' <<<"$roles")
+  done
+  lane_state=$(jq -r .run_dir "$sf")/lane-state.json
+  if [[ -r $lane_state ]]; then
+    local dialect data_root bin expected run_dir
+    run_dir=$(jq -r .run_dir "$sf")
+    dialect=$(jq -r .dialect "$lane_state")
+    data_root=$(jq -r .data_root "$lane_state")
+    bin=$(jq -r .server_binary "$lane_state")
+    expected=$(jq -r .replicas "$lane_state")
+    marker=$(BENCH_DB_DIALECT=$dialect BENCH_DATA_ROOT=$data_root lane_boot_marker "$run_dir")
+    servers=$(jq -nc --argjson in "$(lane_exe_count "$(jq -r .roles.server.cgroup "$sf")" "$bin")" \
+      --argjson total "$(lane_exe_total "$bin")" --argjson e "$expected" \
+      '{in_cgroup: $in, total: $total, expected: $e}')
+  fi
+  jq -nc --arg name "$name" --arg when "$when" --arg at "$(bench_now)" --arg up "$(bench_uptime)" \
+    --argjson roles "$roles" --argjson marker "$marker" --argjson servers "$servers" \
+    '{name: $name, when: $when, at: $at, uptime: $up, roles: $roles, boot_marker: $marker, servers: $servers}' \
+    >"$dir/$when.json"
+}
+
+cmd_begin() {
+  [[ -n ${1:-} ]] || bench_die "usage: bench-window begin NAME"
+  bench_need jq
+  win_snapshot "$1" start
+  bench_log "window '$1' begun"
+}
+
+compute_verdict() { # START END PLAN
+  jq -n --slurpfile start "$1" --slurpfile end "$2" --slurpfile plan "$3" \
+    '$start[0] as $start | $end[0] as $end | $plan[0] as $plan | '"$VERDICT_JQ"
+}
+
+cmd_end() {
+  [[ -n ${1:-} ]] || bench_die "usage: bench-window end NAME"
+  bench_need jq
+  local dir
+  dir=$(win_dir "$1")
+  [[ -r $dir/start.json ]] || bench_die "window '$1' was not begun"
+  win_snapshot "$1" end
+  compute_verdict "$dir/start.json" "$dir/end.json" "$(state_file)" >"$dir/verdict.json"
+  if [[ $(jq -r .valid "$dir/verdict.json") == true ]]; then
+    bench_log "window '$1' is valid ($(jq -r .seconds "$dir/verdict.json") s)"
+    jq -r '.warnings[] | "bench: warning: " + .' "$dir/verdict.json" >&2
+  else
+    bench_log "window '$1' is INVALID:"
+    jq -r '.reasons[] | "bench:   - " + .' "$dir/verdict.json" >&2
+    return 3
+  fi
+}
+
+cmd_run() {
+  local name=${1:-}
+  shift || true
+  [[ ${1:-} == -- ]] && shift
+  [[ -n $name && $# -gt 0 ]] || bench_die "usage: bench-window run NAME -- CMD..."
+  cmd_begin "$name"
+  local status=0
+  "$@" || status=$?
+  local verdict=0
+  cmd_end "$name" || verdict=$?
+  # The command's own failure comes first; an invalid window is its own status.
+  ((status == 0)) || return "$status"
+  return "$verdict"
+}
+
+main() {
+  local cmd=${1:-}
+  shift || true
+  case $cmd in
+    begin) cmd_begin "$@" ;;
+    end) cmd_end "$@" ;;
+    run) cmd_run "$@" ;;
+    verdict)
+      [[ $# -eq 3 ]] || bench_die "usage: bench-window verdict START END PLAN"
+      compute_verdict "$@"
+      ;;
+    -h | --help | help | '') usage ;;
+    *) bench_die "unknown command '$cmd' (try --help)" ;;
+  esac
+}
+
+main "$@"

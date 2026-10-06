@@ -1,0 +1,134 @@
+#!/usr/bin/env bash
+# Demonstrate that a saturating load generator leaves the API server's CPU
+# allocation and throttling counters unchanged (ADR 069; the acceptance check of
+# the benchmark deployment issue).
+#
+#   bench-verify-isolation [--seconds N] [--out FILE]
+#
+# Needs an active partition (`bench-lane up`, or `bench-partition up`). Inside
+# one bench-window it runs twice as many busy loops in the load generator's
+# cgroup as it has CPUs (more demand than the cgroup can serve) and one in the
+# server's cgroup (the stand-in for a request being served), then checks:
+#
+#   saturated   the load generator's cgroup used at least 80% of what its CPUs
+#               can give, so the check really loaded it
+#   placement   every busy loop ran only on CPUs of its own cgroup, and the two
+#               CPU sets are disjoint
+#   served      the server's cgroup received a full core while the load generator
+#               was saturated
+#   unchanged   the window verdict: the server's cpuset.cpus.effective and
+#               memory.max did not move, its cpu.stat nr_throttled and
+#               throttled_usec did not rise, no OOM event anywhere
+#
+# Exit 0: all passed. Exit 1: a check failed. Exit 2: the cpuset partition is not
+# applied (no cpuset controller), so placement cannot be demonstrated and the
+# check reports "incomplete" instead of passing. The report is JSON.
+set -euo pipefail
+shopt -s inherit_errexit
+
+HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+# shellcheck source=../lib/common.sh
+. "$HERE/lib/common.sh"
+# shellcheck source=../lib/cgroup.sh
+. "$HERE/lib/cgroup.sh"
+
+seconds=6
+out=''
+while (($#)); do
+  case $1 in
+    --seconds) seconds=$2; shift 2 ;;
+    --out) out=$2; shift 2 ;;
+    -h | --help) sed -n '2,/^set -euo/p' "${BASH_SOURCE[0]}" | sed '$d;s/^# \{0,1\}//'; exit 0 ;;
+    *) bench_die "unknown argument '$1'" ;;
+  esac
+done
+bench_need jq
+sf=$BENCH_STATE_DIR/partition.json
+[[ -e $sf ]] || bench_die "no partition is active; run bench-lane up (or bench-partition up) first"
+
+# proc_cpu PID: the CPU the process last ran on (field 39 of /proc/PID/stat).
+proc_cpu() {
+  local stat rest
+  stat=$(cat "/proc/$1/stat" 2>/dev/null) || return 1
+  rest=${stat##*) }
+  # shellcheck disable=SC2086
+  set -- $rest
+  printf '%s\n' "${37}"
+}
+
+proc_allowed() { awk '/^Cpus_allowed_list:/ {print $2}' "/proc/$1/status" 2>/dev/null; }
+
+loadgen_cpus=$(jq -r .roles.loadgen.cpus "$sf")
+server_cpus=$(jq -r .roles.server.cpus "$sf")
+cpuset_applied=$(jq -r .cpuset_applied "$sf")
+n_loadgen=$(cpulist_count "$loadgen_cpus")
+burners=$((n_loadgen * 2))
+name=isolation-$(date -u +%H%M%S)
+
+# shellcheck disable=SC2016  # expanded by the inner bash
+busy='end=$((SECONDS + $1)); while ((SECONDS < end)); do :; done'
+
+"$HERE/bin/bench-window" begin "$name"
+
+declare -a lg_pids=()
+for ((i = 0; i < burners; i++)); do
+  "$HERE/bin/bench-partition" exec loadgen -- bash -c "$busy" _ "$seconds" &
+  lg_pids+=("$!")
+done
+"$HERE/bin/bench-partition" exec server -- bash -c "$busy" _ "$seconds" &
+sv_pid=$!
+
+# Sample where each busy loop runs while all of them are running.
+lg_seen=$(mktemp) sv_seen=$(mktemp)
+trap 'rm -f "$lg_seen" "$sv_seen"; kill "${lg_pids[@]}" "$sv_pid" 2>/dev/null || true' EXIT
+sleep 1
+lg_allowed=''
+for ((t = 0; t < (seconds - 2) * 4; t++)); do
+  for p in "${lg_pids[@]}"; do proc_cpu "$p" >>"$lg_seen" || true; done
+  proc_cpu "$sv_pid" >>"$sv_seen" || true
+  sleep 0.25
+done
+lg_allowed=$(proc_allowed "${lg_pids[0]}" || true)
+sv_allowed=$(proc_allowed "$sv_pid" || true)
+wait "${lg_pids[@]}" "$sv_pid" 2>/dev/null || true
+
+# An invalid window is reported as the failed `unchanged` check below.
+"$HERE/bin/bench-window" end "$name" || true
+verdict=$(jq -c . "$(jq -r .run_dir "$sf")/windows/$name/verdict.json")
+
+lg_ran=$(sort -n -u "$lg_seen" | cpulist_union)
+sv_ran=$(sort -n -u "$sv_seen" | cpulist_union)
+
+report=$(jq -n --argjson verdict "$verdict" --argjson secs "$seconds" --argjson burners "$burners" \
+  --arg loadgen_cpus "$loadgen_cpus" --arg server_cpus "$server_cpus" \
+  --arg lg_ran "$lg_ran" --arg sv_ran "$sv_ran" --arg lg_allowed "$lg_allowed" --arg sv_allowed "$sv_allowed" \
+  --argjson applied "$cpuset_applied" --argjson nlg "$n_loadgen" \
+  '
+  ($verdict.deltas.loadgen.cpu_usage_usec) as $lg_used
+  | ($verdict.deltas.server.cpu_usage_usec) as $sv_used
+  | {
+      window: $verdict.name, seconds: $secs, busy_loops_in_loadgen: $burners, loadgen_cpus: $loadgen_cpus, server_cpus: $server_cpus,
+      checks: {
+        saturated: {pass: ($lg_used >= 0.8 * $nlg * $secs * 1000000), loadgen_cpu_usec: $lg_used, available_cpu_usec: ($nlg * $secs * 1000000)},
+        served: {pass: ($sv_used >= 0.8 * $secs * 1000000), server_cpu_usec: $sv_used, wanted_cpu_usec: ($secs * 1000000)},
+        # The verdict also says when the cpuset partition is missing; that is
+        # reported by `placement`, not as a counter that moved.
+        unchanged: {pass: ($verdict.reasons | map(select(test("cpuset partition was not applied") | not)) | length == 0),
+                    reasons: ($verdict.reasons | map(select(test("cpuset partition was not applied") | not))),
+                    server_nr_throttled: $verdict.deltas.server.nr_throttled, server_throttled_usec: $verdict.deltas.server.throttled_usec},
+        placement: (if $applied then
+          {pass: ($lg_allowed == $loadgen_cpus and $sv_allowed == $server_cpus), loadgen_allowed: $lg_allowed, server_allowed: $sv_allowed,
+           loadgen_ran_on: $lg_ran, server_ran_on: $sv_ran}
+         else {pass: null, skipped: "the cpuset controller is not available, so placement cannot be demonstrated"} end)
+      }
+    }
+  | .status = (if ([.checks[] | .pass] | any(. == false)) then "failed"
+               elif .checks.placement.pass == null then "incomplete" else "passed" end)')
+if [[ -n $out ]]; then printf '%s\n' "$report" >"$out"; fi
+jq . <<<"$report"
+status=$(jq -r .status <<<"$report")
+case $status in
+  passed) bench_log "isolation demonstrated: the load generator saturated its cores and the server's allocation and throttling counters did not move" ;;
+  incomplete) bench_warn "isolation NOT demonstrated: no cpuset partition in this cgroup (counters only)"; exit 2 ;;
+  *) bench_die "isolation check failed" ;;
+esac

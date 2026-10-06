@@ -1,0 +1,245 @@
+name: bench-lanes
+
+# The two benchmark lanes on a dedicated runner (ADR 069, #1097): the same server
+# build and the same collector configuration, on SQLite and on PostgreSQL, the
+# runner partitioned by cgroup between the database, the API server and the load
+# generator. Provisioning is .github/bench/; this file only sequences it.
+#
+# What runs where:
+#   selftest  a standard runner; runs on pull requests that touch the lane
+#             tooling. It exercises the partition logic against a stand-in for
+#             cgroupfs. It does not partition anything and proves nothing about
+#             the kernel.
+#   lane      the dedicated runner. workflow_dispatch / workflow_call only, never
+#             on a pull request: it runs untrusted-looking code on hardware whose
+#             whole point is to be quiet, and a PR gate on wall-clock numbers is
+#             a flake generator (#1094).
+#   compare   a standard runner; checks the two lanes differ in the database only.
+#
+# PLACEHOLDERS, to be replaced once the runner exists (this repository cannot see
+# it): the runner labels (repository variable BENCH_RUNNER_LABELS, a JSON array),
+# the machine type (BENCH_MACHINE_TYPE), whether the node is exclusively ours
+# (BENCH_NODE_DEDICATED, "true" or anything else), and the local data volume
+# (BENCH_DATA_ROOT). Until BENCH_RUNNER_LABELS names a real pool, a dispatched
+# lane job waits for a runner that does not exist.
+
+on:
+  pull_request:
+    paths:
+      - ".github/bench/**"
+      - ".github/workflows/bench-lanes.yml"
+  workflow_dispatch:
+    inputs:
+      lanes:
+        description: "Which lanes to run, one after the other"
+        type: choice
+        options: [both, sqlite, postgres]
+        default: both
+      scenarios:
+        description: "Harness scenarios, comma separated"
+        default: "login,getUser"
+      vus:
+        description: "VU counts, comma separated; one measurement window each"
+        default: "1,5,20"
+      duration:
+        description: "Duration of each window"
+        default: "20s"
+  workflow_call:
+    inputs:
+      lanes:
+        type: string
+        default: both
+      scenarios:
+        type: string
+        default: "login,getUser"
+      vus:
+        type: string
+        default: "1,5,20"
+      duration:
+        type: string
+        default: "20s"
+
+permissions:
+  contents: read
+
+jobs:
+  selftest:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+
+      # shellcheck and jq are on the hosted image. The tests need no privileges:
+      # cgroupfs and the CPU topology are generated.
+      - name: Test the lane tooling
+        run: .github/bench/test/run.sh
+
+  lane:
+    needs: selftest
+    if: ${{ github.event_name != 'pull_request' }}
+    # PLACEHOLDER labels: set the repository variable BENCH_RUNNER_LABELS to the
+    # dedicated pool, e.g. ["self-hosted","linux","x64","bench-dedicated"].
+    runs-on: ${{ fromJSON(vars.BENCH_RUNNER_LABELS || '["self-hosted","linux","bench-dedicated"]') }}
+    timeout-minutes: 180
+    # One lane at a time on the one runner, across runs of this workflow too:
+    # a second job on the same pod would be the load the partition exists to
+    # keep out. Never cancelled in flight; a cancelled job still tears down.
+    concurrency:
+      group: bench-dedicated-runner
+      cancel-in-progress: false
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        lane: ${{ fromJSON(inputs.lanes == 'sqlite' && '["sqlite"]' || inputs.lanes == 'postgres' && '["postgres"]' || '["sqlite","postgres"]') }}
+    env:
+      # The facts this repository cannot observe, declared by whoever knows them
+      # and recorded as "declared" in the run metadata.
+      BENCH_MACHINE_TYPE: ${{ vars.BENCH_MACHINE_TYPE || 'unknown' }}
+      BENCH_NODE_DEDICATED: ${{ vars.BENCH_NODE_DEDICATED || 'unknown' }}
+      BENCH_IMAGE_TAG: ${{ github.sha }}
+      # The same sizing for both lanes comes from .github/bench/lanes/common.env;
+      # set a BENCH_CORES_* / BENCH_MEM_* variable here only for both at once.
+      BENCH_SERVER_BIN: dist/nextgen-server
+      # Result caching would let a lane report numbers it did not measure (#974).
+      MOON_CACHE: off
+    steps:
+      - uses: actions/checkout@v6
+
+      # Fail on the first step if the pod cannot host the partition, before
+      # anything is built: a writable cgroup2 mount with the cpuset, cpu and
+      # memory controllers delegated (ADR 069).
+      - name: Check the pod can host the partition
+        run: .github/bench/bin/bench-partition preflight
+
+      - name: Require the harness
+        run: |
+          if [ ! -f tools/bench/moon.yml ]; then
+            echo "tools/bench is not in this checkout: the k6 harness (#1413) has to be merged first" >&2
+            exit 1
+          fi
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: pnpm/action-setup@v5
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Put workspace binaries on PATH
+        run: echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
+
+      # Everything is built before the partition goes up, so a compiler never
+      # competes with a measurement and the server binary is the same file in
+      # both lanes.
+      - name: Build the server and the harness
+        run: |
+          go build -o dist/nextgen-server .
+          moon run bench:build
+
+      - name: Choose where the lane's data lives
+        env:
+          BENCH_DATA_ROOT_VAR: ${{ vars.BENCH_DATA_ROOT }}
+        run: |
+          # The data directory must be on a local volume; bench-lane refuses a
+          # network filesystem, tmpfs and overlay, and records the disk kind.
+          echo "BENCH_DATA_ROOT=${BENCH_DATA_ROOT_VAR:-$RUNNER_TEMP/bench-data}" >> "$GITHUB_ENV"
+          echo "BENCH_RUN_DIR=$GITHUB_WORKSPACE/dist/bench-run/${{ matrix.lane }}" >> "$GITHUB_ENV"
+
+      - name: Bring the ${{ matrix.lane }} lane up
+        run: .github/bench/bin/bench-lane up "${{ matrix.lane }}"
+
+      # The partition, demonstrated: busy loops saturate the load generator's
+      # cores while the server's cpuset, throttling and memory counters are
+      # watched. Fails the lane if the allocation moved, and also when the cpuset
+      # could not be applied, because then nothing was demonstrated.
+      - name: Demonstrate the partition
+        run: .github/bench/bin/bench-verify-isolation --seconds 8 --out "$BENCH_RUN_DIR/isolation.json"
+
+      # Provision the fixture project and user through the API, from the load
+      # generator's cgroup. The target file holds the project secret, so it
+      # stays out of the run directory that is uploaded.
+      - name: Provision the fixtures
+        run: |
+          # `--state` in the first harness layer, `--manifest` once #1415 lands.
+          state_flag=--state
+          if tools/bench/dist/k6 x nextgen bootstrap --help 2>&1 | grep -q -- '--manifest'; then state_flag=--manifest; fi
+          .github/bench/bin/bench-partition exec loadgen -- \
+            tools/bench/dist/k6 x nextgen bootstrap \
+              --base "http://127.0.0.1:8080" --fixtures tools/bench/fixtures/local.json \
+              "$state_flag" "dist/bench-target-${{ matrix.lane }}.json" --lane "${{ matrix.lane }}"
+
+      # The doctor reports the dialect and the cgroup allocation from the facts
+      # the lane declared. The doctor command is in the harness's wave-2 layer
+      # (#1415); until that is merged the facts are printed and live in
+      # run-metadata.json, which is what the doctor will read.
+      - name: Report the lane
+        run: |
+          mapfile -t declared < <(.github/bench/bin/bench-lane declare-args)
+          if tools/bench/dist/k6 x nextgen doctor --help >/dev/null 2>&1; then
+            tools/bench/dist/k6 x nextgen doctor --base "http://127.0.0.1:8080" "${declared[@]}" --out "$BENCH_RUN_DIR/doctor.json"
+          else
+            echo "k6 x nextgen doctor is not in this harness yet (#1415); the declared facts are:"
+            printf '  %s\n' "${declared[@]}"
+          fi
+
+      # Inputs reach the script through the environment, never interpolated into
+      # the shell body.
+      - name: Measure
+        env:
+          SCENARIOS: ${{ inputs.scenarios || 'login,getUser' }}
+          VUS: ${{ inputs.vus || '1,5,20' }}
+          DURATION: ${{ inputs.duration || '20s' }}
+        run: |
+          .github/bench/bin/bench-measure \
+            --k6 "$PWD/tools/bench/dist/k6" --state "dist/bench-target-${{ matrix.lane }}.json" \
+            --lane "${{ matrix.lane }}" --out "$BENCH_RUN_DIR" \
+            --scenarios "$SCENARIOS" --vus "$VUS" --duration "$DURATION"
+
+      # Runs when an earlier step failed and when the job was cancelled. It is
+      # idempotent, and bench-lane up repeats it for a lane a killed job left
+      # behind. A runner that dies outright never reaches this step; register
+      # .github/bench/bin/job-completed-hook as the pod's job-completed hook.
+      - name: Tear the lane down
+        if: ${{ always() }}
+        run: .github/bench/bin/bench-lane down
+
+      # The run directory holds metadata, window records and logs; the harness
+      # target file (it carries the project secret) is outside it.
+      - name: Upload the run record
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-run-${{ matrix.lane }}
+          path: dist/bench-run/${{ matrix.lane }}
+          if-no-files-found: warn
+          retention-days: 30
+
+  compare:
+    needs: lane
+    if: ${{ !cancelled() && needs.lane.result == 'success' && (inputs.lanes == '' || inputs.lanes == 'both') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: bench-run-*
+          path: runs
+
+      # Two lanes are comparable only if they differ in the database: the same
+      # server build, server configuration, collector configuration, hardware
+      # and allocation.
+      - name: Check the lanes differ in the database only
+        run: .github/bench/bin/bench-lane compare runs/bench-run-sqlite/run-metadata.json runs/bench-run-postgres/run-metadata.json

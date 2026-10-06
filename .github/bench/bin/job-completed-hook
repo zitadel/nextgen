@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Runner job-completed hook (ADR 069): tear the lane down when a job ends, however
+# it ended. The workflow's own `if: always()` step covers a failed or cancelled
+# job; this covers the case where that step never ran (the runner process was
+# killed, the step timed out past its grace period).
+#
+# Register it on the dedicated runner pod, which this repository cannot do:
+#   ACTIONS_RUNNER_HOOK_JOB_COMPLETED=/path/to/.github/bench/bin/job-completed-hook
+# BENCH_STATE_DIR must resolve to the same directory the job used (default
+# ${TMPDIR:-/tmp}/bench-lane-<uid>).
+set -uo pipefail
+HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+exec "$HERE/bench-lane" down

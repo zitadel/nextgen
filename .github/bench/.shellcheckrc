@@ -1,0 +1,5 @@
+# Applies to every script under .github/bench (found from each script upwards).
+# Sourced files are looked up next to the script that sources them, so
+# shellcheck gives the same answer from any working directory.
+external-sources=true
+source-path=SCRIPTDIR
