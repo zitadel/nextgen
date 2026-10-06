@@ -90,10 +90,11 @@ jobs:
       BENCH_PARTITION_MODE: host
       BENCH_IMAGE_TAG: ${{ github.sha }}
       BENCH_SERVER_BIN: dist/nextgen-server
-      # Depot offers no local disk: the root volume is a cloud block volume (EBS
-      # on the AWS sizes). The lane refuses it unless this says so, and records
-      # the disk kind either way.
-      BENCH_ALLOW_DISK_KINDS: network-block
+      # Depot exposes no local disk the guest can tell is local: the root volume
+      # is a cloud block volume (EBS) on the AWS-backed VMs and a paravirtual
+      # disk on the others. The lane refuses both unless this says so, and
+      # records the disk kind either way.
+      BENCH_ALLOW_DISK_KINDS: network-block virtual-disk
       # The proof job gives out all 8 cores of the 16 vCPU size.
       BENCH_CORES_SYSTEM: ${{ github.event_name == 'pull_request' && '1' || '' }}
       BENCH_CORES_SERVER: ${{ github.event_name == 'pull_request' && '2' || '' }}
