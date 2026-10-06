@@ -5491,18 +5491,28 @@ func TestFlowStateMachine_Render_TerminalStepSkipsResolution(t *testing.T) {
 	assert.NotNil(t, result.Step.Complete)
 }
 
-// Claim mapping is top-level only, so a dotted claim key cannot be checked
-// against the schema's nested required or unique rules: it is collected
-// instead of created.
-func TestFlowStateMachine_Render_SSODottedClaimKeyFallsBackToCollection(t *testing.T) {
+// A top-level property whose name has a dot would be stored as a nested
+// object, so its claim is collected instead of created.
+func TestFlowStateMachine_Render_SSODottedPropertyFallsBackToCollection(t *testing.T) {
 	t.Parallel()
-	w, def, state := ssoRenderWorld(t)
+	w, def, state := ssoRenderWorldWithSchema(t, `{
+		"$schema": "https://json-schema.org/draft/2020-12/schema",
+		"type": "object",
+		"x-auth-methods": { "password": { "enabled": true } },
+		"x-identifier": "email",
+		"required": ["email"],
+		"properties": {
+			"email":     { "type": "string", "format": "email", "x-unique": "project" },
+			"username":  { "type": "string" },
+			"home.city": { "type": "string" }
+		}
+	}`)
 	def = withSSOOutcomeSteps(def)
-	claims, verified := completeClaims()
-	claims["address.email"] = "alice@home.example.com"
-	verified["address.email"] = true
-	w.expectParked(unlinkedParked(claims, verified), nil)
-	w.ssoIdentities.EXPECT().FindUniqueOwner(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return("", nil).Times(2)
+	w.expectParked(unlinkedParked(
+		map[string]any{"email": "alice@example.com", "home.city": "Oxford"},
+		map[string]bool{"email": true},
+	), nil)
+	w.expectOwner("email", "alice@example.com", "")
 	w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Times(0)
 
 	result, err := w.sm.Render(t.Context(), def, state)
@@ -5613,18 +5623,19 @@ func TestFlowStateMachine_Render_SSOCollisionRetryAfterLostCookieRaisesAgain(t *
 
 // A connection can map a superset of properties for several schemas; each
 // schema consumes only the properties it defines, so the rest is not stored.
+// A dotted key the schema does not define is ignored the same way.
 func TestFlowStateMachine_Render_SSOUnknownClaimIsNotPersisted(t *testing.T) {
 	t.Parallel()
 	w, def, state := ssoRenderWorld(t)
 	claims, verified := completeClaims()
-	withNickname := maps.Clone(claims)
-	withNickname["nickname"] = "ali"
-	w.expectParked(unlinkedParked(withNickname, verified), nil)
+	withUnknown := maps.Clone(claims)
+	withUnknown["nickname"] = "ali"
+	withUnknown["address.city"] = "Oxford"
+	w.expectParked(unlinkedParked(withUnknown, verified), nil)
 	w.ssoIdentities.EXPECT().FindUniqueOwner(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return("", nil).Times(2)
 	w.ssoIdentities.EXPECT().
 		CreateLinked(gomock.Any(), gomock.Cond(func(in domain.FlowSSOCreateInput) bool {
-			_, stored := in.Attributes["nickname"]
-			return !stored && assert.ObjectsAreEqual(claims, in.Attributes)
+			return assert.ObjectsAreEqual(claims, in.Attributes)
 		})).
 		Return("user-new", nil)
 	w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).

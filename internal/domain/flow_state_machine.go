@@ -703,8 +703,9 @@ func ssoClaimsComplete(schema *jsonschema.Schema, parked *FlowSSOParkedIdentity,
 	if newSchemaReader(schema).ComposesRequiredness() {
 		return false
 	}
-	for name := range parked.Claims {
-		// Nested mapped keys are unsupported (mapping is top-level only), so they fall back to collection.
+	for name := range claims {
+		// Attribute keys use the dot as a path separator, so a top-level property
+		// whose name has one would be stored as a nested object.
 		if strings.Contains(name, ".") {
 			return false
 		}
