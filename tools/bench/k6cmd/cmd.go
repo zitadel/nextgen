@@ -59,7 +59,7 @@ func newBootstrapCommand(gs *state.GlobalState) *cobra.Command {
 	}
 	cmd.Flags().StringVar(&base, "base", "", "Base URL of the running server to provision (required)")
 	cmd.Flags().StringVar(&fixtures, "fixtures", "fixtures/local.json", "Fixture file declaring the project and user")
-	cmd.Flags().StringVar(&stateFile, "state", "out/target.json", "Where to write the provisioned target")
+	cmd.Flags().StringVar(&stateFile, "state", "dist/target.json", "Where to write the provisioned target")
 	cmd.Flags().StringVar(&lane, "lane", "local", "Lane tag recorded on every sample")
 	_ = cmd.MarkFlagRequired("base")
 	return cmd
@@ -83,7 +83,7 @@ must already be up and answering /healthz; the sweep never starts one.`,
 			ctx := cmd.Context()
 			dir := out
 			if dir == "" {
-				dir = filepath.Join("out", "sweep-"+time.Now().UTC().Format("20060102T150405Z"))
+				dir = filepath.Join("dist", "sweep-"+time.Now().UTC().Format("20060102T150405Z"))
 			}
 			if err := os.MkdirAll(dir, 0o755); err != nil {
 				return err
@@ -133,7 +133,7 @@ must already be up and answering /healthz; the sweep never starts one.`,
 	cmd.Flags().StringVar(&base, "base", "", "A running server to provision and measure")
 	cmd.Flags().StringVar(&fixtures, "fixtures", "fixtures/local.json", "Fixture file applied to --base")
 	cmd.Flags().StringVar(&lane, "lane", "local", "Lane tag recorded on every sample")
-	cmd.Flags().StringVar(&out, "out", "", "Output directory (default out/sweep-<timestamp>)")
+	cmd.Flags().StringVar(&out, "out", "", "Output directory (default dist/sweep-<timestamp>)")
 	cmd.Flags().StringVar(&script, "script", "", "k6 entry script (default: the embedded bench.js)")
 	cmd.Flags().StringVar(&scenarios, "scenarios", "login,getUser", "Scenarios to run, comma separated")
 	cmd.Flags().StringVar(&vus, "vus", "1,5,20", "VU counts to run, comma separated")

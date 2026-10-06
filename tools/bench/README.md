@@ -1,6 +1,6 @@
 # Benchmark harness
 
-The k6 load-test harness for the nextgen API ([ADR 066](../../docs/adrs/066-benchmark-harness-http-path-ownership.md),
+The k6 load-test harness for the nextgen API ([ADR 067](../../docs/adrs/067-benchmark-harness-http-path-ownership.md),
 epic [#1094](https://github.com/zitadel/nextgen/issues/1094)). A nested Go
 module that compiles two things into one k6 binary:
 
@@ -39,12 +39,13 @@ moon run workspace:server                              # terminal 1: the local s
 moon run bench:sweep                                   # terminal 2: fixtures/local.json, 1/5/20 VUs × 20 s
 moon run bench:sweep -- --vus 5 --duration 10s --scenarios getUser
 moon run bench:sweep -- --base http://localhost:9090 --lane postgres   # any other server; later flags win
-moon run bench:summarize -- out/sweep-<stamp>          # rewrite summary.md / aggregate.json
+moon run bench:summarize -- dist/sweep-<stamp>          # rewrite summary.md / aggregate.json
 ```
 
-`bench:sweep` builds the k6 binary (`out/k6`) through Moon, then
+`bench:sweep` builds the k6 binary (`dist/k6`) through Moon, then
 `k6 x nextgen sweep --base …` provisions the fixture, runs the matrix one run
-at a time, and writes `runs.json`, k6's summary export and console output
+at a time — each run is `k6 run --scenario <name>` on the one entry script,
+with the VU count and duration as `-e` — and writes `runs.json`, k6's summary export and console output
 per run, `summary.md` and `aggregate.json`. `--raw` additionally keeps k6's
 per-sample JSON output for every run. For a quieter server to measure, start
 it with `instrumentation.log.level: warn` and the request stream off; the
@@ -53,8 +54,8 @@ default request log is a measured throughput cost.
 Split provisioning from measuring:
 
 ```sh
-out/k6 x nextgen bootstrap --base http://localhost:8080               # provision only → out/target.json
-out/k6 x nextgen sweep --state out/target.json                        # reuse a provisioned target
+dist/k6 x nextgen bootstrap --base http://localhost:8080               # provision only → dist/target.json
+dist/k6 x nextgen sweep --state dist/target.json                        # reuse a provisioned target
 ```
 
 Scenarios run one at a time on purpose: run together they contend for the
@@ -79,7 +80,7 @@ read, so a fixture that cannot be driven fails before anything is measured.
 | [`harness/`](harness/)                 | operations over the typed client, fixtures, target state, readiness check, sweep runner, summary merge |
 | [`scripts/bench.js`](scripts/bench.js) | the one entry script (embedded into the binary)                                                        |
 | [`fixtures/`](fixtures/)               | what a lane provisions                                                                                 |
-| `out/`                                 | everything the tooling writes; gitignored                                                              |
+| `dist/`                                | everything the tooling writes; gitignored at the root like every project's `dist/`                     |
 
 ## Checks
 

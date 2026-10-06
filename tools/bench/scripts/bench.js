@@ -1,17 +1,12 @@
-// The one k6 entry script. Which scenario runs, with how many VUs and for how
-// long, comes from the environment `k6 x nextgen sweep` sets: SCEN, VUS, DUR.
-// The target itself — and its secret — never passes through __ENV: the Go
-// module reads it from its own process environment.
+// The one k6 entry script. Every scenario is declared; `k6 x nextgen sweep`
+// picks one per run with k6's own `--scenario <name>` and sets its shape
+// through VUS and DUR. The target itself — and its secret — never passes
+// through __ENV: the Go module reads it from its own process environment.
 // Scenarios run one at a time; run together they contend for the same machine
 // and the cheap one starves the others.
 import nextgen from 'k6/x/nextgen';
 
-const all = {
-  login: { executor: 'constant-vus', exec: 'login' },
-  getUser: { executor: 'constant-vus', exec: 'getUser' },
-};
-const pick = __ENV.SCEN || 'login';
-if (!all[pick]) throw new Error(`unknown scenario ${pick}; one of ${Object.keys(all).join(', ')}`);
+const shape = { executor: 'constant-vus', vus: Number(__ENV.VUS || 1), duration: __ENV.DUR || '10s', gracefulStop: '5s' };
 
 // An empty threshold on a sub-metric makes k6 keep and report it in its own
 // end-of-test summary: every metric per operation, and the error counter
@@ -22,7 +17,8 @@ for (const name of nextgen.submetrics()) thresholds[name] = [];
 
 export const options = {
   scenarios: {
-    [pick]: { ...all[pick], vus: Number(__ENV.VUS || 1), duration: __ENV.DUR || '10s', gracefulStop: '5s' },
+    login: { ...shape, exec: 'login' },
+    getUser: { ...shape, exec: 'getUser' },
   },
   thresholds,
 };

@@ -92,7 +92,7 @@ Repo tooling:
 
 - `tools/release/` — the Moon `release` project (snapshot, artifacts, draft
   GitHub Release shell).
-- `tools/bench/` — the k6 benchmark harness, a nested Go module (ADR 066):
+- `tools/bench/` — the k6 benchmark harness, a nested Go module (ADR 067):
   `moon run bench:sweep` measures a server that is already running (locally
   `moon run workspace:server`). AGPL-only and excluded from commercial
   licensing because it links k6.

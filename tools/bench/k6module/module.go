@@ -1,6 +1,6 @@
 // Package k6module registers the k6/x/nextgen JavaScript module: the
 // benchmark scenarios' entry into the server, driven through the generated
-// client with k6 performing every request (ADR 066).
+// client with k6 performing every request (ADR 067).
 package k6module
 
 import (

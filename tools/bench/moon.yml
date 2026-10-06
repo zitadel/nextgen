@@ -3,7 +3,7 @@ language: "go"
 layer: "tool"
 stack: "infrastructure"
 
-# The k6 benchmark harness (ADR 066): a nested Go module that compiles the
+# The k6 benchmark harness (ADR 067): a nested Go module that compiles the
 # k6/x/nextgen scenarios and the `k6 x nextgen` command tree into a k6 binary.
 # Tasks run from this directory, so `go` sees tools/bench/go.mod.
 
@@ -20,12 +20,14 @@ fileGroups:
     - "/go.sum"
 
 tasks:
+  # Tracked Go files only, as the server project checks them.
   format:
     script: |
-      unformatted="$(gofmt -l .)"
+      unformatted="$(git ls-files -z -- '*.go' | xargs -0 gofmt -l)"
       if [ -n "$unformatted" ]; then
         echo "error: gofmt would rewrite the following files:" >&2
         printf '%s\n' "$unformatted" >&2
+        echo "hint: run gofmt -w on those paths, then re-check with moon run bench:format" >&2
         exit 1
       fi
     inputs:
@@ -37,15 +39,16 @@ tasks:
       - "@group(benchInputs)"
 
   # The CI build #1096 asks for: the module and the binary compile. No load
-  # is generated here.
+  # is generated here. dist/ is what every project builds into and is
+  # gitignored at the root.
   build:
-    command: "go build -o out/k6 ./cmd/k6"
+    command: "go build -o dist/k6 ./cmd/k6"
     deps:
       - "vet"
     inputs:
       - "@group(benchInputs)"
     outputs:
-      - "out/k6"
+      - "dist/k6"
 
   test:
     command: "go test -timeout 5m ./..."
@@ -63,7 +66,7 @@ tasks:
   #   moon run bench:sweep -- --vus 5 --duration 10s --scenarios getUser
   #   moon run bench:sweep -- --base http://localhost:9090 --lane postgres
   sweep:
-    command: "out/k6 x nextgen sweep --base http://localhost:8080 --fixtures fixtures/local.json"
+    command: "dist/k6 x nextgen sweep --base http://localhost:8080 --fixtures fixtures/local.json"
     deps:
       - "build"
     options:
@@ -72,9 +75,9 @@ tasks:
       shell: false
 
   # Rewrite the summary of an existing sweep directory:
-  #   moon run bench:summarize -- out/sweep-<stamp>
+  #   moon run bench:summarize -- dist/sweep-<stamp>
   summarize:
-    command: "out/k6 x nextgen summarize"
+    command: "dist/k6 x nextgen summarize"
     deps:
       - "build"
     options:

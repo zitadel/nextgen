@@ -15,7 +15,7 @@ import (
 	"github.com/zitadel/nextgen/tools/bench/harness"
 )
 
-// doer is the request path ADR 066 fixes: the generated client encodes the
+// doer is the request path ADR 067 fixes: the generated client encodes the
 // request and decodes the response, and the call in between is k6's own
 // httpext.MakeRequest — the function k6/http calls from JavaScript. k6 owns
 // the transport, the tracer, the per-VU cookie jar, the http_req_* samples
