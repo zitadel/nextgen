@@ -71,8 +71,12 @@ func (h *IDPCallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		// Process logs ceremony failures itself; what reaches here is a bug in
-		// the process, logged with its cause before the cause-free page.
-		zlog.GetLoggingContext(ctx).Error("sso callback processing failed", slog.Any("error", err))
+		// the process, logged with its cause before the cause-free page. A
+		// cancelled request is the client leaving, not a bug; a deadline is
+		// still logged.
+		if !errors.Is(ctx.Err(), context.Canceled) {
+			zlog.GetLoggingContext(ctx).Error("sso callback processing failed", slog.Any("error", err))
+		}
 		writeIDPCallbackErrorPage(w, http.StatusInternalServerError)
 		return
 	}

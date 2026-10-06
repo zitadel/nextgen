@@ -187,8 +187,8 @@ func (c *FlowSSOCallback) fail(ctx context.Context, projectID, state string, pen
 		return FlowSSOCallbackOutput{}, domain.ErrInternal(cause)
 	}
 	// A cancelled request is not the provider's fault, and the client is
-	// gone, so no warning.
-	if ctx.Err() == nil {
+	// gone, so no warning. A deadline is still logged.
+	if !errors.Is(ctx.Err(), context.Canceled) {
 		getLoggingContext(ctx, "flow").Warn("sso callback failed",
 			slog.String("project_id", projectID),
 			slog.String("slug", pending.ProviderSlug),
