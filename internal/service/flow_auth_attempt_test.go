@@ -32,6 +32,13 @@ type fakeAuthAttempts struct {
 	issueSSOStateIn  service.IssueSSOStateInput
 	issueSSOState    *domain.SSOState
 	issueSSOStateErr error
+	consumeState     string
+	consumeNonce     string
+	consumeCheck     *domain.SSOCallbackCheck
+	consumeErr       error
+	setResultState   string
+	setResult        *domain.SSOCallbackResult
+	setResultErr     error
 }
 
 func (f *fakeAuthAttempts) Create(_ context.Context, in service.CreateAuthAttemptInput) (*domain.AuthAttempt, error) {
@@ -62,6 +69,16 @@ func (f *fakeAuthAttempts) Handoff(_ context.Context, in service.HandoffInput) (
 func (f *fakeAuthAttempts) IssueSSOState(_ context.Context, in service.IssueSSOStateInput) (*domain.SSOState, error) {
 	f.issueSSOStateIn = in
 	return f.issueSSOState, f.issueSSOStateErr
+}
+
+func (f *fakeAuthAttempts) ConsumeSSOState(_ context.Context, _, state, bindingNonce string) (*domain.SSOCallbackCheck, error) {
+	f.consumeState, f.consumeNonce = state, bindingNonce
+	return f.consumeCheck, f.consumeErr
+}
+
+func (f *fakeAuthAttempts) SetSSOCallbackResult(_ context.Context, _, state string, result *domain.SSOCallbackResult) error {
+	f.setResultState, f.setResult = state, result
+	return f.setResultErr
 }
 
 func (f *fakeAuthAttempts) BeginPasskeyEnrollment(context.Context, service.BeginPasskeyEnrollmentInput) (*service.BeginPasskeyEnrollmentOutput, error) {

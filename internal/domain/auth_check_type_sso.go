@@ -304,15 +304,15 @@ func NewSSOState(projectID, providerSlug, connectionRevisionID, redirectURI, ret
 
 // SSOStateProjectID reads the project id back out of a presented state, so the
 // callback can scope its lookup. The input is attacker-controlled: a state
-// without the separator, or with an empty part, reports false, and the caller
+// without the separator, or with an empty part, reads as "", and the caller
 // treats it exactly like an unknown state. The project id is only a routing
 // hint until ConsumeSSOState matches the full string's hash.
-func SSOStateProjectID(state string) (string, bool) {
+func SSOStateProjectID(state string) string {
 	projectID, random, ok := strings.Cut(state, ssoStateSeparator)
 	if !ok || projectID == "" || random == "" {
-		return "", false
+		return ""
 	}
-	return projectID, true
+	return projectID
 }
 
 // PKCEChallenge derives the S256 code challenge from a verifier

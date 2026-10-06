@@ -48,24 +48,10 @@ func (i *FlowSSORedirectIssuer) Issue(ctx context.Context, in domain.FlowIssueSS
 	if parseErr != nil {
 		return domain.FlowSSORedirectOutput{}, i.unavailable(ctx, in, parseErr)
 	}
-	// A `${{ NAME }}` client_id is filled at the point of use (ADR 062); the
-	// value is a project variable until environments exist. A variable marked
-	// secret is refused rather than decrypted: the value goes into a URL the
-	// browser sees. The client secret is not read here: the authorize
-	// request does not use it.
-	if name, ok := domain.VariableReferenceName(conn.OIDC.ClientID); ok {
-		variables, varErr := i.variables.GetVariables(ctx, domain.VariableOwner{ProjectID: in.ProjectID}, name)
-		if varErr != nil {
-			return domain.FlowSSORedirectOutput{}, varErr
-		}
-		clientID := ""
-		if len(variables) == 1 && !variables[0].IsSecret {
-			clientID, _ = variables[0].Value.(string)
-		}
-		if clientID == "" {
-			return domain.FlowSSORedirectOutput{}, i.unavailable(ctx, in, fmt.Errorf("client_id variable %q is missing, a secret, or not a string", name))
-		}
-		conn.OIDC.ClientID = clientID
+	// The client secret is not read here: the authorize request does not
+	// use it.
+	if resolveErr := resolveSSOClientID(ctx, i.variables, in.ProjectID, &conn); resolveErr != nil {
+		return domain.FlowSSORedirectOutput{}, i.unavailable(ctx, in, resolveErr)
 	}
 	client, clientErr := idp.NewOIDCClient(ctx, conn, in.RedirectURI, i.httpClient)
 	if clientErr != nil {
@@ -100,6 +86,32 @@ func (i *FlowSSORedirectIssuer) Issue(ctx context.Context, in domain.FlowIssueSS
 		return domain.FlowSSORedirectOutput{}, err
 	}
 	return domain.FlowSSORedirectOutput{RedirectURL: redirect.URL, BindingNonce: state.BindingNonce}, nil
+}
+
+// resolveSSOClientID fills a `${{ NAME }}` client_id on conn from the
+// project's variables (ADR 062). A literal client_id is left as it is. A
+// variable marked secret is refused rather than decrypted: the value goes
+// into a URL the browser sees. The redirect issuer and the callback both
+// resolve through this, so the exchange runs with the client_id the
+// authorize request was built with.
+func resolveSSOClientID(ctx context.Context, variables VariableService, projectID string, conn *idp.Connection) error {
+	name, ok := domain.VariableReferenceName(conn.OIDC.ClientID)
+	if !ok {
+		return nil
+	}
+	vars, err := variables.GetVariables(ctx, domain.VariableOwner{ProjectID: projectID}, name)
+	if err != nil {
+		return err
+	}
+	clientID := ""
+	if len(vars) == 1 && !vars[0].IsSecret {
+		clientID, _ = vars[0].Value.(string)
+	}
+	if clientID == "" {
+		return fmt.Errorf("client_id variable %q is missing, a secret, or not a string", name)
+	}
+	conn.OIDC.ClientID = clientID
+	return nil
 }
 
 // unavailable turns an engine rejection of the connection into the step

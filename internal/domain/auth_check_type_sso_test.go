@@ -62,9 +62,7 @@ func TestNewSSOState(t *testing.T) {
 		assert.Equal(t, 16, decodedLen(t, sso.OIDCNonce))
 		assert.Equal(t, 32, decodedLen(t, sso.PKCEVerifier))
 
-		projectID, ok := domain.SSOStateProjectID(sso.State)
-		require.True(t, ok)
-		assert.Equal(t, "proj_1", projectID)
+		assert.Equal(t, "proj_1", domain.SSOStateProjectID(sso.State))
 	})
 
 	t.Run("an empty project id is refused", func(t *testing.T) {
@@ -75,9 +73,7 @@ func TestNewSSOState(t *testing.T) {
 	t.Run("a separator in the project id is stripped, so the parse stays exact", func(t *testing.T) {
 		sso, err := domain.NewSSOState("proj.1", "google", "idprev_1", "https://auth.example.com/__nextgen/idp/callback", "/after-login", crypter)
 		require.NoError(t, err)
-		projectID, ok := domain.SSOStateProjectID(sso.State)
-		require.True(t, ok)
-		assert.Equal(t, "proj1", projectID)
+		assert.Equal(t, "proj1", domain.SSOStateProjectID(sso.State))
 	})
 
 	t.Run("the hash covers the project prefix", func(t *testing.T) {
@@ -161,17 +157,16 @@ func TestNewSSOState(t *testing.T) {
 
 // TestSSOStateProjectID feeds the parser what a callback can actually receive:
 // the state query value is attacker-controlled, and every malformed shape must
-// read as not-ok, which the handler treats like an unknown state.
+// read as "", which the handler treats like an unknown state.
 func TestSSOStateProjectID(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name      string
 		state     string
 		projectID string
-		ok        bool
 	}{
-		{name: "minted state", state: "proj_1.abcDEF123-_", projectID: "proj_1", ok: true},
-		{name: "separator in the random part cuts at the first", state: "proj_1.abc.def", projectID: "proj_1", ok: true},
+		{name: "minted state", state: "proj_1.abcDEF123-_", projectID: "proj_1"},
+		{name: "separator in the random part cuts at the first", state: "proj_1.abc.def", projectID: "proj_1"},
 		{name: "no separator", state: "proj_1abcdef"},
 		{name: "empty project", state: ".abcdef"},
 		{name: "empty random part", state: "proj_1."},
@@ -180,9 +175,7 @@ func TestSSOStateProjectID(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			projectID, ok := domain.SSOStateProjectID(tt.state)
-			assert.Equal(t, tt.ok, ok)
-			assert.Equal(t, tt.projectID, projectID)
+			assert.Equal(t, tt.projectID, domain.SSOStateProjectID(tt.state))
 		})
 	}
 }

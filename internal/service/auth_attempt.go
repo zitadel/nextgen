@@ -53,6 +53,23 @@ type AuthAttemptService interface {
 	// errors: domain.ErrAuthAttemptNotFound, domain.ErrAuthAttemptInvalidState, domain.ErrAuthAttemptAlreadyHandedOff, domain.ErrInternal
 	IssueSSOState(ctx context.Context, input IssueSSOStateInput) (*domain.SSOState, error)
 
+	// ConsumeSSOState consumes the single-use SSO state record. It returns
+	// what the submit step stored for the callback: the OIDC nonce, the
+	// encrypted PKCE verifier, the redirect URI and the return target. The
+	// binding cookie value must match the record. Every failure is
+	// ErrSSOStateInvalid.
+	//
+	// errors: domain.ErrSSOStateInvalid, domain.ErrInternal
+	ConsumeSSOState(ctx context.Context, projectID, state, bindingNonce string) (*domain.SSOCallbackCheck, error)
+
+	// SetSSOCallbackResult stores the callback's outcome on the consumed
+	// record, where the next flow render picks it up. It succeeds once per
+	// issued state; a second write, or a write after a re-issue, returns
+	// ErrSSOStateInvalid.
+	//
+	// errors: domain.ErrSSOStateInvalid, domain.ErrInternal
+	SetSSOCallbackResult(ctx context.Context, projectID, state string, result *domain.SSOCallbackResult) error
+
 	// VerifyProof verifies the submitted proof against the challenge identified by ChallengeID.
 	//
 	// On success, it persists the verification and marks the attempt complete if all
@@ -415,6 +432,17 @@ func (s *authAttemptService) IssueSSOState(ctx context.Context, input IssueSSOSt
 		return nil, err
 	}
 	return state, nil
+}
+
+// ConsumeSSOState implements [AuthAttemptService]. The record is stored under
+// the state's hash, so the plain state is hashed here and never compared raw.
+func (s *authAttemptService) ConsumeSSOState(ctx context.Context, projectID, state, bindingNonce string) (*domain.SSOCallbackCheck, error) {
+	return s.stmts.Statements().ConsumeSSOState(ctx, projectID, domain.HashSecret(state), bindingNonce)
+}
+
+// SetSSOCallbackResult implements [AuthAttemptService].
+func (s *authAttemptService) SetSSOCallbackResult(ctx context.Context, projectID, state string, result *domain.SSOCallbackResult) error {
+	return s.stmts.Statements().SetSSOCallbackResult(ctx, projectID, domain.HashSecret(state), result)
 }
 
 // VerifyProof verifies the submitted proof against the challenge identified by ChallengeID.
