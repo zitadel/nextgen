@@ -318,7 +318,7 @@ func (s *flowService) GetStep(ctx context.Context, req GetFlowStepRequest) (doma
 		Step:                  result.Step,
 		HandoffToken:          result.HandoffToken,
 		HandoffTokenExpiresAt: result.HandoffTokenExpiresAt,
-		SSOResolved:           result.SSOResolved,
+		Reseal:                result.Reseal,
 	}, nil
 }
 

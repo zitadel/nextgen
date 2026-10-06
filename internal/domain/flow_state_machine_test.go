@@ -4726,7 +4726,7 @@ func TestFlowStateMachine_Render_SSOReplayGuardSkipsResolution(t *testing.T) {
 	assert.Nil(t, result.Step.Error)
 	assert.Empty(t, result.State.CollectedData.UserID)
 	assert.Empty(t, result.HandoffToken)
-	assert.False(t, result.SSOResolved)
+	assert.False(t, result.Reseal)
 }
 
 func TestFlowStateMachine_Render_NoParkedIdentityRendersStep(t *testing.T) {
@@ -4739,7 +4739,7 @@ func TestFlowStateMachine_Render_NoParkedIdentityRendersStep(t *testing.T) {
 	assert.Equal(t, "credentials", result.Step.Name)
 	assert.Nil(t, result.Step.Error)
 	assert.Empty(t, result.State.SSOResolvedCheckID)
-	assert.False(t, result.SSOResolved)
+	assert.False(t, result.Reseal)
 	assert.Zero(t, result.State.IssuedAt, "a plain render does not refresh IssuedAt")
 }
 
@@ -4778,7 +4778,7 @@ func TestFlowStateMachine_Render_SSOCreationDisabledRendersStepError(t *testing.
 	assert.True(t, containsFieldName(result.Step.Fields, "email"), "the step keeps its inputs")
 	assert.Empty(t, result.HandoffToken)
 	assert.Equal(t, "ch-1", result.State.SSOResolvedCheckID)
-	assert.True(t, result.SSOResolved)
+	assert.True(t, result.Reseal)
 }
 
 // unlinkedParked is an identity with no link under `creation: auto`.
@@ -4845,7 +4845,7 @@ func TestFlowStateMachine_Render_SSOCollisionRoutesUserAlreadyExists(t *testing.
 	assert.Equal(t, "sso-conflict", result.Step.Name)
 	assert.Equal(t, "user-9", result.State.CollectedData.UserID)
 	assert.Equal(t, "ch-1", result.State.SSOResolvedCheckID)
-	assert.True(t, result.SSOResolved)
+	assert.True(t, result.Reseal)
 }
 
 func TestFlowStateMachine_Render_SSOCollisionFlipsRegisterToLogin(t *testing.T) {
@@ -4941,7 +4941,7 @@ func TestFlowStateMachine_Render_SSOAutoCreateRoutesAuthenticated(t *testing.T) 
 	require.Equal(t, "done", result.Step.Name)
 	assert.Equal(t, "handoff-1", result.HandoffToken)
 	assert.Equal(t, "user-new", result.State.CollectedData.UserID)
-	assert.True(t, result.SSOResolved)
+	assert.True(t, result.Reseal)
 }
 
 // Complete claims on a step that cannot route sso_authenticated create
@@ -4967,7 +4967,7 @@ func TestFlowStateMachine_Render_SSOUnroutableTransitionDoesNotCreate(t *testing
 			assert.Equal(t, domain.FlowStepErrorSSOUnavailable, *result.Step.Error)
 			assert.Empty(t, result.State.CollectedData.UserID)
 			assert.Equal(t, "ch-1", result.State.SSOResolvedCheckID)
-			assert.True(t, result.SSOResolved)
+			assert.True(t, result.Reseal)
 		})
 	}
 }
@@ -5029,7 +5029,7 @@ func TestFlowStateMachine_Render_SSOMissingRequiredRoutesUserNotFound(t *testing
 	assert.Equal(t, domain.FlowDefinitionPurposeRegister, result.State.CurrentPurpose)
 	assert.Empty(t, result.State.CollectedData.UserID)
 	assert.Equal(t, "ch-1", result.State.SSOResolvedCheckID, "the row stays, so the guard keeps it from resolving again")
-	assert.True(t, result.SSOResolved, "the guard reaches the cookie only through a re-seal")
+	assert.True(t, result.Reseal, "the guard reaches the cookie only through a re-seal")
 }
 
 // A required unique claim the provider did not verify could take over
@@ -5212,7 +5212,7 @@ func TestFlowStateMachine_Render_SSOUnroutableTransitionDoesNotRetryHandoff(t *t
 			assert.Equal(t, domain.FlowStepErrorSSOUnavailable, *result.Step.Error)
 			assert.Empty(t, result.State.CollectedData.UserID)
 			assert.Equal(t, "att-1", result.State.AuthAttemptID)
-			assert.False(t, result.SSOResolved)
+			assert.False(t, result.Reseal)
 		})
 	}
 }
@@ -5305,7 +5305,7 @@ func TestFlowStateMachine_Render_SSOStaleParkedRowProvisioningRendersStep(t *tes
 			assert.Equal(t, "credentials", result.Step.Name)
 			assert.Nil(t, result.Step.Error)
 			assert.Empty(t, result.State.CollectedData.UserID)
-			assert.False(t, result.SSOResolved)
+			assert.False(t, result.Reseal)
 		})
 	}
 }
@@ -5764,7 +5764,7 @@ func TestFlowStateMachine_Render_SSOCollisionReconcilesLostCookieRace(t *testing
 	require.NoError(t, err)
 	assert.Equal(t, "sso-conflict", result.Step.Name)
 	assert.Equal(t, "u-b", result.State.CollectedData.UserID)
-	assert.True(t, result.SSOResolved)
+	assert.True(t, result.Reseal)
 }
 
 // The catch-up runs on the step the cookie now holds, which may not route
@@ -5793,7 +5793,7 @@ func TestFlowStateMachine_Render_SSOCollisionReconcileUnroutableRendersError(t *
 			require.NotNil(t, result.Step.Error)
 			assert.Equal(t, domain.FlowStepErrorSSOUnavailable, *result.Step.Error)
 			assert.Empty(t, result.State.CollectedData.UserID)
-			assert.False(t, result.SSOResolved)
+			assert.False(t, result.Reseal)
 		})
 	}
 }
@@ -5810,7 +5810,7 @@ func TestFlowStateMachine_Render_SSOCollisionReconcileWithRecordedUserRendersSte
 	require.NoError(t, err)
 	assert.Equal(t, "credentials", result.Step.Name)
 	assert.Nil(t, result.Step.Error)
-	assert.False(t, result.SSOResolved)
+	assert.False(t, result.Reseal)
 }
 
 func TestFlowStateMachine_Render_SSOCollisionReconcileWithOtherUserRestarts(t *testing.T) {

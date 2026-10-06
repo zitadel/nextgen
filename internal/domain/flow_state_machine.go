@@ -133,7 +133,7 @@ type FlowSSOReturn struct {
 // [Process]. Pop is reserved for the deferred pivot stack. HandoffToken
 // + HandoffTokenExpiresAt are populated only on the terminal step;
 // SSOBindingNonce only on the [FlowStepNameSSORedirect] step, where the
-// handler sets it as the browser-binding cookie. SSOResolved is set only by
+// handler sets it as the browser-binding cookie. Reseal is set only by
 // [Render], when resolving a parked SSO identity changed the state: the
 // handler re-seals only such a render.
 type FlowStepResult struct {
@@ -143,7 +143,7 @@ type FlowStepResult struct {
 	HandoffToken          string
 	HandoffTokenExpiresAt time.Time
 	SSOBindingNonce       string
-	SSOResolved           bool
+	Reseal                bool
 }
 
 // FlowStep is the capability payload the API surfaces to the client.
@@ -363,7 +363,7 @@ func (r *FlowStateMachineRuntime) Render(ctx context.Context, def *FlowDefinitio
 		return FlowStepResult{}, fmt.Errorf("%w: render without definition or state", ErrFlowIntegrity())
 	}
 	if result, reseal, err := r.resolveSSOIdentity(ctx, def, state); err != nil || result.Step != nil {
-		result.SSOResolved = reseal
+		result.Reseal = reseal
 		return result, err
 	}
 	step, err := r.renderStep(ctx, def, state)
