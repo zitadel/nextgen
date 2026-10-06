@@ -439,6 +439,12 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 		if err != nil {
 			return FlowStepResult{}, false, err
 		}
+		// The bind may have run on another step, or under an older definition.
+		if !userAlreadyExistsRoutes(currentStep) {
+			msg := FlowStepErrorSSOUnavailable
+			result, err := r.renderStepError(pc, resolvedFields, &msg)
+			return result, true, err
+		}
 		recordResolvedUser(state, parked.CollisionUserID)
 		result, err := r.routeOutcome(pc, resolvedFields, FlowImplicitOutcomeUserAlreadyExists, false)
 		return result, true, err
@@ -674,7 +680,7 @@ func (r *FlowStateMachineRuntime) bindSSOCollision(ctx context.Context, state *F
 		// user_already_exists on a step with sso_providers, so the bind waits
 		// until the outcome can route. A declared purpose can: it starts that
 		// purpose fresh, as it does for a typed collision.
-		if t, ok := step.Transitions[FlowImplicitOutcomeUserAlreadyExists]; !ok || t.Action != nil {
+		if !userAlreadyExistsRoutes(step) {
 			return false, errSSOUnroutable
 		}
 		if err := r.ssoIdentities.BindCollision(ctx, FlowSSOBindInput{
@@ -771,6 +777,13 @@ func (r *FlowStateMachineRuntime) retrySSOHandoff(pc *processCtx, resolvedFields
 func ssoAuthenticatedRoutes(step *FlowDefinitionStep) bool {
 	t, ok := step.Transitions[FlowImplicitOutcomeSSOAuthenticated]
 	return ok && t.Action == nil && t.Purpose == nil
+}
+
+// userAlreadyExistsRoutes reports whether step routes user_already_exists
+// within this flow. A purpose counts: it starts that purpose fresh.
+func userAlreadyExistsRoutes(step *FlowDefinitionStep) bool {
+	t, ok := step.Transitions[FlowImplicitOutcomeUserAlreadyExists]
+	return ok && t.Action == nil
 }
 
 // processCtx carries the per-submission context threaded through the

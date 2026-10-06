@@ -5766,6 +5766,36 @@ func TestFlowStateMachine_Render_SSOCollisionReconcilesLostCookieRace(t *testing
 	assert.True(t, result.SSOResolved)
 }
 
+// The catch-up runs on the step the cookie now holds, which may not route
+// user_already_exists: the step shows the provider as unavailable instead of
+// failing every render until the attempt expires.
+func TestFlowStateMachine_Render_SSOCollisionReconcileUnroutableRendersError(t *testing.T) {
+	t.Parallel()
+	action := domain.Switch
+	for name, transition := range map[string]*domain.FlowStepTransition{
+		"missing":     nil,
+		"with action": {Target: "other-flow", Action: &action},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			w, def, state := ssoRenderWorld(t)
+			if transition != nil {
+				def.Steps[0].Transitions[domain.FlowImplicitOutcomeUserAlreadyExists] = *transition
+			}
+			state.SSOResolvedCheckID = "ch-1"
+			w.ssoIdentities.EXPECT().LoadParked(gomock.Any(), gomock.Any()).
+				Return(&domain.FlowSSOParkedIdentity{CollisionUserID: "u-b", AttemptUserID: "u-b"}, nil)
+
+			result, err := w.sm.Render(t.Context(), def, state)
+			require.NoError(t, err)
+			assert.Equal(t, "credentials", result.Step.Name)
+			require.NotNil(t, result.Step.Error)
+			assert.Equal(t, domain.FlowStepErrorSSOUnavailable, *result.Step.Error)
+			assert.Empty(t, result.State.CollectedData.UserID)
+		})
+	}
+}
+
 func TestFlowStateMachine_Render_SSOCollisionReconcileWithRecordedUserRendersStep(t *testing.T) {
 	t.Parallel()
 	w, def, state := ssoRenderWorld(t)
