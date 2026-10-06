@@ -246,16 +246,16 @@ describe("steps", () => {
     const def = flow();
     def.steps.push({ name: "idle", transitions: { user_not_found: { target: "done" } } });
     expect(messages(validateFlowDefinition(def))).toContain(
-      'step "idle" is non-terminal but has no fields, actions, sso_providers, gates, or transitions.callback',
+      'step "idle" is non-terminal but has no fields, actions, sso_providers, gates, or transitions.sso_authenticated',
     );
   });
 
-  it("rejects sso_providers without transitions.callback", () => {
+  it("rejects sso_providers without transitions.sso_authenticated", () => {
     const def = flow();
     const s = step(def, "identifier");
     s.sso_providers = ["idp"];
     expect(messages(validateFlowDefinition(def))).toContain(
-      'step "identifier": has sso_providers but is missing transitions.callback',
+      'step "identifier": has sso_providers but is missing transitions.sso_authenticated',
     );
   });
 
@@ -271,8 +271,29 @@ describe("steps", () => {
     const def = flow();
     step(def, "identifier").transitions.jump = { target: "done" };
     expect(messages(validateFlowDefinition(def))).toContain(
-      'step "identifier": transition key "jump" is not an action name or reserved outcome (user_not_found, user_already_exists, identity_unknown, callback)',
+      'step "identifier": transition key "jump" is not an action name or reserved outcome (user_not_found, user_already_exists, sso_user_not_found, sso_authenticated)',
     );
+  });
+
+  for (const outcome of ["sso_authenticated", "sso_user_not_found"]) {
+    it(`rejects purpose or action on ${outcome}`, () => {
+      for (const transition of [
+        { target: "register", purpose: "register" },
+        { target: "other-flow", action: "switch" },
+      ]) {
+        const def = flow();
+        step(def, "identifier").transitions[outcome] = transition;
+        expect(messages(validateFlowDefinition(def))).toContain(
+          `step "identifier": transition "${outcome}" is an sso outcome and cannot declare purpose or action`,
+        );
+      }
+    });
+  }
+
+  it("accepts purpose on the shared user_already_exists", () => {
+    const def = flow();
+    step(def, "register").transitions.user_already_exists = { target: "identifier", purpose: "login" };
+    expect(errors(validateFlowDefinition(def))).toEqual([]);
   });
 
   it("collects issues across independent steps", () => {
