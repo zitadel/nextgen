@@ -34,6 +34,73 @@ Layer 3 is not a leftover: layer 2 needs an `Origin` to match, and a server-side
 app sends none. No layer reads a stored pointer; see
 [why there is no pointer column](1-data-model.md#why-there-is-no-pointer-column).
 
+### As a flow chart
+
+The same three layers, the pin, and every refusal, in the order the server
+checks them. `sandbox` is the project [class](2-origins.md#project-class).
+
+```mermaid
+flowchart TD
+    REQ[Request: credential names the project] --> PM{body project_id<br/>agrees with credential?}
+    PM -- no --> E_MISMATCH[403 proj.mismatch]
+    PM -- yes --> HAS_ORIGIN{Origin header?}
+
+    subgraph L1 [Layer 1: gate]
+        HAS_ORIGIN -- present --> MATCH{matches an<br/>allowed_origins pattern?}
+        MATCH -- none --> LOOP{sandbox and<br/>loopback origin?}
+        LOOP -- no --> E_NOT_ALLOWED[403 proj.origin_not_allowed]
+        MATCH -- preview --> ROW{live row for<br/>this exact URL?}
+        ROW -- no or expired --> E_NOT_LIVE[403 proj.preview_not_live]
+    end
+
+    subgraph L2 [Layer 2: route]
+        MATCH -- primary --> NEWEST_ORIGIN[newest deployment row<br/>with origin = this URL]
+        LOOP -- yes --> NEWEST_ORIGIN
+        ROW -- yes --> NEWEST_ORIGIN
+        NEWEST_ORIGIN --> FOUND_ORIGIN{row found?}
+        FOUND_ORIGIN -- yes --> T_ORIGIN[target = this origin]
+        FOUND_ORIGIN -- no, preview URL --> E_NOT_LIVE
+    end
+
+    subgraph L3 [Layer 3: fall back]
+        HAS_ORIGIN -- absent --> NEWEST_DEFAULT[newest deployment row<br/>with origin = empty]
+        FOUND_ORIGIN -- no, primary URL --> NEWEST_DEFAULT
+        NEWEST_DEFAULT --> FOUND_DEFAULT{row found?}
+        FOUND_DEFAULT -- yes --> T_DEFAULT[target = project default]
+        FOUND_DEFAULT -- no --> E_NO_DEFAULT[409 rel.no_default]
+    end
+
+    T_ORIGIN --> PIN
+    T_DEFAULT --> PIN
+
+    subgraph P [Pin: X-Zitadel-Release selects, never activates]
+        PIN{header present?}
+        PIN -- absent --> SERVE_NEWEST[serve the release the<br/>target's newest row names]
+        PIN -- present --> LOOKUP{release in this project?}
+        LOOKUP -- none --> E_NOT_FOUND[404 rel.not_found]
+        LOOKUP -- short digest, several --> E_AMBIGUOUS[400 rel.ambiguous]
+        LOOKUP -- one --> CLASS{sandbox?}
+        CLASS -- yes --> SERVE_PIN[serve the pinned release]
+        CLASS -- no --> DEPLOYED{deployed to this target,<br/>inside the pin window?}
+        DEPLOYED -- no --> E_NOT_DEPLOYED[409 rel.not_deployed]
+        DEPLOYED -- yes --> SERVE_PIN_DEP[serve the newest deployment<br/>of that release on the target]
+    end
+
+    SERVE_NEWEST --> REVOKED{release revoked?}
+    SERVE_PIN --> REVOKED
+    SERVE_PIN_DEP --> REVOKED
+    REVOKED -- yes --> E_REVOKED[409 rel.revoked]
+    REVOKED -- no --> SEAL[seal the deployment id<br/>into the flow state]
+
+    classDef refuse fill:#fde8e8,stroke:#c53030,color:#1a202c
+    class E_MISMATCH,E_NOT_ALLOWED,E_NOT_LIVE,E_NO_DEFAULT,E_NOT_FOUND,E_AMBIGUOUS,E_NOT_DEPLOYED,E_REVOKED refuse
+```
+
+Two things the chart makes visible that the prose states separately: a
+preview URL never reaches layer 3, because a preview with no row fails closed
+rather than serving production; and the pin runs after a target is found, so
+it can only choose among what that target already served.
+
 **Sealing.** The resolved *deployment* id is written into the flow state at the
 first step and reused for the rest of the attempt, so a deploy landing mid
 sign-in cannot change the configuration under the user. Sealing the deployment
