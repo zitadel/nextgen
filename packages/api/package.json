@@ -72,7 +72,7 @@
     "generate": "orval --config orval.config.ts --clean",
     "build": "tsdown",
     "test": "vitest run",
-    "test:all": "pnpm run test"
+    "test:all": "vitest run"
   },
   "devDependencies": {
     "@faker-js/faker": "catalog:",

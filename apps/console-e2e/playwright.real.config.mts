@@ -53,8 +53,10 @@ export default defineConfig({
       serverBinaryHint: "run `moon run server:build` first.",
     },
     app: {
-      command: ["corepack", "pnpm", "--filter", "@zitadel/console", "dev"],
-      cwd: workspaceRoot,
+      // `node --run` starts the app's own `dev` script without a nested pnpm,
+      // which would warn about the platform-specific server packages.
+      command: ["node", "--run", "dev"],
+      cwd: join(workspaceRoot, "apps", "console"),
       readyPath: "/projects",
       env: consoleAppEnv,
       gracefulShutdownMs: 10_000,

@@ -33,8 +33,12 @@ tasks:
     options:
       runInCI: false
 
+  # Runs the script with node rather than through `pnpm run e2e-local`: a pnpm
+  # started from inside a pnpm script re-checks every workspace package and
+  # warns about the platform-specific server binaries, and this script starts
+  # pnpm once per journey.
   e2e-local:
-    command: "corepack pnpm run e2e-local"
+    command: "node scripts/run-local.mjs"
     env:
       ZITADEL_TELEMETRY: "0"
     deps:
@@ -47,7 +51,7 @@ tasks:
   # app, install the kit from the journey registry, and run its withZitadel()
   # suite against the published binary (embedded UIs, no env overrides).
   e2e-testkit:
-    command: "corepack pnpm run e2e-local --suite testkit"
+    command: "node scripts/run-local.mjs --suite testkit"
     env:
       ZITADEL_TELEMETRY: "0"
     deps:

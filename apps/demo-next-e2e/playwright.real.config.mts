@@ -40,8 +40,10 @@ export default defineConfig({
       serverBinaryHint: "run `moon run server:build` first.",
     },
     app: {
-      command: ["corepack", "pnpm", "--filter", "@zitadel/demo-next", "dev"],
-      cwd: workspaceRoot,
+      // `node --run` starts the app's own `dev` script without a nested pnpm,
+      // which would warn about the platform-specific server packages.
+      command: ["node", "--run", "dev"],
+      cwd: join(workspaceRoot, "apps", "demo-next"),
       readyPath: "/login",
       env: nextAppEnv,
     },

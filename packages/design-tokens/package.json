@@ -32,7 +32,7 @@
     "generate": "tsx scripts/build.ts",
     "build": "tsdown",
     "test": "vitest run",
-    "test:all": "pnpm run test"
+    "test:all": "vitest run"
   },
   "devDependencies": {
     "tsdown": "catalog:",

@@ -339,17 +339,9 @@ async function runFrameworkJourney(context) {
     log(`[${prefix}] running Playwright journey`);
     await run(
       "corepack",
-      [
-        "pnpm",
-        "--filter",
-        "@zitadel/cli-journey-e2e",
-        "exec",
-        "playwright",
-        "test",
-        "--config",
-        "playwright.config.mts",
-      ],
+      ["pnpm", "exec", "playwright", "test", "--config", "playwright.config.mts"],
       {
+        cwd: projectRoot,
         env: {
           ...process.env,
           JOURNEY_APP_DIR: context.appDir,
@@ -530,15 +522,9 @@ function validatePortValue(value, name) {
 
 async function ensurePlaywrightBrowsers() {
   log("ensuring Playwright Chromium browsers are installed");
-  await run("corepack", [
-    "pnpm",
-    "--filter",
-    "@zitadel/cli-journey-e2e",
-    "exec",
-    "playwright",
-    "install",
-    "chromium",
-  ]);
+  await run("corepack", ["pnpm", "exec", "playwright", "install", "chromium"], {
+    cwd: projectRoot,
+  });
 }
 
 async function buildJourneyRuntimeImage() {

@@ -32,7 +32,7 @@
     "build": "vite build --mode lib",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:all": "pnpm run test",
+    "test:all": "vitest run",
     "lint": "eslint ."
   },
   "dependencies": {

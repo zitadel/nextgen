@@ -9,7 +9,7 @@
     "build": "storybook build --output-dir dist",
     "typecheck": "tsc --build tsconfig.json",
     "test": "vitest run --project=storybook",
-    "test:all": "pnpm run test"
+    "test:all": "vitest run --project=storybook"
   },
   "dependencies": {
     "@zitadel/api": "workspace:*",

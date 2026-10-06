@@ -32,7 +32,7 @@
     "build": "vite build",
     "typecheck": "svelte-check --tsconfig ./tsconfig.json",
     "test": "vitest run",
-    "test:all": "pnpm run test",
+    "test:all": "vitest run",
     "lint": "eslint ."
   },
   "dependencies": {

@@ -96,7 +96,8 @@ jobs:
 
       - name: Install Playwright Chromium
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.browsers == 'true' }}
-        run: corepack pnpm --filter @zitadel/components exec playwright install chromium
+        working-directory: packages/components
+        run: corepack pnpm exec playwright install chromium
 
       - name: Run Moon build and test graph
         id: moon-ci

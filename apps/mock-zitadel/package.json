@@ -18,9 +18,9 @@
     "dev": "tsx scripts/local-server.ts",
     "build": "tsdown",
     "test": "vitest run",
-    "test:all": "pnpm run test",
+    "test:all": "vitest run",
     "test:watch": "vitest --watch",
-    "typecheck": "corepack pnpm --filter @zitadel/api run generate && tsc --noEmit",
+    "typecheck": "(cd ../../packages/api && node --run generate) && tsc --noEmit",
     "lint": "eslint ."
   },
   "dependencies": {
