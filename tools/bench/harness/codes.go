@@ -23,6 +23,8 @@ func ErrorCodes(op string) []string {
 		codes = submitFlowStepCodes
 	case OpGetUser:
 		codes = getUserCodes
+	case OpGetMySession:
+		codes = getMySessionCodes
 	}
 	return append(append([]string(nil), codes...), harnessCodes...)
 }
@@ -71,6 +73,13 @@ var submitFlowStepCodes = []string{
 	string(api.UserAlreadyExistsSubmitFlowStepErrorResponse),
 	string(api.UserInvalidSubmitFlowStepErrorResponse),
 	string(api.UserNotFoundSubmitFlowStepErrorResponse),
+}
+
+var getMySessionCodes = []string{
+	string(api.AuthUnauthorizedGetMySessionErrorResponse),
+	string(api.InternalGetMySessionErrorResponse),
+	string(api.ReqInvalidGetMySessionErrorResponse),
+	string(api.SessNotFoundGetMySessionErrorResponse),
 }
 
 var getUserCodes = []string{

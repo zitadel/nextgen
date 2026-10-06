@@ -23,6 +23,9 @@ func TestErrorCodesDecode(t *testing.T) {
 		OpGetUser: func(code string) error {
 			return new(api.GetUserByIDErrorResponse).Decode(jx.DecodeStr(fmt.Sprintf(`{"code":%q,"message":"m"}`, code)))
 		},
+		OpGetMySession: func(code string) error {
+			return new(api.GetMySessionErrorResponse).Decode(jx.DecodeStr(fmt.Sprintf(`{"code":%q,"message":"m"}`, code)))
+		},
 	}
 	decoders[OpSubmitPassword] = decoders[OpSubmitIdent]
 	for _, op := range Operations {
