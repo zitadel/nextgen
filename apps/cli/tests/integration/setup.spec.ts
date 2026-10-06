@@ -79,6 +79,16 @@ describe("setup", () => {
         expect(await app.publishedFlows()).toHaveLength(1);
       });
 
+      it("puts the first release live on the default and the local origin", async () => {
+        const app = await anApp();
+
+        expect(await app.setup()).toSucceed();
+
+        const live = await app.run(["deployments", "--live", "--json"]);
+        const rows = app.envelopeOf<{ deployments: Array<{ origin: string }> }>(live).data.deployments;
+        expect(rows.map((row) => row.origin).sort()).toEqual(["", "http://localhost:3000"]);
+      });
+
       it("leaves nothing to reconcile", async () => {
         const app = await anApp();
 

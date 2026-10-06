@@ -427,9 +427,9 @@ export default class Setup extends BaseCommand {
       const sentence = describeWrittenFile(relativeDisplay(cwd, file), dryRun);
       if (sentence) consola.info(sentence);
     }
-    // The server serves nothing until a deploy appends a row for the project
-    // default, so the first release goes live here; without it every sign-in
-    // answers rel.no_default.
+    // The server serves nothing until a deploy appends a row per target, so
+    // the first release goes live here on the project default and the local
+    // origin; without it every sign-in answers rel.no_default.
     if (!dryRun && answers.server !== "mock") {
       try {
         const client = createZitadelClient(
@@ -438,10 +438,10 @@ export default class Setup extends BaseCommand {
         );
         const release = await buildRelease({ cwd, client, projectId: project.id });
         await client.createDeployment(
-          { release: release.id, targets: ["default"], message: "initial release" },
+          { release: release.id, targets: ["default", "primary"], message: "initial release" },
           { project_id: project.id },
         );
-        consola.success(`Deployed release ${release.id} to the project default`);
+        consola.success(`Deployed release ${release.id} to the project default and ${issuer}`);
       } catch (error) {
         await rm(join(cwd, "zitadel.json"), { force: true });
         await rm(join(cwd, ".zitadel/secret"), { force: true });
