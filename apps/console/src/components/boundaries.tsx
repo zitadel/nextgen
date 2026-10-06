@@ -142,7 +142,10 @@ function describeBoundaryError(error: unknown): { heading: string; message: stri
     if (error.status === 403) {
       return {
         heading: "Not authorized",
-        message: "You are signed in, but this account does not have access to this resource.",
+        message: describeError(
+          error,
+          "You are signed in, but this account does not have access to this resource.",
+        ),
       };
     }
     return {

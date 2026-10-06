@@ -38,10 +38,10 @@ export function useLoadMore<P extends Page>(
     setLoading(false);
   }, [loaded]);
 
+  // Set during render, not in an effect: a page that settles between a new
+  // loader result committing and its effects running must still be dropped.
   const loadedRef = useRef(loaded);
-  useEffect(() => {
-    loadedRef.current = loaded;
-  }, [loaded]);
+  loadedRef.current = loaded;
 
   async function loadMore() {
     if (!nextPageToken || loading) return;

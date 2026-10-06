@@ -194,6 +194,33 @@ describe("users screen", () => {
     expect(table.getByText("maya@acme.com")).toBeInTheDocument();
   });
 
+  it("adds raw attribute columns for users whose schema did not load", async () => {
+    server.use(
+      http.post(USERS_QUERY_URL, () =>
+        HttpResponse.json({
+          users: [
+            { id: "user_1", schema: "sch_business", attributes: { email: "maya@acme.com" } },
+            { id: "user_2", schema: "sch_gone", attributes: { email: "x@y.com", handle: "xy" } },
+          ],
+        }),
+      ),
+      http.get(`${SCHEMAS_URL}/sch_business`, () =>
+        HttpResponse.json({
+          id: "sch_business",
+          schema: { title: "Business", properties: { email: { type: "string" } } },
+        }),
+      ),
+      http.get(`${SCHEMAS_URL}/sch_gone`, () => HttpResponse.json({}, { status: 404 })),
+    );
+    await renderUsers();
+
+    const table = within(await screen.findByRole("table"));
+    // The loaded schema's column, then the unreadable schema's keys that are not already columns.
+    expect(await table.findByText("handle")).toBeInTheDocument();
+    expect(table.getByText("xy")).toBeInTheDocument();
+    expect(table.getByText("x@y.com")).toBeInTheDocument();
+  });
+
   it("renders a placeholder where a user's schema does not define a column", async () => {
     // Columns union across schemas (D4), so a minimal user sits in a table that
     // also has business columns. The cell must read as empty, not as missing.

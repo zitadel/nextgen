@@ -67,42 +67,45 @@ export async function columnsForUsers(
   users: Record<string, unknown>[],
 ): Promise<SchemaField[]> {
   const schemaIds = [...new Set(users.map((user) => field(user, "schema")).filter(isPresent))];
-  const schemas = await Promise.all(
+  const loaded = new Map<string, UserSchema>();
+  await Promise.all(
     schemaIds.map(async (id) => {
       try {
-        return (await api.getSchemaById(id, { project_id: projectId })).schema as UserSchema;
+        loaded.set(id, (await api.getSchemaById(id, { project_id: projectId })).schema as UserSchema);
       } catch {
-        // One unreadable schema costs its columns, not the screen. The rows
+        // One unreadable schema costs its columns, not the screen. Its users
         // still render from the fallback below.
-        return undefined;
       }
     }),
   );
-  return columnsFor(users, schemas.filter(isPresent));
+  return columnsFor(users, loaded);
 }
 
 /**
- * Columns from the users' schemas, falling back to the keys the records
- * themselves carry.
- *
- * The fallback matters because the schema fetch is best-effort and because a
- * user may predate its schema. Without it an unreadable schema would render a
- * table of rows with no columns — worse than showing the raw attributes.
+ * Columns from the users' schemas, plus a column for every attribute key of a
+ * user whose schema did not load. A user with no schema at all counts as such.
  */
-function columnsFor(users: Record<string, unknown>[], schemas: UserSchema[]): SchemaField[] {
-  const columns = schemaColumns(schemas);
-  if (columns.length > 0) return columns;
-
+function columnsFor(
+  users: Record<string, unknown>[],
+  schemas: Map<string, UserSchema>,
+): SchemaField[] {
+  const columns = schemaColumns([...schemas.values()]);
+  const known = new Set(columns.map((column) => column.key));
   const keys = new Set<string>();
   for (const user of users) {
-    for (const key of Object.keys(userAttributes(user))) keys.add(key);
+    const schemaId = field(user, "schema");
+    if (schemaId && schemas.has(schemaId)) continue;
+    for (const key of Object.keys(userAttributes(user))) {
+      if (!known.has(key)) keys.add(key);
+    }
   }
-  return [...keys].sort().map((key) => ({
+  const fallback = [...keys].sort().map((key) => ({
     key,
     label: key,
     required: false,
     inputType: "text" as const,
   }));
+  return [...columns, ...fallback];
 }
 
 export interface UserRow {
