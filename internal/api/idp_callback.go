@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/service"
@@ -42,12 +43,14 @@ func NewIDPCallbackHandler(callback ssoCallbackProcessor) *IDPCallbackHandler {
 }
 
 func (h *IDPCallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// The route is not an ogen operation, so it sets its own operation id for
+	// the request log and the request.api event: one key for both mounts.
+	ctx := middleware.WithOperationIDContext(r.Context(), "idpCallback")
 	if r.Method != http.MethodGet {
 		w.Header().Set("Allow", http.MethodGet)
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	ctx := r.Context()
 	query := r.URL.Query()
 	in := service.FlowSSOCallbackInput{
 		State:            query.Get("state"),

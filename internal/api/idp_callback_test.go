@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/api"
+	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/service"
@@ -202,4 +203,17 @@ func TestIDPCallbackHandler_LogsUnlessCancelled(t *testing.T) {
 			assert.Equal(t, tt.wantError, bytes.Contains(logs.Bytes(), []byte("sso callback processing failed")))
 		})
 	}
+}
+
+// The request log and the audit middleware plant the operation id before the
+// handler runs and read it after.
+func TestIDPCallbackHandler_SetsTheOperationID(t *testing.T) {
+	t.Parallel()
+	ctx := middleware.WithOperationIDContext(t.Context(), "")
+	stub := &stubSSOCallback{out: service.FlowSSOCallbackOutput{ReturnTarget: "https://app.example.com/login"}}
+	req := httptest.NewRequestWithContext(ctx, http.MethodGet, api.IDPCallbackPath+"?state=proj-1.rand&code=the-code", nil)
+	api.NewIDPCallbackHandler(stub).ServeHTTP(httptest.NewRecorder(), req)
+
+	operationID, _ := middleware.GetOperationIDContext(ctx)
+	assert.Equal(t, "idpCallback", operationID)
 }
