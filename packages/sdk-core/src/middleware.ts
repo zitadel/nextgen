@@ -106,7 +106,7 @@ function ontoThisApp(location: string, selfUrl: string | undefined): string | un
  *
  * `location` was stripped outright until the identity-provider callback
  * needed it: the provider returns the browser to `/__nextgen/idp/callback`,
- * and the engine answers `302` back to the page the sign-in started on. That
+ * and the engine answers `303` back to the page the sign-in started on. That
  * is a top-level navigation with no JavaScript in the loop, so a dropped
  * `Location` leaves the browser on an empty page. Outbound redirects to a
  * provider do not travel this way -- they arrive as `step.redirect_url` in a
