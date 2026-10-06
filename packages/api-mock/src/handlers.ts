@@ -384,12 +384,15 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
     }),
     // The session endpoints `<zitadel-session>` and `<zitadel-logout>` read on
     // mount. In-process there is no session cookie to present, so both answer
-    // the way the server (and `server.ts`) does for a signed-out browser.
+    // the contract's 401 for a signed-out browser.
     http.get("*/sessions/me", () =>
-      HttpResponse.json({ code: "unauthenticated", message: "no session cookie" }, { status: 401 }),
+      HttpResponse.json(
+        { code: "auth.unauthorized", message: "no session cookie" },
+        { status: 401, headers: { "Cache-Control": "private, no-store" } },
+      ),
     ),
     http.delete("*/sessions/me", () =>
-      HttpResponse.json({ code: "unauthenticated", message: "no session cookie" }, { status: 401 }),
+      HttpResponse.json({ code: "auth.unauthorized", message: "no session cookie" }, { status: 401 }),
     ),
   ];
 
