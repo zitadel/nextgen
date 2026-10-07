@@ -19,6 +19,10 @@ type UserRefResolver interface {
 	ResolveRefsForUsers(ctx context.Context, projectID string, users []*domain.User) (map[string]domain.UserRef, error)
 }
 
+// refUserBatchSize bounds the user ids resolved in one query. Each id is one
+// bound parameter, and Spanner refuses a statement with more than 950.
+const refUserBatchSize = 500
+
 // refSchemaPageSize pages the user-schema listing during ref resolution.
 // Projects hold few schemas; paging is correctness, not tuning.
 const refSchemaPageSize = 100
@@ -52,8 +56,8 @@ var _ UserRefResolver = StatementsUserRefResolver{}
 // ResolveUserRefs loads the project's user-schema documents (every stored
 // revision — users pin the schema URL they were created under, so each
 // revision's own designations govern its users), lists the requested users
-// in one call hydrating only the designated attribute keys, and maps each
-// user through its schema's designations.
+// in batches of refUserBatchSize hydrating only the designated attribute keys,
+// and maps each user through its schema's designations.
 func (r StatementsUserRefResolver) ResolveUserRefs(ctx context.Context, projectID string, userIDs []string) (map[string]domain.UserRef, error) {
 	userIDs = slices.Compact(slices.Sorted(slices.Values(userIDs)))
 	if len(userIDs) == 0 {
@@ -71,30 +75,31 @@ func (r StatementsUserRefResolver) ResolveUserRefs(ctx context.Context, projectI
 		return nil, err
 	}
 
-	idFilters := make([]database.Filter[domain.UserField], 0, len(userIDs))
-	for _, userID := range userIDs {
-		idFilters = append(idFilters, database.Equal(database.Col(domain.UserFieldID), userID))
-	}
-	listed, err := r.Pool.Statements().ListUsers(ctx, &database.ListOptions[domain.UserField]{
-		Filter: database.And(
-			database.Equal(database.Col(domain.UserFieldProjectID), projectID),
-			database.Or(idFilters...),
-		),
-		Pagination: database.Page[domain.UserField]{
-			Limit: uint32(len(userIDs)),
-			OrderBy: database.OrderBy[domain.UserField]{
-				Columns:   []database.Column[domain.UserField]{database.Col(domain.UserFieldID)},
-				Direction: database.OrderAsc,
+	refs := make(map[string]domain.UserRef, len(userIDs))
+	for batch := range slices.Chunk(userIDs, refUserBatchSize) {
+		idFilters := make([]database.Filter[domain.UserField], 0, len(batch))
+		for _, userID := range batch {
+			idFilters = append(idFilters, database.Equal(database.Col(domain.UserFieldID), userID))
+		}
+		listed, err := r.Pool.Statements().ListUsers(ctx, &database.ListOptions[domain.UserField]{
+			Filter: database.And(
+				database.Equal(database.Col(domain.UserFieldProjectID), projectID),
+				database.Or(idFilters...),
+			),
+			Pagination: database.Page[domain.UserField]{
+				Limit: uint32(len(batch)),
+				OrderBy: database.OrderBy[domain.UserField]{
+					Columns:   []database.Column[domain.UserField]{database.Col(domain.UserFieldID)},
+					Direction: database.OrderAsc,
+				},
 			},
-		},
-	}, UserQueryOptions{AttributeKeys: attributeKeys})
-	if err != nil {
-		return nil, err
-	}
-
-	refs := make(map[string]domain.UserRef, len(listed.Items))
-	for _, user := range listed.Items {
-		refs[user.ID] = domain.ResolveUserRef(user, documents[user.SchemaURL])
+		}, UserQueryOptions{AttributeKeys: attributeKeys})
+		if err != nil {
+			return nil, err
+		}
+		for _, user := range listed.Items {
+			refs[user.ID] = domain.ResolveUserRef(user, documents[user.SchemaURL])
+		}
 	}
 	return refs, nil
 }

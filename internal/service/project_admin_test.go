@@ -59,7 +59,9 @@ func (f adminFixture) expect(s *servicemocks.MockAllStatements) {
 				items = append(items, &domain.Team{ID: id, Name: name})
 			}
 			return &database.ListResult[*domain.Team]{Items: items}, nil
-		}).AnyTimes()
+		}).MaxTimes(1)
+	// The owning team and the team grants are expanded together: one read of
+	// the teams and one of their members, not one per kind of source.
 	s.EXPECT().ListAuthzMembershipEdges(gomock.Any(), gomock.Any()).DoAndReturn(
 		func(context.Context, database.Filter[domain.AuthzMembershipEdgeField]) ([]*domain.AuthzMembershipEdge, error) {
 			var edges []*domain.AuthzMembershipEdge
@@ -69,7 +71,7 @@ func (f adminFixture) expect(s *servicemocks.MockAllStatements) {
 				}
 			}
 			return edges, nil
-		}).AnyTimes()
+		}).MaxTimes(1)
 }
 
 func adminGrant(id string, principalType domain.AuthzPrincipalType, principalID string, expiresAt *time.Time) *domain.AuthzAssignment {

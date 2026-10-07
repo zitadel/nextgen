@@ -64,11 +64,15 @@ func (s *GrantService) ListProjectAdmins(ctx context.Context, projectID string) 
 	if projectID == "" {
 		return nil, domain.ErrProjectMissingID()
 	}
-	owningTeam, err := s.owningTeamAdmins(ctx, projectID)
+	owningTeam, err := s.owningTeamSource(ctx, projectID)
 	if err != nil {
 		return nil, err
 	}
-	teamGranted, err := s.teamGrantAdmins(ctx, projectID)
+	teamGranted, err := s.teamGrantSources(ctx, projectID)
+	if err != nil {
+		return nil, err
+	}
+	teamMembers, err := s.teamAdmins(ctx, slices.Concat(owningTeam, teamGranted))
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +83,7 @@ func (s *GrantService) ListProjectAdmins(ctx context.Context, projectID string) 
 
 	admins := map[string]*ProjectAdmin{}
 	homes := map[string]string{}
-	for _, sourced := range slices.Concat(owningTeam, teamGranted, userGranted) {
+	for _, sourced := range slices.Concat(teamMembers, userGranted) {
 		admin, ok := admins[sourced.userID]
 		if !ok {
 			admin = &ProjectAdmin{User: domain.UserRef{UserID: sourced.userID}}
@@ -101,15 +105,15 @@ func (s *GrantService) ListProjectAdmins(ctx context.Context, projectID string) 
 	return out, nil
 }
 
-func (s *GrantService) owningTeamAdmins(ctx context.Context, projectID string) ([]sourcedAdmin, error) {
+func (s *GrantService) owningTeamSource(ctx context.Context, projectID string) ([]teamSource, error) {
 	teamID, err := activeOwningTeamID(ctx, s.v2Pool.Statements(), projectID)
 	if err != nil || teamID == "" {
 		return nil, err
 	}
-	return s.teamAdmins(ctx, []teamSource{{teamID: teamID, source: ProjectAdminSource{Type: ProjectAdminSourceOwningTeam}}})
+	return []teamSource{{teamID: teamID, source: ProjectAdminSource{Type: ProjectAdminSourceOwningTeam}}}, nil
 }
 
-func (s *GrantService) teamGrantAdmins(ctx context.Context, projectID string) ([]sourcedAdmin, error) {
+func (s *GrantService) teamGrantSources(ctx context.Context, projectID string) ([]teamSource, error) {
 	grants, err := s.activeAdminGrants(ctx, projectID, domain.AuthzPrincipalTypeTeam)
 	if err != nil {
 		return nil, err
@@ -118,7 +122,7 @@ func (s *GrantService) teamGrantAdmins(ctx context.Context, projectID string) ([
 	for _, grant := range grants {
 		teams = append(teams, teamSource{teamID: grant.PrincipalID, source: ProjectAdminSource{Type: ProjectAdminSourceGrant, GrantID: grant.ID}})
 	}
-	return s.teamAdmins(ctx, teams)
+	return teams, nil
 }
 
 func (s *GrantService) userGrantAdmins(ctx context.Context, projectID string) ([]sourcedAdmin, error) {
@@ -126,7 +130,8 @@ func (s *GrantService) userGrantAdmins(ctx context.Context, projectID string) ([
 	if err != nil {
 		return nil, err
 	}
-	homes, err := s.principalHomes(ctx, grantPrincipalIDs(grants))
+	userIDs, _ := principalIDs(grants)
+	homes, err := s.principalHomes(ctx, userIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -293,21 +298,14 @@ func (s *GrantService) resolveAdminRefs(ctx context.Context, admins []*ProjectAd
 	return nil
 }
 
-func grantPrincipalIDs(grants []*domain.AuthzAssignment) []string {
-	ids := make([]string, 0, len(grants))
-	for _, grant := range grants {
-		ids = append(ids, grant.PrincipalID)
-	}
-	return ids
-}
-
 // owningTeamGrantStatements reads a project's owning-team assignment.
 type owningTeamGrantStatements interface {
 	GetActiveOwningTeamGrant(ctx context.Context, projectID string) (*domain.AuthzAssignment, error)
 }
 
 // activeOwningTeamID returns the team that owns the project (ADR 054 §2), or ""
-// when no team owns it. Like the resolver, it ignores an expired assignment.
+// when no team owns it. An owning-team assignment cannot expire: a CHECK
+// constraint forbids expires_at on it.
 func activeOwningTeamID(ctx context.Context, stmts owningTeamGrantStatements, projectID string) (string, error) {
 	grant, err := stmts.GetActiveOwningTeamGrant(ctx, projectID)
 	if err != nil {
@@ -315,9 +313,6 @@ func activeOwningTeamID(ctx context.Context, stmts owningTeamGrantStatements, pr
 			return "", nil
 		}
 		return "", domain.ErrInternal(err).WithMessage("failed to load the project's owning team")
-	}
-	if grant.ExpiresAt != nil && !grant.ExpiresAt.After(time.Now()) {
-		return "", nil
 	}
 	return grant.PrincipalID, nil
 }

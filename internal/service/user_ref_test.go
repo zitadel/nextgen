@@ -3,6 +3,7 @@ package service_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -120,6 +121,33 @@ func TestStatementsUserRefResolver_ResolveUserRefs(t *testing.T) {
 		assert.Equal(t, domain.UserRef{UserID: "user-4"}, refs["user-4"])
 		assert.Equal(t, []string{""}, gotKeys,
 			"nil would hydrate everything; the sentinel key hydrates nothing")
+	})
+
+	t.Run("a large id set is resolved in batches", func(t *testing.T) {
+		// Spanner refuses a statement with more than 950 parameters, and each
+		// id is one.
+		ctrl := gomock.NewController(t)
+		stmts := mocks.NewMockAllStatements(ctrl)
+		expectSchemas(stmts, userSchema("https://s/human", `{"x-identifier":"email"}`))
+		var limits []uint32
+		stmts.EXPECT().ListUsers(gomock.Any(), gomock.Any(), gomock.Any()).Times(3).
+			DoAndReturn(func(_ context.Context, opts *database.ListOptions[domain.UserField], _ service.UserQueryOptions) (*database.ListResult[*domain.User], error) {
+				limits = append(limits, opts.Pagination.Limit)
+				id := fmt.Sprintf("user-batch-%d", len(limits))
+				return &database.ListResult[*domain.User]{Items: []*domain.User{
+					{ProjectID: "proj", SchemaURL: "https://s/human", ID: id},
+				}}, nil
+			})
+		ids := make([]string, 1200)
+		for i := range ids {
+			ids[i] = fmt.Sprintf("user-%04d", i)
+		}
+
+		refs, err := newResolver(t, stmts).ResolveUserRefs(t.Context(), "proj", ids)
+
+		require.NoError(t, err)
+		assert.Equal(t, []uint32{500, 500, 200}, limits)
+		assert.Len(t, refs, 3, "every batch's users are in the result")
 	})
 
 	t.Run("empty id set short-circuits without queries", func(t *testing.T) {
