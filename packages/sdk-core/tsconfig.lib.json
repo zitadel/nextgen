@@ -7,7 +7,10 @@
     "emitDeclarationOnly": false,
     "module": "esnext",
     "moduleResolution": "bundler",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"]
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "composite": false,
+    "declaration": true,
+    "declarationMap": false
   },
   "include": ["src/**/*.ts"],
   "exclude": ["src/**/*.spec.ts"]

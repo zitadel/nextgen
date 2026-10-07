@@ -4,16 +4,11 @@
     "outDir": "./out-tsc/vitest",
     "types": ["node"],
     "module": "esnext",
-    "moduleResolution": "bundler"
+    "moduleResolution": "bundler",
+    "composite": false,
+    "declarationMap": false,
+    "emitDeclarationOnly": false,
+    "declaration": false
   },
-  "include": [
-    "vitest.config.ts",
-    "vitest.integration.config.ts",
-    "tests/**/*.ts"
-  ],
-  "references": [
-    {
-      "path": "./tsconfig.lib.json"
-    }
-  ]
+  "include": ["vitest.config.ts", "vitest.integration.config.ts", "tests/**/*.ts"]
 }

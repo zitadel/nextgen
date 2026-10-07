@@ -196,7 +196,10 @@ const calledOperations = async (): Promise<ReadonlySet<string>> => {
   const context = { client, projectId: "proj_test" } as never;
 
   for (const resource of Object.values(RESOURCES)) {
-    const verbs = resource as Record<string, { call?: (...args: never[]) => unknown } | undefined>;
+    const verbs = resource as unknown as Record<
+      string,
+      { call?: (...args: never[]) => Promise<unknown> } | undefined
+    >;
     for (const verb of ["list", "get", "create", "update", "delete"] as const) {
       // A verb may branch on the shape of its argument — a schema is addressed
       // by revision id or by object type — so every branch is driven, or the

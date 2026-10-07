@@ -3,19 +3,12 @@
   "compilerOptions": {
     "outDir": "out-tsc/app",
     "tsBuildInfoFile": "out-tsc/app/tsconfig.app.tsbuildinfo",
-    "rootDir": "src"
+    "rootDir": "src",
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "emitDeclarationOnly": false
   },
   "exclude": ["out-tsc", "dist", "src/**/*.spec.ts"],
-  "include": ["src/**/*.ts"],
-  "references": [
-    {
-      "path": "../../packages/api/tsconfig.lib.json"
-    },
-    {
-      "path": "../../packages/sdk-next/tsconfig.lib.json"
-    },
-    {
-      "path": "../../packages/api-mock/tsconfig.lib.json"
-    }
-  ]
+  "include": ["src/**/*.ts"]
 }

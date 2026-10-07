@@ -1,7 +1,7 @@
-import type { Callback, Mixpanel as MixpanelClient, Modifiers, Properties } from "mixpanel";
+import type { Callback, Mixpanel as MixpanelClient, Modifiers } from "mixpanel";
 import { describe, expect, it } from "vitest";
 
-import { Telemetry, type TelemetryDeps } from "../../../../src/lib/telemetry";
+import { type Properties, Telemetry, type TelemetryDeps } from "../../../../src/lib/telemetry";
 import type { Identity } from "../../../../src/lib/telemetry/identity";
 
 type Tracked = { event: string; properties: Properties };
@@ -37,7 +37,7 @@ function fakeClient(
         callback?.(undefined);
       },
     },
-  };
+  } as unknown as MixpanelClient;
 }
 
 const identity: Identity = { distinctId: "did-123", isFirstRun: false };
@@ -81,14 +81,16 @@ describe("Telemetry (generic core)", () => {
     const sink: Tracked[] = [];
     const peopleSink: Properties[] = [];
     const t = Telemetry.create(deps(sink, { initClient: () => fakeClient(sink, { peopleSink }) }));
-    t.profile({ $name: "darwin · did-1234" }, { $ip: 0 });
+    t.profile({ $name: "darwin · did-1234" }, { $ip: "0" });
 
     expect(peopleSink).toHaveLength(1);
     expect(peopleSink[0]?.$name).toBe("darwin · did-1234");
   });
 
   it("exposes the first-run flag from identity", () => {
-    const t = Telemetry.create(deps([], { loadIdentity: () => ({ distinctId: "x", isFirstRun: true }) }));
+    const t = Telemetry.create(
+      deps([], { loadIdentity: () => ({ distinctId: "x", isFirstRun: true }) }),
+    );
     expect(t.isFirstRun).toBe(true);
   });
 
@@ -122,7 +124,9 @@ describe("Telemetry (generic core)", () => {
 
   it("swallows a synchronous client.track throw", () => {
     const sink: Tracked[] = [];
-    const t = Telemetry.create(deps(sink, { initClient: () => fakeClient(sink, { throwOnTrack: true }) }));
+    const t = Telemetry.create(
+      deps(sink, { initClient: () => fakeClient(sink, { throwOnTrack: true }) }),
+    );
     expect(() => t.track("e", {})).not.toThrow();
   });
 

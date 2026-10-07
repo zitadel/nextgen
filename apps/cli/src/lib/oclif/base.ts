@@ -245,7 +245,7 @@ export abstract class BaseCommand extends Command {
     );
     if (this.telemetry.isFirstRun) {
       this.telemetry.profile(deviceProfileProperties(this.meta, this.telemetry.distinctId), {
-        $ip: 0,
+        $ip: "0",
       });
       if (this.isInteractive()) {
         process.stderr.write(`${FIRST_RUN_NOTICE}\n`);

@@ -8,24 +8,11 @@
     "module": "esnext",
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
-    "lib": [
-      "ES2022",
-      "DOM",
-      "DOM.Iterable"
-    ]
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "composite": false,
+    "declarationMap": false,
+    "declaration": false
   },
-  "include": [
-    "src/**/*.ts",
-    "defaults/**/*.json",
-    "meta-schemas/*.json"
-  ],
-  "exclude": [
-    "src/**/*.spec.ts",
-    "src/**/*.test.ts"
-  ],
-  "references": [
-    {
-      "path": "../api/tsconfig.lib.json"
-    }
-  ]
+  "include": ["src/**/*.ts", "defaults/**/*.json", "meta-schemas/*.json"],
+  "exclude": ["src/**/*.spec.ts", "src/**/*.test.ts"]
 }

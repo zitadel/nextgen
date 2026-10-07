@@ -7,24 +7,12 @@
     "emitDeclarationOnly": false,
     "module": "esnext",
     "moduleResolution": "bundler",
-    "lib": [
-      "ES2022",
-      "DOM",
-      "DOM.Iterable"
-    ],
-    "types": [
-      "node"
-    ]
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["node"],
+    "composite": false,
+    "declarationMap": false,
+    "declaration": false
   },
-  "include": [
-    "src/**/*.ts"
-  ],
-  "exclude": [
-    "src/**/*.spec.ts"
-  ],
-  "references": [
-    {
-      "path": "../api/tsconfig.lib.json"
-    }
-  ]
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/**/*.spec.ts"]
 }

@@ -8,11 +8,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { type Platform, RESOURCES } from "../../../src/commands/resources";
 import { COMMANDS } from "../../../src/index";
-import {
-  parseFilter,
-  parseSort,
-  type ResourceDescriptor,
-} from "../../../src/lib/oclif/crud";
+import { parseFilter, parseSort, type ResourceDescriptor } from "../../../src/lib/oclif/crud";
 import { parseJson, runCliForTest } from "../../helpers/run-cli";
 
 const SERVER = "https://api.zitadel.cloud";
@@ -73,7 +69,7 @@ describe("resource registry", () => {
   });
 
   it("gives no generated command an --environment flag, since none addresses one", () => {
-    const generated = Object.entries(COMMANDS).filter(([id]) => id.split(":")[0] in RESOURCES);
+    const generated = Object.entries(COMMANDS).filter(([id]) => id!.split(":")[0]! in RESOURCES);
     expect(generated.length).toBeGreaterThan(0);
     for (const [id, command] of generated) {
       const flags = { ...command.baseFlags, ...command.flags };
@@ -314,7 +310,16 @@ describe("get rendering", () => {
     server.use(http.get(`${SERVER}/users/user_1`, () => HttpResponse.json(user("user_1"))));
 
     const res = await asTerminal(() =>
-      runCliForTest(["users", "get", "user_1", "--cwd", cwd, "--server", SERVER, "--non-interactive"]),
+      runCliForTest([
+        "users",
+        "get",
+        "user_1",
+        "--cwd",
+        cwd,
+        "--server",
+        SERVER,
+        "--non-interactive",
+      ]),
     );
 
     expect(res.exitCode).toBe(0);
@@ -560,7 +565,9 @@ describe("the drain spinner", () => {
   it("is stopped when a page fails, so it does not outlive the command", async () => {
     const cwd = await makeProject();
     server.use(
-      http.post(`${SERVER}/users/query`, () => HttpResponse.json({ code: "boom" }, { status: 500 })),
+      http.post(`${SERVER}/users/query`, () =>
+        HttpResponse.json({ code: "boom" }, { status: 500 }),
+      ),
     );
 
     // The spinner holds a SIGINT handler between start and stop; counting them
@@ -780,10 +787,7 @@ describe("next page suggestion", () => {
 
   it("suggests nothing after --all drained every page", async () => {
     const cwd = await makeProject();
-    const pages = [
-      { users: [user("user_1")], next_page_token: "p2" },
-      { users: [user("user_2")] },
-    ];
+    const pages = [{ users: [user("user_1")], next_page_token: "p2" }, { users: [user("user_2")] }];
     let call = 0;
     server.use(http.post(`${SERVER}/users/query`, () => HttpResponse.json(pages[call++] ?? {})));
 
@@ -1157,7 +1161,11 @@ describe("configuration resources are read-only", () => {
         url = new URL(request.url);
         return HttpResponse.json({
           schemas: [
-            { id: "sch_1", schema: { objectType: "human-user", kind: "user-schema" }, metadata: { created_at: "2026-01-01T00:00:00Z" } },
+            {
+              id: "sch_1",
+              schema: { objectType: "human-user", kind: "user-schema" },
+              metadata: { created_at: "2026-01-01T00:00:00Z" },
+            },
           ],
         });
       }),
@@ -1234,8 +1242,16 @@ describe("schemas list shows the current schemas, not the history", () => {
         url = new URL(request.url);
         return HttpResponse.json({
           schemas: [
-            { id: "sch_04", schema: { objectType: "human-user", kind: "user-schema" }, metadata: { created_at: "2026-07-02T00:00:00Z" } },
-            { id: "sch_05", schema: { objectType: "machine-user", kind: "user-schema" }, metadata: { created_at: "2026-07-03T00:00:00Z" } },
+            {
+              id: "sch_04",
+              schema: { objectType: "human-user", kind: "user-schema" },
+              metadata: { created_at: "2026-07-02T00:00:00Z" },
+            },
+            {
+              id: "sch_05",
+              schema: { objectType: "machine-user", kind: "user-schema" },
+              metadata: { created_at: "2026-07-03T00:00:00Z" },
+            },
           ],
         });
       }),

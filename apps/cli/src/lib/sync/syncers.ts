@@ -34,6 +34,8 @@ import { ZitadelError } from "../errors";
 import { FatalFetchError } from "./types.js";
 import type { ResourceSyncer } from "./types.js";
 
+export type { ResourceSyncer } from "./types.js";
+
 /** Runtime environment lookup used to resolve `${VAR}` / `*_env` references. */
 type EnvLookup = Record<string, string | undefined>;
 
@@ -54,7 +56,7 @@ export function makeSyncers(opts: {
    * when inlining templates for hashing and upload.
    */
   cwd: string;
-}): ReadonlyArray<ResourceSyncer> {
+}): readonly [SchemaSyncer, IdpConnectionSyncer, FlowDefinitionSyncer, BrandingSyncer] {
   return [
     new SchemaSyncer(opts.client, opts.projectId, opts.env),
     // Before flows: a flow step naming a connection slug is only valid once
@@ -227,9 +229,13 @@ class IdpConnectionSyncer implements ResourceSyncer {
   }
 
   async delete(_id: string): Promise<void> {
-    throw new ZitadelError("E_NOT_IMPLEMENTED", "Deleting an identity provider connection is not supported yet", {
-      hint: "Restore the file, or remove the connection on the platform once deletion is designed (#1013).",
-    });
+    throw new ZitadelError(
+      "E_NOT_IMPLEMENTED",
+      "Deleting an identity provider connection is not supported yet",
+      {
+        hint: "Restore the file, or remove the connection on the platform once deletion is designed (#1013).",
+      },
+    );
   }
 }
 
@@ -292,7 +298,10 @@ class SchemaSyncer implements ResourceSyncer {
    * loudly if a caller reaches it.
    */
   async update(_id: string, _data: object): Promise<{ canonical?: object }> {
-    throw new ZitadelError("E_NOT_IMPLEMENTED", "schemas are revisioned — edit publishes a new revision, not an update");
+    throw new ZitadelError(
+      "E_NOT_IMPLEMENTED",
+      "schemas are revisioned — edit publishes a new revision, not an update",
+    );
   }
 
   async delete(id: string): Promise<void> {

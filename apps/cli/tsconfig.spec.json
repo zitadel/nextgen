@@ -4,7 +4,11 @@
     "outDir": "./out-tsc/vitest",
     "types": ["vitest/globals", "vitest/importMeta", "node", "vitest"],
     "lib": ["es2022", "dom"],
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "emitDeclarationOnly": false
   },
   "include": [
     "vitest.config.ts",
@@ -12,10 +16,5 @@
     "src/**/*.spec.ts",
     "scripts/**/*.ts",
     "tests/**/*.ts"
-  ],
-  "references": [
-    {
-      "path": "./tsconfig.app.json"
-    }
   ]
 }

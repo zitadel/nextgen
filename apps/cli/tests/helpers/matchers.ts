@@ -205,7 +205,7 @@ expect.extend({
 });
 
 declare module "vitest" {
-  interface Matchers<T = unknown> {
+  interface Matchers<T = any> {
     /** Exit 0 and an envelope that is not an error. */
     toSucceed(): T;
     /** Exit 0 and `status: "skipped"` — the command found nothing to do. */

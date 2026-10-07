@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "storybook dev -p 6006 --no-open",
     "build": "storybook build --output-dir dist",
-    "typecheck": "tsc --build tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run --project=storybook",
     "test:all": "pnpm run test"
   },

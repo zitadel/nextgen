@@ -2,12 +2,12 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "./out-tsc/vitest",
-    "types": ["vitest/globals", "vitest/importMeta", "node", "vitest"]
+    "types": ["vitest/globals", "vitest/importMeta", "node", "vitest"],
+    "composite": false,
+    "declarationMap": false,
+    "emitDeclarationOnly": false,
+    "declaration": false,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"]
   },
-  "include": ["vite.config.mts", "src/**/*.spec.ts", "src/**/*.d.ts"],
-  "references": [
-    {
-      "path": "./tsconfig.lib.json"
-    }
-  ]
+  "include": ["vite.config.mts", "src/**/*.spec.ts", "src/**/*.d.ts"]
 }

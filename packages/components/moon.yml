@@ -16,7 +16,7 @@ tasks:
       - "design-tokens:build"
 
   typecheck:
-    command: "corepack pnpm exec tsc --build tsconfig.json"
+    command: "corepack pnpm run typecheck"
     deps:
       - "api:build"
       - "config:build"

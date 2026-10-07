@@ -23,7 +23,7 @@ tasks:
       - "generate"
 
   typecheck:
-    command: "corepack pnpm exec tsc --build tsconfig.json"
+    command: "corepack pnpm run typecheck"
     deps:
       - "generate"
 

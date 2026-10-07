@@ -7,23 +7,11 @@
     "emitDeclarationOnly": false,
     "module": "esnext",
     "moduleResolution": "bundler",
-    "lib": [
-      "ES2022",
-      "ESNext.Disposable"
-    ],
-    "types": [
-      "node"
-    ]
+    "lib": ["ES2022", "ESNext.Disposable"],
+    "types": ["node"],
+    "composite": false,
+    "declarationMap": false,
+    "declaration": false
   },
-  "include": [
-    "src/**/*.ts"
-  ],
-  "references": [
-    {
-      "path": "../api/tsconfig.lib.json"
-    },
-    {
-      "path": "../config/tsconfig.lib.json"
-    }
-  ]
+  "include": ["src/**/*.ts"]
 }
