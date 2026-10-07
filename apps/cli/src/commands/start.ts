@@ -45,6 +45,7 @@ import {
 import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../lib/oclif";
 import { listenersForPort, type TcpListener } from "../lib/prober/ports";
 import { publicCliCommand } from "../lib/public-cli";
+import { reportWarning } from "../lib/warnings";
 
 const START_TIMEOUT_MS = 90_000;
 
@@ -299,7 +300,7 @@ async function consoleLoginFor(
     return { signed_in_as: admin.email, sign_in_url: url };
   } catch (error) {
     const reason = toZitadelError(error);
-    consola.warn(`Could not create a console sign-in link: ${reason.message}`);
+    reportWarning(`Could not create a console sign-in link: ${reason.message}`);
     return { signed_in_as: admin.email, error: reason.message, hint: reason.hint };
   }
 }

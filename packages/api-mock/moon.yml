@@ -37,6 +37,11 @@ tasks:
       - "install-browsers"
       - "api:build"
       - "config:build"
+    options:
+      # Shared mutex with the other browser-mode suites so only one real-Chromium
+      # Vite server runs at a time; concurrent servers starve under moon's CI
+      # graph and drop module fetches. (#1490)
+      mutex: "browser-tests"
 
   start:
     command: "corepack pnpm run start"

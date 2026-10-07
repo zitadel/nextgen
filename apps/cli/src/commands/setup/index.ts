@@ -80,6 +80,7 @@ import {
   type Row,
   type Section,
 } from "./summary";
+import { reportWarning } from "../../lib/warnings";
 
 /**
  * The frameworks `--framework` accepts, derived from Orca's registry so the
@@ -459,7 +460,7 @@ export default class Setup extends BaseCommand {
           // Said out loud: a connection pointing somewhere other than the
           // vendor is not what the developer will want in the end, and nothing
           // else in the summary would show it.
-          consola.warn(
+          reportWarning(
             `${idpProvider(answer.provider).displayName} points at ` +
               `${answer.endpoints.issuer}, not the provider`,
           );
@@ -538,7 +539,6 @@ export default class Setup extends BaseCommand {
     // `zitadel claim` has nothing left to do. Claiming an anonymous project
     // stays a cloud journey.
     let ownedByLocalAdmin: { email: string; team_id: string } | undefined;
-    let unattachedWarning: string | undefined;
     const isLocal = serverKind.value(answers.server) === "local";
     const hostsPlatform =
       !dryRun && isLocal ? await localServerHostsPlatform(answers.server) : false;
@@ -557,8 +557,9 @@ export default class Setup extends BaseCommand {
           // The console lists only projects the signed-in person can manage,
           // so an unattached project is one the local admin never sees. A
           // server started by hand has no local admin anywhere, hence the "if".
-          unattachedWarning = `No local admin for ${answers.server} in ${cwd} or its parents, so the project is not attached to a team and the local console will not list it. If \`zitadel start\` started this server, run setup from the directory it ran in, or one inside it.`;
-          consola.warn(unattachedWarning);
+          reportWarning(
+            `No local admin for ${answers.server} in ${cwd} or its parents, so the project is not attached to a team and the local console will not list it. If \`zitadel start\` started this server, run setup from the directory it ran in, or one inside it.`,
+          );
         }
         if (admin) {
           const owner = await claimProjectAsAdmin({
@@ -580,7 +581,7 @@ export default class Setup extends BaseCommand {
           consola.success(`Project owned by ${admin.email} (team ${owner.team_id})`);
         }
       } catch (error) {
-        consola.warn(
+        reportWarning(
           `Could not attach the project to the local admin: ${toZitadelError(error).message}`,
         );
       }
@@ -661,8 +662,6 @@ export default class Setup extends BaseCommand {
       // renderer doesn't duplicate the summary on stdout. The JSON envelope
       // still carries the full structured payload.
       pretty: "",
-      // Already shown above through consola; this is the copy a JSON run gets.
-      warnings: unattachedWarning ? [unattachedWarning] : [],
       data: {
         title: "Zitadel is ready.",
         project: { project_id: project.id, issuer },
