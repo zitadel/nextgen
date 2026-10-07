@@ -81,37 +81,87 @@ const PACKAGE_MANAGERS = new Set(["pnpm", "npm", "npx", "yarn", "corepack"]);
 
 /**
  * Whether a script starts a package manager (or chains to another script with
- * `node --run`): checks the command at the start of every `&&`/`||`/`;`/`|`
- * segment, after env assignments, so subcommands and options do not matter
- * and package-manager names inside quoted text do not count.
+ * `node --run`). The body is tokenized like a shell would: quotes are removed
+ * but their text kept, and every simple command (split on newlines, `;`, `&`,
+ * `|`, parentheses and braces) is checked after skipping shell keywords, env
+ * assignments and an `env` wrapper (including `env -S '…'`). Command
+ * substitutions run inside double quotes, so their bodies are checked too;
+ * single-quoted text and escaped `\$` stay literal.
  */
 export function startsPackageManager(body) {
-  // Single-quoted text and escaped `\$` are literal; command substitutions
-  // (`$(…)`, backticks) still run inside double quotes, so check their bodies.
   const live = body.replace(/'[^']*'/g, "''").replace(/\\\$/g, "");
   for (const [, dollar, backtick] of live.matchAll(/\$\(([^()]*)\)|`([^`]*)`/g)) {
     if (startsPackageManager(dollar ?? backtick)) return true;
   }
-  const unquoted = live.replace(/"(?:[^"\\]|\\.)*"/g, "''");
-  for (const segment of unquoted.split(/&&|\|\||[;|()]/)) {
-    const [command = "", next = ""] = commandWords(segment.trim().split(/\s+/));
-    if (PACKAGE_MANAGERS.has(command) || (command === "node" && next === "--run")) {
-      return true;
+  return simpleCommands(body).some((words) => {
+    const [command = "", next = ""] = commandWords(words);
+    const executable = command.split("/").pop();
+    return PACKAGE_MANAGERS.has(executable) || (executable === "node" && next === "--run");
+  });
+}
+
+/** Split a shell command line into simple commands, each a list of words. */
+function simpleCommands(text) {
+  const commands = [];
+  let words = [];
+  let word = null;
+  const endWord = () => {
+    if (word !== null) words.push(word);
+    word = null;
+  };
+  const endCommand = () => {
+    endWord();
+    if (words.length > 0) commands.push(words);
+    words = [];
+  };
+  for (let i = 0; i < text.length; i += 1) {
+    const char = text[i];
+    if (char === "'") {
+      const close = text.indexOf("'", i + 1);
+      const stop = close === -1 ? text.length : close;
+      word = (word ?? "") + text.slice(i + 1, stop);
+      i = stop;
+    } else if (char === '"') {
+      let j = i + 1;
+      let quoted = "";
+      while (j < text.length && text[j] !== '"') {
+        if (text[j] === "\\" && j + 1 < text.length) {
+          quoted += text[j + 1];
+          j += 2;
+        } else {
+          quoted += text[j];
+          j += 1;
+        }
+      }
+      word = (word ?? "") + quoted;
+      i = j;
+    } else if (char === "\\" && i + 1 < text.length) {
+      if (text[i + 1] !== "\n") word = (word ?? "") + text[i + 1];
+      i += 1;
+    } else if ("\n;&|(){}".includes(char)) {
+      endCommand();
+    } else if (/\s/.test(char)) {
+      endWord();
+    } else {
+      word = (word ?? "") + char;
     }
   }
-  return false;
+  endCommand();
+  return commands;
 }
 
 const ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/;
+const KEYWORDS = new Set(["if", "then", "else", "elif", "do", "while", "until", "!", "time", "exec", "command", "nohup"]);
 
 /**
- * The words of a command from its executable on: leading env assignments are
- * dropped, and an `env` wrapper is unwrapped (its options, `-u NAME`/`-C DIR`
- * operands and assignments) so the command it runs is the one checked.
+ * The words of a simple command from its executable on: shell keywords and
+ * env assignments are skipped, and an `env` wrapper is unwrapped (options,
+ * `-u NAME`/`-C DIR` operands, assignments, and an `-S` string) so the
+ * command it runs is the one checked.
  */
 function commandWords(words) {
   let i = 0;
-  while (i < words.length && ASSIGNMENT.test(words[i])) i += 1;
+  while (i < words.length && (KEYWORDS.has(words[i]) || ASSIGNMENT.test(words[i]))) i += 1;
   if (words[i] !== "env") return words.slice(i);
   i += 1;
   while (i < words.length) {
@@ -119,6 +169,12 @@ function commandWords(words) {
     if (word === "--") {
       i += 1;
       break;
+    }
+    if (word === "-S" || word === "--split-string") {
+      return commandWords([...(simpleCommands(words[i + 1] ?? "")[0] ?? []), ...words.slice(i + 2)]);
+    }
+    if (word.startsWith("--split-string=")) {
+      return commandWords([...(simpleCommands(word.slice(15))[0] ?? []), ...words.slice(i + 1)]);
     }
     if (word === "-u" || word === "-C" || word === "--unset" || word === "--chdir") {
       i += 2;
@@ -128,8 +184,7 @@ function commandWords(words) {
       break;
     }
   }
-  while (i < words.length && ASSIGNMENT.test(words[i])) i += 1;
-  return words.slice(i);
+  return commandWords(words.slice(i));
 }
 
 function isHook(name, scripts) {
