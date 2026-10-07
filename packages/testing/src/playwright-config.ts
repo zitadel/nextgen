@@ -68,8 +68,9 @@ export interface WithZitadelOptions {
    */
   app?: {
     /**
-     * Spawn argv (no shell), e.g. ["node_modules/.bin/next", "dev"]. Run the dev
-     * server's own binary so the runner's SIGTERM reaches it on teardown.
+     * Spawn argv (no shell), e.g. [process.execPath, "node_modules/next/dist/bin/next", "dev"].
+     * Run the dev server's own CLI with node, so the runner's SIGTERM reaches it
+     * on teardown and it starts on Windows too.
      */
     command: string[];
     /** Working directory for the app command. */

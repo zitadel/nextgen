@@ -5,12 +5,13 @@ import { join } from "node:path";
 const env = { ...process.env };
 delete env.VERCEL;
 
-// moon's `preview` task builds first. The local waku bin rather than
-// `pnpm exec`: this helper already runs under `pnpm run preview`, and a nested
-// pnpm warns about the platform-specific server packages.
-const waku = join(import.meta.dirname, "..", "node_modules", ".bin", "waku");
+// moon's `preview` task builds first. waku's CLI runs under node rather than
+// through `pnpm exec` (this helper already runs under `pnpm run preview`, and a
+// nested pnpm warns about the platform-specific server packages) or its `.bin`
+// shim (a `.cmd` on Windows, which spawn cannot start without a shell).
+const wakuCli = join(import.meta.dirname, "..", "node_modules", "waku", "cli.js");
 
-await run(waku, ["start", "--port", env.PORT || "3003"], { env });
+await run(process.execPath, [wakuCli, "start", "--port", env.PORT || "3003"], { env });
 
 function run(command, args, options) {
   return new Promise((resolve, reject) => {

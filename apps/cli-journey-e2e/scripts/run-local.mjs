@@ -21,10 +21,11 @@ import { parseLocalJourneyArgs } from "./run-options.mjs";
 const here = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(here, "..");
 const repoRoot = resolve(projectRoot, "../..");
-// Playwright is started from this package's own bin rather than through
-// `pnpm exec`: a pnpm started under `pnpm run e2e-local` re-checks every
-// workspace package and warns about the platform-specific server binaries.
-const playwrightBin = join(projectRoot, "node_modules", ".bin", "playwright");
+// Playwright's CLI runs under node rather than through `pnpm exec` (a pnpm
+// started under `pnpm run e2e-local` re-checks every workspace package and
+// warns about the platform-specific server binaries) or its `.bin` shim
+// (which Windows only provides as a `.cmd` that spawn cannot start).
+const playwrightCli = join(projectRoot, "node_modules", "@playwright", "test", "cli.js");
 
 const options = parseArgsOrExit(process.argv.slice(2));
 if (options.help) {
@@ -342,8 +343,8 @@ async function runFrameworkJourney(context) {
 
     log(`[${prefix}] running Playwright journey`);
     await run(
-      playwrightBin,
-      ["test", "--config", "playwright.config.mts"],
+      process.execPath,
+      [playwrightCli, "test", "--config", "playwright.config.mts"],
       {
         cwd: projectRoot,
         env: {
@@ -526,7 +527,7 @@ function validatePortValue(value, name) {
 
 async function ensurePlaywrightBrowsers() {
   log("ensuring Playwright Chromium browsers are installed");
-  await run(playwrightBin, ["install", "chromium"], {
+  await run(process.execPath, [playwrightCli, "install", "chromium"], {
     cwd: projectRoot,
   });
 }

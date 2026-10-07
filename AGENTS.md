@@ -179,8 +179,10 @@ Moon owns the task graph; `package.json` scripts are its leaves.
   runs its prerequisites first.
 - Script names are kebab-case (`dev-real`, not `dev:real`): Moon task ids
   cannot contain `:`.
-- Code that must start a tool from inside a script runs the tool's own binary
-  (`node_modules/.bin/<tool>`), not `pnpm exec`.
+- Code that must start a tool from inside a script runs the tool's CLI file
+  with node (`[process.execPath, "node_modules/vite/bin/vite.js"]`), not
+  `pnpm exec`, and not the `node_modules/.bin` shim, which is a `.cmd` on
+  Windows that `spawn` cannot start without a shell.
 
 `scripts/check-package-scripts.mjs` enforces this in `workspace:test`; its
 exemption lists (the Go server, `build-release`, npm pack hooks, the root
