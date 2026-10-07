@@ -432,7 +432,7 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 		}
 		// Checked here as well, so the error render leaves the cookie alone:
 		// the state does not change, and a reload shows the error again.
-		if !ssoAuthenticatedRoutes(currentStep) {
+		if _, _, ok := ssoRetryRoute(currentStep); !ok {
 			msg := FlowStepErrorSSOUnavailable
 			result, err := r.renderStepError(pc, resolvedFields, &msg)
 			return result, false, err
@@ -781,28 +781,59 @@ func (r *FlowStateMachineRuntime) resolveStaleSSOBind(pc *processCtx, resolvedFi
 	return r.retrySSOHandoff(pc, resolvedFields, reread.BoundUserID, false)
 }
 
-// retrySSOHandoff raises sso_authenticated for a user bound on the attempt,
+// retrySSOHandoff routes a user bound on the attempt through [ssoRetryRoute],
 // which mints the handoff. The bind is this request's or an earlier one whose
 // request did not deliver the handoff; either way a concurrent render can win
 // the handoff first. irreversible clears the back stack. A retry cannot tell
-// a created user from a linked one, so it passes false.
+// a created user from a linked one, so it passes false; the route can still
+// make it irreversible.
 func (r *FlowStateMachineRuntime) retrySSOHandoff(pc *processCtx, resolvedFields FlowResolvedFields, userID string, irreversible bool) (FlowStepResult, bool, error) {
 	// An earlier bind may have run on another step, or under an older
 	// definition. Checked before the user is recorded: a purpose would drop
 	// that user and move the flow to a fresh attempt.
-	if !ssoAuthenticatedRoutes(pc.currentStep) {
+	outcome, routeIrreversible, ok := ssoRetryRoute(pc.currentStep)
+	if !ok {
 		msg := FlowStepErrorSSOUnavailable
 		result, err := r.renderStepError(pc, resolvedFields, &msg)
 		return result, true, err
 	}
 	recordResolvedUser(pc.state, userID)
-	result, err := r.routeOutcome(pc, resolvedFields, FlowImplicitOutcomeSSOAuthenticated, irreversible)
+	result, err := r.routeOutcome(pc, resolvedFields, outcome, irreversible || routeIrreversible)
 	if errors.Is(err, ErrAuthAttemptAlreadyHandedOff()) {
 		// A concurrent retry won the handoff. A handed-off attempt restarts
 		// the flow on every later render too, so this one does the same.
 		return FlowStepResult{}, false, ErrFlowRestartRequired().WithParent(err)
 	}
 	return result, true, err
+}
+
+// ssoRetryRoute picks the outcome that retries the handoff on step, keeping
+// the bound user: sso_authenticated, or on the step that creates the user from
+// the identity, the transition of its only submit action, which the create
+// follows. That route is irreversible, as after the create. ok is false when
+// neither keeps the user, or the step has several submit actions and the
+// retry cannot tell which one the create ran on.
+func ssoRetryRoute(step *FlowDefinitionStep) (outcome string, irreversible, ok bool) {
+	if ssoAuthenticatedRoutes(step) {
+		return FlowImplicitOutcomeSSOAuthenticated, false, true
+	}
+	if step.OnSuccess == nil || *step.OnSuccess != FlowOnSuccessCreateUserWithSso {
+		return "", false, false
+	}
+	for _, a := range step.Actions {
+		if a.Kind != FlowActionKindSubmit {
+			continue
+		}
+		if outcome != "" {
+			return "", false, false
+		}
+		outcome = a.Name
+	}
+	t, routes := step.Transitions[outcome]
+	if outcome == "" || !routes || t.Action != nil || t.Purpose != nil {
+		return "", false, false
+	}
+	return outcome, true, true
 }
 
 // ssoAuthenticatedRoutes reports whether step routes sso_authenticated within

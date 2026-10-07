@@ -6109,3 +6109,131 @@ func TestFlowStateMachine_Render_SSOCollectionStepLoadErrorPropagates(t *testing
 	_, err := w.sm.Render(t.Context(), def, state)
 	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
 }
+
+// boundCollectionStepWorld sits on the collection step, whose only submit
+// action routes to done, after an earlier request created the user on it but
+// did not deliver the handoff: the row is gone and the attempt is bound.
+func boundCollectionStepWorld(t *testing.T) (*flowTestWorld, *domain.FlowDefinition, *domain.FlowState) {
+	t.Helper()
+	w, def, state := ssoRenderWorld(t)
+	def = withSSOCollectionStep(def)
+	step := &def.Steps[len(def.Steps)-1]
+	step.Actions = []domain.FlowStepAction{{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true}}
+	step.Transitions = map[string]domain.FlowStepTransition{domain.FlowActionSubmit: {Target: "done"}}
+	state.CurrentStep = "sso-register"
+	state.SSOResolvedCheckID = "ch-1"
+	state.History = []string{"credentials"}
+	state.BackStack = []domain.FlowBackEntry{{StepName: "credentials", Purpose: domain.FlowDefinitionPurposeRegister}}
+	w.ssoIdentities.EXPECT().
+		LoadParked(gomock.Any(), domain.FlowSSOLoadInput{
+			ProjectID:       testProjectID,
+			AttemptID:       "att-1",
+			UserSchemaURL:   defaultSchemaURL,
+			ResolvedCheckID: "ch-1",
+		}).
+		Return(&domain.FlowSSOParkedIdentity{BoundUserID: "user-1"}, nil)
+	// The step's inputs resolve before the retry, and the prefill finds the
+	// row gone.
+	w.expectCollected(nil, nil)
+	return w, def, state
+}
+
+// The collection step routes no sso_authenticated, so the retry follows the
+// transition the create follows, and the step that created the user offers
+// no back. sso_authenticated still wins where the step routes it, and keeps
+// the back stack, as on any other step.
+func TestFlowStateMachine_Render_SSOCollectionStepRetriesHandoff(t *testing.T) {
+	t.Parallel()
+	for name, tc := range map[string]struct {
+		edit          func(step *domain.FlowDefinitionStep)
+		wantStep      string
+		wantBackStack bool
+	}{
+		"submit action": {edit: func(*domain.FlowDefinitionStep) {}, wantStep: "done"},
+		"renamed submit action": {
+			edit: func(step *domain.FlowDefinitionStep) {
+				step.Actions[0].Name = "create"
+				step.Transitions = map[string]domain.FlowStepTransition{"create": {Target: "done"}}
+			},
+			wantStep: "done",
+		},
+		"navigate action beside it": {
+			edit: func(step *domain.FlowDefinitionStep) {
+				step.Actions = append(step.Actions, domain.FlowStepAction{Name: "sign_in", Kind: domain.FlowActionKindNavigate})
+				step.Transitions["sign_in"] = domain.FlowStepTransition{Target: "credentials"}
+			},
+			wantStep: "done",
+		},
+		// A later step, not the end of the flow, shows the back stack.
+		"submit to a later step": {
+			edit: func(step *domain.FlowDefinitionStep) {
+				step.Transitions[domain.FlowActionSubmit] = domain.FlowStepTransition{Target: "sso-conflict"}
+			},
+			wantStep: "sso-conflict",
+		},
+		"sso_authenticated routed": {
+			edit: func(step *domain.FlowDefinitionStep) {
+				step.Transitions[domain.FlowImplicitOutcomeSSOAuthenticated] = domain.FlowStepTransition{Target: "sso-conflict"}
+			},
+			wantStep:      "sso-conflict",
+			wantBackStack: true,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			w, def, state := boundCollectionStepWorld(t)
+			tc.edit(&def.Steps[len(def.Steps)-1])
+			if tc.wantStep == "done" {
+				w.authAttemptService.EXPECT().
+					Handoff(gomock.Any(), domain.FlowHandoffInput{ProjectID: testProjectID, AttemptID: "att-1"}).
+					Return(domain.FlowHandoffOutput{Token: "handoff-1", ExpiresAt: time.Unix(1700000060, 0).UTC()}, nil)
+			}
+
+			result, err := w.sm.Render(t.Context(), def, state)
+			require.NoError(t, err)
+			require.Equal(t, tc.wantStep, result.Step.Name)
+			assert.Equal(t, "user-1", result.State.CollectedData.UserID)
+			assert.Equal(t, tc.wantBackStack, len(result.State.BackStack) > 0)
+		})
+	}
+}
+
+// A transition that would drop the bound user, or a step whose submit
+// actions leave the retry no single route, keeps the step and shows the
+// provider as unavailable, as on any step that cannot route the retry.
+func TestFlowStateMachine_Render_SSOCollectionStepUnroutableRetry(t *testing.T) {
+	t.Parallel()
+	register := domain.FlowDefinitionPurposeRegister
+	action := domain.Switch
+	for name, edit := range map[string]func(step *domain.FlowDefinitionStep){
+		"with purpose": func(step *domain.FlowDefinitionStep) {
+			step.Transitions[domain.FlowActionSubmit] = domain.FlowStepTransition{Target: "done", Purpose: &register}
+		},
+		"with action": func(step *domain.FlowDefinitionStep) {
+			step.Transitions[domain.FlowActionSubmit] = domain.FlowStepTransition{Target: "other-flow", Action: &action}
+		},
+		"two submit actions": func(step *domain.FlowDefinitionStep) {
+			step.Actions = append(step.Actions, domain.FlowStepAction{Name: "get_help", Kind: domain.FlowActionKindSubmit})
+			step.Transitions["get_help"] = domain.FlowStepTransition{Target: "done"}
+		},
+		"no submit action": func(step *domain.FlowDefinitionStep) {
+			step.Actions = nil
+			step.Transitions = nil
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			w, def, state := boundCollectionStepWorld(t)
+			edit(&def.Steps[len(def.Steps)-1])
+			w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).Times(0)
+
+			result, err := w.sm.Render(t.Context(), def, state)
+			require.NoError(t, err)
+			assert.Equal(t, "sso-register", result.Step.Name)
+			require.NotNil(t, result.Step.Error)
+			assert.Equal(t, domain.FlowStepErrorSSOUnavailable, *result.Step.Error)
+			assert.Empty(t, result.State.CollectedData.UserID)
+			assert.False(t, result.Reseal)
+		})
+	}
+}
