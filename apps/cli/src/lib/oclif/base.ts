@@ -13,6 +13,7 @@ import { normalizePublicCliCommand, normalizePublicCliCommands } from "../public
 import { resolveServer } from "../server";
 import { type Properties, Telemetry, type TelemetryDeps } from "../telemetry";
 import { buildUserAgent, installUserAgent, processUserAgentFacts } from "../user-agent";
+import { takeReportedWarnings } from "../warnings";
 import {
   CLI_COMMAND_COMPLETED,
   CLI_COMMAND_FAILED,
@@ -131,6 +132,9 @@ export abstract class BaseCommand extends Command {
    * not use.)
    */
   protected override async init(): Promise<void> {
+    // A fresh invocation starts with no warnings, even when an earlier one in
+    // the same process (a test run, say) failed before emitting its own.
+    takeReportedWarnings();
     await super.init();
     listenForInterrupt();
     const telemetryFlag = this.argv.includes("--no-telemetry") ? false : undefined;
@@ -260,11 +264,7 @@ export abstract class BaseCommand extends Command {
       return false;
     }
     const argv = process.argv;
-    if (
-      argv.includes("--json") ||
-      argv.includes("--non-interactive") ||
-      argv.includes("-n")
-    ) {
+    if (argv.includes("--json") || argv.includes("--non-interactive") || argv.includes("-n")) {
       return false;
     }
     return Boolean(process.stdout.isTTY && process.stdin.isTTY);
@@ -293,7 +293,9 @@ export abstract class BaseCommand extends Command {
     if (rendered !== "") {
       this.log(rendered);
     }
-    return toEnvelope(normalized, this.meta);
+    // Reported warnings were printed when they happened, so they join the
+    // envelope only: printing them again here would show them twice.
+    return toEnvelope(withReportedWarnings(normalized, takeReportedWarnings()), this.meta);
   }
 
   /**
@@ -401,6 +403,17 @@ function normalizeDataNextCommands(data: unknown, meta: GlobalOptions): unknown 
   };
 }
 
+/**
+ * Add the warnings reported while the command ran to an ok result. A skipped
+ * result has no `warnings` field in its envelope, so it is left as it is.
+ */
+function withReportedWarnings(result: CommandResult, reported: readonly string[]): CommandResult {
+  if (result.status !== "ok" || reported.length === 0) {
+    return result;
+  }
+  return { ...result, warnings: [...reported, ...(result.warnings ?? [])] };
+}
+
 /** Wraps a {@link CommandResult} with the invocation metadata into the final envelope. */
 function toEnvelope(result: CommandResult, meta: GlobalOptions): JsonEnvelope {
   const base: EnvelopeMeta = {
@@ -448,7 +461,12 @@ function toErrorEnvelope(error: ZitadelError, meta: GlobalOptions): ErrorEnvelop
  */
 function renderPretty(result: CommandResult, meta: GlobalOptions): string {
   if (result.pretty !== undefined) {
-    return result.pretty;
+    // A command's own rendering replaces the generic one, but not its
+    // warnings: those are printed after it, so setting `pretty` cannot hide them.
+    const warnings = result.status === "ok" ? (result.warnings ?? []) : [];
+    return [result.pretty, ...warnings.map((warning) => `Warning: ${warning}`)]
+      .filter((line) => line !== "")
+      .join("\n");
   }
   if (result.status === "ok") {
     return formatData(result.data, result.warnings ? [...result.warnings] : [], meta);
