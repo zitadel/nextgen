@@ -139,10 +139,14 @@ export abstract class AuthFactorCommand extends BaseCommand {
       );
     }
     // Reported rather than returned, so a terminal shows them and a dry run's
-    // envelope carries them too (see apps/cli/AGENTS.md).
-    for (const warning of warnings) {
-      reportWarning(warning);
-    }
+    // envelope carries them too (see apps/cli/AGENTS.md). They describe the
+    // schema after the change, so they are reported only once the change is
+    // previewed or written: a failed write must not claim it happened.
+    const reportAll = () => {
+      for (const warning of warnings) {
+        reportWarning(warning);
+      }
+    };
     const data = {
       schema: schema.name,
       file: schema.path,
@@ -153,6 +157,7 @@ export abstract class AuthFactorCommand extends BaseCommand {
     };
 
     if (dryRun) {
+      reportAll();
       return this.emit({
         status: "skipped",
         reason: "dry-run",
@@ -168,6 +173,7 @@ export abstract class AuthFactorCommand extends BaseCommand {
       await writeFile(join(cwd, schema.path), `${stableStringify(change.document)}\n`);
       consola.success(`Updated ${schema.path}`);
     }
+    reportAll();
     for (const factor of change.unchanged) {
       consola.info(`${factor} is already ${verb}d for ${schema.name}`);
     }

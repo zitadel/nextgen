@@ -181,6 +181,23 @@ describe("checkFlow", () => {
     expect(checkFlow(passwordFlow, before, after)).toEqual({ kind: "checked", introduced: [] });
   });
 
+  it("reports a malformed flow file as unchecked", () => {
+    // A string where `fields` should be a list reads as no fields to the
+    // semantic validator, which would hide the password step.
+    const malformed = {
+      ...passwordFlow,
+      steps: [
+        passwordFlow.steps[0],
+        { ...passwordFlow.steps[1], fields: "x-auth-methods#password" },
+        passwordFlow.steps[2],
+      ],
+    };
+    const before = schema({ password: { enabled: true } });
+    const after = schema({ password: { enabled: false } });
+
+    expect(checkFlow(malformed, before, after).kind).toBe("unchecked");
+  });
+
   it("reports a structurally broken flow as unchecked rather than unaffected", () => {
     // A structural error stops the validator before the schema rules, so the
     // password step would otherwise go unnoticed.

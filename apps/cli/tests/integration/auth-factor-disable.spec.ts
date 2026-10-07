@@ -8,28 +8,30 @@ const platform = usePlatformMock();
 describe("auth-factor disable", () => {
   describe("against an invalid server", () => {
     describe("that is not a zitadel api", () => {
-      it("still turns the factor off in the project", async () => {
+      it("still turns the factor off, for apply to publish once it is back", async () => {
         const app = await aSetUpApp();
         platform.isNotZitadel();
 
         expect(await app.disableFactors(["passkey"])).toSucceed();
 
-        expect((await app.committed.userSchema())["x-auth-methods"]?.passkey).toEqual({
-          enabled: false,
-        });
+        platform.recovers();
+        expect(await app.apply()).toSucceed();
+        const { schema } = await app.publishedSchema();
+        expect(schema["x-auth-methods"]?.passkey).toEqual({ enabled: false });
       });
     });
 
     describe("that is down", () => {
-      it("still turns the factor off in the project", async () => {
+      it("still turns the factor off, for apply to publish once it is back", async () => {
         const app = await aSetUpApp();
         platform.isUnavailable();
 
         expect(await app.disableFactors(["passkey"])).toSucceed();
 
-        expect((await app.committed.userSchema())["x-auth-methods"]?.passkey).toEqual({
-          enabled: false,
-        });
+        platform.recovers();
+        expect(await app.apply()).toSucceed();
+        const { schema } = await app.publishedSchema();
+        expect(schema["x-auth-methods"]?.passkey).toEqual({ enabled: false });
       });
     });
   });

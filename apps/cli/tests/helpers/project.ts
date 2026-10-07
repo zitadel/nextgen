@@ -160,11 +160,6 @@ class CommittedFiles {
     }>;
   }
 
-  /** The user schema, for a command whose only effect is an edit to it. */
-  userSchema(): Promise<UserSchemaDocument> {
-    return this.read(SCHEMA_FILE) as Promise<UserSchemaDocument>;
-  }
-
   /** The ejected branding descriptor. */
   brandingDescriptor(): Promise<Record<string, unknown>> {
     return this.read(".zitadel/branding/branding.json");

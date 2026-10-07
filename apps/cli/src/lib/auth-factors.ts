@@ -1,3 +1,4 @@
+import { flowConfigSchema } from "@zitadel/config/schemas";
 import { validateFlowDefinition, type FlowValidationIssue } from "@zitadel/config/validate";
 
 import { isObject } from "./json";
@@ -107,6 +108,20 @@ export function checkFlow(
   before: Record<string, unknown>,
   after: Record<string, unknown>,
 ): FlowCheck {
+  // The semantic validator reads a malformed shape leniently (a string where
+  // `fields` should be a list reads as no fields), so the raw file is checked
+  // against the canonical flow schema first, as `plan` does.
+  const shape = flowConfigSchema.safeParse(flow);
+  if (!shape.success) {
+    return {
+      kind: "unchecked",
+      issues: shape.error.issues.map((issue) => ({
+        severity: "error",
+        rule: "definition",
+        message: `${issue.path.join(".") || "(root)"}: ${issue.message}`,
+      })),
+    };
+  }
   // The validator runs the schema rules only over a structurally sound flow,
   // so without this the change would always look harmless on a broken one.
   const structural = validateFlowDefinition(flow);
@@ -194,9 +209,10 @@ export function malformedAuthMethods(
     if (!isObject(entry)) {
       return `x-auth-methods.${factor} is not an object`;
     }
-    // The meta-schema requires a boolean. A string "true" is neither on nor
-    // off, so it is refused rather than overwritten or read as disabled.
-    if (entry.enabled !== undefined && typeof entry.enabled !== "boolean") {
+    // The meta-schema requires a boolean. A missing one or a string "true" is
+    // neither on nor off, so it is refused rather than overwritten or read as
+    // disabled. Only an absent entry counts as empty.
+    if (typeof entry.enabled !== "boolean") {
       return `x-auth-methods.${factor}.enabled is not a boolean`;
     }
   }

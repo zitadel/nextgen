@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -314,6 +314,46 @@ describe("auth-factor", () => {
       });
     });
 
+    it("refuses a factor entry with no enabled value", async () => {
+      const cwd = await makeProject(
+        {
+          "default-human-user": {
+            ...passwordSchema(),
+            "x-auth-methods": { password: { enabled: true }, passkey: {} },
+          },
+        },
+        {},
+      );
+
+      const { envelope } = await run(cwd, "disable", "--mode", "passkey");
+
+      expect(envelope).toMatchObject({
+        code: "E_VALIDATION",
+        details: { region: "x-auth-methods.passkey.enabled is not a boolean" },
+      });
+    });
+
+    it("refuses to disable while a flow file does not match the flow schema", async () => {
+      const flow = passwordFlow();
+      const malformed = {
+        ...flow,
+        steps: flow.steps.map((step) =>
+          step.name === "password" ? { ...step, fields: "x-auth-methods#password" } : step,
+        ),
+      };
+      const cwd = await makeProject(undefined, { "default-human-user-login": malformed });
+
+      const { envelope } = await run(cwd, "disable", "--mode", "password");
+
+      expect(envelope.code).toBe("E_VALIDATION");
+      expect(envelope.details?.issues).toEqual([
+        expect.objectContaining({
+          rule: "definition",
+          path: ".zitadel/flows/default-human-user-login.json",
+        }),
+      ]);
+    });
+
     it("refuses an enabled value that is not a boolean", async () => {
       const cwd = await makeProject(
         {
@@ -442,6 +482,16 @@ describe("auth-factor", () => {
       expect(envelope.warnings).toEqual([
         "default-human-user has no way to sign in left. Its users can only be managed through the API.",
       ]);
+    });
+
+    it("does not claim the change when the schema cannot be written", async () => {
+      const cwd = await makeProject(passkeyOnly(), {});
+      await chmod(join(cwd, ".zitadel/schemas/default-human-user.json"), 0o444);
+
+      const { envelope } = await run(cwd, "disable", "--mode", "passkey", "--force");
+
+      expect(envelope.status).toBe("error");
+      expect(envelope).not.toHaveProperty("warnings");
     });
 
     it("does not override a flow that still uses the factor", async () => {

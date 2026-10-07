@@ -15,28 +15,30 @@ async function anAppWithoutPasskey(): Promise<ScaffoldedApp> {
 describe("auth-factor enable", () => {
   describe("against an invalid server", () => {
     describe("that is not a zitadel api", () => {
-      it("still turns the factor on in the project", async () => {
+      it("still turns the factor on, for apply to publish once it is back", async () => {
         const app = await anAppWithoutPasskey();
         platform.isNotZitadel();
 
         expect(await app.enableFactors(["passkey"])).toSucceed();
 
-        expect((await app.committed.userSchema())["x-auth-methods"]?.passkey).toEqual({
-          enabled: true,
-        });
+        platform.recovers();
+        expect(await app.apply()).toSucceed();
+        const { schema } = await app.publishedSchema();
+        expect(schema["x-auth-methods"]?.passkey).toEqual({ enabled: true });
       });
     });
 
     describe("that is down", () => {
-      it("still turns the factor on in the project", async () => {
+      it("still turns the factor on, for apply to publish once it is back", async () => {
         const app = await anAppWithoutPasskey();
         platform.isUnavailable();
 
         expect(await app.enableFactors(["passkey"])).toSucceed();
 
-        expect((await app.committed.userSchema())["x-auth-methods"]?.passkey).toEqual({
-          enabled: true,
-        });
+        platform.recovers();
+        expect(await app.apply()).toSucceed();
+        const { schema } = await app.publishedSchema();
+        expect(schema["x-auth-methods"]?.passkey).toEqual({ enabled: true });
       });
     });
   });
