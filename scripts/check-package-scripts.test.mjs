@@ -107,6 +107,9 @@ describe("package-script contract", () => {
     "exec -- pnpm run build",
     "command -- pnpm run build",
     "nohup -- npm start",
+    "time -p pnpm test",
+    "command -p pnpm test",
+    "exec -a name -- pnpm run build",
   ])("detects a package manager in %s", (body) => {
     expect(startsPackageManager(body)).toBe(true);
   });
@@ -181,6 +184,8 @@ describe("package-script contract", () => {
     "2>&1 vitest run",
     "exec -- vitest run",
     "command -- tsc --noEmit",
+    "time -p vitest run",
+    "command -p tsc --noEmit",
   ])("allows plain commands like %s", (body) => {
     expect(unsupportedSyntax(body)).toBeNull();
   });

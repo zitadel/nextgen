@@ -265,8 +265,13 @@ function commandWords(input) {
   }
   let i = 0;
   while (i < words.length && (KEYWORDS.has(words[i]) || ASSIGNMENT.test(words[i]))) {
-    // `exec -- cmd`, `command -- cmd`: the terminator belongs to the wrapper.
-    i += KEYWORDS.has(words[i]) && words[i + 1] === "--" ? 2 : 1;
+    const wrapper = KEYWORDS.has(words[i]) ? words[i] : null;
+    i += 1;
+    // `exec -- cmd`, `time -p cmd`, `command -p cmd`: options belong to the
+    // wrapper; `exec -a NAME` also takes the following word.
+    while (wrapper && i < words.length && words[i].startsWith("-")) {
+      i += wrapper === "exec" && words[i] === "-a" ? 2 : 1;
+    }
   }
   if (words[i]?.split("/").pop() !== "env") return words.slice(i);
   i += 1;
