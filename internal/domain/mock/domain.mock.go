@@ -959,6 +959,45 @@ func (c *MockFlowSSOIdentityServiceFindUniqueOwnerCall) DoAndReturn(f func(conte
 	return c
 }
 
+// LoadCollected mocks base method.
+func (m *MockFlowSSOIdentityService) LoadCollected(ctx context.Context, in domain.FlowSSOLoadInput) (*domain.FlowSSOParkedIdentity, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "LoadCollected", ctx, in)
+	ret0, _ := ret[0].(*domain.FlowSSOParkedIdentity)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// LoadCollected indicates an expected call of LoadCollected.
+func (mr *MockFlowSSOIdentityServiceMockRecorder) LoadCollected(ctx, in any) *MockFlowSSOIdentityServiceLoadCollectedCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LoadCollected", reflect.TypeOf((*MockFlowSSOIdentityService)(nil).LoadCollected), ctx, in)
+	return &MockFlowSSOIdentityServiceLoadCollectedCall{Call: call}
+}
+
+// MockFlowSSOIdentityServiceLoadCollectedCall wrap *gomock.Call
+type MockFlowSSOIdentityServiceLoadCollectedCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockFlowSSOIdentityServiceLoadCollectedCall) Return(arg0 *domain.FlowSSOParkedIdentity, arg1 error) *MockFlowSSOIdentityServiceLoadCollectedCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockFlowSSOIdentityServiceLoadCollectedCall) Do(f func(context.Context, domain.FlowSSOLoadInput) (*domain.FlowSSOParkedIdentity, error)) *MockFlowSSOIdentityServiceLoadCollectedCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockFlowSSOIdentityServiceLoadCollectedCall) DoAndReturn(f func(context.Context, domain.FlowSSOLoadInput) (*domain.FlowSSOParkedIdentity, error)) *MockFlowSSOIdentityServiceLoadCollectedCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // LoadParked mocks base method.
 func (m *MockFlowSSOIdentityService) LoadParked(ctx context.Context, in domain.FlowSSOLoadInput) (*domain.FlowSSOParkedIdentity, error) {
 	m.ctrl.T.Helper()

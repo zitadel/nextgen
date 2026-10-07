@@ -13,6 +13,13 @@ type FlowSSOIdentityService interface {
 	// off, and when the provider's subject is linked to a user under another
 	// schema than the flow's.
 	LoadParked(ctx context.Context, in FlowSSOLoadInput) (*FlowSSOParkedIdentity, error)
+	// LoadCollected reads the parked row LoadParked skips: the one with
+	// in.ResolvedCheckID, left parked for a collection step. It returns
+	// CheckID, ConnectionID, Subject, Claims and Verified, and no link. It
+	// returns nil, nil when that row is gone, was replaced, holds no result or
+	// holds a collision marker, and ErrFlowRestartRequired when its connection
+	// revision no longer exists.
+	LoadCollected(ctx context.Context, in FlowSSOLoadInput) (*FlowSSOParkedIdentity, error)
 	// BindLinked records the linked user and an sso factor on the attempt and
 	// deletes the parked row with in.CheckID, in one transaction. It returns
 	// ErrFlowRestartRequired when the attempt already carries another user or
@@ -79,11 +86,12 @@ type FlowSSOParkedIdentity struct {
 
 type FlowSSOLinkedUser struct{ LinkID, UserID string }
 
-// FlowSSOBindInput settles the parked row CheckID, the one LoadParked read.
+// FlowSSOBindInput settles the parked row CheckID, the one LoadParked or
+// LoadCollected read.
 type FlowSSOBindInput struct{ ProjectID, AttemptID, CheckID, UserID, ConnectionID, LinkID string }
 
 // FlowSSOCreateInput creates a user for the parked row CheckID, the one
-// LoadParked read.
+// LoadParked or LoadCollected read.
 type FlowSSOCreateInput struct {
 	ProjectID, AttemptID, CheckID, UserSchemaURL, ConnectionID, Subject string
 	Attributes                                                          map[string]any

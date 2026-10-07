@@ -877,3 +877,66 @@ func TestFlowSSOIdentityResolver_LoadParked_CollisionMarkerReportedWithoutResolv
 	require.NoError(t, err)
 	assert.Equal(t, &domain.FlowSSOParkedIdentity{CheckID: "ch-1", CollisionUserID: "u-b", AttemptUserID: "u-b"}, got)
 }
+
+func collectedInput() domain.FlowSSOLoadInput {
+	in := loadInput()
+	in.ResolvedCheckID = "ch-1"
+	return in
+}
+
+// The row the engine resolved and left parked for collection is read again,
+// without the link lookup LoadParked makes.
+func TestFlowSSOIdentityResolver_LoadCollected_ReadsResolvedRow(t *testing.T) {
+	t.Parallel()
+	f := newSSOResolverFixture(t)
+	f.stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), ssoProjectID, ssoAttemptID).Return(parkedAttempt(parkedResult()), nil)
+	f.connections.EXPECT().GetRevision(gomock.Any(), ssoProjectID, ssoRevisionID).
+		Return(&domain.IDPConnection{ProjectID: ssoProjectID, ID: "idp-1", RevisionID: ssoRevisionID, Document: []byte(ssoResolverConnectionDocument)}, nil)
+	f.stmts.EXPECT().GetIDPIdentityLink(gomock.Any(), gomock.Any()).Times(0)
+
+	got, err := f.resolver.LoadCollected(t.Context(), collectedInput())
+	require.NoError(t, err)
+	assert.Equal(t, &domain.FlowSSOParkedIdentity{
+		CheckID:      "ch-1",
+		ConnectionID: "idp-1",
+		Subject:      "sub-1",
+		Claims:       map[string]any{"email": "alice@example.com"},
+		Verified:     map[string]bool{"email": true},
+	}, got)
+}
+
+func TestFlowSSOIdentityResolver_LoadCollected_NothingToCollectIsNil(t *testing.T) {
+	t.Parallel()
+	for name, tt := range map[string]struct {
+		attempt    *domain.AuthAttempt
+		resolvedID string
+	}{
+		"no sso row":        {attempt: &domain.AuthAttempt{ProjectID: ssoProjectID, ID: ssoAttemptID}, resolvedID: "ch-1"},
+		"row still pending": {attempt: parkedAttempt(nil), resolvedID: "ch-1"},
+		"newer row":         {attempt: parkedAttempt(parkedResult()), resolvedID: "ch-0"},
+		"collision marker":  {attempt: parkedAttempt(&domain.SSOCallbackResult{CollisionUserID: "u-b"}), resolvedID: "ch-1"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			f := newSSOResolverFixture(t)
+			f.stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), ssoProjectID, ssoAttemptID).Return(tt.attempt, nil)
+			f.connections.EXPECT().GetRevision(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+
+			in := loadInput()
+			in.ResolvedCheckID = tt.resolvedID
+			got, err := f.resolver.LoadCollected(t.Context(), in)
+			require.NoError(t, err)
+			assert.Nil(t, got)
+		})
+	}
+}
+
+func TestFlowSSOIdentityResolver_LoadCollected_RevisionMissingRestarts(t *testing.T) {
+	t.Parallel()
+	f := newSSOResolverFixture(t)
+	f.stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), ssoProjectID, ssoAttemptID).Return(parkedAttempt(parkedResult()), nil)
+	f.connections.EXPECT().GetRevision(gomock.Any(), ssoProjectID, ssoRevisionID).Return(nil, domain.ErrIDPConnectionNotFound())
+
+	_, err := f.resolver.LoadCollected(t.Context(), collectedInput())
+	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
+}

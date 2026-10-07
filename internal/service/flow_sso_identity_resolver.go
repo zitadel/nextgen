@@ -129,6 +129,38 @@ func (r *FlowSSOIdentityResolver) LoadParked(ctx context.Context, in domain.Flow
 	return parked, nil
 }
 
+func (r *FlowSSOIdentityResolver) LoadCollected(ctx context.Context, in domain.FlowSSOLoadInput) (*domain.FlowSSOParkedIdentity, error) {
+	attempt, err := r.db.Statements().GetAuthAttemptByID(ctx, in.ProjectID, in.AttemptID)
+	if err != nil {
+		return nil, fmt.Errorf("load collected sso identity: read attempt: %w", err)
+	}
+	// Only the row the engine resolved: a newer row is resolved by the next
+	// render first and may turn out to be linked.
+	check, ok := attempt.SSOCallback()
+	if !ok || check.ID != in.ResolvedCheckID || check.Result == nil || check.Result.CollisionUserID != "" {
+		return nil, nil
+	}
+	result := check.Result
+	connection, err := r.connections.GetRevision(ctx, in.ProjectID, result.ConnectionRevisionID)
+	if errors.Is(err, domain.ErrIDPConnectionNotFound()) {
+		getLoggingContext(ctx, "flow").Warn("sso identity parked on a connection revision that no longer exists",
+			slog.String("project_id", in.ProjectID),
+			slog.String("connection_revision_id", result.ConnectionRevisionID),
+		)
+		return nil, domain.ErrFlowRestartRequired()
+	}
+	if err != nil {
+		return nil, fmt.Errorf("load collected sso identity: read connection revision: %w", err)
+	}
+	return &domain.FlowSSOParkedIdentity{
+		CheckID:      check.ID,
+		ConnectionID: connection.ID,
+		Subject:      result.Subject,
+		Claims:       result.Claims,
+		Verified:     result.Verified,
+	}, nil
+}
+
 // boundThroughSSO reports the user an earlier BindLinked recorded, while the
 // attempt still waits for its handoff. The sso factor this attempt wrote is the
 // marker: only a bind writes it, together with the user factor. A factor
