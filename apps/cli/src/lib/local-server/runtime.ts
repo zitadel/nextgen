@@ -171,12 +171,7 @@ export async function ensureContainerIdentity(
   );
   await writeFile(
     paths.containerGroupFile,
-    [
-      "root:x:0:",
-      "nonroot:x:65532:",
-      `zitadel-local:x:${String(gid)}:`,
-      "",
-    ].join("\n"),
+    ["root:x:0:", "nonroot:x:65532:", `zitadel-local:x:${String(gid)}:`, ""].join("\n"),
     { mode: 0o644 },
   );
   return {
@@ -282,7 +277,10 @@ export async function removeLocalData(cwd: string): Promise<void> {
   await rm(localRuntimePaths(cwd).dataDir, { recursive: true, force: true });
 }
 
-export async function checkLocalServerHealth(serverUrl: string, timeoutMs = 1500): Promise<boolean> {
+export async function checkLocalServerHealth(
+  serverUrl: string,
+  timeoutMs = 1500,
+): Promise<boolean> {
   try {
     const healthUrl = new URL("/healthz", serverUrl);
     const response = await fetch(healthUrl, { signal: AbortSignal.timeout(timeoutMs) });

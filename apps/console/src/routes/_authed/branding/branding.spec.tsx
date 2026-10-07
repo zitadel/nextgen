@@ -97,7 +97,9 @@ async function renderAt(path: string) {
     import("@tanstack/react-router"),
     import("../../../router"),
   ]);
-  const router = createAppRouter({ history: createMemoryHistory({ initialEntries: [scopedPath(path)] }) });
+  const router = createAppRouter({
+    history: createMemoryHistory({ initialEntries: [scopedPath(path)] }),
+  });
   render(<RouterProvider router={router} />);
   return router;
 }
@@ -270,7 +272,9 @@ describe("branding screen", () => {
     );
     expect(screen.getByTestId("preview")).toHaveAttribute("data-state", "validation_error");
 
-    await userEvent.click(screen.getByRole("button", { name: "serve a step with nothing to flag" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "serve a step with nothing to flag" }),
+    );
 
     // The pick falls back to the default, and the option cannot be chosen.
     expect(screen.getByTestId("preview")).toHaveAttribute("data-state", "default");

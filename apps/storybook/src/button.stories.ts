@@ -43,7 +43,10 @@ const meta: Meta<ButtonArgs> = {
     loading: { control: "boolean" },
     disabled: { control: "boolean" },
     block: { control: "boolean" },
-    leadingIcon: { control: "boolean", description: "Render a leading icon in the `leading` slot." },
+    leadingIcon: {
+      control: "boolean",
+      description: "Render a leading icon in the `leading` slot.",
+    },
     previewState: {
       control: "inline-radio",
       options: ["", "hovered", "focused", "pressed"],
@@ -66,14 +69,16 @@ export const Default: Story = {
       ?block=${block}
       data-state=${previewState || nothing}
     >
-      ${leadingIcon
-        ? html`<zl-icon
+      ${
+        leadingIcon
+          ? html`<zl-icon
             slot="leading"
             name="arrow-left"
             size="16"
             decorative
           ></zl-icon>`
-        : nothing}
+          : nothing
+      }
     </zl-button>
   `,
 };

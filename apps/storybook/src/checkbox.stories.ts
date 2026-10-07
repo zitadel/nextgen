@@ -25,7 +25,14 @@ interface CheckboxArgs {
 const meta: Meta<CheckboxArgs> = {
   title: "Atoms/Checkbox",
   tags: ["autodocs"],
-  args: { label: "Label", checked: false, disabled: false, required: false, error: "", previewState: "" },
+  args: {
+    label: "Label",
+    checked: false,
+    disabled: false,
+    required: false,
+    error: "",
+    previewState: "",
+  },
   argTypes: {
     label: { control: "text" },
     checked: { control: "boolean" },
@@ -43,7 +50,14 @@ const meta: Meta<CheckboxArgs> = {
 export default meta;
 type Story = StoryObj<CheckboxArgs>;
 
-const checkbox = ({ label, checked, disabled, required, error, previewState }: CheckboxArgs) => html`
+const checkbox = ({
+  label,
+  checked,
+  disabled,
+  required,
+  error,
+  previewState,
+}: CheckboxArgs) => html`
   <zl-checkbox
     label=${label || nothing}
     aria-label=${label ? nothing : "Accept terms"}

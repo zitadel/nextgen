@@ -41,10 +41,7 @@ export class ZlButton extends LitElement {
     delegatesFocus: true,
   };
 
-  static override styles = [
-    baseHostStyles,
-    ...surfaceStyles(buttonStyles),
-  ];
+  static override styles = [baseHostStyles, ...surfaceStyles(buttonStyles)];
 
   @property({ reflect: true }) accessor hierarchy: "primary" | "secondary" | "outline" | "text" =
     "primary";
@@ -125,9 +122,11 @@ export class ZlButton extends LitElement {
       >
         <slot name="leading"></slot>
         ${body}
-        ${loading
-          ? html`<span class="zr-btn__spinner" part="spinner"><zl-icon name="spinner" size="16" spin decorative></zl-icon></span>`
-          : html`<slot name="trailing"></slot>`}
+        ${
+          loading
+            ? html`<span class="zr-btn__spinner" part="spinner"><zl-icon name="spinner" size="16" spin decorative></zl-icon></span>`
+            : html`<slot name="trailing"></slot>`
+        }
       </button>
     `;
   }
@@ -162,7 +161,10 @@ export class ZlButton extends LitElement {
   private activate(event: MouseEvent): void {
     const type = this.buttonType();
     const action = this.buttonAction();
-    if (this.booleanOption("disabled", this.disabled) || this.booleanOption("loading", this.loading)) {
+    if (
+      this.booleanOption("disabled", this.disabled) ||
+      this.booleanOption("loading", this.loading)
+    ) {
       event.preventDefault();
       event.stopImmediatePropagation();
       return;
@@ -212,7 +214,17 @@ export class ZlButton extends LitElement {
 export const zlButtonManifest: AtomManifest = {
   tag: "zl-button",
   consumes: { action: { kind: "submit", required: false } },
-  attrs: ["hierarchy", "size", "type", "action", "loading", "disabled", "block", "label", "data-testid"],
+  attrs: [
+    "hierarchy",
+    "size",
+    "type",
+    "action",
+    "loading",
+    "disabled",
+    "block",
+    "label",
+    "data-testid",
+  ],
   parts: ["root", "spinner"],
   slots: ["", "leading", "trailing"],
   events: ["zl-submit"],

@@ -57,7 +57,12 @@ const passkeyUpsellStep: CreateFlow201 = {
     texts: { title_key: "passkey-upsell.title" },
     fields: [],
     actions: [
-      { name: "setup", kind: "passkey_register", text_key: "passkey-upsell.action.setup", primary: true },
+      {
+        name: "setup",
+        kind: "passkey_register",
+        text_key: "passkey-upsell.action.setup",
+        primary: true,
+      },
       { name: "skip", kind: "navigate", text_key: "passkey-upsell.action.skip" },
     ],
     gates: {},
@@ -165,7 +170,11 @@ describe("<zitadel-login> form + focus (chromium)", () => {
 
   beforeEach(() => {
     _resetConfigForTesting();
-    testProject = configureZitadel({ proxyPath: "/__nextgen", projectId: "test-project", url: "http://localhost:4000" });
+    testProject = configureZitadel({
+      proxyPath: "/__nextgen",
+      projectId: "test-project",
+      url: "http://localhost:4000",
+    });
     host = document.createElement("div");
     document.body.appendChild(host);
     stub = installFlowFetchStub([identifierStep, passkeyUpsellStep]);
@@ -185,9 +194,7 @@ describe("<zitadel-login> form + focus (chromium)", () => {
       const root = element.shadowRoot;
       return root && root.querySelectorAll("zl-field").length === 2 ? root : null;
     });
-    await waitFor(() =>
-      element.getAttribute("aria-busy") === "false" ? element : null,
-    );
+    await waitFor(() => (element.getAttribute("aria-busy") === "false" ? element : null));
     return element;
   }
 

@@ -140,11 +140,13 @@ export class ZitadelSession extends ZitadelSurface {
           <h1 slot="header" class="title ${this.suppressHeader ? "sr-only" : ""}">
             ${this.heading}
           </h1>
-          ${this.session.label
-            ? html`<p slot=${this.suppressHeader ? nothing : "header"} class="identity">
+          ${
+            this.session.label
+              ? html`<p slot=${this.suppressHeader ? nothing : "header"} class="identity">
                 ${this.session.label}
               </p>`
-            : nothing}
+              : nothing
+          }
 
           <zl-button
             hierarchy="primary"
@@ -156,9 +158,11 @@ export class ZitadelSession extends ZitadelSurface {
             @zl-submit=${this.handleLogout}
           ></zl-button>
 
-          ${this.session.errorMessage
-            ? html`<p class="error" role="alert">${this.session.errorMessage}</p>`
-            : nothing}
+          ${
+            this.session.errorMessage
+              ? html`<p class="error" role="alert">${this.session.errorMessage}</p>`
+              : nothing
+          }
         </zl-card>
       </zl-page-shell>
     `;

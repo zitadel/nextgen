@@ -54,7 +54,10 @@ const meta: Meta<TextFieldArgs> = {
     invalid: { control: "boolean" },
     error: { control: "text", description: "Inline error message (forces the invalid treatment)." },
     success: { control: "text", description: "Inline success message." },
-    forgotPasswordHref: { control: "text", description: "When set, renders the forgot-password link row." },
+    forgotPasswordHref: {
+      control: "text",
+      description: "When set, renders the forgot-password link row.",
+    },
     value: { control: "text" },
     help: { control: "text", description: "Help text in the `help` slot." },
     trailingIcon: { control: "boolean", description: "Show the default trailing icon." },

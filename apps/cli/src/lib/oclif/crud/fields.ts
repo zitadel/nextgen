@@ -250,7 +250,6 @@ export const fieldExample = (fields: readonly BodyField[]): string | undefined =
     .join(" ");
 };
 
-
 /** A record key, refused when it names a credential. */
 const secretChecked = (key: string, flag: string): string =>
   isSecretKey(key) ? refuseSecret(key, `--${flag}`) : key;

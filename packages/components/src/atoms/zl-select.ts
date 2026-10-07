@@ -45,10 +45,7 @@ export type ZlSelectChangeDetail = { name: string; value: string };
  */
 @customElement("zl-select")
 export class ZlSelect extends FormAtom {
-  static override styles = [
-    baseHostStyles,
-    ...surfaceStyles(sharedStyles, selectStyles),
-  ];
+  static override styles = [baseHostStyles, ...surfaceStyles(sharedStyles, selectStyles)];
 
   @property() accessor label = "";
   @property() accessor value = "";
@@ -234,9 +231,9 @@ export class ZlSelect extends FormAtom {
     return html`
       <label class="zr-select__label" part="label" id=${labelId} @click=${this.handleLabelClick}>
         <span>${this.label}</span>
-        ${this.required
-          ? html`<span class="zr-select__required" aria-hidden="true">*</span>`
-          : null}
+        ${
+          this.required ? html`<span class="zr-select__required" aria-hidden="true">*</span>` : null
+        }
       </label>
     `;
   }

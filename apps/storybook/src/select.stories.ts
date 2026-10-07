@@ -74,9 +74,7 @@ const meta: Meta<SelectArgs> = {
       description: "Preview the open menu without a real click.",
     },
   },
-  decorators: [
-    (story) => html`<div style="width: 20rem; min-height: 18rem;">${story()}</div>`,
-  ],
+  decorators: [(story) => html`<div style="width: 20rem; min-height: 18rem;">${story()}</div>`],
 };
 
 export default meta;

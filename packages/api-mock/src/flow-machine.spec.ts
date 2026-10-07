@@ -70,7 +70,12 @@ describe("the provider round trip", () => {
 describe("register-sso", () => {
   it("creates the account on submit", () => {
     const actor = atProvider();
-    actor.send({ type: "SUBMIT", action: "callback", fields: {}, sso_outcome: "sso_user_not_found" });
+    actor.send({
+      type: "SUBMIT",
+      action: "callback",
+      fields: {},
+      sso_outcome: "sso_user_not_found",
+    });
 
     actor.send({ type: "SUBMIT", action: "submit", fields: { givenName: "Ada" } });
 
@@ -80,7 +85,12 @@ describe("register-sso", () => {
 
   it("goes back to sign-in rather than registering when asked", () => {
     const actor = atProvider();
-    actor.send({ type: "SUBMIT", action: "callback", fields: {}, sso_outcome: "sso_user_not_found" });
+    actor.send({
+      type: "SUBMIT",
+      action: "callback",
+      fields: {},
+      sso_outcome: "sso_user_not_found",
+    });
 
     actor.send({ type: "SUBMIT", action: "sign_in", fields: {} });
 
@@ -127,7 +137,12 @@ describe("sso-conflict", () => {
   it("rotates the session token on every hop, as the engine does", () => {
     const actor = atProvider();
     const atRedirect = actor.getSnapshot().context.sessionToken;
-    actor.send({ type: "SUBMIT", action: "callback", fields: {}, sso_outcome: "user_already_exists" });
+    actor.send({
+      type: "SUBMIT",
+      action: "callback",
+      fields: {},
+      sso_outcome: "user_already_exists",
+    });
 
     expect(actor.getSnapshot().context.sessionToken).not.toBe(atRedirect);
   });

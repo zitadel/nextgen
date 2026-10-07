@@ -68,7 +68,9 @@ describe("<zl-button> rendering (jsdom)", () => {
   });
 
   it("projects host test ids onto the native button", async () => {
-    const el = mount(`<zl-button label="Next" action="submit" data-testid="zitadel-action-submit"></zl-button>`);
+    const el = mount(
+      `<zl-button label="Next" action="submit" data-testid="zitadel-action-submit"></zl-button>`,
+    );
     await el.updateComplete;
     expect(el.shadowRoot?.querySelector("button")?.getAttribute("data-testid")).toBe(
       "zitadel-action-submit-button",

@@ -180,7 +180,9 @@ export function parseChangesetPackages(source) {
     .map((line) => line.trim())
     .filter((line) => line && !line.startsWith("#"))
     .flatMap((line) => {
-      const packageMatch = line.match(/^["']?([^"':]+)["']?\s*:\s*["']?(major|minor|patch|none)["']?\s*$/);
+      const packageMatch = line.match(
+        /^["']?([^"':]+)["']?\s*:\s*["']?(major|minor|patch|none)["']?\s*$/,
+      );
       return packageMatch ? [packageMatch[1]] : [];
     });
 }
@@ -217,7 +219,9 @@ export async function checkChangesetsStatus(options) {
   const pending = options.pending ?? false;
   const versionPr = options.versionPr ?? false;
   const root = options.repoRoot ?? repoRoot;
-  const entries = options.entries ?? (pending ? await pendingChangesetEntries(root) : await gitChangedEntries(root, base));
+  const entries =
+    options.entries ??
+    (pending ? await pendingChangesetEntries(root) : await gitChangedEntries(root, base));
   const config = options.config ?? (await readChangesetsConfig(root));
   const analysis = analyzeChangedEntries(entries, { versionPr });
   const errors = validateFixedGroup(config).map((message) => ({
@@ -229,7 +233,8 @@ export async function checkChangesetsStatus(options) {
 
   if (analysis.currentChangesetFiles.length > 0) {
     const changesetSources =
-      options.changesetSources ?? (await readChangesetSources(root, analysis.currentChangesetFiles));
+      options.changesetSources ??
+      (await readChangesetSources(root, analysis.currentChangesetFiles));
 
     for (const file of analysis.currentChangesetFiles) {
       const packages = parseChangesetPackages(changesetSources[file] ?? "");
@@ -332,14 +337,14 @@ export function renderStepSummary(report) {
   } else {
     lines.push("| Package | Files |", "| --- | --- |");
     for (const changedPackage of report.analysis.changedPackages) {
-      const shownFiles = changedPackage.files.slice(0, 12).map((file) => `\`${escapeMarkdown(file)}\``);
+      const shownFiles = changedPackage.files
+        .slice(0, 12)
+        .map((file) => `\`${escapeMarkdown(file)}\``);
       const hiddenCount = changedPackage.files.length - shownFiles.length;
       if (hiddenCount > 0) {
         shownFiles.push(`and ${hiddenCount} more`);
       }
-      lines.push(
-        `| \`${changedPackage.name}\` | ${shownFiles.join("<br>")} |`,
-      );
+      lines.push(`| \`${changedPackage.name}\` | ${shownFiles.join("<br>")} |`);
     }
     lines.push("");
   }
@@ -420,9 +425,13 @@ export async function main(args = forwardedArgs(), options = {}) {
 }
 
 export async function gitChangedEntries(root, base) {
-  const committed = await runCapture("git", ["diff", "--name-status", `${base}...HEAD`], { cwd: root });
+  const committed = await runCapture("git", ["diff", "--name-status", `${base}...HEAD`], {
+    cwd: root,
+  });
   const worktree = await runCapture("git", ["diff", "--name-status", "HEAD"], { cwd: root });
-  const untracked = await runCapture("git", ["ls-files", "--others", "--exclude-standard"], { cwd: root });
+  const untracked = await runCapture("git", ["ls-files", "--others", "--exclude-standard"], {
+    cwd: root,
+  });
   const entries = new Map();
 
   for (const entry of parseNameStatus(committed.stdout)) {

@@ -330,16 +330,19 @@ export class ZitadelLogout extends ZitadelConfigured {
         ${this.initial}
       </button>
 
-      ${this.open
-        ? html`
+      ${
+        this.open
+          ? html`
             <div class="dropdown" role="dialog" aria-label="User menu">
               <div class="preview">
                 <div class="preview-avatar" aria-hidden="true">${this.initial}</div>
                 <div class="preview-info">
                   <div class="preview-name">${this.session.label}</div>
-                  ${this.session.display && this.session.identifier
-                    ? html`<div class="preview-email">${this.session.identifier}</div>`
-                    : nothing}
+                  ${
+                    this.session.display && this.session.identifier
+                      ? html`<div class="preview-email">${this.session.identifier}</div>`
+                      : nothing
+                  }
                 </div>
               </div>
 
@@ -350,9 +353,10 @@ export class ZitadelLogout extends ZitadelConfigured {
                   ?disabled=${this.session.loading}
                   @click=${this.handleSignOutClick}
                 >
-                  ${this.session.loading
-                    ? html`<zl-icon name="spinner" size="16" spin decorative></zl-icon>`
-                    : html`
+                  ${
+                    this.session.loading
+                      ? html`<zl-icon name="spinner" size="16" spin decorative></zl-icon>`
+                      : html`
                         <svg
                           width="14"
                           height="14"
@@ -368,17 +372,21 @@ export class ZitadelLogout extends ZitadelConfigured {
                           <polyline points="16 17 21 12 16 7" />
                           <line x1="21" y1="12" x2="9" y2="12" />
                         </svg>
-                      `}
+                      `
+                  }
                   <span>${this.session.loading ? "Signing out…" : "Sign out"}</span>
                 </button>
               </div>
 
-              ${this.session.errorMessage
-                ? html`<div class="error-bar" role="alert">${this.session.errorMessage}</div>`
-                : nothing}
+              ${
+                this.session.errorMessage
+                  ? html`<div class="error-bar" role="alert">${this.session.errorMessage}</div>`
+                  : nothing
+              }
             </div>
           `
-        : nothing}
+          : nothing
+      }
     `;
   }
 }

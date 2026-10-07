@@ -743,7 +743,8 @@ export class ZitadelLogin extends ZitadelSurface {
           // forward, so start over. Logged so a host passing a wrong handle
           // does not get a silent restart.
           const gone =
-            error instanceof ApiError && (error.status === 400 || error.status === 404 || error.status === 410);
+            error instanceof ApiError &&
+            (error.status === 400 || error.status === 404 || error.status === 410);
           if (!gone) throw error;
           console.warn(`[zitadel-login] flow ${resumeId} no longer resolves; starting a new flow.`);
         }

@@ -36,9 +36,7 @@ test("shows the bootstrapped project in the list and detail views", async ({
   await expect(projectLink).toBeVisible();
   await projectLink.click();
 
-  await expect(page).toHaveURL(
-    new RegExp(`/teams\\?.*project=${zitadel.handle.projectId}`),
-  );
+  await expect(page).toHaveURL(new RegExp(`/teams\\?.*project=${zitadel.handle.projectId}`));
   await page
     .getByRole("navigation", { name: "Primary" })
     .getByRole("link", { name: "Project settings" })

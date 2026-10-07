@@ -1,5 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/web-components-vite";
-import { SHIPPED_ICON_NAMES, type IconName, type IconSize, type IconTone } from "@zitadel/components";
+import {
+  SHIPPED_ICON_NAMES,
+  type IconName,
+  type IconSize,
+  type IconTone,
+} from "@zitadel/components";
 import { html, nothing } from "lit";
 
 import "@zitadel/components/atoms";
@@ -30,8 +35,14 @@ const meta: Meta<IconArgs> = {
     size: { control: "inline-radio", options: ["16", "24"] },
     tone: { control: "inline-radio", options: ["default", "error", "success", "disabled"] },
     spin: { control: "boolean" },
-    decorative: { control: "boolean", description: "Force aria-hidden (use next to a visible label)." },
-    label: { control: "text", description: "Accessible name override; falls back to the glyph default." },
+    decorative: {
+      control: "boolean",
+      description: "Force aria-hidden (use next to a visible label).",
+    },
+    label: {
+      control: "text",
+      description: "Accessible name override; falls back to the glyph default.",
+    },
   },
 };
 

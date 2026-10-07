@@ -215,9 +215,9 @@ describe("<zl-select> markup", () => {
     error = el.shadowRoot?.querySelector(".zr-select__error");
     expect(error?.hasAttribute("hidden")).toBe(false);
     expect(error?.textContent?.trim()).toBe("Country is required.");
-    expect(el.shadowRoot?.querySelector(".zr-select")?.classList.contains("zr-select--invalid")).toBe(
-      true,
-    );
+    expect(
+      el.shadowRoot?.querySelector(".zr-select")?.classList.contains("zr-select--invalid"),
+    ).toBe(true);
     expect(native(el).getAttribute("aria-invalid")).toBe("true");
     expect(native(el).getAttribute("aria-describedby")).toBe(error?.id);
   });

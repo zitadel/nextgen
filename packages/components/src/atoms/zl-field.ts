@@ -47,10 +47,7 @@ export type ZlFieldInputDetail = { name: string; value: string };
  */
 @customElement("zl-field")
 export class ZlField extends FormAtom {
-  static override styles = [
-    baseHostStyles,
-    ...surfaceStyles(sharedStyles, fieldStyles),
-  ];
+  static override styles = [baseHostStyles, ...surfaceStyles(sharedStyles, fieldStyles)];
 
   @property() accessor label = "";
   @property() accessor type: ZlFieldType = "text";
@@ -155,8 +152,7 @@ export class ZlField extends FormAtom {
       "zr-field--success": showSuccess,
       "zr-field--disabled": this.disabled,
     });
-    const showDefaultTrailing =
-      this.trailingIcon && !this.hasSuffixSlot && !this.disabled;
+    const showDefaultTrailing = this.trailingIcon && !this.hasSuffixSlot && !this.disabled;
     const trailing = showDefaultTrailing ? this.renderTrailingIcon() : null;
     const wrapClass = classMap({
       "zr-field__wrap": true,
@@ -217,9 +213,7 @@ export class ZlField extends FormAtom {
     const label = html`
       <label class="zr-field__label" part="label" id=${labelId} for=${this.inputId}>
         <span>${this.label}</span>
-        ${this.required
-          ? html`<span class="zr-field__required" aria-hidden="true">*</span>`
-          : null}
+        ${this.required ? html`<span class="zr-field__required" aria-hidden="true">*</span>` : null}
       </label>
     `;
     if (!this.forgotPasswordHref) {

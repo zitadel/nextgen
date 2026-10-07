@@ -29,10 +29,7 @@ export type ZlCheckboxChangeDetail = { name: string; checked: boolean; value: st
  */
 @customElement("zl-checkbox")
 export class ZlCheckbox extends FormAtom {
-  static override styles = [
-    baseHostStyles,
-    ...surfaceStyles(sharedStyles, checkboxStyles),
-  ];
+  static override styles = [baseHostStyles, ...surfaceStyles(sharedStyles, checkboxStyles)];
 
   @property() accessor label = "";
   @property() accessor value = "on";
@@ -132,9 +129,11 @@ export class ZlCheckbox extends FormAtom {
               <zl-icon class="zr-checkbox__check" part="check" name="check" size="16" decorative></zl-icon>
             </span>
           </span>
-          ${labelText
-            ? html`<span class="zr-checkbox__label" part="label">${labelText}</span>`
-            : html`<slot></slot>`}
+          ${
+            labelText
+              ? html`<span class="zr-checkbox__label" part="label">${labelText}</span>`
+              : html`<slot></slot>`
+          }
         </label>
         <div
           class="zr-checkbox__error zr-inline-error"

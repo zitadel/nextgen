@@ -126,7 +126,8 @@ export default class Claim extends BaseCommand {
         data: {
           title: "Zitadel claim was not started.",
           project_id: secret.project_id,
-          would: "Open a browser to claim this project, then record the owning team in .zitadel/secret.",
+          would:
+            "Open a browser to claim this project, then record the owning team in .zitadel/secret.",
         },
         nextCommands: ["zitadel claim"],
       });
@@ -137,7 +138,7 @@ export default class Claim extends BaseCommand {
       token: secret.project_secret,
     });
 
-    let challenge;
+    let challenge: Awaited<ReturnType<typeof client.initClaim>>;
     try {
       challenge = await client.initClaim(secret.project_id);
     } catch (error) {

@@ -1,6 +1,6 @@
 import { LitElement } from "lit";
 import { property } from "lit/decorators.js";
-import { type ZitadelProject } from "@zitadel/api/config";
+import type { ZitadelProject } from "@zitadel/api/config";
 
 import type { Branding } from "./branding.js";
 import { applyBaseTokens, applyBrandingTokens } from "./branding-to-tokens.js";
