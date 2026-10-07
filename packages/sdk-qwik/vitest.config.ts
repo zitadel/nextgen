@@ -1,7 +1,7 @@
 import { qwikVite } from "@qwik.dev/core/optimizer";
 import { playwright } from "@vitest/browser-playwright";
-import { chromium } from "playwright";
 import { apiMockPublicDir } from "@zitadel/api-mock/public-dir";
+import { chromium } from "playwright";
 import { defineConfig } from "vitest/config";
 
 import { baseTest, sharedChromium } from "../../vitest.shared.mjs";
