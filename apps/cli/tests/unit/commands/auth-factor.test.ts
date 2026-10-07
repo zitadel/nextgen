@@ -287,6 +287,55 @@ describe("auth-factor", () => {
       ]);
     });
 
+    it("quotes a schema name the shell would misread", async () => {
+      const cwd = await makeProject(
+        {
+          "my users": {
+            ...passwordSchema("my users"),
+            "x-auth-methods": { password: { enabled: false }, passkey: { enabled: true } },
+          },
+        },
+        {},
+      );
+
+      const { envelope } = await run(cwd, "disable", "--mode", "passkey");
+
+      expect(envelope.next_commands?.[0]).toMatch(/--schema 'my users' --force$/);
+    });
+
+    it("refuses an x-auth-methods that is not an object rather than overwrite it", async () => {
+      const cwd = await makeProject(
+        { "default-human-user": { ...passwordSchema(), "x-auth-methods": [] } },
+        {},
+      );
+
+      const { envelope } = await run(cwd, "enable", "--mode", "passkey");
+
+      expect(envelope).toMatchObject({
+        code: "E_VALIDATION",
+        details: { region: "x-auth-methods is not an object" },
+      });
+    });
+
+    it("refuses a factor entry that is not an object rather than overwrite it", async () => {
+      const cwd = await makeProject(
+        {
+          "default-human-user": {
+            ...passwordSchema(),
+            "x-auth-methods": { password: true, passkey: { enabled: true } },
+          },
+        },
+        {},
+      );
+
+      const { envelope } = await run(cwd, "disable", "--mode", "password");
+
+      expect(envelope).toMatchObject({
+        code: "E_VALIDATION",
+        details: { region: "x-auth-methods.password is not an object" },
+      });
+    });
+
     it("does not count otp as a way to sign in", async () => {
       const cwd = await makeProject(
         {

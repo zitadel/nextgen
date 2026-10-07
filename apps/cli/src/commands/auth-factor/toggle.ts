@@ -12,6 +12,7 @@ import {
   checkFlow,
   flowOffers,
   hasIdentifier,
+  malformedAuthMethods,
   reachableSignInMethods,
   setAuthFactors,
   usableSignInMethods,
@@ -20,7 +21,7 @@ import { ZitadelError } from "../../lib/errors";
 import { type FlowFile, readSchemaFiles, type SchemaFile, selectSchema } from "../../lib/idp";
 import { stableStringify } from "../../lib/json";
 import { BaseCommand, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
-import { publicCliCommand } from "../../lib/public-cli";
+import { publicCliCommand, shellArg } from "../../lib/public-cli";
 import { flowsForSchema } from "../../lib/schema-flows";
 import { reportWarning } from "../../lib/warnings";
 
@@ -64,6 +65,15 @@ export abstract class AuthFactorCommand extends BaseCommand {
     }
 
     const schema = selectSchema(await readSchemaFiles(cwd), flags.schema);
+    const malformed = malformedAuthMethods(schema.body, factors);
+    if (malformed !== undefined) {
+      throw new ZitadelError("E_VALIDATION", `${schema.path}: ${malformed}`, {
+        hint:
+          "This command edits that value, and it is not the shape it edits. " +
+          "Fix it against the dialect in .zitadel/meta/, then run the command again.",
+        details: { file: schema.path, region: malformed },
+      });
+    }
     const change = setAuthFactors(schema.body, factors, enabled);
     const flows = await flowsForSchema(cwd, schema);
 
@@ -205,14 +215,17 @@ function refuseLastFactor(
 ): never {
   const modes = disabling.map((factor) => `--mode ${factor}`).join(" ");
   const retry = publicCliCommand(
-    `auth-factor disable ${modes} --schema ${schema.name} --force`,
+    `auth-factor disable ${modes} --schema ${shellArg(schema.name)} --force`,
     cliVersion,
   );
   const alternatives = AUTH_FACTORS.filter(
     (factor) =>
       !disabling.includes(factor) && (factor !== "password" || hasIdentifier(schema.body)),
   ).map((factor) =>
-    publicCliCommand(`auth-factor enable --mode ${factor} --schema ${schema.name}`, cliVersion),
+    publicCliCommand(
+      `auth-factor enable --mode ${factor} --schema ${shellArg(schema.name)}`,
+      cliVersion,
+    ),
   );
   throw new ZitadelError("E_VALIDATION", `${schema.path} would have no way to sign in left`, {
     hint:

@@ -14,6 +14,19 @@ export function npmSelectorForCliVersion(cliVersion: string): string {
   return npmDistTagForCliVersion(normalized);
 }
 
+/**
+ * Quote one argument for a suggested shell command. Values the CLI builds from
+ * local file names can hold spaces or shell syntax, and a suggested command is
+ * meant to be run as written, so anything outside a plain set of characters is
+ * single-quoted.
+ */
+export function shellArg(value: string): string {
+  if (/^[A-Za-z0-9_./:=@%+-]+$/.test(value)) {
+    return value;
+  }
+  return `'${value.replace(/'/g, "'\\''")}'`;
+}
+
 export function publicCliCommand(args: string, cliVersion: string): string {
   const prefix = `npx ${CLI_PACKAGE_NAME}@${npmSelectorForCliVersion(cliVersion)}`;
   return args.length > 0 ? `${prefix} ${args}` : prefix;

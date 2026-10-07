@@ -169,3 +169,23 @@ function offersSso(flow: Record<string, unknown>): boolean {
   const steps = Array.isArray(flow.steps) ? flow.steps.filter(isObject) : [];
   return steps.some((step) => Array.isArray(step.sso_providers) && step.sso_providers.length > 0);
 }
+
+/**
+ * Why the schema's `x-auth-methods` cannot be edited safely, or `undefined`
+ * when it can. Only an absent container or entry counts as empty: a value of
+ * the wrong shape was written by someone, and rewriting it would discard it.
+ */
+export function malformedAuthMethods(
+  schema: Record<string, unknown>,
+  factors: readonly AuthFactor[],
+): string | undefined {
+  const methods = schema["x-auth-methods"];
+  if (methods === undefined) {
+    return undefined;
+  }
+  if (!isObject(methods)) {
+    return "x-auth-methods is not an object";
+  }
+  const bad = factors.find((factor) => methods[factor] !== undefined && !isObject(methods[factor]));
+  return bad === undefined ? undefined : `x-auth-methods.${bad} is not an object`;
+}

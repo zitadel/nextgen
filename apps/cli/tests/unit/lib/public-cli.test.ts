@@ -7,15 +7,14 @@ import {
   npmDistTagForCliVersion,
   npmSelectorForCliVersion,
   publicCliCommand,
+  shellArg,
 } from "../../../src/lib/public-cli";
 
 describe("public CLI command formatting", () => {
   it("keeps dist-tag detection separate from alpha follow-up selectors", () => {
     expect(npmDistTagForCliVersion("0.1.0-alpha.1")).toBe("alpha");
     expect(npmSelectorForCliVersion("0.1.0-alpha.1")).toBe("0.1.0-alpha.1");
-    expect(publicCliCommand("start", "0.1.0-alpha.1")).toBe(
-      "npx @zitadel/cli@0.1.0-alpha.1 start",
-    );
+    expect(publicCliCommand("start", "0.1.0-alpha.1")).toBe("npx @zitadel/cli@0.1.0-alpha.1 start");
   });
 
   it("uses latest for stable versions", () => {
@@ -30,9 +29,7 @@ describe("public CLI command formatting", () => {
   });
 
   it("keeps non-alpha prereleases on their dist-tag", () => {
-    expect(publicCliCommand("start", "0.1.0-beta.2")).toBe(
-      "npx @zitadel/cli@beta start",
-    );
+    expect(publicCliCommand("start", "0.1.0-beta.2")).toBe("npx @zitadel/cli@beta start");
   });
 
   it("normalizes bare zitadel follow-ups and leaves other commands alone", () => {
@@ -54,9 +51,7 @@ describe("normalizePublicCliProse", () => {
         "Start over with `zitadel branding eject --design <name>`.",
         "0.1.0-alpha.1",
       ),
-    ).toBe(
-      "Start over with `npx @zitadel/cli@0.1.0-alpha.1 branding eject --design <name>`.",
-    );
+    ).toBe("Start over with `npx @zitadel/cli@0.1.0-alpha.1 branding eject --design <name>`.");
   });
 
   it("rewrites a bare `zitadel` span and fenced-block command lines", () => {
@@ -117,5 +112,20 @@ describe("normalizePublicCliJson", () => {
       pattern: "^https://",
       nothing: null,
     });
+  });
+});
+
+describe("shellArg", () => {
+  it("leaves a plain value alone", () => {
+    expect(shellArg("default-human-user")).toBe("default-human-user");
+  });
+
+  it("quotes a value with spaces or shell syntax", () => {
+    expect(shellArg("my users")).toBe("'my users'");
+    expect(shellArg("x;$(rm -rf ~)")).toBe("'x;$(rm -rf ~)'");
+  });
+
+  it("escapes a single quote inside the value", () => {
+    expect(shellArg("it's")).toBe("'it'\\''s'");
   });
 });
