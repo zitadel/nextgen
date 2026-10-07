@@ -26,6 +26,9 @@ jobs:
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v6
+        with:
+          # moon shells out to git for its VCS checks and needs full history.
+          fetch-depth: 0
 
       - uses: pnpm/action-setup@v5
         with:
