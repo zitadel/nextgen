@@ -15,16 +15,13 @@ export function npmSelectorForCliVersion(cliVersion: string): string {
 }
 
 /**
- * Quote one argument for a suggested shell command. Values the CLI builds from
- * local file names can hold spaces or shell syntax, and a suggested command is
- * meant to be run as written, so anything outside a plain set of characters is
- * single-quoted.
+ * Whether a value can sit in a suggested command unquoted on every shell the
+ * CLI runs under (POSIX shells, PowerShell and cmd.exe). Quoting differs
+ * between them, so a value that needs quoting is not put in a suggested
+ * command at all; callers hand it over as an argument list instead.
  */
-export function shellArg(value: string): string {
-  if (/^[A-Za-z0-9_./:=@%+-]+$/.test(value)) {
-    return value;
-  }
-  return `'${value.replace(/'/g, "'\\''")}'`;
+export function isPortableShellWord(value: string): boolean {
+  return /^[A-Za-z0-9_.-]+$/.test(value);
 }
 
 export function publicCliCommand(args: string, cliVersion: string): string {

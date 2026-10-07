@@ -186,6 +186,19 @@ export function malformedAuthMethods(
   if (!isObject(methods)) {
     return "x-auth-methods is not an object";
   }
-  const bad = factors.find((factor) => methods[factor] !== undefined && !isObject(methods[factor]));
-  return bad === undefined ? undefined : `x-auth-methods.${bad} is not an object`;
+  for (const factor of factors) {
+    const entry = methods[factor];
+    if (entry === undefined) {
+      continue;
+    }
+    if (!isObject(entry)) {
+      return `x-auth-methods.${factor} is not an object`;
+    }
+    // The meta-schema requires a boolean. A string "true" is neither on nor
+    // off, so it is refused rather than overwritten or read as disabled.
+    if (entry.enabled !== undefined && typeof entry.enabled !== "boolean") {
+      return `x-auth-methods.${factor}.enabled is not a boolean`;
+    }
+  }
+  return undefined;
 }

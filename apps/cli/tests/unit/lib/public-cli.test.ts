@@ -7,7 +7,7 @@ import {
   npmDistTagForCliVersion,
   npmSelectorForCliVersion,
   publicCliCommand,
-  shellArg,
+  isPortableShellWord,
 } from "../../../src/lib/public-cli";
 
 describe("public CLI command formatting", () => {
@@ -115,17 +115,14 @@ describe("normalizePublicCliJson", () => {
   });
 });
 
-describe("shellArg", () => {
-  it("leaves a plain value alone", () => {
-    expect(shellArg("default-human-user")).toBe("default-human-user");
+describe("isPortableShellWord", () => {
+  it("accepts a plain value", () => {
+    expect(isPortableShellWord("default-human-user")).toBe(true);
   });
 
-  it("quotes a value with spaces or shell syntax", () => {
-    expect(shellArg("my users")).toBe("'my users'");
-    expect(shellArg("x;$(rm -rf ~)")).toBe("'x;$(rm -rf ~)'");
-  });
-
-  it("escapes a single quote inside the value", () => {
-    expect(shellArg("it's")).toBe("'it'\\''s'");
+  it("rejects anything a POSIX shell, PowerShell or cmd.exe could read differently", () => {
+    for (const value of ["my users", "x;y", "$(id)", "a&b", "%PATH%", "it's", "a|b", "a`b"]) {
+      expect(isPortableShellWord(value), value).toBe(false);
+    }
   });
 });

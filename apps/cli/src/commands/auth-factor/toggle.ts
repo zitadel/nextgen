@@ -21,7 +21,7 @@ import { ZitadelError } from "../../lib/errors";
 import { type FlowFile, readSchemaFiles, type SchemaFile, selectSchema } from "../../lib/idp";
 import { stableStringify } from "../../lib/json";
 import { BaseCommand, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
-import { publicCliCommand, shellArg } from "../../lib/public-cli";
+import { isPortableShellWord, publicCliCommand } from "../../lib/public-cli";
 import { flowsForSchema } from "../../lib/schema-flows";
 import { reportWarning } from "../../lib/warnings";
 
@@ -213,26 +213,44 @@ function refuseLastFactor(
   disabling: readonly AuthFactor[],
   cliVersion: string,
 ): never {
-  const modes = disabling.map((factor) => `--mode ${factor}`).join(" ");
-  const retry = publicCliCommand(
-    `auth-factor disable ${modes} --schema ${shellArg(schema.name)} --force`,
-    cliVersion,
-  );
+  // Always given as an argument list, which no shell interprets.
+  const retryArgs = [
+    "auth-factor",
+    "disable",
+    ...disabling.flatMap((factor) => ["--mode", factor]),
+    "--schema",
+    schema.name,
+    "--force",
+  ];
   const alternatives = AUTH_FACTORS.filter(
     (factor) =>
       !disabling.includes(factor) && (factor !== "password" || hasIdentifier(schema.body)),
-  ).map((factor) =>
-    publicCliCommand(
-      `auth-factor enable --mode ${factor} --schema ${shellArg(schema.name)}`,
-      cliVersion,
-    ),
   );
+  // The schema name comes from a file name. One that would need quoting is
+  // left out of runnable commands: quoting differs between POSIX shells,
+  // PowerShell and cmd.exe, so no one quoting is safe on all of them.
+  const nextCommands = isPortableShellWord(schema.name)
+    ? [
+        publicCliCommand(retryArgs.join(" "), cliVersion),
+        ...alternatives.map((factor) =>
+          publicCliCommand(
+            `auth-factor enable --mode ${factor} --schema ${schema.name}`,
+            cliVersion,
+          ),
+        ),
+      ]
+    : [];
   throw new ZitadelError("E_VALIDATION", `${schema.path} would have no way to sign in left`, {
     hint:
       "Enable another factor or an identity provider (`sso enable --provider <name>`) first. " +
-      "If the schema's users are only managed through the API, re-run with --force.",
-    details: { file: schema.path, usable: usableSignInMethods(schema.body) },
-    nextCommands: [retry, ...alternatives],
+      "If the schema's users are only managed through the API, re-run with --force " +
+      "(details.retry_args holds the exact arguments).",
+    details: {
+      file: schema.path,
+      usable: usableSignInMethods(schema.body),
+      retry_args: retryArgs,
+    },
+    nextCommands,
   });
 }
 

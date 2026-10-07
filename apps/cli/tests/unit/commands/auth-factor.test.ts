@@ -287,11 +287,11 @@ describe("auth-factor", () => {
       ]);
     });
 
-    it("quotes a schema name the shell would misread", async () => {
+    it("leaves a schema name that needs quoting out of runnable commands", async () => {
       const cwd = await makeProject(
         {
-          "my users": {
-            ...passwordSchema("my users"),
+          "my users&calc": {
+            ...passwordSchema("my users&calc"),
             "x-auth-methods": { password: { enabled: false }, passkey: { enabled: true } },
           },
         },
@@ -300,7 +300,37 @@ describe("auth-factor", () => {
 
       const { envelope } = await run(cwd, "disable", "--mode", "passkey");
 
-      expect(envelope.next_commands?.[0]).toMatch(/--schema 'my users' --force$/);
+      expect(envelope.next_commands ?? []).toEqual([]);
+      expect(envelope.details).toMatchObject({
+        retry_args: [
+          "auth-factor",
+          "disable",
+          "--mode",
+          "passkey",
+          "--schema",
+          "my users&calc",
+          "--force",
+        ],
+      });
+    });
+
+    it("refuses an enabled value that is not a boolean", async () => {
+      const cwd = await makeProject(
+        {
+          "default-human-user": {
+            ...passwordSchema(),
+            "x-auth-methods": { password: { enabled: true }, passkey: { enabled: "true" } },
+          },
+        },
+        {},
+      );
+
+      const { envelope } = await run(cwd, "disable", "--mode", "passkey");
+
+      expect(envelope).toMatchObject({
+        code: "E_VALIDATION",
+        details: { region: "x-auth-methods.passkey.enabled is not a boolean" },
+      });
     });
 
     it("refuses an x-auth-methods that is not an object rather than overwrite it", async () => {
