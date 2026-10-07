@@ -62,6 +62,14 @@ const (
 	EventTypeAuthCheckFailed      EventType = "auth.check.failed"
 	EventTypeAuthCheckSucceeded   EventType = "auth.check.succeeded"
 
+	// The SSO callback's outcome, separate from auth.check.*: a succeeded
+	// exchange is not a sign-in, since the identity may still match no account.
+	// An authorization failure is the provider's error response, or a callback
+	// with no code; an exchange failure is anything after a code arrived.
+	EventTypeAuthSSOAuthorizationFailed EventType = "auth.sso.authorization.failed"
+	EventTypeAuthSSOExchangeSucceeded   EventType = "auth.sso.exchange.succeeded"
+	EventTypeAuthSSOExchangeFailed      EventType = "auth.sso.exchange.failed"
+
 	EventTypeFlowdefCreated EventType = "flowdef.created"
 	// Retired, no producer. Kept so stored rows decode.
 	// TODO(grvijayan): remove both, their OpenAPI event types and the

@@ -49,6 +49,10 @@ var payloadByEventType = map[string]string{
 	"auth.check.failed":       "auth-check-payload.yaml",
 	"auth.check.succeeded":    "auth-check-payload.yaml",
 
+	"auth.sso.authorization.failed": "auth-check-payload.yaml",
+	"auth.sso.exchange.succeeded":   "auth-check-payload.yaml",
+	"auth.sso.exchange.failed":      "auth-check-payload.yaml",
+
 	"flowdef.created": "flowdef-payload.yaml",
 	"flowdef.updated": "flowdef-payload.yaml",
 	"flowdef.deleted": "empty-event-payload.yaml",
