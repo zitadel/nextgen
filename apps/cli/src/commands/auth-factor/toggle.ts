@@ -50,7 +50,7 @@ export abstract class AuthFactorCommand extends BaseCommand {
     enabled: boolean,
   ): Promise<JsonEnvelope> {
     await this.toMeta(flags);
-    const { cwd, dryRun, cliVersion } = this.meta;
+    const { cwd, dryRun, force, cliVersion } = this.meta;
     const verb = enabled ? "enable" : "disable";
 
     const factors = [...new Set(flags.mode ?? [])] as AuthFactor[];
@@ -68,7 +68,9 @@ export abstract class AuthFactorCommand extends BaseCommand {
       if (enabled) {
         refuseMissingIdentifier(schema, change.changed);
       } else {
-        refuseLastFactor(schema, change.document, cliVersion);
+        if (!force) {
+          refuseLastFactor(schema, change.document, cliVersion);
+        }
         refuseBrokenFlows(schema, change.document, flows);
       }
     }
@@ -82,6 +84,16 @@ export abstract class AuthFactorCommand extends BaseCommand {
       (factor) =>
         `No login flow for ${schema.name} offers ${factor} yet. Add it to a flow to show it.`,
     );
+    if (
+      !enabled &&
+      change.changed.length > 0 &&
+      usableSignInMethods(change.document).length === 0
+    ) {
+      // Only reachable with --force: said even so, because nobody can sign in.
+      warnings.push(
+        `${schema.name} has no way to sign in left. Its users can only be managed through the API.`,
+      );
+    }
     const data = {
       schema: schema.name,
       file: schema.path,
@@ -153,7 +165,9 @@ function refuseLastFactor(
     return;
   }
   throw new ZitadelError("E_VALIDATION", `${schema.path} would have no way to sign in left`, {
-    hint: "Enable another factor or an identity provider first.",
+    hint:
+      "Enable another factor or an identity provider first. If the schema's users are only " +
+      "managed through the API, pass --force to disable it anyway.",
     details: { file: schema.path, usable: usableSignInMethods(schema.body) },
     nextCommands: AUTH_FACTORS.filter(
       (factor) => !usableSignInMethods(schema.body).includes(factor),

@@ -227,10 +227,12 @@ Disable password or passkey sign-in for a user schema.
 USAGE
   $ zitadel auth-factor disable [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [-v] [--debug] [--color] [--telemetry] [--mode
-    password|passkey...] [--schema <value>]
+    password|passkey...] [--schema <value>] [-f]
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
+  -f, --force             Disable the schema's last factor. Its users can then
+                          only be managed through the API.
   -n, --non-interactive   Disable prompts. Required when scripting or running as
                           an agent.
   -s, --server=<value>    Override the resolved server URL.
@@ -256,6 +258,8 @@ EXAMPLES
   $ zitadel auth-factor disable --mode passkey
 
   $ zitadel auth-factor disable --mode passkey --schema customers
+
+  $ zitadel auth-factor disable --mode password --mode passkey --schema api-users --force
 ```
 
 ## `zitadel auth-factor enable`

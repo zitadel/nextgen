@@ -270,6 +270,42 @@ describe("auth-factor", () => {
     });
   });
 
+  describe("--force", () => {
+    const passkeyOnly = () => ({
+      "default-human-user": {
+        ...passwordSchema(),
+        "x-auth-methods": { password: { enabled: false }, passkey: { enabled: true } },
+      },
+    });
+
+    it("disables the last factor, which the server allows", async () => {
+      const cwd = await makeProject(passkeyOnly(), {});
+
+      const { exitCode } = await run(cwd, "disable", "--mode", "passkey", "--force");
+
+      expect(exitCode).toBe(0);
+      expect((await readSchema(cwd))["x-auth-methods"].passkey).toEqual({ enabled: false });
+    });
+
+    it("warns that nobody can sign in afterwards", async () => {
+      const cwd = await makeProject(passkeyOnly(), {});
+
+      const { envelope } = await run(cwd, "disable", "--mode", "passkey", "--force");
+
+      expect(envelope.warnings).toEqual([
+        "default-human-user has no way to sign in left. Its users can only be managed through the API.",
+      ]);
+    });
+
+    it("does not override a flow that still uses the factor", async () => {
+      const cwd = await makeProject();
+
+      const { envelope } = await run(cwd, "disable", "--mode", "password", "--force");
+
+      expect(envelope.code).toBe("E_VALIDATION");
+    });
+  });
+
   describe("--dry-run", () => {
     it("previews the change without writing it", async () => {
       const cwd = await makeProject();

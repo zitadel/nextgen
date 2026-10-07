@@ -6,5 +6,5 @@ Add `zitadel auth-factor enable` and `zitadel auth-factor disable`, which turn p
 
 - disabling a factor that a login flow still asks for;
 - disabling while a flow has errors that prevent checking it;
-- disabling the schema's last way to sign in;
+- disabling the schema's last way to sign in, unless `--force` is passed for a schema whose users are only managed through the API;
 - enabling password on a schema without `x-identifier`.
