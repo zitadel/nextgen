@@ -68,7 +68,10 @@ func NewReleaseService(v2Pool *DB) ReleaseService {
 // revisions under a new message resolves to the release that already pins
 // them. That makes a re-run against unchanged content a no-op rather than a
 // growing pile of identical releases.
-func (s *releaseService) Create(ctx context.Context, input CreateReleaseInput) (*CreateReleaseOutput, error) {
+func (s *releaseService) Create(ctx context.Context, input CreateReleaseInput) (_ *CreateReleaseOutput, err error) {
+	ctx, end := startSpan(ctx, "ReleaseService.Create")
+	defer end(&err)
+
 	pointers, err := s.resolvePointers(ctx, input.ProjectID, input.Pointers)
 	if err != nil {
 		return nil, err
@@ -138,7 +141,10 @@ func (s *releaseService) Create(ctx context.Context, input CreateReleaseInput) (
 	return &CreateReleaseOutput{Release: entity, Created: true}, nil
 }
 
-func (s *releaseService) Get(ctx context.Context, projectID, id string) (*domain.Release, error) {
+func (s *releaseService) Get(ctx context.Context, projectID, id string) (_ *domain.Release, err error) {
+	ctx, end := startSpan(ctx, "ReleaseService.Get")
+	defer end(&err)
+
 	entity, err := s.v2Pool.Statements().GetReleaseByID(ctx, projectID, id)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
@@ -149,7 +155,10 @@ func (s *releaseService) Get(ctx context.Context, projectID, id string) (*domain
 	return entity, nil
 }
 
-func (s *releaseService) List(ctx context.Context, input ListReleasesInput) (*ListReleasesOutput, error) {
+func (s *releaseService) List(ctx context.Context, input ListReleasesInput) (_ *ListReleasesOutput, err error) {
+	ctx, end := startSpan(ctx, "ReleaseService.List")
+	defer end(&err)
+
 	opts := release.ListOptions(input.ProjectID, uint32(normalizeLimit(input.Limit)))
 	opts.Pagination.Cursor = []byte(input.PageToken)
 

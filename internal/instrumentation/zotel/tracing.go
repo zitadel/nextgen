@@ -21,15 +21,9 @@ func NewTracerProvider(ctx context.Context, cfg ExporterConfig, traceIDRatio flo
 		return nil, fmt.Errorf("trace exporter: %w", err)
 	}
 
-	fraction := trace.TraceIDRatioBased(traceIDRatio)
-	sampler := trace.ParentBased(
-		spanKindBased(fraction, trace2.SpanKindServer),
-		trace.WithRemoteParentNotSampled(fraction),
-	)
-
 	opts := []trace.TracerProviderOption{
 		trace.WithResource(resource),
-		trace.WithSampler(sampler),
+		trace.WithSampler(NewSampler(traceIDRatio)),
 	}
 	if exporter != nil {
 		opts = append(opts, trace.WithBatcher(exporter, trace.WithBatchTimeout(cfg.BatchDuration)))
@@ -40,11 +34,12 @@ func NewTracerProvider(ctx context.Context, cfg ExporterConfig, traceIDRatio flo
 
 // NewSampler returns the same sampler that [NewTracerProvider] builds, for
 // tests that set up their own provider. A root span is sampled at fraction
-// only when it is a Server span; a child follows its parent.
+// only when it is a Server span (a request) or an Internal span (a run of a
+// background job); a child follows its parent.
 func NewSampler(fraction float64) trace.Sampler {
 	ratio := trace.TraceIDRatioBased(fraction)
 	return trace.ParentBased(
-		spanKindBased(ratio, trace2.SpanKindServer),
+		spanKindBased(ratio, trace2.SpanKindServer, trace2.SpanKindInternal),
 		trace.WithRemoteParentNotSampled(ratio),
 	)
 }

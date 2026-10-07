@@ -84,7 +84,9 @@ func (j *RetentionJob) loop() {
 }
 
 func (j *RetentionJob) runOnce() {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	ctx, span := startJobSpan("audit.PurgeExpiredEvents")
+	defer span.End()
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	j.runMu.Lock()
 	j.runCancel = cancel
 	j.runMu.Unlock()
@@ -98,6 +100,7 @@ func (j *RetentionJob) runOnce() {
 	cutoff := time.Now().UTC().Add(-j.cfg.Retention)
 	n, err := j.purge.DeleteEventsOlderThan(ctx, cutoff)
 	if err != nil {
+		failJobSpan(ctx, err)
 		slog.Error("event retention: purge failed", slog.String("error", err.Error()))
 		return
 	}

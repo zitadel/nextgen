@@ -48,7 +48,10 @@ func NewEventService(v2Pool *DB) *EventService {
 
 // List returns events for a claimed project with optional filters and keyset
 // pagination on (created_at, id). Pre-claim projects yield an empty page.
-func (s *EventService) List(ctx context.Context, req ListEventsRequest) (*ListEventsResponse, error) {
+func (s *EventService) List(ctx context.Context, req ListEventsRequest) (_ *ListEventsResponse, err error) {
+	ctx, end := startSpan(ctx, "EventService.List")
+	defer end(&err)
+
 	if req.ProjectID == "" {
 		return nil, domain.ErrEventInvalid("project_id is required", nil)
 	}
@@ -78,7 +81,10 @@ func (s *EventService) List(ctx context.Context, req ListEventsRequest) (*ListEv
 
 // Get loads one event by (project_id, id). Pre-claim projects and misses
 // return not found (no existence leak).
-func (s *EventService) Get(ctx context.Context, projectID, id string) (*domain.Event, error) {
+func (s *EventService) Get(ctx context.Context, projectID, id string) (_ *domain.Event, err error) {
+	ctx, end := startSpan(ctx, "EventService.Get")
+	defer end(&err)
+
 	if projectID == "" {
 		return nil, domain.ErrEventInvalid("project_id is required", nil)
 	}

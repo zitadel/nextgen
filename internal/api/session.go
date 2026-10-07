@@ -383,8 +383,6 @@ func sessionErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 	switch err.Code {
 	case domain.ErrSessionNotFound().Code:
 		return errorResponseWithStatusCode(http.StatusNotFound, err)
-	case domain.ErrSessionTokenCreationFailed().Code:
-		return errorResponseWithStatusCode(http.StatusInternalServerError, err)
 	case domain.ErrSessionExchangeConflict().Code,
 		domain.ErrSessionInvalidHandoffToken().Code:
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
@@ -392,8 +390,6 @@ func sessionErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		return errorResponseWithStatusCode(http.StatusUnauthorized, err)
 	case domain.ErrSessionPermissionDenied().Code:
 		return errorResponseWithStatusCode(http.StatusForbidden, err)
-	case domain.ErrNotImplemented().Code:
-		return errorResponseWithStatusCode(http.StatusNotImplemented, err)
 	case domain.ErrSessionInvalidTTL().Code:
 		apiErr := &api.ErrorDetailsStatusCode{
 			StatusCode: http.StatusBadRequest,
