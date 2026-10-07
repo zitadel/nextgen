@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
@@ -17,7 +18,11 @@ func getLoggingContext(ctx context.Context) *slog.Logger {
 	return logger
 }
 
-func WithLogging(next http.Handler) http.Handler {
+// WithLogging logs each request. The values of the query parameters named in
+// redactQuery are hidden in the request line: a route whose query carries a
+// secret opts in where it is mounted, and every other route logs its query as
+// received.
+func WithLogging(next http.Handler, redactQuery ...string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
@@ -29,10 +34,14 @@ func WithLogging(next http.Handler) http.Handler {
 		r = r.WithContext(ctx)
 
 		logger = getLoggingContext(ctx)
+		urlValue, uriValue := r.URL.String(), r.RequestURI
+		if redacted, ok := redactedQueryURL(r.URL, redactQuery); ok {
+			urlValue, uriValue = redacted, redacted
+		}
 		logger.Info("handling request",
 			slog.String("method", r.Method),
-			slog.String("url", r.URL.String()),
-			slog.String("uri", r.RequestURI),
+			slog.String("url", urlValue),
+			slog.String("uri", uriValue),
 		)
 
 		start := time.Now()
@@ -98,6 +107,26 @@ func extractWireErrorCode(body []byte) string {
 		return ""
 	}
 	return envelope.Code
+}
+
+// redactedQueryURL hides the values of the named query parameters. It reports
+// false when the URL carries none of them, and the caller logs the request
+// line as received.
+func redactedQueryURL(u *url.URL, names []string) (string, bool) {
+	query := u.Query()
+	redacted := false
+	for _, name := range names {
+		if _, ok := query[name]; ok {
+			query.Set(name, "redacted")
+			redacted = true
+		}
+	}
+	if !redacted {
+		return "", false
+	}
+	clone := *u
+	clone.RawQuery = query.Encode()
+	return clone.String(), true
 }
 
 // ---------------------- LOGGING RESPONSE WRITER -----------------------------
