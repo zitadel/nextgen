@@ -5,6 +5,7 @@ import { validateFlowDefinition, type FlowValidationIssue } from "@zitadel/confi
 import { ZitadelError } from "../errors";
 import { FLOWS_DIR } from "../flows";
 import type { ResourceEntry, SyncAction } from "./types.js";
+import { reportWarning } from "../warnings";
 
 /**
  * Pre-flight semantic validation for every flow this plan uploads,
@@ -34,7 +35,7 @@ export function validatePlannedFlows(opts: {
   stateResources: Readonly<Record<string, ResourceEntry>>;
 }): void {
   if (process.env.ZITADEL_SKIP_FLOW_VALIDATION) {
-    consola.warn("Flow validation skipped (ZITADEL_SKIP_FLOW_VALIDATION is set)");
+    reportWarning("Flow validation skipped (ZITADEL_SKIP_FLOW_VALIDATION is set)");
     return;
   }
 

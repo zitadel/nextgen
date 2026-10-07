@@ -439,8 +439,18 @@ describe("LiquidJS engine", () => {
   it("renders an email+password step on one card: autocomplete, forgot link, sign-in CTA", () => {
     const engine = createLiquidEngine({ locale: fullLocale });
     const f = toArray({
-      email: { type: "email", text_key: "identifier.field.email", required: true },
-      password: { type: "password", text_key: "identifier.field.password", required: true },
+      email: {
+        type: "email",
+        text_key: "identifier.field.email",
+        autocomplete: "username",
+        required: true,
+      },
+      password: {
+        type: "password",
+        text_key: "identifier.field.password",
+        autocomplete: "current-password",
+        required: true,
+      },
     });
     const a = toArray({
       submit: { text_key: "submit.signin", primary: true },
@@ -461,7 +471,7 @@ describe("LiquidJS engine", () => {
       identity: null,
     };
     const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
-    expect(result).toContain('autocomplete="email"');
+    expect(result).toContain('autocomplete="username"');
     expect(result).toContain('autocomplete="current-password"');
     expect(result).toContain('forgot-password-action="recover"');
     expect(result).toContain("forgot-password-href");
@@ -503,8 +513,18 @@ describe("LiquidJS engine", () => {
   it("renders sign-in wrong credentials: inline password error, no form alert", () => {
     const engine = createLiquidEngine({ locale: fullLocale });
     const f = toArray({
-      email: { type: "email", text_key: "identifier.field.email", required: true },
-      password: { type: "password", text_key: "identifier.field.password", required: true },
+      email: {
+        type: "email",
+        text_key: "identifier.field.email",
+        autocomplete: "username",
+        required: true,
+      },
+      password: {
+        type: "password",
+        text_key: "identifier.field.password",
+        autocomplete: "current-password",
+        required: true,
+      },
     });
     const a = toArray({
       submit: { text_key: "submit.signin", primary: true },
@@ -532,8 +552,18 @@ describe("LiquidJS engine", () => {
   it("renders sign-in server error: heading + body alert, fields unchanged", () => {
     const engine = createLiquidEngine({ locale: fullLocale });
     const f = toArray({
-      email: { type: "email", text_key: "identifier.field.email", required: true },
-      password: { type: "password", text_key: "identifier.field.password", required: true },
+      email: {
+        type: "email",
+        text_key: "identifier.field.email",
+        autocomplete: "username",
+        required: true,
+      },
+      password: {
+        type: "password",
+        text_key: "identifier.field.password",
+        autocomplete: "current-password",
+        required: true,
+      },
     });
     const a = toArray({
       submit: { text_key: "submit.signin", primary: true },
@@ -554,7 +584,7 @@ describe("LiquidJS engine", () => {
     const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
     expect(result).toContain('heading="We couldn&#39;t complete your sign in."');
     expect(result).toContain("Please try again in a few minutes");
-    expect(result).toContain('autocomplete="email"');
+    expect(result).toContain('autocomplete="username"');
     expect(result).toContain('autocomplete="current-password"');
     expect(result).not.toContain("Wrong email or password.");
   });
@@ -562,8 +592,18 @@ describe("LiquidJS engine", () => {
   it("renders sign-up field annotations: autocomplete, help, inline email error", () => {
     const engine = createLiquidEngine({ locale: fullLocale });
     const f = toArray({
-      email: { type: "email", text_key: "register.field.email", required: true },
-      password: { type: "password", text_key: "register.field.password", required: true },
+      email: {
+        type: "email",
+        text_key: "register.field.email",
+        autocomplete: "username",
+        required: true,
+      },
+      password: {
+        type: "password",
+        text_key: "register.field.password",
+        autocomplete: "new-password",
+        required: true,
+      },
       dateOfBirth: { type: "date", text_key: "register.field.dateOfBirth", required: true },
     });
     const a = toArray({
@@ -582,7 +622,7 @@ describe("LiquidJS engine", () => {
       identity: null,
     };
     const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
-    expect(result).toContain('autocomplete="email"');
+    expect(result).toContain('autocomplete="username"');
     expect(result).toContain('autocomplete="new-password"');
     // Password complexity copy and the YYYY-MM-DD date hint were removed: only
     // minLength is enforced server-side, and native <input type="date"> handles

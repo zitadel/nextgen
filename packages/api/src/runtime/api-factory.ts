@@ -20,6 +20,7 @@ import * as endpoints from "../generated/endpoints/zitadelNextGen";
 
 import { setApiAuthToken } from "./auth";
 import { setProxyPath } from "./base-url";
+import { setRequestPolicy } from "./fetch";
 
 /**
  * Typed Zitadel client returned by {@link createZitadelClient}.
@@ -41,6 +42,17 @@ export type ZitadelClientOptions = {
    * mutation.
    */
   token?: string;
+  /**
+   * Aborts every request this client makes. A request it cuts off rejects
+   * with the signal's reason rather than a {@link NetworkError}.
+   */
+  signal?: AbortSignal;
+  /**
+   * Deadline for each request, response body included. A request that runs
+   * past it rejects with a {@link NetworkError} whose reason is `timeout`.
+   * Unset by default: no deadline beyond the runtime's own.
+   */
+  timeoutMs?: number;
 };
 
 /**
@@ -66,6 +78,7 @@ export function createZitadelClient(opts: ZitadelClientOptions): ZitadelClient {
       return (...args: unknown[]) => {
         setProxyPath(baseUrl);
         setApiAuthToken(opts.token);
+        setRequestPolicy({ signal: opts.signal, timeoutMs: opts.timeoutMs });
         return (value as (...a: unknown[]) => unknown)(...args);
       };
     },

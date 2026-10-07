@@ -32,7 +32,7 @@ Skip a changeset **only** when the change is *exclusively*:
 - tests (`*_test.go`, `*.spec.ts`, …)
 - generated mocks or fixtures
 - repo-only docs or comments (`docs/`, `AGENTS.md` anywhere, READMEs of
-  private/unpublished workspaces). A `README.md` or `SKILLS.md` under a
+  private/unpublished workspaces). A `README.md` or `SKILL.md` under a
   **published package root** ships in the npm tarball and is product — it
   needs a changeset, and content copied into customer projects
   (`packages/config/defaults/README-*.md`) definitely does. The guards
