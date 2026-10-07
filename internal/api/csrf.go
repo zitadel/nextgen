@@ -8,9 +8,11 @@ import (
 	"encoding/base64"
 	"errors"
 	"net/http"
+	"net/url"
 
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/httputil"
 )
 
 // CSRFHeader carries the session-bound CSRF token on cookie-authenticated
@@ -20,7 +22,8 @@ const CSRFHeader = "X-Zitadel-CSRF"
 // csrfOriginGuard rejects unsafe cross-origin browser requests: it reads the
 // browser-set Sec-Fetch-Site header, falling back to comparing Origin with
 // Host. Requests carrying neither are non-browser clients and pass; those
-// still need the token where one is required.
+// still need the token where one is required. WithCSRFRequest hands it the
+// effective host (see effectiveHostRequest), not the raw one.
 var csrfOriginGuard = http.NewCrossOriginProtection()
 
 // csrfTokenExemptOperations are the state-changing requests the session
@@ -54,14 +57,34 @@ type csrfRequest struct {
 func WithCSRFRequest(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		req := csrfRequest{token: r.Header.Get(CSRFHeader)}
-		switch r.Method {
-		case http.MethodGet, http.MethodHead, http.MethodOptions:
-		default:
+		if !httputil.IsSafeMethod(r.Method) {
 			req.unsafe = true
-			req.originErr = csrfOriginGuard.Check(r)
+			req.originErr = csrfOriginGuard.Check(effectiveHostRequest(r))
 		}
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), csrfRequestKey{}, req)))
 	})
+}
+
+// effectiveHostRequest returns r with Host set to the effective host that
+// WithRequestHostMiddleware resolved (X-Forwarded-Host before Host), which is
+// what the rest of the server treats as this request's own. The origin guard's
+// fallback compares Origin with Host, so behind a proxy that rewrites Host
+// (nginx's default) a client sending its real Origin would otherwise be
+// refused. The fallback only runs without Sec-Fetch-Site, which every browser
+// sends, and a cross-site browser request cannot set X-Forwarded-Host without
+// a CORS preflight, so this widens nothing a forged request can reach.
+func effectiveHostRequest(r *http.Request) *http.Request {
+	origin, ok := requestOriginFromContext(r.Context())
+	if !ok {
+		return r
+	}
+	u, err := url.Parse(origin)
+	if err != nil || u.Host == "" || u.Host == r.Host {
+		return r
+	}
+	shallow := *r
+	shallow.Host = u.Host
+	return &shallow
 }
 
 // CSRFRequestRecorded reports whether WithCSRFRequest ran for the request

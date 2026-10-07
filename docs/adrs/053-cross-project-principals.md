@@ -242,8 +242,10 @@ unchanged; only the cookie-authenticated browser leg it opens is affected.
 >
 > - **Origin.** The check is Go's `http.CrossOriginProtection`: the
 >   browser-set `Sec-Fetch-Site` header, falling back to `Origin` against
->   `Host`. Requests carrying neither (non-browser clients) pass the origin
->   check and still need the token where one is required. An exact match
+>   the effective host (`X-Forwarded-Host` before `Host`, as the rest of the
+>   server resolves it, so a proxy that rewrites `Host` does not refuse a
+>   client's real `Origin`). Requests carrying neither (non-browser clients)
+>   pass the origin check and still need the token where one is required. An exact match
 >   against the configured public base would have failed in every
 >   development and test setup that does not configure it, and behind the
 >   Console's Vite dev proxy.

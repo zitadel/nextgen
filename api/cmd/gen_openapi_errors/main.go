@@ -61,6 +61,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/zitadel/nextgen/api/internal/erroranalysis"
+	"github.com/zitadel/nextgen/internal/httputil"
 )
 
 // Regexps for `go generate -run`, matched against a directive's full source
@@ -640,7 +641,7 @@ func discoverEndpointsWithDefaultErrorResponse(openapiBasePath string) ([]endpoi
 				operationID:  op.OperationID,
 				yamlPath:     path,
 				requiresAuth: requiresAuth,
-				csrfChecked:  acceptsSessionCookie(op) && changesState(op.Method),
+				csrfChecked:  acceptsSessionCookie(op) && !httputil.IsSafeMethod(op.Method),
 			})
 		}
 
@@ -914,17 +915,6 @@ func acceptsSessionCookie(op methodsFileOperation) bool {
 		}
 	}
 	return false
-}
-
-// changesState mirrors the CSRF middleware's notion of an unsafe request
-// (internal/api/csrf.go WithCSRFRequest): everything but GET, HEAD and OPTIONS.
-func changesState(method string) bool {
-	switch method {
-	case "get", "head", "options":
-		return false
-	default:
-		return true
-	}
 }
 
 // operationExcludedErrors drops internal sentinels from the generated default

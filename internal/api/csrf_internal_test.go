@@ -52,6 +52,44 @@ func TestWithCSRFRequest(t *testing.T) {
 	}
 }
 
+// A proxy that rewrites Host (nginx's default) must not turn a client's real
+// Origin into a cross-origin refusal: the guard's Origin fallback compares
+// against the effective host WithRequestHostMiddleware resolved, as the server
+// chains them.
+func TestWithCSRFRequestUsesEffectiveHost(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name          string
+		origin        string
+		forwardedHost string
+		wantOrigin    bool
+	}{
+		{"origin matches the forwarded host", "https://console.example.com", "console.example.com", false},
+		{"origin matches neither", "https://evil.example", "console.example.com", true},
+		{"no forwarded host: compared with Host", "https://console.example.com", "", true},
+		{"no forwarded host, origin matches Host", "http://backend:8080", "", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			// No Sec-Fetch-Site: a non-browser client, like the CLI.
+			req := httptest.NewRequest(http.MethodPost, "http://backend:8080/teams", nil)
+			req.Header.Set("Origin", tc.origin)
+			if tc.forwardedHost != "" {
+				req.Header.Set("X-Forwarded-Host", tc.forwardedHost)
+			}
+
+			var got csrfRequest
+			WithRequestHostMiddleware(WithCSRFRequest(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+				got, _ = r.Context().Value(csrfRequestKey{}).(csrfRequest)
+			}))).ServeHTTP(httptest.NewRecorder(), req)
+
+			require.True(t, got.unsafe)
+			assert.Equal(t, tc.wantOrigin, got.originErr != nil, "%v", got.originErr)
+		})
+	}
+}
+
 func TestCheckSessionCSRF(t *testing.T) {
 	t.Parallel()
 
