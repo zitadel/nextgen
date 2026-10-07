@@ -4,6 +4,7 @@ import {
   checkFlow,
   flowOffers,
   hasIdentifier,
+  reachableSignInMethods,
   setAuthFactors,
   usableSignInMethods,
 } from "../../../src/lib/auth-factors";
@@ -202,5 +203,27 @@ describe("flowOffers", () => {
   it("sees passkey on a step that offers the action", () => {
     expect(flowOffers(passkeyFlow, "passkey")).toBe(true);
     expect(flowOffers(passkeyFlow, "password")).toBe(false);
+  });
+});
+
+describe("reachableSignInMethods", () => {
+  it("counts only methods an active flow offers", () => {
+    // The shipped default: passkey is enabled, but the flow offers password only.
+    const both = schema({ password: { enabled: true }, passkey: { enabled: true } });
+
+    expect(reachableSignInMethods(both, [passwordFlow])).toEqual(["password"]);
+  });
+
+  it("is empty when the flow offers nothing the schema enables", () => {
+    const passkeyOnly = schema({ password: { enabled: false }, passkey: { enabled: true } });
+
+    expect(reachableSignInMethods(passkeyOnly, [passwordFlow])).toEqual([]);
+  });
+
+  it("counts SSO on a step that names a provider", () => {
+    const sso = schema({ sso: { enabled: true, providers: ["google"] } });
+    const ssoFlow = { steps: [{ name: "identifier", sso_providers: ["google"] }] };
+
+    expect(reachableSignInMethods(sso, [ssoFlow])).toEqual(["sso"]);
   });
 });

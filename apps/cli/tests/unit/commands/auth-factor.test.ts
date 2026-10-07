@@ -159,6 +159,30 @@ describe("auth-factor", () => {
       expect(envelope.data?.not_offered).toEqual(["passkey"]);
     });
 
+    it("warns when no active flow offers any factor the schema enables", async () => {
+      // Copilot's lockout case: password steps removed from the flow, passkey
+      // enabled but never offered, then password disabled.
+      const noPassword = {
+        ...passwordFlow(),
+        steps: [
+          {
+            name: "identifier",
+            fields: ["email"],
+            actions: [{ name: "submit", kind: "submit", primary: true }],
+            transitions: { submit: { target: "done" } },
+          },
+          { name: "done", complete: "show" },
+        ],
+      };
+      const cwd = await makeProject(undefined, { "default-human-user-login": noPassword });
+
+      const { envelope } = await run(cwd, "disable", "--mode", "password");
+
+      expect(envelope.warnings).toEqual([
+        "No active login flow for default-human-user offers a factor it enables, so nobody can sign in until one does.",
+      ]);
+    });
+
     it("warns about a factor no flow offers", async () => {
       const cwd = await makeProject();
 

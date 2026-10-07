@@ -149,3 +149,23 @@ export function flowOffers(flow: Record<string, unknown>, factor: AuthFactor): b
       ),
   );
 }
+
+/**
+ * The methods a schema enables that some active flow also offers: the ways a
+ * user can actually sign in. SSO is offered by a step that names a provider.
+ */
+export function reachableSignInMethods(
+  schema: Record<string, unknown>,
+  activeFlows: readonly Record<string, unknown>[],
+): string[] {
+  return usableSignInMethods(schema).filter((method) =>
+    activeFlows.some((flow) =>
+      method === "sso" ? offersSso(flow) : flowOffers(flow, method as AuthFactor),
+    ),
+  );
+}
+
+function offersSso(flow: Record<string, unknown>): boolean {
+  const steps = Array.isArray(flow.steps) ? flow.steps.filter(isObject) : [];
+  return steps.some((step) => Array.isArray(step.sso_providers) && step.sso_providers.length > 0);
+}

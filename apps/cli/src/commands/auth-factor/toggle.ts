@@ -12,6 +12,7 @@ import {
   checkFlow,
   flowOffers,
   hasIdentifier,
+  reachableSignInMethods,
   setAuthFactors,
   usableSignInMethods,
 } from "../../lib/auth-factors";
@@ -110,6 +111,21 @@ export abstract class AuthFactorCommand extends BaseCommand {
       warnings.push(
         `${schema.name} ${dryRun ? "would have" : "has"} no way to sign in left. ` +
           "Its users can only be managed through the API.",
+      );
+    }
+    if (
+      !lastFactor &&
+      reachableSignInMethods(
+        change.document,
+        activeFlows.map((flow) => flow.body),
+      ).length === 0
+    ) {
+      // The schema still enables something, but no active flow offers it, so
+      // the sign-in screen has no way in. Flows are not this command's to edit
+      // (ADR 068 §3), so it says so rather than refusing.
+      warnings.push(
+        `No active login flow for ${schema.name} offers a factor it enables, ` +
+          "so nobody can sign in until one does.",
       );
     }
     // Reported rather than returned, so a terminal shows them and a dry run's
