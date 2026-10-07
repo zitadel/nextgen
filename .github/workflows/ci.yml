@@ -96,6 +96,16 @@ jobs:
         working-directory: packages/components
         run: corepack pnpm exec playwright install chromium
 
+      - name: Keep Docker's interface churn away from Chromium
+        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
+        # Every container the Go integration suites start or stop adds or removes
+        # a host veth interface. With IPv6 on, the kernel gives it a link-local
+        # address, and Chromium aborts every in-flight request when the host's
+        # addresses change (ERR_NETWORK_CHANGED), failing whichever browser-mode
+        # suite is loading at that moment. Disable IPv6 on newly created
+        # interfaces only; loopback and the runner's NIC keep it. (#1490)
+        run: sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
+
       - name: Run Moon build and test graph
         id: moon-ci
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
