@@ -36,7 +36,7 @@ export const AUTH_FACTOR_FLAGS = {
 };
 
 /**
- * What `auth-factor enable` and `auth-factor disable` both do (ADR 070): set
+ * What `auth-factor enable` and `auth-factor disable` both do (ADR 068): set
  * `x-auth-methods.<factor>.enabled` on one local user schema and leave
  * publishing to `plan` and `apply`.
  *

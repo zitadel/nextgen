@@ -3,7 +3,7 @@ import { validateFlowDefinition, type FlowValidationIssue } from "@zitadel/confi
 import { isObject } from "./json";
 
 /**
- * The factors `auth-factor enable` and `auth-factor disable` switch (ADR 070).
+ * The factors `auth-factor enable` and `auth-factor disable` switch (ADR 068).
  *
  * SSO is deliberately absent: a provider needs credentials and a connection
  * file, so it is `sso enable`'s job.
