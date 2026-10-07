@@ -118,6 +118,7 @@ describe("guidance content", () => {
 
   it("gives the README the human journey with pinned CLI commands", () => {
     const readme = readmeGuidanceSection(ctx);
+    expect(readme).toContain("from a second terminal in this directory");
     expect(readme).toContain("register a user, sign out, and sign in again");
     expect(readme).toContain("npx @zitadel/cli@0.1.0-alpha.15 apply");
   });

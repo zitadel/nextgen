@@ -106,7 +106,6 @@ const GO_TEST_TARGETS = [
   "server:check-generate",
   "server:test",
   "server:test-postgres",
-  "server:test-spanner",
   "server:test-sqlite",
 ];
 const TESTING_DEMO_TARGETS = ["testing:test-integration", "demo-next-e2e:e2e-real"];

@@ -287,7 +287,7 @@ tasks:
       # before go's cache mattered. Observed on #934, where moon replayed the
       # emulator task's result for a real-instance run.
       cache: false
-      # Invoked by the CI Spanner emulator step.
+      # Invoked by .github/workflows/spanner.yml (not by ci.yml).
       # runInCI must be true, otherwise moon hides the task from `moon run` in CI
       # ("No tasks found"). It is not pulled into `moon ci :...:test` because that
       # selects the `test` task by name, not `test-spanner`.
