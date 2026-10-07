@@ -251,8 +251,9 @@ To turn password or passkey sign-in on or off later, run `auth-factor enable`
 or `auth-factor disable` with `--mode password` or `--mode passkey` (repeat it
 to change both, and add `--schema` when the project has more than one). Both
 commands edit only the user schema, and write nothing when they refuse. They
-refuse to disable a factor that a login flow still asks for, to disable while a
-flow has errors, and to enable password on a schema without `x-identifier`.
+refuse to disable a factor that a login flow still asks for, to change any
+factor while a flow has errors, and to enable password on a schema without
+`x-identifier`.
 Disabling the schema's last way to sign in needs `--force` when non-interactive;
 only pass it for a schema whose users are managed through the API, and ask the
 user first. A factor that is enabled but not offered by any active flow is

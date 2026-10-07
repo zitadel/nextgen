@@ -245,6 +245,44 @@ describe("auth-factor", () => {
     });
   });
 
+  describe("repeated --mode", () => {
+    it("changes every factor named", async () => {
+      const cwd = await makeProject({
+        "default-human-user": {
+          ...passwordSchema(),
+          "x-auth-methods": { password: { enabled: false }, passkey: { enabled: false } },
+        },
+      });
+
+      const { envelope } = await run(cwd, "enable", "--mode", "password", "--mode", "passkey");
+
+      expect(envelope.data?.changed).toEqual(["password", "passkey"]);
+      expect((await readSchema(cwd))["x-auth-methods"]).toEqual({
+        password: { enabled: true },
+        passkey: { enabled: true },
+      });
+    });
+
+    it("changes neither when one of them is refused", async () => {
+      // Passkey alone could go; password is still collected by the flow.
+      const cwd = await makeProject();
+      const before = await readSchema(cwd);
+
+      const { envelope } = await run(cwd, "disable", "--mode", "password", "--mode", "passkey");
+
+      expect(envelope.code).toBe("E_VALIDATION");
+      expect(await readSchema(cwd)).toEqual(before);
+    });
+
+    it("counts a factor named twice once", async () => {
+      const cwd = await makeProject();
+
+      const { envelope } = await run(cwd, "disable", "--mode", "passkey", "--mode", "passkey");
+
+      expect(envelope.data?.changed).toEqual(["passkey"]);
+    });
+  });
+
   describe("--schema", () => {
     it("changes only the named schema", async () => {
       const cwd = await makeProject(
