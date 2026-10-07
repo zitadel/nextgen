@@ -200,18 +200,18 @@ func TestQuerySessions(t *testing.T) {
 	t.Run("pagination walks every session exactly once", func(t *testing.T) {
 		got := make([]string, 0, 3)
 		req := &api.QuerySessionsRequest{Limit: api.NewOptLimit(1)}
-		for range 3 {
+		for i := range 3 {
 			page := querySessions(t, req)
 			require.Len(t, page.Sessions, 1)
 			got = append(got, string(page.Sessions[0].SessionID))
 			token, ok := page.NextPageToken.Get()
-			require.True(t, ok, "a full page carries a cursor even when it is the last one")
+			if i == 2 {
+				assert.False(t, ok, "the final page carries no cursor (#849)")
+				break
+			}
+			require.True(t, ok, "a non-final full page carries a cursor")
 			req.PageToken = api.NewOptNilPageToken(token)
 		}
 		assert.ElementsMatch(t, []string{building.ID, expired.ID, active.ID}, got)
-
-		past := querySessions(t, req)
-		assert.Empty(t, past.Sessions)
-		assert.False(t, past.NextPageToken.Set, "the page past the end reports that there is nothing more")
 	})
 }

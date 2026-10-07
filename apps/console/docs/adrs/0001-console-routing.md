@@ -1,7 +1,7 @@
 # Console ADR 0001: Routing
 
 > **Status:** Accepted
-> **Date:** 2026-06-29 (accepted 2026-06-30)
+> **Date:** 2026-06-29 (accepted 2026-06-30; amended 2026-08-11, 2026-09-28, 2026-10-04)
 > **Scope:** `apps/console` only. See [`apps/console/AGENTS.md`](../../AGENTS.md).
 > **Context:** Console shell layout, navigation, and resource list pages
 > (issue [#440](https://github.com/zitadel/nextgen/issues/440)).
@@ -135,6 +135,9 @@ endpoint.
 > (`_authed/schemas/{index,$schemaId}.tsx`) — and a `teams/` route was never
 > created. Sessions list now speaks `POST /sessions/query` (the `GET /sessions`
 > list endpoint was replaced by #757).
+
+> **Amendment (2026-10-04):** `_authed/teams/{index,$teamId}.tsx` exist, and
+> the tree has no sessions route.
 
 > **Amendment (2026-09-28, #1299):** screens now act on a **selected project**
 > carried as `?project=<id>` on the `_authed` layout, which validates it and
