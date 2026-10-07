@@ -17,13 +17,11 @@
     "vscode": {
       "extensions": [
         "golang.go",
-        "dbaeumer.vscode-eslint",
-        "esbenp.prettier-vscode",
+        "biomejs.biome",
         "GitHub.vscode-pull-request-github",
         "streetsidesoftware.code-spell-checker",
         "ms-azuretools.vscode-docker",
         "github.vscode-github-actions",
-        "inferrinizzard.prettier-sql-vscode",
         "redhat.vscode-yaml"
       ]
     }

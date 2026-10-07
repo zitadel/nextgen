@@ -1,4 +1,3 @@
-/* oxlint-disable playwright/expect-expect */
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
@@ -18,10 +17,7 @@ const framework = process.env.JOURNEY_FRAMEWORK ?? "next";
 
 const MANAGED_MARKER = "zitadel-cli: managed-file";
 
-const filesByFramework: Record<
-  string,
-  { authPages: string[]; homepage: string; shell: string }
-> = {
+const filesByFramework: Record<string, { authPages: string[]; homepage: string; shell: string }> = {
   next: {
     authPages: ["app/login/page.tsx", "app/register/page.tsx", "app/profile/page.tsx"],
     homepage: "app/page.tsx",

@@ -281,11 +281,7 @@ export async function materializeSetupResources(opts: {
  * has edited the README should keep their edits when `setup --force` is
  * re-run.
  */
-async function writeReadmeFile(
-  cwd: string,
-  relPath: string,
-  content: string,
-): Promise<boolean> {
+async function writeReadmeFile(cwd: string, relPath: string, content: string): Promise<boolean> {
   const dest = join(cwd, relPath);
   await mkdir(dirname(dest), { recursive: true });
   try {

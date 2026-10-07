@@ -1,4 +1,3 @@
-/* oxlint-disable playwright/expect-expect -- Vitest file asserting via node:assert */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
@@ -102,8 +101,12 @@ async function makeTarball(outDir, name, { omitCliSkill = false } = {}) {
     await cp(join(repoRoot, "apps/cli/skills"), join(packageDir, "skills"), { recursive: true });
   }
   await writeFile(join(packageDir, "package.json"), JSON.stringify(manifest));
-  const tar = spawnSync("tar", ["-czf", join(outDir, `${safe}-1.0.0.tgz`), "-C", stage, "package"], {
-    encoding: "utf8",
-  });
+  const tar = spawnSync(
+    "tar",
+    ["-czf", join(outDir, `${safe}-1.0.0.tgz`), "-C", stage, "package"],
+    {
+      encoding: "utf8",
+    },
+  );
   assert.equal(tar.status, 0, tar.stderr);
 }

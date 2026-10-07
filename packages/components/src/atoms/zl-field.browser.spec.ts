@@ -31,9 +31,7 @@ describe("<zl-field> form participation (chromium)", () => {
   }
 
   it("contributes its value to the enclosing FormData", async () => {
-    const { form, field } = mount(
-      `<form><zl-field name="email" type="email"></zl-field></form>`,
-    );
+    const { form, field } = mount(`<form><zl-field name="email" type="email"></zl-field></form>`);
     await field.updateComplete;
     field.value = "alice@acme.com";
     await field.updateComplete;
@@ -41,9 +39,7 @@ describe("<zl-field> form participation (chromium)", () => {
   });
 
   it("flags valueMissing when required and empty", async () => {
-    const { form, field } = mount(
-      `<form><zl-field name="email" required></zl-field></form>`,
-    );
+    const { form, field } = mount(`<form><zl-field name="email" required></zl-field></form>`);
     await field.updateComplete;
     expect(form.checkValidity()).toBe(false);
     field.value = "alice@acme.com";
@@ -52,9 +48,7 @@ describe("<zl-field> form participation (chromium)", () => {
   });
 
   it("forwards a custom error message via setValidity", async () => {
-    const { form, field } = mount(
-      `<form><zl-field name="email" value="x"></zl-field></form>`,
-    );
+    const { form, field } = mount(`<form><zl-field name="email" value="x"></zl-field></form>`);
     await field.updateComplete;
     field.error = "That email is already registered.";
     await field.updateComplete;
@@ -62,9 +56,7 @@ describe("<zl-field> form participation (chromium)", () => {
   });
 
   it("clears its value when the host form is reset", async () => {
-    const { form, field } = mount(
-      `<form><zl-field name="email" value="seed"></zl-field></form>`,
-    );
+    const { form, field } = mount(`<form><zl-field name="email" value="seed"></zl-field></form>`);
     await field.updateComplete;
     field.value = "alice@acme.com";
     await field.updateComplete;

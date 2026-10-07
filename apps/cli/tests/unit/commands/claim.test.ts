@@ -97,8 +97,10 @@ async function writeSecret(cwd: string, secret: Record<string, unknown>): Promis
 }
 
 async function readSecret(cwd: string): Promise<Record<string, unknown>> {
-  return JSON.parse(await readFile(join(cwd, ".zitadel/secret"), "utf8")) as Record<string,
-    unknown>;
+  return JSON.parse(await readFile(join(cwd, ".zitadel/secret"), "utf8")) as Record<
+    string,
+    unknown
+  >;
 }
 
 function claim(cwd: string, extra: string[] = []) {
@@ -431,9 +433,7 @@ describe("claim", () => {
  * a port only known at runtime; a real socket is simpler than reshaping the
  * handlers.
  */
-async function startClaimServer(
-  claimUrl = "http://localhost/claim/ch_localstub",
-): Promise<string> {
+async function startClaimServer(claimUrl = "http://localhost/claim/ch_localstub"): Promise<string> {
   const httpServer = createServer((req, res) => {
     const url = req.url ?? "";
     if (url === "/healthz") {

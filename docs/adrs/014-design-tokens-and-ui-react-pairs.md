@@ -1,10 +1,9 @@
 # ADR 014: Design tokens and paired React components for the auth surface
 
-> **Status:** Superseded by [ADR 055](./055-lit-only-login-surface.md) — 2026-05-19
+> **Status:** Superseded by [ADR 055](./055-lit-only-login-surface.md) (2026-08-16)
 
 > The token half of this ADR still holds: `@zitadel/design-tokens` remains the
-> only producer of `--zl-*`, and the console still embeds `<zitadel-login>`
-> rather than wrapping it with `@lit/react`. What ADR 055 removes is the paired
+> only producer of `--zl-*`. What ADR 055 removes is the paired
 > React implementation of each atom, now that the console composes shadcn/ui.
 
 ## Context
@@ -148,6 +147,6 @@ namespace (`--zl-foreground`) is the mode-neutral successor.
 ## Related work
 
 - [`packages/design-tokens/README.md`](../../packages/design-tokens/README.md)
-- [`packages/ui-react/README.md`](../../packages/ui-react/README.md)
+- `packages/ui-react/README.md`
 - [`packages/components/README.md`](../../packages/components/README.md)
 - [`.github/workflows/sync-design-tokens.yml`](../../.github/workflows/sync-design-tokens.yml)

@@ -161,8 +161,8 @@ function DeleteUserForm({
         <div className={COLUMN}>
           <AlertDialogTitle className={TITLE}>Delete {name}?</AlertDialogTitle>
           <AlertDialogDescription>
-            This permanently deletes the user and all associated sessions, grants, and
-            profile data. This action cannot be undone.
+            This permanently deletes the user and all associated sessions, grants, and profile data.
+            This action cannot be undone.
           </AlertDialogDescription>
           {/* The column's own 6px gap separates this from the description; the
               12px here is the field's internal label→input gap. */}

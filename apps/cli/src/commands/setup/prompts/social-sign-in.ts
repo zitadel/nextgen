@@ -118,7 +118,6 @@ export class SocialSignInPrompt implements SetupPrompt {
     );
   }
 
-
   private async askClientId(entry: IdpProvider): Promise<string> {
     const answer = await text({
       // Named, because several providers may be asked for in a row and an

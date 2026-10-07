@@ -23,12 +23,7 @@ import {
   type RuntimeBackend,
   type RuntimeMetadata,
 } from "../../lib/local-server/runtime";
-import {
-  BaseCommand,
-  CommandGroups,
-  type JsonEnvelope,
-  nonBlankString,
-} from "../../lib/oclif";
+import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
 import { createOrca } from "../../lib/orca";
 import { hasZitadelConfig } from "../../lib/project";
 import { listenersForPort } from "../../lib/prober/ports";
@@ -276,12 +271,16 @@ function advisoryForWarnings(
     // the grant before the window, so running claim is safe and answers
     // authoritatively.
     nextActions.push(
-      claimWindowClosed(claimWarning) ? claimWindowClosedAction(cliVersion) : claimAction(cliVersion),
+      claimWindowClosed(claimWarning)
+        ? claimWindowClosedAction(cliVersion)
+        : claimAction(cliVersion),
     );
     nextCommands.push(claimCommand(cliVersion));
   }
 
-  const managedRuntimeWarning = warnings.find((check) => check.name === "managed-runtime-processes");
+  const managedRuntimeWarning = warnings.find(
+    (check) => check.name === "managed-runtime-processes",
+  );
   if (hasManagedRuntimeProcesses(managedRuntimeWarning)) {
     nextActions.push(
       "Review other host-wide CLI-managed local Zitadel runtimes before starting a new one.",
@@ -330,10 +329,8 @@ async function runLocalRuntimeChecks(
         },
         "warn",
       ),
-      await check(
-        "port",
-        `Port ${String(port)} is available`,
-        () => checkPortAvailability(runtime, port),
+      await check("port", `Port ${String(port)} is available`, () =>
+        checkPortAvailability(runtime, port),
       ),
       await checkRuntime(runtime, runtimeBackend),
       managedRuntimeCheck,
@@ -395,10 +392,8 @@ async function runLocalRuntimeChecks(
       },
       "warn",
     ),
-    await check(
-      "port",
-      `Port ${String(port)} is available`,
-      () => checkPortAvailability(runtime, port),
+    await check("port", `Port ${String(port)} is available`, () =>
+      checkPortAvailability(runtime, port),
     ),
     await checkRuntime(runtime, runtimeBackend),
     managedRuntimeCheck,
@@ -465,7 +460,9 @@ function additionalManagedRuntimeProcesses(
   if (runtime?.backend !== "binary") {
     return processes;
   }
-  return processes.filter((processInfo) => processInfo.pid !== runtime.pid && processInfo.ppid !== runtime.pid);
+  return processes.filter(
+    (processInfo) => processInfo.pid !== runtime.pid && processInfo.ppid !== runtime.pid,
+  );
 }
 
 async function checkRuntime(
