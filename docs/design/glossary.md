@@ -17,7 +17,7 @@ Three layers. Long-form in [`api/hierarchy.md`](api/hierarchy.md).
 
 | Term | Meaning |
 |---|---|
-| **Project** | A tenant / deployment. Owns branding, IdPs, custom domain, feature flags, teams, users, apps, flows, sessions. One project is reserved as the **platform project** — Zitadel's own project, where the accounts that pay Zitadel live. **LOCKED rename** from today's "instance". |
+| **Project** | A tenant. Owns branding, IdPs, custom domain, feature flags, teams, users, apps, flows, sessions. One project is reserved as the **platform project** — Zitadel's own project, where the accounts that pay Zitadel live. **LOCKED rename** from today's "instance". |
 | **Team** | A tenant-grouping inside any project. Two canonical shapes: (a) a team inside the **platform project** represents a paying customer / developer account; (b) a team inside a **customer project** represents a B2B end-customer tenant. Same resource, different project context. |
 | **User** | An identity inside any project. A user inside the platform project is what used to be called a "platform_user" (a developer/admin). A user inside a customer project is an end-user. Team participation attaches users to teams; lifecycle ownership is explicit policy. |
 
@@ -45,21 +45,25 @@ One bearer-token model everywhere. Long-form in [`api/credentials.md`](api/crede
 | Term | Meaning |
 |---|---|
 | **user token** | A user's interactive token. Scope resolved per-request against the membership table. |
-| **`sk_proj_…`** | Project-scoped service token. The workhorse. Variants: `pre_claim: true` (anonymous, issued at `POST /projects`), claimed (bound to a team at claim time), and origin-scoped (binds to declared preview origins). |
+| **`project_secret`** (`sk_proj_…`) | The operator credential: deploys, origins, variables, claim. Read from `.zitadel/secret` or `ZITADEL_PROJECT_SECRET`, never shipped in a browser bundle. Variants: `pre_claim: true` (anonymous, issued at `POST /projects`) and claimed (bound to a team at claim time). |
+| **`publishable_key`** | The public-plane bearer a browser bundle ships with ([ADR 036](../adrs/036-api-credential-planes.md)): identifies the project, safe to publish, `ZITADEL_PUBLISHABLE_KEY`. Specified, not implemented. **RECOMMENDED** as the only public credential. |
+| **`preview_secret`** | Today a read-only `sk_proj_…` minted beside the project secret and consumed by nothing. **OPEN:** either dropped, with previews deploying to a sandbox project under its own `project_secret`, or re-scoped to preview deploys only. It is never the publishable key. |
 | **`sk_team_…`** | Team-scoped service token with a **narrow permission allowlist**. Cannot escalate to project administration. Same prefix regardless of whether the team lives in the platform project or a customer project. |
-| **challenge nonce** | Server-minted, origin-bound, single-use nonce from `POST /bootstrap/challenge`. Replaces the naive "publishable key" concept. The `Origin` header is the real boundary. |
+| **challenge nonce** | Server-minted, origin-bound, single-use nonce from `POST /bootstrap/challenge`. The `Origin` header is the real boundary. Whether it stays beside the publishable key is **OPEN**. |
 | **handoff_token** | Single-use, TTL ≤ 60s, audience-bound token minted at the end of an auth_attempt, exchanged by the customer's backend for a real session. Idempotency-safe for retries. |
 | **api_key** | Globally-addressable resource holding an `sk_*` secret. Secret returned exactly once. Rotate / revoke via verbs on the resource. |
+
+A `_key` is public and a `_secret` never leaves a server; each credential is named like its `ZITADEL_*` environment variable (`ZITADEL_PUBLISHABLE_KEY`, `ZITADEL_PROJECT_SECRET`).
 
 ---
 
 ## 4. Resources
 
-Core nouns used across the API. Full endpoint map in [`api/resource-map.md`](api/resource-map.md).
+Core nouns used across the API. Full endpoint map in [`api/resource-map.md`](api/resource-map.md). The release, deployment, target, origin, preview and mode rows follow the releases-without-environments spike ([#1427](https://github.com/zitadel/nextgen/pull/1427)) and stay **RECOMMENDED** until its ADR amendments land.
 
 | Term | Meaning |
 |---|---|
-| **project** | See §1. Top-level tenant/deployment. |
+| **project** | See §1. Top-level tenant. |
 | **team** | See §1. Tenant-grouping inside a project. |
 | **app** | An OIDC client / SAML SP registered to consume Zitadel; lives in a project. |
 | **app_group** | A bundle of related apps that share a role/grant container. **LOCKED rename** from today's "project" (the authz container — not the tenant). |
@@ -73,7 +77,13 @@ Core nouns used across the API. Full endpoint map in [`api/resource-map.md`](api
 | **handoff_token** | Short-lived, audience-bound token produced by `POST /auth_attempts/{id}/handoff`, consumed by `POST /sessions/exchange`. |
 | **challenge** | A single challenge (password prompt, OTP, passkey assertion, passkey registration, OIDC redirect) issued inside an auth_attempt. |
 | **bootstrap** | The `/bootstrap/*` endpoint family. Two distinct concepts share the prefix: *project bootstrap* (`POST /projects` for anonymous project creation — see [`platform/claim-flow.md`](platform/claim-flow.md)) and *challenge bootstrap* (`POST /bootstrap/challenge` for origin-bound browser nonces — see [`api/authn-and-auth-flows.md`](api/authn-and-auth-flows.md)). |
-| **claim** | The transaction that attaches a team (in the platform project) and an accountable human to a customer project. Free. Forced at first production deploy. See [`platform/claim-flow.md`](platform/claim-flow.md). |
+| **claim** | The transaction that attaches a team (in the platform project) and an accountable human to a customer project. Free. **RECOMMENDED:** it also switches the project's **mode** to `production`, re-checking every origin; there is no separate promote verb. See [`platform/claim-flow.md`](platform/claim-flow.md). |
+| **release** | An immutable bundle of configuration revisions ([ADR 035](../adrs/035-configuration-environments.md)): `rel_…` in storage, its content digest (`sha256:…`) on the wire. Building one is not deploying it. |
+| **deployment** | The operation that makes one release live on one or more targets: `dep_…`, immutable, append-only, one row per origin under it. What a target serves is its newest deployment, and a rollback is another deployment. Replaces the environment's current-deployment pointer and the spike's separate `dpl_` deploy id. |
+| **target** | What a deployment points at: the project default (what a caller with no `Origin` is served) or one exact origin. The word has no other meaning; the CLI's server-and-project lookup is *environment resolution* (§6). |
+| **origin** | One entry of a project's origin allowlist, `{pattern, kind}` with kind `primary` or `preview`. A `primary` pattern admits requests from the URLs it matches; a `preview` pattern only bounds which URLs a preview deploy may register. Project state, not `zitadel.json` content: `POST /projects/{id}/origins`, `zitadel origin add`. Not "domain": an origin carries scheme and port and is matched against the `Origin` header. **RECOMMENDED rename** from `preview_origins` / "allowlist". |
+| **preview** | A live preview URL with an expiry, registered by `zitadel preview`, admitting requests from that exact URL while it lives. `GET /previews`, `zitadel preview list`, `zitadel preview rm`. |
+| **mode** | `sandbox` or `production`, on the project. `sandbox` allows loopback origins and an empty allowlist; `production` requires at least one origin and refuses loopback and wildcard primaries. **RECOMMENDED rename** from `class`. |
 
 ---
 
@@ -99,13 +109,13 @@ From the configuration surface, flow engine, and branding. Long-form in [`platfo
 
 | Term | Meaning |
 |---|---|
-| **issuer** | Customer-owned origin where the auth UI and OIDC endpoints run. Declared per environment in `zitadel.json`. Serves as security allowlist, token `iss` claim, and magic-link hostname context. |
-| **declared issuer** | An issuer entry in `zitadel.json`. The canonical per-environment origin declaration. |
+| **issuer** | Customer-owned origin where the auth UI and OIDC endpoints run: a `primary` **origin** (§4) of the project. Serves as token `iss` claim and magic-link hostname context. |
+| **declared issuer** | **Retired.** Origins are project state (`zitadel origin add`), not `zitadel.json` content, because one repository ships to several projects. |
 | **renderer** | Client-side surface turning Flow v1 nodes into HTML. One of `default`, `template`, `ejected`. |
 | **flow** | The UI-orchestration state machine — decides *which step renders when*. Does **not** hold auth primitives (those live in auth_attempts). Detail in [`flowengine/flow-engine.md`](flowengine/flow-engine.md). |
-| **flow definition** | The declarative spec uploaded via `npx zitadel push` that configures a flow. |
+| **flow definition** | The declarative spec in `.zitadel/` that configures a flow; it ships inside a release. |
 | **audience** | The resolution hierarchy for flow definitions: `app > team > schema > project default`. |
-| **environment** | A config-version slot: `development`, `preview`, `production`. Governs origin wildcard rules (see [`api/security-and-origins.md`](api/security-and-origins.md)). |
+| **environment** | A client-side label binding a working directory to one `(server, project)` pair through `.env.<name>.local`. It selects which `.env` files the CLI reads and never reaches the server: there is no environment resource, id or endpoint. CLI noun `env`. **RECOMMENDED** (supersedes ADR 035's runtime slots; [#1427](https://github.com/zitadel/nextgen/pull/1427)). |
 | **drift** | Divergence between the repo's `zitadel.json` and server-side state. Resolves silently in favor of repo. |
 | **branding** | The per-project login-appearance resource: layout, asset URLs, and the Liquid template, published as immutable revisions via the Branding API / `zitadel apply`. Flow responses resolve the newest revision. Decisions in [ADR 040](../adrs/040-tenant-login-templates-editable-config.md). Carries widget appearance, widget structure, and project translations — not page chrome. Placement of each kind of change: [`branding/customization-strategy.md`](branding/customization-strategy.md), [ADR 057](../adrs/057-login-customization-categories.md). |
 | **translations** | Project-scoped locale × key copy overlays for login strings ([ADR 045](../adrs/045-copy-overlays-as-branding-revisions.md)). A different setting from branding appearance ([#1038](https://github.com/zitadel/nextgen/issues/1038)). Page-local override is `lang` / `locales` on the element ([ADR 018](../adrs/018-widget-owned-locale-resolution.md)). Placement: [`branding/customization-strategy.md`](branding/customization-strategy.md), [ADR 057](../adrs/057-login-customization-categories.md). |
@@ -135,7 +145,7 @@ Four independent axes the system moves on.
 |---|---|
 | **Lifecycle** | pre-claim → claimed |
 | **Tier** | Free, Pro, Enterprise (team-scoped billing inside the platform project) |
-| **Environment** | development, preview, production |
+| **Mode** | sandbox, production (on the project; "environment" is a client-side label, §6) |
 | **Integration level** | 1 (SSR + in-app), 2 (SPA), 3 (Hosted), 4 (White-label) |
 
 ---
@@ -144,7 +154,7 @@ Four independent axes the system moves on.
 
 | Was | Now | Notes |
 |---|---|---|
-| instance | **project** | The tenant / deployment. |
+| instance | **project** | The tenant. |
 | project *(today's authz container)* | **app_group** | Renamed to avoid colliding with the new `project` = tenant. |
 | developer *(as API role)* | **user** | API resource term. A developer is a user inside the platform project. "Developer" still allowed in audience prose. |
 | platform_user *(earlier proposal)* | **user** | Dropped as a distinct resource. The project context does the work. |
@@ -152,7 +162,7 @@ Four independent axes the system moves on.
 | org_membership | **team_membership** | Dedicated team roster/status shape if team participation is stored outside FGA tuples. |
 | `sk_org_…` | **`sk_team_…`** | One team-scoped service token prefix. |
 | `zp_…` | **`sk_proj_…`** | Pre-claim anonymous secret is `sk_proj_` with `pre_claim: true`. |
-| `zpp_…` | **`sk_proj_…`** (origin-scoped) | Origin-scoped variant for preview deploys. |
+| `zpp_…` | **`sk_proj_…`** (origin-scoped) | Origin-scoped variant for preview deploys. Status now **OPEN**: see `preview_secret` in §3. |
 | path version segment | **no version segment** | Versioning via header only. |
 
 ### "Instance" disambiguation
@@ -164,8 +174,26 @@ Five distinct uses of "instance" existed in the branch. Each resolves to a diffe
 | The tenant / deployment | "a Zitadel instance hosting two projects" | **project** |
 | Flow audience hierarchy default | `app > org > schema > instance default` | **project default** (and `org` becomes `team`) |
 | User-schema uniqueness scope | `x-unique: "instance"` | `x-unique: "project"` |
-| The Zitadel server / cluster (runtime sense) | "this Zitadel instance has not yet rolled out v2.1" | **Zitadel deployment** |
+| The Zitadel server / cluster (runtime sense) | "this Zitadel instance has not yet rolled out v2.1" | **Zitadel server** |
 | OpenAPI subdomain template | `{instance}.zitadel.cloud` | `{region}.zitadel.cloud` |
+
+*Zitadel deployment* was the runtime term until `deployment` became a resource (§4); the runtime sense is now *Zitadel server*.
+
+### Releases without environments (RECOMMENDED, 2026-10)
+
+From the spike in [#1427](https://github.com/zitadel/nextgen/pull/1427) and its review. RECOMMENDED until the amendments to ADR 035, 036 and 062 land.
+
+| Was | Now | Notes |
+|---|---|---|
+| `environments` (server resource, `env_…`) | **dropped** | "environment" is a client-side label (§6); CLI noun `env`. |
+| `preview_origins`, "allowlist" | **`origins`** / `origin` | `{pattern, kind}` entries on the project (§4). |
+| live preview origin rows | **`previews`** / `preview` | `GET /previews`; frees "origin" to mean only the URL. |
+| `class` | **`mode`** | `sandbox` or `production`. |
+| `projects promote` / `demote` | **`claim`** switches mode | "promote" is Vercel's word for preview → production. |
+| `dpl_…` deploy id beside `dep_…` rows | **`deployment`** (`dep_…`) is the operation | One row per origin under it; no second prefix. |
+| `preview_secret` as the publishable key | **`publishable_key`** | §3. `preview_secret` stays a server-side secret or is dropped (OPEN). |
+| `POST /configuration-releases` | **`POST /releases/build`** | Both release mechanisms stay; the path joins `/releases`, snake_case like `/deployments/rollback`. |
+| `variables`, `vars` | **`variable`** | Singular, per the CLI grammar (§11). |
 
 ---
 
@@ -177,7 +205,18 @@ Five distinct uses of "instance" existed in the branch. Each resolves to a diffe
 
 ---
 
-## 11. See also
+## 11. CLI grammar
+
+**RECOMMENDED** — amends [ADR 064 §2](../adrs/064-cli-resource-commands.md) (plural) and settles its §3 (`env`).
+
+- `zitadel <noun> <verb> [id] [flags]`, noun **singular**, like `gh pr create`: `user`, `team`, `session`, `grant`, `idp`, `project`, `schema`, `release`, `deployment`, `origin`, `preview`, `variable`, `env`. Five of the six standard verbs take one object; only `list` reads better plural, and `gh pr list` shows nobody minds. Singular also lets a loop verb and its resource share a word (`preview` / `preview rm`, `deploy` / `deployment list`), and `env` needs no exception.
+- **Three top-level verbs**, because a pipeline runs them: `deploy`, `preview`, `rollback`, the release loop. The shipped top-level commands (`setup`, `apply`, `plan`, `claim`, `doctor`, `start`, `stop`, `status`, `logs`, `eject`, `reset`, `console`) stay.
+- **Verbs:** `list`, `get`, `create`, `update`, `delete` on every resource; `add` / `rm` for membership in a list (`origin add`, `env add`, `preview rm`); `set` for key/value (`variable set`); a state verb where `delete` would lie (`session revoke`, `team deactivate`, `release revoke`).
+- Alpha with no broad adoption: the eleven shipped plural commands are renamed without a deprecation window.
+
+---
+
+## 12. See also
 
 - [`api/README.md`](api/README.md) — API design guide index
 - [`platform/README.md`](platform/README.md) — platform lifecycle, claim, configuration
