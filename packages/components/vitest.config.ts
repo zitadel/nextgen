@@ -2,6 +2,7 @@ import { playwright } from "@vitest/browser-playwright";
 import { defineConfig } from "vitest/config";
 
 import { baseTest, sourceConditions } from "../../vitest.shared.mjs";
+import { flakeDiagLaunchArgs, flakeDiagPlugin } from "../../vitest.flake-diag.mjs";
 import { liquidRaw } from "./vite-liquid-plugin.js";
 
 /** Shared plugins for every project in this config. */
@@ -45,7 +46,7 @@ export default defineConfig({
       },
       {
         cacheDir: ".vitest/browser",
-        plugins: sharedPlugins(),
+        plugins: [...sharedPlugins(), flakeDiagPlugin("components")],
         resolve: { conditions: sourceConditions },
         test: {
           name: "browser",
@@ -53,7 +54,7 @@ export default defineConfig({
           include: ["src/**/*.browser.spec.ts"],
           browser: {
             enabled: true,
-            provider: playwright(),
+            provider: playwright({ launchOptions: { args: flakeDiagLaunchArgs("components") } }),
             headless: true,
             instances: [{ browser: "chromium" }],
           },

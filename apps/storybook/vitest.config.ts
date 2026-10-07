@@ -6,6 +6,7 @@ import { playwright } from "@vitest/browser-playwright";
 import { defineConfig } from "vitest/config";
 
 import { baseTest } from "../../vitest.shared.mjs";
+import { flakeDiagLaunchArgs, flakeDiagPlugin } from "../../vitest.flake-diag.mjs";
 import { optimizeDepsExclude, optimizeDepsInclude } from "./.storybook/optimize-deps.js";
 
 const dir = dirname(fileURLToPath(import.meta.url));
@@ -38,6 +39,7 @@ export default defineConfig({
             storybookScript: "storybook dev -p 6006 --no-open",
             tags: { exclude: ["no-test"] },
           }),
+          flakeDiagPlugin("storybook"),
         ],
         optimizeDeps: {
           exclude: optimizeDepsExclude,
@@ -56,7 +58,7 @@ export default defineConfig({
           name: "storybook",
           browser: {
             enabled: true,
-            provider: playwright(),
+            provider: playwright({ launchOptions: { args: flakeDiagLaunchArgs("storybook") } }),
             headless: true,
             instances: [{ browser: "chromium" }],
           },

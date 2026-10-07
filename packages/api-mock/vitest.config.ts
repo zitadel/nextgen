@@ -2,6 +2,7 @@ import { playwright } from "@vitest/browser-playwright";
 import { defineConfig } from "vitest/config";
 
 import { baseTest, sourceConditions } from "../../vitest.shared.mjs";
+import { flakeDiagLaunchArgs, flakeDiagPlugin } from "../../vitest.flake-diag.mjs";
 
 /**
  * Two projects in one config, selected per lane (no separate config files):
@@ -39,6 +40,7 @@ export default defineConfig({
       },
       {
         cacheDir: ".vitest/browser",
+        plugins: [flakeDiagPlugin("api-mock")],
         resolve: { conditions: sourceConditions },
         test: {
           name: "browser",
@@ -46,7 +48,7 @@ export default defineConfig({
           include: ["src/**/*.browser.spec.ts"],
           browser: {
             enabled: true,
-            provider: playwright(),
+            provider: playwright({ launchOptions: { args: flakeDiagLaunchArgs("api-mock") } }),
             headless: true,
             instances: [{ browser: "chromium" }],
           },

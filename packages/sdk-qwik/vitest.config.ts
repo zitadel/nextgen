@@ -4,6 +4,7 @@ import { apiMockPublicDir } from "@zitadel/api-mock/public-dir";
 import { defineConfig } from "vitest/config";
 
 import { baseTest } from "../../vitest.shared.mjs";
+import { flakeDiagLaunchArgs, flakeDiagPlugin } from "../../vitest.flake-diag.mjs";
 
 // Runs in real Chromium via Playwright (mirroring the `@zitadel/components`
 // browser lane) rather than jsdom. Qwik 2's client `render` locates its root
@@ -16,7 +17,7 @@ export default defineConfig({
   // Serves api-mock's `mockServiceWorker.js` from the test origin, where the
   // MSW worker started in `src/test-setup.ts` registers it.
   publicDir: apiMockPublicDir,
-  plugins: [qwikVite()],
+  plugins: [qwikVite(), flakeDiagPlugin("sdk-qwik")],
   resolve: {
     // Use the browser build so Qwik's client `render()` resolves correctly.
     conditions: ["browser"],
@@ -27,7 +28,7 @@ export default defineConfig({
     setupFiles: ["src/test-setup.ts"],
     browser: {
       enabled: true,
-      provider: playwright(),
+      provider: playwright({ launchOptions: { args: flakeDiagLaunchArgs("sdk-qwik") } }),
       headless: true,
       instances: [{ browser: "chromium" }],
     },

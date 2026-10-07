@@ -98,11 +98,27 @@ jobs:
       - name: Run Moon build and test graph
         id: moon-ci
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
+        env:
+          # Spike #1490: surface Vite's dep-optimizer decisions in the log.
+          DEBUG: vite:deps
         run: moon ci :lint :typecheck :build :test :check-adrs
 
       - name: Report Moon CI failures
         if: ${{ failure() && steps.moon-ci.conclusion == 'failure' }}
         run: node scripts/report-moon-failures.mjs
+
+      - name: Summarise browser flake diagnostics (spike #1490)
+        if: ${{ always() && steps.ci-mode.outputs.mode == 'full' }}
+        run: node scripts/flake-diag-report.mjs flake-diag
+
+      - name: Upload browser flake diagnostics (spike #1490)
+        if: ${{ always() && steps.ci-mode.outputs.mode == 'full' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: flake-diag
+          path: flake-diag
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Run Go tests
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' }}

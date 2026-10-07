@@ -75,4 +75,4 @@ tasks:
       # Retry a failed browser suite in CI. The flake is a cold-start race:
       # the first attempt warms the Vite dep cache, so a retry runs warm and
       # clears the "Failed to fetch dynamically imported module" failure. (#1490)
-      retryCount: 3
+      retryCount: 0
