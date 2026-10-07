@@ -1,7 +1,7 @@
 import { createServer as createHttpServer } from "node:http";
 import { createServer, type AddressInfo, type Server, type Socket } from "node:net";
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { getApiCsrfToken, setApiCsrfRejectionHandler, setApiCsrfToken } from "./auth";
 import {
@@ -130,6 +130,12 @@ function captureFetch() {
   return seen;
 }
 
+// The CSRF tests run as a page served from the API's origin, the way the
+// console is: the token and the rejection handler default to that origin.
+beforeEach(() => {
+  vi.stubGlobal("location", new URL("http://api.test/console/"));
+});
+
 afterEach(() => {
   setApiCsrfToken(undefined);
   setApiCsrfRejectionHandler(undefined);
@@ -174,6 +180,32 @@ describe("customFetch CSRF header", () => {
 
   it("adds nothing when no token is set", async () => {
     const seen = captureFetch();
+    await customFetch("http://api.test/x", { method: "POST" });
+    expect(seen[0]?.has(CSRF_HEADER)).toBe(false);
+  });
+
+  // Another client on the page, with another base URL, must not carry this
+  // session's token to a different host.
+  it("sends the token only to the origin it was issued for", async () => {
+    const seen = captureFetch();
+    setApiCsrfToken("tok");
+    await customFetch("http://other.test/x", { method: "POST" });
+    await customFetch("/api/x", { method: "POST" });
+    expect(seen.map((headers) => headers.get(CSRF_HEADER))).toEqual([null, "tok"]);
+  });
+
+  it("takes an explicit origin", async () => {
+    const seen = captureFetch();
+    setApiCsrfToken("tok", "http://other.test");
+    await customFetch("http://other.test/x", { method: "POST" });
+    await customFetch("http://api.test/x", { method: "POST" });
+    expect(seen.map((headers) => headers.get(CSRF_HEADER))).toEqual(["tok", null]);
+  });
+
+  it("sends nothing when there is no origin to go by", async () => {
+    vi.stubGlobal("location", undefined);
+    const seen = captureFetch();
+    setApiCsrfToken("tok");
     await customFetch("http://api.test/x", { method: "POST" });
     expect(seen[0]?.has(CSRF_HEADER)).toBe(false);
   });
@@ -267,6 +299,17 @@ describe("customFetch CSRF refusal", () => {
     ).rejects.toBeInstanceOf(ApiError);
     expect(onRejected).not.toHaveBeenCalled();
     expect(sent).toEqual(["stale"]);
+  });
+
+  it("leaves a refusal from another origin alone", async () => {
+    scriptedFetch([csrfRefused]);
+    setApiCsrfToken("tok");
+    const onRejected = vi.fn(async () => "fresh");
+    setApiCsrfRejectionHandler(onRejected);
+    await expect(customFetch("http://other.test/teams", { method: "POST" })).rejects.toBeInstanceOf(
+      ApiError,
+    );
+    expect(onRejected).not.toHaveBeenCalled();
   });
 
   it("leaves other 403 answers and safe methods alone", async () => {
