@@ -32,6 +32,13 @@ const unsupportedProtocol = /^(catalog|workspace):/;
 const semverVersion = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
 const manifests = new Map();
 const serverPlatformPackagePattern = /^@zitadel\/server-(?:darwin|linux|win32)-/;
+// The CLI ships its agent contract as an installable Agent Skill (ADR 004).
+// Shipping the complete skill — its entry file and every reference it links —
+// is core product behavior, so the tarball must carry all of them.
+const cliSkillFiles = [
+  "skills/zitadel-cli/SKILL.md",
+  "skills/zitadel-cli/references/driving-login-ui.md",
+];
 
 const tarballs = (await readdir(tarballsDir))
   .filter((file) => file.endsWith(".tgz"))
@@ -55,6 +62,7 @@ for (const file of tarballs) {
   }
   assertInstallableManifest(tarball, manifest);
   assertServerPlatformBinary(tarball, manifest);
+  assertCliSkillBundle(tarball, manifest);
   manifests.set(manifest.name, manifest);
 }
 
@@ -119,6 +127,25 @@ function assertServerPlatformBinary(tarball, manifest) {
   const mode = result.stdout.trim().split(/\s+/, 1)[0] ?? "";
   if (!mode.includes("x")) {
     throw new Error(`${tarball} contains non-executable ${binaryPath}`);
+  }
+}
+
+function assertCliSkillBundle(tarball, manifest) {
+  if (manifest.name !== "@zitadel/cli") {
+    return;
+  }
+  const result = spawnSync("tar", ["-tf", tarball], { encoding: "utf8" });
+  if (result.status !== 0) {
+    throw new Error(`failed to list ${tarball}: ${result.stderr}`);
+  }
+  const entries = new Set(
+    result.stdout
+      .split(/\r?\n/)
+      .map((line) => line.replace(/^\.\//, "").replace(/\/$/, "")),
+  );
+  const missing = cliSkillFiles.filter((file) => !entries.has(`package/${file}`));
+  if (missing.length > 0) {
+    throw new Error(`${tarball} is missing CLI agent skill files: ${missing.join(", ")}`);
   }
 }
 

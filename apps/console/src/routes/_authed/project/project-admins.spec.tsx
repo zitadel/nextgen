@@ -233,13 +233,35 @@ describe("project admins", () => {
 
   it("says so when nobody has been granted access", async () => {
     // Right after claiming: the owner's access comes through the owning team,
-    // not an admin grant, so their own project lists nobody. That is correct.
+    // not an admin grant, so their own project lists nobody.
     stubProject([]);
     await renderProject();
 
     await screen.findByRole("region", { name: "Admins" });
-    expect(admins().getByText("No admins yet.")).toBeInTheDocument();
+    expect(admins().getByText("No additional admins have been added.")).toBeInTheDocument();
     expect(admins().getByRole("button", { name: "Add admin" })).toBeInTheDocument();
+  });
+
+  const OWNING_TEAM_LINE = "You have admin access as a member of this Project’s owning Team.";
+
+  it("tells the owner their access comes through the owning team", async () => {
+    // Whoever reaches this page can manage the project; with no grant of their
+    // own, that access is the owning team's. The line stays once admins exist.
+    stubProject([grant({ user: grantUser({ identifier: "colleague@acme.com" }) })]);
+    await renderProject();
+
+    await screen.findByRole("region", { name: "Admins" });
+    expect(admins().getByText(OWNING_TEAM_LINE)).toBeInTheDocument();
+    expect(admins().getByText("colleague@acme.com")).toBeInTheDocument();
+  });
+
+  it("does not claim owning-team access for a granted admin", async () => {
+    // The session fixture signs in as `user_test`.
+    stubProject([grant({ user: { user_id: "user_test" } })]);
+    await renderProject();
+
+    await screen.findByRole("region", { name: "Admins" });
+    expect(admins().queryByText(OWNING_TEAM_LINE)).not.toBeInTheDocument();
   });
 
   it("grants by the address that was typed, on the route's project", async () => {

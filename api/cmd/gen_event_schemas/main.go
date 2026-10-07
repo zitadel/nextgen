@@ -64,6 +64,8 @@ var payloadByEventType = map[string]string{
 	"idp.created": "idp-payload.yaml",
 	"idp.updated": "idp-payload.yaml",
 
+	"idp.identity_link.created": "idp-identity-link-created-payload.yaml",
+
 	"deployment.created": "deployment-created-payload.yaml",
 
 	"authz.granted": "authz-granted-payload.yaml",

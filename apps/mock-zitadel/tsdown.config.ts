@@ -16,6 +16,7 @@ export default defineConfig({
   entry: { app: "src/app.ts" },
   outDir: "dist",
   format: ["esm"],
+  failOnWarn: true,
   platform: "node",
   dts: true,
   // Bundle every dependency into the single self-contained output.

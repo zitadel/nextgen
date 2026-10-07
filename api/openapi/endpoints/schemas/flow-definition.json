@@ -199,7 +199,7 @@
                   "transitions": {
                     "not": {
                       "required": [
-                        "callback"
+                        "sso_authenticated"
                       ]
                     }
                   }
@@ -286,9 +286,82 @@
               "transitions": {
                 "not": {
                   "required": [
-                    "callback"
+                    "sso_authenticated"
                   ]
                 }
+              }
+            }
+          },
+          {
+            "required": [
+              "transitions"
+            ],
+            "properties": {
+              "transitions": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "sso_authenticated"
+                    ],
+                    "properties": {
+                      "sso_authenticated": {
+                        "anyOf": [
+                          {
+                            "required": [
+                              "purpose"
+                            ],
+                            "properties": {
+                              "purpose": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          {
+                            "required": [
+                              "action"
+                            ],
+                            "properties": {
+                              "action": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "required": [
+                      "sso_user_not_found"
+                    ],
+                    "properties": {
+                      "sso_user_not_found": {
+                        "anyOf": [
+                          {
+                            "required": [
+                              "purpose"
+                            ],
+                            "properties": {
+                              "purpose": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          {
+                            "required": [
+                              "action"
+                            ],
+                            "properties": {
+                              "action": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ]
               }
             }
           }
@@ -397,7 +470,7 @@
         },
         "transitions": {
           "type": "object",
-          "description": "Maps action/outcome names to their transition descriptor.\n\nKeys match action names from the `actions` array. Additional keys\ncome from implicit outcomes based on schema annotations\n(e.g. `user_not_found` from `x-unique` fields) and engine\nevents (e.g. `sso`, `callback`).\n",
+          "description": "Maps action/outcome names to their transition descriptor.\n\nKeys match action names from the `actions` array. Additional keys\ncome from implicit outcomes based on schema annotations\n(e.g. `user_not_found` from `x-unique` fields) and engine\nevents (e.g. `sso_authenticated`, `sso_user_not_found`).\n",
           "additionalProperties": {
             "type": "object",
             "required": [

@@ -199,6 +199,9 @@ export const en: Record<string, string> = {
   "error.passkey_unsupported": "This device does not support passkeys",
   "error.passkey_failed": "Something went wrong. Please try again.",
   "error.passkey_invalid": "This passkey could not be verified. Please try again.",
+  "error.sso_creation_disabled":
+    "There is no account for this sign-in, and new accounts cannot be created with this provider.",
+  "error.flow_restart_required": "Your sign-in could not be continued. Please start again.",
   "error.passkey_registration_invalid":
     "The new passkey could not be verified. Please try registering it again.",
   "error.sso_unavailable":

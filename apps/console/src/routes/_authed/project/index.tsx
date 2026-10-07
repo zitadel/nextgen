@@ -53,6 +53,7 @@ export const Route = createFileRoute("/_authed/project/")({
 
 function ProjectDetail() {
   const { project, grants } = Route.useLoaderData();
+  const { session } = Route.useRouteContext();
   const router = useRouter();
 
   return (
@@ -84,6 +85,7 @@ function ProjectDetail() {
       <ProjectAdmins
         projectId={project.id}
         grants={grants}
+        viewerUserId={session.user_id ?? undefined}
         onChanged={() => void router.invalidate()}
       />
     </DetailPage>

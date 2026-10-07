@@ -41,12 +41,14 @@ export const DETAIL_CARD = "gap-0 py-0";
 
 /**
  * A body card with a titled section: the eyebrow, an optional action beside it,
- * a rule, then `children`. Inset 24px, 20px top and bottom, 16px between parts.
+ * an optional note under them, a rule, then `children`. Inset 24px, 20px top
+ * and bottom, 16px between parts.
  */
 export function DetailSection({
   title,
   titleId,
   action,
+  note,
   className,
   children,
   ...props
@@ -55,6 +57,8 @@ export function DetailSection({
   /** Sets the eyebrow's id, for a card labelled by it. */
   titleId?: string;
   action?: ReactNode;
+  /** A line between the header and the rule. */
+  note?: ReactNode;
 }) {
   const eyebrow = (
     <span id={titleId} className={EYEBROW}>
@@ -72,6 +76,7 @@ export function DetailSection({
         ) : (
           eyebrow
         )}
+        {note}
         <Separator />
         {children}
       </CardContent>
