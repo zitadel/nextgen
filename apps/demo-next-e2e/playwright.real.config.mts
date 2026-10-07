@@ -40,11 +40,13 @@ export default defineConfig({
       serverBinaryHint: "run `moon run server:build` first.",
     },
     app: {
-      // demo-next's `dev` script, run as next itself: a nested pnpm would
-      // warn about the platform-specific server packages, and `node --run`
-      // does not pass the runner's SIGTERM on, which would orphan next.
+      // demo-next's `dev` script, run as next's CLI under node: a nested pnpm
+      // would warn about the platform-specific server packages, `node --run`
+      // does not pass the runner's SIGTERM on (orphaning next), and the
+      // `.bin` shim is a `.cmd` on Windows that spawn cannot start.
       command: [
-        join(workspaceRoot, "apps", "demo-next", "node_modules", ".bin", "next"),
+        process.execPath,
+        join(workspaceRoot, "apps", "demo-next", "node_modules", "next", "dist", "bin", "next"),
         "dev",
         "--port",
         "3002",

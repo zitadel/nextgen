@@ -315,7 +315,10 @@ if (seedOnly) {
   // starts.
   const consolePort = new URL(consoleOrigin).port;
   const viteArgs = consolePort ? ["--port", consolePort] : [];
-  const vite = spawn(join(appDir, "node_modules", ".bin", "vite"), viteArgs, {
+  // vite's CLI under node: its `.bin` shim is a `.cmd` on Windows, which spawn
+  // cannot start without a shell.
+  const viteCli = join(appDir, "node_modules", "vite", "bin", "vite.js");
+  const vite = spawn(process.execPath, [viteCli, ...viteArgs], {
     cwd: appDir,
     stdio: "inherit",
     env: {
