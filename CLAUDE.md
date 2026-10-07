@@ -22,9 +22,9 @@ minting contract lives in
 
 Building console or design-system UI (from Figma or otherwise)? Classify the
 component before building — do not reverse-engineer a flattened app mock. The
-3-way decision and token authority live in
-[apps/console/docs/styling.md](apps/console/docs/styling.md); the Figma→pair
-recipe and parity gate in [apps/storybook/AGENTS.md](apps/storybook/AGENTS.md).
+surface decision and token authority live in
+[apps/console/docs/styling.md](apps/console/docs/styling.md); the add-an-atom
+recipe and a11y gate in [apps/storybook/AGENTS.md](apps/storybook/AGENTS.md).
 
 Developing the console? Use `moon run console:dev-real` — it boots a seeded real
 instance, because the console manages an instance and its list screens are only
