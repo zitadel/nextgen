@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -18,7 +18,6 @@ vi.mock("@clack/prompts", async (importOriginal) => ({
   cancel: vi.fn(),
 }));
 
-const tempDirs: string[] = [];
 const tty = { stdout: process.stdout.isTTY, stdin: process.stdin.isTTY };
 
 beforeEach(() => {
@@ -27,22 +26,15 @@ beforeEach(() => {
   Object.defineProperty(process.stdin, "isTTY", { value: true, configurable: true });
 });
 
-afterEach(async () => {
+afterEach(() => {
   Object.defineProperty(process.stdout, "isTTY", { value: tty.stdout, configurable: true });
   Object.defineProperty(process.stdin, "isTTY", { value: tty.stdin, configurable: true });
   vi.mocked(confirm).mockReset();
-  while (tempDirs.length > 0) {
-    const dir = tempDirs.pop();
-    if (dir) {
-      await rm(dir, { recursive: true, force: true });
-    }
-  }
 });
 
 /** A Project whose only enabled factor is passkey, with no flows to stop the change. */
 async function passkeyOnlyProject(): Promise<string> {
   const cwd = await mkdtemp(join(tmpdir(), "zitadel-auth-factor-confirm-"));
-  tempDirs.push(cwd);
   await mkdir(join(cwd, ".zitadel/schemas"), { recursive: true });
   await writeFile(join(cwd, "zitadel.json"), `${JSON.stringify({ version: "0.0.1" })}\n`);
   await writeFile(

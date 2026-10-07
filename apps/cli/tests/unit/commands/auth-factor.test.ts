@@ -1,12 +1,10 @@
-import { chmod, mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, rename, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { parseJson, runCliForTest } from "../../helpers/run-cli";
-
-const tempDirs: string[] = [];
 
 type Envelope = {
   status: string;
@@ -55,7 +53,6 @@ async function makeProject(
   flows: Record<string, unknown> = { "default-human-user-login": passwordFlow() },
 ): Promise<string> {
   const cwd = await mkdtemp(join(tmpdir(), "zitadel-auth-factor-"));
-  tempDirs.push(cwd);
   await mkdir(join(cwd, ".zitadel/schemas"), { recursive: true });
   await mkdir(join(cwd, ".zitadel/flows"), { recursive: true });
   await writeFile(join(cwd, "zitadel.json"), `${JSON.stringify({ version: "0.0.1" })}\n`);
@@ -92,14 +89,8 @@ async function readSchema(cwd: string, name = "default-human-user") {
   };
 }
 
-afterEach(async () => {
-  while (tempDirs.length > 0) {
-    const dir = tempDirs.pop();
-    if (dir) {
-      await rm(dir, { recursive: true, force: true });
-    }
-  }
-});
+// Temp dirs are left for the OS to reclaim, as the integration helper does
+// (#1498): a recursive delete on teardown flakes under CI load.
 
 describe("auth-factor", () => {
   describe("the envelope", () => {
@@ -130,7 +121,6 @@ describe("auth-factor", () => {
 
     it("hands over the follow-ups as argument lists when the path needs quoting", async () => {
       const parent = await mkdtemp(join(tmpdir(), "zitadel auth factor "));
-      tempDirs.push(parent);
       const cwd = await makeProject();
       const spaced = join(parent, "my project");
       await rename(cwd, spaced);

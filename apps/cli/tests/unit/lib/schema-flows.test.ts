@@ -1,22 +1,14 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import type { SchemaFile } from "../../../src/lib/idp";
 import { flowsForSchema } from "../../../src/lib/schema-flows";
 
-const tempDirs: string[] = [];
-
-afterEach(async () => {
-  while (tempDirs.length > 0) {
-    const dir = tempDirs.pop();
-    if (dir) {
-      await rm(dir, { recursive: true, force: true });
-    }
-  }
-});
+// Temp dirs are left for the OS to reclaim, as the integration helper does
+// (#1498): a recursive delete on teardown flakes under CI load.
 
 function schemaFile(name: string, body: Record<string, unknown> = {}): SchemaFile {
   return { name, path: `.zitadel/schemas/${name}.json`, properties: [], methods: [], body };
@@ -25,7 +17,6 @@ function schemaFile(name: string, body: Record<string, unknown> = {}): SchemaFil
 /** A Project holding flows that name the given schema references. */
 async function projectWithFlows(flows: Record<string, string>, state?: string): Promise<string> {
   const cwd = await mkdtemp(join(tmpdir(), "zitadel-schema-flows-"));
-  tempDirs.push(cwd);
   await mkdir(join(cwd, ".zitadel/flows"), { recursive: true });
   for (const [name, userSchema] of Object.entries(flows)) {
     await writeFile(
