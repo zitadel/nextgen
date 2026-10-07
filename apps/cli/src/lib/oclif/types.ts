@@ -29,6 +29,8 @@ export type SkippedEnvelope = EnvelopeMeta & {
   reason: string;
   data?: unknown;
   next_commands?: string[];
+  /** Warnings reported before the command stopped; present only when there are any. */
+  warnings?: string[];
 };
 
 /**
@@ -43,6 +45,8 @@ export type ErrorEnvelope = EnvelopeMeta & {
   hint?: string;
   next_commands?: string[];
   details?: unknown;
+  /** Warnings reported before the command failed; present only when there are any. */
+  warnings?: string[];
 };
 
 /**
