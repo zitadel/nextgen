@@ -70,10 +70,9 @@ func TestNewSSOState(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	t.Run("a separator in the project id is stripped, so the parse stays exact", func(t *testing.T) {
-		sso, err := domain.NewSSOState("proj.1", "google", "idprev_1", "https://auth.example.com/__nextgen/idp/callback", "/after-login", crypter)
-		require.NoError(t, err)
-		assert.Equal(t, "proj1", domain.SSOStateProjectID(sso.State))
+	t.Run("a separator in the project id is refused", func(t *testing.T) {
+		_, err := domain.NewSSOState("proj.1", "google", "idprev_1", "https://auth.example.com/__nextgen/idp/callback", "/after-login", crypter)
+		assert.ErrorIs(t, err, domain.ErrInternal(nil))
 	})
 
 	t.Run("the hash covers the project prefix", func(t *testing.T) {

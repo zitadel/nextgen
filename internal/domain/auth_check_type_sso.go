@@ -5,7 +5,7 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
-	"errors"
+	"fmt"
 	"log/slog"
 	"strings"
 	"time"
@@ -245,8 +245,10 @@ func (s SSOState) LogValue() slog.Value {
 // writing key's id, which is what lets the callback decrypt after a rotation
 // (see [SSOStatePayload.DecryptPKCEVerifier]).
 func NewSSOState(projectID, providerSlug, connectionRevisionID, redirectURI, returnTarget string, pkceEncrypter crypto.Encrypter) (*SSOState, error) {
-	if projectID == "" {
-		return nil, ErrInternal(errors.New("sso state: project id is empty"))
+	// Resource ids never hold the separator (resource.go). One that does would
+	// parse back as a different project at the callback.
+	if projectID == "" || strings.Contains(projectID, ssoStateSeparator) {
+		return nil, ErrInternal(fmt.Errorf("sso state: project id %q is empty or holds the separator", projectID))
 	}
 	random, err := randomSecret(16)
 	if err != nil {
@@ -259,9 +261,7 @@ func NewSSOState(projectID, providerSlug, connectionRevisionID, redirectURI, ret
 	// value the provider echoes back, so the project rides in it, read out
 	// again by [SSOStateProjectID]. The project id is not a secret (the client
 	// sends it in CreateFlow), and the random part keeps its full entropy.
-	// Resource ids never hold the separator (resource.go); stripping it keeps
-	// the parse exact rather than truncated if that ever changes.
-	state := strings.ReplaceAll(projectID, ssoStateSeparator, "") + ssoStateSeparator + random
+	state := projectID + ssoStateSeparator + random
 	bindingNonce, err := randomSecret(16)
 	if err != nil {
 		return nil, err
