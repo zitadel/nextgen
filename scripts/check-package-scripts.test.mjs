@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { checkProject, checkWorkspace, startsPackageManager } from "./check-package-scripts.mjs";
+import { checkProject, checkWorkspace, projectIds, startsPackageManager } from "./check-package-scripts.mjs";
 
 describe("package-script contract", () => {
   it("holds for every workspace package", () => {
@@ -66,6 +66,9 @@ describe("package-script contract", () => {
     "npx vitest",
     "tsdown && pnpm run test",
     "CI=1 pnpm test",
+    "env CI=1 pnpm run test",
+    "env -u CI pnpm run test",
+    "env -u CI -u VERCEL -- pnpm install",
     "node --run build",
   ])("detects a package manager in %s", (body) => {
     expect(startsPackageManager(body)).toBe(true);
@@ -78,6 +81,8 @@ describe("package-script contract", () => {
     'node -e "console.log(\'use pnpm\')"',
     "echo 'run npm install yourself'",
     "NEXTGEN_NUXT_BUILD_DIR=.nuxt nuxt prepare && vue-tsc --noEmit",
+    "env CI=1 vitest run",
+    "env -u CI node scripts/run-local.mjs",
   ])("does not flag %s", (body) => {
     expect(startsPackageManager(body)).toBe(false);
   });
@@ -86,5 +91,12 @@ describe("package-script contract", () => {
     expect(checkProject("apps/x", {}, { build: { command: "corepack pnpm run build" } })).toEqual([
       'apps/x: task "build" runs a script "build" that does not exist',
     ]);
+  });
+
+  it("names projects with forward slashes on every platform", () => {
+    const ids = projectIds();
+    expect(ids).toContain("apps/cli");
+    expect(ids).not.toContain("apps/server");
+    expect(ids.filter((id) => id.includes("\\"))).toEqual([]);
   });
 });

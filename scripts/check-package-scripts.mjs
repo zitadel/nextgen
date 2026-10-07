@@ -88,13 +88,42 @@ const PACKAGE_MANAGERS = new Set(["pnpm", "npm", "npx", "yarn", "corepack"]);
 export function startsPackageManager(body) {
   const unquoted = body.replace(/'[^']*'|"(?:[^"\\]|\\.)*"/g, "''");
   for (const segment of unquoted.split(/&&|\|\||[;|()]/)) {
-    const words = segment.trim().split(/\s+/).filter((word) => !/^[A-Za-z_][A-Za-z0-9_]*=/.test(word));
-    const [command = "", next = ""] = words;
+    const [command = "", next = ""] = commandWords(segment.trim().split(/\s+/));
     if (PACKAGE_MANAGERS.has(command) || (command === "node" && next === "--run")) {
       return true;
     }
   }
   return false;
+}
+
+const ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/;
+
+/**
+ * The words of a command from its executable on: leading env assignments are
+ * dropped, and an `env` wrapper is unwrapped (its options, `-u NAME`/`-C DIR`
+ * operands and assignments) so the command it runs is the one checked.
+ */
+function commandWords(words) {
+  let i = 0;
+  while (i < words.length && ASSIGNMENT.test(words[i])) i += 1;
+  if (words[i] !== "env") return words.slice(i);
+  i += 1;
+  while (i < words.length) {
+    const word = words[i];
+    if (word === "--") {
+      i += 1;
+      break;
+    }
+    if (word === "-u" || word === "-C" || word === "--unset" || word === "--chdir") {
+      i += 2;
+    } else if (word.startsWith("-") || ASSIGNMENT.test(word)) {
+      i += 1;
+    } else {
+      break;
+    }
+  }
+  while (i < words.length && ASSIGNMENT.test(words[i])) i += 1;
+  return words.slice(i);
 }
 
 function isHook(name, scripts) {
@@ -138,28 +167,31 @@ export function checkProject(dir, scripts, tasks) {
   return problems;
 }
 
-function projectDirs(root) {
-  const dirs = [root];
+/**
+ * Workspace project ids, `/`-separated on every platform so they match the
+ * exemption keys; `join()` is only used for the filesystem paths.
+ */
+export function projectIds(root = ".") {
+  const ids = ["."];
   for (const group of ["apps", "packages"]) {
     for (const entry of readdirSync(join(root, group), { withFileTypes: true })) {
-      const dir = join(group, entry.name);
-      if (entry.isDirectory() && existsSync(join(root, dir, "package.json")) && !EXEMPT_PROJECTS.has(dir)) {
-        dirs.push(dir);
+      const id = `${group}/${entry.name}`;
+      if (entry.isDirectory() && existsSync(join(root, group, entry.name, "package.json")) && !EXEMPT_PROJECTS.has(id)) {
+        ids.push(id);
       }
     }
   }
-  return dirs;
+  return ids;
 }
 
 export function checkWorkspace(root = ".") {
   const problems = [];
-  for (const dir of projectDirs(root)) {
-    const base = dir === root ? root : join(root, dir);
-    const label = dir === root ? "." : dir;
+  for (const id of projectIds(root)) {
+    const base = join(root, ...id.split("/"));
     const scripts = JSON.parse(readFileSync(join(base, "package.json"), "utf8")).scripts ?? {};
     const moonPath = join(base, "moon.yml");
     const tasks = existsSync(moonPath) ? (parse(readFileSync(moonPath, "utf8"))?.tasks ?? {}) : {};
-    problems.push(...checkProject(label, scripts, tasks));
+    problems.push(...checkProject(id, scripts, tasks));
   }
   return problems;
 }
