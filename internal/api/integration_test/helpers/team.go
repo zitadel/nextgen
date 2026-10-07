@@ -8,7 +8,7 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 )
 
-func (h *Harness) EnsureTeamService(t *testing.T) *service.TeamService {
+func (h *Harness) EnsureTeamService(t testing.TB) *service.TeamService {
 	t.Helper()
 	h.teamService.mutex.Lock()
 	defer h.teamService.mutex.Unlock()
@@ -25,7 +25,7 @@ type TeamMembershipFixture struct {
 	Pool *service.DB
 }
 
-func (h *Harness) EnsureTeamMembershipFixture(t *testing.T) TeamMembershipFixture {
+func (h *Harness) EnsureTeamMembershipFixture(t testing.TB) TeamMembershipFixture {
 	t.Helper()
 	return TeamMembershipFixture{Pool: h.EnsureServiceDB(t)}
 }

@@ -6,7 +6,7 @@ import (
 	"github.com/zitadel/nextgen/internal/secrets"
 )
 
-func (h *Harness) EnsureSecretGenerator(t *testing.T) secrets.Generator {
+func (h *Harness) EnsureSecretGenerator(t testing.TB) secrets.Generator {
 	t.Helper()
 	h.secretGenerator.mutex.Lock()
 	defer h.secretGenerator.mutex.Unlock()

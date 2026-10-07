@@ -6,7 +6,7 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 )
 
-func (h *Harness) EnsureFlowDefinitionService(t *testing.T) service.FlowDefinitionService {
+func (h *Harness) EnsureFlowDefinitionService(t testing.TB) service.FlowDefinitionService {
 	t.Helper()
 	h.flowDefinitionService.mutex.Lock()
 	defer h.flowDefinitionService.mutex.Unlock()
