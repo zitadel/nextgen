@@ -18,66 +18,91 @@ login flow that still asks for a method the schema no longer enables.
 
 ## Decision
 
-### 1. Two verbs under an `auth` topic
+### 1. Two verbs under an `auth-factor` topic
 
 ```
-zitadel auth enable  --mode password [--mode passkey] [--schema <name>]
-zitadel auth disable --mode passkey  [--schema <name>]
+zitadel auth-factor enable  --mode password [--mode passkey] [--schema <name>]
+zitadel auth-factor disable --mode passkey  [--schema <name>]
 ```
 
-- **`auth` is a topic, not a resource.** ADR 064's `<resource> <verb>`
-  grammar is for runtime resources on the server. This edits a local
+- **The topic is `auth-factor`, not `auth`.** In other developer CLIs, `auth`
+  means the CLI's own login: `gh auth login`, `gcloud auth login`, `vercel
+login`. A developer who reads `zitadel auth enable` could take it to mean
+  "let this CLI sign in", which is not what it does. `zitadel auth` stays free
+  in case the CLI later gets a login of its own. A nested `auth factor` would
+  not solve this, because it still takes the `auth` topic. One hyphenated word
+  does, in the same way `flow-definitions` is spelled.
+- **It is a factor.** Password and passkey are what a user proves sign-in with,
+  so "factor" names the thing being turned on or off. "Method" would also
+  describe SSO, which is not part of this command.
+- **`auth-factor` is a topic, not a resource.** ADR 064's `<resource> <verb>`
+  grammar is for runtime resources on the server. This command edits a local
   configuration file, like `sso enable`, so it follows that command's shape
   rather than ADR 064's.
-- **`--mode` is repeatable and required.** It takes `password` or `passkey`.
-  Several methods change in one run, and naming the method is required for the
+- **`--mode` is repeatable and required.** It takes `password` or `passkey`,
+  and several modes can change in one run. Naming the mode is required for the
   same reason `sso enable` requires `--provider`: a command that guesses which
   method to switch off is not one to trust.
 - **`--schema` chooses the user schema** when the Project has more than one,
   with the same rules as `sso enable`.
 - **SSO is not a mode.** Enabling a provider needs credentials and a
-  connection file, so it stays `sso enable`.
+  connection file, so it stays with `sso enable`.
 
 ### 2. It edits the schema file and nothing else
 
 The command sets `x-auth-methods.<mode>.enabled` in the selected schema and
-writes the file back. Other keys in the method's object, and the other
-methods, are left as they are. Nothing is sent to the server: the change goes
-out through `plan` and `apply` like any other configuration edit (ADR 035), and
-the result lists those two as `next_commands`.
+writes the file back. The other methods keep their values. The file is
+rewritten with sorted keys, as `sso enable` does. Nothing is sent to the
+server: the change goes out through `plan` and `apply` like any other
+configuration edit (ADR 035), and the result lists those two commands as
+`next_commands`.
 
-Running it twice is safe. A method already in the requested state is reported
-as unchanged and the file is not rewritten.
+Running it twice is safe. A mode already in the requested state is reported as
+unchanged, and the file is not rewritten.
 
 Login flows are not edited. Adding or removing a password step or a passkey
 action changes the shape of a journey, and doing that automatically would
 overwrite choices the developer made in the flow file.
 
-### 3. It refuses changes that `plan` would reject
+### 3. It refuses changes that would fail later
 
-Before writing anything, the command validates every login flow that runs
-against the schema, using the schema as it would be after the change, with the
-same validator `plan` uses. If the change introduces an error, such as a step
-that still collects `x-auth-methods#password` or offers a `passkey` action,
-nothing is written. The error names each flow and step, so the developer knows
-what to edit first.
+Every refusal happens before anything is written, including under `--dry-run`.
 
-It also refuses to disable the last method a schema has. With password,
-passkey and SSO all off, nobody can sign in.
+- **A flow would break.** Before disabling, the command validates each login
+  flow that runs against the schema, using the schema as it would be after the
+  change. It uses the validator `plan` uses. If the change adds an error, such
+  as a step that still collects `x-auth-methods#password` or still offers a
+  `passkey` action, the command refuses and names each flow and step. Errors
+  the flow already had do not count. The command matches flows to a schema by
+  the published id, by the schema's `$id`, or by file name, which is broader
+  than `plan`'s matching before the first `apply`. So it can be stricter than
+  `plan`, but never looser.
+- **A flow cannot be checked.** The validator skips the sign-in method rules
+  for a flow with a structural error, such as a purpose that points at a
+  missing step. The command cannot tell whether such a flow still uses the
+  method, so it refuses until the flow is fixed.
+- **No factor would be left.** Disabling the last usable way to sign in is
+  refused. Only password, passkey and SSO with at least one provider count.
+  `otp` and `magic_link` are allowed by the meta-schema but not supported by
+  the login engine yet, so they do not count.
+- **Password needs an identifier.** Enabling password on a schema without
+  `x-identifier` is refused, because the server rejects that combination and
+  `plan` does not catch it.
 
-### 4. Enabling does not make a method appear
+### 4. Enabling does not make a factor appear
 
 Enabling passkey on a schema whose flow offers no passkey action changes
-nothing on the sign-in screen. The command says so as a warning and does not
-fail, because enabling the method first and editing the flow second is a
-normal order of work.
+nothing on the sign-in screen. The command reports this in the envelope's
+`warnings` and in `data.not_offered`, and does not fail, because enabling the
+factor first and editing the flow second is a normal order of work.
 
 ## Consequences
 
 - Password and passkey can be switched without editing JSON, and a change
-  that would break `plan` is caught before the file is written.
-- Disabling a method a flow uses is still two steps: edit the flow, then run
-  the command. A later decision can let the command rewrite the shipped
+  that would break `plan` or `apply` is caught before the file is written.
+- Disabling a factor that a flow uses is still two steps: edit the flow, then
+  run the command. A later decision can let the command rewrite the shipped
   default flow, but not hand-edited ones.
+- `zitadel auth` is left unused.
 - The command contract (`--mode`, the envelope, the refusals) goes into
   `SKILL.md` alongside `sso enable`.
