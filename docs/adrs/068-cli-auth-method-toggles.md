@@ -56,8 +56,9 @@ rewritten with sorted keys, as `sso enable` does. Nothing is sent to the
 server. The change is published by whatever ships configuration edits, like
 any other edit, and the result lists those commands as `next_commands`. Today
 those commands are `plan` and `apply` (ADR 007). [ADR 035
-§CLI](035-configuration-environments.md) replaces them with `deploy`. When that
-lands, `next_commands` changes with it, and this command does not change.
+§CLI](035-configuration-environments.md) removes `plan` and replaces `apply`
+with `deploy`. When that lands, `next_commands` changes with it, and this
+command does not change.
 
 Running it twice is safe. A mode already in the requested state is reported as
 unchanged, and the file is not rewritten.
@@ -91,17 +92,20 @@ Every refusal happens before anything is written, including under `--dry-run`.
   with every method disabled, because a schema whose users are only created
   and managed through the API never needs a sign-in method. Most of the time,
   though, disabling the last factor is a mistake that locks every user out,
-  so the CLI asks for `--force` to confirm it, the same guard ADR 064 puts on
-  destructive verbs. `--force` overrides this refusal only. The other
-  refusals protect against a `plan` or `apply` that would fail, so no flag
-  overrides them.
+  so it is guarded the way [ADR 064 §10](064-cli-resource-commands.md) guards
+  destructive verbs. In a terminal the command asks for confirmation, and
+  declining ends as `skipped`. Non-interactively, and under `--dry-run`, it
+  refuses unless `--force` is passed, and the refusal carries the exact
+  command to re-run with `--force`. `--force` overrides this refusal only. The
+  other refusals protect against a `plan` or `apply` that would fail, so no
+  flag overrides them, and they are checked before the prompt.
 - **Password needs an identifier.** Enabling password on a schema without
   `x-identifier` is refused, because the server rejects that combination and
   `plan` does not catch it.
 
 ### 4. Enabling does not make a factor appear
 
-Enabling passkey on a schema whose flow offers no passkey action changes
+Enabling passkey on a schema whose active flows offer no passkey action changes
 nothing on the sign-in screen. The command reports this in the envelope's
 `warnings` and in `data.not_offered`, and does not fail, because enabling the
 factor first and editing the flow second is a normal order of work.
@@ -110,7 +114,7 @@ factor first and editing the flow second is a normal order of work.
 
 - Password and passkey can be switched without editing JSON, and a change
   that would break `plan` or `apply` is caught before the file is written.
-  The same refusals apply to `deploy` once ADR 035 replaces those commands.
+  The same refusals apply to `deploy` once ADR 035 replaces `apply`.
 - Disabling a factor that a flow uses is still two steps: edit the flow, then
   run the command. A later decision can let the command rewrite the shipped
   default flow, but not hand-edited ones.
