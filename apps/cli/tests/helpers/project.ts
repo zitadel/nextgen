@@ -160,6 +160,11 @@ class CommittedFiles {
     }>;
   }
 
+  /** The user schema, for a command whose only effect is an edit to it. */
+  userSchema(): Promise<UserSchemaDocument> {
+    return this.read(SCHEMA_FILE) as Promise<UserSchemaDocument>;
+  }
+
   /** The ejected branding descriptor. */
   brandingDescriptor(): Promise<Record<string, unknown>> {
     return this.read(".zitadel/branding/branding.json");
@@ -256,28 +261,33 @@ export class ScaffoldedApp {
     );
   }
 
-  /** `auth enable`, one `--mode` per method. */
-  enableAuth(modes: string[], extraArgs: string[] = []): Promise<CliResult> {
+  /** `auth-factor enable`, one `--mode` per factor. */
+  enableFactors(factors: string[], extraArgs: string[] = []): Promise<CliResult> {
     return this.cli([
-      "auth",
+      "auth-factor",
       "enable",
       "--non-interactive",
       "--json",
-      ...modeFlags(modes),
+      ...modeFlags(factors),
       ...extraArgs,
     ]);
   }
 
-  /** `auth disable`, one `--mode` per method. */
-  disableAuth(modes: string[], extraArgs: string[] = []): Promise<CliResult> {
+  /** `auth-factor disable`, one `--mode` per factor. */
+  disableFactors(factors: string[], extraArgs: string[] = []): Promise<CliResult> {
     return this.cli([
-      "auth",
+      "auth-factor",
       "disable",
       "--non-interactive",
       "--json",
-      ...modeFlags(modes),
+      ...modeFlags(factors),
       ...extraArgs,
     ]);
+  }
+
+  /** `auth-factor <verb>` without `--json`, for a spec asserting what the developer reads. */
+  toggleFactorsRendered(verb: "enable" | "disable", factors: string[]): Promise<CliResult> {
+    return this.cli(["auth-factor", verb, "--non-interactive", ...modeFlags(factors)]);
   }
 
   /** Runs `doctor` against a fake docker on PATH and a port from this worker. */
@@ -689,8 +699,8 @@ export async function anApp({
   return new ScaffoldedApp(path);
 }
 
-function modeFlags(modes: string[]): string[] {
-  return modes.flatMap((mode) => ["--mode", mode]);
+function modeFlags(factors: string[]): string[] {
+  return factors.flatMap((factor) => ["--mode", factor]);
 }
 
 /** An app already through `setup`, for specs about the commands after it. */

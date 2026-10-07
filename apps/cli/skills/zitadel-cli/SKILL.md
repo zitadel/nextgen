@@ -243,13 +243,15 @@ auth flow in a visible browser by registering a unique user, logging out, loggin
 back in with the same email/password, and ending on the signed-in profile page.
 Do not treat a rendered login or registration form as completion.
 
-To turn password or passkey sign-in on or off later, run `auth enable` or
-`auth disable` with `--mode password` or `--mode passkey` (repeat it to change
-both, and add `--schema` when the project has more than one). Both commands
-edit only the user schema. They refuse to disable a method that a login flow
-still asks for, or a schema's last method, and they write nothing when they
-refuse. `data.not_offered` lists methods that are enabled but not offered by
-any flow. Follow `data.next_commands` (`plan`, `apply`) to publish the change.
+To turn password or passkey sign-in on or off later, run `auth-factor enable`
+or `auth-factor disable` with `--mode password` or `--mode passkey` (repeat it
+to change both, and add `--schema` when the project has more than one). Both
+commands edit only the user schema, and write nothing when they refuse. They
+refuse to disable a factor that a login flow still asks for, to disable while a
+flow has errors, to disable the schema's last way to sign in, and to enable
+password on a schema without `x-identifier`. A factor that is enabled but not
+offered by any flow is reported in `warnings` and `data.not_offered`. Follow
+`data.next_commands` (`plan`, `apply`) to publish the change.
 
 Repo config is authoritative: edit `zitadel.json` or files under `.zitadel/`,
 then re-run `plan` and `apply`. See the reference below for driving the login UI

@@ -36,8 +36,8 @@ Configuration commands
   plan:                  Validate config without mutation and preview the sync diff
   apply:                 Validate and upload repo config to the platform
   branding eject:        Take ownership of the login template
-  auth disable:          Disable password or passkey sign-in for a user schema
-  auth enable:           Enable password or passkey sign-in for a user schema
+  auth-factor disable:   Disable password or passkey sign-in for a user schema
+  auth-factor enable:    Enable password or passkey sign-in for a user schema
   branding get:          Get one branding revision by id
   branding list:         List branding
   environments get:      Get one environment by id

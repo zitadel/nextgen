@@ -127,6 +127,8 @@ which ships in this package.
 
 <!-- commands -->
 * [`zitadel apply`](#zitadel-apply)
+* [`zitadel auth-factor disable`](#zitadel-auth-factor-disable)
+* [`zitadel auth-factor enable`](#zitadel-auth-factor-enable)
 * [`zitadel autocomplete [SHELL]`](#zitadel-autocomplete-shell)
 * [`zitadel branding eject`](#zitadel-branding-eject)
 * [`zitadel branding get ID`](#zitadel-branding-get-id)
@@ -215,6 +217,84 @@ GLOBAL FLAGS
 
 DESCRIPTION
   Validate and upload repo config to the platform.
+```
+
+## `zitadel auth-factor disable`
+
+Disable password or passkey sign-in for a user schema.
+
+```
+USAGE
+  $ zitadel auth-factor disable [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--mode
+    password|passkey...] [--schema <value>]
+
+FLAGS
+  -c, --cwd=<value>       Project directory to operate on.
+  -n, --non-interactive   Disable prompts. Required when scripting or running as
+                          an agent.
+  -s, --server=<value>    Override the resolved server URL.
+  -v, --verbose           Verbose logging.
+      --[no-]color        Colorize human output. Disable with --no-color;
+                          NO_COLOR and FORCE_COLOR are honored too.
+      --debug             Debug logging.
+      --dry-run           Preview without mutating files or the platform.
+      --mode=<option>...  Factor to change. Repeat it to change several.
+                          <options: password|passkey>
+      --schema=<value>    User schema to change. Required when the Project has
+                          more than one.
+      --[no-]telemetry    Send anonymous usage analytics. Disable with
+                          --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Disable password or passkey sign-in for a user schema.
+
+EXAMPLES
+  $ zitadel auth-factor disable --mode passkey
+
+  $ zitadel auth-factor disable --mode passkey --schema customers
+```
+
+## `zitadel auth-factor enable`
+
+Enable password or passkey sign-in for a user schema.
+
+```
+USAGE
+  $ zitadel auth-factor enable [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--mode
+    password|passkey...] [--schema <value>]
+
+FLAGS
+  -c, --cwd=<value>       Project directory to operate on.
+  -n, --non-interactive   Disable prompts. Required when scripting or running as
+                          an agent.
+  -s, --server=<value>    Override the resolved server URL.
+  -v, --verbose           Verbose logging.
+      --[no-]color        Colorize human output. Disable with --no-color;
+                          NO_COLOR and FORCE_COLOR are honored too.
+      --debug             Debug logging.
+      --dry-run           Preview without mutating files or the platform.
+      --mode=<option>...  Factor to change. Repeat it to change several.
+                          <options: password|passkey>
+      --schema=<value>    User schema to change. Required when the Project has
+                          more than one.
+      --[no-]telemetry    Send anonymous usage analytics. Disable with
+                          --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Enable password or passkey sign-in for a user schema.
+
+EXAMPLES
+  $ zitadel auth-factor enable --mode passkey
+
+  $ zitadel auth-factor enable --mode password --mode passkey --schema customers
 ```
 
 ## `zitadel autocomplete [SHELL]`
