@@ -412,6 +412,17 @@ describe("auth-factor", () => {
       ]);
     });
 
+    it("still suggests a factor the user named that was already off", async () => {
+      const cwd = await makeProject(passkeyOnlySchema(), {});
+
+      const { envelope } = await run(cwd, "disable", "--mode", "password", "--mode", "passkey");
+
+      expect(envelope.next_commands?.map(suggested)).toEqual([
+        "disable --mode password --mode passkey --schema default-human-user --cwd <cwd> --force",
+        "enable --mode password --schema default-human-user --cwd <cwd>",
+      ]);
+    });
+
     it("does not suggest password on a schema with no x-identifier", async () => {
       const { "x-identifier": _, ...noIdentifier } = passwordSchema();
       const cwd = await makeProject(

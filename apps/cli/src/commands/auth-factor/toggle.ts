@@ -107,6 +107,7 @@ export abstract class AuthFactorCommand extends BaseCommand {
         refuseLastFactor(
           schema,
           factors,
+          change.changed,
           [...cwdArgs, ...(dryRun ? ["--dry-run"] : [])],
           cliVersion,
         );
@@ -245,7 +246,8 @@ function refuseMissingIdentifier(schema: SchemaFile, changed: readonly AuthFacto
  */
 function refuseLastFactor(
   schema: SchemaFile,
-  disabling: readonly AuthFactor[],
+  requested: readonly AuthFactor[],
+  turningOff: readonly AuthFactor[],
   cwdArgs: readonly string[],
   cliVersion: string,
 ): never {
@@ -253,14 +255,16 @@ function refuseLastFactor(
   const retryArgs = [
     "auth-factor",
     "disable",
-    ...disabling.flatMap((factor) => ["--mode", factor]),
+    ...requested.flatMap((factor) => ["--mode", factor]),
     ...optionArgs("--schema", schema.name),
     ...cwdArgs,
     "--force",
   ];
+  // Only the factors this run turns off are poor suggestions. One the user
+  // named that was already off is still a way to restore sign-in.
   const alternatives = AUTH_FACTORS.filter(
     (factor) =>
-      !disabling.includes(factor) && (factor !== "password" || hasIdentifier(schema.body)),
+      !turningOff.includes(factor) && (factor !== "password" || hasIdentifier(schema.body)),
   );
   // The schema name comes from a file name and the --cwd path from the user.
   // One that would need quoting leaves the strings out: quoting differs
