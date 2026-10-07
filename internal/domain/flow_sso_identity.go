@@ -17,8 +17,8 @@ type FlowSSOIdentityService interface {
 	// in.ResolvedCheckID, left parked for a collection step. It returns
 	// CheckID, ConnectionID, Subject, Claims and Verified, and no link. It
 	// returns nil, nil when that row is gone, was replaced, holds no result or
-	// holds a collision marker, and ErrFlowRestartRequired when its connection
-	// revision no longer exists.
+	// holds a collision marker, and ErrFlowRestartRequired when it holds an
+	// error result or its connection revision no longer exists.
 	LoadCollected(ctx context.Context, in FlowSSOLoadInput) (*FlowSSOParkedIdentity, error)
 	// BindLinked records the linked user and an sso factor on the attempt and
 	// deletes the parked row with in.CheckID, in one transaction. It returns

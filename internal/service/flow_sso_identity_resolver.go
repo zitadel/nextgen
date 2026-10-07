@@ -148,6 +148,12 @@ func (r *FlowSSOIdentityResolver) LoadCollected(ctx context.Context, in domain.F
 		return nil, nil
 	}
 	result := check.Result
+	// An error result means the ceremony failed: the callback stores only the
+	// key, no identity, and that ceremony replaced the collected row. This step
+	// offers no provider to retry from.
+	if result.IsError() {
+		return nil, domain.ErrFlowRestartRequired()
+	}
 	connection, err := r.connections.GetRevision(ctx, in.ProjectID, result.ConnectionRevisionID)
 	if errors.Is(err, domain.ErrIDPConnectionNotFound()) {
 		getLoggingContext(ctx, "flow").Warn("sso identity parked on a connection revision that no longer exists",

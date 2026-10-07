@@ -498,6 +498,17 @@ func TestFlowSSOIdentityResolver_LoadCollected_NothingToCollectIsNil(t *testing.
 	}
 }
 
+// A failed ceremony left nothing to create from, so the flow restarts.
+func TestFlowSSOIdentityResolver_LoadCollected_ErrorRowRestarts(t *testing.T) {
+	t.Parallel()
+	f := newSSOResolverFixture(t)
+	f.expectAttempt(parkedAttempt(&domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOCancelled}))
+	f.expectNoRevisionOrLinkRead()
+
+	_, err := f.resolver.LoadCollected(t.Context(), collectedInput())
+	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
+}
+
 func TestFlowSSOIdentityResolver_BindLinked_WritesBothFactorsAndDeletes(t *testing.T) {
 	t.Parallel()
 	f := newSSOResolverFixture(t)
