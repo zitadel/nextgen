@@ -6,7 +6,7 @@ import {
 } from "@zitadel/api/runtime/auth";
 import { ApiError } from "@zitadel/api/runtime/fetch";
 
-import { api } from "../api/zitadel";
+import { api, apiBase } from "../api/zitadel";
 import { clearSessionCaches } from "../lib/session-cache";
 
 /**
@@ -24,6 +24,13 @@ import { clearSessionCaches } from "../lib/session-cache";
 export type ConsoleSession = GetMySession200;
 
 const withCredentials: RequestInit = { credentials: "include" };
+
+/**
+ * The origin the console's API lives on, which issues the CSRF token: the
+ * shared fetch sends the token there and nowhere else (ADR 053 §5). Usually the
+ * page's own; `VITE_CONSOLE_API_BASE` may point elsewhere.
+ */
+const apiOrigin = new URL(apiBase || "/", window.location.href).origin;
 
 /**
  * Short-lived cache of the last confirmed session. The `_authed` guard runs
@@ -99,13 +106,6 @@ export async function fetchSession(): Promise<ConsoleSession | null> {
   if (cachedSession && Date.now() - cachedSession.at < SESSION_CACHE_MS) {
     return cachedSession.session;
   }
-  // Every state-changing management call the cookie authenticates must carry
-  // the session's CSRF token (ADR 053 §5). The token is stable for the life of
-  // a cookie, so it is read only when there is none yet, alongside the session
-  // so it costs no extra round trip in sequence. Only the session decides
-  // whether someone is signed in, and a failed token read never replaces a
-  // token that works.
-  const early = getApiCsrfToken() ? undefined : readCsrfToken();
   let session: ConsoleSession;
   try {
     session = await api.getMySession(withCredentials);
@@ -127,7 +127,13 @@ export async function fetchSession(): Promise<ConsoleSession | null> {
   }
   pageUserId = session.user_id;
   cachedSession = { at: Date.now(), session };
-  if (!getApiCsrfToken()) await loadCsrfToken(early);
+  // Every state-changing management call the cookie authenticates must carry
+  // the session's CSRF token (ADR 053 §5). The token is stable for the life of
+  // a cookie, so it is read only when there is none yet, and only once the
+  // session is known to be active: a signed-out check never asks for one. Only
+  // the session decides whether someone is signed in, and a failed token read
+  // never replaces a token that works.
+  if (!getApiCsrfToken()) await loadCsrfToken();
   return session;
 }
 
@@ -146,8 +152,8 @@ function readCsrfToken(): Promise<string | undefined> {
 async function loadCsrfToken(pending?: Promise<string | undefined>): Promise<string | undefined> {
   const token = await (pending ?? readCsrfToken());
   if (!token) return undefined;
-  // The shared fetch adds it to every unsafe request from here on.
-  setApiCsrfToken(token);
+  // The shared fetch adds it to every unsafe request to the API from here on.
+  setApiCsrfToken(token, apiOrigin);
   return token;
 }
 
@@ -194,7 +200,7 @@ setApiCsrfRejectionHandler(() => {
     recheck = undefined;
   });
   return recheck;
-});
+}, apiOrigin);
 
 /**
  * Revokes the current session (`DELETE /sessions/me`). The server deletes the
