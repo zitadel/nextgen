@@ -81,7 +81,7 @@
   "scripts": {
     "build": "tsdown",
     "typecheck": "tsc --build tsconfig.app.json",
-    "pretest": "tsdown",
+    "pretest": "node --run build",
     "test": "vitest run",
     "test:all": "vitest run",
     "readme": "oclif readme",
