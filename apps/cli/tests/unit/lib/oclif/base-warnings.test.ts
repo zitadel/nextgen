@@ -21,6 +21,20 @@ class WarningCommand extends BaseCommand {
     throw new Error("unused");
   }
 
+  public async fail(error: Error): Promise<void> {
+    await this.toMeta({ "no-telemetry": true }, { resolveServer: false, source: "mock" });
+    try {
+      await this.catch(error);
+    } catch {
+      /* catch() ends by throwing oclif's ExitError */
+    }
+  }
+
+  public override logJson(json: unknown): void {
+    this.json.push(json);
+  }
+  public readonly json: unknown[] = [];
+
   public async finish(result: CommandResult): Promise<JsonEnvelope> {
     await this.toMeta({ "no-telemetry": true }, { resolveServer: false, source: "mock" });
     return this.emit(result);
@@ -65,5 +79,34 @@ describe("BaseCommand warnings", () => {
     await cmd.finish({ status: "ok", data: {}, pretty: "Done" });
 
     expect(cmd.printed).toEqual(["Done"]);
+  });
+
+  it("carries a reported warning into a skipped envelope", async () => {
+    const cmd = makeCommand();
+    reportWarning("reported early");
+
+    const envelope = await cmd.finish({ status: "skipped", reason: "dry-run" });
+
+    expect(envelope).toMatchObject({ status: "skipped", warnings: ["reported early"] });
+  });
+
+  it("leaves a skipped envelope without warnings when none were reported", async () => {
+    const cmd = makeCommand();
+
+    const envelope = await cmd.finish({ status: "skipped", reason: "dry-run" });
+
+    expect(envelope).not.toHaveProperty("warnings");
+  });
+
+  it("carries a reported warning into an error envelope", async () => {
+    const cmd = makeCommand();
+    cmd.jsonEnabled = () => true;
+    reportWarning("reported early");
+
+    await cmd.fail(new Error("boom"));
+
+    expect(cmd.json).toEqual([
+      expect.objectContaining({ status: "error", warnings: ["reported early"] }),
+    ]);
   });
 });

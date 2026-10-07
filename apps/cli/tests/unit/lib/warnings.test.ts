@@ -1,5 +1,5 @@
 import { readdir, readFile } from "node:fs/promises";
-import { join, relative } from "node:path";
+import { join, relative, sep } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
@@ -36,7 +36,8 @@ describe("reportWarning", () => {
     const callers: string[] = [];
     for (const file of await sourceFiles(SRC)) {
       if (/consola\.warn\(/.test(await readFile(file, "utf8"))) {
-        callers.push(relative(SRC, file));
+        // Compared with forward slashes, so the test also passes on Windows.
+        callers.push(relative(SRC, file).split(sep).join("/"));
       }
     }
 
