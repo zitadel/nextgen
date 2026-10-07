@@ -120,7 +120,7 @@ function nodeRunsScript(args) {
   return false;
 }
 
-const SHELLS = new Set(["sh", "bash", "zsh", "dash"]);
+const SHELLS = new Set(["sh", "bash", "zsh", "dash", "ksh", "mksh", "ash", "fish", "csh", "tcsh"]);
 
 /**
  * A command word's program name: its basename (either path separator),

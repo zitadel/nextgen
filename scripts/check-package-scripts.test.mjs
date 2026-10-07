@@ -178,6 +178,9 @@ describe("package-script contract", () => {
     ["cmd /c pnpm run test", "the Windows shell `cmd`"],
     ['powershell -Command "pnpm run test"', "the Windows shell `powershell`"],
     ["pwsh -c 'pnpm run test'", "the Windows shell `pwsh`"],
+    ["fish -c 'pnpm run test'", "an inline `fish -c` script"],
+    ["ksh -c 'npm run build'", "an inline `ksh -c` script"],
+    ["tcsh -c 'pnpm test'", "an inline `tcsh -c` script"],
   ])("rejects unsupported syntax in %s", (body, reason) => {
     expect(unsupportedSyntax(body)).toBe(reason);
   });
