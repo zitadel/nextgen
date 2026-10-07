@@ -169,7 +169,9 @@ Moon owns the task graph; `package.json` scripts are its leaves.
 
 - Every script has a Moon task of the same name, and that task's command is
   exactly `corepack pnpm run <name>`. Add the script and the task together.
-- A script is one step (`tsdown`, `vitest run`, `tsc --build tsconfig.json`).
+- A script is one step (`tsdown`, `vitest run`, `tsc --build tsconfig.json`),
+  written as plain commands: no command substitution, `eval`/`source`, or
+  inline `sh -c` scripts.
   It never starts pnpm or another script (`pnpm run`, `pnpm exec`,
   `pnpm --filter`, `node --run`): a pnpm started from inside a pnpm script
   re-checks every workspace package and prints "Unsupported platform"

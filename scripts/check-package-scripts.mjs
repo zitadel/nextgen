@@ -159,6 +159,26 @@ function substitutions(text) {
   return bodies;
 }
 
+const EVALUATORS = new Set(["eval", "source", "."]);
+
+/**
+ * Shell constructs a single-step script has no use for, and that would let a
+ * nested package manager hide from the checks above: command substitution,
+ * `eval`/`source`, and inline `sh -c` scripts. Returns a description, or null.
+ */
+export function unsupportedSyntax(body) {
+  if (substitutions(body).length > 0) return "command substitution";
+  for (const words of simpleCommands(body)) {
+    const [command = "", ...args] = commandWords(words);
+    const executable = command.split("/").pop();
+    if (EVALUATORS.has(executable)) return `\`${executable}\``;
+    if (SHELLS.has(executable) && args.some((arg) => /^-[A-Za-z]*c[A-Za-z]*$/.test(arg))) {
+      return `an inline \`${executable} -c\` script`;
+    }
+  }
+  return null;
+}
+
 /** Split a shell command line into simple commands, each a list of words. */
 function simpleCommands(text) {
   const commands = [];
@@ -218,7 +238,20 @@ const KEYWORDS = new Set(["if", "then", "else", "elif", "do", "while", "until", 
  * `-u NAME`/`-C DIR` operands, assignments, and an `-S` string) so the
  * command it runs is the one checked.
  */
-function commandWords(words) {
+const REDIRECTION = /^\d*(?:>>?|<<?|>&|<&|&>>?)(.*)$/;
+
+function commandWords(input) {
+  // Redirections (`2>/dev/null`, `> out.log`) can appear anywhere, even before
+  // the executable; drop them and, for a bare operator, its target.
+  const words = [];
+  for (let j = 0; j < input.length; j += 1) {
+    const redirect = REDIRECTION.exec(input[j]);
+    if (redirect) {
+      if (redirect[1] === "") j += 1;
+    } else {
+      words.push(input[j]);
+    }
+  }
   let i = 0;
   while (i < words.length && (KEYWORDS.has(words[i]) || ASSIGNMENT.test(words[i]))) i += 1;
   if (words[i]?.split("/").pop() !== "env") return words.slice(i);
@@ -261,6 +294,10 @@ function exempt(set, dir, name) {
 export function checkProject(dir, scripts, tasks) {
   const problems = [];
   for (const [name, body] of Object.entries(scripts)) {
+    const unsupported = unsupportedSyntax(body);
+    if (unsupported) {
+      problems.push(`${dir}: script "${name}" uses ${unsupported}; keep scripts to plain commands`);
+    }
     if (startsPackageManager(body)) {
       problems.push(`${dir}: script "${name}" starts a package manager: ${body}`);
     }

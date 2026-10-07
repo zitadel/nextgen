@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { checkProject, checkWorkspace, projectIds, startsPackageManager } from "./check-package-scripts.mjs";
+import {
+  checkProject,
+  checkWorkspace,
+  projectIds,
+  startsPackageManager,
+  unsupportedSyntax,
+} from "./check-package-scripts.mjs";
 
 describe("package-script contract", () => {
   it("holds for every workspace package", () => {
@@ -92,6 +98,9 @@ describe("package-script contract", () => {
     "node --require ./setup.cjs --run build",
     "/usr/bin/env pnpm run test",
     "/usr/bin/env CI=1 npm run build",
+    "2>/dev/null pnpm run test",
+    "> out.log pnpm run test",
+    "vitest run 2> err.log && pnpm test",
   ])("detects a package manager in %s", (body) => {
     expect(startsPackageManager(body)).toBe(true);
   });
@@ -134,5 +143,33 @@ describe("package-script contract", () => {
     expect(ids).toContain("apps/cli");
     expect(ids).not.toContain("apps/server");
     expect(ids.filter((id) => id.includes("\\"))).toEqual([]);
+  });
+
+  it.each([
+    [`echo "$(printf '%s' ')'; pnpm test)"`, "command substitution"],
+    ["echo `date`", "command substitution"],
+    ["eval 'pnpm run test'", "`eval`"],
+    ["source ./env.sh && vitest run", "`source`"],
+    [". ./env.sh && vitest run", "`.`"],
+    ["sh -c 'vitest run'", "an inline `sh -c` script"],
+    ["bash -lc 'pnpm test'", "an inline `bash -c` script"],
+  ])("rejects unsupported syntax in %s", (body, reason) => {
+    expect(unsupportedSyntax(body)).toBe(reason);
+  });
+
+  it.each([
+    "vitest run",
+    "echo '$(not run)' && vitest run",
+    "tsx --conditions=@zitadel/source scripts/dev-real.mts",
+    "vitest run > out.log 2>&1",
+    "bash scripts/run.sh",
+  ])("allows plain commands like %s", (body) => {
+    expect(unsupportedSyntax(body)).toBeNull();
+  });
+
+  it("reports unsupported syntax as a contract violation", () => {
+    expect(
+      checkProject("apps/x", { test: "eval 'vitest run'" }, { test: { command: "corepack pnpm run test" } }),
+    ).toEqual(['apps/x: script "test" uses `eval`; keep scripts to plain commands']);
   });
 });
