@@ -52,6 +52,7 @@
     },
     "overrides": {
       "@types/react": "^19.2.14",
+      "@types/node": "catalog:",
       "launch-editor": "2.14.1",
       "qs": "6.15.3",
       "@hono/node-server@>=1.0.0 <2.0.12": "^2.0.12",
