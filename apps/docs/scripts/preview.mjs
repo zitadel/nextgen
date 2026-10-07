@@ -5,7 +5,9 @@ import { join } from "node:path";
 // builds first with the caller's environment. A local preview needs the local
 // adapter for both steps, so refuse rather than serve a mismatched build.
 if (process.env.VERCEL) {
-  console.error("docs preview: unset VERCEL to preview the local build (it selects the Vercel adapter)");
+  console.error(
+    "docs preview: unset VERCEL to preview the local build (it selects the Vercel adapter)",
+  );
   process.exit(1);
 }
 const env = process.env;

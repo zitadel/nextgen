@@ -104,7 +104,17 @@ export function startsPackageManager(body) {
 }
 
 /** Node options that take the following argument as their value. */
-const NODE_VALUE_OPTIONS = new Set(["-r", "--require", "--import", "--loader", "--experimental-loader", "-C", "--conditions", "--env-file", "--title"]);
+const NODE_VALUE_OPTIONS = new Set([
+  "-r",
+  "--require",
+  "--import",
+  "--loader",
+  "--experimental-loader",
+  "-C",
+  "--conditions",
+  "--env-file",
+  "--title",
+]);
 
 /**
  * Whether node's own options include `--run` (`--run build`, `--run=build`),
@@ -114,7 +124,8 @@ function nodeRunsScript(args) {
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i];
     if (arg === "--run" || arg.startsWith("--run=")) return true;
-    if (!arg.startsWith("-") || arg === "--" || arg === "-e" || arg === "--eval" || arg === "-p") return false;
+    if (!arg.startsWith("-") || arg === "--" || arg === "-e" || arg === "--eval" || arg === "-p")
+      return false;
     if (NODE_VALUE_OPTIONS.has(arg)) i += 1;
   }
   return false;
@@ -178,8 +189,23 @@ const WINDOWS_SHELLS = new Set(["cmd", "powershell", "pwsh"]);
 
 /** Commands that run another command; a script runs its tool directly. */
 const COMMAND_RUNNERS = new Set([
-  "timeout", "xargs", "nice", "ionice", "stdbuf", "sudo", "doas", "setsid", "flock",
-  "taskset", "chronic", "unbuffer", "parallel", "watch", "caffeinate", "script", "busybox",
+  "timeout",
+  "xargs",
+  "nice",
+  "ionice",
+  "stdbuf",
+  "sudo",
+  "doas",
+  "setsid",
+  "flock",
+  "taskset",
+  "chronic",
+  "unbuffer",
+  "parallel",
+  "watch",
+  "caffeinate",
+  "script",
+  "busybox",
 ]);
 
 /**
@@ -242,7 +268,12 @@ function simpleCommands(text) {
     } else if (char === "\\" && i + 1 < text.length) {
       if (text[i + 1] !== "\n") word = (word ?? "") + text[i + 1];
       i += 1;
-    } else if ((char === "<" || char === ">") && word !== null && !/^\d+$/.test(word) && !/[<>&]$/.test(word)) {
+    } else if (
+      (char === "<" || char === ">") &&
+      word !== null &&
+      !/^\d+$/.test(word) &&
+      !/[<>&]$/.test(word)
+    ) {
       // A redirection attached to a word (`pnpm>out.log`) starts a new token;
       // a bare descriptor number (`2>`) stays with it.
       endWord();
@@ -265,7 +296,20 @@ function simpleCommands(text) {
 }
 
 const ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/;
-const KEYWORDS = new Set(["if", "then", "else", "elif", "do", "while", "until", "!", "time", "exec", "command", "nohup"]);
+const KEYWORDS = new Set([
+  "if",
+  "then",
+  "else",
+  "elif",
+  "do",
+  "while",
+  "until",
+  "!",
+  "time",
+  "exec",
+  "command",
+  "nohup",
+]);
 
 /**
  * The words of a simple command from its executable on: shell keywords and
@@ -309,7 +353,10 @@ function commandWords(input) {
       break;
     }
     if (word === "-S" || word === "--split-string") {
-      return commandWords([...(simpleCommands(words[i + 1] ?? "")[0] ?? []), ...words.slice(i + 2)]);
+      return commandWords([
+        ...(simpleCommands(words[i + 1] ?? "")[0] ?? []),
+        ...words.slice(i + 2),
+      ]);
     }
     if (word.startsWith("--split-string=")) {
       return commandWords([...(simpleCommands(word.slice(15))[0] ?? []), ...words.slice(i + 1)]);
@@ -352,7 +399,9 @@ export function checkProject(dir, scripts, tasks) {
     }
     if (exempt(EXEMPT_SCRIPTS, dir, name)) continue;
     if (name.includes(":")) {
-      problems.push(`${dir}: script "${name}" must be kebab-case (moon task ids cannot contain ":")`);
+      problems.push(
+        `${dir}: script "${name}" must be kebab-case (moon task ids cannot contain ":")`,
+      );
     }
     if (!Object.hasOwn(tasks, name)) {
       problems.push(`${dir}: script "${name}" has no moon task of the same name`);
@@ -379,7 +428,11 @@ export function projectIds(root = ".") {
   for (const group of ["apps", "packages"]) {
     for (const entry of readdirSync(join(root, group), { withFileTypes: true })) {
       const id = `${group}/${entry.name}`;
-      if (entry.isDirectory() && existsSync(join(root, group, entry.name, "package.json")) && !EXEMPT_PROJECTS.has(id)) {
+      if (
+        entry.isDirectory() &&
+        existsSync(join(root, group, entry.name, "package.json")) &&
+        !EXEMPT_PROJECTS.has(id)
+      ) {
         ids.push(id);
       }
     }

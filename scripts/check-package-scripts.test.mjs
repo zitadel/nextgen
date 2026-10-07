@@ -15,7 +15,11 @@ describe("package-script contract", () => {
 
   it("accepts a script run by its same-named moon task", () => {
     expect(
-      checkProject("apps/x", { test: "vitest run" }, { test: { command: "corepack pnpm run test" } }),
+      checkProject(
+        "apps/x",
+        { test: "vitest run" },
+        { test: { command: "corepack pnpm run test" } },
+      ),
     ).toEqual([]);
   });
 
@@ -38,12 +42,18 @@ describe("package-script contract", () => {
         prebuild: { command: "corepack pnpm run prebuild" },
       },
     );
-    expect(problems).toContain('apps/x: script "prebuild" is a pre/post hook; order work with moon deps');
+    expect(problems).toContain(
+      'apps/x: script "prebuild" is a pre/post hook; order work with moon deps',
+    );
   });
 
   it("rejects a script without a task, and a task inlining its command", () => {
     expect(
-      checkProject("apps/x", { lint: "oxlint ." }, { build: { command: "corepack pnpm exec tsdown" } }),
+      checkProject(
+        "apps/x",
+        { lint: "oxlint ." },
+        { build: { command: "corepack pnpm exec tsdown" } },
+      ),
     ).toEqual([
       'apps/x: script "lint" has no moon task of the same name',
       'apps/x: task "build" must run `corepack pnpm run build`, not: corepack pnpm exec tsdown',
@@ -58,7 +68,11 @@ describe("package-script contract", () => {
 
   it("does not treat preview as a hook without a view script", () => {
     expect(
-      checkProject("apps/x", { preview: "vite preview" }, { preview: { command: "corepack pnpm run preview" } }),
+      checkProject(
+        "apps/x",
+        { preview: "vite preview" },
+        { preview: { command: "corepack pnpm run preview" } },
+      ),
     ).toEqual([]);
   });
 
@@ -88,7 +102,7 @@ describe("package-script contract", () => {
     "/usr/local/bin/pnpm run test",
     "{ pnpm run test; }",
     `echo "version='$(pnpm test)'"`,
-    "echo \"$(echo $(pnpm test))\"",
+    'echo "$(echo $(pnpm test))"',
     "sh -c 'pnpm run test'",
     'bash -c "npm run build"',
     "sh -lc 'pnpm run test'",
@@ -129,14 +143,14 @@ describe("package-script contract", () => {
     "vitest run",
     "tsc --noEmit && tsc --noEmit -p tsconfig.spec.json",
     "node scripts/doctor.mjs",
-    'node -e "console.log(\'use pnpm\')"',
+    "node -e \"console.log('use pnpm')\"",
     "echo 'run npm install yourself'",
     "NEXTGEN_NUXT_BUILD_DIR=.nuxt nuxt prepare && vue-tsc --noEmit",
     "env CI=1 vitest run",
     "env -u CI node scripts/run-local.mjs",
     "echo '$(pnpm run test)'",
     'echo "\\$(pnpm run test)"',
-    "echo \"$(node scripts/version.mjs)\"",
+    'echo "$(node scripts/version.mjs)"',
     'echo "pnpm run test"',
     "if true; then vitest run; fi",
     "env -S 'vitest run'",
@@ -219,7 +233,11 @@ describe("package-script contract", () => {
 
   it("reports unsupported syntax as a contract violation", () => {
     expect(
-      checkProject("apps/x", { test: "eval 'vitest run'" }, { test: { command: "corepack pnpm run test" } }),
+      checkProject(
+        "apps/x",
+        { test: "eval 'vitest run'" },
+        { test: { command: "corepack pnpm run test" } },
+      ),
     ).toEqual(['apps/x: script "test" uses `eval`; keep scripts to plain commands']);
   });
 
@@ -227,9 +245,9 @@ describe("package-script contract", () => {
     expect(checkProject("apps/x", { constructor: "vitest run" }, {})).toEqual([
       'apps/x: script "constructor" has no moon task of the same name',
     ]);
-    expect(checkProject("apps/x", {}, { constructor: { command: "corepack pnpm run constructor" } })).toEqual([
-      'apps/x: task "constructor" runs a script "constructor" that does not exist',
-    ]);
+    expect(
+      checkProject("apps/x", {}, { constructor: { command: "corepack pnpm run constructor" } }),
+    ).toEqual(['apps/x: task "constructor" runs a script "constructor" that does not exist']);
     expect(
       checkProject(
         "apps/x",
