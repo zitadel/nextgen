@@ -109,12 +109,14 @@ export async function startLocalRegistry(input) {
   await mkdir(dirname(input.paths.registryLogPath), { recursive: true });
   const logFile = await open(input.paths.registryLogPath, "a", 0o600);
   try {
+    // verdaccio's CLI under node rather than `pnpm exec` (under
+    // `pnpm run e2e-local` a nested pnpm warns about the platform-specific
+    // server packages) or its `.bin` shim (a `.cmd` on Windows, which spawn
+    // cannot start without a shell).
     const child = spawn(
-      "corepack",
+      process.execPath,
       [
-        "pnpm",
-        "exec",
-        "verdaccio",
+        join(input.repoRoot, "node_modules", "verdaccio", "bin", "verdaccio"),
         "--config",
         input.paths.verdaccioConfigPath,
         "--listen",
