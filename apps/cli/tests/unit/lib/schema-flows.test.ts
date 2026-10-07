@@ -108,6 +108,25 @@ describe("flowsForSchema", () => {
     expect(names(flows)).toEqual(["login"]);
   });
 
+  it.each([
+    ["no resources", "{}"],
+    ["resources as a list", JSON.stringify({ resources: [] })],
+    [
+      "an entry that is not an object",
+      JSON.stringify({ resources: { ".zitadel/schemas/customers.json": "sch_1" } }),
+    ],
+    [
+      "an id that is not a string",
+      JSON.stringify({ resources: { ".zitadel/schemas/customers.json": { id: 7 } } }),
+    ],
+  ])("refuses a state file with %s rather than treat it as never synced", async (_, state) => {
+    const cwd = await projectWithFlows({ login: "sch_PUBLISHED" }, state);
+
+    await expect(flowsForSchema(cwd, schemaFile("customers"))).rejects.toMatchObject({
+      code: "E_VALIDATION",
+    });
+  });
+
   it("refuses a state file it cannot read rather than guess", async () => {
     const cwd = await projectWithFlows({ login: "https://a.test/customers.json" }, "{not json");
 

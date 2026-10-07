@@ -363,6 +363,19 @@ describe("auth-factor", () => {
           expect.any(String),
           "--force",
         ],
+        suggested_args: [
+          expect.arrayContaining(["disable", "--force"]),
+          [
+            "auth-factor",
+            "enable",
+            "--mode",
+            "password",
+            "--schema",
+            "my users&calc",
+            "--cwd",
+            expect.any(String),
+          ],
+        ],
       });
     });
 

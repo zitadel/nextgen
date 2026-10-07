@@ -1,4 +1,5 @@
 import { isErrno, ZitadelError } from "./errors";
+import { isObject } from "./json";
 import { readFlowFiles, type FlowFile, type SchemaFile } from "./idp";
 import { readState } from "./sync/state";
 
@@ -65,11 +66,24 @@ function flowUsesSchema(
  */
 async function publishedIdsOf(cwd: string, path: string): Promise<string[]> {
   try {
-    const state = await readState(cwd);
-    const entry = state.resources?.[path];
-    return [entry?.id, entry?.previousId].filter(
-      (id): id is string => typeof id === "string" && id !== "",
-    );
+    // readState only parses JSON, so the shape is checked here: a valid but
+    // corrupt file must not read as "never synced" and skip a pinned flow.
+    const state: unknown = await readState(cwd);
+    if (!isObject(state) || !isObject(state.resources)) {
+      throw new Error("resources is not an object");
+    }
+    const entry = state.resources[path];
+    if (entry === undefined) {
+      return [];
+    }
+    if (!isObject(entry)) {
+      throw new Error(`resources["${path}"] is not an object`);
+    }
+    const ids = [entry.id, entry.previousId].filter((id) => id !== undefined);
+    if (!ids.every((id) => typeof id === "string")) {
+      throw new Error(`resources["${path}"] has an id that is not a string`);
+    }
+    return (ids as string[]).filter((id) => id !== "");
   } catch (error) {
     if (isErrno(error, "ENOENT")) {
       return [];

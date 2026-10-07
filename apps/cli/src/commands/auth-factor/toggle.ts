@@ -256,21 +256,19 @@ function refuseLastFactor(
   // The schema name comes from a file name and the --cwd path from the user.
   // One that would need quoting leaves the strings out: quoting differs
   // between POSIX shells, PowerShell and cmd.exe, so none is safe on all.
-  const nextCommands = portableCommands(
-    [
-      retryArgs,
-      ...alternatives.map((factor) => [
-        "auth-factor",
-        "enable",
-        "--mode",
-        factor,
-        "--schema",
-        schema.name,
-        ...cwdArgs,
-      ]),
-    ],
-    cliVersion,
-  );
+  const suggestedArgs = [
+    retryArgs,
+    ...alternatives.map((factor) => [
+      "auth-factor",
+      "enable",
+      "--mode",
+      factor,
+      "--schema",
+      schema.name,
+      ...cwdArgs,
+    ]),
+  ];
+  const nextCommands = portableCommands(suggestedArgs, cliVersion);
   throw new ZitadelError("E_VALIDATION", `${schema.path} would have no way to sign in left`, {
     hint:
       "Enable another factor or an identity provider (`sso enable --provider <name>`) first. " +
@@ -280,6 +278,10 @@ function refuseLastFactor(
       file: schema.path,
       usable: usableSignInMethods(schema.body),
       retry_args: retryArgs,
+      // Every suggestion as an argument list, the re-run first: when
+      // next_commands is empty because a value needs quoting, this keeps
+      // the safer alternatives too.
+      suggested_args: suggestedArgs,
     },
     nextCommands,
   });

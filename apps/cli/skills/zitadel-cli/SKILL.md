@@ -259,7 +259,8 @@ user first. A factor that is enabled but not offered by any active flow is
 reported in `warnings` and `data.not_offered`. Follow `data.next_commands`
 (`plan`, `apply`) to publish the change. When a path or schema name would need
 shell quoting, `next_commands` is empty and `data.next_args` (or
-`details.retry_args` on a refusal) holds the same commands as argument lists.
+`details.suggested_args` on a refusal, re-run first) holds the same commands
+as argument lists.
 A schema that points at an external url is refused: edit that schema instead.
 
 Repo config is authoritative: edit `zitadel.json` or files under `.zitadel/`,
