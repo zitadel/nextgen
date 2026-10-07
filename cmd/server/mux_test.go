@@ -7,8 +7,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/zitadel/nextgen/internal/api"
 
+	"github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/staticui/console"
 	"github.com/zitadel/nextgen/internal/staticui/login"
 	"github.com/zitadel/nextgen/internal/storage/dialect/idgen"
@@ -44,9 +44,16 @@ func requireEmbeddedUI(t *testing.T) {
 	require.NoError(t, login.ValidateDist(), "run `moon run login-ui:build`")
 }
 
+func idpCallbackEcho() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("X-Test-Handler", "idp-callback")
+		w.WriteHeader(http.StatusTeapot)
+	})
+}
+
 func newTestMux(t *testing.T, cfg ServerConfig) *http.ServeMux {
 	t.Helper()
-	mux, err := buildHTTPMux(cfg, idgen.NewULID(), apiEcho(),
+	mux, err := buildHTTPMux(cfg, idgen.NewULID(), apiEcho(), idpCallbackEcho(),
 		staticResolver(consoleRuntime{Mode: ConsoleModeStandalone, ConsoleProjectID: "proj_first"}, nil),
 		nil)
 	require.NoError(t, err)
@@ -104,6 +111,21 @@ func TestBuildHTTPMuxDoesNotMountTheAPIUnderAPIPrefix(t *testing.T) {
 	}
 }
 
+// The IdP callback is an exact mount ahead of the API catch-all: the provider
+// redirects the browser to it, so it must exist whatever UI surfaces are on.
+// Both spellings are served — the prefixed path when the instance is the
+// browser origin, the stripped one as a scaffolded app's SDK proxy forwards it.
+func TestBuildHTTPMuxMountsTheIDPCallback(t *testing.T) {
+	mux := newTestMux(t, uiConfig(false, false))
+
+	for _, path := range []string{api.IDPCallbackPath, api.IDPCallbackUpstreamPath} {
+		rec := get(t, mux, path+"?state=s&code=c")
+		assert.Equal(t, "idp-callback", rec.Header().Get("X-Test-Handler"), path)
+		// A longer path is not the callback and stays with the API namespace.
+		assert.Equal(t, "api", get(t, mux, path+"/x").Header().Get("X-Test-Handler"), path)
+	}
+}
+
 // The runtime document is not console-only: the hosted login shell resolves
 // the project it signs into from the same two fields, so a console-disabled
 // deployment must still serve it.
@@ -142,6 +164,7 @@ func TestBuildHTTPMuxRecordsCSRFRequestState(t *testing.T) {
 			recorded = api.CSRFRequestRecorded(r.Context())
 			w.WriteHeader(http.StatusTeapot)
 		}),
+		idpCallbackEcho(),
 		staticResolver(consoleRuntime{Mode: ConsoleModeStandalone, ConsoleProjectID: "proj_first"}, nil),
 		nil)
 	require.NoError(t, err)
