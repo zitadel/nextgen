@@ -92,6 +92,10 @@ Repo tooling:
 
 - `tools/release/` — the Moon `release` project (snapshot, artifacts, draft
   GitHub Release shell).
+- `tools/bench/` — the k6 benchmark harness, a nested Go module (ADR 067):
+  `moon run bench:sweep` measures a server that is already running (locally
+  `moon run workspace:server`). AGPL-only and excluded from commercial
+  licensing because it links k6.
 - `scripts/` — the Node `.mjs` orchestration behind the `workspace:*` tasks
   (doctor, check, journey, server, cli, release helpers).
 - `docs/` — design notes, runbooks, and ADRs that explain product intent.

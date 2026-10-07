@@ -44,6 +44,15 @@ tasks:
       - "install-browsers"
       - "api:build"
       - "config:build"
+    options:
+      # Shared mutex with the other browser-mode suites so only one real-Chromium
+      # Vite server runs at a time; concurrent servers starve under moon's CI
+      # graph and drop module fetches. (#1490)
+      mutex: "browser-tests"
+      # Retry a failed browser suite in CI. The flake is a cold-start race:
+      # the first attempt warms the Vite dep cache, so a retry runs warm and
+      # clears the "Failed to fetch dynamically imported module" failure. (#1490)
+      retryCount: 3
 
   start:
     command: "corepack pnpm run start"

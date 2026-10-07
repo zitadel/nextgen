@@ -42,6 +42,8 @@ By default this starts the matching `@zitadel/server` npm binary for the alpha t
 npx @zitadel/cli@alpha setup --server local
 ```
 
+Run setup in the directory `start` ran in, or one inside it: setup looks there for the local admin, and without it the project is not attached to a team and the console does not list it.
+
 In a fresh directory, setup asks which framework to scaffold. Scripted runs should pass `--framework next`, `--framework nuxt`, `--framework react`, `--framework vue`, or `--framework angular`.
 
 Setup also asks how users should sign in and scaffolds the matching schema and login flow: `--preset password-first` (the default: email + password, passkey optional during registration) or `--preset passkey-first` (a one-tap passkey up front, with an email + password fallback). The preset only picks the starting point — everything under `.zitadel/` stays editable.
@@ -66,7 +68,7 @@ register a user -> log out -> log in with the same user -> profile shows signed 
 
 Do not treat a rendered login form as completion. The useful proof is a full register, logout, and login loop in a real browser.
 
-The user you just registered is an end user of your app. The management console is a separate sign-in, as the local admin:
+The user you just registered is an end user of your app. The management console is a separate sign-in, as the local admin. The dev server keeps its terminal busy, so open a second terminal in the same directory:
 
 ```sh
 npx @zitadel/cli@alpha console
