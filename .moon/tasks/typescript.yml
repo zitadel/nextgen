@@ -1,4 +1,3 @@
-# Spike #1490: touched so every TypeScript project is affected (full CI graph).
 # Inherited task config for every `language: "typescript"` project. The
 # filename is a label; the scoping is the inheritedBy condition below.
 inheritedBy:

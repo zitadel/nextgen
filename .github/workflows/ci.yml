@@ -101,9 +101,10 @@ jobs:
         env:
           # Spike #1490: surface Vite's dep-optimizer decisions in the log.
           DEBUG: vite:deps
-          # Spike #1490: run every affected task fresh (no remote-cache hits), so
-          # each run and re-run executes the whole graph under full load.
-          MOON_CACHE: "off"
+          # Spike #1490: force every task in every project to run fresh (no cache,
+          # no affected filtering), so each run and re-run carries the full load a
+          # whole-repo PR does.
+          MOON_FORCE: "true"
         run: moon ci :lint :typecheck :build :test :check-adrs
 
       - name: Report Moon CI failures
