@@ -54,6 +54,7 @@ func (s statements) Statements() service.AllStatements {
 func (s statements) IsStatements() {}
 
 func newStatements(client queryExecutor) statements {
+	client = traced(client)
 	return statements{
 		projectStatements:             newProjectStatements(client),
 		flowDefinitionStatements:      newFlowDefinitionStatements(client),
