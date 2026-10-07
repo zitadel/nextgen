@@ -248,7 +248,9 @@ function simpleCommands(text) {
       endWord();
       word = char;
     } else if (char === "&" && (/[<>]/.test(text[i - 1] ?? "") || text[i + 1] === ">")) {
-      // Part of a redirection (`2>&1`, `<&3`, `&> log`), not a separator.
+      // Part of a redirection (`2>&1`, `<&3`, `&> log`), not a separator. An
+      // `&>` attached to a word (`pnpm&>out.log`) starts a new token.
+      if (text[i + 1] === ">" && word !== null && !/[<>&]$/.test(word)) endWord();
       word = (word ?? "") + char;
     } else if ("\n;&|(){}".includes(char)) {
       endCommand();

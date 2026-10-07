@@ -116,6 +116,8 @@ describe("package-script contract", () => {
     '"C:\\tools\\PNPM.EXE" install',
     "pnpm>out.log test",
     "vitest run && pnpm>>out.log install",
+    "pnpm&>out.log run test",
+    "pnpm&>>out.log run test",
   ])("detects a package manager in %s", (body) => {
     expect(startsPackageManager(body)).toBe(true);
   });
@@ -202,6 +204,8 @@ describe("package-script contract", () => {
     "command -p tsc --noEmit",
     "node.exe scripts/doctor.mjs",
     "vitest run>out.log",
+    "vitest run&>out.log",
+    "tsc --noEmit &>> tsc.log",
     "echo 'a>b' && vitest run",
     "vitest run --testNamePattern 'npm run build'",
     "playwright test --grep 'pnpm install'",
