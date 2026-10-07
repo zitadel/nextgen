@@ -1,4 +1,4 @@
-# ADR 070: CLI Commands to Enable and Disable Password and Passkey Sign-In
+# ADR 068: CLI Commands to Enable and Disable Password and Passkey Sign-In
 
 > **Status:** Proposed
 > **Date:** 2026-10-07
@@ -53,9 +53,11 @@ login`. A developer who reads `zitadel auth enable` could take it to mean
 The command sets `x-auth-methods.<mode>.enabled` in the selected schema and
 writes the file back. The other methods keep their values. The file is
 rewritten with sorted keys, as `sso enable` does. Nothing is sent to the
-server: the change goes out through `plan` and `apply` like any other
-configuration edit (ADR 035), and the result lists those two commands as
-`next_commands`.
+server. The change is published by whatever ships configuration edits, like
+any other edit, and the result lists those commands as `next_commands`. Today
+those commands are `plan` and `apply` (ADR 007). [ADR 035
+§CLI](035-configuration-environments.md) replaces them with `deploy`. When that
+lands, `next_commands` changes with it, and this command does not change.
 
 Running it twice is safe. A mode already in the requested state is reported as
 unchanged, and the file is not rewritten.
@@ -100,6 +102,7 @@ factor first and editing the flow second is a normal order of work.
 
 - Password and passkey can be switched without editing JSON, and a change
   that would break `plan` or `apply` is caught before the file is written.
+  The same refusals apply to `deploy` once ADR 035 replaces those commands.
 - Disabling a factor that a flow uses is still two steps: edit the flow, then
   run the command. A later decision can let the command rewrite the shipped
   default flow, but not hand-edited ones.
