@@ -95,11 +95,14 @@ describe("fetchSession", () => {
     expect(getApiCsrfToken()).toBeUndefined();
   });
 
-  it("reports no session on a 401", async () => {
+  // A signed-out check (/login, the claim page, the 401 boundary) never asks
+  // for a token it is certain not to get.
+  it("reports no session on a 401, without asking for a token", async () => {
     stubSession(null);
-    stubCsrf(failing);
+    const calls = stubCsrf(failing);
 
     expect(await fetchSession()).toBeNull();
+    expect(calls()).toBe(0);
   });
 
   // The token is stable for the life of a cookie: re-validating the session
@@ -174,11 +177,11 @@ describe("fetchSession", () => {
     it("starts over when someone else signs in", async () => {
       await signInThenLose();
       stubSession("user_b");
-      stubCsrf(token("tok_b"));
+      const calls = stubCsrf(token("tok_b"));
 
       void fetchSession();
       await vi.waitFor(() => expect(sessionPage.reload).toHaveBeenCalledOnce());
-      // Read alongside the session, but never stored.
+      expect(calls()).toBe(0);
       expect(getApiCsrfToken()).toBeUndefined();
     });
   });
