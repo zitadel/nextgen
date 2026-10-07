@@ -1,8 +1,9 @@
-import { getApiAuthToken, getApiCsrfRejectionHandler, getApiCsrfToken } from "./auth";
+import { apiCsrfRejectionHandlerFor, apiCsrfTokenFor, getApiAuthToken } from "./auth";
 
 /** The header the session-bound CSRF token travels in (ADR 053 §5). */
 export const CSRF_HEADER = "X-Zitadel-CSRF";
 
+// Mirrors the server's list (`httputil.IsSafeMethod` in `internal/httputil`).
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
 /** The code the server answers a refused CSRF check with. */
@@ -87,10 +88,11 @@ export function setRequestPolicy(policy: RequestPolicy): void {
  *
  * - bearer auth — read from `runtime/auth.ts` and attached automatically;
  * - the CSRF header — the session-bound token from `runtime/auth.ts`, on
- *   unsafe methods only, when a first-party surface has set one; an unsafe
- *   request refused with `403 auth.csrf_invalid` asks the registered rejection
- *   handler for a fresh token and is retried once with it, only if the handler
- *   returns one (the session still belongs to the same person);
+ *   unsafe methods to the origin it was issued for, when a first-party surface
+ *   has set one; an unsafe request to that origin refused with
+ *   `403 auth.csrf_invalid` asks the registered rejection handler for a fresh
+ *   token and is retried once with it, only if the handler returns one (the
+ *   session still belongs to the same person);
  * - non-2xx → throw — orval's stock client parses the body regardless
  *   of status, so callers would have to inspect every response. Throw
  *   `ApiError` on `!res.ok` so failures interrupt control flow;
@@ -111,7 +113,10 @@ export async function customFetch<T>(url: string, options: RequestInit): Promise
   }
   const method = (options.method ?? "GET").toUpperCase();
   const unsafe = !SAFE_METHODS.has(method) && !headers.has(CSRF_HEADER);
-  const csrfToken = getApiCsrfToken();
+  // The token and the rejection handler belong to one server: a request to
+  // any other origin gets neither.
+  const target = originOf(url);
+  const csrfToken = apiCsrfTokenFor(target);
   if (unsafe && csrfToken) {
     headers.set(CSRF_HEADER, csrfToken);
   }
@@ -122,7 +127,7 @@ export async function customFetch<T>(url: string, options: RequestInit): Promise
   // loaded. The app re-checks the session and hands back a fresh token only if
   // it still belongs to the same person; then the request is retried once. A
   // body that can be read only once cannot be sent again, so it is not retried.
-  const onRejected = getApiCsrfRejectionHandler();
+  const onRejected = apiCsrfRejectionHandlerFor(target);
   if (
     unsafe &&
     onRejected &&
@@ -150,6 +155,15 @@ async function readBody(res: Response): Promise<unknown> {
   if ([204, 205, 304].includes(res.status)) return undefined;
   const rawBody = await res.text();
   return rawBody ? (safeJsonParse(rawBody) as unknown) : undefined;
+}
+
+/** The request's origin, resolved against the page for a relative URL. */
+function originOf(url: string): string | undefined {
+  try {
+    return new URL(url, (globalThis as { location?: { href?: string } }).location?.href).origin;
+  } catch {
+    return undefined;
+  }
 }
 
 function isStream(body: RequestInit["body"]): boolean {
