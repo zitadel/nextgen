@@ -71,7 +71,7 @@ overwrite choices the developer made in the flow file.
 
 Every refusal happens before anything is written, including under `--dry-run`.
 
-- **A flow would break.** Before disabling, the command validates each login
+- **A flow would break.** Before any change, the command validates each login
   flow that runs against the schema, using the schema as it would be after the
   change. It uses the validator `plan` uses. If the change adds an error, such
   as a step that still collects `x-auth-methods#password` or still offers a
@@ -83,7 +83,8 @@ Every refusal happens before anything is written, including under `--dry-run`.
 - **A flow cannot be checked.** The validator skips the sign-in method rules
   for a flow with a structural error, such as a purpose that points at a
   missing step. The command cannot tell whether such a flow still uses the
-  method, so it refuses until the flow is fixed.
+  method, and `plan` would reject it once the changed schema re-pins it, so
+  enabling and disabling both refuse until the flow is fixed.
 - **No factor would be left.** Disabling the schema's last enabled way to
   sign in is guarded. Only password, passkey and SSO with at least one
   provider count. `otp` and `magic_link` are allowed by the meta-schema but
