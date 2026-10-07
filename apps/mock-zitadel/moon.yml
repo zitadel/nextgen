@@ -16,11 +16,6 @@ tasks:
     outputs:
       - "dist/**"
 
-  lint:
-    command: "corepack pnpm run lint"
-    deps:
-      - "api-mock:build"
-
   # The `typecheck` script generates @zitadel/api first (its source is
   # gitignored and produced by orval), so it is self-contained — it passes
   # whether run via Moon or standalone (e.g. the Vercel "TypeCheck"

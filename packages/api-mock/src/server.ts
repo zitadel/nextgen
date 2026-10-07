@@ -31,7 +31,7 @@
  *   GET    /flow_definitions/:id      — get flow definition
  */
 import { createHmac, randomBytes, randomUUID } from "node:crypto";
-import { type Server } from "node:http";
+import type { Server } from "node:http";
 
 import { createMiddleware } from "@mswjs/http-middleware";
 import { CompleteClaimBody } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";

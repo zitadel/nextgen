@@ -245,7 +245,14 @@ describe("status command", () => {
     await chmod(join(binDir, "docker"), 0o755);
 
     const res = await runCliForTest(
-      ["status", "--cwd", relative(process.cwd(), cwd), "--json", "--server", "https://api.zitadel.cloud"],
+      [
+        "status",
+        "--cwd",
+        relative(process.cwd(), cwd),
+        "--json",
+        "--server",
+        "https://api.zitadel.cloud",
+      ],
       { PATH: `${binDir}:${process.env.PATH ?? ""}` },
     );
 

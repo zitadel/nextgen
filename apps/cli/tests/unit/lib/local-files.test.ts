@@ -75,9 +75,7 @@ describe("resolveFileReference", () => {
     const cwd = await makeProject();
     const outside = await makeOutside();
     await symlink(join(outside, "missing.txt"), join(cwd, baseDir, "dangling.liquid"));
-    expect(() => resolveFileReference({ cwd, baseDir }, "./dangling.liquid")).toThrow(
-      ZitadelError,
-    );
+    expect(() => resolveFileReference({ cwd, baseDir }, "./dangling.liquid")).toThrow(ZitadelError);
   });
 
   it("allows a symlink that stays inside the project", async () => {
@@ -154,7 +152,7 @@ describe("inlineFileReferences", () => {
       keep: undefined;
       list: Array<string | undefined>;
     };
-    expect(Object.prototype.hasOwnProperty.call(inlined, "keep")).toBe(true);
+    expect(Object.hasOwn(inlined, "keep")).toBe(true);
     expect(inlined.keep).toBeUndefined();
     expect(inlined.list).toEqual([undefined, "<p>template</p>"]);
   });

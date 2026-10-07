@@ -4,10 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import type { ZitadelClient } from "@zitadel/api/client";
-import {
-  DEFAULT_FLOW_CONFIG_PATH,
-  DEFAULT_SCHEMA_CONFIG_PATH,
-} from "@zitadel/config/defaults";
+import { DEFAULT_FLOW_CONFIG_PATH, DEFAULT_SCHEMA_CONFIG_PATH } from "@zitadel/config/defaults";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { normalizeFlowBody, normalizeSchemaBody } from "@zitadel/config/normalize";
@@ -68,13 +65,13 @@ describe("materializeSetupResources", () => {
   it("reuses the server-returned schema id as user_schema on the flow", async () => {
     const client = {
       createSchema: vi.fn().mockResolvedValue({ id: "sch_01KWHF" }),
-      createFlowDefinition: vi.fn().mockImplementation(async (body: {
-        flow_definition: { user_schema: string };
-      }) => ({
-        id: "flow_01KWHG",
-        status: "active",
-        flow_definition: body.flow_definition,
-      })),
+      createFlowDefinition: vi
+        .fn()
+        .mockImplementation(async (body: { flow_definition: { user_schema: string } }) => ({
+          id: "flow_01KWHG",
+          status: "active",
+          flow_definition: body.flow_definition,
+        })),
     } as unknown as ZitadelClient;
 
     await materializeSetupResources({
@@ -85,9 +82,9 @@ describe("materializeSetupResources", () => {
       force: false,
     });
 
-    const flowFile = JSON.parse(
-      await readFile(join(cwd, DEFAULT_FLOW_CONFIG_PATH), "utf8"),
-    ) as { user_schema: string };
+    const flowFile = JSON.parse(await readFile(join(cwd, DEFAULT_FLOW_CONFIG_PATH), "utf8")) as {
+      user_schema: string;
+    };
     expect(flowFile.user_schema).toBe("sch_01KWHF");
   });
 
@@ -113,7 +110,13 @@ describe("materializeSetupResources", () => {
       }),
     } as unknown as ZitadelClient;
 
-    await materializeSetupResources({ cwd, client, projectId: "project_123", force: false, cliVersion: TEST_CLI_VERSION });
+    await materializeSetupResources({
+      cwd,
+      client,
+      projectId: "project_123",
+      force: false,
+      cliVersion: TEST_CLI_VERSION,
+    });
 
     const schemaFile = JSON.parse(
       await readFile(join(cwd, DEFAULT_SCHEMA_CONFIG_PATH), "utf8"),
@@ -148,7 +151,13 @@ describe("materializeSetupResources", () => {
       createFlowDefinition: vi.fn().mockResolvedValue({ id: "flow_01KWHG", status: "active" }),
     } as unknown as ZitadelClient;
 
-    await materializeSetupResources({ cwd, client, projectId: "project_123", force: false, cliVersion: TEST_CLI_VERSION });
+    await materializeSetupResources({
+      cwd,
+      client,
+      projectId: "project_123",
+      force: false,
+      cliVersion: TEST_CLI_VERSION,
+    });
 
     expect(getSchemaById).toHaveBeenCalledWith(id);
   });
@@ -156,16 +165,22 @@ describe("materializeSetupResources", () => {
   it("keeps the server's empty audience echo out of the flow file and hashes past it", async () => {
     const client = {
       createSchema: vi.fn().mockResolvedValue({ id: "sch_01KWHF" }),
-      createFlowDefinition: vi.fn().mockImplementation(async (body: {
-        flow_definition: Record<string, unknown>;
-      }) => ({
-        id: "flow_01KWHG",
-        status: "active",
-        flow_definition: { audience: {}, ...body.flow_definition },
-      })),
+      createFlowDefinition: vi
+        .fn()
+        .mockImplementation(async (body: { flow_definition: Record<string, unknown> }) => ({
+          id: "flow_01KWHG",
+          status: "active",
+          flow_definition: { audience: {}, ...body.flow_definition },
+        })),
     } as unknown as ZitadelClient;
 
-    await materializeSetupResources({ cwd, client, projectId: "project_123", force: false, cliVersion: TEST_CLI_VERSION });
+    await materializeSetupResources({
+      cwd,
+      client,
+      projectId: "project_123",
+      force: false,
+      cliVersion: TEST_CLI_VERSION,
+    });
 
     const flowFile = JSON.parse(
       await readFile(join(cwd, DEFAULT_FLOW_CONFIG_PATH), "utf8"),
@@ -183,13 +198,13 @@ describe("materializeSetupResources", () => {
   it("scaffolds the business use case's companyName into the written schema and register step", async () => {
     const client = {
       createSchema: vi.fn().mockResolvedValue({ id: "sch_01KWHF" }),
-      createFlowDefinition: vi.fn().mockImplementation(async (body: {
-        flow_definition: Record<string, unknown>;
-      }) => ({
-        id: "flow_01KWHG",
-        status: "active",
-        flow_definition: body.flow_definition,
-      })),
+      createFlowDefinition: vi
+        .fn()
+        .mockImplementation(async (body: { flow_definition: Record<string, unknown> }) => ({
+          id: "flow_01KWHG",
+          status: "active",
+          flow_definition: body.flow_definition,
+        })),
     } as unknown as ZitadelClient;
 
     await materializeSetupResources({
@@ -216,9 +231,9 @@ describe("materializeSetupResources", () => {
     expect(schemaFile.properties).toHaveProperty("companyName");
 
     // The register step's fields are derived from the same use case.
-    const flowFile = JSON.parse(
-      await readFile(join(cwd, DEFAULT_FLOW_CONFIG_PATH), "utf8"),
-    ) as { steps: Array<{ name: string; fields?: string[] }> };
+    const flowFile = JSON.parse(await readFile(join(cwd, DEFAULT_FLOW_CONFIG_PATH), "utf8")) as {
+      steps: Array<{ name: string; fields?: string[] }>;
+    };
     const register = flowFile.steps.find((step) => step.name === "register");
     expect(register?.fields).toEqual(["email", "givenName", "familyName", "companyName"]);
   });
@@ -293,7 +308,13 @@ describe("materializeSetupResources branding", () => {
       createBranding,
     } as unknown as ZitadelClient;
 
-    await materializeSetupResources({ cwd, client, projectId: "project_123", force: false, cliVersion: TEST_CLI_VERSION });
+    await materializeSetupResources({
+      cwd,
+      client,
+      projectId: "project_123",
+      force: false,
+      cliVersion: TEST_CLI_VERSION,
+    });
 
     expect(createBranding).not.toHaveBeenCalled();
     expect(existsSync(join(cwd, ".zitadel/branding"))).toBe(false);
@@ -316,9 +337,13 @@ describe("materializeSetupResources with a social provider", () => {
         definition: body.idp,
       })),
       createSchema: vi.fn().mockResolvedValue({ id: "sch_01KWHF" }),
-      createFlowDefinition: vi.fn().mockImplementation(async (body: {
-        flow_definition: object;
-      }) => ({ id: "flow_01KWHG", status: "active", flow_definition: body.flow_definition })),
+      createFlowDefinition: vi
+        .fn()
+        .mockImplementation(async (body: { flow_definition: object }) => ({
+          id: "flow_01KWHG",
+          status: "active",
+          flow_definition: body.flow_definition,
+        })),
     } as unknown as ZitadelClient;
   }
 
@@ -337,9 +362,10 @@ describe("materializeSetupResources with a social provider", () => {
       sso: google,
     });
 
-    const connection = JSON.parse(
-      await readFile(join(cwd, IDPS_DIR, "google.json"), "utf8"),
-    ) as { slug: string; oidc: { client_id: string; client_secret: string } };
+    const connection = JSON.parse(await readFile(join(cwd, IDPS_DIR, "google.json"), "utf8")) as {
+      slug: string;
+      oidc: { client_id: string; client_secret: string };
+    };
     expect(connection.slug).toBe("google");
     // A reference, not the prompted value: the id is published as an ordinary
     // project variable so one connection file serves every environment.
@@ -496,9 +522,9 @@ describe("materializeSetupResources with a social provider", () => {
       sso: google,
     });
 
-    const schema = JSON.parse(
-      await readFile(join(cwd, DEFAULT_SCHEMA_CONFIG_PATH), "utf8"),
-    ) as { "x-auth-methods": { sso?: { enabled: boolean; providers: string[] } } };
+    const schema = JSON.parse(await readFile(join(cwd, DEFAULT_SCHEMA_CONFIG_PATH), "utf8")) as {
+      "x-auth-methods": { sso?: { enabled: boolean; providers: string[] } };
+    };
     expect(schema["x-auth-methods"].sso).toEqual({ enabled: true, providers: ["google"] });
 
     const flow = JSON.parse(await readFile(join(cwd, DEFAULT_FLOW_CONFIG_PATH), "utf8")) as {
@@ -522,9 +548,9 @@ describe("materializeSetupResources with a social provider", () => {
       force: false,
     });
 
-    const schema = JSON.parse(
-      await readFile(join(cwd, DEFAULT_SCHEMA_CONFIG_PATH), "utf8"),
-    ) as { "x-auth-methods": { sso?: unknown } };
+    const schema = JSON.parse(await readFile(join(cwd, DEFAULT_SCHEMA_CONFIG_PATH), "utf8")) as {
+      "x-auth-methods": { sso?: unknown };
+    };
     expect(schema["x-auth-methods"].sso).toBeUndefined();
     expect(client.createIdp).not.toHaveBeenCalled();
   });
@@ -557,9 +583,8 @@ describe("materializeSetupResources with several providers", () => {
   });
 
   it("creates a connection per provider and names every slug", async () => {
-    const actual = await vi.importActual<typeof import("@zitadel/config/idp")>(
-      "@zitadel/config/idp",
-    );
+    const actual =
+      await vi.importActual<typeof import("@zitadel/config/idp")>("@zitadel/config/idp");
     const google = actual.idpProvider("google");
     // Two providers differing only in slug and display name: enough for the
     // loops, and the connection body stays a real one the contract accepts.
@@ -616,9 +641,9 @@ describe("materializeSetupResources with several providers", () => {
     expect(existsSync(join(cwd, IDPS_DIR, "acme.json"))).toBe(true);
 
     // Both slugs reach the schema and the flow, in the order chosen.
-    const schema = JSON.parse(
-      await readFile(join(cwd, DEFAULT_SCHEMA_CONFIG_PATH), "utf8"),
-    ) as { "x-auth-methods": { sso?: { providers: string[] } } };
+    const schema = JSON.parse(await readFile(join(cwd, DEFAULT_SCHEMA_CONFIG_PATH), "utf8")) as {
+      "x-auth-methods": { sso?: { providers: string[] } };
+    };
     expect(schema["x-auth-methods"].sso?.providers).toEqual(["google", "acme"]);
 
     const flow = JSON.parse(await readFile(join(cwd, DEFAULT_FLOW_CONFIG_PATH), "utf8")) as {

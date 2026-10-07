@@ -38,9 +38,7 @@ async function portFromEnvFile(cwd: string): Promise<number | undefined> {
       if (rawPort) {
         return Number.parseInt(rawPort, 10);
       }
-    } catch {
-      continue;
-    }
+    } catch {}
   }
   return undefined;
 }

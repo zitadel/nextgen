@@ -216,7 +216,9 @@ export function applySsoToSchema(schema: object, slug: string): SsoResult<object
   const document = clone(schema) as Json;
   const methods = isObject(document["x-auth-methods"]) ? { ...document["x-auth-methods"] } : {};
   const existing = isObject(methods.sso) ? methods.sso : undefined;
-  const providers = Array.isArray(existing?.providers) ? [...(existing.providers as unknown[])] : [];
+  const providers = Array.isArray(existing?.providers)
+    ? [...(existing.providers as unknown[])]
+    : [];
 
   if (existing?.enabled === true && providers.includes(slug)) {
     return { document: schema, changed: false, skipped: [] };
@@ -254,8 +256,7 @@ function registrationFields(flow: Json): string[] {
     const step = stepNamed(flow, name);
     const fields = isObject(step) && Array.isArray(step.fields) ? step.fields : [];
     const collected = fields.filter(
-      (field): field is string =>
-        typeof field === "string" && !field.startsWith("x-auth-methods#"),
+      (field): field is string => typeof field === "string" && !field.startsWith("x-auth-methods#"),
     );
     if (collected.length > 0) {
       return collected;
@@ -277,7 +278,9 @@ function registerSsoStep(fields: string[], terminal: string): Step {
   return {
     name: REGISTER_SSO,
     fields,
-    actions: [{ name: "submit", kind: "submit", primary: true, text_key: `${REGISTER_SSO}.action.submit` }],
+    actions: [
+      { name: "submit", kind: "submit", primary: true, text_key: `${REGISTER_SSO}.action.submit` },
+    ],
     on_success: "create_user_with_sso",
     transitions: {
       submit: { target: terminal },
@@ -301,10 +304,20 @@ function ssoConflictStep(
   const fields: string[] = [];
   if (methods.password) {
     fields.push("x-auth-methods#password");
-    actions.push({ name: "submit", kind: "submit", primary: true, text_key: `${SSO_CONFLICT}.action.submit` });
+    actions.push({
+      name: "submit",
+      kind: "submit",
+      primary: true,
+      text_key: `${SSO_CONFLICT}.action.submit`,
+    });
   }
   if (methods.passkey) {
-    actions.push({ name: "passkey", kind: "passkey", primary: false, text_key: `${SSO_CONFLICT}.action.passkey` });
+    actions.push({
+      name: "passkey",
+      kind: "passkey",
+      primary: false,
+      text_key: `${SSO_CONFLICT}.action.passkey`,
+    });
   }
   if (loginStep !== undefined) {
     actions.push({
@@ -408,7 +421,9 @@ function migrateLegacyOutcomes(document: Json): boolean {
     }
     const transitions = step.transitions;
     const actions = Array.isArray(step.actions) ? step.actions : [];
-    const actionNames = new Set(actions.map((action) => (isObject(action) ? action.name : undefined)));
+    const actionNames = new Set(
+      actions.map((action) => (isObject(action) ? action.name : undefined)),
+    );
     for (const [old, next] of LEGACY_OUTCOMES) {
       if (!(old in transitions) || actionNames.has(old)) {
         continue;
@@ -425,7 +440,10 @@ function migrateLegacyOutcomes(document: Json): boolean {
       }
       if (!(next in transitions)) {
         const transition = transitions[old];
-        if (isObject(transition) && ((transition.purpose ?? null) !== null || (transition.action ?? null) !== null)) {
+        if (
+          isObject(transition) &&
+          ((transition.purpose ?? null) !== null || (transition.action ?? null) !== null)
+        ) {
           throw new ZitadelError(
             "E_VALIDATION",
             `steps.${String(step.name)}: transition "${old}" declares purpose or action, which "${next}" cannot`,
@@ -533,7 +551,9 @@ export function applySsoToFlow(
   // the same place or a taken email dead-ends there.
   const registerPassword = stepNamed(document, "register-password");
   if (registerPassword !== undefined) {
-    const transitions = isObject(registerPassword.transitions) ? { ...registerPassword.transitions } : {};
+    const transitions = isObject(registerPassword.transitions)
+      ? { ...registerPassword.transitions }
+      : {};
     const current = transitions.user_already_exists;
     if (!isObject(current) || current.target !== SSO_CONFLICT) {
       transitions.user_already_exists = { target: SSO_CONFLICT };

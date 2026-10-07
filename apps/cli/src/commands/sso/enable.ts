@@ -42,12 +42,7 @@ import {
   type SecretOutcome,
   type SecretPublisher,
 } from "../../lib/idp";
-import {
-  BaseCommand,
-  CommandGroups,
-  type JsonEnvelope,
-  nonBlankString,
-} from "../../lib/oclif";
+import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
 import {
   readDevelopmentIssuer,
   readZitadelConfig,
@@ -153,7 +148,9 @@ export default class SsoEnable extends BaseCommand {
     const flows = await this.targetFlows(cwd, schema);
 
     consola.info(`Project   ${secretFile.project_id}`);
-    consola.info(`Schema    ${schema.path}${schema.methods.length > 0 ? ` (${schema.methods.join(", ")})` : ""}`);
+    consola.info(
+      `Schema    ${schema.path}${schema.methods.length > 0 ? ` (${schema.methods.join(", ")})` : ""}`,
+    );
 
     if (dryRun) {
       return this.emit({
@@ -228,8 +225,7 @@ export default class SsoEnable extends BaseCommand {
         developmentBuild: isDevelopmentBuild() && !nonInteractive,
         command: "Enable",
       });
-      const clientId =
-        clientIdFlag ?? (await this.askClientId(entry.displayName, nonInteractive));
+      const clientId = clientIdFlag ?? (await this.askClientId(entry.displayName, nonInteractive));
       const secretValue = await this.askClientSecret(scaffolded.clientSecret, nonInteractive);
 
       const publish = this.publisher(secretFile);
@@ -271,7 +267,9 @@ export default class SsoEnable extends BaseCommand {
       consola.success(`Updated ${file}`);
     }
     for (const skipped of edits.skipped) {
-      reportWarning(`Left ${skipped.region} alone: it has been edited by hand. Update it yourself.`);
+      reportWarning(
+        `Left ${skipped.region} alone: it has been edited by hand. Update it yourself.`,
+      );
     }
     if (edits.written.length === 0 && edits.skipped.length === 0) {
       consola.info(`${schema.name} and its login flow already offer ${entry.displayName}`);
@@ -584,12 +582,15 @@ async function publishedIdOf(cwd: string, path: string): Promise<string | undefi
     if (isErrno(error, "ENOENT")) {
       return undefined;
     }
-    throw new ZitadelError("E_VALIDATION", `Cannot read .zitadel/state.json: ${error instanceof Error ? error.message : String(error)}`, {
-      hint:
-        "The file records which platform resource each local file was synced as. " +
-        "Fix or remove it and run `zitadel apply`, then run this command again.",
-      details: { file: ".zitadel/state.json" },
-    });
+    throw new ZitadelError(
+      "E_VALIDATION",
+      `Cannot read .zitadel/state.json: ${error instanceof Error ? error.message : String(error)}`,
+      {
+        hint:
+          "The file records which platform resource each local file was synced as. " +
+          "Fix or remove it and run `zitadel apply`, then run this command again.",
+        details: { file: ".zitadel/state.json" },
+      },
+    );
   }
 }
-

@@ -57,8 +57,9 @@ export const Default: Story = {
         <h1>${heading}</h1>
         <p>${body}</p>
       </div>
-      ${withFooter
-        ? html`<div slot="footer" class="zl-attribution zl-trustmark">
+      ${
+        withFooter
+          ? html`<div slot="footer" class="zl-attribution zl-trustmark">
             <a
               class="zl-trustmark__mark"
               href="https://zitadel.com"
@@ -66,7 +67,8 @@ export const Default: Story = {
               >${unsafeHTML(zitadelTrustmarkInnerHtml())}</a
             >
           </div>`
-        : nothing}
+          : nothing
+      }
     </zl-page-shell>
   `,
 };

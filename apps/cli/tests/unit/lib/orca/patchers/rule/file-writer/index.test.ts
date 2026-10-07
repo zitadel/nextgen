@@ -382,7 +382,7 @@ describe("scaffold - add-dep", () => {
     const parsed = JSON.parse(await readFile(join(dir, "package.json"), "utf8")) as {
       devDependencies: Record<string, string>;
     };
-    expect(parsed.devDependencies["typescript"]).toBe("5.0.0");
+    expect(parsed.devDependencies.typescript).toBe("5.0.0");
   });
 
   it("skips when the dependency is already at the requested version", async () => {

@@ -172,7 +172,11 @@ function ClaimWindowBadge({ window, slot }: { window: ClaimWindow; slot?: string
   const days = daysUntil(window.expiresAt);
   return (
     <Badge variant="secondary" slot={slot}>
-      {window.expired ? "Claim window expired" : days === 0 ? "Expires today" : `Expires in ${days} ${days === 1 ? "day" : "days"}`}
+      {window.expired
+        ? "Claim window expired"
+        : days === 0
+          ? "Expires today"
+          : `Expires in ${days} ${days === 1 ? "day" : "days"}`}
     </Badge>
   );
 }
@@ -485,7 +489,11 @@ function outcomeCard(outcome: ClaimOutcome, retry: () => void) {
             Your sign-in may have changed in another tab. Reload this page, or reopen the claim link
             from your terminal.
           </p>
-          <Button onClick={() => window.location.reload()} variant="outline" className="mx-auto w-fit">
+          <Button
+            onClick={() => window.location.reload()}
+            variant="outline"
+            className="mx-auto w-fit"
+          >
             Reload
           </Button>
         </StateCard>

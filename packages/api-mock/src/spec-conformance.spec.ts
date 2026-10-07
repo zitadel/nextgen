@@ -1147,7 +1147,9 @@ describe("api-mock idp connections and variables", () => {
     const patch = await fetch(`${BASE}/variables?project_id=${projectId}`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ GOOGLE_CLIENT_ID: { value: "824.apps.googleusercontent.com", secret: false } }),
+      body: JSON.stringify({
+        GOOGLE_CLIENT_ID: { value: "824.apps.googleusercontent.com", secret: false },
+      }),
     });
     // 200 with the addressed owner read back, not 204.
     expect(patch.status).toBe(200);
@@ -1214,10 +1216,9 @@ describe("api-mock idp connections and variables", () => {
       body: JSON.stringify({ GOOGLE_CLIENT_SECRET: { value: "GOCSPX-real", secret: true } }),
     });
 
-    const body = (await (await fetch(`${BASE}/variables?project_id=${projectId}`)).json()) as Record<
-      string,
-      unknown
-    >;
+    const body = (await (
+      await fetch(`${BASE}/variables?project_id=${projectId}`)
+    ).json()) as Record<string, unknown>;
 
     expect(body.GOOGLE_CLIENT_SECRET).toEqual({ secret: true });
     expect(JSON.stringify(body)).not.toContain("GOCSPX-real");

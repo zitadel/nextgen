@@ -39,7 +39,10 @@ const meta: Meta<ButtonArgs> = {
     loading: { control: "boolean" },
     disabled: { control: "boolean" },
     block: { control: "boolean" },
-    leadingIcon: { control: "boolean", description: "Render a leading icon in the `leading` slot." },
+    leadingIcon: {
+      control: "boolean",
+      description: "Render a leading icon in the `leading` slot.",
+    },
   },
 };
 
@@ -56,14 +59,16 @@ export const Default: Story = {
       ?disabled=${disabled}
       ?block=${block}
     >
-      ${leadingIcon
-        ? html`<zl-icon
+      ${
+        leadingIcon
+          ? html`<zl-icon
             slot="leading"
             name="arrow-left"
             size=${size === "small" ? "16" : "24"}
             decorative
           ></zl-icon>`
-        : nothing}
+          : nothing
+      }
     </zl-button>
   `,
 };

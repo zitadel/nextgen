@@ -20,8 +20,7 @@
     "build": "tsc -p tsconfig.lib.json",
     "typecheck": "tsc --build tsconfig.json",
     "test": "vitest run",
-    "test:all": "pnpm run test",
-    "lint": "eslint ."
+    "test:all": "pnpm run test"
   },
   "exports": {
     ".": {
@@ -52,19 +51,8 @@
     "@zitadel/api": "workspace:*"
   },
   "devDependencies": {
-    "@eslint/js": "catalog:",
-    "@eslint/json": "catalog:",
-    "@eslint/markdown": "catalog:",
     "@vitest/coverage-v8": "catalog:",
-    "eslint": "catalog:",
-    "eslint-config-prettier": "catalog:",
-    "eslint-import-resolver-typescript": "catalog:",
-    "eslint-plugin-import": "catalog:",
-    "eslint-plugin-perfectionist": "catalog:",
-    "eslint-plugin-prettier": "catalog:",
-    "prettier": "catalog:",
     "typescript": "catalog:",
-    "typescript-eslint": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:"
   }

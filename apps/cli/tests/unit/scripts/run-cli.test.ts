@@ -155,9 +155,9 @@ describe("run-cli wrapper", () => {
     await expect(
       runCli.assertFreshInstall("/repo", statFor({ [lockfile]: 2000, [installed]: 1000 })),
     ).rejects.toThrow(remedy);
-    await expect(
-      runCli.assertFreshInstall("/repo", statFor({ [lockfile]: 2000 })),
-    ).rejects.toThrow(remedy);
+    await expect(runCli.assertFreshInstall("/repo", statFor({ [lockfile]: 2000 }))).rejects.toThrow(
+      remedy,
+    );
     await expect(
       runCli.assertFreshInstall("/repo", statFor({ [lockfile]: 2000, [installed]: 2000 })),
     ).resolves.toBeUndefined();
