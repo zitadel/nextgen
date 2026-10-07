@@ -1,6 +1,7 @@
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
+import { cancel, confirm, isCancel } from "@clack/prompts";
 import { Flags } from "@oclif/core";
 import type { FlowValidationIssue } from "@zitadel/config/validate";
 import { consola } from "consola";
@@ -51,7 +52,7 @@ export abstract class AuthFactorCommand extends BaseCommand {
     enabled: boolean,
   ): Promise<JsonEnvelope> {
     await this.toMeta(flags);
-    const { cwd, dryRun, force, cliVersion } = this.meta;
+    const { cwd, dryRun, force, nonInteractive, cliVersion } = this.meta;
     const verb = enabled ? "enable" : "disable";
 
     const factors = [...new Set(flags.mode ?? [])] as AuthFactor[];
@@ -65,19 +66,37 @@ export abstract class AuthFactorCommand extends BaseCommand {
     const change = setAuthFactors(schema.body, factors, enabled);
     const flows = await flowsForSchema(cwd, schema);
 
+    const lastFactor =
+      !enabled && change.changed.length > 0 && usableSignInMethods(change.document).length === 0;
     if (change.changed.length > 0) {
       if (enabled) {
         refuseMissingIdentifier(schema, change.changed);
       } else {
-        if (!force) {
-          refuseLastFactor(schema, change.document, cliVersion);
-        }
+        // Before the last-factor guard: these refusals have no override, so
+        // nobody should be asked to confirm a change that fails anyway.
         refuseBrokenFlows(schema, change.document, flows);
       }
     }
+    if (lastFactor && !force) {
+      // ADR 064 §10: a terminal asks; a script or a dry run needs --force.
+      if (nonInteractive || dryRun) {
+        refuseLastFactor(schema, factors, cliVersion);
+      }
+      const answer = await confirm({
+        message: `Disable ${change.changed.join(", ")} anyway? Nobody will be able to sign in to ${schema.name}.`,
+        initialValue: false,
+      });
+      if (isCancel(answer) || !answer) {
+        cancel("Disable cancelled.");
+        return this.emit({ status: "skipped", reason: "disable-cancelled" });
+      }
+    }
 
+    // Only an active flow is served, so a draft offering the factor does not
+    // put it on the sign-in screen.
+    const activeFlows = flows.filter((flow) => flow.body.status === "active");
     const notOffered = enabled
-      ? factors.filter((factor) => !flows.some((flow) => flowOffers(flow.body, factor)))
+      ? factors.filter((factor) => !activeFlows.some((flow) => flowOffers(flow.body, factor)))
       : [];
     // Enabling first and editing the flow second is a normal order of work, so
     // this is a warning rather than a refusal.
@@ -85,12 +104,9 @@ export abstract class AuthFactorCommand extends BaseCommand {
       (factor) =>
         `No login flow for ${schema.name} offers ${factor} yet. Add it to a flow to show it.`,
     );
-    if (
-      !enabled &&
-      change.changed.length > 0 &&
-      usableSignInMethods(change.document).length === 0
-    ) {
-      // Only reachable with --force: said even so, because nobody can sign in.
+    if (lastFactor) {
+      // Reached only through --force or a confirmed prompt: said even so,
+      // because nobody can sign in.
       warnings.push(
         `${schema.name} ${dryRun ? "would have" : "has"} no way to sign in left. ` +
           "Its users can only be managed through the API.",
@@ -106,7 +122,7 @@ export abstract class AuthFactorCommand extends BaseCommand {
       file: schema.path,
       changed: change.changed,
       unchanged: change.unchanged,
-      enabled: usableSignInMethods(change.document),
+      usable: usableSignInMethods(change.document),
       not_offered: notOffered,
     };
 
@@ -161,27 +177,33 @@ function refuseMissingIdentifier(schema: SchemaFile, changed: readonly AuthFacto
   });
 }
 
-/** A schema with no usable way in cannot be signed in to by anyone. */
+/**
+ * Refuse removing the last way in without --force. The exact re-run comes
+ * first; the alternatives are factors this run is not disabling, and password
+ * only where the schema can take it (it needs an identifier).
+ */
 function refuseLastFactor(
   schema: SchemaFile,
-  after: Record<string, unknown>,
+  disabling: readonly AuthFactor[],
   cliVersion: string,
-): void {
-  if (usableSignInMethods(after).length > 0) {
-    return;
-  }
+): never {
+  const modes = disabling.map((factor) => `--mode ${factor}`).join(" ");
+  const retry = publicCliCommand(
+    `auth-factor disable ${modes} --schema ${schema.name} --force`,
+    cliVersion,
+  );
+  const alternatives = AUTH_FACTORS.filter(
+    (factor) =>
+      !disabling.includes(factor) && (factor !== "password" || hasIdentifier(schema.body)),
+  ).map((factor) =>
+    publicCliCommand(`auth-factor enable --mode ${factor} --schema ${schema.name}`, cliVersion),
+  );
   throw new ZitadelError("E_VALIDATION", `${schema.path} would have no way to sign in left`, {
     hint:
-      "Enable another factor or an identity provider first. If the schema's users are only " +
-      "managed through the API, pass --force to disable it anyway.",
+      "Enable another factor or an identity provider (`sso enable --provider <name>`) first. " +
+      "If the schema's users are only managed through the API, re-run with --force.",
     details: { file: schema.path, usable: usableSignInMethods(schema.body) },
-    nextCommands: AUTH_FACTORS.filter(
-      (factor) => !usableSignInMethods(schema.body).includes(factor),
-    )
-      .map((factor) =>
-        publicCliCommand(`auth-factor enable --mode ${factor} --schema ${schema.name}`, cliVersion),
-      )
-      .concat(publicCliCommand(`sso enable --schema ${schema.name}`, cliVersion)),
+    nextCommands: [retry, ...alternatives],
   });
 }
 

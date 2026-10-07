@@ -108,7 +108,7 @@ describe("auth-factor", () => {
         file: ".zitadel/schemas/default-human-user.json",
         changed: ["passkey"],
         unchanged: [],
-        enabled: ["password"],
+        usable: ["password"],
       });
     });
 
@@ -131,6 +131,32 @@ describe("auth-factor", () => {
         unchanged: ["password"],
         next_commands: [],
       });
+    });
+
+    it("does not count a draft flow as offering the factor", async () => {
+      const draft = {
+        ...passwordFlow(),
+        name: "draft-login",
+        status: "draft",
+        steps: [
+          {
+            name: "passkey-first",
+            fields: [],
+            actions: [{ name: "passkey", kind: "passkey", primary: true }],
+            transitions: { passkey: { target: "done" } },
+          },
+          { name: "done", complete: "show" },
+        ],
+        purposes: { login: "passkey-first" },
+      };
+      const cwd = await makeProject(undefined, {
+        "default-human-user-login": passwordFlow(),
+        "draft-login": draft,
+      });
+
+      const { envelope } = await run(cwd, "enable", "--mode", "passkey");
+
+      expect(envelope.data?.not_offered).toEqual(["passkey"]);
     });
 
     it("warns about a factor no flow offers", async () => {
@@ -212,11 +238,29 @@ describe("auth-factor", () => {
 
       expect(envelope.code).toBe("E_VALIDATION");
       expect(envelope.details?.usable).toEqual(["passkey"]);
-      expect(
-        envelope.next_commands?.some((c) =>
-          c.endsWith("--mode password --schema default-human-user"),
-        ),
-      ).toBe(true);
+      expect(envelope.next_commands?.map((c) => c.replace(/^.*? auth-factor /, ""))).toEqual([
+        "disable --mode passkey --schema default-human-user --force",
+        "enable --mode password --schema default-human-user",
+      ]);
+    });
+
+    it("does not suggest password on a schema with no x-identifier", async () => {
+      const { "x-identifier": _, ...noIdentifier } = passwordSchema();
+      const cwd = await makeProject(
+        {
+          "default-human-user": {
+            ...noIdentifier,
+            "x-auth-methods": { password: { enabled: false }, passkey: { enabled: true } },
+          },
+        },
+        {},
+      );
+
+      const { envelope } = await run(cwd, "disable", "--mode", "passkey");
+
+      expect(envelope.next_commands?.map((c) => c.replace(/^.*? auth-factor /, ""))).toEqual([
+        "disable --mode passkey --schema default-human-user --force",
+      ]);
     });
 
     it("does not count otp as a way to sign in", async () => {
