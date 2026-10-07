@@ -787,6 +787,27 @@ func TestFlowSSOIdentityResolver_CreateLinked_RefusesAttempt(t *testing.T) {
 	}
 }
 
+// Values that fail the user schema are logged by where they failed, never by
+// value: the validator's messages quote them.
+func TestFlowSSOIdentityResolver_CreateLinked_InvalidUserLogsLocations(t *testing.T) {
+	t.Parallel()
+	f := newSSOResolverFixture(t)
+	f.stmts.EXPECT().NewManagedID(string(domain.PrefixUser)).Return("user_new", nil)
+	f.schemaStore.EXPECT().GetJSONSchemaByID(gomock.Any(), ssoProjectID, ssoSchemaURL).
+		Return(&domain.JSONSchema{ProjectID: ssoProjectID, URL: ssoSchemaURL, Schema: []byte(ssoUserSchema)}, nil)
+	in := createInput()
+	in.Attributes = map[string]any{"email": map[string]any{"address": "secret-value"}}
+
+	var logged bytes.Buffer
+	ctx := zlog.WithLoggingContext(t.Context(), slog.New(slog.NewTextHandler(&logged, nil)))
+
+	_, err := f.resolver.CreateLinked(ctx, in)
+	require.ErrorIs(t, err, domain.ErrUserInvalid())
+	assert.Contains(t, logged.String(), "level=WARN")
+	assert.Contains(t, logged.String(), "/email")
+	assert.NotContains(t, logged.String(), "secret-value")
+}
+
 // A lost attribute race is a failed user creation, audited like one created
 // through the user API.
 func TestFlowSSOIdentityResolver_CreateLinked_LostRaceEmitsUserCreateFailed(t *testing.T) {

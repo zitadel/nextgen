@@ -5,6 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
+
+	"github.com/ianlancetaylor/jsonschema/types"
 
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -298,6 +301,31 @@ func (r *FlowSSOIdentityResolver) CreateLinked(ctx context.Context, in domain.Fl
 	if err := r.users.ApplyActions(ctx, &ssoClaimAction{bind: bind}, createUser, &ssoLinkAction{subject: in.Subject, bind: bind}); err != nil {
 		// Audited like a create through the user API.
 		emitUserCreateFailedBestEffort(ctx, r.db, createUser, err)
+		if errors.Is(err, domain.ErrUserInvalid()) {
+			// The validator's messages quote the values, so only where they
+			// failed is logged.
+			var failed []*types.ValidationError
+			var one *types.ValidationError
+			var many *types.ValidationErrors
+			if errors.As(err, &many) {
+				failed = many.Errs
+			} else if errors.As(err, &one) {
+				failed = append(failed, one)
+			}
+			var locations []string
+			for _, ve := range failed {
+				location := ""
+				if ve.Loc != nil {
+					location = "/" + strings.Join(*ve.Loc, "/")
+				}
+				locations = append(locations, location)
+			}
+			getLoggingContext(ctx, "flow").WarnContext(ctx, "sso user fails the user schema",
+				slog.String("project_id", in.ProjectID),
+				slog.String("schema_url", in.UserSchemaURL),
+				slog.Any("locations", locations),
+			)
+		}
 		return "", err
 	}
 	return userID, nil

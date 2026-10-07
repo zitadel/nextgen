@@ -41,9 +41,8 @@ type FlowOnSuccess uint8
 const (
 	FlowOnSuccessCreateUser FlowOnSuccess = iota
 	// FlowOnSuccessCreateUserWithSso creates the user from the identity an
-	// external provider returned. The value is accepted so an SSO flow can
-	// be authored and stored; no handler is wired, so a step that reaches
-	// it fails with a flow integrity error (see runOnSuccess).
+	// external provider returned, with the values the step collected, and
+	// links the identity to it (see processSSOCollection).
 	FlowOnSuccessCreateUserWithSso
 )
 

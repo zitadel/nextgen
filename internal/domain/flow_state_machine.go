@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
+	"reflect"
 	"slices"
 	"strings"
 	"time"
@@ -50,6 +52,22 @@ const (
 	// id_token validation, or a configuration failure. The cause goes to the
 	// server log only; the step error stays generic.
 	FlowStepErrorSSOFailed = "error.sso_failed"
+	// FlowStepErrorSSOVerifiedUniqueValueChanged reports an edit, on the
+	// collection step, to a unique value the provider verified. Linking the
+	// identity to an edited, unproven address would let the editor take it.
+	FlowStepErrorSSOVerifiedUniqueValueChanged = "error.sso_verified_unique_value_changed"
+	// FlowStepErrorSSOUserInvalid reports values that fail the user schema
+	// only together, such as a rule across fields. The user can still edit
+	// them on the step.
+	FlowStepErrorSSOUserInvalid = "error.sso_user_invalid"
+	// FlowStepErrorSSOUserCannotBeCreated reports a required property that
+	// neither the step nor the provider supplies. No edit on the step can
+	// fix it; the flow definition must collect it.
+	FlowStepErrorSSOUserCannotBeCreated = "error.sso_user_cannot_be_created"
+	// FlowStepErrorUserAlreadyExists reports a unique value another user
+	// holds where the engine cannot find that user, so it cannot route
+	// user_already_exists: a team-scoped value, or an object or array.
+	FlowStepErrorUserAlreadyExists = "error.user_already_exists"
 )
 
 // FlowStepErrorAllowed reports whether a step error value honors the
@@ -566,7 +584,7 @@ func (r *FlowStateMachineRuntime) provisionSSOIdentity(ctx context.Context, stat
 	// schema consumes only the top-level properties it defines.
 	claims := ssoSchemaClaims(schema, parked.Claims)
 	probeClaims, uniqueClaims := ssoUniqueClaims(schema, claims)
-	if bound, err := r.bindSSOCollision(ctx, state, step, parked, probeClaims); err != nil || bound {
+	if bound, err := r.bindSSOCollision(ctx, state, step, parked, probeClaims, claims); err != nil || bound {
 		return FlowImplicitOutcomeUserAlreadyExists, err
 	}
 	// Neither linked to nor colliding with the user the flow or its attempt
@@ -604,7 +622,7 @@ func (r *FlowStateMachineRuntime) provisionSSOIdentity(ctx context.Context, stat
 		// Another flow took a unique value since the probe (a request on this
 		// attempt loses on the parked row instead): whoever took a probed
 		// attribute is bound, and anything else falls back to collection.
-		if bound, err := r.bindSSOCollision(ctx, state, step, parked, probeClaims); err != nil || bound {
+		if bound, err := r.bindSSOCollision(ctx, state, step, parked, probeClaims, claims); err != nil || bound {
 			return FlowImplicitOutcomeUserAlreadyExists, err
 		}
 		return FlowImplicitOutcomeSSOUserNotFound, nil
@@ -680,17 +698,17 @@ func ssoUniqueClaims(schema *jsonschema.Schema, claims map[string]any) (probe, u
 // unavailable, as for a linked identity.
 var errSSOUnroutable = errors.New("flow state machine: sso outcome cannot route on this step")
 
-// bindSSOCollision looks up each project-unique claim, verified or not, until
-// one names an existing user, then binds that user by id. Like a typed
-// identifier it only binds the user: no link, no sso factor. The bind checks
-// the exact parked row first and replaces it by a marker of that user, so a
-// row another request replaced binds nothing (ErrSSOStateInvalid) and a
-// retry after a lost cookie catches up from the marker. It returns
-// errSSOUnroutable, before binding, when step cannot route
+// bindSSOCollision looks up the value of each project-unique claim in values,
+// verified or not, until one names an existing user, then binds that user by
+// id. Like a typed identifier it only binds the user: no link, no sso factor.
+// The bind checks the exact parked row first and replaces it by a marker of
+// that user, so a row another request replaced binds nothing
+// (ErrSSOStateInvalid) and a retry after a lost cookie catches up from the
+// marker. It returns errSSOUnroutable, before binding, when step cannot route
 // user_already_exists.
-func (r *FlowStateMachineRuntime) bindSSOCollision(ctx context.Context, state *FlowState, step *FlowDefinitionStep, parked *FlowSSOParkedIdentity, probeClaims []string) (bool, error) {
+func (r *FlowStateMachineRuntime) bindSSOCollision(ctx context.Context, state *FlowState, step *FlowDefinitionStep, parked *FlowSSOParkedIdentity, probeClaims []string, values map[string]any) (bool, error) {
 	for _, name := range probeClaims {
-		value, _ := parked.Claims[name].(string)
+		value, _ := values[name].(string)
 		if value == "" {
 			continue
 		}
@@ -1194,6 +1212,11 @@ func (r *FlowStateMachineRuntime) dropResolvedUser(pc *processCtx, reason string
 // processSubmit handles kind=submit: dispatch challenges, run
 // on_success (if declared), and route the resulting outcome.
 func (r *FlowStateMachineRuntime) processSubmit(pc *processCtx, resolved FlowResolvedFields) (FlowStepResult, error) {
+	// The step's values describe the provider's identity, not a sign-in, so
+	// its identifier is never submitted as one.
+	if pc.currentStep.OnSuccess != nil && *pc.currentStep.OnSuccess == FlowOnSuccessCreateUserWithSso {
+		return r.processSSOCollection(pc, resolved)
+	}
 	dispatch, err := r.dispatchChallenges(pc, resolved)
 	if err != nil {
 		return FlowStepResult{}, err
@@ -1226,6 +1249,174 @@ func (r *FlowStateMachineRuntime) processSubmit(pc *processCtx, resolved FlowRes
 		recordResolvedUser(pc.state, result.UserID)
 	}
 	return r.routeOutcome(pc, resolved, pc.in.Action, result.Irreversible)
+}
+
+// processSSOCollection creates the user from the identity the engine resolved
+// into this step, with the values the step collected. A unique value another
+// user holds binds that user instead, as on the render.
+func (r *FlowStateMachineRuntime) processSSOCollection(pc *processCtx, resolved FlowResolvedFields) (FlowStepResult, error) {
+	step, state := pc.currentStep, pc.state
+	// The user and the link cannot be undone, so the submitted action must
+	// route before anything is written, and keep the user it creates.
+	if stepActionKind(step, pc.in.Action) != FlowActionKindSubmit {
+		return FlowStepResult{}, fmt.Errorf("%w: %q on step %q", ErrFlowInvalidAction(), pc.in.Action, step.Name)
+	}
+	transition, ok := step.Transitions[pc.in.Action]
+	if !ok {
+		return FlowStepResult{}, fmt.Errorf("%w: %q on step %q", ErrFlowInvalidAction(), pc.in.Action, step.Name)
+	}
+	if transition.Action != nil || transition.Purpose != nil {
+		return r.renderStepError(pc, resolved, new(FlowStepErrorSSOUnavailable))
+	}
+	if state.SSOResolvedCheckID == "" {
+		return FlowStepResult{}, fmt.Errorf("%w: step %q creates a user from sso, but the flow resolved no sso identity", ErrFlowIntegrity(), step.Name)
+	}
+	// The service refuses a bind or a creation on an attempt carrying another
+	// user too; this makes the invariant explicit in the engine.
+	if state.CollectedData.UserID != "" {
+		return FlowStepResult{}, ErrFlowRestartRequired()
+	}
+	loadInput := FlowSSOLoadInput{
+		ProjectID:       state.ProjectID,
+		AttemptID:       state.AuthAttemptID,
+		UserSchemaURL:   state.UserSchemaURL,
+		ResolvedCheckID: state.SSOResolvedCheckID,
+	}
+	collected, err := r.ssoIdentities.LoadCollected(pc.ctx, loadInput)
+	if err != nil {
+		return FlowStepResult{}, fmt.Errorf("flow state machine: load collected sso identity: %w", err)
+	}
+	if collected == nil {
+		return r.resolveStaleSSOSubmit(pc, resolved, loadInput)
+	}
+	schema, err := r.schemas.Resolve(pc.ctx, r.schemaStore, state.ProjectID, state.UserSchemaURL, nil)
+	if err != nil {
+		return FlowStepResult{}, fmt.Errorf("flow state machine: load user schema for sso identity: %w", err)
+	}
+	claims := ssoSchemaClaims(schema, collected.Claims)
+	// What the steps collected, this submit's values merged in, and each claim
+	// the step does not show. A claim replaces what an earlier step collected,
+	// so a typed identifier cannot override the provider. A hidden claim that
+	// fails its property is dropped: the user cannot see it to fix it.
+	attributes := maps.Clone(state.CollectedData.UserData)
+	if attributes == nil {
+		attributes = map[string]any{}
+	}
+	for name, value := range claims {
+		shown := slices.ContainsFunc(resolved.Fields, func(f FlowField) bool {
+			return f.Name == name || strings.HasPrefix(f.Name, name+".")
+		})
+		if shown {
+			continue
+		}
+		hidden, err := r.fields.Resolve(schema, step.Name, []Field{Field(name)})
+		if err != nil {
+			continue
+		}
+		if err := r.fields.Validate(hidden, map[string]any{name: value}); err != nil {
+			continue
+		}
+		attributes[name] = value
+	}
+
+	_, uniqueClaims := ssoUniqueClaims(schema, claims)
+	for _, name := range uniqueClaims {
+		value, ok := attributes[name]
+		if collected.Verified[name] && ok && !reflect.DeepEqual(value, claims[name]) {
+			return r.renderStepError(pc, resolved, new(FlowStepErrorSSOVerifiedUniqueValueChanged))
+		}
+	}
+	probe, _ := ssoUniqueClaims(schema, attributes)
+	bound, err := r.bindSSOCollision(pc.ctx, state, step, collected, probe, attributes)
+	if result, handled, err := r.ssoCollectionBindResult(pc, resolved, loadInput, bound, err); handled {
+		return result, err
+	}
+	// The submit already required the step's own fields, so a required
+	// property still missing is one no edit on the step can supply: the
+	// definition does not collect it on this path. Checked after the probe,
+	// which binds an existing user without creating one.
+	present := map[string]struct{}{}
+	var walk func(prefix AttributeKey, m map[string]any)
+	walk = func(prefix AttributeKey, m map[string]any) {
+		for name, value := range m {
+			path := prefix.AppendNode(name)
+			present[string(path)] = struct{}{}
+			if nested, ok := value.(map[string]any); ok {
+				walk(path, nested)
+			}
+		}
+	}
+	walk("", attributes)
+	for path := range newSchemaReader(schema).RequiredPaths(present) {
+		if _, ok := present[path]; !ok {
+			return r.renderStepError(pc, resolved, new(FlowStepErrorSSOUserCannotBeCreated))
+		}
+	}
+	userID, err := r.ssoIdentities.CreateLinked(pc.ctx, FlowSSOCreateInput{
+		ProjectID:     state.ProjectID,
+		AttemptID:     state.AuthAttemptID,
+		CheckID:       collected.CheckID,
+		UserSchemaURL: state.UserSchemaURL,
+		ConnectionID:  collected.ConnectionID,
+		Subject:       collected.Subject,
+		Attributes:    attributes,
+	})
+	switch {
+	case errors.Is(err, ErrUserAlreadyExists()):
+		// Another flow took a unique value since the probe: whoever took a
+		// probed value is bound. The probe cannot find an owner of a
+		// team-scoped value, or of an object or array.
+		bound, err := r.bindSSOCollision(pc.ctx, state, step, collected, probe, attributes)
+		if result, handled, err := r.ssoCollectionBindResult(pc, resolved, loadInput, bound, err); handled {
+			return result, err
+		}
+		return r.renderStepError(pc, resolved, new(FlowStepErrorUserAlreadyExists))
+	case errors.Is(err, ErrSSOStateInvalid()):
+		return r.resolveStaleSSOSubmit(pc, resolved, loadInput)
+	case errors.Is(err, ErrUserInvalid()):
+		// Each field passed on its own, so the values fail only together.
+		return r.renderStepError(pc, resolved, new(FlowStepErrorSSOUserInvalid))
+	case err != nil:
+		return FlowStepResult{}, fmt.Errorf("flow state machine: create sso user: %w", err)
+	}
+	recordResolvedUser(state, userID)
+	result, err := r.routeOutcome(pc, resolved, pc.in.Action, true)
+	if errors.Is(err, ErrAuthAttemptAlreadyHandedOff()) {
+		// A render that retried the handoff from the bind won it.
+		return FlowStepResult{}, ErrFlowRestartRequired().WithParent(err)
+	}
+	return result, err
+}
+
+// ssoCollectionBindResult turns the collision probe on the collection step
+// into a result. handled is false when no user holds a probed value, and the
+// caller goes on.
+func (r *FlowStateMachineRuntime) ssoCollectionBindResult(pc *processCtx, resolved FlowResolvedFields, loadInput FlowSSOLoadInput, bound bool, err error) (FlowStepResult, bool, error) {
+	switch {
+	case errors.Is(err, ErrSSOStateInvalid()):
+		result, err := r.resolveStaleSSOSubmit(pc, resolved, loadInput)
+		return result, true, err
+	case errors.Is(err, errSSOUnroutable):
+		result, err := r.renderStepError(pc, resolved, new(FlowStepErrorSSOUnavailable))
+		return result, true, err
+	case err != nil:
+		return FlowStepResult{}, true, err
+	case bound:
+		result, err := r.routeOutcome(pc, resolved, FlowImplicitOutcomeUserAlreadyExists, false)
+		return result, true, err
+	}
+	return FlowStepResult{}, false, nil
+}
+
+// resolveStaleSSOSubmit handles a collection submit whose row is gone or was
+// claimed: a bound user signs in through the retry, and anything else shows
+// the step again with the typed values.
+func (r *FlowStateMachineRuntime) resolveStaleSSOSubmit(pc *processCtx, resolved FlowResolvedFields, loadInput FlowSSOLoadInput) (FlowStepResult, error) {
+	result, _, err := r.resolveStaleSSOBind(pc, resolved, loadInput)
+	if err != nil || result.Step != nil {
+		return result, err
+	}
+	return r.renderStepError(pc, resolved, nil)
 }
 
 // processPasskeyLogin handles kind=passkey. The issue leg runs the
