@@ -78,9 +78,6 @@ export function MetaValue({
  */
 export function MetaRule() {
   return (
-    <span
-      aria-hidden
-      className="bg-border ml-4.5 h-7.5 w-px shrink-0 sm:mx-4.5 sm:self-center"
-    />
+    <span aria-hidden className="bg-border ml-4.5 h-7.5 w-px shrink-0 sm:mx-4.5 sm:self-center" />
   );
 }

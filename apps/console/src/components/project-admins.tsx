@@ -112,9 +112,7 @@ export function ProjectAdmins({
                 <TableCell className={`${RESOURCE_CELL} text-foreground truncate text-sm`}>
                   {row.name}
                 </TableCell>
-                <TableCell className={RESOURCE_CELL_MUTED}>
-                  {row.level}
-                </TableCell>
+                <TableCell className={RESOURCE_CELL_MUTED}>{row.level}</TableCell>
                 <TableCell className={RESOURCE_CELL}>
                   <RowActions projectId={projectId} row={row} onRemoved={onChanged} />
                 </TableCell>

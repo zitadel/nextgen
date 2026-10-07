@@ -123,9 +123,7 @@ export function ContextSwitcher() {
  * every screen behind it — the chrome is not worth a boundary.
  */
 function useProjects(): SwitcherOption[] | undefined {
-  const [projects, setProjects] = useState<{ id: string; label: string }[] | undefined>(
-    undefined,
-  );
+  const [projects, setProjects] = useState<{ id: string; label: string }[] | undefined>(undefined);
   const scopeTo = useScopeTarget();
 
   useEffect(() => {
@@ -133,9 +131,7 @@ function useProjects(): SwitcherOption[] | undefined {
     void listMyProjectsCached()
       .then((result) => {
         if (cancelled) return;
-        setProjects(
-          result.projects.map((project) => ({ id: project.id, label: project.name })),
-        );
+        setProjects(result.projects.map((project) => ({ id: project.id, label: project.name })));
       })
       .catch(() => {
         if (!cancelled) setProjects([]);

@@ -38,6 +38,7 @@ export function SchemaPicker({
     <Combobox open={open} onOpenChange={setOpen}>
       <ComboboxAnchor asChild>
         <ComboboxTrigger
+          id={id}
           label="User Schema"
           open={open}
           disabled={loading}

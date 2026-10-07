@@ -158,7 +158,9 @@ export const SHIPPED_ICON_NAMES = [
  * connection's template has a mark of its own, so adding one here is what
  * makes a new vendor's button carry its logo.
  */
-export const SHIPPED_BRAND_ICON_NAMES = ["brand-google"] as const satisfies readonly BrandIconName[];
+export const SHIPPED_BRAND_ICON_NAMES = [
+  "brand-google",
+] as const satisfies readonly BrandIconName[];
 
 export type IconSize = "16" | "24";
 

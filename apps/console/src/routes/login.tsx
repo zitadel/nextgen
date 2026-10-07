@@ -137,8 +137,8 @@ function NoProjectSetupHint() {
   return (
     <NoProjectYet>
       This deployment has no project to sign in to. Create one from your application with{" "}
-      <InlineCode>npx @zitadel/cli setup</InlineCode> — the first project becomes the
-      console&apos;s default. Then refresh this page.
+      <InlineCode>npx @zitadel/cli setup</InlineCode> — the first project becomes the console&apos;s
+      default. Then refresh this page.
     </NoProjectYet>
   );
 }

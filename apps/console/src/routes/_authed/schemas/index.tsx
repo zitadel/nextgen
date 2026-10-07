@@ -13,7 +13,11 @@ import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { InlineCode } from "@/components/ui/inline-code";
 import { useLoadMore } from "@/hooks/use-load-more";
 import { formatDate } from "@/lib/date";
-import { projectScopeDeps, requireProjectScope, useRequiredProjectScope } from "@/lib/project-scope";
+import {
+  projectScopeDeps,
+  requireProjectScope,
+  useRequiredProjectScope,
+} from "@/lib/project-scope";
 import {
   type UserSchema,
   schemaAuthMethods,

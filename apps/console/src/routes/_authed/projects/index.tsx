@@ -66,7 +66,6 @@ const PAGE_SIZE = 25;
 /** Three equal columns; the trailing one carries the row menu. */
 const COLUMN = "w-1/3";
 
-
 function ProjectsScreen() {
   const loaded = Route.useLoaderData();
   const navigate = useNavigate();

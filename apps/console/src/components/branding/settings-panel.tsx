@@ -210,7 +210,6 @@ function PaletteSection({
             <PaletteRow
               key={key}
               paletteKey={key}
-              side={side}
               value={palette[key] ?? defaults[key]}
               // Both rows of a pair carry the marker, so a failing pair is
               // found from either colour in it.
@@ -225,22 +224,19 @@ function PaletteSection({
 
 function PaletteRow({
   paletteKey,
-  side,
   value,
   issues,
 }: {
   paletteKey: PaletteKey;
-  side: ThemeSide;
   value: string;
   issues: ContrastIssue[];
 }) {
   return (
     <div className={COLOUR_ROW}>
-      {/* Both sides carry a row called "Primary", so the term carries the
-          side for assistive tech: visually the section heading says it. */}
-      <dt className={ROW_LABEL} aria-label={`${PALETTE_LABELS[paletteKey]} (${side} mode)`}>
-        {PALETTE_LABELS[paletteKey]}
-      </dt>
+      {/* `aria-label` is not supported on a `<dt>` (term role), so the label is
+          plain text. Both sides carry a row called "Primary"; the side is
+          conveyed by the section heading above these rows. */}
+      <dt className={ROW_LABEL}>{PALETTE_LABELS[paletteKey]}</dt>
       <dd className={`${ROW_VALUE} gap-1.5`}>
         <span className={SWATCH} style={{ backgroundColor: toHex(value) }} aria-hidden />
         <span className={`${VALUE_TEXT} font-medium leading-5`}>{value.toUpperCase()}</span>

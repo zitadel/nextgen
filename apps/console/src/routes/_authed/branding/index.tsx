@@ -29,7 +29,10 @@ import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
 export const Route = createFileRoute("/_authed/branding/")({
   // Nested under Login flows, as in the design: branding is how those flows
   // render, not a resource of its own. Sub-rows carry no icon.
-  staticData: { scope: "project", nav: { label: "Branding", order: 1, parent: "/flow-definitions" } },
+  staticData: {
+    scope: "project",
+    nav: { label: "Branding", order: 1, parent: "/flow-definitions" },
+  },
   loaderDeps: projectScopeDeps,
   loader: async ({ deps }) => {
     // Newest first, so the head of the list is what visitors see today. The
@@ -197,10 +200,7 @@ function BrandingScreen() {
               No icon on this one; the flow selector alone carries its glyph. */}
           <div className="order-last flex basis-full items-center gap-2.5 sm:order-none sm:basis-auto">
             <Separator orientation="vertical" className="hidden h-5! lg:block" />
-            <Select
-              value={activeState}
-              onValueChange={(value) => setState(value as PreviewState)}
-            >
+            <Select value={activeState} onValueChange={(value) => setState(value as PreviewState)}>
               <SelectTrigger aria-label="Previewed state" variant="ghost">
                 <SelectValue />
               </SelectTrigger>

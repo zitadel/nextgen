@@ -26,7 +26,11 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/in
 import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
 import { findShortcutLabel, useFindShortcut } from "@/hooks/use-find-shortcut";
 import { useLoadMore } from "@/hooks/use-load-more";
-import { projectScopeDeps, requireProjectScope, useRequiredProjectScope } from "@/lib/project-scope";
+import {
+  projectScopeDeps,
+  requireProjectScope,
+  useRequiredProjectScope,
+} from "@/lib/project-scope";
 import type { SchemaField } from "@/lib/schema";
 import type { UserTeam } from "@/lib/user";
 import { columnsForUsers, fetchUsers, toUserRow } from "@/lib/user-list";
@@ -111,21 +115,23 @@ function UsersScreen() {
   // search whatever the project's schema actually defines.
   const rows = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    return users.map((user, index) => toUserRow(user, index, columns)).filter((row) => {
-      if (needle === "") return true;
-      // Team names only while the column is on screen. A later page served
-      // without the expansion drops the column while the rows fetched before it
-      // keep their memberships, and searching those would filter the table on
-      // something the operator cannot see.
-      const teams = teamsExpanded ? row.teams.map((team) => team.name) : [];
-      return [
-        row.id,
-        row.name,
-        row.identifier ?? "",
-        ...teams,
-        ...columns.map((column) => row.values[column.key] ?? ""),
-      ].some((value) => value.toLowerCase().includes(needle));
-    });
+    return users
+      .map((user, index) => toUserRow(user, index, columns))
+      .filter((row) => {
+        if (needle === "") return true;
+        // Team names only while the column is on screen. A later page served
+        // without the expansion drops the column while the rows fetched before it
+        // keep their memberships, and searching those would filter the table on
+        // something the operator cannot see.
+        const teams = teamsExpanded ? row.teams.map((team) => team.name) : [];
+        return [
+          row.id,
+          row.name,
+          row.identifier ?? "",
+          ...teams,
+          ...columns.map((column) => row.values[column.key] ?? ""),
+        ].some((value) => value.toLowerCase().includes(needle));
+      });
   }, [users, query, columns, teamsExpanded]);
 
   return (

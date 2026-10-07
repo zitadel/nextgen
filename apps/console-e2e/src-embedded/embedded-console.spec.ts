@@ -64,9 +64,7 @@ test("signs in end to end against the embedded API", async ({ page, seed }) => {
   await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();
   await expect(page.getByText("No projects yet.")).toBeVisible();
   // `toContainText`: the pill carries its label twice, once per breakpoint.
-  await expect(page.getByRole("button", { name: "Switch project" })).toContainText(
-    "No projects",
-  );
+  await expect(page.getByRole("button", { name: "Switch project" })).toContainText("No projects");
 });
 
 test("manages the project with the session cookie alone", async ({ page, seed, zitadel }) => {

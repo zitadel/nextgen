@@ -93,13 +93,7 @@ const FOCUS_RING = "outline-none focus-visible:ring-[3px] focus-visible:ring-rin
 const HEAD_CELL = PANEL_HEAD_CELL;
 const BODY_CELL = `${PANEL_BODY_CELL} truncate`;
 
-function PropertyRow({
-  property,
-  onDrillIn,
-}: {
-  property: SchemaProperty;
-  onDrillIn: () => void;
-}) {
+function PropertyRow({ property, onDrillIn }: { property: SchemaProperty; onDrillIn: () => void }) {
   return (
     <TableRow className={property.isObject ? "relative hover:bg-accent" : "hover:bg-transparent"}>
       <TableCell className={`${BODY_CELL} pl-2 text-foreground`}>
@@ -148,7 +142,13 @@ function PropertyRow({
  * stays on one line; the ellipsis is inert because it stands for more than one
  * level and picking which to jump to would be a guess.
  */
-function Breadcrumb({ path, onNavigate }: { path: string[]; onNavigate: (next: string[]) => void }) {
+function Breadcrumb({
+  path,
+  onNavigate,
+}: {
+  path: string[];
+  onNavigate: (next: string[]) => void;
+}) {
   const segments = [ROOT_LABEL, ...path];
   const last = segments.length - 1;
   const at = (depth: number) => ({ label: segments[depth] ?? "", depth });
@@ -162,7 +162,7 @@ function Breadcrumb({ path, onNavigate }: { path: string[]; onNavigate: (next: s
       {visible.map((segment, index) => {
         const current = segment.depth === last;
         return (
-          <Fragment key={`${segment.label}-${index}`}>
+          <Fragment key={segment.depth}>
             {index > 0 && (
               <span aria-hidden className="text-[13px] text-muted-foreground">
                 ›

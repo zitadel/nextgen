@@ -123,7 +123,9 @@ describe("landing routes", () => {
     server.use(
       http.get("http://localhost/api/users/me/projects", ({ request }) => {
         if (!new URL(request.url).searchParams.has("limit")) unpaged += 1;
-        return HttpResponse.json({ projects: [project("proj_1", "Acme"), project("proj_2", "Globex")] });
+        return HttpResponse.json({
+          projects: [project("proj_1", "Acme"), project("proj_2", "Globex")],
+        });
       }),
     );
     const router = await renderAt("/");

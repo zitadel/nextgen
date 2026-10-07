@@ -99,7 +99,9 @@ export function PanelTitle({
   eyebrow?: string;
   title: string;
 }) {
-  const heading = <h1 className="truncate font-serif text-lg leading-6 text-foreground">{title}</h1>;
+  const heading = (
+    <h1 className="truncate font-serif text-lg leading-6 text-foreground">{title}</h1>
+  );
   return (
     <div className="flex min-w-0 items-center gap-3">
       <span aria-hidden className={ICON_PLATE}>

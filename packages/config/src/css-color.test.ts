@@ -185,9 +185,9 @@ describe("currentColor", () => {
   });
 
   it("resolves inside a mix", () => {
-    expect(
-      rgbWith("color-mix(in srgb, currentColor, black)", { currentColor: "white" }),
-    ).toBe("128,128,128,1");
+    expect(rgbWith("color-mix(in srgb, currentColor, black)", { currentColor: "white" })).toBe(
+      "128,128,128,1",
+    );
   });
 });
 

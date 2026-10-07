@@ -153,7 +153,11 @@ function ClaimWindowBadge({ window, slot }: { window: ClaimWindow; slot?: string
   const days = daysUntil(window.expiresAt);
   return (
     <Badge variant="secondary" slot={slot}>
-      {window.expired ? "Claim window expired" : days === 0 ? "Expires today" : `Expires in ${days} ${days === 1 ? "day" : "days"}`}
+      {window.expired
+        ? "Claim window expired"
+        : days === 0
+          ? "Expires today"
+          : `Expires in ${days} ${days === 1 ? "day" : "days"}`}
     </Badge>
   );
 }

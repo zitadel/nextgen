@@ -22,7 +22,10 @@ function generate(files: Record<string, string>, name: string) {
     writeFileSync(join(dir, file), body);
   }
   const sources = findSources(dir);
-  return { sources: sources.map((path) => path.slice(dir.length + 1)), schema: generateSchema(join(dir, name), new Set(sources)) };
+  return {
+    sources: sources.map((path) => path.slice(dir.length + 1)),
+    schema: generateSchema(join(dir, name), new Set(sources)),
+  };
 }
 
 test("emits only marked files, stamped with the marker, draft and a derived title", () => {
@@ -41,7 +44,10 @@ test("emits only marked files, stamped with the marker, draft and a derived titl
 });
 
 test("keeps a title the YAML declares", () => {
-  const { schema } = generate({ "a.yaml": "x-meta-schema: true\ntitle: Explicit\ntype: object\n" }, "a.yaml");
+  const { schema } = generate(
+    { "a.yaml": "x-meta-schema: true\ntitle: Explicit\ntype: object\n" },
+    "a.yaml",
+  );
   assert.equal(schema.title, "Explicit");
 });
 
@@ -106,7 +112,8 @@ test("rejects an x-local kind it does not know", () => {
 test("keeps a $ref to another emitted file as a sibling .json reference", () => {
   const { schema } = generate(
     {
-      "parent.yaml": "x-meta-schema: true\ntype: object\nproperties:\n  child:\n    $ref: child.yaml\n",
+      "parent.yaml":
+        "x-meta-schema: true\ntype: object\nproperties:\n  child:\n    $ref: child.yaml\n",
       "child.yaml": "x-meta-schema: true\ntype: string\n",
     },
     "parent.yaml",
@@ -150,8 +157,14 @@ test("inlines a non-emitted $ref once under $defs and survives self-reference", 
 });
 
 test("adds the draft allOf only to json-schema meta-schemas", () => {
-  const documents = generate({ "doc.yaml": "x-meta-schema: json-schema\ntype: object\n" }, "doc.yaml").schema;
-  const plain = generate({ "leaf.yaml": "x-meta-schema: true\ntype: string\n" }, "leaf.yaml").schema;
+  const documents = generate(
+    { "doc.yaml": "x-meta-schema: json-schema\ntype: object\n" },
+    "doc.yaml",
+  ).schema;
+  const plain = generate(
+    { "leaf.yaml": "x-meta-schema: true\ntype: string\n" },
+    "leaf.yaml",
+  ).schema;
   assert.deepEqual(documents.allOf, [{ $ref: DRAFT }]);
   assert.equal("allOf" in plain, false);
 });

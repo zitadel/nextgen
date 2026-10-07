@@ -71,7 +71,10 @@ export async function columnsForUsers(
   await Promise.all(
     schemaIds.map(async (id) => {
       try {
-        loaded.set(id, (await api.getSchemaById(id, { project_id: projectId })).schema as UserSchema);
+        loaded.set(
+          id,
+          (await api.getSchemaById(id, { project_id: projectId })).schema as UserSchema,
+        );
       } catch {
         // One unreadable schema costs its columns, not the screen. Its users
         // still render from the fallback below.

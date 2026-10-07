@@ -48,7 +48,12 @@ export function parseStage(file) {
     } else if (e.type === "assistant") {
       for (const b of e.message?.content ?? []) {
         if (b?.type === "tool_use" && b.name === "Bash") {
-          const entry = push({ role: "agent", kind: "command", cmd: b.input?.command ?? "", out: "" });
+          const entry = push({
+            role: "agent",
+            kind: "command",
+            cmd: b.input?.command ?? "",
+            out: "",
+          });
           cmdById.set(b.id, entry);
         } else if (b?.type === "text" && (b.text ?? "").trim()) {
           final = b.text ?? "";
@@ -81,7 +86,9 @@ export function parseStage(file) {
       lastInTurn = null; // next turn attributes to its own last entry
     }
   }
-  const pairs = transcript.filter((t) => t.kind === "command").map((t) => ({ cmd: t.cmd, out: t.out }));
+  const pairs = transcript
+    .filter((t) => t.kind === "command")
+    .map((t) => ({ cmd: t.cmd, out: t.out }));
   const result = aggregateResults(results);
   return { pairs, transcript, final, result };
 }
@@ -129,7 +136,7 @@ function readIf(path) {
 export function gradeStage(rule, cfgDir, parsed, stage1ok) {
   const { pairs, final, result } = parsed;
   const ok = !(result?.is_error ?? true);
-  const blob = pairs.map((p) => `${p.cmd} ${p.out}`).join(" ") + " " + final;
+  const blob = `${pairs.map((p) => `${p.cmd} ${p.out}`).join(" ")} ${final}`;
 
   if (rule === "setup") {
     const sd = join(cfgDir, "artifacts/.zitadel/schemas");
@@ -145,20 +152,27 @@ export function gradeStage(rule, cfgDir, parsed, stage1ok) {
     const hasLast = /lastName|familyName/.test(txt);
     if (ok && hasFirst && hasLast)
       return { status: "pass", why: "schema has first- + last-name fields; applied" };
-    return { status: "fail", why: "no project created (couldn't find the CLI, or schema missing fields)" };
+    return {
+      status: "fail",
+      why: "no project created (couldn't find the CLI, or schema missing fields)",
+    };
   }
 
-  if (!stage1ok) return { status: "blocked", why: "stage 1 produced no project, so there's nothing to act on" };
+  if (!stage1ok)
+    return { status: "blocked", why: "stage 1 produced no project, so there's nothing to act on" };
 
   if (rule === "list-projects") {
     const listed = /projects?\s+list|projects\b/.test(blob);
-    const found = /proj_[0-9A-Za-z]{6,}|"count":\s*[1-9]|\b1 project\b|found[^.]*project/i.test(blob);
+    const found = /proj_[0-9A-Za-z]{6,}|"count":\s*[1-9]|\b1 project\b|found[^.]*project/i.test(
+      blob,
+    );
     return ok && listed && found
       ? { status: "pass", why: "ran a projects list and the project shows up" }
       : { status: "fail", why: "listed but no project found, or errored" };
   }
   if (rule === "inspect-credentials") {
-    const inspected = /variables|\.zitadel\/secret|client[_ ]?id|client[_ ]?secret|\.env|CLIENT_ID/i.test(blob);
+    const inspected =
+      /variables|\.zitadel\/secret|client[_ ]?id|client[_ ]?secret|\.env|CLIENT_ID/i.test(blob);
     const answered = /\byes\b|\bno\b|client id|client secret|credential/i.test(final);
     return ok && inspected && answered
       ? { status: "pass", why: "inspected credentials and gave an evidenced answer" }

@@ -135,9 +135,7 @@ function AddUserForm({
 
   const selected = schemas?.find((option) => option.id === schemaId);
   const fields = selected ? schemaFields(selected.schema) : [];
-  const missingRequired = fields.some(
-    (entry) => entry.required && !values[entry.key]?.trim(),
-  );
+  const missingRequired = fields.some((entry) => entry.required && !values[entry.key]?.trim());
 
   const create = useSubmit(async () => {
     if (!selected) return;
@@ -166,15 +164,18 @@ function AddUserForm({
   }, "Could not create the user.");
 
   const { clearError } = create;
-  const selectSchema = useCallback((next: string) => {
-    setSchemaId(next);
-    // Values are keyed by property name and schemas do not share a namespace,
-    // so a leftover value could be written to a property the new schema never
-    // declared. Reset rather than merge.
-    setValues({});
-    setLoadError(undefined);
-    clearError();
-  }, [clearError]);
+  const selectSchema = useCallback(
+    (next: string) => {
+      setSchemaId(next);
+      // Values are keyed by property name and schemas do not share a namespace,
+      // so a leftover value could be written to a property the new schema never
+      // declared. Reset rather than merge.
+      setValues({});
+      setLoadError(undefined);
+      clearError();
+    },
+    [clearError],
+  );
 
   return (
     <FormSheetForm
@@ -190,30 +191,28 @@ function AddUserForm({
       onClose={onClose}
     >
       <div className={SECTION}>
-          <Field>
-            <div className={LABEL_ROW}>
-              <FieldLabel className={LABEL}>User Schema</FieldLabel>
-            </div>
-            <SchemaPicker
-              id="user-schema"
-              schemas={schemas}
-              selected={selected}
-              onSelect={selectSchema}
-            />
-          </Field>
-          <Separator />
-          {fields.map((entry) => (
-            <SchemaInput
-              key={entry.key}
-              field={entry}
-              value={values[entry.key] ?? ""}
-              onChange={(value) =>
-                setValues((current) => ({ ...current, [entry.key]: value }))
-              }
-            />
-          ))}
-        </div>
-        {/* Projects block — out of the MVP for two independent reasons, both of
+        <Field>
+          <div className={LABEL_ROW}>
+            <FieldLabel className={LABEL}>User Schema</FieldLabel>
+          </div>
+          <SchemaPicker
+            id="user-schema"
+            schemas={schemas}
+            selected={selected}
+            onSelect={selectSchema}
+          />
+        </Field>
+        <Separator />
+        {fields.map((entry) => (
+          <SchemaInput
+            key={entry.key}
+            field={entry}
+            value={values[entry.key] ?? ""}
+            onChange={(value) => setValues((current) => ({ ...current, [entry.key]: value }))}
+          />
+        ))}
+      </div>
+      {/* Projects block — out of the MVP for two independent reasons, both of
             which must clear before it returns.
 
             Design removed the project selector (design decisions log D6,
@@ -229,7 +228,7 @@ function AddUserForm({
 
             The component, its unit spec and its e2e coverage are kept intact
             alongside this — restore all four together. */}
-        {/* <Separator />
+      {/* <Separator />
         <ProjectAccess projects={projects} rows={access} onChange={setAccess} /> */}
     </FormSheetForm>
   );

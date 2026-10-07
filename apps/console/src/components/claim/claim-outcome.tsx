@@ -8,13 +8,7 @@ import type { ClaimOutcome } from "@/lib/claim";
  * The screen for one completion outcome. Every branch is a state the contract
  * enumerates (`claim/complete` in the OpenAPI source), not an exception.
  */
-export function ClaimOutcomeCard({
-  outcome,
-  retry,
-}: {
-  outcome: ClaimOutcome;
-  retry: () => void;
-}) {
+export function ClaimOutcomeCard({ outcome, retry }: { outcome: ClaimOutcome; retry: () => void }) {
   switch (outcome.kind) {
     case "claimed":
       return (

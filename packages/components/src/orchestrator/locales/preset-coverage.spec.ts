@@ -1,8 +1,4 @@
-import {
-  getDefaultLoginFlow,
-  SETUP_PRESETS,
-  SETUP_USE_CASES,
-} from "@zitadel/config/defaults";
+import { getDefaultLoginFlow, SETUP_PRESETS, SETUP_USE_CASES } from "@zitadel/config/defaults";
 import { describe, expect, it } from "vitest";
 
 import { builtinLocales } from "./index.js";
@@ -42,9 +38,7 @@ describe.each(
       for (const step of steps) {
         expect(locale, `${step.name}.title`).toHaveProperty(`${step.name}.title`);
         if (step.complete === undefined) {
-          expect(locale, `${step.name}.description`).toHaveProperty(
-            `${step.name}.description`,
-          );
+          expect(locale, `${step.name}.description`).toHaveProperty(`${step.name}.description`);
         }
       }
     });
@@ -73,8 +67,7 @@ describe.each(
     it("resolves the injected back action on every non-terminal step", () => {
       for (const step of steps) {
         if (step.complete !== undefined) continue;
-        const resolved =
-          locale[`${step.name}.action.back`] ?? locale["action.back"];
+        const resolved = locale[`${step.name}.action.back`] ?? locale["action.back"];
         expect(resolved, `${step.name}.action.back`).toBeDefined();
       }
     });

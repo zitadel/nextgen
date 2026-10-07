@@ -111,29 +111,29 @@ func (s cryptoKeyStatements) ListEncryptionKeys(ctx context.Context, opts *datab
 	if opts == nil {
 		opts = &database.ListOptions[domain.EncryptionKeyField]{}
 	}
+	keys, nextCursor, err := pagination.Page(opts.Pagination, encryptionKeySchema, func(limit uint32) ([]*domain.EncryptionKey, error) {
+		opts := opts.WithLimit(limit)
 
-	var compiler statementCompiler
-	if err := compileRead(&compiler, encryptionKeyQuery, opts, encryptionKeySchema); err != nil {
+		var compiler statementCompiler
+		if err := compileRead(&compiler, encryptionKeyQuery, opts, encryptionKeySchema); err != nil {
+			return nil, err
+		}
+
+		rows, err := s.client.Query(ctx, compiler.String(), compiler.args...)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+
+		keys, err := pgx.CollectRows(rows, s.scanEncryptionKey)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+
+		return keys, nil
+	})
+	if err != nil {
 		return nil, err
 	}
-
-	rows, err := s.client.Query(ctx, compiler.String(), compiler.args...)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-
-	keys, err := pgx.CollectRows(rows, s.scanEncryptionKey)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-
-	nextCursor := pagination.MarshalNext(
-		opts.Pagination.OrderBy,
-		keys,
-		encryptionKeySchema,
-		opts.Pagination.Limit,
-	)
-
 	return &database.ListResult[*domain.EncryptionKey]{
 		Items:      keys,
 		NextCursor: nextCursor,

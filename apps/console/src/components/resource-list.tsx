@@ -178,7 +178,12 @@ export function RowMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label={`Actions for ${name}`} className={className}>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label={`Actions for ${name}`}
+          className={className}
+        >
           <Icon aria-hidden />
         </Button>
       </DropdownMenuTrigger>

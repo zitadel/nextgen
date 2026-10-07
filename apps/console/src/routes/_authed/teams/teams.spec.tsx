@@ -88,7 +88,9 @@ describe("teams screen", () => {
   it("shows the status the API returns rather than the mock's wording", async () => {
     server.use(
       http.post(TEAMS_URL, () =>
-        HttpResponse.json({ teams: [team({ id: "team_2", name: "Acme Mobile", status: "deactivated" })] }),
+        HttpResponse.json({
+          teams: [team({ id: "team_2", name: "Acme Mobile", status: "deactivated" })],
+        }),
       ),
     );
     await renderTeams();
@@ -214,7 +216,11 @@ describe("teams screen", () => {
     );
     // In the URL rather than in component state: a filtered list is linkable and
     // moves with the back button.
-    expect(router.state.location.search).toEqual({ project: TEST_PROJECT_ID, status: "active", q: "acme" });
+    expect(router.state.location.search).toEqual({
+      project: TEST_PROJECT_ID,
+      status: "active",
+      q: "acme",
+    });
   });
 
   it("starts from the tab and term the URL carries", async () => {
