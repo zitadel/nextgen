@@ -1,11 +1,7 @@
 #!/usr/bin/env node
 import { fileURLToPath } from "node:url";
 
-import {
-  forwardedArgs,
-  isDirectRun,
-  runCapture,
-} from "./dev-process.mjs";
+import { forwardedArgs, isDirectRun, runCapture } from "./dev-process.mjs";
 import { PUBLIC_PACKAGE_BUILD_TARGETS } from "./release-manifest.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
@@ -24,11 +20,7 @@ const BUILD_MUTEX_REQUIREMENTS = new Map([
   ["sdk-next:build-release", "public-dist"],
   ["sdk-nuxt:build-release", "sdk-nuxt-dist"],
 ]);
-const RELEASE_ENTRYPOINT_TARGETS = [
-  "release:pack",
-  "release:snapshot",
-  "release:publish",
-];
+const RELEASE_ENTRYPOINT_TARGETS = ["release:pack", "release:snapshot", "release:publish"];
 
 export async function main(args = forwardedArgs()) {
   if (args.includes("--help")) {
@@ -61,9 +53,7 @@ export async function main(args = forwardedArgs()) {
     assertSelfBuildNotInReleaseGraph(publicTasks, target);
 
     if (!aggregateDeps.has(target)) {
-      throw new Error(
-        `${PUBLIC_AGGREGATE_TARGET} is missing manifest build target ${target}`,
-      );
+      throw new Error(`${PUBLIC_AGGREGATE_TARGET} is missing manifest build target ${target}`);
     }
   }
 
@@ -158,17 +148,13 @@ function assertTaskOption(tasks, target, option, expected) {
   const task = tasks.get(target);
 
   if (task.options?.[option] !== expected) {
-    throw new Error(
-      `${target} must set options.${option} to ${String(expected)}`,
-    );
+    throw new Error(`${target} must set options.${option} to ${String(expected)}`);
   }
 }
 
 function assertTaskRunInCI(task, expected) {
   if (task.options?.runInCI !== expected) {
-    throw new Error(
-      `${task.target} must set options.runInCI to ${String(expected)}`,
-    );
+    throw new Error(`${task.target} must set options.runInCI to ${String(expected)}`);
   }
 }
 

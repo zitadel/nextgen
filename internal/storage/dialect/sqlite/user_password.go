@@ -74,25 +74,26 @@ func (ps userPasswordStatements) GetUserPassword(ctx context.Context, filter dat
 
 // ListUserPasswords implements [service.UserPasswordStatements].
 func (ps userPasswordStatements) ListUserPasswords(ctx context.Context, filter *database.ListOptions[domain.UserPasswordField]) (*database.ListResult[*domain.UserPassword], error) {
-	var compiler statementCompiler
-	if err := compileRead(&compiler, userPasswordQuery, filter, userpassword.Schema, currentUserPassword); err != nil {
+	passwords, nextCursor, err := pagination.Page(filter.Pagination, userpassword.Schema, func(limit uint32) ([]*domain.UserPassword, error) {
+		filter := filter.WithLimit(limit)
+		var compiler statementCompiler
+		if err := compileRead(&compiler, userPasswordQuery, filter, userpassword.Schema, currentUserPassword); err != nil {
+			return nil, err
+		}
+		rows, err := ps.client.Query(ctx, compiler.String(), compiler.args...)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+		defer rows.Close()
+		passwords, err := collectRows(rows, scanUserPassword)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+		return passwords, nil
+	})
+	if err != nil {
 		return nil, err
 	}
-	rows, err := ps.client.Query(ctx, compiler.String(), compiler.args...)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-	defer rows.Close()
-	passwords, err := collectRows(rows, scanUserPassword)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-	nextCursor := pagination.MarshalNext(
-		filter.Pagination.OrderBy,
-		passwords,
-		userpassword.Schema,
-		filter.Pagination.Limit,
-	)
 	return &database.ListResult[*domain.UserPassword]{Items: passwords, NextCursor: nextCursor}, nil
 }
 

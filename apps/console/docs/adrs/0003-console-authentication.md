@@ -87,10 +87,26 @@ contract) with a menu whose only entry is **Sign out**
 console-local (bucket 2 of the root AGENTS.md styling rule) — the dark-only
 `<zitadel-session>`/`<zitadel-logout>` pairs are not theme-portable yet.
 
+> **Amendment (2026-10-04):** the root `AGENTS.md` styling rule now names two
+> surfaces, and the login surface themes light and dark. This chrome stays
+> console-local because the console does not compose login-surface elements
+> (root ADR 055).
+
 A data-load `401` now means "session ended mid-use": the shared error
 boundary drops the session cache and redirects to `/login?next=…` instead of
 rendering dead-end copy (the hook ADR 0002 §3 anticipated). `403` stays a
 rendered state — signed in, but no access.
+
+> **Amendment (2026-10-05, #1300):** a page belongs to one person. The first
+> session the page reads names that person for the life of the document, and
+> nothing changes it in place: a session that now belongs to someone else —
+> another tab signed in, or a sign-in on this page after a sign-out — is
+> never adopted, wherever it is noticed (the guard, the 401 boundary's fresh
+> read, or a refused write's re-check, ADR 0002 §3). The page reloads once
+> instead, and the new document starts as whoever is signed in then. A
+> session that is gone drops the cached session, its CSRF token and the reads
+> cached for it, but keeps the person, so the same person signing in again
+> carries on without a reload.
 
 ### 4. The cookie is the embedded Console's human credential
 
@@ -133,6 +149,10 @@ does not change.
   dark-only login tokens (root ADR 014 §5), so the login screen renders the
   dark treatment in both console themes. Accepted for v1; resolves as the login
   atoms migrate onto the shadcn token roles.
+
+  > **Amendment (2026-10-04):** the login atoms use the shared token roles and
+  > theme light and dark; `/login` passes the console's resolved theme to the
+  > widget (`src/routes/login.tsx`).
 - **Full-page reload on sign-in.** The widget's document navigation reboots
   the SPA with the cookie present. Accepted; an `onFlowComplete` +
   `router.navigate` in-SPA handoff is possible later.
@@ -144,7 +164,9 @@ does not change.
   Console ADR 0004 and root ADR 053 keep those scopes distinct.
 - **Fail-closed session probe.** Any `fetchSession` failure (including a
   backend outage) reads as "not signed in" and lands on the login screen,
-  where the outage surfaces as a widget error.
+  where the outage surfaces as a widget error. A session that belongs to
+  someone else is not a failure: `fetchSession` never answers for it, and the
+  page reloads (§3).
 
 ## Consequences
 

@@ -70,16 +70,25 @@ type UsersPage = Awaited<ReturnType<typeof api.queryUsers>>;
  *
  * `expand: ["teams"]` needs `team_membership.read` on top of `user.read`, and a
  * credential carrying one without the other is refused the whole request rather
- * than just the relation (ADR 059). A Console session passes once it may list
- * the project (#1306); the refusal still falls back to the unexpanded read for
- * a credential that may not, so the screen loses its Team column, not its users.
+ * than just the relation (ADR 059). A Console session passes when it may read
+ * the whole project; a grant on only part of it is refused, and the refusal
+ * falls back to the unexpanded read, so the screen loses its Team column, not
+ * its users.
+ *
+ * `expand` is false once a page was served without the expansion: a refusal
+ * does not turn into a pass by paging, so Load more asks for the plain page
+ * directly instead of being refused first every time.
  */
 async function fetchUsers(
   projectId: string,
   pageToken?: string,
+  expand = true,
 ): Promise<UsersPage & { teamsExpanded: boolean }> {
   const body = { limit: PAGE_SIZE, page_token: pageToken };
   const params = { project_id: projectId };
+  if (!expand) {
+    return { ...(await api.queryUsers(body, params)), teamsExpanded: false };
+  }
   try {
     return {
       ...(await api.queryUsers({ ...body, expand: ["teams"] }, params)),
@@ -227,7 +236,7 @@ function UsersScreen() {
     const generation = loaded;
     setLoadingMore(true);
     try {
-      const page = await fetchUsers(projectId, nextPageToken);
+      const page = await fetchUsers(projectId, nextPageToken, teamsExpanded);
       // A later page can carry a schema the first page never referenced, which
       // would otherwise render its users with every cell blank.
       const nextColumns = await columnsForUsers(projectId, [...users, ...page.users]);
@@ -278,26 +287,30 @@ function UsersScreen() {
   // search whatever the project's schema actually defines.
   const rows = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    return users.map((user, index) => toUserRow(user, index, columns)).filter((row) => {
-      if (needle === "") return true;
-      // Team names only while the column is on screen. A later page served
-      // without the expansion drops the column while the rows fetched before it
-      // keep their memberships, and searching those would filter the table on
-      // something the operator cannot see.
-      const teams = teamsExpanded ? row.teams.map((team) => team.name) : [];
-      return [
-        row.id,
-        row.name,
-        row.identifier ?? "",
-        ...teams,
-        ...columns.map((column) => row.values[column.key] ?? ""),
-      ].some((value) => value.toLowerCase().includes(needle));
-    });
+    return users
+      .map((user, index) => toUserRow(user, index, columns))
+      .filter((row) => {
+        if (needle === "") return true;
+        // Team names only while the column is on screen. A later page served
+        // without the expansion drops the column while the rows fetched before it
+        // keep their memberships, and searching those would filter the table on
+        // something the operator cannot see.
+        const teams = teamsExpanded ? row.teams.map((team) => team.name) : [];
+        return [
+          row.id,
+          row.name,
+          row.identifier ?? "",
+          ...teams,
+          ...columns.map((column) => row.values[column.key] ?? ""),
+        ].some((value) => value.toLowerCase().includes(needle));
+      });
   }, [users, query, columns, teamsExpanded]);
 
   return (
     <div className={`${RESOURCE_PAGE} pt-4`}>
-      <h1 className={`${RESOURCE_HEADER} text-foreground font-serif text-2xl leading-6 tracking-tight`}>
+      <h1
+        className={`${RESOURCE_HEADER} text-foreground font-serif text-2xl leading-6 tracking-tight`}
+      >
         Users
       </h1>
 
@@ -443,11 +456,7 @@ function UsersScreen() {
   );
 }
 
-function toUserRow(
-  user: Record<string, unknown>,
-  index: number,
-  columns: SchemaField[],
-): UserRow {
+function toUserRow(user: Record<string, unknown>, index: number, columns: SchemaField[]): UserRow {
   const id = field(user, "id") ?? `unknown-user-${index}`;
   const attributes = userAttributes(user);
   const values: Record<string, string> = {};
@@ -514,7 +523,6 @@ function userStatus(user: Record<string, unknown>): string | undefined {
   if (!metadata || typeof metadata !== "object") return undefined;
   return field(metadata as Record<string, unknown>, "status");
 }
-
 
 /**
  * The teams a user belongs to, glyphed the way the design draws the cell and the

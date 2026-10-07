@@ -148,9 +148,7 @@ export class Telemetry {
    * a synchronous throw or an error callback must not surface to the caller or
    * leak as an unhandled rejection.
    */
-  private enqueue(
-    send: (client: MixpanelClient, done: () => void) => void,
-  ): void {
+  private enqueue(send: (client: MixpanelClient, done: () => void) => void): void {
     const client = this.client;
     if (!client) {
       return;

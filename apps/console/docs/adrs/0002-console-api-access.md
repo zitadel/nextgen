@@ -135,7 +135,8 @@ instead of writing its own fetch wrapper:
 import { configureZitadel, getApi } from "@zitadel/api/config";
 
 const project = configureZitadel({
-  proxyPath: import.meta.env.VITE_CONSOLE_API_BASE ?? "/api", // same-origin API base
+  // Same-origin API base: the dev proxy path, or the origin root when embedded.
+  proxyPath: import.meta.env.VITE_CONSOLE_API_BASE || (import.meta.env.DEV ? "/api" : ""),
   projectId: "", // learnt at boot from /console/runtime.json (Console ADR 0004 §3)
 });
 
@@ -163,12 +164,24 @@ responsibilities are deliberately narrow:
   The login screen's per-element
   handle is the one exception: it carries the runtime-discovered publishable
   key from ADR 036.
+- **CSRF header** — on state-changing requests `customFetch` sends the
+  session's CSRF token in `X-Zitadel-CSRF` (root ADR 053 §5). The console reads
+  it from `GET /sessions/me/csrf` once per session and keeps it in memory; it
+  is not a credential on its own. The cookie it is bound to can change in
+  another tab, so a write refused with `403 auth.csrf_invalid` makes the console
+  read the session again. Still the same person: it loads a fresh token and the
+  write is retried once with it. Someone else, or nobody: the write is not
+  retried, so it never runs as another person, and the page starts over. The
+  page's person is fixed by its first session for the life of the document,
+  even across a lost session: a session that later belongs to someone else is
+  never adopted in place, wherever it is noticed — the page reloads, once.
 - **Error mapping** — non-2xx throws `ApiError`; loaders let it propagate to
   the route `errorComponent`. `ApiError.status` drives status-specific copy
   (e.g. a `401`/`403` "you don't have access" surface once auth lands).
 
-The console does **not** add token storage, refresh, or retry logic. The
-first-party session credential is browser-managed and not script-readable.
+_Amended 2026-10-02:_ the console keeps no credential. The session cookie is
+browser-managed and not script-readable; the only value the console holds is
+the CSRF token above, which authorizes nothing without that cookie.
 
 ### 4. Dev story keeps the same shape as production
 
@@ -199,7 +212,7 @@ server: {
 
 So dev and prod differ only in whether a proxy sits in front of the API, never
 in whether the browser holds a secret — it never does. The base resolves in
-`src/api/zitadel.ts` as `VITE_CONSOLE_API_BASE ?? (DEV ? "/api" : "")`: the
+`src/api/zitadel.ts` as `VITE_CONSOLE_API_BASE || (DEV ? "/api" : "")`: the
 env var is the escape hatch for a deployment that mounts the API elsewhere,
 `/api` is the dev-proxy path, and root is what the embedded build talks to.
 `vite preview` deliberately proxies nothing, so it cannot be mistaken for the

@@ -9,12 +9,6 @@ dependsOn:
   - "design-tokens"
 
 tasks:
-  lint:
-    command: "corepack pnpm exec oxlint ."
-    deps:
-      - "api:build"
-      - "design-tokens:build"
-
   typecheck:
     command: "corepack pnpm exec tsc --build tsconfig.json"
     deps:

@@ -55,7 +55,7 @@ func (h *Harness) EnsureTestServer(t *testing.T) *httptest.Server {
 		mux := http.NewServeMux()
 		mux.Handle(api.IDPCallbackPath, callback)
 		mux.Handle(api.IDPCallbackUpstreamPath, callback)
-		mux.Handle("/", h.withServerLog(api.WithSessionStateNoStore(h.EnsureGeneratedServer(t))))
+		mux.Handle("/", h.withServerLog(api.WithSessionStateNoStore(api.WithCSRFRequest(h.EnsureGeneratedServer(t)))))
 		h.testServer.value = httptest.NewServer(mux)
 	}
 	return h.testServer.value

@@ -24,6 +24,13 @@ export default defineConfig({
   test: {
     ...baseTest,
     name: "@zitadel/storybook",
+    // Run story files one at a time. main's `optimizeDeps.noDiscovery` (below)
+    // fixes the re-optimization cause of the CI "Failed to fetch dynamically
+    // imported module" flake, but parallel Chromium contexts still overwhelm
+    // the Vitest Vite server under the full `moon ci` load (vitest-dev/vitest#9509).
+    // Serializing the files keeps the server serving one importer at a time;
+    // per-file isolation stays on (this is not `isolate: false`).
+    fileParallelism: false,
     projects: [
       {
         extends: true,

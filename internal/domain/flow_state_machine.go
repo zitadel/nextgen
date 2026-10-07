@@ -1303,11 +1303,11 @@ func applyOutcomeFlip(state *FlowState, outcome string) {
 }
 
 // dispatchChallenges submits field-shaped challenges in
-// [challengeDispatchOrder]. CurrentPurpose + visited on_success decide
-// verify-vs-skip. What reaches it is what the action submitted, so a leg
-// that consumes a subset (see [identifierFieldsOnly]) dispatches a subset.
+// [challengeDispatchOrder]. CurrentPurpose decides verify-vs-skip. What
+// reaches it is what the action submitted, so a leg that consumes a subset
+// (see [identifierFieldsOnly]) dispatches a subset.
 func (r *FlowStateMachineRuntime) dispatchChallenges(pc *processCtx, resolved FlowResolvedFields) (flowDispatchResult, error) {
-	ctx, def, state, step, fields := pc.ctx, pc.def, pc.state, pc.currentStep, pc.in.Fields
+	ctx, state, fields := pc.ctx, pc.state, pc.in.Fields
 	for _, challenge := range challengeDispatchOrder {
 		name, value, ok := fieldValueByChallenge(resolved, fields, challenge)
 		if !ok {
@@ -1346,12 +1346,6 @@ func (r *FlowStateMachineRuntime) dispatchChallenges(pc *processCtx, resolved Fl
 			if state.CurrentPurpose != FlowDefinitionPurposeLogin {
 				continue
 			}
-			// Skip if any visited step runs an on_success — today the only
-			// one (create_user) establishes the password kind, and the
-			// validator enforces password-collected-upstream for it.
-			if anyVisitedStepOnSuccess(def, state, step) {
-				continue
-			}
 			err := r.authAttempts.SubmitPassword(ctx, FlowSubmitPasswordInput{
 				ProjectID: state.ProjectID,
 				AttemptID: state.AuthAttemptID,
@@ -1367,20 +1361,6 @@ func (r *FlowStateMachineRuntime) dispatchChallenges(pc *processCtx, resolved Fl
 		}
 	}
 	return flowDispatchResult{}, nil
-}
-
-// anyVisitedStepOnSuccess reports whether any step in (history ∪ current)
-// runs an on_success mutation.
-func anyVisitedStepOnSuccess(def *FlowDefinition, state *FlowState, current *FlowDefinitionStep) bool {
-	if current.OnSuccess != nil {
-		return true
-	}
-	for _, name := range state.History {
-		if s, ok := def.FindStep(name); ok && s.OnSuccess != nil {
-			return true
-		}
-	}
-	return false
 }
 
 // uniqueFieldValues returns every uniquely-keyed field with a collected

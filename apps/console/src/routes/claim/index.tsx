@@ -172,7 +172,11 @@ function ClaimWindowBadge({ window, slot }: { window: ClaimWindow; slot?: string
   const days = daysUntil(window.expiresAt);
   return (
     <Badge variant="secondary" slot={slot}>
-      {window.expired ? "Claim window expired" : days === 0 ? "Expires today" : `Expires in ${days} ${days === 1 ? "day" : "days"}`}
+      {window.expired
+        ? "Claim window expired"
+        : days === 0
+          ? "Expires today"
+          : `Expires in ${days} ${days === 1 ? "day" : "days"}`}
     </Badge>
   );
 }
@@ -470,6 +474,27 @@ function outcomeCard(outcome: ClaimOutcome, retry: () => void) {
           </p>
           <Button onClick={retry} variant="outline" className="mx-auto w-fit">
             Try again
+          </Button>
+        </StateCard>
+      );
+    case "csrf_refused":
+      // Still refused after the shared fetch's one retry: someone else is
+      // signed in now (the session module may already have reloaded the page),
+      // or the request came from another site. Reloading starts over with the
+      // session this browser actually holds now.
+      return (
+        <StateCard title="The claim was not accepted from this page">
+          <p className={BODY_TEXT}>{outcome.message}</p>
+          <p className={BODY_TEXT}>
+            Your sign-in may have changed in another tab. Reload this page, or reopen the claim link
+            from your terminal.
+          </p>
+          <Button
+            onClick={() => window.location.reload()}
+            variant="outline"
+            className="mx-auto w-fit"
+          >
+            Reload
           </Button>
         </StateCard>
       );

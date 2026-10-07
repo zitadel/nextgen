@@ -48,7 +48,11 @@ function installSessionFetchStub(): { restore: () => void } {
   );
   const original = globalThis.fetch;
   globalThis.fetch = fetchStub as unknown as typeof fetch;
-  return { restore: () => void (globalThis.fetch = original) };
+  return {
+    restore: () => {
+      globalThis.fetch = original;
+    },
+  };
 }
 
 async function waitFor<T>(probe: () => T | null | undefined, timeout = 3000): Promise<T> {
@@ -136,9 +140,7 @@ describe("<zitadel-session> surface (chromium)", () => {
     const shell = element.shadowRoot?.querySelector("zl-page-shell") as HTMLElement;
     expect(shell.hasAttribute("data-widget")).toBe(false);
     // The page paint lives on the internal page shell, not the session host.
-    expect(element.getBoundingClientRect().height).toBeGreaterThanOrEqual(
-      window.innerHeight - 1,
-    );
+    expect(element.getBoundingClientRect().height).toBeGreaterThanOrEqual(window.innerHeight - 1);
     const surface = shell.shadowRoot?.querySelector(".zr-page-shell") as HTMLElement;
     expect(luminance(getComputedStyle(surface).backgroundColor)).toBeLessThan(60);
 

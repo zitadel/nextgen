@@ -24,12 +24,10 @@ describe("default config rendering", () => {
     expect(schema).toMatchObject({
       title: "DefaultHumanUserSchema",
       metaSchema: "https://example.test/api/schemas/user-schema.json",
-      "$id": "https://example.test/api/schemas/default-human-user.json",
+      $id: "https://example.test/api/schemas/default-human-user.json",
       objectType: "human-user",
     });
-    expect(flow.user_schema).toBe(
-      "https://example.test/api/schemas/default-human-user.json",
-    );
+    expect(flow.user_schema).toBe("https://example.test/api/schemas/default-human-user.json");
   });
 
   it("pins the flow to a server-assigned schema id when one is provided", () => {

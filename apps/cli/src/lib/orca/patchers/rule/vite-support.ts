@@ -75,11 +75,14 @@ function isLegacyManagedProxy(source: string): boolean {
   if (source.includes(PROXY_CREDENTIAL_POLICY_MARKER)) {
     return false;
   }
-  return [
-    'loadEnv("development", process.cwd(), "ZITADEL_").ZITADEL_PROJECT_SECRET',
-    'throw new Error("ZITADEL_PROJECT_SECRET is not set; add it to .env.local (zitadel setup writes it).")',
-    "const bearer = `Bearer ${secret}`;",
-  ].every((fingerprint) => source.includes(fingerprint)) && LEGACY_PROXY_REQUEST_LISTENER.test(source);
+  return (
+    [
+      'loadEnv("development", process.cwd(), "ZITADEL_").ZITADEL_PROJECT_SECRET',
+      'throw new Error("ZITADEL_PROJECT_SECRET is not set; add it to .env.local (zitadel setup writes it).")',
+      "const bearer = `Bearer ${secret}`;",
+    ].every((fingerprint) => source.includes(fingerprint)) &&
+    LEGACY_PROXY_REQUEST_LISTENER.test(source)
+  );
 }
 
 /** The imports that the injected proxy entry depends on. */

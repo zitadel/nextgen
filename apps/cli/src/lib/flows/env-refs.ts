@@ -21,7 +21,11 @@ export function flowEnvRefs(value: unknown): string[] {
       node.forEach(visit);
     } else if (isObject(node)) {
       for (const [key, child] of Object.entries(node)) {
-        if (key.endsWith("_env") && typeof child === "string" && /^[A-Za-z_][A-Za-z0-9_]*$/.test(child)) {
+        if (
+          key.endsWith("_env") &&
+          typeof child === "string" &&
+          /^[A-Za-z_][A-Za-z0-9_]*$/.test(child)
+        ) {
           refs.add(child);
         } else {
           visit(child);

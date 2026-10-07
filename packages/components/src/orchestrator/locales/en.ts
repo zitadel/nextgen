@@ -230,7 +230,8 @@ export const en: Record<string, string> = {
   "error.sign_in_server.title": "We couldn't complete your sign in.",
   "error.sign_in_server.body": "Please try again in a few minutes",
   "error.sso_cancelled.title": "Sign-in cancelled",
-  "error.sso_cancelled.body": "You cancelled signing in with the provider, or it declined the request. You can try again or use another method.",
+  "error.sso_cancelled.body":
+    "You cancelled signing in with the provider, or it declined the request. You can try again or use another method.",
   "error.sso_failed.title": "Sign-in failed",
   "error.sso_failed.body": "The sign-in could not be completed. Please try again.",
   "error.more_info": "More information",
