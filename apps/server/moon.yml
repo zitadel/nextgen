@@ -213,6 +213,12 @@ tasks:
     inputs:
       - "@group(serverInputs)"
     options:
+      # Starts and stops Docker containers (testcontainers). On a Linux runner each
+      # one adds or removes a host network interface, and Chromium aborts every
+      # in-flight request on a network change (ERR_NETWORK_CHANGED), failing any
+      # browser-mode suite loading at that moment. Share the browser suites' mutex
+      # so the two never overlap. (#1490)
+      mutex: "browser-tests"
       runFromWorkspaceRoot: true
       # See the -count=1 note above: moon's own cache would skip the process
       # before go's cache mattered.
@@ -277,6 +283,12 @@ tasks:
       # which also lists an env input alongside cache: false.
       - "$ZITADEL_TEST_SPANNER_INSTANCE"
     options:
+      # Starts and stops Docker containers (testcontainers). On a Linux runner each
+      # one adds or removes a host network interface, and Chromium aborts every
+      # in-flight request on a network change (ERR_NETWORK_CHANGED), failing any
+      # browser-mode suite loading at that moment. Share the browser suites' mutex
+      # so the two never overlap. (#1490)
+      mutex: "browser-tests"
       runFromWorkspaceRoot: true
       # See the -count=1 note above: moon's own cache would skip the process
       # before go's cache mattered. Observed on #934, where moon replayed the
