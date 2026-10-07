@@ -18,6 +18,12 @@ Scope pointers first — this file's own body covers **telemetry only**:
 - The test contract — the unit/spec split and one spec per command — is
   [`tests/AGENTS.md`](tests/AGENTS.md). Read it before adding or moving any
   test.
+- Warnings go through `reportWarning` in `src/lib/warnings.ts`, or the
+  `warnings` field of a command's result. Never call `consola.warn` directly:
+  `--json` silences consola, so the warning would never reach an agent.
+  `reportWarning` shows it in the terminal at once and adds it to the JSON
+  envelope's `warnings`, and `emit` prints a result's `warnings` after its
+  `pretty` text. A unit test fails on any other `consola.warn` call.
 - The flag surface deliberately tracks the [WebCLI spec](https://webcli.com/) so
   an agent can drive the CLI from conventions it already knows. That is the
   rationale; the canonical flag list, output-channel rules and the two
