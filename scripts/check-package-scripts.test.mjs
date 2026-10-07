@@ -116,9 +116,6 @@ describe("package-script contract", () => {
     '"C:\\tools\\PNPM.EXE" install',
     "pnpm>out.log test",
     "vitest run && pnpm>>out.log install",
-    "busybox sh -c 'pnpm run test'",
-    "some-wrapper --flag pnpm run test",
-    "some-wrapper --flag 'pnpm run test'",
   ])("detects a package manager in %s", (body) => {
     expect(startsPackageManager(body)).toBe(true);
   });
@@ -205,6 +202,8 @@ describe("package-script contract", () => {
     "node.exe scripts/doctor.mjs",
     "vitest run>out.log",
     "echo 'a>b' && vitest run",
+    "vitest run --testNamePattern 'npm run build'",
+    "playwright test --grep 'pnpm install'",
   ])("allows plain commands like %s", (body) => {
     expect(unsupportedSyntax(body)).toBeNull();
   });

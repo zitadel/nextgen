@@ -99,25 +99,7 @@ export function startsPackageManager(body) {
       return flag !== -1 && startsPackageManager(args[flag + 1] ?? "");
     }
     if (executable === "node") return nodeRunsScript(args);
-    if (PACKAGE_MANAGERS.has(executable)) return true;
-    if (PRINTERS.has(executable)) return false;
-    // Whatever runs it (busybox, xargs, a wrapper not listed here), an
-    // argument that is a package manager, or a command string whose command
-    // is one, means the script reaches a package manager.
-    return args.some((arg) => PACKAGE_MANAGERS.has(executableName(arg)) || commandStringStartsPackageManager(arg));
-  });
-}
-
-/** Commands that only print their arguments, so a package manager there is prose. */
-const PRINTERS = new Set(["echo", "printf"]);
-
-/** Whether a quoted command-string argument's own command is a package manager. */
-function commandStringStartsPackageManager(arg) {
-  if (!/\s/.test(arg)) return false;
-  return simpleCommands(arg).some((words) => {
-    const [command = "", ...rest] = commandWords(words);
-    const executable = executableName(command);
-    return PACKAGE_MANAGERS.has(executable) || (executable === "node" && nodeRunsScript(rest));
+    return PACKAGE_MANAGERS.has(executable);
   });
 }
 
