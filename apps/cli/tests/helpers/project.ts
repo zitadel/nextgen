@@ -8,6 +8,17 @@ import { expect, onTestFinished } from "vitest";
 
 import { parseJson, runCliForTest } from "./run-cli";
 
+/**
+ * Remove a temp dir on teardown, retrying the transient `ENOTEMPTY`/`EBUSY`
+ * that `fs.rm({ recursive })` can hit on a busy CI filesystem. This is not a
+ * writer still running — the CLI awaits every write and renames atomically —
+ * it is the OS-level delete race Node's built-in retry handling exists for.
+ * `retryDelay` is in milliseconds.
+ */
+function rmTemp(target: string): Promise<void> {
+  return rm(target, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+}
+
 const SCHEMA_FILE = ".zitadel/schemas/default-human-user.json";
 const FLOW_FILE = ".zitadel/flows/default-login.json";
 
@@ -642,7 +653,7 @@ export async function anApp({
   nextVersion = "^16.0.0",
 }: { nextVersion?: string } = {}): Promise<ScaffoldedApp> {
   const path = await mkdtemp(join(tmpdir(), "zitadel-next-"));
-  onTestFinished(() => rm(path, { recursive: true, force: true }));
+  onTestFinished(() => rmTemp(path));
 
   await mkdir(join(path, "app"), { recursive: true });
   await writeFile(
@@ -676,7 +687,7 @@ export async function aSetUpApp(extraArgs: string[] = []): Promise<ScaffoldedApp
 /** A fake `npm` on PATH that records its invocation instead of installing. */
 async function fakePackageManager(): Promise<{ binDir: string; logPath: string }> {
   const binDir = await mkdtemp(join(tmpdir(), "zitadel-fake-pm-"));
-  onTestFinished(() => rm(binDir, { recursive: true, force: true }));
+  onTestFinished(() => rmTemp(binDir));
   const logPath = join(binDir, "package-manager.log");
   const binPath = join(binDir, "npm");
   await writeFile(
@@ -698,7 +709,7 @@ process.stderr.write("fake npm stderr\\n");
 /** A fake `docker` on PATH, so doctor's runtime probe needs no daemon. */
 async function fakeDocker(): Promise<{ binDir: string; logPath: string }> {
   const binDir = await mkdtemp(join(tmpdir(), "zitadel-fake-docker-"));
-  onTestFinished(() => rm(binDir, { recursive: true, force: true }));
+  onTestFinished(() => rmTemp(binDir));
   const logPath = join(binDir, "docker.log");
   const dockerPath = join(binDir, "docker");
   await writeFile(
