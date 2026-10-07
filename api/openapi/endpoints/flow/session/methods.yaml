@@ -12,11 +12,29 @@ get:
     - $ref: ../../../components/parameters/flow-cookie.yaml
   responses:
     '200':
-      description: Current step.
+      description: |
+        Current step. Only a render that resolved a parked SSO identity sets
+        the flow cookie; any other render leaves it unchanged. When that
+        render completed the sign-in, the step is terminal, the cookie is
+        cleared, and the step carries the handoff token.
+      headers:
+        Set-Cookie:
+          $ref: ../../../components/headers/set-cookie-flow.yaml
+        Cache-Control:
+          $ref: ../../../components/headers/cache-control-private-no-store.yaml
       content:
         application/json:
           schema:
             $ref: ../../../components/flows/flow-response.yaml
+    '409':
+      description: |
+        The flow must be restarted: the provider's identity belongs to a
+        user the flow cannot continue with, or the flow's auth attempt
+        expired or was already handed off.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
     '404':
       description: Flow not found.
       content:

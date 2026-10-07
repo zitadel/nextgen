@@ -24,6 +24,14 @@
     "./server": {
       "types": "./src/server.ts",
       "import": "./src/server.ts"
+    },
+    "./vitest": {
+      "types": "./src/vitest.ts",
+      "import": "./src/vitest.ts"
+    },
+    "./vitest-browser": {
+      "types": "./src/vitest-browser.ts",
+      "import": "./src/vitest-browser.ts"
     }
   },
   "bin": {

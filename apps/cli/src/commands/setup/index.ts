@@ -45,7 +45,7 @@ import {
   nonBlankString,
 } from "../../lib/oclif";
 import { serverKind } from "../../lib/oclif/server-kind";
-import { readLocalAdmin } from "../../lib/local-server/admin-credential";
+import { findLocalAdminFor } from "../../lib/local-server/admin-credential";
 import { claimProjectAsAdmin } from "../../lib/local-server/claim-as-admin";
 import { readPlatformRuntime } from "../../lib/local-server/runtime";
 import { readZitadelSecret, writeZitadelSecret } from "../../lib/project";
@@ -138,7 +138,11 @@ export default class Setup extends BaseCommand {
     "<%= config.bin %> setup --framework react --dev-port 3000",
   ];
   static override flags = {
-    force: Flags.boolean({ char: "f", description: "Overwrite managed files that already exist." }),
+    force: Flags.boolean({
+      char: "f",
+      description:
+        "Overwrite managed files that already exist, and scaffold into a non-empty directory.",
+    }),
     framework: Flags.string({ description: "Framework to target.", options: FRAMEWORK_OPTIONS }),
     renderer: Flags.string({
       description: RENDERER_FLAG_DESCRIPTION,
@@ -219,13 +223,18 @@ export default class Setup extends BaseCommand {
         error.code === "E_FRAMEWORK_NOT_DETECTED"
       ) {
         const target = await inspectScaffoldTarget(cwd);
-        if (!target.scaffoldable) {
+        if (!target.scaffoldable && !force) {
           throw frameworkDetectionWithScaffoldTarget(error, cwd, target);
         }
-        consola.info("Fresh app directory — scaffolding a fresh project");
+        consola.info(
+          target.scaffoldable
+            ? "Fresh app directory — scaffolding a fresh project"
+            : "Non-empty directory with --force — scaffolding a fresh project",
+        );
         framework = await orca.scaffold(
           cwd,
           await resolveScaffoldFramework(flags.framework, nonInteractive, orca),
+          force,
         );
         scaffoldedFramework = true;
         consola.success(`Scaffolded ${framework.id} skeleton`);
@@ -544,7 +553,11 @@ export default class Setup extends BaseCommand {
     // `zitadel claim` has nothing left to do. Claiming an anonymous project
     // stays a cloud journey.
     let ownedByLocalAdmin: { email: string; team_id: string } | undefined;
-    if (!dryRun && serverKind.value(answers.server) === "local") {
+    let unattachedWarning: string | undefined;
+    const isLocal = serverKind.value(answers.server) === "local";
+    const hostsPlatform =
+      !dryRun && isLocal ? await localServerHostsPlatform(answers.server) : false;
+    if (hostsPlatform) {
       // The runtime document naming the platform project does not prove a
       // claim can complete (a deployment can pin that project without the
       // platform bootstrap, which leaves the admin without a personal team),
@@ -554,8 +567,15 @@ export default class Setup extends BaseCommand {
       // belongs inside the guard for the same reason — a malformed
       // `admin.json` must not fail a setup that already wrote the app.
       try {
-        const admin = await readLocalAdmin(cwd);
-        if (admin && (await localServerHostsPlatform(answers.server))) {
+        const admin = await findLocalAdminFor(cwd, answers.server);
+        if (!admin) {
+          // The console lists only projects the signed-in person can manage,
+          // so an unattached project is one the local admin never sees. A
+          // server started by hand has no local admin anywhere, hence the "if".
+          unattachedWarning = `No local admin for ${answers.server} in ${cwd} or its parents, so the project is not attached to a team and the local console will not list it. If \`zitadel start\` started this server, run setup from the directory it ran in, or one inside it.`;
+          consola.warn(unattachedWarning);
+        }
+        if (admin) {
           const owner = await claimProjectAsAdmin({
             serverUrl: answers.server,
             projectId: project.id,
@@ -585,13 +605,29 @@ export default class Setup extends BaseCommand {
     const nudgeClaim =
       !ownedByLocalAdmin &&
       (claimState({ secret: {}, server: answers.server }).kind === "detached" ||
-        (serverKind.value(answers.server) === "local" &&
-          (dryRun || (await localServerHostsPlatform(answers.server)))));
+        (isLocal && (dryRun || hostsPlatform)));
     const claimNudge = nudgeClaim
       ? {
           actions: [claimAction(this.meta.cliVersion, deadline)],
           boxActions: [claimBoxAction(this.meta.cliVersion, deadline)],
           commands: [claimCommand(this.meta.cliVersion)],
+        }
+      : { actions: [], boxActions: [], commands: [] };
+    // Only when the project is the local admin's: the console lists nothing
+    // else for them, so the command would open an empty console otherwise.
+    const consoleCommand = publicCliCommand("console", this.meta.cliVersion);
+    const consoleStep = ownedByLocalAdmin
+      ? {
+          actions: [
+            `Manage the project in the local console as ${ownedByLocalAdmin.email}: ${consoleCommand}`,
+          ],
+          boxActions: [
+            {
+              text: `Manage the project in the local console, signed in as ${ownedByLocalAdmin.email}:`,
+              command: consoleCommand,
+            },
+          ],
+          commands: [consoleCommand],
         }
       : { actions: [], boxActions: [], commands: [] };
     // The structured report is human-only. Under `--json` we let the
@@ -622,7 +658,11 @@ export default class Setup extends BaseCommand {
           [
             renderSummary(sections),
             "",
-            renderBoxActions([...installOutcome.boxActions, ...claimNudge.boxActions]),
+            renderBoxActions([
+              ...installOutcome.boxActions,
+              ...consoleStep.boxActions,
+              ...claimNudge.boxActions,
+            ]),
           ].join("\n"),
         ),
         style: { padding: 1, borderStyle: "rounded", borderColor: "green" },
@@ -636,6 +676,8 @@ export default class Setup extends BaseCommand {
       // renderer doesn't duplicate the summary on stdout. The JSON envelope
       // still carries the full structured payload.
       pretty: "",
+      // Already shown above through consola; this is the copy a JSON run gets.
+      warnings: unattachedWarning ? [unattachedWarning] : [],
       data: {
         title: "Zitadel is ready.",
         project: { project_id: project.id, issuer },
@@ -681,6 +723,7 @@ export default class Setup extends BaseCommand {
         next_actions: [
           ...installOutcome.nextActions,
           brandingGuidanceAction(this.meta.cliVersion),
+          ...consoleStep.actions,
           ...claimNudge.actions,
         ],
         // A JSON run prints no warnings, so a credential the project never
@@ -706,6 +749,7 @@ export default class Setup extends BaseCommand {
             this.meta.cliVersion,
           ),
           ...installOutcome.nextCommands,
+          ...consoleStep.commands,
           ...claimNudge.commands,
         ],
       },
@@ -720,11 +764,11 @@ function frameworkDetectionWithScaffoldTarget(
 ): ZitadelError {
   return new ZitadelError(
     error.code,
-    "Could not detect a supported app framework, and this directory is not a fresh scaffold target",
+    "Could not detect a supported app framework, and this directory is not empty",
     {
       hint:
         `${target.reason ?? "Directory is not empty."} ` +
-        "Run setup from an empty directory to scaffold a new app, or run setup from an existing supported app project.",
+        "Pass --force to scaffold into this non-empty directory, run setup from an empty directory, or run setup from an existing supported app project.",
       details: { cwd, entries: target.entries, reason: target.reason },
     },
   );

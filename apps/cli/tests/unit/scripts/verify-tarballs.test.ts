@@ -1,5 +1,5 @@
 import { execFile as execFileCallback } from "node:child_process";
-import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -54,11 +54,19 @@ describe("verify-tarballs script", () => {
       stderr: expect.stringContaining("contains non-executable bin/nextgen"),
     });
   });
+
+  it("rejects a @zitadel/cli tarball missing the agent skill bundle", async () => {
+    const tarballsDir = await fixtureTarballs({}, { omitCliSkill: true });
+
+    await expect(runVerify(tarballsDir)).rejects.toMatchObject({
+      stderr: expect.stringContaining("missing CLI agent skill files"),
+    });
+  });
 });
 
 async function fixtureTarballs(
   versionOverrides: Record<string, string> = {},
-  options: { nonExecutablePackage?: string } = {},
+  options: { nonExecutablePackage?: string; omitCliSkill?: boolean } = {},
 ): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "zitadel-verify-tarballs-"));
   tempDirs.push(root);
@@ -73,6 +81,7 @@ async function fixtureTarballs(
     const version = versionOverrides[manifest.name] ?? "0.1.0-alpha.5";
     await createTarball(tarballsDir, manifest.name, version, {
       executable: manifest.name !== options.nonExecutablePackage,
+      includeCliSkill: manifest.name === "@zitadel/cli" && options.omitCliSkill !== true,
     });
   }
 
@@ -90,11 +99,14 @@ async function createTarball(
   tarballsDir: string,
   name: string,
   version: string,
-  options: { executable: boolean },
+  options: { executable: boolean; includeCliSkill?: boolean },
 ): Promise<void> {
   const workDir = await mkdtemp(join(dirname(tarballsDir), "package-"));
   const packageDir = join(workDir, "package");
   await mkdir(packageDir);
+  if (options.includeCliSkill) {
+    await cp(join(repoRoot, "apps/cli/skills"), join(packageDir, "skills"), { recursive: true });
+  }
   const binaryPath = platformBinaryPath(name);
   await writeFile(
     join(packageDir, "package.json"),

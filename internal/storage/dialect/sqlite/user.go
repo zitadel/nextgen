@@ -255,6 +255,10 @@ func (us userStatements) ListUsers(ctx context.Context, filter *database.ListOpt
 				compiler.WriteArg(string(a.Key))
 				compiler.WriteString(" AND ua.value_hash = ")
 				compiler.WriteArg(hash[:])
+				if opts.UniqueTeamID != nil {
+					compiler.WriteString(" AND ua.team_id = ")
+					compiler.WriteArg(*opts.UniqueTeamID)
+				}
 				compiler.WriteString(")")
 				continue
 			}

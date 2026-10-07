@@ -267,6 +267,16 @@ func (s *flowService) Submit(ctx context.Context, req SubmitFlowRequest) (domain
 	if err != nil {
 		return domain.FlowStepResult{}, err
 	}
+	// A dead attempt fails every submission that reaches it, so the flow
+	// restarts here, as a render does. A handoff racing this read still ends
+	// in att.already_handed_off.
+	attempt, err := s.v2Pool.Statements().GetAuthAttemptByID(ctx, req.State.ProjectID, req.State.AuthAttemptID)
+	if err != nil {
+		return domain.FlowStepResult{}, fmt.Errorf("flow service: read auth attempt: %w", err)
+	}
+	if attempt.IsExpired() || attempt.IsHandedOff() {
+		return domain.FlowStepResult{}, domain.ErrFlowRestartRequired()
+	}
 	in := domain.FlowSubmitInput{
 		Action:            req.Action,
 		Fields:            req.Fields,
@@ -303,7 +313,13 @@ func (s *flowService) GetStep(ctx context.Context, req GetFlowStepRequest) (doma
 	if err != nil {
 		return domain.FlowStepResult{}, err
 	}
-	return domain.FlowStepResult{State: result.State, Step: result.Step}, nil
+	return domain.FlowStepResult{
+		State:                 result.State,
+		Step:                  result.Step,
+		HandoffToken:          result.HandoffToken,
+		HandoffTokenExpiresAt: result.HandoffTokenExpiresAt,
+		Reseal:                result.Reseal,
+	}, nil
 }
 
 func flowServesPurpose(def *domain.FlowDefinition, purpose domain.FlowDefinitionPurpose) bool {
