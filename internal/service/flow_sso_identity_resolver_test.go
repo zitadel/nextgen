@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"strings"
 	"testing"
 	"time"
 
@@ -40,6 +41,9 @@ const ssoResolverConnectionDocument = `{
 		"scopes": ["openid"]
 	}
 }`
+
+// ssoResolverCreationAllowedDocument is the same revision with creation allowed.
+var ssoResolverCreationAllowedDocument = strings.Replace(ssoResolverConnectionDocument, `"provisioning": {"creation": "disabled"},`, "", 1)
 
 // ssoUserSchema is the schema CreateLinked validates the claims against.
 const ssoUserSchema = `{
@@ -94,9 +98,9 @@ func (f *ssoResolverFixture) expectAttempt(attempt *domain.AuthAttempt) *service
 	return f.stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), ssoProjectID, ssoAttemptID).Return(attempt, nil)
 }
 
-func (f *ssoResolverFixture) expectRevision() {
+func (f *ssoResolverFixture) expectRevision(document string) {
 	f.connections.EXPECT().GetRevision(gomock.Any(), ssoProjectID, ssoRevisionID).
-		Return(&domain.IDPConnection{ProjectID: ssoProjectID, ID: "idp-1", RevisionID: ssoRevisionID, Document: []byte(ssoResolverConnectionDocument)}, nil)
+		Return(&domain.IDPConnection{ProjectID: ssoProjectID, ID: "idp-1", RevisionID: ssoRevisionID, Document: []byte(document)}, nil)
 }
 
 func (f *ssoResolverFixture) expectNoRevisionOrLinkRead() {
@@ -112,7 +116,7 @@ func (f *ssoResolverFixture) expectNoFactorWrites() {
 // expectParked wires the reads LoadParked makes up to the link lookup.
 func (f *ssoResolverFixture) expectParked(attempt *domain.AuthAttempt, link *domain.IDPIdentityLink, linkErr error) {
 	f.expectAttempt(attempt)
-	f.expectRevision()
+	f.expectRevision(ssoResolverConnectionDocument)
 	f.stmts.EXPECT().GetIDPIdentityLink(gomock.Any(), gomock.Any()).Return(link, linkErr)
 }
 
@@ -458,7 +462,7 @@ func TestFlowSSOIdentityResolver_LoadCollected_ReadsResolvedRow(t *testing.T) {
 	t.Parallel()
 	f := newSSOResolverFixture(t)
 	f.expectAttempt(parkedAttempt(parkedResult()))
-	f.expectRevision()
+	f.expectRevision(ssoResolverCreationAllowedDocument)
 	f.stmts.EXPECT().GetIDPIdentityLink(gomock.Any(), gomock.Any()).Times(0)
 
 	got, err := f.resolver.LoadCollected(t.Context(), collectedInput())
@@ -498,15 +502,31 @@ func TestFlowSSOIdentityResolver_LoadCollected_NothingToCollectIsNil(t *testing.
 	}
 }
 
-// A failed ceremony left nothing to create from, so the flow restarts.
-func TestFlowSSOIdentityResolver_LoadCollected_ErrorRowRestarts(t *testing.T) {
+// The step cannot create from the row, so the flow restarts.
+func TestFlowSSOIdentityResolver_LoadCollected_CannotCreateRestarts(t *testing.T) {
 	t.Parallel()
-	f := newSSOResolverFixture(t)
-	f.expectAttempt(parkedAttempt(&domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOCancelled}))
-	f.expectNoRevisionOrLinkRead()
+	for name, expect := range map[string]func(*ssoResolverFixture){
+		// A failed ceremony left nothing to create from.
+		"error row": func(f *ssoResolverFixture) {
+			f.expectAttempt(parkedAttempt(&domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOCancelled}))
+			f.expectNoRevisionOrLinkRead()
+		},
+		// A render with an older cookie resolved a row of a connection that
+		// refuses creation.
+		"creation disabled": func(f *ssoResolverFixture) {
+			f.expectAttempt(parkedAttempt(parkedResult()))
+			f.expectRevision(ssoResolverConnectionDocument)
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			f := newSSOResolverFixture(t)
+			expect(f)
 
-	_, err := f.resolver.LoadCollected(t.Context(), collectedInput())
-	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
+			_, err := f.resolver.LoadCollected(t.Context(), collectedInput())
+			require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
+		})
+	}
 }
 
 func TestFlowSSOIdentityResolver_BindLinked_WritesBothFactorsAndDeletes(t *testing.T) {

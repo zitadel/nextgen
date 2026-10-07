@@ -165,6 +165,16 @@ func (r *FlowSSOIdentityResolver) LoadCollected(ctx context.Context, in domain.F
 	if err != nil {
 		return nil, fmt.Errorf("load collected sso identity: read connection revision: %w", err)
 	}
+	parsed, err := idp.ParseConnection(connection.RevisionID, connection.Document)
+	if err != nil {
+		return nil, fmt.Errorf("load collected sso identity: parse connection revision: %w", err)
+	}
+	// The engine collects only where creation is allowed, but a render with an
+	// older cookie can resolve a newer row on this step. Its submit would
+	// create the user the connection refuses.
+	if parsed.CreationDisabled {
+		return nil, domain.ErrFlowRestartRequired()
+	}
 	return &domain.FlowSSOParkedIdentity{
 		CheckID:      check.ID,
 		ConnectionID: connection.ID,
