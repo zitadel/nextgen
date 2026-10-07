@@ -50,6 +50,7 @@ import {
 } from "../lib/oclif";
 import { listenersForPort, type TcpListener } from "../lib/prober/ports";
 import { publicCliCommand } from "../lib/public-cli";
+import { reportWarning } from "../lib/warnings";
 
 const START_TIMEOUT_MS = 90_000;
 
@@ -289,7 +290,7 @@ async function consoleLoginFor(
     return { signed_in_as: admin.email, sign_in_url: url };
   } catch (error) {
     const reason = toZitadelError(error);
-    consola.warn(`Could not create a console sign-in link: ${reason.message}`);
+    reportWarning(`Could not create a console sign-in link: ${reason.message}`);
     return { signed_in_as: admin.email, error: reason.message, hint: reason.hint };
   }
 }
@@ -389,7 +390,7 @@ function readyData(
       ...(console?.sign_in_url
         ? [`Console: you are ${console.signed_in_as}. Open ${console.sign_in_url} (works once).`]
         : []),
-      "From your app directory, run setup; the CLI will detect the framework or ask when needed.",
+      "Run setup in this directory or one inside it, so it finds this server's local admin; the CLI will detect the framework or ask when needed.",
       "Setup installs dependencies when needed; then start your app dev server.",
     ],
     next_commands: [

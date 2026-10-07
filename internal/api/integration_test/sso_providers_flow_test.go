@@ -49,8 +49,8 @@ func TestFlowStepRendersSSOProvidersFromConnection(t *testing.T) {
 		Zflow: mustExtractZflow(t, flowHeaders.SetCookie),
 	})
 	require.NoError(t, err)
-	require.IsType(t, &api.FlowResponse{}, stepResp, helpers.MustMarshal(t, stepResp))
-	require.Equal(t, []api.SSOProvider{{ID: "google", Name: "Google Workspace", Template: "google"}}, stepResp.(*api.FlowResponse).Step.SSOProviders,
+	require.IsType(t, &api.FlowResponseHeaders{}, stepResp, helpers.MustMarshal(t, stepResp))
+	require.Equal(t, []api.SSOProvider{{ID: "google", Name: "Google Workspace", Template: "google"}}, stepResp.(*api.FlowResponseHeaders).Response.Step.SSOProviders,
 		"every render reads the connection's newest revision")
 
 	getResp, err := f.client.GetFlowDefinition(t.Context(), api.GetFlowDefinitionParams{ID: definitionID})
@@ -75,8 +75,11 @@ func ssoLoginFlowDefinition(userSchema string) api.FlowDefinition {
 					{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
 				},
 				Transitions: api.NewOptFlowDefinitionStepTransitions(api.FlowDefinitionStepTransitions{
-					"submit":   api.FlowDefinitionStepTransitionsItem{Target: "done"},
-					"callback": api.FlowDefinitionStepTransitionsItem{Target: "done"},
+					"submit":            api.FlowDefinitionStepTransitionsItem{Target: "done"},
+					"sso_authenticated": api.FlowDefinitionStepTransitionsItem{Target: "done"},
+					// An SSO collision binds the owner only when the step
+					// routes this outcome; the owner then signs in here.
+					"user_already_exists": api.FlowDefinitionStepTransitionsItem{Target: "identifier"},
 				}),
 			},
 			{

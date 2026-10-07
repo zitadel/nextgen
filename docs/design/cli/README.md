@@ -45,7 +45,7 @@ Liquid templates are loaded as `.liquid` files referenced from branding, not as
 - *"Bootstrap a couple of admin users in staging."* → Planned imperative bootstrap surface (not yet in the registry), not a file in `.zitadel/`.
 - *"Map `groups` from my customer's runtime-created IdP into a role claim."* → Subordinate config follows the parent: the IdP was created via API, so its claim mapping lives in that API call. Dev-side flow actions can transform claims after the fact, but they don't live in `.zitadel/idps/`.
 
-The per-resource sections in [identity-surface.md](identity-surface.md) carry a *Scope* callout restating this for each kind. AI agents reading [apps/cli/SKILLS.md](../../../apps/cli/SKILLS.md) see the current invocation rules.
+The per-resource sections in [identity-surface.md](identity-surface.md) carry a *Scope* callout restating this for each kind. AI agents reading [apps/cli/skills/zitadel-cli/SKILL.md](../../../apps/cli/skills/zitadel-cli/SKILL.md) see the current invocation rules.
 
 ## Plan
 
@@ -66,4 +66,4 @@ The gap analysis against the product vision is tracked in [PLAN.md](PLAN.md). Or
 - [User Schema Integration](../flowengine/user-schema.md)
 - [Resource Commands](resource-commands.md) — the imperative `users` / `teams` / `sessions` / `events` / `grants` / `projects` surface and its conventions
 - [CLI source](../../../apps/cli)
-- [CLI agent guidance](../../../apps/cli/SKILLS.md)
+- [CLI agent guidance](../../../apps/cli/skills/zitadel-cli/SKILL.md)

@@ -450,8 +450,6 @@ an identifier. Login routes a missing user through `user_not_found` to
 > (#1030, see [capabilities.md](capabilities.md)); the callback route that
 > finishes the sign-in is #1032. The definition below validates against the
 > shipped schema; the runtime exchange shows both legs.
-> The example uses the `sso_authenticated` key from #1371; against the schema
-> on main before that PR merges, the key is still `callback`.
 
 **Flow Definition:**
 
