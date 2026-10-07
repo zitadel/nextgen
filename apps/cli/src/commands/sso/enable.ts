@@ -51,6 +51,7 @@ import {
 } from "../../lib/project";
 import { readState } from "../../lib/sync/state";
 import { readStdin } from "../../lib/variables";
+import { reportWarning } from "../../lib/warnings";
 
 /**
  * The `sso enable` command — add a provider to a Project's sign-in methods.
@@ -189,7 +190,7 @@ export default class SsoEnable extends BaseCommand {
       const publish = this.publisher(secretFile);
       if (clientIdFlag !== undefined) {
         if (idVariable === undefined) {
-          consola.warn(
+          reportWarning(
             `${plan.file.path} holds its client id directly, so nothing was published. ` +
               "Edit the file to change it.",
           );
@@ -204,7 +205,7 @@ export default class SsoEnable extends BaseCommand {
       const piped = nonInteractive ? await this.pipedSecret() : undefined;
       if (piped !== undefined) {
         if (variable === undefined) {
-          consola.warn(
+          reportWarning(
             `${plan.file.path} holds its client secret directly, so nothing was published. ` +
               "Replace it with a ${{ NAME }} reference so the secret is not committed.",
           );
@@ -238,7 +239,7 @@ export default class SsoEnable extends BaseCommand {
         // Said out loud: a connection pointing somewhere other than the
         // vendor is not what the developer will want in the end, and nothing
         // else in the output would show it.
-        consola.warn(`${entry.displayName} points at ${endpoints.issuer}, not the provider`);
+        reportWarning(`${entry.displayName} points at ${endpoints.issuer}, not the provider`);
       }
       const target = join(cwd, plan.path);
       await mkdir(dirname(target), { recursive: true });
@@ -266,7 +267,9 @@ export default class SsoEnable extends BaseCommand {
       consola.success(`Updated ${file}`);
     }
     for (const skipped of edits.skipped) {
-      consola.warn(`Left ${skipped.region} alone: it has been edited by hand. Update it yourself.`);
+      reportWarning(
+        `Left ${skipped.region} alone: it has been edited by hand. Update it yourself.`,
+      );
     }
     if (edits.written.length === 0 && edits.skipped.length === 0) {
       consola.info(`${schema.name} and its login flow already offer ${entry.displayName}`);

@@ -13,6 +13,7 @@ import type { PlanResourceChange } from "./plan-renderer.js";
 import { readState, removeFromState, updateState } from "./state.js";
 import { FatalFetchError } from "./types.js";
 import type { FlowRepin, ResourceEntry, ResourceSyncer, SyncAction } from "./types.js";
+import { reportWarning } from "../warnings";
 
 /**
  * Compute the sync plan for `cwd` against the state file and (when
@@ -269,7 +270,7 @@ export async function runSyncLoop(
   for (const action of actions) {
     if (action.kind === "create" || action.kind === "update" || action.kind === "revise") {
       for (const warning of action.warnings ?? []) {
-        consola.warn(`${action.path}: ${warning.message}`);
+        reportWarning(`${action.path}: ${warning.message}`);
       }
     }
   }
