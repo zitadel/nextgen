@@ -172,6 +172,7 @@ export function unsupportedSyntax(body) {
     const [command = "", ...args] = commandWords(words);
     const executable = command.split("/").pop();
     if (EVALUATORS.has(executable)) return `\`${executable}\``;
+    if (command.includes("$")) return "a variable in the command position";
     if (SHELLS.has(executable) && args.some((arg) => /^-[A-Za-z]*c[A-Za-z]*$/.test(arg))) {
       return `an inline \`${executable} -c\` script`;
     }
@@ -217,6 +218,9 @@ function simpleCommands(text) {
     } else if (char === "\\" && i + 1 < text.length) {
       if (text[i + 1] !== "\n") word = (word ?? "") + text[i + 1];
       i += 1;
+    } else if (char === "&" && (/[<>]/.test(text[i - 1] ?? "") || text[i + 1] === ">")) {
+      // Part of a redirection (`2>&1`, `<&3`, `&> log`), not a separator.
+      word = (word ?? "") + char;
     } else if ("\n;&|(){}".includes(char)) {
       endCommand();
     } else if (/\s/.test(char)) {
