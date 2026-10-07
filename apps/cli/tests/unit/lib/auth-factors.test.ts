@@ -237,6 +237,36 @@ describe("reachableSignInMethods", () => {
     expect(reachableSignInMethods(passkeyOnly, [passwordFlow])).toEqual([]);
   });
 
+  it("does not count a register-only flow that collects a password", () => {
+    const registerOnly = {
+      purposes: { register: "register" },
+      steps: [{ name: "register", fields: ["email", "x-auth-methods#password"] }],
+    };
+
+    expect(reachableSignInMethods(schema({ password: { enabled: true } }), [registerOnly])).toEqual(
+      [],
+    );
+  });
+
+  it("does not count register steps of a flow that also signs in", () => {
+    // The login journey offers passkey only; password is collected on the
+    // register side, which the login steps hand over to with a purpose flip.
+    const combined = {
+      purposes: { login: "start", register: "register" },
+      steps: [
+        {
+          name: "start",
+          actions: [{ name: "passkey", kind: "passkey" }],
+          transitions: { register: { target: "register", purpose: "register" } },
+        },
+        { name: "register", fields: ["x-auth-methods#password"] },
+      ],
+    };
+    const both = schema({ password: { enabled: true }, passkey: { enabled: true } });
+
+    expect(reachableSignInMethods(both, [combined])).toEqual(["passkey"]);
+  });
+
   it("does not count a flow that only registers passkeys", () => {
     const passkeyOnly = schema({ password: { enabled: false }, passkey: { enabled: true } });
     const registerOnly = {
@@ -248,14 +278,20 @@ describe("reachableSignInMethods", () => {
 
   it("does not count SSO for a provider the schema does not enable", () => {
     const sso = schema({ sso: { enabled: true, providers: ["google"] } });
-    const githubFlow = { steps: [{ name: "identifier", sso_providers: ["github"] }] };
+    const githubFlow = {
+      purposes: { login: "identifier" },
+      steps: [{ name: "identifier", sso_providers: ["github"] }],
+    };
 
     expect(reachableSignInMethods(sso, [githubFlow])).toEqual([]);
   });
 
   it("counts SSO on a step that names a provider", () => {
     const sso = schema({ sso: { enabled: true, providers: ["google"] } });
-    const ssoFlow = { steps: [{ name: "identifier", sso_providers: ["google"] }] };
+    const ssoFlow = {
+      purposes: { login: "identifier" },
+      steps: [{ name: "identifier", sso_providers: ["google"] }],
+    };
 
     expect(reachableSignInMethods(sso, [ssoFlow])).toEqual(["sso"]);
   });

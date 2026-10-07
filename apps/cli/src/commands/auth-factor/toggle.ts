@@ -104,7 +104,13 @@ export abstract class AuthFactorCommand extends BaseCommand {
     if (lastFactor && !force) {
       // ADR 064 §10: a terminal asks; a script or a dry run needs --force.
       if (nonInteractive || dryRun) {
-        refuseLastFactor(schema, factors, cwdArgs, cliVersion);
+        // A dry run's suggestions stay previews: following one must not write.
+        refuseLastFactor(
+          schema,
+          factors,
+          [...cwdArgs, ...(dryRun ? ["--dry-run"] : [])],
+          cliVersion,
+        );
       }
       const answer = await confirm({
         message: `Disable ${change.changed.join(", ")} anyway? Nobody will be able to sign in to ${schema.name}.`,

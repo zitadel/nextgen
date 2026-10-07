@@ -83,6 +83,16 @@ function suggested(command: string): string {
   return command.replace(/^.*? auth-factor /, "").replace(/--cwd \S+/, "--cwd <cwd>");
 }
 
+/** A schema whose only enabled factor is passkey. */
+function passkeyOnlySchema() {
+  return {
+    "default-human-user": {
+      ...passwordSchema(),
+      "x-auth-methods": { password: { enabled: false }, passkey: { enabled: true } },
+    },
+  };
+}
+
 async function readSchema(cwd: string, name = "default-human-user") {
   return JSON.parse(await readFile(join(cwd, `.zitadel/schemas/${name}.json`), "utf8")) as {
     "x-auth-methods": Record<string, { enabled: boolean }>;
@@ -570,6 +580,19 @@ describe("auth-factor", () => {
       const { envelope } = await run(cwd, "enable", "--mode", "password");
 
       expect(envelope).toMatchObject({ code: "E_VALIDATION", details: { factor: "password" } });
+    });
+
+    it("keeps --dry-run in the suggestions of a refused dry run", async () => {
+      const cwd = await makeProject(passkeyOnlySchema(), {});
+
+      const { envelope } = await run(cwd, "disable", "--mode", "passkey", "--dry-run");
+
+      expect(envelope.details).toMatchObject({
+        retry_args: expect.arrayContaining(["--dry-run", "--force"]),
+      });
+      for (const command of envelope.next_commands ?? []) {
+        expect(command).toContain("--dry-run");
+      }
     });
 
     it("refuses under --dry-run too", async () => {

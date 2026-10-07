@@ -175,8 +175,12 @@ export function reachableSignInMethods(
   schema: Record<string, unknown>,
   activeFlows: readonly Record<string, unknown>[],
 ): string[] {
+  // Only the login journey signs anyone in: a register-only flow, or the
+  // register steps of a combined one, can collect a password or offer a
+  // passkey without letting an existing user back in.
+  const loginFlows = activeFlows.map(loginJourney);
   return usableSignInMethods(schema).filter((method) =>
-    activeFlows.some((flow) =>
+    loginFlows.some((flow) =>
       method === "sso"
         ? offersSso(flow, enabledProviders(schema))
         : method === "passkey"
@@ -184,6 +188,40 @@ export function reachableSignInMethods(
           : flowOffers(flow, method as AuthFactor),
     ),
   );
+}
+
+/**
+ * The flow cut down to the steps reachable from its `login` entry, following
+ * transitions that stay in the login purpose. No `login` purpose means no
+ * steps: such a flow signs nobody in.
+ */
+function loginJourney(flow: Record<string, unknown>): Record<string, unknown> {
+  const purposes = isObject(flow.purposes) ? flow.purposes : {};
+  const entry = purposes.login;
+  const byName = new Map(steps(flow).map((step) => [step.name, step]));
+  const reached = new Set<string>();
+  const queue = typeof entry === "string" ? [entry] : [];
+  while (queue.length > 0) {
+    const name = queue.shift() as string;
+    const step = byName.get(name);
+    if (reached.has(name) || step === undefined) {
+      continue;
+    }
+    reached.add(name);
+    const transitions = isObject(step.transitions) ? Object.values(step.transitions) : [];
+    for (const transition of transitions) {
+      // A transition into another purpose (register, say) leaves the login
+      // journey, so its target is not a sign-in step.
+      if (
+        isObject(transition) &&
+        typeof transition.target === "string" &&
+        (transition.purpose === undefined || transition.purpose === "login")
+      ) {
+        queue.push(transition.target);
+      }
+    }
+  }
+  return { ...flow, steps: steps(flow).filter((step) => reached.has(step.name as string)) };
 }
 
 function steps(flow: Record<string, unknown>): Record<string, unknown>[] {
