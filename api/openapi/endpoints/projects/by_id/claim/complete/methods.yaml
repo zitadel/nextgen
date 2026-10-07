@@ -59,6 +59,10 @@ post:
             not necessarily the team.
           * `inactive` — the membership is suspended.
           * `pending` — an invitation the user has not accepted yet.
+
+        `auth.csrf_invalid` is the third code: the request came from another
+        site, or did not carry the session's `X-Zitadel-CSRF` token (see the
+        `nextgenSession` scheme). It is refused before the claim is looked at.
       content:
         application/json:
           schema:
@@ -68,11 +72,13 @@ post:
             oneOf:
               - $ref: ../../../../../components/schemas/errors/claim-no_personal_team.yaml
               - $ref: ../../../../../components/schemas/errors/claim-personal_team_not_active.yaml
+              - $ref: ../../../../../components/schemas/errors/auth-csrf_invalid.yaml
             discriminator:
               propertyName: code
               mapping:
                 claim.no_personal_team: ../../../../../components/schemas/errors/claim-no_personal_team.yaml
                 claim.personal_team_not_active: ../../../../../components/schemas/errors/claim-personal_team_not_active.yaml
+                auth.csrf_invalid: ../../../../../components/schemas/errors/auth-csrf_invalid.yaml
     '404':
       description: Challenge not found.
       content:

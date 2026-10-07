@@ -621,8 +621,13 @@ describe("setup command", () => {
       http.post(`${local}/projects/:projectId/claim/init`, () =>
         HttpResponse.json({ challenge_id: "claim_ch_1" }, { status: 201 }),
       ),
-      http.post(`${local}/projects/:projectId/claim/complete`, () =>
-        HttpResponse.json({ team_id: "team_localadmin", claimed_at: "2027-01-01T00:00:00Z" }),
+      http.get(`${local}/sessions/me/csrf`, () => HttpResponse.json({ csrf_token: "csrf_admin" })),
+      // A cookie-authenticated write: refused without the session's CSRF
+      // token, as the server does (ADR 053 §5).
+      http.post(`${local}/projects/:projectId/claim/complete`, ({ request }) =>
+        request.headers.get("x-zitadel-csrf") === "csrf_admin"
+          ? HttpResponse.json({ team_id: "team_localadmin", claimed_at: "2027-01-01T00:00:00Z" })
+          : HttpResponse.json({ code: "auth.csrf_invalid", message: "no" }, { status: 403 }),
       ),
     );
 

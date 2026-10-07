@@ -97,6 +97,17 @@ boundary drops the session cache and redirects to `/login?next=…` instead of
 rendering dead-end copy (the hook ADR 0002 §3 anticipated). `403` stays a
 rendered state — signed in, but no access.
 
+> **Amendment (2026-10-05, #1300):** a page belongs to one person. The first
+> session the page reads names that person for the life of the document, and
+> nothing changes it in place: a session that now belongs to someone else —
+> another tab signed in, or a sign-in on this page after a sign-out — is
+> never adopted, wherever it is noticed (the guard, the 401 boundary's fresh
+> read, or a refused write's re-check, ADR 0002 §3). The page reloads once
+> instead, and the new document starts as whoever is signed in then. A
+> session that is gone drops the cached session, its CSRF token and the reads
+> cached for it, but keeps the person, so the same person signing in again
+> carries on without a reload.
+
 ### 4. The cookie is the embedded Console's human credential
 
 The HttpOnly `__nextgen_session` cookie authenticates the human on same-origin
@@ -153,7 +164,9 @@ does not change.
   Console ADR 0004 and root ADR 053 keep those scopes distinct.
 - **Fail-closed session probe.** Any `fetchSession` failure (including a
   backend outage) reads as "not signed in" and lands on the login screen,
-  where the outage surfaces as a widget error.
+  where the outage surfaces as a widget error. A session that belongs to
+  someone else is not a failure: `fetchSession` never answers for it, and the
+  page reloads (§3).
 
 ## Consequences
 
