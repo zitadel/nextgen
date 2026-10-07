@@ -10,6 +10,7 @@ import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankArg } from "../l
 import { readZitadelSecret } from "../lib/project";
 import { publicCliCommand } from "../lib/public-cli";
 import { makeSyncers, type ResourceSyncer, updateState, writeBackResource } from "../lib/sync";
+import { reportWarning } from "../lib/warnings";
 
 /** A syncer that can serve a pull: it knows how to find and read a revision. */
 type PullableSyncer = ResourceSyncer & {
@@ -154,14 +155,13 @@ export default class Pull extends BaseCommand {
     const safeId = escapeControlCharacters(id);
 
     for (const warning of warnings) {
-      consola.warn(escapeControlCharacters(warning));
+      reportWarning(escapeControlCharacters(warning));
     }
 
     if (dryRun) {
       consola.success(`Would write ${relPath}`);
       return this.emit({
         status: "ok",
-        warnings,
         // The follow-up is the same pull without --dry-run; the handle is a
         // validated single segment, so it needs no quoting.
         data: {
@@ -210,7 +210,6 @@ export default class Pull extends BaseCommand {
 
     return this.emit({
       status: "ok",
-      warnings,
       // Only suggest plan when the pull was recorded: without a state file plan
       // cannot run, so advertising it would hand the caller a failing command.
       data: {

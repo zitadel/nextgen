@@ -959,14 +959,24 @@ describe("newestRevision", () => {
         });
       }),
     );
-    const [schema] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
+    const [schema] = makeSyncers({
+      client,
+      projectId: "proj-1",
+      env: {},
+      cwd: "/tmp/zitadel-sync-test",
+    });
 
     expect(await schema.newestRevision?.("human-user")).toBe("sch_new");
   });
 
   it("returns null when a schema handle names nothing", async () => {
     server.use(http.get(`${BASE}/schemas`, () => HttpResponse.json({ schemas: [] })));
-    const [schema] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
+    const [schema] = makeSyncers({
+      client,
+      projectId: "proj-1",
+      env: {},
+      cwd: "/tmp/zitadel-sync-test",
+    });
 
     expect(await schema.newestRevision?.("absent")).toBeNull();
   });
@@ -982,7 +992,12 @@ describe("newestRevision", () => {
         });
       }),
     );
-    const [, , flow] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
+    const [, , flow] = makeSyncers({
+      client,
+      projectId: "proj-1",
+      env: {},
+      cwd: "/tmp/zitadel-sync-test",
+    });
 
     expect(await flow.newestRevision?.("login")).toBe("flowdef_new");
   });
@@ -1003,7 +1018,12 @@ describe("newestRevision", () => {
 describe("localise", () => {
   /** Localise a flow body against a fresh registry, failing if the flow syncer cannot. */
   const localiseFlow = (body: object): Promise<{ body: object; warnings: string[] }> => {
-    const syncers = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
+    const syncers = makeSyncers({
+      client,
+      projectId: "proj-1",
+      env: {},
+      cwd: "/tmp/zitadel-sync-test",
+    });
     const flow = syncers.find((syncer) => syncer.kind === "flow");
     if (flow?.localise === undefined) {
       throw new Error("the flow syncer should localise");
@@ -1015,7 +1035,11 @@ describe("localise", () => {
     server.use(
       http.get(`${BASE}/schemas/:id`, ({ params }) => {
         expect(params.id).toBe("sch_abc");
-        return HttpResponse.json({ id: "sch_abc", schema: { objectType: "human-user" }, metadata: {} });
+        return HttpResponse.json({
+          id: "sch_abc",
+          schema: { objectType: "human-user" },
+          metadata: {},
+        });
       }),
     );
 
@@ -1071,7 +1095,12 @@ describe("localise", () => {
   });
 
   it("writes a schema body verbatim — a schema references nothing", () => {
-    const [schema] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
+    const [schema] = makeSyncers({
+      client,
+      projectId: "proj-1",
+      env: {},
+      cwd: "/tmp/zitadel-sync-test",
+    });
 
     expect(schema.localise).toBeUndefined();
   });
@@ -1084,7 +1113,8 @@ describe("localise", () => {
  * (ids, URLs, `${VAR}`) are sent unchanged, with no schema lookup.
  */
 describe("FlowDefinitionSyncer.create resolves user_schema", () => {
-  const sync = () => makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
+  const sync = () =>
+    makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
 
   it("sends the resolved id on the wire but keeps the handle in the written body", async () => {
     let posted: { user_schema?: string } = {};

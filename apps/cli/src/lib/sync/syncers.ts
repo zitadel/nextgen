@@ -443,7 +443,9 @@ class FlowDefinitionSyncer implements ResourceSyncer {
     const result = (await this.client.createFlowDefinition({
       project_id: this.projectId,
       schema_uri: DEFAULT_FLOW_SCHEMA_URI,
-      flow_definition: (await this.withResolvedSchema(data)) as CreateFlowDefinitionBodyFlowDefinition,
+      flow_definition: (await this.withResolvedSchema(
+        data,
+      )) as CreateFlowDefinitionBodyFlowDefinition,
     })) as CreateFlowDefinition201;
     // The resolved id was only for the wire. The server echoes it back in
     // `user_schema`, and the loop writes the canonical body to disk — so put

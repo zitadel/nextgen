@@ -12,7 +12,10 @@ const platform = usePlatformMock();
 async function aFreshCheckoutOf(project: ScaffoldedApp): Promise<ScaffoldedApp> {
   const checkout = await anApp();
   await checkout.writeLocalSecret("placeholder");
-  await checkout.writeProjectFile(".zitadel/secret", await project.readProjectFile(".zitadel/secret"));
+  await checkout.writeProjectFile(
+    ".zitadel/secret",
+    await project.readProjectFile(".zitadel/secret"),
+  );
   return checkout;
 }
 

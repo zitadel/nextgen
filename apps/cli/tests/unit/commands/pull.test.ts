@@ -110,7 +110,9 @@ describe("pull command", () => {
     const res = await pull(cwd, base, ["flow", "login"]);
 
     expect(res.exitCode).toBe(0);
-    const json = parseJson(res.stdout) as { data: { kind: string; handle: string; id: string; path: string } };
+    const json = parseJson(res.stdout) as {
+      data: { kind: string; handle: string; id: string; path: string };
+    };
     expect(json.data).toMatchObject({
       kind: "flow",
       handle: "login",
