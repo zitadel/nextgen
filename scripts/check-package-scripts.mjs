@@ -161,6 +161,12 @@ function substitutions(text) {
 
 const EVALUATORS = new Set(["eval", "source", ".", "trap"]);
 
+/** Commands that run another command; a script runs its tool directly. */
+const COMMAND_RUNNERS = new Set([
+  "timeout", "xargs", "nice", "ionice", "stdbuf", "sudo", "doas", "setsid", "flock",
+  "taskset", "chronic", "unbuffer", "parallel", "watch", "caffeinate", "script",
+]);
+
 /**
  * Shell constructs a single-step script has no use for, and that would let a
  * nested package manager hide from the checks above: command substitution,
@@ -172,6 +178,7 @@ export function unsupportedSyntax(body) {
     const [command = "", ...args] = commandWords(words);
     const executable = command.split("/").pop();
     if (EVALUATORS.has(executable)) return `\`${executable}\``;
+    if (COMMAND_RUNNERS.has(executable)) return `the command wrapper \`${executable}\``;
     if (command.includes("$")) return "a variable in the command position";
     if (SHELLS.has(executable) && args.some((arg) => /^-[A-Za-z]*c[A-Za-z]*$/.test(arg))) {
       return `an inline \`${executable} -c\` script`;

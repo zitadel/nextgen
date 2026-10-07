@@ -162,6 +162,10 @@ describe("package-script contract", () => {
     ['PM=pnpm; "$PM" run test', "a variable in the command position"],
     ["$TOOL run build", "a variable in the command position"],
     ["trap 'pnpm run test' EXIT", "`trap`"],
+    ["timeout 30s pnpm run test", "the command wrapper `timeout`"],
+    ["timeout 5 vitest run", "the command wrapper `timeout`"],
+    ["xargs -n1 pnpm add < deps.txt", "the command wrapper `xargs`"],
+    ["nice -n 10 npm run build", "the command wrapper `nice`"],
   ])("rejects unsupported syntax in %s", (body, reason) => {
     expect(unsupportedSyntax(body)).toBe(reason);
   });
